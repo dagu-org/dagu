@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -19,11 +19,11 @@ func TestWriter(t *testing.T) {
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
 		dag := th.DAG("test_write_status")
 		dagRunID := uuid.Must(uuid.NewV7()).String()
-		status := models.NewStatusBuilder(dag.DAG).Create(dagRunID, scheduler.StatusRunning, 1, time.Now())
+		dagRunStatus := models.NewStatusBuilder(dag.DAG).Create(dagRunID, status.StatusRunning, 1, time.Now())
 		writer := dag.Writer(t, dagRunID, time.Now())
-		writer.Write(t, status)
+		writer.Write(t, dagRunStatus)
 
-		writer.AssertContent(t, "test_write_status", dagRunID, scheduler.StatusRunning)
+		writer.AssertContent(t, "test_write_status", dagRunID, status.StatusRunning)
 	})
 
 	t.Run("WriteStatusToExistingFile", func(t *testing.T) {
@@ -33,12 +33,12 @@ func TestWriter(t *testing.T) {
 
 		writer := dag.Writer(t, dagRunID, startedAt)
 
-		status := models.NewStatusBuilder(dag.DAG).Create(dagRunID, scheduler.StatusCancel, 1, time.Now())
+		dagRunStatus := models.NewStatusBuilder(dag.DAG).Create(dagRunID, status.StatusCancel, 1, time.Now())
 
 		// Write initial status
-		writer.Write(t, status)
+		writer.Write(t, dagRunStatus)
 		writer.Close(t)
-		writer.AssertContent(t, "test_append_to_existing", dagRunID, scheduler.StatusCancel)
+		writer.AssertContent(t, "test_append_to_existing", dagRunID, status.StatusCancel)
 
 		// Append to existing file
 		dataRoot := NewDataRoot(th.TmpDir, dag.Name)
@@ -55,12 +55,12 @@ func TestWriter(t *testing.T) {
 		}()
 
 		// Append new status
-		status.Status = scheduler.StatusSuccess
-		err = latestRun.Write(th.Context, status)
+		dagRunStatus.Status = status.StatusSuccess
+		err = latestRun.Write(th.Context, dagRunStatus)
 		require.NoError(t, err)
 
 		// Verify appended data
-		writer.AssertContent(t, "test_append_to_existing", dagRunID, scheduler.StatusSuccess)
+		writer.AssertContent(t, "test_append_to_existing", dagRunID, status.StatusSuccess)
 	})
 }
 
@@ -80,8 +80,8 @@ func TestWriterErrorHandling(t *testing.T) {
 
 		dag := th.DAG("test_write_to_closed_writer")
 		dagRunID := uuid.Must(uuid.NewV7()).String()
-		status := models.NewStatusBuilder(dag.DAG).Create(dagRunID, scheduler.StatusRunning, 1, time.Now())
-		assert.Error(t, writer.write(status))
+		dagRunStatus := models.NewStatusBuilder(dag.DAG).Create(dagRunID, status.StatusRunning, 1, time.Now())
+		assert.Error(t, writer.write(dagRunStatus))
 	})
 
 	t.Run("CloseMultipleTimes", func(t *testing.T) {
@@ -99,8 +99,8 @@ func TestWriterRename(t *testing.T) {
 	dag := th.DAG("test_rename_old")
 	writer := dag.Writer(t, "dag-run-id-1", time.Now())
 	dagRunID := uuid.Must(uuid.NewV7()).String()
-	status := models.NewStatusBuilder(dag.DAG).Create(dagRunID, scheduler.StatusRunning, 1, time.Now())
-	writer.Write(t, status)
+	dagRunStatus := models.NewStatusBuilder(dag.DAG).Create(dagRunID, status.StatusRunning, 1, time.Now())
+	writer.Write(t, dagRunStatus)
 	writer.Close(t)
 	require.FileExists(t, writer.FilePath)
 

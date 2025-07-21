@@ -17,49 +17,12 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
-
-type Status int
-
-const (
-	StatusNone Status = iota
-	StatusRunning
-	StatusError
-	StatusCancel
-	StatusSuccess
-	StatusQueued
-	StatusPartialSuccess
-)
-
-func (s Status) String() string {
-	switch s {
-	case StatusRunning:
-		return "running"
-	case StatusError:
-		return "failed"
-	case StatusCancel:
-		return "canceled"
-	case StatusSuccess:
-		return "finished"
-	case StatusQueued:
-		return "queued"
-	case StatusPartialSuccess:
-		return "partial success"
-	case StatusNone:
-		fallthrough
-	default:
-		return "not started"
-	}
-}
-
-// IsActive checks if the status is active.
-func (s Status) IsActive() bool {
-	return s == StatusRunning || s == StatusQueued
-}
 
 var (
 	ErrUpstreamFailed  = fmt.Errorf("upstream failed")
@@ -163,7 +126,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 	NodesIteration:
 		for _, node := range graph.nodes {
-			if node.State().Status != NodeStatusNone || !isReady(ctx, graph, node) {
+			if node.State().Status != status.NodeStatusNone || !isReady(ctx, graph, node) {
 				continue NodesIteration
 			}
 			if sc.isCanceled() {
@@ -176,7 +139,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 			wg.Add(1)
 
 			logger.Info(ctx, "Step started", "step", node.Name())
-			node.SetStatus(NodeStatusRunning)
+			node.SetStatus(status.NodeStatusRunning)
 			if progressCh != nil {
 				progressCh <- node
 			}
@@ -243,7 +206,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 						continue ExecRepeat
 					}
 
-					if node.State().Status != NodeStatusCancel {
+					if node.State().Status != status.NodeStatusCancel {
 						node.IncDoneCount()
 					}
 
@@ -263,13 +226,13 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 				// If node is still in running state by now, it means it was not canceled
 				// and it has completed its execution without errors.
-				if node.State().Status == NodeStatusRunning {
-					node.SetStatus(NodeStatusSuccess)
+				if node.State().Status == status.NodeStatusRunning {
+					node.SetStatus(status.NodeStatusSuccess)
 				}
 
 				if err := sc.teardownNode(ctx, node); err != nil {
 					sc.setLastError(err)
-					node.SetStatus(NodeStatusError)
+					node.SetStatus(status.NodeStatusError)
 				}
 
 				if progressCh != nil {
@@ -290,21 +253,21 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 	var eventHandlers []digraph.HandlerType
 	switch sc.Status(ctx, graph) {
-	case StatusSuccess:
+	case status.StatusSuccess:
 		eventHandlers = append(eventHandlers, digraph.HandlerOnSuccess)
 
-	case StatusPartialSuccess:
+	case status.StatusPartialSuccess:
 		// PartialSuccess is treated as success since primary work was completed
 		// despite some non-critical failures that were allowed to continue
 		eventHandlers = append(eventHandlers, digraph.HandlerOnSuccess)
 
-	case StatusError:
+	case status.StatusError:
 		eventHandlers = append(eventHandlers, digraph.HandlerOnFailure)
 
-	case StatusCancel:
+	case status.StatusCancel:
 		eventHandlers = append(eventHandlers, digraph.HandlerOnCancel)
 
-	case StatusNone, StatusRunning, StatusQueued:
+	case status.StatusNone, status.StatusRunning, status.StatusQueued:
 		// These states should not occur at this point
 		logger.Warn(ctx, "Unexpected final status",
 			"status", sc.Status(ctx, graph).String(),
@@ -476,26 +439,26 @@ func (sc *Scheduler) Cancel(ctx context.Context, g *ExecutionGraph) {
 }
 
 // Status returns the status of the scheduler.
-func (sc *Scheduler) Status(ctx context.Context, g *ExecutionGraph) Status {
+func (sc *Scheduler) Status(ctx context.Context, g *ExecutionGraph) status.Status {
 	if sc.isCanceled() && !sc.isSucceed(g) {
-		return StatusCancel
+		return status.StatusCancel
 	}
 	if !g.IsStarted() {
-		return StatusNone
+		return status.StatusNone
 	}
 	if g.IsRunning() {
-		return StatusRunning
+		return status.StatusRunning
 	}
 
 	if sc.isPartialSuccess(ctx, g) {
-		return StatusPartialSuccess
+		return status.StatusPartialSuccess
 	}
 
 	if sc.isError() {
-		return StatusError
+		return status.StatusError
 	}
 
-	return StatusSuccess
+	return status.StatusSuccess
 }
 
 func (sc *Scheduler) isError() bool {
@@ -525,34 +488,34 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 		dep := g.nodeByID[dep]
 
 		switch dep.State().Status {
-		case NodeStatusSuccess:
+		case status.NodeStatusSuccess:
 			continue
 
-		case NodeStatusError:
+		case status.NodeStatusError:
 			if dep.ShouldContinue(ctx) {
 				continue
 			}
 			ready = false
-			node.SetStatus(NodeStatusCancel)
+			node.SetStatus(status.NodeStatusCancel)
 			node.SetError(ErrUpstreamFailed)
 
-		case NodeStatusSkipped:
+		case status.NodeStatusSkipped:
 			if dep.ShouldContinue(ctx) {
 				continue
 			}
 			ready = false
-			node.SetStatus(NodeStatusSkipped)
+			node.SetStatus(status.NodeStatusSkipped)
 			node.SetError(ErrUpstreamSkipped)
 
-		case NodeStatusCancel:
+		case status.NodeStatusCancel:
 			ready = false
-			node.SetStatus(NodeStatusCancel)
+			node.SetStatus(status.NodeStatusCancel)
 
-		case NodeStatusPartialSuccess:
+		case status.NodeStatusPartialSuccess:
 			// Partial success is treated like success for dependencies
 			continue
 
-		case NodeStatusNone, NodeStatusRunning:
+		case status.NodeStatusNone, status.NodeStatusRunning:
 			ready = false
 
 		default:
@@ -566,11 +529,11 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 func (sc *Scheduler) runEventHandler(ctx context.Context, graph *ExecutionGraph, node *Node) error {
 	defer node.Finish()
 
-	node.SetStatus(NodeStatusRunning)
+	node.SetStatus(status.NodeStatusRunning)
 
 	if !sc.dry {
 		if err := node.Setup(ctx, sc.logDir, sc.dagRunID); err != nil {
-			node.SetStatus(NodeStatusError)
+			node.SetStatus(status.NodeStatusError)
 			return nil
 		}
 
@@ -580,13 +543,13 @@ func (sc *Scheduler) runEventHandler(ctx context.Context, graph *ExecutionGraph,
 
 		ctx = sc.setupEnvironEventHandler(ctx, graph, node)
 		if err := node.Execute(ctx); err != nil {
-			node.SetStatus(NodeStatusError)
+			node.SetStatus(status.NodeStatusError)
 			return err
 		}
 
-		node.SetStatus(NodeStatusSuccess)
+		node.SetStatus(status.NodeStatusSuccess)
 	} else {
-		node.SetStatus(NodeStatusSuccess)
+		node.SetStatus(status.NodeStatusSuccess)
 	}
 
 	return nil
@@ -643,7 +606,7 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 	defer sc.mu.RUnlock()
 	for _, node := range g.nodes {
 		nodeStatus := node.State().Status
-		if nodeStatus == NodeStatusSuccess || nodeStatus == NodeStatusSkipped || nodeStatus == NodeStatusPartialSuccess {
+		if nodeStatus == status.NodeStatusSuccess || nodeStatus == status.NodeStatusSkipped || nodeStatus == status.NodeStatusPartialSuccess {
 			continue
 		}
 		return false
@@ -663,7 +626,7 @@ func (sc *Scheduler) isPartialSuccess(ctx context.Context, g *ExecutionGraph) bo
 	// First pass: check if any failed node is NOT allowed to continue
 	// If so, this is an error, not partial success
 	for _, node := range g.nodes {
-		if node.State().Status == NodeStatusError {
+		if node.State().Status == status.NodeStatusError {
 			if !node.ShouldContinue(ctx) {
 				// Found a failed node that was NOT allowed to continue
 				// This disqualifies the DAG from being partial success
@@ -675,17 +638,17 @@ func (sc *Scheduler) isPartialSuccess(ctx context.Context, g *ExecutionGraph) bo
 	// Second pass: check for partial success conditions
 	for _, node := range g.nodes {
 		switch node.State().Status {
-		case NodeStatusSuccess:
+		case status.NodeStatusSuccess:
 			hasSuccessfulNodes = true
-		case NodeStatusError:
+		case status.NodeStatusError:
 			if node.ShouldContinue(ctx) && !node.ShouldMarkSuccess(ctx) {
 				hasFailuresWithContinueOn = true
 			}
-		case NodeStatusPartialSuccess:
+		case status.NodeStatusPartialSuccess:
 			// Partial success at node level contributes to overall partial success
 			hasFailuresWithContinueOn = true
 			hasSuccessfulNodes = true
-		case NodeStatusNone, NodeStatusRunning, NodeStatusCancel, NodeStatusSkipped:
+		case status.NodeStatusNone, status.NodeStatusRunning, status.NodeStatusCancel, status.NodeStatusSkipped:
 			// These statuses don't affect partial success determination, but are needed for linter
 		}
 	}
@@ -757,7 +720,7 @@ func (sc *Scheduler) shouldRetryNode(ctx context.Context, node *Node, execErr er
 
 	if !shouldRetry {
 		// finish the node with error
-		node.SetStatus(NodeStatusError)
+		node.SetStatus(status.NodeStatusError)
 		node.MarkError(execErr)
 		sc.setLastError(execErr)
 		return false
@@ -775,7 +738,7 @@ func (sc *Scheduler) shouldRetryNode(ctx context.Context, node *Node, execErr er
 	)
 	time.Sleep(interval)
 	node.SetRetriedAt(time.Now())
-	node.SetStatus(NodeStatusRunning)
+	node.SetStatus(status.NodeStatusRunning)
 	return true
 }
 
@@ -805,17 +768,17 @@ func (sc *Scheduler) finishNode(node *Node, wg *sync.WaitGroup) {
 	defer sc.mu.Unlock()
 
 	switch node.State().Status {
-	case NodeStatusSuccess:
+	case status.NodeStatusSuccess:
 		sc.metrics.completedNodes++
-	case NodeStatusError:
+	case status.NodeStatusError:
 		sc.metrics.failedNodes++
-	case NodeStatusSkipped:
+	case status.NodeStatusSkipped:
 		sc.metrics.skippedNodes++
-	case NodeStatusCancel:
+	case status.NodeStatusCancel:
 		sc.metrics.canceledNodes++
-	case NodeStatusPartialSuccess:
+	case status.NodeStatusPartialSuccess:
 		sc.metrics.completedNodes++ // Count partial success as completed
-	case NodeStatusNone, NodeStatusRunning:
+	case status.NodeStatusNone, status.NodeStatusRunning:
 		// Should not happen at this point
 	}
 
@@ -828,7 +791,7 @@ func meetsPreconditions(ctx context.Context, node *Node, progressCh chan *Node) 
 	err := node.evalPreconditions(ctx)
 	if err != nil {
 		// Precondition not met, skip the node
-		node.SetStatus(NodeStatusSkipped)
+		node.SetStatus(status.NodeStatusSkipped)
 		if !errors.Is(err, ErrConditionNotMet) {
 			node.SetError(err)
 		}
@@ -847,14 +810,14 @@ func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, graph *Execut
 		return false // no error, nothing to handle
 	}
 
-	status := node.State().Status
+	s := node.State().Status
 	switch {
-	case status == NodeStatusSuccess || status == NodeStatusCancel || status == NodeStatusPartialSuccess:
+	case s == status.NodeStatusSuccess || s == status.NodeStatusCancel || s == status.NodeStatusPartialSuccess:
 		// do nothing
 
 	case sc.isTimeout(graph.startedAt):
 		logger.Info(ctx, "Step deadline exceeded", "step", node.Name(), "error", execErr)
-		node.SetStatus(NodeStatusCancel)
+		node.SetStatus(status.NodeStatusCancel)
 		sc.setLastError(execErr)
 
 	case sc.isCanceled():
@@ -867,11 +830,11 @@ func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, graph *Execut
 
 	default:
 		// node execution error is unexpected and unrecoverable
-		node.SetStatus(NodeStatusError)
+		node.SetStatus(status.NodeStatusError)
 		if node.ShouldMarkSuccess(ctx) {
 			// mark as success if the node should be force marked as success
 			// i.e. continueOn.markSuccess is set to true
-			node.SetStatus(NodeStatusSuccess)
+			node.SetStatus(status.NodeStatusSuccess)
 		} else {
 			node.MarkError(execErr)
 			sc.setLastError(execErr)
@@ -941,7 +904,7 @@ func (sc *Scheduler) shouldRepeatNode(ctx context.Context, node *Node, execErr e
 func (sc *Scheduler) prepareNodeForRepeat(ctx context.Context, node *Node, progressCh chan *Node) {
 	step := node.Step()
 
-	node.SetStatus(NodeStatusRunning) // reset status to running for the repeat
+	node.SetStatus(status.NodeStatusRunning) // reset status to running for the repeat
 	if sc.lastError == node.Error() {
 		sc.setLastError(nil) // clear last error if we are repeating
 	}

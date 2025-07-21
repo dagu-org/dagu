@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -45,10 +46,10 @@ func TestNode(t *testing.T) {
 			node.Signal(node.Context, syscall.SIGTERM, false)
 		}()
 
-		node.SetStatus(scheduler.NodeStatusRunning)
+		node.SetStatus(status.NodeStatusRunning)
 
 		node.ExecuteFail(t, "signal: terminated")
-		require.Equal(t, scheduler.NodeStatusCancel.String(), node.State().Status.String())
+		require.Equal(t, status.NodeStatusCancel.String(), node.State().Status.String())
 	})
 	t.Run("SignalOnStop", func(t *testing.T) {
 		t.Parallel()
@@ -59,10 +60,10 @@ func TestNode(t *testing.T) {
 			node.Signal(node.Context, syscall.SIGTERM, true) // allow override signal
 		}()
 
-		node.SetStatus(scheduler.NodeStatusRunning)
+		node.SetStatus(status.NodeStatusRunning)
 
 		node.ExecuteFail(t, "signal: interrupt")
-		require.Equal(t, scheduler.NodeStatusCancel.String(), node.State().Status.String())
+		require.Equal(t, status.NodeStatusCancel.String(), node.State().Status.String())
 	})
 	t.Run("LogOutput", func(t *testing.T) {
 		t.Parallel()
@@ -196,13 +197,13 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		nodeStatus         scheduler.NodeStatus
+		nodeStatus         status.NodeStatus
 		continueOnSettings digraph.ContinueOn
 		expectMarkSuccess  bool
 	}{
 		{
 			name:       "success status",
-			nodeStatus: scheduler.NodeStatusSuccess,
+			nodeStatus: status.NodeStatusSuccess,
 			continueOnSettings: digraph.ContinueOn{
 				MarkSuccess: true,
 			},
@@ -210,7 +211,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 		},
 		{
 			name:       "error with continue on failure and mark success",
-			nodeStatus: scheduler.NodeStatusError,
+			nodeStatus: status.NodeStatusError,
 			continueOnSettings: digraph.ContinueOn{
 				Failure:     true,
 				MarkSuccess: true,
@@ -219,7 +220,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 		},
 		{
 			name:       "error with continue on failure but no mark success",
-			nodeStatus: scheduler.NodeStatusError,
+			nodeStatus: status.NodeStatusError,
 			continueOnSettings: digraph.ContinueOn{
 				Failure:     true,
 				MarkSuccess: false,
@@ -228,7 +229,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 		},
 		{
 			name:       "skipped with continue on skipped and mark success",
-			nodeStatus: scheduler.NodeStatusSkipped,
+			nodeStatus: status.NodeStatusSkipped,
 			continueOnSettings: digraph.ContinueOn{
 				Skipped:     true,
 				MarkSuccess: true,
@@ -737,13 +738,13 @@ func TestNodeCancel(t *testing.T) {
 	}
 
 	node := scheduler.NewNode(step, scheduler.NodeState{})
-	node.SetStatus(scheduler.NodeStatusRunning)
+	node.SetStatus(status.NodeStatusRunning)
 
 	// Cancel the node
 	node.Cancel(ctx)
 
 	// Check status changed to cancel
-	assert.Equal(t, scheduler.NodeStatusCancel, node.NodeData().State.Status)
+	assert.Equal(t, status.NodeStatusCancel, node.NodeData().State.Status)
 }
 
 func TestNodeSetupContextBeforeExec(t *testing.T) {
@@ -895,7 +896,7 @@ func TestNodeShouldContinue(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		nodeStatus         scheduler.NodeStatus
+		nodeStatus         status.NodeStatus
 		exitCode           int
 		continueOnSettings digraph.ContinueOn
 		setupOutput        func(t *testing.T, node *scheduler.Node)
@@ -903,7 +904,7 @@ func TestNodeShouldContinue(t *testing.T) {
 	}{
 		{
 			name:       "continue on failure",
-			nodeStatus: scheduler.NodeStatusError,
+			nodeStatus: status.NodeStatusError,
 			exitCode:   1,
 			continueOnSettings: digraph.ContinueOn{
 				Failure: true,
@@ -912,7 +913,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "continue on specific exit code",
-			nodeStatus: scheduler.NodeStatusError,
+			nodeStatus: status.NodeStatusError,
 			exitCode:   42,
 			continueOnSettings: digraph.ContinueOn{
 				ExitCode: []int{42, 43},
@@ -921,7 +922,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "don't continue on non-matching exit code",
-			nodeStatus: scheduler.NodeStatusError,
+			nodeStatus: status.NodeStatusError,
 			exitCode:   44,
 			continueOnSettings: digraph.ContinueOn{
 				ExitCode: []int{42, 43},
@@ -930,7 +931,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "continue on skipped",
-			nodeStatus: scheduler.NodeStatusSkipped,
+			nodeStatus: status.NodeStatusSkipped,
 			continueOnSettings: digraph.ContinueOn{
 				Skipped: true,
 			},
@@ -938,13 +939,13 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:               "success always continues",
-			nodeStatus:         scheduler.NodeStatusSuccess,
+			nodeStatus:         status.NodeStatusSuccess,
 			continueOnSettings: digraph.ContinueOn{},
 			expectContinue:     true,
 		},
 		{
 			name:       "cancel never continues",
-			nodeStatus: scheduler.NodeStatusCancel,
+			nodeStatus: status.NodeStatusCancel,
 			continueOnSettings: digraph.ContinueOn{
 				Failure: true,
 				Skipped: true,
@@ -953,7 +954,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "continue on output match",
-			nodeStatus: scheduler.NodeStatusError,
+			nodeStatus: status.NodeStatusError,
 			continueOnSettings: digraph.ContinueOn{
 				Output: []string{"WARNING"},
 			},
@@ -972,7 +973,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "continue on regex output match",
-			nodeStatus: scheduler.NodeStatusError,
+			nodeStatus: status.NodeStatusError,
 			continueOnSettings: digraph.ContinueOn{
 				Output: []string{"re:.*timeout.*"},
 			},

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
@@ -30,7 +30,7 @@ type StatusResponse struct {
 type Status struct {
 	RequestID  string           `json:"RequestId"`
 	Name       string           `json:"Name"`
-	Status     scheduler.Status `json:"Status"`
+	Status     status.Status `json:"Status"`
 	StatusText string           `json:"StatusText"`
 	PID        PID              `json:"Pid"`
 	Nodes      []*Node          `json:"Nodes"`
@@ -46,8 +46,8 @@ type Status struct {
 }
 
 func (st *Status) CorrectRunningStatus() {
-	if st.Status == scheduler.StatusRunning {
-		st.Status = scheduler.StatusError
+	if st.Status == status.StatusRunning {
+		st.Status = status.StatusError
 		st.StatusText = st.Status.String()
 	}
 }

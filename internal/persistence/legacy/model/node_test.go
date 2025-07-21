@@ -7,6 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/persistence/legacy/model"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/stretchr/testify/assert"
@@ -33,8 +34,8 @@ func TestFromSteps(t *testing.T) {
 	assert.Equal(t, "step2", nodes[1].Step.Name)
 	assert.Equal(t, "-", nodes[0].StartedAt)
 	assert.Equal(t, "-", nodes[0].FinishedAt)
-	assert.Equal(t, scheduler.NodeStatusNone, nodes[0].Status)
-	assert.Equal(t, scheduler.NodeStatusNone.String(), nodes[0].StatusText)
+	assert.Equal(t, status.NodeStatusNone, nodes[0].Status)
+	assert.Equal(t, status.NodeStatusNone.String(), nodes[0].StatusText)
 }
 
 func TestFromNodes(t *testing.T) {
@@ -49,7 +50,7 @@ func TestFromNodes(t *testing.T) {
 				Command: "echo hello",
 			},
 			State: scheduler.NodeState{
-				Status:     scheduler.NodeStatusSuccess,
+				Status:     status.NodeStatusSuccess,
 				Stdout:     "/tmp/step1.log",
 				StartedAt:  now,
 				FinishedAt: later,
@@ -64,7 +65,7 @@ func TestFromNodes(t *testing.T) {
 				Command: "false",
 			},
 			State: scheduler.NodeState{
-				Status:     scheduler.NodeStatusError,
+				Status:     status.NodeStatusError,
 				Stdout:     "/tmp/step2.log",
 				StartedAt:  now,
 				FinishedAt: later,
@@ -80,8 +81,8 @@ func TestFromNodes(t *testing.T) {
 	// Check first node
 	assert.Equal(t, "step1", nodes[0].Step.Name)
 	assert.Equal(t, "/tmp/step1.log", nodes[0].Log)
-	assert.Equal(t, scheduler.NodeStatusSuccess, nodes[0].Status)
-	assert.Equal(t, scheduler.NodeStatusSuccess.String(), nodes[0].StatusText)
+	assert.Equal(t, status.NodeStatusSuccess, nodes[0].Status)
+	assert.Equal(t, status.NodeStatusSuccess.String(), nodes[0].StatusText)
 	assert.Equal(t, stringutil.FormatTime(now), nodes[0].StartedAt)
 	assert.Equal(t, stringutil.FormatTime(later), nodes[0].FinishedAt)
 	assert.Equal(t, stringutil.FormatTime(retryTime), nodes[0].RetriedAt)
@@ -91,7 +92,7 @@ func TestFromNodes(t *testing.T) {
 
 	// Check second node
 	assert.Equal(t, "step2", nodes[1].Step.Name)
-	assert.Equal(t, scheduler.NodeStatusError, nodes[1].Status)
+	assert.Equal(t, status.NodeStatusError, nodes[1].Status)
 	assert.Equal(t, "command failed", nodes[1].Error)
 }
 
@@ -107,7 +108,7 @@ func TestFromNode(t *testing.T) {
 			Dir:         "/tmp",
 		},
 		State: scheduler.NodeState{
-			Status:     scheduler.NodeStatusSuccess,
+			Status:     status.NodeStatusSuccess,
 			Stdout:     "/tmp/test.log",
 			StartedAt:  now,
 			FinishedAt: later,
@@ -122,8 +123,8 @@ func TestFromNode(t *testing.T) {
 	assert.Equal(t, "test-step", node.Step.Name)
 	assert.Equal(t, "echo test", node.Step.Command)
 	assert.Equal(t, "/tmp/test.log", node.Log)
-	assert.Equal(t, scheduler.NodeStatusSuccess, node.Status)
-	assert.Equal(t, scheduler.NodeStatusSuccess.String(), node.StatusText)
+	assert.Equal(t, status.NodeStatusSuccess, node.Status)
+	assert.Equal(t, status.NodeStatusSuccess.String(), node.StatusText)
 	assert.Equal(t, stringutil.FormatTime(now), node.StartedAt)
 	assert.Equal(t, stringutil.FormatTime(later), node.FinishedAt)
 	assert.Equal(t, 1, node.RetryCount)
@@ -145,8 +146,8 @@ func TestNewNode(t *testing.T) {
 	assert.Equal(t, step, node.Step)
 	assert.Equal(t, "-", node.StartedAt)
 	assert.Equal(t, "-", node.FinishedAt)
-	assert.Equal(t, scheduler.NodeStatusNone, node.Status)
-	assert.Equal(t, scheduler.NodeStatusNone.String(), node.StatusText)
+	assert.Equal(t, status.NodeStatusNone, node.Status)
+	assert.Equal(t, status.NodeStatusNone.String(), node.StatusText)
 	assert.Empty(t, node.Log)
 	assert.Empty(t, node.Error)
 	assert.Empty(t, node.RetriedAt)
@@ -167,8 +168,8 @@ func TestNodeToNode(t *testing.T) {
 		Log:        "/var/log/step.log",
 		StartedAt:  stringutil.FormatTime(now),
 		FinishedAt: stringutil.FormatTime(later),
-		Status:     scheduler.NodeStatusSuccess,
-		StatusText: scheduler.NodeStatusSuccess.String(),
+		Status:     status.NodeStatusSuccess,
+		StatusText: status.NodeStatusSuccess.String(),
 		RetriedAt:  stringutil.FormatTime(retryTime),
 		RetryCount: 3,
 		DoneCount:  4,
@@ -209,8 +210,8 @@ func TestNodeToNodeWithEmptyTimes(t *testing.T) {
 		StartedAt:  "-",
 		FinishedAt: "-",
 		RetriedAt:  "",
-		Status:     scheduler.NodeStatusNone,
-		StatusText: scheduler.NodeStatusNone.String(),
+		Status:     status.NodeStatusNone,
+		StatusText: status.NodeStatusNone.String(),
 	}
 
 	schedulerNode := modelNode.ToNode()
@@ -227,8 +228,8 @@ func TestNodeToNodeWithInvalidTimeFormat(t *testing.T) {
 		},
 		StartedAt:  "invalid-time-format",
 		FinishedAt: "2024-13-45 25:61:70", // Invalid date/time
-		Status:     scheduler.NodeStatusError,
-		StatusText: scheduler.NodeStatusError.String(),
+		Status:     status.NodeStatusError,
+		StatusText: status.NodeStatusError.String(),
 	}
 
 	schedulerNode := modelNode.ToNode()
@@ -317,13 +318,13 @@ func TestErrText(t *testing.T) {
 }
 
 func TestNodeWithAllStatuses(t *testing.T) {
-	statuses := []scheduler.NodeStatus{
-		scheduler.NodeStatusNone,
-		scheduler.NodeStatusRunning,
-		scheduler.NodeStatusError,
-		scheduler.NodeStatusCancel,
-		scheduler.NodeStatusSuccess,
-		scheduler.NodeStatusSkipped,
+	statuses := []status.NodeStatus{
+		status.NodeStatusNone,
+		status.NodeStatusRunning,
+		status.NodeStatusError,
+		status.NodeStatusCancel,
+		status.NodeStatusSuccess,
+		status.NodeStatusSkipped,
 	}
 
 	for _, status := range statuses {
@@ -356,7 +357,7 @@ func TestFromNodesPreservesOrder(t *testing.T) {
 				Name: string(rune('A' + i)),
 			},
 			State: scheduler.NodeState{
-				Status: scheduler.NodeStatusSuccess,
+				Status: status.NodeStatusSuccess,
 			},
 		})
 	}

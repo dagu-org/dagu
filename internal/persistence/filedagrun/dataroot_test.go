@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
@@ -162,7 +162,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 			status := models.DAGRunStatus{
 				Name:     "test-dag",
 				DAGRunID: dagRunTest.dagRunID,
-				Status:   scheduler.StatusSuccess,
+				Status:   status.StatusSuccess,
 			}
 			require.NoError(t, attempt.Write(root.Context, status))
 			require.NoError(t, attempt.Close(root.Context))
@@ -208,7 +208,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 			status := models.DAGRunStatus{
 				Name:     "test-dag",
 				DAGRunID: dagRunTest.dagRunID,
-				Status:   scheduler.StatusSuccess,
+				Status:   status.StatusSuccess,
 			}
 			require.NoError(t, attempt.Write(root.Context, status))
 			require.NoError(t, attempt.Close(root.Context))
@@ -254,7 +254,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 			status := models.DAGRunStatus{
 				Name:     "test-dag",
 				DAGRunID: dagRunTest.dagRunID,
-				Status:   scheduler.StatusSuccess,
+				Status:   status.StatusSuccess,
 			}
 			require.NoError(t, attempt.Write(root.Context, status))
 			require.NoError(t, attempt.Close(root.Context))

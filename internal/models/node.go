@@ -6,6 +6,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
@@ -16,7 +17,7 @@ type Node struct {
 	Stderr           string               `json:"stderr"` // standard error log file path
 	StartedAt        string               `json:"startedAt"`
 	FinishedAt       string               `json:"finishedAt"`
-	Status           scheduler.NodeStatus `json:"status"`
+	Status           status.NodeStatus `json:"status"`
 	RetriedAt        string               `json:"retriedAt,omitempty"`
 	RetryCount       int                  `json:"retryCount,omitempty"`
 	DoneCount        int                  `json:"doneCount,omitempty"`
@@ -82,7 +83,7 @@ func newNodeFromStep(step digraph.Step) *Node {
 		Step:       step,
 		StartedAt:  "-",
 		FinishedAt: "-",
-		Status:     scheduler.NodeStatusNone,
+		Status:     status.NodeStatusNone,
 	}
 }
 

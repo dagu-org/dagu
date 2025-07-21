@@ -20,6 +20,7 @@ import (
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/models"
@@ -494,9 +495,9 @@ func (a *Agent) Status(ctx context.Context) models.DAGRunStatus {
 	defer a.lock.RUnlock()
 
 	schedulerStatus := a.scheduler.Status(ctx, a.graph)
-	if schedulerStatus == scheduler.StatusNone && a.graph.IsStarted() {
+	if schedulerStatus == status.StatusNone && a.graph.IsStarted() {
 		// Match the status to the execution graph.
-		schedulerStatus = scheduler.StatusRunning
+		schedulerStatus = status.StatusRunning
 	}
 
 	opts := []models.StatusOption{
@@ -568,9 +569,9 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 		switch {
 		case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
 			// Return the current status of the dag-run.
-			status := a.Status(ctx)
-			status.Status = scheduler.StatusRunning
-			statusJSON, err := json.Marshal(status)
+			dagStatus := a.Status(ctx)
+			dagStatus.Status = status.StatusRunning
+			statusJSON, err := json.Marshal(dagStatus)
 			if err != nil {
 				encodeError(w, err)
 				return
@@ -909,11 +910,11 @@ func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, ro
 	}
 
 	return &dagRunStatus{
-		status:   status.Status,
-		outputs:  outputVariables,
-		name:     status.Name,
-		dagRunID: status.DAGRunID,
-		params:   status.Params,
+		runStatus: status.Status,
+		outputs:   outputVariables,
+		name:      status.Name,
+		dagRunID:  status.DAGRunID,
+		params:    status.Params,
 	}, nil
 }
 
@@ -929,7 +930,7 @@ type dagRunStatus struct {
 	// Outputs is the outputs of the dag-run.
 	outputs map[string]string
 	// Status is the execution status of the dag-run.
-	status scheduler.Status
+	runStatus status.Status
 }
 
 // Outputs implements digraph.RunStatus.
@@ -942,8 +943,8 @@ func (d *dagRunStatus) Outputs() map[string]string {
 
 // Success implements digraph.RunStatus.
 func (d *dagRunStatus) Success() bool {
-	switch d.status {
-	case scheduler.StatusSuccess, scheduler.StatusPartialSuccess:
+	switch d.runStatus {
+	case status.StatusSuccess, status.StatusPartialSuccess:
 		return true
 	default:
 		return false
@@ -952,7 +953,7 @@ func (d *dagRunStatus) Success() bool {
 
 // StatusLabel implements digraph.RunStatus.
 func (d *dagRunStatus) StatusLabel() string {
-	return d.status.String()
+	return d.runStatus.String()
 }
 
 // MarshalJSON implements json.Marshaler.
@@ -962,12 +963,12 @@ func (d *dagRunStatus) MarshalJSON() ([]byte, error) {
 		DAGRunID string            `json:"dagRunId,omitempty"`
 		Params   string            `json:"params,omitempty"`
 		Outputs  map[string]string `json:"outputs,omitempty"`
-		Status   scheduler.Status  `json:"status"`
+		Status   status.Status     `json:"status"`
 	}{
 		Name:     d.name,
 		DAGRunID: d.dagRunID,
 		Params:   d.params,
 		Outputs:  d.Outputs(),
-		Status:   d.status,
+		Status:   d.runStatus,
 	})
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
@@ -25,7 +26,7 @@ func NewStatusBuilder(dag *digraph.DAG) *StatusBuilder {
 func InitialStatus(dag *digraph.DAG) DAGRunStatus {
 	return DAGRunStatus{
 		Name:          dag.Name,
-		Status:        scheduler.StatusNone,
+		Status:        status.StatusNone,
 		PID:           PID(0),
 		Nodes:         NodesFromSteps(dag.Steps),
 		OnExit:        nodeOrNil(dag.HandlerOn.Exit),
@@ -142,7 +143,7 @@ func WithPreconditions(conditions []*digraph.Condition) StatusOption {
 // Create builds a Status object for a dag-run with the specified parameters
 func (f *StatusBuilder) Create(
 	dagRunID string,
-	status scheduler.Status,
+	status status.Status,
 	pid int,
 	startedAt time.Time,
 	opts ...StatusOption,
@@ -178,7 +179,7 @@ type DAGRunStatus struct {
 	Name          string               `json:"name"`
 	DAGRunID      string               `json:"dagRunId"`
 	AttemptID     string               `json:"attemptId"`
-	Status        scheduler.Status     `json:"status"`
+	Status        status.Status     `json:"status"`
 	PID           PID                  `json:"pid,omitempty"`
 	Nodes         []*Node              `json:"nodes,omitempty"`
 	OnExit        *Node                `json:"onExit,omitempty"`

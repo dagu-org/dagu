@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/stringutil"
@@ -159,33 +160,33 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 
 	continueOn := n.ContinueOn()
 
-	status := n.Status()
-	switch status {
-	case NodeStatusSuccess:
+	s := n.Status()
+	switch s {
+	case status.NodeStatusSuccess:
 		return true
 
-	case NodeStatusError:
+	case status.NodeStatusError:
 		if continueOn.Failure {
 			return true
 		}
-	case NodeStatusCancel:
+	case status.NodeStatusCancel:
 		return false
 
-	case NodeStatusSkipped:
+	case status.NodeStatusSkipped:
 		if continueOn.Skipped {
 			return true
 		}
 
-	case NodeStatusPartialSuccess:
+	case status.NodeStatusPartialSuccess:
 		// Partial success is treated like success for continue on
 		return true
 
-	case NodeStatusNone:
+	case status.NodeStatusNone:
 		fallthrough
 
-	case NodeStatusRunning:
+	case status.NodeStatusRunning:
 		// Unexpected state
-		logger.Error(ctx, "Unexpected node status", "status", status.String())
+		logger.Error(ctx, "Unexpected node status", "status", s.String())
 		return false
 
 	}
@@ -480,8 +481,8 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	status := n.Status()
-	if status == NodeStatusRunning && n.cmd != nil {
+	s := n.Status()
+	if s == status.NodeStatusRunning && n.cmd != nil {
 		sigsig := sig
 		if allowOverride && n.SignalOnStop() != "" {
 			sigsig = syscall.Signal(digraph.GetSignalNum(n.SignalOnStop()))
@@ -491,17 +492,17 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 			logger.Error(ctx, "Failed to send signal", "err", err, "step", n.Name())
 		}
 	}
-	if status == NodeStatusRunning {
-		n.SetStatus(NodeStatusCancel)
+	if s == status.NodeStatusRunning {
+		n.SetStatus(status.NodeStatusCancel)
 	}
 }
 
 func (n *Node) Cancel(ctx context.Context) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	status := n.Status()
-	if status == NodeStatusRunning {
-		n.SetStatus(NodeStatusCancel)
+	s := n.Status()
+	if s == status.NodeStatusRunning {
+		n.SetStatus(status.NodeStatusCancel)
 	}
 	if n.cancelFunc != nil {
 		logger.Info(ctx, "Canceling node", "step", n.Name())

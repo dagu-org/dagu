@@ -15,7 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	dagstatus "github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/samber/lo"
@@ -225,17 +225,17 @@ func (a *API) readHistoryData(
 	defaultHistoryLimit := 30
 	statuses := a.dagRunManager.ListRecentStatus(ctx, dag.Name, defaultHistoryLimit)
 
-	data := map[string][]scheduler.NodeStatus{}
+	data := map[string][]dagstatus.NodeStatus{}
 
 	addStatusFn := func(
-		data map[string][]scheduler.NodeStatus,
+		data map[string][]dagstatus.NodeStatus,
 		logLen int,
 		logIdx int,
 		nodeName string,
-		status scheduler.NodeStatus,
+		status dagstatus.NodeStatus,
 	) {
 		if _, ok := data[nodeName]; !ok {
-			data[nodeName] = make([]scheduler.NodeStatus, logLen)
+			data[nodeName] = make([]dagstatus.NodeStatus, logLen)
 		}
 		data[nodeName][logIdx] = status
 	}
@@ -262,7 +262,7 @@ func (a *API) readHistoryData(
 		return strings.Compare(grid[i].Name, grid[j].Name) <= 0
 	})
 
-	handlers := map[string][]scheduler.NodeStatus{}
+	handlers := map[string][]dagstatus.NodeStatus{}
 	for idx, log := range statuses {
 		if n := log.OnSuccess; n != nil {
 			addStatusFn(handlers, len(statuses), idx, n.Step.Name, n.Status)
@@ -532,7 +532,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, err
 		}
 
-		if status.Status == scheduler.StatusRunning {
+		if status.Status == dagstatus.StatusRunning {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeAlreadyRunning,
@@ -569,7 +569,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, err
 		}
 
-		if status.Status != scheduler.StatusRunning {
+		if status.Status != dagstatus.StatusRunning {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeNotRunning,
@@ -612,7 +612,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, err
 		}
 
-		if status.Status == scheduler.StatusRunning {
+		if status.Status == dagstatus.StatusRunning {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeBadRequest,
@@ -633,9 +633,9 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "step is required for mark-success action",
 			}
 		}
-		toStatus := scheduler.NodeStatusSuccess
+		toStatus := dagstatus.NodeStatusSuccess
 		if action == api.DAGActionMarkFailed {
-			toStatus = scheduler.NodeStatusError
+			toStatus = dagstatus.NodeStatusError
 		}
 
 		if err := a.updateStatus(ctx, *request.Body.RequestId, *request.Body.Step, dag, toStatus); err != nil {
@@ -711,14 +711,14 @@ func (a *API) updateStatus(
 	dagRunID string,
 	step string,
 	dag *digraph.DAG,
-	to scheduler.NodeStatus,
+	to dagstatus.NodeStatus,
 ) error {
 	status, err := a.dagRunManager.GetCurrentStatus(ctx, dag, dagRunID)
 	if err != nil {
 		return fmt.Errorf("error getting status: %w", err)
 	}
 
-	if status.Status == scheduler.StatusRunning {
+	if status.Status == dagstatus.StatusRunning {
 		return &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,

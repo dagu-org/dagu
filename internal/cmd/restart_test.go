@@ -6,7 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +24,7 @@ func TestRestartCommand(t *testing.T) {
 		}()
 
 		// Wait for the DAG to be running.
-		dag.AssertCurrentStatus(t, scheduler.StatusRunning)
+		dag.AssertCurrentStatus(t, status.StatusRunning)
 
 		// Restart the DAG.
 		done := make(chan struct{})
@@ -36,7 +36,7 @@ func TestRestartCommand(t *testing.T) {
 		}()
 
 		// Wait for the dag-run running again.
-		dag.AssertCurrentStatus(t, scheduler.StatusRunning)
+		dag.AssertCurrentStatus(t, status.StatusRunning)
 
 		time.Sleep(time.Millisecond * 300) // Wait a bit (need to investigate why this is needed).
 
@@ -44,7 +44,7 @@ func TestRestartCommand(t *testing.T) {
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{Args: []string{"stop", dag.Location}})
 
 		// Wait for the DAG is stopped.
-		dag.AssertCurrentStatus(t, scheduler.StatusNone)
+		dag.AssertCurrentStatus(t, status.StatusNone)
 
 		// Check parameter was the same as the first execution
 		loaded, err := digraph.Load(th.Context, dag.Location, digraph.WithBaseConfig(th.Config.Paths.BaseConfig))

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 )
 
 // Errors related to dag-run management
@@ -51,7 +51,7 @@ type ListDAGRunStatusesOptions struct {
 	ExactName string
 	From      TimeInUTC
 	To        TimeInUTC
-	Statuses  []scheduler.Status
+	Statuses  []status.Status
 	Limit     int
 }
 
@@ -73,7 +73,7 @@ func WithTo(to TimeInUTC) ListDAGRunStatusesOption {
 }
 
 // WithStatuses sets the statuses for listing dag-runs
-func WithStatuses(statuses []scheduler.Status) ListDAGRunStatusesOption {
+func WithStatuses(statuses []status.Status) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.Statuses = statuses
 	}

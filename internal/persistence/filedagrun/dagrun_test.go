@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,17 +23,17 @@ func TestDAGRun(t *testing.T) {
 		ts2 := models.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
 		ts3 := models.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
 
-		_ = run.WriteStatus(t, ts1, scheduler.StatusRunning)
-		_ = run.WriteStatus(t, ts2, scheduler.StatusSuccess)
-		_ = run.WriteStatus(t, ts3, scheduler.StatusError)
+		_ = run.WriteStatus(t, ts1, status.StatusRunning)
+		_ = run.WriteStatus(t, ts2, status.StatusSuccess)
+		_ = run.WriteStatus(t, ts3, status.StatusError)
 
 		latestRun, err := run.LatestAttempt(run.Context, nil)
 		require.NoError(t, err)
 
-		status, err := latestRun.ReadStatus(run.Context)
+		dagRunStatus, err := latestRun.ReadStatus(run.Context)
 		require.NoError(t, err)
 
-		require.Equal(t, scheduler.StatusError.String(), status.Status.String())
+		require.Equal(t, status.StatusError.String(), dagRunStatus.Status.String())
 	})
 }
 
@@ -43,13 +43,13 @@ type DAGRunTest struct {
 	TB testing.TB
 }
 
-func (dr DAGRunTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s scheduler.Status) *Attempt {
+func (dr DAGRunTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s status.Status) *Attempt {
 	t.Helper()
 
 	dag := &digraph.DAG{Name: "test-dag"}
-	status := models.InitialStatus(dag)
-	status.DAGRunID = "test-id-1"
-	status.Status = s
+	dagRunStatus := models.InitialStatus(dag)
+	dagRunStatus.DAGRunID = "test-id-1"
+	dagRunStatus.Status = s
 
 	run, err := dr.CreateAttempt(dr.Context, ts, nil)
 	require.NoError(t, err)
@@ -60,7 +60,7 @@ func (dr DAGRunTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s scheduler.
 		_ = run.Close(dr.Context)
 	}()
 
-	err = run.Write(dr.Context, status)
+	err = run.Write(dr.Context, dagRunStatus)
 	require.NoError(t, err)
 
 	return run
@@ -129,8 +129,8 @@ func TestDAGRunListRuns(t *testing.T) {
 		// Create additional runs
 		ts1 := models.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
 		ts2 := models.NewUTC(time.Date(2021, 1, 2, 12, 0, 0, 0, time.UTC))
-		run.WriteStatus(t, ts1, scheduler.StatusSuccess)
-		run.WriteStatus(t, ts2, scheduler.StatusError)
+		run.WriteStatus(t, ts1, status.StatusSuccess)
+		run.WriteStatus(t, ts2, status.StatusError)
 
 		runs, err := run.ListAttempts(run.Context)
 		require.NoError(t, err)
@@ -150,11 +150,11 @@ func TestListLogFiles(t *testing.T) {
 
 		// Create a run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
-		status := models.InitialStatus(dag)
-		status.DAGRunID = "test-dag-run"
-		status.Status = scheduler.StatusSuccess
-		status.Log = "/tmp/test.log"
-		status.Nodes = []*models.Node{
+		dagRunStatus := models.InitialStatus(dag)
+		dagRunStatus.DAGRunID = "test-dag-run"
+		dagRunStatus.Status = status.StatusSuccess
+		dagRunStatus.Log = "/tmp/test.log"
+		dagRunStatus.Nodes = []*models.Node{
 			{
 				Step:   digraph.Step{Name: "step1"},
 				Stdout: "/tmp/step1.out",
@@ -171,7 +171,7 @@ func TestListLogFiles(t *testing.T) {
 		att, err := run.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
-		require.NoError(t, att.Write(run.Context, status))
+		require.NoError(t, att.Write(run.Context, dagRunStatus))
 		require.NoError(t, att.Close(run.Context))
 
 		logFiles, err := run.listLogFiles(run.Context)
@@ -210,11 +210,11 @@ func TestRemoveLogFiles(t *testing.T) {
 
 		// Create a run with log files pointing to our test files
 		dag := &digraph.DAG{Name: "test-dag"}
-		status := models.InitialStatus(dag)
-		status.DAGRunID = "test-dag-run"
-		status.Status = scheduler.StatusSuccess
-		status.Log = logFiles[0]
-		status.Nodes = []*models.Node{
+		dagRunStatus := models.InitialStatus(dag)
+		dagRunStatus.DAGRunID = "test-dag-run"
+		dagRunStatus.Status = status.StatusSuccess
+		dagRunStatus.Log = logFiles[0]
+		dagRunStatus.Nodes = []*models.Node{
 			{
 				Step:   digraph.Step{Name: "step1"},
 				Stdout: logFiles[1],
@@ -226,7 +226,7 @@ func TestRemoveLogFiles(t *testing.T) {
 		att, err := run.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
-		require.NoError(t, att.Write(run.Context, status))
+		require.NoError(t, att.Write(run.Context, dagRunStatus))
 		require.NoError(t, att.Close(run.Context))
 
 		// Verify files exist before removal
@@ -269,10 +269,10 @@ func TestRemoveLogFiles(t *testing.T) {
 
 		// Create parent dag-run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
-		status := models.InitialStatus(dag)
-		status.DAGRunID = "parent-dag-run"
-		status.Log = parentLogFiles[0]
-		status.Nodes = []*models.Node{{
+		dagRunStatus := models.InitialStatus(dag)
+		dagRunStatus.DAGRunID = "parent-dag-run"
+		dagRunStatus.Log = parentLogFiles[0]
+		dagRunStatus.Nodes = []*models.Node{{
 			Step:   digraph.Step{Name: "parent-step"},
 			Stdout: parentLogFiles[1],
 		}}
@@ -281,7 +281,7 @@ func TestRemoveLogFiles(t *testing.T) {
 		att, err := run.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
-		require.NoError(t, att.Write(run.Context, status))
+		require.NoError(t, att.Write(run.Context, dagRunStatus))
 		require.NoError(t, att.Close(run.Context))
 
 		// Create child dag-run directory
@@ -347,11 +347,11 @@ func TestDAGRunRemove(t *testing.T) {
 
 		// Create a run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
-		status := models.InitialStatus(dag)
-		status.DAGRunID = "test-dag-run"
-		status.Status = scheduler.StatusSuccess
-		status.Log = logFiles[0]
-		status.Nodes = []*models.Node{
+		dagRunStatus := models.InitialStatus(dag)
+		dagRunStatus.DAGRunID = "test-dag-run"
+		dagRunStatus.Status = status.StatusSuccess
+		dagRunStatus.Log = logFiles[0]
+		dagRunStatus.Nodes = []*models.Node{
 			{
 				Step:   digraph.Step{Name: "step1"},
 				Stdout: logFiles[1],
@@ -363,7 +363,7 @@ func TestDAGRunRemove(t *testing.T) {
 		att, err := run.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
-		require.NoError(t, att.Write(run.Context, status))
+		require.NoError(t, att.Write(run.Context, dagRunStatus))
 		require.NoError(t, att.Close(run.Context))
 
 		// Verify dag-run directory and log files exist
@@ -417,10 +417,10 @@ func TestDAGRunRemove(t *testing.T) {
 
 		// Create parent dag-run with log files
 		dag := &digraph.DAG{Name: "test-dag"}
-		status := models.InitialStatus(dag)
-		status.DAGRunID = "parent-dag-run"
-		status.Log = parentLogFiles[0]
-		status.Nodes = []*models.Node{{
+		dagRunStatus := models.InitialStatus(dag)
+		dagRunStatus.DAGRunID = "parent-dag-run"
+		dagRunStatus.Log = parentLogFiles[0]
+		dagRunStatus.Nodes = []*models.Node{{
 			Step:   digraph.Step{Name: "parent-step"},
 			Stdout: parentLogFiles[1],
 		}}
@@ -429,7 +429,7 @@ func TestDAGRunRemove(t *testing.T) {
 		att, err := run.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
-		require.NoError(t, att.Write(run.Context, status))
+		require.NoError(t, att.Write(run.Context, dagRunStatus))
 		require.NoError(t, att.Close(run.Context))
 
 		// Create child dag-run directory
@@ -494,10 +494,10 @@ func TestDAGRunRemove(t *testing.T) {
 
 		// Create a run with log files that don't exist
 		dag := &digraph.DAG{Name: "test-dag"}
-		status := models.InitialStatus(dag)
-		status.DAGRunID = "test-dag-run"
-		status.Log = "/non/existent/path/dag-run.log"
-		status.Nodes = []*models.Node{
+		dagRunStatus := models.InitialStatus(dag)
+		dagRunStatus.DAGRunID = "test-dag-run"
+		dagRunStatus.Log = "/non/existent/path/dag-run.log"
+		dagRunStatus.Nodes = []*models.Node{
 			{
 				Step:   digraph.Step{Name: "step1"},
 				Stdout: "/non/existent/path/step1.out",
@@ -509,7 +509,7 @@ func TestDAGRunRemove(t *testing.T) {
 		att, err := run.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
-		require.NoError(t, att.Write(run.Context, status))
+		require.NoError(t, att.Write(run.Context, dagRunStatus))
 		require.NoError(t, att.Close(run.Context))
 
 		// Remove should not fail even if log files don't exist

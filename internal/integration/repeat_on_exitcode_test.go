@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,16 +31,16 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
 	err := agent.Run(ctx)
 	require.NoError(t, err, "DAG should complete successfully")
 
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.StatusSuccess)
 
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
+	require.NotNil(t, dagRunStatus)
 
-	require.Len(t, status.Nodes, 1)
-	nodeStatus := status.Nodes[0]
+	require.Len(t, dagRunStatus.Nodes, 1)
+	nodeStatus := dagRunStatus.Nodes[0]
 
-	assert.Equal(t, scheduler.NodeStatusSuccess, nodeStatus.Status, "The final status of the node should be Success")
+	assert.Equal(t, status.NodeStatusSuccess, nodeStatus.Status, "The final status of the node should be Success")
 	assert.True(t, nodeStatus.Repeated, "The step should be marked as repeated")
 	assert.GreaterOrEqual(t, nodeStatus.DoneCount, 3, "The step should have executed at least 3 times")
 }

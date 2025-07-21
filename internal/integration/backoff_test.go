@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,17 +30,17 @@ func TestRetryPolicy_WithExponentialBackoff(t *testing.T) {
 	_ = agent.Run(ctx)
 
 	// Get the latest status
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
+	require.NotNil(t, dagRunStatus)
 
 	// Verify the step failed after retries
-	require.Len(t, status.Nodes, 1)
-	assert.Equal(t, scheduler.NodeStatusError, status.Nodes[0].Status)
-	assert.Equal(t, "failing-step", status.Nodes[0].Step.Name)
+	require.Len(t, dagRunStatus.Nodes, 1)
+	assert.Equal(t, status.NodeStatusError, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, "failing-step", dagRunStatus.Nodes[0].Step.Name)
 
 	// Verify it retried exactly 3 times
-	assert.Equal(t, 3, status.Nodes[0].RetryCount, "Step should have retried exactly 3 times")
+	assert.Equal(t, 3, dagRunStatus.Nodes[0].RetryCount, "Step should have retried exactly 3 times")
 
 	// Verify total time is approximately correct
 	// Expected: initial + 1s + 2s + 4s = 7s minimum
@@ -66,14 +66,14 @@ func TestRetryPolicy_WithBackoffBoolean(t *testing.T) {
 	_ = agent.Run(ctx)
 
 	// Get the latest status
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
+	require.NotNil(t, dagRunStatus)
 
 	// Verify the step failed after retries
-	require.Len(t, status.Nodes, 1)
-	assert.Equal(t, scheduler.NodeStatusError, status.Nodes[0].Status)
-	assert.Equal(t, 3, status.Nodes[0].RetryCount)
+	require.Len(t, dagRunStatus.Nodes, 1)
+	assert.Equal(t, status.NodeStatusError, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, 3, dagRunStatus.Nodes[0].RetryCount)
 
 	// Verify timing (backoff: true should use 2.0 multiplier)
 	// Expected: initial + 1s + 2s + 4s = 7s minimum
@@ -99,13 +99,13 @@ func TestRetryPolicy_WithMaxInterval(t *testing.T) {
 	_ = agent.Run(ctx)
 
 	// Get the latest status
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
+	require.NotNil(t, dagRunStatus)
 
 	// Verify it retried 5 times
-	require.Len(t, status.Nodes, 1)
-	assert.Equal(t, 5, status.Nodes[0].RetryCount)
+	require.Len(t, dagRunStatus.Nodes, 1)
+	assert.Equal(t, 5, dagRunStatus.Nodes[0].RetryCount)
 
 	// Verify timing with max interval cap
 	// backoff: 3.0, intervalSec: 1, maxIntervalSec: 5
@@ -135,17 +135,17 @@ func TestRepeatPolicy_WithExponentialBackoff(t *testing.T) {
 	require.NoError(t, err, "DAG should complete successfully")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.StatusSuccess)
 
 	// Get the latest status
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
+	require.NotNil(t, dagRunStatus)
 
 	// Verify it repeated exactly 4 times
-	require.Len(t, status.Nodes, 1)
-	assert.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
-	assert.Equal(t, 4, status.Nodes[0].DoneCount, "Step should have executed exactly 4 times")
+	require.Len(t, dagRunStatus.Nodes, 1)
+	assert.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, 4, dagRunStatus.Nodes[0].DoneCount, "Step should have executed exactly 4 times")
 
 	// Verify timing
 	// Expected intervals: initial, then 1s, 2s, 4s = 7s minimum
@@ -171,16 +171,16 @@ func TestRepeatPolicy_WithMaxInterval(t *testing.T) {
 	require.NoError(t, err, "DAG should complete successfully")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.StatusSuccess)
 
 	// Get the latest status
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
+	require.NotNil(t, dagRunStatus)
 
 	// Verify it repeated exactly 5 times
-	require.Len(t, status.Nodes, 1)
-	assert.Equal(t, 5, status.Nodes[0].DoneCount, "Step should have executed exactly 5 times")
+	require.Len(t, dagRunStatus.Nodes, 1)
+	assert.Equal(t, 5, dagRunStatus.Nodes[0].DoneCount, "Step should have executed exactly 5 times")
 
 	// Verify timing with max interval cap
 	// backoff: 3.0, intervalSec: 1, maxIntervalSec: 5

@@ -9,7 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
@@ -163,27 +163,27 @@ func (c *Collector) collectDAGRunMetrics(ch chan<- prometheus.Metric) {
 	statusCounts := make(map[string]float64)
 	currentlyRunning := float64(0)
 
-	for _, status := range statuses {
-		if status.Status == scheduler.StatusRunning {
+	for _, st := range statuses {
+		if st.Status == status.StatusRunning {
 			currentlyRunning++
 		}
 
 		// Map internal status to user-friendly names
 		var statusLabel string
-		switch status.Status {
-		case scheduler.StatusSuccess:
+		switch st.Status {
+		case status.StatusSuccess:
 			statusLabel = "success"
-		case scheduler.StatusError:
+		case status.StatusError:
 			statusLabel = "error"
-		case scheduler.StatusPartialSuccess:
+		case status.StatusPartialSuccess:
 			statusLabel = "partial_success"
-		case scheduler.StatusCancel:
+		case status.StatusCancel:
 			statusLabel = "cancelled"
-		case scheduler.StatusRunning:
+		case status.StatusRunning:
 			statusLabel = "running"
-		case scheduler.StatusQueued:
+		case status.StatusQueued:
 			statusLabel = "queued"
-		case scheduler.StatusNone:
+		case status.StatusNone:
 			statusLabel = "none"
 		default:
 			continue // Skip any unknown statuses

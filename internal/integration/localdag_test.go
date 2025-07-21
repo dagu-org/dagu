@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -67,20 +67,20 @@ steps:
 		require.NoError(t, agent.Run(agent.Context))
 
 		// Verify successful completion
-		testDAG.AssertLatestStatus(t, scheduler.StatusSuccess)
+		testDAG.AssertLatestStatus(t, status.StatusSuccess)
 
 		// Get the full run status
-		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
 		require.NoError(t, err)
 
 		// Verify the first step (run-local-child) completed successfully
 		// Note: The child DAG's output is not directly visible in the parent's stdout
-		require.Len(t, status.Nodes, 2)
-		require.Equal(t, "run-local-child", status.Nodes[0].Step.Name)
-		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
+		require.Len(t, dagRunStatus.Nodes, 2)
+		require.Equal(t, "run-local-child", dagRunStatus.Nodes[0].Step.Name)
+		require.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[0].Status)
 
 		// Verify the second step output
-		logContent, err := os.ReadFile(status.Nodes[1].Stdout)
+		logContent, err := os.ReadFile(dagRunStatus.Nodes[1].Stdout)
 		require.NoError(t, err)
 		require.Contains(t, string(logContent), "Child said Hello, World!")
 	})
@@ -143,16 +143,16 @@ steps:
 		require.NoError(t, agent.Run(agent.Context))
 
 		// Verify successful completion
-		testDAG.AssertLatestStatus(t, scheduler.StatusSuccess)
+		testDAG.AssertLatestStatus(t, status.StatusSuccess)
 
 		// Get the full run status
-		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
 		require.NoError(t, err)
 
 		// For parallel execution, we should have one step that ran multiple instances
-		require.Len(t, status.Nodes, 1)
-		require.Equal(t, "parallel-tasks", status.Nodes[0].Step.Name)
-		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
+		require.Len(t, dagRunStatus.Nodes, 1)
+		require.Equal(t, "parallel-tasks", dagRunStatus.Nodes[0].Step.Name)
+		require.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[0].Status)
 	})
 
 	t.Run("NestedLocalDAGs", func(t *testing.T) {
@@ -217,15 +217,15 @@ steps:
 		require.Contains(t, err.Error(), "child dag-run failed")
 
 		// This should fail because middle-dag cannot see leaf-dag
-		testDAG.AssertLatestStatus(t, scheduler.StatusError)
+		testDAG.AssertLatestStatus(t, status.StatusError)
 
-		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
 		require.NoError(t, err)
 
 		// Root DAG should have one step that tried to run middle-dag
-		require.Len(t, status.Nodes, 1)
-		require.Equal(t, "run-middle-dag", status.Nodes[0].Step.Name)
-		require.Equal(t, scheduler.NodeStatusError, status.Nodes[0].Status)
+		require.Len(t, dagRunStatus.Nodes, 1)
+		require.Equal(t, "run-middle-dag", dagRunStatus.Nodes[0].Step.Name)
+		require.Equal(t, status.NodeStatusError, dagRunStatus.Nodes[0].Status)
 	})
 
 	t.Run("LocalDAGWithConditionalExecution", func(t *testing.T) {
@@ -299,25 +299,25 @@ steps:
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
 
-		testDAG.AssertLatestStatus(t, scheduler.StatusSuccess)
+		testDAG.AssertLatestStatus(t, status.StatusSuccess)
 
-		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
 		require.NoError(t, err)
 
 		// Should have 3 steps: check-env, run-prod-dag, run-dev-dag
-		require.Len(t, status.Nodes, 3)
+		require.Len(t, dagRunStatus.Nodes, 3)
 
 		// Check environment step
-		require.Equal(t, "check-env", status.Nodes[0].Step.Name)
-		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
+		require.Equal(t, "check-env", dagRunStatus.Nodes[0].Step.Name)
+		require.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[0].Status)
 
 		// Production DAG should run
-		require.Equal(t, "run-prod-dag", status.Nodes[1].Step.Name)
-		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[1].Status)
+		require.Equal(t, "run-prod-dag", dagRunStatus.Nodes[1].Step.Name)
+		require.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[1].Status)
 
 		// Development DAG should be skipped
-		require.Equal(t, "run-dev-dag", status.Nodes[2].Step.Name)
-		require.Equal(t, scheduler.NodeStatusSkipped, status.Nodes[2].Status)
+		require.Equal(t, "run-dev-dag", dagRunStatus.Nodes[2].Step.Name)
+		require.Equal(t, status.NodeStatusSkipped, dagRunStatus.Nodes[2].Status)
 	})
 
 	t.Run("LocalDAGWithOutputPassing", func(t *testing.T) {
@@ -379,21 +379,21 @@ steps:
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
 
-		testDAG.AssertLatestStatus(t, scheduler.StatusSuccess)
+		testDAG.AssertLatestStatus(t, status.StatusSuccess)
 
-		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
 		require.NoError(t, err)
 
 		// Should have 2 steps
-		require.Len(t, status.Nodes, 2)
+		require.Len(t, dagRunStatus.Nodes, 2)
 
 		// First step generates data
-		require.Equal(t, "generate-data", status.Nodes[0].Step.Name)
-		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
+		require.Equal(t, "generate-data", dagRunStatus.Nodes[0].Step.Name)
+		require.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[0].Status)
 
 		// Second step processes data
-		require.Equal(t, "process-data", status.Nodes[1].Step.Name)
-		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[1].Status)
+		require.Equal(t, "process-data", dagRunStatus.Nodes[1].Step.Name)
+		require.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[1].Status)
 	})
 
 	t.Run("LocalDAGReferencesNonExistent", func(t *testing.T) {
@@ -435,15 +435,15 @@ steps:
 		require.Contains(t, err.Error(), "non-existent-dag")
 
 		// Check that the DAG failed
-		testDAG.AssertLatestStatus(t, scheduler.StatusError)
+		testDAG.AssertLatestStatus(t, status.StatusError)
 
-		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
 		require.NoError(t, err)
 
 		// Should have one step that failed
-		require.Len(t, status.Nodes, 1)
-		require.Equal(t, "run-missing-dag", status.Nodes[0].Step.Name)
-		require.Equal(t, scheduler.NodeStatusError, status.Nodes[0].Status)
+		require.Len(t, dagRunStatus.Nodes, 1)
+		require.Equal(t, "run-missing-dag", dagRunStatus.Nodes[0].Step.Name)
+		require.Equal(t, status.NodeStatusError, dagRunStatus.Nodes[0].Status)
 	})
 
 	t.Run("LocalDAGWithComplexDependencies", func(t *testing.T) {
@@ -507,29 +507,29 @@ steps:
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
 
-		testDAG.AssertLatestStatus(t, scheduler.StatusSuccess)
+		testDAG.AssertLatestStatus(t, status.StatusSuccess)
 
-		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
 		require.NoError(t, err)
 
 		// Should have 4 steps: setup, task1, task2, combine
-		require.Len(t, status.Nodes, 4)
+		require.Len(t, dagRunStatus.Nodes, 4)
 
 		// Verify each step
-		require.Equal(t, "setup", status.Nodes[0].Step.Name)
-		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
+		require.Equal(t, "setup", dagRunStatus.Nodes[0].Step.Name)
+		require.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[0].Status)
 
-		require.Equal(t, "task1", status.Nodes[1].Step.Name)
-		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[1].Status)
+		require.Equal(t, "task1", dagRunStatus.Nodes[1].Step.Name)
+		require.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[1].Status)
 
-		require.Equal(t, "task2", status.Nodes[2].Step.Name)
-		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[2].Status)
+		require.Equal(t, "task2", dagRunStatus.Nodes[2].Step.Name)
+		require.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[2].Status)
 
-		require.Equal(t, "combine", status.Nodes[3].Step.Name)
-		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[3].Status)
+		require.Equal(t, "combine", dagRunStatus.Nodes[3].Step.Name)
+		require.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[3].Status)
 
 		// Verify the combine step output
-		logContent, err := os.ReadFile(status.Nodes[3].Stdout)
+		logContent, err := os.ReadFile(dagRunStatus.Nodes[3].Stdout)
 		require.NoError(t, err)
 		require.Contains(t, string(logContent), "Combining")
 		require.Contains(t, string(logContent), "Task1 processing with Setting up")
