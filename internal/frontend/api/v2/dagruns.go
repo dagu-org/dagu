@@ -188,7 +188,7 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
 	}
-	if dagStatus.Status == status.StatusRunning {
+	if dagStatus.Status == status.Running {
 		return &api.UpdateDAGRunStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
 			Message: fmt.Sprintf("dag-run ID %s for DAG %s is still running", request.DagRunId, request.Name),
@@ -344,7 +344,7 @@ func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.Updat
 			Message: fmt.Sprintf("child dag-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
 		}, nil
 	}
-	if dagStatus.Status == status.StatusRunning {
+	if dagStatus.Status == status.Running {
 		return &api.UpdateChildDAGRunStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
 			Message: fmt.Sprintf("dag-run ID %s for DAG %s is still running", request.DagRunId, request.Name),
@@ -375,12 +375,12 @@ func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.Updat
 }
 
 var nodeStatusMapping = map[api.NodeStatus]status.NodeStatus{
-	api.NodeStatusNotStarted: status.NodeStatusNone,
-	api.NodeStatusRunning:    status.NodeStatusRunning,
-	api.NodeStatusFailed:     status.NodeStatusError,
-	api.NodeStatusCancelled:  status.NodeStatusCancel,
-	api.NodeStatusSuccess:    status.NodeStatusSuccess,
-	api.NodeStatusSkipped:    status.NodeStatusSkipped,
+	api.NodeStatusNotStarted: status.NodeNone,
+	api.NodeStatusRunning:    status.NodeRunning,
+	api.NodeStatusFailed:     status.NodeError,
+	api.NodeStatusCancelled:  status.NodeCancel,
+	api.NodeStatusSuccess:    status.NodeSuccess,
+	api.NodeStatusSkipped:    status.NodeSkipped,
 }
 
 func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObject) (api.RetryDAGRunResponseObject, error) {
@@ -444,7 +444,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		}
 	}
 
-	if dagStatus.Status != status.StatusRunning {
+	if dagStatus.Status != status.Running {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeNotRunning,
@@ -484,7 +484,7 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 		return nil, fmt.Errorf("error getting latest status: %w", err)
 	}
 
-	if latestStatus.Status != status.StatusQueued {
+	if latestStatus.Status != status.Queued {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,

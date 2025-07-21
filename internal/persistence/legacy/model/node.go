@@ -42,16 +42,16 @@ func FromNode(node scheduler.NodeData) *Node {
 }
 
 type Node struct {
-	Step       digraph.Step         `json:"Step"`
-	Log        string               `json:"Log"`
-	StartedAt  string               `json:"StartedAt"`
-	FinishedAt string               `json:"FinishedAt"`
+	Step       digraph.Step      `json:"Step"`
+	Log        string            `json:"Log"`
+	StartedAt  string            `json:"StartedAt"`
+	FinishedAt string            `json:"FinishedAt"`
 	Status     status.NodeStatus `json:"Status"`
-	RetriedAt  string               `json:"RetriedAt,omitempty"`
-	RetryCount int                  `json:"RetryCount,omitempty"`
-	DoneCount  int                  `json:"DoneCount,omitempty"`
-	Error      string               `json:"Error,omitempty"`
-	StatusText string               `json:"StatusText"`
+	RetriedAt  string            `json:"RetriedAt,omitempty"`
+	RetryCount int               `json:"RetryCount,omitempty"`
+	DoneCount  int               `json:"DoneCount,omitempty"`
+	Error      string            `json:"Error,omitempty"`
+	StatusText string            `json:"StatusText"`
 }
 
 func (n *Node) ToNode() *scheduler.Node {
@@ -75,8 +75,8 @@ func NewNode(step digraph.Step) *Node {
 		Step:       step,
 		StartedAt:  "-",
 		FinishedAt: "-",
-		Status:     status.NodeStatusNone,
-		StatusText: status.NodeStatusNone.String(),
+		Status:     status.NodeNone,
+		StatusText: status.NodeNone.String(),
 	}
 }
 

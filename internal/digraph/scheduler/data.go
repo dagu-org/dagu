@@ -105,8 +105,6 @@ type ChildDAGRun struct {
 	Params string
 }
 
-
-
 func newSafeData(data NodeData) Data {
 	return Data{inner: data}
 }
@@ -445,5 +443,5 @@ func (d *Data) MarkError(err error) {
 	defer d.mu.Unlock()
 
 	d.inner.State.Error = err
-	d.inner.State.Status = status.NodeStatusError
+	d.inner.State.Status = status.NodeError
 }

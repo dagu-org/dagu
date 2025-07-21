@@ -44,7 +44,7 @@ func TestDAG(t *testing.T) {
 			var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
 			statusResp.Unmarshal(t, &dagRunStatus)
 
-			return dagRunStatus.DagRun.Status == api.Status(status.StatusSuccess)
+			return dagRunStatus.DagRun.Status == api.Status(status.Success)
 		}, 5*time.Second, 1*time.Second, "expected DAG to complete")
 
 		// Delete the created DAG

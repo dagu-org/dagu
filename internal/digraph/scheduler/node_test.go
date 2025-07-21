@@ -46,10 +46,10 @@ func TestNode(t *testing.T) {
 			node.Signal(node.Context, syscall.SIGTERM, false)
 		}()
 
-		node.SetStatus(status.NodeStatusRunning)
+		node.SetStatus(status.NodeRunning)
 
 		node.ExecuteFail(t, "signal: terminated")
-		require.Equal(t, status.NodeStatusCancel.String(), node.State().Status.String())
+		require.Equal(t, status.NodeCancel.String(), node.State().Status.String())
 	})
 	t.Run("SignalOnStop", func(t *testing.T) {
 		t.Parallel()
@@ -60,10 +60,10 @@ func TestNode(t *testing.T) {
 			node.Signal(node.Context, syscall.SIGTERM, true) // allow override signal
 		}()
 
-		node.SetStatus(status.NodeStatusRunning)
+		node.SetStatus(status.NodeRunning)
 
 		node.ExecuteFail(t, "signal: interrupt")
-		require.Equal(t, status.NodeStatusCancel.String(), node.State().Status.String())
+		require.Equal(t, status.NodeCancel.String(), node.State().Status.String())
 	})
 	t.Run("LogOutput", func(t *testing.T) {
 		t.Parallel()
@@ -203,7 +203,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 	}{
 		{
 			name:       "success status",
-			nodeStatus: status.NodeStatusSuccess,
+			nodeStatus: status.NodeSuccess,
 			continueOnSettings: digraph.ContinueOn{
 				MarkSuccess: true,
 			},
@@ -211,7 +211,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 		},
 		{
 			name:       "error with continue on failure and mark success",
-			nodeStatus: status.NodeStatusError,
+			nodeStatus: status.NodeError,
 			continueOnSettings: digraph.ContinueOn{
 				Failure:     true,
 				MarkSuccess: true,
@@ -220,7 +220,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 		},
 		{
 			name:       "error with continue on failure but no mark success",
-			nodeStatus: status.NodeStatusError,
+			nodeStatus: status.NodeError,
 			continueOnSettings: digraph.ContinueOn{
 				Failure:     true,
 				MarkSuccess: false,
@@ -229,7 +229,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 		},
 		{
 			name:       "skipped with continue on skipped and mark success",
-			nodeStatus: status.NodeStatusSkipped,
+			nodeStatus: status.NodeSkipped,
 			continueOnSettings: digraph.ContinueOn{
 				Skipped:     true,
 				MarkSuccess: true,
@@ -738,13 +738,13 @@ func TestNodeCancel(t *testing.T) {
 	}
 
 	node := scheduler.NewNode(step, scheduler.NodeState{})
-	node.SetStatus(status.NodeStatusRunning)
+	node.SetStatus(status.NodeRunning)
 
 	// Cancel the node
 	node.Cancel(ctx)
 
 	// Check status changed to cancel
-	assert.Equal(t, status.NodeStatusCancel, node.NodeData().State.Status)
+	assert.Equal(t, status.NodeCancel, node.NodeData().State.Status)
 }
 
 func TestNodeSetupContextBeforeExec(t *testing.T) {
@@ -904,7 +904,7 @@ func TestNodeShouldContinue(t *testing.T) {
 	}{
 		{
 			name:       "continue on failure",
-			nodeStatus: status.NodeStatusError,
+			nodeStatus: status.NodeError,
 			exitCode:   1,
 			continueOnSettings: digraph.ContinueOn{
 				Failure: true,
@@ -913,7 +913,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "continue on specific exit code",
-			nodeStatus: status.NodeStatusError,
+			nodeStatus: status.NodeError,
 			exitCode:   42,
 			continueOnSettings: digraph.ContinueOn{
 				ExitCode: []int{42, 43},
@@ -922,7 +922,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "don't continue on non-matching exit code",
-			nodeStatus: status.NodeStatusError,
+			nodeStatus: status.NodeError,
 			exitCode:   44,
 			continueOnSettings: digraph.ContinueOn{
 				ExitCode: []int{42, 43},
@@ -931,7 +931,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "continue on skipped",
-			nodeStatus: status.NodeStatusSkipped,
+			nodeStatus: status.NodeSkipped,
 			continueOnSettings: digraph.ContinueOn{
 				Skipped: true,
 			},
@@ -939,13 +939,13 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:               "success always continues",
-			nodeStatus:         status.NodeStatusSuccess,
+			nodeStatus:         status.NodeSuccess,
 			continueOnSettings: digraph.ContinueOn{},
 			expectContinue:     true,
 		},
 		{
 			name:       "cancel never continues",
-			nodeStatus: status.NodeStatusCancel,
+			nodeStatus: status.NodeCancel,
 			continueOnSettings: digraph.ContinueOn{
 				Failure: true,
 				Skipped: true,
@@ -954,7 +954,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "continue on output match",
-			nodeStatus: status.NodeStatusError,
+			nodeStatus: status.NodeError,
 			continueOnSettings: digraph.ContinueOn{
 				Output: []string{"WARNING"},
 			},
@@ -973,7 +973,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "continue on regex output match",
-			nodeStatus: status.NodeStatusError,
+			nodeStatus: status.NodeError,
 			continueOnSettings: digraph.ContinueOn{
 				Output: []string{"re:.*timeout.*"},
 			},

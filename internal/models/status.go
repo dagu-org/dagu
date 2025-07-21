@@ -26,7 +26,7 @@ func NewStatusBuilder(dag *digraph.DAG) *StatusBuilder {
 func InitialStatus(dag *digraph.DAG) DAGRunStatus {
 	return DAGRunStatus{
 		Name:          dag.Name,
-		Status:        status.StatusNone,
+		Status:        status.None,
 		PID:           PID(0),
 		Nodes:         NodesFromSteps(dag.Steps),
 		OnExit:        nodeOrNil(dag.HandlerOn.Exit),
@@ -179,7 +179,7 @@ type DAGRunStatus struct {
 	Name          string               `json:"name"`
 	DAGRunID      string               `json:"dagRunId"`
 	AttemptID     string               `json:"attemptId"`
-	Status        status.Status     `json:"status"`
+	Status        status.Status        `json:"status"`
 	PID           PID                  `json:"pid,omitempty"`
 	Nodes         []*Node              `json:"nodes,omitempty"`
 	OnExit        *Node                `json:"onExit,omitempty"`

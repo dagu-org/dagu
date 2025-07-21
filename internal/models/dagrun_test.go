@@ -132,7 +132,7 @@ func (m *mockDAGRunAttempt) CancelRequested(ctx context.Context) (bool, error) {
 func TestListDAGRunStatusesOptions(t *testing.T) {
 	from := models.NewUTC(time.Now().Add(-24 * time.Hour))
 	to := models.NewUTC(time.Now())
-	statuses := []status.Status{status.StatusSuccess, status.StatusError}
+	statuses := []status.Status{status.Success, status.Error}
 
 	opts := models.ListDAGRunStatusesOptions{}
 
@@ -199,7 +199,7 @@ func TestDAGRunStoreInterface(t *testing.T) {
 
 	// Test ListStatuses
 	statuses := []*models.DAGRunStatus{
-		{Name: "test-dag", Status: status.StatusSuccess},
+		{Name: "test-dag", Status: status.Success},
 	}
 	store.On("ListStatuses", ctx, mock.Anything).Return(statuses, nil)
 
@@ -255,7 +255,7 @@ func TestDAGRunAttemptInterface(t *testing.T) {
 	status := models.DAGRunStatus{
 		Name:     "test-dag",
 		DAGRunID: "run-123",
-		Status:   status.StatusRunning,
+		Status:   status.Running,
 	}
 	attempt.On("Write", ctx, status).Return(nil)
 	err = attempt.Write(ctx, status)
@@ -393,7 +393,7 @@ func TestListDAGRunStatusesWithOptions(t *testing.T) {
 	opts := []models.ListDAGRunStatusesOption{
 		models.WithFrom(from),
 		models.WithTo(to),
-		models.WithStatuses([]status.Status{status.StatusSuccess}),
+		models.WithStatuses([]status.Status{status.Success}),
 		models.WithName("test"),
 	}
 
@@ -401,7 +401,7 @@ func TestListDAGRunStatusesWithOptions(t *testing.T) {
 		{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
-			Status:   status.StatusSuccess,
+			Status:   status.Success,
 		},
 	}
 

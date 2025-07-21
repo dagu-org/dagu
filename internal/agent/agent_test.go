@@ -24,13 +24,13 @@ func TestAgent_Run(t *testing.T) {
 		dag := th.DAG(t, "agent/run.yaml")
 		dagAgent := dag.Agent()
 
-		dag.AssertLatestStatus(t, status.StatusNone)
+		dag.AssertLatestStatus(t, status.None)
 
 		go func() {
 			dagAgent.RunSuccess(t)
 		}()
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 	})
 	t.Run("DeleteOldHistory", func(t *testing.T) {
 		th := test.Setup(t)
@@ -63,7 +63,7 @@ func TestAgent_Run(t *testing.T) {
 			close(done)
 		}()
 
-		dag.AssertCurrentStatus(t, status.StatusRunning)
+		dag.AssertCurrentStatus(t, status.Running)
 
 		isRunning := th.DAGRunMgr.IsRunning(context.Background(), dag.DAG, "test-dag-run")
 		require.True(t, isRunning, "DAG should be running")
@@ -85,9 +85,9 @@ func TestAgent_Run(t *testing.T) {
 
 		// Check if all nodes are not executed
 		dagRunStatus := dagAgent.Status(th.Context)
-		require.Equal(t, status.StatusCancel.String(), dagRunStatus.Status.String())
-		require.Equal(t, status.NodeStatusNone.String(), dagRunStatus.Nodes[0].Status.String())
-		require.Equal(t, status.NodeStatusNone.String(), dagRunStatus.Nodes[1].Status.String())
+		require.Equal(t, status.Cancel.String(), dagRunStatus.Status.String())
+		require.Equal(t, status.NodeNone.String(), dagRunStatus.Nodes[0].Status.String())
+		require.Equal(t, status.NodeNone.String(), dagRunStatus.Nodes[1].Status.String())
 	})
 	t.Run("FinishWithError", func(t *testing.T) {
 		th := test.Setup(t)
@@ -96,7 +96,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent.RunError(t)
 
 		// Check if the status is saved correctly
-		require.Equal(t, status.StatusError, dagAgent.Status(th.Context).Status)
+		require.Equal(t, status.Error, dagAgent.Status(th.Context).Status)
 	})
 	t.Run("FinishWithTimeout", func(t *testing.T) {
 		th := test.Setup(t)
@@ -105,7 +105,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent.RunError(t)
 
 		// Check if the status is saved correctly
-		require.Equal(t, status.StatusError, dagAgent.Status(th.Context).Status)
+		require.Equal(t, status.Error, dagAgent.Status(th.Context).Status)
 	})
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		th := test.Setup(t)
@@ -119,7 +119,7 @@ func TestAgent_Run(t *testing.T) {
 		}()
 
 		// wait for the DAG to start
-		dag.AssertLatestStatus(t, status.StatusRunning)
+		dag.AssertLatestStatus(t, status.Running)
 
 		// send a signal to cancel the DAG
 		dagAgent.Abort()
@@ -127,7 +127,7 @@ func TestAgent_Run(t *testing.T) {
 		<-done
 
 		// wait for the DAG to be canceled
-		dag.AssertLatestStatus(t, status.StatusCancel)
+		dag.AssertLatestStatus(t, status.Cancel)
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
 		th := test.Setup(t)
@@ -137,13 +137,13 @@ func TestAgent_Run(t *testing.T) {
 
 		// Check if the DAG is executed successfully
 		dagRunStatus := dagAgent.Status(th.Context)
-		require.Equal(t, status.StatusSuccess.String(), dagRunStatus.Status.String())
+		require.Equal(t, status.Success.String(), dagRunStatus.Status.String())
 		for _, s := range dagRunStatus.Nodes {
-			require.Equal(t, status.NodeStatusSuccess.String(), s.Status.String())
+			require.Equal(t, status.NodeSuccess.String(), s.Status.String())
 		}
 
 		// Check if the exit handler is executed
-		require.Equal(t, status.NodeStatusSuccess.String(), dagRunStatus.OnExit.Status.String())
+		require.Equal(t, status.NodeSuccess.String(), dagRunStatus.OnExit.Status.String())
 	})
 }
 
@@ -157,7 +157,7 @@ func TestAgent_DryRun(t *testing.T) {
 		dagAgent.RunSuccess(t)
 
 		curStatus := dagAgent.Status(th.Context)
-		require.Equal(t, status.StatusSuccess, curStatus.Status)
+		require.Equal(t, status.Success, curStatus.Status)
 
 		// Check if the status is not saved
 		dag.AssertDAGRunCount(t, 0)
@@ -188,8 +188,8 @@ func TestAgent_Retry(t *testing.T) {
 		dagAgent.RunSuccess(t)
 
 		for _, node := range dagAgent.Status(th.Context).Nodes {
-			if node.Status != status.NodeStatusSuccess &&
-				node.Status != status.NodeStatusSkipped {
+			if node.Status != status.NodeSuccess &&
+				node.Status != status.NodeSkipped {
 				t.Errorf("node %q is not successful: %s", node.Step.Name, node.Status)
 			}
 		}
@@ -242,7 +242,7 @@ func TestAgent_Retry(t *testing.T) {
 
 			if _, isRetried := retried[name]; isRetried {
 				// Only step '5' should be retried and successful
-				if node.Status != status.NodeStatusSuccess && node.Status != status.NodeStatusSkipped {
+				if node.Status != status.NodeSuccess && node.Status != status.NodeSkipped {
 					t.Errorf("step %q is not successful or skipped after step retry: %s", name, node.Status)
 				}
 				// FinishedAt should be fresher (more recent) than before, if it was set
@@ -252,7 +252,7 @@ func TestAgent_Retry(t *testing.T) {
 			} else {
 				// Assert that steps with "false" commands are still failed
 				if _, isFalseStep := falseSteps[name]; isFalseStep {
-					if node.Status != status.NodeStatusError {
+					if node.Status != status.NodeError {
 						t.Errorf("non-retried step %q (false command) should remain failed after step retry, got: %s", name, node.Status)
 					}
 				}
@@ -279,7 +279,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}()
 
 		// Wait for the DAG to start
-		dag.AssertLatestStatus(t, status.StatusRunning)
+		dag.AssertLatestStatus(t, status.Running)
 
 		// Get the status of the DAG
 		var mockResponseWriter = mockResponseWriter{}
@@ -291,11 +291,11 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		// Check if the status is returned correctly
 		dagRunStatus, err := models.StatusFromJSON(mockResponseWriter.body)
 		require.NoError(t, err)
-		require.Equal(t, status.StatusRunning, dagRunStatus.Status)
+		require.Equal(t, status.Running, dagRunStatus.Status)
 
 		// Stop the DAG
 		dagAgent.Abort()
-		dag.AssertLatestStatus(t, status.StatusCancel)
+		dag.AssertLatestStatus(t, status.Cancel)
 	})
 	t.Run("HTTP_InvalidRequest", func(t *testing.T) {
 		th := test.Setup(t)
@@ -309,7 +309,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}()
 
 		// Wait for the DAG to start
-		dag.AssertLatestStatus(t, status.StatusRunning)
+		dag.AssertLatestStatus(t, status.Running)
 
 		var mockResponseWriter = mockResponseWriter{}
 
@@ -322,7 +322,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Stop the DAG
 		dagAgent.Abort()
-		dag.AssertLatestStatus(t, status.StatusCancel)
+		dag.AssertLatestStatus(t, status.Cancel)
 	})
 	t.Run("HTTP_HandleCancel", func(t *testing.T) {
 		th := test.Setup(t)
@@ -338,7 +338,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}()
 
 		// Wait for the DAG to start
-		dag.AssertLatestStatus(t, status.StatusRunning)
+		dag.AssertLatestStatus(t, status.Running)
 
 		// Cancel the DAG
 		var mockResponseWriter = mockResponseWriter{}
@@ -351,7 +351,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Wait for the DAG to stop
 		<-done
-		dag.AssertLatestStatus(t, status.StatusCancel)
+		dag.AssertLatestStatus(t, status.Cancel)
 	})
 }
 

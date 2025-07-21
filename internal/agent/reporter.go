@@ -35,10 +35,10 @@ func (r *reporter) reportStep(
 	ctx context.Context, dag *digraph.DAG, dagStatus models.DAGRunStatus, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
-	if nodeStatus != status.NodeStatusNone {
+	if nodeStatus != status.NodeNone {
 		logger.Info(ctx, "Step finished", "step", node.NodeData().Step.Name, "status", nodeStatus)
 	}
-	if nodeStatus == status.NodeStatusError && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
+	if nodeStatus == status.NodeError && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
 		fromAddress := dag.ErrorMail.From
 		toAddresses := []string{dag.ErrorMail.To}
 		subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, dagStatus.Status)
@@ -63,7 +63,7 @@ func (r *reporter) getSummary(_ context.Context, dagStatus models.DAGRunStatus, 
 
 // send is a function that sends a report mail.
 func (r *reporter) send(ctx context.Context, dag *digraph.DAG, dagStatus models.DAGRunStatus, err error) error {
-	if err != nil || dagStatus.Status == status.StatusError {
+	if err != nil || dagStatus.Status == status.Error {
 		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
 			fromAddress := dag.ErrorMail.From
 			toAddresses := []string{dag.ErrorMail.To}
@@ -72,7 +72,7 @@ func (r *reporter) send(ctx context.Context, dag *digraph.DAG, dagStatus models.
 			attachments := addAttachments(dag.ErrorMail.AttachLogs, dagStatus.Nodes)
 			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
-	} else if dagStatus.Status == status.StatusSuccess || dagStatus.Status == status.StatusPartialSuccess {
+	} else if dagStatus.Status == status.Success || dagStatus.Status == status.PartialSuccess {
 		if dag.MailOn != nil && dag.MailOn.Success && dag.InfoMail != nil {
 			fromAddress := dag.InfoMail.From
 			toAddresses := []string{dag.InfoMail.To}

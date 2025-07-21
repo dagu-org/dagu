@@ -23,9 +23,9 @@ func TestDAGRun(t *testing.T) {
 		ts2 := models.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
 		ts3 := models.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
 
-		_ = run.WriteStatus(t, ts1, status.StatusRunning)
-		_ = run.WriteStatus(t, ts2, status.StatusSuccess)
-		_ = run.WriteStatus(t, ts3, status.StatusError)
+		_ = run.WriteStatus(t, ts1, status.Running)
+		_ = run.WriteStatus(t, ts2, status.Success)
+		_ = run.WriteStatus(t, ts3, status.Error)
 
 		latestRun, err := run.LatestAttempt(run.Context, nil)
 		require.NoError(t, err)
@@ -33,7 +33,7 @@ func TestDAGRun(t *testing.T) {
 		dagRunStatus, err := latestRun.ReadStatus(run.Context)
 		require.NoError(t, err)
 
-		require.Equal(t, status.StatusError.String(), dagRunStatus.Status.String())
+		require.Equal(t, status.Error.String(), dagRunStatus.Status.String())
 	})
 }
 
@@ -129,8 +129,8 @@ func TestDAGRunListRuns(t *testing.T) {
 		// Create additional runs
 		ts1 := models.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
 		ts2 := models.NewUTC(time.Date(2021, 1, 2, 12, 0, 0, 0, time.UTC))
-		run.WriteStatus(t, ts1, status.StatusSuccess)
-		run.WriteStatus(t, ts2, status.StatusError)
+		run.WriteStatus(t, ts1, status.Success)
+		run.WriteStatus(t, ts2, status.Error)
 
 		runs, err := run.ListAttempts(run.Context)
 		require.NoError(t, err)
@@ -152,7 +152,7 @@ func TestListLogFiles(t *testing.T) {
 		dag := &digraph.DAG{Name: "test-dag"}
 		dagRunStatus := models.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
-		dagRunStatus.Status = status.StatusSuccess
+		dagRunStatus.Status = status.Success
 		dagRunStatus.Log = "/tmp/test.log"
 		dagRunStatus.Nodes = []*models.Node{
 			{
@@ -212,7 +212,7 @@ func TestRemoveLogFiles(t *testing.T) {
 		dag := &digraph.DAG{Name: "test-dag"}
 		dagRunStatus := models.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
-		dagRunStatus.Status = status.StatusSuccess
+		dagRunStatus.Status = status.Success
 		dagRunStatus.Log = logFiles[0]
 		dagRunStatus.Nodes = []*models.Node{
 			{
@@ -349,7 +349,7 @@ func TestDAGRunRemove(t *testing.T) {
 		dag := &digraph.DAG{Name: "test-dag"}
 		dagRunStatus := models.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
-		dagRunStatus.Status = status.StatusSuccess
+		dagRunStatus.Status = status.Success
 		dagRunStatus.Log = logFiles[0]
 		dagRunStatus.Nodes = []*models.Node{
 			{

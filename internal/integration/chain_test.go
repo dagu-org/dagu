@@ -20,7 +20,7 @@ func TestChainExecution(t *testing.T) {
 	require.NoError(t, agent.Run(agent.Context))
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status to verify execution order
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)

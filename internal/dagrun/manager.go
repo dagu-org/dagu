@@ -263,7 +263,7 @@ func (m *Manager) runRetryCommand(ctx context.Context, args []string, dag *digra
 // Returns true if the status can be retrieved without error, indicating the DAG is running.
 func (m *Manager) IsRunning(ctx context.Context, dag *digraph.DAG, dagRunID string) bool {
 	st, _ := m.currentStatus(ctx, dag, dagRunID)
-	return st != nil && st.DAGRunID == dagRunID && st.Status == status.StatusRunning
+	return st != nil && st.DAGRunID == dagRunID && st.Status == status.Running
 }
 
 // GetCurrentStatus retrieves the current status of a dag-run by its run ID.
@@ -315,7 +315,7 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.
 	}
 
 	// If the DAG is running, query the current status
-	if st.Status == status.StatusRunning {
+	if st.Status == status.Running {
 		currentStatus, err := m.currentStatus(ctx, dag, st.DAGRunID)
 		if err == nil {
 			return currentStatus, nil
@@ -324,8 +324,8 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.
 
 	// If querying the current status fails, even if the status is running,
 	// set the status to error because it indicates the process is not responding.
-	if st.Status == status.StatusRunning {
-		st.Status = status.StatusError
+	if st.Status == status.Running {
+		st.Status = status.Error
 	}
 
 	return st, nil
@@ -373,7 +373,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 	alive, _ := m.procStore.CountAlive(ctx, dag.Name)
 	if alive > 0 {
 		items, _ := m.dagRunStore.ListStatuses(
-			ctx, models.WithName(dag.Name), models.WithStatuses([]status.Status{status.StatusRunning}),
+			ctx, models.WithName(dag.Name), models.WithStatuses([]status.Status{status.Running}),
 		)
 		if len(items) > 0 {
 			return *items[0], nil
@@ -397,7 +397,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 	}
 
 	// If the DAG is running, query the current status
-	if st.Status == status.StatusRunning {
+	if st.Status == status.Running {
 		dag, err = attempt.ReadDAG(ctx)
 		if err != nil {
 			currentStatus, err := m.currentStatus(ctx, dag, st.DAGRunID)
@@ -410,14 +410,14 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 	}
 
 	// If querying the current status fails, ensure if the status is running,
-	if st.Status == status.StatusRunning {
+	if st.Status == status.Running {
 		// Check the PID is still alive
 		pid := int(st.PID)
 		if pid > 0 {
 			_, err := os.FindProcess(pid)
 			if err != nil {
 				// If we cannot find the process, mark the status as error
-				st.Status = status.StatusError
+				st.Status = status.Error
 				logger.Warn(ctx, "No PID set for running status, marking status as error")
 			}
 		}

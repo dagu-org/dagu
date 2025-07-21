@@ -162,29 +162,29 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 
 	s := n.Status()
 	switch s {
-	case status.NodeStatusSuccess:
+	case status.NodeSuccess:
 		return true
 
-	case status.NodeStatusError:
+	case status.NodeError:
 		if continueOn.Failure {
 			return true
 		}
-	case status.NodeStatusCancel:
+	case status.NodeCancel:
 		return false
 
-	case status.NodeStatusSkipped:
+	case status.NodeSkipped:
 		if continueOn.Skipped {
 			return true
 		}
 
-	case status.NodeStatusPartialSuccess:
+	case status.NodePartialSuccess:
 		// Partial success is treated like success for continue on
 		return true
 
-	case status.NodeStatusNone:
+	case status.NodeNone:
 		fallthrough
 
-	case status.NodeStatusRunning:
+	case status.NodeRunning:
 		// Unexpected state
 		logger.Error(ctx, "Unexpected node status", "status", s.String())
 		return false
@@ -492,7 +492,7 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	defer n.mu.Unlock()
 
 	s := n.Status()
-	if s == status.NodeStatusRunning && n.cmd != nil {
+	if s == status.NodeRunning && n.cmd != nil {
 		sigsig := sig
 		if allowOverride && n.SignalOnStop() != "" {
 			sigsig = syscall.Signal(digraph.GetSignalNum(n.SignalOnStop()))
@@ -502,8 +502,8 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 			logger.Error(ctx, "Failed to send signal", "err", err, "step", n.Name())
 		}
 	}
-	if s == status.NodeStatusRunning {
-		n.SetStatus(status.NodeStatusCancel)
+	if s == status.NodeRunning {
+		n.SetStatus(status.NodeCancel)
 	}
 }
 
@@ -511,8 +511,8 @@ func (n *Node) Cancel(ctx context.Context) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	s := n.Status()
-	if s == status.NodeStatusRunning {
-		n.SetStatus(status.NodeStatusCancel)
+	if s == status.NodeRunning {
+		n.SetStatus(status.NodeCancel)
 	}
 	if n.cancelFunc != nil {
 		logger.Info(ctx, "Canceling node", "step", n.Name())

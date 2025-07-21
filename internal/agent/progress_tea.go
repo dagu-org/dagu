@@ -107,11 +107,11 @@ func NewProgressModel(dag *digraph.DAG) ProgressModel {
 			m.nodes[step.Name] = &nodeProgress{
 				node: &models.Node{
 					Step:       step,
-					Status:     status.NodeStatusNone,
+					Status:     status.NodeNone,
 					StartedAt:  "-",
 					FinishedAt: "-",
 				},
-				status: status.NodeStatusNone,
+				status: status.NodeNone,
 			}
 		}
 	}
@@ -364,10 +364,10 @@ func (m ProgressModel) renderProgressBar() string {
 	total := len(m.nodes)
 
 	for _, np := range m.nodes {
-		if np.status == status.NodeStatusSuccess ||
-			np.status == status.NodeStatusError ||
-			np.status == status.NodeStatusSkipped ||
-			np.status == status.NodeStatusCancel {
+		if np.status == status.NodeSuccess ||
+			np.status == status.NodeError ||
+			np.status == status.NodeSkipped ||
+			np.status == status.NodeCancel {
 			completed++
 		}
 	}
@@ -401,7 +401,7 @@ func (m ProgressModel) renderProgressBar() string {
 }
 
 func (m ProgressModel) renderCurrentlyRunning() string {
-	running := m.getNodesByStatus(status.NodeStatusRunning)
+	running := m.getNodesByStatus(status.NodeRunning)
 	if len(running) == 0 {
 		return ""
 	}
@@ -454,7 +454,7 @@ func (m ProgressModel) renderRecentlyCompleted() string {
 			truncateString(np.node.Step.Name, 30),
 			m.faintStyle.Render(duration))
 
-		if np.status == status.NodeStatusError && np.node.Error != "" {
+		if np.status == status.NodeError && np.node.Error != "" {
 			availableSpace := m.width - 50
 			if availableSpace < 20 {
 				availableSpace = 20
@@ -490,7 +490,7 @@ func (m ProgressModel) renderAllCompleted() string {
 			truncateString(np.node.Step.Name, 30),
 			m.faintStyle.Render(duration))
 
-		if np.status == status.NodeStatusError && np.node.Error != "" {
+		if np.status == status.NodeError && np.node.Error != "" {
 			availableSpace := m.width - 50
 			if availableSpace < 20 {
 				availableSpace = 20
@@ -506,7 +506,7 @@ func (m ProgressModel) renderAllCompleted() string {
 }
 
 func (m ProgressModel) renderQueued() string {
-	queued := m.getNodesByStatus(status.NodeStatusNone)
+	queued := m.getNodesByStatus(status.NodeNone)
 	if len(queued) == 0 {
 		return ""
 	}
@@ -565,11 +565,11 @@ func (m ProgressModel) renderFooter() string {
 	if m.finalized {
 		st := m.getOverallStatus()
 		switch st {
-		case status.StatusSuccess:
+		case status.Success:
 			return m.successStyle.Render("✓ Execution completed successfully")
-		case status.StatusError:
+		case status.Error:
 			return m.errorStyle.Render("✗ Execution failed")
-		case status.StatusCancel:
+		case status.Cancel:
 			return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ Execution cancelled")
 		default:
 			return m.boldStyle.Render("Execution finished")
@@ -582,20 +582,20 @@ func (m ProgressModel) getOverallStatus() status.Status {
 	if m.status != nil {
 		return m.status.Status
 	}
-	return status.StatusRunning
+	return status.Running
 }
 
 func (m ProgressModel) formatStatus(st status.Status) string {
 	switch st {
-	case status.StatusSuccess:
+	case status.Success:
 		return m.successStyle.Render("Success ✓")
-	case status.StatusError:
+	case status.Error:
 		return m.errorStyle.Render("Failed ✗")
-	case status.StatusRunning:
+	case status.Running:
 		return m.runningStyle.Render("Running ●")
-	case status.StatusCancel:
+	case status.Cancel:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("Cancelled ⚠")
-	case status.StatusQueued:
+	case status.Queued:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Render("Queued ●")
 	default:
 		return m.faintStyle.Render("Not Started ○")
@@ -604,17 +604,17 @@ func (m ProgressModel) formatStatus(st status.Status) string {
 
 func (m ProgressModel) getStatusIcon(s status.NodeStatus) string {
 	switch s {
-	case status.NodeStatusSuccess:
+	case status.NodeSuccess:
 		return m.successStyle.Render("✓")
-	case status.NodeStatusError:
+	case status.NodeError:
 		return m.errorStyle.Render("✗")
-	case status.NodeStatusRunning:
+	case status.NodeRunning:
 		return m.runningStyle.Render("●")
-	case status.NodeStatusCancel:
+	case status.NodeCancel:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠")
-	case status.NodeStatusSkipped:
+	case status.NodeSkipped:
 		return m.faintStyle.Render("⊘")
-	case status.NodeStatusPartialSuccess:
+	case status.NodePartialSuccess:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("◐")
 	default:
 		return m.faintStyle.Render("○")
@@ -646,10 +646,10 @@ func (m ProgressModel) getNodesByStatus(s status.NodeStatus) []*nodeProgress {
 func (m ProgressModel) getCompletedNodes() []*nodeProgress {
 	var nodes []*nodeProgress
 	for _, np := range m.nodes {
-		if np.status == status.NodeStatusSuccess ||
-			np.status == status.NodeStatusError ||
-			np.status == status.NodeStatusSkipped ||
-			np.status == status.NodeStatusCancel {
+		if np.status == status.NodeSuccess ||
+			np.status == status.NodeError ||
+			np.status == status.NodeSkipped ||
+			np.status == status.NodeCancel {
 			nodes = append(nodes, np)
 		}
 	}

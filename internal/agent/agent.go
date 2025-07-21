@@ -494,9 +494,9 @@ func (a *Agent) Status(ctx context.Context) models.DAGRunStatus {
 	defer a.lock.RUnlock()
 
 	schedulerStatus := a.scheduler.Status(ctx, a.graph)
-	if schedulerStatus == status.StatusNone && a.graph.IsStarted() {
+	if schedulerStatus == status.None && a.graph.IsStarted() {
 		// Match the status to the execution graph.
-		schedulerStatus = status.StatusRunning
+		schedulerStatus = status.Running
 	}
 
 	opts := []models.StatusOption{
@@ -569,7 +569,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 		case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
 			// Return the current status of the dag-run.
 			dagStatus := a.Status(ctx)
-			dagStatus.Status = status.StatusRunning
+			dagStatus.Status = status.Running
 			statusJSON, err := json.Marshal(dagStatus)
 			if err != nil {
 				encodeError(w, err)

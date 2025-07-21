@@ -532,7 +532,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, err
 		}
 
-		if status.Status == dagstatus.StatusRunning {
+		if status.Status == dagstatus.Running {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeAlreadyRunning,
@@ -569,7 +569,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, err
 		}
 
-		if status.Status != dagstatus.StatusRunning {
+		if status.Status != dagstatus.Running {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeNotRunning,
@@ -612,7 +612,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			return nil, err
 		}
 
-		if status.Status == dagstatus.StatusRunning {
+		if status.Status == dagstatus.Running {
 			return nil, &Error{
 				HTTPStatus: http.StatusBadRequest,
 				Code:       api.ErrorCodeBadRequest,
@@ -633,9 +633,9 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "step is required for mark-success action",
 			}
 		}
-		toStatus := dagstatus.NodeStatusSuccess
+		toStatus := dagstatus.NodeSuccess
 		if action == api.DAGActionMarkFailed {
-			toStatus = dagstatus.NodeStatusError
+			toStatus = dagstatus.NodeError
 		}
 
 		if err := a.updateStatus(ctx, *request.Body.RequestId, *request.Body.Step, dag, toStatus); err != nil {
@@ -718,7 +718,7 @@ func (a *API) updateStatus(
 		return fmt.Errorf("error getting status: %w", err)
 	}
 
-	if status.Status == dagstatus.StatusRunning {
+	if status.Status == dagstatus.Running {
 		return &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,

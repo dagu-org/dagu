@@ -28,8 +28,8 @@ func TestProgressModel_Init(t *testing.T) {
 	assert.Len(t, model.nodes, 2)
 	assert.NotNil(t, model.nodes["step1"])
 	assert.NotNil(t, model.nodes["step2"])
-	assert.Equal(t, status.NodeStatusNone, model.nodes["step1"].status)
-	assert.Equal(t, status.NodeStatusNone, model.nodes["step2"].status)
+	assert.Equal(t, status.NodeNone, model.nodes["step1"].status)
+	assert.Equal(t, status.NodeNone, model.nodes["step2"].status)
 
 	// Test Init command
 	cmd := model.Init()
@@ -49,14 +49,14 @@ func TestProgressModel_UpdateNode(t *testing.T) {
 	// Update node status
 	node := &models.Node{
 		Step:      digraph.Step{Name: "step1"},
-		Status:    status.NodeStatusRunning,
+		Status:    status.NodeRunning,
 		StartedAt: time.Now().Format(time.RFC3339),
 	}
 
 	updatedModel, _ := model.Update(NodeUpdateMsg{Node: node})
 	m := updatedModel.(ProgressModel)
 
-	assert.Equal(t, status.NodeStatusRunning, m.nodes["step1"].status)
+	assert.Equal(t, status.NodeRunning, m.nodes["step1"].status)
 	assert.False(t, m.nodes["step1"].startTime.IsZero())
 }
 
@@ -67,7 +67,7 @@ func TestProgressModel_UpdateStatus(t *testing.T) {
 	dagRunStatus := &models.DAGRunStatus{
 		DAGRunID: "run-123",
 		Params:   "KEY=value",
-		Status:   status.StatusRunning,
+		Status:   status.Running,
 	}
 
 	updatedModel, _ := model.Update(StatusUpdateMsg{Status: dagRunStatus})
@@ -75,7 +75,7 @@ func TestProgressModel_UpdateStatus(t *testing.T) {
 
 	assert.Equal(t, "run-123", m.dagRunID)
 	assert.Equal(t, "KEY=value", m.params)
-	assert.Equal(t, status.StatusRunning, m.status.Status)
+	assert.Equal(t, status.Running, m.status.Status)
 }
 
 func TestProgressModel_WindowResize(t *testing.T) {
@@ -139,10 +139,10 @@ func TestProgressModel_ProgressCalculation(t *testing.T) {
 	model.width = 80
 
 	// Mark some steps as completed
-	model.nodes["step1"].status = status.NodeStatusSuccess
-	model.nodes["step2"].status = status.NodeStatusError
-	model.nodes["step3"].status = status.NodeStatusRunning
-	model.nodes["step4"].status = status.NodeStatusNone
+	model.nodes["step1"].status = status.NodeSuccess
+	model.nodes["step2"].status = status.NodeError
+	model.nodes["step3"].status = status.NodeRunning
+	model.nodes["step4"].status = status.NodeNone
 
 	view := model.View()
 
@@ -160,12 +160,12 @@ func TestProgressModel_StatusFormatting(t *testing.T) {
 		status   status.Status
 		expected string
 	}{
-		{status.StatusSuccess, "Success ✓"},
-		{status.StatusError, "Failed ✗"},
-		{status.StatusRunning, "Running ●"},
-		{status.StatusCancel, "Cancelled ⚠"},
-		{status.StatusQueued, "Queued ●"},
-		{status.StatusNone, "Not Started ○"},
+		{status.Success, "Success ✓"},
+		{status.Error, "Failed ✗"},
+		{status.Running, "Running ●"},
+		{status.Cancel, "Cancelled ⚠"},
+		{status.Queued, "Queued ●"},
+		{status.None, "Not Started ○"},
 	}
 
 	for _, tt := range tests {
@@ -237,7 +237,7 @@ func TestProgressTeaDisplay_Integration(t *testing.T) {
 	// Update a node
 	node := &models.Node{
 		Step:      digraph.Step{Name: "step1"},
-		Status:    status.NodeStatusRunning,
+		Status:    status.NodeRunning,
 		StartedAt: time.Now().Format(time.RFC3339),
 	}
 	display.UpdateNode(node)
@@ -245,7 +245,7 @@ func TestProgressTeaDisplay_Integration(t *testing.T) {
 	// Update status
 	status := &models.DAGRunStatus{
 		DAGRunID: "run-123",
-		Status:   status.StatusRunning,
+		Status:   status.Running,
 	}
 	display.UpdateStatus(status)
 }
@@ -287,7 +287,7 @@ func TestProgressModel_ErrorDisplay(t *testing.T) {
 	model.width = 100
 
 	// Mark step as failed with error
-	model.nodes["failing-step"].status = status.NodeStatusError
+	model.nodes["failing-step"].status = status.NodeError
 	model.nodes["failing-step"].node.Error = "Connection timeout"
 	model.nodes["failing-step"].endTime = time.Now()
 	model.nodes["failing-step"].startTime = time.Now().Add(-5 * time.Second)

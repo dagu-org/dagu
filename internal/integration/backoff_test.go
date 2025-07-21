@@ -36,7 +36,7 @@ func TestRetryPolicy_WithExponentialBackoff(t *testing.T) {
 
 	// Verify the step failed after retries
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, status.NodeStatusError, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, status.NodeError, dagRunStatus.Nodes[0].Status)
 	assert.Equal(t, "failing-step", dagRunStatus.Nodes[0].Step.Name)
 
 	// Verify it retried exactly 3 times
@@ -72,7 +72,7 @@ func TestRetryPolicy_WithBackoffBoolean(t *testing.T) {
 
 	// Verify the step failed after retries
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, status.NodeStatusError, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, status.NodeError, dagRunStatus.Nodes[0].Status)
 	assert.Equal(t, 3, dagRunStatus.Nodes[0].RetryCount)
 
 	// Verify timing (backoff: true should use 2.0 multiplier)
@@ -135,7 +135,7 @@ func TestRepeatPolicy_WithExponentialBackoff(t *testing.T) {
 	require.NoError(t, err, "DAG should complete successfully")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -144,7 +144,7 @@ func TestRepeatPolicy_WithExponentialBackoff(t *testing.T) {
 
 	// Verify it repeated exactly 4 times
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
 	assert.Equal(t, 4, dagRunStatus.Nodes[0].DoneCount, "Step should have executed exactly 4 times")
 
 	// Verify timing
@@ -171,7 +171,7 @@ func TestRepeatPolicy_WithMaxInterval(t *testing.T) {
 	require.NoError(t, err, "DAG should complete successfully")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)

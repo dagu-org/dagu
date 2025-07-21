@@ -21,7 +21,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 	})
 
 	t.Run("Pipe", func(t *testing.T) {
@@ -31,7 +31,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "hello foo",
 		})
@@ -44,7 +44,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "123 abc",
 		})
@@ -57,7 +57,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "Dagu",
 			"OUT2": "Hello, Dagu",
@@ -71,7 +71,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "Dagu",
 			"OUT2": "Hello, Dagu",
@@ -85,7 +85,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": []test.Contains{
 				"$1 is foo",
@@ -101,7 +101,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": []test.Contains{
 				"$1 is foo",
@@ -117,7 +117,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "1 2 3",
 		})
@@ -130,7 +130,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "abc run def",
 			"OUT2": "match",
@@ -144,7 +144,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "Starting server at localhost:8080",
 		})
@@ -157,7 +157,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "foo",
 		})
@@ -170,7 +170,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": []test.Contains{
 				"E1 is foo",
@@ -186,7 +186,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": test.NotEmpty{},
 			"OUT2": test.NotEmpty{},
@@ -203,7 +203,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"NAME": `"John"`,
 		})
@@ -216,7 +216,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "Starting server at localhost:8080",
 		})
@@ -229,7 +229,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "Hello World",
 		})
@@ -242,7 +242,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": os.ExpandEnv("$HOME"),
 			"OUT2": os.ExpandEnv("$HOME"),
@@ -256,7 +256,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "start",
 			"OUT2": "foo",
@@ -272,7 +272,7 @@ func TestDAGExecution(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": []test.Contains{
 				"hello world",
@@ -314,7 +314,7 @@ func TestNestedDAG(t *testing.T) {
 
 			agent.RunSuccess(t)
 
-			dag.AssertLatestStatus(t, status.StatusSuccess)
+			dag.AssertLatestStatus(t, status.Success)
 			dag.AssertOutputs(t, tc.expectedOutputs)
 		})
 	}
@@ -334,7 +334,7 @@ func TestSkippedPreconditions(t *testing.T) {
 	agent.RunSuccess(t)
 
 	// Assert that the final status is successful.
-	dag.AssertLatestStatus(t, status.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Verify outputs:
 	// OUT_RUN should be "executed" and OUT_SKIP should be empty (indicating the step was skipped).
@@ -359,7 +359,7 @@ func TestComplexDependencies(t *testing.T) {
 	agent.RunSuccess(t)
 
 	// Assert that the final status is successful.
-	dag.AssertLatestStatus(t, status.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Verify the outputs from each step.
 	dag.AssertOutputs(t, map[string]any{
@@ -384,39 +384,39 @@ func TestProgressingNode(t *testing.T) {
 		require.NoError(t, err, "failed to run agent")
 	}()
 
-	dag.AssertCurrentStatus(t, status.StatusRunning)
+	dag.AssertCurrentStatus(t, status.Running)
 
 	dagRunStatus, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, err, "failed to get latest status")
 
 	// Check the first node is in progress
-	require.Equal(t, status.NodeStatusRunning.String(), dagRunStatus.Nodes[0].Status.String(), "first node should be in progress")
+	require.Equal(t, status.NodeRunning.String(), dagRunStatus.Nodes[0].Status.String(), "first node should be in progress")
 	// Check the second node is not started
-	require.Equal(t, status.NodeStatusNone.String(), dagRunStatus.Nodes[1].Status.String(), "second node should not be started")
+	require.Equal(t, status.NodeNone.String(), dagRunStatus.Nodes[1].Status.String(), "second node should not be started")
 
 	// Wait for the first node to finish
 	time.Sleep(time.Second * 2)
 
-	dag.AssertCurrentStatus(t, status.StatusRunning)
+	dag.AssertCurrentStatus(t, status.Running)
 
 	// Check the progress of the nodes
 	dagRunStatus, err = dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, err, "failed to get latest status")
 
 	// Assert that the dag-run is still running
-	require.Equal(t, status.StatusRunning.String(), dagRunStatus.Status.String(), "dag-run should be running")
+	require.Equal(t, status.Running.String(), dagRunStatus.Status.String(), "dag-run should be running")
 
 	// Check the first node is finished
-	require.Equal(t, status.NodeStatusSuccess.String(), dagRunStatus.Nodes[0].Status.String(), "first node should be finished")
+	require.Equal(t, status.NodeSuccess.String(), dagRunStatus.Nodes[0].Status.String(), "first node should be finished")
 	// Check the second node is in progress
-	require.Equal(t, status.NodeStatusRunning.String(), dagRunStatus.Nodes[1].Status.String(), "second node should be in progress")
+	require.Equal(t, status.NodeRunning.String(), dagRunStatus.Nodes[1].Status.String(), "second node should be in progress")
 
 	// Wait for all nodes to finish
-	dag.AssertLatestStatus(t, status.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Check the second node is finished
 	dagRunStatus, err = dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, err, "failed to get latest status")
 
-	require.Equal(t, status.NodeStatusSuccess.String(), dagRunStatus.Nodes[1].Status.String(), "second node should be finished")
+	require.Equal(t, status.NodeSuccess.String(), dagRunStatus.Nodes[1].Status.String(), "second node should be finished")
 }

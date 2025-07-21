@@ -164,26 +164,26 @@ func (c *Collector) collectDAGRunMetrics(ch chan<- prometheus.Metric) {
 	currentlyRunning := float64(0)
 
 	for _, st := range statuses {
-		if st.Status == status.StatusRunning {
+		if st.Status == status.Running {
 			currentlyRunning++
 		}
 
 		// Map internal status to user-friendly names
 		var statusLabel string
 		switch st.Status {
-		case status.StatusSuccess:
+		case status.Success:
 			statusLabel = "success"
-		case status.StatusError:
+		case status.Error:
 			statusLabel = "error"
-		case status.StatusPartialSuccess:
+		case status.PartialSuccess:
 			statusLabel = "partial_success"
-		case status.StatusCancel:
+		case status.Cancel:
 			statusLabel = "cancelled"
-		case status.StatusRunning:
+		case status.Running:
 			statusLabel = "running"
-		case status.StatusQueued:
+		case status.Queued:
 			statusLabel = "queued"
-		case status.StatusNone:
+		case status.None:
 			statusLabel = "none"
 		default:
 			continue // Skip any unknown statuses

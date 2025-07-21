@@ -24,7 +24,7 @@ func TestRestartCommand(t *testing.T) {
 		}()
 
 		// Wait for the DAG to be running.
-		dag.AssertCurrentStatus(t, status.StatusRunning)
+		dag.AssertCurrentStatus(t, status.Running)
 
 		// Restart the DAG.
 		done := make(chan struct{})
@@ -36,7 +36,7 @@ func TestRestartCommand(t *testing.T) {
 		}()
 
 		// Wait for the dag-run running again.
-		dag.AssertCurrentStatus(t, status.StatusRunning)
+		dag.AssertCurrentStatus(t, status.Running)
 
 		time.Sleep(time.Millisecond * 300) // Wait a bit (need to investigate why this is needed).
 
@@ -44,7 +44,7 @@ func TestRestartCommand(t *testing.T) {
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{Args: []string{"stop", dag.Location}})
 
 		// Wait for the DAG is stopped.
-		dag.AssertCurrentStatus(t, status.StatusNone)
+		dag.AssertCurrentStatus(t, status.None)
 
 		// Check parameter was the same as the first execution
 		loaded, err := digraph.Load(th.Context, dag.Location, digraph.WithBaseConfig(th.Config.Paths.BaseConfig))

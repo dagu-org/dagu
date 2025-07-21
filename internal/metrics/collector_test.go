@@ -293,12 +293,12 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 
 	// Mock DAG run store response
 	statuses := []*models.DAGRunStatus{
-		{Status: status.StatusSuccess},
-		{Status: status.StatusSuccess},
-		{Status: status.StatusError},
-		{Status: status.StatusRunning},
-		{Status: status.StatusQueued},
-		{Status: status.StatusCancel},
+		{Status: status.Success},
+		{Status: status.Success},
+		{Status: status.Error},
+		{Status: status.Running},
+		{Status: status.Queued},
+		{Status: status.Cancel},
 	}
 	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return(statuses, nil)
 

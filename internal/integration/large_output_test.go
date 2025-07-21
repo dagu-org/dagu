@@ -27,7 +27,7 @@ func TestLargeOutput_64KB(t *testing.T) {
 	require.NoError(t, err, "DAG should complete without hanging")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status to verify output capture
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -36,7 +36,7 @@ func TestLargeOutput_64KB(t *testing.T) {
 
 	// Verify the step completed successfully
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
 	assert.Equal(t, "read-64kb-file", dagRunStatus.Nodes[0].Step.Name)
 }
 
@@ -55,7 +55,7 @@ func TestLargeOutput_65KB(t *testing.T) {
 	require.NoError(t, err, "DAG should complete without hanging when output exceeds 64KB")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -64,7 +64,7 @@ func TestLargeOutput_65KB(t *testing.T) {
 
 	// Verify the step completed successfully
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
 	assert.Equal(t, "read-65kb-file", dagRunStatus.Nodes[0].Step.Name)
 }
 
@@ -83,7 +83,7 @@ func TestLargeOutput_128KB(t *testing.T) {
 	require.NoError(t, err, "DAG should complete without hanging with large output")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -92,6 +92,6 @@ func TestLargeOutput_128KB(t *testing.T) {
 
 	// Verify the step completed successfully
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, status.NodeStatusSuccess, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
 	assert.Equal(t, "read-128kb-file", dagRunStatus.Nodes[0].Step.Name)
 }

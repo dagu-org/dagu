@@ -10,13 +10,13 @@ func TestStatusConstants(t *testing.T) {
 		status   Status
 		expected int
 	}{
-		{"StatusNone", StatusNone, 0},
-		{"StatusRunning", StatusRunning, 1},
-		{"StatusError", StatusError, 2},
-		{"StatusCancel", StatusCancel, 3},
-		{"StatusSuccess", StatusSuccess, 4},
-		{"StatusQueued", StatusQueued, 5},
-		{"StatusPartialSuccess", StatusPartialSuccess, 6},
+		{"StatusNone", None, 0},
+		{"StatusRunning", Running, 1},
+		{"StatusError", Error, 2},
+		{"StatusCancel", Cancel, 3},
+		{"StatusSuccess", Success, 4},
+		{"StatusQueued", Queued, 5},
+		{"StatusPartialSuccess", PartialSuccess, 6},
 	}
 
 	for _, tt := range tests {
@@ -34,13 +34,13 @@ func TestNodeStatusConstants(t *testing.T) {
 		nodeStatus NodeStatus
 		expected   int
 	}{
-		{"NodeStatusNone", NodeStatusNone, 0},
-		{"NodeStatusRunning", NodeStatusRunning, 1},
-		{"NodeStatusError", NodeStatusError, 2},
-		{"NodeStatusCancel", NodeStatusCancel, 3},
-		{"NodeStatusSuccess", NodeStatusSuccess, 4},
-		{"NodeStatusSkipped", NodeStatusSkipped, 5},
-		{"NodeStatusPartialSuccess", NodeStatusPartialSuccess, 6},
+		{"NodeStatusNone", NodeNone, 0},
+		{"NodeStatusRunning", NodeRunning, 1},
+		{"NodeStatusError", NodeError, 2},
+		{"NodeStatusCancel", NodeCancel, 3},
+		{"NodeStatusSuccess", NodeSuccess, 4},
+		{"NodeStatusSkipped", NodeSkipped, 5},
+		{"NodeStatusPartialSuccess", NodePartialSuccess, 6},
 	}
 
 	for _, tt := range tests {
@@ -57,13 +57,13 @@ func TestStatusString(t *testing.T) {
 		status   Status
 		expected string
 	}{
-		{StatusNone, "not started"},
-		{StatusRunning, "running"},
-		{StatusError, "failed"},
-		{StatusCancel, "canceled"},
-		{StatusSuccess, "finished"},
-		{StatusQueued, "queued"},
-		{StatusPartialSuccess, "partial success"},
+		{None, "not started"},
+		{Running, "running"},
+		{Error, "failed"},
+		{Cancel, "canceled"},
+		{Success, "finished"},
+		{Queued, "queued"},
+		{PartialSuccess, "partial success"},
 	}
 
 	for _, tt := range tests {
@@ -80,13 +80,13 @@ func TestNodeStatusString(t *testing.T) {
 		nodeStatus NodeStatus
 		expected   string
 	}{
-		{NodeStatusNone, "not started"},
-		{NodeStatusRunning, "running"},
-		{NodeStatusError, "failed"},
-		{NodeStatusCancel, "canceled"},
-		{NodeStatusSuccess, "finished"},
-		{NodeStatusSkipped, "skipped"},
-		{NodeStatusPartialSuccess, "partial success"},
+		{NodeNone, "not started"},
+		{NodeRunning, "running"},
+		{NodeError, "failed"},
+		{NodeCancel, "canceled"},
+		{NodeSuccess, "finished"},
+		{NodeSkipped, "skipped"},
+		{NodePartialSuccess, "partial success"},
 	}
 
 	for _, tt := range tests {

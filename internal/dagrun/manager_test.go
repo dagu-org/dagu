@@ -33,7 +33,7 @@ func TestManager(t *testing.T) {
 			dag.SockAddr(dagRunID),
 			func(w http.ResponseWriter, _ *http.Request) {
 				status := models.NewStatusBuilder(dag.DAG).Create(
-					dagRunID, status.StatusRunning, 0, time.Now(),
+					dagRunID, status.Running, 0, time.Now(),
 				)
 				w.WriteHeader(http.StatusOK)
 				jsonData, err := json.Marshal(status)
@@ -50,11 +50,11 @@ func TestManager(t *testing.T) {
 			_ = socketServer.Shutdown(ctx)
 		}()
 
-		dag.AssertCurrentStatus(t, status.StatusRunning)
+		dag.AssertCurrentStatus(t, status.Running)
 
 		_ = socketServer.Shutdown(ctx)
 
-		dag.AssertCurrentStatus(t, status.StatusNone)
+		dag.AssertCurrentStatus(t, status.None)
 	})
 	t.Run("UpdateStatus", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "update_status.yaml"))
@@ -71,7 +71,7 @@ func TestManager(t *testing.T) {
 		err = att.Open(ctx)
 		require.NoError(t, err)
 
-		dagRunStatus := testNewStatus(dag.DAG, dagRunID, status.StatusSuccess, status.NodeStatusSuccess)
+		dagRunStatus := testNewStatus(dag.DAG, dagRunID, status.Success, status.NodeSuccess)
 
 		err = att.Write(ctx, dagRunStatus)
 		require.NoError(t, err)
@@ -81,10 +81,10 @@ func TestManager(t *testing.T) {
 		ref := digraph.NewDAGRunRef(dag.Name, dagRunID)
 		statusToCheck, err := cli.GetSavedStatus(ctx, ref)
 		require.NoError(t, err)
-		require.Equal(t, status.NodeStatusSuccess, statusToCheck.Nodes[0].Status)
+		require.Equal(t, status.NodeSuccess, statusToCheck.Nodes[0].Status)
 
 		// Update the status.
-		newStatus := status.NodeStatusError
+		newStatus := status.NodeError
 		dagRunStatus.Nodes[0].Status = newStatus
 
 		root := digraph.NewDAGRunRef(dag.Name, dagRunID)
@@ -103,7 +103,7 @@ func TestManager(t *testing.T) {
 		err := th.DAGRunMgr.StartDAGRun(th.Context, dag.DAG, dagrun.StartOptions{Quiet: true})
 		require.NoError(t, err)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 
 		// Get the child dag-run status.
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -114,17 +114,17 @@ func TestManager(t *testing.T) {
 		root := digraph.NewDAGRunRef(dag.Name, dagRunID)
 		childDAGRunStatus, err := th.DAGRunMgr.FindChildDAGRunStatus(th.Context, root, childDAGRun.DAGRunID)
 		require.NoError(t, err)
-		require.Equal(t, status.StatusSuccess.String(), childDAGRunStatus.Status.String())
+		require.Equal(t, status.Success.String(), childDAGRunStatus.Status.String())
 
 		// Update the the child dag-run status.
-		childDAGRunStatus.Nodes[0].Status = status.NodeStatusError
+		childDAGRunStatus.Nodes[0].Status = status.NodeError
 		err = th.DAGRunMgr.UpdateStatus(th.Context, root, *childDAGRunStatus)
 		require.NoError(t, err)
 
 		// Check if the child dag-run status is updated.
 		childDAGRunStatus, err = th.DAGRunMgr.FindChildDAGRunStatus(th.Context, root, childDAGRun.DAGRunID)
 		require.NoError(t, err)
-		require.Equal(t, status.NodeStatusError.String(), childDAGRunStatus.Nodes[0].Status.String())
+		require.Equal(t, status.NodeError.String(), childDAGRunStatus.Nodes[0].Status.String())
 	})
 	t.Run("InvalidUpdateStatusWithInvalidDAGRunID", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "invalid_run_id.yaml"))
@@ -132,7 +132,7 @@ func TestManager(t *testing.T) {
 		cli := th.DAGRunMgr
 
 		// update with invalid dag-run ID.
-		status := testNewStatus(dag.DAG, "unknown-req-id", status.StatusError, status.NodeStatusError)
+		status := testNewStatus(dag.DAG, "unknown-req-id", status.Error, status.NodeError)
 
 		// Check if the update fails.
 		root := digraph.NewDAGRunRef(dag.Name, "unknown-req-id")
@@ -152,11 +152,11 @@ func TestClient_RunDAG(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
-		require.Equal(t, status.StatusSuccess.String(), dagRunStatus.Status.String())
+		require.Equal(t, status.Success.String(), dagRunStatus.Status.String())
 	})
 	t.Run("Stop", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "stop.yaml"))
@@ -165,12 +165,12 @@ func TestClient_RunDAG(t *testing.T) {
 		err := th.DAGRunMgr.StartDAGRun(ctx, dag.DAG, dagrun.StartOptions{})
 		require.NoError(t, err)
 
-		dag.AssertLatestStatus(t, status.StatusRunning)
+		dag.AssertLatestStatus(t, status.Running)
 
 		err = th.DAGRunMgr.Stop(ctx, dag.DAG, "")
 		require.NoError(t, err)
 
-		dag.AssertLatestStatus(t, status.StatusCancel)
+		dag.AssertLatestStatus(t, status.Cancel)
 	})
 	t.Run("Restart", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "restart.yaml"))
@@ -179,12 +179,12 @@ func TestClient_RunDAG(t *testing.T) {
 		err := th.DAGRunMgr.StartDAGRun(th.Context, dag.DAG, dagrun.StartOptions{})
 		require.NoError(t, err)
 
-		dag.AssertLatestStatus(t, status.StatusRunning)
+		dag.AssertLatestStatus(t, status.Running)
 
 		err = th.DAGRunMgr.RestartDAG(ctx, dag.DAG, dagrun.RestartOptions{})
 		require.NoError(t, err)
 
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 	})
 	t.Run("Retry", func(t *testing.T) {
 		dag := th.DAG(t, filepath.Join("client", "retry.yaml"))
@@ -195,7 +195,7 @@ func TestClient_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 
 		// Retry the DAG with the same params.
 		dagRunStatus, err := cli.GetLatestStatus(ctx, dag.DAG)
@@ -210,7 +210,7 @@ func TestClient_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 
 		dagRunStatus, err = cli.GetLatestStatus(ctx, dag.DAG)
 		require.NoError(t, err)
@@ -228,7 +228,7 @@ func TestClient_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 
 		dagRunStatus, err := cli.GetLatestStatus(ctx, dag.DAG)
 		require.NoError(t, err)
@@ -241,7 +241,7 @@ func TestClient_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish again
-		dag.AssertLatestStatus(t, status.StatusSuccess)
+		dag.AssertLatestStatus(t, status.Success)
 
 		dagRunStatus, err = cli.GetLatestStatus(ctx, dag.DAG)
 		require.NoError(t, err)

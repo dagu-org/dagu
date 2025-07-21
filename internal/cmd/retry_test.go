@@ -30,7 +30,7 @@ func TestRetryCommand(t *testing.T) {
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
-		require.Equal(t, dagRunStatus.Status, status.StatusSuccess)
+		require.Equal(t, dagRunStatus.Status, status.Success)
 		require.NotNil(t, dagRunStatus.Status)
 
 		// Retry with the dag-run ID using file path.
@@ -59,7 +59,7 @@ func TestRetryCommand(t *testing.T) {
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
-		require.Equal(t, dagRunStatus.Status, status.StatusSuccess)
+		require.Equal(t, dagRunStatus.Status, status.Success)
 		require.NotNil(t, dagRunStatus.Status)
 
 		// Retry with the dag-run ID using DAG name.

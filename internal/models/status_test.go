@@ -34,7 +34,7 @@ func TestStatusSerialization(t *testing.T) {
 		SMTP:      &digraph.SMTPConfig{},
 	}
 	dagRunID := uuid.Must(uuid.NewV7()).String()
-	statusToPersist := models.NewStatusBuilder(dag).Create(dagRunID, status.StatusSuccess, 0, startedAt, models.WithFinishedAt(finishedAt))
+	statusToPersist := models.NewStatusBuilder(dag).Create(dagRunID, status.Success, 0, startedAt, models.WithFinishedAt(finishedAt))
 
 	rawJSON, err := json.Marshal(statusToPersist)
 	require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestStatusBuilder(t *testing.T) {
 
 	builder := models.NewStatusBuilder(dag)
 	dagRunID := "test-run-123"
-	s := status.StatusRunning
+	s := status.Running
 	pid := 12345
 	startedAt := time.Now()
 
@@ -100,7 +100,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 
 	builder := models.NewStatusBuilder(dag)
 	dagRunID := "test-run-456"
-	s := status.StatusSuccess
+	s := status.Success
 	pid := 54321
 	startedAt := time.Now()
 	finishedAt := startedAt.Add(5 * time.Minute)
@@ -110,7 +110,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 		{
 			Step: digraph.Step{Name: "step1"},
 			State: scheduler.NodeState{
-				Status:     status.NodeStatusSuccess,
+				Status:     status.NodeSuccess,
 				StartedAt:  startedAt,
 				FinishedAt: finishedAt,
 			},
@@ -182,7 +182,7 @@ func TestInitialStatus(t *testing.T) {
 	st := models.InitialStatus(dag)
 
 	assert.Equal(t, dag.Name, st.Name)
-	assert.Equal(t, status.StatusNone, st.Status)
+	assert.Equal(t, status.None, st.Status)
 	assert.Equal(t, models.PID(0), st.PID)
 	assert.Equal(t, 2, len(st.Nodes))
 	assert.NotNil(t, st.OnExit)
@@ -321,8 +321,8 @@ func TestNodesFromSteps(t *testing.T) {
 	assert.Equal(t, 2, len(nodes))
 	assert.Equal(t, "step1", nodes[0].Step.Name)
 	assert.Equal(t, "step2", nodes[1].Step.Name)
-	assert.Equal(t, status.NodeStatusNone, nodes[0].Status)
-	assert.Equal(t, status.NodeStatusNone, nodes[1].Status)
+	assert.Equal(t, status.NodeNone, nodes[0].Status)
+	assert.Equal(t, status.NodeNone, nodes[1].Status)
 }
 
 func TestWithCreatedAtDefaultTime(t *testing.T) {

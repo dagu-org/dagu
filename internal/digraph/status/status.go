@@ -6,30 +6,30 @@ package status
 type Status int
 
 const (
-	StatusNone Status = iota
-	StatusRunning
-	StatusError
-	StatusCancel
-	StatusSuccess
-	StatusQueued
-	StatusPartialSuccess
+	None Status = iota
+	Running
+	Error
+	Cancel
+	Success
+	Queued
+	PartialSuccess
 )
 
 func (s Status) String() string {
 	switch s {
-	case StatusRunning:
+	case Running:
 		return "running"
-	case StatusError:
+	case Error:
 		return "failed"
-	case StatusCancel:
+	case Cancel:
 		return "canceled"
-	case StatusSuccess:
+	case Success:
 		return "finished"
-	case StatusQueued:
+	case Queued:
 		return "queued"
-	case StatusPartialSuccess:
+	case PartialSuccess:
 		return "partial success"
-	case StatusNone:
+	case None:
 		fallthrough
 	default:
 		return "not started"
@@ -38,47 +38,47 @@ func (s Status) String() string {
 
 // IsActive checks if the status is active.
 func (s Status) IsActive() bool {
-	return s == StatusRunning || s == StatusQueued
+	return s == Running || s == Queued
 }
 
 // IsSuccess checks if the status indicates a successful execution.
 func (s Status) IsSuccess() bool {
-	return s == StatusSuccess || s == StatusPartialSuccess
+	return s == Success || s == PartialSuccess
 }
 
 // NodeStatus represents the status of a node in a DAG.
 type NodeStatus int
 
 const (
-	NodeStatusNone NodeStatus = iota
-	NodeStatusRunning
-	NodeStatusError
-	NodeStatusCancel
-	NodeStatusSuccess
-	NodeStatusSkipped
-	NodeStatusPartialSuccess
+	NodeNone NodeStatus = iota
+	NodeRunning
+	NodeError
+	NodeCancel
+	NodeSuccess
+	NodeSkipped
+	NodePartialSuccess
 )
 
 // IsSuccess checks if the node status indicates a successful execution.
 func (s NodeStatus) IsSuccess() bool {
-	return s == NodeStatusSuccess || s == NodeStatusPartialSuccess
+	return s == NodeSuccess || s == NodePartialSuccess
 }
 
 func (s NodeStatus) String() string {
 	switch s {
-	case NodeStatusRunning:
+	case NodeRunning:
 		return "running"
-	case NodeStatusError:
+	case NodeError:
 		return "failed"
-	case NodeStatusCancel:
+	case NodeCancel:
 		return "canceled"
-	case NodeStatusSuccess:
+	case NodeSuccess:
 		return "finished"
-	case NodeStatusSkipped:
+	case NodeSkipped:
 		return "skipped"
-	case NodeStatusPartialSuccess:
+	case NodePartialSuccess:
 		return "partial success"
-	case NodeStatusNone:
+	case NodeNone:
 		fallthrough
 	default:
 		return "not started"

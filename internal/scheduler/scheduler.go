@@ -254,7 +254,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			if status.Status != dagstatus.StatusQueued {
+			if status.Status != dagstatus.Queued {
 				logger.Info(ctx, "Skipping item from queue", "data", data, "status", status.Status)
 				result = models.QueuedItemProcessingResultDiscard
 				goto SEND_RESULT
@@ -300,7 +300,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 					result = models.QueuedItemProcessingResultDiscard
 					goto SEND_RESULT
 				}
-				if status.Status != dagstatus.StatusQueued {
+				if status.Status != dagstatus.Queued {
 					logger.Info(ctx, "DAG run is no longer queued", "data", data, "status", status.Status)
 					result = models.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN

@@ -358,7 +358,7 @@ func (a *Agent) RunError(t *testing.T) {
 	assert.Error(t, err)
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, status.StatusError.String(), st.String())
+	require.Equal(t, status.Error.String(), st.String())
 }
 
 func (a *Agent) RunCancel(t *testing.T) {
@@ -368,7 +368,7 @@ func (a *Agent) RunCancel(t *testing.T) {
 	assert.NoError(t, err)
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, status.StatusCancel.String(), st.String())
+	require.Equal(t, status.Cancel.String(), st.String())
 }
 
 func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
@@ -378,7 +378,7 @@ func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
 	require.Error(t, err, "expected error %q, got nil", expectedErr)
 	require.Contains(t, err.Error(), expectedErr)
 	st := a.Status(a.Context)
-	require.Equal(t, status.StatusCancel.String(), st.Status.String())
+	require.Equal(t, status.Cancel.String(), st.Status.String())
 }
 
 func (a *Agent) RunSuccess(t *testing.T) {
@@ -388,12 +388,12 @@ func (a *Agent) RunSuccess(t *testing.T) {
 	assert.NoError(t, err, "failed to run agent")
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, status.StatusSuccess.String(), st.String(), "expected status %q, got %q", status.StatusSuccess, st)
+	require.Equal(t, status.Success.String(), st.String(), "expected status %q, got %q", status.Success, st)
 
 	// check all nodes are in success or skipped state
 	for _, node := range a.Status(a.Context).Nodes {
 		st := node.Status
-		if st == status.NodeStatusSkipped || st == status.NodeStatusSuccess {
+		if st == status.NodeSkipped || st == status.NodeSuccess {
 			continue
 		}
 		t.Errorf("expected node %q to be in success state, got %q", node.Step.Name, st.String())

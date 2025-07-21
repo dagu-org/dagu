@@ -32,7 +32,7 @@ steps:
   - name: success-step
     command: echo "This step should run even if the previous one fails"
 `,
-			expectedStatus: status.StatusPartialSuccess,
+			expectedStatus: status.PartialSuccess,
 		},
 		{
 			name: "Success by marking step as successful",
@@ -47,7 +47,7 @@ steps:
   - name: success-step
     command: echo "This step should run even if the previous one fails"
 `,
-			expectedStatus: status.StatusSuccess,
+			expectedStatus: status.Success,
 		},
 		{
 			name: "Single step with continueOn failure",
@@ -58,7 +58,7 @@ steps:
     continueOn:
       failure: true
 `,
-			expectedStatus: status.StatusError,
+			expectedStatus: status.Error,
 		},
 		{
 			name: "Single step with continueOn marking as success",
@@ -70,7 +70,7 @@ steps:
       failure: true
       markSuccess: true
 `,
-			expectedStatus: status.StatusSuccess,
+			expectedStatus: status.Success,
 		},
 	}
 
@@ -97,7 +97,7 @@ steps:
 			agent := testDAG.Agent()
 			err = agent.Run(agent.Context)
 
-			if tc.expectedStatus == status.StatusSuccess {
+			if tc.expectedStatus == status.Success {
 				require.NoError(t, err)
 			}
 

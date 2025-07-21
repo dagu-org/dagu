@@ -103,10 +103,10 @@ func (g *ExecutionGraph) IsRunning() bool {
 	defer g.lock.RUnlock()
 	for _, node := range g.nodes {
 		s := node.State().Status
-		if s == status.NodeStatusRunning {
+		if s == status.NodeRunning {
 			return true
 		}
-		if s == status.NodeStatusNone && g.finishedAt.IsZero() {
+		if s == status.NodeNone && g.finishedAt.IsZero() {
 			// If the node is not started and the graph is not finished,
 			// it means the node is still pending to be executed.
 			return true
@@ -172,8 +172,8 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context, steps map[string]digrap
 	for len(frontier) > 0 {
 		var next []int
 		for _, u := range frontier {
-			if retry[u] || dict[u] == status.NodeStatusError ||
-				dict[u] == status.NodeStatusCancel {
+			if retry[u] || dict[u] == status.NodeError ||
+				dict[u] == status.NodeCancel {
 				logger.Debug(ctx, "Clearing node state", "step", g.nodeByID[u].Name())
 				step, ok := steps[g.nodeByID[u].Name()]
 				if !ok {
@@ -266,8 +266,8 @@ func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 
 func (g *ExecutionGraph) isFinished() bool {
 	for _, node := range g.nodes {
-		if node.State().Status == status.NodeStatusRunning ||
-			node.State().Status == status.NodeStatusNone {
+		if node.State().Status == status.NodeRunning ||
+			node.State().Status == status.NodeNone {
 			return false
 		}
 	}
@@ -277,7 +277,7 @@ func (g *ExecutionGraph) isFinished() bool {
 func (g *ExecutionGraph) runningCount() int {
 	count := 0
 	for _, node := range g.nodes {
-		if node.State().Status == status.NodeStatusRunning {
+		if node.State().Status == status.NodeRunning {
 			count++
 		}
 	}

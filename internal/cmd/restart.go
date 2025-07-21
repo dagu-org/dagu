@@ -71,7 +71,7 @@ func runRestart(ctx *Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
-	if dagStatus.Status != status.StatusRunning {
+	if dagStatus.Status != status.Running {
 		return fmt.Errorf("DAG %s is not running", name)
 	}
 
@@ -157,7 +157,7 @@ func stopDAGIfRunning(ctx context.Context, cli dagrun.Manager, dag *digraph.DAG,
 		return fmt.Errorf("failed to get current status: %w", err)
 	}
 
-	if dagStatus.Status == status.StatusRunning {
+	if dagStatus.Status == status.Running {
 		logger.Infof(ctx, "Stopping: %s", dag.Name)
 		if err := stopRunningDAG(ctx, cli, dag, dagRunID); err != nil {
 			return fmt.Errorf("failed to stop running DAG: %w", err)
@@ -174,7 +174,7 @@ func stopRunningDAG(ctx context.Context, cli dagrun.Manager, dag *digraph.DAG, d
 			return fmt.Errorf("failed to get current status: %w", err)
 		}
 
-		if dagStatus.Status != status.StatusRunning {
+		if dagStatus.Status != status.Running {
 			return nil
 		}
 

@@ -51,7 +51,7 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	if dagStatus.Status != status.StatusQueued {
+	if dagStatus.Status != status.Queued {
 		// If the status is not queued, return an error
 		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, dagStatus.Status)
 	}
@@ -66,12 +66,12 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 	if err != nil {
 		return fmt.Errorf("failed to get latest status: %w", err)
 	}
-	if latestStatus.Status != status.StatusQueued {
+	if latestStatus.Status != status.Queued {
 		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, latestStatus.Status)
 	}
 
 	// Make the status as canceled
-	dagStatus.Status = status.StatusCancel
+	dagStatus.Status = status.Cancel
 
 	if err := attempt.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)

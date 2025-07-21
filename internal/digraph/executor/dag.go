@@ -139,18 +139,18 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 // DetermineNodeStatus implements NodeStatusDeterminer.
 func (e *dagExecutor) DetermineNodeStatus(ctx context.Context) (status.NodeStatus, error) {
 	if e.result == nil {
-		return status.NodeStatusError, fmt.Errorf("no result available for node status determination")
+		return status.NodeError, fmt.Errorf("no result available for node status determination")
 	}
 
 	// Check if the status is partial success or success
 	// For error cases, we return an error with the status
 	switch e.result.Status {
-	case status.StatusSuccess:
-		return status.NodeStatusSuccess, nil
-	case status.StatusPartialSuccess:
-		return status.NodeStatusPartialSuccess, nil
+	case status.Success:
+		return status.NodeSuccess, nil
+	case status.PartialSuccess:
+		return status.NodePartialSuccess, nil
 	default:
-		return status.NodeStatusError, fmt.Errorf("child DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
+		return status.NodeError, fmt.Errorf("child DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
 	}
 }
 

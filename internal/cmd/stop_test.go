@@ -27,7 +27,7 @@ func TestStopCommand(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 
 		// Wait for the dag-run running.
-		dag.AssertLatestStatus(t, status.StatusRunning)
+		dag.AssertLatestStatus(t, status.Running)
 
 		// Stop the dag-run.
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
@@ -35,7 +35,7 @@ func TestStopCommand(t *testing.T) {
 			ExpectedOut: []string{"stopped"}})
 
 		// Check the dag-run is stopped.
-		dag.AssertLatestStatus(t, status.StatusCancel)
+		dag.AssertLatestStatus(t, status.Cancel)
 		<-done
 	})
 	t.Run("StopDAGRunWithRunID", func(t *testing.T) {
@@ -55,7 +55,7 @@ func TestStopCommand(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 
 		// Wait for the dag-run running
-		dag.AssertLatestStatus(t, status.StatusRunning)
+		dag.AssertLatestStatus(t, status.Running)
 
 		// Stop the dag-run with a specific run ID.
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
@@ -63,7 +63,7 @@ func TestStopCommand(t *testing.T) {
 			ExpectedOut: []string{"stopped"}})
 
 		// Check the dag-run is stopped.
-		dag.AssertLatestStatus(t, status.StatusCancel)
+		dag.AssertLatestStatus(t, status.Cancel)
 		<-done
 	})
 }
