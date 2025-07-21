@@ -241,26 +241,23 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*DAG, error) {
 
 	// If there are child DAGs, add them to the main DAG
 	if len(dags) > 1 {
-		mainDAG.LocalDAGs = make(map[string]LocalDAG)
+		mainDAG.LocalDAGs = make(map[string]*DAG)
 		for i := 1; i < len(dags); i++ {
 			childDAG := dags[i]
 			if childDAG.Name == "" {
 				return nil, fmt.Errorf("child DAG at index %d must have a name", i)
 			}
-			mainDAG.LocalDAGs[childDAG.Name] = LocalDAG{
-				DAG:      childDAG.DAG,
-				YamlData: childDAG.yamlData,
-			}
+			mainDAG.LocalDAGs[childDAG.Name] = childDAG
 		}
 	}
 
 	mainDAG.initializeDefaults()
 
-	return mainDAG.DAG, nil
+	return mainDAG, nil
 }
 
 // loadDAGsFromFile loads all DAGs from a multi-document YAML file
-func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([]loadedDAG, error) {
+func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([]*DAG, error) {
 	// Open the file
 	f, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
@@ -268,8 +265,14 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 	}
 	defer func() { _ = f.Close() }()
 
-	var dags []loadedDAG
-	decoder := yaml.NewDecoder(f)
+	// Read data from the file
+	dat, err := io.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %q", filePath)
+	}
+
+	var dags []*DAG
+	decoder := yaml.NewDecoder(bytes.NewReader(dat))
 
 	// Read all documents from the file
 	docIndex := 0
@@ -329,16 +332,19 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 		// Set the location for the DAG
 		dest.Location = filePath
 
-		// Marshal the document back to YAML to preserve original data
-		yamlData, err := yaml.Marshal(doc)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal DAG in document %d: %w", docIndex, err)
+		if docIndex == 0 {
+			// If this is the first document, set the entire DAG
+			dest.YamlData = dat
+		} else {
+			// Marshal the document back to YAML to preserve original data
+			yamlData, err := yaml.Marshal(doc)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal DAG in document %d: %w", docIndex, err)
+			}
+			dest.YamlData = yamlData
 		}
 
-		dags = append(dags, loadedDAG{
-			DAG:      dest,
-			yamlData: yamlData,
-		})
+		dags = append(dags, dest)
 		docIndex++
 	}
 
@@ -361,12 +367,6 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 	}
 
 	return dags, nil
-}
-
-// loadedDAG is a wrapper for a DAG that includes the original YAML data.
-type loadedDAG struct {
-	*DAG
-	yamlData []byte // Original YAML data for the DAG
 }
 
 // defaultName returns the default name for the given file.

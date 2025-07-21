@@ -277,7 +277,7 @@ Dagu supports distributed execution through a coordinator-worker model. Workers 
 ### Core Components
 
 #### 1. Coordinator Service
-- **gRPC Server**: Listens on configurable port (default: 50051)
+- **gRPC Server**: Listens on configurable port (default: 50055)
 - **Task Distribution**: Routes tasks to appropriate workers based on labels
 - **Long Polling**: Workers poll for tasks using efficient long-polling mechanism
 - **Health Monitoring**: Tracks worker heartbeats and health status

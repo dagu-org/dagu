@@ -68,6 +68,8 @@ type definition struct {
 	MaxOutputSize int
 	// OTel is the OpenTelemetry configuration.
 	OTel any
+	// WorkerSelector specifies required worker labels for execution.
+	WorkerSelector map[string]string
 }
 
 // handlerOnDef defines the steps to be executed on different events.

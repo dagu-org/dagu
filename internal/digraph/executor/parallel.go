@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -27,19 +26,17 @@ type parallelExecutor struct {
 	env           Env
 
 	// Runtime state
-	running             map[string]*exec.Cmd    // Maps DAG run ID to command
-	distributedChildren map[string]bool         // Maps DAG run ID to distributed status
-	results             map[string]*ChildResult // Maps DAG run ID to result
-	errors              []error                 // Collects errors from failed executions
-	wg                  sync.WaitGroup          // Tracks running goroutines
-	cancelFunc          context.CancelFunc      // For canceling all child executions
+	results    map[string]*ChildResult // Maps DAG run ID to result
+	errors     []error                 // Collects errors from failed executions
+	wg         sync.WaitGroup          // Tracks running goroutines
+	cancelFunc context.CancelFunc      // For canceling all child executions
 }
 
 // ChildResult holds the result of a single child DAG execution
 type ChildResult struct {
 	RunID    string         `json:"runId"`
 	Params   string         `json:"params"`
-	Status   string         `json:"status"`
+	Success  bool           `json:"success"`
 	Output   map[string]any `json:"output,omitempty"`
 	Error    string         `json:"error,omitempty"`
 	ExitCode int            `json:"exitCode"`
@@ -71,14 +68,12 @@ func newParallelExecutor(
 	}
 
 	return &parallelExecutor{
-		child:               child,
-		workDir:             dir,
-		maxConcurrent:       maxConcurrent,
-		env:                 GetEnv(ctx),
-		running:             make(map[string]*exec.Cmd),
-		distributedChildren: make(map[string]bool),
-		results:             make(map[string]*ChildResult),
-		errors:              make([]error, 0),
+		child:         child,
+		workDir:       dir,
+		maxConcurrent: maxConcurrent,
+		env:           GetEnv(ctx),
+		results:       make(map[string]*ChildResult),
+		errors:        make([]error, 0),
 	}, nil
 }
 
@@ -153,7 +148,27 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 
 	// Check if any executions failed
 	if len(e.errors) > 0 {
+		// Check if any error is due to context cancellation
+		for _, err := range e.errors {
+			if err == context.Canceled {
+				return fmt.Errorf("parallel execution cancelled")
+			}
+		}
 		return fmt.Errorf("parallel execution failed with %d errors: %v", len(e.errors), e.errors[0])
+	}
+
+	// Check if any child DAGs failed (even if they completed without execution errors)
+	e.lock.Lock()
+	failedCount := 0
+	for _, result := range e.results {
+		if !result.Success {
+			failedCount++
+		}
+	}
+	e.lock.Unlock()
+
+	if failedCount > 0 {
+		return fmt.Errorf("parallel execution failed: %d child dag(s) failed", failedCount)
 	}
 
 	return nil
@@ -179,90 +194,26 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 
 // executeChild executes a single child DAG with the given parameters
 func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams) error {
-	cmd, err := e.child.BuildCommand(ctx, runParams, e.workDir)
-	if err != nil {
-		return err
-	}
-
-	// Create pipes for stdout/stderr capture
-	// We'll collect individual outputs for aggregation
-	cmd.Stdout = io.Discard // TODO: Capture individual outputs if needed
-	cmd.Stderr = io.Discard // TODO: Capture individual errors if needed
-
-	// Store the command for potential killing
-	e.lock.Lock()
-	e.running[runParams.RunID] = cmd
-	e.lock.Unlock()
-
-	logger.Info(ctx, "Executing child DAG",
-		"dagRunId", runParams.RunID,
-		"target", e.child.DAG.Name,
-		"params", runParams.Params,
-	)
-
-	// Start and wait for the command
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start child dag-run: %w", err)
-	}
-
-	err = cmd.Wait()
-
-	// Remove from running map
-	e.lock.Lock()
-	delete(e.running, runParams.RunID)
-	e.lock.Unlock()
-
-	// Get the result regardless of error
-	env := GetEnv(ctx)
-	result, resultErr := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
+	// Use the new ExecuteWithResult API
+	result, err := e.child.ExecuteWithResult(ctx, runParams, e.workDir)
 
 	// Store the result
 	e.lock.Lock()
-	if resultErr == nil && result != nil {
-		// Convert digraph.Status outputs to map[string]any
-		outputs := make(map[string]any)
-		for k, v := range result.Outputs {
-			outputs[k] = v
-		}
-
-		// Determine status based on execution error
-		status := "success"
-		if err != nil {
-			status = "failed"
-		}
-
+	if result != nil {
+		e.results[runParams.RunID] = result
+	} else if err != nil {
+		// Create error result if execution failed
 		e.results[runParams.RunID] = &ChildResult{
 			RunID:    runParams.RunID,
 			Params:   runParams.Params,
-			Status:   status,
-			Output:   outputs,
-			ExitCode: cmd.ProcessState.ExitCode(),
-		}
-	} else {
-		// Even if we couldn't get the result, store what we know
-		status := "error"
-		if err == nil && resultErr != nil {
-			// Command succeeded but couldn't get result
-			status = "success"
-		} else if err != nil {
-			status = "failed"
-		}
-
-		e.results[runParams.RunID] = &ChildResult{
-			RunID:    runParams.RunID,
-			Params:   runParams.Params,
-			Status:   status,
-			Error:    fmt.Sprintf("execution error: %v, result error: %v", err, resultErr),
-			ExitCode: cmd.ProcessState.ExitCode(),
+			Success:  false,
+			Error:    err.Error(),
+			ExitCode: 1,
 		}
 	}
 	e.lock.Unlock()
 
-	if err != nil {
-		return fmt.Errorf("child dag-run failed: %w", err)
-	}
-
-	return nil
+	return err
 }
 
 // outputResults aggregates and outputs all child DAG results
@@ -293,7 +244,7 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 			resultCopy := *result
 
 			// Clear output for failed executions
-			if result.Status != "success" {
+			if !result.Success {
 				resultCopy.Output = nil
 			}
 
@@ -301,14 +252,13 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 
 			// Add output to the outputs array
 			// Only include outputs from successful executions
-			if result.Status == "success" && result.Output != nil {
+			if result.Success && result.Output != nil {
 				output.Outputs = append(output.Outputs, result.Output)
 			}
 
-			switch result.Status {
-			case "success":
+			if result.Success {
 				output.Summary.Succeeded++
-			case "failed", "error":
+			} else {
 				output.Summary.Failed++
 			}
 
@@ -346,23 +296,12 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 		e.cancelFunc()
 	}
 
-	// Request cancellation for distributed children
-	if len(e.distributedChildren) > 0 {
-		ctx := context.Background()
-		for dagRunID, isDistributed := range e.distributedChildren {
-			if isDistributed {
-				if err := e.env.DB.RequestChildCancel(ctx, dagRunID, e.env.RootDAGRun); err != nil {
-					logger.Error(ctx, "Failed to request child DAG cancellation",
-						"dagRunId", dagRunID, "err", err)
-				}
-			}
-		}
+	// Kill all child processes (both local and distributed)
+	if e.child != nil {
+		return e.child.Kill(sig)
 	}
 
-	// Kill all running child processes
-	lastErr := killMultipleProcessGroups(e.running, sig)
-
-	return lastErr
+	return nil
 }
 
 func init() {

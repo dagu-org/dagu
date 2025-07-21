@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/stringutil"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/robfig/cron/v3"
 )
 
@@ -27,12 +28,13 @@ var _ Job = (*DAGRunJob)(nil)
 
 // DAGRunJob represents a job that runs a DAG.
 type DAGRunJob struct {
-	DAG        *digraph.DAG
-	Executable string
-	WorkDir    string
-	Next       time.Time
-	Schedule   cron.Schedule
-	Client     dagrun.Manager
+	DAG         *digraph.DAG
+	Executable  string
+	WorkDir     string
+	Next        time.Time
+	Schedule    cron.Schedule
+	Client      dagrun.Manager
+	DAGExecutor *DAGExecutor
 }
 
 // GetDAG returns the DAG associated with this job.
@@ -57,8 +59,14 @@ func (j *DAGRunJob) Start(ctx context.Context) error {
 		return err
 	}
 
-	// Job is ready; proceed to start.
-	return j.Client.StartDAGRunAsync(ctx, j.DAG, dagrun.StartOptions{Quiet: true})
+	// Create a unique run ID for this scheduled execution
+	runID, err := j.Client.GenDAGRunID(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Handle the job execution (implements persistence-first for distributed execution)
+	return j.DAGExecutor.HandleJob(ctx, j.DAG, coordinatorv1.Operation_OPERATION_START, runID)
 }
 
 // Ready checks whether the job can be safely started based on the latest status.
