@@ -259,6 +259,16 @@ func (n *Node) Execute(ctx context.Context) error {
 		n.setVariable(output, value)
 	}
 
+	if status, ok := cmd.(executor.NodeStatusDeterminer); ok {
+		// Determine the node status based on the executor's implementation
+		nodeStatus, err := status.DetermineNodeStatus(ctx)
+		// Only set the status if it is a success
+		// Handle the error case at the scheduler level for simplicity
+		if err == nil && nodeStatus.IsSuccess() {
+			n.SetStatus(nodeStatus)
+		}
+	}
+
 	return n.Error()
 }
 

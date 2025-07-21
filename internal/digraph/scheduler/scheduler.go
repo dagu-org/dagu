@@ -491,6 +491,10 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 		case status.NodeStatusSuccess:
 			continue
 
+		case status.NodeStatusPartialSuccess:
+			// Partial success is treated like success for dependencies
+			continue
+
 		case status.NodeStatusError:
 			if dep.ShouldContinue(ctx) {
 				continue
@@ -510,10 +514,6 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 		case status.NodeStatusCancel:
 			ready = false
 			node.SetStatus(status.NodeStatusCancel)
-
-		case status.NodeStatusPartialSuccess:
-			// Partial success is treated like success for dependencies
-			continue
 
 		case status.NodeStatusNone, status.NodeStatusRunning:
 			ready = false

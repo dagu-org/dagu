@@ -59,6 +59,11 @@ const (
 	NodeStatusPartialSuccess
 )
 
+// IsSuccess checks if the node status indicates a successful execution.
+func (s NodeStatus) IsSuccess() bool {
+	return s == NodeStatusSuccess || s == NodeStatusPartialSuccess
+}
+
 func (s NodeStatus) String() string {
 	switch s {
 	case NodeStatusRunning:

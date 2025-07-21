@@ -10,11 +10,13 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
 var _ ParallelExecutor = (*parallelExecutor)(nil)
+var _ NodeStatusDeterminer = (*parallelExecutor)(nil)
 
 type parallelExecutor struct {
 	child         *ChildDAGExecutor
@@ -163,6 +165,30 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
+// DetermineNodeStatus implements NodeStatusDeterminer.
+func (e *parallelExecutor) DetermineNodeStatus(ctx context.Context) (status.NodeStatus, error) {
+	if len(e.results) == 0 {
+		return status.NodeStatusError, fmt.Errorf("no results available for node status determination")
+	}
+
+	// Check if all child DAGs succeeded or if any had partial success
+	// For error cases, we return an error status with error message
+	var partialSuccess bool
+	for _, result := range e.results {
+		if !result.Status.IsSuccess() {
+			return status.NodeStatusError, fmt.Errorf("child DAG run %s failed with status: %s", result.DAGRunID, result.Status)
+		}
+		if result.Status == status.StatusPartialSuccess {
+			partialSuccess = true
+		}
+	}
+
+	if partialSuccess {
+		return status.NodeStatusPartialSuccess, nil
+	}
+	return status.NodeStatusSuccess, nil
+}
+
 // executeChild executes a single child DAG with the given parameters
 func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams) error {
 	cmd, err := e.child.BuildCommand(ctx, runParams, e.workDir)
@@ -232,7 +258,6 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 			Total     int `json:"total"`
 			Succeeded int `json:"succeeded"`
 			Failed    int `json:"failed"`
-			Errors    int `json:"errors"`
 		} `json:"summary"`
 		Results []digraph.RunStatus `json:"results"`
 		Outputs []map[string]string `json:"outputs"`

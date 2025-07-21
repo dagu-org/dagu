@@ -10,11 +10,13 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
 var _ DAGExecutor = (*dagExecutor)(nil)
+var _ NodeStatusDeterminer = (*dagExecutor)(nil)
 
 type dagExecutor struct {
 	child     *ChildDAGExecutor
@@ -24,6 +26,7 @@ type dagExecutor struct {
 	stderr    io.Writer
 	cmd       *exec.Cmd
 	runParams RunParams
+	result    *digraph.RunStatus
 }
 
 // Errors for DAG executor
@@ -101,6 +104,8 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to find result for the child dag-run %q: %w", e.runParams.RunID, err)
 	}
 
+	e.result = result
+
 	if result.Status.IsSuccess() {
 		if waitErr != nil {
 			logger.Warn(ctx, "Child DAG completed with exit code but no error",
@@ -129,6 +134,24 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// DetermineNodeStatus implements NodeStatusDeterminer.
+func (e *dagExecutor) DetermineNodeStatus(ctx context.Context) (status.NodeStatus, error) {
+	if e.result == nil {
+		return status.NodeStatusError, fmt.Errorf("no result available for node status determination")
+	}
+
+	// Check if the status is partial success or success
+	// For error cases, we return an error with the status
+	switch e.result.Status {
+	case status.StatusSuccess:
+		return status.NodeStatusSuccess, nil
+	case status.StatusPartialSuccess:
+		return status.NodeStatusPartialSuccess, nil
+	default:
+		return status.NodeStatusError, fmt.Errorf("child DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
+	}
 }
 
 func (e *dagExecutor) SetParams(params RunParams) {
