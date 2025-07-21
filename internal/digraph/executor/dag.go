@@ -137,7 +137,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 }
 
 // DetermineNodeStatus implements NodeStatusDeterminer.
-func (e *dagExecutor) DetermineNodeStatus(ctx context.Context) (status.NodeStatus, error) {
+func (e *dagExecutor) DetermineNodeStatus(_ context.Context) (status.NodeStatus, error) {
 	if e.result == nil {
 		return status.NodeError, fmt.Errorf("no result available for node status determination")
 	}
@@ -149,8 +149,11 @@ func (e *dagExecutor) DetermineNodeStatus(ctx context.Context) (status.NodeStatu
 		return status.NodeSuccess, nil
 	case status.PartialSuccess:
 		return status.NodePartialSuccess, nil
-	default:
+	case status.None, status.Running, status.Error, status.Cancel, status.Queued:
 		return status.NodeError, fmt.Errorf("child DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
+	default:
+		// This should never happen, but satisfies the exhaustive check
+		return status.NodeError, fmt.Errorf("child DAG run %s failed with unknown status: %s", e.result.DAGRunID, e.result.Status)
 	}
 }
 

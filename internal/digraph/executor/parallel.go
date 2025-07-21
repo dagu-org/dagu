@@ -166,7 +166,7 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 }
 
 // DetermineNodeStatus implements NodeStatusDeterminer.
-func (e *parallelExecutor) DetermineNodeStatus(ctx context.Context) (status.NodeStatus, error) {
+func (e *parallelExecutor) DetermineNodeStatus(_ context.Context) (status.NodeStatus, error) {
 	if len(e.results) == 0 {
 		return status.NodeError, fmt.Errorf("no results available for node status determination")
 	}
