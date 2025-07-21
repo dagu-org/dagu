@@ -101,7 +101,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to find result for the child dag-run %q: %w", e.runParams.RunID, err)
 	}
 
-	if result.Success() {
+	if result.Status.IsSuccess() {
 		if waitErr != nil {
 			logger.Warn(ctx, "Child DAG completed with exit code but no error",
 				"dagRunId", e.runParams.RunID,
@@ -111,7 +111,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 			logger.Info(ctx, "Child DAG completed successfully", "dagRunId", e.runParams.RunID)
 		}
 	} else {
-		return fmt.Errorf("child dag-run failed with status: %s", result.StatusLabel())
+		return fmt.Errorf("child dag-run failed with status: %s", result.Status)
 	}
 
 	jsonData, err := json.MarshalIndent(result, "", "  ")

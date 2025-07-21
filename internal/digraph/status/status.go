@@ -41,6 +41,11 @@ func (s Status) IsActive() bool {
 	return s == StatusRunning || s == StatusQueued
 }
 
+// IsSuccess checks if the status indicates a successful execution.
+func (s Status) IsSuccess() bool {
+	return s == StatusSuccess || s == StatusPartialSuccess
+}
+
 // NodeStatus represents the status of a node in a DAG.
 type NodeStatus int
 

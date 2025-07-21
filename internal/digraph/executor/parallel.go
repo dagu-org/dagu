@@ -26,21 +26,11 @@ type parallelExecutor struct {
 	maxConcurrent int
 
 	// Runtime state
-	running    map[string]*exec.Cmd    // Maps DAG run ID to command
-	results    map[string]*ChildResult // Maps DAG run ID to result
-	errors     []error                 // Collects errors from failed executions
-	wg         sync.WaitGroup          // Tracks running goroutines
-	cancelFunc context.CancelFunc      // For canceling all child executions
-}
-
-// ChildResult holds the result of a single child DAG execution
-type ChildResult struct {
-	RunID    string         `json:"runId"`
-	Params   string         `json:"params"`
-	Status   string         `json:"status"`
-	Output   map[string]any `json:"output,omitempty"`
-	Error    string         `json:"error,omitempty"`
-	ExitCode int            `json:"exitCode"`
+	running    map[string]*exec.Cmd          // Maps DAG run ID to command
+	results    map[string]*digraph.RunStatus // Maps DAG run ID to result
+	errors     []error                       // Collects errors from failed executions
+	wg         sync.WaitGroup                // Tracks running goroutines
+	cancelFunc context.CancelFunc            // For canceling all child executions
 }
 
 func newParallelExecutor(
@@ -73,7 +63,7 @@ func newParallelExecutor(
 		workDir:       dir,
 		maxConcurrent: maxConcurrent,
 		running:       make(map[string]*exec.Cmd),
-		results:       make(map[string]*ChildResult),
+		results:       make(map[string]*digraph.RunStatus),
 		errors:        make([]error, 0),
 	}, nil
 }
@@ -220,24 +210,12 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 	// Store the result
 	e.lock.Lock()
 
-	// Convert digraph.Status outputs to map[string]any
-	outputs := make(map[string]any)
-	for k, v := range result.Outputs() {
-		outputs[k] = v
-	}
-
-	e.results[runParams.RunID] = &ChildResult{
-		RunID:    runParams.RunID,
-		Params:   runParams.Params,
-		Status:   result.StatusLabel(),
-		Output:   outputs,
-		ExitCode: cmd.ProcessState.ExitCode(),
-	}
+	e.results[runParams.RunID] = result
 
 	e.lock.Unlock()
 
-	if !result.Success() {
-		return fmt.Errorf("child DAG %s failed with status: %s", runParams.RunID, result.StatusLabel())
+	if !result.Status.IsSuccess() {
+		return fmt.Errorf("child DAG %s failed with status: %s", runParams.RunID, result.Status)
 	}
 
 	return nil
@@ -256,13 +234,13 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 			Failed    int `json:"failed"`
 			Errors    int `json:"errors"`
 		} `json:"summary"`
-		Results []ChildResult    `json:"results"`
-		Outputs []map[string]any `json:"outputs"`
+		Results []digraph.RunStatus `json:"results"`
+		Outputs []map[string]string `json:"outputs"`
 	}{}
 
 	output.Summary.Total = len(e.runParamsList)
-	output.Results = make([]ChildResult, 0, len(e.results))
-	output.Outputs = make([]map[string]any, 0, len(e.results))
+	output.Results = make([]digraph.RunStatus, 0, len(e.results))
+	output.Outputs = make([]map[string]string, 0, len(e.results))
 
 	// Collect results in order of runParamsList for consistency
 	for _, params := range e.runParamsList {
@@ -274,19 +252,14 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 
 			// Add output to the outputs array
 			// Only include outputs from successful executions
-			if result.Output != nil {
-				output.Outputs = append(output.Outputs, result.Output)
+			if result.Outputs != nil {
+				output.Outputs = append(output.Outputs, result.Outputs)
 			}
 
-			switch result.Status {
-			case "finished", "partial success":
+			if result.Status.IsSuccess() {
 				output.Summary.Succeeded++
-			default:
+			} else {
 				output.Summary.Failed++
-			}
-
-			if result.Error != "" {
-				output.Summary.Errors++
 			}
 		}
 	}

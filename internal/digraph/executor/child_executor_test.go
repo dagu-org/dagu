@@ -382,10 +382,10 @@ func (m *mockDatabase) GetDAG(ctx context.Context, name string) (*digraph.DAG, e
 	return args.Get(0).(*digraph.DAG), args.Error(1)
 }
 
-func (m *mockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (digraph.RunStatus, error) {
+func (m *mockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (*digraph.RunStatus, error) {
 	args := m.Called(ctx, dagRunID, rootDAGRun)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(digraph.RunStatus), args.Error(1)
+	return args.Get(0).(*digraph.RunStatus), args.Error(1)
 }
