@@ -14,7 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
@@ -121,7 +121,7 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 		}
 	}
 
-	status, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
+	dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -130,7 +130,7 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 		}
 	}
 
-	if status.Status == scheduler.StatusRunning {
+	if dagStatus.Status == status.Running {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeNotRunning,
@@ -196,7 +196,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 		}
 	}
 
-	status, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
+	dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -219,7 +219,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 	return api.GetDAGDetails200JSONResponse{
 		Dag:          details,
-		LatestDAGRun: toDAGRunDetails(status),
+		LatestDAGRun: toDAGRunDetails(dagStatus),
 		Suspended:    a.dagStore.IsSuspended(ctx, fileName),
 		LocalDags:    localDAGs,
 	}, nil
@@ -229,23 +229,23 @@ func (a *API) readHistoryData(
 	_ context.Context,
 	statusList []models.DAGRunStatus,
 ) []api.DAGGridItem {
-	data := map[string][]scheduler.NodeStatus{}
+	data := map[string][]status.NodeStatus{}
 
 	addStatusFn := func(
-		data map[string][]scheduler.NodeStatus,
+		data map[string][]status.NodeStatus,
 		logLen int,
 		logIdx int,
 		nodeName string,
-		status scheduler.NodeStatus,
+		nodeStatus status.NodeStatus,
 	) {
 		if _, ok := data[nodeName]; !ok {
-			data[nodeName] = make([]scheduler.NodeStatus, logLen)
+			data[nodeName] = make([]status.NodeStatus, logLen)
 		}
-		data[nodeName][logIdx] = status
+		data[nodeName][logIdx] = nodeStatus
 	}
 
-	for idx, status := range statusList {
-		for _, node := range status.Nodes {
+	for idx, st := range statusList {
+		for _, node := range st.Nodes {
 			addStatusFn(data, len(statusList), idx, node.Step.Name, node.Status)
 		}
 	}
@@ -266,7 +266,7 @@ func (a *API) readHistoryData(
 		return strings.Compare(grid[i].Name, grid[j].Name) <= 0
 	})
 
-	handlers := map[string][]scheduler.NodeStatus{}
+	handlers := map[string][]status.NodeStatus{}
 	for idx, status := range statusList {
 		if n := status.OnSuccess; n != nil {
 			addStatusFn(handlers, len(statusList), idx, n.Step.Name, n.Status)
@@ -322,11 +322,11 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	// Get status for each DAG
 	dagStatuses := make([]models.DAGRunStatus, len(result.Items))
 	for i, item := range result.Items {
-		status, err := a.dagRunMgr.GetLatestStatus(ctx, item)
+		dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, item)
 		if err != nil {
 			errList = append(errList, err.Error())
 		}
-		dagStatuses[i] = status
+		dagStatuses[i] = dagStatus
 	}
 
 	for i, item := range result.Items {
@@ -379,13 +379,13 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 		}, nil
 	}
 
-	status, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunId)
+	dagStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunId)
 	if err != nil {
 		return nil, fmt.Errorf("error getting status by dag-run ID: %w", err)
 	}
 
 	return &api.GetDAGDAGRunDetails200JSONResponse{
-		DagRun: toDAGRunDetails(*status),
+		DagRun: toDAGRunDetails(*dagStatus),
 	}, nil
 }
 
@@ -461,11 +461,11 @@ waitLoop:
 		case <-ctx.Done():
 			break waitLoop
 		default:
-			status, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
-			if status == nil {
+			dagStatus, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
+			if dagStatus == nil {
 				continue
 			}
-			if status.Status != scheduler.StatusNone {
+			if dagStatus.Status != status.None {
 				// If status is not None, it means the DAG has started or even finished
 				running = true
 				timer.Stop()
@@ -539,11 +539,11 @@ waitLoop:
 		case <-ctx.Done():
 			break waitLoop
 		default:
-			status, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
-			if status == nil {
+			dagStatus, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
+			if dagStatus == nil {
 				continue
 			}
-			if status.Status != scheduler.StatusNone {
+			if dagStatus.Status != status.None {
 				// If status is not None, it means the DAG has started or even finished
 				ok = true
 				timer.Stop()

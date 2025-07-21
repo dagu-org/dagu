@@ -1,8 +1,8 @@
 <div align="center">
-  <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
+  <img src="./assets/images/dagu-logo.png" width="480" alt="Dagu Logo">
   
-  <h3>Local-First Workflow Engine, Built for Self-Hosting</h3>
-  <p>Zero dependencies. Language agnostic. Self-contained.</p>
+  <h3>A lightweight and powerful workflow engine for enterprise & small teams</h3>
+  <p>Deployable on-premise, in the cloud, or on IoT devices. Low-code declarative workflow definitions that anyone can understand.</p>
   
   <p>
     <a href="https://docs.dagu.cloud/reference/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
@@ -21,39 +21,72 @@
   </p>
 </div>
 
-## What is Dagu?
 
-Dagu solves the problem of complex workflow orchestration without requiring a dedicated infrastructure team. Unlike traditional workflow engines that demand databases, message queues, and careful operational overhead, Dagu runs as a single binary with zero external dependencies. 
+# Overview
 
-After managing hundreds of cron jobs across multiple servers, I built Dagu to bring sanity to workflow automation. It handles scheduling, dependencies, error recovery, and monitoring - everything you need for production workflows, without the complexity.
+Dagu is a powerful workflow engine designed to be deployable in environments where Airflow cannot be installed, such as small devices, on-premise servers, and legacy systems. It allows you to declaratively define any batch job as a single DAG (Directed Acyclic Graph) in a simple YAML format.
 
-[→ Learn the core concepts](https://docs.dagu.cloud/getting-started/concepts)
+```yaml
+steps:
+  - name: step1
+    command: sleep 1 && echo "Hello, Dagu!"
+    
+  - name: step2
+    command: sleep 1 && echo "This is a second step"
+```
 
-### Design Philosophy
+By declaratively defining the processes within a job, complex workflows become visualized, making troubleshooting and recovery easier. Viewing log and retry can be performed from the Web UI, eliminating the need to manually log into a server via SSH.
 
-1. **Local‑first.** Workflows should run offline on laptops, air‑gapped servers, or the cloud—your choice.  
-2. **Zero foot‑print.** One static binary; no databases, brokers, or sidecars.  
-3. **Bring‑your‑own language.** Bash, Python, Go, or anything just works.
+It is equipped with many features to meet the highly detailed requirements of enterprise environments. It operates even in environments without internet access and, being statically compiled, includes all dependencies, allowing it to be used in any environment, including on-premise, cloud, and IoT devices. It is a lightweight workflow engine that meets enterprise requirements.
+
+Note: For a list of features, please refer to the [documentation](https://docs.dagu.cloud/features/).
+
+Workflow jobs are defined as commands. Therefore, legacy scripts that have been in operation for a long time within a company or organization can be used as-is without modification. There is no need to learn a complex new language, and you can start using it right away.
+
+Dagu is designed for small teams of 1-3 people to easily manage complex workflows. It aims to be an ideal choice for teams that find large-scale, high-cost infrastructure like Airflow to be overkill and are looking for a simpler solution.
+
+## Demo
+
+**CLI Demo**: Create a simple DAG workflow and execute it using the command line interface.
+
+![Demo CLI](./assets/images/demo-cli.gif)
+
+**Web UI Demo**: Create and manage workflows using the web interface, including real-time monitoring and control.
+
+[Docs on CLI](https://docs.dagu.cloud/overview/cli)
+
+![Demo Web UI](./assets/images/demo-web-ui.gif)
+
+[Docs on Web UI](https://docs.dagu.cloud/overview/web-ui)
 
 ## Recent Updates
 
 ### v1.17.4
-- **Interactive DAG Selection**: Run `dagu start` without arguments to select DAGs interactively
-- **OpenTelemetry Support**: Distributed tracing with W3C trace context propagation (requested by [@jeremydelattre59](https://github.com/jeremydelattre59))
+- **OpenTelemetry Support (OTEL)**: Distributed tracing with W3C trace context propagation (requested by [@jeremydelattre59](https://github.com/jeremydelattre59))
 - **Windows Support (Beta)**: Initial PowerShell and cmd.exe compatibility - basic functionality works but may have limitations ([@pdoronila](https://github.com/pdoronila))
 - **Scheduler Refactoring**: Improved maintainability ([@thefishhat](https://github.com/thefishhat))
 
 ### v1.17.0
-- **Hierarchical DAG Execution**: Nest workflows with parameter passing and output bubbling
-- **Multiple DAGs in Single File**: Define workflows together using `---` separator
-- **Parallel Execution**: Run steps or sub-DAGs in parallel with different parameters
-- **Enhanced Web UI**: Performance improvements and better user interface
-- **One-click Step Re-run**: Retry individual steps without re-running entire workflow ([@thefishhat](https://github.com/thefishhat))
-- **Enhanced Repeat Policy**: Explicit 'while'/'until' modes for clear repeat logic ([@thefishhat](https://github.com/thefishhat))
-- **Queue Management**: Enqueue DAGs with custom run IDs ([@kriyanshii](https://github.com/kriyanshii))
-- **Docker Improvements**: Optimized images and better container support ([@jerry-yuan](https://github.com/jerry-yuan), [@vnghia](https://github.com/vnghia))
+- **Hierarchical DAG**: Nested workflows with parameter passing
+- **Fan-out**: Run steps or nested workflows in parallel with different parameters
+- **Individual Step Retry**: Retry individual steps without re-running entire workflow ([@thefishhat](https://github.com/thefishhat))
+- **Repeat Policy Enhancement**: The 'while'/'until' modes are added to repeat policy setting ([@thefishhat](https://github.com/thefishhat))
+- **Queue Management**: Enqueue DAGs without running immediately to limit resource usage of the workflow ([@kriyanshii](https://github.com/kriyanshii))
+- **Docker Improvements**: Optimized docker image ([@jerry-yuan](https://github.com/jerry-yuan), [@vnghia](https://github.com/vnghia))
 
-[Full changelog →](https://docs.dagu.cloud/reference/changelog)
+[Full changelog](https://docs.dagu.cloud/reference/changelog)
+
+## Use Cases
+
+Dagu is designed to orchestrate workflows across various domains, particularly those involving multi-step batch jobs and complex data dependencies. Example applications include:
+
+* AI/ML & Data Science - Automating machine learning workflows, including data ingestion, feature engineering, model training, validation, and deployment.
+* Geospatial & Environmental Analysis - Processing datasets from sources such as satellites (earth observation), aerial/terrestrial sensors, seismic surveys, and ground-based radar. Common uses include numerical weather prediction and natural resource management.
+* Finance & Trading - Implementing time-sensitive workflows for stock market analysis, quantitative modeling, risk assessment, and report generation.
+* Medical Imaging & Bioinformatics - Creating pipelines to process and analyze large volumes of medical scans (e.g., MRI, CT) or genomic data for clinical and research purposes.
+* Data Engineering (ETL/ELT) - Building, scheduling, and monitoring pipelines for moving and transforming data between systems like databases, data warehouses, and data lakes.
+* IoT & Edge Computing - Orchestrating workflows that collect, process, and analyze data from distributed IoT devices, sensors, and edge nodes.
+* Media & Content Processing - Automating workflows for video transcoding, image processing, and content delivery, including tasks like format conversion, compression, and metadata extraction.
 
 ## Features
 
@@ -121,6 +154,9 @@ curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.s
 
 # Homebrew
 brew install dagu-org/brew/dagu
+
+# Homebrew (upgrade)
+brew upgrade dagu-org/brew/dagu
 ```
 
 ### Docker
@@ -247,33 +283,6 @@ steps:
     command: python train_model.py ${REGION}
 ```
 
-## Web Interface
-
-[Learn more about the Web UI →](https://docs.dagu.cloud/overview/web-ui)
-
-<div align="center">
-  <img src="docs/public/dashboard.png" width="720" alt="Dashboard">
-  <p><i>Real-time monitoring of all workflows</i></p>
-</div>
-
-<div align="center">
-  <img src="docs/public/dag-editor.png" width="720" alt="DAG Editor">
-  <p><i>Visual workflow editor with validation</i></p>
-</div>
-
-<div align="center">
-  <img src="docs/public/dag-logs.png" width="720" alt="Log Viewer">
-  <p><i>Detailed execution logs with stdout/stderr separation</i></p>
-</div>
-
-## Use Cases
-
-- **Data Engineering** - ETL pipelines, data validation, warehouse loading
-- **Machine Learning** - Training pipelines, model deployment, experiment tracking
-- **DevOps** - CI/CD workflows, infrastructure automation, deployment orchestration
-- **Media Processing** - Video transcoding, image manipulation, content pipelines
-- **Business Automation** - Report generation, data synchronization, scheduled tasks
-
 ## Roadmap
 
 - [x] Run steps in a DAG across multiple machines (distributed execution) - **Available in v1.18.0**
@@ -303,6 +312,17 @@ Contributions are welcome. See our [documentation](https://docs.dagu.cloud) for 
 <a href="https://github.com/dagu-org/dagu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=dagu-org/dagu" />
 </a>
+
+## Sponsors & Supporters
+
+<a href="https://github.com/Arvintian">
+  <img src="https://github.com/Arvintian.png" width="64" alt="@Arvintian"style="border-radius: 50%;"  />
+</a>
+<a href="https://github.com/yurivish">
+  <img src="https://github.com/yurivish.png" width="64" alt="@yurivish"style="border-radius: 50%;"  />
+</a>
+
+Thanks for supporting Dagu’s development! Join our supporters: [GitHub Sponsors](https://github.com/sponsors/dagu-org)
 
 ## License
 

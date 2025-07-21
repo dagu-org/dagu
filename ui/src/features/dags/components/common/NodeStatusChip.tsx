@@ -71,6 +71,12 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
       textColorClass = 'text-[steelblue] dark:text-[lightblue]';
       statusIcon = '○'; // Circle
       break;
+    case NodeStatus.PartialSuccess: // partial success -> orange/amber
+      bgColorClass = 'bg-[rgba(245,158,11,0.1)] dark:bg-[rgba(245,158,11,0.2)]';
+      borderColorClass = 'border-[#f59e0b] dark:border-[#f59e0b]';
+      textColorClass = 'text-[#f59e0b] dark:text-[#fbbf24]';
+      statusIcon = '◐'; // Half-filled circle
+      break;
     default: // Fallback to gray
       bgColorClass =
         'bg-[rgba(128,128,128,0.1)] dark:bg-[rgba(169,169,169,0.2)]';

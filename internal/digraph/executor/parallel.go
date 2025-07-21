@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
 var _ ParallelExecutor = (*parallelExecutor)(nil)
+var _ NodeStatusDeterminer = (*parallelExecutor)(nil)
 
 type parallelExecutor struct {
 	child         *ChildDAGExecutor
@@ -23,23 +26,13 @@ type parallelExecutor struct {
 	stderr        io.Writer
 	runParamsList []RunParams
 	maxConcurrent int
-	env           Env
 
 	// Runtime state
-	results    map[string]*ChildResult // Maps DAG run ID to result
-	errors     []error                 // Collects errors from failed executions
-	wg         sync.WaitGroup          // Tracks running goroutines
-	cancelFunc context.CancelFunc      // For canceling all child executions
-}
-
-// ChildResult holds the result of a single child DAG execution
-type ChildResult struct {
-	RunID    string         `json:"runId"`
-	Params   string         `json:"params"`
-	Success  bool           `json:"success"`
-	Output   map[string]any `json:"output,omitempty"`
-	Error    string         `json:"error,omitempty"`
-	ExitCode int            `json:"exitCode"`
+	running    map[string]*exec.Cmd          // Maps DAG run ID to running command
+	results    map[string]*digraph.RunStatus // Maps DAG run ID to result
+	errors     []error                       // Collects errors from failed executions
+	wg         sync.WaitGroup                // Tracks running goroutines
+	cancelFunc context.CancelFunc            // For canceling all child executions
 }
 
 func newParallelExecutor(
@@ -71,8 +64,8 @@ func newParallelExecutor(
 		child:         child,
 		workDir:       dir,
 		maxConcurrent: maxConcurrent,
-		env:           GetEnv(ctx),
-		results:       make(map[string]*ChildResult),
+		running:       make(map[string]*exec.Cmd),
+		results:       make(map[string]*digraph.RunStatus),
 		errors:        make([]error, 0),
 	}, nil
 }
@@ -161,7 +154,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	e.lock.Lock()
 	failedCount := 0
 	for _, result := range e.results {
-		if !result.Success {
+		if !result.Status.IsSuccess() {
 			failedCount++
 		}
 	}
@@ -192,6 +185,30 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
+// DetermineNodeStatus implements NodeStatusDeterminer.
+func (e *parallelExecutor) DetermineNodeStatus(_ context.Context) (status.NodeStatus, error) {
+	if len(e.results) == 0 {
+		return status.NodeError, fmt.Errorf("no results available for node status determination")
+	}
+
+	// Check if all child DAGs succeeded or if any had partial success
+	// For error cases, we return an error status with error message
+	var partialSuccess bool
+	for _, result := range e.results {
+		if !result.Status.IsSuccess() {
+			return status.NodeError, fmt.Errorf("child DAG run %s failed with status: %s", result.DAGRunID, result.Status)
+		}
+		if result.Status == status.PartialSuccess {
+			partialSuccess = true
+		}
+	}
+
+	if partialSuccess {
+		return status.NodePartialSuccess, nil
+	}
+	return status.NodeSuccess, nil
+}
+
 // executeChild executes a single child DAG with the given parameters
 func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams) error {
 	// Use the new ExecuteWithResult API
@@ -201,15 +218,6 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams
 	e.lock.Lock()
 	if result != nil {
 		e.results[runParams.RunID] = result
-	} else if err != nil {
-		// Create error result if execution failed
-		e.results[runParams.RunID] = &ChildResult{
-			RunID:    runParams.RunID,
-			Params:   runParams.Params,
-			Success:  false,
-			Error:    err.Error(),
-			ExitCode: 1,
-		}
 	}
 	e.lock.Unlock()
 
@@ -227,15 +235,14 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 			Total     int `json:"total"`
 			Succeeded int `json:"succeeded"`
 			Failed    int `json:"failed"`
-			Errors    int `json:"errors"`
 		} `json:"summary"`
-		Results []ChildResult    `json:"results"`
-		Outputs []map[string]any `json:"outputs"`
+		Results []digraph.RunStatus `json:"results"`
+		Outputs []map[string]string `json:"outputs"`
 	}{}
 
 	output.Summary.Total = len(e.runParamsList)
-	output.Results = make([]ChildResult, 0, len(e.results))
-	output.Outputs = make([]map[string]any, 0, len(e.results))
+	output.Results = make([]digraph.RunStatus, 0, len(e.results))
+	output.Outputs = make([]map[string]string, 0, len(e.results))
 
 	// Collect results in order of runParamsList for consistency
 	for _, params := range e.runParamsList {
@@ -243,27 +250,18 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 			// Create a copy of the result to potentially modify it
 			resultCopy := *result
 
-			// Clear output for failed executions
-			if !result.Success {
-				resultCopy.Output = nil
-			}
-
 			output.Results = append(output.Results, resultCopy)
 
-			// Add output to the outputs array
-			// Only include outputs from successful executions
-			if result.Success && result.Output != nil {
-				output.Outputs = append(output.Outputs, result.Output)
-			}
-
-			if result.Success {
+			if result.Status.IsSuccess() {
 				output.Summary.Succeeded++
+
+				// Add output to the outputs array
+				// Only include outputs from successful executions
+				if result.Outputs != nil {
+					output.Outputs = append(output.Outputs, result.Outputs)
+				}
 			} else {
 				output.Summary.Failed++
-			}
-
-			if result.Error != "" {
-				output.Summary.Errors++
 			}
 		}
 	}

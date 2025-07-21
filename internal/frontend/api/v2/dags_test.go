@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -41,10 +41,10 @@ func TestDAG(t *testing.T) {
 		require.Eventually(t, func() bool {
 			url := fmt.Sprintf("/api/v2/dags/test_dag/dag-runs/%s", execResp.DagRunId)
 			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
-			var status api.GetDAGDAGRunDetails200JSONResponse
-			statusResp.Unmarshal(t, &status)
+			var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+			statusResp.Unmarshal(t, &dagRunStatus)
 
-			return status.DagRun.Status == api.Status(scheduler.StatusSuccess)
+			return dagRunStatus.DagRun.Status == api.Status(status.Success)
 		}, 5*time.Second, 1*time.Second, "expected DAG to complete")
 
 		// Delete the created DAG

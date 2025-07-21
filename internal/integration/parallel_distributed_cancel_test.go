@@ -11,7 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/test"
@@ -146,25 +146,25 @@ steps:
 				strings.Contains(err.Error(), "killed"),
 			"error should indicate cancellation: %v", err)
 
-		// Get the latest status
-		status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag)
+		// Get the latest st
+		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag)
 		require.NoError(t, err)
-		require.NotNil(t, status)
+		require.NotNil(t, st)
 
 		// Check that the parallel step exists
-		require.GreaterOrEqual(t, len(status.Nodes), 1)
-		parallelNode := status.Nodes[0]
+		require.GreaterOrEqual(t, len(st.Nodes), 1)
+		parallelNode := st.Nodes[0]
 		require.Equal(t, "process-items", parallelNode.Step.Name)
 
 		// The step might be marked as failed, cancelled, or error depending on timing
 		require.True(t,
-			parallelNode.Status == scheduler.NodeStatusCancel ||
-				parallelNode.Status == scheduler.NodeStatusError ||
-				parallelNode.Status == scheduler.NodeStatusNone,
+			parallelNode.Status == status.NodeCancel ||
+				parallelNode.Status == status.NodeError ||
+				parallelNode.Status == status.NodeNone,
 			"parallel step should be cancelled, failed, or not started, got: %v", parallelNode.Status)
 
 		// If the step was actually started, verify that child DAG runs were created
-		if parallelNode.Status != scheduler.NodeStatusNone && len(parallelNode.Children) > 0 {
+		if parallelNode.Status != status.NodeNone && len(parallelNode.Children) > 0 {
 			// Verify that distributed child runs were cancelled
 			for _, child := range parallelNode.Children {
 				t.Logf("Child DAG run %s with params %s", child.DAGRunID, child.Params)
@@ -293,21 +293,21 @@ steps:
 		err = <-errChan
 		require.Error(t, err, "agent should return an error when cancelled")
 
-		// Get the latest status
-		status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag)
+		// Get the latest st
+		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag)
 		require.NoError(t, err)
-		require.NotNil(t, status)
+		require.NotNil(t, st)
 
 		// Both parallel steps should be affected by cancellation
-		for _, node := range status.Nodes {
+		for _, node := range st.Nodes {
 			if node.Step.Name == "local-execution" || node.Step.Name == "distributed-execution" {
 				t.Logf("Node %s status: %v", node.Step.Name, node.Status)
 				// Nodes might not have started or might be cancelled/failed
 				require.True(t,
-					node.Status == scheduler.NodeStatusCancel ||
-						node.Status == scheduler.NodeStatusError ||
-						node.Status == scheduler.NodeStatusNone ||
-						node.Status == scheduler.NodeStatusRunning,
+					node.Status == status.NodeCancel ||
+						node.Status == status.NodeError ||
+						node.Status == status.NodeNone ||
+						node.Status == status.NodeRunning,
 					"node %s should show cancellation effect, got: %v", node.Step.Name, node.Status)
 			}
 		}
@@ -437,14 +437,14 @@ steps:
 		err = <-errChan
 		require.Error(t, err, "agent should return an error when cancelled")
 
-		// Get the latest status
-		status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag)
+		// Get the latest st
+		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag)
 		require.NoError(t, err)
-		require.NotNil(t, status)
+		require.NotNil(t, st)
 
 		// Verify the high-concurrency step
-		require.GreaterOrEqual(t, len(status.Nodes), 1)
-		concurrentNode := status.Nodes[0]
+		require.GreaterOrEqual(t, len(st.Nodes), 1)
+		concurrentNode := st.Nodes[0]
 		require.Equal(t, "high-concurrency", concurrentNode.Step.Name)
 
 		// Log information about child runs
@@ -457,12 +457,12 @@ steps:
 
 		// The node should reflect cancellation or might not have completed
 		// In high concurrency scenarios, the status depends on timing
-		validStatuses := []scheduler.NodeStatus{
-			scheduler.NodeStatusCancel,
-			scheduler.NodeStatusError,
-			scheduler.NodeStatusRunning,
-			scheduler.NodeStatusNone,
-			scheduler.NodeStatusSuccess, // Some children might have completed before cancellation
+		validStatuses := []status.NodeStatus{
+			status.NodeCancel,
+			status.NodeError,
+			status.NodeRunning,
+			status.NodeNone,
+			status.NodeSuccess, // Some children might have completed before cancellation
 		}
 
 		statusFound := false

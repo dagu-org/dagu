@@ -17,7 +17,7 @@ import (
 	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	dagstatus "github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/dirlock"
@@ -270,7 +270,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			if status.Status != scheduler.StatusQueued {
+			if status.Status != dagstatus.Queued {
 				logger.Info(ctx, "Skipping item from queue", "data", data, "status", status.Status)
 				result = models.QueuedItemProcessingResultDiscard
 				goto SEND_RESULT
@@ -325,7 +325,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 					result = models.QueuedItemProcessingResultDiscard
 					goto SEND_RESULT
 				}
-				if status.Status != scheduler.StatusQueued {
+				if status.Status != dagstatus.Queued {
 					logger.Info(ctx, "DAG run is no longer queued", "data", data, "status", status.Status)
 					result = models.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN

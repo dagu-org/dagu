@@ -25,7 +25,7 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 	return o.ds.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (*digraph.Status, error) {
+func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (*digraph.RunStatus, error) {
 	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
@@ -35,7 +35,7 @@ func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, ro
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
 
-	outputVariables := map[string]string{}
+	outputVariables := make(map[string]string)
 	for _, node := range status.Nodes {
 		if node.OutputVariables != nil {
 			node.OutputVariables.Range(func(_, value any) bool {
@@ -49,12 +49,12 @@ func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, ro
 		}
 	}
 
-	return &digraph.Status{
+	return &digraph.RunStatus{
+		Status:   status.Status,
 		Outputs:  outputVariables,
 		Name:     status.Name,
 		DAGRunID: status.DAGRunID,
 		Params:   status.Params,
-		Success:  status.Status.IsSuccess(),
 	}, nil
 }
 

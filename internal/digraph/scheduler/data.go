@@ -9,6 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
@@ -26,7 +27,7 @@ type NodeData struct {
 
 type NodeState struct {
 	// Status represents the state of the node.
-	Status NodeStatus
+	Status status.NodeStatus
 	// Stdout is the log file path from the node.
 	Stdout string
 	// Stderr is the log file path for the error log (stderr).
@@ -102,36 +103,6 @@ type ChildDAGRun struct {
 	// - Raw JSON: '{"region": "us-east-1", "config": {"timeout": 30}}'
 	// The exact format depends on how the DAG expects to receive parameters.
 	Params string
-}
-
-type NodeStatus int
-
-const (
-	NodeStatusNone NodeStatus = iota
-	NodeStatusRunning
-	NodeStatusError
-	NodeStatusCancel
-	NodeStatusSuccess
-	NodeStatusSkipped
-)
-
-func (s NodeStatus) String() string {
-	switch s {
-	case NodeStatusRunning:
-		return "running"
-	case NodeStatusError:
-		return "failed"
-	case NodeStatusCancel:
-		return "canceled"
-	case NodeStatusSuccess:
-		return "finished"
-	case NodeStatusSkipped:
-		return "skipped"
-	case NodeStatusNone:
-		fallthrough
-	default:
-		return "not started"
-	}
 }
 
 func newSafeData(data NodeData) Data {
@@ -257,18 +228,18 @@ func (d *Data) State() NodeState {
 	return d.inner.State
 }
 
-func (d *Data) Status() NodeStatus {
+func (d *Data) Status() status.NodeStatus {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
 	return d.inner.State.Status
 }
 
-func (d *Data) SetStatus(status NodeStatus) {
+func (d *Data) SetStatus(s status.NodeStatus) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.inner.State.Status = status
+	d.inner.State.Status = s
 }
 
 func (d *Data) ContinueOn() digraph.ContinueOn {
@@ -472,5 +443,5 @@ func (d *Data) MarkError(err error) {
 	defer d.mu.Unlock()
 
 	d.inner.State.Error = err
-	d.inner.State.Status = NodeStatusError
+	d.inner.State.Status = status.NodeError
 }

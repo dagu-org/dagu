@@ -13,7 +13,7 @@ import (
 
 func TestDAGExecutor_Kill_Distributed(t *testing.T) {
 	// Create a mock database
-	mockDB := new(MockDatabase)
+	mockDB := new(mockDatabase)
 
 	// Create a context with environment
 	env := Env{
@@ -61,7 +61,7 @@ func TestDAGExecutor_Kill_Distributed(t *testing.T) {
 
 func TestDAGExecutor_Kill_NotDistributed(t *testing.T) {
 	// Create a mock database
-	mockDB := new(MockDatabase)
+	mockDB := new(mockDatabase)
 
 	// Create a context with environment
 	env := Env{

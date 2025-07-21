@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/stringutil"
@@ -91,7 +91,7 @@ func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
 
 	// As a prototype, we save the status to the database to enqueue the dag-run.
 	// This could be changed to save to a queue file in the future
-	status := models.NewStatusBuilder(dag).Create(dagRunID, scheduler.StatusQueued, 0, time.Time{}, opts...)
+	dagStatus := models.NewStatusBuilder(dag).Create(dagRunID, status.Queued, 0, time.Time{}, opts...)
 
 	if err := att.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
@@ -99,7 +99,7 @@ func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
 	defer func() {
 		_ = att.Close(ctx.Context)
 	}()
-	if err := att.Write(ctx.Context, status); err != nil {
+	if err := att.Write(ctx.Context, dagStatus); err != nil {
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 

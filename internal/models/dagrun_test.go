@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -132,7 +132,7 @@ func (m *mockDAGRunAttempt) CancelRequested(ctx context.Context) (bool, error) {
 func TestListDAGRunStatusesOptions(t *testing.T) {
 	from := models.NewUTC(time.Now().Add(-24 * time.Hour))
 	to := models.NewUTC(time.Now())
-	statuses := []scheduler.Status{scheduler.StatusSuccess, scheduler.StatusError}
+	statuses := []status.Status{status.Success, status.Error}
 
 	opts := models.ListDAGRunStatusesOptions{}
 
@@ -199,7 +199,7 @@ func TestDAGRunStoreInterface(t *testing.T) {
 
 	// Test ListStatuses
 	statuses := []*models.DAGRunStatus{
-		{Name: "test-dag", Status: scheduler.StatusSuccess},
+		{Name: "test-dag", Status: status.Success},
 	}
 	store.On("ListStatuses", ctx, mock.Anything).Return(statuses, nil)
 
@@ -255,7 +255,7 @@ func TestDAGRunAttemptInterface(t *testing.T) {
 	status := models.DAGRunStatus{
 		Name:     "test-dag",
 		DAGRunID: "run-123",
-		Status:   scheduler.StatusRunning,
+		Status:   status.Running,
 	}
 	attempt.On("Write", ctx, status).Return(nil)
 	err = attempt.Write(ctx, status)
@@ -393,7 +393,7 @@ func TestListDAGRunStatusesWithOptions(t *testing.T) {
 	opts := []models.ListDAGRunStatusesOption{
 		models.WithFrom(from),
 		models.WithTo(to),
-		models.WithStatuses([]scheduler.Status{scheduler.StatusSuccess}),
+		models.WithStatuses([]status.Status{status.Success}),
 		models.WithName("test"),
 	}
 
@@ -401,7 +401,7 @@ func TestListDAGRunStatusesWithOptions(t *testing.T) {
 		{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
-			Status:   scheduler.StatusSuccess,
+			Status:   status.Success,
 		},
 	}
 

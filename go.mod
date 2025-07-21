@@ -2,14 +2,13 @@ module github.com/dagu-org/dagu
 
 go 1.24.0
 
-toolchain go1.24.1
-
 require (
 	dario.cat/mergo v1.0.1
 	github.com/adrg/xdg v0.5.0
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.5
 	github.com/containerd/platforms v0.2.1
+	github.com/coreos/go-oidc v2.3.0+incompatible
 	github.com/docker/docker v28.1.1+incompatible
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/getkin/kin-openapi v0.131.0
@@ -64,11 +63,13 @@ require (
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/oklog/run v1.0.0 // indirect
+	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/yoheimuta/go-protoparser/v4 v4.14.2 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
+	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
 )
 
 require (
@@ -288,7 +289,7 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20250210185358-939b2ce775ac // indirect
 	golang.org/x/mod v0.25.0 // indirect
-	golang.org/x/oauth2 v0.30.0 // indirect
+	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/term v0.32.0
 	golang.org/x/tools v0.33.0 // indirect

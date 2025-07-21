@@ -10,7 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
@@ -67,11 +67,11 @@ func runRestart(ctx *Context, args []string) error {
 		attempt = att
 	}
 
-	status, err := attempt.ReadStatus(ctx)
+	dagStatus, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
-	if status.Status != scheduler.StatusRunning {
+	if dagStatus.Status != status.Running {
 		return fmt.Errorf("DAG %s is not running", name)
 	}
 
@@ -152,12 +152,12 @@ func executeDAG(ctx *Context, cli dagrun.Manager, dag *digraph.DAG) error {
 }
 
 func stopDAGIfRunning(ctx context.Context, cli dagrun.Manager, dag *digraph.DAG, dagRunID string) error {
-	status, err := cli.GetCurrentStatus(ctx, dag, dagRunID)
+	dagStatus, err := cli.GetCurrentStatus(ctx, dag, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to get current status: %w", err)
 	}
 
-	if status.Status == scheduler.StatusRunning {
+	if dagStatus.Status == status.Running {
 		logger.Infof(ctx, "Stopping: %s", dag.Name)
 		if err := stopRunningDAG(ctx, cli, dag, dagRunID); err != nil {
 			return fmt.Errorf("failed to stop running DAG: %w", err)
@@ -169,12 +169,12 @@ func stopDAGIfRunning(ctx context.Context, cli dagrun.Manager, dag *digraph.DAG,
 func stopRunningDAG(ctx context.Context, cli dagrun.Manager, dag *digraph.DAG, dagRunID string) error {
 	const stopPollInterval = 100 * time.Millisecond
 	for {
-		status, err := cli.GetCurrentStatus(ctx, dag, dagRunID)
+		dagStatus, err := cli.GetCurrentStatus(ctx, dag, dagRunID)
 		if err != nil {
 			return fmt.Errorf("failed to get current status: %w", err)
 		}
 
-		if status.Status != scheduler.StatusRunning {
+		if dagStatus.Status != status.Running {
 			return nil
 		}
 

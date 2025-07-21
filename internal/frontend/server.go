@@ -19,6 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/dagrun"
 	apiv1 "github.com/dagu-org/dagu/internal/frontend/api/v1"
 	apiv2 "github.com/dagu-org/dagu/internal/frontend/api/v2"
+	"github.com/dagu-org/dagu/internal/frontend/auth"
 	"github.com/dagu-org/dagu/internal/frontend/metrics"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
@@ -174,8 +175,18 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) {
 
 	// Serve UI pages
 	indexHandler := srv.useTemplate(ctx, "index.gohtml", "index")
-	r.Get("/*", func(w http.ResponseWriter, _ *http.Request) {
-		indexHandler(w, nil)
+	r.Route("/", func(r chi.Router) {
+		if srv.config.Server.Auth.OIDC.Enabled() {
+			authOptions := auth.Options{}
+			oidcProvider, oidcVerify, oidcConfig := auth.InitVerifierAndConfig(srv.config.Server.Auth.OIDC)
+			authOptions.OIDCAuthEnabled = true
+			authOptions.OIDCWhitelist = srv.config.Server.Auth.OIDC.Whitelist
+			authOptions.OIDCProvider, authOptions.OIDCVerify, authOptions.OIDCConfig = oidcProvider, oidcVerify, oidcConfig
+			r.Use(auth.OIDCMiddleware(authOptions))
+		}
+		r.Get("/*", func(w http.ResponseWriter, _ *http.Request) {
+			indexHandler(w, nil)
+		})
 	})
 }
 

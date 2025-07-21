@@ -280,12 +280,6 @@ func TestPickDAG(t *testing.T) {
 		mockStore.AssertExpectations(t)
 	})
 
-	t.Run("Handles DAGs with warnings", func(t *testing.T) {
-		// This test would require mocking the entire terminal UI interaction
-		// which is complex and not practical for unit tests
-		t.Skip("Interactive UI testing requires terminal mocking")
-	})
-
 	t.Run("Creates proper DAGItems from DAGs", func(t *testing.T) {
 		// This tests the internal logic of converting DAGs to list items
 		dags := []*digraph.DAG{

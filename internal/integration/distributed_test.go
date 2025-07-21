@@ -10,7 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/test"
@@ -118,7 +118,7 @@ steps:
 		agent.RunSuccess(t)
 
 		// Verify the DAG completed successfully
-		dagWrapper.AssertLatestStatus(t, scheduler.StatusSuccess)
+		dagWrapper.AssertLatestStatus(t, status.Success)
 	})
 
 	t.Run("TempFileCreationForLocalDAG", func(t *testing.T) {
@@ -203,7 +203,7 @@ steps:
 		require.Contains(t, err.Error(), "distributed execution failed")
 
 		// Verify the DAG did not complete successfully
-		status := agent.Status(coord.Context)
-		require.NotEqual(t, scheduler.StatusSuccess, status.Status)
+		st := agent.Status(coord.Context)
+		require.NotEqual(t, status.Success, st.Status)
 	})
 }

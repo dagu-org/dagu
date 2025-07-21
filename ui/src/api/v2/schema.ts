@@ -684,6 +684,7 @@ export interface components {
          *     3: "Cancelled"
          *     4: "Success"
          *     5: "Skipped"
+         *     6: "Partial Success"
          *
          * @enum {integer}
          */
@@ -2431,7 +2432,8 @@ export enum NodeStatus {
     Failed = 2,
     Cancelled = 3,
     Success = 4,
-    Skipped = 5
+    Skipped = 5,
+    PartialSuccess = 6
 }
 export enum NodeStatusLabel {
     not_started = "not started",
@@ -2439,7 +2441,8 @@ export enum NodeStatusLabel {
     failed = "failed",
     canceled = "canceled",
     finished = "finished",
-    skipped = "skipped"
+    skipped = "skipped",
+    partial_success = "partial success"
 }
 export enum WorkerHealthStatus {
     healthy = "healthy",

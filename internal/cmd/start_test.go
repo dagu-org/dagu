@@ -49,13 +49,6 @@ func TestStartCommand(t *testing.T) {
 }
 
 func TestCmdStart_InteractiveMode(t *testing.T) {
-	t.Run("Non-TTY behavior", func(t *testing.T) {
-		// The command behavior depends on whether we're in a TTY
-		// In test environment (non-TTY), it should require a DAG path
-		// We can't fully test this without proper context setup
-		t.Skip("Requires context setup to test interactive mode behavior")
-	})
-
 	t.Run("Works with explicit DAG path", func(t *testing.T) {
 		// Create a test DAG
 		tmpDir := t.TempDir()

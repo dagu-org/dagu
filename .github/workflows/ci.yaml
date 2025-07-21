@@ -7,12 +7,24 @@ on:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
       - "v[0-9]+.[0-9]+.[0-9]+-*"
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Makefile'
+      - '.github/workflows/ci.yaml'
   pull_request:
     types:
       - opened
       - reopened # new commits are pushed to the branch that the PR is based on
       - synchronize # new commits are pushed to the branch that the PR is based on
       - ready_for_review # PR is ready for review
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Makefile'
+      - '.github/workflows/ci.yaml'
 
 jobs:
   # Spell check

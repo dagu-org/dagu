@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -220,26 +219,9 @@ func (e *ChildDAGExecutor) Cleanup(ctx context.Context) error {
 	return nil
 }
 
-// Execute executes the child DAG either locally or via coordinator based on configuration.
-// It writes the output to the provided stdout writer.
-func (e *ChildDAGExecutor) Execute(ctx context.Context, runParams RunParams, workDir string, stdout io.Writer) error {
-	// Check if we should use distributed execution
-	if e.ShouldUseDistributedExecution() {
-		// Track distributed execution
-		e.mu.Lock()
-		e.distributedRuns[runParams.RunID] = true
-		e.mu.Unlock()
-
-		return e.executeDistributed(ctx, runParams, stdout)
-	}
-
-	// Local execution
-	return e.executeLocal(ctx, runParams, workDir, stdout)
-}
-
 // ExecuteWithResult executes the child DAG and returns the result.
 // This is useful for parallel execution where results need to be collected.
-func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunParams, workDir string) (*ChildResult, error) {
+func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunParams, workDir string) (*digraph.RunStatus, error) {
 	// Check if we should use distributed execution
 	if e.ShouldUseDistributedExecution() {
 		// Track distributed execution
@@ -251,9 +233,9 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 	}
 
 	// Local execution
-	cmd, err := e.buildCommand(ctx, runParams, workDir)
-	if err != nil {
-		return nil, err
+	cmd, waitErr := e.buildCommand(ctx, runParams, workDir)
+	if waitErr != nil {
+		return nil, waitErr
 	}
 
 	// Create pipes for stdout/stderr capture
@@ -283,7 +265,7 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 		return nil, fmt.Errorf("failed to start child dag-run: %w", err)
 	}
 
-	err = cmd.Wait()
+	waitErr = cmd.Wait()
 
 	// Check if the error is due to context cancellation
 	if ctx.Err() == context.Canceled {
@@ -293,120 +275,25 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 	// Get the result regardless of error
 	env := GetEnv(ctx)
 	result, resultErr := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
+	if resultErr != nil {
+		return nil, fmt.Errorf("failed to find result for the child dag-run %q: %w", runParams.RunID, resultErr)
+	}
+
+	if result.Status.IsSuccess() {
+		if waitErr != nil {
+			logger.Warn(ctx, "Child DAG completed with exit code but no error", "err", waitErr, "dagRunId", runParams.RunID, "target", e.DAG.Name)
+		} else {
+			logger.Info(ctx, "Child DAG completed successfully", "dagRunId", runParams.RunID, "target", e.DAG.Name)
+		}
+		return result, nil
+	}
 
 	// Build child result
-	if resultErr == nil && result != nil {
-		// Convert digraph.Status outputs to map[string]any
-		outputs := make(map[string]any)
-		for k, v := range result.Outputs {
-			outputs[k] = v
-		}
-
-		// Determine success based on execution error
-		success := err == nil
-
-		return &ChildResult{
-			RunID:    runParams.RunID,
-			Params:   runParams.Params,
-			Success:  success,
-			Output:   outputs,
-			ExitCode: cmd.ProcessState.ExitCode(),
-		}, nil
-	}
-
-	// Even if we couldn't get the result, return what we know
-	success := err == nil
-	exitCode := -1
-	if cmd.ProcessState != nil {
-		exitCode = cmd.ProcessState.ExitCode()
-	}
-
-	return &ChildResult{
-		RunID:    runParams.RunID,
-		Params:   runParams.Params,
-		Success:  success,
-		Error:    fmt.Sprintf("execution error: %v, result error: %v", err, resultErr),
-		ExitCode: exitCode,
-	}, nil
-}
-
-// executeLocal runs the child DAG locally
-func (e *ChildDAGExecutor) executeLocal(ctx context.Context, runParams RunParams, workDir string, stdout io.Writer) error {
-	cmd, err := e.buildCommand(ctx, runParams, workDir)
-	if err != nil {
-		return err
-	}
-
-	if stdout != nil {
-		cmd.Stdout = stdout
-	}
-
-	// Store command reference for Kill
-	e.mu.Lock()
-	e.cmds[runParams.RunID] = cmd
-	e.mu.Unlock()
-
-	// Ensure we clear command reference when done
-	defer func() {
-		e.mu.Lock()
-		delete(e.cmds, runParams.RunID)
-		e.mu.Unlock()
-	}()
-
-	logger.Info(ctx, "Executing child DAG locally",
-		"dagRunId", runParams.RunID,
-		"target", e.DAG.Name,
-	)
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start child dag-run: %w", err)
-	}
-
-	if err := cmd.Wait(); err != nil {
-		// Check if the error is due to context cancellation
-		if ctx.Err() == context.Canceled {
-			return fmt.Errorf("child dag execution cancelled")
-		}
-		return fmt.Errorf("child dag-run failed: %w", err)
-	}
-
-	// Get results from the child dag-run
-	env := GetEnv(ctx)
-	result, err := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
-	if err != nil {
-		return fmt.Errorf("failed to find result for the child dag-run %q: %w", runParams.RunID, err)
-	}
-
-	jsonData, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal outputs: %w", err)
-	}
-
-	// Add a newline at the end of the JSON output
-	jsonData = append(jsonData, '\n')
-
-	if stdout != nil {
-		if _, err := stdout.Write(jsonData); err != nil {
-			return fmt.Errorf("failed to write outputs: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// executeDistributed runs the child DAG via coordinator
-func (e *ChildDAGExecutor) executeDistributed(ctx context.Context, runParams RunParams, stdout io.Writer) error {
-	// Dispatch to coordinator
-	if err := e.dispatchToCoordinator(ctx, runParams); err != nil {
-		return fmt.Errorf("distributed execution failed: %w", err)
-	}
-
-	// Wait for completion
-	return e.waitForCompletion(ctx, runParams.RunID, stdout)
+	return result, waitErr
 }
 
 // executeDistributedWithResult runs the child DAG via coordinator and returns the result
-func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, runParams RunParams) (*ChildResult, error) {
+func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, runParams RunParams) (*digraph.RunStatus, error) {
 	// Dispatch to coordinator
 	if err := e.dispatchToCoordinator(ctx, runParams); err != nil {
 		return nil, fmt.Errorf("distributed execution failed: %w", err)
@@ -449,80 +336,8 @@ func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams 
 	return nil
 }
 
-// waitForCompletion polls for the completion of a distributed task
-func (e *ChildDAGExecutor) waitForCompletion(ctx context.Context, dagRunID string, stdout io.Writer) error {
-	env := GetEnv(ctx)
-
-	// Poll for completion
-	pollInterval := 1 * time.Second
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("distributed execution cancelled: %w", ctx.Err())
-		case <-ticker.C:
-			// Check if the child DAG run has completed
-			isCompleted, err := env.DB.IsChildDAGRunCompleted(ctx, dagRunID, env.RootDAGRun)
-			if err != nil {
-				logger.Error(ctx, "Failed to check child DAG run completion",
-					"dag_run_id", dagRunID,
-					"err", err,
-				)
-				continue // Retry on error
-			}
-
-			if !isCompleted {
-				logger.Debug(ctx, "Child DAG run not completed yet",
-					"dag_run_id", dagRunID,
-				)
-				continue // Not completed, keep polling
-			}
-
-			// Check the final status of the child DAG run
-			result, err := env.DB.GetChildDAGRunStatus(ctx, dagRunID, env.RootDAGRun)
-			if err != nil {
-				// Not found yet, continue polling
-				logger.Debug(ctx, "Child DAG run status not available yet",
-					"dag_run_id", dagRunID,
-					"err", err,
-				)
-				continue
-			}
-
-			// If we got a result, the child DAG has completed
-			logger.Info(ctx, "Distributed execution completed",
-				"dag_run_id", dagRunID,
-				"name", result.Name,
-				"is_success", result.Success,
-			)
-
-			// Write the results to stdout if available
-			if stdout != nil {
-				jsonData, err := json.MarshalIndent(result, "", "  ")
-				if err != nil {
-					return fmt.Errorf("failed to marshal outputs: %w", err)
-				}
-				jsonData = append(jsonData, '\n')
-
-				if _, err := stdout.Write(jsonData); err != nil {
-					return fmt.Errorf("failed to write outputs: %w", err)
-				}
-			}
-
-			// Check if the execution was successful
-			if !result.Success {
-				return fmt.Errorf("child DAG execution failed")
-			}
-
-			return nil
-		}
-	}
-}
-
 // waitForCompletionWithResult is similar to waitForCompletion but returns the result
-func (e *ChildDAGExecutor) waitForCompletionWithResult(ctx context.Context, dagRunID string) (*ChildResult, error) {
+func (e *ChildDAGExecutor) waitForCompletionWithResult(ctx context.Context, dagRunID string) (*digraph.RunStatus, error) {
 	env := GetEnv(ctx)
 
 	// Poll for completion
@@ -567,20 +382,9 @@ func (e *ChildDAGExecutor) waitForCompletionWithResult(ctx context.Context, dagR
 			logger.Info(ctx, "Distributed execution completed",
 				"dag_run_id", dagRunID,
 				"name", result.Name,
-				"is_success", result.Success,
 			)
 
-			// Convert to ChildResult
-			childResult := &ChildResult{
-				RunID:    dagRunID,
-				Params:   result.Params,
-				Success:  result.Success,
-				Output:   convertOutputsToMap(result.Outputs),
-				Error:    getErrorString(result),
-				ExitCode: getExitCode(result.Success),
-			}
-
-			return childResult, nil
+			return result, nil
 		}
 	}
 }
@@ -594,20 +398,6 @@ func (e *ChildDAGExecutor) getCoordinatorClient(ctx context.Context) (client.Cli
 
 	// Build client from factory
 	return e.coordinatorClientFactory.Build(ctx)
-}
-
-func getErrorString(result *digraph.Status) string {
-	if !result.Success {
-		return "child DAG execution failed"
-	}
-	return ""
-}
-
-func getExitCode(success bool) int {
-	if success {
-		return 0
-	}
-	return 1
 }
 
 // Kill terminates all running child DAG processes (both local and distributed)
@@ -657,18 +447,6 @@ func (e *ChildDAGExecutor) Kill(sig os.Signal) error {
 		return errs[0]
 	}
 	return nil
-}
-
-// convertOutputsToMap converts string map to map[string]any
-func convertOutputsToMap(outputs map[string]string) map[string]any {
-	if outputs == nil {
-		return nil
-	}
-	result := make(map[string]any)
-	for k, v := range outputs {
-		result[k] = v
-	}
-	return result
 }
 
 // createTempDAGFile creates a temporary file with the DAG YAML content.

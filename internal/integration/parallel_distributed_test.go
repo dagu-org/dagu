@@ -10,7 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/test"
@@ -125,18 +125,18 @@ steps:
 		agent.RunSuccess(t)
 
 		// Verify the DAG completed successfully
-		dagWrapper.AssertLatestStatus(t, scheduler.StatusSuccess)
+		dagWrapper.AssertLatestStatus(t, status.Success)
 
-		// Get the latest status to verify parallel execution
-		status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag)
+		// Get the latest st to verify parallel execution
+		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag)
 		require.NoError(t, err)
-		require.NotNil(t, status)
-		require.Len(t, status.Nodes, 1) // process-items
+		require.NotNil(t, st)
+		require.Len(t, st.Nodes, 1) // process-items
 
 		// Check process-items node
-		processNode := status.Nodes[0]
+		processNode := st.Nodes[0]
 		require.Equal(t, "process-items", processNode.Step.Name)
-		require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
+		require.Equal(t, status.NodeSuccess, processNode.Status)
 
 		// Verify child DAG runs were created
 		require.NotEmpty(t, processNode.Children)
@@ -267,17 +267,17 @@ steps:
 		agent.RunSuccess(t)
 
 		// Verify successful completion
-		dagWrapper.AssertLatestStatus(t, scheduler.StatusSuccess)
+		dagWrapper.AssertLatestStatus(t, status.Success)
 
-		// Get status to verify execution
-		status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag)
+		// Get st to verify execution
+		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag)
 		require.NoError(t, err)
-		require.NotNil(t, status)
+		require.NotNil(t, st)
 
 		// Check the parallel node
-		processNode := status.Nodes[0]
+		processNode := st.Nodes[0]
 		require.Equal(t, "process-regions", processNode.Step.Name)
-		require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
+		require.Equal(t, status.NodeSuccess, processNode.Status)
 		require.Len(t, processNode.Children, 3)
 
 		// Verify output shows all regions were processed
@@ -340,7 +340,7 @@ steps:
 		require.Error(t, err)
 
 		// Verify the DAG did not complete successfully
-		status := agent.Status(coord.Context)
-		require.NotEqual(t, scheduler.StatusSuccess, status.Status)
+		st := agent.Status(coord.Context)
+		require.NotEqual(t, status.Success, st.Status)
 	})
 }

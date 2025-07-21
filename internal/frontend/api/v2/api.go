@@ -112,6 +112,12 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 				a.config.Server.Auth.Basic.Username: a.config.Server.Auth.Basic.Password,
 			},
 		}
+		if a.config.Server.Auth.OIDC.Enabled() {
+			oidcProvider, oidcVerify, oidcConfig := auth.InitVerifierAndConfig(a.config.Server.Auth.OIDC)
+			authOptions.OIDCAuthEnabled = true
+			authOptions.OIDCWhitelist = a.config.Server.Auth.OIDC.Whitelist
+			authOptions.OIDCProvider, authOptions.OIDCVerify, authOptions.OIDCConfig = oidcProvider, oidcVerify, oidcConfig
+		}
 		r.Use(auth.Middleware(authOptions))
 		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
 

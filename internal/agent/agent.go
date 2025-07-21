@@ -20,6 +20,7 @@ import (
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/models"
@@ -498,9 +499,9 @@ func (a *Agent) Status(ctx context.Context) models.DAGRunStatus {
 	defer a.lock.RUnlock()
 
 	schedulerStatus := a.scheduler.Status(ctx, a.graph)
-	if schedulerStatus == scheduler.StatusNone && a.graph.IsStarted() {
+	if schedulerStatus == status.None && a.graph.IsStarted() {
 		// Match the status to the execution graph.
-		schedulerStatus = scheduler.StatusRunning
+		schedulerStatus = status.Running
 	}
 
 	opts := []models.StatusOption{
@@ -572,9 +573,9 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 		switch {
 		case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
 			// Return the current status of the dag-run.
-			status := a.Status(ctx)
-			status.Status = scheduler.StatusRunning
-			statusJSON, err := json.Marshal(status)
+			dagStatus := a.Status(ctx)
+			dagStatus.Status = status.Running
+			statusJSON, err := json.Marshal(dagStatus)
 			if err != nil {
 				encodeError(w, err)
 				return

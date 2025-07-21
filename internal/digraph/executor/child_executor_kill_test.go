@@ -13,7 +13,7 @@ import (
 
 func TestChildDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 	// Create a mock database
-	mockDB := new(MockDatabase)
+	mockDB := new(mockDatabase)
 
 	// Create a context with environment
 	env := Env{
@@ -61,7 +61,7 @@ func TestChildDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 
 func TestChildDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 	// Create a mock database
-	mockDB := new(MockDatabase)
+	mockDB := new(mockDatabase)
 
 	// Create a context with environment
 	env := Env{
@@ -105,7 +105,7 @@ func TestChildDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 
 func TestChildDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 	// Create a mock database
-	mockDB := new(MockDatabase)
+	mockDB := new(mockDatabase)
 
 	// Create a context with environment
 	env := Env{
@@ -144,7 +144,7 @@ func TestChildDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 
 func TestChildDAGExecutor_Kill_Empty(t *testing.T) {
 	// Create a mock database
-	mockDB := new(MockDatabase)
+	mockDB := new(mockDatabase)
 
 	// Create a context with environment
 	env := Env{

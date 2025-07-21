@@ -1546,7 +1546,7 @@ components:
 
     NodeStatus:
       type: integer
-      enum: [0, 1, 2, 3, 4, 5]
+      enum: [0, 1, 2, 3, 4, 5, 6]
       x-enum-varnames:
         - "NotStarted"
         - "Running"
@@ -1554,6 +1554,7 @@ components:
         - "Cancelled"
         - "Success"
         - "Skipped"
+        - "PartialSuccess"
       description: |
         Numeric status code indicating current node state:
         0: "Not started"
@@ -1562,6 +1563,7 @@ components:
         3: "Cancelled"
         4: "Success"
         5: "Skipped"
+        6: "Partial Success"
 
     NodeStatusLabel:
       type: string
@@ -1573,6 +1575,7 @@ components:
         - "canceled"
         - "finished"
         - "skipped"
+        - "partial success"
 
     WorkerHealthStatus:
       type: string

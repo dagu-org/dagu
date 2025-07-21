@@ -2,17 +2,20 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
 var _ DAGExecutor = (*dagExecutor)(nil)
+var _ NodeStatusDeterminer = (*dagExecutor)(nil)
 
 type dagExecutor struct {
 	child     *ChildDAGExecutor
@@ -22,6 +25,7 @@ type dagExecutor struct {
 	stderr    io.Writer
 	runParams RunParams
 	step      digraph.Step
+	result    *digraph.RunStatus
 }
 
 // Errors for DAG executor
@@ -61,10 +65,49 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		}
 	}()
 
-	// Execute using the simplified API
-	err := e.child.Execute(ctx, e.runParams, e.workDir, e.stdout)
+	result, execErr := e.child.ExecuteWithResult(ctx, e.runParams, e.workDir)
+	if result != nil {
+		e.lock.Lock()
+		e.result = result
+		e.lock.Unlock()
+	}
 
-	return err
+	jsonData, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal outputs: %w", execErr)
+	}
+
+	// Add a newline at the end of the JSON output
+	jsonData = append(jsonData, '\n')
+
+	if e.stdout != nil {
+		if _, err := e.stdout.Write(jsonData); err != nil {
+			return fmt.Errorf("failed to write outputs: %w", err)
+		}
+	}
+
+	return execErr
+}
+
+// DetermineNodeStatus implements NodeStatusDeterminer.
+func (e *dagExecutor) DetermineNodeStatus(_ context.Context) (status.NodeStatus, error) {
+	if e.result == nil {
+		return status.NodeError, fmt.Errorf("no result available for node status determination")
+	}
+
+	// Check if the status is partial success or success
+	// For error cases, we return an error with the status
+	switch e.result.Status {
+	case status.Success:
+		return status.NodeSuccess, nil
+	case status.PartialSuccess:
+		return status.NodePartialSuccess, nil
+	case status.None, status.Running, status.Error, status.Cancel, status.Queued:
+		return status.NodeError, fmt.Errorf("child DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
+	default:
+		// This should never happen, but satisfies the exhaustive check
+		return status.NodeError, fmt.Errorf("child DAG run %s failed with unknown status: %s", e.result.DAGRunID, e.result.Status)
+	}
 }
 
 func (e *dagExecutor) SetParams(params RunParams) {
