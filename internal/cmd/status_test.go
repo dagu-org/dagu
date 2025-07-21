@@ -7,7 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -33,12 +33,12 @@ func TestStatusCommand(t *testing.T) {
 			if len(attempts) < 1 {
 				return false
 			}
-			status, err := attempts[0].ReadStatus(th.Context)
+			dagRunStatus, err := attempts[0].ReadStatus(th.Context)
 			if err != nil {
 				return false
 			}
 
-			return scheduler.StatusRunning == status.Status
+			return status.Running == dagRunStatus.Status
 		}, time.Second*3, time.Millisecond*50)
 
 		// Check the current status - just verify it runs without error
@@ -111,14 +111,14 @@ func TestStatusCommand(t *testing.T) {
 		status := models.DAGRunStatus{
 			Name:       dag.Name,
 			DAGRunID:   dagRunID,
-			Status:     scheduler.StatusError,
+			Status:     status.Error,
 			StartedAt:  time.Now().Format(time.RFC3339),
 			FinishedAt: time.Now().Format(time.RFC3339),
 			AttemptID:  attempt.ID(),
 			Nodes: []*models.Node{
 				{
 					Step:   digraph.Step{Name: "error"},
-					Status: scheduler.NodeStatusError,
+					Status: status.NodeError,
 					Error:  "exit status 1",
 				},
 			},
@@ -268,21 +268,21 @@ func TestStatusCommand(t *testing.T) {
 		status := models.DAGRunStatus{
 			Name:       dag.Name,
 			DAGRunID:   dagRunID,
-			Status:     scheduler.StatusError,
+			Status:     status.Error,
 			StartedAt:  time.Now().Format(time.RFC3339),
 			FinishedAt: time.Now().Format(time.RFC3339),
 			AttemptID:  attempt.ID(),
 			Nodes: []*models.Node{
 				{
 					Step:       digraph.Step{Name: "check"},
-					Status:     scheduler.NodeStatusError,
+					Status:     status.NodeError,
 					Error:      "exit status 1",
 					StartedAt:  time.Now().Format(time.RFC3339),
 					FinishedAt: time.Now().Format(time.RFC3339),
 				},
 				{
 					Step:       digraph.Step{Name: "skipped"},
-					Status:     scheduler.NodeStatusSkipped,
+					Status:     status.NodeSkipped,
 					StartedAt:  "-",
 					FinishedAt: time.Now().Format(time.RFC3339),
 				},
@@ -325,11 +325,11 @@ func TestStatusCommand(t *testing.T) {
 			if len(attempts) < 1 {
 				return false
 			}
-			status, err := attempts[0].ReadStatus(th.Context)
+			dagRunStatus, err := attempts[0].ReadStatus(th.Context)
 			if err != nil {
 				return false
 			}
-			return scheduler.StatusRunning == status.Status
+			return status.Running == dagRunStatus.Status
 		}, time.Second*3, time.Millisecond*50)
 
 		// Cancel the DAG
@@ -428,11 +428,11 @@ func TestStatusCommand(t *testing.T) {
 			if len(attempts) < 1 {
 				return false
 			}
-			status, err := attempts[0].ReadStatus(th.Context)
+			dagRunStatus, err := attempts[0].ReadStatus(th.Context)
 			if err != nil {
 				return false
 			}
-			return scheduler.StatusRunning == status.Status
+			return status.Running == dagRunStatus.Status
 		}, time.Second*3, time.Millisecond*50)
 
 		// Check the status runs without error
@@ -547,14 +547,14 @@ func TestStatusCommand(t *testing.T) {
 		status := models.DAGRunStatus{
 			Name:       dag.Name,
 			DAGRunID:   dagRunID,
-			Status:     scheduler.StatusSuccess,
+			Status:     status.Success,
 			StartedAt:  time.Now().Format(time.RFC3339),
 			FinishedAt: time.Now().Format(time.RFC3339),
 			AttemptID:  attempt.ID(),
 			Nodes: []*models.Node{
 				{
 					Step:   digraph.Step{Name: "binary_output"},
-					Status: scheduler.NodeStatusSuccess,
+					Status: status.NodeSuccess,
 					Stdout: "/nonexistent/binary.log", // This will trigger "(unable to read)"
 					Stderr: "",
 				},

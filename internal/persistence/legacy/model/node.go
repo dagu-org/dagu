@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
@@ -41,16 +42,16 @@ func FromNode(node scheduler.NodeData) *Node {
 }
 
 type Node struct {
-	Step       digraph.Step         `json:"Step"`
-	Log        string               `json:"Log"`
-	StartedAt  string               `json:"StartedAt"`
-	FinishedAt string               `json:"FinishedAt"`
-	Status     scheduler.NodeStatus `json:"Status"`
-	RetriedAt  string               `json:"RetriedAt,omitempty"`
-	RetryCount int                  `json:"RetryCount,omitempty"`
-	DoneCount  int                  `json:"DoneCount,omitempty"`
-	Error      string               `json:"Error,omitempty"`
-	StatusText string               `json:"StatusText"`
+	Step       digraph.Step      `json:"Step"`
+	Log        string            `json:"Log"`
+	StartedAt  string            `json:"StartedAt"`
+	FinishedAt string            `json:"FinishedAt"`
+	Status     status.NodeStatus `json:"Status"`
+	RetriedAt  string            `json:"RetriedAt,omitempty"`
+	RetryCount int               `json:"RetryCount,omitempty"`
+	DoneCount  int               `json:"DoneCount,omitempty"`
+	Error      string            `json:"Error,omitempty"`
+	StatusText string            `json:"StatusText"`
 }
 
 func (n *Node) ToNode() *scheduler.Node {
@@ -74,8 +75,8 @@ func NewNode(step digraph.Step) *Node {
 		Step:       step,
 		StartedAt:  "-",
 		FinishedAt: "-",
-		Status:     scheduler.NodeStatusNone,
-		StatusText: scheduler.NodeStatusNone.String(),
+		Status:     status.NodeNone,
+		StatusText: status.NodeNone.String(),
 	}
 }
 

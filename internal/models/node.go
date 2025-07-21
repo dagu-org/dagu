@@ -6,25 +6,26 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 // Node represents a DAG step with its execution state for persistence
 type Node struct {
-	Step             digraph.Step         `json:"step,omitzero"`
-	Stdout           string               `json:"stdout"` // standard output log file path
-	Stderr           string               `json:"stderr"` // standard error log file path
-	StartedAt        string               `json:"startedAt"`
-	FinishedAt       string               `json:"finishedAt"`
-	Status           scheduler.NodeStatus `json:"status"`
-	RetriedAt        string               `json:"retriedAt,omitempty"`
-	RetryCount       int                  `json:"retryCount,omitempty"`
-	DoneCount        int                  `json:"doneCount,omitempty"`
-	Repeated         bool                 `json:"repeated,omitempty"` // indicates if the node has been repeated
-	Error            string               `json:"error,omitempty"`
-	Children         []ChildDAGRun        `json:"children,omitempty"`
-	ChildrenRepeated []ChildDAGRun        `json:"childrenRepeated,omitempty"` // repeated child DAG runs
-	OutputVariables  *executor.SyncMap    `json:"outputVariables,omitempty"`
+	Step             digraph.Step      `json:"step,omitzero"`
+	Stdout           string            `json:"stdout"` // standard output log file path
+	Stderr           string            `json:"stderr"` // standard error log file path
+	StartedAt        string            `json:"startedAt"`
+	FinishedAt       string            `json:"finishedAt"`
+	Status           status.NodeStatus `json:"status"`
+	RetriedAt        string            `json:"retriedAt,omitempty"`
+	RetryCount       int               `json:"retryCount,omitempty"`
+	DoneCount        int               `json:"doneCount,omitempty"`
+	Repeated         bool              `json:"repeated,omitempty"` // indicates if the node has been repeated
+	Error            string            `json:"error,omitempty"`
+	Children         []ChildDAGRun     `json:"children,omitempty"`
+	ChildrenRepeated []ChildDAGRun     `json:"childrenRepeated,omitempty"` // repeated child DAG runs
+	OutputVariables  *executor.SyncMap `json:"outputVariables,omitempty"`
 }
 
 // ChildDAGRun represents a child DAG run associated with a node
@@ -82,7 +83,7 @@ func newNodeFromStep(step digraph.Step) *Node {
 		Step:       step,
 		StartedAt:  "-",
 		FinishedAt: "-",
-		Status:     scheduler.NodeStatusNone,
+		Status:     status.NodeNone,
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
@@ -293,12 +293,12 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 
 	// Mock DAG run store response
 	statuses := []*models.DAGRunStatus{
-		{Status: scheduler.StatusSuccess},
-		{Status: scheduler.StatusSuccess},
-		{Status: scheduler.StatusError},
-		{Status: scheduler.StatusRunning},
-		{Status: scheduler.StatusQueued},
-		{Status: scheduler.StatusCancel},
+		{Status: status.Success},
+		{Status: status.Success},
+		{Status: status.Error},
+		{Status: status.Running},
+		{Status: status.Queued},
+		{Status: status.Cancel},
 	}
 	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return(statuses, nil)
 

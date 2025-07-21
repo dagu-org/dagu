@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/models"
 )
@@ -17,8 +17,8 @@ import (
 func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObject) (api.ListDAGRunsResponseObject, error) {
 	var opts []models.ListDAGRunStatusesOption
 	if request.Params.Status != nil {
-		opts = append(opts, models.WithStatuses([]scheduler.Status{
-			scheduler.Status(*request.Params.Status),
+		opts = append(opts, models.WithStatuses([]status.Status{
+			status.Status(*request.Params.Status),
 		}))
 	}
 	if request.Params.FromDate != nil {
@@ -52,8 +52,8 @@ func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNa
 	}
 
 	if request.Params.Status != nil {
-		opts = append(opts, models.WithStatuses([]scheduler.Status{
-			scheduler.Status(*request.Params.Status),
+		opts = append(opts, models.WithStatuses([]status.Status{
+			status.Status(*request.Params.Status),
 		}))
 	}
 	if request.Params.FromDate != nil {
@@ -95,7 +95,7 @@ func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestO
 	dagRunId := request.DagRunId
 
 	ref := digraph.NewDAGRunRef(dagName, dagRunId)
-	status, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return api.GetDAGRunLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -112,9 +112,9 @@ func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestO
 	}
 
 	// Use the new log utility function
-	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(status.Log, options)
+	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(dagStatus.Log, options)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
+		return nil, fmt.Errorf("error reading %s: %w", dagStatus.Log, err)
 	}
 
 	return api.GetDAGRunLog200JSONResponse{
@@ -131,7 +131,7 @@ func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLog
 	dagRunId := request.DagRunId
 
 	ref := digraph.NewDAGRunRef(dagName, dagRunId)
-	status, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return api.GetDAGRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -139,7 +139,7 @@ func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLog
 		}, nil
 	}
 
-	node, err := status.NodeByName(request.StepName)
+	node, err := dagStatus.NodeByName(request.StepName)
 	if err != nil {
 		return api.GetDAGRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -181,14 +181,14 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 	}
 
 	ref := digraph.NewDAGRunRef(request.Name, request.DagRunId)
-	status, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return &api.UpdateDAGRunStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
 	}
-	if status.Status == scheduler.StatusRunning {
+	if dagStatus.Status == status.Running {
 		return &api.UpdateDAGRunStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
 			Message: fmt.Sprintf("dag-run ID %s for DAG %s is still running", request.DagRunId, request.Name),
@@ -197,7 +197,7 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 
 	idxToUpdate := -1
 
-	for idx, n := range status.Nodes {
+	for idx, n := range dagStatus.Nodes {
 		if n.Step.Name == request.StepName {
 			idxToUpdate = idx
 		}
@@ -209,10 +209,10 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 		}, nil
 	}
 
-	status.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
+	dagStatus.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
 
 	root := digraph.NewDAGRunRef(request.Name, request.DagRunId)
-	if err := a.dagRunMgr.UpdateStatus(ctx, root, *status); err != nil {
+	if err := a.dagRunMgr.UpdateStatus(ctx, root, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
@@ -222,7 +222,7 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 // GetDAGRunDetails implements api.StrictServerInterface.
 func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetailsRequestObject) (api.GetDAGRunDetailsResponseObject, error) {
 	ref := digraph.NewDAGRunRef(request.Name, request.DagRunId)
-	status, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return &api.GetDAGRunDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -230,14 +230,14 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 		}, nil
 	}
 	return &api.GetDAGRunDetails200JSONResponse{
-		DagRunDetails: toDAGRunDetails(*status),
+		DagRunDetails: toDAGRunDetails(*dagStatus),
 	}, nil
 }
 
 // GetChildDAGRunDetails implements api.StrictServerInterface.
 func (a *API) GetChildDAGRunDetails(ctx context.Context, request api.GetChildDAGRunDetailsRequestObject) (api.GetChildDAGRunDetailsResponseObject, error) {
 	root := digraph.NewDAGRunRef(request.Name, request.DagRunId)
-	status, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
+	dagStatus, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
 	if err != nil {
 		return &api.GetChildDAGRunDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -245,14 +245,14 @@ func (a *API) GetChildDAGRunDetails(ctx context.Context, request api.GetChildDAG
 		}, nil
 	}
 	return &api.GetChildDAGRunDetails200JSONResponse{
-		DagRunDetails: toDAGRunDetails(*status),
+		DagRunDetails: toDAGRunDetails(*dagStatus),
 	}, nil
 }
 
 // GetChildDAGRunLog implements api.StrictServerInterface.
 func (a *API) GetChildDAGRunLog(ctx context.Context, request api.GetChildDAGRunLogRequestObject) (api.GetChildDAGRunLogResponseObject, error) {
 	root := digraph.NewDAGRunRef(request.Name, request.DagRunId)
-	status, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
+	dagStatus, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
 	if err != nil {
 		return &api.GetChildDAGRunLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -269,9 +269,9 @@ func (a *API) GetChildDAGRunLog(ctx context.Context, request api.GetChildDAGRunL
 	}
 
 	// Use the new log utility function
-	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(status.Log, options)
+	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(dagStatus.Log, options)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", status.Log, err)
+		return nil, fmt.Errorf("error reading %s: %w", dagStatus.Log, err)
 	}
 
 	return &api.GetChildDAGRunLog200JSONResponse{
@@ -286,7 +286,7 @@ func (a *API) GetChildDAGRunLog(ctx context.Context, request api.GetChildDAGRunL
 // GetChildDAGRunStepLog implements api.StrictServerInterface.
 func (a *API) GetChildDAGRunStepLog(ctx context.Context, request api.GetChildDAGRunStepLogRequestObject) (api.GetChildDAGRunStepLogResponseObject, error) {
 	root := digraph.NewDAGRunRef(request.Name, request.DagRunId)
-	status, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
+	dagStatus, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
 	if err != nil {
 		return &api.GetChildDAGRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -294,7 +294,7 @@ func (a *API) GetChildDAGRunStepLog(ctx context.Context, request api.GetChildDAG
 		}, nil
 	}
 
-	node, err := status.NodeByName(request.StepName)
+	node, err := dagStatus.NodeByName(request.StepName)
 	if err != nil {
 		return &api.GetChildDAGRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
@@ -337,14 +337,14 @@ func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.Updat
 	}
 
 	root := digraph.NewDAGRunRef(request.Name, request.DagRunId)
-	status, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
+	dagStatus, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
 	if err != nil {
 		return &api.UpdateChildDAGRunStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("child dag-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
 		}, nil
 	}
-	if status.Status == scheduler.StatusRunning {
+	if dagStatus.Status == status.Running {
 		return &api.UpdateChildDAGRunStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
 			Message: fmt.Sprintf("dag-run ID %s for DAG %s is still running", request.DagRunId, request.Name),
@@ -353,7 +353,7 @@ func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.Updat
 
 	idxToUpdate := -1
 
-	for idx, n := range status.Nodes {
+	for idx, n := range dagStatus.Nodes {
 		if n.Step.Name == request.StepName {
 			idxToUpdate = idx
 		}
@@ -365,22 +365,22 @@ func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.Updat
 		}, nil
 	}
 
-	status.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
+	dagStatus.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
 
-	if err := a.dagRunMgr.UpdateStatus(ctx, root, *status); err != nil {
+	if err := a.dagRunMgr.UpdateStatus(ctx, root, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
 	return &api.UpdateChildDAGRunStepStatus200Response{}, nil
 }
 
-var nodeStatusMapping = map[api.NodeStatus]scheduler.NodeStatus{
-	api.NodeStatusNotStarted: scheduler.NodeStatusNone,
-	api.NodeStatusRunning:    scheduler.NodeStatusRunning,
-	api.NodeStatusFailed:     scheduler.NodeStatusError,
-	api.NodeStatusCancelled:  scheduler.NodeStatusCancel,
-	api.NodeStatusSuccess:    scheduler.NodeStatusSuccess,
-	api.NodeStatusSkipped:    scheduler.NodeStatusSkipped,
+var nodeStatusMapping = map[api.NodeStatus]status.NodeStatus{
+	api.NodeStatusNotStarted: status.NodeNone,
+	api.NodeStatusRunning:    status.NodeRunning,
+	api.NodeStatusFailed:     status.NodeError,
+	api.NodeStatusCancelled:  status.NodeCancel,
+	api.NodeStatusSuccess:    status.NodeSuccess,
+	api.NodeStatusSkipped:    status.NodeSkipped,
 }
 
 func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObject) (api.RetryDAGRunResponseObject, error) {
@@ -435,7 +435,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
 
-	status, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, request.DagRunId)
+	dagStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, request.DagRunId)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -444,7 +444,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		}
 	}
 
-	if status.Status != scheduler.StatusRunning {
+	if dagStatus.Status != status.Running {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeNotRunning,
@@ -452,7 +452,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		}
 	}
 
-	if err := a.dagRunMgr.Stop(ctx, dag, status.DAGRunID); err != nil {
+	if err := a.dagRunMgr.Stop(ctx, dag, dagStatus.DAGRunID); err != nil {
 		return nil, fmt.Errorf("error stopping DAG: %w", err)
 	}
 
@@ -484,7 +484,7 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 		return nil, fmt.Errorf("error getting latest status: %w", err)
 	}
 
-	if latestStatus.Status != scheduler.StatusQueued {
+	if latestStatus.Status != status.Queued {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,

@@ -7,6 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -33,7 +34,7 @@ func TestStatusSerialization(t *testing.T) {
 		SMTP:      &digraph.SMTPConfig{},
 	}
 	dagRunID := uuid.Must(uuid.NewV7()).String()
-	statusToPersist := models.NewStatusBuilder(dag).Create(dagRunID, scheduler.StatusSuccess, 0, startedAt, models.WithFinishedAt(finishedAt))
+	statusToPersist := models.NewStatusBuilder(dag).Create(dagRunID, status.Success, 0, startedAt, models.WithFinishedAt(finishedAt))
 
 	rawJSON, err := json.Marshal(statusToPersist)
 	require.NoError(t, err)
@@ -67,16 +68,16 @@ func TestStatusBuilder(t *testing.T) {
 
 	builder := models.NewStatusBuilder(dag)
 	dagRunID := "test-run-123"
-	status := scheduler.StatusRunning
+	s := status.Running
 	pid := 12345
 	startedAt := time.Now()
 
 	// Test basic creation
-	result := builder.Create(dagRunID, status, pid, startedAt)
+	result := builder.Create(dagRunID, s, pid, startedAt)
 
 	assert.Equal(t, dag.Name, result.Name)
 	assert.Equal(t, dagRunID, result.DAGRunID)
-	assert.Equal(t, status, result.Status)
+	assert.Equal(t, s, result.Status)
 	assert.Equal(t, models.PID(pid), result.PID)
 	assert.NotEmpty(t, result.StartedAt)
 	assert.Equal(t, 2, len(result.Nodes))
@@ -99,7 +100,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 
 	builder := models.NewStatusBuilder(dag)
 	dagRunID := "test-run-456"
-	status := scheduler.StatusSuccess
+	s := status.Success
 	pid := 54321
 	startedAt := time.Now()
 	finishedAt := startedAt.Add(5 * time.Minute)
@@ -109,7 +110,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 		{
 			Step: digraph.Step{Name: "step1"},
 			State: scheduler.NodeState{
-				Status:     scheduler.NodeStatusSuccess,
+				Status:     status.NodeSuccess,
 				StartedAt:  startedAt,
 				FinishedAt: finishedAt,
 			},
@@ -127,7 +128,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 	// Test with all options
 	result := builder.Create(
 		dagRunID,
-		status,
+		s,
 		pid,
 		startedAt,
 		models.WithFinishedAt(finishedAt),
@@ -178,22 +179,22 @@ func TestInitialStatus(t *testing.T) {
 		},
 	}
 
-	status := models.InitialStatus(dag)
+	st := models.InitialStatus(dag)
 
-	assert.Equal(t, dag.Name, status.Name)
-	assert.Equal(t, scheduler.StatusNone, status.Status)
-	assert.Equal(t, models.PID(0), status.PID)
-	assert.Equal(t, 2, len(status.Nodes))
-	assert.NotNil(t, status.OnExit)
-	assert.NotNil(t, status.OnSuccess)
-	assert.NotNil(t, status.OnFailure)
-	assert.NotNil(t, status.OnCancel)
-	assert.Equal(t, "arg1 arg2", status.Params)
-	assert.Equal(t, dag.Params, status.ParamsList)
-	assert.Equal(t, dag.Preconditions, status.Preconditions)
-	assert.NotZero(t, status.CreatedAt)
-	assert.Equal(t, "", status.StartedAt)
-	assert.Equal(t, "", status.FinishedAt)
+	assert.Equal(t, dag.Name, st.Name)
+	assert.Equal(t, status.None, st.Status)
+	assert.Equal(t, models.PID(0), st.PID)
+	assert.Equal(t, 2, len(st.Nodes))
+	assert.NotNil(t, st.OnExit)
+	assert.NotNil(t, st.OnSuccess)
+	assert.NotNil(t, st.OnFailure)
+	assert.NotNil(t, st.OnCancel)
+	assert.Equal(t, "arg1 arg2", st.Params)
+	assert.Equal(t, dag.Params, st.ParamsList)
+	assert.Equal(t, dag.Preconditions, st.Preconditions)
+	assert.NotZero(t, st.CreatedAt)
+	assert.Equal(t, "", st.StartedAt)
+	assert.Equal(t, "", st.FinishedAt)
 }
 
 func TestStatusFromJSONError(t *testing.T) {
@@ -207,18 +208,18 @@ func TestStatusFromJSONError(t *testing.T) {
 }
 
 func TestDAGRunStatus_DAGRun(t *testing.T) {
-	status := &models.DAGRunStatus{
+	dagRunStatus := &models.DAGRunStatus{
 		Name:     "test-dag",
 		DAGRunID: "run-123",
 	}
 
-	dagRun := status.DAGRun()
+	dagRun := dagRunStatus.DAGRun()
 	assert.Equal(t, "test-dag", dagRun.Name)
 	assert.Equal(t, "run-123", dagRun.ID)
 }
 
 func TestDAGRunStatus_Errors(t *testing.T) {
-	status := &models.DAGRunStatus{
+	dagRunStatus := &models.DAGRunStatus{
 		Nodes: []*models.Node{
 			{Step: digraph.Step{Name: "step1"}, Error: "error1"},
 			{Step: digraph.Step{Name: "step2"}, Error: ""},
@@ -230,7 +231,7 @@ func TestDAGRunStatus_Errors(t *testing.T) {
 		OnCancel:  &models.Node{Step: digraph.Step{Name: "cancel"}, Error: "cancel error"},
 	}
 
-	errors := status.Errors()
+	errors := dagRunStatus.Errors()
 	assert.Equal(t, 5, len(errors))
 	assert.Contains(t, errors[0].Error(), "node step1: error1")
 	assert.Contains(t, errors[1].Error(), "node step3: error3")
@@ -240,7 +241,7 @@ func TestDAGRunStatus_Errors(t *testing.T) {
 }
 
 func TestDAGRunStatus_NodeByName(t *testing.T) {
-	status := &models.DAGRunStatus{
+	dagRunStatus := &models.DAGRunStatus{
 		Nodes: []*models.Node{
 			{Step: digraph.Step{Name: "step1"}},
 			{Step: digraph.Step{Name: "step2"}},
@@ -252,21 +253,21 @@ func TestDAGRunStatus_NodeByName(t *testing.T) {
 	}
 
 	// Test finding regular nodes
-	node, err := status.NodeByName("step1")
+	node, err := dagRunStatus.NodeByName("step1")
 	assert.NoError(t, err)
 	assert.Equal(t, "step1", node.Step.Name)
 
 	// Test finding handler nodes
-	node, err = status.NodeByName("exit")
+	node, err = dagRunStatus.NodeByName("exit")
 	assert.NoError(t, err)
 	assert.Equal(t, "exit", node.Step.Name)
 
-	node, err = status.NodeByName("success")
+	node, err = dagRunStatus.NodeByName("success")
 	assert.NoError(t, err)
 	assert.Equal(t, "success", node.Step.Name)
 
 	// Test node not found
-	_, err = status.NodeByName("nonexistent")
+	_, err = dagRunStatus.NodeByName("nonexistent")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "node nonexistent not found")
 }
@@ -320,19 +321,19 @@ func TestNodesFromSteps(t *testing.T) {
 	assert.Equal(t, 2, len(nodes))
 	assert.Equal(t, "step1", nodes[0].Step.Name)
 	assert.Equal(t, "step2", nodes[1].Step.Name)
-	assert.Equal(t, scheduler.NodeStatusNone, nodes[0].Status)
-	assert.Equal(t, scheduler.NodeStatusNone, nodes[1].Status)
+	assert.Equal(t, status.NodeNone, nodes[0].Status)
+	assert.Equal(t, status.NodeNone, nodes[1].Status)
 }
 
 func TestWithCreatedAtDefaultTime(t *testing.T) {
 	dag := &digraph.DAG{Name: "test"}
-	status := models.InitialStatus(dag)
+	dagRunStatus := models.InitialStatus(dag)
 
 	// Test WithCreatedAt with 0 - should use current time
 	beforeTime := time.Now().UnixMilli()
-	models.WithCreatedAt(0)(&status)
+	models.WithCreatedAt(0)(&dagRunStatus)
 	afterTime := time.Now().UnixMilli()
 
-	assert.GreaterOrEqual(t, status.CreatedAt, beforeTime)
-	assert.LessOrEqual(t, status.CreatedAt, afterTime)
+	assert.GreaterOrEqual(t, dagRunStatus.CreatedAt, beforeTime)
+	assert.LessOrEqual(t, dagRunStatus.CreatedAt, afterTime)
 }

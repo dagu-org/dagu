@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/stringutil"
@@ -159,29 +160,33 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 
 	continueOn := n.ContinueOn()
 
-	status := n.Status()
-	switch status {
-	case NodeStatusSuccess:
+	s := n.Status()
+	switch s {
+	case status.NodeSuccess:
 		return true
 
-	case NodeStatusError:
+	case status.NodeError:
 		if continueOn.Failure {
 			return true
 		}
-	case NodeStatusCancel:
+	case status.NodeCancel:
 		return false
 
-	case NodeStatusSkipped:
+	case status.NodeSkipped:
 		if continueOn.Skipped {
 			return true
 		}
 
-	case NodeStatusNone:
+	case status.NodePartialSuccess:
+		// Partial success is treated like success for continue on
+		return true
+
+	case status.NodeNone:
 		fallthrough
 
-	case NodeStatusRunning:
+	case status.NodeRunning:
 		// Unexpected state
-		logger.Error(ctx, "Unexpected node status", "status", status.String())
+		logger.Error(ctx, "Unexpected node status", "status", s.String())
 		return false
 
 	}
@@ -252,6 +257,16 @@ func (n *Node) Execute(ctx context.Context) error {
 			return fmt.Errorf("failed to capture output: %w", err)
 		}
 		n.setVariable(output, value)
+	}
+
+	if status, ok := cmd.(executor.NodeStatusDeterminer); ok {
+		// Determine the node status based on the executor's implementation
+		nodeStatus, err := status.DetermineNodeStatus(ctx)
+		// Only set the status if it is a success
+		// Handle the error case at the scheduler level for simplicity
+		if err == nil && nodeStatus.IsSuccess() {
+			n.SetStatus(nodeStatus)
+		}
 	}
 
 	return n.Error()
@@ -476,8 +491,8 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	status := n.Status()
-	if status == NodeStatusRunning && n.cmd != nil {
+	s := n.Status()
+	if s == status.NodeRunning && n.cmd != nil {
 		sigsig := sig
 		if allowOverride && n.SignalOnStop() != "" {
 			sigsig = syscall.Signal(digraph.GetSignalNum(n.SignalOnStop()))
@@ -487,17 +502,17 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 			logger.Error(ctx, "Failed to send signal", "err", err, "step", n.Name())
 		}
 	}
-	if status == NodeStatusRunning {
-		n.SetStatus(NodeStatusCancel)
+	if s == status.NodeRunning {
+		n.SetStatus(status.NodeCancel)
 	}
 }
 
 func (n *Node) Cancel(ctx context.Context) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	status := n.Status()
-	if status == NodeStatusRunning {
-		n.SetStatus(NodeStatusCancel)
+	s := n.Status()
+	if s == status.NodeRunning {
+		n.SetStatus(status.NodeCancel)
 	}
 	if n.cancelFunc != nil {
 		logger.Info(ctx, "Canceling node", "step", n.Name())

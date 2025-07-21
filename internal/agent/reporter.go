@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -31,53 +32,53 @@ func newReporter(f SenderFn) *reporter {
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	ctx context.Context, dag *digraph.DAG, status models.DAGRunStatus, node *scheduler.Node,
+	ctx context.Context, dag *digraph.DAG, dagStatus models.DAGRunStatus, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
-	if nodeStatus != scheduler.NodeStatusNone {
+	if nodeStatus != status.NodeNone {
 		logger.Info(ctx, "Step finished", "step", node.NodeData().Step.Name, "status", nodeStatus)
 	}
-	if nodeStatus == scheduler.NodeStatusError && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
+	if nodeStatus == status.NodeError && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
 		fromAddress := dag.ErrorMail.From
 		toAddresses := []string{dag.ErrorMail.To}
-		subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status)
-		html := renderHTMLWithDAGInfo(status)
-		attachments := addAttachments(dag.ErrorMail.AttachLogs, status.Nodes)
+		subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, dagStatus.Status)
+		html := renderHTMLWithDAGInfo(dagStatus)
+		attachments := addAttachments(dag.ErrorMail.AttachLogs, dagStatus.Nodes)
 		return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 	}
 	return nil
 }
 
 // report is a function that reports the status of the scheduler.
-func (r *reporter) getSummary(_ context.Context, status models.DAGRunStatus, err error) string {
+func (r *reporter) getSummary(_ context.Context, dagStatus models.DAGRunStatus, err error) string {
 	var buf bytes.Buffer
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Summary ->\n"))
-	_, _ = buf.Write([]byte(renderDAGSummary(status, err)))
+	_, _ = buf.Write([]byte(renderDAGSummary(dagStatus, err)))
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Details ->\n"))
-	_, _ = buf.Write([]byte(renderStepSummary(status.Nodes)))
+	_, _ = buf.Write([]byte(renderStepSummary(dagStatus.Nodes)))
 	return buf.String()
 }
 
 // send is a function that sends a report mail.
-func (r *reporter) send(ctx context.Context, dag *digraph.DAG, status models.DAGRunStatus, err error) error {
-	if err != nil || status.Status == scheduler.StatusError {
+func (r *reporter) send(ctx context.Context, dag *digraph.DAG, dagStatus models.DAGRunStatus, err error) error {
+	if err != nil || dagStatus.Status == status.Error {
 		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
 			fromAddress := dag.ErrorMail.From
 			toAddresses := []string{dag.ErrorMail.To}
-			subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status)
-			html := renderHTMLWithDAGInfo(status)
-			attachments := addAttachments(dag.ErrorMail.AttachLogs, status.Nodes)
+			subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, dagStatus.Status)
+			html := renderHTMLWithDAGInfo(dagStatus)
+			attachments := addAttachments(dag.ErrorMail.AttachLogs, dagStatus.Nodes)
 			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
-	} else if status.Status == scheduler.StatusSuccess || status.Status == scheduler.StatusPartialSuccess {
+	} else if dagStatus.Status == status.Success || dagStatus.Status == status.PartialSuccess {
 		if dag.MailOn != nil && dag.MailOn.Success && dag.InfoMail != nil {
 			fromAddress := dag.InfoMail.From
 			toAddresses := []string{dag.InfoMail.To}
-			subject := fmt.Sprintf("%s %s (%s)", dag.InfoMail.Prefix, dag.Name, status.Status)
-			html := renderHTMLWithDAGInfo(status)
-			attachments := addAttachments(dag.InfoMail.AttachLogs, status.Nodes)
+			subject := fmt.Sprintf("%s %s (%s)", dag.InfoMail.Prefix, dag.Name, dagStatus.Status)
+			html := renderHTMLWithDAGInfo(dagStatus)
+			attachments := addAttachments(dag.InfoMail.AttachLogs, dagStatus.Nodes)
 			_ = r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
 	}
@@ -94,14 +95,14 @@ var dagHeader = table.Row{
 	"Error",
 }
 
-func renderDAGSummary(status models.DAGRunStatus, err error) string {
+func renderDAGSummary(dagStatus models.DAGRunStatus, err error) string {
 	dataRow := table.Row{
-		status.DAGRunID,
-		status.Name,
-		status.StartedAt,
-		status.FinishedAt,
-		status.Status,
-		status.Params,
+		dagStatus.DAGRunID,
+		dagStatus.Name,
+		dagStatus.StartedAt,
+		dagStatus.FinishedAt,
+		dagStatus.Status,
+		dagStatus.Params,
 	}
 	if err != nil {
 		dataRow = append(dataRow, err.Error())
@@ -281,7 +282,7 @@ func renderHTML(nodes []*models.Node) string {
 	return buffer.String()
 }
 
-func renderHTMLWithDAGInfo(status models.DAGRunStatus) string {
+func renderHTMLWithDAGInfo(dagStatus models.DAGRunStatus) string {
 	var buffer bytes.Buffer
 
 	// Start with enhanced HTML structure and styling
@@ -455,7 +456,7 @@ func renderHTMLWithDAGInfo(status models.DAGRunStatus) string {
         <div class="status-badge `)
 
 	// Add status class
-	statusStr := status.Status.String()
+	statusStr := dagStatus.Status.String()
 	statusClass := ""
 	switch statusStr {
 	case "finished":
@@ -475,7 +476,7 @@ func renderHTMLWithDAGInfo(status models.DAGRunStatus) string {
         <div class="dag-name">`)
 
 	// Add DAG name (escaped)
-	dagName := strings.ReplaceAll(status.Name, "&", "&amp;")
+	dagName := strings.ReplaceAll(dagStatus.Name, "&", "&amp;")
 	dagName = strings.ReplaceAll(dagName, "<", "&lt;")
 	dagName = strings.ReplaceAll(dagName, ">", "&gt;")
 	_, _ = buffer.WriteString(dagName)
@@ -487,7 +488,7 @@ func renderHTMLWithDAGInfo(status models.DAGRunStatus) string {
                 <div class="dag-info-value mono">`)
 
 	// Add DAG Run ID (escaped)
-	dagRunID := strings.ReplaceAll(status.DAGRunID, "&", "&amp;")
+	dagRunID := strings.ReplaceAll(dagStatus.DAGRunID, "&", "&amp;")
 	dagRunID = strings.ReplaceAll(dagRunID, "<", "&lt;")
 	dagRunID = strings.ReplaceAll(dagRunID, ">", "&gt;")
 	_, _ = buffer.WriteString(dagRunID)
@@ -499,7 +500,7 @@ func renderHTMLWithDAGInfo(status models.DAGRunStatus) string {
                 <div class="dag-info-value mono">`)
 
 	// Add Parameters (escaped)
-	params := status.Params
+	params := dagStatus.Params
 	if params == "" {
 		params = "(none)"
 	}
@@ -514,14 +515,14 @@ func renderHTMLWithDAGInfo(status models.DAGRunStatus) string {
             <div class="info-item">
                 <div class="dag-info-label">Started At</div>
                 <div class="dag-info-value">`)
-	_, _ = buffer.WriteString(status.StartedAt)
+	_, _ = buffer.WriteString(dagStatus.StartedAt)
 
 	_, _ = buffer.WriteString(`</div>
             </div>
             <div class="info-item">
                 <div class="dag-info-label">Finished At</div>
                 <div class="dag-info-value">`)
-	_, _ = buffer.WriteString(status.FinishedAt)
+	_, _ = buffer.WriteString(dagStatus.FinishedAt)
 
 	_, _ = buffer.WriteString(`</div>
             </div>
@@ -540,7 +541,7 @@ func renderHTMLWithDAGInfo(status models.DAGRunStatus) string {
 	_, _ = buffer.WriteString("</tr></thead><tbody>")
 
 	// Add table rows (reuse the logic from renderHTML)
-	for i, n := range status.Nodes {
+	for i, n := range dagStatus.Nodes {
 		_, _ = buffer.WriteString("<tr>")
 
 		// Row number with special styling

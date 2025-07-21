@@ -8,7 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -66,10 +66,10 @@ steps:
 	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
-	updateStatus := func(rec models.DAGRunAttempt, status *models.DAGRunStatus) {
+	updateStatus := func(rec models.DAGRunAttempt, dagRunStatus *models.DAGRunStatus) {
 		err = rec.Open(ctx)
 		require.NoError(t, err)
-		err = rec.Write(ctx, *status)
+		err = rec.Write(ctx, *dagRunStatus)
 		require.NoError(t, err)
 		err = rec.Close(ctx)
 		require.NoError(t, err)
@@ -80,7 +80,7 @@ steps:
 	require.NoError(t, err)
 
 	child1Node := parentStatus.Nodes[0]
-	child1Node.Status = scheduler.NodeStatusError
+	child1Node.Status = status.NodeError
 	updateStatus(parentAttempt, parentStatus)
 
 	// (2) Find the child_1 dag-run ID to update its status
@@ -92,7 +92,7 @@ steps:
 
 	// (3) Find the child_2 node and update its status to "failed"
 	child2Node := child1Status.Nodes[0]
-	child2Node.Status = scheduler.NodeStatusError
+	child2Node.Status = status.NodeError
 	updateStatus(child1Attempt, child1Status)
 
 	// (4) Find the child_2 dag-run ID to update its status
@@ -102,16 +102,16 @@ steps:
 	child2Status, err := child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), child2Status.Status.String())
+	require.Equal(t, status.NodeSuccess.String(), child2Status.Status.String())
 
 	// (5) Update the step in child_2 to "failed" to simulate a retry
-	child2Status.Nodes[0].Status = scheduler.NodeStatusError
+	child2Status.Nodes[0].Status = status.NodeError
 	updateStatus(child2Attempt, child2Status)
 
 	// (6) Check if the child_2 status is now "failed"
 	child2Status, err = child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.NodeStatusError.String(), child2Status.Nodes[0].Status.String())
+	require.Equal(t, status.NodeError.String(), child2Status.Nodes[0].Status.String())
 
 	// Retry the DAG
 
@@ -126,7 +126,7 @@ steps:
 	require.NoError(t, err)
 	child2Status, err = child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), child2Status.Nodes[0].Status.String())
+	require.Equal(t, status.NodeSuccess.String(), child2Status.Nodes[0].Status.String())
 
 	require.Equal(t, "parent", child2Status.Root.Name, "parent")
 	require.Equal(t, dagRunID, child2Status.Root.ID)
@@ -191,22 +191,22 @@ steps:
 
 	parentStatus, err := parentAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), parentStatus.Status.String())
+	require.Equal(t, status.NodeSuccess.String(), parentStatus.Status.String())
 
 	// Find child DAG run
 	childNode := parentStatus.Nodes[0]
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), childNode.Status.String())
+	require.Equal(t, status.NodeSuccess.String(), childNode.Status.String())
 
 	childAttempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, childNode.Children[0].DAGRunID)
 	require.NoError(t, err)
 
 	childStatus, err := childAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), childStatus.Status.String())
+	require.Equal(t, status.NodeSuccess.String(), childStatus.Status.String())
 
 	// Verify the step in child DAG completed successfully after retry
 	retryStep := childStatus.Nodes[0]
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), retryStep.Status.String())
+	require.Equal(t, status.NodeSuccess.String(), retryStep.Status.String())
 
 	// Verify output was captured from the successful retry attempt
 	require.NotNil(t, retryStep.OutputVariables, "OutputVariables should not be nil")
@@ -258,22 +258,22 @@ steps:
 
 	parentStatus, err := parentAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), parentStatus.Status.String())
+	require.Equal(t, status.NodeSuccess.String(), parentStatus.Status.String())
 
 	// Find child DAG run
 	childNode := parentStatus.Nodes[0]
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), childNode.Status.String())
+	require.Equal(t, status.NodeSuccess.String(), childNode.Status.String())
 
 	childAttempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, childNode.Children[0].DAGRunID)
 	require.NoError(t, err)
 
 	childStatus, err := childAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), childStatus.Status.String())
+	require.Equal(t, status.NodeSuccess.String(), childStatus.Status.String())
 
 	// Verify the step in child DAG completed successfully
 	basicStep := childStatus.Nodes[0]
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), basicStep.Status.String())
+	require.Equal(t, status.NodeSuccess.String(), basicStep.Status.String())
 
 	// Debug: Print all output variables
 	if basicStep.OutputVariables != nil {
@@ -340,13 +340,13 @@ steps:
 	attempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
-	status, err := attempt.ReadStatus(ctx)
+	dagRunStatus, err := attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), status.Status.String())
+	require.Equal(t, status.NodeSuccess.String(), dagRunStatus.Status.String())
 
 	// Verify the step completed successfully after retry
-	retryStep := status.Nodes[0]
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), retryStep.Status.String())
+	retryStep := dagRunStatus.Nodes[0]
+	require.Equal(t, status.NodeSuccess.String(), retryStep.Status.String())
 
 	// Debug retry output
 	require.NotNil(t, retryStep.OutputVariables, "OutputVariables should not be nil")
@@ -399,13 +399,13 @@ steps:
 	attempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
-	status, err := attempt.ReadStatus(ctx)
+	dagRunStatus, err := attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), status.Status.String())
+	require.Equal(t, status.NodeSuccess.String(), dagRunStatus.Status.String())
 
 	// Verify the step completed successfully on first attempt
-	successStep := status.Nodes[0]
-	require.Equal(t, scheduler.NodeStatusSuccess.String(), successStep.Status.String())
+	successStep := dagRunStatus.Nodes[0]
+	require.Equal(t, status.NodeSuccess.String(), successStep.Status.String())
 
 	// Debug output for first attempt success
 	require.NotNil(t, successStep.OutputVariables, "OutputVariables should not be nil")

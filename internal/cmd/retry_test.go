@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -28,13 +28,13 @@ func TestRetryCommand(t *testing.T) {
 		dag, err := cli.GetMetadata(ctx, dagFile.Location)
 		require.NoError(t, err)
 
-		status, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
-		require.Equal(t, status.Status, scheduler.StatusSuccess)
-		require.NotNil(t, status.Status)
+		require.Equal(t, dagRunStatus.Status, status.Success)
+		require.NotNil(t, dagRunStatus.Status)
 
 		// Retry with the dag-run ID using file path.
-		args = []string{"retry", fmt.Sprintf("--run-id=%s", status.DAGRunID), dagFile.Location}
+		args = []string{"retry", fmt.Sprintf("--run-id=%s", dagRunStatus.DAGRunID), dagFile.Location}
 		th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 			Args:        args,
 			ExpectedOut: []string{`[1=foo]`},
@@ -57,13 +57,13 @@ func TestRetryCommand(t *testing.T) {
 		dag, err := cli.GetMetadata(ctx, dagFile.Location)
 		require.NoError(t, err)
 
-		status, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
-		require.Equal(t, status.Status, scheduler.StatusSuccess)
-		require.NotNil(t, status.Status)
+		require.Equal(t, dagRunStatus.Status, status.Success)
+		require.NotNil(t, dagRunStatus.Status)
 
 		// Retry with the dag-run ID using DAG name.
-		args = []string{"retry", fmt.Sprintf("--run-id=%s", status.DAGRunID), dag.Name}
+		args = []string{"retry", fmt.Sprintf("--run-id=%s", dagRunStatus.DAGRunID), dag.Name}
 		th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 			Args:        args,
 			ExpectedOut: []string{`[1=bar]`},

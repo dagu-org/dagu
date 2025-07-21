@@ -8,8 +8,10 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 )
 
+// Executor is an interface for executing steps in a DAG.
 type Executor interface {
 	SetStdout(out io.Writer)
 	SetStderr(out io.Writer)
@@ -17,19 +19,29 @@ type Executor interface {
 	Run(ctx context.Context) error
 }
 
+// ExitCoder is an interface for executors that can return an exit code.
 type ExitCoder interface {
 	ExitCode() int
+}
+
+// NodeStatusDeterminer is an interface for executors that can determine the status of a node.
+type NodeStatusDeterminer interface {
+	DetermineNodeStatus(ctx context.Context) (status.NodeStatus, error)
 }
 
 // DAGExecutor is an interface for child DAG executors.
 type DAGExecutor interface {
 	Executor
+
+	// SetParams sets the parameters for running a child DAG.
 	SetParams(RunParams)
 }
 
 // ParallelExecutor is an interface for parallel step executors.
 type ParallelExecutor interface {
 	Executor
+
+	// SetParamsList sets the parameters for running multiple child DAGs in parallel.
 	SetParamsList([]RunParams)
 }
 

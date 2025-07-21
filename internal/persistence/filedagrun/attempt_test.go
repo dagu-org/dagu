@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/stretchr/testify/assert"
@@ -45,8 +45,8 @@ func TestAttempt_Write(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test write without open
-	status := createTestStatus(scheduler.StatusRunning)
-	err = att.Write(context.Background(), status)
+	testStatus := createTestStatus(status.Running)
+	err = att.Write(context.Background(), testStatus)
 	assert.ErrorIs(t, err, ErrStatusFileNotOpen)
 
 	// Open and write
@@ -54,14 +54,14 @@ func TestAttempt_Write(t *testing.T) {
 	require.NoError(t, err)
 
 	// Write test status
-	err = att.Write(context.Background(), status)
+	err = att.Write(context.Background(), testStatus)
 	assert.NoError(t, err)
 
 	// Verify file content
 	actual, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "test", actual.DAGRunID)
-	assert.Equal(t, scheduler.StatusRunning, actual.Status)
+	assert.Equal(t, status.Running, actual.Status)
 
 	// Close
 	err = att.Close(context.Background())
@@ -73,8 +73,8 @@ func TestAttempt_Read(t *testing.T) {
 	file := filepath.Join(dir, "status.dat")
 
 	// Create test file with multiple status entries
-	status1 := createTestStatus(scheduler.StatusRunning)
-	status2 := createTestStatus(scheduler.StatusSuccess)
+	status1 := createTestStatus(status.Running)
+	status2 := createTestStatus(status.Success)
 
 	// Create file directory if it doesn't exist
 	err := os.MkdirAll(filepath.Dir(file), 0750)
@@ -102,14 +102,14 @@ func TestAttempt_Read(t *testing.T) {
 	require.NoError(t, err)
 
 	// Read status - should get the last entry (test2)
-	status, err := att.ReadStatus(context.Background())
+	dagRunStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())
+	assert.Equal(t, status.Success.String(), dagRunStatus.Status.String())
 
 	// Read using ReadStatus
 	latestStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, scheduler.StatusSuccess.String(), latestStatus.Status.String())
+	assert.Equal(t, status.Success.String(), latestStatus.Status.String())
 }
 
 func TestAttempt_Compact(t *testing.T) {
@@ -118,19 +118,19 @@ func TestAttempt_Compact(t *testing.T) {
 
 	// Create test file with multiple status entries
 	for i := 0; i < 10; i++ {
-		status := createTestStatus(scheduler.StatusRunning)
+		testStatus := createTestStatus(status.Running)
 
 		if i == 9 {
 			// Make some status changes to create different attempts
-			status.Status = scheduler.StatusSuccess
+			testStatus.Status = status.Success
 		}
 
 		if i == 0 {
 			// Create new file for first write
-			writeJSONToFile(t, file, status)
+			writeJSONToFile(t, file, testStatus)
 		} else {
 			// Append to existing file
-			data, err := json.Marshal(status)
+			data, err := json.Marshal(testStatus)
 			require.NoError(t, err)
 
 			f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0600)
@@ -164,9 +164,9 @@ func TestAttempt_Compact(t *testing.T) {
 	assert.Less(t, afterSize, beforeSize)
 
 	// Verify content is still correct
-	status, err := att.ReadStatus(context.Background())
+	dagRunStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, scheduler.StatusSuccess, status.Status)
+	assert.Equal(t, status.Success, dagRunStatus.Status)
 }
 
 func TestAttempt_Close(t *testing.T) {
@@ -181,7 +181,7 @@ func TestAttempt_Close(t *testing.T) {
 	require.NoError(t, err)
 
 	// Write some data
-	err = att.Write(context.Background(), createTestStatus(scheduler.StatusRunning))
+	err = att.Write(context.Background(), createTestStatus(status.Running))
 	require.NoError(t, err)
 
 	// Close
@@ -189,7 +189,7 @@ func TestAttempt_Close(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify we can't write after close
-	err = att.Write(context.Background(), createTestStatus(scheduler.StatusSuccess))
+	err = att.Write(context.Background(), createTestStatus(status.Success))
 	assert.ErrorIs(t, err, ErrStatusFileNotOpen)
 
 	// Test double close is safe
@@ -209,13 +209,13 @@ func TestAttempt_HandleNonExistentFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Write to create the file
-	err = att.Write(context.Background(), createTestStatus(scheduler.StatusSuccess))
+	err = att.Write(context.Background(), createTestStatus(status.Success))
 	assert.NoError(t, err)
 
 	// Verify the file was created with correct data
-	status, err := att.ReadStatus(context.Background())
+	dagRunStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, "test", status.DAGRunID)
+	assert.Equal(t, "test", dagRunStatus.DAGRunID)
 
 	// Cleanup
 	err = att.Close(context.Background())
@@ -248,7 +248,7 @@ func TestAttempt_InvalidJSON(t *testing.T) {
 	file := filepath.Join(dir, "invalid.dat")
 
 	// Create a file with valid JSOn
-	validStatus := createTestStatus(scheduler.StatusRunning)
+	validStatus := createTestStatus(status.Running)
 	writeJSONToFile(t, file, validStatus)
 
 	// Append invalid JSON
@@ -261,9 +261,9 @@ func TestAttempt_InvalidJSON(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should be able to read and get the valid entry
-	status, err := att.ReadStatus(context.Background())
+	dagRunStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, scheduler.StatusRunning.String(), status.Status.String())
+	assert.Equal(t, status.Running.String(), dagRunStatus.Status.String())
 }
 
 func TestAttempt_CorruptedStatusFile(t *testing.T) {
@@ -434,13 +434,13 @@ func createTestDAG() *digraph.DAG {
 }
 
 // createTestStatus creates a sample status for testing using StatusFactory
-func createTestStatus(status scheduler.Status) models.DAGRunStatus {
+func createTestStatus(st status.Status) models.DAGRunStatus {
 	dag := createTestDAG()
 
 	return models.DAGRunStatus{
 		Name:      dag.Name,
 		DAGRunID:  "test",
-		Status:    status,
+		Status:    st,
 		PID:       models.PID(12345),
 		StartedAt: stringutil.FormatTime(time.Now()),
 		Nodes:     models.NodesFromSteps(dag.Steps),

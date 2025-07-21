@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
@@ -101,11 +102,11 @@ func (g *ExecutionGraph) IsRunning() bool {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 	for _, node := range g.nodes {
-		status := node.State().Status
-		if status == NodeStatusRunning {
+		s := node.State().Status
+		if s == status.NodeRunning {
 			return true
 		}
-		if status == NodeStatusNone && g.finishedAt.IsZero() {
+		if s == status.NodeNone && g.finishedAt.IsZero() {
 			// If the node is not started and the graph is not finished,
 			// it means the node is still pending to be executed.
 			return true
@@ -156,7 +157,7 @@ func (g *ExecutionGraph) NodeByName(name string) *Node {
 }
 
 func (g *ExecutionGraph) setupRetry(ctx context.Context, steps map[string]digraph.Step) error {
-	dict := map[int]NodeStatus{}
+	dict := map[int]status.NodeStatus{}
 	retry := map[int]bool{}
 	for _, node := range g.nodes {
 		dict[node.id] = node.Status()
@@ -171,8 +172,8 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context, steps map[string]digrap
 	for len(frontier) > 0 {
 		var next []int
 		for _, u := range frontier {
-			if retry[u] || dict[u] == NodeStatusError ||
-				dict[u] == NodeStatusCancel {
+			if retry[u] || dict[u] == status.NodeError ||
+				dict[u] == status.NodeCancel {
 				logger.Debug(ctx, "Clearing node state", "step", g.nodeByID[u].Name())
 				step, ok := steps[g.nodeByID[u].Name()]
 				if !ok {
@@ -265,8 +266,8 @@ func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 
 func (g *ExecutionGraph) isFinished() bool {
 	for _, node := range g.nodes {
-		if node.State().Status == NodeStatusRunning ||
-			node.State().Status == NodeStatusNone {
+		if node.State().Status == status.NodeRunning ||
+			node.State().Status == status.NodeNone {
 			return false
 		}
 	}
@@ -276,7 +277,7 @@ func (g *ExecutionGraph) isFinished() bool {
 func (g *ExecutionGraph) runningCount() int {
 	count := 0
 	for _, node := range g.nodes {
-		if node.State().Status == NodeStatusRunning {
+		if node.State().Status == status.NodeRunning {
 			count++
 		}
 	}

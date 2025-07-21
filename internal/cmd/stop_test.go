@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 )
@@ -27,7 +27,7 @@ func TestStopCommand(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 
 		// Wait for the dag-run running.
-		dag.AssertLatestStatus(t, scheduler.StatusRunning)
+		dag.AssertLatestStatus(t, status.Running)
 
 		// Stop the dag-run.
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
@@ -35,7 +35,7 @@ func TestStopCommand(t *testing.T) {
 			ExpectedOut: []string{"stopped"}})
 
 		// Check the dag-run is stopped.
-		dag.AssertLatestStatus(t, scheduler.StatusCancel)
+		dag.AssertLatestStatus(t, status.Cancel)
 		<-done
 	})
 	t.Run("StopDAGRunWithRunID", func(t *testing.T) {
@@ -55,7 +55,7 @@ func TestStopCommand(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 
 		// Wait for the dag-run running
-		dag.AssertLatestStatus(t, scheduler.StatusRunning)
+		dag.AssertLatestStatus(t, status.Running)
 
 		// Stop the dag-run with a specific run ID.
 		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
@@ -63,7 +63,7 @@ func TestStopCommand(t *testing.T) {
 			ExpectedOut: []string{"stopped"}})
 
 		// Check the dag-run is stopped.
-		dag.AssertLatestStatus(t, scheduler.StatusCancel)
+		dag.AssertLatestStatus(t, status.Cancel)
 		<-done
 	})
 }

@@ -233,6 +233,9 @@ const Graph: React.FC<Props> = ({
     dat.push(
       `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:gray,stroke-width:1.2px`
     );
+    dat.push(
+      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:1.2px`
+    );
 
     // Add custom link styles
     dat.push(...linkStyles);
@@ -358,4 +361,5 @@ const graphStatusMap = {
   [3]: ':::cancel',
   [4]: ':::done',
   [5]: ':::skipped',
+  [6]: ':::partial',
 };

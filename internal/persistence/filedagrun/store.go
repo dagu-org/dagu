@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
@@ -157,7 +157,7 @@ func (store *Store) collectStatusesFromRoots(
 		resultsMu      sync.Mutex
 		results        = make([]*models.DAGRunStatus, 0, opts.Limit)
 		remaining      atomic.Int64
-		statusesFilter = make(map[scheduler.Status]struct{})
+		statusesFilter = make(map[status.Status]struct{})
 	)
 
 	for _, status := range opts.Statuses {

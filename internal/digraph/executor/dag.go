@@ -10,11 +10,13 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
 var _ DAGExecutor = (*dagExecutor)(nil)
+var _ NodeStatusDeterminer = (*dagExecutor)(nil)
 
 type dagExecutor struct {
 	child     *ChildDAGExecutor
@@ -24,6 +26,7 @@ type dagExecutor struct {
 	stderr    io.Writer
 	cmd       *exec.Cmd
 	runParams RunParams
+	result    *digraph.RunStatus
 }
 
 // Errors for DAG executor
@@ -91,15 +94,29 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to start child dag-run: %w", err)
 	}
 
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("child dag-run failed: %w", err)
-	}
+	// Wait for the command to complete
+	waitErr := cmd.Wait()
 
-	// get results from the child dag-run
+	// Always get the actual status from the child dag-run, regardless of exit code
 	env := GetEnv(ctx)
 	result, err := env.DB.GetChildDAGRunStatus(ctx, e.runParams.RunID, env.RootDAGRun)
 	if err != nil {
 		return fmt.Errorf("failed to find result for the child dag-run %q: %w", e.runParams.RunID, err)
+	}
+
+	e.result = result
+
+	if result.Status.IsSuccess() {
+		if waitErr != nil {
+			logger.Warn(ctx, "Child DAG completed with exit code but no error",
+				"dagRunId", e.runParams.RunID,
+				"err", waitErr,
+			)
+		} else {
+			logger.Info(ctx, "Child DAG completed successfully", "dagRunId", e.runParams.RunID)
+		}
+	} else {
+		return fmt.Errorf("child dag-run failed with status: %s", result.Status)
 	}
 
 	jsonData, err := json.MarshalIndent(result, "", "  ")
@@ -117,6 +134,27 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// DetermineNodeStatus implements NodeStatusDeterminer.
+func (e *dagExecutor) DetermineNodeStatus(_ context.Context) (status.NodeStatus, error) {
+	if e.result == nil {
+		return status.NodeError, fmt.Errorf("no result available for node status determination")
+	}
+
+	// Check if the status is partial success or success
+	// For error cases, we return an error with the status
+	switch e.result.Status {
+	case status.Success:
+		return status.NodeSuccess, nil
+	case status.PartialSuccess:
+		return status.NodePartialSuccess, nil
+	case status.None, status.Running, status.Error, status.Cancel, status.Queued:
+		return status.NodeError, fmt.Errorf("child DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
+	default:
+		// This should never happen, but satisfies the exhaustive check
+		return status.NodeError, fmt.Errorf("child DAG run %s failed with unknown status: %s", e.result.DAGRunID, e.result.Status)
+	}
 }
 
 func (e *dagExecutor) SetParams(params RunParams) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
@@ -46,14 +46,14 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRun.ID, err)
 	}
 
-	status, err := attempt.ReadStatus(ctx)
+	dagStatus, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	if status.Status != scheduler.StatusQueued {
+	if dagStatus.Status != status.Queued {
 		// If the status is not queued, return an error
-		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, status.Status)
+		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, dagStatus.Status)
 	}
 
 	dag, err := attempt.ReadDAG(ctx)
@@ -66,12 +66,12 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 	if err != nil {
 		return fmt.Errorf("failed to get latest status: %w", err)
 	}
-	if latestStatus.Status != scheduler.StatusQueued {
+	if latestStatus.Status != status.Queued {
 		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, latestStatus.Status)
 	}
 
 	// Make the status as canceled
-	status.Status = scheduler.StatusCancel
+	dagStatus.Status = status.Cancel
 
 	if err := attempt.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
@@ -79,7 +79,7 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 	defer func() {
 		_ = attempt.Close(ctx.Context)
 	}()
-	if err := attempt.Write(ctx.Context, *status); err != nil {
+	if err := attempt.Write(ctx.Context, *dagStatus); err != nil {
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 

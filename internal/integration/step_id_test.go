@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ func TestStepIDPropertyAccess(t *testing.T) {
 	tests := []struct {
 		name           string
 		yaml           string
-		expectedStatus scheduler.Status
+		expectedStatus status.Status
 		expectedOutput map[string]any
 	}{
 		{
@@ -41,7 +41,7 @@ steps:
       echo "stderr_file=${gen.stderr}"
     output: FILE_PATHS
 `,
-			expectedStatus: scheduler.StatusSuccess,
+			expectedStatus: status.Success,
 			expectedOutput: map[string]any{
 				"GEN_OUTPUT": "Test output data",
 				// FILE_PATHS will contain file paths which include .out and .err
@@ -75,7 +75,7 @@ steps:
       echo "failure_code=${failure.exitCode}"
     output: EXIT_CODES
 `,
-			expectedStatus: scheduler.StatusPartialSuccess,
+			expectedStatus: status.PartialSuccess,
 			expectedOutput: map[string]any{
 				"EXIT_CODES": "success_code=0\nfailure_code=42",
 			},
@@ -99,7 +99,7 @@ steps:
       echo "invalid=\${first_step.unknown_property}"
     output: RESULT
 `,
-			expectedStatus: scheduler.StatusSuccess,
+			expectedStatus: status.Success,
 			expectedOutput: map[string]any{
 				"FIRST_OUT": "Hello",
 				"RESULT": []test.Contains{
@@ -128,7 +128,7 @@ steps:
       echo "stdout=${check.stdout}"
     output: PRECEDENCE_TEST
 `,
-			expectedStatus: scheduler.StatusSuccess,
+			expectedStatus: status.Success,
 			expectedOutput: map[string]any{
 				"check": `{"status":"from-step"}`,
 				"PRECEDENCE_TEST": []test.Contains{
@@ -163,7 +163,7 @@ steps:
 			agent := testDAG.Agent()
 			err = agent.Run(agent.Context)
 
-			if tc.expectedStatus == scheduler.StatusSuccess {
+			if tc.expectedStatus == status.Success {
 				require.NoError(t, err)
 			}
 
@@ -222,7 +222,7 @@ steps:
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
 
-		testDAG.AssertLatestStatus(t, scheduler.StatusSuccess)
+		testDAG.AssertLatestStatus(t, status.Success)
 
 		// Note: When multiple steps output to the same variable name,
 		// the final value depends on the order of execution which may not be deterministic
@@ -286,7 +286,7 @@ steps:
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
 
-		testDAG.AssertLatestStatus(t, scheduler.StatusSuccess)
+		testDAG.AssertLatestStatus(t, status.Success)
 		testDAG.AssertOutputs(t, map[string]any{
 			"NUM":          "10",
 			"NUM2":         "15",
@@ -332,7 +332,7 @@ steps:
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
 
-		testDAG.AssertLatestStatus(t, scheduler.StatusSuccess)
+		testDAG.AssertLatestStatus(t, status.Success)
 
 		testDAG.AssertOutputs(t, map[string]any{
 			"CONFIG": `{"env":"test","timeout":30}`,
@@ -381,7 +381,7 @@ steps:
 		require.NoError(t, agent.Run(agent.Context))
 
 		// Should succeed but the invalid path should remain as-is
-		testDAG.AssertLatestStatus(t, scheduler.StatusSuccess)
+		testDAG.AssertLatestStatus(t, status.Success)
 		testDAG.AssertOutputs(t, map[string]any{
 			"DATA":   "not json",
 			"RESULT": "data=not json",

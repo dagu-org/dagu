@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/fatih/color"
@@ -64,29 +64,29 @@ func runStatus(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from run data: %w", err)
 	}
 
-	status, err := attempt.ReadStatus(ctx)
+	dagStatus, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read status from attempt: %w", err)
 	}
 
-	if status.Status == scheduler.StatusRunning {
+	if dagStatus.Status == status.Running {
 		realtimeStatus, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve current status: %w", err)
 		}
-		if realtimeStatus.DAGRunID == status.DAGRunID {
-			status = realtimeStatus
+		if realtimeStatus.DAGRunID == dagStatus.DAGRunID {
+			dagStatus = realtimeStatus
 		}
 	}
 
 	// Display detailed status information
-	displayDetailedStatus(dag, status)
+	displayDetailedStatus(dag, dagStatus)
 
 	return nil
 }
 
 // displayDetailedStatus renders a formatted table with DAG run information
-func displayDetailedStatus(dag *digraph.DAG, status *models.DAGRunStatus) {
+func displayDetailedStatus(dag *digraph.DAG, dagStatus *models.DAGRunStatus) {
 	// Create header with 80 character width
 	fmt.Println()
 	headerColor := color.New(color.FgCyan, color.Bold)
@@ -114,35 +114,35 @@ func displayDetailedStatus(dag *digraph.DAG, status *models.DAGRunStatus) {
 
 	// Basic Information
 	t.AppendRow(table.Row{"DAG Name", dag.Name})
-	t.AppendRow(table.Row{"Run ID", status.DAGRunID})
-	t.AppendRow(table.Row{"Process ID", formatPID(status.PID)})
-	t.AppendRow(table.Row{"Status", formatStatus(status.Status)})
+	t.AppendRow(table.Row{"Run ID", dagStatus.DAGRunID})
+	t.AppendRow(table.Row{"Process ID", formatPID(dagStatus.PID)})
+	t.AppendRow(table.Row{"Status", formatStatus(dagStatus.Status)})
 
 	// Timing Information
-	if status.StartedAt != "" && status.StartedAt != "-" {
-		startedAt, _ := stringutil.ParseTime(status.StartedAt)
-		t.AppendRow(table.Row{"Started At", status.StartedAt})
+	if dagStatus.StartedAt != "" && dagStatus.StartedAt != "-" {
+		startedAt, _ := stringutil.ParseTime(dagStatus.StartedAt)
+		t.AppendRow(table.Row{"Started At", dagStatus.StartedAt})
 
-		if status.FinishedAt != "" && status.FinishedAt != "-" {
-			finishedAt, _ := stringutil.ParseTime(status.FinishedAt)
+		if dagStatus.FinishedAt != "" && dagStatus.FinishedAt != "-" {
+			finishedAt, _ := stringutil.ParseTime(dagStatus.FinishedAt)
 			if !startedAt.IsZero() && !finishedAt.IsZero() {
 				duration := finishedAt.Sub(startedAt)
 				t.AppendRow(table.Row{"Duration", stringutil.FormatDuration(duration)})
 			}
-			t.AppendRow(table.Row{"Finished At", status.FinishedAt})
-		} else if status.Status == scheduler.StatusRunning && !startedAt.IsZero() {
+			t.AppendRow(table.Row{"Finished At", dagStatus.FinishedAt})
+		} else if dagStatus.Status == status.Running && !startedAt.IsZero() {
 			elapsed := time.Since(startedAt)
 			t.AppendRow(table.Row{"Running For", stringutil.FormatDuration(elapsed)})
 		}
 	}
 
 	// Additional Information
-	if status.AttemptID != "" {
-		t.AppendRow(table.Row{"Attempt ID", status.AttemptID})
+	if dagStatus.AttemptID != "" {
+		t.AppendRow(table.Row{"Attempt ID", dagStatus.AttemptID})
 	}
 
 	// Error information if available
-	errors := status.Errors()
+	errors := dagStatus.Errors()
 	if len(errors) > 0 {
 		errorText := ""
 		for i, err := range errors {
@@ -158,29 +158,29 @@ func displayDetailedStatus(dag *digraph.DAG, status *models.DAGRunStatus) {
 	fmt.Println(t.Render())
 
 	// Step Summary if available
-	if len(status.Nodes) > 0 {
+	if len(dagStatus.Nodes) > 0 {
 		fmt.Println()
-		displayStepSummary(status.Nodes)
+		displayStepSummary(dagStatus.Nodes)
 	}
 
 	// Additional status-specific messages
 	fmt.Println()
-	switch status.Status {
-	case scheduler.StatusRunning:
+	switch dagStatus.Status {
+	case status.Running:
 		fmt.Printf("%s The DAG is currently running. Use 'dagu stop %s' to stop it.\n",
 			color.YellowString("→"), dag.Name)
-	case scheduler.StatusError:
+	case status.Error:
 		fmt.Printf("%s The DAG failed. Use 'dagu retry --run-id=%s %s' to retry.\n",
-			color.RedString("✗"), status.DAGRunID, dag.Name)
-	case scheduler.StatusSuccess:
+			color.RedString("✗"), dagStatus.DAGRunID, dag.Name)
+	case status.Success:
 		fmt.Printf("%s The DAG completed successfully.\n", color.GreenString("✓"))
-	case scheduler.StatusPartialSuccess:
+	case status.PartialSuccess:
 		fmt.Printf("%s The DAG completed with partial success.\n", color.YellowString("⚠"))
-	case scheduler.StatusCancel:
+	case status.Cancel:
 		fmt.Printf("%s The DAG was cancelled.\n", color.YellowString("⚠"))
-	case scheduler.StatusQueued:
+	case status.Queued:
 		fmt.Printf("%s The DAG is queued for execution.\n", color.BlueString("●"))
-	case scheduler.StatusNone:
+	case status.None:
 		fmt.Printf("%s The DAG has not been started yet.\n", color.New(color.Faint).Sprint("○"))
 	}
 }
@@ -200,7 +200,7 @@ func displayStepSummary(nodes []*models.Node) {
 	fmt.Println(strings.Repeat("─", 80))
 
 	// Count steps by status
-	statusCounts := make(map[scheduler.NodeStatus]int)
+	statusCounts := make(map[status.NodeStatus]int)
 	for _, node := range nodes {
 		statusCounts[node.Status]++
 	}
@@ -229,7 +229,7 @@ func displayStepSummary(nodes []*models.Node) {
 	failedSteps := []*models.Node{}
 
 	for _, node := range nodes {
-		if node.Status == scheduler.NodeStatusError {
+		if node.Status == status.NodeError {
 			failedSteps = append(failedSteps, node)
 		}
 
@@ -247,7 +247,7 @@ func displayStepSummary(nodes []*models.Node) {
 				if !startedAt.IsZero() && !finishedAt.IsZero() {
 					duration = stringutil.FormatDuration(finishedAt.Sub(startedAt))
 				}
-			} else if node.Status == scheduler.NodeStatusRunning && !startedAt.IsZero() {
+			} else if node.Status == status.NodeRunning && !startedAt.IsZero() {
 				duration = stringutil.FormatDuration(time.Since(startedAt))
 			}
 		}
@@ -425,44 +425,46 @@ func isBinaryContent(data []byte) bool {
 }
 
 // formatStatus returns a colored status string
-func formatStatus(status scheduler.Status) string {
-	switch status {
-	case scheduler.StatusSuccess:
+func formatStatus(st status.Status) string {
+	switch st {
+	case status.Success:
 		return color.GreenString("Success")
-	case scheduler.StatusError:
+	case status.Error:
 		return color.RedString("Failed")
-	case scheduler.StatusPartialSuccess:
+	case status.PartialSuccess:
 		return color.YellowString("Partial Success")
-	case scheduler.StatusRunning:
+	case status.Running:
 		return color.New(color.FgHiGreen).Sprint("Running")
-	case scheduler.StatusCancel:
+	case status.Cancel:
 		return color.YellowString("Cancelled")
-	case scheduler.StatusQueued:
+	case status.Queued:
 		return color.BlueString("Queued")
-	case scheduler.StatusNone:
+	case status.None:
 		return color.New(color.Faint).Sprint("Not Started")
 	default:
-		return status.String()
+		return st.String()
 	}
 }
 
 // formatNodeStatus returns a colored status string for node status
-func formatNodeStatus(status scheduler.NodeStatus) string {
-	switch status {
-	case scheduler.NodeStatusSuccess:
+func formatNodeStatus(s status.NodeStatus) string {
+	switch s {
+	case status.NodeSuccess:
 		return color.GreenString("Success")
-	case scheduler.NodeStatusError:
+	case status.NodeError:
 		return color.RedString("Failed")
-	case scheduler.NodeStatusRunning:
+	case status.NodeRunning:
 		return color.New(color.FgHiGreen).Sprint("Running")
-	case scheduler.NodeStatusCancel:
+	case status.NodeCancel:
 		return color.YellowString("Cancelled")
-	case scheduler.NodeStatusSkipped:
+	case status.NodeSkipped:
 		return color.New(color.Faint).Sprint("Skipped")
-	case scheduler.NodeStatusNone:
+	case status.NodePartialSuccess:
+		return color.YellowString("Partial Success")
+	case status.NodeNone:
 		return color.New(color.Faint).Sprint("Not Started")
 	default:
-		return fmt.Sprintf("%d", status)
+		return fmt.Sprintf("%d", s)
 	}
 }
 

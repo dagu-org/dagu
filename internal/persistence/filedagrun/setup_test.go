@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +36,7 @@ func setupTestStore(t *testing.T) StoreTest {
 	return th
 }
 
-func (th StoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s scheduler.Status) *Attempt {
+func (th StoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s status.Status) *Attempt {
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
@@ -50,11 +50,11 @@ func (th StoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s
 		_ = attempt.Close(th.Context)
 	}()
 
-	status := models.InitialStatus(dag.DAG)
-	status.DAGRunID = dagRunID
-	status.Status = s
+	dagRunStatus := models.InitialStatus(dag.DAG)
+	dagRunStatus.DAGRunID = dagRunID
+	dagRunStatus.Status = s
 
-	err = attempt.Write(th.Context, status)
+	err = attempt.Write(th.Context, dagRunStatus)
 	require.NoError(t, err)
 
 	return attempt.(*Attempt)
@@ -102,14 +102,14 @@ func (d DAGTest) Writer(t *testing.T, dagRunID string, startedAt time.Time) Writ
 	}
 }
 
-func (w WriterTest) Write(t *testing.T, status models.DAGRunStatus) {
+func (w WriterTest) Write(t *testing.T, dagRunStatus models.DAGRunStatus) {
 	t.Helper()
 
-	err := w.Writer.write(status)
+	err := w.Writer.write(dagRunStatus)
 	require.NoError(t, err)
 }
 
-func (w WriterTest) AssertContent(t *testing.T, name, dagRunID string, status scheduler.Status) {
+func (w WriterTest) AssertContent(t *testing.T, name, dagRunID string, st status.Status) {
 	t.Helper()
 
 	data, err := ParseStatusFile(w.FilePath)
@@ -117,7 +117,7 @@ func (w WriterTest) AssertContent(t *testing.T, name, dagRunID string, status sc
 
 	assert.Equal(t, name, data.Name)
 	assert.Equal(t, dagRunID, data.DAGRunID)
-	assert.Equal(t, status, data.Status)
+	assert.Equal(t, st, data.Status)
 }
 
 func (w WriterTest) Close(t *testing.T) {

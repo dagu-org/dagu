@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ func TestPartialSuccess(t *testing.T) {
 	tests := []struct {
 		name           string
 		yaml           string
-		expectedStatus scheduler.Status
+		expectedStatus status.Status
 		expectedOutput map[string]any
 	}{
 		{
@@ -32,7 +32,7 @@ steps:
   - name: success-step
     command: echo "This step should run even if the previous one fails"
 `,
-			expectedStatus: scheduler.StatusPartialSuccess,
+			expectedStatus: status.PartialSuccess,
 		},
 		{
 			name: "Success by marking step as successful",
@@ -47,7 +47,7 @@ steps:
   - name: success-step
     command: echo "This step should run even if the previous one fails"
 `,
-			expectedStatus: scheduler.StatusSuccess,
+			expectedStatus: status.Success,
 		},
 		{
 			name: "Single step with continueOn failure",
@@ -58,7 +58,7 @@ steps:
     continueOn:
       failure: true
 `,
-			expectedStatus: scheduler.StatusError,
+			expectedStatus: status.Error,
 		},
 		{
 			name: "Single step with continueOn marking as success",
@@ -70,7 +70,7 @@ steps:
       failure: true
       markSuccess: true
 `,
-			expectedStatus: scheduler.StatusSuccess,
+			expectedStatus: status.Success,
 		},
 	}
 
@@ -97,7 +97,7 @@ steps:
 			agent := testDAG.Agent()
 			err = agent.Run(agent.Context)
 
-			if tc.expectedStatus == scheduler.StatusSuccess {
+			if tc.expectedStatus == status.Success {
 				require.NoError(t, err)
 			}
 

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -27,18 +27,18 @@ func TestParallelExecution_SimpleItems(t *testing.T) {
 	require.NoError(t, agent.Run(agent.Context))
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status to verify parallel execution
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 1) // process-items
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 1) // process-items
 
 	// Check process-items node
-	processNode := status.Nodes[0]
+	processNode := dagRunStatus.Nodes[0]
 	require.Equal(t, "process-items", processNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
+	require.Equal(t, status.NodeSuccess, processNode.Status)
 
 	// Verify child DAG runs were created
 	require.NotEmpty(t, processNode.Children)
@@ -56,18 +56,18 @@ func TestParallelExecution_ObjectItems(t *testing.T) {
 	require.NoError(t, agent.Run(agent.Context))
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status to verify parallel execution
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 1) // process-regions
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 1) // process-regions
 
 	// Check process-regions node
-	processNode := status.Nodes[0]
+	processNode := dagRunStatus.Nodes[0]
 	require.Equal(t, "process-regions", processNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
+	require.Equal(t, status.NodeSuccess, processNode.Status)
 
 	// Verify child DAG runs were created with JSON parameters
 	require.NotEmpty(t, processNode.Children)
@@ -91,18 +91,18 @@ func TestParallelExecution_VariableReference(t *testing.T) {
 	require.NoError(t, agent.Run(agent.Context))
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status to verify parallel execution
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 1) // process-from-var
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 1) // process-from-var
 
 	// Check process-from-var node
-	processNode := status.Nodes[0]
+	processNode := dagRunStatus.Nodes[0]
 	require.Equal(t, "process-from-var", processNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
+	require.Equal(t, status.NodeSuccess, processNode.Status)
 
 	// Verify four child DAG runs from JSON array
 	require.NotEmpty(t, processNode.Children)
@@ -120,18 +120,18 @@ func TestParallelExecution_SpaceSeparated(t *testing.T) {
 	require.NoError(t, agent.Run(agent.Context))
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status to verify parallel execution
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 1) // process-servers
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 1) // process-servers
 
 	// Check process-servers node
-	processNode := status.Nodes[0]
+	processNode := dagRunStatus.Nodes[0]
 	require.Equal(t, "process-servers", processNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
+	require.Equal(t, status.NodeSuccess, processNode.Status)
 
 	// Verify three child DAG runs from space-separated values
 	require.NotEmpty(t, processNode.Children)
@@ -149,18 +149,18 @@ func TestParallelExecution_DirectVariable(t *testing.T) {
 	require.NoError(t, agent.Run(agent.Context))
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status to verify parallel execution
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 2) // parallel-tasks and aggregate-results
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 2) // parallel-tasks and aggregate-results
 
 	// Check parallel-tasks node
-	parallelNode := status.Nodes[0]
+	parallelNode := dagRunStatus.Nodes[0]
 	require.Equal(t, "parallel-tasks", parallelNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, parallelNode.Status)
+	require.Equal(t, status.NodeSuccess, parallelNode.Status)
 
 	// Verify child DAG runs were created
 	require.NotEmpty(t, parallelNode.Children)
@@ -201,18 +201,18 @@ steps:
 	require.NoError(t, agent.Run(agent.Context))
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status to verify outputs
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 2) // parallel-with-output and use-output
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 2) // parallel-with-output and use-output
 
 	// Check parallel-with-output node
-	parallelNode := status.Nodes[0]
+	parallelNode := dagRunStatus.Nodes[0]
 	require.Equal(t, "parallel-with-output", parallelNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, parallelNode.Status)
+	require.Equal(t, status.NodeSuccess, parallelNode.Status)
 	require.Len(t, parallelNode.Children, 3) // 3 child runs
 
 	// Check that the parallel execution produced output
@@ -236,9 +236,9 @@ steps:
 	}
 
 	// Check use-output node
-	useOutputNode := status.Nodes[1]
+	useOutputNode := dagRunStatus.Nodes[1]
 	require.Equal(t, "use-output", useOutputNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, useOutputNode.Status)
+	require.Equal(t, status.NodeSuccess, useOutputNode.Status)
 }
 
 func TestParallelExecution_InvalidConfiguration(t *testing.T) {
@@ -343,21 +343,21 @@ steps:
 	// Run and verify deduplication
 	agent := dag.Agent()
 	require.NoError(t, agent.Run(agent.Context))
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the status to check child DAG run IDs
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.Len(t, status.Nodes, 1)
+	require.Len(t, dagRunStatus.Nodes, 1)
 
 	// Collect unique parameters
 	uniqueParams := make(map[string]string)
-	for _, child := range status.Nodes[0].Children {
+	for _, child := range dagRunStatus.Nodes[0].Children {
 		uniqueParams[child.Params] = child.DAGRunID
 	}
 
 	// Should have only 3 unique runs despite 5 items (test1, test2, test1, test3, test2)
-	require.Len(t, status.Nodes[0].Children, 3, "duplicate items should be deduplicated")
+	require.Len(t, dagRunStatus.Nodes[0].Children, 3, "duplicate items should be deduplicated")
 	require.Len(t, uniqueParams, 3, "should have 3 unique parameter sets")
 
 	// Verify we have the expected unique parameters
@@ -426,27 +426,27 @@ steps:
 	require.Error(t, err, "agent should return an error when cancelled")
 	// The error might contain "killed" or "cancelled" depending on timing
 	require.True(t,
-		strings.Contains(err.Error(), "killed") || strings.Contains(err.Error(), "cancelled"),
+		strings.Contains(err.Error(), "killed") || strings.Contains(err.Error(), "canceled"),
 		"error should indicate cancellation: %v", err)
 
 	// Get the latest status
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
+	require.NotNil(t, dagRunStatus)
 
 	// Check that the parallel step exists
-	require.Len(t, status.Nodes, 1)
-	parallelNode := status.Nodes[0]
+	require.Len(t, dagRunStatus.Nodes, 1)
+	parallelNode := dagRunStatus.Nodes[0]
 	require.Equal(t, "parallel-sleep", parallelNode.Step.Name)
 	// The step might be marked as failed, cancelled, or even not started depending on timing
 	require.True(t,
-		parallelNode.Status == scheduler.NodeStatusCancel ||
-			parallelNode.Status == scheduler.NodeStatusError ||
-			parallelNode.Status == scheduler.NodeStatusNone,
+		parallelNode.Status == status.NodeCancel ||
+			parallelNode.Status == status.NodeError ||
+			parallelNode.Status == status.NodeNone,
 		"parallel step should be cancelled, failed, or not started, got: %v", parallelNode.Status)
 
 	// If the step was actually started, verify that child DAG runs were created
-	if parallelNode.Status != scheduler.NodeStatusNone {
+	if parallelNode.Status != status.NodeNone {
 		require.NotEmpty(t, parallelNode.Children, "child DAG runs should have been created if step started")
 	}
 }
@@ -501,15 +501,15 @@ steps:
 	require.Error(t, err)
 
 	// Get the latest status
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
+	require.NotNil(t, dagRunStatus)
 
 	// Check that the parallel step failed
-	require.Len(t, status.Nodes, 1)
-	parallelNode := status.Nodes[0]
+	require.Len(t, dagRunStatus.Nodes, 1)
+	parallelNode := dagRunStatus.Nodes[0]
 	require.Equal(t, "parallel-mixed", parallelNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusError, parallelNode.Status)
+	require.Equal(t, status.NodeError, parallelNode.Status)
 
 	// Verify that child DAG runs were created (4 due to deduplication of "fail")
 	require.Len(t, parallelNode.Children, 4, "should have 4 child DAG runs after deduplication")
@@ -554,18 +554,18 @@ steps:
 	require.NoError(t, agent.Run(agent.Context))
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status to verify outputs
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 3) // parallel-tasks, use-first-output, use-all-outputs
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 3) // parallel-tasks, use-first-output, use-all-outputs
 
 	// Check that subsequent steps could access the outputs array
-	firstOutputNode := status.Nodes[1]
+	firstOutputNode := dagRunStatus.Nodes[1]
 	require.Equal(t, "use-first-output", firstOutputNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, firstOutputNode.Status)
+	require.Equal(t, status.NodeSuccess, firstOutputNode.Status)
 
 	// Verify the first output was accessible
 	if value, ok := firstOutputNode.OutputVariables.Load("FIRST_OUTPUT"); ok {
@@ -578,9 +578,9 @@ steps:
 	}
 
 	// Check all outputs were accessible
-	allOutputsNode := status.Nodes[2]
+	allOutputsNode := dagRunStatus.Nodes[2]
 	require.Equal(t, "use-all-outputs", allOutputsNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, allOutputsNode.Status)
+	require.Equal(t, status.NodeSuccess, allOutputsNode.Status)
 
 	if value, ok := allOutputsNode.OutputVariables.Load("ALL_OUTPUTS"); ok {
 		allOutputs := value.(string)
@@ -628,15 +628,15 @@ steps:
 	require.NoError(t, err)
 
 	// Get the latest status to check outputs
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 2)
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 2)
 
 	// Check the output from the access-out-of-bounds step
-	outOfBoundsNode := status.Nodes[1]
+	outOfBoundsNode := dagRunStatus.Nodes[1]
 	require.Equal(t, "access-out-of-bounds", outOfBoundsNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, outOfBoundsNode.Status)
+	require.Equal(t, status.NodeSuccess, outOfBoundsNode.Status)
 
 	if value, ok := outOfBoundsNode.OutputVariables.Load("TEST_OUTPUT"); ok {
 		output := value.(string)
@@ -694,12 +694,12 @@ steps:
 	require.Error(t, err, "DAG should fail")
 
 	// Get status
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
 
 	// Find the parallel node
 	var parallelNode *models.Node
-	for _, node := range status.Nodes {
+	for _, node := range dagRunStatus.Nodes {
 		if node.Step.Name == "parallel-execution" {
 			parallelNode = node
 			break
@@ -707,12 +707,12 @@ steps:
 	}
 	require.NotNil(t, parallelNode)
 
-	t.Logf("Node status: %v (expected %v)", parallelNode.Status, scheduler.NodeStatusError)
+	t.Logf("Node status: %v (expected %v)", parallelNode.Status, status.NodeError)
 	t.Logf("Retry count: %v", parallelNode.RetryCount)
 	t.Logf("Error: %v", parallelNode.Error)
 
 	// Should be marked as error (not success)
-	require.Equal(t, scheduler.NodeStatusError, parallelNode.Status)
+	require.Equal(t, status.NodeError, parallelNode.Status)
 	require.Equal(t, 1, parallelNode.RetryCount)
 }
 
@@ -763,13 +763,13 @@ steps:
 	require.Error(t, err)
 
 	// Get status
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
 
 	// Find nodes
 	var parallelNode *models.Node
 	var nextNode *models.Node
-	for _, node := range status.Nodes {
+	for _, node := range dagRunStatus.Nodes {
 		if node.Step.Name == "parallel-execution" {
 			parallelNode = node
 		}
@@ -780,14 +780,14 @@ steps:
 	require.NotNil(t, parallelNode)
 	require.NotNil(t, nextNode)
 
-	t.Logf("Parallel node status: %v (expected %v)", parallelNode.Status, scheduler.NodeStatusError)
+	t.Logf("Parallel node status: %v (expected %v)", parallelNode.Status, status.NodeError)
 	t.Logf("Retry count: %v", parallelNode.RetryCount)
 	t.Logf("Next node status: %v", nextNode.Status)
 
 	// THE KEY TEST: With retry AND continueOn.failure, should still be marked as error
-	require.Equal(t, scheduler.NodeStatusError, parallelNode.Status, "Node should be marked as error, not success")
+	require.Equal(t, status.NodeError, parallelNode.Status, "Node should be marked as error, not success")
 	require.Equal(t, 1, parallelNode.RetryCount)
-	require.Equal(t, scheduler.NodeStatusSuccess, nextNode.Status)
+	require.Equal(t, status.NodeSuccess, nextNode.Status)
 
 	// Check if output was captured despite the error
 	if parallelNode.OutputVariables != nil {
@@ -800,93 +800,6 @@ steps:
 		}
 	} else {
 		t.Log("OutputVariables is nil - this might be the bug we're fixing")
-	}
-}
-
-// TestParallelExecution_OutputCaptureWithFailures verifies output behavior when some child DAGs fail
-func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
-
-	// Create a simple child DAG that outputs data and fails/succeeds based on input
-	testDir := test.TestdataPath(t, "integration")
-	childDagFile := filepath.Join(testDir, "child-output-fail.yaml")
-	childDagContent := `name: child-output-fail
-steps:
-  - name: process
-    command: |
-      INPUT="$1"
-      echo "Output for ${INPUT}"
-      if [ "${INPUT}" = "fail" ]; then
-        exit 1
-      fi
-    output: RESULT
-`
-	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(childDagFile) })
-
-	// Parent DAG with mixed success/failure
-	parentDagFile := filepath.Join(testDir, "test-parallel-output-failures.yaml")
-	parentDagContent := `name: test-parallel-output-failures
-steps:
-  - name: parallel-test
-    run: child-output-fail
-    parallel:
-      items:
-        - "success"
-        - "fail"
-    output: RESULTS
-    continueOn:
-      failure: true
-`
-	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
-
-	// Run the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-output-failures.yaml"))
-	agent := dag.Agent()
-	err = agent.Run(agent.Context)
-	// Should complete successfully due to continueOn.failure: true, despite one child failing
-	require.Error(t, err)
-
-	// Get the latest status
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
-	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 1)
-
-	// Check parallel node
-	parallelNode := status.Nodes[0]
-	require.Equal(t, "parallel-test", parallelNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusError, parallelNode.Status)
-
-	// Verify output was captured for successful executions only
-	require.NotNil(t, parallelNode.OutputVariables)
-	if value, ok := parallelNode.OutputVariables.Load("RESULTS"); ok {
-		results := value.(string)
-		t.Logf("Captured results: %s", results)
-		require.Contains(t, results, "RESULTS=")
-
-		// Verify we got JSON output with both success and failure
-		require.Contains(t, results, `"total": 2`)
-		require.Contains(t, results, `"succeeded": 1`)
-		require.Contains(t, results, `"failed": 1`)
-
-		// Only successful output should be captured
-		require.Contains(t, results, "Output for success")
-		require.NotContains(t, results, "Output for fail")
-
-		// Verify the failed execution has no output in results
-		require.Contains(t, results, `"status": "failed"`)
-		// Outputs array should only contain the successful output
-		outputsSection := results[strings.Index(results, `"outputs": [`):]
-		outputsEndIndex := strings.Index(outputsSection, `]`) + 1
-		outputsContent := outputsSection[:outputsEndIndex]
-		// Should only have 1 output (from the successful execution)
-		require.Equal(t, 1, strings.Count(outputsContent, `"RESULT"`), "Outputs array should only contain successful output")
-	} else {
-		t.Fatal("RESULTS output not found")
 	}
 }
 
@@ -946,15 +859,15 @@ steps:
 	require.NoError(t, err)
 
 	// Get the latest status
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 1)
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 1)
 
 	// Check parallel node
-	parallelNode := status.Nodes[0]
+	parallelNode := dagRunStatus.Nodes[0]
 	require.Equal(t, "parallel-retry", parallelNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, parallelNode.Status)
+	require.Equal(t, status.NodeSuccess, parallelNode.Status)
 
 	// Verify output was captured from retry
 	require.NotNil(t, parallelNode.OutputVariables)
@@ -967,109 +880,6 @@ steps:
 		// Should contain retry output, not first attempt
 		require.Contains(t, results, "Retry success")
 		require.NotContains(t, results, "First attempt")
-	} else {
-		t.Fatal("RESULTS output not found")
-	}
-}
-
-// TestParallelExecution_FailedChildOutputExclusion verifies that outputs from failed child DAGs are excluded
-func TestParallelExecution_FailedChildOutputExclusion(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
-
-	// Create a child DAG that outputs data based on input
-	testDir := test.TestdataPath(t, "integration")
-	childDagFile := filepath.Join(testDir, "child-conditional-output.yaml")
-	childDagContent := `name: child-conditional-output
-steps:
-  - name: process
-    command: |
-      INPUT="$1"
-      if [ "${INPUT}" = "fail1" ]; then
-        echo "Failed output 1"
-        exit 1
-      elif [ "${INPUT}" = "fail2" ]; then
-        echo "Failed output 2"  
-        exit 2
-      else
-        echo "Success output for ${INPUT}"
-        exit 0
-      fi
-    output: RESULT
-`
-	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(childDagFile) })
-
-	// Parent DAG with mixed success/failure items
-	parentDagFile := filepath.Join(testDir, "test-parallel-output-exclusion.yaml")
-	parentDagContent := `name: test-parallel-output-exclusion
-steps:
-  - name: parallel-mixed
-    run: child-conditional-output
-    parallel:
-      items:
-        - "success1"
-        - "fail1"
-        - "success2"
-        - "fail2"
-        - "success3"
-    output: RESULTS
-    continueOn:
-      failure: true
-`
-	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
-
-	// Run the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-output-exclusion.yaml"))
-	agent := dag.Agent()
-	err = agent.Run(agent.Context)
-	// Should complete successfully due to continueOn.failure: true, despite some children failing
-	require.Error(t, err)
-
-	// Get the latest status
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
-	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 1)
-
-	// Check parallel node
-	parallelNode := status.Nodes[0]
-	require.Equal(t, "parallel-mixed", parallelNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusError, parallelNode.Status)
-
-	// Verify output was captured
-	require.NotNil(t, parallelNode.OutputVariables)
-	if value, ok := parallelNode.OutputVariables.Load("RESULTS"); ok {
-		results := value.(string)
-		t.Logf("Captured results: %s", results)
-		require.Contains(t, results, "RESULTS=")
-
-		// Verify summary counts
-		require.Contains(t, results, `"total": 5`)
-		require.Contains(t, results, `"succeeded": 3`)
-		require.Contains(t, results, `"failed": 2`)
-
-		// Successful outputs should be included
-		require.Contains(t, results, "Success output for success1")
-		require.Contains(t, results, "Success output for success2")
-		require.Contains(t, results, "Success output for success3")
-
-		// Failed outputs should NOT be included
-		require.NotContains(t, results, "Failed output 1")
-		require.NotContains(t, results, "Failed output 2")
-
-		// Verify outputs array only contains successful outputs
-		require.Contains(t, results, `"outputs": [`)
-
-		// The outputs array should only have 3 items (successful ones)
-		// Count occurrences of RESULT in outputs array
-		outputsSection := results[strings.Index(results, `"outputs": [`):]
-		outputsEndIndex := strings.Index(outputsSection, `]`) + 1
-		outputsContent := outputsSection[:outputsEndIndex]
-		resultCount := strings.Count(outputsContent, `"RESULT": "Success output`)
-		require.Equal(t, 3, resultCount, "Outputs array should only contain successful outputs")
 	} else {
 		t.Fatal("RESULTS output not found")
 	}
@@ -1241,23 +1051,23 @@ steps:
 	require.NoError(t, agent.Run(agent.Context))
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status to verify parallel execution
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 2) // get configs and sync data
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 2) // get configs and sync data
 
 	// Check get configs node
-	getConfigsNode := status.Nodes[0]
+	getConfigsNode := dagRunStatus.Nodes[0]
 	require.Equal(t, "get configs", getConfigsNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, getConfigsNode.Status)
+	require.Equal(t, status.NodeSuccess, getConfigsNode.Status)
 
 	// Check sync data node
-	syncNode := status.Nodes[1]
+	syncNode := dagRunStatus.Nodes[1]
 	require.Equal(t, "sync data", syncNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, syncNode.Status)
+	require.Equal(t, status.NodeSuccess, syncNode.Status)
 
 	// Verify child DAG runs were created
 	require.NotEmpty(t, syncNode.Children)
@@ -1366,18 +1176,18 @@ steps:
 	require.NoError(t, agent.Run(agent.Context))
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+	dag.AssertLatestStatus(t, status.Success)
 
 	// Get the latest status to verify parallel execution
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 2) // get files and process files
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 2) // get files and process files
 
 	// Check get files node
-	getFilesNode := status.Nodes[0]
+	getFilesNode := dagRunStatus.Nodes[0]
 	require.Equal(t, "get files", getFilesNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, getFilesNode.Status)
+	require.Equal(t, status.NodeSuccess, getFilesNode.Status)
 
 	// Verify FILES output contains the discovered files
 	require.NotNil(t, getFilesNode.OutputVariables)
@@ -1392,9 +1202,9 @@ steps:
 	}
 
 	// Check process files node
-	processNode := status.Nodes[1]
+	processNode := dagRunStatus.Nodes[1]
 	require.Equal(t, "process files", processNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusSuccess, processNode.Status)
+	require.Equal(t, status.NodeSuccess, processNode.Status)
 
 	// Verify child DAG runs were created for each file
 	require.NotEmpty(t, processNode.Children)
@@ -1517,15 +1327,15 @@ steps:
 	require.Error(t, err)
 
 	// Get the latest status to verify parallel execution
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.NotNil(t, status)
-	require.Len(t, status.Nodes, 1) // deploy services
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 1) // deploy services
 
 	// Check deploy services node
-	deployNode := status.Nodes[0]
+	deployNode := dagRunStatus.Nodes[0]
 	require.Equal(t, "deploy services", deployNode.Step.Name)
-	require.Equal(t, scheduler.NodeStatusError, deployNode.Status) // Error because one child failed
+	require.Equal(t, status.NodeError, deployNode.Status) // Error because one child failed
 
 	// Verify child DAG runs were created
 	require.NotEmpty(t, deployNode.Children)
