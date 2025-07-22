@@ -247,6 +247,12 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
+			if attempt.Hidden() {
+				logger.Info(ctx, "DAG run is hidden, marking as discard", "data", data)
+				result = models.QueuedItemProcessingResultDiscard
+				goto SEND_RESULT
+			}
+
 			dag, err = attempt.ReadDAG(ctx)
 			if err != nil {
 				logger.Error(ctx, "Failed to read dag", "err", err, "data", data)

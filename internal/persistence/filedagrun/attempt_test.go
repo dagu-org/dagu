@@ -386,6 +386,32 @@ func TestSafeRename(t *testing.T) {
 	assert.Equal(t, "new content", string(content))
 }
 
+func TestAttempt_HideAndIsHidden(t *testing.T) {
+	ctx := context.Background()
+
+	// Create attempt
+	dir := createTempDir(t)
+	statusFile := filepath.Join(dir, "status.dat")
+	att, err := NewAttempt(statusFile, nil)
+	require.NoError(t, err)
+
+	// Initially not hidden
+	assert.False(t, att.Hidden())
+
+	// Can't hide when open
+	require.NoError(t, att.Open(ctx))
+	assert.ErrorIs(t, att.Hide(ctx), ErrStatusFileOpen)
+
+	// Can hide after close
+	require.NoError(t, att.Close(ctx))
+	require.NoError(t, att.Hide(ctx))
+	assert.True(t, att.Hidden())
+
+	// Idempotent
+	require.NoError(t, att.Hide(ctx))
+	assert.True(t, att.Hidden())
+}
+
 // createTempDir creates a temporary directory for testing
 func createTempDir(t *testing.T) string {
 	t.Helper()

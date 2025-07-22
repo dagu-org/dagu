@@ -1,0 +1,4 @@
+name: dequeue_preserves_state
+steps:
+  - name: step1
+    command: echo "success"

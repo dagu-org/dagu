@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
 )
 
@@ -70,22 +72,39 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, latestStatus.Status)
 	}
 
+	// Dequeue the dag-run from the queue
+	if _, err = ctx.QueueStore.DequeueByDAGRunID(ctx.Context, dagRun.Name, dagRun.ID); err != nil {
+		return fmt.Errorf("failed to dequeue dag-run %s: %w", dagRun.ID, err)
+	}
+
 	// Make the status as canceled
 	dagStatus.Status = status.Cancel
 
 	if err := attempt.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
 	}
-	defer func() {
-		_ = attempt.Close(ctx.Context)
-	}()
 	if err := attempt.Write(ctx.Context, *dagStatus); err != nil {
+		_ = attempt.Close(ctx.Context)
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 
-	// Dequeue the dag-run from the queue
-	if _, err = ctx.QueueStore.DequeueByDAGRunID(ctx.Context, dagRun.Name, dagRun.ID); err != nil {
-		return fmt.Errorf("failed to dequeue dag-run %s: %w", dagRun.ID, err)
+	// Close the attempt before hiding
+	if err := attempt.Close(ctx.Context); err != nil {
+		return fmt.Errorf("failed to close attempt: %w", err)
+	}
+
+	// Hide the canceled attempt to preserve the previous state
+	if err := attempt.Hide(ctx.Context); err != nil {
+		return fmt.Errorf("failed to hide canceled attempt: %w", err)
+	}
+
+	// Read the latest attempt and if it's NotStarted, we can remove the DAGRun from the store
+	// as it only has the queued status and no other attempts.
+	_, err = ctx.DAGRunStore.FindAttempt(ctx, dagRun)
+	if errors.Is(err, models.ErrNoStatusData) {
+		if err := ctx.DAGRunStore.RemoveDAGRun(ctx, dagRun); err != nil {
+			return fmt.Errorf("failed to remove dag-run %s from store: %w", dagRun.ID, err)
+		}
 	}
 
 	logger.Info(ctx.Context, "Dequeued dag-run",

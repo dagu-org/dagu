@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -67,7 +68,8 @@ func (att *Attempt) ID() string {
 
 // NewAttempt creates a new Run for the specified file.
 func NewAttempt(file string, cache *fileutil.Cache[*models.DAGRunStatus], opts ...AttemptOption) (*Attempt, error) {
-	matches := reAttemptDir.FindStringSubmatch(filepath.Base(filepath.Dir(file)))
+	dirName := filepath.Base(filepath.Dir(file))
+	matches := reAttemptDir.FindStringSubmatch(dirName)
 	if len(matches) != 3 {
 		return nil, fmt.Errorf("invalid file path for run data: %s", file)
 	}
@@ -75,6 +77,7 @@ func NewAttempt(file string, cache *fileutil.Cache[*models.DAGRunStatus], opts .
 	for _, opt := range opts {
 		opt(att)
 	}
+
 	return att, nil
 }
 
@@ -469,6 +472,73 @@ func (att *Attempt) CancelRequested(ctx context.Context) (bool, error) {
 
 	logger.Infof(ctx, "Cancel request found for attempt %s at %s", att.id, cancelFile)
 	return true, nil
+}
+
+// Hidden returns true if the attempt is hidden from normal operations.
+func (att *Attempt) Hidden() bool {
+	att.mu.RLock()
+	defer att.mu.RUnlock()
+
+	// Check if the directory name starts with a dot
+	dir := filepath.Dir(att.file)
+	baseName := filepath.Base(dir)
+	return strings.HasPrefix(baseName, ".")
+}
+
+// Hide renames the attempt directory to hide it from normal operations.
+// It prefixes the directory name with a dot to make it hidden.
+func (att *Attempt) Hide(ctx context.Context) error {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
+	default:
+		// Continue with operation
+	}
+
+	att.mu.Lock()
+	defer att.mu.Unlock()
+
+	// Cannot hide if attempt is open
+	if att.writer != nil {
+		return fmt.Errorf("cannot hide open attempt: %w", ErrStatusFileOpen)
+	}
+
+	// Get current directory path
+	currentDir := filepath.Dir(att.file)
+	baseName := filepath.Base(currentDir)
+
+	// Check if already hidden (idempotent)
+	if strings.HasPrefix(baseName, ".") {
+		return nil
+	}
+
+	// Add dot prefix to hide the directory
+	newBaseName := "." + baseName
+	newDir := filepath.Join(filepath.Dir(currentDir), newBaseName)
+
+	// Check if target already exists
+	if _, err := os.Stat(newDir); err == nil {
+		return fmt.Errorf("target directory already exists: %s", newDir)
+	}
+
+	// Perform atomic rename
+	if err := safeRename(currentDir, newDir); err != nil {
+		return fmt.Errorf("failed to hide attempt: %w", err)
+	}
+
+	// Update internal file path
+	att.file = filepath.Join(newDir, filepath.Base(att.file))
+
+	// Invalidate cache if present
+	if att.cache != nil {
+		att.cache.Invalidate(att.file)
+	}
+
+	// Log the operation
+	logger.Infof(ctx, "Hidden attempt %s: %s -> %s", att.id, currentDir, newDir)
+
+	return nil
 }
 
 // readLineFrom reads a line from the file starting at the specified offset.

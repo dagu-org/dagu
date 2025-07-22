@@ -515,17 +515,20 @@ func listDirsSorted(path string, reverse bool, pattern *regexp.Regexp) ([]string
 	if err != nil {
 		return nil, err
 	}
+
 	var dirs []string
 	if pattern != nil {
 		for _, entry := range entries {
-			if entry.IsDir() && pattern.MatchString(entry.Name()) {
-				dirs = append(dirs, entry.Name())
+			name := entry.Name()
+			if entry.IsDir() && pattern.MatchString(name) {
+				dirs = append(dirs, name)
 			}
 		}
 	} else {
 		for _, entry := range entries {
+			name := entry.Name()
 			if entry.IsDir() {
-				dirs = append(dirs, entry.Name())
+				dirs = append(dirs, name)
 			}
 		}
 	}

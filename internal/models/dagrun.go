@@ -42,6 +42,8 @@ type DAGRunStore interface {
 	// The name means the DAG name, renaming it will allow user to manage those runs
 	// with the new DAG name.
 	RenameDAGRuns(ctx context.Context, oldName, newName string) error
+	// RemoveDAGRun removes a dag-run record by its reference.
+	RemoveDAGRun(ctx context.Context, dagRun digraph.DAGRunRef) error
 }
 
 // ListDAGRunStatusesOptions contains options for listing runs
@@ -126,4 +128,9 @@ type DAGRunAttempt interface {
 	RequestCancel(ctx context.Context) error
 	// CancelRequested checks if a cancellation has been requested for this attempt.
 	CancelRequested(ctx context.Context) (bool, error)
+	// Hide marks the attempt as hidden from normal operations.
+	// This is useful for preserving previous state visibility when dequeuing.
+	Hide(ctx context.Context) error
+	// Hidden returns true if the attempt is hidden from normal operations.
+	Hidden() bool
 }

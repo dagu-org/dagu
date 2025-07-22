@@ -127,6 +127,16 @@ func (m *mockDAGRunAttempt) CancelRequested(ctx context.Context) (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
+func (m *mockDAGRunAttempt) Hide(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *mockDAGRunAttempt) Hidden() bool {
+	args := m.Called()
+	return args.Bool(0)
+}
+
 // Tests
 
 func TestListDAGRunStatusesOptions(t *testing.T) {
