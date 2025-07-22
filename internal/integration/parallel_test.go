@@ -872,7 +872,7 @@ steps:
 		require.Contains(t, results, `"failed": 1`)
 
 		// Only successful output should be captured
-		outputsValue := strings.Split(value.(string), `"outputs":`)[1]
+		outputsValue := strings.SplitN(value.(string), `"outputs": [`, 2)[1]
 		require.Contains(t, outputsValue, "Output for success")
 		require.NotContains(t, outputsValue, `"Output for fail"`)
 
