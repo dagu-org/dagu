@@ -1,6 +1,8 @@
 package filedagrun
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -105,41 +107,6 @@ func TestListChildDAGRuns(t *testing.T) {
 		}
 		assert.Contains(t, childIDs, "child1")
 		assert.Contains(t, childIDs, "child2")
-	})
-}
-
-func TestDAGRunListRuns(t *testing.T) {
-	t.Run("NoRuns", func(t *testing.T) {
-		root := setupTestDataRoot(t)
-		run := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
-
-		// Remove the run that was created by CreateTestDAGRun
-		require.NoError(t, os.RemoveAll(run.baseDir))
-		require.NoError(t, os.MkdirAll(run.baseDir, 0750))
-
-		runs, err := run.ListAttempts(run.Context)
-		require.NoError(t, err)
-		assert.Empty(t, runs, "should return empty list when no runs exist")
-	})
-
-	t.Run("WithMultipleRuns", func(t *testing.T) {
-		root := setupTestDataRoot(t)
-		run := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
-
-		// Create additional runs
-		ts1 := models.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
-		ts2 := models.NewUTC(time.Date(2021, 1, 2, 12, 0, 0, 0, time.UTC))
-		run.WriteStatus(t, ts1, status.Success)
-		run.WriteStatus(t, ts2, status.Error)
-
-		runs, err := run.ListAttempts(run.Context)
-		require.NoError(t, err)
-		assert.GreaterOrEqual(t, len(runs), 2, "should return at least the runs we created")
-
-		// Verify runs are valid
-		for _, run := range runs {
-			assert.True(t, run.Exists(), "each run should exist")
-		}
 	})
 }
 
@@ -520,4 +487,68 @@ func TestDAGRunRemove(t *testing.T) {
 		_, err = os.Stat(run.baseDir)
 		assert.True(t, os.IsNotExist(err), "dag-run directory should be removed")
 	})
+}
+
+func TestDAGRun_listAttemptDirs(t *testing.T) {
+	ctx := context.Background()
+	root := setupTestDataRoot(t)
+
+	// Create DAG run directory manually without creating any attempts
+	dagRunDir := filepath.Join(root.dagRunsDir, "2025", "07", "22", "dag-run_20250722_120000Z_test-run")
+	require.NoError(t, os.MkdirAll(dagRunDir, 0755))
+
+	run, err := NewDAGRun(dagRunDir)
+	require.NoError(t, err)
+
+	// Create some normal attempt directories with older timestamps
+	normalAttempt1 := filepath.Join(run.baseDir, "attempt_20250722_120000_123Z_abc123")
+	normalAttempt2 := filepath.Join(run.baseDir, "attempt_20250722_120100_456Z_def456")
+	require.NoError(t, os.MkdirAll(normalAttempt1, 0755))
+	require.NoError(t, os.MkdirAll(normalAttempt2, 0755))
+
+	// Create a hidden attempt directory with the latest timestamp
+	hiddenAttempt := filepath.Join(run.baseDir, ".attempt_20250722_120200_789Z_ghi789")
+	require.NoError(t, os.MkdirAll(hiddenAttempt, 0755))
+
+	// Create some non-attempt directories that should be ignored
+	require.NoError(t, os.MkdirAll(filepath.Join(run.baseDir, "not-an-attempt"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(run.baseDir, ".hidden-but-not-attempt"), 0755))
+
+	// Create a file that should be ignored
+	require.NoError(t, os.WriteFile(filepath.Join(run.baseDir, "attempt_fake.txt"), []byte("fake"), 0644))
+
+	// Get all attempt directories
+	dirs, err := run.listAttemptDirs()
+	require.NoError(t, err)
+
+	// Should return 3 directories (2 normal + 1 hidden)
+	assert.Len(t, dirs, 3, "should return all attempt directories including hidden ones")
+
+	// Verify the directories are sorted in reverse order (newest first)
+	// The hidden attempt with latest timestamp should be first
+	expected := []string{
+		".attempt_20250722_120200_789Z_ghi789", // Latest (hidden)
+		"attempt_20250722_120100_456Z_def456",  // Second
+		"attempt_20250722_120000_123Z_abc123",  // Oldest
+	}
+	assert.Equal(t, expected, dirs, "directories should be sorted newest first with hidden directory in correct position")
+
+	// Create status files so attempts are considered valid
+	for _, dir := range []string{normalAttempt1, normalAttempt2, hiddenAttempt} {
+		statusFile := filepath.Join(dir, JSONLStatusFile)
+		status := createTestStatus(status.Success)
+		data, err := json.Marshal(status)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(statusFile, append(data, '\n'), 0600))
+	}
+
+	// Test that LatestAttempt skips hidden directories
+	latestAttempt, err := run.LatestAttempt(ctx, nil)
+	require.NoError(t, err)
+	assert.False(t, latestAttempt.Hidden(), "LatestAttempt should skip hidden attempts")
+
+	// The latest visible attempt should be normalAttempt2
+	status, err := latestAttempt.ReadStatus(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "test", status.DAGRunID, "should return the latest visible attempt")
 }

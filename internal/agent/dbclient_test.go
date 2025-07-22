@@ -240,9 +240,16 @@ func (m *mockDAGStore) IsSuspended(ctx context.Context, fileName string) bool {
 	return args.Bool(0)
 }
 
+var _ models.DAGRunStore = (*mockDAGRunStore)(nil)
+
 // mockDAGRunStore implements models.DAGRunStore
 type mockDAGRunStore struct {
 	mock.Mock
+}
+
+// RemoveDAGRun implements models.DAGRunStore.
+func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun digraph.DAGRunRef) error {
+	panic("unimplemented")
 }
 
 func (m *mockDAGRunStore) CreateAttempt(ctx context.Context, dag *digraph.DAG, ts time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
@@ -357,4 +364,14 @@ func (m *mockDAGRunAttempt) GetOutputs() *executor.SyncMap {
 		m.outputs = &executor.SyncMap{}
 	}
 	return m.outputs
+}
+
+func (m *mockDAGRunAttempt) Hide(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *mockDAGRunAttempt) Hidden() bool {
+	args := m.Called()
+	return args.Bool(0)
 }

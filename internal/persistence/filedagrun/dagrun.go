@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -156,28 +157,9 @@ func (dr DAGRun) ListChildDAGRuns(ctx context.Context) ([]*DAGRun, error) {
 	return dagRuns, nil
 }
 
-// ListAttempts returns a list of all attempts for the dag-run.
-func (dr DAGRun) ListAttempts(ctx context.Context) ([]*Attempt, error) {
-	attDirs, err := listDirsSorted(dr.baseDir, true, reAttemptDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list run directories: %w", err)
-	}
-	var attempts []*Attempt
-	for _, attDir := range attDirs {
-		run, err := NewAttempt(filepath.Join(dr.baseDir, attDir, JSONLStatusFile), nil)
-		if err != nil {
-			logger.Error(ctx, "failed to read a run data: %w", err)
-			continue
-		}
-		if run.Exists() {
-			attempts = append(attempts, run)
-		}
-	}
-	return attempts, nil
-}
-
 // LatestAttempt returns the most recent Attempt for the dag-run.
 // It searches through all run directories and returns the first valid Attempt found.
+// It skips hidden attempts (dequeued ones).
 func (dr DAGRun) LatestAttempt(ctx context.Context, cache *fileutil.Cache[*models.DAGRunStatus]) (*Attempt, error) {
 	attDirs, err := listDirsSorted(dr.baseDir, true, reAttemptDir)
 	if err != nil {
@@ -188,6 +170,9 @@ func (dr DAGRun) LatestAttempt(ctx context.Context, cache *fileutil.Cache[*model
 		att, err := NewAttempt(filepath.Join(dr.baseDir, attDir, JSONLStatusFile), cache)
 		if err != nil {
 			logger.Error(ctx, "failed to read a run data: %w", err)
+			continue
+		}
+		if att.Hidden() {
 			continue
 		}
 		if att.Exists() {
@@ -205,8 +190,8 @@ func (dr DAGRun) Remove(ctx context.Context) error {
 	return os.RemoveAll(dr.baseDir)
 }
 
+// removeLogFiles removes all log files associated with the dag-run and its child dag-runs.
 func (dr DAGRun) removeLogFiles(ctx context.Context) error {
-	// Remove the log files
 	deleteFiles, err := dr.listLogFiles(ctx)
 	if err != nil {
 		logger.Error(ctx, "failed to list log files to remove", "err", err, "dagRunId", dr.dagRunID)
@@ -242,19 +227,63 @@ func (dr DAGRun) removeLogFiles(ctx context.Context) error {
 	return nil
 }
 
+// listAttemptDirs lists all attempt directories including hidden ones.
+func (dr DAGRun) listAttemptDirs() ([]string, error) {
+	entries, err := os.ReadDir(dr.baseDir)
+	// If the directory does not exist, return nil
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var dirs []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		// Trim the dot prefix if it is a hidden directory
+		name := strings.TrimPrefix(entry.Name(), ".")
+		if reAttemptDir.MatchString(name) {
+			dirs = append(dirs, entry.Name())
+		}
+	}
+
+	// Sort in reverse order (newest first) based on timestamp
+	sort.Slice(dirs, func(i, j int) bool {
+		// Extract timestamps for comparison
+		// Remove dot prefix if present for comparison
+		nameI := strings.TrimPrefix(dirs[i], ".")
+		nameJ := strings.TrimPrefix(dirs[j], ".")
+
+		// Compare timestamps (the format ensures lexical sort = chronological sort)
+		// Reverse order: newer (larger) timestamps come first
+		return nameI > nameJ
+	})
+	return dirs, nil
+}
+
 // listLogFiles lists all log files associated with the dag-run.
 func (dr DAGRun) listLogFiles(ctx context.Context) ([]string, error) {
-	// List all log files in the dag-run directory and its attempts.
-	runs, err := dr.ListAttempts(ctx)
+	attDirs, err := dr.listAttemptDirs()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list runs: %w", err)
+		return nil, fmt.Errorf("failed to list attempt directories: %w", err)
 	}
 
 	var logFiles []string
-	for _, run := range runs {
-		status, err := run.ReadStatus(ctx)
+	for _, attDir := range attDirs {
+		attempt, err := NewAttempt(filepath.Join(dr.baseDir, attDir, JSONLStatusFile), nil)
 		if err != nil {
-			logger.Error(ctx, "failed to read status for run", "err", err, "dagRunId", dr.dagRunID, "run", run.ID())
+			logger.Error(ctx, "failed toead attempt data", "err", err, "dagRId", dr.dagRunID, "attemptDir", attDir)
+			continue
+		}
+		if !attempt.Exists() {
+			continue
+		}
+		status, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			logger.Error(ctx, "failed to read status for attempt", "err", err, "dagRunId", dr.dagRunID, "attemptId", attempt.ID())
 			continue
 		}
 		logFiles = append(logFiles, status.Log)

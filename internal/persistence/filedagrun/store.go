@@ -265,6 +265,7 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 
 	lockCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
+
 	if err := dataRoot.Lock(lockCtx); err != nil {
 		return nil, fmt.Errorf("failed to acquire lock for dag-run %s: %w", dagRunID, err)
 	}
@@ -479,6 +480,43 @@ func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retent
 
 	root := NewDataRoot(store.baseDir, dagName)
 	return root.RemoveOld(ctx, retentionDays)
+}
+
+// RemoveDAGRun implements models.DAGRunStore.
+func (store *Store) RemoveDAGRun(ctx context.Context, dagRun digraph.DAGRunRef) error {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("RemoveDAGRun canceled: %w", ctx.Err())
+	default:
+		// Continue with operation
+	}
+
+	if dagRun.ID == "" {
+		return ErrDAGRunIDEmpty
+	}
+
+	root := NewDataRoot(store.baseDir, dagRun.Name)
+	run, err := root.FindByDAGRunID(ctx, dagRun.ID)
+	if err != nil {
+		return fmt.Errorf("failed to find dag-run %s: %w", dagRun.ID, err)
+	}
+
+	if err := root.Lock(ctx); err != nil {
+		return fmt.Errorf("failed to acquire lock for dag-run %s: %w", dagRun.ID, err)
+	}
+
+	defer func() {
+		if err := root.Unlock(); err != nil {
+			logger.Error(ctx, "Failed to unlock dag-run", "dagRunID", dagRun.ID, "err", err)
+		}
+	}()
+
+	if err := run.Remove(ctx); err != nil {
+		return fmt.Errorf("failed to remove dag-run %s: %w", dagRun.ID, err)
+	}
+
+	return nil
 }
 
 // RenameDAGRuns renames all history records for the specified DAG name.
