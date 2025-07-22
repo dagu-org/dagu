@@ -63,7 +63,7 @@ Dagu is designed for small teams of 1-3 people to easily manage complex workflow
 
 ### v1.18 (upcoming)
 - **OpenID Connect (OIDC) Support**: OpenID Connect authentication for secure access (implemented by [@Arvintian](https://github.com/Arvintian))
-- **Distributed Execution**: Run steps in a DAG across multiple machines (requested by Clément Doumouro)
+- **Distributed Execution**: Run steps in a DAG across multiple machines
 
 ### v1.17
 - **OpenTelemetry Support (OTEL)**: Distributed tracing with W3C trace context propagation (requested by [@jeremydelattre59](https://github.com/jeremydelattre59))
@@ -302,7 +302,7 @@ make run
 ## Acknowledgements
 
 - [@Arvintian](https://github.com/Arvintian) for implementing OpenID Connect (OIDC) support and HTTP executor
-- [@kriyanshii](https://github.com/kriyanshii) for implementing the distributed execution feature
+- [@kriyanshii](https://github.com/kriyanshii) for implementing the queueing functionality
 - [@pdoronila](https://github.com/pdoronila) for adding Windows support
 - [@thefishhat](https://github.com/thefishhat) for various improvements on the scheduler, retry policy, and more
 - [@arky](https://github.com/arky) for managing and improving the community, documentation, and examples
