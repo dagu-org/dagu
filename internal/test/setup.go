@@ -192,6 +192,43 @@ func (h Helper) DAG(t *testing.T, name string) DAG {
 	}
 }
 
+// DAGWithYAML creates a test DAG from YAML content
+func (h Helper) DAGWithYAML(t *testing.T, name string, yamlContent []byte) DAG {
+	t.Helper()
+
+	// Create temporary directory and file
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, fmt.Sprintf("%s.yaml", name))
+	err := os.WriteFile(testFile, yamlContent, 0600)
+	require.NoError(t, err, "failed to write test DAG %q", name)
+
+	// Load the DAG
+	dag, err := digraph.Load(h.Context, testFile)
+	require.NoError(t, err, "failed to load test DAG %q", name)
+
+	return DAG{
+		Helper: &h,
+		DAG:    dag,
+	}
+}
+
+// CreateDAGFile creates a DAG file in a given directory for tests that need separate DAG files
+func (h Helper) CreateDAGFile(t *testing.T, dir string, name string, yamlContent []byte) string {
+	t.Helper()
+
+	// Create the directory if it doesn't exist
+	err := os.MkdirAll(dir, 0750)
+	require.NoError(t, err, "failed to create directory %q", dir)
+
+	dagFile := filepath.Join(dir, fmt.Sprintf("%s.yaml", name))
+	err = os.WriteFile(dagFile, yamlContent, 0600)
+	require.NoError(t, err, "failed to write DAG file %q", name)
+
+	t.Cleanup(func() { _ = os.Remove(dagFile) })
+
+	return dagFile
+}
+
 func (h Helper) DAGExpectError(t *testing.T, name string, expectedErr string) {
 	t.Helper()
 

@@ -36,14 +36,14 @@ func TestServer_StartWithConfig(t *testing.T) {
 			name: "DAGLocalLogDir",
 			setupFunc: func(t *testing.T) (string, string) {
 				tempDir := t.TempDir()
-				dagFile := filepath.Join(tempDir, "basic.yaml")
+				th := test.Setup(t)
 				dagContent := `
 logDir: ${DAG_TMP_LOGS_DIR}/logs
 steps:
   - name: step1
     command: echo "Hello, world!"
 `
-				require.NoError(t, os.WriteFile(dagFile, []byte(dagContent), 0600))
+				dagFile := th.CreateDAGFile(t, tempDir, "basic", []byte(dagContent))
 				return dagFile, tempDir
 			},
 			dagPath: func(_ *testing.T, tempDir string) string {

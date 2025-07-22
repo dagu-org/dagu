@@ -190,6 +190,7 @@ func (c *coordinatorClient) waitForHealthy(ctx context.Context) error {
 
 		resp, err := c.healthClient.Check(ctx, req)
 		if err != nil {
+			logger.Error(ctx, "Health check failed", "err", err)
 			return err
 		}
 

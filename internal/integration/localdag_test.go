@@ -2,10 +2,8 @@ package integration_test
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -43,24 +41,11 @@ steps:
     depends: 
       - greet
 `
-		// Create temp dir for this test
-		tmpDir := t.TempDir()
-		testFile := filepath.Join(tmpDir, "local-dag.yaml")
-		err := os.WriteFile(testFile, []byte(yamlContent), 0644)
-		require.NoError(t, err)
-
 		// Setup test helper
 		th := test.Setup(t)
 
-		// Load the DAG directly
-		dag, err := digraph.Load(th.Context, testFile)
-		require.NoError(t, err)
-
-		// Create a DAG wrapper for test utilities
-		testDAG := test.DAG{
-			Helper: &th,
-			DAG:    dag,
-		}
+		// Load the DAG using helper
+		testDAG := th.DAGWithYAML(t, "local-dag", []byte(yamlContent))
 
 		// Run the DAG
 		agent := testDAG.Agent()
@@ -70,7 +55,7 @@ steps:
 		testDAG.AssertLatestStatus(t, status.Success)
 
 		// Get the full run status
-		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
 
 		// Verify the first step (run-local-child) completed successfully
@@ -119,24 +104,11 @@ steps:
     depends:
       - process
 `
-		// Create temp dir for this test
-		tmpDir := t.TempDir()
-		testFile := filepath.Join(tmpDir, "parallel-local-dag.yaml")
-		err := os.WriteFile(testFile, []byte(yamlContent), 0644)
-		require.NoError(t, err)
-
 		// Setup test helper
 		th := test.Setup(t)
 
-		// Load the DAG directly
-		dag, err := digraph.Load(th.Context, testFile)
-		require.NoError(t, err)
-
-		// Create a DAG wrapper for test utilities
-		testDAG := test.DAG{
-			Helper: &th,
-			DAG:    dag,
-		}
+		// Load the DAG using helper
+		testDAG := th.DAGWithYAML(t, "parallel-local-dag", []byte(yamlContent))
 
 		// Run the DAG
 		agent := testDAG.Agent()
@@ -146,7 +118,7 @@ steps:
 		testDAG.AssertLatestStatus(t, status.Success)
 
 		// Get the full run status
-		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
 
 		// For parallel execution, we should have one step that ran multiple instances
@@ -193,25 +165,13 @@ steps:
     command: |
       echo "Middle: ${MIDDLE_PARAM}, Leaf: ${LEAF_PARAM}"
 `
-		tmpDir := t.TempDir()
-		testFile := filepath.Join(tmpDir, "nested-local-dag.yaml")
-		err := os.WriteFile(testFile, []byte(yamlContent), 0644)
-		require.NoError(t, err)
-
 		th := test.Setup(t)
 
-		// Load the DAG directly
-		dag, err := digraph.Load(th.Context, testFile)
-		require.NoError(t, err)
-
-		// Create a DAG wrapper
-		testDAG := test.DAG{
-			Helper: &th,
-			DAG:    dag,
-		}
+		// Load the DAG using helper
+		testDAG := th.DAGWithYAML(t, "nested-local-dag", []byte(yamlContent))
 
 		agent := testDAG.Agent()
-		err = agent.Run(agent.Context)
+		err := agent.Run(agent.Context)
 		// The root DAG execution will fail because middle-dag fails
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed")
@@ -219,7 +179,7 @@ steps:
 		// This should fail because middle-dag cannot see leaf-dag
 		testDAG.AssertLatestStatus(t, status.Error)
 
-		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
 
 		// Root DAG should have one step that tried to run middle-dag
@@ -279,29 +239,17 @@ steps:
     depends:
       - dev-build
 `
-		tmpDir := t.TempDir()
-		testFile := filepath.Join(tmpDir, "conditional-local-dag.yaml")
-		err := os.WriteFile(testFile, []byte(yamlContent), 0644)
-		require.NoError(t, err)
-
 		th := test.Setup(t)
 
-		// Load the DAG directly
-		dag, err := digraph.Load(th.Context, testFile)
-		require.NoError(t, err)
-
-		// Create a DAG wrapper
-		testDAG := test.DAG{
-			Helper: &th,
-			DAG:    dag,
-		}
+		// Load the DAG using helper
+		testDAG := th.DAGWithYAML(t, "conditional-local-dag", []byte(yamlContent))
 
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
 
 		testDAG.AssertLatestStatus(t, status.Success)
 
-		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
 
 		// Should have 3 steps: check-env, run-prod-dag, run-dev-dag
@@ -359,29 +307,17 @@ steps:
     depends:
       - parse-data
 `
-		tmpDir := t.TempDir()
-		testFile := filepath.Join(tmpDir, "output-passing.yaml")
-		err := os.WriteFile(testFile, []byte(yamlContent), 0644)
-		require.NoError(t, err)
-
 		th := test.Setup(t)
 
-		// Load the DAG directly
-		dag, err := digraph.Load(th.Context, testFile)
-		require.NoError(t, err)
-
-		// Create a DAG wrapper
-		testDAG := test.DAG{
-			Helper: &th,
-			DAG:    dag,
-		}
+		// Load the DAG using helper
+		testDAG := th.DAGWithYAML(t, "output-passing", []byte(yamlContent))
 
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
 
 		testDAG.AssertLatestStatus(t, status.Success)
 
-		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
 
 		// Should have 2 steps
@@ -411,25 +347,13 @@ steps:
   - name: task
     command: echo "test"
 `
-		tmpDir := t.TempDir()
-		testFile := filepath.Join(tmpDir, "invalid-reference.yaml")
-		err := os.WriteFile(testFile, []byte(yamlContent), 0644)
-		require.NoError(t, err)
-
 		th := test.Setup(t)
 
-		// Load the DAG directly
-		dag, err := digraph.Load(th.Context, testFile)
-		require.NoError(t, err)
-
-		// Create a DAG wrapper
-		testDAG := test.DAG{
-			Helper: &th,
-			DAG:    dag,
-		}
+		// Load the DAG using helper
+		testDAG := th.DAGWithYAML(t, "invalid-reference", []byte(yamlContent))
 
 		agent := testDAG.Agent()
-		err = agent.Run(agent.Context)
+		err := agent.Run(agent.Context)
 		// The agent will return an error when a step fails
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "non-existent-dag")
@@ -437,7 +361,7 @@ steps:
 		// Check that the DAG failed
 		testDAG.AssertLatestStatus(t, status.Error)
 
-		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
 
 		// Should have one step that failed
@@ -487,29 +411,17 @@ steps:
     command: echo "${TASK_NAME} processing with ${SETUP}"
     output: RESULT
 `
-		tmpDir := t.TempDir()
-		testFile := filepath.Join(tmpDir, "complex-deps.yaml")
-		err := os.WriteFile(testFile, []byte(yamlContent), 0644)
-		require.NoError(t, err)
-
 		th := test.Setup(t)
 
-		// Load the DAG directly
-		dag, err := digraph.Load(th.Context, testFile)
-		require.NoError(t, err)
-
-		// Create a DAG wrapper
-		testDAG := test.DAG{
-			Helper: &th,
-			DAG:    dag,
-		}
+		// Load the DAG using helper
+		testDAG := th.DAGWithYAML(t, "complex-deps", []byte(yamlContent))
 
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
 
 		testDAG.AssertLatestStatus(t, status.Success)
 
-		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
 
 		// Should have 4 steps: setup, task1, task2, combine
@@ -559,24 +471,11 @@ steps:
   - name: s2
     command: exit 0
 `
-		// Create temp dir for this test
-		tmpDir := t.TempDir()
-		testFile := filepath.Join(tmpDir, "partial-success.yaml")
-		err := os.WriteFile(testFile, []byte(yamlContent), 0644)
-		require.NoError(t, err)
-
 		// Setup test helper
 		th := test.Setup(t)
 
-		// Load the DAG directly
-		dag, err := digraph.Load(th.Context, testFile)
-		require.NoError(t, err)
-
-		// Create a DAG wrapper for test utilities
-		testDAG := test.DAG{
-			Helper: &th,
-			DAG:    dag,
-		}
+		// Load the DAG using helper
+		testDAG := th.DAGWithYAML(t, "partial-success", []byte(yamlContent))
 
 		// Run the DAG
 		agent := testDAG.Agent()
@@ -607,24 +506,11 @@ steps:
   - name: s2
     command: exit 0
 `
-		// Create temp dir for this test
-		tmpDir := t.TempDir()
-		testFile := filepath.Join(tmpDir, "partial-success.yaml")
-		err := os.WriteFile(testFile, []byte(yamlContent), 0644)
-		require.NoError(t, err)
-
 		// Setup test helper
 		th := test.Setup(t)
 
-		// Load the DAG directly
-		dag, err := digraph.Load(th.Context, testFile)
-		require.NoError(t, err)
-
-		// Create a DAG wrapper for test utilities
-		testDAG := test.DAG{
-			Helper: &th,
-			DAG:    dag,
-		}
+		// Load the DAG using helper
+		testDAG := th.DAGWithYAML(t, "partial-success", []byte(yamlContent))
 
 		// Run the DAG
 		agent := testDAG.Agent()

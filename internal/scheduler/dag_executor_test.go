@@ -29,6 +29,9 @@ func TestDAGExecutorRealBehavior(t *testing.T) {
 		err := os.MkdirAll(queueDir, 0755)
 		require.NoError(t, err)
 
+		// Create real DAG run manager with test helper config
+		th := test.Setup(t)
+
 		// Create a test DAG
 		yamlContent := `
 name: test-behavior-dag
@@ -36,12 +39,8 @@ steps:
   - name: test-step
     command: echo "test"
 `
-		testFile := filepath.Join(tmpDir, "test-behavior.yaml")
-		err = os.WriteFile(testFile, []byte(yamlContent), 0644)
-		require.NoError(t, err)
-
-		// Create real DAG run manager with test helper config
-		th := test.Setup(t)
+		testDAG := th.DAGWithYAML(t, "test-behavior", []byte(yamlContent))
+		testFile := testDAG.Location
 		runStore := filedagrun.New(filepath.Join(tmpDir, "data"))
 		procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
 		dagRunMgr := dagrun.New(runStore, procStore, th.Config.Paths.Executable, tmpDir)

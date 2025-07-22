@@ -51,16 +51,14 @@ func TestStartCommand(t *testing.T) {
 func TestCmdStart_InteractiveMode(t *testing.T) {
 	t.Run("Works with explicit DAG path", func(t *testing.T) {
 		// Create a test DAG
-		tmpDir := t.TempDir()
-		dagFile := tmpDir + "/test.yaml"
+		th := test.SetupCommand(t)
 		dagContent := `
 name: test-dag
 steps:
   - name: step1
     command: echo test
 `
-		err := os.WriteFile(dagFile, []byte(dagContent), 0644)
-		require.NoError(t, err)
+		dagFile := th.CreateDAGFile(t, "test.yaml", dagContent)
 
 		// Providing a DAG path should work
 		cmd := cmd.CmdStart()
@@ -85,8 +83,7 @@ steps:
 
 func TestCmdStart_BackwardCompatibility(t *testing.T) {
 	t.Run("Should accept parameters after --", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		dagFile := tmpDir + "/test-params.yaml"
+		th := test.SetupCommand(t)
 		dagContent := `
 name: test-params
 params: KEY1=default1 KEY2=default2
@@ -94,8 +91,7 @@ steps:
   - name: step1
     command: echo $KEY1 $KEY2
 `
-		err := os.WriteFile(dagFile, []byte(dagContent), 0644)
-		require.NoError(t, err)
+		dagFile := th.CreateDAGFile(t, "test-params.yaml", dagContent)
 
 		cmd := cmd.CmdStart()
 		cmd.SetArgs([]string{dagFile, "--", "KEY1=value1", "KEY2=value2"})
@@ -106,8 +102,7 @@ steps:
 	})
 
 	t.Run("Should accept --params flag", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		dagFile := tmpDir + "/test-params-flag.yaml"
+		th := test.SetupCommand(t)
 		dagContent := `
 name: test-params-flag
 params: KEY=default
@@ -115,8 +110,7 @@ steps:
   - name: step1
     command: echo $KEY
 `
-		err := os.WriteFile(dagFile, []byte(dagContent), 0644)
-		require.NoError(t, err)
+		dagFile := th.CreateDAGFile(t, "test-params-flag.yaml", dagContent)
 
 		cmd := cmd.CmdStart()
 		cmd.SetArgs([]string{dagFile, "--params", "KEY=value"})

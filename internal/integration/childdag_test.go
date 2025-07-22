@@ -19,25 +19,15 @@ func TestRetryChildDAGRun(t *testing.T) {
 	// Get DAG path
 	th := test.SetupCommand(t)
 
-	createDAGFile := func(name, content string) {
-		// Create temporary DAG file
-		dagFile := filepath.Join(th.Config.Paths.DAGsDir, name)
-		// Create the directory if it doesn't exist
-		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
-		require.NoError(t, err)
-		// Write the DAG file
-		err = os.WriteFile(dagFile, []byte(content), 0600)
-		require.NoError(t, err)
-	}
 
-	createDAGFile("parent.yaml", `
+	th.CreateDAGFile(t, "parent.yaml", `
 steps:
   - name: parent
     run: child_1
     params: "PARAM=FOO"
 `)
 
-	createDAGFile("child_1.yaml", `
+	th.CreateDAGFile(t, "child_1.yaml", `
 params: "PARAM=BAR"
 steps:
   - name: child_2
@@ -45,7 +35,7 @@ steps:
     params: "PARAM=$PARAM"
 `)
 
-	createDAGFile("child_2.yaml", `
+	th.CreateDAGFile(t, "child_2.yaml", `
 params: "PARAM=BAZ"
 steps:
   - name: child_2
@@ -135,27 +125,20 @@ steps:
 func TestRetryPolicyChildDAGRunWithOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
 
-	createDAGFile := func(name, content string) {
-		dagFile := filepath.Join(th.Config.Paths.DAGsDir, name)
-		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
-		require.NoError(t, err)
-		err = os.WriteFile(dagFile, []byte(content), 0600)
-		require.NoError(t, err)
-	}
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
 
 	// Generate a unique counter file path for this test
 	counterFile := filepath.Join("/tmp", "retry_counter_"+dagRunID)
 
-	createDAGFile("parent_retry.yaml", `
+	th.CreateDAGFile(t, "parent_retry.yaml", `
 steps:
   - name: call_child
     run: child_retry
     output: CHILD_OUTPUT
 `)
 
-	createDAGFile("child_retry.yaml", `
+	th.CreateDAGFile(t, "child_retry.yaml", `
 steps:
   - name: retry_step
     command: |
@@ -221,22 +204,15 @@ steps:
 func TestBasicChildDAGOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
 
-	createDAGFile := func(name, content string) {
-		dagFile := filepath.Join(th.Config.Paths.DAGsDir, name)
-		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
-		require.NoError(t, err)
-		err = os.WriteFile(dagFile, []byte(content), 0600)
-		require.NoError(t, err)
-	}
 
-	createDAGFile("parent_basic.yaml", `
+	th.CreateDAGFile(t, "parent_basic.yaml", `
 steps:
   - name: call_child
     run: child_basic
     output: CHILD_OUTPUT
 `)
 
-	createDAGFile("child_basic.yaml", `
+	th.CreateDAGFile(t, "child_basic.yaml", `
 steps:
   - name: basic_step
     command: echo "hello_from_child"
@@ -290,13 +266,6 @@ steps:
 func TestRetryPolicyBasicOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
 
-	createDAGFile := func(name, content string) {
-		dagFile := filepath.Join(th.Config.Paths.DAGsDir, name)
-		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
-		require.NoError(t, err)
-		err = os.WriteFile(dagFile, []byte(content), 0600)
-		require.NoError(t, err)
-	}
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
 	counterFile := filepath.Join("/tmp", "retry_counter_basic_"+dagRunID)
@@ -305,7 +274,7 @@ func TestRetryPolicyBasicOutputCapture(t *testing.T) {
 		_ = os.Remove(counterFile)
 	}()
 
-	createDAGFile("basic_retry.yaml", `
+	th.CreateDAGFile(t, "basic_retry.yaml", `
 steps:
   - name: retry_step
     command: |
@@ -371,15 +340,8 @@ steps:
 func TestNoRetryPolicyOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
 
-	createDAGFile := func(name, content string) {
-		dagFile := filepath.Join(th.Config.Paths.DAGsDir, name)
-		err := os.MkdirAll(filepath.Dir(dagFile), 0750)
-		require.NoError(t, err)
-		err = os.WriteFile(dagFile, []byte(content), 0600)
-		require.NoError(t, err)
-	}
 
-	createDAGFile("no_retry.yaml", `
+	th.CreateDAGFile(t, "no_retry.yaml", `
 steps:
   - name: success_step
     command: echo "output_first_attempt_success"

@@ -1,11 +1,8 @@
 package integration_test
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -81,21 +78,11 @@ steps:
 			th := test.Setup(t)
 
 			// Create DAG from YAML
-			testFile := filepath.Join(t.TempDir(), "test.yaml")
-			err := os.WriteFile(testFile, []byte(tc.yaml), 0644)
-			require.NoError(t, err)
-
-			dag, err := digraph.Load(th.Context, testFile)
-			require.NoError(t, err)
-
-			testDAG := test.DAG{
-				Helper: &th,
-				DAG:    dag,
-			}
+			testDAG := th.DAGWithYAML(t, "workflow", []byte(tc.yaml))
 
 			// Run the DAG
 			agent := testDAG.Agent()
-			err = agent.Run(agent.Context)
+			err := agent.Run(agent.Context)
 
 			if tc.expectedStatus == status.Success {
 				require.NoError(t, err)

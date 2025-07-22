@@ -1,6 +1,8 @@
 package test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -45,4 +47,18 @@ func SetupCommand(t *testing.T, opts ...HelperOption) Command {
 
 	opts = append(opts, WithCaptureLoggingOutput())
 	return Command{Helper: Setup(t, opts...)}
+}
+
+// CreateDAGFile creates a DAG file in the DAGsDir for command tests
+func (c Command) CreateDAGFile(t *testing.T, name string, content string) string {
+	t.Helper()
+
+	dagFile := filepath.Join(c.Config.Paths.DAGsDir, name)
+	// Create the directory if it doesn't exist
+	err := os.MkdirAll(filepath.Dir(dagFile), 0750)
+	require.NoError(t, err)
+	// Write the DAG file
+	err = os.WriteFile(dagFile, []byte(content), 0600)
+	require.NoError(t, err)
+	return dagFile
 }

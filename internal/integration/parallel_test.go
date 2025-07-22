@@ -168,12 +168,11 @@ func TestParallelExecution_DirectVariable(t *testing.T) {
 }
 
 func TestParallelExecution_WithOutput(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Create a DAG that uses parallel execution output
-	testDir := test.TestdataPath(t, "integration")
-	dagFile := filepath.Join(testDir, "test-parallel-output.yaml")
-	dagContent := `name: test-parallel-output
+	dag := th.DAGWithYAML(t, "test-parallel-output", []byte(`
+name: test-parallel-output
 steps:
   - name: parallel-with-output
     run: child-with-output
@@ -189,13 +188,17 @@ steps:
       echo "${PARALLEL_RESULTS}"
     depends: parallel-with-output
     output: FINAL_OUTPUT
-`
-	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(dagFile) })
-
-	// Load and run the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-output.yaml"))
+---
+name: child-with-output
+params:
+  - ITEM: ""
+steps:
+  - name: process
+    command: |
+      echo "Processing item: $1"
+      echo "TASK_RESULT_$1"
+    output: TASK_OUTPUT
+`))
 
 	agent := dag.Agent()
 	require.NoError(t, agent.Run(agent.Context))
@@ -313,15 +316,11 @@ steps:
 
 // TestParallelExecution_DeterministicIDs verifies that child DAG run IDs are deterministic and duplicates are deduplicated
 func TestParallelExecution_DeterministicIDs(t *testing.T) {
-	// Create test DAGs in testdata directory
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
-
-	// The child-echo DAG already exists in testdata
+	th := test.Setup(t)
 
 	// Create a temporary test DAG that uses parallel execution with duplicate items
-	testDir := test.TestdataPath(t, "integration")
-	dagFile := filepath.Join(testDir, "test-deterministic-ids.yaml")
-	dagContent := `name: test-deterministic-ids
+	dag := th.DAGWithYAML(t, "test-deterministic-ids", []byte(`
+name: test-deterministic-ids
 steps:
   - name: process
     run: child-echo
@@ -332,13 +331,15 @@ steps:
         - "test1"  # Duplicate to verify deduplication
         - "test3"
         - "test2"  # Another duplicate
-`
-	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(dagFile) })
-
-	// Load and run the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-deterministic-ids.yaml"))
+---
+name: child-echo
+params:
+  - ITEM: ""
+steps:
+  - name: echo
+    command: echo "$1"
+    output: ECHO_OUTPUT
+`))
 
 	// Run and verify deduplication
 	agent := dag.Agent()
@@ -371,25 +372,11 @@ steps:
 
 // TestParallelExecution_Cancel verifies that cancelling a parallel execution properly cancels all child DAG runs
 func TestParallelExecution_Cancel(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
-	// Create a child DAG that sleeps for a while
-	testDir := test.TestdataPath(t, "integration")
-	childDagFile := filepath.Join(testDir, "child-sleep.yaml")
-	childDagContent := `name: child-sleep
-params:
-  - SLEEP_TIME: "5"
-steps:
-  - name: sleep
-    command: sleep $1
-`
-	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(childDagFile) })
-
-	// Create a parent DAG with parallel execution
-	parentDagFile := filepath.Join(testDir, "test-parallel-cancel.yaml")
-	parentDagContent := `name: test-parallel-cancel
+	// Create parent and child DAGs
+	dag := th.DAGWithYAML(t, "test-parallel-cancel", []byte(`
+name: test-parallel-cancel
 steps:
   - name: parallel-sleep
     run: child-sleep
@@ -400,13 +387,14 @@ steps:
         - "10"
         - "10"
       maxConcurrent: 2
-`
-	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
-
-	// Load and start the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-cancel.yaml"))
+---
+name: child-sleep
+params:
+  - SLEEP_TIME: "5"
+steps:
+  - name: sleep
+    command: sleep $1
+`))
 	agent := dag.Agent()
 
 	// Start the DAG in a goroutine
@@ -422,7 +410,7 @@ steps:
 	agent.Cancel()
 
 	// Wait for the agent to finish
-	err = <-errChan
+	err := <-errChan
 	require.Error(t, err, "agent should return an error when cancelled")
 	// The error might contain "cancelled" depending on timing
 	require.True(t, strings.Contains(err.Error(), "cancelled"), "error should indicate cancellation: %v", err)
@@ -451,30 +439,11 @@ steps:
 
 // TestParallelExecution_PartialFailure verifies behavior when some child DAGs fail
 func TestParallelExecution_PartialFailure(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
-	// Create a child DAG that fails for certain inputs
-	testDir := test.TestdataPath(t, "integration")
-	childDagFile := filepath.Join(testDir, "child-conditional-fail.yaml")
-	childDagContent := `name: child-conditional-fail
-params:
-  - INPUT: "default"
-steps:
-  - name: process
-    command: |
-      if [ "$1" = "fail" ]; then
-        echo "Failing as requested"
-        exit 1
-      fi
-      echo "Processing: $1"
-`
-	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(childDagFile) })
-
-	// Create a parent DAG with mixed success/failure items
-	parentDagFile := filepath.Join(testDir, "test-parallel-partial-failure.yaml")
-	parentDagContent := `name: test-parallel-partial-failure
+	// Create parent and child DAGs
+	dag := th.DAGWithYAML(t, "test-parallel-partial-failure", []byte(`
+name: test-parallel-partial-failure
 steps:
   - name: parallel-mixed
     run: child-conditional-fail
@@ -485,17 +454,23 @@ steps:
         - "ok2"
         - "fail"
         - "ok3"
-`
-	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
-
-	// Load and run the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-partial-failure.yaml"))
+---
+name: child-conditional-fail
+params:
+  - INPUT: "default"
+steps:
+  - name: process
+    command: |
+      if [ "$1" = "fail" ]; then
+        echo "Failing as requested"
+        exit 1
+      fi
+      echo "Processing: $1"
+`))
 	agent := dag.Agent()
 
 	// Run should fail because some child DAGs fail
-	err = agent.Run(agent.Context)
+	err := agent.Run(agent.Context)
 	require.Error(t, err)
 
 	// Get the latest status
@@ -515,12 +490,11 @@ steps:
 
 // TestParallelExecution_OutputsArray verifies the outputs array is easily accessible
 func TestParallelExecution_OutputsArray(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
-	// Create a parent DAG that uses outputs array from parallel execution
-	testDir := test.TestdataPath(t, "integration")
-	dagFile := filepath.Join(testDir, "test-parallel-outputs-array.yaml")
-	dagContent := `name: test-parallel-outputs-array
+	// Create parent and child DAGs
+	dag := th.DAGWithYAML(t, "test-parallel-outputs-array", []byte(`
+name: test-parallel-outputs-array
 steps:
   - name: parallel-tasks
     run: child-with-output
@@ -541,13 +515,17 @@ steps:
       echo "Output 2: ${RESULTS.outputs[2].TASK_OUTPUT}"
     depends: parallel-tasks
     output: ALL_OUTPUTS
-`
-	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(dagFile) })
-
-	// Load and run the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-outputs-array.yaml"))
+---
+name: child-with-output
+params:
+  - ITEM: ""
+steps:
+  - name: process
+    command: |
+      echo "Processing item: $1"
+      echo "TASK_RESULT_$1"
+    output: TASK_OUTPUT
+`))
 	agent := dag.Agent()
 	require.NoError(t, agent.Run(agent.Context))
 
@@ -592,12 +570,11 @@ steps:
 
 // TestParallelExecution_OutOfBoundsAccess verifies behavior when accessing out-of-bounds indices
 func TestParallelExecution_OutOfBoundsAccess(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
-	// Create a parent DAG that tries to access out-of-bounds indices
-	testDir := test.TestdataPath(t, "integration")
-	dagFile := filepath.Join(testDir, "test-parallel-out-of-bounds.yaml")
-	dagContent := `name: test-parallel-out-of-bounds
+	// Create parent and child DAGs
+	dag := th.DAGWithYAML(t, "test-parallel-out-of-bounds", []byte(`
+name: test-parallel-out-of-bounds
 steps:
   - name: parallel-tasks
     run: child-with-output
@@ -612,17 +589,21 @@ steps:
       echo "Out of bounds index 10: ${RESULTS.outputs[10].TASK_OUTPUT}"
     depends: parallel-tasks
     output: TEST_OUTPUT
-`
-	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(dagFile) })
-
-	// Load and run the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-out-of-bounds.yaml"))
+---
+name: child-with-output
+params:
+  - ITEM: ""
+steps:
+  - name: process
+    command: |
+      echo "Processing item: $1"
+      echo "TASK_RESULT_$1"
+    output: TASK_OUTPUT
+`))
 	agent := dag.Agent()
 
 	// The DAG should complete (variable expansion handles undefined gracefully)
-	err = agent.Run(agent.Context)
+	err := agent.Run(agent.Context)
 	require.NoError(t, err)
 
 	// Get the latest status to check outputs
@@ -653,23 +634,11 @@ steps:
 
 // TestParallelExecution_MinimalRetry tests the minimal case of parallel execution with retry
 func TestParallelExecution_MinimalRetry(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
-	// Create a simple child DAG that always fails
-	testDir := test.TestdataPath(t, "integration")
-	childDagFile := filepath.Join(testDir, "child-fail.yaml")
-	childDagContent := `name: child-fail
-steps:
-  - name: fail
-    command: exit 1
-`
-	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(childDagFile) })
-
-	// Parent DAG with retry but NO continueOn
-	parentDagFile := filepath.Join(testDir, "test-parallel-minimal.yaml")
-	parentDagContent := `name: test-parallel-minimal
+	// Create parent and child DAGs
+	dag := th.DAGWithYAML(t, "test-parallel-minimal", []byte(`
+name: test-parallel-minimal
 steps:
   - name: parallel-execution
     run: child-fail
@@ -680,15 +649,14 @@ steps:
       limit: 1
       intervalSec: 1
     output: RESULTS
-`
-	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
-
-	// Run the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-minimal.yaml"))
+---
+name: child-fail
+steps:
+  - name: fail
+    command: exit 1
+`))
 	agent := dag.Agent()
-	err = agent.Run(agent.Context)
+	err := agent.Run(agent.Context)
 	require.Error(t, err, "DAG should fail")
 
 	// Get status
@@ -716,23 +684,11 @@ steps:
 
 // TestParallelExecution_RetryAndContinueOn tests both retry and continueOn together (the main issue)
 func TestParallelExecution_RetryAndContinueOn(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
-	// Create a simple child DAG that always fails
-	testDir := test.TestdataPath(t, "integration")
-	childDagFile := filepath.Join(testDir, "child-fail-both.yaml")
-	childDagContent := `name: child-fail-both
-steps:
-  - name: fail
-    command: exit 1
-`
-	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(childDagFile) })
-
-	// Parent DAG with BOTH retry and continueOn.failure (like the original failing test)
-	parentDagFile := filepath.Join(testDir, "test-parallel-both.yaml")
-	parentDagContent := `name: test-parallel-both
+	// Create parent and child DAGs
+	dag := th.DAGWithYAML(t, "test-parallel-both", []byte(`
+name: test-parallel-both
 steps:
   - name: parallel-execution
     run: child-fail-both
@@ -748,15 +704,14 @@ steps:
   - name: next-step
     command: echo "This should run"
     depends: parallel-execution
-`
-	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
-
-	// Run the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-both.yaml"))
+---
+name: child-fail-both
+steps:
+  - name: fail
+    command: exit 1
+`))
 	agent := dag.Agent()
-	err = agent.Run(agent.Context)
+	err := agent.Run(agent.Context)
 	// DAG should complete successfully due to continueOn.failure: true, even after retries fail
 	require.Error(t, err)
 
@@ -803,29 +758,11 @@ steps:
 
 // TestParallelExecution_OutputCaptureWithFailures verifies output behavior when some child DAGs fail
 func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
-	// Create a simple child DAG that outputs data and fails/succeeds based on input
-	testDir := test.TestdataPath(t, "integration")
-	childDagFile := filepath.Join(testDir, "child-output-fail.yaml")
-	childDagContent := `name: child-output-fail
-steps:
-  - name: process
-    command: |
-      INPUT="$1"
-      echo "Output for ${INPUT}"
-      if [ "${INPUT}" = "fail" ]; then
-        exit 1
-      fi
-    output: RESULT
-`
-	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(childDagFile) })
-
-	// Parent DAG with mixed success/failure
-	parentDagFile := filepath.Join(testDir, "test-parallel-output-failures.yaml")
-	parentDagContent := `name: test-parallel-output-failures
+	// Create parent and child DAGs
+	dag := th.DAGWithYAML(t, "test-parallel-output-failures", []byte(`
+name: test-parallel-output-failures
 steps:
   - name: parallel-test
     run: child-output-fail
@@ -836,15 +773,20 @@ steps:
     output: RESULTS
     continueOn:
       failure: true
-`
-	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
-
-	// Run the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-output-failures.yaml"))
+---
+name: child-output-fail
+steps:
+  - name: process
+    command: |
+      INPUT="$1"
+      echo "Output for ${INPUT}"
+      if [ "${INPUT}" = "fail" ]; then
+        exit 1
+      fi
+    output: RESULT
+`))
 	agent := dag.Agent()
-	err = agent.Run(agent.Context)
+	err := agent.Run(agent.Context)
 	// Should complete successfully due to continueOn.failure: true, despite one child failing
 	require.Error(t, err)
 
@@ -889,17 +831,24 @@ steps:
 
 // TestParallelExecution_OutputCaptureWithRetry verifies output capture when child DAGs retry
 func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
-
-	// Create a simple child DAG that fails first, succeeds on retry
-	testDir := test.TestdataPath(t, "integration")
+	th := test.Setup(t)
 
 	// Clean up counter file after test
 	counterFile := "/tmp/test_retry_counter.txt"
 	t.Cleanup(func() { _ = os.Remove(counterFile) })
 
-	childDagFile := filepath.Join(testDir, "child-retry-simple.yaml")
-	childDagContent := `name: child-retry-simple
+	// Create parent and child DAGs
+	dag := th.DAGWithYAML(t, "test-parallel-retry", []byte(`
+name: test-parallel-retry
+steps:
+  - name: parallel-retry
+    run: child-retry-simple
+    parallel:
+      items:
+        - "item1"
+    output: RESULTS
+---
+name: child-retry-simple
 steps:
   - name: retry-step
     command: |
@@ -916,30 +865,9 @@ steps:
     retryPolicy:
       limit: 1
       intervalSec: 0
-`
-	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(childDagFile) })
-
-	// Parent DAG with parallel execution
-	parentDagFile := filepath.Join(testDir, "test-parallel-retry.yaml")
-	parentDagContent := `name: test-parallel-retry
-steps:
-  - name: parallel-retry
-    run: child-retry-simple
-    parallel:
-      items:
-        - "item1"
-    output: RESULTS
-`
-	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
-
-	// Run the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-retry.yaml"))
+`))
 	agent := dag.Agent()
-	err = agent.Run(agent.Context)
+	err := agent.Run(agent.Context)
 	require.NoError(t, err)
 
 	// Get the latest status
@@ -971,11 +899,7 @@ steps:
 
 // TestParallelExecution_ExceedsMaxLimit verifies that parallel execution with too many items fails
 func TestParallelExecution_ExceedsMaxLimit(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
-
-	// Create a parent DAG with more than 1000 items
-	testDir := test.TestdataPath(t, "integration")
-	dagFile := filepath.Join(testDir, "test-parallel-exceed-limit.yaml")
+	th := test.Setup(t)
 
 	// Generate a large list of items (1001 items)
 	items := make([]string, 1001)
@@ -984,25 +908,30 @@ func TestParallelExecution_ExceedsMaxLimit(t *testing.T) {
 	}
 	itemsStr := strings.Join(items, "\n")
 
-	dagContent := fmt.Sprintf(`name: test-parallel-exceed-limit
+	dagContent := fmt.Sprintf(`
+name: test-parallel-exceed-limit
 steps:
   - name: too-many-items
     run: child-echo
     parallel:
       items:
 %s
+---
+name: child-echo
+params:
+  - ITEM: ""
+steps:
+  - name: echo
+    command: echo "$1"
+    output: ECHO_OUTPUT
 `, itemsStr)
 
-	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(dagFile) })
-
-	// Load and run the DAG
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-exceed-limit.yaml"))
+	// Create parent and child DAGs
+	dag := th.DAGWithYAML(t, "test-parallel-exceed-limit", []byte(dagContent))
 	agent := dag.Agent()
 
 	// This should fail during execution when buildChildDAGRuns is called
-	err = agent.Run(agent.Context)
+	err := agent.Run(agent.Context)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "parallel execution exceeds maximum limit: 1001 items (max: 1000)")
 }
@@ -1011,11 +940,7 @@ steps:
 func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
 	// Run this test to verify the boundary condition
 
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
-
-	// Create a parent DAG with exactly 1000 items
-	testDir := test.TestdataPath(t, "integration")
-	dagFile := filepath.Join(testDir, "test-parallel-max-limit.yaml")
+	th := test.Setup(t)
 
 	// Generate exactly 1000 items
 	items := make([]string, 1000)
@@ -1024,7 +949,8 @@ func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
 	}
 	itemsStr := strings.Join(items, "\n")
 
-	dagContent := fmt.Sprintf(`name: test-parallel-max-limit
+	dagContent := fmt.Sprintf(`
+name: test-parallel-max-limit
 steps:
   - name: max-items
     run: child-echo
@@ -1032,14 +958,18 @@ steps:
       items:
 %s
       maxConcurrent: 10
+---
+name: child-echo
+params:
+  - ITEM: ""
+steps:
+  - name: echo
+    command: echo "$1"
+    output: ECHO_OUTPUT
 `, itemsStr)
 
-	err := os.WriteFile(dagFile, []byte(dagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(dagFile) })
-
-	// Load the DAG - this should succeed
-	dag := th.DAG(t, filepath.Join("integration", "test-parallel-max-limit.yaml"))
+	// Create parent and child DAGs
+	dag := th.DAGWithYAML(t, "test-parallel-exceed-limit", []byte(dagContent))
 
 	// Load and start the DAG - this should succeed as we're at the exact limit
 	agent := dag.Agent()
@@ -1076,7 +1006,6 @@ func TestParallelExecution_ObjectItemProperties(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a child DAG that processes regions and buckets
-	childDagFile := filepath.Join(th.Config.Paths.DAGsDir, "sync-data.yaml")
 	childDagContent := `name: sync-data
 params:
   - REGION: ""
@@ -1089,12 +1018,9 @@ steps:
       echo "Sync completed for $BUCKET in $REGION"
     output: SYNC_RESULT
 `
-	err = os.WriteFile(childDagFile, []byte(childDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(childDagFile) })
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "sync-data", []byte(childDagContent))
 
 	// Create the parent DAG that uses object items with property access
-	parentDagFile := filepath.Join(th.Config.Paths.DAGsDir, "test-object-properties.yaml")
 	parentDagContent := `name: test-object-properties
 steps:
   - name: get configs
@@ -1117,12 +1043,10 @@ steps:
     depends: get configs
     output: RESULTS
 `
-	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "test-object-properties", []byte(parentDagContent))
 
 	// Load and run the DAG
-	dagStruct, err := digraph.Load(th.Context, parentDagFile)
+	dagStruct, err := digraph.Load(th.Context, filepath.Join(th.Config.Paths.DAGsDir, "test-object-properties.yaml"))
 	require.NoError(t, err)
 
 	// Create the DAG wrapper
@@ -1203,7 +1127,6 @@ func TestParallelExecution_DynamicFileDiscovery(t *testing.T) {
 	}
 
 	// Create a child DAG that processes a file
-	childDagFile := filepath.Join(th.Config.Paths.DAGsDir, "process-file.yaml")
 	childDagContent := `name: process-file
 params:
   - ITEM: ""
@@ -1222,12 +1145,9 @@ steps:
       fi
     output: PROCESS_RESULT
 `
-	err = os.WriteFile(childDagFile, []byte(childDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(childDagFile) })
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "process-file", []byte(childDagContent))
 
 	// Create the parent DAG that discovers and processes files
-	parentDagFile := filepath.Join(th.Config.Paths.DAGsDir, "test-file-discovery.yaml")
 	parentDagContent := fmt.Sprintf(`name: test-file-discovery
 steps:
   - name: get files
@@ -1242,12 +1162,10 @@ steps:
     depends: get files
     output: RESULTS
 `, testDataDir)
-	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "test-file-discovery", []byte(parentDagContent))
 
 	// Load and run the DAG
-	dagStruct, err := digraph.Load(th.Context, parentDagFile)
+	dagStruct, err := digraph.Load(th.Context, filepath.Join(th.Config.Paths.DAGsDir, "test-file-discovery.yaml"))
 	require.NoError(t, err)
 
 	// Create the DAG wrapper
@@ -1323,7 +1241,6 @@ func TestParallelExecution_StaticObjectItems(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a child DAG that deploys a service
-	childDagFile := filepath.Join(th.Config.Paths.DAGsDir, "deploy-service.yaml")
 	childDagContent := `name: deploy-service
 params:
   - SERVICE_NAME: ""
@@ -1360,12 +1277,9 @@ steps:
     depends: validate
     output: DEPLOY_RESULT
 `
-	err = os.WriteFile(childDagFile, []byte(childDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(childDagFile) })
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "deploy-service", []byte(childDagContent))
 
 	// Create the parent DAG with static object items
-	parentDagFile := filepath.Join(th.Config.Paths.DAGsDir, "test-static-objects.yaml")
 	parentDagContent := `name: test-static-objects
 steps:
   - name: deploy services
@@ -1390,12 +1304,10 @@ steps:
       failure: true  # Continue even if some deployments fail
     output: DEPLOYMENT_RESULTS
 `
-	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "test-static-objects", []byte(parentDagContent))
 
 	// Load and run the DAG
-	dagStruct, err := digraph.Load(th.Context, parentDagFile)
+	dagStruct, err := digraph.Load(th.Context, filepath.Join(th.Config.Paths.DAGsDir, "test-static-objects.yaml"))
 	require.NoError(t, err)
 
 	// Create the DAG wrapper
