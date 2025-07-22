@@ -29,7 +29,7 @@ func TestScheduler(t *testing.T) {
 		}
 
 		th := setupTest(t)
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, nil)
 		require.NoError(t, err)
 
 		ctx := context.Background()
@@ -55,7 +55,7 @@ func TestScheduler(t *testing.T) {
 		}
 
 		th := setupTest(t)
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, nil)
 		require.NoError(t, err)
 
 		go func() {
@@ -72,7 +72,7 @@ func TestScheduler(t *testing.T) {
 		scheduler.SetFixedTime(now)
 
 		th := setupTest(t)
-		schedulerInstance, err := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		schedulerInstance, err := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, nil)
 		require.NoError(t, err)
 
 		next := schedulerInstance.NextTick(now)
@@ -228,7 +228,7 @@ func TestScheduler_QueueDisabled(t *testing.T) {
 			Entries: []*scheduler.ScheduledJob{},
 		}
 
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, nil)
 		require.NoError(t, err)
 
 		ctx := context.Background()
@@ -256,7 +256,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	th := setupTest(t)
 
 	// Create first scheduler instance
-	sc1, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+	sc1, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, nil)
 	require.NoError(t, err)
 
 	// Start first scheduler
@@ -270,7 +270,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	// Create second scheduler instance with same config
-	sc2, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+	sc2, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, nil)
 	require.NoError(t, err)
 
 	// Try to start second scheduler - should fail due to lock conflict
@@ -338,7 +338,7 @@ func TestSchedulerLockUtilities(t *testing.T) {
 
 	t.Run("IsLocked returns true when scheduler is running", func(t *testing.T) {
 		entryReader := &mockJobManager{Entries: []*scheduler.ScheduledJob{}}
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, nil)
 		require.NoError(t, err)
 
 		ctx := context.Background()
@@ -375,7 +375,7 @@ func TestSchedulerLockUtilities(t *testing.T) {
 
 	t.Run("ForceUnlock removes existing lock", func(t *testing.T) {
 		entryReader := &mockJobManager{Entries: []*scheduler.ScheduledJob{}}
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, nil)
 		require.NoError(t, err)
 
 		ctx := context.Background()

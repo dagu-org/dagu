@@ -85,6 +85,34 @@ func IsJSONArray(s string) bool {
 	return json.Valid([]byte(s))
 }
 
+// KebabToCamel converts a kebab-case string to camelCase.
+func KebabToCamel(s string) string {
+	parts := strings.Split(s, "-")
+	if len(parts) == 0 {
+		return ""
+	}
+
+	// Find the first non-empty part for the initial word
+	result := ""
+	startIdx := 0
+	for i := 0; i < len(parts); i++ {
+		if len(parts[i]) > 0 {
+			result = parts[i]
+			startIdx = i + 1
+			break
+		}
+	}
+
+	// Capitalize remaining parts
+	for i := startIdx; i < len(parts); i++ {
+		if len(parts[i]) > 0 {
+			result += strings.ToUpper(parts[i][:1]) + parts[i][1:]
+		}
+	}
+
+	return result
+}
+
 var src = rand.NewSource(time.Now().UnixNano())
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

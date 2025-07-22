@@ -161,7 +161,7 @@ dagu scheduler --dags=/opt/dags # Custom directory
 
 ### `start-all`
 
-Start both scheduler and web UI.
+Start scheduler, web UI, and coordinator service.
 
 ```bash
 dagu start-all [options]
@@ -176,6 +176,8 @@ dagu start-all [options]
 dagu start-all                           # Default settings
 dagu start-all --host=0.0.0.0 --port=9000 # Production mode
 ```
+
+**Note:** This command now also starts the coordinator service for distributed execution.
 
 ### `dry`
 
@@ -235,6 +237,101 @@ Migrate legacy data to new format.
 dagu migrate history  # Migrate v1.16 -> v1.17+ format
 ```
 
+### `coordinator`
+
+Start the coordinator gRPC server for distributed task execution.
+
+```bash
+dagu coordinator [options]
+```
+
+**Options:**
+- `--coordinator.host` - Host address to bind (default: `127.0.0.1`)
+- `--coordinator.port` - Port number (default: `50055`)
+- `--coordinator.signing-key` - Signing key for authentication
+- `--coordinator.tls-cert` - Path to TLS certificate file
+- `--coordinator.tls-key` - Path to TLS key file
+- `--coordinator.tls-ca` - Path to CA certificate file (for mTLS)
+
+```bash
+# Basic usage
+dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
+
+# With authentication
+dagu coordinator --coordinator.signing-key=mysecretkey
+
+# With TLS
+dagu coordinator \
+  --coordinator.tls-cert=server.crt \
+  --coordinator.tls-key=server.key
+
+# With mutual TLS
+dagu coordinator \
+  --coordinator.tls-cert=server.crt \
+  --coordinator.tls-key=server.key \
+  --coordinator.tls-ca=ca.crt
+```
+
+The coordinator service enables distributed task execution by:
+- Accepting task polling requests from workers
+- Matching tasks to workers based on labels
+- Tracking worker health via heartbeats
+- Providing task distribution API
+
+### `worker`
+
+Start a worker that polls the coordinator for tasks.
+
+```bash
+dagu worker [options]
+```
+
+**Options:**
+- `--worker.id` - Worker instance ID (default: `hostname@PID`)
+- `--worker.max-active-runs` - Maximum number of active runs (default: `100`)
+- `--worker.coordinator-host` - Coordinator gRPC server host (default: `127.0.0.1`)
+- `--worker.coordinator-port` - Coordinator gRPC server port (default: `50055`)
+- `--worker.insecure` - Use insecure connection (h2c) instead of TLS (default: `true`)
+- `--worker.tls-cert` - Path to TLS certificate file for mutual TLS
+- `--worker.tls-key` - Path to TLS key file for mutual TLS
+- `--worker.tls-ca` - Path to CA certificate file for server verification
+- `--worker.skip-tls-verify` - Skip TLS certificate verification (insecure)
+- `--worker.labels, -l` - Worker labels for capability matching (format: `key1=value1,key2=value2`)
+
+```bash
+# Basic usage
+dagu worker
+
+# With custom configuration
+dagu worker \
+  --worker.id=worker-1 \
+  --worker.max-active-runs=50 \
+  --worker.coordinator-host=coordinator.example.com
+
+# With labels for capability matching
+dagu worker --worker.labels gpu=true,memory=64G,region=us-east-1
+dagu worker --worker.labels cpu-arch=amd64,instance-type=m5.xlarge
+
+# With TLS connection
+dagu worker \
+  --worker.insecure=false \
+  --worker.coordinator-host=coordinator.example.com
+
+# With mutual TLS
+dagu worker \
+  --worker.insecure=false \
+  --worker.tls-cert=client.crt \
+  --worker.tls-key=client.key \
+  --worker.tls-ca=ca.crt
+
+# With self-signed certificates
+dagu worker \
+  --worker.insecure=false \
+  --worker.skip-tls-verify
+```
+
+Workers poll the coordinator for tasks matching their labels and execute them locally.
+
 ## Configuration
 
 Priority: CLI flags > Environment variables > Config file
@@ -248,32 +345,3 @@ Priority: CLI flags > Environment variables > Config file
 - `DAGU_DATA_DIR` - Data directory
 - `DAGU_AUTH_BASIC_USERNAME` - Basic auth username
 - `DAGU_AUTH_BASIC_PASSWORD` - Basic auth password
-
-## Exit Codes
-
-- `0` - Success
-- `1` - General error
-- `2` - Invalid arguments
-- `3` - DAG not found
-- `4` - Validation failed
-- `5` - Execution failed
-- `130` - Interrupted (SIGINT)
-- `143` - Terminated (SIGTERM)
-
-## Common Usage
-
-```bash
-# Development
-dagu dry my-workflow.yaml        # Validate
-dagu start my-workflow.yaml      # Run
-dagu status my-workflow          # Check
-
-# Production
-dagu start-all --host=0.0.0.0   # Start services
-systemctl status dagu            # Monitor
-journalctl -u dagu -f           # View logs
-
-# Debugging
-dagu status failed-workflow      # Check failure
-dagu retry --run-id=xyz failed  # Retry run
-```

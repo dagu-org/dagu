@@ -14,12 +14,14 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
+	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	dagstatus "github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/dirlock"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 // Job is the interface for the actual DAG.
@@ -47,6 +49,7 @@ type Scheduler struct {
 	queueConfigs sync.Map
 	config       *config.Config
 	dirLock      dirlock.DirLock // File-based lock to prevent multiple scheduler instances
+	dagExecutor  *DAGExecutor
 }
 
 type queueConfig struct {
@@ -60,6 +63,7 @@ func New(
 	drs models.DAGRunStore,
 	qs models.QueueStore,
 	ps models.ProcStore,
+	coordinatorClientFactory *coordinatorclient.Factory,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Global.Location
 	if timeLoc == nil {
@@ -72,6 +76,9 @@ func New(
 		return nil, fmt.Errorf("failed to initialize scheduler lock at %s: %w", schedulerLockDir(cfg), err)
 	}
 
+	// Create DAG executor
+	dagExecutor := NewDAGExecutor(coordinatorClientFactory, drm)
+
 	return &Scheduler{
 		logDir:      cfg.Paths.LogDir,
 		stopChan:    make(chan struct{}),
@@ -83,6 +90,7 @@ func New(
 		procStore:   ps,
 		config:      cfg,
 		dirLock:     dirLock,
+		dagExecutor: dagExecutor,
 	}, nil
 }
 
@@ -193,6 +201,14 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	return nil
 }
 
+// handleQueue processes queued DAG runs from the persistence layer.
+// This is the second phase of the persistence-first architecture:
+// - Phase 1: Scheduled jobs are enqueued by HandleJob (status=QUEUED)
+// - Phase 2: This handler picks up queued items and executes/dispatches them
+//
+// The handler uses OPERATION_RETRY for all executions, which means "retry the dispatch"
+// rather than "retry a failed execution". This allows the system to retry dispatching
+// to the coordinator if it was temporarily unavailable.
 func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, done chan any) {
 	for {
 		select {
@@ -276,8 +292,17 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			})
 
 			startedAt = time.Now()
-			if err := s.hm.RetryDAGRun(ctx, dag, data.ID); err != nil {
-				logger.Error(ctx, "Failed to retry dag", "err", err, "data", data)
+
+			// Execute the DAG that was previously enqueued.
+			// IMPORTANT: We use OPERATION_RETRY here, which means "retry the dispatch", not "retry a failed execution".
+			// This is part of the persistence-first approach:
+			// 1. Scheduled jobs (via HandleJob) enqueue with status=QUEUED
+			// 2. Queue handler (here) picks up and dispatches with OPERATION_RETRY
+			// 3. For distributed execution, this dispatches to coordinator
+			// 4. For local execution, this runs the DAG
+			// The RETRY operation ensures the queue handler can retry dispatch if coordinator is temporarily down.
+			if err := s.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, data.ID); err != nil {
+				logger.Error(ctx, "Failed to execute dag", "err", err, "data", data)
 				goto SEND_RESULT
 			}
 
@@ -401,6 +426,13 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		s.cancel = nil
 	}
 	s.lock.Unlock()
+
+	// Close DAG executor to release gRPC connections
+	if s.dagExecutor != nil {
+		if err := s.dagExecutor.Close(); err != nil {
+			logger.Error(ctx, "Failed to close DAG executor", "err", err)
+		}
+	}
 
 	// Release directory lock
 	if s.dirLock.IsHeldByMe() {

@@ -1779,15 +1779,101 @@ const dagu = new DaguAPI('http://localhost:8080', 'your-token');
 | 500 | Internal Error | Server-side processing error |
 | 503 | Service Unavailable | Server unhealthy or scheduler not responding |
 
-## Rate Limiting and Best Practices
+## Workers Endpoints
 
-1. **Authentication**: Always include authentication headers in production
-2. **Pagination**: Use pagination for list endpoints to avoid large responses
-3. **Polling**: When checking DAG run status, implement exponential backoff
-4. **Error Handling**: Always check response status codes and handle errors gracefully
-5. **Timeouts**: Set appropriate client timeouts for long-running operations
-6. **Retries**: Implement retry logic with backoff for transient failures
-7. **Metrics**: Use the `/api/v2/metrics` endpoint for monitoring integration
+### List Workers
+
+**Endpoint**: `GET /api/v2/workers`
+
+Retrieves information about connected workers in the distributed execution system.
+
+**Query Parameters**:
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| remoteNode | string | Remote node name | "local" |
+
+**Response (200)**:
+```json
+{
+  "workers": [
+    {
+      "id": "worker-gpu-01",
+      "labels": {
+        "gpu": "true",
+        "cuda": "11.8",
+        "memory": "64G",
+        "region": "us-east-1"
+      },
+      "health_status": "WORKER_HEALTH_STATUS_HEALTHY",
+      "last_heartbeat": "2024-02-11T12:00:00Z",
+      "running_tasks": [
+        {
+          "dagName": "ml-training-pipeline",
+          "dagRunId": "20240211_120000_abc123",
+          "rootDagRunName": "ml-training-pipeline",
+          "rootDagRunId": "20240211_120000_abc123",
+          "parentDagRunName": "",
+          "parentDagRunId": "",
+          "startedAt": "2024-02-11T12:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "worker-cpu-02",
+      "labels": {
+        "cpu-arch": "amd64",
+        "cpu-cores": "32",
+        "region": "us-east-1"
+      },
+      "health_status": "WORKER_HEALTH_STATUS_WARNING",
+      "last_heartbeat": "2024-02-11T11:59:50Z",
+      "running_tasks": []
+    },
+    {
+      "id": "worker-eu-01",
+      "labels": {
+        "region": "eu-west-1",
+        "compliance": "gdpr"
+      },
+      "health_status": "WORKER_HEALTH_STATUS_UNHEALTHY",
+      "last_heartbeat": "2024-02-11T11:59:30Z",
+      "running_tasks": [
+        {
+          "dagName": "data-processor",
+          "dagRunId": "20240211_113000_def456",
+          "rootDagRunName": "data-pipeline",
+          "rootDagRunId": "20240211_110000_xyz789",
+          "parentDagRunName": "data-pipeline",
+          "parentDagRunId": "20240211_110000_xyz789",
+          "startedAt": "2024-02-11T11:30:00Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Worker Health Status Values**:
+- `WORKER_HEALTH_STATUS_HEALTHY`: Last heartbeat < 5 seconds ago
+- `WORKER_HEALTH_STATUS_WARNING`: Last heartbeat 5-15 seconds ago
+- `WORKER_HEALTH_STATUS_UNHEALTHY`: Last heartbeat > 15 seconds ago
+
+**Running Task Fields**:
+- `dagName`: Name of the DAG being executed
+- `dagRunId`: ID of the current DAG run
+- `rootDagRunName`: Name of the root DAG (for nested workflows)
+- `rootDagRunId`: ID of the root DAG run
+- `parentDagRunName`: Name of the immediate parent DAG (empty for root DAGs)
+- `parentDagRunId`: ID of the immediate parent DAG run
+- `startedAt`: When the task execution started
+
+**Error Response (503)** (when coordinator is not running):
+```json
+{
+  "code": "service_unavailable",
+  "message": "Coordinator service is not available"
+}
+```
 
 ## API Versioning
 

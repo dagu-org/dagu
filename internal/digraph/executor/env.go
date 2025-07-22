@@ -64,14 +64,14 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 		if err == nil {
 			workingDir = dir
 		} else {
-			logger.Warn(ctx, "Failed to resolve working directory for step", "step", step.Name, "dir", dir, "error", err)
+			logger.Warn(ctx, "Failed to resolve working directory for step", "step", step.Name, "dir", dir, "err", err)
 		}
 	} else {
 		// Use the current working directory if not specified
 		if wd, err := os.Getwd(); err == nil {
 			workingDir = wd
 		} else {
-			logger.Warn(ctx, "Failed to get current working directory", "error", err)
+			logger.Warn(ctx, "Failed to get current working directory", "err", err)
 		}
 	}
 

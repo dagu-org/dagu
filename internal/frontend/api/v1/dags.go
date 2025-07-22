@@ -539,7 +539,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is already running",
 			}
 		}
-		if err := a.dagRunManager.StartDAGRun(ctx, dag, dagrun.StartOptions{
+		if err := a.dagRunManager.StartDAGRunAsync(ctx, dag, dagrun.StartOptions{
 			Params: valueOf(request.Body.Params),
 		}); err != nil {
 			return nil, fmt.Errorf("error starting DAG: %w", err)

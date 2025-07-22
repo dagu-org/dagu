@@ -28,7 +28,7 @@ type parallelExecutor struct {
 	maxConcurrent int
 
 	// Runtime state
-	running    map[string]*exec.Cmd          // Maps DAG run ID to command
+	running    map[string]*exec.Cmd          // Maps DAG run ID to running command
 	results    map[string]*digraph.RunStatus // Maps DAG run ID to result
 	errors     []error                       // Collects errors from failed executions
 	wg         sync.WaitGroup                // Tracks running goroutines
@@ -74,7 +74,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Ensure cleanup happens even if there's an error
 	defer func() {
 		if err := e.child.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup child DAG executor", "error", err)
+			logger.Error(ctx, "Failed to cleanup child DAG executor", "err", err)
 		}
 	}()
 
@@ -117,7 +117,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 			if err := e.executeChild(ctx, runParams); err != nil {
 				logger.Error(ctx, "Child DAG execution failed",
 					"runId", runParams.RunID,
-					"error", err,
+					"err", err,
 				)
 				errChan <- fmt.Errorf("child DAG %s failed: %w", runParams.RunID, err)
 			}
@@ -136,12 +136,32 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Always output aggregated results, even if some executions failed
 	if err := e.outputResults(ctx); err != nil {
 		// Log the output error but don't fail the entire execution because of it
-		logger.Error(ctx, "Failed to output results", "error", err)
+		logger.Error(ctx, "Failed to output results", "err", err)
 	}
 
 	// Check if any executions failed
 	if len(e.errors) > 0 {
+		// Check if any error is due to context cancellation
+		for _, err := range e.errors {
+			if err == context.Canceled {
+				return fmt.Errorf("parallel execution cancelled")
+			}
+		}
 		return fmt.Errorf("parallel execution failed with %d errors: %v", len(e.errors), e.errors[0])
+	}
+
+	// Check if any child DAGs failed (even if they completed without execution errors)
+	e.lock.Lock()
+	failedCount := 0
+	for _, result := range e.results {
+		if !result.Status.IsSuccess() {
+			failedCount++
+		}
+	}
+	e.lock.Unlock()
+
+	if failedCount > 0 {
+		return fmt.Errorf("parallel execution failed: %d child dag(s) failed", failedCount)
 	}
 
 	return nil
@@ -191,60 +211,17 @@ func (e *parallelExecutor) DetermineNodeStatus(_ context.Context) (status.NodeSt
 
 // executeChild executes a single child DAG with the given parameters
 func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams) error {
-	cmd, err := e.child.BuildCommand(ctx, runParams, e.workDir)
-	if err != nil {
-		return err
-	}
-
-	// Create pipes for stdout/stderr capture
-	// We'll collect individual outputs for aggregation
-	cmd.Stdout = io.Discard // TODO: Capture individual outputs if needed
-	cmd.Stderr = io.Discard // TODO: Capture individual errors if needed
-
-	// Store the command for potential killing
-	e.lock.Lock()
-	e.running[runParams.RunID] = cmd
-	e.lock.Unlock()
-
-	logger.Info(ctx, "Executing child DAG",
-		"dagRunId", runParams.RunID,
-		"target", e.child.DAG.Name,
-		"params", runParams.Params,
-	)
-
-	// Start and wait for the command
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start child dag-run: %w", err)
-	}
-
-	if err := cmd.Wait(); err != nil {
-		logger.Error(ctx, "Child DAG execution finished with error", "runId", runParams.RunID, "er", err)
-	}
-
-	// Remove from running map
-	e.lock.Lock()
-	delete(e.running, runParams.RunID)
-	e.lock.Unlock()
-
-	// Get the result regardless of error
-	env := GetEnv(ctx)
-	result, err := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
-	if err != nil {
-		return fmt.Errorf("failed to find result for the child dag-run %q: %w", runParams.RunID, err)
-	}
+	// Use the new ExecuteWithResult API
+	result, err := e.child.ExecuteWithResult(ctx, runParams, e.workDir)
 
 	// Store the result
 	e.lock.Lock()
-
-	e.results[runParams.RunID] = result
-
+	if result != nil {
+		e.results[runParams.RunID] = result
+	}
 	e.lock.Unlock()
 
-	if !result.Status.IsSuccess() {
-		return fmt.Errorf("child DAG %s failed with status: %s", runParams.RunID, result.Status)
-	}
-
-	return nil
+	return err
 }
 
 // outputResults aggregates and outputs all child DAG results
@@ -275,14 +252,14 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 
 			output.Results = append(output.Results, resultCopy)
 
-			// Add output to the outputs array
-			// Only include outputs from successful executions
-			if result.Outputs != nil {
-				output.Outputs = append(output.Outputs, result.Outputs)
-			}
-
 			if result.Status.IsSuccess() {
 				output.Summary.Succeeded++
+
+				// Add output to the outputs array
+				// Only include outputs from successful executions
+				if result.Outputs != nil {
+					output.Outputs = append(output.Outputs, result.Outputs)
+				}
 			} else {
 				output.Summary.Failed++
 			}
@@ -317,10 +294,12 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 		e.cancelFunc()
 	}
 
-	// Kill all running child processes
-	lastErr := killMultipleProcessGroups(e.running, sig)
+	// Kill all child processes (both local and distributed)
+	if e.child != nil {
+		return e.child.Kill(sig)
+	}
 
-	return lastErr
+	return nil
 }
 
 func init() {

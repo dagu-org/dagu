@@ -82,6 +82,26 @@ Distributed tracing for observability:
 - Nested DAG correlation
 - Integration with Jaeger, Tempo, etc.
 
+### [Distributed Execution](/features/distributed-execution)
+
+Scale workflows across multiple machines:
+
+- Coordinator-worker architecture
+- Label-based task routing
+- Real-time worker monitoring
+- Requires shared storage for DAG files and state
+- Horizontal scaling
+
+### [Worker Labels](/features/worker-labels)
+
+Task routing for distributed execution:
+
+- Capability-based worker tagging
+- Flexible label matching
+- Resource optimization
+- Geographic distribution
+- Compliance requirements
+
 ## Feature Highlights
 
 ### Zero Dependencies

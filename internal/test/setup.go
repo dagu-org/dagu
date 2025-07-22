@@ -40,6 +40,8 @@ type Options struct {
 	CaptureLoggingOutput bool // CaptureLoggingOutput enables capturing of logging output
 	DAGsDir              string
 	ServerConfig         *config.Server
+	CoordinatorHost      string
+	CoordinatorPort      int
 }
 
 // WithCaptureLoggingOutput creates a logging capture option
@@ -96,6 +98,13 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	if options.ServerConfig != nil {
 		cfg.Server = *options.ServerConfig
+	}
+
+	if options.CoordinatorHost != "" {
+		cfg.Coordinator.Host = options.CoordinatorHost
+	}
+	if options.CoordinatorPort != 0 {
+		cfg.Coordinator.Port = options.CoordinatorPort
 	}
 
 	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))

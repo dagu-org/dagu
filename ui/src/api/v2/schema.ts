@@ -24,6 +24,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List distributed workers
+         * @description Retrieves information about distributed workers connected to the coordinator
+         */
+        get: operations["getWorkers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dags": {
         parameters: {
             query?: never;
@@ -674,6 +694,11 @@ export interface components {
          * @enum {string}
          */
         NodeStatusLabel: NodeStatusLabel;
+        /**
+         * @description Health status of the worker based on heartbeat recency
+         * @enum {string}
+         */
+        WorkerHealthStatus: WorkerHealthStatus;
         /** @description Detailed DAG configuration information */
         DAGDetails: {
             /** @description Logical grouping of related DAGs for organizational purposes */
@@ -905,6 +930,48 @@ export interface components {
             /** @description List of errors encountered during the request */
             errors: string[];
         };
+        /** @description Response object for listing distributed workers */
+        WorkersListResponse: {
+            /** @description List of distributed workers */
+            workers: components["schemas"]["Worker"][];
+            /** @description List of errors encountered during the request */
+            errors: string[];
+        };
+        /** @description Information about a distributed worker */
+        Worker: {
+            /** @description Unique identifier for the worker */
+            id: string;
+            /** @description Key-value pairs of labels assigned to the worker */
+            labels: {
+                [key: string]: string;
+            };
+            /** @description Total number of pollers configured for this worker */
+            totalPollers: number;
+            /** @description Number of pollers currently executing tasks */
+            busyPollers: number;
+            /** @description List of tasks currently being executed by this worker */
+            runningTasks: components["schemas"]["RunningTask"][];
+            /** @description RFC3339 timestamp of the last heartbeat received from this worker */
+            lastHeartbeatAt: string;
+            healthStatus: components["schemas"]["WorkerHealthStatus"];
+        };
+        /** @description Information about a task currently being executed */
+        RunningTask: {
+            /** @description ID of the DAG run being executed */
+            dagRunId: string;
+            /** @description Name of the DAG being executed */
+            dagName: string;
+            /** @description RFC3339 timestamp when the task started */
+            startedAt: string;
+            /** @description Name of the root DAG run */
+            rootDagRunName?: string;
+            /** @description ID of the root DAG run */
+            rootDagRunId?: string;
+            /** @description Name of the parent DAG run */
+            parentDagRunName?: string;
+            /** @description ID of the parent DAG run */
+            parentDagRunId?: string;
+        };
     };
     responses: never;
     parameters: {
@@ -973,6 +1040,47 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getWorkers: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkersListResponse"];
+                };
+            };
+            /** @description Coordinator service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -2335,6 +2443,11 @@ export enum NodeStatusLabel {
     finished = "finished",
     skipped = "skipped",
     partial_success = "partial success"
+}
+export enum WorkerHealthStatus {
+    healthy = "healthy",
+    warning = "warning",
+    unhealthy = "unhealthy"
 }
 export enum RepeatMode {
     While = "while",

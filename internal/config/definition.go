@@ -10,6 +10,12 @@ type Definition struct {
 	// Port specifies the network port for incoming connections.
 	Port int `mapstructure:"port"`
 
+	// PermissionWriteDAGs indicates if the user has permission to write DAGs.
+	PermissionWriteDAGs *bool `mapstructure:"permissionWriteDAGs"`
+
+	// PermissionRunDAGs indicates if the user has permission to run DAGs.
+	PermissionRunDAGs *bool `mapstructure:"permissionRunDAGs"`
+
 	// Permissions defines the permissions allowed in the UI and API.
 	Permissions permissionsDef `mapstructure:"permissions"`
 
@@ -69,6 +75,12 @@ type Definition struct {
 	// Queues contains global queue configuration settings.
 	Queues *queuesDef `mapstructure:"queues"`
 
+	// Coordinator contains configuration for the coordinator server.
+	Coordinator *coordinatorDef `mapstructure:"coordinator"`
+
+	// Worker contains configuration for the worker.
+	Worker *workerDef `mapstructure:"worker"`
+
 	// SchedulerLockStaleThreshold is the time after which a scheduler lock is considered stale.
 	// Default is 30 seconds.
 	SchedulerLockStaleThreshold string `mapstructure:"schedulerLockStaleThreshold"`
@@ -77,78 +89,55 @@ type Definition struct {
 	// Default is 50 milliseconds.
 	SchedulerLockRetryInterval string `mapstructure:"schedulerLockRetryInterval"`
 
-	// ----------------------------------------------------------------------------
-	// Legacy fields for backward compatibility - Start
-	// These fields are maintained for compatibility with older configuration formats.
-	// They are deprecated and should be avoided in new implementations.
-	// ----------------------------------------------------------------------------
-
 	// DAGs is a legacy field that was previously used to configure DAG-related settings.
-	// Deprecated: Use Auth.Basic.Enabled instead.
 	DAGs string `mapstructure:"dags"`
 
 	// DAGsDir specifies the directory where DAG files are stored.
-	// Deprecated: Use Paths.DAGsDir instead.
 	DAGsDir string `mapstructure:"dagsDir"`
 
 	// Executable indicates the path to the executable used for running DAG tasks.
-	// Deprecated: Use Paths.Executable instead.
 	Executable string `mapstructure:"executable"`
 
 	// LogDir defines the directory where log files are saved.
-	// Deprecated: Use Paths.LogDir instead.
 	LogDir string `mapstructure:"logDir"`
 
 	// DataDir specifies the directory for storing application data, such as history or state.
-	// Deprecated: Use Paths.DataDir instead.
 	DataDir string `mapstructure:"dataDir"`
 
 	// SuspendFlagsDir sets the directory used for storing flags that indicate a DAG is suspended.
-	// Deprecated: Use Paths.SuspendFlagsDir instead.
 	SuspendFlagsDir string `mapstructure:"suspendFlagsDir"`
 
 	// AdminLogsDir indicates the directory for storing administrative logs.
-	// Deprecated: Use Paths.AdminLogsDir instead.
 	AdminLogsDir string `mapstructure:"adminLogsDir"`
 
 	// BaseConfig provides the path to a base configuration file shared across DAGs.
-	// Deprecated: Use Paths.BaseConfig instead.
 	BaseConfig string `mapstructure:"baseConfig"`
 
 	// IsBasicAuth indicates whether basic authentication is enabled.
-	// Deprecated: Use Auth.Token.Enabled instead.
 	IsBasicAuth bool `mapstructure:"isBasicAuth"`
 
 	// BasicAuthUsername holds the username for basic authentication.
-	// Deprecated: Use Auth.Basic.Username instead.
 	BasicAuthUsername string `mapstructure:"basicAuthUsername"`
 
 	// BasicAuthPassword holds the password for basic authentication.
-	// Deprecated: Use Auth.Basic.Password instead.
 	BasicAuthPassword string `mapstructure:"basicAuthPassword"`
 
 	// IsAuthToken indicates whether token-based authentication is enabled.
-	// Deprecated: Use Auth.Token.Enabled instead.
 	IsAuthToken bool `mapstructure:"isAuthToken"`
 
 	// AuthToken holds the token value for API authentication.
-	// Deprecated: Use Auth.Token.Value instead.
 	AuthToken string `mapstructure:"authToken"`
 
 	// LogEncodingCharset defines the character encoding used in log files.
-	// Deprecated: Use UI.LogEncodingCharset instead.
 	LogEncodingCharset string `mapstructure:"logEncodingCharset"`
 
 	// NavbarColor sets the color of the navigation bar in the application's UI.
-	// Deprecated: Use UI.NavbarColor instead.
 	NavbarColor string `mapstructure:"navbarColor"`
 
 	// NavbarTitle specifies the title text displayed in the navigation bar of the UI.
-	// Deprecated: Use UI.NavbarTitle instead.
 	NavbarTitle string `mapstructure:"navbarTitle"`
 
 	// MaxDashboardPageLimit limits the number of dashboard pages that can be shown in the UI.
-	// Deprecated: Use UI.MaxDashboardPageLimit instead.
 	MaxDashboardPageLimit int `mapstructure:"maxDashboardPageLimit"`
 
 	// ----------------------------------------------------------------------------
@@ -231,6 +220,7 @@ type remoteNodeDef struct {
 type tlsConfigDef struct {
 	CertFile string `mapstructure:"certFile"`
 	KeyFile  string `mapstructure:"keyFile"`
+	CAFile   string `mapstructure:"caFile"`
 }
 
 // queuesDef represents the global queue configuration
@@ -243,4 +233,59 @@ type queuesDef struct {
 type queueConfigDef struct {
 	Name          string `mapstructure:"name"`
 	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
+}
+
+// coordinatorDef holds the configuration for the coordinator service.
+type coordinatorDef struct {
+	// Host is the hostname or IP address for the coordinator service.
+	Host string `mapstructure:"host"`
+
+	// Port is the port number for the coordinator service.
+	Port int `mapstructure:"port"`
+
+	// SigningKey is the key used for signing requests to the coordinator service.
+	SigningKey string `mapstructure:"signingKey"`
+
+	// CertFile is the path to the coordinator's TLS certificate file.
+	CertFile string `mapstructure:"certFile"`
+
+	// KeyFile is the path to the coordinator's TLS key file.
+	KeyFile string `mapstructure:"keyFile"`
+
+	// CAFile is the path to the coordinator's CA certificate file.
+	CAFile string `mapstructure:"caFile"`
+}
+
+// workerDef holds the configuration for the worker.
+type workerDef struct {
+	// ID is the unique identifier for the worker instance.
+	ID string `mapstructure:"id"`
+
+	// MaxActiveRuns is the maximum number of active runs for the worker.
+	MaxActiveRuns int `mapstructure:"maxActiveRuns"`
+
+	// CoordinatorHost is the hostname or IP address for connecting to the coordinator.
+	CoordinatorHost string `mapstructure:"coordinatorHost"`
+
+	// CoordinatorPort is the port number for connecting to the coordinator.
+	CoordinatorPort int `mapstructure:"coordinatorPort"`
+
+	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
+	Insecure bool `mapstructure:"insecure"`
+
+	// SkipTLSVerify indicates whether to skip TLS certificate verification.
+	SkipTLSVerify bool `mapstructure:"skipTlsVerify"`
+
+	// Labels are the worker labels for capability matching.
+	// Can be either a string (key1=value1,key2=value2) or a map in YAML.
+	Labels interface{} `mapstructure:"labels"`
+
+	// CertFile is the path to the worker's TLS certificate file for mutual TLS.
+	CertFile string `mapstructure:"certFile"`
+
+	// KeyFile is the path to the worker's TLS key file for mutual TLS.
+	KeyFile string `mapstructure:"keyFile"`
+
+	// CAFile is the path to the CA certificate file for server verification.
+	CAFile string `mapstructure:"caFile"`
 }

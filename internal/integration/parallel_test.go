@@ -424,10 +424,8 @@ steps:
 	// Wait for the agent to finish
 	err = <-errChan
 	require.Error(t, err, "agent should return an error when cancelled")
-	// The error might contain "killed" or "cancelled" depending on timing
-	require.True(t,
-		strings.Contains(err.Error(), "killed") || strings.Contains(err.Error(), "canceled"),
-		"error should indicate cancellation: %v", err)
+	// The error might contain "cancelled" depending on timing
+	require.True(t, strings.Contains(err.Error(), "cancelled"), "error should indicate cancellation: %v", err)
 
 	// Get the latest status
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -800,6 +798,92 @@ steps:
 		}
 	} else {
 		t.Log("OutputVariables is nil - this might be the bug we're fixing")
+	}
+}
+
+// TestParallelExecution_OutputCaptureWithFailures verifies output behavior when some child DAGs fail
+func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+
+	// Create a simple child DAG that outputs data and fails/succeeds based on input
+	testDir := test.TestdataPath(t, "integration")
+	childDagFile := filepath.Join(testDir, "child-output-fail.yaml")
+	childDagContent := `name: child-output-fail
+steps:
+  - name: process
+    command: |
+      INPUT="$1"
+      echo "Output for ${INPUT}"
+      if [ "${INPUT}" = "fail" ]; then
+        exit 1
+      fi
+    output: RESULT
+`
+	err := os.WriteFile(childDagFile, []byte(childDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(childDagFile) })
+
+	// Parent DAG with mixed success/failure
+	parentDagFile := filepath.Join(testDir, "test-parallel-output-failures.yaml")
+	parentDagContent := `name: test-parallel-output-failures
+steps:
+  - name: parallel-test
+    run: child-output-fail
+    parallel:
+      items:
+        - "success"
+        - "fail"
+    output: RESULTS
+    continueOn:
+      failure: true
+`
+	err = os.WriteFile(parentDagFile, []byte(parentDagContent), 0600)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(parentDagFile) })
+
+	// Run the DAG
+	dag := th.DAG(t, filepath.Join("integration", "test-parallel-output-failures.yaml"))
+	agent := dag.Agent()
+	err = agent.Run(agent.Context)
+	// Should complete successfully due to continueOn.failure: true, despite one child failing
+	require.Error(t, err)
+
+	// Get the latest st
+	st, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, st)
+	require.Len(t, st.Nodes, 1)
+
+	// Check parallel node
+	parallelNode := st.Nodes[0]
+	require.Equal(t, "parallel-test", parallelNode.Step.Name)
+	require.Equal(t, status.NodeError, parallelNode.Status)
+
+	// Verify output was captured for successful executions only
+	require.NotNil(t, parallelNode.OutputVariables)
+	if value, ok := parallelNode.OutputVariables.Load("RESULTS"); ok {
+		results := value.(string)
+		t.Logf("Captured results: %s", results)
+		require.Contains(t, results, "RESULTS=")
+
+		// Verify we got JSON output with both success and failure
+		require.Contains(t, results, `"total": 2`)
+		require.Contains(t, results, `"succeeded": 1`)
+		require.Contains(t, results, `"failed": 1`)
+
+		// Only successful output should be captured
+		outputsValue := strings.Split(value.(string), `"outputs":`)[1]
+		require.Contains(t, outputsValue, "Output for success")
+		require.NotContains(t, outputsValue, `"Output for fail"`)
+
+		// Outputs array should only contain the successful output
+		outputsSection := results[strings.Index(results, `"outputs": [`):]
+		outputsEndIndex := strings.Index(outputsSection, `]`) + 1
+		outputsContent := outputsSection[:outputsEndIndex]
+		// Should only have 1 output (from the successful execution)
+		require.Equal(t, 1, strings.Count(outputsContent, `"RESULT"`), "Outputs array should only contain successful output")
+	} else {
+		t.Fatal("RESULTS output not found")
 	}
 }
 

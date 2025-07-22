@@ -68,6 +68,8 @@ type definition struct {
 	MaxOutputSize int
 	// OTel is the OpenTelemetry configuration.
 	OTel any
+	// WorkerSelector specifies required worker labels for execution.
+	WorkerSelector map[string]string
 }
 
 // handlerOnDef defines the steps to be executed on different events.
@@ -133,6 +135,8 @@ type stepDef struct {
 	// - Static array: parallel: [item1, item2]
 	// - Object configuration: parallel: {items: ${ITEMS}, maxConcurrent: 5}
 	Parallel any `yaml:"parallel,omitempty"`
+	// WorkerSelector specifies required worker labels for execution.
+	WorkerSelector map[string]string `yaml:"workerSelector,omitempty"`
 }
 
 // continueOnDef defines the conditions to continue on failure or skipped.

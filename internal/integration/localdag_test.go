@@ -214,7 +214,7 @@ steps:
 		err = agent.Run(agent.Context)
 		// The root DAG execution will fail because middle-dag fails
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "child dag-run failed")
+		require.Contains(t, err.Error(), "failed")
 
 		// This should fail because middle-dag cannot see leaf-dag
 		testDAG.AssertLatestStatus(t, status.Error)

@@ -700,6 +700,13 @@
             }
           ],
           "description": "Configuration for parallel execution of child DAGs. Only applicable when 'run' is specified. Allows processing multiple items concurrently using the same workflow definition."
+        },
+        "workerSelector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Key-value pairs specifying worker label requirements for executing this step. The step will only run on workers that have all specified labels with matching values. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels."
         }
       }
     },

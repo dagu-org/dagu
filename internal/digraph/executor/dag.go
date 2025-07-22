@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -24,8 +23,8 @@ type dagExecutor struct {
 	workDir   string
 	stdout    io.Writer
 	stderr    io.Writer
-	cmd       *exec.Cmd
 	runParams RunParams
+	step      digraph.Step
 	result    *digraph.RunStatus
 }
 
@@ -54,6 +53,7 @@ func newDAGExecutor(
 	return &dagExecutor{
 		child:   child,
 		workDir: dir,
+		step:    step,
 	}, nil
 }
 
@@ -61,70 +61,23 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	// Ensure cleanup happens even if there's an error
 	defer func() {
 		if err := e.child.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup child DAG executor", "error", err)
+			logger.Error(ctx, "Failed to cleanup child DAG executor", "err", err)
 		}
 	}()
 
-	e.lock.Lock()
-
-	cmd, err := e.child.BuildCommand(ctx, e.runParams, e.workDir)
-	if err != nil {
+	result, execErr := e.child.ExecuteWithResult(ctx, e.runParams, e.workDir)
+	if result != nil {
+		e.lock.Lock()
+		e.result = result
 		e.lock.Unlock()
-		return err
-	}
-
-	if e.stdout != nil {
-		cmd.Stdout = e.stdout
-	}
-	if e.stderr != nil {
-		cmd.Stderr = e.stderr
-	}
-
-	e.cmd = cmd
-
-	logger.Info(ctx, "Executing child DAG",
-		"dagRunId", e.runParams.RunID,
-		"target", e.child.DAG.Name,
-	)
-
-	err = cmd.Start()
-	e.lock.Unlock()
-
-	if err != nil {
-		return fmt.Errorf("failed to start child dag-run: %w", err)
-	}
-
-	// Wait for the command to complete
-	waitErr := cmd.Wait()
-
-	// Always get the actual status from the child dag-run, regardless of exit code
-	env := GetEnv(ctx)
-	result, err := env.DB.GetChildDAGRunStatus(ctx, e.runParams.RunID, env.RootDAGRun)
-	if err != nil {
-		return fmt.Errorf("failed to find result for the child dag-run %q: %w", e.runParams.RunID, err)
-	}
-
-	e.result = result
-
-	if result.Status.IsSuccess() {
-		if waitErr != nil {
-			logger.Warn(ctx, "Child DAG completed with exit code but no error",
-				"dagRunId", e.runParams.RunID,
-				"err", waitErr,
-			)
-		} else {
-			logger.Info(ctx, "Child DAG completed successfully", "dagRunId", e.runParams.RunID)
-		}
-	} else {
-		return fmt.Errorf("child dag-run failed with status: %s", result.Status)
 	}
 
 	jsonData, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal outputs: %w", err)
+		return fmt.Errorf("failed to marshal outputs: %w", execErr)
 	}
 
-	// add a newline at the end of the JSON output
+	// Add a newline at the end of the JSON output
 	jsonData = append(jsonData, '\n')
 
 	if e.stdout != nil {
@@ -133,7 +86,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		}
 	}
 
-	return nil
+	return execErr
 }
 
 // DetermineNodeStatus implements NodeStatusDeterminer.
@@ -176,9 +129,12 @@ func (e *dagExecutor) SetStderr(out io.Writer) {
 }
 
 func (e *dagExecutor) Kill(sig os.Signal) error {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-	return killProcessGroup(e.cmd, sig)
+	// Kill all child processes (both local and distributed)
+	if e.child != nil {
+		return e.child.Kill(sig)
+	}
+
+	return nil
 }
 
 func init() {

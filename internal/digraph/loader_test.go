@@ -236,7 +236,7 @@ steps:
 		// Check transform-data child DAG
 		_, exists := dag.LocalDAGs["transform-data"]
 		require.True(t, exists)
-		transformDAG := dag.LocalDAGs["transform-data"].DAG
+		transformDAG := dag.LocalDAGs["transform-data"]
 		assert.Equal(t, "transform-data", transformDAG.Name)
 		assert.Len(t, transformDAG.Steps, 1)
 		assert.Equal(t, "transform", transformDAG.Steps[0].Name)
@@ -245,7 +245,7 @@ steps:
 		// Check archive-results child DAG
 		_, exists = dag.LocalDAGs["archive-results"]
 		require.True(t, exists)
-		archiveDAG := dag.LocalDAGs["archive-results"].DAG
+		archiveDAG := dag.LocalDAGs["archive-results"]
 		assert.Equal(t, "archive-results", archiveDAG.Name)
 		assert.Len(t, archiveDAG.Steps, 1)
 		assert.Equal(t, "archive", archiveDAG.Steps[0].Name)
@@ -303,14 +303,14 @@ steps:
 		// Verify child DAG also inherits base config
 		childDAG := dag.LocalDAGs["child-dag"]
 		require.NotNil(t, childDAG)
-		assert.Equal(t, "/base/logs", childDAG.DAG.LogDir)
-		assert.NotNil(t, childDAG.DAG.SMTP)
-		assert.Equal(t, "smtp.example.com", childDAG.DAG.SMTP.Host)
+		assert.Equal(t, "/base/logs", childDAG.LogDir)
+		assert.NotNil(t, childDAG.SMTP)
+		assert.Equal(t, "smtp.example.com", childDAG.SMTP.Host)
 
 		// Verify child DAG has merged env vars
-		assert.Contains(t, childDAG.DAG.Env, "ENV=production")
-		assert.Contains(t, childDAG.DAG.Env, "API_KEY=secret123")
-		assert.Contains(t, childDAG.DAG.Env, "SERVICE=worker")
+		assert.Contains(t, childDAG.Env, "ENV=production")
+		assert.Contains(t, childDAG.Env, "API_KEY=secret123")
+		assert.Contains(t, childDAG.Env, "SERVICE=worker")
 	})
 
 	t.Run("SingleDAGFileCompatibility", func(t *testing.T) {
@@ -473,11 +473,29 @@ steps:
 		// Verify extract-module child DAG
 		extractDAG := dag.LocalDAGs["extract-module"]
 		require.NotNil(t, extractDAG)
-		assert.Contains(t, extractDAG.DAG.Params, "SOURCE=default_source")
-		assert.Contains(t, extractDAG.DAG.Params, "TABLE=default_table")
-		assert.Len(t, extractDAG.DAG.Steps, 2)
+		assert.Contains(t, extractDAG.Params, "SOURCE=default_source")
+		assert.Contains(t, extractDAG.Params, "TABLE=default_table")
+		assert.Len(t, extractDAG.Steps, 2)
 
 		// Verify dependencies in child DAG
-		assert.Contains(t, extractDAG.DAG.Steps[1].Depends, "validate")
+		assert.Contains(t, extractDAG.Steps[1].Depends, "validate")
+	})
+
+	t.Run("WorkerSelector", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "worker_selector.yaml"))
+		dag, err := digraph.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+
+		// Verify DAG loaded successfully
+		assert.Equal(t, "worker-selector-test", dag.Name)
+		assert.Equal(t, "Test DAG with worker selector", dag.Description)
+		assert.Len(t, dag.Steps, 1)
+
+		// Verify the step with GPU selector
+		assert.NotNil(t, dag.WorkerSelector)
+		assert.Equal(t, "true", dag.WorkerSelector["gpu"])
+		assert.Equal(t, "64G", dag.WorkerSelector["memory"])
 	})
 }
