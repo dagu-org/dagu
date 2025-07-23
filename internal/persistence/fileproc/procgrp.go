@@ -145,3 +145,38 @@ func (pg *ProcGroup) getFileName(t models.TimeInUTC, dagRun digraph.DAGRunRef) s
 
 // dateTimeFormat is the format used for the timestamp in the queue file name
 const dateTimeFormatUTC = "20060102_150405"
+
+// IsRunAlive checks if a specific DAG run has an alive process file.
+func (pg *ProcGroup) IsRunAlive(ctx context.Context, dagRun digraph.DAGRunRef) (bool, error) {
+	pg.mu.Lock()
+	defer pg.mu.Unlock()
+
+	// If directory does not exist, return false
+	if _, err := os.Stat(pg.baseDir); errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+
+	// Look for proc files with the specific run ID
+	pattern := filepath.Join(pg.baseDir, procFilePrefix+"*_"+dagRun.ID+".proc")
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		return false, err
+	}
+
+	// Check each matching file
+	for _, file := range files {
+		if !procFileRegex.MatchString(filepath.Base(file)) {
+			continue
+		}
+		// Check if the file is stale
+		if !pg.isStale(ctx, file) {
+			return true, nil
+		}
+		// File is stale, remove it
+		if err := os.Remove(file); err != nil {
+			logger.Error(ctx, "failed to remove stale file %s: %v", file, err)
+		}
+	}
+
+	return false, nil
+}

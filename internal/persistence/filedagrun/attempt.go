@@ -443,7 +443,7 @@ func (att *Attempt) RequestCancel(ctx context.Context) error {
 	}
 	cancelFile := filepath.Join(dir, CancelRequestedFlag)
 	if _, err := os.Stat(cancelFile); err == nil {
-		return fmt.Errorf("cancel request already exists: %w", ErrStatusFileOpen)
+		return nil
 	}
 	if err := os.WriteFile(cancelFile, []byte{}, 0600); err != nil {
 		return fmt.Errorf("failed to create cancel request file: %w", err)

@@ -2,6 +2,7 @@ package fileproc
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"sync"
 	"time"
@@ -29,22 +30,24 @@ func New(baseDir string) *Store {
 
 // CountAlive implements models.ProcStore.
 func (s *Store) CountAlive(ctx context.Context, name string) (int, error) {
-	if _, ok := s.procGroups.Load(name); !ok {
-		pgBaseDir := filepath.Join(s.baseDir, name)
-		s.procGroups.Store(name, NewProcGroup(pgBaseDir, name, s.staleTime))
+	pgBaseDir := filepath.Join(s.baseDir, name)
+	pg, _ := s.procGroups.LoadOrStore(name, NewProcGroup(pgBaseDir, name, s.staleTime))
+	procGroup, ok := pg.(*ProcGroup)
+	if !ok {
+		return 0, fmt.Errorf("invalid type in procGroups map: expected *ProcGroup, got %T", pg)
 	}
-	pg, _ := s.procGroups.Load(name)
-	return pg.(*ProcGroup).Count(ctx)
+	return procGroup.Count(ctx)
 }
 
 // Acquire implements models.ProcStore.
 func (s *Store) Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (models.ProcHandle, error) {
-	if _, ok := s.procGroups.Load(dagRun.Name); !ok {
-		pgBaseDir := filepath.Join(s.baseDir, dagRun.Name)
-		s.procGroups.Store(dagRun.Name, NewProcGroup(pgBaseDir, dagRun.Name, s.staleTime))
+	pgBaseDir := filepath.Join(s.baseDir, dagRun.Name)
+	pg, _ := s.procGroups.LoadOrStore(dagRun.Name, NewProcGroup(pgBaseDir, dagRun.Name, s.staleTime))
+	procGroup, ok := pg.(*ProcGroup)
+	if !ok {
+		return nil, fmt.Errorf("invalid type in procGroups map: expected *ProcGroup, got %T", pg)
 	}
-	pg, _ := s.procGroups.Load(dagRun.Name)
-	proc, err := pg.(*ProcGroup).Acquire(ctx, dagRun)
+	proc, err := procGroup.Acquire(ctx, dagRun)
 	if err != nil {
 		return nil, err
 	}
@@ -52,4 +55,15 @@ func (s *Store) Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (models.P
 		return nil, err
 	}
 	return proc, nil
+}
+
+// IsRunAlive implements models.ProcStore.
+func (s *Store) IsRunAlive(ctx context.Context, dagRun digraph.DAGRunRef) (bool, error) {
+	pgBaseDir := filepath.Join(s.baseDir, dagRun.Name)
+	pg, _ := s.procGroups.LoadOrStore(dagRun.Name, NewProcGroup(pgBaseDir, dagRun.Name, s.staleTime))
+	procGroup, ok := pg.(*ProcGroup)
+	if !ok {
+		return false, fmt.Errorf("invalid type in procGroups map: expected *ProcGroup, got %T", pg)
+	}
+	return procGroup.IsRunAlive(ctx, dagRun)
 }

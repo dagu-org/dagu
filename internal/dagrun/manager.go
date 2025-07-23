@@ -292,11 +292,19 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun digraph.DAGRunRef) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by run reference: %w", err)
 	}
-	status, err := attempt.ReadStatus(ctx)
+	st, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
-	return status, nil
+
+	// If the status is running, ensure if the process is still alive
+	if dagRun.ID == st.Root.ID && st.Status == status.Running {
+		if err := m.checkAndUpdateStaleRunningStatus(ctx, st); err != nil {
+			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
+		}
+	}
+
+	return st, nil
 }
 
 // getPersistedOrCurrentStatus retrieves the persisted status of a dag-run by its ID.
@@ -324,9 +332,11 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.
 	}
 
 	// If querying the current status fails, even if the status is running,
-	// set the status to error because it indicates the process is not responding.
+	// check if the process is actually alive before marking as error.
 	if st.Status == status.Running {
-		st.Status = status.Error
+		if err := m.checkAndUpdateStaleRunningStatus(ctx, st); err != nil {
+			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
+		}
 	}
 
 	return st, nil
@@ -412,15 +422,8 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 
 	// If querying the current status fails, ensure if the status is running,
 	if st.Status == status.Running {
-		// Check the PID is still alive
-		pid := int(st.PID)
-		if pid > 0 {
-			_, err := os.FindProcess(pid)
-			if err != nil {
-				// If we cannot find the process, mark the status as error
-				st.Status = status.Error
-				logger.Warn(ctx, "No PID set for running status, marking status as error")
-			}
+		if err := m.checkAndUpdateStaleRunningStatus(ctx, st); err != nil {
+			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
 		}
 	}
 	dagStatus = st
@@ -674,4 +677,33 @@ func (m *Manager) createTempDAGFile(dagName string, yamlData []byte) (string, er
 	}
 
 	return tempFile.Name(), nil
+}
+
+// checkAndUpdateStaleRunningStatus checks if a running DAG has a live process
+// and updates its status to error if the process is not alive.
+func (m *Manager) checkAndUpdateStaleRunningStatus(
+	ctx context.Context,
+	st *models.DAGRunStatus,
+) error {
+	dagRun := digraph.DAGRunRef{
+		Name: st.Name,
+		ID:   st.DAGRunID,
+	}
+
+	alive, err := m.procStore.IsRunAlive(ctx, dagRun)
+	if err != nil {
+		// Log but don't fail - we can't determine if it's alive
+		logger.Error(ctx, "Failed to check if DAG run is alive", "err", err)
+		return nil
+	}
+
+	if alive {
+		// Process is still alive, nothing to do
+		return nil
+	}
+
+	// Process is not alive, update status to error
+	st.Status = status.Error
+
+	return nil
 }

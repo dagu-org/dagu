@@ -14,6 +14,8 @@ type ProcStore interface {
 	// CountAlive retrieves the number of processes associated with a given DAG name.
 	// It only counts the processes that are alive.
 	CountAlive(ctx context.Context, name string) (int, error)
+	// IsRunAlive checks if a specific DAG run is currently alive.
+	IsRunAlive(ctx context.Context, dagRun digraph.DAGRunRef) (bool, error)
 }
 
 // ProcHandle represents a process that is associated with a dag-run.
