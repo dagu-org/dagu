@@ -254,3 +254,37 @@ func TestKebabToCamel(t *testing.T) {
 		require.Equal(t, "com.example.package", result)
 	})
 }
+
+func TestRandomString(t *testing.T) {
+	t.Run("GeneratesCorrectLength", func(t *testing.T) {
+		// Test various lengths
+		for _, length := range []int{0, 1, 5, 10, 32, 100} {
+			result := stringutil.RandomString(length)
+			require.Len(t, result, length, "expected string of length %d, got %d", length, len(result))
+		}
+	})
+
+	t.Run("ContainsOnlyAlphabetic", func(t *testing.T) {
+		// Generate a string and check all characters are alphabetic
+		result := stringutil.RandomString(50)
+		for i, ch := range result {
+			require.True(t, (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'),
+				"character at position %d (%c) is not alphabetic", i, ch)
+		}
+	})
+
+	t.Run("GeneratesDifferentStrings", func(t *testing.T) {
+		// Generate multiple strings and check they're different
+		// (technically could fail with extremely low probability)
+		const numStrings = 10
+		const stringLength = 10
+		strings := make(map[string]bool)
+		
+		for i := 0; i < numStrings; i++ {
+			s := stringutil.RandomString(stringLength)
+			strings[s] = true
+		}
+		
+		require.Greater(t, len(strings), 1, "expected different strings, but all were identical")
+	})
+}
