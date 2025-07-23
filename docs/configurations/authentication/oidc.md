@@ -93,7 +93,6 @@ Note: Wildcard domains (e.g., `*@company.com`) are NOT supported. You must list 
 - [Google](oidc-google) - Google Workspace/Cloud Identity
 - [Auth0](oidc-auth0) - Identity platform with social login support
 - [Keycloak](oidc-keycloak) - Open source identity provider
-- [Other Providers](oidc-providers) - Okta, Azure AD, GitLab, etc.
 
 ## Multiple Authentication Methods
 

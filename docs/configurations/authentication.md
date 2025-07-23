@@ -44,8 +44,3 @@ auth:
 ## Environment Variables
 
 All authentication methods support environment variable configuration. See individual authentication type documentation for details.
-
-## See Also
-
-- [Server Configuration](../server) - Full server configuration options
-- [API Reference](/reference/api) - API authentication details
