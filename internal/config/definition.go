@@ -154,19 +154,16 @@ type authDef struct {
 
 // authBasicDef represents the basic authentication configuration
 type authBasicDef struct {
-	Enabled  bool   `mapstructure:"enabled"`
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 }
 
 // authTokenDef represents the authentication token configuration
 type authTokenDef struct {
-	Enabled bool   `mapstructure:"enabled"`
-	Value   string `mapstructure:"value"`
+	Value string `mapstructure:"value"`
 }
 
 type authOIDCDef struct {
-	Enabled      bool     `mapstructure:"enabled"`
 	ClientId     string   `mapstructure:"clientId"`
 	ClientSecret string   `mapstructure:"clientSecret"`
 	ClientUrl    string   `mapstructure:"clientUrl"`

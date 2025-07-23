@@ -544,6 +544,14 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("auth.basic.password", "AUTH_BASIC_PASSWORD")
 	l.bindEnv("auth.token.value", "AUTH_TOKEN")
 
+	// Authentication configurations (OIDC)
+	l.bindEnv("auth.oidc.clientId", "AUTH_OIDC_CLIENT_ID")
+	l.bindEnv("auth.oidc.clientSecret", "AUTH_OIDC_CLIENT_SECRET")
+	l.bindEnv("auth.oidc.clientUrl", "AUTH_OIDC_CLIENT_URL")
+	l.bindEnv("auth.oidc.issuer", "AUTH_OIDC_ISSUER")
+	l.bindEnv("auth.oidc.scopes", "AUTH_OIDC_SCOPES")
+	l.bindEnv("auth.oidc.whitelist", "AUTH_OIDC_WHITELIST")
+
 	// Authentication configurations (legacy keys)
 	l.bindEnv("auth.basic.username", "BASICAUTH_USERNAME")
 	l.bindEnv("auth.basic.password", "BASICAUTH_PASSWORD")
