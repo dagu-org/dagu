@@ -224,9 +224,13 @@ const defaultColumns = [
       return null; // Return null instead of empty string for clarity
     },
     size: 40,
+    minSize: 40,
+    maxSize: 40,
   }),
   columnHelper.accessor('name', {
     id: 'Name',
+    size: 350,
+    minSize: 200,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Name</span>
@@ -256,14 +260,14 @@ const defaultColumns = [
         return (
           <div
             style={{ paddingLeft: `${row.depth * 1.5}rem` }}
-            className="space-y-0.5"
+            className="space-y-0.5 min-w-0"
           >
-            <div className="font-medium text-gray-800 dark:text-gray-200 tracking-tight text-xs">
+            <div className="font-medium text-gray-800 dark:text-gray-200 tracking-tight text-xs truncate">
               {getValue()}
             </div>
 
             {description && (
-              <div className="text-[10px] text-muted-foreground whitespace-normal leading-tight">
+              <div className="text-[10px] text-muted-foreground whitespace-normal leading-tight line-clamp-2">
                 {description}
               </div>
             )}
@@ -323,6 +327,9 @@ const defaultColumns = [
   // The filter functionality is preserved in the Name column
   columnHelper.accessor('kind', {
     id: 'Status',
+    size: 100,
+    minSize: 100,
+    maxSize: 120,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Status</span>
@@ -348,6 +355,9 @@ const defaultColumns = [
   // Removed Started At and Finished At columns
   columnHelper.accessor('kind', {
     id: 'LastRun',
+    size: 150,
+    minSize: 150,
+    maxSize: 180,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Last Run</span>
@@ -401,10 +411,12 @@ const defaultColumns = [
         </div>
       );
     },
-    size: 200, // Adjust size as needed
   }),
   columnHelper.accessor('kind', {
     id: 'ScheduleAndNextRun',
+    size: 180,
+    minSize: 150,
+    maxSize: 200,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Schedule</span>
@@ -470,11 +482,13 @@ const defaultColumns = [
       }
       return null;
     },
-    size: 120,
   }),
   // Description column removed as description is now displayed under the name
   columnHelper.accessor('kind', {
     id: 'Live',
+    size: 70,
+    minSize: 70,
+    maxSize: 70,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Live</span>
@@ -503,10 +517,12 @@ const defaultColumns = [
         </div>
       );
     },
-    size: 60,
   }),
   columnHelper.display({
     id: 'Actions',
+    size: 100,
+    minSize: 100,
+    maxSize: 100,
     header: () => (
       <div className="flex flex-col items-center py-1">
         <span className="text-xs">Actions</span>
@@ -538,7 +554,6 @@ const defaultColumns = [
         </div>
       );
     },
-    size: 100,
   }),
 ];
 
@@ -917,7 +932,7 @@ function DAGTable({
           borderRadius: '0.75rem',
         }}
       >
-        <Table className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}>
+        <Table className={`w-full text-xs table-fixed ${isLoading ? 'opacity-70' : ''}`}>
           <TableHeader>
             {instance.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -932,12 +947,9 @@ function DAGTable({
                       'text-muted-foreground text-xs'
                     }
                     style={{
-                      width:
-                        header.getSize() !== 150 ? header.getSize() : undefined,
-                      maxWidth:
-                        header.column.id === 'Description'
-                          ? '250px'
-                          : undefined,
+                      width: header.getSize(),
+                      minWidth: header.column.columnDef.minSize,
+                      maxWidth: header.column.columnDef.maxSize,
                       fontWeight: 500, // Medium weight headers
                       fontSize: '0.75rem', // Smaller font size for headers
                     }}
@@ -1016,10 +1028,11 @@ function DAGTable({
                     {row.getVisibleCells().map((cell) => (
                       <TableCell
                         key={cell.id}
-                        className="py-1 px-2"
+                        className="py-1 px-2 overflow-hidden"
                         style={{
-                          maxWidth:
-                            cell.column.id === 'Name' ? '350px' : undefined, // Apply max-width to Name cell
+                          width: cell.column.getSize(),
+                          minWidth: cell.column.columnDef.minSize,
+                          maxWidth: cell.column.columnDef.maxSize,
                         }}
                       >
                         {flexRender(
