@@ -9,6 +9,7 @@ import (
 	"runtime/debug"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -18,6 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/sock"
+	"github.com/dagu-org/dagu/internal/stringutil"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
 )
@@ -324,9 +326,11 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.
 	}
 
 	// If querying the current status fails, even if the status is running,
-	// set the status to error because it indicates the process is not responding.
+	// check if the process is actually alive before marking as error.
 	if st.Status == status.Running {
-		st.Status = status.Error
+		if err := m.checkAndUpdateStaleRunningStatus(ctx, dag, st, attempt); err != nil {
+			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
+		}
 	}
 
 	return st, nil
@@ -412,15 +416,8 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 
 	// If querying the current status fails, ensure if the status is running,
 	if st.Status == status.Running {
-		// Check the PID is still alive
-		pid := int(st.PID)
-		if pid > 0 {
-			_, err := os.FindProcess(pid)
-			if err != nil {
-				// If we cannot find the process, mark the status as error
-				st.Status = status.Error
-				logger.Warn(ctx, "No PID set for running status, marking status as error")
-			}
+		if err := m.checkAndUpdateStaleRunningStatus(ctx, dag, st, attempt); err != nil {
+			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
 		}
 	}
 	dagStatus = st
@@ -674,4 +671,51 @@ func (m *Manager) createTempDAGFile(dagName string, yamlData []byte) (string, er
 	}
 
 	return tempFile.Name(), nil
+}
+
+// checkAndUpdateStaleRunningStatus checks if a running DAG has a live process
+// and updates its status to error if the process is not alive.
+func (m *Manager) checkAndUpdateStaleRunningStatus(
+	ctx context.Context,
+	dag *digraph.DAG,
+	st *models.DAGRunStatus,
+	attempt models.DAGRunAttempt,
+) error {
+	dagRun := digraph.DAGRunRef{
+		Name: dag.Name,
+		ID:   st.DAGRunID,
+	}
+
+	alive, err := m.procStore.IsRunAlive(ctx, dagRun)
+	if err != nil {
+		// Log but don't fail - we can't determine if it's alive
+		logger.Error(ctx, "Failed to check if DAG run is alive", "err", err)
+		return nil
+	}
+
+	if alive {
+		// Process is still alive, nothing to do
+		return nil
+	}
+
+	// Process is not alive, update status to error
+	st.Status = status.Error
+	st.FinishedAt = stringutil.FormatTime(time.Now())
+	logger.Warn(ctx, "DAG run marked as running but process is not alive, updating status to error", "dagRunID", st.DAGRunID)
+
+	// Persist the status update
+	if err := attempt.Open(ctx); err != nil {
+		return fmt.Errorf("open attempt: %w", err)
+	}
+	defer func() {
+		if closeErr := attempt.Close(ctx); closeErr != nil {
+			logger.Error(ctx, "Failed to close attempt", "err", closeErr)
+		}
+	}()
+
+	if err := attempt.Write(ctx, *st); err != nil {
+		return fmt.Errorf("write status: %w", err)
+	}
+
+	return nil
 }

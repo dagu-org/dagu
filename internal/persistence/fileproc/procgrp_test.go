@@ -120,3 +120,158 @@ func TestProcGroup_IsStale(t *testing.T) {
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 0, count, "expected 0 proc files")
 }
+
+func TestProcGroup_IsRunAlive(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	name := "test_proc"
+	pg := NewProcGroup(baseDir, name, time.Second*5)
+
+	t.Run("NoProcessFile", func(t *testing.T) {
+		dagRun := digraph.DAGRunRef{
+			Name: name,
+			ID:   "run-123",
+		}
+
+		// Test when no process file exists
+		alive, err := pg.IsRunAlive(ctx, dagRun)
+		require.NoError(t, err)
+		require.False(t, alive)
+	})
+
+	t.Run("AliveProcess", func(t *testing.T) {
+		dagRun := digraph.DAGRunRef{
+			Name: name,
+			ID:   "run-456",
+		}
+
+		// Create a process
+		proc, err := pg.Acquire(ctx, dagRun)
+		require.NoError(t, err)
+
+		// Start heartbeat
+		err = proc.startHeartbeat(ctx)
+		require.NoError(t, err)
+
+		// Give a moment for the heartbeat to write
+		time.Sleep(time.Millisecond * 50)
+
+		// Check if the run is alive
+		alive, err := pg.IsRunAlive(ctx, dagRun)
+		require.NoError(t, err)
+		require.True(t, alive)
+
+		// Stop the process
+		err = proc.Stop(ctx)
+		require.NoError(t, err)
+
+		// Check again - should be false now
+		alive, err = pg.IsRunAlive(ctx, dagRun)
+		require.NoError(t, err)
+		require.False(t, alive)
+	})
+
+	t.Run("DifferentRunID", func(t *testing.T) {
+		// Create a process for one run ID
+		dagRun1 := digraph.DAGRunRef{
+			Name: name,
+			ID:   "run-789",
+		}
+		proc1, err := pg.Acquire(ctx, dagRun1)
+		require.NoError(t, err)
+
+		// Start heartbeat
+		err = proc1.startHeartbeat(ctx)
+		require.NoError(t, err)
+
+		// Give a moment for the heartbeat to write
+		time.Sleep(time.Millisecond * 50)
+
+		// Check for a different run ID
+		dagRun2 := digraph.DAGRunRef{
+			Name: name,
+			ID:   "run-999",
+		}
+		alive, err := pg.IsRunAlive(ctx, dagRun2)
+		require.NoError(t, err)
+		require.False(t, alive)
+
+		// Check the original run is still alive
+		alive, err = pg.IsRunAlive(ctx, dagRun1)
+		require.NoError(t, err)
+		require.True(t, alive)
+
+		// Cleanup
+		err = proc1.Stop(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("StaleProcess", func(t *testing.T) {
+		// Create a ProcGroup with very short stale time
+		shortPG := NewProcGroup(baseDir, name, time.Millisecond*100)
+
+		dagRun := digraph.DAGRunRef{
+			Name: name,
+			ID:   "run-stale",
+		}
+
+		// Create a process
+		proc, err := shortPG.Acquire(ctx, dagRun)
+		require.NoError(t, err)
+
+		// Ensure directory exists
+		err = os.MkdirAll(filepath.Dir(proc.fileName), 0750)
+		require.NoError(t, err)
+
+		// Create the proc file with old timestamp
+		fd, err := os.OpenFile(proc.fileName, os.O_CREATE|os.O_RDWR, 0600)
+		require.NoError(t, err)
+
+		// Write an old timestamp
+		buf := make([]byte, 8)
+		oldTime := time.Now().Add(-time.Second * 10)
+		binary.BigEndian.PutUint64(buf, uint64(oldTime.Unix()))
+		_, err = fd.WriteAt(buf, 0)
+		require.NoError(t, err)
+		_ = fd.Close()
+
+		// Set old modification time
+		err = os.Chtimes(proc.fileName, oldTime, oldTime)
+		require.NoError(t, err)
+
+		// Check if the run is alive (should be false and file should be cleaned up)
+		alive, err := shortPG.IsRunAlive(ctx, dagRun)
+		require.NoError(t, err)
+		require.False(t, alive)
+
+		// Verify file was removed
+		_, err = os.Stat(proc.fileName)
+		require.True(t, os.IsNotExist(err))
+	})
+
+	t.Run("InvalidFilePattern", func(t *testing.T) {
+		dagRun := digraph.DAGRunRef{
+			Name: name,
+			ID:   "run-invalid",
+		}
+
+		// Create directory
+		err := os.MkdirAll(baseDir, 0750)
+		require.NoError(t, err)
+
+		// Create a file with invalid pattern but matching run ID
+		invalidFile := filepath.Join(baseDir, "invalid_file_run-invalid.proc")
+		err = os.WriteFile(invalidFile, []byte("test"), 0600)
+		require.NoError(t, err)
+
+		// Should return false as the file doesn't match the regex pattern
+		alive, err := pg.IsRunAlive(ctx, dagRun)
+		require.NoError(t, err)
+		require.False(t, alive)
+
+		// Clean up
+		_ = os.Remove(invalidFile)
+	})
+}
