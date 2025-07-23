@@ -207,13 +207,6 @@ steps:
 		dagRunStatus, err = th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
 		require.NoError(t, err)
 		require.Equal(t, status.Error.String(), dagRunStatus.Status.String())
-
-		// Verify the status was persisted as error
-		attempt, err = th.DAGRunStore.FindAttempt(ctx, dagRunRef)
-		require.NoError(t, err)
-		persistedStatus, err := attempt.ReadStatus(ctx)
-		require.NoError(t, err)
-		require.Equal(t, status.Error.String(), persistedStatus.Status.String())
 	})
 }
 

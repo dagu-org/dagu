@@ -9,7 +9,6 @@ import (
 	"runtime/debug"
 	"slices"
 	"strconv"
-	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -19,7 +18,6 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/sock"
-	"github.com/dagu-org/dagu/internal/stringutil"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
 )
@@ -707,22 +705,6 @@ func (m *Manager) checkAndUpdateStaleRunningStatus(
 
 	// Process is not alive, update status to error
 	st.Status = status.Error
-	st.FinishedAt = stringutil.FormatTime(time.Now())
-	logger.Warn(ctx, "DAG run marked as running but process is not alive, updating status to error", "dagRunID", st.DAGRunID)
-
-	// Persist the status update
-	if err := attempt.Open(ctx); err != nil {
-		return fmt.Errorf("open attempt: %w", err)
-	}
-	defer func() {
-		if closeErr := attempt.Close(ctx); closeErr != nil {
-			logger.Error(ctx, "Failed to close attempt", "err", closeErr)
-		}
-	}()
-
-	if err := attempt.Write(ctx, *st); err != nil {
-		return fmt.Errorf("write status: %w", err)
-	}
 
 	return nil
 }
