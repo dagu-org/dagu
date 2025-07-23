@@ -32,7 +32,8 @@ const generatePaginationItems = (
   onPageChange: (page: number) => void
 ) => {
   const items = [];
-  const maxPagesToShow = 5; // Adjust number of page links shown
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+  const maxPagesToShow = isMobile ? 3 : 5; // Show fewer pages on mobile
   const halfMaxPages = Math.floor(maxPagesToShow / 2);
 
   // Always show Previous button (icon only)
@@ -41,7 +42,7 @@ const generatePaginationItems = (
       <Button
         variant="ghost"
         size="icon"
-        className={`h-6 w-6 rounded-md flex items-center justify-center cursor-pointer ${currentPage <= 1 ? 'pointer-events-none opacity-50' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} transition-colors`}
+        className={`h-6 w-6 sm:h-7 sm:w-7 rounded-md flex items-center justify-center cursor-pointer ${currentPage <= 1 ? 'pointer-events-none opacity-50' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} transition-colors`}
         disabled={currentPage <= 1}
         onClick={(e) => {
           e.preventDefault();
@@ -75,7 +76,7 @@ const generatePaginationItems = (
           <Button
             variant="ghost"
             size="icon"
-            className={`h-6 w-6 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${i === currentPage ? 'bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/60 text-blue-700 dark:text-blue-300 font-medium' : 'text-muted-foreground font-normal'}`}
+            className={`h-6 w-6 sm:h-7 sm:w-7 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${i === currentPage ? 'bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/60 text-blue-700 dark:text-blue-300 font-medium' : 'text-muted-foreground font-normal'}`}
             onClick={(e) => {
               e.preventDefault();
               onPageChange(i);
@@ -109,7 +110,7 @@ const generatePaginationItems = (
     if (currentPage > halfMaxPages + 2) {
       items.push(
         <PaginationItem key="ellipsis-start">
-          <div className="h-6 w-6 flex items-center justify-center text-muted-foreground">
+          <div className="h-6 w-6 sm:h-7 sm:w-7 flex items-center justify-center text-muted-foreground">
             <span className="text-xs">•••</span>
           </div>
         </PaginationItem>
@@ -126,7 +127,7 @@ const generatePaginationItems = (
           <Button
             variant="ghost"
             size="icon"
-            className={`h-6 w-6 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${i === currentPage ? 'bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/60 text-blue-700 dark:text-blue-300 font-medium' : 'text-muted-foreground font-normal'}`}
+            className={`h-6 w-6 sm:h-7 sm:w-7 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${i === currentPage ? 'bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/60 text-blue-700 dark:text-blue-300 font-medium' : 'text-muted-foreground font-normal'}`}
             onClick={(e) => {
               e.preventDefault();
               onPageChange(i);
@@ -143,7 +144,7 @@ const generatePaginationItems = (
     if (currentPage < totalPages - halfMaxPages - 1) {
       items.push(
         <PaginationItem key="ellipsis-end">
-          <div className="h-6 w-6 flex items-center justify-center text-muted-foreground">
+          <div className="h-6 w-6 sm:h-7 sm:w-7 flex items-center justify-center text-muted-foreground">
             <span className="text-xs">•••</span>
           </div>
         </PaginationItem>
@@ -175,7 +176,7 @@ const generatePaginationItems = (
       <Button
         variant="ghost"
         size="icon"
-        className={`h-6 w-6 rounded-md flex items-center justify-center cursor-pointer ${currentPage >= totalPages ? 'pointer-events-none opacity-50' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} transition-colors`}
+        className={`h-6 w-6 sm:h-7 sm:w-7 rounded-md flex items-center justify-center cursor-pointer ${currentPage >= totalPages ? 'pointer-events-none opacity-50' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} transition-colors`}
         disabled={currentPage >= totalPages}
         onClick={(e) => {
           e.preventDefault();
@@ -254,16 +255,16 @@ const DAGPagination = ({
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1 sm:gap-2">
       {/* Pagination controls */}
       <Pagination>
-        <PaginationContent className="flex items-center space-x-1">
+        <PaginationContent className="flex items-center space-x-0.5 sm:space-x-1">
           {generatePaginationItems(page, totalPages, pageChange)}
         </PaginationContent>
       </Pagination>
 
-      {/* Items per page selector */}
-      <div className="flex items-center gap-1">
+      {/* Items per page selector - hidden on very small screens */}
+      <div className="hidden sm:flex items-center gap-1">
         <span className="text-xs text-muted-foreground">{pageLimit}</span>
         <div className="relative group">
           <Button

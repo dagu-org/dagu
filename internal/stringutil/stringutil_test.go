@@ -279,12 +279,12 @@ func TestRandomString(t *testing.T) {
 		const numStrings = 10
 		const stringLength = 10
 		strings := make(map[string]bool)
-		
+
 		for i := 0; i < numStrings; i++ {
 			s := stringutil.RandomString(stringLength)
 			strings[s] = true
 		}
-		
+
 		require.Greater(t, len(strings), 1, "expected different strings, but all were identical")
 	})
 }

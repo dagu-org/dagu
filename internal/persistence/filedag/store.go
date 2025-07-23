@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -208,9 +209,8 @@ func (store *Storage) ensureDirExist() error {
 
 // List lists DAGs with pagination support.
 func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (models.PaginatedResult[*digraph.DAG], []string, error) {
-	var dags []*digraph.DAG
+	var allDags []*digraph.DAG
 	var errList []string
-	var totalCount int
 
 	if opts.Paginator == nil {
 		p := models.DefaultPaginator()
@@ -220,9 +220,10 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 	entries, err := os.ReadDir(store.baseDir)
 	if err != nil {
 		errList = append(errList, fmt.Sprintf("failed to read directory %s: %s", store.baseDir, err))
-		return models.NewPaginatedResult(dags, totalCount, *opts.Paginator), errList, err
+		return models.NewPaginatedResult([]*digraph.DAG{}, 0, *opts.Paginator), errList, err
 	}
 
+	// First, collect all matching DAGs
 	for _, entry := range entries {
 		if entry.IsDir() || !fileutil.IsYAMLFile(entry.Name()) {
 			continue
@@ -254,14 +255,48 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 			continue
 		}
 
-		totalCount++
-		if totalCount > opts.Paginator.Offset() && len(dags) < opts.Paginator.Limit() {
-			dags = append(dags, dag)
+		allDags = append(allDags, dag)
+	}
+
+	// Sort DAGs based on the sort field and order
+	// Note: Only basic sorting is done here. Complex sorting (status, lastRun, etc.)
+	// is handled in the API layer after fetching additional metadata
+	sort.Slice(allDags, func(i, j int) bool {
+		// Default to ascending order
+		ascending := opts.Order != "desc"
+
+		switch opts.Sort {
+		case "name", "": // default to name if not specified
+			if ascending {
+				return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
+			}
+			return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
+		default:
+			// For fields that require additional metadata (status, lastRun, schedule, suspended),
+			// we sort by name here and let the API layer handle the actual sorting
+			if ascending {
+				return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
+			}
+			return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
 		}
+	})
+
+	totalCount := len(allDags)
+
+	// Apply pagination
+	var paginatedDags []*digraph.DAG
+	start := opts.Paginator.Offset()
+	end := start + opts.Paginator.Limit()
+
+	if start < len(allDags) {
+		if end > len(allDags) {
+			end = len(allDags)
+		}
+		paginatedDags = allDags[start:end]
 	}
 
 	result := models.NewPaginatedResult(
-		dags, totalCount, *opts.Paginator,
+		paginatedDags, totalCount, *opts.Paginator,
 	)
 
 	return result, errList, nil

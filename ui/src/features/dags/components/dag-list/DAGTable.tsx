@@ -7,9 +7,7 @@ import {
   getCoreRowModel,
   getExpandedRowModel,
   getFilteredRowModel,
-  getSortedRowModel,
   RowData,
-  SortingState,
   useReactTable,
 } from '@tanstack/react-table';
 import cronParser, { CronDate } from 'cron-parser';
@@ -104,6 +102,12 @@ type Props = {
     /** Callback for page limit change */
     onPageLimitChange: (pageLimit: number) => void;
   };
+  /** Current sort field */
+  sortField?: string;
+  /** Current sort order */
+  sortOrder?: string;
+  /** Handler for sort changes */
+  onSortChange?: (field: string, order: string) => void;
 };
 
 /**
@@ -219,11 +223,14 @@ const defaultColumns = [
       }
       return null; // Return null instead of empty string for clarity
     },
-    enableSorting: false,
     size: 40,
+    minSize: 40,
+    maxSize: 40,
   }),
   columnHelper.accessor('name', {
     id: 'Name',
+    size: 350,
+    minSize: 200,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Name</span>
@@ -253,14 +260,14 @@ const defaultColumns = [
         return (
           <div
             style={{ paddingLeft: `${row.depth * 1.5}rem` }}
-            className="space-y-0.5"
+            className="space-y-0.5 min-w-0"
           >
-            <div className="font-medium text-gray-800 dark:text-gray-200 tracking-tight text-xs">
+            <div className="font-medium text-gray-800 dark:text-gray-200 tracking-tight text-xs truncate">
               {getValue()}
             </div>
 
             {description && (
-              <div className="text-[10px] text-muted-foreground whitespace-normal leading-tight">
+              <div className="text-[10px] text-muted-foreground whitespace-normal leading-tight line-clamp-2">
                 {description}
               </div>
             )}
@@ -315,22 +322,14 @@ const defaultColumns = [
       }
       return false;
     },
-    sortingFn: (a, b) => {
-      const ta = a.original!.kind;
-      const tb = b.original!.kind;
-      if (ta === tb) {
-        const nameA = a.original!.name.toLowerCase();
-        const nameB = b.original!.name.toLowerCase();
-        return nameA.localeCompare(nameB);
-      }
-      // Keep groups potentially sorted differently if needed, or simply by name
-      return ta === ItemKind.Group ? -1 : 1;
-    },
   }),
   // Tags column removed as tags are now displayed under the name
   // The filter functionality is preserved in the Name column
   columnHelper.accessor('kind', {
     id: 'Status',
+    size: 100,
+    minSize: 100,
+    maxSize: 120,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Status</span>
@@ -352,16 +351,13 @@ const defaultColumns = [
       }
       return null;
     },
-    sortingFn: (a, b) => {
-      // Explicitly handle number type for comparison
-      const valA = getStatus(a.original) as number;
-      const valB = getStatus(b.original) as number;
-      return valA - valB;
-    },
   }),
   // Removed Started At and Finished At columns
   columnHelper.accessor('kind', {
     id: 'LastRun',
+    size: 150,
+    minSize: 150,
+    maxSize: 180,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Last Run</span>
@@ -415,28 +411,12 @@ const defaultColumns = [
         </div>
       );
     },
-    sortingFn: (a, b) => {
-      const dataA = a.original!;
-      const dataB = b.original!;
-      if (dataA.kind !== ItemKind.DAG || dataB.kind !== ItemKind.DAG) {
-        // Handle sorting for non-DAG rows if necessary, e.g., groups first
-        return dataA.kind === ItemKind.Group ? -1 : 1;
-      }
-      // Prioritize rows with startedAt dates
-      const startedAtA = dataA.dag.latestDAGRun.startedAt;
-      const startedAtB = dataB.dag.latestDAGRun.startedAt;
-
-      if (!startedAtA && !startedAtB) return 0; // Both null/undefined
-      if (!startedAtA) return 1; // A is null, should come after B
-      if (!startedAtB) return -1; // B is null, should come after A
-
-      // Compare valid dates using dayjs's diff for accurate comparison
-      return dayjs(startedAtA).diff(dayjs(startedAtB));
-    },
-    size: 200, // Adjust size as needed
   }),
   columnHelper.accessor('kind', {
     id: 'ScheduleAndNextRun',
+    size: 180,
+    minSize: 150,
+    maxSize: 200,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Schedule</span>
@@ -445,7 +425,6 @@ const defaultColumns = [
         </span>
       </div>
     ),
-    enableSorting: true,
     cell: ({ row }) => {
       const data = row.original!;
       if (data.kind === ItemKind.DAG) {
@@ -503,30 +482,13 @@ const defaultColumns = [
       }
       return null;
     },
-    sortingFn: (a, b) => {
-      const dataA = a.original!;
-      const dataB = b.original!;
-      if (dataA.kind !== ItemKind.DAG || dataB.kind !== ItemKind.DAG) {
-        return dataA!.kind - dataB!.kind;
-      }
-      const nextA = getNextSchedule(dataA.dag);
-      const nextB = getNextSchedule(dataB.dag);
-      if (!nextA && !nextB) {
-        return 0; // Both are undefined
-      }
-      if (!nextA) {
-        return 1; // A is undefined, B is defined
-      }
-      if (!nextB) {
-        return -1; // B is undefined, A is defined
-      }
-      return nextA.getTime() - nextB.getTime();
-    },
-    size: 120,
   }),
   // Description column removed as description is now displayed under the name
   columnHelper.accessor('kind', {
     id: 'Live',
+    size: 70,
+    minSize: 70,
+    maxSize: 70,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Live</span>
@@ -555,10 +517,12 @@ const defaultColumns = [
         </div>
       );
     },
-    size: 60,
   }),
   columnHelper.display({
     id: 'Actions',
+    size: 100,
+    minSize: 100,
+    maxSize: 100,
     header: () => (
       <div className="flex flex-col items-center py-1">
         <span className="text-xs">Actions</span>
@@ -590,28 +554,55 @@ const defaultColumns = [
         </div>
       );
     },
-    size: 100,
   }),
 ];
 
-// --- Header Component for Sorting ---
+// Mapping between column IDs and backend sort fields
+const columnToSortField: Record<string, string> = {
+  'Name': 'name',
+  'Status': 'status',
+  'LastRun': 'lastRun',
+  'ScheduleAndNextRun': 'schedule',
+  'Live': 'suspended',
+};
+
+// --- Header Component for Server-side Sorting ---
 const SortableHeader = ({
   column,
   children,
+  currentSort,
+  currentOrder,
+  onSort,
 }: {
   column: Column<Data, unknown>;
   children: React.ReactNode;
+  currentSort?: string;
+  currentOrder?: string;
+  onSort?: (field: string, order: string) => void;
 }) => {
-  const sort = column.getIsSorted();
+  const sortField = columnToSortField[column.id];
+  const isActive = sortField && currentSort === sortField;
+  const isSortable = sortField && onSort;
+
+  if (!isSortable) {
+    return <>{children}</>;
+  }
+
+  const handleClick = () => {
+    // Toggle order if clicking the same column, otherwise default to asc
+    const newOrder = isActive && currentOrder === 'asc' ? 'desc' : 'asc';
+    onSort(sortField, newOrder);
+  };
+
   return (
     <Button
       variant="ghost"
-      onClick={column.getToggleSortingHandler()}
+      onClick={handleClick}
       className="-ml-4 h-8 cursor-pointer" // Adjust spacing
     >
       {children}
-      {sort === 'asc' && <ArrowUp className="ml-2 h-4 w-4" />}
-      {sort === 'desc' && <ArrowDown className="ml-2 h-4 w-4" />}
+      {isActive && currentOrder === 'asc' && <ArrowUp className="ml-2 h-4 w-4" />}
+      {isActive && currentOrder === 'desc' && <ArrowDown className="ml-2 h-4 w-4" />}
     </Button>
   );
 };
@@ -629,15 +620,15 @@ function DAGTable({
   handleSearchTagChange,
   isLoading = false,
   pagination,
+  sortField = 'name',
+  sortOrder = 'asc',
+  onSortChange,
 }: Props) {
   const navigate = useNavigate();
   const [columns] = React.useState(() => [...defaultColumns]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
-  const [sorting, setSorting] = React.useState<SortingState>([
-    { id: 'Name', desc: false },
-  ]);
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
 
   // State for the side modal
@@ -794,24 +785,23 @@ function DAGTable({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isModalOpen, selectedDAG, sorting]); // Include sorting in dependencies
+  }, [isModalOpen, selectedDAG]); // No need for sorting in dependencies anymore
 
   const instance = useReactTable<Data>({
     data,
     columns,
     getSubRows: (row) => row.subRows,
     getCoreRowModel: getCoreRowModel<Data>(),
-    getSortedRowModel: getSortedRowModel<Data>(),
+    // Disable client-side sorting as we're using server-side sorting
+    manualSorting: true,
     getFilteredRowModel: getFilteredRowModel<Data>(),
     onColumnFiltersChange: setColumnFilters, // Let table manage internal filter state
     getExpandedRowModel: getExpandedRowModel<Data>(),
     autoResetExpanded: false, // Keep expanded state on data change
     state: {
-      sorting,
       expanded,
       columnFilters, // Pass filters to table state
     },
-    onSortingChange: setSorting,
     onExpandedChange: setExpanded,
     // Pass handlers via meta
     meta: {
@@ -850,71 +840,74 @@ function DAGTable({
           isLoading ? 'opacity-70 pointer-events-none' : ''
         }`}
       >
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Search input */}
-          <div className="relative flex-1 min-w-[200px]">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-              <Search className="h-4 w-4" />
-            </div>
-            <Input
-              type="search"
-              placeholder="Search definitions..."
-              value={searchText}
-              onChange={(e) => handleSearchTextChange(e.target.value)}
-              className="pl-10 h-9 border border-input rounded-md w-full"
-            />
-            {searchText && (
-              <button
-                onClick={() => handleSearchTextChange('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Clear search"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
+          {/* Search and Filter Row */}
+          <div className="flex flex-1 gap-2 min-w-0">
+            {/* Search input */}
+            <div className="relative flex-1 min-w-0">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                <Search className="h-4 w-4" />
+              </div>
+              <Input
+                type="search"
+                placeholder="Search definitions..."
+                value={searchText}
+                onChange={(e) => handleSearchTextChange(e.target.value)}
+                className="pl-10 h-9 border border-input rounded-md w-full"
+              />
+              {searchText && (
+                <button
+                  onClick={() => handleSearchTextChange('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Clear search"
                 >
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            )}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Tag filter */}
+            <Select
+              value={searchTag}
+              onValueChange={(value) =>
+                handleSearchTagChange(value === 'all' ? '' : value)
+              }
+            >
+              <SelectTrigger className="w-auto min-w-[120px] sm:min-w-[160px] h-9 border border-input rounded-md">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Filter by tag" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="max-h-[280px] overflow-y-auto">
+                <SelectItem value="all">
+                  <span className="font-medium">All Tags</span>
+                </SelectItem>
+                {uniqueTags?.tags?.map((tag) => (
+                  <SelectItem key={tag} value={tag}>
+                    {tag}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Tag filter */}
-          <Select
-            value={searchTag}
-            onValueChange={(value) =>
-              handleSearchTagChange(value === 'all' ? '' : value)
-            }
-          >
-            <SelectTrigger className="w-auto min-w-[160px] h-9 border border-input rounded-md">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder="Filter by tag" />
-              </div>
-            </SelectTrigger>
-            <SelectContent className="max-h-[280px] overflow-y-auto">
-              <SelectItem value="all">
-                <span className="font-medium">All Tags</span>
-              </SelectItem>
-              {uniqueTags?.tags?.map((tag) => (
-                <SelectItem key={tag} value={tag}>
-                  {tag}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Pagination */}
+          {/* Pagination - on new row on mobile */}
           {pagination && (
-            <div className="ml-auto">
+            <div className="flex justify-center sm:justify-end sm:ml-auto">
               <DAGPagination
                 totalPages={pagination.totalPages}
                 page={pagination.page}
@@ -939,7 +932,7 @@ function DAGTable({
           borderRadius: '0.75rem',
         }}
       >
-        <Table className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}>
+        <Table className={`w-full text-xs table-fixed ${isLoading ? 'opacity-70' : ''}`}>
           <TableHeader>
             {instance.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -954,12 +947,9 @@ function DAGTable({
                       'text-muted-foreground text-xs'
                     }
                     style={{
-                      width:
-                        header.getSize() !== 150 ? header.getSize() : undefined,
-                      maxWidth:
-                        header.column.id === 'Description'
-                          ? '250px'
-                          : undefined,
+                      width: header.getSize(),
+                      minWidth: header.column.columnDef.minSize,
+                      maxWidth: header.column.columnDef.maxSize,
                       fontWeight: 500, // Medium weight headers
                       fontSize: '0.75rem', // Smaller font size for headers
                     }}
@@ -968,14 +958,17 @@ function DAGTable({
                       <div>
                         {' '}
                         {/* Wrap header content */}
-                        {header.column.getCanSort() ? (
+                        {columnToSortField[header.column.id] ? (
                           <SortableHeader
                             column={header.column}
+                            currentSort={sortField}
+                            currentOrder={sortOrder}
+                            onSort={onSortChange}
                             children={flexRender(
                               header.column.columnDef.header,
                               header.getContext()
                             )}
-                          ></SortableHeader>
+                          />
                         ) : (
                           flexRender(
                             header.column.columnDef.header,
@@ -1035,10 +1028,11 @@ function DAGTable({
                     {row.getVisibleCells().map((cell) => (
                       <TableCell
                         key={cell.id}
-                        className="py-1 px-2"
+                        className="py-1 px-2 overflow-hidden"
                         style={{
-                          maxWidth:
-                            cell.column.id === 'Name' ? '350px' : undefined, // Apply max-width to Name cell
+                          width: cell.column.getSize(),
+                          minWidth: cell.column.columnDef.minSize,
+                          maxWidth: cell.column.columnDef.maxSize,
                         }}
                       >
                         {flexRender(

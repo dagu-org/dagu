@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/models"
@@ -495,6 +496,59 @@ steps:
 	assert.True(t, result.HasPrevPage)
 }
 
+func TestListAlphabeticalSorting(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-list-alphabetical")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	store := New(tmpDir)
+	ctx := context.Background()
+
+	// Create DAGs in non-alphabetical order
+	dags := []struct {
+		fileName string
+		name     string
+	}{
+		{"zebra-dag", "zebra-dag"},
+		{"alpha-dag", "alpha-dag"},
+		{"beta-dag", "beta-dag"},
+		{"CAPITAL-dag", "CAPITAL-dag"},
+		{"123-numeric-dag", "123-numeric-dag"},
+	}
+
+	for _, dag := range dags {
+		content := fmt.Sprintf(`name: %s
+steps:
+  - name: step1
+    command: echo "%s"`, dag.name, dag.name)
+		err := store.Create(ctx, dag.fileName, []byte(content))
+		require.NoError(t, err)
+	}
+
+	// List all DAGs
+	opts := models.ListDAGsOptions{}
+	result, errList, err := store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 5)
+
+	// Verify alphabetical order (case-insensitive)
+	expectedOrder := []string{
+		"123-numeric-dag",
+		"alpha-dag",
+		"beta-dag",
+		"CAPITAL-dag",
+		"zebra-dag",
+	}
+
+	for i, dag := range result.Items {
+		assert.Equal(t, expectedOrder[i], dag.Name,
+			"DAG at position %d should be %s but was %s",
+			i, expectedOrder[i], dag.Name)
+	}
+}
+
 func TestListWithFiltering(t *testing.T) {
 	tmpDir := fileutil.MustTempDir("test-list-filtering")
 	defer func() {
@@ -544,4 +598,251 @@ steps:
 	require.Empty(t, errList)
 	require.Len(t, result.Items, 1)
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
+}
+
+func TestListWithSortAndOrder(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-list-sort-order")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	store := New(tmpDir)
+	ctx := context.Background()
+
+	// Create DAGs with different names
+	dags := []struct {
+		fileName string
+		name     string
+	}{
+		{"zebra-dag", "zebra-dag"},
+		{"alpha-dag", "alpha-dag"},
+		{"beta-dag", "beta-dag"},
+		{"GAMMA-dag", "GAMMA-dag"},
+	}
+
+	// Create files with some time delay to ensure different modification times
+	for i, dag := range dags {
+		content := fmt.Sprintf(`name: %s
+steps:
+  - name: step1
+    command: echo "%s"`, dag.name, dag.name)
+		err := store.Create(ctx, dag.fileName, []byte(content))
+		require.NoError(t, err)
+
+		// Add a small delay between file creations to ensure different mod times
+		if i < len(dags)-1 {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	// Test 1: Sort by name ascending (default)
+	opts := models.ListDAGsOptions{
+		Sort:  "name",
+		Order: "asc",
+	}
+	result, errList, err := store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 4)
+
+	assert.Equal(t, "alpha-dag", result.Items[0].Name)
+	assert.Equal(t, "beta-dag", result.Items[1].Name)
+	assert.Equal(t, "GAMMA-dag", result.Items[2].Name)
+	assert.Equal(t, "zebra-dag", result.Items[3].Name)
+
+	// Test 2: Sort by name descending
+	opts = models.ListDAGsOptions{
+		Sort:  "name",
+		Order: "desc",
+	}
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 4)
+
+	assert.Equal(t, "zebra-dag", result.Items[0].Name)
+	assert.Equal(t, "GAMMA-dag", result.Items[1].Name)
+	assert.Equal(t, "beta-dag", result.Items[2].Name)
+	assert.Equal(t, "alpha-dag", result.Items[3].Name)
+
+	// Test 3: Sort by updated_at should fall back to name sorting in storage layer
+	opts = models.ListDAGsOptions{
+		Sort:  "updated_at",
+		Order: "asc",
+	}
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 4)
+
+	// Should be sorted by name since updated_at is handled in API layer
+	assert.Equal(t, "alpha-dag", result.Items[0].Name)
+	assert.Equal(t, "beta-dag", result.Items[1].Name)
+	assert.Equal(t, "GAMMA-dag", result.Items[2].Name)
+	assert.Equal(t, "zebra-dag", result.Items[3].Name)
+
+	// Test 4: Sort by updated_at desc should also fall back to name
+	opts = models.ListDAGsOptions{
+		Sort:  "updated_at",
+		Order: "desc",
+	}
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 4)
+
+	// Should be sorted by name descending (fallback behavior)
+	assert.Equal(t, "zebra-dag", result.Items[0].Name)
+	assert.Equal(t, "GAMMA-dag", result.Items[1].Name)
+	assert.Equal(t, "beta-dag", result.Items[2].Name)
+	assert.Equal(t, "alpha-dag", result.Items[3].Name)
+
+	// Test 5: Default sort (empty sort field) should sort by name
+	opts = models.ListDAGsOptions{
+		Sort:  "",
+		Order: "asc",
+	}
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 4)
+
+	assert.Equal(t, "alpha-dag", result.Items[0].Name)
+	assert.Equal(t, "beta-dag", result.Items[1].Name)
+	assert.Equal(t, "GAMMA-dag", result.Items[2].Name)
+	assert.Equal(t, "zebra-dag", result.Items[3].Name)
+
+	// Test 6: Unknown sort field falls back to name
+	opts = models.ListDAGsOptions{
+		Sort:  "unknown",
+		Order: "asc",
+	}
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 4)
+
+	assert.Equal(t, "alpha-dag", result.Items[0].Name)
+	assert.Equal(t, "beta-dag", result.Items[1].Name)
+	assert.Equal(t, "GAMMA-dag", result.Items[2].Name)
+	assert.Equal(t, "zebra-dag", result.Items[3].Name)
+}
+
+func TestListWithSortingAndPagination(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-list-sort-pagination")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	store := New(tmpDir)
+	ctx := context.Background()
+
+	// Create multiple DAGs for pagination testing
+	dagNames := []string{
+		"zulu-dag", "yankee-dag", "x-ray-dag", "whiskey-dag",
+		"victor-dag", "uniform-dag", "tango-dag", "sierra-dag",
+		"romeo-dag", "quebec-dag", "papa-dag", "oscar-dag",
+	}
+
+	for i, name := range dagNames {
+		content := fmt.Sprintf(`name: %s
+steps:
+  - name: step1
+    command: echo "%s"`, name, name)
+		err := store.Create(ctx, name, []byte(content))
+		require.NoError(t, err)
+
+		// Add delay to ensure different mod times
+		if i < len(dagNames)-1 {
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+
+	// Test 1: Name sort ascending with pagination
+	// Page 1
+	paginator := models.NewPaginator(1, 5) // page=1, perPage=5
+	opts := models.ListDAGsOptions{
+		Paginator: &paginator,
+		Sort:      "name",
+		Order:     "asc",
+	}
+	result, errList, err := store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	assert.Equal(t, 12, result.TotalCount)
+	assert.Len(t, result.Items, 5)
+	assert.True(t, result.HasNextPage)
+	assert.False(t, result.HasPrevPage)
+
+	// First page should have first 5 alphabetically
+	expectedPage1 := []string{"oscar-dag", "papa-dag", "quebec-dag", "romeo-dag", "sierra-dag"}
+	for i, expected := range expectedPage1 {
+		assert.Equal(t, expected, result.Items[i].Name)
+	}
+
+	// Page 2
+	paginator = models.NewPaginator(2, 5) // page=2, perPage=5
+	opts.Paginator = &paginator
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	assert.Len(t, result.Items, 5)
+	assert.True(t, result.HasNextPage)
+	assert.True(t, result.HasPrevPage)
+
+	// Second page should have next 5 alphabetically
+	expectedPage2 := []string{"tango-dag", "uniform-dag", "victor-dag", "whiskey-dag", "x-ray-dag"}
+	for i, expected := range expectedPage2 {
+		assert.Equal(t, expected, result.Items[i].Name)
+	}
+
+	// Page 3
+	paginator = models.NewPaginator(3, 5) // page=3, perPage=5
+	opts.Paginator = &paginator
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	assert.Len(t, result.Items, 2) // Only 2 items left
+	assert.False(t, result.HasNextPage)
+	assert.True(t, result.HasPrevPage)
+
+	// Third page should have last 2 alphabetically
+	assert.Equal(t, "yankee-dag", result.Items[0].Name)
+	assert.Equal(t, "zulu-dag", result.Items[1].Name)
+
+	// Test 2: Name sort descending with pagination
+	paginator = models.NewPaginator(1, 5) // page=1, perPage=5
+	opts = models.ListDAGsOptions{
+		Paginator: &paginator,
+		Sort:      "name",
+		Order:     "desc",
+	}
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	assert.Len(t, result.Items, 5)
+
+	// First page descending should start with zulu
+	expectedDesc := []string{"zulu-dag", "yankee-dag", "x-ray-dag", "whiskey-dag", "victor-dag"}
+	for i, expected := range expectedDesc {
+		assert.Equal(t, expected, result.Items[i].Name)
+	}
+
+	// Test 3: Non-name sort fields fall back to name sorting in storage layer
+	paginator = models.NewPaginator(1, 5) // page=1, perPage=5
+	opts = models.ListDAGsOptions{
+		Paginator: &paginator,
+		Sort:      "updated_at",
+		Order:     "desc", // This will fall back to name desc
+	}
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	assert.Len(t, result.Items, 5)
+
+	// Should be sorted by name descending (fallback)
+	expectedDesc = []string{"zulu-dag", "yankee-dag", "x-ray-dag", "whiskey-dag", "victor-dag"}
+	for i, expected := range expectedDesc {
+		assert.Equal(t, expected, result.Items[i].Name)
+	}
 }

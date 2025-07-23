@@ -1097,6 +1097,10 @@ export interface operations {
                 name?: string;
                 /** @description Filter DAGs by tag */
                 tag?: string;
+                /** @description Field to sort by */
+                sort?: PathsDagsGetParametersQuerySort;
+                /** @description Sort order (ascending or descending) */
+                order?: PathsDagsGetParametersQueryOrder;
             };
             header?: never;
             path?: never;
@@ -2387,6 +2391,17 @@ export interface operations {
             };
         };
     };
+}
+export enum PathsDagsGetParametersQuerySort {
+    name = "name",
+    status = "status",
+    lastRun = "lastRun",
+    schedule = "schedule",
+    suspended = "suspended"
+}
+export enum PathsDagsGetParametersQueryOrder {
+    asc = "asc",
+    desc = "desc"
 }
 export enum ErrorCode {
     forbidden = "forbidden",
