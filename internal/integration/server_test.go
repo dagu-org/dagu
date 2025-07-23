@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 
@@ -25,10 +24,19 @@ func TestServer_StartWithConfig(t *testing.T) {
 				configFile := filepath.Join(tempDir, "config.yaml")
 				configContent := `logDir: ${TMP_LOGS_DIR}/logs`
 				require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0600))
+				
+				// Create basic.yaml dynamically
+				th := test.Setup(t)
+				dagContent := `steps:
+  - name: step1
+    command: echo "Hello, world!"
+`
+				th.CreateDAGFile(t, tempDir, "basic", []byte(dagContent))
+				
 				return configFile, tempDir
 			},
-			dagPath: func(t *testing.T, _ string) string {
-				return test.TestdataPath(t, path.Join("integration", "basic.yaml"))
+			dagPath: func(t *testing.T, tempDir string) string {
+				return filepath.Join(tempDir, "basic.yaml")
 			},
 			envVarName: "TMP_LOGS_DIR",
 		},

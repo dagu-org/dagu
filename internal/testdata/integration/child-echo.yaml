@@ -1,7 +1,0 @@
-name: child-echo
-params:
-  - ITEM: "default"
-steps:
-  - name: echo-item
-    command: echo "Processing $1"
-    output: PROCESSED_ITEM

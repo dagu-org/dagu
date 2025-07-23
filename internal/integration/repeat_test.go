@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -13,10 +12,19 @@ import (
 )
 
 func TestRepeatPolicy_WithLimit(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG with repeat limit
-	dag := th.DAG(t, filepath.Join("integration", "repeat-with-limit.yaml"))
+	dag := th.DAGWithYAML(t, "repeat-with-limit", []byte(`
+name: repeat-with-limit
+steps:
+  - name: repeat-step
+    command: echo "Executing step"
+    repeatPolicy:
+      repeat: true
+      limit: 3
+      intervalSec: 0
+`))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -44,10 +52,35 @@ func TestRepeatPolicy_WithLimit(t *testing.T) {
 }
 
 func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG with repeat limit and condition
-	dag := th.DAG(t, filepath.Join("integration", "repeat-limit-condition.yaml"))
+	dag := th.DAGWithYAML(t, "repeat-limit-condition", []byte(`name: repeat-limit-condition
+steps:
+  - name: increment-counter
+    script: |
+      COUNTER_FILE="/tmp/dagu_repeat_counter_test2"
+      COUNT=0
+      if [ -f "$COUNTER_FILE" ]; then
+        COUNT=$(cat "$COUNTER_FILE")
+      fi
+      COUNT=$((COUNT + 1))
+      echo "$COUNT" > "$COUNTER_FILE"
+      echo "Count: $COUNT"
+      # Output the count so we can verify in test
+      echo "$COUNT"
+      # Clean up on final run
+      if [ "$COUNT" -ge 5 ]; then
+        rm -f "$COUNTER_FILE"
+      fi
+    output: FINAL_COUNT
+    repeatPolicy:
+      repeat: until
+      limit: 5
+      intervalSec: 0
+      condition: "` + "`" + `[ -f /tmp/dagu_repeat_counter_test2 ] && cat /tmp/dagu_repeat_counter_test2 || echo 0` + "`" + `"
+      expected: "10"
+`))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -74,10 +107,19 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 }
 
 func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG that repeats with a limit
-	dag := th.DAG(t, filepath.Join("integration", "repeat-limit-before-condition.yaml"))
+	dag := th.DAGWithYAML(t, "repeat-limit-before-condition", []byte(`
+name: repeat-limit-before-condition
+steps:
+  - name: check-flag
+    command: echo "Checking for flag file"
+    repeatPolicy:
+      repeat: true
+      limit: 3
+      intervalSec: 0
+`))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -102,10 +144,19 @@ func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 }
 
 func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG with boolean repeat mode (should repeat while step succeeds, like unconditional while)
-	dag := th.DAG(t, filepath.Join("integration", "repeat-while-unconditional.yaml"))
+	dag := th.DAGWithYAML(t, "repeat-while-unconditional", []byte(`
+name: repeat-while-unconditional
+steps:
+  - name: repeat-step
+    command: echo "Unconditional while loop using boolean mode"
+    repeatPolicy:
+      repeat: true
+      limit: 3
+      intervalSec: 0
+`))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -133,10 +184,37 @@ func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
 }
 
 func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG with until mode and exitCode (should repeat until step returns exit code 0)
-	dag := th.DAG(t, filepath.Join("integration", "repeat-until-unconditional.yaml"))
+	dag := th.DAGWithYAML(t, "repeat-until-unconditional", []byte(`
+name: repeat-until-unconditional
+steps:
+  - name: repeat-step
+    script: |
+      COUNT_FILE="/tmp/dagu_repeat_until_unconditional_test"
+      COUNT=0
+      if [ -f "$COUNT_FILE" ]; then
+        COUNT=$(cat "$COUNT_FILE")
+      fi
+      COUNT=$((COUNT + 1))
+      echo "$COUNT" > "$COUNT_FILE"
+      echo "Count: $COUNT"
+      if [ "$COUNT" -le 2 ]; then
+        exit 1
+      else
+        rm -f "$COUNT_FILE"
+        exit 0
+      fi
+    repeatPolicy:
+      # Using backward compatibility mode: exitCode only infers "while" mode
+      # but we can test "until" behavior with explicit condition that inverts logic
+      repeat: "until"
+      exitCode: [0]  # Repeat until we get exit code 0
+      intervalSec: 0
+    continueOn:
+      exitCode: [1]
+`))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -163,10 +241,19 @@ func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
 }
 
 func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG with repeat: true (should work as "while" mode)
-	dag := th.DAG(t, filepath.Join("integration", "repeat-backward-compatibility-true.yaml"))
+	dag := th.DAGWithYAML(t, "repeat-backward-compatibility-true", []byte(`
+name: repeat-backward-compatibility-true
+steps:
+  - name: repeat-step
+    command: echo "Boolean true compatibility test"
+    repeatPolicy:
+      repeat: true
+      limit: 4
+      intervalSec: 0
+`))
 	agent := dag.Agent()
 
 	// Run with timeout

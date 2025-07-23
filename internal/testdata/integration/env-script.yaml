@@ -1,9 +1,0 @@
-env:
-  - "E1": foo
-  - "E2": bar
-
-steps:
-  - name: step1
-    output: OUT1
-    script: |
-      echo E1 is $E1, E2 is $E2

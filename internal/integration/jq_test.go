@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph/status"
@@ -12,8 +11,19 @@ func TestJQExecutor(t *testing.T) {
 	t.Parallel()
 
 	t.Run("MultipleOutputsWithRawTrue", func(t *testing.T) {
-		th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
-		dag := th.DAG(t, filepath.Join("integration", "jq-raw-multiple.yaml"))
+		th := test.Setup(t)
+		dag := th.DAGWithYAML(t, "jq-raw-multiple", []byte(`
+steps:
+  - name: extract-array-raw
+    executor: 
+      type: jq
+      config:
+        raw: true
+    script: |
+      { "data": [1, 2, 3] }
+    command: '.data[]'
+    output: RESULT
+`))
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -25,8 +35,19 @@ func TestJQExecutor(t *testing.T) {
 	})
 
 	t.Run("MultipleOutputsWithRawFalse", func(t *testing.T) {
-		th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
-		dag := th.DAG(t, filepath.Join("integration", "jq-json-multiple.yaml"))
+		th := test.Setup(t)
+		dag := th.DAGWithYAML(t, "jq-json-multiple", []byte(`
+steps:
+  - name: extract-array-json
+    executor: 
+      type: jq
+      config:
+        raw: false
+    script: |
+      { "data": [1, 2, 3] }
+    command: '.data[]'
+    output: RESULT
+`))
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -38,8 +59,19 @@ func TestJQExecutor(t *testing.T) {
 	})
 
 	t.Run("StringOutputWithRawTrue", func(t *testing.T) {
-		th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
-		dag := th.DAG(t, filepath.Join("integration", "jq-raw-strings.yaml"))
+		th := test.Setup(t)
+		dag := th.DAGWithYAML(t, "jq-raw-strings", []byte(`
+steps:
+  - name: extract-strings-raw
+    executor: 
+      type: jq
+      config:
+        raw: true
+    script: |
+      { "messages": ["hello", "world"] }
+    command: '.messages[]'
+    output: RESULT
+`))
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -51,8 +83,19 @@ func TestJQExecutor(t *testing.T) {
 	})
 
 	t.Run("StringOutputWithRawFalse", func(t *testing.T) {
-		th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
-		dag := th.DAG(t, filepath.Join("integration", "jq-json-strings.yaml"))
+		th := test.Setup(t)
+		dag := th.DAGWithYAML(t, "jq-json-strings", []byte(`
+steps:
+  - name: extract-strings-json
+    executor: 
+      type: jq
+      config:
+        raw: false
+    script: |
+      { "messages": ["hello", "world"] }
+    command: '.messages[]'
+    output: RESULT
+`))
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -64,8 +107,19 @@ func TestJQExecutor(t *testing.T) {
 	})
 
 	t.Run("TSVOutputWithRawTrue", func(t *testing.T) {
-		th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
-		dag := th.DAG(t, filepath.Join("integration", "jq-raw-tsv.yaml"))
+		th := test.Setup(t)
+		dag := th.DAGWithYAML(t, "jq-raw-tsv", []byte(`
+steps:
+  - name: extract-tsv
+    executor: 
+      type: jq
+      config:
+        raw: true
+    script: |
+      { "data": [1, 2, 3] }
+    command: '.data[] | [., 100 * .] | @tsv'
+    output: RESULT
+`))
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)

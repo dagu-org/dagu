@@ -1,5 +1,0 @@
-name: large-output-65kb
-steps:
-  - name: read-65kb-file
-    command: cat large-output-65kb.txt
-    output: OUTPUT_65KB

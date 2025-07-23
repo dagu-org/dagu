@@ -1,7 +1,0 @@
-params:
-  - NAME: "foo"
-steps:
-  - name: step1
-    script: |
-      echo 1 2 3
-    output: OUT1

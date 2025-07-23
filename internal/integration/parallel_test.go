@@ -17,10 +17,32 @@ import (
 )
 
 func TestParallelExecution_SimpleItems(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
+
+	// Create child DAG
+	childDAGContent := `name: child-echo
+params:
+  - ITEM: "default"
+steps:
+  - name: echo-item
+    command: echo "Processing $1"
+    output: PROCESSED_ITEM
+`
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-echo", []byte(childDAGContent))
 
 	// Load parent DAG with parallel configuration
-	dag := th.DAG(t, filepath.Join("integration", "parallel-simple.yaml"))
+	dag := th.DAGWithYAML(t, "parallel-simple", []byte(`
+name: parallel-simple
+steps:
+  - name: process-items
+    run: child-echo
+    parallel:
+      items:
+        - "item1"
+        - "item2"
+        - "item3"
+      maxConcurrent: 2
+`))
 
 	// Run the DAG
 	agent := dag.Agent()
@@ -46,10 +68,36 @@ func TestParallelExecution_SimpleItems(t *testing.T) {
 }
 
 func TestParallelExecution_ObjectItems(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
+
+	// Create child DAG
+	childDAGContent := `name: child-process
+params:
+  - REGION: "us-east-1"
+  - VERSION: "1.0.0"
+steps:
+  - name: process-region
+    command: echo "Deploying version $VERSION to region $REGION"
+    output: DEPLOYMENT_RESULT
+`
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-process", []byte(childDAGContent))
 
 	// Load parent DAG with parallel object configuration
-	dag := th.DAG(t, filepath.Join("integration", "parallel-objects.yaml"))
+	dag := th.DAGWithYAML(t, "parallel-objects", []byte(`
+name: parallel-objects
+steps:
+  - name: process-regions
+    run: child-process
+    parallel:
+      items:
+        - REGION: us-east-1
+          VERSION: "1.0.0"
+        - REGION: us-west-2
+          VERSION: "1.0.1"
+        - REGION: eu-west-1
+          VERSION: "1.0.2"
+      maxConcurrent: 2
+`))
 
 	// Run the DAG
 	agent := dag.Agent()
@@ -81,10 +129,29 @@ func TestParallelExecution_ObjectItems(t *testing.T) {
 }
 
 func TestParallelExecution_VariableReference(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
+
+	// Create child DAG (reusing child-echo)
+	childDAGContent := `name: child-echo
+params:
+  - ITEM: "default"
+steps:
+  - name: echo-item
+    command: echo "Processing $1"
+    output: PROCESSED_ITEM
+`
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-echo", []byte(childDAGContent))
 
 	// Load parent DAG with variable reference
-	dag := th.DAG(t, filepath.Join("integration", "parallel-variable.yaml"))
+	dag := th.DAGWithYAML(t, "parallel-variable", []byte(`
+name: parallel-variable
+params:
+  - ITEMS: '["alpha", "beta", "gamma", "delta"]'
+steps:
+  - name: process-from-var
+    run: child-echo
+    parallel: ${ITEMS}
+`))
 
 	// Run the DAG
 	agent := dag.Agent()
@@ -110,10 +177,29 @@ func TestParallelExecution_VariableReference(t *testing.T) {
 }
 
 func TestParallelExecution_SpaceSeparated(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
+
+	// Create child DAG (reusing child-echo)
+	childDAGContent := `name: child-echo
+params:
+  - ITEM: "default"
+steps:
+  - name: echo-item
+    command: echo "Processing $1"
+    output: PROCESSED_ITEM
+`
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-echo", []byte(childDAGContent))
 
 	// Load parent DAG with space-separated variable
-	dag := th.DAG(t, filepath.Join("integration", "parallel-space-separated.yaml"))
+	dag := th.DAGWithYAML(t, "parallel-space-separated", []byte(`
+name: parallel-space-separated
+env:
+  - SERVERS: "server1 server2 server3"
+steps:
+  - name: process-servers
+    run: child-echo
+    parallel: ${SERVERS}
+`))
 
 	// Run the DAG
 	agent := dag.Agent()
@@ -139,10 +225,37 @@ func TestParallelExecution_SpaceSeparated(t *testing.T) {
 }
 
 func TestParallelExecution_DirectVariable(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
+
+	// Create child DAG
+	childDAGContent := `name: child-with-output
+params:
+  - TASK: "default"
+steps:
+  - name: process-task
+    command: |
+      echo "Processing task: $1"
+      echo "TASK_RESULT_$1"
+    output: TASK_OUTPUT
+  - name: finalize
+    command: echo "Task $1 completed with output ${TASK_OUTPUT}"
+`
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-with-output", []byte(childDAGContent))
 
 	// Load parent DAG with direct variable reference (not ${ITEMS} but $ITEMS)
-	dag := th.DAG(t, filepath.Join("integration", "parallel-direct-variable.yaml"))
+	dag := th.DAGWithYAML(t, "parallel-direct-variable", []byte(`
+name: parallel-direct-variable
+env:
+  - ITEMS: '["task1", "task2", "task3"]'
+steps:
+  - name: parallel-tasks
+    run: child-with-output
+    parallel: $ITEMS
+  - name: aggregate-results
+    command: echo "Completed parallel tasks"
+    depends: parallel-tasks
+    output: FINAL_RESULT
+`))
 
 	// Run the DAG
 	agent := dag.Agent()

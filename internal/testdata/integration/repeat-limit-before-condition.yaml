@@ -1,8 +1,0 @@
-name: repeat-limit-before-condition
-steps:
-  - name: check-flag
-    command: echo "Checking for flag file"
-    repeatPolicy:
-      repeat: true
-      limit: 3
-      intervalSec: 0

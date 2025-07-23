@@ -1,9 +1,0 @@
-name: test-chain
-type: chain
-steps:
-  - name: step1
-    command: echo "step 1"
-  - name: step2
-    command: echo "step 2"
-  - name: step3
-    command: echo "step 3"

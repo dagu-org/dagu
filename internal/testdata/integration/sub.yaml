@@ -1,6 +1,0 @@
-params:
-  SUB_P1: xyz
-steps:
-  - name: step1
-    command: echo $SUB_P1
-    output: OUT

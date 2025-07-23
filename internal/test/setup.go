@@ -196,13 +196,13 @@ func (h Helper) DAG(t *testing.T, name string) DAG {
 func (h Helper) DAGWithYAML(t *testing.T, name string, yamlContent []byte) DAG {
 	t.Helper()
 
-	// Create temporary directory and file
-	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, fmt.Sprintf("%s.yaml", name))
-	err := os.WriteFile(testFile, yamlContent, 0600)
+	err := os.MkdirAll(h.Config.Paths.DAGsDir, 0750)
+	require.NoError(t, err, "failed to create DAGs directory %q", h.Config.Paths.DAGsDir)
+
+	testFile := filepath.Join(h.Config.Paths.DAGsDir, fmt.Sprintf("%s.yaml", name))
+	err = os.WriteFile(testFile, yamlContent, 0600)
 	require.NoError(t, err, "failed to write test DAG %q", name)
 
-	// Load the DAG
 	dag, err := digraph.Load(h.Context, testFile)
 	require.NoError(t, err, "failed to load test DAG %q", name)
 

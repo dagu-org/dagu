@@ -1,8 +1,0 @@
-steps:
-  - name: step1
-    command: perl
-    script: |
-      use strict;
-      use warnings;
-      print("Hello World\n");
-    output: OUT1

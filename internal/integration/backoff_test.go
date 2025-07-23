@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -13,10 +12,22 @@ import (
 )
 
 func TestRetryPolicy_WithExponentialBackoff(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG with retry backoff
-	dag := th.DAG(t, filepath.Join("integration", "retry-with-backoff.yaml"))
+	dag := th.DAGWithYAML(t, "retry-with-backoff", []byte(`
+name: retry-with-backoff
+steps:
+  - name: failing-step
+    command: |
+      echo "Attempt at $(date +%s.%N)"
+      exit 1
+    retryPolicy:
+      limit: 3
+      intervalSec: 1
+      backoff: 2.0
+      exitCode: [1]
+`))
 	agent := dag.Agent()
 
 	// Record start time
@@ -49,10 +60,22 @@ func TestRetryPolicy_WithExponentialBackoff(t *testing.T) {
 }
 
 func TestRetryPolicy_WithBackoffBoolean(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG with boolean backoff
-	dag := th.DAG(t, filepath.Join("integration", "retry-with-backoff-bool.yaml"))
+	dag := th.DAGWithYAML(t, "retry-with-backoff-bool", []byte(`
+name: retry-with-backoff-bool
+steps:
+  - name: failing-step
+    command: |
+      echo "Attempt at $(date +%s.%N)"
+      exit 1
+    retryPolicy:
+      limit: 3
+      intervalSec: 1
+      backoff: true  # Should use default 2.0 multiplier
+      exitCode: [1]
+`))
 	agent := dag.Agent()
 
 	// Record start time
@@ -82,10 +105,23 @@ func TestRetryPolicy_WithBackoffBoolean(t *testing.T) {
 }
 
 func TestRetryPolicy_WithMaxInterval(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG with max interval cap
-	dag := th.DAG(t, filepath.Join("integration", "retry-with-backoff-max.yaml"))
+	dag := th.DAGWithYAML(t, "retry-with-backoff-max", []byte(`
+name: retry-with-backoff-max
+steps:
+  - name: failing-step
+    command: |
+      echo "Attempt at $(date +%s.%N)"
+      exit 1
+    retryPolicy:
+      limit: 5
+      intervalSec: 1
+      backoff: 3.0
+      maxIntervalSec: 5  # Cap at 5 seconds
+      exitCode: [1]
+`))
 	agent := dag.Agent()
 
 	// Record start time
@@ -118,10 +154,23 @@ func TestRetryPolicy_WithMaxInterval(t *testing.T) {
 }
 
 func TestRepeatPolicy_WithExponentialBackoff(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG with repeat backoff
-	dag := th.DAG(t, filepath.Join("integration", "repeat-with-backoff.yaml"))
+	dag := th.DAGWithYAML(t, "repeat-with-backoff", []byte(`
+name: repeat-with-backoff
+steps:
+  - name: repeat-step
+    command: |
+      echo "Execution at $(date +%s.%N)"
+      exit 0
+    repeatPolicy:
+      repeat: while
+      limit: 4
+      intervalSec: 1
+      backoff: 2.0
+      exitCode: [0]  # Repeat while exit code is 0
+`))
 	agent := dag.Agent()
 
 	// Record start time
@@ -154,10 +203,24 @@ func TestRepeatPolicy_WithExponentialBackoff(t *testing.T) {
 }
 
 func TestRepeatPolicy_WithMaxInterval(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG with max interval cap
-	dag := th.DAG(t, filepath.Join("integration", "repeat-with-backoff-max.yaml"))
+	dag := th.DAGWithYAML(t, "repeat-with-backoff-max", []byte(`
+name: repeat-with-backoff-max
+steps:
+  - name: repeat-step
+    command: |
+      echo "Execution at $(date +%s.%N)"
+      exit 0
+    repeatPolicy:
+      repeat: while
+      limit: 5
+      intervalSec: 1
+      backoff: 3.0
+      maxIntervalSec: 5  # Cap at 5 seconds
+      exitCode: [0]  # Repeat while exit code is 0
+`))
 	agent := dag.Agent()
 
 	// Record start time

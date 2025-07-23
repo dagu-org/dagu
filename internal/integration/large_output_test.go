@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -13,10 +12,17 @@ import (
 )
 
 func TestLargeOutput_64KB(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG that reads a 64KB file
-	dag := th.DAG(t, filepath.Join("integration", "large-output-64kb.yaml"))
+	textFilePath := test.TestdataPath(t, "integration/large-output-64kb.txt")
+	dag := th.DAGWithYAML(t, "large-output-64kb", []byte(`
+name: large-output-64kb
+steps:
+  - name: read-64kb-file
+    command: cat `+textFilePath+`
+    output: OUTPUT_64KB
+`))
 	agent := dag.Agent()
 
 	// Run with timeout to detect hanging
@@ -41,10 +47,17 @@ func TestLargeOutput_64KB(t *testing.T) {
 }
 
 func TestLargeOutput_65KB(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG that reads a 65KB file (exceeds typical pipe buffer)
-	dag := th.DAG(t, filepath.Join("integration", "large-output-65kb.yaml"))
+	textFilePath := test.TestdataPath(t, "integration/large-output-65kb.txt")
+	dag := th.DAGWithYAML(t, "large-output-65kb", []byte(`
+name: large-output-65kb
+steps:
+  - name: read-65kb-file
+    command: cat `+textFilePath+`
+    output: OUTPUT_65KB
+`))
 	agent := dag.Agent()
 
 	// Run with timeout to detect hanging
@@ -69,10 +82,17 @@ func TestLargeOutput_65KB(t *testing.T) {
 }
 
 func TestLargeOutput_128KB(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load DAG that reads a 128KB file
-	dag := th.DAG(t, filepath.Join("integration", "large-output-128kb.yaml"))
+	textFilePath := test.TestdataPath(t, "integration/large-output-128kb.txt")
+	dag := th.DAGWithYAML(t, "large-output-128kb", []byte(`
+name: large-output-128kb
+steps:
+  - name: read-128kb-file
+    command: cat `+textFilePath+`
+    output: OUTPUT_128KB
+`))
 	agent := dag.Agent()
 
 	// Run with timeout to detect hanging

@@ -1,6 +1,0 @@
-params:
-  PARAM: VALUE
-steps:
-  - name: grand_child
-    command: "echo value is ${PARAM}"
-    output: OUTPUT

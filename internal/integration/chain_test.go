@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph/status"
@@ -10,10 +9,20 @@ import (
 )
 
 func TestChainExecution(t *testing.T) {
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
 	// Load chain DAG
-	dag := th.DAG(t, filepath.Join("integration", "chain.yaml"))
+	dag := th.DAGWithYAML(t, "test-chain", []byte(`
+name: test-chain
+type: chain
+steps:
+  - name: step1
+    command: echo "step 1"
+  - name: step2
+    command: echo "step 2"
+  - name: step3
+    command: echo "step 3"
+`))
 
 	// Run the DAG
 	agent := dag.Agent()

@@ -3,7 +3,6 @@ package integration_test
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -20,9 +19,33 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
 		_ = os.Remove(counterFile)
 	})
 
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	th := test.Setup(t)
 
-	dag := th.DAG(t, filepath.Join("integration", "repeat-on-exitcode-fail.yaml"))
+	dag := th.DAGWithYAML(t, "test-repeat-on-exitcode", []byte(`
+name: test-repeat-on-exitcode
+steps:
+  - name: repeat-on-fail
+    command: |
+      #!/bin/bash
+      COUNTER_FILE="/tmp/dagu-test-counter-repeat-on-exitcode"
+      if [ ! -f "$COUNTER_FILE" ]; then
+          echo 1 > "$COUNTER_FILE"
+          exit 1
+      fi
+
+      count=$(cat "$COUNTER_FILE")
+      if [ "$count" -lt 3 ]; then
+          echo $((count + 1)) > "$COUNTER_FILE"
+          exit 1
+      else
+          echo $((count + 1)) > "$COUNTER_FILE"
+          exit 0
+      fi
+    repeatPolicy:
+      exitCode: [1]
+      limit: 5
+      intervalSec: 1
+`))
 	agent := dag.Agent()
 
 	ctx, cancel := context.WithTimeout(agent.Context, 15*time.Second)

@@ -1,5 +1,0 @@
-name: large-output-128kb
-steps:
-  - name: read-128kb-file
-    command: cat large-output-128kb.txt
-    output: OUTPUT_128KB
