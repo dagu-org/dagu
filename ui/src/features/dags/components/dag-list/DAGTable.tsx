@@ -825,71 +825,74 @@ function DAGTable({
           isLoading ? 'opacity-70 pointer-events-none' : ''
         }`}
       >
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Search input */}
-          <div className="relative flex-1 min-w-[200px]">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-              <Search className="h-4 w-4" />
-            </div>
-            <Input
-              type="search"
-              placeholder="Search definitions..."
-              value={searchText}
-              onChange={(e) => handleSearchTextChange(e.target.value)}
-              className="pl-10 h-9 border border-input rounded-md w-full"
-            />
-            {searchText && (
-              <button
-                onClick={() => handleSearchTextChange('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Clear search"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
+          {/* Search and Filter Row */}
+          <div className="flex flex-1 gap-2 min-w-0">
+            {/* Search input */}
+            <div className="relative flex-1 min-w-0">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                <Search className="h-4 w-4" />
+              </div>
+              <Input
+                type="search"
+                placeholder="Search definitions..."
+                value={searchText}
+                onChange={(e) => handleSearchTextChange(e.target.value)}
+                className="pl-10 h-9 border border-input rounded-md w-full"
+              />
+              {searchText && (
+                <button
+                  onClick={() => handleSearchTextChange('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Clear search"
                 >
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            )}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Tag filter */}
+            <Select
+              value={searchTag}
+              onValueChange={(value) =>
+                handleSearchTagChange(value === 'all' ? '' : value)
+              }
+            >
+              <SelectTrigger className="w-auto min-w-[120px] sm:min-w-[160px] h-9 border border-input rounded-md">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Filter by tag" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="max-h-[280px] overflow-y-auto">
+                <SelectItem value="all">
+                  <span className="font-medium">All Tags</span>
+                </SelectItem>
+                {uniqueTags?.tags?.map((tag) => (
+                  <SelectItem key={tag} value={tag}>
+                    {tag}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Tag filter */}
-          <Select
-            value={searchTag}
-            onValueChange={(value) =>
-              handleSearchTagChange(value === 'all' ? '' : value)
-            }
-          >
-            <SelectTrigger className="w-auto min-w-[160px] h-9 border border-input rounded-md">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder="Filter by tag" />
-              </div>
-            </SelectTrigger>
-            <SelectContent className="max-h-[280px] overflow-y-auto">
-              <SelectItem value="all">
-                <span className="font-medium">All Tags</span>
-              </SelectItem>
-              {uniqueTags?.tags?.map((tag) => (
-                <SelectItem key={tag} value={tag}>
-                  {tag}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Pagination */}
+          {/* Pagination - on new row on mobile */}
           {pagination && (
-            <div className="ml-auto">
+            <div className="flex justify-center sm:justify-end sm:ml-auto">
               <DAGPagination
                 totalPages={pagination.totalPages}
                 page={pagination.page}
