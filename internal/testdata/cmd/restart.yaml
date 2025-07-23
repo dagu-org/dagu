@@ -1,8 +1,0 @@
-params: "p1"
-steps:
-  - name: "1"
-    script: "echo $1"
-  - name: "2"
-    script: "sleep 100"
-    depends:
-      - "1"

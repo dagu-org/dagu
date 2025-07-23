@@ -1,7 +1,0 @@
-env:
-  CHILD_ENV: "child_value"
-  OVERWRITE_ENV: "child_overwrite_value"
-
-steps:
-  - name: "step1"
-    command: echo "step1"

@@ -1,9 +1,0 @@
-steps:
-  - name: step1
-    id: unique-step-1
-    command: echo "Step with ID"
-  - name: step2
-    command: echo "Step without ID"
-  - name: step3
-    id: custom-id-123
-    command: echo "Another step with ID"

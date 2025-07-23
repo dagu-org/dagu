@@ -1,4 +1,0 @@
-params:
-  - FOO: foo
-  - BAR: bar
-  - BAZ: "`echo baz`"

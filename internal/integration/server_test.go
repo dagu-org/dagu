@@ -13,8 +13,7 @@ import (
 func TestServer_StartWithConfig(t *testing.T) {
 	testCases := []struct {
 		name       string
-		setupFunc  func(t *testing.T) (string, string) // returns configFile and tempDir
-		dagPath    func(t *testing.T, tempDir string) string
+		setupFunc  func(t *testing.T) (string, string) // returns configFile and dagPath
 		envVarName string
 	}{
 		{
@@ -24,26 +23,23 @@ func TestServer_StartWithConfig(t *testing.T) {
 				configFile := filepath.Join(tempDir, "config.yaml")
 				configContent := `logDir: ${TMP_LOGS_DIR}/logs`
 				require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0600))
-				
-				// Create basic.yaml dynamically
+
+				// Create DAG with inline YAML
 				th := test.Setup(t)
 				dagContent := `steps:
   - name: step1
     command: echo "Hello, world!"
 `
-				th.CreateDAGFile(t, tempDir, "basic", []byte(dagContent))
-				
-				return configFile, tempDir
-			},
-			dagPath: func(t *testing.T, tempDir string) string {
-				return filepath.Join(tempDir, "basic.yaml")
+				dag := th.DAG(t, dagContent)
+
+				return configFile, dag.Location
 			},
 			envVarName: "TMP_LOGS_DIR",
 		},
 		{
 			name: "DAGLocalLogDir",
 			setupFunc: func(t *testing.T) (string, string) {
-				tempDir := t.TempDir()
+				// Create DAG with inline YAML
 				th := test.Setup(t)
 				dagContent := `
 logDir: ${DAG_TMP_LOGS_DIR}/logs
@@ -51,11 +47,8 @@ steps:
   - name: step1
     command: echo "Hello, world!"
 `
-				dagFile := th.CreateDAGFile(t, tempDir, "basic", []byte(dagContent))
-				return dagFile, tempDir
-			},
-			dagPath: func(_ *testing.T, tempDir string) string {
-				return filepath.Join(tempDir, "basic.yaml")
+				dag := th.DAG(t, dagContent)
+				return "", dag.Location
 			},
 			envVarName: "DAG_TMP_LOGS_DIR",
 		},
@@ -64,16 +57,14 @@ steps:
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup test case
-			configFile, tempDir := tc.setupFunc(t)
+			configFile, dagPath := tc.setupFunc(t)
+			tempDir := t.TempDir()
 			_ = os.Setenv(tc.envVarName, tempDir)
-
-			// Get DAG path
-			dagPath := tc.dagPath(t, tempDir)
 
 			// Run command
 			th := test.SetupCommand(t)
 			args := []string{"start"}
-			if tc.name == "GlobalLogDir" {
+			if tc.name == "GlobalLogDir" && configFile != "" {
 				args = append(args, "--config", configFile)
 			}
 			args = append(args, dagPath)

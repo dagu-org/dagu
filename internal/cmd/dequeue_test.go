@@ -15,7 +15,11 @@ import (
 func TestDequeueCommand(t *testing.T) {
 	th := test.SetupCommand(t)
 
-	dag := th.DAG(t, "cmd/dequeue.yaml")
+	dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "true"
+`)
 
 	// Enqueue the DAG first
 	th.RunCommand(t, cmd.CmdEnqueue(), test.CmdTest{
@@ -26,7 +30,7 @@ func TestDequeueCommand(t *testing.T) {
 	// Now test the dequeue command
 	th.RunCommand(t, cmd.CmdDequeue(), test.CmdTest{
 		Name:        "Dequeue",
-		Args:        []string{"dequeue", "--dag-run", "dequeue:test-DAG"},
+		Args:        []string{"dequeue", "--dag-run", dag.Name + ":test-DAG"},
 		ExpectedOut: []string{"Dequeued dag-run"},
 	})
 }
@@ -36,7 +40,12 @@ func TestDequeueCommand_PreservesState(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a DAG
-	dag := th.DAG(t, "cmd/dequeue_preserves_state.yaml")
+	dag := th.DAG(t, `
+name: dequeue_preserves_state
+steps:
+  - name: step1
+    command: echo "success"
+`)
 
 	// First run the DAG successfully
 	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{

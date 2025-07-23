@@ -10,25 +10,38 @@ import (
 func TestEnqueueCommand(t *testing.T) {
 	th := test.SetupCommand(t)
 
+	dagEnqueue := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "true"
+`)
+
+	dagEnqueueWithParams := th.DAG(t, `
+params: "p1 p2"
+steps:
+  - name: "1"
+    command: "echo \"params is $1 and $2\""
+`)
+
 	tests := []test.CmdTest{
 		{
 			Name:        "Enqueue",
-			Args:        []string{"enqueue", th.DAG(t, "cmd/enqueue.yaml").Location},
+			Args:        []string{"enqueue", dagEnqueue.Location},
 			ExpectedOut: []string{"Enqueued"},
 		},
 		{
 			Name:        "EnqueueWithParams",
-			Args:        []string{"enqueue", `--params="p3 p4"`, th.DAG(t, "cmd/enqueue_with_params.yaml").Location},
+			Args:        []string{"enqueue", `--params="p3 p4"`, dagEnqueueWithParams.Location},
 			ExpectedOut: []string{`params="[1=p3 2=p4]"`},
 		},
 		{
 			Name:        "StartDAGWithParamsAfterDash",
-			Args:        []string{"enqueue", th.DAG(t, "cmd/enqueue_with_params.yaml").Location, "--", "p5", "p6"},
+			Args:        []string{"enqueue", dagEnqueueWithParams.Location, "--", "p5", "p6"},
 			ExpectedOut: []string{`params="[1=p5 2=p6]"`},
 		},
 		{
 			Name:        "EnqueueWithDAGRunID",
-			Args:        []string{"enqueue", `--run-id="test-dag-run"`, th.DAG(t, "cmd/enqueue.yaml").Location},
+			Args:        []string{"enqueue", `--run-id="test-dag-run"`, dagEnqueue.Location},
 			ExpectedOut: []string{"test-dag-run"},
 		},
 	}

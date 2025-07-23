@@ -12,7 +12,7 @@ func TestJQExecutor(t *testing.T) {
 
 	t.Run("MultipleOutputsWithRawTrue", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "jq-raw-multiple", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: extract-array-raw
     executor: 
@@ -23,7 +23,7 @@ steps:
       { "data": [1, 2, 3] }
     command: '.data[]'
     output: RESULT
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -36,7 +36,7 @@ steps:
 
 	t.Run("MultipleOutputsWithRawFalse", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "jq-json-multiple", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: extract-array-json
     executor: 
@@ -47,7 +47,7 @@ steps:
       { "data": [1, 2, 3] }
     command: '.data[]'
     output: RESULT
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -60,7 +60,7 @@ steps:
 
 	t.Run("StringOutputWithRawTrue", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "jq-raw-strings", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: extract-strings-raw
     executor: 
@@ -71,7 +71,7 @@ steps:
       { "messages": ["hello", "world"] }
     command: '.messages[]'
     output: RESULT
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -84,7 +84,7 @@ steps:
 
 	t.Run("StringOutputWithRawFalse", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "jq-json-strings", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: extract-strings-json
     executor: 
@@ -95,7 +95,7 @@ steps:
       { "messages": ["hello", "world"] }
     command: '.messages[]'
     output: RESULT
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -108,7 +108,7 @@ steps:
 
 	t.Run("TSVOutputWithRawTrue", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "jq-raw-tsv", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: extract-tsv
     executor: 
@@ -119,7 +119,7 @@ steps:
       { "data": [1, 2, 3] }
     command: '.data[] | [., 100 * .] | @tsv'
     output: RESULT
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)

@@ -1,8 +1,0 @@
-name: worker-selector-test
-description: Test DAG with worker selector
-workerSelector:
-  gpu: "true"
-  memory: "64G"
-steps:
-  - name: gpu-task
-    command: echo "Running on GPU worker"

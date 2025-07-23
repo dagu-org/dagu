@@ -1,8 +1,0 @@
-steps:
-  - name: "repeat-while-condition"
-    command: "echo test"
-    repeatPolicy:
-      repeat: "while"
-      condition: "echo hello"
-      intervalSec: 5
-      limit: 3

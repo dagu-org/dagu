@@ -15,7 +15,12 @@ func TestRetryCommand(t *testing.T) {
 	t.Run("RetryDAGWithFilePath", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/retry.yaml")
+		dagFile := th.DAG(t, `
+params: "p1"
+steps:
+  - name: "1"
+    command: "echo param is $1"
+`)
 
 		// Run a DAG.
 		args := []string{"start", `--params="foo"`, dagFile.Location}
@@ -44,7 +49,12 @@ func TestRetryCommand(t *testing.T) {
 	t.Run("RetryDAGWithName", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/retry.yaml")
+		dagFile := th.DAG(t, `
+params: "p1"
+steps:
+  - name: "1"
+    command: "echo param is $1"
+`)
 
 		// Run a DAG.
 		args := []string{"start", `--params="bar"`, dagFile.Location}

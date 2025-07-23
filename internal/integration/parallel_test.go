@@ -31,7 +31,7 @@ steps:
 	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-echo", []byte(childDAGContent))
 
 	// Load parent DAG with parallel configuration
-	dag := th.DAGWithYAML(t, "parallel-simple", []byte(`
+	dag := th.DAG(t, `
 name: parallel-simple
 steps:
   - name: process-items
@@ -42,7 +42,7 @@ steps:
         - "item2"
         - "item3"
       maxConcurrent: 2
-`))
+`)
 
 	// Run the DAG
 	agent := dag.Agent()
@@ -83,7 +83,7 @@ steps:
 	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-process", []byte(childDAGContent))
 
 	// Load parent DAG with parallel object configuration
-	dag := th.DAGWithYAML(t, "parallel-objects", []byte(`
+	dag := th.DAG(t, `
 name: parallel-objects
 steps:
   - name: process-regions
@@ -97,7 +97,7 @@ steps:
         - REGION: eu-west-1
           VERSION: "1.0.2"
       maxConcurrent: 2
-`))
+`)
 
 	// Run the DAG
 	agent := dag.Agent()
@@ -143,7 +143,7 @@ steps:
 	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-echo", []byte(childDAGContent))
 
 	// Load parent DAG with variable reference
-	dag := th.DAGWithYAML(t, "parallel-variable", []byte(`
+	dag := th.DAG(t, `
 name: parallel-variable
 params:
   - ITEMS: '["alpha", "beta", "gamma", "delta"]'
@@ -151,7 +151,7 @@ steps:
   - name: process-from-var
     run: child-echo
     parallel: ${ITEMS}
-`))
+`)
 
 	// Run the DAG
 	agent := dag.Agent()
@@ -191,7 +191,7 @@ steps:
 	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-echo", []byte(childDAGContent))
 
 	// Load parent DAG with space-separated variable
-	dag := th.DAGWithYAML(t, "parallel-space-separated", []byte(`
+	dag := th.DAG(t, `
 name: parallel-space-separated
 env:
   - SERVERS: "server1 server2 server3"
@@ -199,7 +199,7 @@ steps:
   - name: process-servers
     run: child-echo
     parallel: ${SERVERS}
-`))
+`)
 
 	// Run the DAG
 	agent := dag.Agent()
@@ -243,7 +243,7 @@ steps:
 	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-with-output", []byte(childDAGContent))
 
 	// Load parent DAG with direct variable reference (not ${ITEMS} but $ITEMS)
-	dag := th.DAGWithYAML(t, "parallel-direct-variable", []byte(`
+	dag := th.DAG(t, `
 name: parallel-direct-variable
 env:
   - ITEMS: '["task1", "task2", "task3"]'
@@ -255,7 +255,7 @@ steps:
     command: echo "Completed parallel tasks"
     depends: parallel-tasks
     output: FINAL_RESULT
-`))
+`)
 
 	// Run the DAG
 	agent := dag.Agent()
@@ -284,7 +284,7 @@ func TestParallelExecution_WithOutput(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create a DAG that uses parallel execution output
-	dag := th.DAGWithYAML(t, "test-parallel-output", []byte(`
+	dag := th.DAG(t, `
 name: test-parallel-output
 steps:
   - name: parallel-with-output
@@ -311,7 +311,7 @@ steps:
       echo "Processing item: $1"
       echo "TASK_RESULT_$1"
     output: TASK_OUTPUT
-`))
+`)
 
 	agent := dag.Agent()
 	require.NoError(t, agent.Run(agent.Context))
@@ -432,7 +432,7 @@ func TestParallelExecution_DeterministicIDs(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create a temporary test DAG that uses parallel execution with duplicate items
-	dag := th.DAGWithYAML(t, "test-deterministic-ids", []byte(`
+	dag := th.DAG(t, `
 name: test-deterministic-ids
 steps:
   - name: process
@@ -452,7 +452,7 @@ steps:
   - name: echo
     command: echo "$1"
     output: ECHO_OUTPUT
-`))
+`)
 
 	// Run and verify deduplication
 	agent := dag.Agent()
@@ -488,7 +488,7 @@ func TestParallelExecution_Cancel(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create parent and child DAGs
-	dag := th.DAGWithYAML(t, "test-parallel-cancel", []byte(`
+	dag := th.DAG(t, `
 name: test-parallel-cancel
 steps:
   - name: parallel-sleep
@@ -507,7 +507,7 @@ params:
 steps:
   - name: sleep
     command: sleep $1
-`))
+`)
 	agent := dag.Agent()
 
 	// Start the DAG in a goroutine
@@ -555,7 +555,7 @@ func TestParallelExecution_PartialFailure(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create parent and child DAGs
-	dag := th.DAGWithYAML(t, "test-parallel-partial-failure", []byte(`
+	dag := th.DAG(t, `
 name: test-parallel-partial-failure
 steps:
   - name: parallel-mixed
@@ -579,7 +579,7 @@ steps:
         exit 1
       fi
       echo "Processing: $1"
-`))
+`)
 	agent := dag.Agent()
 
 	// Run should fail because some child DAGs fail
@@ -606,7 +606,7 @@ func TestParallelExecution_OutputsArray(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create parent and child DAGs
-	dag := th.DAGWithYAML(t, "test-parallel-outputs-array", []byte(`
+	dag := th.DAG(t, `
 name: test-parallel-outputs-array
 steps:
   - name: parallel-tasks
@@ -638,7 +638,7 @@ steps:
       echo "Processing item: $1"
       echo "TASK_RESULT_$1"
     output: TASK_OUTPUT
-`))
+`)
 	agent := dag.Agent()
 	require.NoError(t, agent.Run(agent.Context))
 
@@ -686,7 +686,7 @@ func TestParallelExecution_OutOfBoundsAccess(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create parent and child DAGs
-	dag := th.DAGWithYAML(t, "test-parallel-out-of-bounds", []byte(`
+	dag := th.DAG(t, `
 name: test-parallel-out-of-bounds
 steps:
   - name: parallel-tasks
@@ -712,7 +712,7 @@ steps:
       echo "Processing item: $1"
       echo "TASK_RESULT_$1"
     output: TASK_OUTPUT
-`))
+`)
 	agent := dag.Agent()
 
 	// The DAG should complete (variable expansion handles undefined gracefully)
@@ -750,7 +750,7 @@ func TestParallelExecution_MinimalRetry(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create parent and child DAGs
-	dag := th.DAGWithYAML(t, "test-parallel-minimal", []byte(`
+	dag := th.DAG(t, `
 name: test-parallel-minimal
 steps:
   - name: parallel-execution
@@ -767,7 +767,7 @@ name: child-fail
 steps:
   - name: fail
     command: exit 1
-`))
+`)
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.Error(t, err, "DAG should fail")
@@ -800,7 +800,7 @@ func TestParallelExecution_RetryAndContinueOn(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create parent and child DAGs
-	dag := th.DAGWithYAML(t, "test-parallel-both", []byte(`
+	dag := th.DAG(t, `
 name: test-parallel-both
 steps:
   - name: parallel-execution
@@ -822,7 +822,7 @@ name: child-fail-both
 steps:
   - name: fail
     command: exit 1
-`))
+`)
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	// DAG should complete successfully due to continueOn.failure: true, even after retries fail
@@ -874,7 +874,7 @@ func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create parent and child DAGs
-	dag := th.DAGWithYAML(t, "test-parallel-output-failures", []byte(`
+	dag := th.DAG(t, `
 name: test-parallel-output-failures
 steps:
   - name: parallel-test
@@ -897,7 +897,7 @@ steps:
         exit 1
       fi
     output: RESULT
-`))
+`)
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	// Should complete successfully due to continueOn.failure: true, despite one child failing
@@ -951,7 +951,7 @@ func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
 	t.Cleanup(func() { _ = os.Remove(counterFile) })
 
 	// Create parent and child DAGs
-	dag := th.DAGWithYAML(t, "test-parallel-retry", []byte(`
+	dag := th.DAG(t, `
 name: test-parallel-retry
 steps:
   - name: parallel-retry
@@ -978,7 +978,7 @@ steps:
     retryPolicy:
       limit: 1
       intervalSec: 0
-`))
+`)
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
@@ -1040,7 +1040,7 @@ steps:
 `, itemsStr)
 
 	// Create parent and child DAGs
-	dag := th.DAGWithYAML(t, "test-parallel-exceed-limit", []byte(dagContent))
+	dag := th.DAG(t, dagContent)
 	agent := dag.Agent()
 
 	// This should fail during execution when buildChildDAGRuns is called
@@ -1082,7 +1082,7 @@ steps:
 `, itemsStr)
 
 	// Create parent and child DAGs
-	dag := th.DAGWithYAML(t, "test-parallel-exceed-limit", []byte(dagContent))
+	dag := th.DAG(t, dagContent)
 
 	// Load and start the DAG - this should succeed as we're at the exact limit
 	agent := dag.Agent()

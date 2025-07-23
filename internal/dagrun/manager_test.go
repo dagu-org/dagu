@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -25,7 +24,11 @@ func TestManager(t *testing.T) {
 	th := test.Setup(t)
 
 	t.Run("Valid", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "valid.yaml"))
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 1"
+`)
 		ctx := th.Context
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -57,7 +60,11 @@ func TestManager(t *testing.T) {
 		dag.AssertCurrentStatus(t, status.None)
 	})
 	t.Run("UpdateStatus", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "update_status.yaml"))
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "true"
+`)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
 		now := time.Now()
@@ -98,7 +105,18 @@ func TestManager(t *testing.T) {
 		require.Equal(t, newStatus, statusByDAGRunID.Nodes[0].Status)
 	})
 	t.Run("UpdateChildDAGRunStatus", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "tree_parent.yaml"))
+		// Create child DAG first
+		th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "tree_child", []byte(`
+steps:
+  - name: "1"
+    command: "true"
+`))
+
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    run: tree_child
+`)
 
 		err := th.DAGRunMgr.StartDAGRunAsync(th.Context, dag.DAG, dagrun.StartOptions{})
 		require.NoError(t, err)
@@ -127,7 +145,11 @@ func TestManager(t *testing.T) {
 		require.Equal(t, status.NodeError.String(), childDAGRunStatus.Nodes[0].Status.String())
 	})
 	t.Run("InvalidUpdateStatusWithInvalidDAGRunID", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "invalid_run_id.yaml"))
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 1"
+`)
 		ctx := th.Context
 		cli := th.DAGRunMgr
 
@@ -145,7 +167,11 @@ func TestClient_RunDAG(t *testing.T) {
 	th := test.Setup(t)
 
 	t.Run("RunDAG", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "run_dag.yaml"))
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "true"
+`)
 
 		err := th.DAGRunMgr.StartDAGRunAsync(th.Context, dag.DAG, dagrun.StartOptions{
 			Quiet: true,
@@ -159,7 +185,11 @@ func TestClient_RunDAG(t *testing.T) {
 		require.Equal(t, status.Success.String(), dagRunStatus.Status.String())
 	})
 	t.Run("Stop", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "stop.yaml"))
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 10"
+`)
 		ctx := th.Context
 
 		err := th.DAGRunMgr.StartDAGRunAsync(ctx, dag.DAG, dagrun.StartOptions{})
@@ -173,7 +203,11 @@ func TestClient_RunDAG(t *testing.T) {
 		dag.AssertLatestStatus(t, status.Cancel)
 	})
 	t.Run("Restart", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "restart.yaml"))
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 1"
+`)
 		ctx := th.Context
 
 		err := th.DAGRunMgr.StartDAGRunAsync(th.Context, dag.DAG, dagrun.StartOptions{})
@@ -187,7 +221,11 @@ func TestClient_RunDAG(t *testing.T) {
 		dag.AssertLatestStatus(t, status.Success)
 	})
 	t.Run("Retry", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "retry.yaml"))
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "true"
+`)
 		ctx := th.Context
 		cli := th.DAGRunMgr
 
@@ -220,7 +258,11 @@ func TestClient_RunDAG(t *testing.T) {
 		require.Equal(t, prevParams, dagRunStatus.Params)
 	})
 	t.Run("RetryStep", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "retry.yaml"))
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "true"
+`)
 		ctx := th.Context
 		cli := th.DAGRunMgr
 
@@ -263,7 +305,13 @@ func TestHandleTask(t *testing.T) {
 	th := test.Setup(t)
 
 	t.Run("HandleTaskRetry", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "handle_task_retry.yaml"))
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "echo step1"
+  - name: "2"
+    command: "echo step2"
+`)
 		ctx := th.Context
 		cli := th.DAGRunMgr
 
@@ -299,7 +347,13 @@ func TestHandleTask(t *testing.T) {
 	})
 
 	t.Run("HandleTaskRetryWithStep", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "handle_task_retry_step.yaml"))
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "echo step1"
+  - name: "2"
+    command: "echo step2"
+`)
 		ctx := th.Context
 		cli := th.DAGRunMgr
 
@@ -336,7 +390,11 @@ func TestHandleTask(t *testing.T) {
 	})
 
 	t.Run("HandleTaskStart", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "handle_task_start.yaml"))
+		dag := th.DAG(t, `
+steps:
+  - name: "process"
+    command: "echo processing $1"
+`)
 		ctx := th.Context
 		cli := th.DAGRunMgr
 

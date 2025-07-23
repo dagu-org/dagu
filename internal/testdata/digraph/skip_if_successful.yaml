@@ -1,4 +1,0 @@
-skipIfSuccessful: true
-steps:
-  - name: "1"
-    command: "true"

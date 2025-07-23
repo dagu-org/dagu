@@ -13,30 +13,49 @@ import (
 func TestStartCommand(t *testing.T) {
 	th := test.SetupCommand(t)
 
+	dagStart := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "true"
+`)
+
+	dagStartWithParams := th.DAG(t, `
+params: "p1 p2"
+steps:
+  - name: "1"
+    command: "echo \"params is $1 and $2\""
+`)
+
+	dagStartWithDAGRunID := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "true"
+`)
+
 	tests := []test.CmdTest{
 		{
 			Name:        "StartDAG",
-			Args:        []string{"start", th.DAG(t, "cmd/start.yaml").Location},
+			Args:        []string{"start", dagStart.Location},
 			ExpectedOut: []string{"Step started"},
 		},
 		{
 			Name:        "StartDAGWithDefaultParams",
-			Args:        []string{"start", th.DAG(t, "cmd/start_with_params.yaml").Location},
+			Args:        []string{"start", dagStartWithParams.Location},
 			ExpectedOut: []string{`params="[1=p1 2=p2]"`},
 		},
 		{
 			Name:        "StartDAGWithParams",
-			Args:        []string{"start", `--params="p3 p4"`, th.DAG(t, "cmd/start_with_params.yaml").Location},
+			Args:        []string{"start", `--params="p3 p4"`, dagStartWithParams.Location},
 			ExpectedOut: []string{`params="[1=p3 2=p4]"`},
 		},
 		{
 			Name:        "StartDAGWithParamsAfterDash",
-			Args:        []string{"start", th.DAG(t, "cmd/start_with_params.yaml").Location, "--", "p5", "p6"},
+			Args:        []string{"start", dagStartWithParams.Location, "--", "p5", "p6"},
 			ExpectedOut: []string{`params="[1=p5 2=p6]"`},
 		},
 		{
 			Name:        "StartDAGWithRequestID",
-			Args:        []string{"start", th.DAG(t, "cmd/start_with_dagrun_id.yaml").Location, "--run-id", "CfmC9GPywTC24bXbY1yEU7eQANNvpdxAPJXdSKTSaCVC"},
+			Args:        []string{"start", dagStartWithDAGRunID.Location, "--run-id", "CfmC9GPywTC24bXbY1yEU7eQANNvpdxAPJXdSKTSaCVC"},
 			ExpectedOut: []string{"CfmC9GPywTC24bXbY1yEU7eQANNvpdxAPJXdSKTSaCVC"},
 		},
 	}

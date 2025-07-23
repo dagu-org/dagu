@@ -178,33 +178,21 @@ func (h Helper) Cleanup() {
 	_ = os.RemoveAll(h.tmpDir)
 }
 
-// DAG loads a test DAG from the testdata directory
-func (h Helper) DAG(t *testing.T, name string) DAG {
-	t.Helper()
-
-	filePath := TestdataPath(t, name)
-	dag, err := digraph.Load(h.Context, filePath)
-	require.NoError(t, err, "failed to load test DAG %q", name)
-
-	return DAG{
-		Helper: &h,
-		DAG:    dag,
-	}
-}
-
-// DAGWithYAML creates a test DAG from YAML content
-func (h Helper) DAGWithYAML(t *testing.T, name string, yamlContent []byte) DAG {
+// DAG creates a test DAG from YAML content
+func (h Helper) DAG(t *testing.T, yamlContent string) DAG {
 	t.Helper()
 
 	err := os.MkdirAll(h.Config.Paths.DAGsDir, 0750)
 	require.NoError(t, err, "failed to create DAGs directory %q", h.Config.Paths.DAGsDir)
 
-	testFile := filepath.Join(h.Config.Paths.DAGsDir, fmt.Sprintf("%s.yaml", name))
-	err = os.WriteFile(testFile, yamlContent, 0600)
-	require.NoError(t, err, "failed to write test DAG %q", name)
+	// Generate a unique filename for the test DAG
+	filename := fmt.Sprintf("test-%s.yaml", uuid.New().String())
+	testFile := filepath.Join(h.Config.Paths.DAGsDir, filename)
+	err = os.WriteFile(testFile, []byte(yamlContent), 0600)
+	require.NoError(t, err, "failed to write test DAG")
 
 	dag, err := digraph.Load(h.Context, testFile)
-	require.NoError(t, err, "failed to load test DAG %q", name)
+	require.NoError(t, err, "failed to load test DAG")
 
 	return DAG{
 		Helper: &h,

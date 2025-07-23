@@ -389,7 +389,7 @@ steps:
 		time.Sleep(500 * time.Millisecond)
 
 		// Load the DAG using helper
-		dagWrapper := coord.DAGWithYAML(t, "parallel-cancel", []byte(yamlContent))
+		dagWrapper := coord.DAG(t, yamlContent)
 
 		// Create agent with cancellable context
 		ctx, cancel := context.WithCancel(coord.Context)
@@ -533,7 +533,7 @@ steps:
 		time.Sleep(500 * time.Millisecond)
 
 		// Load the DAG using helper
-		dagWrapper := coord.DAGWithYAML(t, "mixed-cancel", []byte(yamlContent))
+		dagWrapper := coord.DAG(t, yamlContent)
 
 		// Create agent with cancellable context
 		execCtx, execCancel := context.WithCancel(coord.Context)
@@ -667,7 +667,7 @@ steps:
 		time.Sleep(1 * time.Second)
 
 		// Load the DAG using helper
-		dagWrapper := coord.DAGWithYAML(t, "concurrent-cancel", []byte(yamlContent))
+		dagWrapper := coord.DAG(t, yamlContent)
 
 		// Create agent with cancellable context
 		ctx, cancel := context.WithCancel(coord.Context)

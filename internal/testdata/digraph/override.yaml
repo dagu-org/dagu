@@ -1,9 +1,0 @@
-mailOn:
-  failure: false
-  success: true
-
-histRetentionDays: 7
-
-steps:
-  - name: "1"
-    command: "true"

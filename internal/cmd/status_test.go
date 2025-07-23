@@ -18,7 +18,11 @@ func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGRunning", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status.yaml")
+		dagFile := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 10"
+`)
 
 		done := make(chan struct{})
 		go func() {
@@ -60,7 +64,12 @@ func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGSuccess", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status_success.yaml")
+		dagFile := th.DAG(t, `
+name: status-success
+steps:
+  - name: "success"
+    command: "echo 'Success!'"
+`)
 
 		// Run the DAG to completion
 		startCmd := cmd.CmdStart()
@@ -92,7 +101,12 @@ func TestStatusCommand(t *testing.T) {
 		// We'll create a failed DAG run directly rather than running it.
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status_error.yaml")
+		dagFile := th.DAG(t, `
+name: status-error
+steps:
+  - name: "error"
+    command: "exit 1"
+`)
 
 		// Create a DAG context
 		dag, err := th.DAGStore.GetMetadata(th.Context, dagFile.Location)
@@ -144,7 +158,15 @@ func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGWithParams", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status_with_params.yaml")
+		dagFile := th.DAG(t, `
+name: status-with-params
+params:
+  - param1
+  - param2
+steps:
+  - name: "print-params"
+    command: "echo Param1: ${param1}, Param2: ${param2}"
+`)
 
 		// Run the DAG with custom parameters
 		startCmd := cmd.CmdStart()
@@ -173,7 +195,12 @@ func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGWithSpecificRunID", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status_success.yaml")
+		dagFile := th.DAG(t, `
+name: status-success
+steps:
+  - name: "success"
+    command: "echo 'Success!'"
+`)
 		runID := uuid.Must(uuid.NewV7()).String()
 
 		// Run the DAG with a specific run ID
@@ -203,7 +230,12 @@ func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGMultipleRuns", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status_success.yaml")
+		dagFile := th.DAG(t, `
+name: status-success
+steps:
+  - name: "success"
+    command: "echo 'Success!'"
+`)
 
 		// Run the DAG twice
 		startCmd := cmd.CmdStart()
@@ -249,7 +281,18 @@ func TestStatusCommand(t *testing.T) {
 		// DAGs that have skipped steps.
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status_skipped.yaml")
+		dagFile := th.DAG(t, `
+name: status-skipped
+steps:
+  - name: "check"
+    command: "false"
+    continueOn:
+      failure: true
+  - name: "skipped"
+    command: "echo 'This will be skipped'"
+    preconditions:
+      - condition: "test -f /nonexistent"
+`)
 
 		// Create a DAG context
 		dag, err := th.DAGStore.GetMetadata(th.Context, dagFile.Location)
@@ -309,7 +352,11 @@ func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGCancel", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status.yaml")
+		dagFile := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 10"
+`)
 
 		done := make(chan struct{})
 		go func() {
@@ -354,7 +401,30 @@ func TestStatusCommand(t *testing.T) {
 		th := test.SetupCommand(t)
 
 		// Create a DAG with many steps to test the step summary truncation
-		dagFile := th.DAG(t, "cmd/status_multiple.yaml")
+		dagFile := th.DAG(t, `
+name: status-multiple
+steps:
+  - name: "step1"
+    command: "echo 'Step 1'"
+  - name: "step2"
+    command: "echo 'Step 2'"
+  - name: "step3"
+    command: "echo 'Step 3'"
+  - name: "step4"
+    command: "echo 'Step 4'"
+  - name: "step5"
+    command: "echo 'Step 5'"
+  - name: "step6"
+    command: "echo 'Step 6'"
+  - name: "step7"
+    command: "echo 'Step 7'"
+  - name: "step8"
+    command: "echo 'Step 8'"
+  - name: "step9"
+    command: "echo 'Step 9'"
+  - name: "step10"
+    command: "echo 'Step 10'"
+`)
 
 		// Run the DAG
 		startCmd := cmd.CmdStart()
@@ -383,7 +453,12 @@ func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGByName", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status_success.yaml")
+		dagFile := th.DAG(t, `
+name: status-success
+steps:
+  - name: "success"
+    command: "echo 'Success!'"
+`)
 
 		// Run the DAG
 		startCmd := cmd.CmdStart()
@@ -412,7 +487,11 @@ func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGWithPID", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status.yaml")
+		dagFile := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 10"
+`)
 
 		done := make(chan struct{})
 		go func() {
@@ -455,7 +534,12 @@ func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGWithAttemptID", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status_success.yaml")
+		dagFile := th.DAG(t, `
+name: status-success
+steps:
+  - name: "success"
+    command: "echo 'Success!'"
+`)
 
 		// Run the DAG
 		startCmd := cmd.CmdStart()
@@ -495,7 +579,12 @@ func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGWithLogPaths", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status_success.yaml")
+		dagFile := th.DAG(t, `
+name: status-success
+steps:
+  - name: "success"
+    command: "echo 'Success!'"
+`)
 
 		// Run the DAG
 		startCmd := cmd.CmdStart()
@@ -528,7 +617,12 @@ func TestStatusCommand(t *testing.T) {
 		// This test verifies that the status command handles binary log content gracefully
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, "cmd/status_success.yaml")
+		dagFile := th.DAG(t, `
+name: status-success
+steps:
+  - name: "success"
+    command: "echo 'Success!'"
+`)
 
 		// Create a DAG context
 		dag, err := th.DAGStore.GetMetadata(th.Context, dagFile.Location)

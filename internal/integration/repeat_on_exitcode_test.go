@@ -21,7 +21,7 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dag := th.DAGWithYAML(t, "test-repeat-on-exitcode", []byte(`
+	dag := th.DAG(t, `
 name: test-repeat-on-exitcode
 steps:
   - name: repeat-on-fail
@@ -45,7 +45,7 @@ steps:
       exitCode: [1]
       limit: 5
       intervalSec: 1
-`))
+`)
 	agent := dag.Agent()
 
 	ctx, cancel := context.WithTimeout(agent.Context, 15*time.Second)

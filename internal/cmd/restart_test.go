@@ -15,7 +15,16 @@ func TestRestartCommand(t *testing.T) {
 	t.Run("RestartDAG", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dag := th.DAG(t, "cmd/restart.yaml")
+		dag := th.DAG(t, `
+params: "p1"
+steps:
+  - name: "1"
+    script: "echo $1"
+  - name: "2"
+    script: "sleep 100"
+    depends:
+      - "1"
+`)
 
 		go func() {
 			// Start the DAG to restart.

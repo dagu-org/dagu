@@ -1,9 +1,0 @@
-steps:
-  - name: "repeat-until-condition"
-    command: "echo test"
-    repeatPolicy:
-      repeat: "until"
-      condition: "echo hello"
-      expected: "hello"
-      intervalSec: 10
-      limit: 5

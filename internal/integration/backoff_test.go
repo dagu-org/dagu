@@ -15,7 +15,7 @@ func TestRetryPolicy_WithExponentialBackoff(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with retry backoff
-	dag := th.DAGWithYAML(t, "retry-with-backoff", []byte(`
+	dag := th.DAG(t, `
 name: retry-with-backoff
 steps:
   - name: failing-step
@@ -27,7 +27,7 @@ steps:
       intervalSec: 1
       backoff: 2.0
       exitCode: [1]
-`))
+`)
 	agent := dag.Agent()
 
 	// Record start time
@@ -63,7 +63,7 @@ func TestRetryPolicy_WithBackoffBoolean(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with boolean backoff
-	dag := th.DAGWithYAML(t, "retry-with-backoff-bool", []byte(`
+	dag := th.DAG(t, `
 name: retry-with-backoff-bool
 steps:
   - name: failing-step
@@ -75,7 +75,7 @@ steps:
       intervalSec: 1
       backoff: true  # Should use default 2.0 multiplier
       exitCode: [1]
-`))
+`)
 	agent := dag.Agent()
 
 	// Record start time
@@ -108,7 +108,7 @@ func TestRetryPolicy_WithMaxInterval(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with max interval cap
-	dag := th.DAGWithYAML(t, "retry-with-backoff-max", []byte(`
+	dag := th.DAG(t, `
 name: retry-with-backoff-max
 steps:
   - name: failing-step
@@ -121,7 +121,7 @@ steps:
       backoff: 3.0
       maxIntervalSec: 5  # Cap at 5 seconds
       exitCode: [1]
-`))
+`)
 	agent := dag.Agent()
 
 	// Record start time
@@ -157,7 +157,7 @@ func TestRepeatPolicy_WithExponentialBackoff(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with repeat backoff
-	dag := th.DAGWithYAML(t, "repeat-with-backoff", []byte(`
+	dag := th.DAG(t, `
 name: repeat-with-backoff
 steps:
   - name: repeat-step
@@ -170,7 +170,7 @@ steps:
       intervalSec: 1
       backoff: 2.0
       exitCode: [0]  # Repeat while exit code is 0
-`))
+`)
 	agent := dag.Agent()
 
 	// Record start time
@@ -206,7 +206,7 @@ func TestRepeatPolicy_WithMaxInterval(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with max interval cap
-	dag := th.DAGWithYAML(t, "repeat-with-backoff-max", []byte(`
+	dag := th.DAG(t, `
 name: repeat-with-backoff-max
 steps:
   - name: repeat-step
@@ -220,7 +220,7 @@ steps:
       backoff: 3.0
       maxIntervalSec: 5  # Cap at 5 seconds
       exitCode: [0]  # Repeat while exit code is 0
-`))
+`)
 	agent := dag.Agent()
 
 	// Record start time

@@ -15,7 +15,7 @@ func TestRepeatPolicy_WithLimit(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with repeat limit
-	dag := th.DAGWithYAML(t, "repeat-with-limit", []byte(`
+	dag := th.DAG(t, `
 name: repeat-with-limit
 steps:
   - name: repeat-step
@@ -24,7 +24,7 @@ steps:
       repeat: true
       limit: 3
       intervalSec: 0
-`))
+`)
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -55,7 +55,7 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with repeat limit and condition
-	dag := th.DAGWithYAML(t, "repeat-limit-condition", []byte(`name: repeat-limit-condition
+	dag := th.DAG(t, `name: repeat-limit-condition
 steps:
   - name: increment-counter
     script: |
@@ -78,9 +78,9 @@ steps:
       repeat: until
       limit: 5
       intervalSec: 0
-      condition: "` + "`" + `[ -f /tmp/dagu_repeat_counter_test2 ] && cat /tmp/dagu_repeat_counter_test2 || echo 0` + "`" + `"
+      condition: "`+"`"+`[ -f /tmp/dagu_repeat_counter_test2 ] && cat /tmp/dagu_repeat_counter_test2 || echo 0`+"`"+`"
       expected: "10"
-`))
+`)
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -110,7 +110,7 @@ func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG that repeats with a limit
-	dag := th.DAGWithYAML(t, "repeat-limit-before-condition", []byte(`
+	dag := th.DAG(t, `
 name: repeat-limit-before-condition
 steps:
   - name: check-flag
@@ -119,7 +119,7 @@ steps:
       repeat: true
       limit: 3
       intervalSec: 0
-`))
+`)
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -147,7 +147,7 @@ func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with boolean repeat mode (should repeat while step succeeds, like unconditional while)
-	dag := th.DAGWithYAML(t, "repeat-while-unconditional", []byte(`
+	dag := th.DAG(t, `
 name: repeat-while-unconditional
 steps:
   - name: repeat-step
@@ -156,7 +156,7 @@ steps:
       repeat: true
       limit: 3
       intervalSec: 0
-`))
+`)
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -187,7 +187,7 @@ func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with until mode and exitCode (should repeat until step returns exit code 0)
-	dag := th.DAGWithYAML(t, "repeat-until-unconditional", []byte(`
+	dag := th.DAG(t, `
 name: repeat-until-unconditional
 steps:
   - name: repeat-step
@@ -214,7 +214,7 @@ steps:
       intervalSec: 0
     continueOn:
       exitCode: [1]
-`))
+`)
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -244,7 +244,7 @@ func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with repeat: true (should work as "while" mode)
-	dag := th.DAGWithYAML(t, "repeat-backward-compatibility-true", []byte(`
+	dag := th.DAG(t, `
 name: repeat-backward-compatibility-true
 steps:
   - name: repeat-step
@@ -253,7 +253,7 @@ steps:
       repeat: true
       limit: 4
       intervalSec: 0
-`))
+`)
 	agent := dag.Agent()
 
 	// Run with timeout

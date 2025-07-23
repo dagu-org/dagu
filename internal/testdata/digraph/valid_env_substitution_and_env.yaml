@@ -1,4 +1,0 @@
-env:
-  - BEE: "`echo BEE`"
-  - BOO: "`echo BOO`"
-  - FOO: "${BEE}:BAZ:${BOO}:`echo FOO`"

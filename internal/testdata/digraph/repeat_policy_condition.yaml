@@ -1,7 +1,0 @@
-steps:
-  - name: "repeat-condition"
-    command: "echo hello"
-    repeatPolicy:
-      condition: "echo hello"
-      expected: "hello"
-      intervalSec: 1

@@ -39,7 +39,7 @@ steps:
   - name: test-step
     command: echo "test"
 `
-		testDAG := th.DAGWithYAML(t, "test-behavior", []byte(yamlContent))
+		testDAG := th.DAG(t, yamlContent)
 		testFile := testDAG.Location
 		runStore := filedagrun.New(filepath.Join(tmpDir, "data"))
 		procStore := fileproc.New(filepath.Join(tmpDir, "proc"))

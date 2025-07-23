@@ -12,7 +12,7 @@ func TestChainExecution(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load chain DAG
-	dag := th.DAGWithYAML(t, "test-chain", []byte(`
+	dag := th.DAG(t, `
 name: test-chain
 type: chain
 steps:
@@ -22,7 +22,7 @@ steps:
     command: echo "step 2"
   - name: step3
     command: echo "step 3"
-`))
+`)
 
 	// Run the DAG
 	agent := dag.Agent()

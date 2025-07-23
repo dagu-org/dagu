@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +18,10 @@ func TestLoad(t *testing.T) {
 	t.Run(("WithName"), func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "loader_test.yaml"))
+		testDAG := createTempYAMLFile(t, `steps:
+  - name: "1"
+    command: "true"
+`)
 		dag, err := digraph.Load(context.Background(), testDAG, digraph.WithName("testDAG"))
 		require.NoError(t, err)
 		require.Equal(t, "testDAG", dag.Name)
@@ -27,14 +29,16 @@ func TestLoad(t *testing.T) {
 	t.Run("InvalidPath", func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "not_existing_file.yaml"))
+		// Use a non-existing file path
+		testDAG := "/tmp/non_existing_file_" + t.Name() + ".yaml"
 		_, err := digraph.Load(context.Background(), testDAG)
 		require.Error(t, err)
 	})
 	t.Run("UnknownField", func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "err_decode.yaml"))
+		testDAG := createTempYAMLFile(t, `invalidKey: test
+`)
 		_, err := digraph.Load(context.Background(), testDAG)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "has invalid keys: invalidKey")
@@ -42,7 +46,7 @@ func TestLoad(t *testing.T) {
 	t.Run("InvalidYAML", func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "err_parse.yaml"))
+		testDAG := createTempYAMLFile(t, `invalidyaml`)
 		_, err := digraph.Load(context.Background(), testDAG)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalidyaml")
@@ -50,7 +54,11 @@ func TestLoad(t *testing.T) {
 	t.Run("MetadataOnly", func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "loader_test.yaml"))
+		testDAG := createTempYAMLFile(t, `name: loader_test
+steps:
+  - name: "1"
+    command: "true"
+`)
 		dag, err := digraph.Load(context.Background(), testDAG, digraph.OnlyMetadata())
 		require.NoError(t, err)
 		require.Empty(t, dag.Steps)
@@ -61,7 +69,11 @@ func TestLoad(t *testing.T) {
 	t.Run("DefaultConfig", func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "default.yaml"))
+		testDAG := createTempYAMLFile(t, `name: default
+steps:
+  - name: "1"
+    command: "true"
+`)
 		dag, err := digraph.Load(context.Background(), testDAG)
 
 		require.NoError(t, err)
@@ -84,10 +96,35 @@ func TestLoad(t *testing.T) {
 
 		// Base config has the following values:
 		// MailOn: {Failure: true, Success: false}
-		base := test.TestdataPath(t, filepath.Join("digraph", "base.yaml"))
+		base := createTempYAMLFile(t, `env:
+  LOG_DIR: "${HOME}/logs"
+logDir: "${LOG_DIR}"
+smtp:
+  host: "smtp.host"
+  port: "25"
+errorMail:
+  from: "system@mail.com"
+  to: "error@mail.com"
+  prefix: "[ERROR]"
+infoMail:
+  from: "system@mail.com"
+  to: "info@mail.com"
+  prefix: "[INFO]"
+mailOn:
+  failure: true
+`)
 		// Overwrite the base config with the following values:
 		// MailOn: {Failure: false, Success: true}
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "override.yaml"))
+		testDAG := createTempYAMLFile(t, `mailOn:
+  failure: false
+  success: true
+
+histRetentionDays: 7
+
+steps:
+  - name: "1"
+    command: "true"
+`)
 		dag, err := digraph.Load(context.Background(), testDAG, digraph.WithBaseConfig(base))
 		require.NoError(t, err)
 
@@ -103,7 +140,23 @@ func TestLoadBaseConfig(t *testing.T) {
 	t.Run("LoadBaseConfigFile", func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "base.yaml"))
+		testDAG := createTempYAMLFile(t, `env:
+  LOG_DIR: "${HOME}/logs"
+logDir: "${LOG_DIR}"
+smtp:
+  host: "smtp.host"
+  port: "25"
+errorMail:
+  from: "system@mail.com"
+  to: "error@mail.com"
+  prefix: "[ERROR]"
+infoMail:
+  from: "system@mail.com"
+  to: "info@mail.com"
+  prefix: "[INFO]"
+mailOn:
+  failure: true
+`)
 		dag, err := digraph.LoadBaseConfig(digraph.BuildContext{}, testDAG)
 		require.NotNil(t, dag)
 		require.NoError(t, err)
@@ -111,8 +164,20 @@ func TestLoadBaseConfig(t *testing.T) {
 	t.Run("InheritBaseConfig", func(t *testing.T) {
 		t.Parallel()
 
-		baseDAG := test.TestdataPath(t, filepath.Join("digraph", "inherit_base.yaml"))
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "inherit_child.yaml"))
+		baseDAG := createTempYAMLFile(t, `env:
+  BASE_ENV: "base_value"
+  OVERWRITE_ENV: "base_overwrite_value"
+
+logDir: "/base/logs"
+`)
+		testDAG := createTempYAMLFile(t, `env:
+  CHILD_ENV: "child_value"
+  OVERWRITE_ENV: "child_overwrite_value"
+
+steps:
+  - name: "step1"
+    command: echo "step1"
+`)
 		dag, err := digraph.Load(context.Background(), testDAG, digraph.WithBaseConfig(baseDAG))
 		require.NotNil(t, dag)
 		require.NoError(t, err)
@@ -484,7 +549,15 @@ steps:
 	t.Run("WorkerSelector", func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := test.TestdataPath(t, filepath.Join("digraph", "worker_selector.yaml"))
+		testDAG := createTempYAMLFile(t, `name: worker-selector-test
+description: Test DAG with worker selector
+workerSelector:
+  gpu: "true"
+  memory: "64G"
+steps:
+  - name: gpu-task
+    command: echo "Running on GPU worker"
+`)
 		dag, err := digraph.Load(context.Background(), testDAG)
 		require.NoError(t, err)
 

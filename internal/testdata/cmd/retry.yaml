@@ -1,4 +1,0 @@
-params: "p1"
-steps:
-  - name: "1"
-    command: "echo param is $1"

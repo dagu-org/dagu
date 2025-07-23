@@ -15,14 +15,14 @@ func TestDAGExecution(t *testing.T) {
 
 	t.Run("Depends", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "depends", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: "1"
     command: "echo 1"
   - name: "2"
     depends: "1"
     command: "echo 2"
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -32,14 +32,14 @@ steps:
 
 	t.Run("Pipe", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "pipe", []byte(`
+		dag := th.DAG(t, `
 params:
   - NAME: "foo"
 steps:
   - name: step1
     command: echo hello $NAME | xargs echo
     output: OUT1
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -52,12 +52,12 @@ steps:
 
 	t.Run("DotEnv", func(t *testing.T) {
 		th := test.Setup(t)
-		
+
 		// Create dotenv files
 		dotenv1Path := test.TestdataPath(t, "integration/dotenv1")
 		dotenv2Path := test.TestdataPath(t, "integration/dotenv2")
-		
-		dag := th.DAGWithYAML(t, "dotenv", []byte(`
+
+		dag := th.DAG(t, `
 dotenv:
   - `+dotenv1Path+`
   - `+dotenv2Path+`
@@ -65,7 +65,7 @@ steps:
   - name: step1
     command: echo "${ENV1} ${ENV2}"
     output: OUT1 #123 abc
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -78,7 +78,7 @@ steps:
 
 	t.Run("NamedParams", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "named-params", []byte(`
+		dag := th.DAG(t, `
 params:
   NAME: "Dagu"
   AGE: 30
@@ -91,7 +91,7 @@ steps:
     command: echo Hello, $NAME
     depends: Hello
     output: OUT2
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -105,7 +105,7 @@ steps:
 
 	t.Run("NamedParamsList", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "named-params-list", []byte(`
+		dag := th.DAG(t, `
 params:
   - NAME: "Dagu"
   - AGE: 30
@@ -118,7 +118,7 @@ steps:
     command: echo Hello, $NAME
     depends: Hello
     output: OUT2
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -132,14 +132,14 @@ steps:
 
 	t.Run("PositionalParams", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "positional-params", []byte(`
+		dag := th.DAG(t, `
 params: "foo bar"
 
 steps:
   - name: step1
     output: OUT1
     command: echo '$1' is $1, '$2' is $2
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -155,7 +155,7 @@ steps:
 
 	t.Run("PositionalParamsScript", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "positional-params-script", []byte(`
+		dag := th.DAG(t, `
 params: "foo bar"
 
 steps:
@@ -163,7 +163,7 @@ steps:
     output: OUT1
     script: |
       echo '$1' is $1, '$2' is ${2}
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -179,7 +179,7 @@ steps:
 
 	t.Run("Script", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "script", []byte(`
+		dag := th.DAG(t, `
 params:
   - NAME: "foo"
 steps:
@@ -187,7 +187,7 @@ steps:
     script: |
       echo 1 2 3
     output: OUT1
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -200,7 +200,7 @@ steps:
 
 	t.Run("RegexPrecondition", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "precondition-regex", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: test
     command: echo abc run def
@@ -212,7 +212,7 @@ steps:
     precondition:
       - condition: "$OUT1"
         expected: "re:^abc.*def$"
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -226,7 +226,7 @@ steps:
 
 	t.Run("JSON", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "json", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: get config
     command: |
@@ -237,7 +237,7 @@ steps:
     command: echo "Starting server at ${CONFIG.host}:${CONFIG.port}"
     output: OUT1
     depends: get config
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -250,10 +250,10 @@ steps:
 
 	t.Run("EnvVar", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "environment-var", []byte(`name: environment-var
+		dag := th.DAG(t, `name: environment-var
 env:
   - DATA_DIR: /tmp/dagu_test_integration
-  - PROCESS_DATE: "` + "`" + `date '+%Y%m%d_%H%M%S'` + "`" + `"
+  - PROCESS_DATE: "`+"`"+`date '+%Y%m%d_%H%M%S'`+"`"+`"
 
 steps:
   - name: output_file
@@ -269,7 +269,7 @@ steps:
   - name: cleanup
     command: rm ${DATA_DIR}_${PROCESS_DATE}
     depends: make_tmp_file
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -282,7 +282,7 @@ steps:
 
 	t.Run("EnvScript", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "env-script", []byte(`
+		dag := th.DAG(t, `
 env:
   - "E1": foo
   - "E2": bar
@@ -292,7 +292,7 @@ steps:
     output: OUT1
     script: |
       echo E1 is $E1, E2 is $E2
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -308,7 +308,7 @@ steps:
 
 	t.Run("SpecialVars", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "special-vars", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: step1
     command: echo $DAG_RUN_LOG_FILE
@@ -329,7 +329,7 @@ steps:
     output: OUT5
     script: |
       echo $DAG_RUN_ID
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -346,7 +346,7 @@ steps:
 
 	t.Run("JQ", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "jq", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: extract_value
     executor: jq
@@ -359,7 +359,7 @@ steps:
           "age": 30
         }
       }
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -372,7 +372,7 @@ steps:
 
 	t.Run("JSONVar", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "json_var", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: get_config
     command: |
@@ -383,7 +383,7 @@ steps:
     command: echo "Starting server at ${CONFIG.host}:${CONFIG.port}"
     output: OUT1
     depends: get_config
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -396,7 +396,7 @@ steps:
 
 	t.Run("PerlScript", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "perl-script", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: step1
     command: perl
@@ -405,7 +405,7 @@ steps:
       use warnings;
       print("Hello World\n");
     output: OUT1
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -418,7 +418,7 @@ steps:
 
 	t.Run("Workdir", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "workdir", []byte(`
+		dag := th.DAG(t, `
 env:
   - WORKDIR: $HOME
   - TILDE: ~/
@@ -432,7 +432,7 @@ steps:
     dir: $WORKDIR
     command: echo $PWD
     output: OUT2
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -446,7 +446,7 @@ steps:
 
 	t.Run("Issue-810", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "issue-810", []byte(`
+		dag := th.DAG(t, `
 params: bar
 steps:
   - name: step1
@@ -477,7 +477,7 @@ steps:
     preconditions:
       - condition: "$1" # should be "bar"
         expected: bar
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -493,7 +493,7 @@ steps:
 
 	t.Run("ShellOptions", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAGWithYAML(t, "shellopts", []byte(`
+		dag := th.DAG(t, `
 steps:
   - name: step1
     description: test step
@@ -501,7 +501,7 @@ steps:
       echo 'hello world' && ls -al /
     shell: bash -o errexit -o xtrace -o pipefail -c
     output: OUT1
-`))
+`)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
@@ -581,9 +581,9 @@ steps:
 `))
 			}
 
-			var dagContent []byte
+			var dagContent string
 			if tc.name == "CallSub" {
-				dagContent = []byte(`
+				dagContent = `
 steps:
   - name: step1
     run: sub
@@ -593,10 +593,10 @@ steps:
     command: echo "${OUT1.outputs.OUT}"
     output: OUT2
     depends: [step1]
-`)
+`
 			} else {
 				// NestedGraph
-				dagContent = []byte(`
+				dagContent = `
 steps:
   - name: child
     run: nested_child
@@ -607,9 +607,9 @@ steps:
     output: OUT1
     depends:
       - child
-`)
+`
 			}
-			dag := th.DAGWithYAML(t, tc.dag[:len(tc.dag)-5], dagContent)
+			dag := th.DAG(t, dagContent)
 			agent := dag.Agent()
 
 			agent.RunSuccess(t)
@@ -627,7 +627,7 @@ func TestSkippedPreconditions(t *testing.T) {
 	// Setup the test helper with the integration DAGs directory.
 	th := test.Setup(t)
 	// Load the DAG from inline YAML.
-	dag := th.DAGWithYAML(t, "skipped-preconditions", []byte(`
+	dag := th.DAG(t, `
 type: graph  # Use graph mode to avoid implicit dependencies
 steps:
   - name: run-step
@@ -636,16 +636,16 @@ steps:
   - name: skip-step
     command: echo "should not execute"
     preconditions:
-      - condition: "` + "`" + `echo no` + "`" + `"
+      - condition: "`+"`"+`echo no`+"`"+`"
         expected: "yes"
     output: OUT_SKIP1
   - name: skip-step2
     command: echo "should execute"
     preconditions:
-      - condition: "` + "`" + `echo yes` + "`" + `"
+      - condition: "`+"`"+`echo yes`+"`"+`"
         expected: "yes"
     output: OUT_SKIP2
-`))
+`)
 	agent := dag.Agent()
 
 	// Run the DAG and expect it to complete successfully.
@@ -670,7 +670,7 @@ func TestComplexDependencies(t *testing.T) {
 	// Setup the test helper with the integration DAGs directory.
 	th := test.Setup(t)
 	// Load the DAG from inline YAML.
-	dag := th.DAGWithYAML(t, "complex-dependencies", []byte(`
+	dag := th.DAG(t, `
 steps:
   - name: start
     command: echo "start"
@@ -693,7 +693,7 @@ steps:
     command: echo "final"
     depends: merge
     output: FINAL
-`))
+`)
 	agent := dag.Agent()
 
 	// Run the DAG and expect it to complete successfully.
@@ -717,14 +717,14 @@ func TestProgressingNode(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dag := th.DAGWithYAML(t, "progress", []byte(`
+	dag := th.DAG(t, `
 steps:
   - name: "1"
     command: "sleep 3"
   - name: "2"
     command: "sleep 3"
     depends: "1"
-`))
+`)
 	agent := dag.Agent()
 
 	go func() {

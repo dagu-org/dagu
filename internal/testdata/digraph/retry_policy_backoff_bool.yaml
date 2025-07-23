@@ -1,8 +1,0 @@
-steps:
-  - name: "test_backoff_bool"
-    command: "echo test"
-    retryPolicy:
-      limit: 3
-      intervalSec: 1
-      backoff: true
-      maxIntervalSec: 10

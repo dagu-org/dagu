@@ -45,7 +45,7 @@ steps:
 		th := test.Setup(t)
 
 		// Load the DAG using helper
-		testDAG := th.DAGWithYAML(t, "local-dag", []byte(yamlContent))
+		testDAG := th.DAG(t, yamlContent)
 
 		// Run the DAG
 		agent := testDAG.Agent()
@@ -108,7 +108,7 @@ steps:
 		th := test.Setup(t)
 
 		// Load the DAG using helper
-		testDAG := th.DAGWithYAML(t, "parallel-local-dag", []byte(yamlContent))
+		testDAG := th.DAG(t, yamlContent)
 
 		// Run the DAG
 		agent := testDAG.Agent()
@@ -168,7 +168,7 @@ steps:
 		th := test.Setup(t)
 
 		// Load the DAG using helper
-		testDAG := th.DAGWithYAML(t, "nested-local-dag", []byte(yamlContent))
+		testDAG := th.DAG(t, yamlContent)
 
 		agent := testDAG.Agent()
 		err := agent.Run(agent.Context)
@@ -242,7 +242,7 @@ steps:
 		th := test.Setup(t)
 
 		// Load the DAG using helper
-		testDAG := th.DAGWithYAML(t, "conditional-local-dag", []byte(yamlContent))
+		testDAG := th.DAG(t, yamlContent)
 
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
@@ -310,7 +310,7 @@ steps:
 		th := test.Setup(t)
 
 		// Load the DAG using helper
-		testDAG := th.DAGWithYAML(t, "output-passing", []byte(yamlContent))
+		testDAG := th.DAG(t, yamlContent)
 
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
@@ -350,7 +350,7 @@ steps:
 		th := test.Setup(t)
 
 		// Load the DAG using helper
-		testDAG := th.DAGWithYAML(t, "invalid-reference", []byte(yamlContent))
+		testDAG := th.DAG(t, yamlContent)
 
 		agent := testDAG.Agent()
 		err := agent.Run(agent.Context)
@@ -414,7 +414,7 @@ steps:
 		th := test.Setup(t)
 
 		// Load the DAG using helper
-		testDAG := th.DAGWithYAML(t, "complex-deps", []byte(yamlContent))
+		testDAG := th.DAG(t, yamlContent)
 
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
@@ -475,7 +475,7 @@ steps:
 		th := test.Setup(t)
 
 		// Load the DAG using helper
-		testDAG := th.DAGWithYAML(t, "partial-success", []byte(yamlContent))
+		testDAG := th.DAG(t, yamlContent)
 
 		// Run the DAG
 		agent := testDAG.Agent()
@@ -510,7 +510,7 @@ steps:
 		th := test.Setup(t)
 
 		// Load the DAG using helper
-		testDAG := th.DAGWithYAML(t, "partial-success", []byte(yamlContent))
+		testDAG := th.DAG(t, yamlContent)
 
 		// Run the DAG
 		agent := testDAG.Agent()

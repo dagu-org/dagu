@@ -72,7 +72,7 @@ steps:
 		time.Sleep(500 * time.Millisecond)
 
 		// Load the DAG using helper
-		dagWrapper := coord.DAGWithYAML(t, "distributed-local", []byte(yamlContent))
+		dagWrapper := coord.DAG(t, yamlContent)
 
 		// Run the DAG
 		agent := dagWrapper.Agent()
@@ -97,7 +97,7 @@ steps:
 		th := test.Setup(t)
 
 		// Test using the helper to create DAG
-		dagWrapper := th.DAGWithYAML(t, "local-child-test", []byte(localDAGYAML))
+		dagWrapper := th.DAG(t, localDAGYAML)
 
 		// Verify the DAG was loaded correctly
 		require.NotNil(t, dagWrapper.DAG)
@@ -131,7 +131,7 @@ steps:
 		t.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port()))
 
 		// Load the DAG using helper
-		dagWrapper := coord.DAGWithYAML(t, "distributed-fail", []byte(yamlContent))
+		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
 
 		// Run should fail because no worker matches the selector

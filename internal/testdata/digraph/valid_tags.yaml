@@ -1,4 +1,0 @@
-tags: daily,monthly
-steps:
-  - command: echo 1
-    name: step1

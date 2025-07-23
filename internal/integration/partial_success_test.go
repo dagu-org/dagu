@@ -78,7 +78,7 @@ steps:
 			th := test.Setup(t)
 
 			// Create DAG from YAML
-			testDAG := th.DAGWithYAML(t, "workflow", []byte(tc.yaml))
+			testDAG := th.DAG(t, tc.yaml)
 
 			// Run the DAG
 			agent := testDAG.Agent()

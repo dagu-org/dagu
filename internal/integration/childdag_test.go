@@ -19,7 +19,6 @@ func TestRetryChildDAGRun(t *testing.T) {
 	// Get DAG path
 	th := test.SetupCommand(t)
 
-
 	th.CreateDAGFile(t, "parent.yaml", `
 steps:
   - name: parent
@@ -125,7 +124,6 @@ steps:
 func TestRetryPolicyChildDAGRunWithOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
 
-
 	dagRunID := uuid.Must(uuid.NewV7()).String()
 
 	// Generate a unique counter file path for this test
@@ -204,7 +202,6 @@ steps:
 func TestBasicChildDAGOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
 
-
 	th.CreateDAGFile(t, "parent_basic.yaml", `
 steps:
   - name: call_child
@@ -265,7 +262,6 @@ steps:
 
 func TestRetryPolicyBasicOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
-
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
 	counterFile := filepath.Join("/tmp", "retry_counter_basic_"+dagRunID)
@@ -339,7 +335,6 @@ steps:
 
 func TestNoRetryPolicyOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
-
 
 	th.CreateDAGFile(t, "no_retry.yaml", `
 steps:

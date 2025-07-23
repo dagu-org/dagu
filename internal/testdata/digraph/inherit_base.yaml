@@ -1,5 +1,0 @@
-env:
-  BASE_ENV: "base_value"
-  OVERWRITE_ENV: "base_overwrite_value"
-
-logDir: "/base/logs"

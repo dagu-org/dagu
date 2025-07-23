@@ -14,7 +14,11 @@ func TestStopCommand(t *testing.T) {
 	t.Run("StopDAGRun", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dag := th.DAG(t, "cmd/stop.yaml")
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    script: "sleep 10"
+`)
 
 		done := make(chan struct{})
 		go func() {
@@ -41,7 +45,11 @@ func TestStopCommand(t *testing.T) {
 	t.Run("StopDAGRunWithRunID", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dag := th.DAG(t, "cmd/stop.yaml")
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    script: "sleep 10"
+`)
 
 		done := make(chan struct{})
 		dagRunID := uuid.Must(uuid.NewV7()).String()

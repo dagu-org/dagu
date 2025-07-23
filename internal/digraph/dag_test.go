@@ -2,7 +2,6 @@ package digraph_test
 
 import (
 	"encoding/json"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,7 +16,12 @@ import (
 func TestDAG(t *testing.T) {
 	th := test.Setup(t)
 	t.Run("String", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("digraph", "default.yaml"))
+		dag := th.DAG(t, `
+name: default
+steps:
+  - name: "1"
+    command: "true"
+`)
 		ret := dag.String()
 		require.Contains(t, ret, "Name: default")
 	})
@@ -45,7 +49,12 @@ func TestUnixSocket(t *testing.T) {
 func TestMarshalJSON(t *testing.T) {
 	th := test.Setup(t)
 	t.Run("MarshalJSON", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("digraph", "default.yaml"))
+		dag := th.DAG(t, `
+name: default
+steps:
+  - name: "1"
+    command: "true"
+`)
 		_, err := json.Marshal(dag.DAG)
 		require.NoError(t, err)
 	})

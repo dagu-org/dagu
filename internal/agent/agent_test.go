@@ -21,7 +21,11 @@ func TestAgent_Run(t *testing.T) {
 
 	t.Run("RunDAG", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, "agent/run.yaml")
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 1"
+`)
 		dagAgent := dag.Agent()
 
 		dag.AssertLatestStatus(t, status.None)
@@ -34,7 +38,11 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("DeleteOldHistory", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, "agent/delete_old_history.yaml")
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 1"
+`)
 		dagAgent := dag.Agent()
 
 		// Create a history file by running a DAG
@@ -53,7 +61,11 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, "agent/is_running.yaml")
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 1"
+`)
 		dagAgent := dag.Agent(test.WithDAGRunID("test-dag-run"))
 		done := make(chan struct{})
 
@@ -73,7 +85,15 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("PreConditionNotMet", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, "agent/multiple_steps.yaml")
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "true"
+  - name: "2"
+    command: "true"
+    depends:
+      - "1"
+`)
 
 		// Set a precondition that always fails
 		dag.Preconditions = []*digraph.Condition{
@@ -91,7 +111,11 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("FinishWithError", func(t *testing.T) {
 		th := test.Setup(t)
-		errDAG := th.DAG(t, "agent/error.yaml")
+		errDAG := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "false"
+`)
 		dagAgent := errDAG.Agent()
 		dagAgent.RunError(t)
 
@@ -100,7 +124,14 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("FinishWithTimeout", func(t *testing.T) {
 		th := test.Setup(t)
-		timeoutDAG := th.DAG(t, "agent/timeout.yaml")
+		timeoutDAG := th.DAG(t, `
+timeoutSec: 2
+steps:
+  - name: "1"
+    command: "sleep 1"
+  - name: "2"
+    command: "sleep 2"
+`)
 		dagAgent := timeoutDAG.Agent()
 		dagAgent.RunError(t)
 
@@ -109,7 +140,11 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, "agent/sleep.yaml")
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 3"
+`)
 		dagAgent := dag.Agent()
 		done := make(chan struct{})
 
@@ -131,7 +166,18 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, "agent/on_exit.yaml")
+		dag := th.DAG(t, `
+handlerOn:
+  Exit:
+    command: "true"
+steps:
+  - name: "1"
+    command: "true"
+  - name: "2"
+    command: "true"
+    depends:
+      - "1"
+`)
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
 
@@ -151,7 +197,11 @@ func TestAgent_DryRun(t *testing.T) {
 	t.Run("DryRun", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dag := th.DAG(t, "agent/dry.yaml")
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "true"
+`)
 		dagAgent := dag.Agent(test.WithAgentOptions(agent.Options{Dry: true}))
 
 		dagAgent.RunSuccess(t)
@@ -169,8 +219,48 @@ func TestAgent_Retry(t *testing.T) {
 
 	t.Run("RetryDAG", func(t *testing.T) {
 		th := test.Setup(t)
-		// retry.yaml has a DAG that fails
-		dag := th.DAG(t, "agent/retry.yaml")
+		// retry DAG that fails
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "true"
+  - name: "2"
+    command: "false"
+    continueOn:
+      failure: true
+    depends: ["1"]
+  - name: "3"
+    command: "true"
+    depends: ["2"]
+  - name: "4"
+    command: "true"
+    preconditions:
+      - condition: "`+"`"+`echo 0`+"`"+`"
+        expected: "1"
+    continueOn:
+      skipped: true
+  - name: "5"
+    command: "false"
+    depends: ["4"]
+  - name: "6"
+    command: "true"
+    depends: ["5"]
+  - name: "7"
+    command: "true"
+    preconditions:
+      - condition: "`+"`"+`echo 0`+"`"+`"
+        expected: "1"
+    depends: ["6"]
+    continueOn:
+      skipped: true
+  - name: "8"
+    command: "true"
+    preconditions:
+      - condition: "`+"`"+`echo 0`+"`"+`"
+        expected: "1"
+  - name: "9"
+    command: "false"
+`)
 		dagAgent := dag.Agent()
 
 		dagAgent.RunError(t)
@@ -197,7 +287,47 @@ func TestAgent_Retry(t *testing.T) {
 
 	t.Run("StepRetry", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, "agent/retry.yaml")
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "true"
+  - name: "2"
+    command: "false"
+    continueOn:
+      failure: true
+    depends: ["1"]
+  - name: "3"
+    command: "true"
+    depends: ["2"]
+  - name: "4"
+    command: "true"
+    preconditions:
+      - condition: "`+"`"+`echo 0`+"`"+`"
+        expected: "1"
+    continueOn:
+      skipped: true
+  - name: "5"
+    command: "false"
+    depends: ["4"]
+  - name: "6"
+    command: "true"
+    depends: ["5"]
+  - name: "7"
+    command: "true"
+    preconditions:
+      - condition: "`+"`"+`echo 0`+"`"+`"
+        expected: "1"
+    depends: ["6"]
+    continueOn:
+      skipped: true
+  - name: "8"
+    command: "true"
+    preconditions:
+      - condition: "`+"`"+`echo 0`+"`"+`"
+        expected: "1"
+  - name: "9"
+    command: "false"
+`)
 		dagAgent := dag.Agent()
 
 		// Run the DAG to get a failed status
@@ -271,7 +401,11 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		th := test.Setup(t)
 
 		// Start a long-running DAG
-		dag := th.DAG(t, "agent/handle_http_valid.yaml")
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 10"
+`)
 		dagAgent := dag.Agent()
 		ctx := th.Context
 		go func() {
@@ -301,7 +435,11 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		th := test.Setup(t)
 
 		// Start a long-running DAG
-		dag := th.DAG(t, "agent/handle_http_invalid.yaml")
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 10"
+`)
 		dagAgent := dag.Agent()
 
 		go func() {
@@ -328,7 +466,11 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		th := test.Setup(t)
 
 		// Start a long-running DAG
-		dag := th.DAG(t, "agent/handle_http_cancel.yaml")
+		dag := th.DAG(t, `
+steps:
+  - name: "1"
+    command: "sleep 10"
+`)
 		dagAgent := dag.Agent()
 
 		done := make(chan struct{})

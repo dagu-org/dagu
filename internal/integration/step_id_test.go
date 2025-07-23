@@ -144,7 +144,7 @@ steps:
 			th := test.Setup(t)
 
 			// Create DAG from YAML
-			testDAG := th.DAGWithYAML(t, "workflow", []byte(tc.yaml))
+			testDAG := th.DAG(t, tc.yaml)
 
 			// Run the DAG
 			agent := testDAG.Agent()
@@ -194,7 +194,7 @@ steps:
       echo "current_DATA=${DATA}"
     output: RESULT
 `
-		testDAG := th.DAGWithYAML(t, "test-multiple-outputs", []byte(yaml))
+		testDAG := th.DAG(t, yaml)
 
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
@@ -248,7 +248,7 @@ steps:
       echo "total=45"
     output: FINAL_RESULT
 `
-		testDAG := th.DAGWithYAML(t, "test-chained-refs", []byte(yaml))
+		testDAG := th.DAG(t, yaml)
 
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
@@ -284,7 +284,7 @@ steps:
       echo "Setup logs available at: ${setup_step.stdout}"
     output: SCRIPT_OUTPUT
 `
-		testDAG := th.DAGWithYAML(t, "test-script-refs", []byte(yaml))
+		testDAG := th.DAG(t, yaml)
 
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
@@ -322,7 +322,7 @@ steps:
       echo "data=not json"
     output: RESULT
 `
-		testDAG := th.DAGWithYAML(t, "test-invalid-json-path", []byte(yaml))
+		testDAG := th.DAG(t, yaml)
 
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))

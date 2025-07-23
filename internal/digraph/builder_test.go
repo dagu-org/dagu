@@ -3,32 +3,56 @@ package digraph_test
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBuild(t *testing.T) {
 	t.Run("SkipIfSuccessful", func(t *testing.T) {
-		th := testLoad(t, "skip_if_successful.yaml")
+		data := []byte(`
+skipIfSuccessful: true
+steps:
+  - name: "1"
+    command: "true"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.True(t, th.SkipIfSuccessful)
 	})
 	t.Run("ParamsWithSubstitution", func(t *testing.T) {
-		th := testLoad(t, "params_with_substitution.yaml")
+		data := []byte(`
+params: "TEST_PARAM $1"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		th.AssertParam(t, "1=TEST_PARAM", "2=TEST_PARAM")
 	})
 	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
-		th := testLoad(t, "params_with_quoted_values.yaml")
+		data := []byte(`
+params: x="a b c" y="d e f"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		th.AssertParam(t, "x=a b c", "y=d e f")
 	})
 	t.Run("ParamsAsMap", func(t *testing.T) {
-		th := testLoad(t, "params_as_map.yaml")
+		data := []byte(`
+params:
+  - FOO: foo
+  - BAR: bar
+  - BAZ: "` + "`echo baz`" + `"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		th.AssertParam(t,
 			"FOO=foo",
 			"BAR=bar",
@@ -36,9 +60,15 @@ func TestBuild(t *testing.T) {
 		)
 	})
 	t.Run("ParamsAsMapOverride", func(t *testing.T) {
-		th := testLoad(t, "params_as_map.yaml", withBuildOpts(
-			digraph.BuildOpts{Parameters: "FOO=X BAZ=Y"},
-		))
+		data := []byte(`
+params:
+  - FOO: foo
+  - BAR: bar
+  - BAZ: "` + "`echo baz`" + `"
+`)
+		dag, err := digraph.LoadYAMLWithOpts(context.Background(), data, digraph.BuildOpts{Parameters: "FOO=X BAZ=Y"})
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		th.AssertParam(t,
 			"FOO=X",
 			"BAR=bar",
@@ -46,7 +76,14 @@ func TestBuild(t *testing.T) {
 		)
 	})
 	t.Run("ParamsWithComplexValues", func(t *testing.T) {
-		th := testLoad(t, "params_with_complex_values.yaml")
+		data := []byte(`
+params: first P1=foo P2=${A001} P3=` + "`/bin/echo BAR`" + ` X=bar Y=${P1} Z="A B C"
+env:
+  - A001: TEXT
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		th.AssertParam(t,
 			"1=first",
 			"P1=foo",
@@ -58,26 +95,87 @@ func TestBuild(t *testing.T) {
 		)
 	})
 	t.Run("mailOn", func(t *testing.T) {
-		th := testLoad(t, "valid_mail_on.yaml")
+		data := []byte(`
+steps:
+  - name: "1"
+    command: "true"
+
+mailOn:
+  failure: true
+  success: true
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.True(t, th.MailOn.Failure)
 		assert.True(t, th.MailOn.Success)
 	})
 	t.Run("ValidTags", func(t *testing.T) {
-		th := testLoad(t, "valid_tags.yaml")
+		data := []byte(`
+tags: daily,monthly
+steps:
+  - command: echo 1
+    name: step1
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.True(t, th.HasTag("daily"))
 		assert.True(t, th.HasTag("monthly"))
 	})
 	t.Run("ValidTagsList", func(t *testing.T) {
-		th := testLoad(t, "valid_tags_list.yaml")
+		data := []byte(`
+tags:
+  - daily
+  - monthly
+steps:
+  - command: echo 1
+    name: step1
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.True(t, th.HasTag("daily"))
 		assert.True(t, th.HasTag("monthly"))
 	})
 	t.Run("LogDir", func(t *testing.T) {
-		th := testLoad(t, "valid_log_dir.yaml")
+		data := []byte(`
+logDir: /tmp/logs
+steps:
+  - name: "1"
+    command: "true"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, "/tmp/logs", th.LogDir)
 	})
 	t.Run("MailConfig", func(t *testing.T) {
-		th := testLoad(t, "valid_mail_config.yaml")
+		data := []byte(`
+# SMTP server settings
+smtp:
+  host: "smtp.example.com"
+  port: "587"
+  username: user@example.com
+  password: password
+
+# Error mail configuration
+errorMail:
+  from: "error@example.com"
+  to: "admin@example.com"
+  prefix: "[ERROR]"
+  attachLogs: true
+
+# Info mail configuration
+infoMail:
+  from: "info@example.com"
+  to: "user@example.com"
+  prefix: "[INFO]"
+  attachLogs: true
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, "smtp.example.com", th.SMTP.Host)
 		assert.Equal(t, "587", th.SMTP.Port)
 		assert.Equal(t, "user@example.com", th.SMTP.Username)
@@ -114,15 +212,47 @@ steps:
 		assert.Equal(t, "password", dag.SMTP.Password)
 	})
 	t.Run("MaxHistRetentionDays", func(t *testing.T) {
-		th := testLoad(t, "hist_retention_days.yaml")
+		data := []byte(`
+histRetentionDays: 365
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, 365, th.HistRetentionDays)
 	})
 	t.Run("CleanUpTime", func(t *testing.T) {
-		th := testLoad(t, "max_cleanup_time.yaml")
+		data := []byte(`
+maxCleanUpTimeSec: 10
+steps:
+  - name: "1"
+    command: "true"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, time.Duration(10*time.Second), th.MaxCleanUpTime)
 	})
 	t.Run("ChainTypeBasic", func(t *testing.T) {
-		th := testLoad(t, "chain_basic.yaml")
+		data := []byte(`
+name: chain-basic-test
+type: chain
+
+steps:
+  - name: step1
+    command: echo "First"
+  
+  - name: step2  
+    command: echo "Second"
+  
+  - name: step3
+    command: echo "Third"
+  
+  - name: step4
+    command: echo "Fourth"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, digraph.TypeChain, th.Type)
 
 		// Check that implicit dependencies were added
@@ -133,7 +263,32 @@ steps:
 		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends)
 	})
 	t.Run("ChainTypeWithExplicitDepends", func(t *testing.T) {
-		th := testLoad(t, "chain_with_explicit_depends.yaml")
+		data := []byte(`
+name: chain-explicit-depends-test
+type: chain
+
+steps:
+  - name: setup
+    command: ./setup.sh
+  
+  - name: download-a
+    command: wget fileA
+  
+  - name: download-b
+    command: wget fileB
+  
+  - name: process-both
+    command: process.py fileA fileB
+    depends:  # Override chain to depend on both downloads
+      - download-a
+      - download-b
+  
+  - name: cleanup
+    command: rm -f fileA fileB
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, digraph.TypeChain, th.Type)
 
 		// Check dependencies
@@ -147,17 +302,51 @@ steps:
 	})
 	t.Run("InvalidType", func(t *testing.T) {
 		// Test will fail with an error containing "invalid type"
-		data := test.ReadTestdata(t, filepath.Join("digraph", "invalid_type.yaml"))
+		data := []byte(`
+name: invalid-type-test
+type: invalid-type
+
+steps:
+  - name: step1
+    command: echo "test"
+`)
 		_, err := digraph.LoadYAML(context.Background(), data)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid type")
 	})
 	t.Run("DefaultTypeIsChain", func(t *testing.T) {
-		th := testLoad(t, "valid_command.yaml")
+		data := []byte(`
+steps:
+  - command: echo 1
+    name: step1
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, digraph.TypeChain, th.Type)
 	})
 	t.Run("ChainTypeWithNoDependencies", func(t *testing.T) {
-		th := testLoad(t, "chain_no_dependencies.yaml")
+		data := []byte(`
+name: chain-no-deps-test
+type: chain
+
+steps:
+  - name: step1
+    command: echo "First"
+  
+  - name: step2
+    command: echo "Second - should depend on step1"
+  
+  - name: step3
+    command: echo "Third - no dependencies"
+    depends: []  # Explicitly no dependencies
+  
+  - name: step4
+    command: echo "Fourth - should depend on step3"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, digraph.TypeChain, th.Type)
 
 		// Check dependencies
@@ -168,58 +357,102 @@ steps:
 		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends) // step4 should depend on step3
 	})
 	t.Run("Preconditions", func(t *testing.T) {
-		th := testLoad(t, "preconditions.yaml")
+		data := []byte(`
+preconditions:
+  - condition: "test -f file.txt"
+    expected: "true"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Preconditions, 1)
 		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
 	t.Run("maxActiveRuns", func(t *testing.T) {
-		th := testLoad(t, "max_active_runs.yaml")
+		data := []byte(`
+maxActiveRuns: 5
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, 5, th.MaxActiveRuns)
 	})
 	t.Run("MaxActiveSteps", func(t *testing.T) {
-		th := testLoad(t, "max_active_steps.yaml")
+		data := []byte(`
+maxActiveSteps: 3
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, 3, th.MaxActiveSteps)
 	})
 	t.Run("MaxOutputSize", func(t *testing.T) {
 		// Test custom maxOutputSize
-		th := testLoad(t, "valid_max_output_size.yaml")
+		data := []byte(`
+name: test-max-output-size
+description: Test DAG with custom maxOutputSize
+
+# Custom maxOutputSize of 512KB
+maxOutputSize: 524288
+
+steps:
+  - name: step1
+    command: echo "test output"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, 524288, th.MaxOutputSize) // 512KB
 
 		// Test default maxOutputSize when not specified
-		th2 := testLoad(t, "default.yaml")
+		data2 := []byte(`
+steps:
+  - name: "1"
+    command: "true"
+`)
+		dag2, err := digraph.LoadYAML(context.Background(), data2)
+		require.NoError(t, err)
+		th2 := DAG{t: t, DAG: dag2}
 		assert.Equal(t, 0, th2.MaxOutputSize) // Default 1MB
 	})
 	t.Run("ValidationError", func(t *testing.T) {
 		type testCase struct {
 			name        string
-			dag         string
+			yaml        string
 			expectedErr error
 		}
 
 		testCases := []testCase{
 			{
-				name:        "NoName",
-				dag:         "invalid_no_name.yaml",
+				name: "NoName",
+				yaml: `steps:
+  - command: "true"`,
 				expectedErr: digraph.ErrStepNameRequired,
 			},
 			{
-				name:        "InvalidEnv",
-				dag:         "invalid_env.yaml",
+				name: "InvalidEnv",
+				yaml: `
+env:
+  - VAR: "` + "`invalid command`" + `"`,
 				expectedErr: digraph.ErrInvalidEnvValue,
 			},
 			{
-				name:        "InvalidParams",
-				dag:         "invalid_params.yaml",
+				name: "InvalidParams",
+				yaml: `
+params: "` + "`invalid command`" + `"`,
 				expectedErr: digraph.ErrInvalidParamValue,
 			},
 			{
-				name:        "InvalidSchedule",
-				dag:         "invalid_schedule.yaml",
+				name: "InvalidSchedule",
+				yaml: `
+schedule: "1"`,
 				expectedErr: digraph.ErrInvalidSchedule,
 			},
 			{
-				name:        "NoCommand",
-				dag:         "invalid_no_command.yaml",
+				name: "NoCommand",
+				yaml: `
+steps:
+  - name: "1"`,
 				expectedErr: digraph.ErrStepCommandIsRequired,
 			},
 		}
@@ -228,7 +461,21 @@ steps:
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
-				_ = testLoad(t, tc.dag, withExpectedErr(tc.expectedErr))
+				data := []byte(tc.yaml)
+				ctx := context.Background()
+				_, err := digraph.LoadYAML(ctx, data)
+				if errs, ok := err.(*digraph.ErrorList); ok && len(*errs) > 0 {
+					found := false
+					for _, e := range *errs {
+						if errors.Is(e, tc.expectedErr) {
+							found = true
+							break
+						}
+					}
+					require.True(t, found, "expected error %v, got %v", tc.expectedErr, err)
+				} else {
+					assert.ErrorIs(t, err, tc.expectedErr)
+				}
 			})
 		}
 	})
@@ -239,28 +486,52 @@ func TestBuildEnv(t *testing.T) {
 
 	type testCase struct {
 		name     string
-		file     string
+		yaml     string
 		expected map[string]string
 	}
 
 	testCases := []testCase{
 		{
 			name: "ValidEnv",
-			file: "valid_env.yaml",
+			yaml: `
+env:
+  - FOO: "123"
+
+steps:
+  - name: "1"
+    command: "true"
+`,
 			expected: map[string]string{
 				"FOO": "123",
 			},
 		},
 		{
 			name: "ValidEnvWithSubstitution",
-			file: "valid_env_substitution.yaml",
+			yaml: `
+env:
+  - VAR: "` + "`echo 123`" + `"
+
+steps:
+  - name: "1"
+    command: "true"
+`,
 			expected: map[string]string{
 				"VAR": "123",
 			},
 		},
 		{
 			name: "ValidEnvWithSubstitutionAndEnv",
-			file: "valid_env_substitution_and_env.yaml",
+			yaml: `
+env:
+  - BEE: "BEE"
+  - BAZ: "BAZ"
+  - BOO: "BOO"
+  - FOO: "${BEE}:${BAZ}:${BOO}:FOO"
+
+steps:
+  - name: "1"
+    command: "true"
+`,
 			expected: map[string]string{
 				"FOO": "BEE:BAZ:BOO:FOO",
 			},
@@ -271,7 +542,9 @@ func TestBuildEnv(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			th := testLoad(t, tc.file)
+			dag, err := digraph.LoadYAML(context.Background(), []byte(tc.yaml))
+			require.NoError(t, err)
+			th := DAG{t: t, DAG: dag}
 			for key, val := range tc.expected {
 				th.AssertEnv(t, key, val)
 			}
@@ -284,7 +557,7 @@ func TestBuildSchedule(t *testing.T) {
 
 	type testCase struct {
 		name    string
-		file    string
+		yaml    string
 		start   []string
 		stop    []string
 		restart []string
@@ -292,15 +565,32 @@ func TestBuildSchedule(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			name:    "ValidSchedule",
-			file:    "valid_schedule.yaml",
+			name: "ValidSchedule",
+			yaml: `
+schedule:
+  start: "0 1 * * *"
+  stop: "0 2 * * *"
+  restart: "0 12 * * *"
+
+steps:
+  - name: "1"
+    command: "true"
+`,
 			start:   []string{"0 1 * * *"},
 			stop:    []string{"0 2 * * *"},
 			restart: []string{"0 12 * * *"},
 		},
 		{
 			name: "ListSchedule",
-			file: "schedule_in_list.yaml",
+			yaml: `
+schedule:
+  - "0 1 * * *"
+  - "0 18 * * *"
+
+steps:
+  - name: "1"
+    command: "true"
+`,
 			start: []string{
 				"0 1 * * *",
 				"0 18 * * *",
@@ -308,7 +598,22 @@ func TestBuildSchedule(t *testing.T) {
 		},
 		{
 			name: "MultipleValues",
-			file: "schedule_with_multiple_values.yaml",
+			yaml: `
+schedule:
+  start:
+    - "0 1 * * *"
+    - "0 18 * * *"
+  stop:
+    - "0 2 * * *"
+    - "0 20 * * *"
+  restart:
+    - "0 12 * * *"
+    - "0 22 * * *"
+
+steps:
+  - name: "1"
+    command: "true"
+`,
 			start: []string{
 				"0 1 * * *",
 				"0 18 * * *",
@@ -328,7 +633,9 @@ func TestBuildSchedule(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			th := testLoad(t, tc.file)
+			dag, err := digraph.LoadYAML(context.Background(), []byte(tc.yaml))
+			require.NoError(t, err)
+			th := DAG{t: t, DAG: dag}
 			assert.Len(t, th.Schedule, len(tc.start))
 			for i, s := range tc.start {
 				assert.Equal(t, s, th.Schedule[i].Expression)
@@ -352,7 +659,14 @@ func TestBuildStep(t *testing.T) {
 	t.Run("ValidCommand", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "valid_command.yaml")
+		data := []byte(`
+steps:
+  - command: echo 1
+    name: step1
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.Equal(t, "echo 1", th.Steps[0].CmdWithArgs)
 		assert.Equal(t, "echo", th.Steps[0].Command)
@@ -362,7 +676,14 @@ func TestBuildStep(t *testing.T) {
 	t.Run("ValidCommandInArray", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "valid_command_in_array.yaml")
+		data := []byte(`
+steps:
+  - command: [echo, 1]
+    name: step1
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.Equal(t,
 			cmdutil.JoinCommandArgs("echo", []string{"1"}),
@@ -374,7 +695,16 @@ func TestBuildStep(t *testing.T) {
 	t.Run("ValidCommandInList", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "valid_command_in_list.yaml")
+		data := []byte(`
+steps:
+  - command:
+      - echo
+      - 1
+    name: step1
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.Equal(t,
 			cmdutil.JoinCommandArgs("echo", []string{"1"}),
@@ -386,14 +716,35 @@ func TestBuildStep(t *testing.T) {
 	t.Run("HTTPExecutor", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "http_executor.yaml")
+		data := []byte(`
+steps:
+  - command: GET http://example.com
+    name: step1
+    executor: http
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.Equal(t, "http", th.Steps[0].ExecutorConfig.Type)
 	})
 	t.Run("HTTPExecutorWithConfig", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "http_executor_with_config.yaml")
+		data := []byte(`
+steps:
+  - command: http://example.com
+    name: step1
+    executor:
+      type: http
+      config:
+        key: value
+        map:
+          foo: bar
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.Equal(t, "http", th.Steps[0].ExecutorConfig.Type)
 		assert.Equal(t, map[string]any{
@@ -406,7 +757,15 @@ func TestBuildStep(t *testing.T) {
 	t.Run("DAGExecutor", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "sub_dag.yaml")
+		data := []byte(`
+steps:
+  - name: execute a sub-dag
+    run: sub_dag
+    params: "param1=value1 param2=value2"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.Equal(t, "dag", th.Steps[0].ExecutorConfig.Type)
 		assert.Equal(t, "run", th.Steps[0].Command)
@@ -418,7 +777,17 @@ func TestBuildStep(t *testing.T) {
 	t.Run("ContinueOn", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "continue_on.yaml")
+		data := []byte(`
+steps:
+  - name: "1"
+    command: "echo 1"
+    continueOn:
+      skipped: true
+      failure: true
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.True(t, th.Steps[0].ContinueOn.Failure)
 		assert.True(t, th.Steps[0].ContinueOn.Skipped)
@@ -426,7 +795,17 @@ func TestBuildStep(t *testing.T) {
 	t.Run("RetryPolicy", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "retry_policy.yaml")
+		data := []byte(`
+steps:
+  - name: "2"
+    command: "echo 2"
+    retryPolicy:
+      limit: 3
+      intervalSec: 10
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		require.NotNil(t, th.Steps[0].RetryPolicy)
 		assert.Equal(t, 3, th.Steps[0].RetryPolicy.Limit)
@@ -435,7 +814,19 @@ func TestBuildStep(t *testing.T) {
 	t.Run("RetryPolicyWithBackoff", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "retry_policy_backoff.yaml")
+		data := []byte(`
+steps:
+  - name: "test_backoff"
+    command: "echo test"
+    retryPolicy:
+      limit: 5
+      intervalSec: 2
+      backoff: 2.0
+      maxIntervalSec: 30
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		require.NotNil(t, th.Steps[0].RetryPolicy)
 		assert.Equal(t, 5, th.Steps[0].RetryPolicy.Limit)
@@ -446,7 +837,19 @@ func TestBuildStep(t *testing.T) {
 	t.Run("RetryPolicyWithBackoffBool", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "retry_policy_backoff_bool.yaml")
+		data := []byte(`
+steps:
+  - name: "test_backoff_bool"
+    command: "echo test"
+    retryPolicy:
+      limit: 3
+      intervalSec: 1
+      backoff: true
+      maxIntervalSec: 10
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		require.NotNil(t, th.Steps[0].RetryPolicy)
 		assert.Equal(t, 3, th.Steps[0].RetryPolicy.Limit)
@@ -477,7 +880,17 @@ steps:
 		t.Parallel()
 
 		// Test basic boolean repeat (backward compatibility)
-		th := testLoad(t, "repeat_policy.yaml")
+		data := []byte(`
+steps:
+  - name: "2"
+    command: "echo 2"
+    repeatPolicy:
+      repeat: true
+      intervalSec: 60
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		require.NotNil(t, th.Steps[0].RepeatPolicy)
 		assert.Equal(t, digraph.RepeatModeWhile, th.Steps[0].RepeatPolicy.RepeatMode)
@@ -488,7 +901,19 @@ steps:
 	t.Run("RepeatPolicyWhileCondition", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "repeat_policy_while_condition.yaml")
+		data := []byte(`
+steps:
+  - name: "repeat-while-condition"
+    command: "echo test"
+    repeatPolicy:
+      repeat: "while"
+      condition: "echo hello"
+      intervalSec: 5
+      limit: 3
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
@@ -503,7 +928,20 @@ steps:
 	t.Run("RepeatPolicyUntilCondition", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "repeat_policy_until_condition.yaml")
+		data := []byte(`
+steps:
+  - name: "repeat-until-condition"
+    command: "echo test"
+    repeatPolicy:
+      repeat: "until"
+      condition: "echo hello"
+      expected: "hello"
+      intervalSec: 10
+      limit: 5
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
@@ -518,7 +956,18 @@ steps:
 	t.Run("RepeatPolicyWhileExitCode", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "repeat_policy_while_exitcode.yaml")
+		data := []byte(`
+steps:
+  - name: "repeat-while-exitcode"
+    command: "exit 1"
+    repeatPolicy:
+      repeat: "while"
+      exitCode: [1, 2]
+      intervalSec: 15
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
@@ -531,7 +980,18 @@ steps:
 	t.Run("RepeatPolicyUntilExitCode", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "repeat_policy_until_exitcode.yaml")
+		data := []byte(`
+steps:
+  - name: "repeat-until-exitcode"
+    command: "exit 0"
+    repeatPolicy:
+      repeat: "until"
+      exitCode: [0]
+      intervalSec: 20
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
@@ -545,7 +1005,18 @@ steps:
 		t.Parallel()
 
 		// Test backward compatibility: condition + expected should infer "until" mode
-		th := testLoad(t, "repeat_policy_backward_until.yaml")
+		data := []byte(`
+steps:
+  - name: "repeat-backward-compatibility-until"
+    command: "echo test"
+    repeatPolicy:
+      condition: "echo hello"
+      expected: "hello"
+      intervalSec: 25
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
@@ -560,7 +1031,17 @@ steps:
 		t.Parallel()
 
 		// Test backward compatibility: condition only should infer "while" mode
-		th := testLoad(t, "repeat_policy_backward_while.yaml")
+		data := []byte(`
+steps:
+  - name: "repeat-backward-compatibility-while"
+    command: "echo test"
+    repeatPolicy:
+      condition: "echo hello"
+      intervalSec: 30
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
@@ -575,7 +1056,18 @@ steps:
 		t.Parallel()
 
 		// Test existing backward compatibility condition test
-		th := testLoad(t, "repeat_policy_condition.yaml")
+		data := []byte(`
+steps:
+  - name: "repeat-condition"
+    command: "echo hello"
+    repeatPolicy:
+      condition: "echo hello"
+      expected: "hello"
+      intervalSec: 1
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy.Condition)
@@ -588,14 +1080,35 @@ steps:
 	t.Run("SignalOnStop", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "signal_on_stop.yaml")
+		data := []byte(`
+steps:
+  - command: echo 1
+    name: step1
+    signalOnStop: SIGINT
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.Equal(t, "SIGINT", th.Steps[0].SignalOnStop)
 	})
 	t.Run("StepWithID", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "step_with_id.yaml")
+		data := []byte(`
+steps:
+  - name: step1
+    id: unique-step-1
+    command: echo "Step with ID"
+  - name: step2
+    command: echo "Step without ID"
+  - name: step3
+    id: custom-id-123
+    command: echo "Another step with ID"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 3)
 
 		// First step has ID
@@ -613,7 +1126,17 @@ steps:
 	t.Run("Preconditions", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "step_preconditions.yaml")
+		data := []byte(`
+steps:
+  - name: "2"
+    command: "echo 2"
+    preconditions:
+      - condition: "test -f file.txt"
+        expected: "true"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.Len(t, th.Steps[0].Preconditions, 1)
 		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
@@ -622,7 +1145,17 @@ steps:
 		t.Parallel()
 
 		// Test existing backward compatibility exitcode test
-		th := testLoad(t, "repeat_policy_exitcode.yaml")
+		data := []byte(`
+steps:
+  - name: "repeat-exitcode"
+    command: "exit 42"
+    repeatPolicy:
+      exitCode: [42]
+      intervalSec: 2
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
@@ -635,7 +1168,21 @@ steps:
 	t.Run("RepeatPolicyWithBackoff", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "repeat_policy_backoff.yaml")
+		data := []byte(`
+steps:
+  - name: "test_repeat_backoff"
+    command: "echo test"
+    repeatPolicy:
+      repeat: while
+      intervalSec: 5
+      backoff: 1.5
+      maxIntervalSec: 60
+      limit: 10
+      exitCode: [1]
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
@@ -650,7 +1197,22 @@ steps:
 	t.Run("RepeatPolicyWithBackoffBool", func(t *testing.T) {
 		t.Parallel()
 
-		th := testLoad(t, "repeat_policy_backoff_bool.yaml")
+		data := []byte(`
+steps:
+  - name: "test_repeat_backoff_bool"
+    command: "echo test"
+    repeatPolicy:
+      repeat: until
+      intervalSec: 2
+      backoff: true
+      maxIntervalSec: 20
+      limit: 5
+      condition: "echo done"
+      expected: "done"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		repeatPolicy := th.Steps[0].RepeatPolicy
 		require.NotNil(t, repeatPolicy)
@@ -797,63 +1359,19 @@ func (th *DAG) AssertParam(t *testing.T, params ...string) {
 	}
 }
 
-type testOption func(*testOptions)
-type testOptions struct {
-	buildOpts   digraph.BuildOpts
-	expectedErr error
-}
-
-func withBuildOpts(opts digraph.BuildOpts) testOption {
-	return func(to *testOptions) {
-		to.buildOpts = opts
-	}
-}
-
-func withExpectedErr(err error) testOption {
-	return func(to *testOptions) {
-		to.expectedErr = err
-	}
-}
-
-func testLoad(t *testing.T, file string, opts ...testOption) DAG {
-	t.Helper()
-
-	ctx := context.Background()
-	var options testOptions
-
-	for _, opt := range opts {
-		opt(&options)
-	}
-
-	data := test.ReadTestdata(t, filepath.Join("digraph", file))
-	dag, err := digraph.LoadYAMLWithOpts(ctx, data, options.buildOpts)
-
-	if options.expectedErr != nil {
-		if errs, ok := err.(*digraph.ErrorList); ok && len(*errs) > 0 {
-			found := false
-			for _, e := range *errs {
-				if errors.Is(e, options.expectedErr) {
-					found = true
-					break
-				}
-			}
-			require.True(t, found, "expected error %v, got %v", options.expectedErr, err)
-		} else {
-			assert.ErrorIs(t, err, options.expectedErr)
-		}
-
-		return DAG{t: t, DAG: nil}
-	}
-
-	require.NoError(t, err, "failed to load YAML %s", file)
-
-	return DAG{t: t, DAG: dag}
-}
+// testLoad and helper functions have been removed - all tests now use inline YAML
 
 func TestBuild_QueueConfiguration(t *testing.T) {
 	t.Run("MaxActiveRunsDefaultsToOne", func(t *testing.T) {
 		// Test that when maxActiveRuns is not specified, it defaults to 1
-		th := testLoad(t, "valid_command.yaml") // Using a simple DAG without maxActiveRuns
+		data := []byte(`
+steps:
+  - command: echo 1
+    name: step1
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag} // Using a simple DAG without maxActiveRuns
 		assert.Equal(t, 1, th.MaxActiveRuns, "maxActiveRuns should default to 1 when not specified")
 	})
 

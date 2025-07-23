@@ -1,7 +1,0 @@
-name: status-with-params
-params:
-  - param1
-  - param2
-steps:
-  - name: "print-params"
-    command: "echo Param1: ${param1}, Param2: ${param2}"
