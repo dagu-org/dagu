@@ -78,8 +78,11 @@ type LayoutProps = {
 // Main Content component including Sidebar and AppBar logic
 function Content({ title, navbarColor, children }: LayoutProps) {
   const [scrolled, setScrolled] = React.useState(false);
-  // Sidebar is always visible in collapsed state by default on desktop
-  const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(false);
+  // Sidebar state with localStorage persistence
+  const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(() => {
+    const saved = localStorage.getItem('sidebarExpanded');
+    return saved ? saved === 'true' : false;
+  });
   // Mobile sidebar state (hidden by default)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -93,6 +96,16 @@ function Content({ title, navbarColor, children }: LayoutProps) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Save sidebar state to localStorage when it changes
+  React.useEffect(() => {
+    localStorage.setItem('sidebarExpanded', isSidebarExpanded.toString());
+  }, [isSidebarExpanded]);
+
+  // Toggle sidebar function
+  const toggleSidebar = () => {
+    setIsSidebarExpanded(!isSidebarExpanded);
+  };
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">
       {/* Desktop Sidebar - Hidden on mobile, visible in collapsed state on desktop */}
@@ -104,17 +117,16 @@ function Content({ title, navbarColor, children }: LayoutProps) {
           'shadow-lg',
           // Hidden on mobile, visible on desktop
           'hidden md:block',
-          'z-40 transition-all duration-50 ease-in-out',
+          'z-40 transition-all duration-200 ease-in-out',
           isSidebarExpanded ? 'w-60' : sidebarWidthCollapsed
         )}
-        onMouseEnter={() => setIsSidebarExpanded(true)}
-        onMouseLeave={() => setIsSidebarExpanded(false)}
       >
         {/* Simplified flex column layout */}
         <div className="flex flex-col h-full">
           <nav className="flex-1">
             <MainListItems
               isOpen={isSidebarExpanded}
+              onToggle={toggleSidebar}
               // Don't collapse sidebar on navigation to prevent jarring transition
             />
           </nav>
