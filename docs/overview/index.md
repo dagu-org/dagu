@@ -1,47 +1,37 @@
-# What is Dagu?
+# Orchestrate workflows without complexity
 
-Dagu is a workflow engine that runs as a single binary with zero dependencies. It replaces complex orchestration platforms with a tool that just works—on your laptop, in containers, or on production servers.
-
-## The Problem
-
-You know the pain: hundreds of cron jobs scattered across servers, written in different languages, with hidden dependencies. When something breaks at 3 AM, you're hunting through logs, trying to understand what went wrong.
-
-Traditional orchestration platforms solve this but introduce new complexity: databases, message queues, language lock-in. You need a team just to manage the infrastructure.
-
-## The Solution
-
-Dagu provides powerful workflow orchestration without the overhead:
+Dagu is a powerful workflow engine designed to be deployable in environments where Airflow cannot be installed, such as small devices, on-premise servers, and legacy systems. It allows you to declaratively define any batch job as a single DAG (Directed Acyclic Graph) in a simple YAML format.
 
 ```yaml
 steps:
-  - name: extract
-    command: python extract.py
+  - name: step1
+    command: sleep 1 && echo "Hello, Dagu!"
     
-  - name: transform
-    command: ./transform.sh
-    
-  - name: load
-    command: psql -f load.sql
-    retryPolicy:
-      limit: 3
-      intervalSec: 30
+  - name: step2
+    command: sleep 1 && echo "This is a second step"
 ```
 
-Clear dependencies. Visual monitoring. One binary. No database.
+By declaratively defining the processes within a job, complex workflows become visualized, making troubleshooting and recovery easier. Viewing log and retry can be performed from the Web UI, eliminating the need to manually log into a server via SSH.
 
-## Design Philosophy
+It is equipped with many features to meet the highly detailed requirements of enterprise environments. It operates even in environments without internet access and, being statically compiled, includes all dependencies, allowing it to be used in any environment, including on-premise, cloud, and IoT devices. It is a lightweight workflow engine that meets enterprise requirements.
 
-### 1. Single Binary
-Download and run. No installation process, no dependencies, no containers required.
+Workflow jobs are defined as commands. Therefore, legacy scripts that have been in operation for a long time within a company or organization can be used as-is without modification. There is no need to learn a complex new language, and you can start using it right away.
 
-### 2. Language Agnostic
-Use any command, any language. Your existing scripts work without modification.
+Dagu is designed for small teams of 1-3 people to easily manage complex workflows. It aims to be an ideal choice for teams that find large-scale, high-cost infrastructure like Airflow to be overkill and are looking for a simpler solution.
 
-### 3. File-Based Storage
-All state in local files. Version control your workflows. Understand exactly what's happening.
+## Demo
 
-### 4. Production Ready
-Built-in scheduling, error handling, retries, logging, and monitoring. Everything you need.
+**CLI Demo**: Create a simple DAG workflow and execute it using the command line interface.
+
+![Demo CLI](/demo-cli.webp)
+
+**Web UI Demo**: Create and manage workflows using the web interface, including real-time monitoring and control.
+
+[Docs on CLI](/overview/cli)
+
+![Demo Web UI](/demo-web-ui.webp)
+
+[Docs on Web UI](/overview/web-ui)
 
 ## When to Use Dagu
 

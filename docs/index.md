@@ -10,9 +10,9 @@ layout: doc
   </div>
 </div>
 
-<div class="tagline">
-  <h1>Local-First Workflow Engine, Built for Self-Hosting</h1>
-  <p>Zero dependencies. Language agnostic. Production ready.</p>
+<div class="tagline" style="text-align: center;">
+  <h1>A lightweight and powerful workflow engine for enterprise & small teams</h1>
+  <p>Deployable on-premise, in the cloud, or on IoT devices. Low-code declarative workflow definitions that anyone can understand.</p>
 </div>
 
 
