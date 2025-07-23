@@ -1,7 +1,7 @@
 import { debounce } from 'lodash';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { components } from '../../api/v2/schema';
+import { components, PathsDagsGetParametersQuerySort, PathsDagsGetParametersQueryOrder } from '../../api/v2/schema';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
 import { DAGErrors } from '../../features/dags/components/dag-editor';
@@ -23,11 +23,15 @@ function DAGs() {
   const [apiSearchTag, setAPISearchTag] = React.useState(
     query.get('tag') || ''
   );
+  const [sortField, setSortField] = React.useState(query.get('sort') || 'name');
+  const [sortOrder, setSortOrder] = React.useState(query.get('order') || 'asc');
   const { preferences, updatePreference } = useUserPreferences();
 
   const handlePageLimitChange = (newLimit: number) => {
     updatePreference('pageLimit', newLimit);
   };
+
+
 
   const { data, mutate, isLoading } = useQuery(
     '/dags',
@@ -39,6 +43,8 @@ function DAGs() {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
           name: apiSearchText ? apiSearchText : undefined,
           tag: apiSearchTag ? apiSearchTag : undefined,
+          sort: sortField as PathsDagsGetParametersQuerySort,
+          order: sortOrder as PathsDagsGetParametersQueryOrder,
         },
       },
     },
@@ -120,6 +126,14 @@ function DAGs() {
     debouncedAPISearchTag(searchTag);
   };
 
+  const handleSortChange = (field: string, order: string) => {
+    addSearchParam('sort', field);
+    addSearchParam('order', order);
+    setSortField(field);
+    setSortOrder(order);
+    setPage(1); // Reset to first page when sorting changes
+  };
+
   // Store the last valid data to prevent blank screens during loading
   const [lastValidData, setLastValidData] = React.useState<typeof data | null>(
     null
@@ -166,6 +180,9 @@ function DAGs() {
                 pageLimit: preferences.pageLimit,
               }}
               isLoading={isLoading}
+              sortField={sortField}
+              sortOrder={sortOrder}
+              onSortChange={handleSortChange}
             />
           </>
         ) : (

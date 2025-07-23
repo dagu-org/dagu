@@ -7,9 +7,7 @@ import {
   getCoreRowModel,
   getExpandedRowModel,
   getFilteredRowModel,
-  getSortedRowModel,
   RowData,
-  SortingState,
   useReactTable,
 } from '@tanstack/react-table';
 import cronParser, { CronDate } from 'cron-parser';
@@ -104,6 +102,12 @@ type Props = {
     /** Callback for page limit change */
     onPageLimitChange: (pageLimit: number) => void;
   };
+  /** Current sort field */
+  sortField?: string;
+  /** Current sort order */
+  sortOrder?: string;
+  /** Handler for sort changes */
+  onSortChange?: (field: string, order: string) => void;
 };
 
 /**
@@ -219,7 +223,6 @@ const defaultColumns = [
       }
       return null; // Return null instead of empty string for clarity
     },
-    enableSorting: false,
     size: 40,
   }),
   columnHelper.accessor('name', {
@@ -315,17 +318,6 @@ const defaultColumns = [
       }
       return false;
     },
-    sortingFn: (a, b) => {
-      const ta = a.original!.kind;
-      const tb = b.original!.kind;
-      if (ta === tb) {
-        const nameA = a.original!.name.toLowerCase();
-        const nameB = b.original!.name.toLowerCase();
-        return nameA.localeCompare(nameB);
-      }
-      // Keep groups potentially sorted differently if needed, or simply by name
-      return ta === ItemKind.Group ? -1 : 1;
-    },
   }),
   // Tags column removed as tags are now displayed under the name
   // The filter functionality is preserved in the Name column
@@ -351,12 +343,6 @@ const defaultColumns = [
         );
       }
       return null;
-    },
-    sortingFn: (a, b) => {
-      // Explicitly handle number type for comparison
-      const valA = getStatus(a.original) as number;
-      const valB = getStatus(b.original) as number;
-      return valA - valB;
     },
   }),
   // Removed Started At and Finished At columns
@@ -415,24 +401,6 @@ const defaultColumns = [
         </div>
       );
     },
-    sortingFn: (a, b) => {
-      const dataA = a.original!;
-      const dataB = b.original!;
-      if (dataA.kind !== ItemKind.DAG || dataB.kind !== ItemKind.DAG) {
-        // Handle sorting for non-DAG rows if necessary, e.g., groups first
-        return dataA.kind === ItemKind.Group ? -1 : 1;
-      }
-      // Prioritize rows with startedAt dates
-      const startedAtA = dataA.dag.latestDAGRun.startedAt;
-      const startedAtB = dataB.dag.latestDAGRun.startedAt;
-
-      if (!startedAtA && !startedAtB) return 0; // Both null/undefined
-      if (!startedAtA) return 1; // A is null, should come after B
-      if (!startedAtB) return -1; // B is null, should come after A
-
-      // Compare valid dates using dayjs's diff for accurate comparison
-      return dayjs(startedAtA).diff(dayjs(startedAtB));
-    },
     size: 200, // Adjust size as needed
   }),
   columnHelper.accessor('kind', {
@@ -445,7 +413,6 @@ const defaultColumns = [
         </span>
       </div>
     ),
-    enableSorting: true,
     cell: ({ row }) => {
       const data = row.original!;
       if (data.kind === ItemKind.DAG) {
@@ -502,25 +469,6 @@ const defaultColumns = [
         );
       }
       return null;
-    },
-    sortingFn: (a, b) => {
-      const dataA = a.original!;
-      const dataB = b.original!;
-      if (dataA.kind !== ItemKind.DAG || dataB.kind !== ItemKind.DAG) {
-        return dataA!.kind - dataB!.kind;
-      }
-      const nextA = getNextSchedule(dataA.dag);
-      const nextB = getNextSchedule(dataB.dag);
-      if (!nextA && !nextB) {
-        return 0; // Both are undefined
-      }
-      if (!nextA) {
-        return 1; // A is undefined, B is defined
-      }
-      if (!nextB) {
-        return -1; // B is undefined, A is defined
-      }
-      return nextA.getTime() - nextB.getTime();
     },
     size: 120,
   }),
@@ -594,24 +542,52 @@ const defaultColumns = [
   }),
 ];
 
-// --- Header Component for Sorting ---
+// Mapping between column IDs and backend sort fields
+const columnToSortField: Record<string, string> = {
+  'Name': 'name',
+  'Status': 'status',
+  'LastRun': 'lastRun',
+  'ScheduleAndNextRun': 'schedule',
+  'Live': 'suspended',
+};
+
+// --- Header Component for Server-side Sorting ---
 const SortableHeader = ({
   column,
   children,
+  currentSort,
+  currentOrder,
+  onSort,
 }: {
   column: Column<Data, unknown>;
   children: React.ReactNode;
+  currentSort?: string;
+  currentOrder?: string;
+  onSort?: (field: string, order: string) => void;
 }) => {
-  const sort = column.getIsSorted();
+  const sortField = columnToSortField[column.id];
+  const isActive = sortField && currentSort === sortField;
+  const isSortable = sortField && onSort;
+
+  if (!isSortable) {
+    return <>{children}</>;
+  }
+
+  const handleClick = () => {
+    // Toggle order if clicking the same column, otherwise default to asc
+    const newOrder = isActive && currentOrder === 'asc' ? 'desc' : 'asc';
+    onSort(sortField, newOrder);
+  };
+
   return (
     <Button
       variant="ghost"
-      onClick={column.getToggleSortingHandler()}
+      onClick={handleClick}
       className="-ml-4 h-8 cursor-pointer" // Adjust spacing
     >
       {children}
-      {sort === 'asc' && <ArrowUp className="ml-2 h-4 w-4" />}
-      {sort === 'desc' && <ArrowDown className="ml-2 h-4 w-4" />}
+      {isActive && currentOrder === 'asc' && <ArrowUp className="ml-2 h-4 w-4" />}
+      {isActive && currentOrder === 'desc' && <ArrowDown className="ml-2 h-4 w-4" />}
     </Button>
   );
 };
@@ -629,15 +605,15 @@ function DAGTable({
   handleSearchTagChange,
   isLoading = false,
   pagination,
+  sortField = 'name',
+  sortOrder = 'asc',
+  onSortChange,
 }: Props) {
   const navigate = useNavigate();
   const [columns] = React.useState(() => [...defaultColumns]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
-  const [sorting, setSorting] = React.useState<SortingState>([
-    { id: 'Name', desc: false },
-  ]);
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
 
   // State for the side modal
@@ -794,24 +770,23 @@ function DAGTable({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isModalOpen, selectedDAG, sorting]); // Include sorting in dependencies
+  }, [isModalOpen, selectedDAG]); // No need for sorting in dependencies anymore
 
   const instance = useReactTable<Data>({
     data,
     columns,
     getSubRows: (row) => row.subRows,
     getCoreRowModel: getCoreRowModel<Data>(),
-    getSortedRowModel: getSortedRowModel<Data>(),
+    // Disable client-side sorting as we're using server-side sorting
+    manualSorting: true,
     getFilteredRowModel: getFilteredRowModel<Data>(),
     onColumnFiltersChange: setColumnFilters, // Let table manage internal filter state
     getExpandedRowModel: getExpandedRowModel<Data>(),
     autoResetExpanded: false, // Keep expanded state on data change
     state: {
-      sorting,
       expanded,
       columnFilters, // Pass filters to table state
     },
-    onSortingChange: setSorting,
     onExpandedChange: setExpanded,
     // Pass handlers via meta
     meta: {
@@ -968,14 +943,17 @@ function DAGTable({
                       <div>
                         {' '}
                         {/* Wrap header content */}
-                        {header.column.getCanSort() ? (
+                        {columnToSortField[header.column.id] ? (
                           <SortableHeader
                             column={header.column}
+                            currentSort={sortField}
+                            currentOrder={sortOrder}
+                            onSort={onSortChange}
                             children={flexRender(
                               header.column.columnDef.header,
                               header.getContext()
                             )}
-                          ></SortableHeader>
+                          />
                         ) : (
                           flexRender(
                             header.column.columnDef.header,
