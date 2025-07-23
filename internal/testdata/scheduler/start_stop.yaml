@@ -1,6 +1,0 @@
-schedule:
-  start: "0 * * * *"
-  stop: "1 * * * *"
-steps:
-  - name: step1
-    command: "sleep 10"
