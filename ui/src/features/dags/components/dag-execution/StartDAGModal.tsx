@@ -116,7 +116,7 @@ function StartDAGModal({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
-            {action === 'enqueue' ? 'Enqueue the DAG' : 'Start the DAG'}
+            Start the DAG
           </DialogTitle>
         </DialogHeader>
 
