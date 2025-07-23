@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { components } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v2/schema';
 import {
   Table,
   TableBody,
@@ -161,14 +161,16 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
   // Calculate duration between start and finish times
   const calculateDuration = (
     startedAt: string,
-    finishedAt: string | null
+    finishedAt: string | null,
+    status: number
   ): string => {
     // If DAG-run hasn't started yet, return dash
     if (!startedAt) {
       return '-';
     }
 
-    if (!finishedAt) {
+    // Only calculate duration dynamically for running DAGs
+    if (status === Status.Running && !finishedAt) {
       // If DAG-run is still running, calculate duration from start until now
       const start = dayjs(startedAt);
       const now = dayjs();
@@ -176,10 +178,16 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
       return formatDuration(durationMs);
     }
 
-    const start = dayjs(startedAt);
-    const end = dayjs(finishedAt);
-    const durationMs = end.diff(start);
-    return formatDuration(durationMs);
+    // For finished DAGs, use the static duration
+    if (finishedAt) {
+      const start = dayjs(startedAt);
+      const end = dayjs(finishedAt);
+      const durationMs = end.diff(start);
+      return formatDuration(durationMs);
+    }
+
+    // For non-running DAGs without a finish time, return dash
+    return '-';
   };
 
   // Format duration in a human-readable format
@@ -278,8 +286,8 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
               <div className="text-left flex items-center gap-1.5">
                 <span className="text-muted-foreground">Duration: </span>
                 <span className="flex items-center gap-1">
-                  {calculateDuration(dagRun.startedAt, dagRun.finishedAt)}
-                  {dagRun.status === 1 && dagRun.startedAt && (
+                  {calculateDuration(dagRun.startedAt, dagRun.finishedAt, dagRun.status)}
+                  {dagRun.status === Status.Running && dagRun.startedAt && (
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-lime-500 animate-pulse" />
                   )}
                 </span>
@@ -373,8 +381,8 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
               </TableCell>
               <TableCell className="py-1 px-2 text-left">
                 <div className="flex items-center gap-1">
-                  {calculateDuration(dagRun.startedAt, dagRun.finishedAt)}
-                  {dagRun.status === 1 && dagRun.startedAt && (
+                  {calculateDuration(dagRun.startedAt, dagRun.finishedAt, dagRun.status)}
+                  {dagRun.status === Status.Running && dagRun.startedAt && (
                     <span className="inline-block w-2 h-2 rounded-full bg-lime-500 animate-pulse" />
                   )}
                 </div>

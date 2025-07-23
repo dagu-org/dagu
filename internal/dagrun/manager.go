@@ -294,11 +294,19 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun digraph.DAGRunRef) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by run reference: %w", err)
 	}
-	status, err := attempt.ReadStatus(ctx)
+	st, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
-	return status, nil
+
+	// If the status is running, ensure if the process is still alive
+	if dagRun.ID == st.Root.ID && st.Status == status.Running {
+		if err := m.checkAndUpdateStaleRunningStatus(ctx, st, attempt); err != nil {
+			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
+		}
+	}
+
+	return st, nil
 }
 
 // getPersistedOrCurrentStatus retrieves the persisted status of a dag-run by its ID.
@@ -328,7 +336,7 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.
 	// If querying the current status fails, even if the status is running,
 	// check if the process is actually alive before marking as error.
 	if st.Status == status.Running {
-		if err := m.checkAndUpdateStaleRunningStatus(ctx, dag, st, attempt); err != nil {
+		if err := m.checkAndUpdateStaleRunningStatus(ctx, st, attempt); err != nil {
 			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
 		}
 	}
@@ -416,7 +424,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 
 	// If querying the current status fails, ensure if the status is running,
 	if st.Status == status.Running {
-		if err := m.checkAndUpdateStaleRunningStatus(ctx, dag, st, attempt); err != nil {
+		if err := m.checkAndUpdateStaleRunningStatus(ctx, st, attempt); err != nil {
 			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
 		}
 	}
@@ -677,12 +685,11 @@ func (m *Manager) createTempDAGFile(dagName string, yamlData []byte) (string, er
 // and updates its status to error if the process is not alive.
 func (m *Manager) checkAndUpdateStaleRunningStatus(
 	ctx context.Context,
-	dag *digraph.DAG,
 	st *models.DAGRunStatus,
 	attempt models.DAGRunAttempt,
 ) error {
 	dagRun := digraph.DAGRunRef{
-		Name: dag.Name,
+		Name: st.Name,
 		ID:   st.DAGRunID,
 	}
 
