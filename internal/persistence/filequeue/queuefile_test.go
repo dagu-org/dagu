@@ -1,10 +1,11 @@
-package filequeue
+package filequeue_test
 
 import (
 	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +18,7 @@ func TestQueueFile(t *testing.T) {
 	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-name")
 
 	// Create a new queue file
-	qf := NewQueueFile(queueDir, "high_")
+	qf := filequeue.NewQueueFile(queueDir, "high_")
 	if qf == nil {
 		t.Fatal("expected queue file to be created")
 	}
@@ -58,7 +59,7 @@ func TestQueueFile(t *testing.T) {
 
 	// Check if pop returns an error when the queue is empty
 	_, err = qf.Pop(th.Context)
-	require.ErrorIs(t, err, ErrQueueFileEmpty, "expected error when popping from empty queue")
+	require.ErrorIs(t, err, filequeue.ErrQueueFileEmpty, "expected error when popping from empty queue")
 }
 
 func TestQueueFile_FindByDAGRunID(t *testing.T) {
@@ -69,7 +70,7 @@ func TestQueueFile_FindByDAGRunID(t *testing.T) {
 	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-name")
 
 	// Create a new queue file
-	qf := NewQueueFile(queueDir, "high_")
+	qf := filequeue.NewQueueFile(queueDir, "high_")
 	if qf == nil {
 		t.Fatal("expected queue file to be created")
 	}
@@ -100,7 +101,7 @@ func TestQueueFile_Pop(t *testing.T) {
 	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-name")
 
 	// Create a new queue file
-	qf := NewQueueFile(queueDir, "high_")
+	qf := filequeue.NewQueueFile(queueDir, "high_")
 	if qf == nil {
 		t.Fatal("expected queue file to be created")
 	}
@@ -133,7 +134,7 @@ func TestQueueFile_Error(t *testing.T) {
 	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-name")
 
 	// Create a new queue file
-	qf := NewQueueFile(queueDir, "high_")
+	qf := filequeue.NewQueueFile(queueDir, "high_")
 	if qf == nil {
 		t.Fatal("expected queue file to be created")
 	}
@@ -146,6 +147,6 @@ func TestQueueFile_Error(t *testing.T) {
 
 		// Check if pop returns an error when the queue is empty
 		_, err = qf.Pop(th.Context)
-		require.ErrorIs(t, err, ErrQueueFileEmpty, "expected error when popping from empty queue")
+		require.ErrorIs(t, err, filequeue.ErrQueueFileEmpty, "expected error when popping from empty queue")
 	})
 }

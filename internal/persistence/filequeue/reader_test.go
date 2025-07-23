@@ -1,4 +1,4 @@
-package filequeue
+package filequeue_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +19,7 @@ func TestQueueReader(t *testing.T) {
 	defer cancel()
 
 	// Create a new store
-	store := New(th.Config.Paths.QueueDir)
+	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add some items to the queue
 	err := store.Enqueue(ctx, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
@@ -78,7 +79,7 @@ func TestQueueReaderChannelFull(t *testing.T) {
 	defer cancel()
 
 	// Create a new store
-	store := New(th.Config.Paths.QueueDir)
+	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add an item to the queue
 	err := store.Enqueue(ctx, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
@@ -116,7 +117,7 @@ func TestQueueReaderStartStop(t *testing.T) {
 	defer cancel()
 
 	// Create a new store
-	store := New(th.Config.Paths.QueueDir)
+	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Get a reader from the store
 	reader := store.Reader(ctx)
@@ -145,7 +146,7 @@ func TestQueueReaderContextCancellation(t *testing.T) {
 	defer cancel()
 
 	// Create a new store
-	store := New(th.Config.Paths.QueueDir)
+	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add an item to the queue
 	err := store.Enqueue(ctx, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
@@ -187,7 +188,7 @@ func TestQueueReaderRetryDelay(t *testing.T) {
 	defer cancel()
 
 	// Create a new store
-	store := New(th.Config.Paths.QueueDir)
+	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add multiple items from the same queue
 	queueName := "test-queue"
@@ -258,7 +259,7 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 	defer cancel()
 
 	// Create a new store
-	store := New(th.Config.Paths.QueueDir)
+	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add items from different queues
 	queue1 := "queue-1"

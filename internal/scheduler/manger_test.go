@@ -7,6 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/scheduler"
+	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,7 +22,7 @@ func TestReadEntries(t *testing.T) {
 		require.Len(t, jobs, 0)
 	})
 	t.Run("StartAndNext", func(t *testing.T) {
-		th := setupTest(t)
+		th := test.SetupScheduler(t)
 		ctx := context.Background()
 
 		done := make(chan any)
@@ -39,7 +40,7 @@ func TestReadEntries(t *testing.T) {
 		require.Equal(t, expectedNext, next)
 	})
 	t.Run("SuspendedJob", func(t *testing.T) {
-		th := setupTest(t)
+		th := test.SetupScheduler(t)
 		ctx := context.Background()
 
 		done := make(chan any)

@@ -1,10 +1,11 @@
-package filequeue
+package filequeue_test
 
 import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +16,7 @@ func TestStore(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create a new store
-	store := New(th.Config.Paths.QueueDir)
+	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Check if the store is empty
 	length, err := store.Len(th.Context, "test-name")
@@ -59,7 +60,7 @@ func TestStore_DequeueByDAGRunID(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create a newstore
-	store := New(th.Config.Paths.QueueDir)
+	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add a job to thestore
 	err := store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
@@ -91,7 +92,7 @@ func TestStore_List(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create a newstore
-	store := New(th.Config.Paths.QueueDir)
+	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add a job to thestore
 	err := store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
@@ -119,7 +120,7 @@ func TestStore_All(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create a newstore
-	store := New(th.Config.Paths.QueueDir)
+	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add a job to thestore
 	err := store.Enqueue(th.Context, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{

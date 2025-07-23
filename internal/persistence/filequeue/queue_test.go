@@ -1,4 +1,4 @@
-package filequeue
+package filequeue_test
 
 import (
 	"path/filepath"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +17,7 @@ func TestQueue(t *testing.T) {
 	th := test.Setup(t)
 
 	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-name")
-	queue := NewDualQueue(queueDir, "test-name")
+	queue := filequeue.NewDualQueue(queueDir, "test-name")
 
 	// Check if the queue is empty
 	queueLen, err := queue.Len(th.Context)
@@ -71,7 +72,7 @@ func TestQueue_FindByDAGRunID(t *testing.T) {
 	th := test.Setup(t)
 
 	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-name")
-	queue := NewDualQueue(queueDir, "test-name")
+	queue := filequeue.NewDualQueue(queueDir, "test-name")
 
 	// Add a low priority job to the queue
 	err := queue.Enqueue(th.Context, models.QueuePriorityLow, digraph.DAGRunRef{

@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/test"
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +29,7 @@ func TestScheduler(t *testing.T) {
 			},
 		}
 
-		th := setupTest(t)
+		th := test.SetupScheduler(t)
 		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, nil)
 		require.NoError(t, err)
 
@@ -54,7 +55,7 @@ func TestScheduler(t *testing.T) {
 			},
 		}
 
-		th := setupTest(t)
+		th := test.SetupScheduler(t)
 		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, nil)
 		require.NoError(t, err)
 
@@ -71,7 +72,7 @@ func TestScheduler(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 		scheduler.SetFixedTime(now)
 
-		th := setupTest(t)
+		th := test.SetupScheduler(t)
 		schedulerInstance, err := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, nil)
 		require.NoError(t, err)
 
@@ -220,7 +221,7 @@ func TestScheduler_QueueDisabled(t *testing.T) {
 	t.Parallel()
 
 	t.Run("QueueDisabled_SkipsQueueProcessing", func(t *testing.T) {
-		th := setupTest(t)
+		th := test.SetupScheduler(t)
 		// Disable queues
 		th.Config.Queues.Enabled = false
 
@@ -253,7 +254,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 		Entries: []*scheduler.ScheduledJob{},
 	}
 
-	th := setupTest(t)
+	th := test.SetupScheduler(t)
 
 	// Create first scheduler instance
 	sc1, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, nil)
@@ -311,7 +312,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 }
 
 func TestSchedulerLockUtilities(t *testing.T) {
-	th := setupTest(t)
+	th := test.SetupScheduler(t)
 
 	t.Run("IsLocked returns false when no lock exists", func(t *testing.T) {
 		require.False(t, scheduler.IsLocked(th.Config))
