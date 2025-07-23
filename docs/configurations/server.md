@@ -61,6 +61,13 @@ auth:
     password: "secret"
   token:
     value: "your-secret-token"
+  oidc:
+    clientId: "your-client-id"
+    clientSecret: "your-client-secret"
+    clientUrl: "http://localhost:8080"
+    issuer: "https://accounts.google.com"
+    scopes: ["openid", "profile", "email"]
+    whitelist: ["admin@example.com"]
 
 # TLS/HTTPS Configuration
 tls:
@@ -123,6 +130,12 @@ All options support `DAGU_` prefix:
 - `DAGU_AUTH_BASIC_USERNAME` - Basic auth username
 - `DAGU_AUTH_BASIC_PASSWORD` - Basic auth password
 - `DAGU_AUTH_TOKEN` - API token
+- `DAGU_AUTH_OIDC_CLIENT_ID` - OIDC client ID
+- `DAGU_AUTH_OIDC_CLIENT_SECRET` - OIDC client secret
+- `DAGU_AUTH_OIDC_CLIENT_URL` - OIDC client URL
+- `DAGU_AUTH_OIDC_ISSUER` - OIDC issuer URL
+- `DAGU_AUTH_OIDC_SCOPES` - OIDC scopes (comma-separated)
+- `DAGU_AUTH_OIDC_WHITELIST` - OIDC email whitelist (comma-separated)
 
 ## Common Setups
 
@@ -180,6 +193,21 @@ curl -H "Authorization: Bearer your-token" \
   http://localhost:8080/api/v2/dags
 ```
 
+### OIDC Authentication
+```yaml
+auth:
+  oidc:
+    clientId: "${OIDC_CLIENT_ID}"
+    clientSecret: "${OIDC_CLIENT_SECRET}"
+    clientUrl: "https://dagu.example.com"
+    issuer: "https://accounts.google.com"
+    scopes: 
+      - "email"
+    whitelist:
+      - "admin@dagu.example.com" # Optional: restrict to specific emails
+```
+
+See [OIDC Configuration](authentication/oidc) for detailed setup.
 
 ### TLS/HTTPS
 

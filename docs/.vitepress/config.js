@@ -57,7 +57,6 @@ const fullSidebar = [
       { text: "Queue System", link: "/features/queues" },
       { text: "Notifications", link: "/features/notifications" },
       { text: "Email Notifications", link: "/features/email-notifications" },
-      { text: "Authentication", link: "/features/authentication" },
       { text: "OpenTelemetry", link: "/features/opentelemetry" },
       {
         text: "Distributed Execution",
@@ -74,6 +73,37 @@ const fullSidebar = [
     items: [
       { text: "Overview", link: "/configurations/" },
       { text: "Server Configuration", link: "/configurations/server" },
+      {
+        text: "Authentication",
+        collapsed: false,
+        items: [
+          { text: "Overview", link: "/configurations/authentication" },
+          { text: "Basic Auth", link: "/configurations/authentication/basic" },
+          { text: "Token Auth", link: "/configurations/authentication/token" },
+          { text: "OIDC", link: "/configurations/authentication/oidc" },
+          {
+            text: "OIDC - Google",
+            link: "/configurations/authentication/oidc-google",
+          },
+          {
+            text: "OIDC - Auth0",
+            link: "/configurations/authentication/oidc-auth0",
+          },
+          {
+            text: "OIDC - Keycloak",
+            link: "/configurations/authentication/oidc-keycloak",
+          },
+          { text: "TLS/HTTPS", link: "/configurations/authentication/tls" },
+          {
+            text: "Permissions",
+            link: "/configurations/authentication/permissions",
+          },
+          {
+            text: "Remote Nodes",
+            link: "/configurations/authentication/remote-nodes",
+          },
+        ],
+      },
       { text: "Deployment", link: "/configurations/deployment" },
       { text: "Operations", link: "/configurations/operations" },
       { text: "Advanced Setup", link: "/configurations/advanced" },
