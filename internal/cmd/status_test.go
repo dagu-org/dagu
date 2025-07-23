@@ -18,8 +18,7 @@ func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGRunning", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 10"
 `)
@@ -64,9 +63,7 @@ steps:
 	t.Run("StatusDAGSuccess", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-name: status-success
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "success"
     command: "echo 'Success!'"
 `)
@@ -101,9 +98,7 @@ steps:
 		// We'll create a failed DAG run directly rather than running it.
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-name: status-error
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "error"
     command: "exit 1"
 `)
@@ -158,9 +153,7 @@ steps:
 	t.Run("StatusDAGWithParams", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-name: status-with-params
-params:
+		dagFile := th.DAG(t, `params:
   - param1
   - param2
 steps:
@@ -195,9 +188,7 @@ steps:
 	t.Run("StatusDAGWithSpecificRunID", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-name: status-success
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "success"
     command: "echo 'Success!'"
 `)
@@ -230,9 +221,7 @@ steps:
 	t.Run("StatusDAGMultipleRuns", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-name: status-success
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "success"
     command: "echo 'Success!'"
 `)
@@ -281,9 +270,7 @@ steps:
 		// DAGs that have skipped steps.
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-name: status-skipped
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "check"
     command: "false"
     continueOn:
@@ -352,8 +339,7 @@ steps:
 	t.Run("StatusDAGCancel", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 10"
 `)
@@ -401,9 +387,7 @@ steps:
 		th := test.SetupCommand(t)
 
 		// Create a DAG with many steps to test the step summary truncation
-		dagFile := th.DAG(t, `
-name: status-multiple
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "step1"
     command: "echo 'Step 1'"
   - name: "step2"
@@ -453,9 +437,7 @@ steps:
 	t.Run("StatusDAGByName", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-name: status-success
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "success"
     command: "echo 'Success!'"
 `)
@@ -476,7 +458,7 @@ steps:
 		// Check status using DAG name instead of file path
 		statusCmd := cmd.CmdStatus()
 		statusCmd.SetContext(th.Context)
-		statusCmd.SetArgs([]string{"status-success"})
+		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
 		statusCmd.SilenceUsage = true
 
@@ -487,8 +469,7 @@ steps:
 	t.Run("StatusDAGWithPID", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 10"
 `)
@@ -534,9 +515,7 @@ steps:
 	t.Run("StatusDAGWithAttemptID", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-name: status-success
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "success"
     command: "echo 'Success!'"
 `)
@@ -579,9 +558,7 @@ steps:
 	t.Run("StatusDAGWithLogPaths", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-name: status-success
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "success"
     command: "echo 'Success!'"
 `)
@@ -617,9 +594,7 @@ steps:
 		// This test verifies that the status command handles binary log content gracefully
 		th := test.SetupCommand(t)
 
-		dagFile := th.DAG(t, `
-name: status-success
-steps:
+		dagFile := th.DAG(t, `steps:
   - name: "success"
     command: "echo 'Success!'"
 `)

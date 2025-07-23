@@ -15,9 +15,7 @@ func TestRepeatPolicy_WithLimit(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with repeat limit
-	dag := th.DAG(t, `
-name: repeat-with-limit
-steps:
+	dag := th.DAG(t, `steps:
   - name: repeat-step
     command: echo "Executing step"
     repeatPolicy:
@@ -55,8 +53,7 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with repeat limit and condition
-	dag := th.DAG(t, `name: repeat-limit-condition
-steps:
+	dag := th.DAG(t, `steps:
   - name: increment-counter
     script: |
       COUNTER_FILE="/tmp/dagu_repeat_counter_test2"
@@ -110,9 +107,7 @@ func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG that repeats with a limit
-	dag := th.DAG(t, `
-name: repeat-limit-before-condition
-steps:
+	dag := th.DAG(t, `steps:
   - name: check-flag
     command: echo "Checking for flag file"
     repeatPolicy:
@@ -147,9 +142,7 @@ func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with boolean repeat mode (should repeat while step succeeds, like unconditional while)
-	dag := th.DAG(t, `
-name: repeat-while-unconditional
-steps:
+	dag := th.DAG(t, `steps:
   - name: repeat-step
     command: echo "Unconditional while loop using boolean mode"
     repeatPolicy:
@@ -187,9 +180,7 @@ func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with until mode and exitCode (should repeat until step returns exit code 0)
-	dag := th.DAG(t, `
-name: repeat-until-unconditional
-steps:
+	dag := th.DAG(t, `steps:
   - name: repeat-step
     script: |
       COUNT_FILE="/tmp/dagu_repeat_until_unconditional_test"
@@ -244,9 +235,7 @@ func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with repeat: true (should work as "while" mode)
-	dag := th.DAG(t, `
-name: repeat-backward-compatibility-true
-steps:
+	dag := th.DAG(t, `steps:
   - name: repeat-step
     command: echo "Boolean true compatibility test"
     repeatPolicy:

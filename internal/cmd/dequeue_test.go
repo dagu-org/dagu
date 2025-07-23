@@ -15,8 +15,7 @@ import (
 func TestDequeueCommand(t *testing.T) {
 	th := test.SetupCommand(t)
 
-	dag := th.DAG(t, `
-steps:
+	dag := th.DAG(t, `steps:
   - name: "1"
     command: "true"
 `)
@@ -40,9 +39,7 @@ func TestDequeueCommand_PreservesState(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a DAG
-	dag := th.DAG(t, `
-name: dequeue_preserves_state
-steps:
+	dag := th.DAG(t, `steps:
   - name: step1
     command: echo "success"
 `)
@@ -55,7 +52,7 @@ steps:
 
 	// Wait for it to complete
 	attempt, err := th.DAGRunStore.FindAttempt(ctx, digraph.DAGRunRef{
-		Name: "dequeue_preserves_state",
+		Name: dag.Name,
 		ID:   "success-run",
 	})
 	require.NoError(t, err)
@@ -73,12 +70,12 @@ steps:
 	// Dequeue it
 	th.RunCommand(t, cmd.CmdDequeue(), test.CmdTest{
 		Name:        "Dequeue",
-		Args:        []string{"dequeue", "--dag-run", "dequeue_preserves_state:queued-run"},
+		Args:        []string{"dequeue", "--dag-run", dag.Name + ":queued-run"},
 		ExpectedOut: []string{"Dequeued dag-run"},
 	})
 
 	// Verify the latest visible attempt shows success
-	latestAttempt, err := th.DAGRunStore.LatestAttempt(ctx, "dequeue_preserves_state")
+	latestAttempt, err := th.DAGRunStore.LatestAttempt(ctx, dag.Name)
 	require.NoError(t, err)
 
 	latestStatus, err := latestAttempt.ReadStatus(ctx)

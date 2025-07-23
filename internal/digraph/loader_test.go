@@ -54,8 +54,7 @@ func TestLoad(t *testing.T) {
 	t.Run("MetadataOnly", func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := createTempYAMLFile(t, `name: loader_test
-steps:
+		testDAG := createTempYAMLFile(t, `steps:
   - name: "1"
     command: "true"
 `)
@@ -63,14 +62,12 @@ steps:
 		require.NoError(t, err)
 		require.Empty(t, dag.Steps)
 		// Check if the metadata is loaded correctly
-		require.Equal(t, "loader_test", dag.Name)
 		require.Len(t, dag.Steps, 0)
 	})
 	t.Run("DefaultConfig", func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := createTempYAMLFile(t, `name: default
-steps:
+		testDAG := createTempYAMLFile(t, `steps:
   - name: "1"
     command: "true"
 `)
@@ -81,7 +78,6 @@ steps:
 		// DAG level
 		assert.Equal(t, "", dag.LogDir)
 		assert.Equal(t, testDAG, dag.Location)
-		assert.Equal(t, "default", dag.Name)
 		assert.Equal(t, time.Second*60, dag.MaxCleanUpTime)
 		assert.Equal(t, 30, dag.HistRetentionDays)
 
@@ -195,9 +191,7 @@ steps:
 
 func TestLoadYAML(t *testing.T) {
 	t.Parallel()
-	const testDAG = `
-name: test DAG
-steps:
+	const testDAG = `steps:
   - name: "1"
     command: "true"
 `
@@ -206,7 +200,6 @@ steps:
 
 		ret, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(testDAG), digraph.BuildOpts{})
 		require.NoError(t, err)
-		require.Equal(t, "test DAG", ret.Name)
 
 		step := ret.Steps[0]
 		require.Equal(t, "1", step.Name)
@@ -260,8 +253,7 @@ func TestMultiDAGFile(t *testing.T) {
 		t.Parallel()
 
 		// Create a temporary multi-DAG YAML file
-		multiDAGContent := `name: main-pipeline
-steps:
+		multiDAGContent := `steps:
   - name: process
     run: transform-data
   - name: archive
@@ -287,7 +279,6 @@ steps:
 		require.NoError(t, err)
 
 		// Verify main DAG
-		assert.Equal(t, "main-pipeline", dag.Name)
 		assert.Len(t, dag.Steps, 2)
 		assert.Equal(t, "process", dag.Steps[0].Name)
 		assert.Equal(t, "transform-data", dag.Steps[0].ChildDAG.Name)
@@ -332,8 +323,7 @@ smtp:
 		baseFile := createTempYAMLFile(t, baseConfig)
 
 		// Create multi-DAG file
-		multiDAGContent := `name: main-dag
-env:
+		multiDAGContent := `env:
   - APP: myapp
 steps:
   - name: process
@@ -355,7 +345,6 @@ steps:
 		require.NoError(t, err)
 
 		// Verify main DAG inherits base config
-		assert.Equal(t, "main-dag", dag.Name)
 		assert.Equal(t, "/base/logs", dag.LogDir)
 		assert.NotNil(t, dag.SMTP)
 		assert.Equal(t, "smtp.example.com", dag.SMTP.Host)
@@ -382,8 +371,7 @@ steps:
 		t.Parallel()
 
 		// Single DAG file (no document separator)
-		singleDAGContent := `name: single-dag
-steps:
+		singleDAGContent := `steps:
   - name: step1
     command: echo "hello"
 `
@@ -394,7 +382,6 @@ steps:
 		require.NoError(t, err)
 
 		// Verify it loads correctly without child DAGs
-		assert.Equal(t, "single-dag", dag.Name)
 		assert.Len(t, dag.Steps, 1)
 		assert.Nil(t, dag.LocalDAGs) // No child DAGs for single DAG file
 	})
@@ -403,8 +390,7 @@ steps:
 		t.Parallel()
 
 		// Multi-DAG file with duplicate names
-		multiDAGContent := `name: main
-steps:
+		multiDAGContent := `steps:
   - name: step1
     command: echo "main"
 
@@ -432,8 +418,7 @@ steps:
 		t.Parallel()
 
 		// Multi-DAG file where child DAG has no name
-		multiDAGContent := `name: main
-steps:
+		multiDAGContent := `steps:
   - name: step1
     command: echo "main"
 
@@ -457,8 +442,7 @@ steps:
 		// The behavior is inconsistent - sometimes it skips them, sometimes it errors.
 		// For now, we test that it loads something, but the child DAG after
 		// the empty document may or may not be loaded.
-		multiDAGContent := `name: main
-steps:
+		multiDAGContent := `steps:
   - name: step1
     command: echo "main"
 
@@ -473,15 +457,10 @@ steps:
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
 		// The behavior with empty documents is unpredictable
-		dag, err := digraph.Load(context.Background(), tmpFile)
+		_, err := digraph.Load(context.Background(), tmpFile)
 		if err != nil {
 			// If it errors, it should be a decode error
 			assert.Contains(t, err.Error(), "failed to decode document")
-		} else {
-			// If it succeeds, at least the main DAG should be loaded
-			assert.Equal(t, "main", dag.Name)
-			// The child DAG after empty document may or may not be loaded
-			// due to YAML parser limitations
 		}
 	})
 
@@ -489,8 +468,7 @@ steps:
 		t.Parallel()
 
 		// Complex multi-DAG with parameters
-		multiDAGContent := `name: etl-pipeline
-params:
+		multiDAGContent := `params:
   - ENVIRONMENT: dev
 schedule: "0 2 * * *"
 steps:
@@ -525,7 +503,6 @@ steps:
 		require.NoError(t, err)
 
 		// Verify main DAG
-		assert.Equal(t, "etl-pipeline", dag.Name)
 		assert.Len(t, dag.Schedule, 1)
 		assert.Equal(t, "0 2 * * *", dag.Schedule[0].Expression)
 		assert.Contains(t, dag.Params, "ENVIRONMENT=dev")
@@ -549,8 +526,7 @@ steps:
 	t.Run("WorkerSelector", func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := createTempYAMLFile(t, `name: worker-selector-test
-description: Test DAG with worker selector
+		testDAG := createTempYAMLFile(t, `description: Test DAG with worker selector
 workerSelector:
   gpu: "true"
   memory: "64G"
@@ -562,7 +538,6 @@ steps:
 		require.NoError(t, err)
 
 		// Verify DAG loaded successfully
-		assert.Equal(t, "worker-selector-test", dag.Name)
 		assert.Equal(t, "Test DAG with worker selector", dag.Description)
 		assert.Len(t, dag.Steps, 1)
 

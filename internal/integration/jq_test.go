@@ -12,8 +12,7 @@ func TestJQExecutor(t *testing.T) {
 
 	t.Run("MultipleOutputsWithRawTrue", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: extract-array-raw
     executor: 
       type: jq
@@ -36,8 +35,7 @@ steps:
 
 	t.Run("MultipleOutputsWithRawFalse", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: extract-array-json
     executor: 
       type: jq
@@ -60,8 +58,7 @@ steps:
 
 	t.Run("StringOutputWithRawTrue", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: extract-strings-raw
     executor: 
       type: jq
@@ -84,8 +81,7 @@ steps:
 
 	t.Run("StringOutputWithRawFalse", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: extract-strings-json
     executor: 
       type: jq
@@ -108,8 +104,7 @@ steps:
 
 	t.Run("TSVOutputWithRawTrue", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: extract-tsv
     executor: 
       type: jq

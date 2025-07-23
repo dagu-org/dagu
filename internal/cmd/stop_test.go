@@ -14,8 +14,7 @@ func TestStopCommand(t *testing.T) {
 	t.Run("StopDAGRun", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     script: "sleep 10"
 `)
@@ -45,8 +44,7 @@ steps:
 	t.Run("StopDAGRunWithRunID", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     script: "sleep 10"
 `)

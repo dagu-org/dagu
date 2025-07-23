@@ -10,14 +10,12 @@ import (
 func TestEnqueueCommand(t *testing.T) {
 	th := test.SetupCommand(t)
 
-	dagEnqueue := th.DAG(t, `
-steps:
+	dagEnqueue := th.DAG(t, `steps:
   - name: "1"
     command: "true"
 `)
 
-	dagEnqueueWithParams := th.DAG(t, `
-params: "p1 p2"
+	dagEnqueueWithParams := th.DAG(t, `params: "p1 p2"
 steps:
   - name: "1"
     command: "echo \"params is $1 and $2\""

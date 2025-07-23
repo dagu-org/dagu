@@ -24,8 +24,7 @@ func TestManager(t *testing.T) {
 	th := test.Setup(t)
 
 	t.Run("Valid", func(t *testing.T) {
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 1"
 `)
@@ -60,8 +59,7 @@ steps:
 		dag.AssertCurrentStatus(t, status.None)
 	})
 	t.Run("UpdateStatus", func(t *testing.T) {
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "true"
 `)
@@ -106,16 +104,16 @@ steps:
 	})
 	t.Run("UpdateChildDAGRunStatus", func(t *testing.T) {
 		// Create child DAG first
-		th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "tree_child", []byte(`
-steps:
-  - name: "1"
-    command: "true"
-`))
-
 		dag := th.DAG(t, `
 steps:
   - name: "1"
     run: tree_child
+---
+name: tree_child
+steps:
+  - name: "1"
+    command: "true"
+---
 `)
 
 		err := th.DAGRunMgr.StartDAGRunAsync(th.Context, dag.DAG, dagrun.StartOptions{})
@@ -145,8 +143,7 @@ steps:
 		require.Equal(t, status.NodeError.String(), childDAGRunStatus.Nodes[0].Status.String())
 	})
 	t.Run("InvalidUpdateStatusWithInvalidDAGRunID", func(t *testing.T) {
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 1"
 `)
@@ -167,8 +164,7 @@ func TestClient_RunDAG(t *testing.T) {
 	th := test.Setup(t)
 
 	t.Run("RunDAG", func(t *testing.T) {
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "true"
 `)
@@ -185,8 +181,7 @@ steps:
 		require.Equal(t, status.Success.String(), dagRunStatus.Status.String())
 	})
 	t.Run("Stop", func(t *testing.T) {
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 10"
 `)
@@ -203,8 +198,7 @@ steps:
 		dag.AssertLatestStatus(t, status.Cancel)
 	})
 	t.Run("Restart", func(t *testing.T) {
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 1"
 `)
@@ -221,8 +215,7 @@ steps:
 		dag.AssertLatestStatus(t, status.Success)
 	})
 	t.Run("Retry", func(t *testing.T) {
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "true"
 `)
@@ -258,8 +251,7 @@ steps:
 		require.Equal(t, prevParams, dagRunStatus.Params)
 	})
 	t.Run("RetryStep", func(t *testing.T) {
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "true"
 `)
@@ -305,8 +297,7 @@ func TestHandleTask(t *testing.T) {
 	th := test.Setup(t)
 
 	t.Run("HandleTaskRetry", func(t *testing.T) {
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "echo step1"
   - name: "2"
@@ -347,8 +338,7 @@ steps:
 	})
 
 	t.Run("HandleTaskRetryWithStep", func(t *testing.T) {
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "echo step1"
   - name: "2"
@@ -390,8 +380,7 @@ steps:
 	})
 
 	t.Run("HandleTaskStart", func(t *testing.T) {
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "process"
     command: "echo processing $1"
 `)

@@ -34,7 +34,6 @@ func TestDAGExecutorRealBehavior(t *testing.T) {
 
 		// Create a test DAG
 		yamlContent := `
-name: test-behavior-dag
 steps:
   - name: test-step
     command: echo "test"

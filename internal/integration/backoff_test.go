@@ -15,9 +15,7 @@ func TestRetryPolicy_WithExponentialBackoff(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with retry backoff
-	dag := th.DAG(t, `
-name: retry-with-backoff
-steps:
+	dag := th.DAG(t, `steps:
   - name: failing-step
     command: |
       echo "Attempt at $(date +%s.%N)"
@@ -63,9 +61,7 @@ func TestRetryPolicy_WithBackoffBoolean(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with boolean backoff
-	dag := th.DAG(t, `
-name: retry-with-backoff-bool
-steps:
+	dag := th.DAG(t, `steps:
   - name: failing-step
     command: |
       echo "Attempt at $(date +%s.%N)"
@@ -108,9 +104,7 @@ func TestRetryPolicy_WithMaxInterval(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with max interval cap
-	dag := th.DAG(t, `
-name: retry-with-backoff-max
-steps:
+	dag := th.DAG(t, `steps:
   - name: failing-step
     command: |
       echo "Attempt at $(date +%s.%N)"
@@ -157,9 +151,7 @@ func TestRepeatPolicy_WithExponentialBackoff(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with repeat backoff
-	dag := th.DAG(t, `
-name: repeat-with-backoff
-steps:
+	dag := th.DAG(t, `steps:
   - name: repeat-step
     command: |
       echo "Execution at $(date +%s.%N)"
@@ -206,9 +198,7 @@ func TestRepeatPolicy_WithMaxInterval(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with max interval cap
-	dag := th.DAG(t, `
-name: repeat-with-backoff-max
-steps:
+	dag := th.DAG(t, `steps:
   - name: repeat-step
     command: |
       echo "Execution at $(date +%s.%N)"

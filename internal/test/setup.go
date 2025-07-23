@@ -208,7 +208,11 @@ func (h Helper) CreateDAGFile(t *testing.T, dir string, name string, yamlContent
 	err := os.MkdirAll(dir, 0750)
 	require.NoError(t, err, "failed to create directory %q", dir)
 
-	dagFile := filepath.Join(dir, fmt.Sprintf("%s.yaml", name))
+	if !fileutil.IsYAMLFile(name) {
+		name = fmt.Sprintf("%s.yaml", name)
+	}
+
+	dagFile := filepath.Join(dir, name)
 	err = os.WriteFile(dagFile, yamlContent, 0600)
 	require.NoError(t, err, "failed to write DAG file %q", name)
 

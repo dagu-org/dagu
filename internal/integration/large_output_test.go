@@ -16,9 +16,7 @@ func TestLargeOutput_64KB(t *testing.T) {
 
 	// Load DAG that reads a 64KB file
 	textFilePath := test.TestdataPath(t, "integration/large-output-64kb.txt")
-	dag := th.DAG(t, `
-name: large-output-64kb
-steps:
+	dag := th.DAG(t, `steps:
   - name: read-64kb-file
     command: cat `+textFilePath+`
     output: OUTPUT_64KB
@@ -51,9 +49,7 @@ func TestLargeOutput_65KB(t *testing.T) {
 
 	// Load DAG that reads a 65KB file (exceeds typical pipe buffer)
 	textFilePath := test.TestdataPath(t, "integration/large-output-65kb.txt")
-	dag := th.DAG(t, `
-name: large-output-65kb
-steps:
+	dag := th.DAG(t, `steps:
   - name: read-65kb-file
     command: cat `+textFilePath+`
     output: OUTPUT_65KB
@@ -86,9 +82,7 @@ func TestLargeOutput_128KB(t *testing.T) {
 
 	// Load DAG that reads a 128KB file
 	textFilePath := test.TestdataPath(t, "integration/large-output-128kb.txt")
-	dag := th.DAG(t, `
-name: large-output-128kb
-steps:
+	dag := th.DAG(t, `steps:
   - name: read-128kb-file
     command: cat `+textFilePath+`
     output: OUTPUT_128KB

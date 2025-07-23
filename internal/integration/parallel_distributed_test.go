@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
@@ -24,7 +23,6 @@ func TestParallelDistributedExecution(t *testing.T) {
 	t.Run("ParallelExecutionOnWorkers", func(t *testing.T) {
 		// Create test DAGs with parallel execution using workerSelector
 		yamlContent := `
-name: parent-parallel-distributed
 steps:
   - name: process-items
     run: child-worker
@@ -90,16 +88,8 @@ steps:
 		// Give workers time to connect
 		time.Sleep(500 * time.Millisecond)
 
-		// Create the DAG file in the coordinator's DAGs directory
-		dagFile := coord.CreateDAGFile(t, coord.Config.Paths.DAGsDir, "parent-parallel-distributed", []byte(yamlContent))
-
-		// Load the DAG
-		dag, err := digraph.Load(coord.Context, dagFile)
-		require.NoError(t, err)
-		dagWrapper := test.DAG{
-			Helper: &coord.Helper,
-			DAG:    dag,
-		}
+		// Load the DAG using helper
+		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
 
 		// Run the DAG
@@ -150,7 +140,6 @@ steps:
 	t.Run("ParallelDistributedWithSameWorkerType", func(t *testing.T) {
 		// Test parallel execution where all items go to the same worker type
 		yamlContent := `
-name: parent-same-workers
 steps:
   - name: process-regions
     run: child-regional
@@ -214,16 +203,8 @@ steps:
 		// Give workers time to connect
 		time.Sleep(500 * time.Millisecond)
 
-		// Create the DAG file in the coordinator's DAGs directory
-		dagFile := coord.CreateDAGFile(t, coord.Config.Paths.DAGsDir, "parent-same-workers", []byte(yamlContent))
-
-		// Load the DAG
-		dag, err := digraph.Load(coord.Context, dagFile)
-		require.NoError(t, err)
-		dagWrapper := test.DAG{
-			Helper: &coord.Helper,
-			DAG:    dag,
-		}
+		// Load the DAG using helper
+		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
 		agent.RunSuccess(t)
 
@@ -255,16 +236,15 @@ steps:
 
 	t.Run("ParallelDistributedWithNoMatchingWorkers", func(t *testing.T) {
 		// Test that parallel execution fails gracefully when no workers match
-		parentYAML := `
-name: parent-no-workers
+		yamlContent := `
 steps:
   - name: process-items
     run: child-nonexistent
     parallel:
       items: ["a", "b", "c"]
     output: RESULTS
-`
-		childYAML := `
+
+---
 name: child-nonexistent
 workerSelector:
   type: nonexistent-worker
@@ -279,21 +259,12 @@ steps:
 		t.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1")
 		t.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port()))
 
-		// Create both DAG files in the coordinator's DAGs directory
-		_ = coord.CreateDAGFile(t, coord.Config.Paths.DAGsDir, "child-nonexistent", []byte(childYAML))
-		parentFile := coord.CreateDAGFile(t, coord.Config.Paths.DAGsDir, "parent-no-workers", []byte(parentYAML))
-
-		// Load the parent DAG
-		dag, err := digraph.Load(coord.Context, parentFile)
-		require.NoError(t, err)
-		dagWrapper := test.DAG{
-			Helper: &coord.Helper,
-			DAG:    dag,
-		}
+		// Load the DAG using helper
+		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
 
 		// Run should fail because no workers match
-		err = agent.Run(coord.Context)
+		err := agent.Run(coord.Context)
 		require.Error(t, err)
 
 		// Verify the DAG did not complete successfully
@@ -306,7 +277,6 @@ func TestParallelDistributedCancellation(t *testing.T) {
 	t.Run("CancelParallelExecutionOnWorkers", func(t *testing.T) {
 		// Create test DAGs with parallel execution using workerSelector
 		yamlContent := `
-name: parent-parallel-cancel
 steps:
   - name: process-items
     run: child-sleep
@@ -448,7 +418,6 @@ steps:
 	t.Run("MixedLocalAndDistributedCancellation", func(t *testing.T) {
 		// Create test DAGs with both local and distributed child DAGs
 		yamlContent := `
-name: parent-mixed-cancel
 steps:
   - name: local-execution
     run: child-local
@@ -579,7 +548,6 @@ steps:
 	t.Run("ConcurrentWorkerCancellation", func(t *testing.T) {
 		// Test cancellation with high concurrency across multiple workers
 		yamlContent := `
-name: parent-concurrent-cancel
 steps:
   - name: high-concurrency
     run: child-task

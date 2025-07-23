@@ -13,21 +13,18 @@ import (
 func TestStartCommand(t *testing.T) {
 	th := test.SetupCommand(t)
 
-	dagStart := th.DAG(t, `
-steps:
+	dagStart := th.DAG(t, `steps:
   - name: "1"
     command: "true"
 `)
 
-	dagStartWithParams := th.DAG(t, `
-params: "p1 p2"
+	dagStartWithParams := th.DAG(t, `params: "p1 p2"
 steps:
   - name: "1"
     command: "echo \"params is $1 and $2\""
 `)
 
-	dagStartWithDAGRunID := th.DAG(t, `
-steps:
+	dagStartWithDAGRunID := th.DAG(t, `steps:
   - name: "1"
     command: "true"
 `)

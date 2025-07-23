@@ -16,14 +16,14 @@ import (
 func TestDAG(t *testing.T) {
 	th := test.Setup(t)
 	t.Run("String", func(t *testing.T) {
-		dag := th.DAG(t, `
-name: default
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "true"
 `)
 		ret := dag.String()
-		require.Contains(t, ret, "Name: default")
+		require.Contains(t, ret, "Name: ")
+		require.Contains(t, ret, "Step0: Name: 1")
+		require.Contains(t, ret, "Command: true")
 	})
 }
 
@@ -49,9 +49,7 @@ func TestUnixSocket(t *testing.T) {
 func TestMarshalJSON(t *testing.T) {
 	th := test.Setup(t)
 	t.Run("MarshalJSON", func(t *testing.T) {
-		dag := th.DAG(t, `
-name: default
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "true"
 `)

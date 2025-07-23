@@ -21,8 +21,7 @@ func TestAgent_Run(t *testing.T) {
 
 	t.Run("RunDAG", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 1"
 `)
@@ -38,8 +37,7 @@ steps:
 	})
 	t.Run("DeleteOldHistory", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 1"
 `)
@@ -61,8 +59,7 @@ steps:
 	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 1"
 `)
@@ -85,8 +82,7 @@ steps:
 	})
 	t.Run("PreConditionNotMet", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "true"
   - name: "2"
@@ -111,8 +107,7 @@ steps:
 	})
 	t.Run("FinishWithError", func(t *testing.T) {
 		th := test.Setup(t)
-		errDAG := th.DAG(t, `
-steps:
+		errDAG := th.DAG(t, `steps:
   - name: "1"
     command: "false"
 `)
@@ -124,8 +119,7 @@ steps:
 	})
 	t.Run("FinishWithTimeout", func(t *testing.T) {
 		th := test.Setup(t)
-		timeoutDAG := th.DAG(t, `
-timeoutSec: 2
+		timeoutDAG := th.DAG(t, `timeoutSec: 2
 steps:
   - name: "1"
     command: "sleep 1"
@@ -140,8 +134,7 @@ steps:
 	})
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 3"
 `)
@@ -166,8 +159,7 @@ steps:
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-handlerOn:
+		dag := th.DAG(t, `handlerOn:
   Exit:
     command: "true"
 steps:
@@ -197,8 +189,7 @@ func TestAgent_DryRun(t *testing.T) {
 	t.Run("DryRun", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "true"
 `)
@@ -220,8 +211,7 @@ func TestAgent_Retry(t *testing.T) {
 	t.Run("RetryDAG", func(t *testing.T) {
 		th := test.Setup(t)
 		// retry DAG that fails
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "true"
   - name: "2"
@@ -287,8 +277,7 @@ steps:
 
 	t.Run("StepRetry", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "true"
   - name: "2"
@@ -401,8 +390,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		th := test.Setup(t)
 
 		// Start a long-running DAG
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 10"
 `)
@@ -435,8 +423,7 @@ steps:
 		th := test.Setup(t)
 
 		// Start a long-running DAG
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 10"
 `)
@@ -466,8 +453,7 @@ steps:
 		th := test.Setup(t)
 
 		// Start a long-running DAG
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 10"
 `)

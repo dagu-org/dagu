@@ -12,9 +12,7 @@ func TestChainExecution(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load chain DAG
-	dag := th.DAG(t, `
-name: test-chain
-type: chain
+	dag := th.DAG(t, `type: chain
 steps:
   - name: step1
     command: echo "step 1"

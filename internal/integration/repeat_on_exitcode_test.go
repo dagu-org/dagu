@@ -21,9 +21,7 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dag := th.DAG(t, `
-name: test-repeat-on-exitcode
-steps:
+	dag := th.DAG(t, `steps:
   - name: repeat-on-fail
     command: |
       #!/bin/bash

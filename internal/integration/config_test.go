@@ -15,8 +15,7 @@ func TestDAGExecution(t *testing.T) {
 
 	t.Run("Depends", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: "1"
     command: "echo 1"
   - name: "2"
@@ -32,8 +31,7 @@ steps:
 
 	t.Run("Pipe", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-params:
+		dag := th.DAG(t, `params:
   - NAME: "foo"
 steps:
   - name: step1
@@ -57,8 +55,7 @@ steps:
 		dotenv1Path := test.TestdataPath(t, "integration/dotenv1")
 		dotenv2Path := test.TestdataPath(t, "integration/dotenv2")
 
-		dag := th.DAG(t, `
-dotenv:
+		dag := th.DAG(t, `dotenv:
   - `+dotenv1Path+`
   - `+dotenv2Path+`
 steps:
@@ -78,8 +75,7 @@ steps:
 
 	t.Run("NamedParams", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-params:
+		dag := th.DAG(t, `params:
   NAME: "Dagu"
   AGE: 30
 
@@ -105,8 +101,7 @@ steps:
 
 	t.Run("NamedParamsList", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-params:
+		dag := th.DAG(t, `params:
   - NAME: "Dagu"
   - AGE: 30
 
@@ -132,8 +127,7 @@ steps:
 
 	t.Run("PositionalParams", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-params: "foo bar"
+		dag := th.DAG(t, `params: "foo bar"
 
 steps:
   - name: step1
@@ -155,8 +149,7 @@ steps:
 
 	t.Run("PositionalParamsScript", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-params: "foo bar"
+		dag := th.DAG(t, `params: "foo bar"
 
 steps:
   - name: step1
@@ -179,8 +172,7 @@ steps:
 
 	t.Run("Script", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-params:
+		dag := th.DAG(t, `params:
   - NAME: "foo"
 steps:
   - name: step1
@@ -200,8 +192,7 @@ steps:
 
 	t.Run("RegexPrecondition", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: test
     command: echo abc run def
     output: OUT1
@@ -226,8 +217,7 @@ steps:
 
 	t.Run("JSON", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: get config
     command: |
       echo '{"port": 8080, "host": "localhost"}'
@@ -250,8 +240,7 @@ steps:
 
 	t.Run("EnvVar", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `name: environment-var
-env:
+		dag := th.DAG(t, `env:
   - DATA_DIR: /tmp/dagu_test_integration
   - PROCESS_DATE: "`+"`"+`date '+%Y%m%d_%H%M%S'`+"`"+`"
 
@@ -282,8 +271,7 @@ steps:
 
 	t.Run("EnvScript", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-env:
+		dag := th.DAG(t, `env:
   - "E1": foo
   - "E2": bar
 
@@ -308,8 +296,7 @@ steps:
 
 	t.Run("SpecialVars", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: step1
     command: echo $DAG_RUN_LOG_FILE
     output: OUT1
@@ -346,8 +333,7 @@ steps:
 
 	t.Run("JQ", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: extract_value
     executor: jq
     command: .user.name # Get user name from JSON
@@ -372,8 +358,7 @@ steps:
 
 	t.Run("JSONVar", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: get_config
     command: |
       echo '{"port": 8080, "host": "localhost"}'
@@ -396,8 +381,7 @@ steps:
 
 	t.Run("PerlScript", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: step1
     command: perl
     script: |
@@ -418,8 +402,7 @@ steps:
 
 	t.Run("Workdir", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-env:
+		dag := th.DAG(t, `env:
   - WORKDIR: $HOME
   - TILDE: ~/
 steps:
@@ -446,8 +429,7 @@ steps:
 
 	t.Run("Issue-810", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-params: bar
+		dag := th.DAG(t, `params: bar
 steps:
   - name: step1
     command: echo start
@@ -493,8 +475,7 @@ steps:
 
 	t.Run("ShellOptions", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `
-steps:
+		dag := th.DAG(t, `steps:
   - name: step1
     description: test step
     command: |
@@ -515,49 +496,44 @@ steps:
 	})
 }
 
-func TestNestedDAG(t *testing.T) {
-	type testCase struct {
-		name            string
-		dag             string
-		expectedOutputs map[string]any
-	}
+func TestCallSubDAG(t *testing.T) {
+	th := test.Setup(t)
 
-	testCases := []testCase{
-		{
-			name: "CallSub",
-			dag:  "call-sub.yaml",
-			expectedOutputs: map[string]any{
-				"OUT2": "foo",
-			},
-		},
-		{
-			name: "NestedGraph",
-			dag:  "nested_parent.yaml",
-			expectedOutputs: map[string]any{
-				"OUT1": "value is 123",
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			th := test.Setup(t)
-
-			// Create sub DAG for CallSub test
-			if tc.name == "CallSub" {
-				th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "sub", []byte(`
+	// Use multi-document YAML to include both parent and sub DAG
+	dagContent := `steps:
+  - name: step1
+    run: sub
+    params: "SUB_P1=foo"
+    output: OUT1
+  - name: step2
+    command: echo "${OUT1.outputs.OUT}"
+    output: OUT2
+    depends: [step1]
+---
+name: sub
 params:
   SUB_P1: xyz
 steps:
   - name: step1
     command: echo $SUB_P1
     output: OUT
-`))
-			}
+`
+	dag := th.DAG(t, dagContent)
+	agent := dag.Agent()
 
-			// Create nested DAGs for NestedGraph test
-			if tc.name == "NestedGraph" {
-				th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "nested_grand_child", []byte(`
+	agent.RunSuccess(t)
+
+	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertOutputs(t, map[string]any{
+		"OUT2": "foo",
+	})
+}
+
+func TestNestedThreeLevelDAG(t *testing.T) {
+	th := test.Setup(t)
+
+	// Create the grandchild DAG as a separate file
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "nested_grand_child", []byte(`
 params:
   PARAM: VALUE
 steps:
@@ -565,7 +541,20 @@ steps:
     command: "echo value is ${PARAM}"
     output: OUTPUT
 `))
-				th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "nested_child", []byte(`
+
+	// Create parent and child DAGs using multi-document YAML
+	dagContent := `steps:
+  - name: child
+    run: nested_child
+    params: "PARAM=123"
+    output: CHILD_OUTPUT
+  - name: output
+    command: "echo ${CHILD_OUTPUT.outputs.OUTPUT}"
+    output: OUT1
+    depends:
+      - child
+---
+name: nested_child
 params:
   PARAM: VALUE
 steps:
@@ -578,46 +567,16 @@ steps:
     depends:
       - child
     output: OUTPUT
-`))
-			}
-
-			var dagContent string
-			if tc.name == "CallSub" {
-				dagContent = `
-steps:
-  - name: step1
-    run: sub
-    params: "SUB_P1=foo"
-    output: OUT1
-  - name: step2
-    command: echo "${OUT1.outputs.OUT}"
-    output: OUT2
-    depends: [step1]
 `
-			} else {
-				// NestedGraph
-				dagContent = `
-steps:
-  - name: child
-    run: nested_child
-    params: "PARAM=123"
-    output: CHILD_OUTPUT
-  - name: output
-    command: "echo ${CHILD_OUTPUT.outputs.OUTPUT}"
-    output: OUT1
-    depends:
-      - child
-`
-			}
-			dag := th.DAG(t, dagContent)
-			agent := dag.Agent()
+	dag := th.DAG(t, dagContent)
+	agent := dag.Agent()
 
-			agent.RunSuccess(t)
+	agent.RunSuccess(t)
 
-			dag.AssertLatestStatus(t, status.Success)
-			dag.AssertOutputs(t, tc.expectedOutputs)
-		})
-	}
+	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertOutputs(t, map[string]any{
+		"OUT1": "value is 123",
+	})
 }
 
 // TestSkippedPreconditions verifies that steps with unmet preconditions are skipped.
@@ -627,8 +586,7 @@ func TestSkippedPreconditions(t *testing.T) {
 	// Setup the test helper with the integration DAGs directory.
 	th := test.Setup(t)
 	// Load the DAG from inline YAML.
-	dag := th.DAG(t, `
-type: graph  # Use graph mode to avoid implicit dependencies
+	dag := th.DAG(t, `type: graph  # Use graph mode to avoid implicit dependencies
 steps:
   - name: run-step
     command: echo "executed"
@@ -670,8 +628,7 @@ func TestComplexDependencies(t *testing.T) {
 	// Setup the test helper with the integration DAGs directory.
 	th := test.Setup(t)
 	// Load the DAG from inline YAML.
-	dag := th.DAG(t, `
-steps:
+	dag := th.DAG(t, `steps:
   - name: start
     command: echo "start"
     output: START
@@ -717,8 +674,7 @@ func TestProgressingNode(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dag := th.DAG(t, `
-steps:
+	dag := th.DAG(t, `steps:
   - name: "1"
     command: "sleep 3"
   - name: "2"

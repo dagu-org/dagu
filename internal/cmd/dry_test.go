@@ -11,14 +11,12 @@ func TestDryCommand(t *testing.T) {
 	t.Run("DryRun", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dagDry := th.DAG(t, `
-steps:
+		dagDry := th.DAG(t, `steps:
   - name: "1"
     command: "true"
 `)
 
-		dagDryWithParams := th.DAG(t, `
-params: "p1 p2"
+		dagDryWithParams := th.DAG(t, `params: "p1 p2"
 steps:
   - name: "1"
     command: 'echo "params is $1 and $2"'

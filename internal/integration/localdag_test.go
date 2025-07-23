@@ -13,7 +13,6 @@ func TestLocalDAGExecution(t *testing.T) {
 	t.Run("SimpleLocalDAG", func(t *testing.T) {
 		// Create a DAG with local child DAGs using separator
 		yamlContent := `
-name: parent-with-local-dags
 steps:
   - name: run-local-child
     run: local-child
@@ -73,7 +72,6 @@ steps:
 	t.Run("ParallelLocalDAGExecution", func(t *testing.T) {
 		// Create a DAG with parallel execution of local DAGs
 		yamlContent := `
-name: parent-with-parallel-local-dags
 steps:
   - name: parallel-tasks
     run: worker-dag
@@ -132,7 +130,6 @@ steps:
 		// This should fail because middle-dag tries to run leaf-dag, but leaf-dag
 		// is not visible to middle-dag (only to root-dag)
 		yamlContent := `
-name: root-dag
 steps:
   - name: run-middle-dag
     run: middle-dag
@@ -191,7 +188,6 @@ steps:
 	t.Run("LocalDAGWithConditionalExecution", func(t *testing.T) {
 		// Test conditional execution with local DAGs
 		yamlContent := `
-name: conditional-local-dag
 env:
   - ENVIRONMENT: production
 steps:
@@ -271,7 +267,6 @@ steps:
 	t.Run("LocalDAGWithOutputPassing", func(t *testing.T) {
 		// Test passing outputs between local DAGs
 		yamlContent := `
-name: output-passing
 steps:
   - name: generate-data
     run: generator-dag
@@ -335,7 +330,6 @@ steps:
 	t.Run("LocalDAGReferencesNonExistent", func(t *testing.T) {
 		// Test error when referencing non-existent local DAG
 		yamlContent := `
-name: invalid-reference
 steps:
   - name: run-missing-dag
     run: non-existent-dag
@@ -373,7 +367,6 @@ steps:
 	t.Run("LocalDAGWithComplexDependencies", func(t *testing.T) {
 		// Test complex dependencies between local DAGs
 		yamlContent := `
-name: complex-dependencies
 steps:
   - name: setup
     command: echo "Setting up"

@@ -15,8 +15,7 @@ func TestRestartCommand(t *testing.T) {
 	t.Run("RestartDAG", func(t *testing.T) {
 		th := test.SetupCommand(t)
 
-		dag := th.DAG(t, `
-params: "p1"
+		dag := th.DAG(t, `params: "p1"
 steps:
   - name: "1"
     script: "echo $1"
