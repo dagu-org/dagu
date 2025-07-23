@@ -304,42 +304,188 @@ func (a *API) readHistoryData(
 }
 
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
-	pg := models.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
+	// Extract sort and order parameters
+	sortField := "name" // default
+	if request.Params.Sort != nil {
+		sortField = string(*request.Params.Sort)
+	}
+
+	sortOrder := "asc" // default
+	if request.Params.Order != nil {
+		sortOrder = string(*request.Params.Order)
+	}
+
+	// For complex sorting, we need to fetch all DAGs first
+	// Use a large paginator to get all DAGs
+	allDagsPaginator := models.NewPaginator(1, 10000)
 	result, errList, err := a.dagStore.List(ctx, models.ListDAGsOptions{
-		Paginator: &pg,
+		Paginator: &allDagsPaginator,
 		Name:      valueOf(request.Params.Name),
 		Tag:       valueOf(request.Params.Tag),
+		Sort:      "name", // Always sort by name in storage layer
+		Order:     "asc",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
 
-	resp := &api.ListDAGs200JSONResponse{
-		Errors:     errList,
-		Pagination: toPagination(result),
+	// Build complete DAG files with all metadata
+	type dagWithMetadata struct {
+		dag       *digraph.DAG
+		file      api.DAGFile
+		status    models.DAGRunStatus
+		suspended bool
 	}
 
-	// Get status for each DAG
-	dagStatuses := make([]models.DAGRunStatus, len(result.Items))
-	for i, item := range result.Items {
+	allDags := make([]dagWithMetadata, 0, len(result.Items))
+
+	// Get status and suspended state for each DAG
+	for _, item := range result.Items {
 		dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, item)
 		if err != nil {
 			errList = append(errList, err.Error())
 		}
-		dagStatuses[i] = dagStatus
-	}
 
-	for i, item := range result.Items {
-		dagRun := toDAGRunSummary(dagStatuses[i])
-		dag := api.DAGFile{
+		suspended := a.dagStore.IsSuspended(ctx, item.FileName())
+		dagRun := toDAGRunSummary(dagStatus)
+
+		dagFile := api.DAGFile{
 			FileName:     item.FileName(),
 			LatestDAGRun: dagRun,
-			Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
+			Suspended:    suspended,
 			Dag:          toDAG(item),
 			Errors:       []string{},
 		}
 
-		resp.Dags = append(resp.Dags, dag)
+		allDags = append(allDags, dagWithMetadata{
+			dag:       item,
+			file:      dagFile,
+			status:    dagStatus,
+			suspended: suspended,
+		})
+	}
+
+	// Sort based on the requested field
+	sort.Slice(allDags, func(i, j int) bool {
+		ascending := sortOrder != "desc"
+
+		switch sortField {
+		case "name":
+			if ascending {
+				return strings.ToLower(allDags[i].dag.Name) < strings.ToLower(allDags[j].dag.Name)
+			}
+			return strings.ToLower(allDags[i].dag.Name) > strings.ToLower(allDags[j].dag.Name)
+
+		case "status":
+			iStatus := allDags[i].status.Status
+			jStatus := allDags[j].status.Status
+			if iStatus == jStatus {
+				// Secondary sort by name if status is the same
+				return strings.ToLower(allDags[i].dag.Name) < strings.ToLower(allDags[j].dag.Name)
+			}
+			if ascending {
+				return iStatus < jStatus
+			}
+			return iStatus > jStatus
+
+		case "lastRun":
+			iTimeStr := allDags[i].status.StartedAt
+			jTimeStr := allDags[j].status.StartedAt
+
+			// Handle DAGs that have never run
+			if iTimeStr == "" && jTimeStr == "" {
+				// Secondary sort by name if both have never run
+				return strings.ToLower(allDags[i].dag.Name) < strings.ToLower(allDags[j].dag.Name)
+			}
+			if iTimeStr == "" {
+				return !ascending // Put never-run DAGs at the end when ascending
+			}
+			if jTimeStr == "" {
+				return ascending
+			}
+
+			// Parse time strings for comparison
+			iTime, iErr := time.Parse(time.RFC3339, iTimeStr)
+			jTime, jErr := time.Parse(time.RFC3339, jTimeStr)
+
+			// Handle parse errors
+			if iErr != nil || jErr != nil {
+				// Fall back to string comparison if parsing fails
+				if ascending {
+					return iTimeStr < jTimeStr
+				}
+				return iTimeStr > jTimeStr
+			}
+
+			if ascending {
+				return iTime.Before(jTime)
+			}
+			return iTime.After(jTime)
+
+		case "schedule":
+			// Sort by first schedule expression, treating no schedule as empty string
+			iSchedule := ""
+			if len(allDags[i].dag.Schedule) > 0 {
+				iSchedule = allDags[i].dag.Schedule[0].Expression
+			}
+			jSchedule := ""
+			if len(allDags[j].dag.Schedule) > 0 {
+				jSchedule = allDags[j].dag.Schedule[0].Expression
+			}
+
+			if iSchedule == jSchedule {
+				// Secondary sort by name if schedule is the same
+				return strings.ToLower(allDags[i].dag.Name) < strings.ToLower(allDags[j].dag.Name)
+			}
+
+			if ascending {
+				return iSchedule < jSchedule
+			}
+			return iSchedule > jSchedule
+
+		case "suspended":
+			if allDags[i].suspended == allDags[j].suspended {
+				// Secondary sort by name if suspended state is the same
+				return strings.ToLower(allDags[i].dag.Name) < strings.ToLower(allDags[j].dag.Name)
+			}
+			// When ascending, non-suspended (false) comes before suspended (true)
+			if ascending {
+				return !allDags[i].suspended && allDags[j].suspended
+			}
+			return allDags[i].suspended && !allDags[j].suspended
+
+		default:
+			// Fall back to name sorting
+			if ascending {
+				return strings.ToLower(allDags[i].dag.Name) < strings.ToLower(allDags[j].dag.Name)
+			}
+			return strings.ToLower(allDags[i].dag.Name) > strings.ToLower(allDags[j].dag.Name)
+		}
+	})
+
+	// Apply pagination after sorting
+	pg := models.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
+	start := pg.Offset()
+	end := start + pg.Limit()
+
+	var paginatedDags []api.DAGFile
+	if start < len(allDags) {
+		if end > len(allDags) {
+			end = len(allDags)
+		}
+		for i := start; i < end; i++ {
+			paginatedDags = append(paginatedDags, allDags[i].file)
+		}
+	}
+
+	// Create pagination info
+	totalCount := len(allDags)
+	paginationResult := models.NewPaginatedResult(result.Items[:0], totalCount, pg)
+
+	resp := &api.ListDAGs200JSONResponse{
+		Dags:       paginatedDags,
+		Errors:     errList,
+		Pagination: toPagination(paginationResult),
 	}
 
 	return resp, nil

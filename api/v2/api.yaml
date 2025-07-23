@@ -102,6 +102,22 @@ paths:
           schema:
             type: "string"
           description: "Filter DAGs by tag"
+        - name: "sort"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            enum: ["name", "status", "lastRun", "schedule", "suspended"]
+            default: "name"
+          description: "Field to sort by"
+        - name: "order"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            enum: ["asc", "desc"]
+            default: "asc"
+          description: "Sort order (ascending or descending)"
       responses:
         "200":
           description: "A successful response"
