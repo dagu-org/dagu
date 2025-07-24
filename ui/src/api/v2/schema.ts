@@ -2393,11 +2393,7 @@ export interface operations {
     };
 }
 export enum PathsDagsGetParametersQuerySort {
-    name = "name",
-    status = "status",
-    lastRun = "lastRun",
-    schedule = "schedule",
-    suspended = "suspended"
+    name = "name"
 }
 export enum PathsDagsGetParametersQueryOrder {
     asc = "asc",
