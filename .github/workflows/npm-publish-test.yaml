@@ -1,0 +1,96 @@
+name: Test NPM Publish Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to test (e.g., 1.16.4)'
+        required: true
+        type: string
+        default: '1.16.4'
+
+env:
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  test-workflow-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test version handling
+        run: |
+          echo "Input version: ${{ inputs.version }}"
+          echo "ENV version: ${{ env.VERSION }}"
+          
+          # Test version stripping
+          VERSION="${{ env.VERSION }}"
+          VERSION="${VERSION#v}"
+          echo "Stripped version: ${VERSION}"
+
+      - name: Test matrix values
+        run: |
+          # Test asset name generation
+          echo "Testing asset names..."
+          echo "Linux x64: dagu_${{ env.VERSION }}_Linux_x86_64.tar.gz"
+          echo "Darwin arm64: dagu_${{ env.VERSION }}_Darwin_arm64.tar.gz"
+          echo "Windows x64: dagu_${{ env.VERSION }}_Windows_x86_64.zip"
+
+      - name: Test Node.js script
+        run: |
+          cd /tmp
+          
+          # Create test package.json
+          cat > package.json << 'EOF'
+          {
+            "name": "test-package",
+            "version": "1.0.0",
+            "optionalDependencies": {
+              "@dagu-org/dagu-linux-x64": "1.0.0",
+              "@dagu-org/dagu-darwin-arm64": "1.0.0"
+            }
+          }
+          EOF
+          
+          # Create update script
+          cat > update-deps.js << 'EOF'
+          const fs = require('fs');
+          const pkg = require('./package.json');
+          const version = process.argv[2];
+          
+          Object.keys(pkg.optionalDependencies || {}).forEach(dep => {
+            pkg.optionalDependencies[dep] = version;
+          });
+          
+          fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+          console.log('Updated:', JSON.stringify(pkg.optionalDependencies, null, 2));
+          EOF
+          
+          # Test the script
+          VERSION="${{ env.VERSION }}"
+          VERSION="${VERSION#v}"
+          node update-deps.js "${VERSION}"
+          
+          # Verify result
+          cat package.json
+
+  test-platform-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            arch: x64
+            package: dagu-linux-x64
+          - platform: darwin
+            arch: arm64
+            package: dagu-darwin-arm64
+    steps:
+      - name: Test matrix variables
+        run: |
+          echo "Platform: ${{ matrix.platform }}"
+          echo "Arch: ${{ matrix.arch }}"
+          echo "Package: ${{ matrix.package }}"
+          echo "Asset would be: dagu_${{ env.VERSION }}_${{ matrix.platform }}_${{ matrix.arch }}.tar.gz"

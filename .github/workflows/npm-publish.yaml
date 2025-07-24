@@ -1,0 +1,262 @@
+name: Publish to NPM
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.16.4)'
+        required: true
+        type: string
+
+env:
+  VERSION: ${{ github.event.release.tag_name || inputs.version }}
+
+jobs:
+  # First, publish all platform-specific packages
+  publish-platform-packages:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Tier 1 - Essential platforms
+          - platform: linux
+            arch: x64
+            package: dagu-linux-x64
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_amd64.tar.gz
+          - platform: linux
+            arch: arm64
+            package: dagu-linux-arm64
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_arm64.tar.gz
+          - platform: darwin
+            arch: x64
+            package: dagu-darwin-x64
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_darwin_amd64.tar.gz
+          - platform: darwin
+            arch: arm64
+            package: dagu-darwin-arm64
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_darwin_arm64.tar.gz
+          - platform: win32
+            arch: x64
+            package: dagu-win32-x64
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_windows_amd64.tar.gz
+          
+          # Tier 2 - Important platforms
+          - platform: linux
+            arch: ia32
+            package: dagu-linux-ia32
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_386.tar.gz
+          - platform: linux
+            arch: armv7
+            package: dagu-linux-armv7
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_armv7.tar.gz
+          - platform: win32
+            arch: ia32
+            package: dagu-win32-ia32
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_windows_386.tar.gz
+          - platform: freebsd
+            arch: x64
+            package: dagu-freebsd-x64
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_freebsd_amd64.tar.gz
+          
+          # Tier 3 - Less common platforms
+          - platform: linux
+            arch: armv6
+            package: dagu-linux-armv6
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_armv6.tar.gz
+          - platform: linux
+            arch: ppc64
+            package: dagu-linux-ppc64
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_ppc64le.tar.gz
+          - platform: linux
+            arch: s390x
+            package: dagu-linux-s390x
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_linux_s390x.tar.gz
+          - platform: win32
+            arch: arm64
+            package: dagu-win32-arm64
+            asset: dagu_${{ github.event.release.tag_name || inputs.version }}_windows_arm64.tar.gz
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # For workflow_dispatch, we need to find the release
+          if [ -z "${{ github.event.release.tag_name }}" ]; then
+            echo "Finding release for version v${{ inputs.version }}"
+            RELEASE_TAG="v${{ inputs.version }}"
+          else
+            RELEASE_TAG="${{ github.event.release.tag_name }}"
+          fi
+          
+          echo "Downloading asset: ${{ matrix.asset }}"
+          gh release download "${RELEASE_TAG}" \
+            --repo ${{ github.repository }} \
+            --pattern "${{ matrix.asset }}" \
+            --dir /tmp
+
+      - name: Extract binary
+        run: |
+          mkdir -p npm/${{ matrix.package }}/bin
+          cd npm/${{ matrix.package }}/bin
+          
+          # All assets are now .tar.gz
+          tar -xzf /tmp/${{ matrix.asset }} dagu || tar -xzf /tmp/${{ matrix.asset }} dagu.exe
+          
+          # Verify binary exists
+          if [[ "${{ matrix.platform }}" == "win32" ]]; then
+            test -f dagu.exe
+          else
+            test -f dagu
+            chmod +x dagu
+          fi
+
+      - name: Update package version
+        run: |
+          cd npm/${{ matrix.package }}
+          # Strip 'v' prefix if present
+          VERSION="${{ env.VERSION }}"
+          VERSION="${VERSION#v}"
+          npm version "${VERSION}" --no-git-tag-version --allow-same-version
+
+
+      - name: Publish to NPM
+        run: |
+          cd npm/${{ matrix.package }}
+          # Try to publish, but don't fail if version already exists
+          npm publish --access public 2>&1 | tee publish.log || {
+            if grep -q "cannot publish over the previously published versions" publish.log; then
+              echo "Version already published, skipping..."
+              exit 0
+            else
+              exit 1
+            fi
+          }
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: ${{ matrix.arch == 'ppc64' || matrix.arch == 's390x' || matrix.arch == 'armv6' }}
+
+  # Then publish the main package that depends on platform packages
+  publish-main-package:
+    needs: publish-platform-packages
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Update main package version and dependencies
+        run: |
+          cd npm/dagu
+          
+          # Strip 'v' prefix if present
+          VERSION="${{ env.VERSION }}"
+          VERSION="${VERSION#v}"
+          
+          # Update package version
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          
+          # Update all optionalDependencies to match the version
+          cat > update-deps.js << 'EOF'
+          const fs = require('fs');
+          const pkg = require('./package.json');
+          const version = process.argv[2];
+          
+          // Update all optional dependencies to the new version
+          Object.keys(pkg.optionalDependencies || {}).forEach(dep => {
+            pkg.optionalDependencies[dep] = version;
+          });
+          
+          fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+          
+          console.log('Updated package.json:');
+          console.log(JSON.stringify(pkg, null, 2));
+          EOF
+          
+          node update-deps.js "${VERSION}"
+
+      - name: Wait for npm registry propagation
+        run: |
+          echo "Waiting 60 seconds for npm registry to propagate platform packages..."
+          sleep 60
+
+      - name: Publish main package
+        run: |
+          cd npm/dagu
+          # Try to publish, but don't fail if version already exists
+          npm publish --access public 2>&1 | tee publish.log || {
+            if grep -q "cannot publish over the previously published versions" publish.log; then
+              echo "Version already published, skipping..."
+              exit 0
+            else
+              exit 1
+            fi
+          }
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Verify the published packages
+  verify-packages:
+    needs: [publish-platform-packages, publish-main-package]
+    if: always()
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            test-install: npm install -g dagu
+          - os: macos-latest
+            test-install: npm install -g dagu
+          - os: windows-latest
+            test-install: npm install -g dagu
+
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Wait for npm propagation
+        shell: bash
+        run: |
+          # Wait for package to be available with retries
+          echo "Checking npm package availability..."
+          for i in {1..30}; do
+            if npm view dagu version 2>/dev/null; then
+              echo "Package is available!"
+              break
+            fi
+            echo "Attempt $i/30: Package not yet available, waiting 10 seconds..."
+            sleep 10
+          done
+
+      - name: Test installation
+        run: |
+          ${{ matrix.test-install }}
+          
+      - name: Verify installation
+        run: |
+          dagu --version
+          
+      - name: Test basic functionality
+        run: |
+          dagu --help

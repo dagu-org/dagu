@@ -1,0 +1,2 @@
+# This file prevents binary download during development.
+# Remove this file to enable binary download in postinstall script.

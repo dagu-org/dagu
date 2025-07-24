@@ -1,0 +1,10 @@
+{
+  "name": "@dagu-org/dagu-linux-arm64",
+  "version": "0.0.0-development",
+  "description": "Dagu binary for Linux ARM64",
+  "repository": "github:dagu-org/dagu",
+  "license": "GPL-3.0",
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "files": ["bin/dagu"]
+}
