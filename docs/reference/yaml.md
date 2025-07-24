@@ -153,13 +153,21 @@ mailOn:
   
 errorMail:
   from: alerts@example.com
-  to: oncall@example.com
+  to: oncall@example.com  # Single recipient (string)
+  # Or multiple recipients (array):
+  # to:
+  #   - oncall@example.com
+  #   - manager@example.com
   prefix: "[ALERT]"
   attachLogs: true
   
 infoMail:
   from: notifications@example.com
-  to: team@example.com
+  to: team@example.com  # Single recipient (string)
+  # Or multiple recipients (array):
+  # to:
+  #   - team@example.com
+  #   - stakeholders@example.com
   prefix: "[INFO]"
   attachLogs: false
   

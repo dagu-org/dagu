@@ -18,7 +18,7 @@ smtp:
   
 errorMail:
   from: alerts@example.com
-  to: team@example.com
+  to: team@example.com  # Single recipient (string format)
   prefix: "[Dagu Alert]"
   attachLogs: true
 ```
