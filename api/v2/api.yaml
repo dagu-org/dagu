@@ -107,7 +107,7 @@ paths:
           required: false
           schema:
             type: "string"
-            enum: ["name", "status", "lastRun", "schedule", "suspended"]
+            enum: ["name"]
             default: "name"
           description: "Field to sort by"
         - name: "order"

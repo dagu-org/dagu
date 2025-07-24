@@ -258,27 +258,16 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 		allDags = append(allDags, dag)
 	}
 
-	// Sort DAGs based on the sort field and order
-	// Note: Only basic sorting is done here. Complex sorting (status, lastRun, etc.)
-	// is handled in the API layer after fetching additional metadata
+	// Sort DAGs by name (the only supported sort field)
 	sort.Slice(allDags, func(i, j int) bool {
 		// Default to ascending order
 		ascending := opts.Order != "desc"
 
-		switch opts.Sort {
-		case "name", "": // default to name if not specified
-			if ascending {
-				return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
-			}
-			return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
-		default:
-			// For fields that require additional metadata (status, lastRun, schedule, suspended),
-			// we sort by name here and let the API layer handle the actual sorting
-			if ascending {
-				return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
-			}
-			return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
+		// Always sort by name (case-insensitive)
+		if ascending {
+			return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
 		}
+		return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
 	})
 
 	totalCount := len(allDags)
