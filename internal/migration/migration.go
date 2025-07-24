@@ -291,12 +291,7 @@ func (m *HistoryMigrator) convertNode(legacy *legacymodel.Node) *models.Node {
 		StartedAt:  legacy.StartedAt,
 		FinishedAt: legacy.FinishedAt,
 		RetriedAt:  legacy.RetriedAt,
-	}
-
-	// Legacy format stored logs inline, new format uses file paths
-	// We'll store the log content as a note that it was migrated
-	if legacy.Log != "" {
-		node.Stdout = "(migrated - log content was inline)"
+		Stdout:     legacy.Log,
 	}
 
 	return node
