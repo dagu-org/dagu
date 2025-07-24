@@ -732,8 +732,20 @@
           "description": "Email address to use as the sender address for notifications."
         },
         "to": {
-          "type": "string",
-          "description": "Email address(es) to receive notifications. Multiple addresses should be comma-separated."
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Single email address to receive notifications."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of email addresses to receive notifications."
+            }
+          ],
+          "description": "Email address(es) to receive notifications. Can be a single string or an array of strings."
         },
         "prefix": {
           "type": "string",

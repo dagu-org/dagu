@@ -182,12 +182,12 @@ infoMail:
 		assert.Equal(t, "password", th.SMTP.Password)
 
 		assert.Equal(t, "error@example.com", th.ErrorMail.From)
-		assert.Equal(t, "admin@example.com", th.ErrorMail.To)
+		assert.Equal(t, []string{"admin@example.com"}, th.ErrorMail.To)
 		assert.Equal(t, "[ERROR]", th.ErrorMail.Prefix)
 		assert.True(t, th.ErrorMail.AttachLogs)
 
 		assert.Equal(t, "info@example.com", th.InfoMail.From)
-		assert.Equal(t, "user@example.com", th.InfoMail.To)
+		assert.Equal(t, []string{"user@example.com"}, th.InfoMail.To)
 		assert.Equal(t, "[INFO]", th.InfoMail.Prefix)
 		assert.True(t, th.InfoMail.AttachLogs)
 	})
@@ -210,6 +210,49 @@ steps:
 		assert.Equal(t, "587", dag.SMTP.Port)
 		assert.Equal(t, "user@example.com", dag.SMTP.Username)
 		assert.Equal(t, "password", dag.SMTP.Password)
+	})
+	t.Run("MailConfigMultipleRecipients", func(t *testing.T) {
+		data := []byte(`
+# SMTP server settings
+smtp:
+  host: "smtp.example.com"
+  port: "587"
+  username: user@example.com
+  password: password
+
+# Error mail with multiple recipients
+errorMail:
+  from: "error@example.com"
+  to: 
+    - "admin1@example.com"
+    - "admin2@example.com"
+    - "admin3@example.com"
+  prefix: "[ERROR]"
+  attachLogs: true
+
+# Info mail with single recipient as array
+infoMail:
+  from: "info@example.com"
+  to:
+    - "user@example.com"
+  prefix: "[INFO]"
+  attachLogs: false
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+
+		// Check error mail with multiple recipients
+		assert.Equal(t, "error@example.com", th.ErrorMail.From)
+		assert.Equal(t, []string{"admin1@example.com", "admin2@example.com", "admin3@example.com"}, th.ErrorMail.To)
+		assert.Equal(t, "[ERROR]", th.ErrorMail.Prefix)
+		assert.True(t, th.ErrorMail.AttachLogs)
+
+		// Check info mail with single recipient as array
+		assert.Equal(t, "info@example.com", th.InfoMail.From)
+		assert.Equal(t, []string{"user@example.com"}, th.InfoMail.To)
+		assert.Equal(t, "[INFO]", th.InfoMail.Prefix)
+		assert.False(t, th.InfoMail.AttachLogs)
 	})
 	t.Run("MaxHistRetentionDays", func(t *testing.T) {
 		data := []byte(`

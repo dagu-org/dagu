@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/mailer"
@@ -22,7 +23,7 @@ type mail struct {
 
 type mailConfig struct {
 	From        string   `mapstructure:"from"`
-	To          string   `mapstructure:"to"`
+	To          any      `mapstructure:"to"`
 	Subject     string   `mapstructure:"subject"`
 	Message     string   `mapstructure:"message"`
 	Attachments []string `mapstructure:"attachments"`
@@ -69,11 +70,34 @@ message: %s
 `
 
 func (e *mail) Run(ctx context.Context) error {
-	_, _ = fmt.Fprintf(e.stdout, mailLogTemplate, e.cfg.From, e.cfg.To, e.cfg.Subject, e.cfg.Message)
+	// Convert To field to []string
+	var toAddresses []string
+	switch v := e.cfg.To.(type) {
+	case string:
+		if v != "" {
+			toAddresses = []string{v}
+		}
+	case []string:
+		toAddresses = v
+	case []any:
+		for _, addr := range v {
+			if str, ok := addr.(string); ok && str != "" {
+				toAddresses = append(toAddresses, str)
+			}
+		}
+	default:
+		return fmt.Errorf("invalid type for 'to' field: expected string or array, got %T", v)
+	}
+
+	if len(toAddresses) == 0 {
+		return fmt.Errorf("no valid recipients specified")
+	}
+
+	_, _ = fmt.Fprintf(e.stdout, mailLogTemplate, e.cfg.From, strings.Join(toAddresses, ", "), e.cfg.Subject, e.cfg.Message)
 	err := e.mailer.Send(
 		ctx,
 		e.cfg.From,
-		[]string{e.cfg.To},
+		toAddresses,
 		e.cfg.Subject,
 		e.cfg.Message,
 		[]string{},

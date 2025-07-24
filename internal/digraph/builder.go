@@ -753,13 +753,40 @@ func buildInfoMailConfig(_ BuildContext, spec *definition, dag *DAG) (err error)
 
 // buildMailConfig builds a MailConfig from the definition.
 func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
-	if def.From == "" && def.To == "" {
+	// Handle case where To is not specified
+	if def.From == "" && def.To == nil {
+		return nil, nil
+	}
+
+	// Convert To field to []string
+	var toAddresses []string
+	switch v := def.To.(type) {
+	case nil:
+		// To field not specified
+	case string:
+		// Single recipient
+		if v != "" {
+			toAddresses = []string{v}
+		}
+	case []any:
+		// Multiple recipients
+		for _, addr := range v {
+			if str, ok := addr.(string); ok && str != "" {
+				toAddresses = append(toAddresses, str)
+			}
+		}
+	default:
+		return nil, fmt.Errorf("invalid type for 'to' field: expected string or array, got %T", v)
+	}
+
+	// Return nil if no valid configuration
+	if def.From == "" && len(toAddresses) == 0 {
 		return nil, nil
 	}
 
 	return &MailConfig{
 		From:       def.From,
-		To:         def.To,
+		To:         toAddresses,
 		Prefix:     def.Prefix,
 		AttachLogs: def.AttachLogs,
 	}, nil

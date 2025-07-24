@@ -40,7 +40,7 @@ func (r *reporter) reportStep(
 	}
 	if nodeStatus == status.NodeError && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
 		fromAddress := dag.ErrorMail.From
-		toAddresses := []string{dag.ErrorMail.To}
+		toAddresses := dag.ErrorMail.To
 		subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, dagStatus.Status)
 		html := renderHTMLWithDAGInfo(dagStatus)
 		attachments := addAttachments(dag.ErrorMail.AttachLogs, dagStatus.Nodes)
@@ -66,7 +66,7 @@ func (r *reporter) send(ctx context.Context, dag *digraph.DAG, dagStatus models.
 	if err != nil || dagStatus.Status == status.Error {
 		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
 			fromAddress := dag.ErrorMail.From
-			toAddresses := []string{dag.ErrorMail.To}
+			toAddresses := dag.ErrorMail.To
 			subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, dagStatus.Status)
 			html := renderHTMLWithDAGInfo(dagStatus)
 			attachments := addAttachments(dag.ErrorMail.AttachLogs, dagStatus.Nodes)
@@ -75,7 +75,7 @@ func (r *reporter) send(ctx context.Context, dag *digraph.DAG, dagStatus models.
 	} else if dagStatus.Status == status.Success || dagStatus.Status == status.PartialSuccess {
 		if dag.MailOn != nil && dag.MailOn.Success && dag.InfoMail != nil {
 			fromAddress := dag.InfoMail.From
-			toAddresses := []string{dag.InfoMail.To}
+			toAddresses := dag.InfoMail.To
 			subject := fmt.Sprintf("%s %s (%s)", dag.InfoMail.Prefix, dag.Name, dagStatus.Status)
 			html := renderHTMLWithDAGInfo(dagStatus)
 			attachments := addAttachments(dag.InfoMail.AttachLogs, dagStatus.Nodes)
