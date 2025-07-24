@@ -31,7 +31,7 @@
     "postinstall": "node install.js"
   },
   "dependencies": {
-    "tar": "^6.1.15"
+    "tar": "^7.4.3"
   },
   "optionalDependencies": {
     "@dagu-org/dagu-linux-x64": "0.0.0-development",

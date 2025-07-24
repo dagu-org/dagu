@@ -45,7 +45,7 @@ RUN set -ex && \
     jq \
     python3 \
     python3-pip \
-    openjdk-11-jdk \
+    openjdk-17-jdk \
     nodejs \
     npm \
     ca-certificates \
