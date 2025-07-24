@@ -35,12 +35,12 @@ func TestReporter(t *testing.T) {
 				ErrorMail: &digraph.MailConfig{
 					Prefix: "Error: ",
 					From:   "from@mailer.com",
-					To:     "to@mailer.com",
+					To:     []string{"to@mailer.com"},
 				},
 				InfoMail: &digraph.MailConfig{
 					Prefix: "Success: ",
 					From:   "from@mailer.com",
-					To:     "to@mailer.com",
+					To:     []string{"to@mailer.com"},
 				},
 				Steps: []digraph.Step{
 					{

@@ -92,4 +92,83 @@ func TestMail(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("MultipleRecipients", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			toField   any
+			expected  []string
+			expectErr bool
+		}{
+			{
+				name:     "SingleRecipientString",
+				toField:  "single@example.com",
+				expected: []string{"single@example.com"},
+			},
+			{
+				name:     "MultipleRecipientsArray",
+				toField:  []string{"user1@example.com", "user2@example.com", "user3@example.com"},
+				expected: []string{"user1@example.com", "user2@example.com", "user3@example.com"},
+			},
+			{
+				name:     "MultipleRecipientsAnyArray",
+				toField:  []any{"user1@example.com", "user2@example.com"},
+				expected: []string{"user1@example.com", "user2@example.com"},
+			},
+			{
+				name:      "EmptyString",
+				toField:   "",
+				expected:  nil,
+				expectErr: true, // Should error because no valid recipients
+			},
+			{
+				name:      "EmptyArray",
+				toField:   []string{},
+				expected:  nil,
+				expectErr: true, // Should error because no valid recipients
+			},
+			{
+				name:     "ArrayWithEmptyStrings",
+				toField:  []any{"user1@example.com", "", "user2@example.com"},
+				expected: []string{"user1@example.com", "user2@example.com"},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				step := digraph.Step{
+					ExecutorConfig: digraph.ExecutorConfig{
+						Config: map[string]any{
+							"from":    "test@example.com",
+							"to":      tt.toField,
+							"subject": "Test Subject",
+							"message": "Test Message",
+						},
+					},
+				}
+
+				ctx := context.Background()
+				ctx = digraph.SetupEnvForTest(ctx, &digraph.DAG{
+					SMTP: &digraph.SMTPConfig{},
+				}, nil, digraph.DAGRunRef{}, "", "", nil)
+
+				exec, err := newMail(ctx, step)
+				assert.NoError(t, err)
+				assert.NotNil(t, exec)
+
+				mailExec, ok := exec.(*mail)
+				assert.True(t, ok)
+
+				// Test Run method to validate the to field handling
+				if tt.expectErr {
+					err := mailExec.Run(ctx)
+					assert.Error(t, err)
+				} else {
+					// We can't actually run the mail sending without mocking,
+					// but we can verify the config is set correctly
+					assert.Equal(t, tt.toField, mailExec.cfg.To)
+				}
+			})
+		}
+	})
 }

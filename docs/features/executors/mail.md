@@ -59,10 +59,22 @@ steps:
     executor:
       type: mail
       config:
-        to: "team@example.com, manager@example.com"
+        to:
+          - team@example.com
+          - manager@example.com
+          - stakeholders@example.com
         from: noreply@example.com
         subject: "Daily Report Ready"
         message: "The daily report has been generated."
+        
+  - name: single-recipient
+    executor:
+      type: mail
+      config:
+        to: admin@example.com  # Single recipient still works
+        from: system@example.com
+        subject: "System Update"
+        message: "System maintenance completed."
 ```
 
 ### With Variables

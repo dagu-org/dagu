@@ -180,7 +180,7 @@ type smtpConfigDef struct {
 // mailConfigDef defines the mail configuration.
 type mailConfigDef struct {
 	From       string // Sender email address
-	To         string // Recipient email address
+	To         any    // Recipient email address(es) - can be string or []string
 	Prefix     string // Prefix for the email subject
 	AttachLogs bool   // Flag to attach logs to the email
 }

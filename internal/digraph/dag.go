@@ -284,10 +284,10 @@ type SMTPConfig struct {
 
 // MailConfig contains the mail configuration.
 type MailConfig struct {
-	From       string `json:"from,omitempty"`
-	To         string `json:"to,omitempty"`
-	Prefix     string `json:"prefix,omitempty"`
-	AttachLogs bool   `json:"attachLogs,omitempty"`
+	From       string   `json:"from,omitempty"`
+	To         []string `json:"to,omitempty"`
+	Prefix     string   `json:"prefix,omitempty"`
+	AttachLogs bool     `json:"attachLogs,omitempty"`
 }
 
 // OTelConfig contains the OpenTelemetry configuration.
