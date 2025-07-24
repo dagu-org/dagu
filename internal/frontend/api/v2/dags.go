@@ -317,7 +317,8 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 
 	// For complex sorting, we need to fetch all DAGs first
 	// Use a large paginator to get all DAGs
-	allDagsPaginator := models.NewPaginator(1, 10000)
+	maxInt := int(^uint(0) >> 1)
+	allDagsPaginator := models.NewPaginator(1, maxInt)
 	result, errList, err := a.dagStore.List(ctx, models.ListDAGsOptions{
 		Paginator: &allDagsPaginator,
 		Name:      valueOf(request.Params.Name),

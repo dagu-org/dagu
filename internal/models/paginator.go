@@ -16,7 +16,8 @@ type Paginator struct {
 
 func NewPaginator(page, perPage int) Paginator {
 	page = max(page, 1)
-	if perPage > maxPerPage {
+	maxInt := int(^uint(0) >> 1)
+	if perPage > maxPerPage && perPage != maxInt {
 		perPage = maxPerPage
 	}
 	if perPage == 0 {
