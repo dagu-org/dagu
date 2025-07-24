@@ -18,7 +18,7 @@ import (
 	dagstatus "github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
-	"github.com/samber/lo"
+	"github.com/samber/lo/mutable"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
 	"golang.org/x/text/transform"
@@ -305,9 +305,10 @@ func (a *API) readHistoryData(
 		statusList = append(statusList, statusFile)
 	}
 
+    mutable.Reverse(statusList)
 	return api.DAGHistoryData{
 		GridData: grid,
-		Logs:     lo.Reverse(statusList),
+		Logs:     statusList,
 	}
 }
 
