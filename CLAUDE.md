@@ -370,6 +370,7 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
   - Log encoding charset
   - Dashboard page limits
   - Latest status display options
+  - DAG list default sorting
 
 ### 🛠️ **Variable & Parameter Management**
 - **Parameter Types**:
@@ -1021,6 +1022,9 @@ ui:
   navbarTitle: "Dagu Production"
   logEncodingCharset: utf-8
   maxDashboardPageLimit: 100
+  dagList:                      # Default DAG list sorting
+    sortField: "lastRun"        # Sort by most recent execution
+    sortOrder: "desc"           # Newest first
 
 # Remote Nodes
 remoteNodes:
