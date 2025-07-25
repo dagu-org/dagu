@@ -5,6 +5,7 @@ import React from 'react';
 
 export interface ModalLinkTabProps {
   label?: string;
+  value?: string;
   isActive?: boolean;
   className?: string;
   icon?: LucideIcon;
