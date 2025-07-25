@@ -131,7 +131,7 @@ steps:
     executor:
       type: docker
       config:
-        image: node:18
+        image: node:20
         autoRemove: true
         container:
           env:
@@ -219,7 +219,7 @@ steps:
     executor:
       type: docker
       config:
-        image: postgres:15
+        image: postgres:17
         containerName: test-db
         pull: missing
         platform: linux/amd64

@@ -272,8 +272,9 @@ function NodeStatusTableRow({
       });
       setSuccess(true);
       setShowDialog(false);
-    } catch (e: any) {
-      setError(e?.data?.message || e.message || 'Retry failed');
+    } catch (e) {
+      const error = e as { data?: { message?: string }; message?: string };
+      setError(error?.data?.message || error.message || 'Retry failed');
     } finally {
       setLoading(false);
     }

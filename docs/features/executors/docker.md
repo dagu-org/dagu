@@ -50,7 +50,7 @@ executor:
 executor:
   type: docker
   config:
-    image: node:18
+    image: node:20
     host:
       binds:
         - /host/data:/container/data:ro # Read-only
@@ -63,7 +63,7 @@ executor:
 executor:
   type: docker
   config:
-    image: postgres:15
+    image: postgres:17
     container:
       env:
         - POSTGRES_PASSWORD=secret
@@ -130,7 +130,7 @@ steps:
     executor:
       type: docker
       config:
-        image: postgres:15
+        image: postgres:17
         autoRemove: true
         container:
           env:

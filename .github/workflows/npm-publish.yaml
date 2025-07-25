@@ -12,6 +12,7 @@ on:
 
 env:
   VERSION: ${{ github.event.release.tag_name || inputs.version }}
+  NODE_VERSION: '20'
 
 jobs:
   # First, publish all platform-specific packages
@@ -42,7 +43,7 @@ jobs:
             arch: x64
             package: dagu-win32-x64
             asset: dagu_${{ github.event.release.tag_name || inputs.version }}_windows_amd64.tar.gz
-          
+
           # Tier 2 - Important platforms
           - platform: linux
             arch: ia32
@@ -60,7 +61,7 @@ jobs:
             arch: x64
             package: dagu-freebsd-x64
             asset: dagu_${{ github.event.release.tag_name || inputs.version }}_freebsd_amd64.tar.gz
-          
+
           # Tier 3 - Less common platforms
           - platform: linux
             arch: armv6
@@ -86,7 +87,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ env.NODE_VERSION }}
           registry-url: 'https://registry.npmjs.org'
 
       - name: Download release asset
@@ -160,7 +161,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ env.NODE_VERSION }}
           registry-url: 'https://registry.npmjs.org'
 
       - name: Update main package version and dependencies
@@ -233,7 +234,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Wait for npm propagation
         shell: bash
@@ -252,11 +253,11 @@ jobs:
       - name: Test installation
         run: |
           ${{ matrix.test-install }}
-          
+
       - name: Verify installation
         run: |
           dagu --version
-          
+
       - name: Test basic functionality
         run: |
           dagu --help

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { DataSet, Timeline } from 'vis-timeline/standalone';
+import { Timeline } from 'vis-timeline/standalone';
+import { DataSet } from 'vis-data';
 import 'vis-timeline/styles/vis-timeline-graph2d.css';
 import { components } from '../../../api/v2/schema';
 import { statusColorMapping } from '../../../consts';

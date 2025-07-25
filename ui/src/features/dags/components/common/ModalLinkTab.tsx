@@ -5,7 +5,7 @@ import React from 'react';
 
 export interface ModalLinkTabProps {
   label?: string;
-  value: string;
+  value?: string;
   isActive?: boolean;
   className?: string;
   icon?: LucideIcon;
@@ -13,7 +13,6 @@ export interface ModalLinkTabProps {
 }
 
 const ModalLinkTab: React.FC<ModalLinkTabProps> = ({
-  value,
   label,
   isActive,
   className,

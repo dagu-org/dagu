@@ -110,9 +110,6 @@ Worker labels are key-value pairs that describe worker capabilities:
 # Resource specifications
 --worker.labels memory=128G,cpu-cores=64,storage=fast-nvme
 
-# Software environment
---worker.labels python=3.11,cuda=11.8,torch=2.0
-
 # Compliance and security
 --worker.labels compliance=hipaa,security-clearance=high
 ```

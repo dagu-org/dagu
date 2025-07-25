@@ -2,13 +2,13 @@ package fileutil
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"golang.org/x/exp/rand"
 )
 
 // Entry represents a single cached item with metadata and expiration information
@@ -163,7 +163,12 @@ func newEntry[T any](
 ) Entry[T] {
 	expiresAt := time.Now().Add(ttl)
 	// Add random jitter to avoid thundering herd
-	randMin := time.Duration(rand.Intn(60)) * time.Minute
+	randBigInt, err := rand.Int(rand.Reader, big.NewInt(60))
+	if err != nil {
+		panic(err)
+	}
+	randInt := int(randBigInt.Int64())
+	randMin := time.Duration(randInt) * time.Minute
 	expiresAt = expiresAt.Add(randMin)
 
 	return Entry[T]{
