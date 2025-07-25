@@ -768,8 +768,8 @@ function DAGTable({
     const sortedDags = [...dags];
     if (clientSort) {
       sortedDags.sort((a, b) => {
-        let aValue: string;
-        let bValue: string;
+        let aValue: string | components['schemas']['Status'] = '';
+        let bValue: string | components['schemas']['Status'] = '';
 
         if (clientSort === 'Status') {
           aValue = a.latestDAGRun?.status || '';
@@ -817,8 +817,8 @@ function DAGTable({
           group.subRows.sort((a, b) => {
             const aDag = (a as DAGRow).dag;
             const bDag = (b as DAGRow).dag;
-            let aValue: any;
-            let bValue: any;
+            let aValue: string | components['schemas']['Status'] = '';
+            let bValue: string | components['schemas']['Status'] = '';
 
             if (clientSort === 'Status') {
               aValue = aDag.latestDAGRun?.status || '';
