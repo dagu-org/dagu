@@ -66,6 +66,11 @@ import {
   TableHeader,
   TableRow,
 } from '../../../../components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '../../../../components/ui/tooltip';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 
@@ -550,52 +555,102 @@ const defaultColumns = [
 
 // Mapping between column IDs and backend sort fields
 const columnToSortField: Record<string, string> = {
-  'Name': 'name',
-  'Status': 'status',
-  'LastRun': 'lastRun',
-  'ScheduleAndNextRun': 'schedule',
-  'Live': 'suspended',
+  Name: 'name',
+  // Only name sorting is supported by the backend
 };
 
-// --- Header Component for Server-side Sorting ---
+// Client-side sortable columns
+const clientSortableColumns = ['Status', 'LastRun'];
+
+// --- Header Component for both Server-side and Client-side Sorting ---
 const SortableHeader = ({
   column,
   children,
   currentSort,
   currentOrder,
   onSort,
+  clientSort,
+  clientOrder,
+  onClientSort,
 }: {
   column: Column<Data, unknown>;
   children: React.ReactNode;
   currentSort?: string;
   currentOrder?: string;
   onSort?: (field: string, order: string) => void;
+  clientSort?: string;
+  clientOrder?: string;
+  onClientSort?: (field: string, order: string) => void;
 }) => {
-  const sortField = columnToSortField[column.id];
-  const isActive = sortField && currentSort === sortField;
-  const isSortable = sortField && onSort;
+  const serverSortField = columnToSortField[column.id];
+  const isClientSortable = clientSortableColumns.includes(column.id);
+
+  // Check if this column is currently sorted (either server or client)
+  const isServerActive = serverSortField && currentSort === serverSortField;
+  const isClientActive = isClientSortable && clientSort === column.id;
+  const isActive = isServerActive || isClientActive;
+
+  // Determine if column is sortable at all
+  const isSortable =
+    (serverSortField && onSort) || (isClientSortable && onClientSort);
 
   if (!isSortable) {
     return <>{children}</>;
   }
 
   const handleClick = () => {
-    // Toggle order if clicking the same column, otherwise default to asc
-    const newOrder = isActive && currentOrder === 'asc' ? 'desc' : 'asc';
-    onSort(sortField, newOrder);
+    if (serverSortField && onSort) {
+      // Server-side sorting
+      const newOrder =
+        isServerActive && currentOrder === 'asc' ? 'desc' : 'asc';
+      onSort(serverSortField, newOrder);
+      // Clear client sort when server sort is applied
+      if (onClientSort) {
+        onClientSort('', '');
+      }
+    } else if (isClientSortable && onClientSort) {
+      // Client-side sorting
+      const newOrder = isClientActive && clientOrder === 'asc' ? 'desc' : 'asc';
+      onClientSort(column.id, newOrder);
+    }
   };
 
-  return (
+  // Determine which order to show
+  const displayOrder = isServerActive
+    ? currentOrder
+    : isClientActive
+      ? clientOrder
+      : '';
+
+  const button = (
     <Button
       variant="ghost"
       onClick={handleClick}
       className="-ml-4 h-8 cursor-pointer" // Adjust spacing
     >
       {children}
-      {isActive && currentOrder === 'asc' && <ArrowUp className="ml-2 h-4 w-4" />}
-      {isActive && currentOrder === 'desc' && <ArrowDown className="ml-2 h-4 w-4" />}
+      {isActive && displayOrder === 'asc' && (
+        <ArrowUp className="ml-2 h-4 w-4" />
+      )}
+      {isActive && displayOrder === 'desc' && (
+        <ArrowDown className="ml-2 h-4 w-4" />
+      )}
     </Button>
   );
+
+  // Wrap client-sortable columns with tooltip
+  if (isClientSortable) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent className="bg-muted text-muted-foreground border">
+          <p className="text-xs">Sorts current page only</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return button;
 };
 
 /**
@@ -625,6 +680,16 @@ function DAGTable({
   // State for the side modal
   const [selectedDAG, setSelectedDAG] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // State for client-side sorting
+  const [clientSort, setClientSort] = React.useState<string>('');
+  const [clientOrder, setClientOrder] = React.useState<string>('asc');
+
+  // Handler for client-side sorting
+  const handleClientSort = (field: string, order: string) => {
+    setClientSort(field);
+    setClientOrder(order);
+  };
 
   // Handlers for the modal
   const openModal = (fileName: string) => {
@@ -699,8 +764,35 @@ function DAGTable({
 
   // Transform the flat list of DAGs into a hierarchical structure with groups
   const data = useMemo(() => {
+    // Apply client-side sorting if needed
+    const sortedDags = [...dags];
+    if (clientSort) {
+      sortedDags.sort((a, b) => {
+        let aValue: string | components['schemas']['Status'] = '';
+        let bValue: string | components['schemas']['Status'] = '';
+
+        if (clientSort === 'Status') {
+          aValue = a.latestDAGRun?.status || '';
+          bValue = b.latestDAGRun?.status || '';
+        } else if (clientSort === 'LastRun') {
+          aValue = a.latestDAGRun?.startedAt || '';
+          bValue = b.latestDAGRun?.startedAt || '';
+        }
+
+        // Handle ascending/descending
+        if (clientOrder === 'desc') {
+          [aValue, bValue] = [bValue, aValue];
+        }
+
+        // Compare values
+        if (aValue < bValue) return -1;
+        if (aValue > bValue) return 1;
+        return 0;
+      });
+    }
+
     const groups: { [key: string]: Data } = {};
-    dags.forEach((dag) => {
+    sortedDags.forEach((dag) => {
       const groupName = dag.dag.group; // Use groupName consistently
       if (groupName) {
         if (!groups[groupName]) {
@@ -717,9 +809,40 @@ function DAGTable({
         });
       }
     });
+
+    // Sort subrows within groups if client sorting is active
+    if (clientSort) {
+      Object.values(groups).forEach((group) => {
+        if (group.subRows) {
+          group.subRows.sort((a, b) => {
+            const aDag = (a as DAGRow).dag;
+            const bDag = (b as DAGRow).dag;
+            let aValue: string | components['schemas']['Status'] = '';
+            let bValue: string | components['schemas']['Status'] = '';
+
+            if (clientSort === 'Status') {
+              aValue = aDag.latestDAGRun?.status || '';
+              bValue = bDag.latestDAGRun?.status || '';
+            } else if (clientSort === 'LastRun') {
+              aValue = aDag.latestDAGRun?.startedAt || '';
+              bValue = bDag.latestDAGRun?.startedAt || '';
+            }
+
+            if (clientOrder === 'desc') {
+              [aValue, bValue] = [bValue, aValue];
+            }
+
+            if (aValue < bValue) return -1;
+            if (aValue > bValue) return 1;
+            return 0;
+          });
+        }
+      });
+    }
+
     const hierarchicalData: Data[] = Object.values(groups); // Get group objects
     // Add DAGs without a group
-    dags
+    sortedDags
       .filter((dag) => !dag.dag.group)
       .forEach((dag) => {
         hierarchicalData.push({
@@ -729,7 +852,7 @@ function DAGTable({
         });
       });
     return hierarchicalData;
-  }, [dags]); // Removed 'group' dependency as it's handled by filtering
+  }, [dags, clientSort, clientOrder]); // Added client sort dependencies
 
   // Add keyboard navigation between DAGs when modal is open
   // Create a ref to store the table instance
@@ -923,7 +1046,9 @@ function DAGTable({
           borderRadius: '0.75rem',
         }}
       >
-        <Table className={`w-full text-xs table-fixed ${isLoading ? 'opacity-70' : ''}`}>
+        <Table
+          className={`w-full text-xs table-fixed ${isLoading ? 'opacity-70' : ''}`}
+        >
           <TableHeader>
             {instance.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -949,12 +1074,16 @@ function DAGTable({
                       <div>
                         {' '}
                         {/* Wrap header content */}
-                        {columnToSortField[header.column.id] ? (
+                        {columnToSortField[header.column.id] ||
+                        clientSortableColumns.includes(header.column.id) ? (
                           <SortableHeader
                             column={header.column}
                             currentSort={sortField}
                             currentOrder={sortOrder}
                             onSort={onSortChange}
+                            clientSort={clientSort}
+                            clientOrder={clientOrder}
+                            onClientSort={handleClientSort}
                             children={flexRender(
                               header.column.columnDef.header,
                               header.getContext()
