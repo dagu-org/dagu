@@ -81,6 +81,9 @@ type Definition struct {
 	// Worker contains configuration for the worker.
 	Worker *workerDef `mapstructure:"worker"`
 
+	// Scheduler contains configuration for the scheduler.
+	Scheduler *schedulerDef `mapstructure:"scheduler"`
+
 	// SchedulerLockStaleThreshold is the time after which a scheduler lock is considered stale.
 	// Default is 30 seconds.
 	SchedulerLockStaleThreshold string `mapstructure:"schedulerLockStaleThreshold"`
@@ -285,4 +288,10 @@ type workerDef struct {
 
 	// CAFile is the path to the CA certificate file for server verification.
 	CAFile string `mapstructure:"caFile"`
+}
+
+// schedulerDef holds the configuration for the scheduler.
+type schedulerDef struct {
+	// Port is the port number for the health check server.
+	Port int `mapstructure:"port"`
 }

@@ -70,6 +70,8 @@ func runStartAll(ctx *Context, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize scheduler: %w", err)
 	}
+	// Disable health server when running from start-all
+	scheduler.DisableHealthServer()
 
 	server, err := ctx.NewServer()
 	if err != nil {

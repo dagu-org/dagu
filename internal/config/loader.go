@@ -319,6 +319,14 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		}
 	}
 
+	// Set scheduler configuration
+	if def.Scheduler != nil {
+		cfg.Scheduler.Port = def.Scheduler.Port
+	} else {
+		// Set default scheduler port only if scheduler config was not provided at all
+		cfg.Scheduler.Port = 8090
+	}
+
 	// Incorporate legacy field values, which may override existing settings.
 	l.LoadLegacyFields(&cfg, def)
 	// Load legacy environment variable overrides.
@@ -599,6 +607,8 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("worker.certFile", "WORKER_TLS_CERT_FILE")
 	l.bindEnv("worker.keyFile", "WORKER_TLS_KEY_FILE")
 	l.bindEnv("worker.caFile", "WORKER_TLS_CA_FILE")
+	// Scheduler configuration
+	l.bindEnv("scheduler.port", "SCHEDULER_PORT")
 }
 
 // bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.

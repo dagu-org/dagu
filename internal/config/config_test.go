@@ -60,6 +60,8 @@ remoteNodes:
 tls:
   certFile: "/path/to/cert.pem"
   keyFile: "/path/to/key.pem"
+scheduler:
+  port: 7890
 `
 	err := os.WriteFile(configFile, []byte(configContent), 0600)
 	require.NoError(t, err)
@@ -114,6 +116,9 @@ tls:
 	assert.Equal(t, "/var/dagu/data/dag-runs", cfg.Paths.DAGRunsDir)
 	assert.Equal(t, "/var/dagu/queue", cfg.Paths.QueueDir)
 	assert.Equal(t, "/var/dagu/proc", cfg.Paths.ProcDir)
+
+	// Verify scheduler settings.
+	assert.Equal(t, 7890, cfg.Scheduler.Port)
 
 	// Verify UI settings.
 	assert.Equal(t, "Test Dagu", cfg.UI.NavbarTitle)
@@ -645,3 +650,4 @@ queues:
 	// Verify environment variable overrides config file
 	assert.False(t, cfg.Queues.Enabled)
 }
+
