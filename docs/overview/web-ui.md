@@ -53,6 +53,32 @@ The DAGs page shows all DAGs and their real-time status. This gives you an immed
 
 ![Definitions](/dag-definitions.png)
 
+### DAG List Sorting
+The DAG list can be sorted by:
+- **Name**: Alphabetical order
+- **Status**: Current execution status  
+- **Last Run**: Most recent execution time
+- **Schedule**: Cron schedule
+- **Suspended**: Suspension state
+
+Configure default sorting in `config.yaml`:
+```yaml
+ui:
+  dags:
+    sortField: "lastRun"  # Default sort field
+    sortOrder: "desc"     # Default sort order (asc/desc)
+```
+
+Or via environment variables:
+```bash
+export DAGU_UI_DAGS_SORT_FIELD=lastRun
+export DAGU_UI_DAGS_SORT_ORDER=desc
+```
+
+::: info Backend Sorting
+Only the `name` field is sorted server-side. Other fields (status, lastRun, schedule, suspended) are sorted client-side for performance.
+:::
+
 ## DAG Details
 
 Click any DAG to see detailed information including real-time status, logs, and DAG configurations. You can edit DAG configurations directly in the browser.
@@ -199,6 +225,9 @@ ui:
 ui:
   maxDashboardPageLimit: 100  # Items per page
   logEncodingCharset: utf-8   # Log encoding
+  dags:
+    sortField: "name"         # Default sort field
+    sortOrder: "asc"          # Default sort order
 ```
 
 ## Remote Nodes

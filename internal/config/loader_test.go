@@ -613,6 +613,6 @@ worker:
 		require.NotNil(t, cfg)
 
 		// Verify labels are nil or empty
-		assert.True(t, cfg.Worker.Labels == nil || len(cfg.Worker.Labels) == 0)
+		assert.True(t, len(cfg.Worker.Labels) == 0)
 	})
 }

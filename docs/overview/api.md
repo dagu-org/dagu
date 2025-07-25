@@ -41,7 +41,14 @@ curl http://localhost:8080/api/v2/dags
 
 # With filtering and pagination
 curl "http://localhost:8080/api/v2/dags?page=1&perPage=10&name=example&tag=prod"
+
+# With sorting (only 'name' field is supported)
+curl "http://localhost:8080/api/v2/dags?sort=name&order=desc"
 ```
+
+::: info Sorting Limitations
+The API only supports server-side sorting by the `name` field. While the API accepts `sort` parameter with value `name` only, the UI can perform client-side sorting for other fields like status, lastRun, schedule, and suspended.
+:::
 
 #### Get DAG Details
 ```bash

@@ -80,6 +80,9 @@ ui:
   navbarTitle: "Dagu"           # Header title
   logEncodingCharset: "utf-8"   # Log file encoding
   maxDashboardPageLimit: 100    # Max items on dashboard
+  dags:
+    sortField: "name"           # Default sort field (name/status/lastRun/schedule/suspended)
+    sortOrder: "asc"            # Default sort order (asc/desc)
 
 # Latest Status Configuration
 latestStatusToday: true         # Show only today's latest status
@@ -136,6 +139,10 @@ All options support `DAGU_` prefix:
 - `DAGU_AUTH_OIDC_ISSUER` - OIDC issuer URL
 - `DAGU_AUTH_OIDC_SCOPES` - OIDC scopes (comma-separated)
 - `DAGU_AUTH_OIDC_WHITELIST` - OIDC email whitelist (comma-separated)
+
+**UI:**
+- `DAGU_UI_DAGS_SORT_FIELD` - Default DAGs page sort field
+- `DAGU_UI_DAGS_SORT_ORDER` - Default DAGs page sort order
 
 ## Common Setups
 
