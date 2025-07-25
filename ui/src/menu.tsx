@@ -1,7 +1,7 @@
 import logoDark from '@/assets/images/logo_dark.png';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
-import { BarChart2, GitBranch, List, Search, Server, PanelLeft } from 'lucide-react';
+import { BarChart2, GitBranch, List, Search, Server, PanelLeft, Github } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -137,6 +137,24 @@ export const mainListItems = React.forwardRef<
           onClick={onNavItemClick}
         />
       </nav>
+      {/* GitHub link */}
+      <div className="px-2 py-2">
+        <a
+          href="https://github.com/dagu-org/dagu"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            'flex items-center justify-center transition-all duration-200',
+            isOpen
+              ? 'h-9 px-3 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground'
+              : 'w-8 h-8 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground'
+          )}
+          title="GitHub Repository"
+        >
+          <Github size={18} />
+          {isOpen && <span className="ml-3 text-xs font-medium">GitHub</span>}
+        </a>
+      </div>
       {/* Version display - only shown when sidebar is expanded */}
       {isOpen && (
         <div className="px-3 py-2 text-xs text-primary-foreground/60">
