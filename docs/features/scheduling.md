@@ -12,6 +12,20 @@ dagu scheduler
 
 Or use `dagu start-all` to run both scheduler and web server.
 
+### Health Check Monitoring
+
+The scheduler provides an optional HTTP health check endpoint for monitoring:
+
+```yaml
+# config.yaml
+scheduler:
+  port: 8090  # Health check port (set to 0 to disable)
+```
+
+When enabled, access the health endpoint at `http://localhost:8090/health`.
+
+**Note**: The health check only runs when using `dagu scheduler` directly, not with `dagu start-all`.
+
 ## Basic Scheduling
 
 Schedule workflows with cron expressions:

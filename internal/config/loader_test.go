@@ -87,6 +87,9 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_WORKER_TLS_CERT_FILE":    "/test/worker/cert.pem",
 		"DAGU_WORKER_TLS_KEY_FILE":     "/test/worker/key.pem",
 		"DAGU_WORKER_TLS_CA_FILE":      "/test/worker/ca.pem",
+
+		// Scheduler configuration
+		"DAGU_SCHEDULER_PORT": "9999",
 	}
 
 	// Save and clear existing environment variables
@@ -185,6 +188,9 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	assert.Equal(t, "/test/worker/cert.pem", cfg.Worker.TLS.CertFile)
 	assert.Equal(t, "/test/worker/key.pem", cfg.Worker.TLS.KeyFile)
 	assert.Equal(t, "/test/worker/ca.pem", cfg.Worker.TLS.CAFile)
+
+	// Scheduler configuration
+	assert.Equal(t, 9999, cfg.Scheduler.Port)
 }
 
 func TestConfigLoader_CoordinatorSigningKey(t *testing.T) {

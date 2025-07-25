@@ -35,21 +35,23 @@ type Job interface {
 }
 
 type Scheduler struct {
-	hm           dagrun.Manager
-	er           EntryReader
-	logDir       string
-	stopChan     chan struct{}
-	running      atomic.Bool
-	location     *time.Location
-	dagRunStore  models.DAGRunStore
-	queueStore   models.QueueStore
-	procStore    models.ProcStore
-	cancel       context.CancelFunc
-	lock         sync.Mutex
-	queueConfigs sync.Map
-	config       *config.Config
-	dirLock      dirlock.DirLock // File-based lock to prevent multiple scheduler instances
-	dagExecutor  *DAGExecutor
+	hm                    dagrun.Manager
+	er                    EntryReader
+	logDir                string
+	stopChan              chan struct{}
+	running               atomic.Bool
+	location              *time.Location
+	dagRunStore           models.DAGRunStore
+	queueStore            models.QueueStore
+	procStore             models.ProcStore
+	cancel                context.CancelFunc
+	lock                  sync.Mutex
+	queueConfigs          sync.Map
+	config                *config.Config
+	dirLock               dirlock.DirLock // File-based lock to prevent multiple scheduler instances
+	dagExecutor           *DAGExecutor
+	healthServer          *HealthServer // Health check server for monitoring
+	disableHealthServer   bool         // Disable health server when running from start-all
 }
 
 type queueConfig struct {
@@ -79,19 +81,28 @@ func New(
 	// Create DAG executor
 	dagExecutor := NewDAGExecutor(coordinatorClientFactory, drm)
 
+	// Create health server
+	healthServer := NewHealthServer(cfg.Scheduler.Port)
+
 	return &Scheduler{
-		logDir:      cfg.Paths.LogDir,
-		stopChan:    make(chan struct{}),
-		location:    timeLoc,
-		er:          er,
-		hm:          drm,
-		dagRunStore: drs,
-		queueStore:  qs,
-		procStore:   ps,
-		config:      cfg,
-		dirLock:     dirLock,
-		dagExecutor: dagExecutor,
+		logDir:       cfg.Paths.LogDir,
+		stopChan:     make(chan struct{}),
+		location:     timeLoc,
+		er:           er,
+		hm:           drm,
+		dagRunStore:  drs,
+		queueStore:   qs,
+		procStore:    ps,
+		config:       cfg,
+		dirLock:      dirLock,
+		dagExecutor:  dagExecutor,
+		healthServer: healthServer,
 	}, nil
+}
+
+// DisableHealthServer disables the health check server (used when running from start-all)
+func (s *Scheduler) DisableHealthServer() {
+	s.disableHealthServer = true
 }
 
 func (s *Scheduler) Start(ctx context.Context) error {
@@ -112,6 +123,13 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		"lockDir", schedulerLockDir(s.config),
 		"staleThreshold", s.config.Global.SchedulerLockStaleThreshold.String(),
 		"retryInterval", s.config.Global.SchedulerLockRetryInterval.String())
+
+	// Start health check server only if not disabled
+	if !s.disableHealthServer {
+		if err := s.healthServer.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start health check server: %w", err)
+		}
+	}
 
 	// Ensure lock is always released
 	defer func() {
@@ -432,6 +450,13 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		s.cancel = nil
 	}
 	s.lock.Unlock()
+
+	// Stop health check server if it was started
+	if s.healthServer != nil && !s.disableHealthServer {
+		if err := s.healthServer.Stop(ctx); err != nil {
+			logger.Error(ctx, "Failed to stop health check server", "err", err)
+		}
+	}
 
 	// Close DAG executor to release gRPC connections
 	if s.dagExecutor != nil {

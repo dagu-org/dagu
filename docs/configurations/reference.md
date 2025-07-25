@@ -109,6 +109,10 @@ worker:
     certFile: ""          # Client certificate (mTLS)
     keyFile: ""           # Client key
     caFile: ""            # CA for server verification
+
+# Scheduler
+scheduler:
+  port: 8090              # Health check port (0 to disable)
 ```
 
 ## Environment Variables
@@ -178,6 +182,9 @@ All options support `DAGU_` prefix.
 - `DAGU_WORKER_TLS_KEY` - Client key for mTLS
 - `DAGU_WORKER_TLS_CA` - CA certificate for server verification
 - `DAGU_WORKER_SKIP_TLS_VERIFY` - Skip TLS certificate verification
+
+### Scheduler
+- `DAGU_SCHEDULER_PORT` - Health check server port (default: `8090`)
 
 ### Legacy Environment Variables (Deprecated)
 These variables are maintained for backward compatibility but should not be used in new deployments:

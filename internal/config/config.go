@@ -30,6 +30,9 @@ type Config struct {
 	// Worker defines the worker configuration.
 	Worker Worker
 
+	// Scheduler defines the scheduler configuration.
+	Scheduler Scheduler
+
 	// Warnings contains a list of warnings generated during the configuration loading process.
 	Warnings []string
 }
@@ -283,4 +286,9 @@ type Worker struct {
 	Insecure        bool              // Use insecure connection (h2c) - must be explicitly enabled
 	SkipTLSVerify   bool              // Skip TLS certificate verification
 	Labels          map[string]string // Worker labels for capability matching
+}
+
+// Scheduler represents the scheduler configuration
+type Scheduler struct {
+	Port int // Health check server port (default: 8090)
 }
