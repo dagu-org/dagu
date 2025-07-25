@@ -191,15 +191,15 @@ type pathsConfigDef struct {
 
 // uiDef holds the user interface configuration settings.
 type uiDef struct {
-	LogEncodingCharset    string      `mapstructure:"logEncodingCharset"`
-	NavbarColor           string      `mapstructure:"navbarColor"`
-	NavbarTitle           string      `mapstructure:"navbarTitle"`
-	MaxDashboardPageLimit int         `mapstructure:"maxDashboardPageLimit"`
-	DAGList               *dagListDef `mapstructure:"dagList"`
+	LogEncodingCharset    string   `mapstructure:"logEncodingCharset"`
+	NavbarColor           string   `mapstructure:"navbarColor"`
+	NavbarTitle           string   `mapstructure:"navbarTitle"`
+	MaxDashboardPageLimit int      `mapstructure:"maxDashboardPageLimit"`
+	DAGs                  *dagsDef `mapstructure:"dags"`
 }
 
-// dagListDef holds the DAG list configuration settings.
-type dagListDef struct {
+// dagsDef holds the DAGs page configuration settings.
+type dagsDef struct {
 	SortField string `mapstructure:"sortField"`
 	SortOrder string `mapstructure:"sortOrder"`
 }

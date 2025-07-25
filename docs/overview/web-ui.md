@@ -64,15 +64,15 @@ The DAG list can be sorted by:
 Configure default sorting in `config.yaml`:
 ```yaml
 ui:
-  dagList:
+  dags:
     sortField: "lastRun"  # Default sort field
     sortOrder: "desc"     # Default sort order (asc/desc)
 ```
 
 Or via environment variables:
 ```bash
-export DAGU_UI_DAG_LIST_SORT_FIELD=lastRun
-export DAGU_UI_DAG_LIST_SORT_ORDER=desc
+export DAGU_UI_DAGS_SORT_FIELD=lastRun
+export DAGU_UI_DAGS_SORT_ORDER=desc
 ```
 
 ::: info Backend Sorting
@@ -225,7 +225,7 @@ ui:
 ui:
   maxDashboardPageLimit: 100  # Items per page
   logEncodingCharset: utf-8   # Log encoding
-  dagList:
+  dags:
     sortField: "name"         # Default sort field
     sortOrder: "asc"          # Default sort order
 ```

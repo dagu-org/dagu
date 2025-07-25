@@ -55,7 +55,7 @@ ui:
   navbarTitle: "Dagu"
   logEncodingCharset: "utf-8"
   maxDashboardPageLimit: 100
-  dagList:
+  dags:
     sortField: "name"        # Default sort field (name/status/lastRun/schedule/suspended)
     sortOrder: "asc"         # Default sort order (asc/desc)
 
@@ -162,8 +162,8 @@ All options support `DAGU_` prefix.
 - `DAGU_UI_NAVBAR_TITLE` - Nav bar title
 - `DAGU_UI_LOG_ENCODING_CHARSET` - Log encoding
 - `DAGU_UI_MAX_DASHBOARD_PAGE_LIMIT` - Dashboard limit
-- `DAGU_UI_DAG_LIST_SORT_FIELD` - Default DAG list sort field
-- `DAGU_UI_DAG_LIST_SORT_ORDER` - Default DAG list sort order
+- `DAGU_UI_DAGS_SORT_FIELD` - Default DAGs page sort field
+- `DAGU_UI_DAGS_SORT_ORDER` - Default DAGs page sort order
 
 ### Queue
 - `DAGU_QUEUE_ENABLED` - Enable queue system (default: true)
@@ -405,8 +405,8 @@ dagu start-all --config ~/.config/dagu/config.yaml --dry-run
 - `permissions.runDAGs`: `true`
 - `ui.maxDashboardPageLimit`: `100`
 - `ui.logEncodingCharset`: `utf-8`
-- `ui.dagList.sortField`: `name`
-- `ui.dagList.sortOrder`: `asc`
+- `ui.dags.sortField`: `name`
+- `ui.dags.sortOrder`: `asc`
 - `logFormat`: `text`
 - `host`: `127.0.0.1`
 - `port`: `8080`

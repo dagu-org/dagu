@@ -1022,7 +1022,7 @@ ui:
   navbarTitle: "Dagu Production"
   logEncodingCharset: utf-8
   maxDashboardPageLimit: 100
-  dagList:                      # Default DAG list sorting
+  dags:                         # Default DAGs page sorting
     sortField: "lastRun"        # Sort by most recent execution
     sortOrder: "desc"           # Newest first
 

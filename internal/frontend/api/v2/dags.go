@@ -305,7 +305,7 @@ func (a *API) readHistoryData(
 
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
 	// Extract sort and order parameters with config defaults
-	sortField := a.config.UI.DAGList.SortField
+	sortField := a.config.UI.DAGs.SortField
 	if sortField == "" {
 		sortField = "name" // fallback if config is empty
 	}
@@ -313,7 +313,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		sortField = string(*request.Params.Sort)
 	}
 
-	sortOrder := a.config.UI.DAGList.SortOrder
+	sortOrder := a.config.UI.DAGs.SortOrder
 	if sortOrder == "" {
 		sortOrder = "asc" // fallback if config is empty
 	}

@@ -230,10 +230,10 @@ type UI struct {
 	NavbarColor           string
 	NavbarTitle           string
 	MaxDashboardPageLimit int
-	DAGList               DAGListConfig
+	DAGs                  DAGsConfig
 }
 
-type DAGListConfig struct {
+type DAGsConfig struct {
 	SortField string
 	SortOrder string
 }

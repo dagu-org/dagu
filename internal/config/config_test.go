@@ -125,9 +125,9 @@ scheduler:
 	assert.Equal(t, 50, cfg.UI.MaxDashboardPageLimit)
 	assert.Equal(t, "utf-8", cfg.UI.LogEncodingCharset)
 
-	// Verify DAGList defaults (not specified in config)
-	assert.Equal(t, "name", cfg.UI.DAGList.SortField)
-	assert.Equal(t, "asc", cfg.UI.DAGList.SortOrder)
+	// Verify DAGs defaults (not specified in config)
+	assert.Equal(t, "name", cfg.UI.DAGs.SortField)
+	assert.Equal(t, "asc", cfg.UI.DAGs.SortOrder)
 }
 
 func TestLoadConfig_Defaults(t *testing.T) {
@@ -148,9 +148,9 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	assert.Equal(t, 100, cfg.UI.MaxDashboardPageLimit)
 	assert.Equal(t, "utf-8", cfg.UI.LogEncodingCharset)
 
-	// DAGList defaults
-	assert.Equal(t, "name", cfg.UI.DAGList.SortField)
-	assert.Equal(t, "asc", cfg.UI.DAGList.SortOrder)
+	// DAGs defaults
+	assert.Equal(t, "name", cfg.UI.DAGs.SortField)
+	assert.Equal(t, "asc", cfg.UI.DAGs.SortOrder)
 
 	// Permissions should be set to true
 	assert.True(t, cfg.Server.Permissions[config.PermissionWriteDAGs])
@@ -659,14 +659,14 @@ queues:
 	assert.False(t, cfg.Queues.Enabled)
 }
 
-func TestLoadConfig_WithDAGListConfiguration(t *testing.T) {
+func TestLoadConfig_WithDAGsConfiguration(t *testing.T) {
 	viper.Reset()
 
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "config.yaml")
 	configContent := `
 ui:
-  dagList:
+  dags:
     sortField: "lastRun"
     sortOrder: "desc"
 `
@@ -677,19 +677,19 @@ ui:
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 
-	// Verify DAGList configuration
-	assert.Equal(t, "lastRun", cfg.UI.DAGList.SortField)
-	assert.Equal(t, "desc", cfg.UI.DAGList.SortOrder)
+	// Verify DAGs configuration
+	assert.Equal(t, "lastRun", cfg.UI.DAGs.SortField)
+	assert.Equal(t, "desc", cfg.UI.DAGs.SortOrder)
 }
 
-func TestLoadConfig_DAGListEnvironmentOverride(t *testing.T) {
+func TestLoadConfig_DAGsEnvironmentOverride(t *testing.T) {
 	viper.Reset()
 
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "config.yaml")
 	configContent := `
 ui:
-  dagList:
+  dags:
     sortField: "name"
     sortOrder: "asc"
 `
@@ -697,19 +697,19 @@ ui:
 	require.NoError(t, err)
 
 	// Set environment variables to override
-	originalField := os.Getenv("DAGU_UI_DAG_LIST_SORT_FIELD")
-	originalOrder := os.Getenv("DAGU_UI_DAG_LIST_SORT_ORDER")
-	defer os.Setenv("DAGU_UI_DAG_LIST_SORT_FIELD", originalField)
-	defer os.Setenv("DAGU_UI_DAG_LIST_SORT_ORDER", originalOrder)
+	originalField := os.Getenv("DAGU_UI_DAGS_SORT_FIELD")
+	originalOrder := os.Getenv("DAGU_UI_DAGS_SORT_ORDER")
+	defer os.Setenv("DAGU_UI_DAGS_SORT_FIELD", originalField)
+	defer os.Setenv("DAGU_UI_DAGS_SORT_ORDER", originalOrder)
 
-	os.Setenv("DAGU_UI_DAG_LIST_SORT_FIELD", "status")
-	os.Setenv("DAGU_UI_DAG_LIST_SORT_ORDER", "desc")
+	os.Setenv("DAGU_UI_DAGS_SORT_FIELD", "status")
+	os.Setenv("DAGU_UI_DAGS_SORT_ORDER", "desc")
 
 	cfg, err := config.Load(config.WithConfigFile(configFile))
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 
 	// Verify environment variables override config file
-	assert.Equal(t, "status", cfg.UI.DAGList.SortField)
-	assert.Equal(t, "desc", cfg.UI.DAGList.SortOrder)
+	assert.Equal(t, "status", cfg.UI.DAGs.SortField)
+	assert.Equal(t, "desc", cfg.UI.DAGs.SortOrder)
 }
