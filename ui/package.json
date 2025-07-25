@@ -96,7 +96,7 @@
     "react": "^19.1.0",
     "react-cookie": "^8.0.1",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.7.0",
+    "react-router-dom": "^7.7.1",
     "recharts": "^3.1.0",
     "swr": "^2.3.4",
     "swr-openapi": "^5.3.0",
