@@ -305,7 +305,7 @@ func (a *API) readHistoryData(
 		statusList = append(statusList, statusFile)
 	}
 
-    mutable.Reverse(statusList)
+	mutable.Reverse(statusList)
 	return api.DAGHistoryData{
 		GridData: grid,
 		Logs:     statusList,

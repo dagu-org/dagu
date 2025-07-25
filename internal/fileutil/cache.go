@@ -163,11 +163,11 @@ func newEntry[T any](
 ) Entry[T] {
 	expiresAt := time.Now().Add(ttl)
 	// Add random jitter to avoid thundering herd
-    randBigInt, err := rand.Int(rand.Reader, big.NewInt(60))
-    if err != nil {
-        panic(err)
-    }
-    randInt := int(randBigInt.Int64())
+	randBigInt, err := rand.Int(rand.Reader, big.NewInt(60))
+	if err != nil {
+		panic(err)
+	}
+	randInt := int(randBigInt.Int64())
 	randMin := time.Duration(randInt) * time.Minute
 	expiresAt = expiresAt.Add(randMin)
 
