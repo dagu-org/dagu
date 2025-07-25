@@ -304,13 +304,19 @@ func (a *API) readHistoryData(
 }
 
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
-	// Extract sort and order parameters
-	sortField := "name" // default
+	// Extract sort and order parameters with config defaults
+	sortField := a.config.UI.DAGList.SortField
+	if sortField == "" {
+		sortField = "name" // fallback if config is empty
+	}
 	if request.Params.Sort != nil {
 		sortField = string(*request.Params.Sort)
 	}
 
-	sortOrder := "asc" // default
+	sortOrder := a.config.UI.DAGList.SortOrder
+	if sortOrder == "" {
+		sortOrder = "asc" // fallback if config is empty
+	}
 	if request.Params.Order != nil {
 		sortOrder = string(*request.Params.Order)
 	}

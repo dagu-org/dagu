@@ -230,6 +230,12 @@ type UI struct {
 	NavbarColor           string
 	NavbarTitle           string
 	MaxDashboardPageLimit int
+	DAGList               DAGListConfig
+}
+
+type DAGListConfig struct {
+	SortField string
+	SortOrder string
 }
 
 // RemoteNode represents a remote node configuration

@@ -244,6 +244,12 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.UI.NavbarTitle = def.UI.NavbarTitle
 		cfg.UI.MaxDashboardPageLimit = def.UI.MaxDashboardPageLimit
 		cfg.UI.LogEncodingCharset = def.UI.LogEncodingCharset
+
+		// Set DAGList configuration if provided
+		if def.UI.DAGList != nil {
+			cfg.UI.DAGList.SortField = def.UI.DAGList.SortField
+			cfg.UI.DAGList.SortOrder = def.UI.DAGList.SortOrder
+		}
 	}
 
 	// Set queue configuration if provided, with default enabled=true.
@@ -503,6 +509,8 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("ui.navbarTitle", build.AppName)
 	viper.SetDefault("ui.maxDashboardPageLimit", 100)
 	viper.SetDefault("ui.logEncodingCharset", "utf-8")
+	viper.SetDefault("ui.dagList.sortField", "name")
+	viper.SetDefault("ui.dagList.sortOrder", "asc")
 
 	// Logging settings
 	viper.SetDefault("logFormat", "text")
@@ -540,6 +548,8 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("ui.logEncodingCharset", "UI_LOG_ENCODING_CHARSET")
 	l.bindEnv("ui.navbarColor", "UI_NAVBAR_COLOR")
 	l.bindEnv("ui.navbarTitle", "UI_NAVBAR_TITLE")
+	l.bindEnv("ui.dagList.sortField", "UI_DAG_LIST_SORT_FIELD")
+	l.bindEnv("ui.dagList.sortOrder", "UI_DAG_LIST_SORT_ORDER")
 
 	// UI configurations (legacy keys)
 	l.bindEnv("ui.maxDashboardPageLimit", "MAX_DASHBOARD_PAGE_LIMIT")

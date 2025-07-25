@@ -124,6 +124,10 @@ scheduler:
 	assert.Equal(t, "Test Dagu", cfg.UI.NavbarTitle)
 	assert.Equal(t, 50, cfg.UI.MaxDashboardPageLimit)
 	assert.Equal(t, "utf-8", cfg.UI.LogEncodingCharset)
+
+	// Verify DAGList defaults (not specified in config)
+	assert.Equal(t, "name", cfg.UI.DAGList.SortField)
+	assert.Equal(t, "asc", cfg.UI.DAGList.SortOrder)
 }
 
 func TestLoadConfig_Defaults(t *testing.T) {
@@ -143,6 +147,10 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	// For UI defaults, maxDashboardPageLimit should be 100 and logEncodingCharset "utf-8".
 	assert.Equal(t, 100, cfg.UI.MaxDashboardPageLimit)
 	assert.Equal(t, "utf-8", cfg.UI.LogEncodingCharset)
+
+	// DAGList defaults
+	assert.Equal(t, "name", cfg.UI.DAGList.SortField)
+	assert.Equal(t, "asc", cfg.UI.DAGList.SortOrder)
 
 	// Permissions should be set to true
 	assert.True(t, cfg.Server.Permissions[config.PermissionWriteDAGs])
@@ -651,3 +659,57 @@ queues:
 	assert.False(t, cfg.Queues.Enabled)
 }
 
+func TestLoadConfig_WithDAGListConfiguration(t *testing.T) {
+	viper.Reset()
+
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := `
+ui:
+  dagList:
+    sortField: "lastRun"
+    sortOrder: "desc"
+`
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
+	require.NoError(t, err)
+
+	cfg, err := config.Load(config.WithConfigFile(configFile))
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	// Verify DAGList configuration
+	assert.Equal(t, "lastRun", cfg.UI.DAGList.SortField)
+	assert.Equal(t, "desc", cfg.UI.DAGList.SortOrder)
+}
+
+func TestLoadConfig_DAGListEnvironmentOverride(t *testing.T) {
+	viper.Reset()
+
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := `
+ui:
+  dagList:
+    sortField: "name"
+    sortOrder: "asc"
+`
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
+	require.NoError(t, err)
+
+	// Set environment variables to override
+	originalField := os.Getenv("DAGU_UI_DAG_LIST_SORT_FIELD")
+	originalOrder := os.Getenv("DAGU_UI_DAG_LIST_SORT_ORDER")
+	defer os.Setenv("DAGU_UI_DAG_LIST_SORT_FIELD", originalField)
+	defer os.Setenv("DAGU_UI_DAG_LIST_SORT_ORDER", originalOrder)
+
+	os.Setenv("DAGU_UI_DAG_LIST_SORT_FIELD", "status")
+	os.Setenv("DAGU_UI_DAG_LIST_SORT_ORDER", "desc")
+
+	cfg, err := config.Load(config.WithConfigFile(configFile))
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	// Verify environment variables override config file
+	assert.Equal(t, "status", cfg.UI.DAGList.SortField)
+	assert.Equal(t, "desc", cfg.UI.DAGList.SortOrder)
+}
