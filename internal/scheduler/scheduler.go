@@ -35,23 +35,23 @@ type Job interface {
 }
 
 type Scheduler struct {
-	hm                    dagrun.Manager
-	er                    EntryReader
-	logDir                string
-	stopChan              chan struct{}
-	running               atomic.Bool
-	location              *time.Location
-	dagRunStore           models.DAGRunStore
-	queueStore            models.QueueStore
-	procStore             models.ProcStore
-	cancel                context.CancelFunc
-	lock                  sync.Mutex
-	queueConfigs          sync.Map
-	config                *config.Config
-	dirLock               dirlock.DirLock // File-based lock to prevent multiple scheduler instances
-	dagExecutor           *DAGExecutor
-	healthServer          *HealthServer // Health check server for monitoring
-	disableHealthServer   bool         // Disable health server when running from start-all
+	hm                  dagrun.Manager
+	er                  EntryReader
+	logDir              string
+	stopChan            chan struct{}
+	running             atomic.Bool
+	location            *time.Location
+	dagRunStore         models.DAGRunStore
+	queueStore          models.QueueStore
+	procStore           models.ProcStore
+	cancel              context.CancelFunc
+	lock                sync.Mutex
+	queueConfigs        sync.Map
+	config              *config.Config
+	dirLock             dirlock.DirLock // File-based lock to prevent multiple scheduler instances
+	dagExecutor         *DAGExecutor
+	healthServer        *HealthServer // Health check server for monitoring
+	disableHealthServer bool          // Disable health server when running from start-all
 }
 
 type queueConfig struct {
