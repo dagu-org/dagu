@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -6,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Command, ExternalLink, Layers } from 'lucide-react';
+import { ExternalLink, Layers } from 'lucide-react';
 import React from 'react';
 import { components } from '../../../../api/v2/schema';
 
@@ -22,7 +21,6 @@ type Props = {
 export function ParallelExecutionModal({
   isOpen,
   onClose,
-  stepName,
   childDAGName,
   children,
   onSelectChild,

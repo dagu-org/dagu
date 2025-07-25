@@ -170,15 +170,6 @@ function getNextSchedule(
     return;
   }
 }
-
-// Allow returning number for group sorting placeholder
-function getStatus(data: RowItem): components['schemas']['Status'] | number {
-  if (data.kind === ItemKind.DAG) {
-    return data.dag.latestDAGRun.status;
-  }
-  // Use a number outside the Status enum range for groups
-  return -1;
-}
 // --- End Helper Functions ---
 
 const defaultColumns = [

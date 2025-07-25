@@ -50,7 +50,7 @@ function DAGRunDetailsPage() {
 
   // Handle 404 error for dequeued DAG runs
   if (error) {
-    const statusCode = (error as any)?.response?.status;
+    const statusCode = (error as { response?: { status?: number } })?.response?.status;
     if (statusCode === 404) {
       return (
         <div className="container mx-auto">
@@ -76,7 +76,7 @@ function DAGRunDetailsPage() {
             Error Loading DAG Run
           </h2>
           <p className="text-red-600 dark:text-red-400">
-            {(error as any)?.message || 'Failed to load DAG run details'}
+            {(error as { message?: string })?.message || 'Failed to load DAG run details'}
           </p>
         </div>
       </div>

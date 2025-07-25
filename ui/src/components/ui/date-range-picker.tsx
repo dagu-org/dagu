@@ -1,4 +1,4 @@
-import { CalendarRange, Calendar } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import React, { useRef, useState, useEffect } from 'react';
 import { cn } from '../../lib/utils';
 import { Input } from './input';
@@ -202,8 +202,6 @@ export function DateRangePicker({
   toDate,
   onFromDateChange,
   onToDateChange,
-  fromLabel = 'From',
-  toLabel = 'To',
   onEnterPress,
   className,
   ...props

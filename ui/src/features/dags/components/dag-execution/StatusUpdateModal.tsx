@@ -3,11 +3,9 @@
  *
  * @module features/dags/components/dag-execution
  */
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/ui/CustomDialog';
@@ -41,7 +39,6 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
   }
 
   // Create refs for the buttons
-  const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
   const successButtonRef = React.useRef<HTMLButtonElement>(null);
   const failedButtonRef = React.useRef<HTMLButtonElement>(null);
   
