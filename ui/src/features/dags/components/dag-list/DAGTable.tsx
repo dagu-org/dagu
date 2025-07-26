@@ -379,17 +379,34 @@ const defaultColumns = [
       let durationContent: React.ReactNode = null;
 
       if (finishedAt && finishedAt !== '-') {
-        const durationMs = dayjs(finishedAt).diff(dayjs(startedAt));
-        // Choose format based on duration length
-        const format = durationMs >= 1000 * 60 ? 'd[d] h[h] m[m]' : 's[s]';
-        const formattedDuration = dayjs.duration(durationMs).format(format);
-        if (durationMs > 0) {
-          // Only show duration if positive
-          durationContent = (
-            <div className="text-[10px] text-muted-foreground">
-              {formattedDuration}
-            </div>
-          );
+        const start = dayjs(startedAt);
+        const end = dayjs(finishedAt);
+        
+        if (start.isValid() && end.isValid()) {
+          const durationMs = end.diff(start);
+          
+          if (durationMs > 0) {
+            // Format duration manually without using the custom format function
+            const duration = dayjs.duration(durationMs);
+            const days = Math.floor(duration.asDays());
+            const hours = duration.hours();
+            const minutes = duration.minutes();
+            const seconds = duration.seconds();
+            
+            const parts: string[] = [];
+            if (days > 0) parts.push(`${days}d`);
+            if (hours > 0) parts.push(`${hours}h`);
+            if (minutes > 0) parts.push(`${minutes}m`);
+            if (seconds > 0 && parts.length === 0) parts.push(`${seconds}s`);
+            
+            const formattedDuration = parts.join(' ');
+            
+            durationContent = (
+              <div className="text-[10px] text-muted-foreground">
+                {formattedDuration}
+              </div>
+            );
+          }
         }
       } else if (status === 1) {
         // Status 1 typically means "Running"
@@ -810,7 +827,7 @@ function DAGTable({
       }
     });
 
-    // Sort subrows within groups if client sorting is active
+    // Sort sub-rows within groups if client sorting is active
     if (clientSort) {
       Object.values(groups).forEach((group) => {
         if (group.subRows) {
