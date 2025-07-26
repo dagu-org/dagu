@@ -109,61 +109,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Bug fixes require regression tests
 - Use `th.RunCommand(t, cmd.CmdStatus(), test.CmdTest{...})` pattern for consistency
 
-## Git Commit Guidelines
-- Keep commit messages to one line unless body is absolutely necessary
-- **NEVER EVER use `git add -A` or `git add .`** - ALWAYS stage specific files only
-- **CRITICAL: Using `git add -A` is FORBIDDEN. Always use `git add <specific-file>`**
-- Follow conventional commit format (fix:, feat:, docs:, etc.)
-- For commits fixing bugs or adding features based on user reports add:
-  ```
-  git commit --trailer "Reported-by:<name>"
-  ```
-  Where `<name>` is the name of the user
-- For commits related to a Github issue, add:
-  ```
-  git commit --trailer "Github-Issue:#<number>"
-  ```
-- **NEVER mention co-authored-by or similar aspects**
-- **NEVER mention the tool used to create the commit message or PR**
-- **NEVER ever include *Generated with* or similar in commit messages**
-- **NEVER ever include *Co-Authored-By* or similar in commit messages**
-
-# Pull Request Guidelines
-When creating pull requests, follow this style:
-- Start with a clear problem statement explaining the user need
-- Describe the solution concisely as a few paragraphs at most
-- Include issue reference and feedback-from credits on separate lines
-- Use **Changes** section with bullet points for what was modified
-- Include an **Example** section with a practical YAML snippet
-- Example format:
-  ```
-  **Overview:**
-  Users need to [problem description]. They have to [current workaround].
-
-  As a solution, [what was implemented].
-
-  Issue: #XXX
-  Feedback-from: @user1 and @user2
-
-  **Changes:**
-  - [Specific change 1]
-  - [Specific change 2]
-  - [Documentation/examples added]
-
-  **Why:** (optional)
-
-  **Example:** (optional)
-
-  **Notes:** (optional)
-
-
-## 🎯 What is Dagu?
+## What is Dagu?
 
 Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration engine** that runs as a single binary with zero external dependencies. Born from the frustration of managing hundreds of legacy cron jobs scattered across multiple servers, Dagu brings clarity, visibility, and control to workflow automation.
 
 **The Game Changer**: Unlike traditional workflow engines, Dagu introduces **hierarchical DAG composition** - the ability to nest workflows within workflows to unlimited depth. This transforms how you build and maintain complex systems, enabling true modularity and reusability at scale.
 
-## 🚀 Core Philosophy & Design Principles
+## Core Philosophy & Design Principles
 
 ### 1. **Local-First Architecture**
 - Single binary installation - no databases, message brokers, or external services required
@@ -200,9 +152,9 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
 - Scalable from single workflows to thousands
 - Graceful shutdown with configurable cleanup timeouts
 
-## 💪 Comprehensive Features & Capabilities
+## Comprehensive Features & Capabilities
 
-### 🔄 **Advanced DAG Execution & Control**
+### **Advanced DAG Execution & Control**
 - **Directed Acyclic Graphs (DAGs)**: Define complex workflows with dependencies
 - **Parallel Execution**: Run multiple steps concurrently with `maxActiveSteps` control
 - **Concurrent DAG Runs**: Control parallel runs with `maxActiveRuns`
@@ -216,7 +168,7 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
   - JSON path references for nested data (`${VAR.path.to.value}`)
   - Environment variable expansion
   - Command substitution with backticks
-- **🚀 Hierarchical DAG Composition** (Revolutionary Feature!):
+- **Hierarchical DAG Composition** (Revolutionary Feature!):
   - **Multi-level nesting**: Parent → Child → Grandchild → ... (unlimited depth)
   - **Full hierarchy tracking**: Root, parent, and child relationships maintained
   - **Parameter inheritance**: Pass parameters down the hierarchy chain
@@ -226,7 +178,7 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
   - **Dynamic composition**: Conditionally execute different sub-workflows
 - **Step Dependencies**: Define complex dependency graphs between steps
 
-### ⏰ **Sophisticated Scheduling**
+### **Sophisticated Scheduling**
 - **Cron-based Scheduling**: Standard cron expressions with timezone support
 - **Multiple Schedules**: Define arrays of schedule times
 - **Start/Stop/Restart Schedules**: Control long-running processes:
@@ -237,7 +189,7 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
 - **Restart Wait Time**: Configurable delay before restart
 - **Schedule-based Preconditions**: Run only on specific days/times
 
-### 🔧 **Powerful Executors**
+### **Powerful Executors**
 - **Shell Executor**: Run any command with shell selection:
   - Default shell (`$SHELL` or `sh`)
   - Custom shells (bash, zsh, etc.)
@@ -260,7 +212,7 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
   - File attachments
 - **JQ Executor**: JSON processing and transformation
 
-### 🔁 **Advanced Flow Control**
+### **Advanced Flow Control**
 - **Retry Policies**: 
   - Configurable retry limits and intervals
   - Exit code-based retry triggers
@@ -289,7 +241,7 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
   - `onCancel`: Execute when DAG is cancelled
   - `onExit`: Always execute on DAG completion
 
-### 📊 **Enterprise-Grade Features**
+### **Enterprise-Grade Features**
 - **Queue Management**: 
   - Enqueue DAG runs with priorities
   - Dequeue by name or DAG run ID
@@ -310,7 +262,7 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
   - Returns error when limit exceeded to ensure awareness
   - Per-DAG configuration with `maxOutputSize`
 
-### 🎨 **Modern Web UI**
+### **Modern Web UI**
 - **Real-time Dashboard**: 
   - Status metrics with filtering
   - Timeline visualization
@@ -335,7 +287,7 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
 - **Advanced Search**: Find DAGs by name, tags, or content
 - **Remote Node Support**: Manage workflows across multiple environments
 
-### 🔒 **Security & Configuration**
+### **Security & Configuration**
 - **Authentication**:
   - Basic authentication (username/password)
   - API token authentication
@@ -372,98 +324,7 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
   - Latest status display options
   - DAG list default sorting
 
-### 🛠️ **Variable & Parameter Management**
-- **Parameter Types**:
-  - Positional parameters (`$1`, `$2`, etc.)
-  - Named parameters (`${NAME}`)
-  - Map-based parameters
-  - Command-line overrides
-- **Variable Features**:
-  - Environment variable expansion
-  - Command substitution with backticks
-  - JSON path references (`${VAR.nested.field}`)
-  - Default values with overrides
-- **Special Variables**:
-  - `DAG_NAME`: Current DAG name
-  - `DAG_RUN_ID`: Unique execution ID
-  - `DAG_RUN_LOG_FILE`: Log file path
-  - `DAG_RUN_STEP_NAME`: Current step name
-  - `DAG_RUN_STEP_STDOUT_FILE`: Step stdout path
-  - `DAG_RUN_STEP_STDERR_FILE`: Step stderr path
-- **Template Support**:
-  - Sprig template functions
-  - Custom template functions
-  - Variable interpolation
-
-### 📈 **Operational Excellence**
-- **Monitoring & Metrics**:
-  - Execution time tracking
-  - Resource usage monitoring
-  - Performance dashboards
-  - Status aggregation
-- **Log Management**:
-  - Configurable retention policies
-  - Log rotation
-  - Centralized logging
-  - Log file attachments in emails
-- **Process Management**:
-  - Graceful shutdown
-  - Process group management
-  - Signal propagation
-  - Cleanup timeouts
-- **Error Handling**:
-  - Detailed error messages
-  - Error propagation control
-  - Recovery mechanisms
-  - Notification on errors
-
-## 🎯 Real-World Use Cases
-
-### Data Engineering
-- **ETL Pipelines**: Extract, transform, and load data with dependencies
-- **Data Processing**: Batch processing with parallel execution
-- **Data Quality Checks**: Conditional validation steps
-- **Report Generation**: Scheduled analytics and reporting
-
-### DevOps & Infrastructure
-- **CI/CD Automation**: Build, test, and deploy workflows
-- **Infrastructure Provisioning**: Orchestrate Terraform, Ansible, etc.
-- **Backup & Recovery**: Scheduled backups with notifications
-- **System Maintenance**: Automated cleanup and optimization tasks
-
-### Business Automation
-- **Employee Onboarding/Offboarding**: Multi-step HR processes
-- **Financial Processing**: Scheduled reports and reconciliation
-- **Customer Data Sync**: Integration between systems
-- **Compliance Workflows**: Automated checks and reporting
-
-### AI/ML Operations
-- **Model Training Pipelines**: Orchestrate training workflows
-- **Data Preparation**: Preprocessing and feature engineering
-- **Model Deployment**: Automated deployment pipelines
-- **Experiment Tracking**: Scheduled model evaluations
-
-## 🏆 Why Dagu Stands Out
-
-### Vs. Airflow
-- **No Python Required**: Use any language or tool
-- **Zero Infrastructure**: No database, message broker, or webserver setup
-- **Instant Start**: Running in minutes vs. hours of configuration
-- **Lightweight**: Single binary vs. complex distributed system
-
-### Vs. Cron
-- **Visual Monitoring**: See all jobs in one place
-- **Dependency Management**: Define relationships between tasks
-- **Error Handling**: Built-in retries and notifications
-- **Logging**: Centralized logs with search capabilities
-
-### Vs. GitHub Actions / CI Tools
-- **Local Execution**: Run on your infrastructure
-- **No Vendor Lock-in**: Portable YAML format
-- **Fine-grained Control**: Advanced scheduling and execution options
-- **Cost Effective**: No usage-based pricing
-
-## 🔥 Advanced Capabilities & Examples
+## Advanced Capabilities & Examples
 
 ### Dynamic Workflows with Variable Passing
 ```yaml
@@ -641,7 +502,7 @@ schedule:
 restartWaitSec: 60  # Wait 1 minute before restart
 ```
 
-### 🌟 The Power of Nested DAGs - Build Modular, Reusable Workflows
+### The Power of Nested DAGs - Build Modular, Reusable Workflows
 
 Nested DAGs are not just a feature - they're a paradigm shift in workflow design. Instead of monolithic workflows, you can build a library of reusable components that compose into complex systems.
 
@@ -707,15 +568,6 @@ steps:
       - transform customer data
       - transform product data
 ```
-
-**Why This Changes Everything:**
-- **Module Library**: Build once, use everywhere
-- **Team Collaboration**: Different teams maintain different modules
-- **Testing**: Test modules independently
-- **Versioning**: Version control individual components
-- **Dynamic Pipelines**: Choose modules based on conditions
-- **Error Isolation**: Failures contained within module boundaries
-- **Parallel Development**: Teams work on modules simultaneously
 
 **Real-World Example: Multi-Environment Deployment**
 ```yaml
@@ -794,28 +646,7 @@ steps:
     command: ./update_cache.sh
 ```
 
-### Template Rendering with Sprig Functions
-```yaml
-env:
-  - TIMESTAMP: "`date +%Y%m%d_%H%M%S`"
-  - ENVIRONMENT: production
-
-steps:
-  - name: generate config
-    command: |
-      cat > config.json << EOF
-      {
-        "timestamp": "${TIMESTAMP}",
-        "environment": "${ENVIRONMENT}",
-        "hostname": "{{ .HOSTNAME | default "localhost" }}",
-        "date": "{{ now | date "2006-01-02" }}",
-        "random_id": "{{ uuidv4 }}"
-      }
-      EOF
-    output: CONFIG_FILE
-```
-
-## 📝 Complete YAML Configuration Reference
+## Complete YAML Configuration Reference
 
 ### DAG-Level Configuration
 ```yaml
@@ -954,7 +785,7 @@ steps:
         image: python:3.11
 ```
 
-## 🌟 The Dagu Advantage
+## The Dagu Advantage
 
 ### Architectural Excellence
 - **Zero Dependencies**: Single binary, no database, no message broker
@@ -974,7 +805,7 @@ steps:
 - **Modern UI**: Beautiful, responsive web interface
 - **Great Documentation**: Comprehensive guides and examples
 
-## 📋 Complete Server Configuration
+## Complete Server Configuration
 
 ### Configuration File Example (`~/.config/dagu/config.yaml`)
 ```yaml
@@ -1040,7 +871,7 @@ remoteNodes:
     skipTLSVerify: false
 ```
 
-## 🎬 Getting Started is Dead Simple
+## Getting Started is Dead Simple
 
 ```bash
 # Install (macOS, Linux, Windows WSL)
@@ -1094,7 +925,7 @@ dagu dequeue hello.yaml
 open http://localhost:8080
 ```
 
-## 🚀 Why Teams Choose Dagu
+## Why Teams Choose Dagu
 
 ### For Developers
 - **No Learning Curve**: If you can write YAML, you can use Dagu
@@ -1114,10 +945,8 @@ open http://localhost:8080
 - **Cost Effective**: No licensing, minimal infrastructure
 - **Proven Reliability**: Used in production worldwide
 
-## 🌈 The Future of Workflow Orchestration
+## The Future of Workflow Orchestration
 
 Dagu proves that powerful doesn't mean complex. While other tools require teams of engineers to maintain, Dagu empowers individual developers to build robust automation. It's the missing link between simple cron jobs and heavyweight orchestration platforms.
 
 In a world of over-engineered solutions, Dagu stands out by doing less, but doing it perfectly. It's not trying to be everything to everyone - it's focused on being the best tool for running workflows reliably and simply.
-
-**Join the movement. Simplify your workflows. Choose Dagu.**
