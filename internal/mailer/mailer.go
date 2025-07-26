@@ -55,19 +55,23 @@ func (m *Mailer) Send(
 	ctx context.Context,
 	from string,
 	to []string,
+	cc []string,
+	bcc []string,
 	subject, body string,
 	attachments []string,
 ) error {
-	logger.Info(ctx, "Sending an email", "to", to, "subject", subject)
+	logger.Info(ctx, "Sending an email", "to", to, "cc", cc, "subject", subject)
 	if m.username == "" && m.password == "" {
-		return m.sendWithNoAuth(from, to, subject, body, attachments)
+		return m.sendWithNoAuth(from, to, cc, bcc, subject, body, attachments)
 	}
-	return m.sendWithAuth(from, to, subject, body, attachments)
+	return m.sendWithAuth(from, to, cc, bcc, subject, body, attachments)
 }
 
 func (m *Mailer) sendWithNoAuth(
 	from string,
 	to []string,
+	cc []string,
+	bcc []string,
 	subject, body string,
 	attachments []string,
 ) error {
@@ -107,13 +111,27 @@ func (m *Mailer) sendWithNoAuth(
 			return err
 		}
 	}
+	for i := range cc {
+		cc[i] = replacer.Replace(cc[i])
+		if err = c.Rcpt(cc[i]); err != nil {
+			return err
+		}
+	}
+
+	for i := range bcc {
+		bcc[i] = replacer.Replace(bcc[i])
+		if err = c.Rcpt(bcc[i]); err != nil {
+			return err
+		}
+	}
+
 	wc, err := c.Data()
 	if err != nil {
 		return err
 	}
 	body = processEmailBody(body)
 	_, err = wc.Write(
-		m.composeMail(to, from, subject, body, attachments),
+		m.composeMail(to, cc, from, subject, body, attachments),
 	)
 	if err != nil {
 		return err
@@ -127,6 +145,8 @@ func (m *Mailer) sendWithNoAuth(
 func (m *Mailer) sendWithAuth(
 	from string,
 	to []string,
+	cc []string,
+	bcc []string,
 	subject, body string,
 	attachments []string,
 ) error {
@@ -136,13 +156,16 @@ func (m *Mailer) sendWithAuth(
 	}
 	resultChan := make(chan result, 1)
 
+	to = append(to, cc...)
+	to = append(to, bcc...)
+
 	// Run SendMail in a goroutine
 	go func() {
 		auth := smtp.PlainAuth("", m.username, m.password, m.host)
 		body = processEmailBody(body)
 		err := smtp.SendMail(
 			m.host+":"+m.port, auth, from, to,
-			m.composeMail(to, from, subject, body, attachments),
+			m.composeMail(to, cc, from, subject, body, attachments),
 		)
 		resultChan <- result{err: err}
 	}()
@@ -157,9 +180,10 @@ func (m *Mailer) sendWithAuth(
 }
 
 func (*Mailer) composeHeader(
-	to []string, from string, subject string,
+	to []string, cc []string, from string, subject string,
 ) string {
 	return "To: " + strings.Join(to, ",") + "\r\n" +
+		"Cc: " + strings.Join(cc, ",") + "\r\n" +
 		"From: " + from + "\r\n" +
 		"Subject: " + subject + "\r\n" +
 		"Content-Type: multipart/mixed;\r\n" +
@@ -172,10 +196,11 @@ func (*Mailer) composeHeader(
 
 func (m *Mailer) composeMail(
 	to []string,
+	cc []string,
 	from, subject, body string,
 	attachments []string,
 ) (b []byte) {
-	msg := m.composeHeader(to, from, subject) +
+	msg := m.composeHeader(to, cc, from, subject) +
 		"\r\n" + base64.StdEncoding.EncodeToString([]byte(body))
 	b = joinBytes([]byte(msg), addAttachments(attachments))
 	b = joinBytes(b, []byte("\r\n\r\n--"+boundary+"--\r\n\r\n"))

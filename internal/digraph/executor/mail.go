@@ -24,6 +24,8 @@ type mail struct {
 type mailConfig struct {
 	From        string   `mapstructure:"from"`
 	To          any      `mapstructure:"to"`
+	Cc          any      `mapstructure:"cc"`
+	Bcc         any      `mapstructure:"bcc"`
 	Subject     string   `mapstructure:"subject"`
 	Message     string   `mapstructure:"message"`
 	Attachments []string `mapstructure:"attachments"`
@@ -64,6 +66,7 @@ const mailLogTemplate = `sending email
 -----
 from: %s
 to: %s
+cc: %s
 subject: %s
 message: %s
 -----
@@ -93,11 +96,49 @@ func (e *mail) Run(ctx context.Context) error {
 		return fmt.Errorf("no valid recipients specified")
 	}
 
+	var ccAddresses []string
+	switch v := e.cfg.Cc.(type) {
+	case string:
+		if v != "" {
+			ccAddresses = []string{v}
+		}
+	case []string:
+		ccAddresses = v
+	case []any:
+		for _, addr := range v {
+			if str, ok := addr.(string); ok && str != "" {
+				ccAddresses = append(ccAddresses, str)
+			}
+		}
+	default:
+		return fmt.Errorf("invalid type for 'cc' field: expected string or array, got %T", v)
+	}
+
+	var bccAddresses []string
+	switch v := e.cfg.Bcc.(type) {
+	case string:
+		if v != "" {
+			bccAddresses = []string{v}
+		}
+	case []string:
+		bccAddresses = v
+	case []any:
+		for _, addr := range v {
+			if str, ok := addr.(string); ok && str != "" {
+				bccAddresses = append(bccAddresses, str)
+			}
+		}
+	default:
+		return fmt.Errorf("invalid type for 'bcc' field: expected string or array, got %T", v)
+	}
+
 	_, _ = fmt.Fprintf(e.stdout, mailLogTemplate, e.cfg.From, strings.Join(toAddresses, ", "), e.cfg.Subject, e.cfg.Message)
 	err := e.mailer.Send(
 		ctx,
 		e.cfg.From,
 		toAddresses,
+		ccAddresses,
+		bccAddresses,
 		e.cfg.Subject,
 		e.cfg.Message,
 		[]string{},
