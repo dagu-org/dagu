@@ -143,11 +143,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	assert.True(t, cfg.Server.Auth.Basic.Enabled())
 	assert.True(t, cfg.Server.Auth.Token.Enabled())
 
-	// Coordinator configurations
-	// The DAGU_COORDINATOR_SIGNING_KEY environment variable doesn't work because
-	// it's bound to a flat field that doesn't exist in the definition.
-	// The coordinator config is only loaded from the nested structure.
-	assert.Equal(t, "", cfg.Coordinator.SigningKey) // No env var override support
+	// Coordinator configurations are loaded from config file only
 
 	// TLS configurations
 	require.NotNil(t, cfg.Server.TLS)
@@ -188,7 +184,7 @@ func TestConfigLoader_CoordinatorSigningKey(t *testing.T) {
 		viper.Reset()
 		defer viper.Reset()
 
-		// Create a config file with CoordinatorSigningKey
+		// Create a config file with auth configuration
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
@@ -207,7 +203,7 @@ auth:
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
 
-		// Verify CoordinatorSigningKey is loaded from YAML
+		// Verify auth configuration is loaded from YAML
 		assert.Equal(t, "admin", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
 		assert.Equal(t, "api-token", cfg.Server.Auth.Token.Value)
@@ -218,7 +214,7 @@ auth:
 		viper.Reset()
 		defer viper.Reset()
 
-		// Create a minimal config file without CoordinatorSigningKey
+		// Create a minimal config file with basic auth only
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
@@ -235,8 +231,7 @@ auth:
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
 
-		// Verify CoordinatorSigningKey is empty when not provided
-		assert.Equal(t, "", cfg.Coordinator.SigningKey)
+		// Verify auth configuration
 		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
 	})

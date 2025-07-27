@@ -265,15 +265,6 @@ type coordinatorDef struct {
 
 	// Port is the port number for the coordinator service.
 	Port int `mapstructure:"port"`
-
-	// CertFile is the path to the coordinator's TLS certificate file.
-	CertFile string `mapstructure:"certFile"`
-
-	// KeyFile is the path to the coordinator's TLS key file.
-	KeyFile string `mapstructure:"keyFile"`
-
-	// CAFile is the path to the coordinator's CA certificate file.
-	CAFile string `mapstructure:"caFile"`
 }
 
 // workerDef holds the configuration for the worker.
