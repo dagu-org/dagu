@@ -89,28 +89,25 @@ remoteNodes:
 coordinator:
   host: "127.0.0.1"       # Bind address
   port: 50055             # gRPC port
-  tls:
-    certFile: ""          # Server certificate
-    keyFile: ""           # Server key
-    caFile: ""            # CA for client verification (mTLS)
 
 # Worker (for distributed execution)
 worker:
   id: ""                  # Worker ID (default: hostname@PID)
   maxActiveRuns: 100      # Max parallel task executions
-  coordinator:
-    host: "127.0.0.1"
-    port: 50055
-  insecure: true          # Use h2c instead of TLS
-  skipTLSVerify: false    # Skip cert verification
+  coordinatorHost: "127.0.0.1"
+  coordinatorPort: 50055
   labels:                 # Worker capabilities
     gpu: "false"
     memory: "16G"
     region: "us-east-1"
-  tls:
-    certFile: ""          # Client certificate (mTLS)
-    keyFile: ""           # Client key
-    caFile: ""            # CA for server verification
+
+# Peer TLS configuration (for distributed execution)
+peer:
+  insecure: true          # Use h2c instead of TLS (default: true)
+  certFile: ""            # TLS certificate for peer connections
+  keyFile: ""             # TLS key for peer connections
+  clientCaFile: ""        # CA certificate for peer verification (mTLS)
+  skipTlsVerify: false    # Skip TLS certificate verification
 
 # Scheduler
 scheduler:
@@ -170,10 +167,6 @@ All options support `DAGU_` prefix.
 ### Coordinator
 - `DAGU_COORDINATOR_HOST` - Coordinator bind address (default: `127.0.0.1`)
 - `DAGU_COORDINATOR_PORT` - Coordinator gRPC port (default: `50055`)
-- `DAGU_COORDINATOR_SIGNING_KEY` - Authentication signing key
-- `DAGU_COORDINATOR_TLS_CERT` - TLS certificate file path
-- `DAGU_COORDINATOR_TLS_KEY` - TLS key file path
-- `DAGU_COORDINATOR_TLS_CA` - CA certificate for client verification
 
 ### Worker
 - `DAGU_WORKER_ID` - Worker instance ID (default: `hostname@PID`)
@@ -181,11 +174,13 @@ All options support `DAGU_` prefix.
 - `DAGU_WORKER_COORDINATOR_HOST` - Coordinator host to connect to
 - `DAGU_WORKER_COORDINATOR_PORT` - Coordinator port (default: `50055`)
 - `DAGU_WORKER_LABELS` - Worker labels (format: `key1=value1,key2=value2`)
-- `DAGU_WORKER_INSECURE` - Use insecure connection (default: `true`)
-- `DAGU_WORKER_TLS_CERT` - Client certificate for mTLS
-- `DAGU_WORKER_TLS_KEY` - Client key for mTLS
-- `DAGU_WORKER_TLS_CA` - CA certificate for server verification
-- `DAGU_WORKER_SKIP_TLS_VERIFY` - Skip TLS certificate verification
+
+### Peer (for distributed TLS)
+- `DAGU_PEER_INSECURE` - Use insecure connection (default: `true`)
+- `DAGU_PEER_CERT_FILE` - TLS certificate for peer connections
+- `DAGU_PEER_KEY_FILE` - TLS key for peer connections
+- `DAGU_PEER_CLIENT_CA_FILE` - CA certificate for peer verification (mTLS)
+- `DAGU_PEER_SKIP_TLS_VERIFY` - Skip TLS certificate verification
 
 ### Scheduler
 - `DAGU_SCHEDULER_PORT` - Health check server port (default: `8090`)
@@ -363,9 +358,6 @@ port: 8080
 coordinator:
   host: 0.0.0.0
   port: 50055
-  tls:
-    certFile: /etc/dagu/tls/server.crt
-    keyFile: /etc/dagu/tls/server.key
 
 # Worker configuration
 worker:
@@ -373,15 +365,18 @@ worker:
   maxActiveRuns: 10
   coordinatorHost: coordinator.internal
   coordinatorPort: 50055
-  insecure: false
   labels:
     gpu: "true"
     cuda: "11.8"
     memory: "64G"
     region: "us-east-1"
-  certFile: /etc/dagu/tls/client.crt
-  keyFile: /etc/dagu/tls/client.key
-  caFile: /etc/dagu/tls/ca.crt
+
+# TLS configuration for peer connections
+peer:
+  insecure: false  # Enable TLS
+  certFile: /etc/dagu/tls/cert.pem
+  keyFile: /etc/dagu/tls/key.pem
+  clientCaFile: /etc/dagu/tls/ca.pem
 ```
 
 ## Validation

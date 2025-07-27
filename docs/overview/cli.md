@@ -149,8 +149,8 @@ dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
 
 # With TLS
 dagu coordinator \
-  --coordinator.tls-cert=server.crt \
-  --coordinator.tls-key=server.key
+  --peer.cert-file=server.pem \
+  --peer.key-file=server-key.pem
 ```
 
 The coordinator service manages task distribution to workers for distributed execution.

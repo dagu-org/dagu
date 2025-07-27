@@ -129,10 +129,13 @@ Worker labels are key-value pairs that describe worker capabilities:
 coordinator:
   host: 0.0.0.0
   port: 50055
-  tls:
-    certFile: /path/to/server.crt
-    keyFile: /path/to/server.key
-    caFile: /path/to/ca.crt  # For mutual TLS
+
+# TLS configuration for peer connections (both coordinator and worker)
+peer:
+  insecure: false  # Enable TLS (default: true for insecure)
+  certFile: /path/to/cert.pem
+  keyFile: /path/to/key.pem
+  clientCaFile: /path/to/ca.pem  # For mutual TLS
 ```
 
 ### Worker Configuration
@@ -148,11 +151,13 @@ worker:
     gpu: "true"
     memory: "64G"
     region: "us-east-1"
-  insecure: false  # Use TLS
-  tls:
-    certFile: /path/to/client.crt
-    keyFile: /path/to/client.key
-    caFile: /path/to/ca.crt
+
+# TLS configuration shared with coordinator
+peer:
+  insecure: false  # Enable TLS
+  certFile: /path/to/cert.pem
+  keyFile: /path/to/key.pem
+  clientCaFile: /path/to/ca.pem
 ```
 
 ### Environment Variables
@@ -161,12 +166,17 @@ worker:
 # Coordinator
 export DAGU_COORDINATOR_HOST=0.0.0.0
 export DAGU_COORDINATOR_PORT=50055
-export DAGU_COORDINATOR_SIGNING_KEY=secret
 
 # Worker
 export DAGU_WORKER_ID=worker-01
 export DAGU_WORKER_COORDINATOR_HOST=coordinator.example.com
 export DAGU_WORKER_LABELS="gpu=true,region=us-east-1"
+
+# Peer TLS configuration (for both coordinator and worker)
+export DAGU_PEER_INSECURE=false
+export DAGU_PEER_CERT_FILE=/path/to/cert.pem
+export DAGU_PEER_KEY_FILE=/path/to/key.pem
+export DAGU_PEER_CLIENT_CA_FILE=/path/to/ca.pem
 ```
 
 ## Monitoring Workers
@@ -221,24 +231,24 @@ curl -H "Authorization: Bearer $TOKEN" \
 #### Server-side TLS (Coordinator)
 ```bash
 dagu coordinator \
-  --coordinator.tls-cert=server.crt \
-  --coordinator.tls-key=server.key
+  --peer.cert-file=server.pem \
+  --peer.key-file=server-key.pem
 ```
 
 #### Mutual TLS (mTLS)
 ```bash
 # Coordinator with client verification
 dagu coordinator \
-  --coordinator.tls-cert=server.crt \
-  --coordinator.tls-key=server.key \
-  --coordinator.tls-ca=ca.crt
+  --peer.cert-file=server.pem \
+  --peer.key-file=server-key.pem \
+  --peer.client-ca-file=ca.pem
 
 # Worker with client certificate
 dagu worker \
-  --worker.insecure=false \
-  --worker.tls-cert=client.crt \
-  --worker.tls-key=client.key \
-  --worker.tls-ca=ca.crt
+  --peer.insecure=false \
+  --peer.cert-file=client.pem \
+  --peer.key-file=client-key.pem \
+  --peer.client-ca-file=ca.pem
 ```
 
 ## Deployment Examples
