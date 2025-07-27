@@ -36,11 +36,15 @@ func TestReporter(t *testing.T) {
 					Prefix: "Error: ",
 					From:   "from@mailer.com",
 					To:     []string{"to@mailer.com"},
+					Cc:     []string{"cc@mailer.com"},
+					Bcc:    []string{"bcc@mailer.com"},
 				},
 				InfoMail: &digraph.MailConfig{
 					Prefix: "Success: ",
 					From:   "from@mailer.com",
 					To:     []string{"to@mailer.com"},
+					Cc:     []string{"cc@mailer.com"},
+					Bcc:    []string{"bcc@mailer.com"},
 				},
 				Steps: []digraph.Step{
 					{
@@ -232,15 +236,19 @@ func testRenderTable(t *testing.T, _ *reporter, _ *mockSender, _ *digraph.DAG, n
 type mockSender struct {
 	from    string
 	to      []string
+	cc      []string
+	bcc     []string
 	subject string
 	body    string
 	count   int
 }
 
-func (m *mockSender) Send(_ context.Context, from string, to []string, subject, body string, _ []string) error {
+func (m *mockSender) Send(_ context.Context, from string, to []string, cc []string, bcc []string, subject, body string, _ []string) error {
 	m.count += 1
 	m.from = from
 	m.to = to
+	m.cc = cc
+	m.bcc = bcc
 	m.subject = subject
 	m.body = body
 	return nil

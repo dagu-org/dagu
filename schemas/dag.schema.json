@@ -747,6 +747,38 @@
           ],
           "description": "Email address(es) to receive notifications. Can be a single string or an array of strings."
         },
+        "cc": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Single email address to add cc to receive notification."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of email addresses to add to cc receive notifications."
+            }
+          ],
+          "description": "Email address(es) to add cc to receive notifications. Can be a single string or an array of strings."
+        },
+        "bcc": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Single email address to add bcc receive notifications."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of email addresses to add bcc receive notifications."
+            }
+          ],
+          "description": "Email address(es) to add bcc to receive notifications. Can be a single string or an array of strings."
+        },
         "prefix": {
           "type": "string",
           "description": "Text to prepend to the email subject line. Useful for filtering or categorizing notification emails."

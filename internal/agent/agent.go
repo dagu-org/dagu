@@ -614,7 +614,7 @@ func (a *Agent) setupReporter(ctx context.Context) {
 			Password: a.dag.SMTP.Password,
 		}).Send
 	} else {
-		senderFn = func(ctx context.Context, _ string, _ []string, subject, _ string, _ []string) error {
+		senderFn = func(ctx context.Context, _ string, _ []string, _ []string, _ []string, subject, _ string, _ []string) error {
 			logger.Debug(ctx, "Mail notification is disabled", "subject", subject)
 			return nil
 		}

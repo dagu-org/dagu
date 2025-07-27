@@ -779,6 +779,46 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 		return nil, fmt.Errorf("invalid type for 'to' field: expected string or array, got %T", v)
 	}
 
+	var ccAddresses []string
+	switch v := def.Cc.(type) {
+	case nil:
+		// To field not specified
+	case string:
+		// Single recipient
+		if v != "" {
+			ccAddresses = []string{v}
+		}
+	case []any:
+		// Multiple recipients
+		for _, addr := range v {
+			if str, ok := addr.(string); ok && str != "" {
+				ccAddresses = append(ccAddresses, str)
+			}
+		}
+	default:
+		return nil, fmt.Errorf("invalid type for 'cc' field: expected string or array, got %T", v)
+	}
+
+	var bccAddresses []string
+	switch v := def.To.(type) {
+	case nil:
+		// To field not specified
+	case string:
+		// Single recipient
+		if v != "" {
+			bccAddresses = []string{v}
+		}
+	case []any:
+		// Multiple recipients
+		for _, addr := range v {
+			if str, ok := addr.(string); ok && str != "" {
+				bccAddresses = append(bccAddresses, str)
+			}
+		}
+	default:
+		return nil, fmt.Errorf("invalid type for 'to' field: expected string or array, got %T", v)
+	}
+
 	// Return nil if no valid configuration
 	if def.From == "" && len(toAddresses) == 0 {
 		return nil, nil
@@ -787,6 +827,8 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 	return &MailConfig{
 		From:       def.From,
 		To:         toAddresses,
+		Cc:         ccAddresses,
+		Bcc:        bccAddresses,
 		Prefix:     def.Prefix,
 		AttachLogs: def.AttachLogs,
 	}, nil

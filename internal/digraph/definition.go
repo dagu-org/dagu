@@ -181,6 +181,8 @@ type smtpConfigDef struct {
 type mailConfigDef struct {
 	From       string // Sender email address
 	To         any    // Recipient email address(es) - can be string or []string
+	Cc         any    // Recipient Cc email address(es) - can be string or []string
+	Bcc        any    // Recipient Bcc email address(es) - can be string or []string
 	Prefix     string // Prefix for the email subject
 	AttachLogs bool   // Flag to attach logs to the email
 }

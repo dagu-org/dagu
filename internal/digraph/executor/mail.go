@@ -132,7 +132,7 @@ func (e *mail) Run(ctx context.Context) error {
 		return fmt.Errorf("invalid type for 'bcc' field: expected string or array, got %T", v)
 	}
 
-	_, _ = fmt.Fprintf(e.stdout, mailLogTemplate, e.cfg.From, strings.Join(toAddresses, ", "), e.cfg.Subject, e.cfg.Message)
+	_, _ = fmt.Fprintf(e.stdout, mailLogTemplate, e.cfg.From, strings.Join(toAddresses, ", "), strings.Join(ccAddresses, ", "), e.cfg.Subject, e.cfg.Message)
 	err := e.mailer.Send(
 		ctx,
 		e.cfg.From,

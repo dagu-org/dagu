@@ -341,6 +341,8 @@ func TestMailerTimeout(t *testing.T) {
 		err = mailer.sendWithNoAuth(
 			"from@example.com",
 			[]string{"to@example.com"},
+			[]string{"cc@example.com"},
+			[]string{"bcc@example.com"},
 			"Test Subject",
 			"Test Body",
 			nil,
@@ -371,6 +373,8 @@ func TestMailerTimeout(t *testing.T) {
 		err = mailer.sendWithNoAuth(
 			"from@example.com",
 			[]string{"to@example.com"},
+			[]string{"cc@example.com"},
+			[]string{"bcc@example.com"},
 			"Test Subject",
 			"Test Body",
 			nil,
@@ -404,6 +408,8 @@ func TestMailerTimeout(t *testing.T) {
 		err = mailer.sendWithNoAuth(
 			"from@example.com",
 			[]string{"to@example.com"},
+			[]string{"cc@example.com"},
+			[]string{"bcc@example.com"},
 			"Test Subject",
 			"Test Body",
 			nil,
@@ -442,6 +448,8 @@ func TestMailerTimeout(t *testing.T) {
 		err = mailer.sendWithAuth(
 			"from@example.com",
 			[]string{"to@example.com"},
+			[]string{"cc@example.com"},
+			[]string{"bcc@example.com"},
 			"Test Subject",
 			"Test Body",
 			nil,
@@ -463,7 +471,7 @@ func TestMailerTimeout(t *testing.T) {
 		})
 
 		ctx := context.Background()
-		err := mailer.Send(ctx, "from@example.com", []string{"to@example.com"}, "Subject", "Body", nil)
+		err := mailer.Send(ctx, "from@example.com", []string{"to@example.com"}, []string{"cc@example.com"}, []string{"bcc@example.com"}, "Subject", "Body", nil)
 		assert.Error(t, err)
 
 		// Test that Send method correctly routes to sendWithNoAuth when no credentials
@@ -472,7 +480,7 @@ func TestMailerTimeout(t *testing.T) {
 			Port: "25",
 		})
 
-		err = mailer.Send(ctx, "from@example.com", []string{"to@example.com"}, "Subject", "Body", nil)
+		err = mailer.Send(ctx, "from@example.com", []string{"to@example.com"}, []string{"cc@example.com"}, []string{"bcc@example.com"}, "Subject", "Body", nil)
 		assert.Error(t, err)
 	})
 }
