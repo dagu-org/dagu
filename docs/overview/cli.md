@@ -147,9 +147,6 @@ dagu coordinator
 # Custom host and port
 dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
 
-# With authentication
-dagu coordinator --coordinator.signing-key=mysecretkey
-
 # With TLS
 dagu coordinator \
   --coordinator.tls-cert=server.crt \

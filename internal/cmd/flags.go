@@ -152,13 +152,6 @@ var (
 		bindViper:    true,
 	}
 
-	// coordinatorSigningKeyFlag is the signing key for the coordinator service.
-	coordinatorSigningKeyFlag = commandLineFlag{
-		name:      "coordinator.signing-key",
-		usage:     "Signing key for coordinator authentication",
-		bindViper: true,
-	}
-
 	// workerIDFlag is the unique identifier for the worker instance.
 	workerIDFlag = commandLineFlag{
 		name:      "worker.id",

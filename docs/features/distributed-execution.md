@@ -242,18 +242,6 @@ dagu worker \
   --worker.tls-ca=ca.crt
 ```
 
-### Authentication
-
-Use signing keys for additional security:
-
-```bash
-# Coordinator
-dagu coordinator --coordinator.signing-key=your-secret-key
-
-# Worker (key configured in coordinator)
-dagu worker --worker.coordinator-host=secure-coordinator.example.com
-```
-
 ## Deployment Examples
 
 ### Docker Compose

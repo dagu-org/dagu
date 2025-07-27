@@ -48,19 +48,6 @@ func TestCoordinatorCommand(t *testing.T) {
 		})
 	})
 
-	t.Run("StartCoordinatorWithSigningKey", func(t *testing.T) {
-		th := test.SetupCommand(t)
-		go func() {
-			time.Sleep(time.Millisecond * 500)
-			th.Cancel()
-		}()
-		port := findPort(t)
-		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
-			Args:        []string{"coordinator", fmt.Sprintf("--coordinator.port=%s", port), "--coordinator.signing-key=test-secret-key"},
-			ExpectedOut: []string{"Coordinator initialization", port},
-		})
-	})
-
 	t.Run("StartCoordinatorWithTLS", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {

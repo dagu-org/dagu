@@ -248,7 +248,6 @@ dagu coordinator [options]
 **Options:**
 - `--coordinator.host` - Host address to bind (default: `127.0.0.1`)
 - `--coordinator.port` - Port number (default: `50055`)
-- `--coordinator.signing-key` - Signing key for authentication
 - `--coordinator.tls-cert` - Path to TLS certificate file
 - `--coordinator.tls-key` - Path to TLS key file
 - `--coordinator.tls-ca` - Path to CA certificate file (for mTLS)
@@ -256,9 +255,6 @@ dagu coordinator [options]
 ```bash
 # Basic usage
 dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
-
-# With authentication
-dagu coordinator --coordinator.signing-key=mysecretkey
 
 # With TLS
 dagu coordinator \

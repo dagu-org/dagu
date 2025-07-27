@@ -30,7 +30,6 @@ Flags:
   --dags string                     Path to the directory containing DAG definition files
   --coordinator.host string         Host address to bind the coordinator gRPC server to (default: 127.0.0.1)
   --coordinator.port int            Port number for the coordinator gRPC server (default: 50055)
-  --coordinator.signing-key string  Signing key for coordinator authentication
   --coordinator.tls-cert string     Path to TLS certificate file for the coordinator server
   --coordinator.tls-key string      Path to TLS key file for the coordinator server
   --coordinator.tls-ca string       Path to CA certificate file for client verification (mTLS)
@@ -50,7 +49,6 @@ var startAllFlags = []commandLineFlag{
 	portFlag,
 	coordinatorHostFlag,
 	coordinatorPortFlag,
-	coordinatorSigningKeyFlag,
 	coordinatorTLSCertFlag,
 	coordinatorTLSKeyFlag,
 	coordinatorTLSCAFlag,
