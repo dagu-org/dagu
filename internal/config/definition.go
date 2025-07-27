@@ -159,6 +159,9 @@ type peerDef struct {
 
 	// SkipTLSVerify indicates whether to skip TLS certificate verification.
 	SkipTLSVerify bool `mapstructure:"skipTlsVerify"`
+
+	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
+	Insecure bool `mapstructure:"insecure"`
 }
 
 // authDef holds the authentication configuration for the application.
@@ -287,24 +290,9 @@ type workerDef struct {
 	// CoordinatorPort is the port number for connecting to the coordinator.
 	CoordinatorPort int `mapstructure:"coordinatorPort"`
 
-	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
-	Insecure bool `mapstructure:"insecure"`
-
-	// SkipTLSVerify indicates whether to skip TLS certificate verification.
-	SkipTLSVerify bool `mapstructure:"skipTlsVerify"`
-
 	// Labels are the worker labels for capability matching.
 	// Can be either a string (key1=value1,key2=value2) or a map in YAML.
 	Labels interface{} `mapstructure:"labels"`
-
-	// CertFile is the path to the worker's TLS certificate file for mutual TLS.
-	CertFile string `mapstructure:"certFile"`
-
-	// KeyFile is the path to the worker's TLS key file for mutual TLS.
-	KeyFile string `mapstructure:"keyFile"`
-
-	// CAFile is the path to the CA certificate file for server verification.
-	CAFile string `mapstructure:"caFile"`
 }
 
 // schedulerDef holds the configuration for the scheduler.

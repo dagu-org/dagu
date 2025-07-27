@@ -291,9 +291,6 @@ type Worker struct {
 	MaxActiveRuns   int               // Maximum number of active runs (default: 100)
 	CoordinatorHost string            // Coordinator gRPC server host (default: 127.0.0.1)
 	CoordinatorPort int               // Coordinator gRPC server port (default: 50055)
-	TLS             *TLSConfig        // TLS configuration for coordinator connection
-	Insecure        bool              // Use insecure connection (h2c) - must be explicitly enabled
-	SkipTLSVerify   bool              // Skip TLS certificate verification
 	Labels          map[string]string // Worker labels for capability matching
 }
 
@@ -315,4 +312,7 @@ type Peer struct {
 
 	// SkipTLSVerify indicates whether to skip TLS certificate verification.
 	SkipTLSVerify bool
+
+	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
+	Insecure bool
 }

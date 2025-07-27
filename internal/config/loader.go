@@ -134,12 +134,13 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 
 	// Set Peer configuration if provided
-	if def.Peer.CertFile != "" || def.Peer.KeyFile != "" || def.Peer.ClientCaFile != "" || def.Peer.SkipTLSVerify {
+	if def.Peer.CertFile != "" || def.Peer.KeyFile != "" || def.Peer.ClientCaFile != "" || def.Peer.SkipTLSVerify || def.Peer.Insecure {
 		cfg.Global.Peer = Peer{
 			CertFile:      def.Peer.CertFile,
 			KeyFile:       def.Peer.KeyFile,
 			ClientCaFile:  def.Peer.ClientCaFile,
 			SkipTLSVerify: def.Peer.SkipTLSVerify,
+			Insecure:      def.Peer.Insecure,
 		}
 	}
 
@@ -295,17 +296,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.Worker.MaxActiveRuns = def.Worker.MaxActiveRuns
 		cfg.Worker.CoordinatorHost = def.Worker.CoordinatorHost
 		cfg.Worker.CoordinatorPort = def.Worker.CoordinatorPort
-		cfg.Worker.Insecure = def.Worker.Insecure
-		cfg.Worker.SkipTLSVerify = def.Worker.SkipTLSVerify
-
-		// Set worker TLS configuration if available
-		if def.Worker.CertFile != "" || def.Worker.KeyFile != "" || def.Worker.CAFile != "" {
-			cfg.Worker.TLS = &TLSConfig{
-				CertFile: def.Worker.CertFile,
-				KeyFile:  def.Worker.KeyFile,
-				CAFile:   def.Worker.CAFile,
-			}
-		}
 
 		// Parse worker labels - can be either string or map
 		if def.Worker.Labels != nil {
@@ -510,8 +500,6 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("worker.maxActiveRuns", 100)
 	viper.SetDefault("worker.coordinatorHost", "127.0.0.1")
 	viper.SetDefault("worker.coordinatorPort", 50055)
-	viper.SetDefault("worker.insecure", true) // Insecure by default to match coordinator
-	viper.SetDefault("worker.skipTlsVerify", false)
 
 	// UI settings
 	viper.SetDefault("ui.navbarTitle", build.AppName)
@@ -529,6 +517,9 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	// Scheduler lock settings
 	viper.SetDefault("schedulerLockStaleThreshold", "30s")
 	viper.SetDefault("schedulerLockRetryInterval", "50ms")
+
+	// Peer settings
+	viper.SetDefault("peer.insecure", true) // Default to insecure (h2c)
 }
 
 // bindEnvironmentVariables binds various configuration keys to environment variables.
@@ -618,12 +609,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("worker.maxActiveRuns", "WORKER_MAX_ACTIVE_RUNS")
 	l.bindEnv("worker.coordinatorHost", "WORKER_COORDINATOR_HOST")
 	l.bindEnv("worker.coordinatorPort", "WORKER_COORDINATOR_PORT")
-	l.bindEnv("worker.insecure", "WORKER_INSECURE")
-	l.bindEnv("worker.skipTlsVerify", "WORKER_SKIP_TLS_VERIFY")
 	l.bindEnv("worker.labels", "WORKER_LABELS")
-	l.bindEnv("worker.certFile", "WORKER_TLS_CERT_FILE")
-	l.bindEnv("worker.keyFile", "WORKER_TLS_KEY_FILE")
-	l.bindEnv("worker.caFile", "WORKER_TLS_CA_FILE")
 	// Scheduler configuration
 	l.bindEnv("scheduler.port", "SCHEDULER_PORT")
 
@@ -632,6 +618,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("peer.keyFile", "PEER_KEY_FILE")
 	l.bindEnv("peer.clientCaFile", "PEER_CLIENT_CA_FILE")
 	l.bindEnv("peer.skipTlsVerify", "PEER_SKIP_TLS_VERIFY")
+	l.bindEnv("peer.insecure", "PEER_INSECURE")
 }
 
 // bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.

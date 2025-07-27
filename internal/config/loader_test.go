@@ -82,11 +82,6 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_WORKER_MAX_ACTIVE_RUNS":  "200",
 		"DAGU_WORKER_COORDINATOR_HOST": "worker.example.com",
 		"DAGU_WORKER_COORDINATOR_PORT": "60051",
-		"DAGU_WORKER_INSECURE":         "true",
-		"DAGU_WORKER_SKIP_TLS_VERIFY":  "true",
-		"DAGU_WORKER_TLS_CERT_FILE":    "/test/worker/cert.pem",
-		"DAGU_WORKER_TLS_KEY_FILE":     "/test/worker/key.pem",
-		"DAGU_WORKER_TLS_CA_FILE":      "/test/worker/ca.pem",
 
 		// Scheduler configuration
 		"DAGU_SCHEDULER_PORT": "9999",
@@ -182,12 +177,6 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	assert.Equal(t, 200, cfg.Worker.MaxActiveRuns)
 	assert.Equal(t, "worker.example.com", cfg.Worker.CoordinatorHost)
 	assert.Equal(t, 60051, cfg.Worker.CoordinatorPort)
-	assert.True(t, cfg.Worker.Insecure)
-	assert.True(t, cfg.Worker.SkipTLSVerify)
-	require.NotNil(t, cfg.Worker.TLS)
-	assert.Equal(t, "/test/worker/cert.pem", cfg.Worker.TLS.CertFile)
-	assert.Equal(t, "/test/worker/key.pem", cfg.Worker.TLS.KeyFile)
-	assert.Equal(t, "/test/worker/ca.pem", cfg.Worker.TLS.CAFile)
 
 	// Scheduler configuration
 	assert.Equal(t, 9999, cfg.Scheduler.Port)
@@ -298,11 +287,6 @@ worker:
   maxActiveRuns: 50
   coordinatorHost: "coordinator.example.com"
   coordinatorPort: 8080
-  insecure: true
-  skipTlsVerify: true
-  certFile: "/path/to/worker/cert.pem"
-  keyFile: "/path/to/worker/key.pem"
-  caFile: "/path/to/worker/ca.pem"
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -317,12 +301,6 @@ worker:
 		assert.Equal(t, 50, cfg.Worker.MaxActiveRuns)
 		assert.Equal(t, "coordinator.example.com", cfg.Worker.CoordinatorHost)
 		assert.Equal(t, 8080, cfg.Worker.CoordinatorPort)
-		assert.True(t, cfg.Worker.Insecure)
-		assert.True(t, cfg.Worker.SkipTLSVerify)
-		require.NotNil(t, cfg.Worker.TLS)
-		assert.Equal(t, "/path/to/worker/cert.pem", cfg.Worker.TLS.CertFile)
-		assert.Equal(t, "/path/to/worker/key.pem", cfg.Worker.TLS.KeyFile)
-		assert.Equal(t, "/path/to/worker/ca.pem", cfg.Worker.TLS.CAFile)
 	})
 
 	t.Run("EnvironmentVariableOverride", func(t *testing.T) {
@@ -339,7 +317,6 @@ worker:
   maxActiveRuns: 10
   coordinatorHost: "localhost"
   coordinatorPort: 5000
-  insecure: false
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -350,11 +327,6 @@ worker:
 			"DAGU_WORKER_MAX_ACTIVE_RUNS":  "300",
 			"DAGU_WORKER_COORDINATOR_HOST": "env.coordinator.com",
 			"DAGU_WORKER_COORDINATOR_PORT": "9090",
-			"DAGU_WORKER_INSECURE":         "true",
-			"DAGU_WORKER_SKIP_TLS_VERIFY":  "true",
-			"DAGU_WORKER_TLS_CERT_FILE":    "/env/cert.pem",
-			"DAGU_WORKER_TLS_KEY_FILE":     "/env/key.pem",
-			"DAGU_WORKER_TLS_CA_FILE":      "/env/ca.pem",
 		}
 
 		// Save and clear existing environment variables
@@ -389,12 +361,6 @@ worker:
 		assert.Equal(t, 300, cfg.Worker.MaxActiveRuns)
 		assert.Equal(t, "env.coordinator.com", cfg.Worker.CoordinatorHost)
 		assert.Equal(t, 9090, cfg.Worker.CoordinatorPort)
-		assert.True(t, cfg.Worker.Insecure)
-		assert.True(t, cfg.Worker.SkipTLSVerify)
-		require.NotNil(t, cfg.Worker.TLS)
-		assert.Equal(t, "/env/cert.pem", cfg.Worker.TLS.CertFile)
-		assert.Equal(t, "/env/key.pem", cfg.Worker.TLS.KeyFile)
-		assert.Equal(t, "/env/ca.pem", cfg.Worker.TLS.CAFile)
 	})
 
 	t.Run("DefaultValues", func(t *testing.T) {
@@ -422,9 +388,6 @@ port: 8080
 		assert.Equal(t, 100, cfg.Worker.MaxActiveRuns)
 		assert.Equal(t, "127.0.0.1", cfg.Worker.CoordinatorHost)
 		assert.Equal(t, 50055, cfg.Worker.CoordinatorPort)
-		assert.True(t, cfg.Worker.Insecure)
-		assert.False(t, cfg.Worker.SkipTLSVerify)
-		assert.Nil(t, cfg.Worker.TLS) // No TLS config by default
 	})
 
 	t.Run("SecureByDefault", func(t *testing.T) {
@@ -448,38 +411,9 @@ worker:
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
 
-		// Verify worker is secure by default
+		// Verify worker configuration
 		assert.Equal(t, "secure.example.com", cfg.Worker.CoordinatorHost)
 		assert.Equal(t, 443, cfg.Worker.CoordinatorPort)
-		assert.True(t, cfg.Worker.Insecure)
-		assert.False(t, cfg.Worker.SkipTLSVerify)
-	})
-
-	t.Run("PartialTLSConfig", func(t *testing.T) {
-		// Reset viper to ensure clean state
-		viper.Reset()
-		defer viper.Reset()
-
-		// Create a config file with partial TLS configuration
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "config.yaml")
-		configContent := `
-worker:
-  caFile: "/path/to/ca.pem"
-`
-		err := os.WriteFile(configFile, []byte(configContent), 0600)
-		require.NoError(t, err)
-
-		// Load configuration
-		cfg, err := config.Load(config.WithConfigFile(configFile))
-		require.NoError(t, err)
-		require.NotNil(t, cfg)
-
-		// Verify partial TLS config is loaded correctly
-		require.NotNil(t, cfg.Worker.TLS)
-		assert.Equal(t, "", cfg.Worker.TLS.CertFile)
-		assert.Equal(t, "", cfg.Worker.TLS.KeyFile)
-		assert.Equal(t, "/path/to/ca.pem", cfg.Worker.TLS.CAFile)
 	})
 }
 
@@ -597,6 +531,7 @@ peer:
   keyFile: "/path/to/peer/key.pem"
   clientCaFile: "/path/to/peer/ca.pem"
   skipTlsVerify: true
+  insecure: false
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -611,6 +546,7 @@ peer:
 		assert.Equal(t, "/path/to/peer/key.pem", cfg.Global.Peer.KeyFile)
 		assert.Equal(t, "/path/to/peer/ca.pem", cfg.Global.Peer.ClientCaFile)
 		assert.True(t, cfg.Global.Peer.SkipTLSVerify)
+		assert.False(t, cfg.Global.Peer.Insecure)
 	})
 
 	t.Run("EnvironmentVariableOverride", func(t *testing.T) {
@@ -636,6 +572,7 @@ peer:
 			"DAGU_PEER_KEY_FILE":       "/env/key.pem",
 			"DAGU_PEER_CLIENT_CA_FILE": "/env/ca.pem",
 			"DAGU_PEER_SKIP_TLS_VERIFY": "true",
+			"DAGU_PEER_INSECURE":       "false",
 		}
 
 		// Save and clear existing environment variables
@@ -670,6 +607,7 @@ peer:
 		assert.Equal(t, "/env/key.pem", cfg.Global.Peer.KeyFile)
 		assert.Equal(t, "/env/ca.pem", cfg.Global.Peer.ClientCaFile)
 		assert.True(t, cfg.Global.Peer.SkipTLSVerify)
+		assert.False(t, cfg.Global.Peer.Insecure) // overridden by env var
 	})
 
 	t.Run("DefaultValues", func(t *testing.T) {
@@ -692,11 +630,12 @@ port: 8080
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
 
-		// Verify default Peer configuration values (should be empty)
+		// Verify default Peer configuration values
 		assert.Equal(t, "", cfg.Global.Peer.CertFile)
 		assert.Equal(t, "", cfg.Global.Peer.KeyFile)
 		assert.Equal(t, "", cfg.Global.Peer.ClientCaFile)
 		assert.False(t, cfg.Global.Peer.SkipTLSVerify)
+		assert.True(t, cfg.Global.Peer.Insecure) // default is true
 	})
 
 	t.Run("PartialPeerConfig", func(t *testing.T) {
