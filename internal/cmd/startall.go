@@ -30,9 +30,11 @@ Flags:
   --dags string                     Path to the directory containing DAG definition files
   --coordinator.host string         Host address to bind the coordinator gRPC server to (default: 127.0.0.1)
   --coordinator.port int            Port number for the coordinator gRPC server (default: 50055)
-  --coordinator.tls-cert string     Path to TLS certificate file for the coordinator server
-  --coordinator.tls-key string      Path to TLS key file for the coordinator server
-  --coordinator.tls-ca string       Path to CA certificate file for client verification (mTLS)
+  --peer.cert-file string           Path to TLS certificate file for peer connections
+  --peer.key-file string            Path to TLS key file for peer connections
+  --peer.client-ca-file string      Path to CA certificate file for client verification (mTLS)
+  --peer.insecure                   Use insecure connection (h2c) instead of TLS
+  --peer.skip-tls-verify            Skip TLS certificate verification (insecure)
 
 Example:
   dagu start-all --host=0.0.0.0 --port=8080 --dags=/path/to/dags --coordinator.port=50055
@@ -49,9 +51,12 @@ var startAllFlags = []commandLineFlag{
 	portFlag,
 	coordinatorHostFlag,
 	coordinatorPortFlag,
-	coordinatorTLSCertFlag,
-	coordinatorTLSKeyFlag,
-	coordinatorTLSCAFlag,
+	// Peer configuration flags for TLS
+	peerInsecureFlag,
+	peerCertFileFlag,
+	peerKeyFileFlag,
+	peerClientCAFileFlag,
+	peerSkipTLSVerifyFlag,
 }
 
 func runStartAll(ctx *Context, _ []string) error {
@@ -76,7 +81,7 @@ func runStartAll(ctx *Context, _ []string) error {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
-	coordinator, err := newCoordinator(ctx.Config.Coordinator)
+	coordinator, err := newCoordinator(ctx.Config)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}

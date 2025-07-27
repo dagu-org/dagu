@@ -230,26 +230,6 @@ var (
 		bindViper: true,
 	}
 
-	// coordinatorTLSCertFlag is the path to the TLS certificate for coordinator server.
-	coordinatorTLSCertFlag = commandLineFlag{
-		name:      "coordinator.tls-cert",
-		usage:     "Path to TLS certificate file for the coordinator server",
-		bindViper: true,
-	}
-
-	// coordinatorTLSKeyFlag is the path to the TLS key for coordinator server.
-	coordinatorTLSKeyFlag = commandLineFlag{
-		name:      "coordinator.tls-key",
-		usage:     "Path to TLS key file for the coordinator server",
-		bindViper: true,
-	}
-
-	// coordinatorTLSCAFlag is the path to the CA certificate for coordinator server.
-	coordinatorTLSCAFlag = commandLineFlag{
-		name:      "coordinator.tls-ca",
-		usage:     "Path to CA certificate file for client verification (mTLS)",
-		bindViper: true,
-	}
 )
 
 type commandLineFlag struct {

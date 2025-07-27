@@ -196,14 +196,17 @@ func (c *Context) NewCoordinatorClientFactory() *coordinatorclient.Factory {
 		WithHost(c.Config.Coordinator.Host).
 		WithPort(c.Config.Coordinator.Port)
 
-	// Configure TLS if available, otherwise use insecure connection
-	if c.Config.Coordinator.TLS != nil && (c.Config.Coordinator.TLS.CertFile != "" || c.Config.Coordinator.TLS.CAFile != "") {
+	// Configure TLS using global peer config
+	if c.Config.Global.Peer.CertFile != "" {
 		factory.WithTLS(
-			c.Config.Coordinator.TLS.CertFile,
-			c.Config.Coordinator.TLS.KeyFile,
-			c.Config.Coordinator.TLS.CAFile,
+			c.Config.Global.Peer.CertFile,
+			c.Config.Global.Peer.KeyFile,
+			c.Config.Global.Peer.ClientCaFile,
 		)
-	} else {
+		if c.Config.Global.Peer.SkipTLSVerify {
+			factory.WithSkipTLSVerify(true)
+		}
+	} else if c.Config.Global.Peer.Insecure {
 		factory.WithInsecure()
 	}
 

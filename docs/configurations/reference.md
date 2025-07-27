@@ -89,7 +89,6 @@ remoteNodes:
 coordinator:
   host: "127.0.0.1"       # Bind address
   port: 50055             # gRPC port
-  signingKey: ""          # Authentication key
   tls:
     certFile: ""          # Server certificate
     keyFile: ""           # Server key
@@ -364,7 +363,6 @@ port: 8080
 coordinator:
   host: 0.0.0.0
   port: 50055
-  signingKey: ${COORDINATOR_KEY}
   tls:
     certFile: /etc/dagu/tls/server.crt
     keyFile: /etc/dagu/tls/server.key

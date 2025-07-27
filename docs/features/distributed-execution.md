@@ -129,7 +129,6 @@ Worker labels are key-value pairs that describe worker capabilities:
 coordinator:
   host: 0.0.0.0
   port: 50055
-  signingKey: "your-secret-key"
   tls:
     certFile: /path/to/server.crt
     keyFile: /path/to/server.key

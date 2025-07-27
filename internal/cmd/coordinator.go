@@ -36,19 +36,21 @@ supports authentication via signing keys and TLS encryption.
 Flags:
   --coordinator.host string         Host address to bind the gRPC server to (default: 127.0.0.1)
   --coordinator.port int            Port number for the gRPC server to listen on (default: 50055)
-  --coordinator.tls-cert string     Path to TLS certificate file for the coordinator server
-  --coordinator.tls-key string      Path to TLS key file for the coordinator server
-  --coordinator.tls-ca string       Path to CA certificate file for client verification (mTLS)
+  --peer.cert-file string           Path to TLS certificate file for peer connections
+  --peer.key-file string            Path to TLS key file for peer connections
+  --peer.client-ca-file string      Path to CA certificate file for client verification (mTLS)
+  --peer.insecure                   Use insecure connection (h2c) instead of TLS
+  --peer.skip-tls-verify            Skip TLS certificate verification (insecure)
 
 Example:
   # Basic usage
   dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
 
   # With TLS
-  dagu coordinator --coordinator.tls-cert=server.crt --coordinator.tls-key=server.key
+  dagu coordinator --peer.cert-file=server.crt --peer.key-file=server.key
 
   # With mutual TLS
-  dagu coordinator --coordinator.tls-cert=server.crt --coordinator.tls-key=server.key --coordinator.tls-ca=ca.crt
+  dagu coordinator --peer.cert-file=server.crt --peer.key-file=server.key --peer.client-ca-file=ca.crt
 
 This process runs continuously in the foreground until terminated.
 `,
@@ -59,15 +61,18 @@ This process runs continuously in the foreground until terminated.
 var coordinatorFlags = []commandLineFlag{
 	coordinatorHostFlag,
 	coordinatorPortFlag,
-	coordinatorTLSCertFlag,
-	coordinatorTLSKeyFlag,
-	coordinatorTLSCAFlag,
+	// Peer configuration flags for TLS
+	peerInsecureFlag,
+	peerCertFileFlag,
+	peerKeyFileFlag,
+	peerClientCAFileFlag,
+	peerSkipTLSVerifyFlag,
 }
 
 func runCoordinator(ctx *Context, _ []string) error {
 	logger.Info(ctx, "Coordinator initialization", "host", ctx.Config.Coordinator.Host, "port", ctx.Config.Coordinator.Port)
 
-	coordinator, err := newCoordinator(ctx.Config.Coordinator)
+	coordinator, err := newCoordinator(ctx.Config)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
@@ -89,14 +94,18 @@ func runCoordinator(ctx *Context, _ []string) error {
 
 // newCoordinator creates a new Coordinator service instance.
 // It sets up a gRPC server and listener for distributed task coordination.
-func newCoordinator(cfg config.Coordinator) (*coordinator.Service, error) {
+func newCoordinator(cfg *config.Config) (*coordinator.Service, error) {
 	// Create gRPC server options
 	var serverOpts []grpc.ServerOption
 
-	// Configure TLS if enabled
-	if cfg.TLS != nil && cfg.TLS.CertFile != "" && cfg.TLS.KeyFile != "" {
+	// Configure TLS using global peer config
+	if cfg.Global.Peer.CertFile != "" && cfg.Global.Peer.KeyFile != "" {
 		// Load server certificates
-		creds, err := loadCoordinatorTLSCredentials(cfg.TLS)
+		creds, err := loadCoordinatorTLSCredentials(&config.TLSConfig{
+			CertFile: cfg.Global.Peer.CertFile,
+			KeyFile:  cfg.Global.Peer.KeyFile,
+			CAFile:   cfg.Global.Peer.ClientCaFile,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to load TLS credentials: %w", err)
 		}
@@ -111,7 +120,7 @@ func newCoordinator(cfg config.Coordinator) (*coordinator.Service, error) {
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 
 	// Create listener
-	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	addr := fmt.Sprintf("%s:%d", cfg.Coordinator.Host, cfg.Coordinator.Port)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create listener on %s: %w", addr, err)

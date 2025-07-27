@@ -51,10 +51,6 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_AUTH_BASIC_PASSWORD": "testpass",
 		"DAGU_AUTH_TOKEN":          "test-token-123",
 
-		// Note: DAGU_COORDINATOR_SIGNING_KEY environment variable is bound to coordinatorSigningKey
-		// but there's no flat field in the definition, so it doesn't work.
-		// Removing this test case as it's testing non-existent functionality.
-
 		// TLS configurations
 		"DAGU_CERT_FILE": "/test/cert.pem",
 		"DAGU_KEY_FILE":  "/test/key.pem",
@@ -563,11 +559,11 @@ peer:
 
 		// Set environment variables
 		envs := map[string]string{
-			"DAGU_PEER_CERT_FILE":      "/env/cert.pem",
-			"DAGU_PEER_KEY_FILE":       "/env/key.pem",
-			"DAGU_PEER_CLIENT_CA_FILE": "/env/ca.pem",
+			"DAGU_PEER_CERT_FILE":       "/env/cert.pem",
+			"DAGU_PEER_KEY_FILE":        "/env/key.pem",
+			"DAGU_PEER_CLIENT_CA_FILE":  "/env/ca.pem",
 			"DAGU_PEER_SKIP_TLS_VERIFY": "true",
-			"DAGU_PEER_INSECURE":       "false",
+			"DAGU_PEER_INSECURE":        "false",
 		}
 
 		// Save and clear existing environment variables

@@ -59,8 +59,8 @@ func TestCoordinatorCommand(t *testing.T) {
 			Args: []string{
 				"coordinator",
 				fmt.Sprintf("--coordinator.port=%s", port),
-				"--coordinator.tls-cert=/path/to/cert.pem",
-				"--coordinator.tls-key=/path/to/key.pem",
+				fmt.Sprintf("--peer.cert-file=%s", test.TestdataPath(t, "certs/cert.pem")),
+				fmt.Sprintf("--peer.key-file=%s", test.TestdataPath(t, "certs/key.pem")),
 			},
 			ExpectedOut: []string{"Coordinator initialization", port},
 		})
@@ -77,9 +77,9 @@ func TestCoordinatorCommand(t *testing.T) {
 			Args: []string{
 				"coordinator",
 				fmt.Sprintf("--coordinator.port=%s", port),
-				"--coordinator.tls-cert=/path/to/cert.pem",
-				"--coordinator.tls-key=/path/to/key.pem",
-				"--coordinator.tls-ca=/path/to/ca.pem",
+				fmt.Sprintf("--peer.cert-file=%s", test.TestdataPath(t, "certs/cert.pem")),
+				fmt.Sprintf("--peer.key-file=%s", test.TestdataPath(t, "certs/key.pem")),
+				fmt.Sprintf("--peer.client-ca-file=%s", test.TestdataPath(t, "certs/ca.pem")),
 			},
 			ExpectedOut: []string{"Coordinator initialization", port},
 		})
