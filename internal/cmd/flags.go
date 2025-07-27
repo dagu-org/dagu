@@ -185,48 +185,48 @@ var (
 		bindViper:    true,
 	}
 
-	// workerInsecureFlag disables TLS for worker connection.
-	workerInsecureFlag = commandLineFlag{
-		name:      "worker.insecure",
-		usage:     "Use insecure connection (h2c) instead of TLS",
-		isBool:    true,
-		bindViper: true,
-	}
-
-	// workerSkipTLSVerifyFlag skips TLS certificate verification for worker.
-	workerSkipTLSVerifyFlag = commandLineFlag{
-		name:      "worker.skip-tls-verify",
-		usage:     "Skip TLS certificate verification (insecure)",
-		isBool:    true,
-		bindViper: true,
-	}
-
-	// workerTLSCertFlag is the TLS certificate for worker connection.
-	workerTLSCertFlag = commandLineFlag{
-		name:      "worker.tls-cert",
-		usage:     "Path to TLS certificate file for mutual TLS",
-		bindViper: true,
-	}
-
-	// workerTLSKeyFlag is the TLS key for worker connection.
-	workerTLSKeyFlag = commandLineFlag{
-		name:      "worker.tls-key",
-		usage:     "Path to TLS key file for mutual TLS",
-		bindViper: true,
-	}
-
-	// workerTLSCAFlag is the CA certificate for worker connection.
-	workerTLSCAFlag = commandLineFlag{
-		name:      "worker.tls-ca",
-		usage:     "Path to CA certificate file for server verification",
-		bindViper: true,
-	}
-
 	// workerLabelsFlag is the labels for worker capabilities.
 	workerLabelsFlag = commandLineFlag{
 		name:      "worker.labels",
 		shorthand: "l",
 		usage:     "Worker labels for capability matching (format: key1=value1,key2=value2)",
+		bindViper: true,
+	}
+
+	// peerInsecureFlag disables TLS for peer connections.
+	peerInsecureFlag = commandLineFlag{
+		name:      "peer.insecure",
+		usage:     "Use insecure connection (h2c) instead of TLS",
+		isBool:    true,
+		bindViper: true,
+	}
+
+	// peerCertFileFlag is the TLS certificate for peer connections.
+	peerCertFileFlag = commandLineFlag{
+		name:      "peer.cert-file",
+		usage:     "Path to TLS certificate file for mutual TLS",
+		bindViper: true,
+	}
+
+	// peerKeyFileFlag is the TLS key for peer connections.
+	peerKeyFileFlag = commandLineFlag{
+		name:      "peer.key-file",
+		usage:     "Path to TLS key file for mutual TLS",
+		bindViper: true,
+	}
+
+	// peerClientCAFileFlag is the CA certificate for peer connections.
+	peerClientCAFileFlag = commandLineFlag{
+		name:      "peer.client-ca-file",
+		usage:     "Path to CA certificate file for server verification",
+		bindViper: true,
+	}
+
+	// peerSkipTLSVerifyFlag skips TLS certificate verification for peer connections.
+	peerSkipTLSVerifyFlag = commandLineFlag{
+		name:      "peer.skip-tls-verify",
+		usage:     "Skip TLS certificate verification (insecure)",
+		isBool:    true,
 		bindViper: true,
 	}
 

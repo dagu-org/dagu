@@ -26,12 +26,14 @@ Flags:
   --worker.max-active-runs int             Maximum number of active runs (default: 100)
   --worker.coordinator-host string         Coordinator gRPC server host (default: 127.0.0.1)
   --worker.coordinator-port int            Coordinator gRPC server port (default: 50055)
-  --worker.insecure                        Use insecure connection (h2c) instead of TLS (default: true)
-  --worker.tls-cert string                 Path to TLS certificate file for mutual TLS
-  --worker.tls-key string                  Path to TLS key file for mutual TLS
-  --worker.tls-ca string                   Path to CA certificate file for server verification
-  --worker.skip-tls-verify                 Skip TLS certificate verification (insecure)
   --worker.labels -l string                Worker labels for capability matching (format: key1=value1,key2=value2)
+
+TLS Configuration (uses global peer settings):
+  --peer.insecure                          Use insecure connection (h2c) instead of TLS (default: true)
+  --peer.cert-file string                  Path to TLS certificate file for mutual TLS
+  --peer.key-file string                   Path to TLS key file for mutual TLS
+  --peer.client-ca-file string             Path to CA certificate file for server verification
+  --peer.skip-tls-verify                   Skip TLS certificate verification (insecure)
 
 Example:
   dagu worker
@@ -44,10 +46,10 @@ Example:
   dagu worker --worker.labels cpu-arch=amd64,instance-type=m5.xlarge
   
   # For TLS connections (when coordinator has TLS enabled):
-  dagu worker --worker.insecure=false --worker.coordinator-host=coordinator.example.com
-  dagu worker --worker.insecure=false --worker.tls-cert=client.crt --worker.tls-key=client.key
-  dagu worker --worker.insecure=false --worker.tls-ca=ca.crt
-  dagu worker --worker.insecure=false --worker.skip-tls-verify  # For self-signed certificates
+  dagu worker --peer.insecure=false --worker.coordinator-host=coordinator.example.com
+  dagu worker --peer.insecure=false --peer.cert-file=client.crt --peer.key-file=client.key
+  dagu worker --peer.insecure=false --peer.client-ca-file=ca.crt
+  dagu worker --peer.insecure=false --peer.skip-tls-verify  # For self-signed certificates
 
 This process runs continuously in the foreground until terminated.
 `,
@@ -60,12 +62,13 @@ var workerFlags = []commandLineFlag{
 	workerMaxActiveRunsFlag,
 	workerCoordinatorHostFlag,
 	workerCoordinatorPortFlag,
-	workerInsecureFlag,
-	workerTLSCertFlag,
-	workerTLSKeyFlag,
-	workerTLSCAFlag,
-	workerSkipTLSVerifyFlag,
 	workerLabelsFlag,
+	// Peer configuration flags for TLS
+	peerInsecureFlag,
+	peerCertFileFlag,
+	peerKeyFileFlag,
+	peerClientCAFileFlag,
+	peerSkipTLSVerifyFlag,
 }
 
 func runWorker(ctx *Context, _ []string) error {
@@ -75,16 +78,13 @@ func runWorker(ctx *Context, _ []string) error {
 	coordinatorHost := ctx.Config.Worker.CoordinatorHost
 	coordinatorPort := ctx.Config.Worker.CoordinatorPort
 
-	// Build TLS configuration from config
+	// Build TLS configuration from global peer config
 	tlsConfig := &worker.TLSConfig{
-		Insecure:      ctx.Config.Worker.Insecure,
-		SkipTLSVerify: ctx.Config.Worker.SkipTLSVerify,
-	}
-
-	if ctx.Config.Worker.TLS != nil {
-		tlsConfig.CertFile = ctx.Config.Worker.TLS.CertFile
-		tlsConfig.KeyFile = ctx.Config.Worker.TLS.KeyFile
-		tlsConfig.CAFile = ctx.Config.Worker.TLS.CAFile
+		Insecure:      ctx.Config.Global.Peer.Insecure,
+		SkipTLSVerify: ctx.Config.Global.Peer.SkipTLSVerify,
+		CertFile:      ctx.Config.Global.Peer.CertFile,
+		KeyFile:       ctx.Config.Global.Peer.KeyFile,
+		CAFile:        ctx.Config.Global.Peer.ClientCaFile,
 	}
 
 	// Create and start the worker

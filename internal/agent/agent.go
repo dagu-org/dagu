@@ -685,24 +685,24 @@ func (a *Agent) createCoordinatorClientFactory(ctx context.Context) *client.Fact
 		WithPort(port)
 
 	// Configure TLS if provided
-	if cfg.Worker.TLS != nil && cfg.Worker.TLS.CertFile != "" {
+	if cfg.Global.Peer.CertFile != "" {
 		factory.WithTLS(
-			cfg.Worker.TLS.CertFile,
-			cfg.Worker.TLS.KeyFile,
-			cfg.Worker.TLS.CAFile,
+			cfg.Global.Peer.CertFile,
+			cfg.Global.Peer.KeyFile,
+			cfg.Global.Peer.ClientCaFile,
 		)
-		if cfg.Worker.SkipTLSVerify {
+		if cfg.Global.Peer.SkipTLSVerify {
 			factory.WithSkipTLSVerify(true)
 		}
-	} else {
-		// Default to insecure if not specified
+	} else if cfg.Global.Peer.Insecure {
+		// Use insecure connection (h2c)
 		factory.WithInsecure()
 	}
 
 	logger.Info(ctx, "Created coordinator client factory",
 		"host", host,
 		"port", port,
-		"insecure", cfg.Worker.TLS == nil || cfg.Worker.TLS.CertFile == "",
+		"insecure", cfg.Global.Peer.Insecure || cfg.Global.Peer.CertFile == "",
 	)
 
 	return factory
