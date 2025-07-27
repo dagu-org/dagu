@@ -268,7 +268,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	if def.Coordinator != nil {
 		cfg.Coordinator.Host = def.Coordinator.Host
 		cfg.Coordinator.Port = def.Coordinator.Port
-		cfg.Coordinator.SigningKey = def.Coordinator.SigningKey
 
 		// Set TLS configuration if available
 		if def.Coordinator.CertFile != "" || def.Coordinator.KeyFile != "" || def.Coordinator.CAFile != "" {
@@ -493,7 +492,6 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	// Coordinator settings
 	viper.SetDefault("coordinatorHost", "127.0.0.1")
 	viper.SetDefault("coordinatorPort", 50055)
-	viper.SetDefault("coordinatorSigningKey", "")
 	viper.SetDefault("coordinatorCertFile", "")
 	viper.SetDefault("coordinatorKeyFile", "")
 	viper.SetDefault("coordinatorCAFile", "")
@@ -601,7 +599,6 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	// Coordinator service configuration (flat structure)
 	l.bindEnv("coordinatorHost", "COORDINATOR_HOST")
 	l.bindEnv("coordinatorPort", "COORDINATOR_PORT")
-	l.bindEnv("coordinatorSigningKey", "COORDINATOR_SIGNING_KEY")
 	l.bindEnv("coordinatorCertFile", "COORDINATOR_CERT_FILE")
 	l.bindEnv("coordinatorKeyFile", "COORDINATOR_KEY_FILE")
 	l.bindEnv("coordinatorCaFile", "COORDINATOR_CA_FILE")

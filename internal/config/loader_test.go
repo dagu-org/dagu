@@ -203,8 +203,6 @@ func TestConfigLoader_CoordinatorSigningKey(t *testing.T) {
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-coordinator:
-  signingKey: "yaml-signing-key-123"
 auth:
   basic:
     username: "admin"
@@ -221,39 +219,9 @@ auth:
 		require.NotNil(t, cfg)
 
 		// Verify CoordinatorSigningKey is loaded from YAML
-		assert.Equal(t, "yaml-signing-key-123", cfg.Coordinator.SigningKey)
 		assert.Equal(t, "admin", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
 		assert.Equal(t, "api-token", cfg.Server.Auth.Token.Value)
-	})
-
-	t.Run("EnvironmentVariableOverride", func(t *testing.T) {
-		// Reset viper to ensure clean state
-		viper.Reset()
-		defer viper.Reset()
-
-		// Create a config file with CoordinatorSigningKey
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "config.yaml")
-		configContent := `
-coordinator:
-  signingKey: "yaml-signing-key"
-`
-		err := os.WriteFile(configFile, []byte(configContent), 0600)
-		require.NoError(t, err)
-
-		// Set environment variable
-		os.Setenv("DAGU_COORDINATOR_SIGNING_KEY", "env-signing-key-override")
-		defer os.Unsetenv("DAGU_COORDINATOR_SIGNING_KEY")
-
-		// Load configuration
-		cfg, err := config.Load(config.WithConfigFile(configFile))
-		require.NoError(t, err)
-		require.NotNil(t, cfg)
-
-		// Verify that environment variable does NOT override YAML
-		// because the env var is bound to a flat field that doesn't exist
-		assert.Equal(t, "yaml-signing-key", cfg.Coordinator.SigningKey)
 	})
 
 	t.Run("EmptyCoordinatorSigningKey", func(t *testing.T) {
@@ -293,8 +261,6 @@ auth:
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
-coordinator:
-  signingKey: "master-signing-key"
 auth:
   basic:
     username: "testuser"
@@ -311,7 +277,6 @@ auth:
 		require.NotNil(t, cfg)
 
 		// Verify all auth fields are loaded correctly
-		assert.Equal(t, "master-signing-key", cfg.Coordinator.SigningKey)
 		assert.Equal(t, "testuser", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "testpass", cfg.Server.Auth.Basic.Password)
 		assert.Equal(t, "test-token", cfg.Server.Auth.Token.Value)

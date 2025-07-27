@@ -250,9 +250,6 @@ type coordinatorDef struct {
 	// Port is the port number for the coordinator service.
 	Port int `mapstructure:"port"`
 
-	// SigningKey is the key used for signing requests to the coordinator service.
-	SigningKey string `mapstructure:"signingKey"`
-
 	// CertFile is the path to the coordinator's TLS certificate file.
 	CertFile string `mapstructure:"certFile"`
 
