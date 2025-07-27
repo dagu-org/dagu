@@ -66,6 +66,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_DAG_RUNS_DIR":      "/test/runs",
 		"DAGU_PROC_DIR":          "/test/proc",
 		"DAGU_QUEUE_DIR":         "/test/queue",
+		"DAGU_DISCOVERY_DIR":     "/test/discovery",
 
 		// UI customization
 		"DAGU_LATEST_STATUS_TODAY": "true",
@@ -157,6 +158,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	assert.Equal(t, "/test/runs", cfg.Paths.DAGRunsDir)
 	assert.Equal(t, "/test/proc", cfg.Paths.ProcDir)
 	assert.Equal(t, "/test/queue", cfg.Paths.QueueDir)
+	assert.Equal(t, "/test/discovery", cfg.Paths.DiscoveryDir)
 
 	// UI customization
 	assert.True(t, cfg.Server.LatestStatusToday)
@@ -504,6 +506,36 @@ worker:
 
 		// Verify labels are nil or empty
 		assert.True(t, len(cfg.Worker.Labels) == 0)
+	})
+}
+
+func TestDefaultDirectoryConfiguration(t *testing.T) {
+	t.Run("DefaultDirectoriesUnderDataDir", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a minimal config file with only data dir specified
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+paths:
+  dataDir: "/custom/data"
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify default directories are created under data dir
+		assert.Equal(t, "/custom/data", cfg.Paths.DataDir)
+		assert.Equal(t, "/custom/data/dag-runs", cfg.Paths.DAGRunsDir)
+		assert.Equal(t, "/custom/data/proc", cfg.Paths.ProcDir)
+		assert.Equal(t, "/custom/data/queue", cfg.Paths.QueueDir)
+		assert.Equal(t, "/custom/data/discovery", cfg.Paths.DiscoveryDir)
 	})
 }
 
