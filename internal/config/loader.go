@@ -133,6 +133,16 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		SchedulerLockRetryInterval:  50 * time.Millisecond,
 	}
 
+	// Set Peer configuration if provided
+	if def.Peer.CertFile != "" || def.Peer.KeyFile != "" || def.Peer.ClientCaFile != "" || def.Peer.SkipTLSVerify {
+		cfg.Global.Peer = Peer{
+			CertFile:      def.Peer.CertFile,
+			KeyFile:       def.Peer.KeyFile,
+			ClientCaFile:  def.Peer.ClientCaFile,
+			SkipTLSVerify: def.Peer.SkipTLSVerify,
+		}
+	}
+
 	if def.SchedulerLockStaleThreshold != "" {
 		if duration, err := time.ParseDuration(def.SchedulerLockStaleThreshold); err == nil {
 			cfg.Global.SchedulerLockStaleThreshold = duration
@@ -616,6 +626,12 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("worker.caFile", "WORKER_TLS_CA_FILE")
 	// Scheduler configuration
 	l.bindEnv("scheduler.port", "SCHEDULER_PORT")
+
+	// Peer configuration
+	l.bindEnv("peer.certFile", "PEER_CERT_FILE")
+	l.bindEnv("peer.keyFile", "PEER_KEY_FILE")
+	l.bindEnv("peer.clientCaFile", "PEER_CLIENT_CA_FILE")
+	l.bindEnv("peer.skipTlsVerify", "PEER_SKIP_TLS_VERIFY")
 }
 
 // bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.

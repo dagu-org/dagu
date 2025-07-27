@@ -581,3 +581,149 @@ worker:
 		assert.True(t, len(cfg.Worker.Labels) == 0)
 	})
 }
+
+func TestPeerConfiguration(t *testing.T) {
+	t.Run("LoadFromYAML", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a config file with Peer configuration
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+peer:
+  certFile: "/path/to/peer/cert.pem"
+  keyFile: "/path/to/peer/key.pem"
+  clientCaFile: "/path/to/peer/ca.pem"
+  skipTlsVerify: true
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify Peer configuration is loaded from YAML
+		assert.Equal(t, "/path/to/peer/cert.pem", cfg.Global.Peer.CertFile)
+		assert.Equal(t, "/path/to/peer/key.pem", cfg.Global.Peer.KeyFile)
+		assert.Equal(t, "/path/to/peer/ca.pem", cfg.Global.Peer.ClientCaFile)
+		assert.True(t, cfg.Global.Peer.SkipTLSVerify)
+	})
+
+	t.Run("EnvironmentVariableOverride", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a config file with Peer configuration
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+peer:
+  certFile: "/yaml/cert.pem"
+  keyFile: "/yaml/key.pem"
+  skipTlsVerify: false
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Set environment variables
+		envs := map[string]string{
+			"DAGU_PEER_CERT_FILE":      "/env/cert.pem",
+			"DAGU_PEER_KEY_FILE":       "/env/key.pem",
+			"DAGU_PEER_CLIENT_CA_FILE": "/env/ca.pem",
+			"DAGU_PEER_SKIP_TLS_VERIFY": "true",
+		}
+
+		// Save and clear existing environment variables
+		savedEnvs := make(map[string]string)
+		for key := range envs {
+			savedEnvs[key] = os.Getenv(key)
+			os.Unsetenv(key)
+		}
+		defer func() {
+			// Restore original environment
+			for key, val := range savedEnvs {
+				if val != "" {
+					os.Setenv(key, val)
+				} else {
+					os.Unsetenv(key)
+				}
+			}
+		}()
+
+		// Set test environment variables
+		for key, val := range envs {
+			os.Setenv(key, val)
+		}
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify environment variables override YAML
+		assert.Equal(t, "/env/cert.pem", cfg.Global.Peer.CertFile)
+		assert.Equal(t, "/env/key.pem", cfg.Global.Peer.KeyFile)
+		assert.Equal(t, "/env/ca.pem", cfg.Global.Peer.ClientCaFile)
+		assert.True(t, cfg.Global.Peer.SkipTLSVerify)
+	})
+
+	t.Run("DefaultValues", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a minimal config file without Peer configuration
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+host: "localhost"
+port: 8080
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify default Peer configuration values (should be empty)
+		assert.Equal(t, "", cfg.Global.Peer.CertFile)
+		assert.Equal(t, "", cfg.Global.Peer.KeyFile)
+		assert.Equal(t, "", cfg.Global.Peer.ClientCaFile)
+		assert.False(t, cfg.Global.Peer.SkipTLSVerify)
+	})
+
+	t.Run("PartialPeerConfig", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a config file with partial Peer configuration
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+peer:
+  certFile: "/path/to/cert.pem"
+  skipTlsVerify: true
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify partial Peer config is loaded correctly
+		assert.Equal(t, "/path/to/cert.pem", cfg.Global.Peer.CertFile)
+		assert.Equal(t, "", cfg.Global.Peer.KeyFile)
+		assert.Equal(t, "", cfg.Global.Peer.ClientCaFile)
+		assert.True(t, cfg.Global.Peer.SkipTLSVerify)
+	})
+}

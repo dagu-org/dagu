@@ -71,6 +71,9 @@ type Global struct {
 	// SchedulerLockRetryInterval is the interval between lock acquisition attempts.
 	// Default is 50 milliseconds.
 	SchedulerLockRetryInterval time.Duration
+
+	// Peer contains configuration for peer connections over gRPC.
+	Peer Peer
 }
 
 func (cfg *Global) setTimezone() error {
@@ -297,4 +300,19 @@ type Worker struct {
 // Scheduler represents the scheduler configuration
 type Scheduler struct {
 	Port int // Health check server port (default: 8090)
+}
+
+// Peer holds the certificate and TLS configuration for peer connections over gRPC.
+type Peer struct {
+	// CertFile is the path to the server's TLS certificate file.
+	CertFile string
+
+	// KeyFile is the path to the server's TLS key file.
+	KeyFile string
+
+	// ClientCaFile is the path to the CA certificate file used for client verification.
+	ClientCaFile string
+
+	// SkipTLSVerify indicates whether to skip TLS certificate verification.
+	SkipTLSVerify bool
 }

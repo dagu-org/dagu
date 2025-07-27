@@ -2,8 +2,10 @@ package config
 
 // Definition holds the overall configuration for the application.
 // Each field maps to a configuration key defined in external sources (like YAML files)
-// via the "mapstructure" tags. Some fields are legacy and maintained only for backward compatibility.
 type Definition struct {
+	// Peer contains configuration for peer connections over gRPC.
+	Peer peerDef `mapstructure:"peer"`
+
 	// Host defines the hostname or IP address on which the application will run.
 	Host string `mapstructure:"host"`
 
@@ -92,7 +94,7 @@ type Definition struct {
 	// Default is 50 milliseconds.
 	SchedulerLockRetryInterval string `mapstructure:"schedulerLockRetryInterval"`
 
-	// DAGs is a legacy field that was previously used to configure DAG-related settings.
+	// DAGs is a field that was previously used to configure the directory for DAG files.
 	DAGs string `mapstructure:"dags"`
 
 	// DAGsDir specifies the directory where DAG files are stored.
@@ -142,10 +144,21 @@ type Definition struct {
 
 	// MaxDashboardPageLimit limits the number of dashboard pages that can be shown in the UI.
 	MaxDashboardPageLimit int `mapstructure:"maxDashboardPageLimit"`
+}
 
-	// ----------------------------------------------------------------------------
-	// Legacy fields for backward compatibility - End
-	// ----------------------------------------------------------------------------
+// peerDef holds the certificate and TLS configuration for peer connections over gRPC.
+type peerDef struct {
+	// CertFile is the path to the server's TLS certificate file.
+	CertFile string `mapstructure:"certFile"`
+
+	// KeyFile is the path to the server's TLS key file.
+	KeyFile string `mapstructure:"keyFile"`
+
+	// ClientCaFile is the path to the CA certificate file used for client verification.
+	ClientCaFile string `mapstructure:"clientCaFile"`
+
+	// SkipTLSVerify indicates whether to skip TLS certificate verification.
+	SkipTLSVerify bool `mapstructure:"skipTlsVerify"`
 }
 
 // authDef holds the authentication configuration for the application.
