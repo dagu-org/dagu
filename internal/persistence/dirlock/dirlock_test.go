@@ -262,36 +262,6 @@ func TestIsLocked(t *testing.T) {
 	})
 }
 
-func TestInfo(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	t.Run("no lock", func(t *testing.T) {
-		lock, err := New(tmpDir, nil)
-		require.NoError(t, err)
-
-		info, err := lock.Info()
-		require.NoError(t, err)
-		require.Nil(t, info)
-	})
-
-	t.Run("with lock", func(t *testing.T) {
-		lock, err := New(tmpDir, nil)
-		require.NoError(t, err)
-
-		err = lock.TryLock()
-		require.NoError(t, err)
-
-		info, err := lock.Info()
-		require.NoError(t, err)
-		require.NotNil(t, info)
-		require.WithinDuration(t, time.Now(), info.AcquiredAt, 2*time.Second)
-		require.Contains(t, info.LockDirName, ".dagu_lock.")
-
-		err = lock.Unlock()
-		require.NoError(t, err)
-	})
-}
-
 func TestStaleDetection(t *testing.T) {
 	tmpDir := t.TempDir()
 

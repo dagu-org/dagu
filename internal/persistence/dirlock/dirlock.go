@@ -49,10 +49,6 @@ type DirLock interface {
 	// IsHeldByMe checks if this instance holds the lock
 	IsHeldByMe() bool
 
-	// Refresh updates the heartbeat timestamp
-	// Called automatically but can be triggered manually
-	Refresh() error
-
 	// Info returns information about current lock holder
 	// Returns nil if not locked
 	Info() (*LockInfo, error)
@@ -233,11 +229,6 @@ func (l *dirLock) IsHeldByMe() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.isHeld
-}
-
-// Refresh is a no-op for directory-based locks
-func (l *dirLock) Refresh() error {
-	return nil
 }
 
 // Info returns information about current lock holder
