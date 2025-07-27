@@ -78,7 +78,7 @@ func runStartAll(ctx *Context, _ []string) error {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
-	coordinator, err := ctx.NewCoordinator()
+	coordinator, err := newCoordinator(ctx.Config.Coordinator)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}

@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/coordinator"
 	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -31,9 +29,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
-	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 // Context holds the configuration for a command.
@@ -186,29 +181,6 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, coordinatorClientFactory)
 }
 
-// NewCoordinator creates a new Coordinator service instance.
-// It sets up a gRPC server and listener for distributed task coordination.
-func (c *Context) NewCoordinator() (*coordinator.Service, error) {
-	// Create gRPC server
-	grpcServer := grpc.NewServer()
-
-	// Create health service
-	healthServer := health.NewServer()
-	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
-
-	// Create listener
-	addr := fmt.Sprintf("%s:%d", c.Config.Coordinator.Host, c.Config.Coordinator.Port)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create listener on %s: %w", addr, err)
-	}
-
-	// Create handler
-	handler := coordinator.NewHandler()
-
-	// Create and return service
-	return coordinator.NewService(grpcServer, handler, listener, healthServer), nil
-}
 
 // NewCoordinatorClientFactory creates a configured coordinator client factory.
 // It returns nil if coordinator is not configured.
@@ -222,16 +194,17 @@ func (c *Context) NewCoordinatorClientFactory() *coordinatorclient.Factory {
 	// Build factory with configuration
 	factory := coordinatorclient.NewFactory().
 		WithHost(c.Config.Coordinator.Host).
-		WithPort(c.Config.Coordinator.Port).
-		WithInsecure() // Default to insecure for now
+		WithPort(c.Config.Coordinator.Port)
 
-	// Configure TLS if available
-	if c.Config.Coordinator.TLS != nil {
+	// Configure TLS if available, otherwise use insecure connection
+	if c.Config.Coordinator.TLS != nil && (c.Config.Coordinator.TLS.CertFile != "" || c.Config.Coordinator.TLS.CAFile != "") {
 		factory.WithTLS(
 			c.Config.Coordinator.TLS.CertFile,
 			c.Config.Coordinator.TLS.KeyFile,
 			c.Config.Coordinator.TLS.CAFile,
 		)
+	} else {
+		factory.WithInsecure()
 	}
 
 	return factory
