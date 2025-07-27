@@ -146,6 +146,18 @@ declare module '@tanstack/react-table' {
 
 const columnHelper = createColumnHelper<Data>();
 
+function getTzAndExp(exp: string) {
+  const parts = exp.trim().split(/\s+/);
+
+  if (parts[0]?.startsWith("CRON_TZ=")) {
+    const timezone = parts[0]?.split("=")[1];
+    const cronExpr = parts?.slice(1).join(" ");
+    return [timezone, cronExpr];
+  } else {
+    return [parts.join(" ")];
+  }
+}
+
 function getNextSchedule(
   data: components['schemas']['DAGFile']
 ): CronDate | undefined {
@@ -155,12 +167,14 @@ function getNextSchedule(
   }
   try {
     const datesToRun = schedules.map((schedule) => {
+      const parsedCronExp = getTzAndExp(schedule.expression)
       const options = {
-        tz: getConfig().tz,
+        tz: (parsedCronExp.length > 1 ? parsedCronExp[0] : getConfig().tz),
         iterator: true,
       };
       // Assuming 'parseExpression' is the correct method name based on library docs
-      const interval = cronParser.parse(schedule.expression, options);
+      const cronExp = (parsedCronExp.length > 1 ? parsedCronExp[1] : parsedCronExp[0])
+      const interval = cronParser.parse(cronExp!, options);
       return interval.next();
     });
     // Sort the next run dates
