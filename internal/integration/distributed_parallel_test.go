@@ -77,7 +77,7 @@ steps:
 		}
 
 		// Give workers time to connect
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -184,7 +184,7 @@ steps:
 		}
 
 		// Give workers time to connect
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -243,7 +243,10 @@ steps:
 		agent := dagWrapper.Agent()
 
 		// Run should fail because no workers match
-		err := agent.Run(coord.Context)
+		// Use a short timeout since we expect this to fail
+		ctx, cancel := context.WithTimeout(coord.Context, 5*time.Second)
+		defer cancel()
+		err := agent.Run(ctx)
 		require.Error(t, err)
 
 		// Verify the DAG did not complete successfully
@@ -261,10 +264,10 @@ steps:
     run: child-sleep
     parallel:
       items:
-        - "30"
-        - "30"
-        - "30"
-        - "30"
+        - "1"
+        - "1"
+        - "1"
+        - "1"
       maxConcurrent: 2
 
 ---
@@ -327,7 +330,7 @@ steps:
 		}
 
 		// Give workers time to connect
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -344,7 +347,7 @@ steps:
 		}()
 
 		// Wait a bit to ensure parallel execution has started on workers
-		time.Sleep(2 * time.Second)
+		time.Sleep(300 * time.Millisecond)
 
 		// Cancel the execution
 		cancel()
@@ -393,12 +396,12 @@ steps:
   - name: local-execution
     run: child-local
     parallel:
-      items: ["30", "30"]
+      items: ["1", "1"]
     output: LOCAL_RESULTS
   - name: distributed-execution
     run: child-distributed
     parallel:
-      items: ["30", "30"]
+      items: ["1", "1"]
     output: DISTRIBUTED_RESULTS
 
 ---
@@ -480,7 +483,7 @@ steps:
 		}()
 
 		// Wait to ensure both local and distributed executions have started
-		time.Sleep(2 * time.Second)
+		time.Sleep(300 * time.Millisecond)
 
 		// Cancel the execution
 		execCancel()
@@ -533,7 +536,7 @@ steps:
   - name: process
     command: |
       echo "Starting task $1"
-      sleep 20
+      sleep 1
       echo "Completed task $1"
 `
 		// Setup and start coordinator
@@ -588,7 +591,7 @@ steps:
 		}
 
 		// Give workers time to connect
-		time.Sleep(1 * time.Second)
+		time.Sleep(200 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -605,7 +608,7 @@ steps:
 		}()
 
 		// Wait to ensure concurrent execution has started across workers
-		time.Sleep(2 * time.Second)
+		time.Sleep(300 * time.Millisecond)
 
 		// Cancel the execution
 		cancel()

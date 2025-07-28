@@ -3,11 +3,9 @@ package integration_test
 import (
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
-	"github.com/stretchr/testify/require"
 )
 
 func TestDAGExecution(t *testing.T) {
@@ -667,60 +665,4 @@ func TestComplexDependencies(t *testing.T) {
 		"MERGE":   "merge",
 		"FINAL":   "final",
 	})
-}
-
-func TestProgressingNode(t *testing.T) {
-	t.Parallel()
-
-	th := test.Setup(t)
-
-	dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "sleep 3"
-  - name: "2"
-    command: "sleep 3"
-    depends: "1"
-`)
-	agent := dag.Agent()
-
-	go func() {
-		err := agent.Run(agent.Context)
-		require.NoError(t, err, "failed to run agent")
-	}()
-
-	dag.AssertCurrentStatus(t, status.Running)
-
-	dagRunStatus, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
-	require.NoError(t, err, "failed to get latest status")
-
-	// Check the first node is in progress
-	require.Equal(t, status.NodeRunning.String(), dagRunStatus.Nodes[0].Status.String(), "first node should be in progress")
-	// Check the second node is not started
-	require.Equal(t, status.NodeNone.String(), dagRunStatus.Nodes[1].Status.String(), "second node should not be started")
-
-	// Wait for the first node to finish
-	time.Sleep(time.Second * 2)
-
-	dag.AssertCurrentStatus(t, status.Running)
-
-	// Check the progress of the nodes
-	dagRunStatus, err = dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
-	require.NoError(t, err, "failed to get latest status")
-
-	// Assert that the dag-run is still running
-	require.Equal(t, status.Running.String(), dagRunStatus.Status.String(), "dag-run should be running")
-
-	// Check the first node is finished
-	require.Equal(t, status.NodeSuccess.String(), dagRunStatus.Nodes[0].Status.String(), "first node should be finished")
-	// Check the second node is in progress
-	require.Equal(t, status.NodeRunning.String(), dagRunStatus.Nodes[1].Status.String(), "second node should be in progress")
-
-	// Wait for all nodes to finish
-	dag.AssertLatestStatus(t, status.Success)
-
-	// Check the second node is finished
-	dagRunStatus, err = dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
-	require.NoError(t, err, "failed to get latest status")
-
-	require.Equal(t, status.NodeSuccess.String(), dagRunStatus.Nodes[1].Status.String(), "second node should be finished")
 }

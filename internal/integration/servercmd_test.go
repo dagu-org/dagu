@@ -40,7 +40,7 @@ basePath: "/dagu"
 
 	// Cancel the test context after a delay so the server doesn’t run forever.
 	go func() {
-		time.Sleep(1500 * time.Millisecond)
+		time.Sleep(300 * time.Millisecond)
 		th.Cancel()
 	}()
 
@@ -54,7 +54,7 @@ basePath: "/dagu"
 	}()
 
 	// Wait a moment for the server to start.
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// When the config's BasePath is "/dagu", the health endpoint (normally at "/api/v1/health")
 	// should be available at "/dagu/api/v1/health" and NOT at "/api/v1/health".
@@ -110,7 +110,7 @@ remoteNodes:
 
 			// Cancel the test context after a delay so the server doesn’t run forever.
 			go func() {
-				time.Sleep(1500 * time.Millisecond)
+				time.Sleep(300 * time.Millisecond)
 				th.Cancel()
 			}()
 
@@ -124,7 +124,7 @@ remoteNodes:
 			}()
 
 			// Wait a moment for the server to start.
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(200 * time.Millisecond)
 
 			// 2. Request with the base path should return 200.
 			resp, err := http.Get("http://127.0.0.1:" + port + tc.basePath + "/api/v2/health?remoteNode=dev")
