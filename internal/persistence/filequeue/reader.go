@@ -46,7 +46,7 @@ const (
 const (
 	// Longer intervals since we use file events as primary notification
 	reloadInterval    = 30 * time.Second // Backup polling interval
-	processingDelay   = 1 * time.Second
+	processingDelay   = 10 * time.Millisecond // Small delay to prevent busy loop
 	shutdownTimeout   = 5 * time.Second
 	pollingInterval   = 2 * time.Second // For filenotify poller fallback
 	processingTimeout = 8 * time.Second
@@ -317,8 +317,11 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 			item.status = statusNone
 		}
 	default:
-		// Channel is full, reset status and try later
+		// Channel is full, reset status and set retry delay for this queue
 		item.status = statusNone
+		retryAfter := time.Now().Add(queueRetryDelay)
+		q.queueRetryTime.Store(data.Name, retryAfter)
+		logger.Info(ctx, "Channel full, delaying retry", "name", data.Name, "retryAfter", retryAfter.Format(time.RFC3339))
 		return
 	}
 }
