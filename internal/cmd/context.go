@@ -13,7 +13,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
-	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -201,37 +200,6 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	de := scheduler.NewDAGExecutor(coordinatorCli, c.DAGRunMgr)
 	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable, c.Config.Global.WorkDir)
 	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceMonitor, coordinatorCli)
-}
-
-// NewCoordinatorClientFactory creates a configured coordinator client factory.
-// It returns nil if coordinator is not configured.
-func (c *Context) NewCoordinatorClientFactory() *coordinatorclient.Factory {
-	// Check if coordinator is configured
-	if c.Config.Coordinator.Host == "" || c.Config.Coordinator.Port <= 0 {
-		logger.Info(c, "Coordinator not configured, distributed execution disabled")
-		return nil
-	}
-
-	// Build factory with configuration
-	factory := coordinatorclient.NewFactory().
-		WithHost(c.Config.Coordinator.Host).
-		WithPort(c.Config.Coordinator.Port)
-
-	// Configure TLS using global peer config
-	if c.Config.Global.Peer.CertFile != "" {
-		factory.WithTLS(
-			c.Config.Global.Peer.CertFile,
-			c.Config.Global.Peer.KeyFile,
-			c.Config.Global.Peer.ClientCaFile,
-		)
-		if c.Config.Global.Peer.SkipTLSVerify {
-			factory.WithSkipTLSVerify(true)
-		}
-	} else if c.Config.Global.Peer.Insecure {
-		factory.WithInsecure()
-	}
-
-	return factory
 }
 
 // StringParam retrieves a string parameter from the command line flags.
