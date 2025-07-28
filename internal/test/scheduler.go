@@ -21,8 +21,8 @@ import (
 // Scheduler represents a test scheduler instance
 type Scheduler struct {
 	Helper
-	EntryReader scheduler.EntryReader
-	QueueStore  models.QueueStore
+	EntryReader    scheduler.EntryReader
+	QueueStore     models.QueueStore
 	CoordinatorCli digraph.Dispatcher
 }
 
@@ -78,9 +78,9 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 	helper.DAGRunMgr = drm
 
 	sch := &Scheduler{
-		Helper:      helper,
-		EntryReader: em,
-		QueueStore:  qs,
+		Helper:         helper,
+		EntryReader:    em,
+		QueueStore:     qs,
 		CoordinatorCli: coordinatorCli,
 	}
 

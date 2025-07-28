@@ -12,11 +12,11 @@ import (
 
 // Env contains the execution metadata for a dag-run.
 type Env struct {
-	DAGRunID   string
-	RootDAGRun DAGRunRef
-	DAG        *DAG
-	DB         Database
-	Envs       map[string]string
+	DAGRunID       string
+	RootDAGRun     DAGRunRef
+	DAG            *DAG
+	DB             Database
+	Envs           map[string]string
 	CoordinatorCli Dispatcher
 }
 
@@ -69,11 +69,11 @@ func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, 
 	}
 
 	return context.WithValue(ctx, envCtxKey{}, Env{
-		RootDAGRun: rootDAGRun,
-		DAG:        dag,
-		DB:         db,
-		Envs:       envs,
-		DAGRunID:   dagRunID,
+		RootDAGRun:     rootDAGRun,
+		DAG:            dag,
+		DB:             db,
+		Envs:           envs,
+		DAGRunID:       dagRunID,
 		CoordinatorCli: coordinatorCli,
 	})
 }

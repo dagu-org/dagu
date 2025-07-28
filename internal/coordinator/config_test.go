@@ -11,7 +11,7 @@ import (
 
 func TestDefaultConfig(t *testing.T) {
 	config := coordinator.DefaultConfig()
-	
+
 	assert.True(t, config.Insecure)
 	assert.Equal(t, 10*time.Second, config.DialTimeout)
 	assert.Equal(t, 5*time.Minute, config.RequestTimeout)
@@ -131,7 +131,7 @@ func TestConfigValidate(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.config.Validate()
@@ -142,7 +142,7 @@ func TestConfigValidate(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
-				
+
 				// Check defaults are applied
 				if tt.config.DialTimeout == 0 {
 					assert.Equal(t, 10*time.Second, tt.config.DialTimeout)
@@ -170,10 +170,10 @@ func TestConfigValidateDefaults(t *testing.T) {
 		MaxRetries:     -5,
 		RetryInterval:  0,
 	}
-	
+
 	err := config.Validate()
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, 10*time.Second, config.DialTimeout)
 	assert.Equal(t, 5*time.Minute, config.RequestTimeout)
 	assert.Equal(t, 0, config.MaxRetries)

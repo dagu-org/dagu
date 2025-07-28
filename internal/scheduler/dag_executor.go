@@ -45,7 +45,7 @@ import (
 // - ExecuteDAG(): Executes/dispatches already-persisted jobs (no persistence)
 type DAGExecutor struct {
 	coordinatorCli digraph.Dispatcher
-	dagRunManager dagrun.Manager
+	dagRunManager  dagrun.Manager
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
@@ -55,7 +55,7 @@ func NewDAGExecutor(
 ) *DAGExecutor {
 	return &DAGExecutor{
 		coordinatorCli: coordinatorCli,
-		dagRunManager: dagRunManager,
+		dagRunManager:  dagRunManager,
 	}
 }
 

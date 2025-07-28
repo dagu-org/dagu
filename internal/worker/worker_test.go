@@ -104,8 +104,8 @@ func TestWorkerStart(t *testing.T) {
 			}
 			err := coord.DispatchTask(t, task)
 			require.NoError(t, err)
-			
-			// After dispatching first 3 tasks, add delay to allow workers to complete 
+
+			// After dispatching first 3 tasks, add delay to allow workers to complete
 			// and re-poll (tasks take 100ms to execute in this test)
 			if i >= 2 {
 				time.Sleep(120 * time.Millisecond)
@@ -456,7 +456,7 @@ func TestRunningTaskTracking(t *testing.T) {
 
 		// Now dispatch 2 more tasks after some have completed
 		time.Sleep(120 * time.Millisecond) // Wait for at least one task to complete
-		
+
 		for i := 3; i < 5; i++ {
 			task := &coordinatorv1.Task{
 				DagRunId:       "task-" + string(rune('a'+i)),

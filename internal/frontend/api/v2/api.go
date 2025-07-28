@@ -34,7 +34,7 @@ type API struct {
 	logEncodingCharset string
 	config             *config.Config
 	metricsRegistry    *prometheus.Registry
-	coordinatorCli coordinator.Client
+	coordinatorCli     coordinator.Client
 }
 
 func New(

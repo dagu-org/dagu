@@ -39,11 +39,11 @@ func (e *dagRunTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Ta
 
 // Worker represents a worker instance that polls for tasks from the coordinator.
 type Worker struct {
-	id            string
-	maxActiveRuns int
+	id             string
+	maxActiveRuns  int
 	coordinatorCli coordinator.Client
-	taskExecutor  TaskExecutor
-	labels        map[string]string
+	taskExecutor   TaskExecutor
+	labels         map[string]string
 
 	// For tracking poller states and heartbeats
 	pollersMu    sync.Mutex
@@ -67,12 +67,12 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 	}
 
 	return &Worker{
-		id:            workerID,
-		maxActiveRuns: maxActiveRuns,
+		id:             workerID,
+		maxActiveRuns:  maxActiveRuns,
 		coordinatorCli: coordinatorClient,
-		taskExecutor:  &dagRunTaskExecutor{manager: dagRunMgr},
-		labels:        labels,
-		runningTasks:  make(map[string]*coordinatorv1.RunningTask),
+		taskExecutor:   &dagRunTaskExecutor{manager: dagRunMgr},
+		labels:         labels,
+		runningTasks:   make(map[string]*coordinatorv1.RunningTask),
 	}
 }
 

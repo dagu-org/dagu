@@ -99,7 +99,7 @@ func TestClientDispatch(t *testing.T) {
 		err := client.Dispatch(ctx, task)
 		require.Error(t, err)
 		// Could be either error depending on timing
-		assert.True(t, strings.Contains(err.Error(), "no coordinator instances available") || 
+		assert.True(t, strings.Contains(err.Error(), "no coordinator instances available") ||
 			strings.Contains(err.Error(), "context deadline exceeded"))
 	})
 }
@@ -356,7 +356,7 @@ func TestClientDispatcherInterface(t *testing.T) {
 	err := client.Dispatch(ctx, task)
 	require.Error(t, err)
 	// Could be either error depending on timing
-	assert.True(t, strings.Contains(err.Error(), "no coordinator instances available") || 
+	assert.True(t, strings.Contains(err.Error(), "no coordinator instances available") ||
 		strings.Contains(err.Error(), "context deadline exceeded"))
 }
 

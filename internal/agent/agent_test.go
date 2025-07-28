@@ -419,10 +419,10 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Stop the DAG
 		dagAgent.Abort()
-		
+
 		// Give the process a moment to handle the signal and update status
 		time.Sleep(100 * time.Millisecond)
-		
+
 		dag.AssertLatestStatus(t, status.Cancel)
 	})
 	t.Run("HTTP_InvalidRequest", func(t *testing.T) {

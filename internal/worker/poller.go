@@ -13,21 +13,21 @@ import (
 
 // Poller handles polling for tasks from the coordinator
 type Poller struct {
-	workerID     string
+	workerID       string
 	coordinatorCli coordinator.Client
-	taskExecutor TaskExecutor
-	index        int
-	labels       map[string]string
+	taskExecutor   TaskExecutor
+	index          int
+	labels         map[string]string
 }
 
 // NewPoller creates a new poller instance
 func NewPoller(workerID string, coordinatorCli coordinator.Client, taskExecutor TaskExecutor, index int, labels map[string]string) *Poller {
 	return &Poller{
-		workerID:     workerID,
+		workerID:       workerID,
 		coordinatorCli: coordinatorCli,
-		taskExecutor: taskExecutor,
-		index:        index,
-		labels:       labels,
+		taskExecutor:   taskExecutor,
+		index:          index,
+		labels:         labels,
 	}
 }
 
