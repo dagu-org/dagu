@@ -43,7 +43,7 @@ func TestClientDispatch(t *testing.T) {
 		config.RequestTimeout = 100 * time.Millisecond
 
 		mockCoord := &mockCoordinatorService{
-			dispatchFunc: func(ctx context.Context, req *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error) {
+			dispatchFunc: func(_ context.Context, req *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error) {
 				assert.Equal(t, "test-dag-run", req.Task.DagRunId)
 				assert.Equal(t, "test.yaml", req.Task.Target)
 				return &coordinatorv1.DispatchResponse{}, nil
@@ -115,7 +115,7 @@ func TestClientPoll(t *testing.T) {
 	}
 
 	mockCoord := &mockCoordinatorService{
-		pollFunc: func(ctx context.Context, req *coordinatorv1.PollRequest) (*coordinatorv1.PollResponse, error) {
+		pollFunc: func(_ context.Context, req *coordinatorv1.PollRequest) (*coordinatorv1.PollResponse, error) {
 			assert.Equal(t, "test-worker", req.WorkerId)
 			return &coordinatorv1.PollResponse{Task: expectedTask}, nil
 		},
@@ -165,7 +165,7 @@ func TestClientGetWorkers(t *testing.T) {
 	}
 
 	mockCoord := &mockCoordinatorService{
-		getWorkersFunc: func(ctx context.Context, req *coordinatorv1.GetWorkersRequest) (*coordinatorv1.GetWorkersResponse, error) {
+		getWorkersFunc: func(_ context.Context, _ *coordinatorv1.GetWorkersRequest) (*coordinatorv1.GetWorkersResponse, error) {
 			return &coordinatorv1.GetWorkersResponse{Workers: expectedWorkers}, nil
 		},
 	}
@@ -199,7 +199,7 @@ func TestClientHeartbeat(t *testing.T) {
 
 	var receivedReq *coordinatorv1.HeartbeatRequest
 	mockCoord := &mockCoordinatorService{
-		heartbeatFunc: func(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
+		heartbeatFunc: func(_ context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
 			receivedReq = req
 			return &coordinatorv1.HeartbeatResponse{}, nil
 		},
@@ -246,7 +246,7 @@ func TestClientMetrics(t *testing.T) {
 
 	// Create a failing coordinator
 	mockCoord := &mockCoordinatorService{
-		dispatchFunc: func(ctx context.Context, req *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error) {
+		dispatchFunc: func(_ context.Context, _ *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error) {
 			return nil, status.Error(codes.Unavailable, "service unavailable")
 		},
 	}
@@ -290,7 +290,7 @@ func TestClientCleanup(t *testing.T) {
 	config.RequestTimeout = 100 * time.Millisecond
 
 	mockCoord := &mockCoordinatorService{
-		dispatchFunc: func(ctx context.Context, req *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error) {
+		dispatchFunc: func(_ context.Context, _ *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error) {
 			return &coordinatorv1.DispatchResponse{}, nil
 		},
 	}
