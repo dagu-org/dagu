@@ -261,9 +261,6 @@ type queueConfigDef struct {
 
 // coordinatorDef holds the configuration for the coordinator service.
 type coordinatorDef struct {
-	// ID is the coordinator instance identifier.
-	ID string `mapstructure:"id"`
-
 	// Host is the hostname or IP address for the coordinator service.
 	Host string `mapstructure:"host"`
 
@@ -278,12 +275,6 @@ type workerDef struct {
 
 	// MaxActiveRuns is the maximum number of active runs for the worker.
 	MaxActiveRuns int `mapstructure:"maxActiveRuns"`
-
-	// CoordinatorHost is the hostname or IP address for connecting to the coordinator.
-	CoordinatorHost string `mapstructure:"coordinatorHost"`
-
-	// CoordinatorPort is the port number for connecting to the coordinator.
-	CoordinatorPort int `mapstructure:"coordinatorPort"`
 
 	// Labels are the worker labels for capability matching.
 	// Can be either a string (key1=value1,key2=value2) or a map in YAML.

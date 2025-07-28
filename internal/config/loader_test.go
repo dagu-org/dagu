@@ -75,10 +75,8 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_QUEUE_ENABLED": "false",
 
 		// Worker configuration - env vars still bound but to nested structure
-		"DAGU_WORKER_ID":               "test-worker-123",
-		"DAGU_WORKER_MAX_ACTIVE_RUNS":  "200",
-		"DAGU_WORKER_COORDINATOR_HOST": "worker.example.com",
-		"DAGU_WORKER_COORDINATOR_PORT": "60051",
+		"DAGU_WORKER_ID":              "test-worker-123",
+		"DAGU_WORKER_MAX_ACTIVE_RUNS": "200",
 
 		// Scheduler configuration
 		"DAGU_SCHEDULER_PORT": "9999",
@@ -276,8 +274,6 @@ func TestConfigLoader_WorkerConfiguration(t *testing.T) {
 worker:
   id: "yaml-worker-01"
   maxActiveRuns: 50
-  coordinatorHost: "coordinator.example.com"
-  coordinatorPort: 8080
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -304,18 +300,14 @@ worker:
 worker:
   id: "yaml-worker"
   maxActiveRuns: 10
-  coordinatorHost: "localhost"
-  coordinatorPort: 5000
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
 
 		// Set environment variables
 		envs := map[string]string{
-			"DAGU_WORKER_ID":               "env-worker-override",
-			"DAGU_WORKER_MAX_ACTIVE_RUNS":  "300",
-			"DAGU_WORKER_COORDINATOR_HOST": "env.coordinator.com",
-			"DAGU_WORKER_COORDINATOR_PORT": "9090",
+			"DAGU_WORKER_ID":              "env-worker-override",
+			"DAGU_WORKER_MAX_ACTIVE_RUNS": "300",
 		}
 
 		// Save and clear existing environment variables

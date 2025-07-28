@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -71,22 +72,7 @@ var coordinatorFlags = []commandLineFlag{
 }
 
 func runCoordinator(ctx *Context, _ []string) error {
-	// Get or generate instance ID
-	instanceID := ctx.Config.Coordinator.ID
-	if instanceID == "" {
-		hostname, err := os.Hostname()
-		if err != nil {
-			hostname = "unknown"
-		}
-		instanceID = fmt.Sprintf("%s@%d", hostname, ctx.Config.Coordinator.Port)
-	}
-
-	logger.Info(ctx, "Coordinator initialization",
-		"host", ctx.Config.Coordinator.Host,
-		"port", ctx.Config.Coordinator.Port,
-		"instance_id", instanceID)
-
-	coordinator, err := newCoordinator(ctx.Config, ctx.ServiceMonitor)
+	coordinator, err := newCoordinator(ctx, ctx.Config, ctx.ServiceMonitor)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
@@ -108,16 +94,18 @@ func runCoordinator(ctx *Context, _ []string) error {
 
 // newCoordinator creates a new Coordinator service instance.
 // It sets up a gRPC server and listener for distributed task coordination.
-func newCoordinator(cfg *config.Config, serviceMonitor models.ServiceMonitor) (*coordinator.Service, error) {
-	// Generate instance ID if not provided
-	instanceID := cfg.Coordinator.ID
-	if instanceID == "" {
-		hostname, err := os.Hostname()
-		if err != nil {
-			hostname = "unknown"
-		}
-		instanceID = fmt.Sprintf("%s@%d", hostname, cfg.Coordinator.Port)
+func newCoordinator(ctx context.Context, cfg *config.Config, serviceMonitor models.ServiceMonitor) (*coordinator.Service, error) {
+	// Generate instance ID
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
 	}
+	instanceID := fmt.Sprintf("%s@%d", hostname, cfg.Coordinator.Port)
+
+	logger.Info(ctx, "Coordinator initialization",
+		"host", cfg.Coordinator.Host,
+		"port", cfg.Coordinator.Port,
+		"instance_id", instanceID)
 	// Create gRPC server options
 	var serverOpts []grpc.ServerOption
 
