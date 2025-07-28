@@ -23,6 +23,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// Client abstracts handling communication with the coordinator service using
+// service discovery and gRPC.
 type Client interface {
 	digraph.Dispatcher
 
@@ -50,10 +52,10 @@ type Metrics struct {
 	LastError        error // Last error encountered
 }
 
-var _ Client = (*dispatcher)(nil)
+var _ Client = (*clientImpl)(nil)
 
-// dispatcher is the concrete implementation
-type dispatcher struct {
+// clientImpl is the concrete implementation
+type clientImpl struct {
 	config    *Config
 	discovery models.ServiceMonitor
 
@@ -62,14 +64,6 @@ type dispatcher struct {
 
 	stateMu sync.RWMutex // Mutex for state access
 	state   *Metrics     // Connection state tracking
-}
-
-// Metrics implements Client.
-func (d *dispatcher) Metrics() Metrics {
-	d.stateMu.RLock()
-	defer d.stateMu.RUnlock()
-
-	return *d.state
 }
 
 // client holds the gRPC connection and clients for the coordinator service.
@@ -88,7 +82,7 @@ var (
 
 // New creates a new coordinator client with the given configuration
 func New(monitor models.ServiceMonitor, config *Config) Client {
-	return &dispatcher{
+	return &clientImpl{
 		config:    config,
 		discovery: monitor,
 		clients:   make(map[string]*client),
@@ -99,15 +93,15 @@ func New(monitor models.ServiceMonitor, config *Config) Client {
 }
 
 // Dispatch sends a task to the coordinator
-func (d *dispatcher) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
+func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
 	// Get coordinator resolver from discovery
-	resolver := d.discovery.Resolver(ctx, models.ServiceNameCoordinator)
+	resolver := cli.discovery.Resolver(ctx, models.ServiceNameCoordinator)
 
 	// Set up retry policy
-	basePolicy := backoff.NewExponentialBackoffPolicy(d.config.RetryInterval)
+	basePolicy := backoff.NewExponentialBackoffPolicy(cli.config.RetryInterval)
 	basePolicy.BackoffFactor = 2.0
 	basePolicy.MaxInterval = 30 * time.Second
-	basePolicy.MaxRetries = d.config.MaxRetries
+	basePolicy.MaxRetries = cli.config.MaxRetries
 
 	policy := backoff.WithJitter(basePolicy, backoff.FullJitter)
 
@@ -122,12 +116,12 @@ func (d *dispatcher) Dispatch(ctx context.Context, task *coordinatorv1.Task) err
 			return fmt.Errorf("no coordinator instances available")
 		}
 
-		return d.attemptCall(ctx, members, func(ctx context.Context, member models.HostInfo, client *client) error {
+		return cli.attemptCall(ctx, members, func(ctx context.Context, member models.HostInfo, client *client) error {
 			// Create request
 			req := &coordinatorv1.DispatchRequest{Task: task}
 
 			// Apply request timeout
-			dispatchCtx, cancel := context.WithTimeout(ctx, d.config.RequestTimeout)
+			dispatchCtx, cancel := context.WithTimeout(ctx, cli.config.RequestTimeout)
 			defer cancel()
 
 			// Try to dispatch
@@ -148,9 +142,9 @@ func (d *dispatcher) Dispatch(ctx context.Context, task *coordinatorv1.Task) err
 }
 
 // Poll implements Client.
-func (d *dispatcher) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+func (cli *clientImpl) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 	// Get coordinator resolver from discovery
-	resolver := d.discovery.Resolver(ctx, models.ServiceNameCoordinator)
+	resolver := cli.discovery.Resolver(ctx, models.ServiceNameCoordinator)
 
 	var task *coordinatorv1.Task
 	err := backoff.Retry(ctx, func(ctx context.Context) error {
@@ -164,7 +158,7 @@ func (d *dispatcher) Poll(ctx context.Context, policy backoff.RetryPolicy, req *
 			return fmt.Errorf("no coordinator instances available")
 		}
 
-		return d.attemptCall(ctx, members, func(ctx context.Context, member models.HostInfo, client *client) error {
+		return cli.attemptCall(ctx, members, func(ctx context.Context, member models.HostInfo, client *client) error {
 			resp, err := client.client.Poll(ctx, req)
 			if err != nil {
 				return fmt.Errorf("failed to poll task from coordinator %s: %w", member.ID, err)
@@ -188,7 +182,15 @@ func (d *dispatcher) Poll(ctx context.Context, policy backoff.RetryPolicy, req *
 	return task, err
 }
 
-func (d *dispatcher) attemptCall(ctx context.Context, members []models.HostInfo, callback func(ctx context.Context, member models.HostInfo, client *client) error) error {
+// Metrics implements Client.
+func (cli *clientImpl) Metrics() Metrics {
+	cli.stateMu.RLock()
+	defer cli.stateMu.RUnlock()
+
+	return *cli.state
+}
+
+func (cli *clientImpl) attemptCall(ctx context.Context, members []models.HostInfo, callback func(ctx context.Context, member models.HostInfo, client *client) error) error {
 	// Shuffle members to distribute load evenly
 	rand.Shuffle(len(members), func(i, j int) {
 		members[i], members[j] = members[j], members[i]
@@ -198,24 +200,24 @@ func (d *dispatcher) attemptCall(ctx context.Context, members []models.HostInfo,
 	var lastErr error
 	for _, member := range members {
 		// Get or create client for this coordinator
-		client, err := d.getOrCreateClient(ctx, member)
+		client, err := cli.getOrCreateClient(ctx, member)
 		if err != nil {
 			logger.Warn(ctx, "Failed to connect to coordinator",
 				"coordinator_id", member.ID,
 				"address", member.HostPort,
 				"error", err)
-			d.removeClient(member.ID) // Remove failed client
-			d.recordFailure(err)
+			cli.removeClient(member.ID) // Remove failed client
+			cli.recordFailure(err)
 			continue
 		}
 
 		// Check if the coordinator is healthy
-		if err := d.isHealthy(ctx, member); err != nil {
+		if err := cli.isHealthy(ctx, member); err != nil {
 			logger.Warn(ctx, "Failed to check coordinator health",
 				"coordinator_id", member.ID,
 				"address", member.HostPort,
 				"error", err)
-			d.recordFailure(err)
+			cli.recordFailure(err)
 			continue
 		}
 
@@ -226,10 +228,10 @@ func (d *dispatcher) attemptCall(ctx context.Context, members []models.HostInfo,
 				"address", member.HostPort,
 				"error", err)
 			lastErr = err
-			d.recordFailure(err)
+			cli.recordFailure(err)
 		} else {
 			// Success - record and return immediately
-			d.recordSuccess(ctx)
+			cli.recordSuccess(ctx)
 			return nil
 		}
 	}
@@ -237,9 +239,9 @@ func (d *dispatcher) attemptCall(ctx context.Context, members []models.HostInfo,
 	return lastErr
 }
 
-func (d *dispatcher) isHealthy(ctx context.Context, member models.HostInfo) error {
+func (cli *clientImpl) isHealthy(ctx context.Context, member models.HostInfo) error {
 	// Get or create client for this coordinator
-	client, err := d.getOrCreateClient(ctx, member)
+	client, err := cli.getOrCreateClient(ctx, member)
 	if err != nil {
 		return fmt.Errorf("failed to get coordinator client: %w", err)
 	}
@@ -262,39 +264,39 @@ func (d *dispatcher) isHealthy(ctx context.Context, member models.HostInfo) erro
 }
 
 // getOrCreateClient gets an existing client or creates a new one for the given member
-func (d *dispatcher) getOrCreateClient(ctx context.Context, member models.HostInfo) (*client, error) {
+func (cli *clientImpl) getOrCreateClient(ctx context.Context, member models.HostInfo) (*client, error) {
 	// Try to get existing client with read lock
-	d.clientsMu.RLock()
-	if c, exists := d.clients[member.ID]; exists {
-		d.clientsMu.RUnlock()
+	cli.clientsMu.RLock()
+	if c, exists := cli.clients[member.ID]; exists {
+		cli.clientsMu.RUnlock()
 		return c, nil
 	}
-	d.clientsMu.RUnlock()
+	cli.clientsMu.RUnlock()
 
 	// Need to create new client, acquire write lock
-	d.clientsMu.Lock()
-	defer d.clientsMu.Unlock()
+	cli.clientsMu.Lock()
+	defer cli.clientsMu.Unlock()
 
 	// Double-check after acquiring write lock
-	if c, exists := d.clients[member.ID]; exists {
+	if c, exists := cli.clients[member.ID]; exists {
 		return c, nil
 	}
 
 	// Create new client
-	c, err := d.createClient(ctx, member)
+	c, err := cli.createClient(ctx, member)
 	if err != nil {
 		return nil, err
 	}
 
 	// Cache it
-	d.clients[member.ID] = c
+	cli.clients[member.ID] = c
 	return c, nil
 }
 
 // createClient creates a new gRPC client for the given coordinator
-func (d *dispatcher) createClient(_ context.Context, member models.HostInfo) (*client, error) {
+func (cli *clientImpl) createClient(_ context.Context, member models.HostInfo) (*client, error) {
 	// Get dial options based on TLS configuration
-	dialOpts, err := getDialOptions(d.config)
+	dialOpts, err := getDialOptions(cli.config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure gRPC connection: %w", err)
 	}
@@ -313,22 +315,22 @@ func (d *dispatcher) createClient(_ context.Context, member models.HostInfo) (*c
 }
 
 // removeClient removes a client from the cache
-func (d *dispatcher) removeClient(coordinatorID string) {
-	d.clientsMu.Lock()
-	defer d.clientsMu.Unlock()
+func (cli *clientImpl) removeClient(coordinatorID string) {
+	cli.clientsMu.Lock()
+	defer cli.clientsMu.Unlock()
 
-	if c, exists := d.clients[coordinatorID]; exists {
+	if c, exists := cli.clients[coordinatorID]; exists {
 		_ = c.conn.Close()
-		delete(d.clients, coordinatorID)
+		delete(cli.clients, coordinatorID)
 	}
 }
 
 // Cleanup cleans up all connections
-func (d *dispatcher) Cleanup(ctx context.Context) error {
-	d.clientsMu.Lock()
-	defer d.clientsMu.Unlock()
+func (cli *clientImpl) Cleanup(ctx context.Context) error {
+	cli.clientsMu.Lock()
+	defer cli.clientsMu.Unlock()
 
-	for id, c := range d.clients {
+	for id, c := range cli.clients {
 		if err := c.conn.Close(); err != nil {
 			logger.Error(ctx, "Failed to close connection",
 				"coordinator_id", id,
@@ -337,42 +339,42 @@ func (d *dispatcher) Cleanup(ctx context.Context) error {
 	}
 
 	// Clear the map
-	d.clients = make(map[string]*client)
+	cli.clients = make(map[string]*client)
 	return nil
 }
 
 // recordFailure updates the state for a failed coordinator connection/operation
-func (d *dispatcher) recordFailure(err error) {
-	d.stateMu.Lock()
-	defer d.stateMu.Unlock()
+func (cli *clientImpl) recordFailure(err error) {
+	cli.stateMu.Lock()
+	defer cli.stateMu.Unlock()
 
-	d.state.IsConnected = false
-	d.state.ConsecutiveFails++
-	d.state.FailCount++
-	d.state.LastError = err
+	cli.state.IsConnected = false
+	cli.state.ConsecutiveFails++
+	cli.state.FailCount++
+	cli.state.LastError = err
 }
 
 // recordSuccess updates the state for a successful coordinator operation
-func (d *dispatcher) recordSuccess(ctx context.Context) {
-	d.stateMu.Lock()
-	defer d.stateMu.Unlock()
+func (cli *clientImpl) recordSuccess(ctx context.Context) {
+	cli.stateMu.Lock()
+	defer cli.stateMu.Unlock()
 
 	// Log recovery if this was a disconnection
-	if !d.state.IsConnected && d.state.ConsecutiveFails > 0 {
+	if !cli.state.IsConnected && cli.state.ConsecutiveFails > 0 {
 		logger.Info(ctx, "Dispatcher connection recovered",
-			"previous_consecutive_failures", d.state.ConsecutiveFails)
+			"previous_consecutive_failures", cli.state.ConsecutiveFails)
 	}
 
 	// Reset consecutive failures on success
-	d.state.IsConnected = true
-	d.state.ConsecutiveFails = 0
-	d.state.LastError = nil
+	cli.state.IsConnected = true
+	cli.state.ConsecutiveFails = 0
+	cli.state.LastError = nil
 }
 
 // GetWorkers retrieves the list of workers from all coordinators
-func (d *dispatcher) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error) {
+func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error) {
 	// Get coordinator resolver from discovery
-	resolver := d.discovery.Resolver(ctx, models.ServiceNameCoordinator)
+	resolver := cli.discovery.Resolver(ctx, models.ServiceNameCoordinator)
 
 	// Try to get members
 	members, err := resolver.Members(ctx)
@@ -386,7 +388,7 @@ func (d *dispatcher) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInf
 
 	for _, member := range members {
 		// Get or create client for this member
-		c, err := d.getOrCreateClient(ctx, member)
+		c, err := cli.getOrCreateClient(ctx, member)
 		if err != nil {
 			logger.Warn(ctx, "Failed to connect to coordinator",
 				"id", member.ID,
@@ -407,7 +409,7 @@ func (d *dispatcher) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInf
 
 			// If this is a connection error, remove the client from cache
 			if st, ok := status.FromError(err); ok && st.Code() == codes.Unavailable {
-				d.removeClient(member.ID)
+				cli.removeClient(member.ID)
 			}
 			continue
 		}
@@ -432,9 +434,9 @@ func (d *dispatcher) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInf
 }
 
 // Heartbeat sends a heartbeat to coordinators
-func (d *dispatcher) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) error {
+func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) error {
 	// Get coordinator resolver from discovery
-	resolver := d.discovery.Resolver(ctx, models.ServiceNameCoordinator)
+	resolver := cli.discovery.Resolver(ctx, models.ServiceNameCoordinator)
 
 	// Try to get members
 	members, err := resolver.Members(ctx)
@@ -447,7 +449,7 @@ func (d *dispatcher) Heartbeat(ctx context.Context, req *coordinatorv1.Heartbeat
 	}
 
 	// Use attemptCall to send heartbeat to any available coordinator
-	return d.attemptCall(ctx, members, func(ctx context.Context, member models.HostInfo, client *client) error {
+	return cli.attemptCall(ctx, members, func(ctx context.Context, member models.HostInfo, client *client) error {
 		// Send heartbeat
 		_, err := client.client.Heartbeat(ctx, req)
 		if err != nil {
