@@ -45,7 +45,7 @@
     "copy-webpack-plugin": "^13.0.0",
     "css-loader": "^7.1.2",
     "esbuild-loader": "^4.3.0",
-    "eslint": "^9.31.0",
+    "eslint": "^9.32.0",
     "html-loader": "^5.1.0",
     "html-webpack-plugin": "^5.6.3",
     "monaco-editor-webpack-plugin": "^7.1.0",
