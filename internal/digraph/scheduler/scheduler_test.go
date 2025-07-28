@@ -26,6 +26,7 @@ func TestScheduler(t *testing.T) {
 	testScript := test.TestdataPath(t, filepath.Join("digraph", "scheduler", "testfile.sh"))
 
 	t.Run("SequentialStepsSuccess", func(t *testing.T) {
+		t.Parallel()
 		sc := setupScheduler(t, withMaxActiveRuns(1))
 
 		// 1 -> 2 -> 3
@@ -42,6 +43,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "3", status.NodeSuccess)
 	})
 	t.Run("SequentialStepsWithFailure", func(t *testing.T) {
+		t.Parallel()
 		sc := setupScheduler(t, withMaxActiveRuns(1))
 
 		// 1 -> 2 -> 3 -> 4
@@ -61,6 +63,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "4", status.NodeCancel)
 	})
 	t.Run("ParallelSteps", func(t *testing.T) {
+		t.Parallel()
 		sc := setupScheduler(t, withMaxActiveRuns(3))
 
 		// 1,2,3
@@ -95,6 +98,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "4", status.NodeSuccess)
 	})
 	t.Run("ComplexCommand", func(t *testing.T) {
+		t.Parallel()
 		sc := setupScheduler(t, withMaxActiveRuns(1))
 
 		graph := sc.newGraph(t,
@@ -267,12 +271,12 @@ func TestScheduler(t *testing.T) {
 		// 1 -> 2 (cancel when running) -> 3 (should not be executed)
 		graph := sc.newGraph(t,
 			successStep("1"),
-			newStep("2", withDepends("1"), withCommand("sleep 10")),
+			newStep("2", withDepends("1"), withCommand("sleep 0.5")),
 			failStep("3", "2"),
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 500) // wait for step 2 to start
+			time.Sleep(time.Millisecond * 200) // wait for step 2 to start
 			graph.Cancel(t)
 		}()
 
@@ -283,12 +287,12 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "3", status.NodeNone)
 	})
 	t.Run("Timeout", func(t *testing.T) {
-		sc := setupScheduler(t, withTimeout(time.Second*2))
+		sc := setupScheduler(t, withTimeout(time.Millisecond*500))
 
 		// 1 -> 2 (timeout) -> 3 (should not be executed)
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("sleep 1")),
-			newStep("2", withCommand("sleep 10"), withDepends("1")),
+			newStep("1", withCommand("sleep 0.1")),
+			newStep("2", withCommand("sleep 0.5"), withDepends("1")),
 			successStep("3", "2"),
 		)
 
@@ -331,13 +335,13 @@ func TestScheduler(t *testing.T) {
 					fi
 					exit 0
 				`),
-				withRetryPolicy(1, time.Millisecond*500),
+				withRetryPolicy(1, time.Millisecond*50),
 			),
 		)
 
 		_ = os.Setenv(testEnv, "1")
 		go func() {
-			time.Sleep(time.Millisecond * 300)
+			time.Sleep(time.Millisecond * 50)
 			_ = os.Setenv(testEnv, "0")
 			t.Cleanup(func() {
 				_ = os.Unsetenv(testEnv)
@@ -362,13 +366,13 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t,
 			newStep("1",
 				withCommand(fmt.Sprintf("%s %s", testScript, file)),
-				withRetryPolicy(1, time.Millisecond*500),
+				withRetryPolicy(1, time.Millisecond*50),
 			),
 		)
 
 		go func() {
 			// Create file for successful retry
-			time.Sleep(time.Millisecond * 300) // wait for step 1 to start
+			time.Sleep(time.Millisecond * 30) // wait for step 1 to start
 
 			// Create file during the retry interval
 			f, err := os.Create(file)
@@ -393,6 +397,7 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "1", status.NodeSuccess)
 	})
 	t.Run("PreconditionMatch", func(t *testing.T) {
+		t.Parallel()
 		sc := setupScheduler(t)
 
 		// 1 -> 2 (precondition match) -> 3
@@ -498,11 +503,11 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t, withOnCancel(successStep("onCancel")))
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("sleep 10")),
+			newStep("1", withCommand("sleep 0.5")),
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 100) // wait for step 1 to start
+			time.Sleep(time.Millisecond * 30) // wait for step 1 to start
 			graph.Signal(syscall.SIGTERM)
 		}()
 
@@ -535,11 +540,11 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("sleep 10")),
+			newStep("1", withCommand("sleep 0.5")),
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 100) // wait for step 1 to start
+			time.Sleep(time.Millisecond * 30) // wait for step 1 to start
 			graph.Signal(syscall.SIGTERM)
 		}()
 
@@ -552,13 +557,13 @@ func TestScheduler(t *testing.T) {
 
 		graph := sc.newGraph(t,
 			newStep("1",
-				withCommand("sleep 1"),
-				withRepeatPolicy(true, time.Millisecond*500),
+				withCommand("sleep 0.1"),
+				withRepeatPolicy(true, time.Millisecond*100),
 			),
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 1750)
+			time.Sleep(time.Millisecond * 250)
 			graph.Cancel(t)
 		}()
 
@@ -577,7 +582,7 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t,
 			newStep("1",
 				withCommand("false"),
-				withRepeatPolicy(true, time.Millisecond*300),
+				withRepeatPolicy(true, time.Millisecond*50),
 			),
 		)
 
@@ -594,8 +599,8 @@ func TestScheduler(t *testing.T) {
 
 		graph := sc.newGraph(t,
 			newStep("1",
-				withCommand("sleep 1"),
-				withRepeatPolicy(true, time.Millisecond*300),
+				withCommand("sleep 0.1"),
+				withRepeatPolicy(true, time.Millisecond*50),
 			),
 		)
 
@@ -627,6 +632,7 @@ func TestScheduler(t *testing.T) {
 		require.Contains(t, result.Error.Error(), "no such file or directory")
 	})
 	t.Run("OutputVariables", func(t *testing.T) {
+		t.Parallel()
 		sc := setupScheduler(t)
 
 		// 1: echo hello > OUT
@@ -659,7 +665,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1", withCommand("echo hello"), withOutput("OUT")),
 			newStep("2", withCommand("echo world"), withOutput("OUT2"), withDepends("1")),
 			newStep("3", withCommand("echo $OUT $OUT2"), withDepends("2"), withOutput("RESULT")),
-			newStep("4", withCommand("sleep 1")),
+			newStep("4", withCommand("sleep 0.1")),
 			// 5 should not have reference to OUT or OUT2
 			newStep("5", withCommand("echo $OUT $OUT2"), withDepends("4"), withOutput("RESULT2")),
 		)
@@ -817,7 +823,7 @@ func TestScheduler(t *testing.T) {
 						Condition: fmt.Sprintf("`cat %s || true`", file),
 						Expected:  "ready",
 					}
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
@@ -857,7 +863,7 @@ func TestScheduler(t *testing.T) {
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: "test ! -f " + file,
 					}
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
@@ -896,7 +902,7 @@ func TestScheduler(t *testing.T) {
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: "test ! -f " + file,
 					}
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
@@ -935,7 +941,7 @@ func TestScheduler(t *testing.T) {
 				func(step *digraph.Step) {
 					step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile
 					step.RepeatPolicy.ExitCode = []int{42}
-					step.RepeatPolicy.Interval = 200 * time.Millisecond
+					step.RepeatPolicy.Interval = 50 * time.Millisecond
 				},
 			),
 		)
@@ -969,7 +975,7 @@ func TestScheduler(t *testing.T) {
 						Condition: "$TEST_REPEAT_MATCH_EXPR",
 						Expected:  "done",
 					}
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
@@ -1005,7 +1011,7 @@ func TestScheduler(t *testing.T) {
 						Condition: "$OUT",
 						Expected:  "done",
 					}
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
@@ -1051,7 +1057,7 @@ func TestScheduler(t *testing.T) {
 					fi
 				`, counterFile)),
 				withOutput("RESULT"),
-				withRetryPolicy(3, time.Millisecond*100),
+				withRetryPolicy(3, time.Millisecond*20),
 			),
 		)
 
@@ -1122,7 +1128,7 @@ func TestScheduler(t *testing.T) {
 					fi
 				`, counterFile)),
 				withOutput("RESULT"),
-				withRetryPolicy(2, time.Millisecond*100),
+				withRetryPolicy(2, time.Millisecond*20),
 			),
 		)
 
@@ -1665,7 +1671,7 @@ func TestScheduler_SignalHandling(t *testing.T) {
 		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("sleep 10")),
+			newStep("1", withCommand("sleep 0.5")),
 			successStep("2", "1"),
 		)
 
@@ -1683,7 +1689,7 @@ func TestScheduler_SignalHandling(t *testing.T) {
 		select {
 		case <-done:
 			// Signal handling completed
-		case <-time.After(5 * time.Second):
+		case <-time.After(1 * time.Second):
 			t.Fatal("Signal handling did not complete in time")
 		}
 
@@ -1698,7 +1704,7 @@ func TestScheduler_SignalHandling(t *testing.T) {
 		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
-			newStep("1", withCommand("sleep 10")),
+			newStep("1", withCommand("sleep 0.5")),
 		)
 
 		go func() {
@@ -1850,13 +1856,13 @@ func TestScheduler_MultipleHandlerExecution(t *testing.T) {
 }
 
 func TestScheduler_TimeoutDuringRetry(t *testing.T) {
-	sc := setupScheduler(t, withTimeout(2*time.Second))
+	sc := setupScheduler(t, withTimeout(500*time.Millisecond))
 
 	// Step that will keep retrying until timeout
 	graph := sc.newGraph(t,
 		newStep("1",
-			withCommand("sleep 1 && false"),
-			withRetryPolicy(10, 500*time.Millisecond), // Many retries
+			withCommand("sleep 0.1 && false"),
+			withRetryPolicy(10, 50*time.Millisecond), // Many retries
 		),
 	)
 
@@ -1871,7 +1877,7 @@ func TestScheduler_TimeoutDuringRetry(t *testing.T) {
 
 func TestScheduler_CancelDuringHandlerExecution(t *testing.T) {
 	sc := setupScheduler(t,
-		withOnExit(newStep("onExit", withScript("echo handler started && sleep 1 && echo handler done"))),
+		withOnExit(newStep("onExit", withScript("echo handler started && sleep 0.1 && echo handler done"))),
 	)
 
 	graph := sc.newGraph(t, successStep("1"))
@@ -1989,7 +1995,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 					trap 'exit 143' TERM
 					sleep 10
 				`),
-				withRetryPolicy(2, 100*time.Millisecond),
+				withRetryPolicy(2, 20*time.Millisecond),
 			),
 		)
 
@@ -2023,7 +2029,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 						fi
 					fi
 				`, counterFile, counterFile, counterFile, counterFile)),
-				withRetryPolicy(3, 100*time.Millisecond),
+				withRetryPolicy(3, 20*time.Millisecond),
 				func(step *digraph.Step) {
 					step.RetryPolicy.ExitCodes = []int{42} // Only retry on exit code 42
 				},
@@ -2048,7 +2054,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 				withCommand("echo boolean true mode"),
 				func(step *digraph.Step) {
 					step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile // This is what repeat: true becomes
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 					step.RepeatPolicy.Limit = 3 // Limit to prevent infinite loop
 					// No condition, no exitCode - should repeat while step succeeds
 				},
@@ -2087,7 +2093,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 				`, counterFile, counterFile, counterFile)),
 				func(step *digraph.Step) {
 					step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile // Boolean true mode
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 					// No condition, no exitCode - should stop when step fails
 				},
 			),
@@ -2130,7 +2136,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 				}),
 				func(step *digraph.Step) {
 					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 					// No condition, no exitCode - should repeat until step succeeds
 				},
 			),
@@ -2167,13 +2173,13 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: fmt.Sprintf("test ! -f %s", counterFile),
 					}
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 250)
+			time.Sleep(time.Millisecond * 50)
 			f, _ := os.Create(counterFile)
 			_ = f.Close()
 		}()
@@ -2206,13 +2212,13 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 						Condition: fmt.Sprintf("`cat %s`", counterFile),
 						Expected:  "continue",
 					}
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 250)
+			time.Sleep(time.Millisecond * 50)
 			err := os.WriteFile(counterFile, []byte("stop"), 0600)
 			require.NoError(t, err)
 		}()
@@ -2248,13 +2254,13 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 					step.RepeatPolicy.Condition = &digraph.Condition{
 						Condition: fmt.Sprintf("test -f %s", counterFile),
 					}
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 350)
+			time.Sleep(time.Millisecond * 100)
 			f, _ := os.Create(counterFile)
 			_ = f.Close()
 		}()
@@ -2287,13 +2293,13 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 						Condition: fmt.Sprintf("`cat %s`", counterFile),
 						Expected:  "ready",
 					}
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 250)
+			time.Sleep(time.Millisecond * 50)
 			err := os.WriteFile(counterFile, []byte("ready"), 0600)
 			require.NoError(t, err)
 		}()
@@ -2336,13 +2342,13 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 				func(step *digraph.Step) {
 					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 					step.RepeatPolicy.ExitCode = []int{42}
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 350)
+			time.Sleep(time.Millisecond * 100)
 			f, _ := os.Create(counterFile)
 			_ = f.Close()
 		}()
@@ -2379,13 +2385,13 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 						Condition: fmt.Sprintf("test -f %s", file),
 					}
 					step.RepeatPolicy.Limit = 3
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 250)
+			time.Sleep(time.Millisecond * 50)
 			f, _ := os.Create(file)
 			_ = f.Close()
 		}()
@@ -2426,7 +2432,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 						Condition: "$COUNTER",
 						Expected:  "3",
 					}
-					step.RepeatPolicy.Interval = 100 * time.Millisecond
+					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
@@ -2515,7 +2521,7 @@ func TestScheduler_RetryPolicyDefaults(t *testing.T) {
 				echo "Test error" >&2
 				exit 1
 			`),
-			withRetryPolicy(1, 100*time.Millisecond),
+			withRetryPolicy(1, 20*time.Millisecond),
 		),
 	)
 
