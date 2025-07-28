@@ -71,6 +71,11 @@ docker run -d \
 - Remote nodes
 - Queue management
 
+**[Distributed Execution](/features/distributed-execution)**
+- Coordinator and worker setup
+- Service discovery configuration
+- Worker labels and routing
+
 **[Configuration Reference](/configurations/reference)**
 - All options
 - Environment variables

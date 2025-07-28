@@ -260,21 +260,25 @@ dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
 
 # With TLS
 dagu coordinator \
+  --peer.insecure=false \
   --peer.cert-file=server.pem \
   --peer.key-file=server-key.pem
 
 # With mutual TLS
 dagu coordinator \
+  --peer.insecure=false \
   --peer.cert-file=server.pem \
   --peer.key-file=server-key.pem \
   --peer.client-ca-file=ca.pem
 ```
 
 The coordinator service enables distributed task execution by:
+- Automatically registering in the service discovery system
 - Accepting task polling requests from workers
 - Matching tasks to workers based on labels
-- Tracking worker health via heartbeats
-- Providing task distribution API
+- Tracking worker health via heartbeats (every 10 seconds)
+- Providing task distribution API with automatic failover
+- Managing worker lifecycle through file-based discovery
 
 ### `worker`
 
@@ -287,8 +291,6 @@ dagu worker [options]
 **Options:**
 - `--worker.id` - Worker instance ID (default: `hostname@PID`)
 - `--worker.max-active-runs` - Maximum number of active runs (default: `100`)
-- `--worker.coordinator-host` - Coordinator gRPC server host (default: `127.0.0.1`)
-- `--worker.coordinator-port` - Coordinator gRPC server port (default: `50055`)
 - `--worker.labels, -l` - Worker labels for capability matching (format: `key1=value1,key2=value2`)
 - `--peer.insecure` - Use insecure connection (h2c) instead of TLS (default: `true`)
 - `--peer.cert-file` - Path to TLS certificate file for peer connections
@@ -303,8 +305,7 @@ dagu worker
 # With custom configuration
 dagu worker \
   --worker.id=worker-1 \
-  --worker.max-active-runs=50 \
-  --worker.coordinator-host=coordinator.example.com
+  --worker.max-active-runs=50
 
 # With labels for capability matching
 dagu worker --worker.labels gpu=true,memory=64G,region=us-east-1
@@ -312,8 +313,7 @@ dagu worker --worker.labels cpu-arch=amd64,instance-type=m5.xlarge
 
 # With TLS connection
 dagu worker \
-  --peer.insecure=false \
-  --worker.coordinator-host=coordinator.example.com
+  --peer.insecure=false
 
 # With mutual TLS
 dagu worker \
@@ -328,7 +328,7 @@ dagu worker \
   --peer.skip-tls-verify
 ```
 
-Workers poll the coordinator for tasks matching their labels and execute them locally.
+Workers automatically register in the service discovery system, send regular heartbeats, and poll the coordinator for tasks matching their labels to execute them locally.
 
 ## Configuration
 

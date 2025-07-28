@@ -153,7 +153,7 @@ dagu coordinator \
   --peer.key-file=server-key.pem
 ```
 
-The coordinator service manages task distribution to workers for distributed execution.
+The coordinator service manages task distribution to workers for distributed execution with automatic service discovery and health monitoring.
 
 #### Start Worker
 ```bash
@@ -163,18 +163,13 @@ dagu worker
 # With labels for capability matching
 dagu worker --worker.labels gpu=true,memory=64G,region=us-east-1
 
-# Connect to remote coordinator
-dagu worker \
-  --worker.coordinator-host=coordinator.example.com \
-  --worker.coordinator-port=50055
-
 # With custom worker ID and concurrency
 dagu worker \
   --worker.id=gpu-worker-01 \
   --worker.max-active-runs=50
 ```
 
-Workers poll the coordinator for matching tasks based on their labels.
+Workers automatically register in the service discovery system and poll the coordinator for matching tasks based on their labels.
 
 ### Interactive DAG Selection
 

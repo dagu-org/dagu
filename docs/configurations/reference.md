@@ -95,8 +95,6 @@ coordinator:
 worker:
   id: ""                  # Worker ID (default: hostname@PID)
   maxActiveRuns: 100      # Max parallel task executions
-  coordinatorHost: "127.0.0.1"
-  coordinatorPort: 50055
   labels:                 # Worker capabilities
     gpu: "false"
     memory: "16G"
@@ -173,8 +171,6 @@ All options support `DAGU_` prefix.
 ### Worker
 - `DAGU_WORKER_ID` - Worker instance ID (default: `hostname@PID`)
 - `DAGU_WORKER_MAX_ACTIVE_RUNS` - Max concurrent task executions (default: `100`)
-- `DAGU_WORKER_COORDINATOR_HOST` - Coordinator host to connect to
-- `DAGU_WORKER_COORDINATOR_PORT` - Coordinator port (default: `50055`)
 - `DAGU_WORKER_LABELS` - Worker labels (format: `key1=value1,key2=value2`)
 
 ### Peer (for distributed TLS)
@@ -367,8 +363,6 @@ coordinator:
 worker:
   id: gpu-worker-01
   maxActiveRuns: 10
-  coordinatorHost: coordinator.internal
-  coordinatorPort: 50055
   labels:
     gpu: "true"
     cuda: "11.8"

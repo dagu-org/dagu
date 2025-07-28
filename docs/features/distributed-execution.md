@@ -16,25 +16,36 @@ Distributed execution allows you to:
 The distributed execution system consists of:
 
 1. **Main Dagu Instance**: Runs the scheduler, web UI, and coordinator service
-2. **Coordinator Service**: gRPC server that distributes tasks to workers
-3. **Worker Nodes**: Poll the coordinator for tasks and execute them
-4. **Shared Storage**: Required for DAG files and execution state
+2. **Coordinator Service**: gRPC server that distributes tasks to workers with automatic service discovery
+3. **Worker Nodes**: Poll the coordinator for tasks and execute them with heartbeat monitoring
+4. **Service Discovery**: File-based system for automatic worker registration and health tracking
+5. **Shared Storage**: Required for DAG files and execution state
 
 ```
 Main Instance (Scheduler + UI + Coordinator)
-                    │
-                    │ gRPC
-                    │
-    ┌───────────────┴───────────────┐
-    │                               │
-Worker 1                        Worker 2
-(gpu=true)                   (region=eu-west)
-    │                               │
-    └───────────────┬───────────────┘
+         │                    │
+         │ Service Discovery  │ gRPC + Heartbeat
+         │ (File-based)       │
+         │                    │
+    ┌────┴──────────┬─────────┴─────────────┐
+    │               │                       │
+Worker 1        Worker 2                Worker 3
+(gpu=true)   (region=eu-west)        (cpu-optimized)
+    │               │                       │
+    └───────────────┴───────────────────────┘
                     │
             Shared Storage
         (DAG files, logs, state)
 ```
+
+### Service Discovery & Health Monitoring
+
+The distributed execution system features automatic service discovery and health monitoring:
+
+- **File-based Service Discovery**: Workers automatically register themselves in a shared discovery directory
+- **Heartbeat Mechanism**: Workers send regular heartbeats (every 10 seconds by default)
+- **Automatic Failover**: Tasks are automatically redistributed if a worker becomes unhealthy
+- **Dynamic Scaling**: Add or remove workers at runtime without coordinator restart
 
 ## Setting Up Distributed Execution
 
@@ -50,6 +61,8 @@ dagu start-all --host=0.0.0.0 --port=8080
 dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
 ```
 
+The coordinator automatically registers itself in the service discovery system and begins accepting worker connections.
+
 ### Step 2: Deploy Workers
 
 Start workers on your compute nodes with appropriate labels:
@@ -57,18 +70,15 @@ Start workers on your compute nodes with appropriate labels:
 ```bash
 # GPU-enabled worker
 dagu worker \
-  --worker.labels gpu=true,cuda=11.8,memory=64G \
-  --worker.coordinator-host=coordinator.example.com
+  --worker.labels gpu=true,cuda=11.8,memory=64G
 
 # CPU-optimized worker
 dagu worker \
-  --worker.labels cpu-arch=amd64,cpu-cores=32,region=us-east-1 \
-  --worker.coordinator-host=coordinator.example.com
+  --worker.labels cpu-arch=amd64,cpu-cores=32,region=us-east-1
 
 # Region-specific worker
 dagu worker \
-  --worker.labels region=eu-west-1,compliance=gdpr \
-  --worker.coordinator-host=coordinator.example.com
+  --worker.labels region=eu-west-1,compliance=gdpr
 ```
 
 ### Step 3: Route Tasks to Workers
@@ -130,12 +140,17 @@ coordinator:
   host: 0.0.0.0
   port: 50055
 
+# Service discovery configuration
+paths:
+  discoveryDir: "~/.local/share/dagu/discovery"  # Directory for service discovery files
+
 # TLS configuration for peer connections (both coordinator and worker)
 peer:
-  insecure: false  # Enable TLS (default: true for insecure)
+  insecure: true   # Use h2c (HTTP/2 cleartext) instead of TLS (default: true)
   certFile: /path/to/cert.pem
   keyFile: /path/to/key.pem
   clientCaFile: /path/to/ca.pem  # For mutual TLS
+  skipTlsVerify: false  # Skip TLS certificate verification
 ```
 
 ### Worker Configuration
@@ -145,8 +160,6 @@ peer:
 worker:
   id: "worker-gpu-01"  # Defaults to hostname@PID
   maxActiveRuns: 10
-  coordinatorHost: coordinator.example.com
-  coordinatorPort: 50055
   labels:
     gpu: "true"
     memory: "64G"
@@ -169,14 +182,17 @@ export DAGU_COORDINATOR_PORT=50055
 
 # Worker
 export DAGU_WORKER_ID=worker-01
-export DAGU_WORKER_COORDINATOR_HOST=coordinator.example.com
 export DAGU_WORKER_LABELS="gpu=true,region=us-east-1"
 
+# Service Discovery
+export DAGU_PATHS_DISCOVERY_DIR=/shared/dagu/discovery
+
 # Peer TLS configuration (for both coordinator and worker)
-export DAGU_PEER_INSECURE=false
+export DAGU_PEER_INSECURE=true  # Default: true (use h2c)
 export DAGU_PEER_CERT_FILE=/path/to/cert.pem
 export DAGU_PEER_KEY_FILE=/path/to/key.pem
 export DAGU_PEER_CLIENT_CA_FILE=/path/to/ca.pem
+export DAGU_PEER_SKIP_TLS_VERIFY=false
 ```
 
 ## Monitoring Workers
@@ -224,6 +240,56 @@ curl -H "Authorization: Bearer $TOKEN" \
 }
 ```
 
+## Service Discovery Deep Dive
+
+### How It Works
+
+The file-based service discovery system provides automatic worker registration and health monitoring:
+
+1. **Worker Registration**: When a worker starts, it creates a discovery file containing:
+   - Worker ID
+   - Host and port information
+   - Process ID (PID)
+   - Timestamp of registration
+
+2. **Heartbeat Updates**: Workers update their discovery files every 10 seconds with:
+   - Current timestamp
+   - Health status
+   - Active task count
+
+3. **Coordinator Monitoring**: The coordinator continuously monitors discovery files to:
+   - Track available workers
+   - Detect unhealthy workers
+   - Remove stale entries (no heartbeat for 30+ seconds)
+
+4. **Automatic Cleanup**: Discovery files are automatically removed when:
+   - Worker shuts down gracefully
+   - Worker process terminates unexpectedly
+   - Heartbeat timeout exceeds threshold
+
+### Discovery Directory Structure
+
+```
+~/.local/share/dagu/discovery/
+├── coordinator/
+│   └── coordinator-primary-host1-50055.json
+└── worker/
+    ├── worker-gpu-01-host2-1234.json
+    ├── worker-cpu-02-host3-5678.json
+    └── worker-cpu-03-host4-9012.json
+```
+
+### Configuring Service Discovery
+
+```yaml
+# Shared discovery directory (must be accessible by all nodes)
+paths:
+  discoveryDir: "/nfs/shared/dagu/discovery"  # NFS mount example
+
+# Or use environment variable
+export DAGU_PATHS_DISCOVERY_DIR=/nfs/shared/dagu/discovery
+```
+
 ## Security
 
 ### TLS Configuration
@@ -231,6 +297,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 #### Server-side TLS (Coordinator)
 ```bash
 dagu coordinator \
+  --peer.insecure=false \
   --peer.cert-file=server.pem \
   --peer.key-file=server-key.pem
 ```
@@ -239,6 +306,7 @@ dagu coordinator \
 ```bash
 # Coordinator with client verification
 dagu coordinator \
+  --peer.insecure=false \
   --peer.cert-file=server.pem \
   --peer.key-file=server-key.pem \
   --peer.client-ca-file=ca.pem
@@ -274,8 +342,8 @@ services:
     command: >
       worker
       --worker.labels=gpu=true,cuda=11.8
-      --worker.coordinator-host=dagu-main
-      --worker.coordinator-port=50055
+    volumes:
+      - ./data:/var/lib/dagu  # Shared storage for service discovery
     deploy:
       replicas: 2
       resources:
@@ -288,8 +356,8 @@ services:
     command: >
       worker
       --worker.labels=cpu-only=true,region=us-east-1
-      --worker.coordinator-host=dagu-main
-      --worker.coordinator-port=50055
+    volumes:
+      - ./data:/var/lib/dagu  # Shared storage for service discovery
     deploy:
       replicas: 5
 ```
@@ -373,8 +441,13 @@ spec:
         command: ["dagu", "worker"]
         args:
         - --worker.labels=cpu-optimized=true,region=us-east-1
-        - --worker.coordinator-host=dagu-coordinator
-        - --worker.coordinator-port=50055
+        volumeMounts:
+        - name: discovery
+          mountPath: /var/lib/dagu/discovery
+      volumes:
+      - name: discovery
+        persistentVolumeClaim:
+          claimName: dagu-discovery-pvc
 ```
 
 ## See Also
