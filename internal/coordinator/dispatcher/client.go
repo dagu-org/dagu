@@ -21,16 +21,17 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
-// client holds the gRPC connection and clients for the coordinator service.
-// it should be closed and removed when no longer needed or when the coordinator
-// is unhealthy.
-type client struct {
-	conn         *grpc.ClientConn
-	client       coordinatorv1.CoordinatorServiceClient
-	healthClient grpc_health_v1.HealthClient
+type Client interface {
+	digraph.Dispatcher
+
+	// Dispatch sends a task to the coordinator
+	Dispatch(ctx context.Context, task *coordinatorv1.Task) error
+
+	// Poll retrieves a task from the coordinator.
+	Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
 }
 
-var _ digraph.Dispatcher = (*dispatcher)(nil)
+var _ Client = (*dispatcher)(nil)
 
 // dispatcher is the concrete implementation
 type dispatcher struct {
@@ -39,6 +40,15 @@ type dispatcher struct {
 
 	mu      sync.RWMutex
 	clients map[string]*client // Cache of gRPC clients by coordinator ID
+}
+
+// client holds the gRPC connection and clients for the coordinator service.
+// it should be closed and removed when no longer needed or when the coordinator
+// is unhealthy.
+type client struct {
+	conn         *grpc.ClientConn
+	client       coordinatorv1.CoordinatorServiceClient
+	healthClient grpc_health_v1.HealthClient
 }
 
 // Errors
@@ -83,11 +93,77 @@ func (d *dispatcher) Dispatch(ctx context.Context, task *coordinatorv1.Task) err
 			return fmt.Errorf("no coordinator instances available")
 		}
 
-		return d.attemptDispatch(ctx, members, task)
+		return d.attemptCall(ctx, members, func(ctx context.Context, member models.HostInfo, client *client) error {
+			// Create request
+			req := &coordinatorv1.DispatchRequest{Task: task}
+
+			// Apply request timeout
+			dispatchCtx, cancel := context.WithTimeout(ctx, d.config.RequestTimeout)
+			defer cancel()
+
+			// Try to dispatch
+			if _, err := client.client.Dispatch(dispatchCtx, req); err != nil {
+				return fmt.Errorf("failed to dispatch task to coordinator %s: %w", member.ID, err)
+			}
+
+			logger.Info(ctx, "Task dispatched successfully",
+				"dag_run_id", task.DagRunId,
+				"target", task.Target,
+				"worker_selector", task.WorkerSelector,
+				"coordinator_id", member.ID,
+			)
+
+			return nil
+		})
 	}, policy, nil)
 }
 
-func (d *dispatcher) attemptDispatch(ctx context.Context, members []models.HostInfo, task *coordinatorv1.Task) error {
+// Poll implements Client.
+func (d *dispatcher) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+	if err := d.config.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	// Get coordinator resolver from discovery
+	resolver := d.discovery.Resolver(ctx, models.ServiceNameCoordinator)
+
+	var task *coordinatorv1.Task
+	err := backoff.Retry(ctx, func(ctx context.Context) error {
+		// Get all available coordinators
+		members, err := resolver.Members(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get coordinator members: %w", err)
+		}
+
+		if len(members) == 0 {
+			return fmt.Errorf("no coordinator instances available")
+		}
+
+		return d.attemptCall(ctx, members, func(ctx context.Context, member models.HostInfo, client *client) error {
+			resp, err := client.client.Poll(ctx, req)
+			if err != nil {
+				return fmt.Errorf("failed to poll task from coordinator %s: %w", member.ID, err)
+			}
+
+			if resp.Task != nil {
+				task = resp.Task
+				logger.Info(ctx, "Task polled successfully",
+					"dag_run_id", task.DagRunId,
+					"target", task.Target,
+					"worker_selector", task.WorkerSelector,
+					"coordinator_id", member.ID,
+				)
+			}
+
+			return nil
+		})
+
+	}, policy, nil)
+
+	return task, err
+}
+
+func (d *dispatcher) attemptCall(ctx context.Context, members []models.HostInfo, callback func(ctx context.Context, member models.HostInfo, client *client) error) error {
 	// Shuffle members to distribute load evenly
 	rand.Shuffle(len(members), func(i, j int) {
 		members[i], members[j] = members[j], members[i]
@@ -117,32 +193,16 @@ func (d *dispatcher) attemptDispatch(ctx context.Context, members []models.HostI
 		}
 
 		// Create request
-		req := &coordinatorv1.DispatchRequest{Task: task}
-
-		// Apply request timeout
-		dispatchCtx, cancel := context.WithTimeout(ctx, d.config.RequestTimeout)
-		defer cancel()
-
-		// Try to dispatch
-		_, err = client.client.Dispatch(dispatchCtx, req)
-		if err == nil {
-			logger.Info(ctx, "Task dispatched successfully",
-				"dag_run_id", task.DagRunId,
-				"target", task.Target,
-				"worker_selector", task.WorkerSelector,
+		if err := callback(ctx, member, client); err != nil {
+			logger.Debug(ctx, "Failed to dispatch to coordinator",
 				"coordinator_id", member.ID,
-			)
+				"address", member.HostPort,
+				"error", err)
+			lastErr = err
+		} else {
+			// Success - return immediately
 			return nil
 		}
-
-		logger.Debug(ctx, "Failed to dispatch to coordinator",
-			"coordinator_id", member.ID,
-			"address", member.HostPort,
-			"error", err)
-		lastErr = err
-
-		// Remove failed client from cache
-		d.removeClient(member.ID)
 	}
 
 	return lastErr
