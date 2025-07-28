@@ -13,7 +13,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
-	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
+	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -22,6 +22,7 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
+	"github.com/dagu-org/dagu/internal/persistence/filediscovery"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/scheduler"
@@ -40,10 +41,11 @@ type Context struct {
 	Config  *config.Config
 	Quiet   bool
 
-	DAGRunStore models.DAGRunStore
-	DAGRunMgr   dagrun.Manager
-	ProcStore   models.ProcStore
-	QueueStore  models.QueueStore
+	DAGRunStore    models.DAGRunStore
+	DAGRunMgr      dagrun.Manager
+	ProcStore      models.ProcStore
+	QueueStore     models.QueueStore
+	ServiceMonitor models.ServiceMonitor
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -124,17 +126,19 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
 	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.WorkDir)
 	qs := filequeue.New(cfg.Paths.QueueDir)
+	sm := filediscovery.New(cfg.Paths.DiscoveryDir)
 
 	return &Context{
-		Context:     ctx,
-		Command:     cmd,
-		Config:      cfg,
-		Quiet:       quiet,
-		DAGRunStore: drs,
-		DAGRunMgr:   drm,
-		Flags:       flags,
-		ProcStore:   ps,
-		QueueStore:  qs,
+		Context:        ctx,
+		Command:        cmd,
+		Config:         cfg,
+		Quiet:          quiet,
+		DAGRunStore:    drs,
+		DAGRunMgr:      drm,
+		Flags:          flags,
+		ProcStore:      ps,
+		QueueStore:     qs,
+		ServiceMonitor: sm,
 	}, nil
 }
 
@@ -159,10 +163,26 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 		return nil, err
 	}
 
-	// Create coordinator client factory (may be nil if not configured)
-	coordinatorClientFactory := c.NewCoordinatorClientFactory()
+	// Create coordinator client (may be nil if not configured)
+	coordinatorCli := c.NewCoordinatorClient()
 
-	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.DAGRunMgr, coordinatorClientFactory), nil
+	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.DAGRunMgr, coordinatorCli), nil
+}
+
+// NewCoordinatorClient creates a new coordinator client using the global peer configuration.
+func (c *Context) NewCoordinatorClient() coordinator.Client {
+	coordinatorCliCfg := coordinator.DefaultConfig()
+	coordinatorCliCfg.CAFile = c.Config.Global.Peer.ClientCaFile
+	coordinatorCliCfg.CertFile = c.Config.Global.Peer.CertFile
+	coordinatorCliCfg.KeyFile = c.Config.Global.Peer.KeyFile
+	coordinatorCliCfg.SkipTLSVerify = c.Config.Global.Peer.SkipTLSVerify
+	coordinatorCliCfg.Insecure = c.Config.Global.Peer.Insecure
+
+	if err := coordinatorCliCfg.Validate(); err != nil {
+		logger.Error(c.Context, "Invalid coordinator client configuration", "err", err)
+		return nil
+	}
+	return coordinator.New(c.ServiceMonitor, coordinatorCliCfg)
 }
 
 // NewScheduler creates a new NewScheduler instance using the default client.
@@ -176,38 +196,10 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	coordinatorClientFactory := c.NewCoordinatorClientFactory()
-	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir, coordinatorClientFactory)
-	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, coordinatorClientFactory)
-}
-
-
-// NewCoordinatorClientFactory creates a configured coordinator client factory.
-// It returns nil if coordinator is not configured.
-func (c *Context) NewCoordinatorClientFactory() *coordinatorclient.Factory {
-	// Check if coordinator is configured
-	if c.Config.Coordinator.Host == "" || c.Config.Coordinator.Port <= 0 {
-		logger.Info(c, "Coordinator not configured, distributed execution disabled")
-		return nil
-	}
-
-	// Build factory with configuration
-	factory := coordinatorclient.NewFactory().
-		WithHost(c.Config.Coordinator.Host).
-		WithPort(c.Config.Coordinator.Port)
-
-	// Configure TLS if available, otherwise use insecure connection
-	if c.Config.Coordinator.TLS != nil && (c.Config.Coordinator.TLS.CertFile != "" || c.Config.Coordinator.TLS.CAFile != "") {
-		factory.WithTLS(
-			c.Config.Coordinator.TLS.CertFile,
-			c.Config.Coordinator.TLS.KeyFile,
-			c.Config.Coordinator.TLS.CAFile,
-		)
-	} else {
-		factory.WithInsecure()
-	}
-
-	return factory
+	coordinatorCli := c.NewCoordinatorClient()
+	de := scheduler.NewDAGExecutor(coordinatorCli, c.DAGRunMgr)
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable, c.Config.Global.WorkDir)
+	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceMonitor, coordinatorCli)
 }
 
 // StringParam retrieves a string parameter from the command line flags.

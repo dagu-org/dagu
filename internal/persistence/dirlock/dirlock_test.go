@@ -337,7 +337,7 @@ func TestConcurrency(t *testing.T) {
 					ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 					if err := lock.Lock(ctx); err == nil {
 						successCount[id]++
-						time.Sleep(10 * time.Millisecond) // Simulate work
+						time.Sleep(2 * time.Millisecond) // Simulate work
 						_ = lock.Unlock()
 					}
 					cancel()

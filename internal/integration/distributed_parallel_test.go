@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -46,14 +45,8 @@ steps:
 		// Setup and start coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Set environment variables for the worker configuration
-		t.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1")
-		t.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port()))
-
-		// Create worker TLS config
-		tlsConfig := &worker.TLSConfig{
-			Insecure: true,
-		}
+		// Get dispatcher client from coordinator
+		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Create and start multiple workers to handle parallel execution
 		workers := make([]*worker.Worker, 2)
@@ -61,9 +54,7 @@ steps:
 			workerInst := worker.NewWorker(
 				fmt.Sprintf("test-worker-%d", i+1),
 				10, // maxActiveRuns
-				"127.0.0.1",
-				coord.Port(),
-				tlsConfig,
+				coordinatorClient,
 				coord.DAGRunMgr,
 				map[string]string{"type": "test-worker"},
 			)
@@ -86,7 +77,7 @@ steps:
 		}
 
 		// Give workers time to connect
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -163,23 +154,15 @@ steps:
 		// Setup and start coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Set environment variables for the worker configuration
-		t.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1")
-		t.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port()))
-
-		// Create workers with same type
-		tlsConfig := &worker.TLSConfig{
-			Insecure: true,
-		}
+		// Get dispatcher client from coordinator
+		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Create multiple workers of the same type
 		for i := 0; i < 3; i++ {
 			workerInst := worker.NewWorker(
 				fmt.Sprintf("test-worker-%d", i+1),
 				10,
-				"127.0.0.1",
-				coord.Port(),
-				tlsConfig,
+				coordinatorClient,
 				coord.DAGRunMgr,
 				map[string]string{"type": "test-worker"},
 			)
@@ -201,7 +184,7 @@ steps:
 		}
 
 		// Give workers time to connect
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -255,16 +238,15 @@ steps:
 		// Setup coordinator without matching workers
 		coord := test.SetupCoordinator(t)
 
-		// Set environment variables for the worker configuration
-		t.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1")
-		t.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port()))
-
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
 
 		// Run should fail because no workers match
-		err := agent.Run(coord.Context)
+		// Use a short timeout since we expect this to fail
+		ctx, cancel := context.WithTimeout(coord.Context, 5*time.Second)
+		defer cancel()
+		err := agent.Run(ctx)
 		require.Error(t, err)
 
 		// Verify the DAG did not complete successfully
@@ -282,10 +264,10 @@ steps:
     run: child-sleep
     parallel:
       items:
-        - "30"
-        - "30"
-        - "30"
-        - "30"
+        - "1"
+        - "1"
+        - "1"
+        - "1"
       maxConcurrent: 2
 
 ---
@@ -299,10 +281,6 @@ steps:
 		// Setup and start coordinator
 		tmpDir := t.TempDir()
 		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
-
-		// Set environment variables for the worker configuration
-		require.NoError(t, os.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1"))
-		require.NoError(t, os.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port())))
 
 		// Create DAG run manager for workers
 		logDir := filepath.Join(tmpDir, "logs")
@@ -320,10 +298,8 @@ steps:
 		procStore := fileproc.New(procDir)
 		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable, coord.Config.Global.WorkDir)
 
-		// Create worker TLS config
-		tlsConfig := &worker.TLSConfig{
-			Insecure: true,
-		}
+		// Get dispatcher client from coordinator
+		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Create and start multiple workers to handle parallel execution
 		workers := make([]*worker.Worker, 2)
@@ -331,9 +307,7 @@ steps:
 			workerInst := worker.NewWorker(
 				fmt.Sprintf("test-worker-%d", i+1),
 				10, // maxActiveRuns
-				"127.0.0.1",
-				coord.Port(),
-				tlsConfig,
+				coordinatorClient,
 				dagRunMgr,
 				map[string]string{"type": "test-worker"},
 			)
@@ -356,7 +330,7 @@ steps:
 		}
 
 		// Give workers time to connect
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -373,7 +347,7 @@ steps:
 		}()
 
 		// Wait a bit to ensure parallel execution has started on workers
-		time.Sleep(2 * time.Second)
+		time.Sleep(100 * time.Millisecond)
 
 		// Cancel the execution
 		cancel()
@@ -422,12 +396,12 @@ steps:
   - name: local-execution
     run: child-local
     parallel:
-      items: ["30", "30"]
+      items: ["1", "1"]
     output: LOCAL_RESULTS
   - name: distributed-execution
     run: child-distributed
     parallel:
-      items: ["30", "30"]
+      items: ["1", "1"]
     output: DISTRIBUTED_RESULTS
 
 ---
@@ -448,10 +422,6 @@ steps:
 		tmpDir := t.TempDir()
 		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
 
-		// Set environment variables for the worker configuration
-		require.NoError(t, os.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1"))
-		require.NoError(t, os.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port())))
-
 		// Create DAG run manager for worker
 		logDir := filepath.Join(tmpDir, "logs")
 		dataDir := filepath.Join(tmpDir, "data")
@@ -469,16 +439,13 @@ steps:
 		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable, coord.Config.Global.WorkDir)
 
 		// Create worker for distributed execution
-		tlsConfig := &worker.TLSConfig{
-			Insecure: true,
-		}
+		// Get dispatcher client from coordinator
+		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		workerInst := worker.NewWorker(
 			"test-worker-1",
 			10,
-			"127.0.0.1",
-			coord.Port(),
-			tlsConfig,
+			coordinatorClient,
 			dagRunMgr,
 			map[string]string{"type": "test-worker"},
 		)
@@ -499,7 +466,7 @@ steps:
 		})
 
 		// Give worker time to connect
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -516,7 +483,7 @@ steps:
 		}()
 
 		// Wait to ensure both local and distributed executions have started
-		time.Sleep(2 * time.Second)
+		time.Sleep(100 * time.Millisecond)
 
 		// Cancel the execution
 		execCancel()
@@ -569,16 +536,12 @@ steps:
   - name: process
     command: |
       echo "Starting task $1"
-      sleep 20
+      sleep 1
       echo "Completed task $1"
 `
 		// Setup and start coordinator
 		tmpDir := t.TempDir()
 		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
-
-		// Set environment variables for the worker configuration
-		require.NoError(t, os.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1"))
-		require.NoError(t, os.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port())))
 
 		// Create DAG run manager
 		logDir := filepath.Join(tmpDir, "logs")
@@ -596,10 +559,8 @@ steps:
 		procStore := fileproc.New(procDir)
 		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable, coord.Config.Global.WorkDir)
 
-		// Create multiple workers to handle concurrent execution
-		tlsConfig := &worker.TLSConfig{
-			Insecure: true,
-		}
+		// Get dispatcher client from coordinator
+		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		numWorkers := 3
 		workers := make([]*worker.Worker, numWorkers)
@@ -607,9 +568,7 @@ steps:
 			workerInst := worker.NewWorker(
 				fmt.Sprintf("test-worker-%d", i+1),
 				5, // maxActiveRuns per worker
-				"127.0.0.1",
-				coord.Port(),
-				tlsConfig,
+				coordinatorClient,
 				dagRunMgr,
 				map[string]string{"type": "test-worker"},
 			)
@@ -632,7 +591,7 @@ steps:
 		}
 
 		// Give workers time to connect
-		time.Sleep(1 * time.Second)
+		time.Sleep(50 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -649,7 +608,7 @@ steps:
 		}()
 
 		// Wait to ensure concurrent execution has started across workers
-		time.Sleep(2 * time.Second)
+		time.Sleep(100 * time.Millisecond)
 
 		// Cancel the execution
 		cancel()

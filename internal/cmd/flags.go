@@ -169,59 +169,6 @@ var (
 		bindViper:    true,
 	}
 
-	// workerCoordinatorHostFlag is the coordinator host for worker connection.
-	workerCoordinatorHostFlag = commandLineFlag{
-		name:         "worker.coordinator-host",
-		defaultValue: "127.0.0.1",
-		usage:        "Coordinator gRPC server host (default: 127.0.0.1)",
-		bindViper:    true,
-	}
-
-	// workerCoordinatorPortFlag is the coordinator port for worker connection.
-	workerCoordinatorPortFlag = commandLineFlag{
-		name:         "worker.coordinator-port",
-		defaultValue: "50055",
-		usage:        "Coordinator gRPC server port (default: 50055)",
-		bindViper:    true,
-	}
-
-	// workerInsecureFlag disables TLS for worker connection.
-	workerInsecureFlag = commandLineFlag{
-		name:      "worker.insecure",
-		usage:     "Use insecure connection (h2c) instead of TLS",
-		isBool:    true,
-		bindViper: true,
-	}
-
-	// workerSkipTLSVerifyFlag skips TLS certificate verification for worker.
-	workerSkipTLSVerifyFlag = commandLineFlag{
-		name:      "worker.skip-tls-verify",
-		usage:     "Skip TLS certificate verification (insecure)",
-		isBool:    true,
-		bindViper: true,
-	}
-
-	// workerTLSCertFlag is the TLS certificate for worker connection.
-	workerTLSCertFlag = commandLineFlag{
-		name:      "worker.tls-cert",
-		usage:     "Path to TLS certificate file for mutual TLS",
-		bindViper: true,
-	}
-
-	// workerTLSKeyFlag is the TLS key for worker connection.
-	workerTLSKeyFlag = commandLineFlag{
-		name:      "worker.tls-key",
-		usage:     "Path to TLS key file for mutual TLS",
-		bindViper: true,
-	}
-
-	// workerTLSCAFlag is the CA certificate for worker connection.
-	workerTLSCAFlag = commandLineFlag{
-		name:      "worker.tls-ca",
-		usage:     "Path to CA certificate file for server verification",
-		bindViper: true,
-	}
-
 	// workerLabelsFlag is the labels for worker capabilities.
 	workerLabelsFlag = commandLineFlag{
 		name:      "worker.labels",
@@ -230,24 +177,40 @@ var (
 		bindViper: true,
 	}
 
-	// coordinatorTLSCertFlag is the path to the TLS certificate for coordinator server.
-	coordinatorTLSCertFlag = commandLineFlag{
-		name:      "coordinator.tls-cert",
-		usage:     "Path to TLS certificate file for the coordinator server",
+	// peerInsecureFlag disables TLS for peer connections.
+	peerInsecureFlag = commandLineFlag{
+		name:      "peer.insecure",
+		usage:     "Use insecure connection (h2c) instead of TLS",
+		isBool:    true,
 		bindViper: true,
 	}
 
-	// coordinatorTLSKeyFlag is the path to the TLS key for coordinator server.
-	coordinatorTLSKeyFlag = commandLineFlag{
-		name:      "coordinator.tls-key",
-		usage:     "Path to TLS key file for the coordinator server",
+	// peerCertFileFlag is the TLS certificate for peer connections.
+	peerCertFileFlag = commandLineFlag{
+		name:      "peer.cert-file",
+		usage:     "Path to TLS certificate file for mutual TLS",
 		bindViper: true,
 	}
 
-	// coordinatorTLSCAFlag is the path to the CA certificate for coordinator server.
-	coordinatorTLSCAFlag = commandLineFlag{
-		name:      "coordinator.tls-ca",
-		usage:     "Path to CA certificate file for client verification (mTLS)",
+	// peerKeyFileFlag is the TLS key for peer connections.
+	peerKeyFileFlag = commandLineFlag{
+		name:      "peer.key-file",
+		usage:     "Path to TLS key file for mutual TLS",
+		bindViper: true,
+	}
+
+	// peerClientCAFileFlag is the CA certificate for peer connections.
+	peerClientCAFileFlag = commandLineFlag{
+		name:      "peer.client-ca-file",
+		usage:     "Path to CA certificate file for server verification",
+		bindViper: true,
+	}
+
+	// peerSkipTLSVerifyFlag skips TLS certificate verification for peer connections.
+	peerSkipTLSVerifyFlag = commandLineFlag{
+		name:      "peer.skip-tls-verify",
+		usage:     "Skip TLS certificate verification (insecure)",
+		isBool:    true,
 		bindViper: true,
 	}
 )

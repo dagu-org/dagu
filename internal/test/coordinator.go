@@ -51,8 +51,8 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	// Create handler
 	handler := coordinator.NewHandler()
 
-	// Create service
-	service := coordinator.NewService(grpcServer, handler, listener, healthServer)
+	// Create service with ServiceMonitor from helper
+	service := coordinator.NewService(grpcServer, handler, listener, healthServer, helper.ServiceMonitor, "test-coordinator")
 
 	coord := &Coordinator{
 		Helper:       helper,
@@ -111,6 +111,18 @@ func (c *Coordinator) DispatchTask(t *testing.T, task *coordinatorv1.Task) error
 
 	_, err = client.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: task})
 	return err
+}
+
+// GetCoordinatorClient returns a coordinator client for this coordinator
+func (c *Coordinator) GetCoordinatorClient(t *testing.T) coordinator.Client {
+	t.Helper()
+
+	// Create coordinator client config
+	config := coordinator.DefaultConfig()
+	config.Insecure = true
+
+	// Create coordinator client - cast to Client interface
+	return coordinator.New(c.ServiceMonitor, config)
 }
 
 // WithCoordinatorConfig creates a coordinator configuration option

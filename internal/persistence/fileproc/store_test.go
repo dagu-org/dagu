@@ -148,12 +148,10 @@ func TestStore_IsRunAlive(t *testing.T) {
 		err = proc.Stop(ctx)
 		require.NoError(t, err)
 
-		// Wait for the process to become stale
-		time.Sleep(time.Millisecond * 150)
-
-		// Check if the run is alive (should be false and file should be cleaned up)
-		alive, err := shortStore.IsRunAlive(ctx, dagRun)
-		require.NoError(t, err)
-		require.False(t, alive)
+		// Check if the run is alive (should become false when stale)
+		require.Eventually(t, func() bool {
+			alive, err := shortStore.IsRunAlive(ctx, dagRun)
+			return err == nil && !alive
+		}, 200*time.Millisecond, 10*time.Millisecond, "expected process to become stale")
 	})
 }

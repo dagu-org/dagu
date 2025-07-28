@@ -51,10 +51,6 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_AUTH_BASIC_PASSWORD": "testpass",
 		"DAGU_AUTH_TOKEN":          "test-token-123",
 
-		// Note: DAGU_COORDINATOR_SIGNING_KEY environment variable is bound to coordinatorSigningKey
-		// but there's no flat field in the definition, so it doesn't work.
-		// Removing this test case as it's testing non-existent functionality.
-
 		// TLS configurations
 		"DAGU_CERT_FILE": "/test/cert.pem",
 		"DAGU_KEY_FILE":  "/test/key.pem",
@@ -70,6 +66,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_DAG_RUNS_DIR":      "/test/runs",
 		"DAGU_PROC_DIR":          "/test/proc",
 		"DAGU_QUEUE_DIR":         "/test/queue",
+		"DAGU_DISCOVERY_DIR":     "/test/discovery",
 
 		// UI customization
 		"DAGU_LATEST_STATUS_TODAY": "true",
@@ -78,15 +75,8 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_QUEUE_ENABLED": "false",
 
 		// Worker configuration - env vars still bound but to nested structure
-		"DAGU_WORKER_ID":               "test-worker-123",
-		"DAGU_WORKER_MAX_ACTIVE_RUNS":  "200",
-		"DAGU_WORKER_COORDINATOR_HOST": "worker.example.com",
-		"DAGU_WORKER_COORDINATOR_PORT": "60051",
-		"DAGU_WORKER_INSECURE":         "true",
-		"DAGU_WORKER_SKIP_TLS_VERIFY":  "true",
-		"DAGU_WORKER_TLS_CERT_FILE":    "/test/worker/cert.pem",
-		"DAGU_WORKER_TLS_KEY_FILE":     "/test/worker/key.pem",
-		"DAGU_WORKER_TLS_CA_FILE":      "/test/worker/ca.pem",
+		"DAGU_WORKER_ID":              "test-worker-123",
+		"DAGU_WORKER_MAX_ACTIVE_RUNS": "200",
 
 		// Scheduler configuration
 		"DAGU_SCHEDULER_PORT": "9999",
@@ -148,11 +138,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	assert.True(t, cfg.Server.Auth.Basic.Enabled())
 	assert.True(t, cfg.Server.Auth.Token.Enabled())
 
-	// Coordinator configurations
-	// The DAGU_COORDINATOR_SIGNING_KEY environment variable doesn't work because
-	// it's bound to a flat field that doesn't exist in the definition.
-	// The coordinator config is only loaded from the nested structure.
-	assert.Equal(t, "", cfg.Coordinator.SigningKey) // No env var override support
+	// Coordinator configurations are loaded from config file only
 
 	// TLS configurations
 	require.NotNil(t, cfg.Server.TLS)
@@ -170,6 +156,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	assert.Equal(t, "/test/runs", cfg.Paths.DAGRunsDir)
 	assert.Equal(t, "/test/proc", cfg.Paths.ProcDir)
 	assert.Equal(t, "/test/queue", cfg.Paths.QueueDir)
+	assert.Equal(t, "/test/discovery", cfg.Paths.DiscoveryDir)
 
 	// UI customization
 	assert.True(t, cfg.Server.LatestStatusToday)
@@ -180,14 +167,6 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	// Worker configuration
 	assert.Equal(t, "test-worker-123", cfg.Worker.ID)
 	assert.Equal(t, 200, cfg.Worker.MaxActiveRuns)
-	assert.Equal(t, "worker.example.com", cfg.Worker.CoordinatorHost)
-	assert.Equal(t, 60051, cfg.Worker.CoordinatorPort)
-	assert.True(t, cfg.Worker.Insecure)
-	assert.True(t, cfg.Worker.SkipTLSVerify)
-	require.NotNil(t, cfg.Worker.TLS)
-	assert.Equal(t, "/test/worker/cert.pem", cfg.Worker.TLS.CertFile)
-	assert.Equal(t, "/test/worker/key.pem", cfg.Worker.TLS.KeyFile)
-	assert.Equal(t, "/test/worker/ca.pem", cfg.Worker.TLS.CAFile)
 
 	// Scheduler configuration
 	assert.Equal(t, 9999, cfg.Scheduler.Port)
@@ -199,7 +178,7 @@ func TestConfigLoader_CoordinatorSigningKey(t *testing.T) {
 		viper.Reset()
 		defer viper.Reset()
 
-		// Create a config file with CoordinatorSigningKey
+		// Create a config file with auth configuration
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
@@ -218,7 +197,7 @@ auth:
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
 
-		// Verify CoordinatorSigningKey is loaded from YAML
+		// Verify auth configuration is loaded from YAML
 		assert.Equal(t, "admin", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
 		assert.Equal(t, "api-token", cfg.Server.Auth.Token.Value)
@@ -229,7 +208,7 @@ auth:
 		viper.Reset()
 		defer viper.Reset()
 
-		// Create a minimal config file without CoordinatorSigningKey
+		// Create a minimal config file with basic auth only
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		configContent := `
@@ -246,8 +225,7 @@ auth:
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
 
-		// Verify CoordinatorSigningKey is empty when not provided
-		assert.Equal(t, "", cfg.Coordinator.SigningKey)
+		// Verify auth configuration
 		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
 	})
@@ -296,13 +274,6 @@ func TestConfigLoader_WorkerConfiguration(t *testing.T) {
 worker:
   id: "yaml-worker-01"
   maxActiveRuns: 50
-  coordinatorHost: "coordinator.example.com"
-  coordinatorPort: 8080
-  insecure: true
-  skipTlsVerify: true
-  certFile: "/path/to/worker/cert.pem"
-  keyFile: "/path/to/worker/key.pem"
-  caFile: "/path/to/worker/ca.pem"
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
@@ -315,14 +286,6 @@ worker:
 		// Verify Worker configuration is loaded from YAML
 		assert.Equal(t, "yaml-worker-01", cfg.Worker.ID)
 		assert.Equal(t, 50, cfg.Worker.MaxActiveRuns)
-		assert.Equal(t, "coordinator.example.com", cfg.Worker.CoordinatorHost)
-		assert.Equal(t, 8080, cfg.Worker.CoordinatorPort)
-		assert.True(t, cfg.Worker.Insecure)
-		assert.True(t, cfg.Worker.SkipTLSVerify)
-		require.NotNil(t, cfg.Worker.TLS)
-		assert.Equal(t, "/path/to/worker/cert.pem", cfg.Worker.TLS.CertFile)
-		assert.Equal(t, "/path/to/worker/key.pem", cfg.Worker.TLS.KeyFile)
-		assert.Equal(t, "/path/to/worker/ca.pem", cfg.Worker.TLS.CAFile)
 	})
 
 	t.Run("EnvironmentVariableOverride", func(t *testing.T) {
@@ -337,24 +300,14 @@ worker:
 worker:
   id: "yaml-worker"
   maxActiveRuns: 10
-  coordinatorHost: "localhost"
-  coordinatorPort: 5000
-  insecure: false
 `
 		err := os.WriteFile(configFile, []byte(configContent), 0600)
 		require.NoError(t, err)
 
 		// Set environment variables
 		envs := map[string]string{
-			"DAGU_WORKER_ID":               "env-worker-override",
-			"DAGU_WORKER_MAX_ACTIVE_RUNS":  "300",
-			"DAGU_WORKER_COORDINATOR_HOST": "env.coordinator.com",
-			"DAGU_WORKER_COORDINATOR_PORT": "9090",
-			"DAGU_WORKER_INSECURE":         "true",
-			"DAGU_WORKER_SKIP_TLS_VERIFY":  "true",
-			"DAGU_WORKER_TLS_CERT_FILE":    "/env/cert.pem",
-			"DAGU_WORKER_TLS_KEY_FILE":     "/env/key.pem",
-			"DAGU_WORKER_TLS_CA_FILE":      "/env/ca.pem",
+			"DAGU_WORKER_ID":              "env-worker-override",
+			"DAGU_WORKER_MAX_ACTIVE_RUNS": "300",
 		}
 
 		// Save and clear existing environment variables
@@ -387,14 +340,6 @@ worker:
 		// Verify environment variables override YAML
 		assert.Equal(t, "env-worker-override", cfg.Worker.ID)
 		assert.Equal(t, 300, cfg.Worker.MaxActiveRuns)
-		assert.Equal(t, "env.coordinator.com", cfg.Worker.CoordinatorHost)
-		assert.Equal(t, 9090, cfg.Worker.CoordinatorPort)
-		assert.True(t, cfg.Worker.Insecure)
-		assert.True(t, cfg.Worker.SkipTLSVerify)
-		require.NotNil(t, cfg.Worker.TLS)
-		assert.Equal(t, "/env/cert.pem", cfg.Worker.TLS.CertFile)
-		assert.Equal(t, "/env/key.pem", cfg.Worker.TLS.KeyFile)
-		assert.Equal(t, "/env/ca.pem", cfg.Worker.TLS.CAFile)
 	})
 
 	t.Run("DefaultValues", func(t *testing.T) {
@@ -420,11 +365,6 @@ port: 8080
 		// Verify default Worker configuration values
 		assert.Equal(t, "", cfg.Worker.ID) // No default ID
 		assert.Equal(t, 100, cfg.Worker.MaxActiveRuns)
-		assert.Equal(t, "127.0.0.1", cfg.Worker.CoordinatorHost)
-		assert.Equal(t, 50055, cfg.Worker.CoordinatorPort)
-		assert.True(t, cfg.Worker.Insecure)
-		assert.False(t, cfg.Worker.SkipTLSVerify)
-		assert.Nil(t, cfg.Worker.TLS) // No TLS config by default
 	})
 
 	t.Run("SecureByDefault", func(t *testing.T) {
@@ -447,39 +387,6 @@ worker:
 		cfg, err := config.Load(config.WithConfigFile(configFile))
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
-
-		// Verify worker is secure by default
-		assert.Equal(t, "secure.example.com", cfg.Worker.CoordinatorHost)
-		assert.Equal(t, 443, cfg.Worker.CoordinatorPort)
-		assert.True(t, cfg.Worker.Insecure)
-		assert.False(t, cfg.Worker.SkipTLSVerify)
-	})
-
-	t.Run("PartialTLSConfig", func(t *testing.T) {
-		// Reset viper to ensure clean state
-		viper.Reset()
-		defer viper.Reset()
-
-		// Create a config file with partial TLS configuration
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "config.yaml")
-		configContent := `
-worker:
-  caFile: "/path/to/ca.pem"
-`
-		err := os.WriteFile(configFile, []byte(configContent), 0600)
-		require.NoError(t, err)
-
-		// Load configuration
-		cfg, err := config.Load(config.WithConfigFile(configFile))
-		require.NoError(t, err)
-		require.NotNil(t, cfg)
-
-		// Verify partial TLS config is loaded correctly
-		require.NotNil(t, cfg.Worker.TLS)
-		assert.Equal(t, "", cfg.Worker.TLS.CertFile)
-		assert.Equal(t, "", cfg.Worker.TLS.KeyFile)
-		assert.Equal(t, "/path/to/ca.pem", cfg.Worker.TLS.CAFile)
 	})
 }
 
@@ -579,5 +486,186 @@ worker:
 
 		// Verify labels are nil or empty
 		assert.True(t, len(cfg.Worker.Labels) == 0)
+	})
+}
+
+func TestDefaultDirectoryConfiguration(t *testing.T) {
+	t.Run("DefaultDirectoriesUnderDataDir", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a minimal config file with only data dir specified
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+paths:
+  dataDir: "/custom/data"
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify default directories are created under data dir
+		assert.Equal(t, "/custom/data", cfg.Paths.DataDir)
+		assert.Equal(t, "/custom/data/dag-runs", cfg.Paths.DAGRunsDir)
+		assert.Equal(t, "/custom/data/proc", cfg.Paths.ProcDir)
+		assert.Equal(t, "/custom/data/queue", cfg.Paths.QueueDir)
+		assert.Equal(t, "/custom/data/discovery", cfg.Paths.DiscoveryDir)
+	})
+}
+
+func TestPeerConfiguration(t *testing.T) {
+	t.Run("LoadFromYAML", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a config file with Peer configuration
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+peer:
+  certFile: "/path/to/peer/cert.pem"
+  keyFile: "/path/to/peer/key.pem"
+  clientCaFile: "/path/to/peer/ca.pem"
+  skipTlsVerify: true
+  insecure: false
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify Peer configuration is loaded from YAML
+		assert.Equal(t, "/path/to/peer/cert.pem", cfg.Global.Peer.CertFile)
+		assert.Equal(t, "/path/to/peer/key.pem", cfg.Global.Peer.KeyFile)
+		assert.Equal(t, "/path/to/peer/ca.pem", cfg.Global.Peer.ClientCaFile)
+		assert.True(t, cfg.Global.Peer.SkipTLSVerify)
+		assert.False(t, cfg.Global.Peer.Insecure)
+	})
+
+	t.Run("EnvironmentVariableOverride", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a config file with Peer configuration
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+peer:
+  certFile: "/yaml/cert.pem"
+  keyFile: "/yaml/key.pem"
+  skipTlsVerify: false
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Set environment variables
+		envs := map[string]string{
+			"DAGU_PEER_CERT_FILE":       "/env/cert.pem",
+			"DAGU_PEER_KEY_FILE":        "/env/key.pem",
+			"DAGU_PEER_CLIENT_CA_FILE":  "/env/ca.pem",
+			"DAGU_PEER_SKIP_TLS_VERIFY": "true",
+			"DAGU_PEER_INSECURE":        "false",
+		}
+
+		// Save and clear existing environment variables
+		savedEnvs := make(map[string]string)
+		for key := range envs {
+			savedEnvs[key] = os.Getenv(key)
+			os.Unsetenv(key)
+		}
+		defer func() {
+			// Restore original environment
+			for key, val := range savedEnvs {
+				if val != "" {
+					os.Setenv(key, val)
+				} else {
+					os.Unsetenv(key)
+				}
+			}
+		}()
+
+		// Set test environment variables
+		for key, val := range envs {
+			os.Setenv(key, val)
+		}
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify environment variables override YAML
+		assert.Equal(t, "/env/cert.pem", cfg.Global.Peer.CertFile)
+		assert.Equal(t, "/env/key.pem", cfg.Global.Peer.KeyFile)
+		assert.Equal(t, "/env/ca.pem", cfg.Global.Peer.ClientCaFile)
+		assert.True(t, cfg.Global.Peer.SkipTLSVerify)
+		assert.False(t, cfg.Global.Peer.Insecure) // overridden by env var
+	})
+
+	t.Run("DefaultValues", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a minimal config file without Peer configuration
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+host: "localhost"
+port: 8080
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify default Peer configuration values
+		assert.Equal(t, "", cfg.Global.Peer.CertFile)
+		assert.Equal(t, "", cfg.Global.Peer.KeyFile)
+		assert.Equal(t, "", cfg.Global.Peer.ClientCaFile)
+		assert.False(t, cfg.Global.Peer.SkipTLSVerify)
+		assert.True(t, cfg.Global.Peer.Insecure) // default is true
+	})
+
+	t.Run("PartialPeerConfig", func(t *testing.T) {
+		// Reset viper to ensure clean state
+		viper.Reset()
+		defer viper.Reset()
+
+		// Create a config file with partial Peer configuration
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+peer:
+  certFile: "/path/to/cert.pem"
+  skipTlsVerify: true
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		// Load configuration
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Verify partial Peer config is loaded correctly
+		assert.Equal(t, "/path/to/cert.pem", cfg.Global.Peer.CertFile)
+		assert.Equal(t, "", cfg.Global.Peer.KeyFile)
+		assert.Equal(t, "", cfg.Global.Peer.ClientCaFile)
+		assert.True(t, cfg.Global.Peer.SkipTLSVerify)
 	})
 }

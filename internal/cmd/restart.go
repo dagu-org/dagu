@@ -135,6 +135,7 @@ func executeDAG(ctx *Context, cli dagrun.Manager, dag *digraph.DAG) error {
 		dr,
 		ctx.DAGRunStore,
 		ctx.ProcStore,
+		ctx.ServiceMonitor,
 		digraph.NewDAGRunRef(dag.Name, dagRunID),
 		agent.Options{Dry: false})
 

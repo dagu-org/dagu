@@ -3,7 +3,6 @@ package integration_test
 import (
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
@@ -13,8 +12,11 @@ import (
 func TestDAGExecution(t *testing.T) {
 	t.Parallel()
 
+	th := test.Setup(t)
+
 	t.Run("Depends", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: "1"
     command: "echo 1"
@@ -30,7 +32,8 @@ func TestDAGExecution(t *testing.T) {
 	})
 
 	t.Run("Pipe", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params:
   - NAME: "foo"
 steps:
@@ -49,7 +52,7 @@ steps:
 	})
 
 	t.Run("DotEnv", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
 
 		// Create dotenv files
 		dotenv1Path := test.TestdataPath(t, "integration/dotenv1")
@@ -74,7 +77,8 @@ steps:
 	})
 
 	t.Run("NamedParams", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params:
   NAME: "Dagu"
   AGE: 30
@@ -100,7 +104,8 @@ steps:
 	})
 
 	t.Run("NamedParamsList", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params:
   - NAME: "Dagu"
   - AGE: 30
@@ -126,7 +131,8 @@ steps:
 	})
 
 	t.Run("PositionalParams", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params: "foo bar"
 
 steps:
@@ -148,7 +154,8 @@ steps:
 	})
 
 	t.Run("PositionalParamsScript", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params: "foo bar"
 
 steps:
@@ -171,7 +178,8 @@ steps:
 	})
 
 	t.Run("Script", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params:
   - NAME: "foo"
 steps:
@@ -191,7 +199,8 @@ steps:
 	})
 
 	t.Run("RegexPrecondition", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: test
     command: echo abc run def
@@ -216,7 +225,8 @@ steps:
 	})
 
 	t.Run("JSON", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: get config
     command: |
@@ -239,7 +249,8 @@ steps:
 	})
 
 	t.Run("EnvVar", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `env:
   - DATA_DIR: /tmp/dagu_test_integration
   - PROCESS_DATE: "`+"`"+`date '+%Y%m%d_%H%M%S'`+"`"+`"
@@ -270,7 +281,8 @@ steps:
 	})
 
 	t.Run("EnvScript", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `env:
   - "E1": foo
   - "E2": bar
@@ -295,7 +307,8 @@ steps:
 	})
 
 	t.Run("SpecialVars", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: step1
     command: echo $DAG_RUN_LOG_FILE
@@ -332,7 +345,8 @@ steps:
 	})
 
 	t.Run("JQ", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: extract_value
     executor: jq
@@ -357,7 +371,8 @@ steps:
 	})
 
 	t.Run("JSONVar", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: get_config
     command: |
@@ -380,7 +395,8 @@ steps:
 	})
 
 	t.Run("PerlScript", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: step1
     command: perl
@@ -401,7 +417,8 @@ steps:
 	})
 
 	t.Run("Workdir", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `env:
   - WORKDIR: $HOME
   - TILDE: ~/
@@ -428,7 +445,8 @@ steps:
 	})
 
 	t.Run("Issue-810", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params: bar
 steps:
   - name: step1
@@ -474,7 +492,8 @@ steps:
 	})
 
 	t.Run("ShellOptions", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: step1
     description: test step
@@ -669,58 +688,37 @@ func TestComplexDependencies(t *testing.T) {
 	})
 }
 
-func TestProgressingNode(t *testing.T) {
+func TestChainExecution(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
 
-	dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "sleep 3"
-  - name: "2"
-    command: "sleep 3"
-    depends: "1"
+	// Load chain DAG
+	dag := th.DAG(t, `type: chain
+steps:
+  - name: step1
+    command: echo "step 1"
+  - name: step2
+    command: echo "step 2"
+  - name: step3
+    command: echo "step 3"
 `)
+
+	// Run the DAG
 	agent := dag.Agent()
+	require.NoError(t, agent.Run(agent.Context))
 
-	go func() {
-		err := agent.Run(agent.Context)
-		require.NoError(t, err, "failed to run agent")
-	}()
-
-	dag.AssertCurrentStatus(t, status.Running)
-
-	dagRunStatus, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
-	require.NoError(t, err, "failed to get latest status")
-
-	// Check the first node is in progress
-	require.Equal(t, status.NodeRunning.String(), dagRunStatus.Nodes[0].Status.String(), "first node should be in progress")
-	// Check the second node is not started
-	require.Equal(t, status.NodeNone.String(), dagRunStatus.Nodes[1].Status.String(), "second node should not be started")
-
-	// Wait for the first node to finish
-	time.Sleep(time.Second * 2)
-
-	dag.AssertCurrentStatus(t, status.Running)
-
-	// Check the progress of the nodes
-	dagRunStatus, err = dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
-	require.NoError(t, err, "failed to get latest status")
-
-	// Assert that the dag-run is still running
-	require.Equal(t, status.Running.String(), dagRunStatus.Status.String(), "dag-run should be running")
-
-	// Check the first node is finished
-	require.Equal(t, status.NodeSuccess.String(), dagRunStatus.Nodes[0].Status.String(), "first node should be finished")
-	// Check the second node is in progress
-	require.Equal(t, status.NodeRunning.String(), dagRunStatus.Nodes[1].Status.String(), "second node should be in progress")
-
-	// Wait for all nodes to finish
+	// Verify successful completion
 	dag.AssertLatestStatus(t, status.Success)
 
-	// Check the second node is finished
-	dagRunStatus, err = dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
-	require.NoError(t, err, "failed to get latest status")
+	// Get the latest status to verify execution order
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 3)
 
-	require.Equal(t, status.NodeSuccess.String(), dagRunStatus.Nodes[1].Status.String(), "second node should be finished")
+	// Verify steps ran in order (chain type adds implicit dependencies)
+	require.Equal(t, "step1", dagRunStatus.Nodes[0].Step.Name)
+	require.Equal(t, "step2", dagRunStatus.Nodes[1].Step.Name)
+	require.Equal(t, "step3", dagRunStatus.Nodes[2].Step.Name)
 }

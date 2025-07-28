@@ -71,6 +71,9 @@ type Global struct {
 	// SchedulerLockRetryInterval is the interval between lock acquisition attempts.
 	// Default is 50 milliseconds.
 	SchedulerLockRetryInterval time.Duration
+
+	// Peer contains configuration for peer connections over gRPC.
+	Peer Peer
 }
 
 func (cfg *Global) setTimezone() error {
@@ -223,6 +226,7 @@ type PathsConfig struct {
 	DAGRunsDir      string
 	QueueDir        string
 	ProcDir         string
+	DiscoveryDir    string // Directory for service discovery files
 }
 
 type UI struct {
@@ -276,25 +280,37 @@ type QueueConfig struct {
 
 // Coordinator represents the coordinator service configuration
 type Coordinator struct {
-	Host       string     // gRPC server host address
-	Port       int        // gRPC server port number
-	SigningKey string     // Used for signing key for JWT
-	TLS        *TLSConfig // TLS configuration for secure connections
+	ID   string // Coordinator instance ID (default: hostname@port)
+	Host string // gRPC server host address
+	Port int    // gRPC server port number
 }
 
 // Worker represents the worker configuration
 type Worker struct {
-	ID              string            // Worker instance ID (default: hostname@PID)
-	MaxActiveRuns   int               // Maximum number of active runs (default: 100)
-	CoordinatorHost string            // Coordinator gRPC server host (default: 127.0.0.1)
-	CoordinatorPort int               // Coordinator gRPC server port (default: 50055)
-	TLS             *TLSConfig        // TLS configuration for coordinator connection
-	Insecure        bool              // Use insecure connection (h2c) - must be explicitly enabled
-	SkipTLSVerify   bool              // Skip TLS certificate verification
-	Labels          map[string]string // Worker labels for capability matching
+	ID            string            // Worker instance ID (default: hostname@PID)
+	MaxActiveRuns int               // Maximum number of active runs (default: 100)
+	Labels        map[string]string // Worker labels for capability matching
 }
 
 // Scheduler represents the scheduler configuration
 type Scheduler struct {
 	Port int // Health check server port (default: 8090)
+}
+
+// Peer holds the certificate and TLS configuration for peer connections over gRPC.
+type Peer struct {
+	// CertFile is the path to the server's TLS certificate file.
+	CertFile string
+
+	// KeyFile is the path to the server's TLS key file.
+	KeyFile string
+
+	// ClientCaFile is the path to the CA certificate file used for client verification.
+	ClientCaFile string
+
+	// SkipTLSVerify indicates whether to skip TLS certificate verification.
+	SkipTLSVerify bool
+
+	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
+	Insecure bool
 }

@@ -2,8 +2,10 @@ package config
 
 // Definition holds the overall configuration for the application.
 // Each field maps to a configuration key defined in external sources (like YAML files)
-// via the "mapstructure" tags. Some fields are legacy and maintained only for backward compatibility.
 type Definition struct {
+	// Peer contains configuration for peer connections over gRPC.
+	Peer peerDef `mapstructure:"peer"`
+
 	// Host defines the hostname or IP address on which the application will run.
 	Host string `mapstructure:"host"`
 
@@ -92,7 +94,7 @@ type Definition struct {
 	// Default is 50 milliseconds.
 	SchedulerLockRetryInterval string `mapstructure:"schedulerLockRetryInterval"`
 
-	// DAGs is a legacy field that was previously used to configure DAG-related settings.
+	// DAGs is a field that was previously used to configure the directory for DAG files.
 	DAGs string `mapstructure:"dags"`
 
 	// DAGsDir specifies the directory where DAG files are stored.
@@ -142,10 +144,24 @@ type Definition struct {
 
 	// MaxDashboardPageLimit limits the number of dashboard pages that can be shown in the UI.
 	MaxDashboardPageLimit int `mapstructure:"maxDashboardPageLimit"`
+}
 
-	// ----------------------------------------------------------------------------
-	// Legacy fields for backward compatibility - End
-	// ----------------------------------------------------------------------------
+// peerDef holds the certificate and TLS configuration for peer connections over gRPC.
+type peerDef struct {
+	// CertFile is the path to the server's TLS certificate file.
+	CertFile string `mapstructure:"certFile"`
+
+	// KeyFile is the path to the server's TLS key file.
+	KeyFile string `mapstructure:"keyFile"`
+
+	// ClientCaFile is the path to the CA certificate file used for client verification.
+	ClientCaFile string `mapstructure:"clientCaFile"`
+
+	// SkipTLSVerify indicates whether to skip TLS certificate verification.
+	SkipTLSVerify bool `mapstructure:"skipTlsVerify"`
+
+	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
+	Insecure bool `mapstructure:"insecure"`
 }
 
 // authDef holds the authentication configuration for the application.
@@ -187,6 +203,7 @@ type pathsConfigDef struct {
 	DAGRunsDir      string `mapstructure:"dagRunsDir"`
 	QueueDir        string `mapstructure:"queueDir"`
 	ProcDir         string `mapstructure:"procDir"`
+	DiscoveryDir    string `mapstructure:"discoveryDir"`
 }
 
 // uiDef holds the user interface configuration settings.
@@ -249,15 +266,6 @@ type coordinatorDef struct {
 
 	// Port is the port number for the coordinator service.
 	Port int `mapstructure:"port"`
-
-	// CertFile is the path to the coordinator's TLS certificate file.
-	CertFile string `mapstructure:"certFile"`
-
-	// KeyFile is the path to the coordinator's TLS key file.
-	KeyFile string `mapstructure:"keyFile"`
-
-	// CAFile is the path to the coordinator's CA certificate file.
-	CAFile string `mapstructure:"caFile"`
 }
 
 // workerDef holds the configuration for the worker.
@@ -268,30 +276,9 @@ type workerDef struct {
 	// MaxActiveRuns is the maximum number of active runs for the worker.
 	MaxActiveRuns int `mapstructure:"maxActiveRuns"`
 
-	// CoordinatorHost is the hostname or IP address for connecting to the coordinator.
-	CoordinatorHost string `mapstructure:"coordinatorHost"`
-
-	// CoordinatorPort is the port number for connecting to the coordinator.
-	CoordinatorPort int `mapstructure:"coordinatorPort"`
-
-	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
-	Insecure bool `mapstructure:"insecure"`
-
-	// SkipTLSVerify indicates whether to skip TLS certificate verification.
-	SkipTLSVerify bool `mapstructure:"skipTlsVerify"`
-
 	// Labels are the worker labels for capability matching.
 	// Can be either a string (key1=value1,key2=value2) or a map in YAML.
 	Labels interface{} `mapstructure:"labels"`
-
-	// CertFile is the path to the worker's TLS certificate file for mutual TLS.
-	CertFile string `mapstructure:"certFile"`
-
-	// KeyFile is the path to the worker's TLS key file for mutual TLS.
-	KeyFile string `mapstructure:"keyFile"`
-
-	// CAFile is the path to the CA certificate file for server verification.
-	CAFile string `mapstructure:"caFile"`
 }
 
 // schedulerDef holds the configuration for the scheduler.

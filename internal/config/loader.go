@@ -133,6 +133,17 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		SchedulerLockRetryInterval:  50 * time.Millisecond,
 	}
 
+	// Set Peer configuration if provided
+	if def.Peer.CertFile != "" || def.Peer.KeyFile != "" || def.Peer.ClientCaFile != "" || def.Peer.SkipTLSVerify || def.Peer.Insecure {
+		cfg.Global.Peer = Peer{
+			CertFile:      def.Peer.CertFile,
+			KeyFile:       def.Peer.KeyFile,
+			ClientCaFile:  def.Peer.ClientCaFile,
+			SkipTLSVerify: def.Peer.SkipTLSVerify,
+			Insecure:      def.Peer.Insecure,
+		}
+	}
+
 	if def.SchedulerLockStaleThreshold != "" {
 		if duration, err := time.ParseDuration(def.SchedulerLockStaleThreshold); err == nil {
 			cfg.Global.SchedulerLockStaleThreshold = duration
@@ -236,6 +247,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.Paths.DAGRunsDir = fileutil.ResolvePathOrBlank(def.Paths.DAGRunsDir)
 		cfg.Paths.QueueDir = fileutil.ResolvePathOrBlank(def.Paths.QueueDir)
 		cfg.Paths.ProcDir = fileutil.ResolvePathOrBlank(def.Paths.ProcDir)
+		cfg.Paths.DiscoveryDir = fileutil.ResolvePathOrBlank(def.Paths.DiscoveryDir)
 	}
 
 	// Set UI configuration if provided.
@@ -268,34 +280,12 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	if def.Coordinator != nil {
 		cfg.Coordinator.Host = def.Coordinator.Host
 		cfg.Coordinator.Port = def.Coordinator.Port
-
-		// Set TLS configuration if available
-		if def.Coordinator.CertFile != "" || def.Coordinator.KeyFile != "" || def.Coordinator.CAFile != "" {
-			cfg.Coordinator.TLS = &TLSConfig{
-				CertFile: def.Coordinator.CertFile,
-				KeyFile:  def.Coordinator.KeyFile,
-				CAFile:   def.Coordinator.CAFile,
-			}
-		}
 	}
 
 	// Set worker configuration from nested structure
 	if def.Worker != nil {
 		cfg.Worker.ID = def.Worker.ID
 		cfg.Worker.MaxActiveRuns = def.Worker.MaxActiveRuns
-		cfg.Worker.CoordinatorHost = def.Worker.CoordinatorHost
-		cfg.Worker.CoordinatorPort = def.Worker.CoordinatorPort
-		cfg.Worker.Insecure = def.Worker.Insecure
-		cfg.Worker.SkipTLSVerify = def.Worker.SkipTLSVerify
-
-		// Set worker TLS configuration if available
-		if def.Worker.CertFile != "" || def.Worker.KeyFile != "" || def.Worker.CAFile != "" {
-			cfg.Worker.TLS = &TLSConfig{
-				CertFile: def.Worker.CertFile,
-				KeyFile:  def.Worker.KeyFile,
-				CAFile:   def.Worker.CAFile,
-			}
-		}
 
 		// Parse worker labels - can be either string or map
 		if def.Worker.Labels != nil {
@@ -346,6 +336,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 	if cfg.Paths.QueueDir == "" {
 		cfg.Paths.QueueDir = filepath.Join(cfg.Paths.DataDir, "queue")
+	}
+	if cfg.Paths.DiscoveryDir == "" {
+		cfg.Paths.DiscoveryDir = filepath.Join(cfg.Paths.DataDir, "discovery")
 	}
 
 	// Ensure the executable path is set.
@@ -492,16 +485,9 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	// Coordinator settings
 	viper.SetDefault("coordinatorHost", "127.0.0.1")
 	viper.SetDefault("coordinatorPort", 50055)
-	viper.SetDefault("coordinatorCertFile", "")
-	viper.SetDefault("coordinatorKeyFile", "")
-	viper.SetDefault("coordinatorCAFile", "")
 
 	// Worker settings - nested structure
 	viper.SetDefault("worker.maxActiveRuns", 100)
-	viper.SetDefault("worker.coordinatorHost", "127.0.0.1")
-	viper.SetDefault("worker.coordinatorPort", 50055)
-	viper.SetDefault("worker.insecure", true) // Insecure by default to match coordinator
-	viper.SetDefault("worker.skipTlsVerify", false)
 
 	// UI settings
 	viper.SetDefault("ui.navbarTitle", build.AppName)
@@ -519,6 +505,9 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	// Scheduler lock settings
 	viper.SetDefault("schedulerLockStaleThreshold", "30s")
 	viper.SetDefault("schedulerLockRetryInterval", "50ms")
+
+	// Peer settings
+	viper.SetDefault("peer.insecure", true) // Default to insecure (h2c)
 }
 
 // bindEnvironmentVariables binds various configuration keys to environment variables.
@@ -589,6 +578,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("paths.dagRunsDir", "DAG_RUNS_DIR")
 	l.bindEnv("paths.procDir", "PROC_DIR")
 	l.bindEnv("paths.queueDir", "QUEUE_DIR")
+	l.bindEnv("paths.discoveryDir", "DISCOVERY_DIR")
 
 	// UI customization
 	l.bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")
@@ -599,23 +589,20 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	// Coordinator service configuration (flat structure)
 	l.bindEnv("coordinatorHost", "COORDINATOR_HOST")
 	l.bindEnv("coordinatorPort", "COORDINATOR_PORT")
-	l.bindEnv("coordinatorCertFile", "COORDINATOR_CERT_FILE")
-	l.bindEnv("coordinatorKeyFile", "COORDINATOR_KEY_FILE")
-	l.bindEnv("coordinatorCaFile", "COORDINATOR_CA_FILE")
 
 	// Worker configuration (nested structure)
 	l.bindEnv("worker.id", "WORKER_ID")
 	l.bindEnv("worker.maxActiveRuns", "WORKER_MAX_ACTIVE_RUNS")
-	l.bindEnv("worker.coordinatorHost", "WORKER_COORDINATOR_HOST")
-	l.bindEnv("worker.coordinatorPort", "WORKER_COORDINATOR_PORT")
-	l.bindEnv("worker.insecure", "WORKER_INSECURE")
-	l.bindEnv("worker.skipTlsVerify", "WORKER_SKIP_TLS_VERIFY")
 	l.bindEnv("worker.labels", "WORKER_LABELS")
-	l.bindEnv("worker.certFile", "WORKER_TLS_CERT_FILE")
-	l.bindEnv("worker.keyFile", "WORKER_TLS_KEY_FILE")
-	l.bindEnv("worker.caFile", "WORKER_TLS_CA_FILE")
 	// Scheduler configuration
 	l.bindEnv("scheduler.port", "SCHEDULER_PORT")
+
+	// Peer configuration
+	l.bindEnv("peer.certFile", "PEER_CERT_FILE")
+	l.bindEnv("peer.keyFile", "PEER_KEY_FILE")
+	l.bindEnv("peer.clientCaFile", "PEER_CLIENT_CA_FILE")
+	l.bindEnv("peer.skipTlsVerify", "PEER_SKIP_TLS_VERIFY")
+	l.bindEnv("peer.insecure", "PEER_INSECURE")
 }
 
 // bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.

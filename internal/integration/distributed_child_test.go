@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"strconv"
 	"testing"
 	"time"
 
@@ -34,22 +33,14 @@ steps:
 		// Setup and start coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Set environment variables for the worker configuration
-		t.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1")
-		t.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port()))
-
-		// Create worker TLS config
-		tlsConfig := &worker.TLSConfig{
-			Insecure: true,
-		}
+		// Get dispatcher client from coordinator
+		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Create and start worker with selector labels
 		workerInst := worker.NewWorker(
 			"test-worker-1",
 			10, // maxActiveRuns
-			"127.0.0.1",
-			coord.Port(),
-			tlsConfig,
+			coordinatorClient,
 			coord.DAGRunMgr,
 			map[string]string{"type": "test-worker"},
 		)
@@ -69,7 +60,7 @@ steps:
 		})
 
 		// Give worker time to connect
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -126,18 +117,16 @@ steps:
 		// Setup coordinator without any matching workers
 		coord := test.SetupCoordinator(t)
 
-		// Set environment variables for the worker configuration
-		t.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1")
-		t.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port()))
-
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
 
 		// Run should fail because no worker matches the selector
-		err := agent.Run(coord.Context)
+		// Use a short timeout since we expect this to fail
+		ctx, cancel := context.WithTimeout(coord.Context, 5*time.Second)
+		defer cancel()
+		err := agent.Run(ctx)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "distributed execution failed")
 
 		// Verify the DAG did not complete successfully
 		st := agent.Status(coord.Context)

@@ -88,6 +88,7 @@ func runDry(ctx *Context, args []string) error {
 		dr,
 		ctx.DAGRunStore,
 		ctx.ProcStore,
+		ctx.ServiceMonitor,
 		root,
 		agent.Options{Dry: true},
 	)

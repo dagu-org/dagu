@@ -10,7 +10,10 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/",
-      "args": ["server", "--port=8080"]
+      "args": [
+        "server",
+        "--port=8080"
+      ]
     },
     {
       "name": "Start-All",
@@ -18,7 +21,10 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/",
-      "args": ["start-all", "--port=8080"]
+      "args": [
+        "start-all",
+        "--port=8080"
+      ]
     },
     {
       "name": "Scheduler",
@@ -26,7 +32,21 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/",
-      "args": ["scheduler"]
+      "args": [
+        "scheduler"
+      ]
+    },
+    {
+      "name": "Worker",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/",
+      "args": [
+        "worker",
+        "--worker.labels",
+        "xxx:yyy"
+      ],
     },
     {
       "name": "Start",
@@ -34,7 +54,11 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/",
-      "args": ["start", "--no-queue", "${input:pathToSpec}"]
+      "args": [
+        "start",
+        "--no-queue",
+        "${input:pathToSpec}"
+      ]
     },
     {
       "name": "Stop",
@@ -42,7 +66,10 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/",
-      "args": ["stop", "${input:pathToSpec}"]
+      "args": [
+        "stop",
+        "${input:pathToSpec}"
+      ]
     },
     {
       "name": "Status",
@@ -50,7 +77,10 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/",
-      "args": ["status", "${input:pathToSpec}"]
+      "args": [
+        "status",
+        "${input:pathToSpec}"
+      ]
     },
     {
       "name": "Enqueue",
@@ -58,7 +88,10 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/",
-      "args": ["enqueue", "${input:pathToSpec}"]
+      "args": [
+        "enqueue",
+        "${input:pathToSpec}"
+      ]
     },
     {
       "name": "Migrate",
@@ -66,8 +99,11 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/",
-      "args": ["migrate", "history"]
-    }
+      "args": [
+        "migrate",
+        "history"
+      ]
+    },
   ],
   "inputs": [
     {
