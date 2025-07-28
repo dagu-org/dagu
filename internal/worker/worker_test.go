@@ -94,6 +94,8 @@ func TestWorkerStart(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Dispatch multiple tasks
+		// Note: We have 3 pollers, so we can dispatch 3 tasks immediately
+		// For the remaining tasks, we need to allow time for workers to re-poll
 		for i := 0; i < 5; i++ {
 			task := &coordinatorv1.Task{
 				DagRunId:  "run-" + string(rune('a'+i)),
@@ -102,6 +104,12 @@ func TestWorkerStart(t *testing.T) {
 			}
 			err := coord.DispatchTask(t, task)
 			require.NoError(t, err)
+			
+			// After dispatching first 3 tasks, add delay to allow workers to complete 
+			// and re-poll (tasks take 100ms to execute in this test)
+			if i >= 2 {
+				time.Sleep(120 * time.Millisecond)
+			}
 		}
 
 		// Wait for tasks to be processed
@@ -418,8 +426,8 @@ func TestRunningTaskTracking(t *testing.T) {
 		// Give worker time to connect
 		time.Sleep(100 * time.Millisecond)
 
-		// Create multiple tasks
-		for i := 0; i < 5; i++ {
+		// Create first 3 tasks to fill all pollers
+		for i := 0; i < 3; i++ {
 			task := &coordinatorv1.Task{
 				DagRunId:       "task-" + string(rune('a'+i)),
 				Target:         "test.yaml",
@@ -430,7 +438,7 @@ func TestRunningTaskTracking(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// Wait for some tasks to start
+		// Wait for all 3 tasks to start
 		for i := 0; i < 3; i++ {
 			select {
 			case <-taskStarted:
@@ -440,11 +448,26 @@ func TestRunningTaskTracking(t *testing.T) {
 			}
 		}
 
-		// Check that we have active tasks
+		// Check that we have 3 active tasks (they should still be running)
 		activeTasksMu.Lock()
 		activeCount := len(activeTasks)
 		activeTasksMu.Unlock()
 		assert.Equal(t, 3, activeCount, "Should have 3 active tasks")
+
+		// Now dispatch 2 more tasks after some have completed
+		time.Sleep(120 * time.Millisecond) // Wait for at least one task to complete
+		
+		for i := 3; i < 5; i++ {
+			task := &coordinatorv1.Task{
+				DagRunId:       "task-" + string(rune('a'+i)),
+				Target:         "test.yaml",
+				RootDagRunName: "root-dag",
+				RootDagRunId:   "root-123",
+			}
+			err := coord.DispatchTask(t, task)
+			require.NoError(t, err)
+			time.Sleep(10 * time.Millisecond) // Small delay between tasks
+		}
 
 		// Stop worker
 		cancel()
