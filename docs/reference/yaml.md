@@ -158,6 +158,16 @@ errorMail:
   # to:
   #   - oncall@example.com
   #   - manager@example.com
+  cc: team@example.com  # Single cc recipient (string)
+  # Or multiple cc recipients (array):
+  # cc:
+  #   - team@example.com
+  #   - stakeholders@example.com
+  bcc: team@example.com  # Single bcc recipient (string)
+  # Or multiple bcc recipients (array):
+  # bcc:
+  #   - team@example.com
+  #   - stakeholders@example.com
   prefix: "[ALERT]"
   attachLogs: true
   
@@ -166,6 +176,16 @@ infoMail:
   to: team@example.com  # Single recipient (string)
   # Or multiple recipients (array):
   # to:
+  #   - team@example.com
+  #   - stakeholders@example.com
+  cc: team@example.com  # Single cc recipient (string)
+  # Or multiple cc recipients (array):
+  # cc:
+  #   - team@example.com
+  #   - stakeholders@example.com
+  bcc: team@example.com  # Single bcc recipient (string)
+  # Or multiple bcc recipients (array):
+  # bcc:
   #   - team@example.com
   #   - stakeholders@example.com
   prefix: "[INFO]"
