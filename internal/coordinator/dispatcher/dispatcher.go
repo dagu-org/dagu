@@ -5,7 +5,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"math/rand/v2"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/backoff"
@@ -23,8 +25,8 @@ type Dispatcher interface {
 	// Dispatch sends a task to the coordinator
 	Dispatch(ctx context.Context, task *coordinatorv1.Task) error
 
-	// Dispose cleans up any resources used by the dispatcher
-	Dispose(ctx context.Context) error
+	// Cleanup cleans up any resources used by the dispatcher
+	Cleanup(ctx context.Context) error
 }
 
 // client holds the gRPC connection and clients for the coordinator service.
@@ -42,6 +44,9 @@ var _ Dispatcher = (*dispatcher)(nil)
 type dispatcher struct {
 	config    *Config
 	discovery models.ServiceMonitor
+
+	mu      sync.RWMutex
+	clients map[string]*client // Cache of gRPC clients by coordinator ID
 }
 
 // Errors
@@ -49,7 +54,7 @@ var (
 	ErrMissingTLSConfig = fmt.Errorf("TLS enabled but no certificates provided")
 )
 
-// newClient creates a new coordinator client with the given configuration
+// NewDispatcher creates a new coordinator client with the given configuration
 func NewDispatcher(ctx context.Context, monitor models.ServiceMonitor, config *Config) (Dispatcher, error) {
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
@@ -58,70 +63,204 @@ func NewDispatcher(ctx context.Context, monitor models.ServiceMonitor, config *C
 	return &dispatcher{
 		config:    config,
 		discovery: monitor,
+		clients:   make(map[string]*client),
 	}, nil
 }
 
 // Dispatch sends a task to the coordinator
-func (c *dispatcher) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
+func (d *dispatcher) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
+	// Get coordinator resolver from discovery
+	resolver := d.discovery.Resolver(ctx, models.ServiceNameCoordinator)
 
-	// TODO: get members from discovery service , shuffle them and try each one
-	// create gRPC connection and cache the client for same member id
+	// Set up retry policy
+	basePolicy := backoff.NewExponentialBackoffPolicy(d.config.RetryInterval)
+	basePolicy.BackoffFactor = 2.0
+	basePolicy.MaxInterval = 30 * time.Second
+	basePolicy.MaxRetries = d.config.MaxRetries
+
+	policy := backoff.WithJitter(basePolicy, backoff.FullJitter)
+
+	return backoff.Retry(ctx, func(ctx context.Context) error {
+		// Get all available coordinators
+		members, err := resolver.Members(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get coordinator members: %w", err)
+		}
+
+		if len(members) == 0 {
+			return fmt.Errorf("no coordinator instances available")
+		}
+
+		return d.attemptDispatch(ctx, members, task)
+	}, policy, nil)
+}
+
+func (d *dispatcher) attemptDispatch(ctx context.Context, members []models.HostInfo, task *coordinatorv1.Task) error {
+	// Shuffle members to distribute load evenly
+	rand.Shuffle(len(members), func(i, j int) {
+		members[i], members[j] = members[j], members[i]
+	})
+
+	// Try each coordinator in order (round-robin style)
+	var lastErr error
+	for _, member := range members {
+		// Get or create client for this coordinator
+		client, err := d.getOrCreateClient(ctx, member)
+		if err != nil {
+			logger.Warn(ctx, "Failed to connect to coordinator",
+				"coordinator_id", member.ID,
+				"address", member.HostPort,
+				"error", err)
+			continue
+		}
+
+		// Check if the coordinator is healthy
+		if err := d.isHealthy(ctx, member); err != nil {
+			logger.Warn(ctx, "Failed to check coordinator health",
+				"coordinator_id", member.ID,
+				"address", member.HostPort,
+				"error", err)
+			continue
+		}
+
+		// Create request
+		req := &coordinatorv1.DispatchRequest{Task: task}
+
+		// Apply request timeout
+		dispatchCtx, cancel := context.WithTimeout(ctx, d.config.RequestTimeout)
+		defer cancel()
+
+		// Try to dispatch
+		_, err = client.client.Dispatch(dispatchCtx, req)
+		if err == nil {
+			logger.Info(ctx, "Task dispatched successfully",
+				"dag_run_id", task.DagRunId,
+				"target", task.Target,
+				"worker_selector", task.WorkerSelector,
+				"coordinator_id", member.ID,
+			)
+			return nil
+		}
+
+		logger.Debug(ctx, "Failed to dispatch to coordinator",
+			"coordinator_id", member.ID,
+			"address", member.HostPort,
+			"error", err)
+		lastErr = err
+
+		// Remove failed client from cache
+		d.removeClient(member.ID)
+	}
+
+	return lastErr
+}
+
+func (d *dispatcher) isHealthy(ctx context.Context, member models.HostInfo) error {
+	// Get or create client for this coordinator
+	client, err := d.getOrCreateClient(ctx, member)
+	if err != nil {
+		return fmt.Errorf("failed to get coordinator client: %w", err)
+	}
+
+	// Check health
+	req := &grpc_health_v1.HealthCheckRequest{
+		Service: "", // Check overall server health
+	}
+
+	resp, err := client.healthClient.Check(ctx, req)
+	if err != nil {
+		return fmt.Errorf("health check failed: %w", err)
+	}
+
+	if resp.Status != grpc_health_v1.HealthCheckResponse_SERVING {
+		return fmt.Errorf("coordinator not healthy: %s", resp.Status)
+	}
 
 	return nil
 }
 
-// dispatchWithRetry attempts to dispatch a task with exponential backoff retry
-func (c *dispatcher) dispatchWithRetry(ctx context.Context, req *coordinatorv1.DispatchRequest) error {
-	if c.config.MaxRetries == 0 {
-		// No retries, just try once
-		_, err := c.client.Dispatch(ctx, req)
-		return err
+// getOrCreateClient gets an existing client or creates a new one for the given member
+func (d *dispatcher) getOrCreateClient(ctx context.Context, member models.HostInfo) (*client, error) {
+	// Try to get existing client with read lock
+	d.mu.RLock()
+	if c, exists := d.clients[member.ID]; exists {
+		d.mu.RUnlock()
+		return c, nil
+	}
+	d.mu.RUnlock()
+
+	// Need to create new client, acquire write lock
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	// Double-check after acquiring write lock
+	if c, exists := d.clients[member.ID]; exists {
+		return c, nil
 	}
 
-	// Set up retry policy
-	basePolicy := backoff.NewExponentialBackoffPolicy(c.config.RetryInterval)
-	basePolicy.BackoffFactor = 2.0
-	basePolicy.MaxInterval = 30 * time.Second
-	basePolicy.MaxRetries = c.config.MaxRetries
+	// Create new client
+	c, err := d.createClient(ctx, member)
+	if err != nil {
+		return nil, err
+	}
 
-	policy := backoff.WithJitter(basePolicy, backoff.FullJitter)
-
-	return backoff.Retry(ctx, func(ctx context.Context) error {
-		_, err := c.client.Dispatch(ctx, req)
-		return err
-	}, policy, nil)
+	// Cache it
+	d.clients[member.ID] = c
+	return c, nil
 }
 
-// waitForHealthy waits for the coordinator to become healthy
-func (c *client) waitForHealthy(ctx context.Context) error {
-	basePolicy := backoff.NewExponentialBackoffPolicy(time.Second)
-	basePolicy.BackoffFactor = 2.0
-	basePolicy.MaxInterval = 30 * time.Second
-	basePolicy.MaxRetries = 10
+// createClient creates a new gRPC client for the given coordinator
+func (d *dispatcher) createClient(ctx context.Context, member models.HostInfo) (*client, error) {
+	// Get dial options based on TLS configuration
+	dialOpts, err := getDialOptions(d.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure gRPC connection: %w", err)
+	}
 
-	policy := backoff.WithJitter(basePolicy, backoff.FullJitter)
+	// Create gRPC connection
+	conn, err := grpc.NewClient(member.HostPort, dialOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create coordinator client for %s: %w", member.HostPort, err)
+	}
 
-	return backoff.Retry(ctx, func(ctx context.Context) error {
-		req := &grpc_health_v1.HealthCheckRequest{
-			Service: "", // Check overall server health
+	return &client{
+		conn:         conn,
+		client:       coordinatorv1.NewCoordinatorServiceClient(conn),
+		healthClient: grpc_health_v1.NewHealthClient(conn),
+	}, nil
+}
+
+// removeClient removes a client from the cache
+func (d *dispatcher) removeClient(coordinatorID string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if c, exists := d.clients[coordinatorID]; exists {
+		_ = c.conn.Close()
+		delete(d.clients, coordinatorID)
+	}
+}
+
+// Cleanup cleans up all connections
+func (d *dispatcher) Cleanup(ctx context.Context) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	for id, c := range d.clients {
+		if err := c.conn.Close(); err != nil {
+			logger.Error(ctx, "Failed to close connection",
+				"coordinator_id", id,
+				"error", err)
 		}
+	}
 
-		resp, err := c.healthClient.Check(ctx, req)
-		if err != nil {
-			logger.Error(ctx, "Health check failed", "err", err)
-			return err
-		}
-
-		if resp.Status != grpc_health_v1.HealthCheckResponse_SERVING {
-			return fmt.Errorf("coordinator not healthy: %s", resp.Status)
-		}
-
-		return nil
-	}, policy, nil)
+	// Clear the map
+	d.clients = make(map[string]*client)
+	return nil
 }
 
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration
-func getDialOptions(address string, config *Config) ([]grpc.DialOption, error) {
+func getDialOptions(config *Config) ([]grpc.DialOption, error) {
 	opts := []grpc.DialOption{}
 
 	if config.Insecure {

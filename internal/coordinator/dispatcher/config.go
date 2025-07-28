@@ -23,8 +23,6 @@ type Config struct {
 // DefaultConfig returns a Config with default values
 func DefaultConfig() *Config {
 	return &Config{
-		Host:           "localhost",
-		Port:           50055,
 		Insecure:       true,
 		DialTimeout:    10 * time.Second,
 		RequestTimeout: 5 * time.Minute,
