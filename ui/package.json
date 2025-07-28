@@ -86,7 +86,7 @@
     "dayjs": "^1.11.13",
     "lodash": "^4.17.21",
     "lodash-es": "^4.17.21",
-    "lucide": "^0.525.0",
+    "lucide": "^0.526.0",
     "lucide-react": "^0.525.0",
     "mermaid": "^11.9.0",
     "monaco-editor": "^0.52.2",
