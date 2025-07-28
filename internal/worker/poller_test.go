@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/backoff"
-	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
+	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/worker"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
@@ -18,14 +18,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// TestPollerStateTracking tests that the poller correctly tracks connection state via dispatcher
+// TestPollerStateTracking tests that the poller correctly tracks connection state via coordinator client
 func TestPollerStateTracking(t *testing.T) {
 	t.Run("InitialStateIsConnected", func(t *testing.T) {
-		mockDispatcher := newMockDispatcher()
+		mockCoordinatorCli := newMockCoordinatorCli()
 		mockExecutor := &mockTaskExecutor{}
 		labels := make(map[string]string)
 
-		poller := worker.NewPoller("test-worker", mockDispatcher, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
 
 		// Check initial state
 		isConnected, consecutiveFails, lastError := poller.GetState()
@@ -35,12 +35,12 @@ func TestPollerStateTracking(t *testing.T) {
 	})
 
 	t.Run("StateReflectsDispatcherMetrics", func(t *testing.T) {
-		mockDispatcher := newMockDispatcher()
+		mockCoordinatorCli := newMockCoordinatorCli()
 		connectionError := status.Error(codes.Unavailable, "connection refused")
 
-		// Configure dispatcher to return specific metrics
-		mockDispatcher.MetricsFunc = func() dispatcher.Metrics {
-			return dispatcher.Metrics{
+		// Configure coordinator client to return specific metrics
+		mockCoordinatorCli.MetricsFunc = func() coordinator.Metrics {
+			return coordinator.Metrics{
 				IsConnected:      false,
 				ConsecutiveFails: 5,
 				LastError:        connectionError,
@@ -49,9 +49,9 @@ func TestPollerStateTracking(t *testing.T) {
 
 		mockExecutor := &mockTaskExecutor{}
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockDispatcher, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
 
-		// State should reflect dispatcher metrics
+		// State should reflect coordinator client metrics
 		isConnected, consecutiveFails, lastError := poller.GetState()
 		assert.False(t, isConnected)
 		assert.Equal(t, 5, consecutiveFails)
@@ -69,8 +69,8 @@ func TestPollerTaskDispatch(t *testing.T) {
 			Target:   "test.yaml",
 		}
 
-		mockDispatcher := newMockDispatcher()
-		mockDispatcher.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+		mockCoordinatorCli := newMockCoordinatorCli()
+		mockCoordinatorCli.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 			// Return task once then nil
 			select {
 			case <-ctx.Done():
@@ -91,7 +91,7 @@ func TestPollerTaskDispatch(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockDispatcher, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
 
 		// Run poller
 		poller.Run(ctx)
@@ -109,8 +109,8 @@ func TestPollerTaskDispatch(t *testing.T) {
 		var pollCount int32
 		var executionCount int32
 
-		mockDispatcher := newMockDispatcher()
-		mockDispatcher.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+		mockCoordinatorCli := newMockCoordinatorCli()
+		mockCoordinatorCli.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 			count := atomic.AddInt32(&pollCount, 1)
 
 			// Return tasks for first 3 polls
@@ -137,7 +137,7 @@ func TestPollerTaskDispatch(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockDispatcher, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
 
 		// Run poller in background
 		go poller.Run(ctx)
@@ -157,9 +157,9 @@ func TestPollerErrorHandling(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		mockDispatcher := newMockDispatcher()
+		mockCoordinatorCli := newMockCoordinatorCli()
 		var taskReturned bool
-		mockDispatcher.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+		mockCoordinatorCli.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 			if !taskReturned {
 				taskReturned = true
 				return &coordinatorv1.Task{DagRunId: "error-task"}, nil
@@ -182,7 +182,7 @@ func TestPollerErrorHandling(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockDispatcher, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
 
 		// Run poller in background
 		go poller.Run(ctx)
@@ -202,8 +202,8 @@ func TestPollerErrorHandling(t *testing.T) {
 		var pollAttempts int32
 		pollError := status.Error(codes.Unavailable, "poll failed")
 
-		mockDispatcher := newMockDispatcher()
-		mockDispatcher.PollFunc = func(_ context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+		mockCoordinatorCli := newMockCoordinatorCli()
+		mockCoordinatorCli.PollFunc = func(_ context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 			count := atomic.AddInt32(&pollAttempts, 1)
 
 			if count <= 3 {
@@ -225,7 +225,7 @@ func TestPollerErrorHandling(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockDispatcher, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
 
 		// Run poller (will retry on errors)
 		poller.Run(ctx)
@@ -241,8 +241,8 @@ func TestPollerContextCancellation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		var pollStarted atomic.Bool
-		mockDispatcher := newMockDispatcher()
-		mockDispatcher.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+		mockCoordinatorCli := newMockCoordinatorCli()
+		mockCoordinatorCli.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 			pollStarted.Store(true)
 			// Block until cancelled
 			<-ctx.Done()
@@ -251,7 +251,7 @@ func TestPollerContextCancellation(t *testing.T) {
 
 		mockExecutor := &mockTaskExecutor{}
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockDispatcher, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
 
 		// Run poller in background
 		var wg sync.WaitGroup
@@ -273,8 +273,8 @@ func TestPollerContextCancellation(t *testing.T) {
 	t.Run("StopExecutionOnContextCancel", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
-		mockDispatcher := newMockDispatcher()
-		mockDispatcher.PollFunc = func(_ context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+		mockCoordinatorCli := newMockCoordinatorCli()
+		mockCoordinatorCli.PollFunc = func(_ context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 			return &coordinatorv1.Task{DagRunId: "long-task"}, nil
 		}
 
@@ -293,7 +293,7 @@ func TestPollerContextCancellation(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockDispatcher, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
 
 		// Run poller in background
 		var wg sync.WaitGroup
@@ -324,15 +324,15 @@ func TestPollerWithLabels(t *testing.T) {
 		}
 
 		var receivedReq *coordinatorv1.PollRequest
-		mockDispatcher := newMockDispatcher()
-		mockDispatcher.PollFunc = func(_ context.Context, _ backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+		mockCoordinatorCli := newMockCoordinatorCli()
+		mockCoordinatorCli.PollFunc = func(_ context.Context, _ backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 			receivedReq = req
 			cancel() // Stop after first poll
 			return nil, nil
 		}
 
 		mockExecutor := &mockTaskExecutor{}
-		poller := worker.NewPoller("test-worker", mockDispatcher, mockExecutor, 0, expectedLabels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, expectedLabels)
 
 		// Run poller
 		poller.Run(ctx)
@@ -344,11 +344,11 @@ func TestPollerWithLabels(t *testing.T) {
 	})
 }
 
-// mockDispatcher is a mock implementation of dispatcher.Client
-type mockDispatcher struct {
+// mockCoordinatorCli is a mock implementation of coordinator.Client
+type mockCoordinatorCli struct {
 	PollFunc     func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
 	DispatchFunc func(ctx context.Context, task *coordinatorv1.Task) error
-	MetricsFunc  func() dispatcher.Metrics
+	MetricsFunc  func() coordinator.Metrics
 	CleanupFunc  func(ctx context.Context) error
 
 	// Internal state tracking
@@ -358,13 +358,13 @@ type mockDispatcher struct {
 	lastError        error
 }
 
-func newMockDispatcher() *mockDispatcher {
-	return &mockDispatcher{
+func newMockCoordinatorCli() *mockCoordinatorCli {
+	return &mockCoordinatorCli{
 		isConnected: true,
 	}
 }
 
-func (m *mockDispatcher) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+func (m *mockCoordinatorCli) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 	if m.PollFunc != nil {
 		task, err := m.PollFunc(ctx, policy, req)
 		m.updateState(err)
@@ -373,14 +373,14 @@ func (m *mockDispatcher) Poll(ctx context.Context, policy backoff.RetryPolicy, r
 	return nil, nil
 }
 
-func (m *mockDispatcher) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
+func (m *mockCoordinatorCli) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
 	if m.DispatchFunc != nil {
 		return m.DispatchFunc(ctx, task)
 	}
 	return nil
 }
 
-func (m *mockDispatcher) Metrics() dispatcher.Metrics {
+func (m *mockCoordinatorCli) Metrics() coordinator.Metrics {
 	if m.MetricsFunc != nil {
 		return m.MetricsFunc()
 	}
@@ -388,31 +388,31 @@ func (m *mockDispatcher) Metrics() dispatcher.Metrics {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	return dispatcher.Metrics{
+	return coordinator.Metrics{
 		IsConnected:      m.isConnected,
 		ConsecutiveFails: m.consecutiveFails,
 		LastError:        m.lastError,
 	}
 }
 
-func (m *mockDispatcher) Cleanup(ctx context.Context) error {
+func (m *mockCoordinatorCli) Cleanup(ctx context.Context) error {
 	if m.CleanupFunc != nil {
 		return m.CleanupFunc(ctx)
 	}
 	return nil
 }
 
-func (m *mockDispatcher) GetWorkers(_ context.Context) ([]*coordinatorv1.WorkerInfo, error) {
+func (m *mockCoordinatorCli) GetWorkers(_ context.Context) ([]*coordinatorv1.WorkerInfo, error) {
 	// Return empty list by default for tests
 	return []*coordinatorv1.WorkerInfo{}, nil
 }
 
-func (m *mockDispatcher) Heartbeat(_ context.Context, _ *coordinatorv1.HeartbeatRequest) error {
+func (m *mockCoordinatorCli) Heartbeat(_ context.Context, _ *coordinatorv1.HeartbeatRequest) error {
 	// Return success by default for tests
 	return nil
 }
 
-func (m *mockDispatcher) updateState(err error) {
+func (m *mockCoordinatorCli) updateState(err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

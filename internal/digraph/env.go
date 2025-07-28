@@ -17,7 +17,7 @@ type Env struct {
 	DAG        *DAG
 	DB         Database
 	Envs       map[string]string
-	Dispatcher Dispatcher
+	CoordinatorCli Dispatcher
 }
 
 func (e Env) AllEnvs() []string {
@@ -47,13 +47,13 @@ type Dispatcher interface {
 	// Dispatch sends a task to the coordinator
 	Dispatch(ctx context.Context, task *coordinatorv1.Task) error
 
-	// Cleanup cleans up any resources used by the dispatcher
+	// Cleanup cleans up any resources used by the coordinator client
 	Cleanup(ctx context.Context) error
 }
 
 // SetupEnv sets up the execution context for a dag-run.
 // It initializes the environment variables and the DAG metadata.
-func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, dagRunID, logFile string, params []string, dispacher Dispatcher) context.Context {
+func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, dagRunID, logFile string, params []string, coordinatorCli Dispatcher) context.Context {
 	var envs = map[string]string{
 		EnvKeyDAGRunLogFile: logFile,
 		EnvKeyDAGRunID:      dagRunID,
@@ -74,7 +74,7 @@ func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, 
 		DB:         db,
 		Envs:       envs,
 		DAGRunID:   dagRunID,
-		Dispatcher: dispacher,
+		CoordinatorCli: coordinatorCli,
 	})
 }
 

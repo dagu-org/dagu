@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
+	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -41,7 +41,7 @@ func (e *dagRunTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Ta
 type Worker struct {
 	id            string
 	maxActiveRuns int
-	dispatcher    dispatcher.Client
+	coordinatorCli coordinator.Client
 	taskExecutor  TaskExecutor
 	labels        map[string]string
 
@@ -56,7 +56,7 @@ func (w *Worker) SetTaskExecutor(executor TaskExecutor) {
 }
 
 // NewWorker creates a new worker instance.
-func NewWorker(workerID string, maxActiveRuns int, dispatcherClient dispatcher.Client, dagRunMgr dagrun.Manager, labels map[string]string) *Worker {
+func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator.Client, dagRunMgr dagrun.Manager, labels map[string]string) *Worker {
 	// Generate default worker ID if not provided
 	if workerID == "" {
 		hostname, err := os.Hostname()
@@ -69,7 +69,7 @@ func NewWorker(workerID string, maxActiveRuns int, dispatcherClient dispatcher.C
 	return &Worker{
 		id:            workerID,
 		maxActiveRuns: maxActiveRuns,
-		dispatcher:    dispatcherClient,
+		coordinatorCli: coordinatorClient,
 		taskExecutor:  &dagRunTaskExecutor{manager: dagRunMgr},
 		labels:        labels,
 		runningTasks:  make(map[string]*coordinatorv1.RunningTask),
@@ -96,7 +96,7 @@ func (w *Worker) Start(ctx context.Context) error {
 				pollerIndex:   pollerIndex,
 				innerExecutor: w.taskExecutor,
 			}
-			poller := NewPoller(w.id, w.dispatcher, wrappedExecutor, pollerIndex, w.labels)
+			poller := NewPoller(w.id, w.coordinatorCli, wrappedExecutor, pollerIndex, w.labels)
 			poller.Run(ctx)
 		}(i)
 	}
@@ -118,9 +118,9 @@ func (w *Worker) Start(ctx context.Context) error {
 func (w *Worker) Stop(ctx context.Context) error {
 	logger.Info(ctx, "Worker stopping", "worker_id", w.id)
 
-	// Cleanup dispatcher connections
-	if err := w.dispatcher.Cleanup(ctx); err != nil {
-		return fmt.Errorf("failed to cleanup dispatcher: %w", err)
+	// Cleanup coordinator client connections
+	if err := w.coordinatorCli.Cleanup(ctx); err != nil {
+		return fmt.Errorf("failed to cleanup coordinator client: %w", err)
 	}
 
 	return nil
@@ -214,5 +214,5 @@ func (w *Worker) sendHeartbeat(ctx context.Context) error {
 		},
 	}
 
-	return w.dispatcher.Heartbeat(ctx, req)
+	return w.coordinatorCli.Heartbeat(ctx, req)
 }

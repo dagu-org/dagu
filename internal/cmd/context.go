@@ -13,7 +13,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
+	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -170,19 +170,19 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 }
 
 // NewCoordinatorClient creates a new coordinator client using the global peer configuration.
-func (c *Context) NewCoordinatorClient() dispatcher.Client {
-	dispatcherCfg := dispatcher.DefaultConfig()
-	dispatcherCfg.CAFile = c.Config.Global.Peer.ClientCaFile
-	dispatcherCfg.CertFile = c.Config.Global.Peer.CertFile
-	dispatcherCfg.KeyFile = c.Config.Global.Peer.KeyFile
-	dispatcherCfg.SkipTLSVerify = c.Config.Global.Peer.SkipTLSVerify
-	dispatcherCfg.Insecure = c.Config.Global.Peer.Insecure
+func (c *Context) NewCoordinatorClient() coordinator.Client {
+	coordinatorCliCfg := coordinator.DefaultConfig()
+	coordinatorCliCfg.CAFile = c.Config.Global.Peer.ClientCaFile
+	coordinatorCliCfg.CertFile = c.Config.Global.Peer.CertFile
+	coordinatorCliCfg.KeyFile = c.Config.Global.Peer.KeyFile
+	coordinatorCliCfg.SkipTLSVerify = c.Config.Global.Peer.SkipTLSVerify
+	coordinatorCliCfg.Insecure = c.Config.Global.Peer.Insecure
 
-	if err := dispatcherCfg.Validate(); err != nil {
-		logger.Error(c.Context, "Invalid dispatcher configuration", "err", err)
+	if err := coordinatorCliCfg.Validate(); err != nil {
+		logger.Error(c.Context, "Invalid coordinator client configuration", "err", err)
 		return nil
 	}
-	return dispatcher.New(c.ServiceMonitor, dispatcherCfg)
+	return coordinator.New(c.ServiceMonitor, coordinatorCliCfg)
 }
 
 // NewScheduler creates a new NewScheduler instance using the default client.

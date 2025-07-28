@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
+	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/require"
@@ -52,7 +52,7 @@ func SetupServer(t *testing.T, opts ...HelperOption) Server {
 func (srv *Server) runServer(t *testing.T) {
 	t.Helper()
 
-	coordinatorCli := dispatcher.New(srv.ServiceMonitor, dispatcher.DefaultConfig())
+	coordinatorCli := coordinator.New(srv.ServiceMonitor, coordinator.DefaultConfig())
 	server := frontend.NewServer(srv.Config, srv.DAGStore, srv.DAGRunStore, srv.DAGRunMgr, coordinatorCli)
 	err := server.Serve(srv.Context)
 	require.NoError(t, err, "failed to start server")

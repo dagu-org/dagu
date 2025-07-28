@@ -11,7 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
+	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/frontend/auth"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -34,7 +34,7 @@ type API struct {
 	logEncodingCharset string
 	config             *config.Config
 	metricsRegistry    *prometheus.Registry
-	coordinatorCli     dispatcher.Client
+	coordinatorCli coordinator.Client
 }
 
 func New(
@@ -42,7 +42,7 @@ func New(
 	drs models.DAGRunStore,
 	drm dagrun.Manager,
 	cfg *config.Config,
-	coordinatorCli dispatcher.Client,
+	coordinatorCli coordinator.Client,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
 	for _, n := range cfg.Server.RemoteNodes {

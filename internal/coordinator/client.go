@@ -1,4 +1,4 @@
-package dispatcher
+package coordinator
 
 import (
 	"context"
@@ -361,7 +361,7 @@ func (cli *clientImpl) recordSuccess(ctx context.Context) {
 
 	// Log recovery if this was a disconnection
 	if !cli.state.IsConnected && cli.state.ConsecutiveFails > 0 {
-		logger.Info(ctx, "Dispatcher connection recovered",
+		logger.Info(ctx, "CoordinatorCli connection recovered",
 			"previous_consecutive_failures", cli.state.ConsecutiveFails)
 	}
 

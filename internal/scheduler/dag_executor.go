@@ -44,17 +44,17 @@ import (
 // - HandleJob(): Entry point for new scheduled jobs (handles persistence)
 // - ExecuteDAG(): Executes/dispatches already-persisted jobs (no persistence)
 type DAGExecutor struct {
-	dispacher     digraph.Dispatcher
+	coordinatorCli digraph.Dispatcher
 	dagRunManager dagrun.Manager
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
 func NewDAGExecutor(
-	dispatcher digraph.Dispatcher,
+	coordinatorCli digraph.Dispatcher,
 	dagRunManager dagrun.Manager,
 ) *DAGExecutor {
 	return &DAGExecutor{
-		dispacher:     dispatcher,
+		coordinatorCli: coordinatorCli,
 		dagRunManager: dagRunManager,
 	}
 }
@@ -145,7 +145,7 @@ func (e *DAGExecutor) ExecuteDAG(
 // This ensures backward compatibility - DAGs without workerSelector continue
 // to run locally even when a coordinator is configured.
 func (e *DAGExecutor) shouldUseDistributedExecution(dag *digraph.DAG) bool {
-	return e.dispacher != nil && dag != nil && len(dag.WorkerSelector) > 0
+	return e.coordinatorCli != nil && dag != nil && len(dag.WorkerSelector) > 0
 }
 
 // dispatchToCoordinator dispatches a task to the coordinator for distributed execution.
@@ -157,7 +157,7 @@ func (e *DAGExecutor) shouldUseDistributedExecution(dag *digraph.DAG) bool {
 // 2. Forward the task to the selected worker
 // 3. Track the execution status
 func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinatorv1.Task) error {
-	if err := e.dispacher.Dispatch(ctx, task); err != nil {
+	if err := e.coordinatorCli.Dispatch(ctx, task); err != nil {
 		return fmt.Errorf("failed to dispatch task: %w", err)
 	}
 
@@ -171,10 +171,10 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 
 // Close closes any resources held by the DAGExecutor, including the coordinator client
 func (e *DAGExecutor) Close(ctx context.Context) {
-	if e.dispacher != nil {
-		if err := e.dispacher.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup dispatcher", "err", err)
+	if e.coordinatorCli != nil {
+		if err := e.coordinatorCli.Cleanup(ctx); err != nil {
+			logger.Error(ctx, "Failed to cleanup coordinator client", "err", err)
 		}
-		e.dispacher = nil
+		e.coordinatorCli = nil
 	}
 }

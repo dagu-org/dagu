@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/backoff"
-	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
+	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
@@ -14,17 +14,17 @@ import (
 // Poller handles polling for tasks from the coordinator
 type Poller struct {
 	workerID     string
-	dispatcher   dispatcher.Client
+	coordinatorCli coordinator.Client
 	taskExecutor TaskExecutor
 	index        int
 	labels       map[string]string
 }
 
 // NewPoller creates a new poller instance
-func NewPoller(workerID string, dispatcher dispatcher.Client, taskExecutor TaskExecutor, index int, labels map[string]string) *Poller {
+func NewPoller(workerID string, coordinatorCli coordinator.Client, taskExecutor TaskExecutor, index int, labels map[string]string) *Poller {
 	return &Poller{
 		workerID:     workerID,
-		dispatcher:   dispatcher,
+		coordinatorCli: coordinatorCli,
 		taskExecutor: taskExecutor,
 		index:        index,
 		labels:       labels,
@@ -95,8 +95,8 @@ func (p *Poller) Run(ctx context.Context) {
 func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*coordinatorv1.Task, error) {
 	pollerID := uuid.New().String()
 
-	// Get current dispatcher state before polling
-	beforeMetrics := p.dispatcher.Metrics()
+	// Get current coordinator client state before polling
+	beforeMetrics := p.coordinatorCli.Metrics()
 
 	req := &coordinatorv1.PollRequest{
 		WorkerId: p.workerID,
@@ -104,11 +104,11 @@ func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*
 		Labels:   p.labels,
 	}
 
-	// Use dispatcher's Poll method which handles retries and failover
-	task, err := p.dispatcher.Poll(ctx, policy, req)
+	// Use coordinator client's Poll method which handles retries and failover
+	task, err := p.coordinatorCli.Poll(ctx, policy, req)
 	if err != nil {
 		// Get updated metrics after failure
-		afterMetrics := p.dispatcher.Metrics()
+		afterMetrics := p.coordinatorCli.Metrics()
 
 		// Check if this was first failure after being connected
 		if beforeMetrics.IsConnected && !afterMetrics.IsConnected {
@@ -131,7 +131,7 @@ func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*
 	}
 
 	// Success - check if we recovered from disconnection
-	afterMetrics := p.dispatcher.Metrics()
+	afterMetrics := p.coordinatorCli.Metrics()
 	if !beforeMetrics.IsConnected && afterMetrics.IsConnected && beforeMetrics.ConsecutiveFails > 0 {
 		// Recovered from disconnection - log as INFO
 		logger.Info(ctx, "Poll succeeded - reconnected to coordinator",
@@ -159,6 +159,6 @@ func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*
 
 // GetState returns the current connection state (for monitoring/testing)
 func (p *Poller) GetState() (isConnected bool, consecutiveFails int, lastError error) {
-	metrics := p.dispatcher.Metrics()
+	metrics := p.coordinatorCli.Metrics()
 	return metrics.IsConnected, metrics.ConsecutiveFails, metrics.LastError
 }

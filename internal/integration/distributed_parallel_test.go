@@ -46,7 +46,7 @@ steps:
 		coord := test.SetupCoordinator(t)
 
 		// Get dispatcher client from coordinator
-		dispatcherClient := coord.GetDispatcherClient(t)
+		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Create and start multiple workers to handle parallel execution
 		workers := make([]*worker.Worker, 2)
@@ -54,7 +54,7 @@ steps:
 			workerInst := worker.NewWorker(
 				fmt.Sprintf("test-worker-%d", i+1),
 				10, // maxActiveRuns
-				dispatcherClient,
+				coordinatorClient,
 				coord.DAGRunMgr,
 				map[string]string{"type": "test-worker"},
 			)
@@ -155,14 +155,14 @@ steps:
 		coord := test.SetupCoordinator(t)
 
 		// Get dispatcher client from coordinator
-		dispatcherClient := coord.GetDispatcherClient(t)
+		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Create multiple workers of the same type
 		for i := 0; i < 3; i++ {
 			workerInst := worker.NewWorker(
 				fmt.Sprintf("test-worker-%d", i+1),
 				10,
-				dispatcherClient,
+				coordinatorClient,
 				coord.DAGRunMgr,
 				map[string]string{"type": "test-worker"},
 			)
@@ -299,7 +299,7 @@ steps:
 		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable, coord.Config.Global.WorkDir)
 
 		// Get dispatcher client from coordinator
-		dispatcherClient := coord.GetDispatcherClient(t)
+		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Create and start multiple workers to handle parallel execution
 		workers := make([]*worker.Worker, 2)
@@ -307,7 +307,7 @@ steps:
 			workerInst := worker.NewWorker(
 				fmt.Sprintf("test-worker-%d", i+1),
 				10, // maxActiveRuns
-				dispatcherClient,
+				coordinatorClient,
 				dagRunMgr,
 				map[string]string{"type": "test-worker"},
 			)
@@ -440,12 +440,12 @@ steps:
 
 		// Create worker for distributed execution
 		// Get dispatcher client from coordinator
-		dispatcherClient := coord.GetDispatcherClient(t)
+		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		workerInst := worker.NewWorker(
 			"test-worker-1",
 			10,
-			dispatcherClient,
+			coordinatorClient,
 			dagRunMgr,
 			map[string]string{"type": "test-worker"},
 		)
@@ -560,7 +560,7 @@ steps:
 		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable, coord.Config.Global.WorkDir)
 
 		// Get dispatcher client from coordinator
-		dispatcherClient := coord.GetDispatcherClient(t)
+		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		numWorkers := 3
 		workers := make([]*worker.Worker, numWorkers)
@@ -568,7 +568,7 @@ steps:
 			workerInst := worker.NewWorker(
 				fmt.Sprintf("test-worker-%d", i+1),
 				5, // maxActiveRuns per worker
-				dispatcherClient,
+				coordinatorClient,
 				dagRunMgr,
 				map[string]string{"type": "test-worker"},
 			)

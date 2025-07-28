@@ -28,8 +28,8 @@ type ChildDAGExecutor struct {
 	// This will be cleaned up after execution.
 	tempFile string
 
-	// dispacher is used for distributed execution
-	dispacher digraph.Dispatcher
+	// coordinatorCli is used for distributed execution
+	coordinatorCli digraph.Dispatcher
 
 	// Process tracking for ALL executions
 	mu              sync.Mutex
@@ -60,7 +60,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 			return &ChildDAGExecutor{
 				DAG:             &dag,
 				tempFile:        tempFile,
-				dispacher:       env.Dispatcher,
+				coordinatorCli:  env.CoordinatorCli,
 				cmds:            make(map[string]*exec.Cmd),
 				distributedRuns: make(map[string]bool),
 				env:             GetEnv(ctx),
@@ -76,7 +76,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 
 	return &ChildDAGExecutor{
 		DAG:             dag,
-		dispacher:       env.Dispatcher,
+		coordinatorCli:  env.CoordinatorCli,
 		cmds:            make(map[string]*exec.Cmd),
 		distributedRuns: make(map[string]bool),
 		env:             GetEnv(ctx),
@@ -310,8 +310,8 @@ func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams 
 		return fmt.Errorf("failed to build coordinator task: %w", err)
 	}
 
-	if e.dispacher == nil {
-		return fmt.Errorf("no coordinator dispatcher configured for distributed execution")
+	if e.coordinatorCli == nil {
+		return fmt.Errorf("no coordinator client configured for distributed execution")
 	}
 
 	// Dispatch the task
@@ -321,7 +321,7 @@ func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams 
 		"worker_selector", task.WorkerSelector,
 	)
 
-	if err := e.dispacher.Dispatch(ctx, task); err != nil {
+	if err := e.coordinatorCli.Dispatch(ctx, task); err != nil {
 		return fmt.Errorf("failed to dispatch task: %w", err)
 	}
 

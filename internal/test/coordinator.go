@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/coordinator"
-	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -114,16 +113,16 @@ func (c *Coordinator) DispatchTask(t *testing.T, task *coordinatorv1.Task) error
 	return err
 }
 
-// GetDispatcherClient returns a dispatcher client for this coordinator
-func (c *Coordinator) GetDispatcherClient(t *testing.T) dispatcher.Client {
+// GetCoordinatorClient returns a coordinator client for this coordinator
+func (c *Coordinator) GetCoordinatorClient(t *testing.T) coordinator.Client {
 	t.Helper()
 
-	// Create dispatcher config
-	config := dispatcher.DefaultConfig()
+	// Create coordinator client config
+	config := coordinator.DefaultConfig()
 	config.Insecure = true
 
-	// Create dispatcher client - cast to Client interface
-	return dispatcher.New(c.ServiceMonitor, config)
+	// Create coordinator client - cast to Client interface
+	return coordinator.New(c.ServiceMonitor, config)
 }
 
 // WithCoordinatorConfig creates a coordinator configuration option

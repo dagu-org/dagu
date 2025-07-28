@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
+	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
@@ -43,9 +43,9 @@ steps:
 		runStore := filedagrun.New(filepath.Join(tmpDir, "data"))
 		procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
 		dagRunMgr := dagrun.New(runStore, procStore, th.Config.Paths.Executable, tmpDir)
-		dispatcher := dispatcher.New(th.ServiceMonitor, dispatcher.DefaultConfig())
+		coordinatorCli := coordinator.New(th.ServiceMonitor, coordinator.DefaultConfig())
 
-		dagExecutor := scheduler.NewDAGExecutor(dispatcher, dagRunMgr)
+		dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, dagRunMgr)
 		t.Cleanup(func() {
 			dagExecutor.Close(th.Context)
 		})
@@ -76,7 +76,7 @@ steps:
 		// Test 2: ExecuteDAG with distributed execution
 		t.Run("ExecuteDAG_Distributed", func(t *testing.T) {
 			// Create DAG executor
-			dagExecutor := scheduler.NewDAGExecutor(dispatcher, dagRunMgr)
+			dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, dagRunMgr)
 
 			// Load DAG and set worker selector
 			dag, err := digraph.Load(context.Background(), testFile)
@@ -133,7 +133,7 @@ steps:
 		// Test 4: HandleJob with RETRY operation
 		t.Run("HandleJob_RETRY", func(t *testing.T) {
 			// Create DAG executor
-			dagExecutor := scheduler.NewDAGExecutor(dispatcher, dagRunMgr)
+			dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, dagRunMgr)
 
 			// Load DAG and set worker selector
 			dag, err := digraph.Load(context.Background(), testFile)

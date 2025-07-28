@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
+	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
@@ -280,9 +280,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	dbClient := newDBClient(a.dagRunStore, a.dagStore)
 
 	// Initialize coordinator client factory for distributed execution
-	dispatcher := a.createDispatcher(ctx)
+	coordinatorCli := a.createCoordinatorClient(ctx)
 
-	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, dispatcher)
+	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli)
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}
@@ -420,10 +420,10 @@ func (a *Agent) Run(ctx context.Context) error {
 		logger.Error(ctx, "failed to stop the heartbeat", "err", err)
 	}
 
-	if dispatcher != nil {
-		// Cleanup the dispatcher resources if it was created.
-		if err := dispatcher.Cleanup(ctx); err != nil {
-			logger.Warn(ctx, "Failed to cleanup coordinator dispatcher", "err", err)
+	if coordinatorCli != nil {
+		// Cleanup the coordinator client resources if it was created.
+		if err := coordinatorCli.Cleanup(ctx); err != nil {
+			logger.Warn(ctx, "Failed to cleanup coordinator client", "err", err)
 		}
 	}
 
@@ -670,10 +670,10 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 	return scheduler.New(cfg)
 }
 
-// createDispatcher creates a coordinator client factory for distributed execution
-func (a *Agent) createDispatcher(ctx context.Context) digraph.Dispatcher {
+// createCoordinatorClient creates a coordinator client factory for distributed execution
+func (a *Agent) createCoordinatorClient(ctx context.Context) digraph.Dispatcher {
 	if a.monitor == nil {
-		logger.Debug(ctx, "Service monitor is not configured, skipping dispatcher creation")
+		logger.Debug(ctx, "Service monitor is not configured, skipping coordinator client creation")
 		return nil
 	}
 
@@ -685,17 +685,17 @@ func (a *Agent) createDispatcher(ctx context.Context) digraph.Dispatcher {
 	}
 
 	// Create and configure factory
-	dispatcherCfg := dispatcher.DefaultConfig()
-	dispatcherCfg.MaxRetries = 10
+	coordinatorCliCfg := coordinator.DefaultConfig()
+	coordinatorCliCfg.MaxRetries = 10
 
-	// Configure the dispatcher based on the global configuration
-	dispatcherCfg.CAFile = cfg.Global.Peer.ClientCaFile
-	dispatcherCfg.CertFile = cfg.Global.Peer.CertFile
-	dispatcherCfg.KeyFile = cfg.Global.Peer.KeyFile
-	dispatcherCfg.SkipTLSVerify = cfg.Global.Peer.SkipTLSVerify
-	dispatcherCfg.Insecure = cfg.Global.Peer.Insecure
+	// Configure the coordinator client based on the global configuration
+	coordinatorCliCfg.CAFile = cfg.Global.Peer.ClientCaFile
+	coordinatorCliCfg.CertFile = cfg.Global.Peer.CertFile
+	coordinatorCliCfg.KeyFile = cfg.Global.Peer.KeyFile
+	coordinatorCliCfg.SkipTLSVerify = cfg.Global.Peer.SkipTLSVerify
+	coordinatorCliCfg.Insecure = cfg.Global.Peer.Insecure
 
-	return dispatcher.New(a.monitor, dispatcherCfg)
+	return coordinator.New(a.monitor, coordinatorCliCfg)
 }
 
 // dryRun performs a dry-run of the DAG. It only simulates the execution of

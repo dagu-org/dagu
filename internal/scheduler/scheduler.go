@@ -65,7 +65,7 @@ func New(
 	qs models.QueueStore,
 	ps models.ProcStore,
 	_ models.ServiceMonitor, // Currently unused but kept for API compatibility
-	dispatcher digraph.Dispatcher,
+	coordinatorCli digraph.Dispatcher,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Global.Location
 	if timeLoc == nil {
@@ -79,7 +79,7 @@ func New(
 	}
 
 	// Create DAG executor
-	dagExecutor := NewDAGExecutor(dispatcher, drm)
+	dagExecutor := NewDAGExecutor(coordinatorCli, drm)
 
 	// Create health server
 	healthServer := NewHealthServer(cfg.Scheduler.Port)

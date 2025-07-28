@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
+	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/models"
@@ -23,7 +23,7 @@ type Scheduler struct {
 	Helper
 	EntryReader scheduler.EntryReader
 	QueueStore  models.QueueStore
-	Dispatcher  digraph.Dispatcher
+	CoordinatorCli digraph.Dispatcher
 }
 
 // SetupScheduler creates a test scheduler instance with all dependencies
@@ -67,8 +67,8 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 	drm := dagrun.New(drs, ps, helper.Config.Paths.Executable, helper.Config.Global.WorkDir)
 
 	// Create entry reader
-	dispacher := dispatcher.New(helper.ServiceMonitor, dispatcher.DefaultConfig())
-	de := scheduler.NewDAGExecutor(dispacher, drm)
+	coordinatorCli := coordinator.New(helper.ServiceMonitor, coordinator.DefaultConfig())
+	de := scheduler.NewDAGExecutor(coordinatorCli, drm)
 	em := scheduler.NewEntryReader(helper.Config.Paths.DAGsDir, ds, drm, de, "", "")
 
 	// Update helper with scheduler-specific stores
@@ -81,7 +81,7 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 		Helper:      helper,
 		EntryReader: em,
 		QueueStore:  qs,
-		Dispatcher:  dispacher,
+		CoordinatorCli: coordinatorCli,
 	}
 
 	return sch
@@ -99,7 +99,7 @@ func (s *Scheduler) NewSchedulerInstance(t *testing.T) (*scheduler.Scheduler, er
 		s.QueueStore,
 		s.ProcStore,
 		s.ServiceMonitor,
-		s.Dispatcher,
+		s.CoordinatorCli,
 	)
 }
 
