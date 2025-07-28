@@ -169,8 +169,6 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	// Worker configuration
 	assert.Equal(t, "test-worker-123", cfg.Worker.ID)
 	assert.Equal(t, 200, cfg.Worker.MaxActiveRuns)
-	assert.Equal(t, "worker.example.com", cfg.Worker.CoordinatorHost)
-	assert.Equal(t, 60051, cfg.Worker.CoordinatorPort)
 
 	// Scheduler configuration
 	assert.Equal(t, 9999, cfg.Scheduler.Port)
@@ -292,8 +290,6 @@ worker:
 		// Verify Worker configuration is loaded from YAML
 		assert.Equal(t, "yaml-worker-01", cfg.Worker.ID)
 		assert.Equal(t, 50, cfg.Worker.MaxActiveRuns)
-		assert.Equal(t, "coordinator.example.com", cfg.Worker.CoordinatorHost)
-		assert.Equal(t, 8080, cfg.Worker.CoordinatorPort)
 	})
 
 	t.Run("EnvironmentVariableOverride", func(t *testing.T) {
@@ -352,8 +348,6 @@ worker:
 		// Verify environment variables override YAML
 		assert.Equal(t, "env-worker-override", cfg.Worker.ID)
 		assert.Equal(t, 300, cfg.Worker.MaxActiveRuns)
-		assert.Equal(t, "env.coordinator.com", cfg.Worker.CoordinatorHost)
-		assert.Equal(t, 9090, cfg.Worker.CoordinatorPort)
 	})
 
 	t.Run("DefaultValues", func(t *testing.T) {
@@ -379,8 +373,6 @@ port: 8080
 		// Verify default Worker configuration values
 		assert.Equal(t, "", cfg.Worker.ID) // No default ID
 		assert.Equal(t, 100, cfg.Worker.MaxActiveRuns)
-		assert.Equal(t, "127.0.0.1", cfg.Worker.CoordinatorHost)
-		assert.Equal(t, 50055, cfg.Worker.CoordinatorPort)
 	})
 
 	t.Run("SecureByDefault", func(t *testing.T) {
@@ -403,10 +395,6 @@ worker:
 		cfg, err := config.Load(config.WithConfigFile(configFile))
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
-
-		// Verify worker configuration
-		assert.Equal(t, "secure.example.com", cfg.Worker.CoordinatorHost)
-		assert.Equal(t, 443, cfg.Worker.CoordinatorPort)
 	})
 }
 

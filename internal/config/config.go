@@ -287,11 +287,9 @@ type Coordinator struct {
 
 // Worker represents the worker configuration
 type Worker struct {
-	ID              string            // Worker instance ID (default: hostname@PID)
-	MaxActiveRuns   int               // Maximum number of active runs (default: 100)
-	CoordinatorHost string            // Coordinator gRPC server host (default: 127.0.0.1)
-	CoordinatorPort int               // Coordinator gRPC server port (default: 50055)
-	Labels          map[string]string // Worker labels for capability matching
+	ID            string            // Worker instance ID (default: hostname@PID)
+	MaxActiveRuns int               // Maximum number of active runs (default: 100)
+	Labels        map[string]string // Worker labels for capability matching
 }
 
 // Scheduler represents the scheduler configuration

@@ -287,8 +287,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	if def.Worker != nil {
 		cfg.Worker.ID = def.Worker.ID
 		cfg.Worker.MaxActiveRuns = def.Worker.MaxActiveRuns
-		cfg.Worker.CoordinatorHost = def.Worker.CoordinatorHost
-		cfg.Worker.CoordinatorPort = def.Worker.CoordinatorPort
 
 		// Parse worker labels - can be either string or map
 		if def.Worker.Labels != nil {
@@ -491,8 +489,6 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 
 	// Worker settings - nested structure
 	viper.SetDefault("worker.maxActiveRuns", 100)
-	viper.SetDefault("worker.coordinatorHost", "127.0.0.1")
-	viper.SetDefault("worker.coordinatorPort", 50055)
 
 	// UI settings
 	viper.SetDefault("ui.navbarTitle", build.AppName)
@@ -599,8 +595,6 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	// Worker configuration (nested structure)
 	l.bindEnv("worker.id", "WORKER_ID")
 	l.bindEnv("worker.maxActiveRuns", "WORKER_MAX_ACTIVE_RUNS")
-	l.bindEnv("worker.coordinatorHost", "WORKER_COORDINATOR_HOST")
-	l.bindEnv("worker.coordinatorPort", "WORKER_COORDINATOR_PORT")
 	l.bindEnv("worker.labels", "WORKER_LABELS")
 	// Scheduler configuration
 	l.bindEnv("scheduler.port", "SCHEDULER_PORT")
