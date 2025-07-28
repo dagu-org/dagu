@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"sync"
 	"time"
@@ -100,6 +101,13 @@ func (w *Worker) Start(ctx context.Context) error {
 		}(i)
 	}
 
+	// Start heartbeat goroutine
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		w.sendHeartbeats(ctx)
+	}()
+
 	// Wait for all goroutines to complete
 	wg.Wait()
 
@@ -151,4 +159,60 @@ func (t *trackingTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.
 	t.worker.pollersMu.Unlock()
 
 	return err
+}
+
+// sendHeartbeats sends periodic heartbeats to the coordinator
+func (w *Worker) sendHeartbeats(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := w.sendHeartbeat(ctx); err != nil {
+				logger.Error(ctx, "Failed to send heartbeat",
+					"worker_id", w.id,
+					"err", err)
+			}
+		}
+	}
+}
+
+// sendHeartbeat sends a single heartbeat to the coordinator
+func (w *Worker) sendHeartbeat(ctx context.Context) error {
+	w.pollersMu.Lock()
+
+	// Calculate stats
+	busyCount := len(w.runningTasks)
+	runningTasks := make([]*coordinatorv1.RunningTask, 0, busyCount)
+	for _, task := range w.runningTasks {
+		runningTasks = append(runningTasks, task)
+	}
+
+	w.pollersMu.Unlock()
+
+	// Safely convert to int32, capping at max int32 if needed
+	totalPollers := int32(math.MaxInt32)
+	if w.maxActiveRuns <= math.MaxInt32 {
+		totalPollers = int32(w.maxActiveRuns) //nolint:gosec // Already checked above
+	}
+
+	busyCount32 := int32(math.MaxInt32)
+	if busyCount <= math.MaxInt32 {
+		busyCount32 = int32(busyCount) //nolint:gosec // Already checked above
+	}
+
+	req := &coordinatorv1.HeartbeatRequest{
+		WorkerId: w.id,
+		Labels:   w.labels,
+		Stats: &coordinatorv1.WorkerStats{
+			TotalPollers: totalPollers,
+			BusyPollers:  busyCount32,
+			RunningTasks: runningTasks,
+		},
+	}
+
+	return w.dispatcher.Heartbeat(ctx, req)
 }
