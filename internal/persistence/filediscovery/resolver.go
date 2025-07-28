@@ -19,6 +19,11 @@ type resolver struct {
 	staleTimeout time.Duration
 	dirLock      dirlock.DirLock
 	mu           sync.Mutex
+
+	// Cache fields
+	cachedMembers []models.HostInfo
+	cacheTime     time.Time
+	cacheDuration time.Duration
 }
 
 // newResolver creates a new resolver for a specific service
@@ -32,15 +37,27 @@ func newResolver(baseDir string, serviceName models.ServiceName) *resolver {
 	})
 
 	return &resolver{
-		baseDir:      baseDir,
-		serviceName:  serviceName,
-		staleTimeout: 30 * time.Second, // Consider instances stale after 30 seconds
-		dirLock:      lock,
+		baseDir:       baseDir,
+		serviceName:   serviceName,
+		staleTimeout:  30 * time.Second, // Consider instances stale after 30 seconds
+		dirLock:       lock,
+		cacheDuration: 3 * time.Second, // Cache members for 15 seconds
 	}
 }
 
 // Members returns all active instances of the service
 func (r *resolver) Members(ctx context.Context) ([]models.HostInfo, error) {
+	r.mu.Lock()
+
+	// Check if we have a valid cache
+	if len(r.cachedMembers) > 0 && time.Since(r.cacheTime) < r.cacheDuration {
+		members := make([]models.HostInfo, len(r.cachedMembers))
+		copy(members, r.cachedMembers)
+		r.mu.Unlock()
+		return members, nil
+	}
+	r.mu.Unlock()
+
 	serviceDir := filepath.Join(r.baseDir, string(r.serviceName))
 
 	// If directory doesn't exist, return empty list (no instances)
@@ -123,6 +140,13 @@ func (r *resolver) Members(ctx context.Context) ([]models.HostInfo, error) {
 				logger.Error(ctx, "Failed to remove stale instance file", "file", staleFile, "err", err)
 			}
 		}
+	}
+
+	// Update cache if members is not empty
+	if len(members) > 0 {
+		r.cachedMembers = make([]models.HostInfo, len(members))
+		copy(r.cachedMembers, members)
+		r.cacheTime = time.Now()
 	}
 
 	return members, nil

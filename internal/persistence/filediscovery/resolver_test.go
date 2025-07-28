@@ -226,6 +226,8 @@ func TestResolver_RealWorldScenario(t *testing.T) {
 
 	// Simulate coordinator service discovery
 	coordinatorResolver := newResolver(tmpDir, models.ServiceNameCoordinator)
+	// Disable caching for this test to ensure we see updates immediately
+	coordinatorResolver.cacheDuration = 0
 
 	ctx := context.Background()
 
@@ -264,4 +266,220 @@ func TestResolver_RealWorldScenario(t *testing.T) {
 	members, err = coordinatorResolver.Members(ctx)
 	require.NoError(t, err)
 	assert.Len(t, members, 2)
+}
+
+func TestResolver_Members_Caching(t *testing.T) {
+	tmpDir := t.TempDir()
+	serviceDir := filepath.Join(tmpDir, "test-service")
+	err := os.MkdirAll(serviceDir, 0755)
+	require.NoError(t, err)
+
+	// Create initial instances
+	instance1 := instanceInfo{
+		ID:       "instance-1",
+		HostPort: "host1:8080",
+		PID:      1234,
+	}
+	filename := instanceFilePath(tmpDir, "test-service", instance1.ID)
+	err = writeInstanceFile(filename, &instance1)
+	require.NoError(t, err)
+
+	resolver := newResolver(tmpDir, "test-service")
+	ctx := context.Background()
+
+	// First call - should read from disk
+	members1, err := resolver.Members(ctx)
+	require.NoError(t, err)
+	assert.Len(t, members1, 1)
+	assert.Equal(t, "host1:8080", members1[0].HostPort)
+
+	// Add another instance to disk
+	instance2 := instanceInfo{
+		ID:       "instance-2",
+		HostPort: "host2:8081",
+		PID:      1235,
+	}
+	filename = instanceFilePath(tmpDir, "test-service", instance2.ID)
+	err = writeInstanceFile(filename, &instance2)
+	require.NoError(t, err)
+
+	// Second call immediately - should return cached result
+	members2, err := resolver.Members(ctx)
+	require.NoError(t, err)
+	assert.Len(t, members2, 1) // Still only 1 member from cache
+	assert.Equal(t, "host1:8080", members2[0].HostPort)
+
+	// Verify cache is being used by checking the same data
+	assert.Equal(t, members1[0].ID, members2[0].ID)
+	assert.Equal(t, members1[0].HostPort, members2[0].HostPort)
+}
+
+func TestResolver_Members_CacheExpiration(t *testing.T) {
+	tmpDir := t.TempDir()
+	serviceDir := filepath.Join(tmpDir, "test-service")
+	err := os.MkdirAll(serviceDir, 0755)
+	require.NoError(t, err)
+
+	// Create initial instance
+	instance1 := instanceInfo{
+		ID:       "instance-1",
+		HostPort: "host1:8080",
+		PID:      1234,
+	}
+	filename := instanceFilePath(tmpDir, "test-service", instance1.ID)
+	err = writeInstanceFile(filename, &instance1)
+	require.NoError(t, err)
+
+	resolver := newResolver(tmpDir, "test-service")
+	// Set short cache duration for testing
+	resolver.cacheDuration = 100 * time.Millisecond
+	ctx := context.Background()
+
+	// First call - should read from disk
+	members1, err := resolver.Members(ctx)
+	require.NoError(t, err)
+	assert.Len(t, members1, 1)
+
+	// Add another instance
+	instance2 := instanceInfo{
+		ID:       "instance-2",
+		HostPort: "host2:8081",
+		PID:      1235,
+	}
+	filename = instanceFilePath(tmpDir, "test-service", instance2.ID)
+	err = writeInstanceFile(filename, &instance2)
+	require.NoError(t, err)
+
+	// Wait for cache to expire
+	time.Sleep(150 * time.Millisecond)
+
+	// Third call - cache expired, should read from disk again
+	members3, err := resolver.Members(ctx)
+	require.NoError(t, err)
+	assert.Len(t, members3, 2) // Now sees both instances
+}
+
+func TestResolver_Members_NoCacheForEmptyMembers(t *testing.T) {
+	tmpDir := t.TempDir()
+	resolver := newResolver(tmpDir, "test-service")
+	ctx := context.Background()
+
+	// First call - no instances
+	members1, err := resolver.Members(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, members1)
+
+	// Create service directory and add instance
+	serviceDir := filepath.Join(tmpDir, "test-service")
+	err = os.MkdirAll(serviceDir, 0755)
+	require.NoError(t, err)
+
+	instance := instanceInfo{
+		ID:       "instance-1",
+		HostPort: "host1:8080",
+		PID:      1234,
+	}
+	filename := instanceFilePath(tmpDir, "test-service", instance.ID)
+	err = writeInstanceFile(filename, &instance)
+	require.NoError(t, err)
+
+	// Second call immediately - should NOT use cache (since it was empty)
+	members2, err := resolver.Members(ctx)
+	require.NoError(t, err)
+	assert.Len(t, members2, 1) // Should see the new instance
+	assert.Equal(t, "host1:8080", members2[0].HostPort)
+}
+
+func TestResolver_Members_CacheConcurrency(t *testing.T) {
+	tmpDir := t.TempDir()
+	serviceDir := filepath.Join(tmpDir, "test-service")
+	err := os.MkdirAll(serviceDir, 0755)
+	require.NoError(t, err)
+
+	// Create instances
+	for i := 0; i < 5; i++ {
+		inst := instanceInfo{
+			ID:       fmt.Sprintf("instance-%d", i),
+			HostPort: fmt.Sprintf("host%d:808%d", i, i),
+			PID:      1234 + i,
+		}
+		filename := instanceFilePath(tmpDir, "test-service", inst.ID)
+		err := writeInstanceFile(filename, &inst)
+		require.NoError(t, err)
+	}
+
+	resolver := newResolver(tmpDir, "test-service")
+	ctx := context.Background()
+
+	// Run concurrent reads
+	const numGoroutines = 10
+	results := make(chan []models.HostInfo, numGoroutines)
+	errors := make(chan error, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			members, err := resolver.Members(ctx)
+			if err != nil {
+				errors <- err
+				return
+			}
+			results <- members
+		}()
+	}
+
+	// Collect results
+	for i := 0; i < numGoroutines; i++ {
+		select {
+		case err := <-errors:
+			t.Fatalf("Unexpected error: %v", err)
+		case members := <-results:
+			assert.Len(t, members, 5)
+		}
+	}
+}
+
+func TestResolver_Members_CacheInvalidation(t *testing.T) {
+	tmpDir := t.TempDir()
+	serviceDir := filepath.Join(tmpDir, "test-service")
+	err := os.MkdirAll(serviceDir, 0755)
+	require.NoError(t, err)
+
+	// Create initial instance
+	instance1 := instanceInfo{
+		ID:       "instance-1",
+		HostPort: "host1:8080",
+		PID:      1234,
+	}
+	filename := instanceFilePath(tmpDir, "test-service", instance1.ID)
+	err = writeInstanceFile(filename, &instance1)
+	require.NoError(t, err)
+
+	resolver := newResolver(tmpDir, "test-service")
+	// Use longer cache for this test
+	resolver.cacheDuration = 5 * time.Second
+	ctx := context.Background()
+
+	// First call - populate cache
+	members1, err := resolver.Members(ctx)
+	require.NoError(t, err)
+	assert.Len(t, members1, 1)
+
+	// Remove the instance file
+	err = os.Remove(filename)
+	require.NoError(t, err)
+
+	// Second call - should still return cached result
+	members2, err := resolver.Members(ctx)
+	require.NoError(t, err)
+	assert.Len(t, members2, 1)
+
+	// Manually expire cache
+	resolver.mu.Lock()
+	resolver.cacheTime = time.Now().Add(-10 * time.Second)
+	resolver.mu.Unlock()
+
+	// Third call - cache expired, should see no instances
+	members3, err := resolver.Members(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, members3)
 }
