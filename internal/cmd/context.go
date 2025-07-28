@@ -22,6 +22,7 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
+	"github.com/dagu-org/dagu/internal/persistence/filediscovery"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/scheduler"
@@ -40,10 +41,11 @@ type Context struct {
 	Config  *config.Config
 	Quiet   bool
 
-	DAGRunStore models.DAGRunStore
-	DAGRunMgr   dagrun.Manager
-	ProcStore   models.ProcStore
-	QueueStore  models.QueueStore
+	DAGRunStore    models.DAGRunStore
+	DAGRunMgr      dagrun.Manager
+	ProcStore      models.ProcStore
+	QueueStore     models.QueueStore
+	ServiceMonitor models.ServiceMonitor
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -124,17 +126,19 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
 	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.WorkDir)
 	qs := filequeue.New(cfg.Paths.QueueDir)
+	sm := filediscovery.New(cfg.Paths.DiscoveryDir)
 
 	return &Context{
-		Context:     ctx,
-		Command:     cmd,
-		Config:      cfg,
-		Quiet:       quiet,
-		DAGRunStore: drs,
-		DAGRunMgr:   drm,
-		Flags:       flags,
-		ProcStore:   ps,
-		QueueStore:  qs,
+		Context:        ctx,
+		Command:        cmd,
+		Config:         cfg,
+		Quiet:          quiet,
+		DAGRunStore:    drs,
+		DAGRunMgr:      drm,
+		Flags:          flags,
+		ProcStore:      ps,
+		QueueStore:     qs,
+		ServiceMonitor: sm,
 	}, nil
 }
 
@@ -180,7 +184,6 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, c.Config.Paths.Executable, c.Config.Global.WorkDir, coordinatorClientFactory)
 	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, coordinatorClientFactory)
 }
-
 
 // NewCoordinatorClientFactory creates a configured coordinator client factory.
 // It returns nil if coordinator is not configured.

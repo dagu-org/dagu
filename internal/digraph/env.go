@@ -6,18 +6,18 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
-	"github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/logger"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 // Env contains the execution metadata for a dag-run.
 type Env struct {
-	DAGRunID                 string
-	RootDAGRun               DAGRunRef
-	DAG                      *DAG
-	DB                       Database
-	Envs                     map[string]string
-	CoordinatorClientFactory *client.Factory
+	DAGRunID   string
+	RootDAGRun DAGRunRef
+	DAG        *DAG
+	DB         Database
+	Envs       map[string]string
+	Dispatcher Dispatcher
 }
 
 func (e Env) AllEnvs() []string {
@@ -42,9 +42,18 @@ func (e Env) ApplyEnvs(ctx context.Context) {
 	}
 }
 
+// Dispatcher defines the interface for coordinator operations
+type Dispatcher interface {
+	// Dispatch sends a task to the coordinator
+	Dispatch(ctx context.Context, task *coordinatorv1.Task) error
+
+	// Cleanup cleans up any resources used by the dispatcher
+	Cleanup(ctx context.Context) error
+}
+
 // SetupEnv sets up the execution context for a dag-run.
 // It initializes the environment variables and the DAG metadata.
-func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, dagRunID, logFile string, params []string, coordinatorFactory *client.Factory) context.Context {
+func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, dagRunID, logFile string, params []string, dispacher Dispatcher) context.Context {
 	var envs = map[string]string{
 		EnvKeyDAGRunLogFile: logFile,
 		EnvKeyDAGRunID:      dagRunID,
@@ -60,12 +69,12 @@ func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, 
 	}
 
 	return context.WithValue(ctx, envCtxKey{}, Env{
-		RootDAGRun:               rootDAGRun,
-		DAG:                      dag,
-		DB:                       db,
-		Envs:                     envs,
-		DAGRunID:                 dagRunID,
-		CoordinatorClientFactory: coordinatorFactory,
+		RootDAGRun: rootDAGRun,
+		DAG:        dag,
+		DB:         db,
+		Envs:       envs,
+		DAGRunID:   dagRunID,
+		Dispatcher: dispacher,
 	})
 }
 

@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/coordinator/client"
+	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
@@ -55,6 +55,9 @@ type Agent struct {
 
 	// procStore is the database to store the process information.
 	procStore models.ProcStore
+
+	// monitor is the discovery service monitor to find the coordinator service.
+	monitor models.ServiceMonitor
 
 	// dagRunMgr is the runstore dagRunMgr to communicate with the history.
 	dagRunMgr dagrun.Manager
@@ -144,6 +147,7 @@ func New(
 	ds models.DAGStore,
 	drs models.DAGRunStore,
 	ps models.ProcStore,
+	sm models.ServiceMonitor,
 	root digraph.DAGRunRef,
 	opts Options,
 ) *Agent {
@@ -160,6 +164,7 @@ func New(
 		dagStore:     ds,
 		dagRunStore:  drs,
 		procStore:    ps,
+		monitor:      sm,
 		stepRetry:    opts.StepRetry,
 	}
 
@@ -275,9 +280,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	dbClient := newDBClient(a.dagRunStore, a.dagStore)
 
 	// Initialize coordinator client factory for distributed execution
-	coordinatorFactory := a.createCoordinatorClientFactory(ctx)
+	dispatcher := a.createDispatcher(ctx)
 
-	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorFactory)
+	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, dispatcher)
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}
@@ -413,6 +418,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Stop the process and remove it from the store.
 	if err := proc.Stop(ctx); err != nil {
 		logger.Error(ctx, "failed to stop the heartbeat", "err", err)
+	}
+
+	if dispatcher != nil {
+		// Cleanup the dispatcher resources if it was created.
+		if err := dispatcher.Cleanup(ctx); err != nil {
+			logger.Warn(ctx, "Failed to cleanup coordinator dispatcher", "err", err)
+		}
 	}
 
 	// Update the finished status to the runstore database.
@@ -658,8 +670,13 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 	return scheduler.New(cfg)
 }
 
-// createCoordinatorClientFactory creates a coordinator client factory for distributed execution
-func (a *Agent) createCoordinatorClientFactory(ctx context.Context) *client.Factory {
+// createDispatcher creates a coordinator client factory for distributed execution
+func (a *Agent) createDispatcher(ctx context.Context) digraph.Dispatcher {
+	if a.monitor == nil {
+		logger.Debug(ctx, "Service monitor is not configured, skipping dispatcher creation")
+		return nil
+	}
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
@@ -667,45 +684,22 @@ func (a *Agent) createCoordinatorClientFactory(ctx context.Context) *client.Fact
 		return nil
 	}
 
-	// Use worker configuration for coordinator connection
-	host := cfg.Worker.CoordinatorHost
-	port := cfg.Worker.CoordinatorPort
-
-	// Default values if not configured
-	if host == "" {
-		host = "localhost"
-	}
-	if port == 0 {
-		port = 8084
-	}
-
 	// Create and configure factory
-	factory := client.NewFactory().
-		WithHost(host).
-		WithPort(port)
+	dispatcherCfg := dispatcher.DefaultConfig()
+	dispatcherCfg.MaxRetries = 10
 
 	// Configure TLS if provided
 	if cfg.Global.Peer.CertFile != "" {
-		factory.WithTLS(
-			cfg.Global.Peer.CertFile,
-			cfg.Global.Peer.KeyFile,
-			cfg.Global.Peer.ClientCaFile,
-		)
-		if cfg.Global.Peer.SkipTLSVerify {
-			factory.WithSkipTLSVerify(true)
-		}
+		dispatcherCfg.CAFile = cfg.Global.Peer.ClientCaFile
+		dispatcherCfg.CertFile = cfg.Global.Peer.CertFile
+		dispatcherCfg.KeyFile = cfg.Global.Peer.KeyFile
+		dispatcherCfg.SkipTLSVerify = cfg.Global.Peer.SkipTLSVerify
 	} else if cfg.Global.Peer.Insecure {
 		// Use insecure connection (h2c)
-		factory.WithInsecure()
+		dispatcherCfg.Insecure = true
 	}
 
-	logger.Info(ctx, "Created coordinator client factory",
-		"host", host,
-		"port", port,
-		"insecure", cfg.Global.Peer.Insecure || cfg.Global.Peer.CertFile == "",
-	)
-
-	return factory
+	return dispatcher.New(ctx, a.monitor, dispatcherCfg)
 }
 
 // dryRun performs a dry-run of the DAG. It only simulates the execution of
@@ -726,8 +720,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
-	coordinatorFactory := a.createCoordinatorClientFactory(ctx)
-	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorFactory)
+	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
 	a.lastErr = lastErr
 

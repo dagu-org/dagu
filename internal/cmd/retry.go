@@ -103,6 +103,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 		dr,
 		ctx.DAGRunStore,
 		ctx.ProcStore,
+		ctx.ServiceMonitor,
 		rootRun,
 		agent.Options{
 			RetryTarget:     status,

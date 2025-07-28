@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/backoff"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -19,15 +20,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
-
-// Dispatcher defines the interface for coordinator operations
-type Dispatcher interface {
-	// Dispatch sends a task to the coordinator
-	Dispatch(ctx context.Context, task *coordinatorv1.Task) error
-
-	// Cleanup cleans up any resources used by the dispatcher
-	Cleanup(ctx context.Context) error
-}
 
 // client holds the gRPC connection and clients for the coordinator service.
 // it should be closed and removed when no longer needed or when the coordinator
@@ -38,7 +30,7 @@ type client struct {
 	healthClient grpc_health_v1.HealthClient
 }
 
-var _ Dispatcher = (*dispatcher)(nil)
+var _ digraph.Dispatcher = (*dispatcher)(nil)
 
 // dispatcher is the concrete implementation
 type dispatcher struct {
@@ -54,21 +46,21 @@ var (
 	ErrMissingTLSConfig = fmt.Errorf("TLS enabled but no certificates provided")
 )
 
-// NewDispatcher creates a new coordinator client with the given configuration
-func NewDispatcher(ctx context.Context, monitor models.ServiceMonitor, config *Config) (Dispatcher, error) {
-	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
-	}
-
+// New creates a new coordinator client with the given configuration
+func New(ctx context.Context, monitor models.ServiceMonitor, config *Config) digraph.Dispatcher {
 	return &dispatcher{
 		config:    config,
 		discovery: monitor,
 		clients:   make(map[string]*client),
-	}, nil
+	}
 }
 
 // Dispatch sends a task to the coordinator
 func (d *dispatcher) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
+	if err := d.config.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+
 	// Get coordinator resolver from discovery
 	resolver := d.discovery.Resolver(ctx, models.ServiceNameCoordinator)
 

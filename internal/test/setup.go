@@ -25,6 +25,7 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
+	"github.com/dagu-org/dagu/internal/persistence/filediscovery"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -110,16 +111,18 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
 	procStore := fileproc.New(cfg.Paths.ProcDir)
+	serviceMonitor := filediscovery.New(cfg.Paths.DiscoveryDir)
 
 	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 
 	helper := Helper{
-		Context:     createDefaultContext(),
-		Config:      cfg,
-		DAGRunMgr:   drm,
-		DAGStore:    dagStore,
-		DAGRunStore: runStore,
-		ProcStore:   procStore,
+		Context:        createDefaultContext(),
+		Config:         cfg,
+		DAGRunMgr:      drm,
+		DAGStore:       dagStore,
+		DAGRunStore:    runStore,
+		ProcStore:      procStore,
+		ServiceMonitor: serviceMonitor,
 
 		tmpDir: tmpDir,
 	}
@@ -158,14 +161,15 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 // Helper provides test utilities and configuration
 type Helper struct {
-	Context       context.Context
-	Cancel        context.CancelFunc
-	Config        *config.Config
-	LoggingOutput *SyncBuffer
-	DAGStore      models.DAGStore
-	DAGRunStore   models.DAGRunStore
-	DAGRunMgr     dagrun.Manager
-	ProcStore     models.ProcStore
+	Context        context.Context
+	Cancel         context.CancelFunc
+	Config         *config.Config
+	LoggingOutput  *SyncBuffer
+	DAGStore       models.DAGStore
+	DAGRunStore    models.DAGRunStore
+	DAGRunMgr      dagrun.Manager
+	ProcStore      models.ProcStore
+	ServiceMonitor models.ServiceMonitor
 
 	tmpDir string
 }
@@ -374,6 +378,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.DAGStore,
 		d.DAGRunStore,
 		d.ProcStore,
+		d.ServiceMonitor,
 		root,
 		helper.opts,
 	)

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/otel"
@@ -29,8 +28,8 @@ type ChildDAGExecutor struct {
 	// This will be cleaned up after execution.
 	tempFile string
 
-	// coordinatorClientFactory is used for distributed execution
-	coordinatorClientFactory *client.Factory
+	// dispacher is used for distributed execution
+	dispacher digraph.Dispatcher
 
 	// Process tracking for ALL executions
 	mu              sync.Mutex
@@ -59,12 +58,12 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 			dag.Location = tempFile
 
 			return &ChildDAGExecutor{
-				DAG:                      &dag,
-				tempFile:                 tempFile,
-				coordinatorClientFactory: env.CoordinatorClientFactory,
-				cmds:                     make(map[string]*exec.Cmd),
-				distributedRuns:          make(map[string]bool),
-				env:                      GetEnv(ctx),
+				DAG:             &dag,
+				tempFile:        tempFile,
+				dispacher:       env.Dispatcher,
+				cmds:            make(map[string]*exec.Cmd),
+				distributedRuns: make(map[string]bool),
+				env:             GetEnv(ctx),
 			}, nil
 		}
 	}
@@ -76,11 +75,11 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 	}
 
 	return &ChildDAGExecutor{
-		DAG:                      dag,
-		coordinatorClientFactory: env.CoordinatorClientFactory,
-		cmds:                     make(map[string]*exec.Cmd),
-		distributedRuns:          make(map[string]bool),
-		env:                      GetEnv(ctx),
+		DAG:             dag,
+		dispacher:       env.Dispatcher,
+		cmds:            make(map[string]*exec.Cmd),
+		distributedRuns: make(map[string]bool),
+		env:             GetEnv(ctx),
 	}, nil
 }
 
@@ -311,16 +310,9 @@ func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams 
 		return fmt.Errorf("failed to build coordinator task: %w", err)
 	}
 
-	// Create coordinator client
-	coordinatorClient, err := e.getCoordinatorClient(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to create coordinator client: %w", err)
+	if e.dispacher == nil {
+		return fmt.Errorf("no coordinator dispatcher configured for distributed execution")
 	}
-	defer func() {
-		if err := coordinatorClient.Close(); err != nil {
-			logger.Error(ctx, "Failed to close coordinator client", "err", err)
-		}
-	}()
 
 	// Dispatch the task
 	logger.Info(ctx, "Dispatching task to coordinator",
@@ -329,7 +321,7 @@ func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams 
 		"worker_selector", task.WorkerSelector,
 	)
 
-	if err := coordinatorClient.Dispatch(ctx, task); err != nil {
+	if err := e.dispacher.Dispatch(ctx, task); err != nil {
 		return fmt.Errorf("failed to dispatch task: %w", err)
 	}
 
@@ -387,17 +379,6 @@ func (e *ChildDAGExecutor) waitForCompletionWithResult(ctx context.Context, dagR
 			return result, nil
 		}
 	}
-}
-
-// getCoordinatorClient gets a coordinator client using the factory from environment
-func (e *ChildDAGExecutor) getCoordinatorClient(ctx context.Context) (client.Client, error) {
-	// Factory should be initialized when Env is created
-	if e.coordinatorClientFactory == nil {
-		return nil, fmt.Errorf("coordinator client factory not initialized in environment")
-	}
-
-	// Build client from factory
-	return e.coordinatorClientFactory.Build(ctx)
 }
 
 // Kill terminates all running child DAG processes (both local and distributed)
