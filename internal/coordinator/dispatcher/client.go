@@ -35,6 +35,9 @@ type Client interface {
 	// GetWorkers retrieves the list of workers from the coordinator
 	GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error)
 
+	// Heartbeat sends a heartbeat to the coordinator
+	Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) error
+
 	// Metrics returns the metrics for the coordinator client
 	Metrics() Metrics
 }
@@ -424,7 +427,38 @@ func (d *dispatcher) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInf
 	if lastErr != nil {
 		return nil, fmt.Errorf("failed to get workers from any coordinator: %w", lastErr)
 	}
-	return nil, nil
+
+	return allWorkers, nil
+}
+
+// Heartbeat sends a heartbeat to coordinators
+func (d *dispatcher) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) error {
+	// Get coordinator resolver from discovery
+	resolver := d.discovery.Resolver(ctx, models.ServiceNameCoordinator)
+
+	// Try to get members
+	members, err := resolver.Members(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to discover coordinators: %w", err)
+	}
+
+	if len(members) == 0 {
+		return fmt.Errorf("no coordinators available")
+	}
+
+	// Use attemptCall to send heartbeat to any available coordinator
+	return d.attemptCall(ctx, members, func(ctx context.Context, member models.HostInfo, client *client) error {
+		// Send heartbeat
+		_, err := client.client.Heartbeat(ctx, req)
+		if err != nil {
+			return fmt.Errorf("heartbeat failed: %w", err)
+		}
+
+		logger.Debug(ctx, "Heartbeat sent successfully",
+			"coordinator_id", member.ID,
+			"worker_id", req.WorkerId)
+		return nil
+	})
 }
 
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration

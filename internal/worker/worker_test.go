@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/backoff"
-	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/dagu-org/dagu/internal/worker"
@@ -25,57 +24,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// MockTaskExecutor is a mock implementation of TaskExecutor for testing
-type MockTaskExecutor struct {
-	ExecuteFunc   func(ctx context.Context, task *coordinatorv1.Task) error
-	ExecutedTasks []string
-	ExecutionTime time.Duration
-	mu            sync.Mutex
-}
-
-// Execute implements the TaskExecutor interface
-func (m *MockTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Task) error {
-	m.mu.Lock()
-	m.ExecutedTasks = append(m.ExecutedTasks, task.DagRunId)
-	m.mu.Unlock()
-
-	if m.ExecuteFunc != nil {
-		return m.ExecuteFunc(ctx, task)
-	}
-
-	// Default behavior: simulate execution with configurable duration
-	if m.ExecutionTime > 0 {
-		select {
-		case <-time.After(m.ExecutionTime):
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-	return nil
-}
-
-// GetExecutedTasks returns a copy of executed task IDs
-func (m *MockTaskExecutor) GetExecutedTasks() []string {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	result := make([]string, len(m.ExecutedTasks))
-	copy(result, m.ExecutedTasks)
-	return result
-}
-
-// createTestWorker creates a worker with a mock dagrun.Manager and dispatcher for testing
-func createTestWorker(t *testing.T, workerID string, maxActiveRuns int, coord *test.Coordinator) *worker.Worker {
-	mockMgr := dagrun.New(nil, nil, "dagu", ".")
-	labels := make(map[string]string)
-
-	// Create dispatcher client for the coordinator
-	dispatcherClient := coord.GetDispatcherClient(t)
-
-	return worker.NewWorker(workerID, maxActiveRuns, dispatcherClient, mockMgr, labels)
-}
-
 func TestWorkerConnection(t *testing.T) {
 	t.Run("ConnectToCoordinator", func(t *testing.T) {
 		// Setup coordinator
@@ -83,7 +31,7 @@ func TestWorkerConnection(t *testing.T) {
 
 		// Create worker with instant mock executor
 		w := createTestWorker(t, "test-worker-1", 1, coord)
-		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
+		w.SetTaskExecutor(&mockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker in a goroutine
 		ctx, cancel := context.WithCancel(context.Background())
@@ -116,7 +64,7 @@ func TestWorkerConnection(t *testing.T) {
 		// Create worker with custom ID and instant mock executor
 		customID := "custom-worker-id"
 		w := createTestWorker(t, customID, 1, coord)
-		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
+		w.SetTaskExecutor(&mockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
 		ctx, cancel := context.WithCancel(context.Background())
@@ -145,7 +93,7 @@ func TestWorkerPolling(t *testing.T) {
 		coord := test.SetupCoordinator(t)
 
 		// Create mock executor
-		mockExecutor := &MockTaskExecutor{
+		mockExecutor := &mockTaskExecutor{
 			ExecutionTime: 100 * time.Millisecond, // Fast execution for tests
 		}
 
@@ -198,7 +146,7 @@ func TestWorkerPolling(t *testing.T) {
 		coord := test.SetupCoordinator(t)
 
 		// Create shared mock executor to track all executed tasks
-		mockExecutor := &MockTaskExecutor{
+		mockExecutor := &mockTaskExecutor{
 			ExecutionTime: 50 * time.Millisecond,
 		}
 
@@ -272,7 +220,7 @@ func TestWorkerReconnection(t *testing.T) {
 
 		// Create worker with instant mock executor
 		w := createTestWorker(t, "test-worker", 1, coord)
-		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
+		w.SetTaskExecutor(&mockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
 		ctx, cancel := context.WithCancel(context.Background())
@@ -312,7 +260,7 @@ func TestWorkerWithTLS(t *testing.T) {
 
 		// Create worker with insecure connection and instant mock executor
 		w := createTestWorker(t, "test-worker", 1, coord)
-		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
+		w.SetTaskExecutor(&mockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
 		ctx, cancel := context.WithCancel(context.Background())
@@ -340,7 +288,7 @@ func TestWorkerWithTLS(t *testing.T) {
 
 		// Create worker with nil TLS config (should default to insecure) and instant mock executor
 		w := createTestWorker(t, "test-worker", 1, coord)
-		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
+		w.SetTaskExecutor(&mockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
 		ctx, cancel := context.WithCancel(context.Background())
@@ -370,7 +318,7 @@ func TestWorkerShutdown(t *testing.T) {
 
 		// Create worker with instant mock executor
 		w := createTestWorker(t, "test-worker", 2, coord)
-		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
+		w.SetTaskExecutor(&mockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
 		ctx, cancel := context.WithCancel(context.Background())
@@ -400,9 +348,9 @@ func TestWorkerShutdown(t *testing.T) {
 		mockMgr := dagrun.New(nil, nil, "dagu", ".")
 		labels := make(map[string]string)
 		// Create a mock dispatcher that doesn't connect
-		mockDispatcher := &mockDispatcher{}
+		mockDispatcher := newMockDispatcher()
 		w := worker.NewWorker("test-worker", 1, mockDispatcher, mockMgr, labels)
-		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
+		w.SetTaskExecutor(&mockTaskExecutor{ExecutionTime: 0})
 
 		// Stop should work without error even if not started
 		err := w.Stop(context.Background())
@@ -418,7 +366,7 @@ func TestWorkerConcurrency(t *testing.T) {
 		maxConcurrent := 5
 
 		// Create mock executor that holds tasks to simulate long-running execution
-		mockExecutor := &MockTaskExecutor{
+		mockExecutor := &mockTaskExecutor{
 			ExecuteFunc: func(ctx context.Context, _ *coordinatorv1.Task) error {
 				// Hold the task for a long time to ensure all workers become busy
 				select {
@@ -478,52 +426,6 @@ func TestWorkerConcurrency(t *testing.T) {
 	})
 }
 
-// mockDispatcher is a mock implementation of dispatcher.Client for testing
-type mockDispatcher struct {
-	pollError    error
-	PollFunc     func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
-	DispatchFunc func(ctx context.Context, task *coordinatorv1.Task) error
-
-	// State tracking
-	consecutiveFails int
-}
-
-func (m *mockDispatcher) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
-	if m.DispatchFunc != nil {
-		return m.DispatchFunc(ctx, task)
-	}
-	return m.pollError
-}
-
-func (m *mockDispatcher) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
-	if m.PollFunc != nil {
-		return m.PollFunc(ctx, policy, req)
-	}
-	if m.pollError != nil {
-		m.consecutiveFails++
-		return nil, m.pollError
-	}
-	m.consecutiveFails = 0
-	return nil, nil
-}
-
-func (m *mockDispatcher) Metrics() dispatcher.Metrics {
-	return dispatcher.Metrics{
-		IsConnected:      m.pollError == nil && m.consecutiveFails == 0,
-		ConsecutiveFails: m.consecutiveFails,
-		LastError:        m.pollError,
-	}
-}
-
-func (m *mockDispatcher) Cleanup(_ context.Context) error {
-	return nil
-}
-
-func (m *mockDispatcher) GetWorkers(_ context.Context) ([]*coordinatorv1.WorkerInfo, error) {
-	// Return empty list by default for tests
-	return []*coordinatorv1.WorkerInfo{}, nil
-}
-
 func TestWorkerErrorHandling(t *testing.T) {
 	t.Run("DispatcherFailure", func(t *testing.T) {
 		// Create worker with a mock dispatcher that always fails
@@ -531,18 +433,16 @@ func TestWorkerErrorHandling(t *testing.T) {
 		labels := make(map[string]string)
 
 		var pollCalled atomic.Bool
-		mockDispatcher := &mockDispatcher{
-			pollError: status.Error(codes.Unavailable, "connection failed"),
-		}
+		pollError := status.Error(codes.Unavailable, "connection failed")
+		mockDispatcher := newMockDispatcher()
 		// Override the Poll method to track calls
-		mockDispatcher.PollFunc = func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+		mockDispatcher.PollFunc = func(_ context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 			pollCalled.Store(true)
-			mockDispatcher.consecutiveFails++
-			return nil, mockDispatcher.pollError
+			return nil, pollError
 		}
 
 		w := worker.NewWorker("test-worker", 1, mockDispatcher, mockMgr, labels)
-		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
+		w.SetTaskExecutor(&mockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker with a short timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -572,4 +472,55 @@ func TestWorkerErrorHandling(t *testing.T) {
 		require.Greater(t, metrics.ConsecutiveFails, 0)
 		require.NotNil(t, metrics.LastError)
 	})
+}
+
+// mockTaskExecutor is a mock implementation of TaskExecutor for testing
+type mockTaskExecutor struct {
+	ExecuteFunc   func(ctx context.Context, task *coordinatorv1.Task) error
+	ExecutedTasks []string
+	ExecutionTime time.Duration
+	mu            sync.Mutex
+}
+
+// Execute implements the TaskExecutor interface
+func (m *mockTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Task) error {
+	m.mu.Lock()
+	m.ExecutedTasks = append(m.ExecutedTasks, task.DagRunId)
+	m.mu.Unlock()
+
+	if m.ExecuteFunc != nil {
+		return m.ExecuteFunc(ctx, task)
+	}
+
+	// Default behavior: simulate execution with configurable duration
+	if m.ExecutionTime > 0 {
+		select {
+		case <-time.After(m.ExecutionTime):
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return nil
+}
+
+// GetExecutedTasks returns a copy of executed task IDs
+func (m *mockTaskExecutor) GetExecutedTasks() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	result := make([]string, len(m.ExecutedTasks))
+	copy(result, m.ExecutedTasks)
+	return result
+}
+
+// createTestWorker creates a worker with a mock dagrun.Manager and dispatcher for testing
+func createTestWorker(t *testing.T, workerID string, maxActiveRuns int, coord *test.Coordinator) *worker.Worker {
+	mockMgr := dagrun.New(nil, nil, "dagu", ".")
+	labels := make(map[string]string)
+
+	// Create dispatcher client for the coordinator
+	dispatcherClient := coord.GetDispatcherClient(t)
+
+	return worker.NewWorker(workerID, maxActiveRuns, dispatcherClient, mockMgr, labels)
 }

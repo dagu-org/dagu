@@ -20,9 +20,9 @@ func TestGetWorkers(t *testing.T) {
 		var workersResp api.WorkersListResponse
 		resp.Unmarshal(t, &workersResp)
 
-		// Should return empty workers list with a message
+		// Should return empty workers list when no coordinators are available
 		require.Empty(t, workersResp.Workers)
-		require.Contains(t, workersResp.Errors, "Coordinator service not configured")
+		require.Empty(t, workersResp.Errors)
 	})
 
 	// Additional integration tests would require a real coordinator running
