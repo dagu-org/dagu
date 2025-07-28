@@ -3,27 +3,27 @@ updates:
   - package-ecosystem: devcontainers
     directory: /
     schedule:
-      interval: weekly
+      interval: quarterly
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: weekly
+      interval: quarterly
   - package-ecosystem: docker-compose
     directory: /
     schedule:
-      interval: weekly
+      interval: quarterly
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: quarterly
   - package-ecosystem: gomod
     directory: /
     schedule:
-      interval: weekly
+      interval: quarterly
   - package-ecosystem: npm
     directories:
       - docs
       - npm/*
       - ui
     schedule:
-      interval: weekly
+      interval: quarterly
