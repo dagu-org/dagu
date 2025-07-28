@@ -43,7 +43,6 @@ type Scheduler struct {
 	dagRunStore         models.DAGRunStore
 	queueStore          models.QueueStore
 	procStore           models.ProcStore
-	serviceMonitor      models.ServiceMonitor
 	cancel              context.CancelFunc
 	lock                sync.Mutex
 	queueConfigs        sync.Map
@@ -65,7 +64,7 @@ func New(
 	drs models.DAGRunStore,
 	qs models.QueueStore,
 	ps models.ProcStore,
-	sm models.ServiceMonitor,
+	_ models.ServiceMonitor, // Currently unused but kept for API compatibility
 	dispatcher digraph.Dispatcher,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Global.Location

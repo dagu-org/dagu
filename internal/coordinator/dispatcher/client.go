@@ -203,7 +203,7 @@ func (d *dispatcher) getOrCreateClient(ctx context.Context, member models.HostIn
 }
 
 // createClient creates a new gRPC client for the given coordinator
-func (d *dispatcher) createClient(ctx context.Context, member models.HostInfo) (*client, error) {
+func (d *dispatcher) createClient(_ context.Context, member models.HostInfo) (*client, error) {
 	// Get dial options based on TLS configuration
 	dialOpts, err := getDialOptions(d.config)
 	if err != nil {

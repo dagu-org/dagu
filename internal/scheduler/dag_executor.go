@@ -172,7 +172,9 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 // Close closes any resources held by the DAGExecutor, including the coordinator client
 func (e *DAGExecutor) Close(ctx context.Context) {
 	if e.dispacher != nil {
-		e.dispacher.Cleanup(ctx)
+		if err := e.dispacher.Cleanup(ctx); err != nil {
+			logger.Error(ctx, "Failed to cleanup dispatcher", "err", err)
+		}
 		e.dispacher = nil
 	}
 }

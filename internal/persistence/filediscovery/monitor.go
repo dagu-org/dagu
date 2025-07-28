@@ -47,6 +47,11 @@ func (m *Monitor) Start(ctx context.Context, serviceName models.ServiceName, hos
 		return fmt.Errorf("monitor already started")
 	}
 
+	logger.Info(ctx, "Starting service monitor",
+		"service_name", serviceName,
+		"instance_id", hostInfo.ID,
+		"address", hostInfo.HostPort)
+
 	// Ensure base directory exists
 	if err := os.MkdirAll(m.baseDir, 0750); err != nil {
 		return fmt.Errorf("failed to create discovery directory: %w", err)
@@ -102,6 +107,11 @@ func (m *Monitor) Stop(ctx context.Context) {
 		m.instanceMu.Unlock()
 		return
 	}
+
+	logger.Info(ctx, "Stopping service monitor",
+		"service_name", m.serviceName,
+		"instance_id", m.instanceInfo.ID,
+		"address", m.instanceInfo.HostPort)
 
 	// Cancel the context to stop background goroutines
 	cancel := m.cancel

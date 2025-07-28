@@ -81,22 +81,23 @@ func runStartAll(ctx *Context, _ []string) error {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
-	coordinator, err := newCoordinator(ctx.Config)
+	coordinator, err := newCoordinator(ctx.Config, ctx.ServiceMonitor)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
 
 	// Create a new context with the signal context for services
 	serviceCtx := &Context{
-		Context:     signalCtx,
-		Command:     ctx.Command,
-		Flags:       ctx.Flags,
-		Config:      ctx.Config,
-		Quiet:       ctx.Quiet,
-		DAGRunStore: ctx.DAGRunStore,
-		DAGRunMgr:   ctx.DAGRunMgr,
-		ProcStore:   ctx.ProcStore,
-		QueueStore:  ctx.QueueStore,
+		Context:        signalCtx,
+		Command:        ctx.Command,
+		Flags:          ctx.Flags,
+		Config:         ctx.Config,
+		Quiet:          ctx.Quiet,
+		DAGRunStore:    ctx.DAGRunStore,
+		DAGRunMgr:      ctx.DAGRunMgr,
+		ProcStore:      ctx.ProcStore,
+		QueueStore:     ctx.QueueStore,
+		ServiceMonitor: ctx.ServiceMonitor,
 	}
 
 	// WaitGroup to track all services
@@ -153,6 +154,14 @@ func runStartAll(ctx *Context, _ []string) error {
 		firstErr = err
 		logger.Error(ctx, "Service failed, shutting down", "err", err)
 		stop() // Cancel the signal context to trigger shutdown of other services
+	}
+
+	// Stop all services gracefully
+	logger.Info(ctx, "Stopping all services...")
+
+	// Stop coordinator first to unregister from service discovery
+	if err := coordinator.Stop(ctx); err != nil {
+		logger.Error(ctx, "Failed to stop coordinator", "err", err)
 	}
 
 	// Wait for all services to finish with timeout

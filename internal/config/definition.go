@@ -261,6 +261,9 @@ type queueConfigDef struct {
 
 // coordinatorDef holds the configuration for the coordinator service.
 type coordinatorDef struct {
+	// ID is the coordinator instance identifier.
+	ID string `mapstructure:"id"`
+
 	// Host is the hostname or IP address for the coordinator service.
 	Host string `mapstructure:"host"`
 

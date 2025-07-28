@@ -229,7 +229,6 @@ var (
 		isBool:    true,
 		bindViper: true,
 	}
-
 )
 
 type commandLineFlag struct {

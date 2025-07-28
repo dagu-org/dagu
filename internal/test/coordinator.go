@@ -51,8 +51,8 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	// Create handler
 	handler := coordinator.NewHandler()
 
-	// Create service
-	service := coordinator.NewService(grpcServer, handler, listener, healthServer)
+	// Create service with ServiceMonitor from helper
+	service := coordinator.NewService(grpcServer, handler, listener, healthServer, helper.ServiceMonitor, "test-coordinator")
 
 	coord := &Coordinator{
 		Helper:       helper,

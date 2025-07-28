@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -70,9 +71,22 @@ var coordinatorFlags = []commandLineFlag{
 }
 
 func runCoordinator(ctx *Context, _ []string) error {
-	logger.Info(ctx, "Coordinator initialization", "host", ctx.Config.Coordinator.Host, "port", ctx.Config.Coordinator.Port)
+	// Get or generate instance ID
+	instanceID := ctx.Config.Coordinator.ID
+	if instanceID == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			hostname = "unknown"
+		}
+		instanceID = fmt.Sprintf("%s@%d", hostname, ctx.Config.Coordinator.Port)
+	}
 
-	coordinator, err := newCoordinator(ctx.Config)
+	logger.Info(ctx, "Coordinator initialization",
+		"host", ctx.Config.Coordinator.Host,
+		"port", ctx.Config.Coordinator.Port,
+		"instance_id", instanceID)
+
+	coordinator, err := newCoordinator(ctx.Config, ctx.ServiceMonitor)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
@@ -94,7 +108,16 @@ func runCoordinator(ctx *Context, _ []string) error {
 
 // newCoordinator creates a new Coordinator service instance.
 // It sets up a gRPC server and listener for distributed task coordination.
-func newCoordinator(cfg *config.Config) (*coordinator.Service, error) {
+func newCoordinator(cfg *config.Config, serviceMonitor models.ServiceMonitor) (*coordinator.Service, error) {
+	// Generate instance ID if not provided
+	instanceID := cfg.Coordinator.ID
+	if instanceID == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			hostname = "unknown"
+		}
+		instanceID = fmt.Sprintf("%s@%d", hostname, cfg.Coordinator.Port)
+	}
 	// Create gRPC server options
 	var serverOpts []grpc.ServerOption
 
@@ -130,7 +153,7 @@ func newCoordinator(cfg *config.Config) (*coordinator.Service, error) {
 	handler := coordinator.NewHandler()
 
 	// Create and return service
-	return coordinator.NewService(grpcServer, handler, listener, healthServer), nil
+	return coordinator.NewService(grpcServer, handler, listener, healthServer, serviceMonitor, instanceID), nil
 }
 
 // loadCoordinatorTLSCredentials loads TLS credentials for the coordinator server.

@@ -278,6 +278,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Override with values from config file if provided
 	if def.Coordinator != nil {
+		cfg.Coordinator.ID = def.Coordinator.ID
 		cfg.Coordinator.Host = def.Coordinator.Host
 		cfg.Coordinator.Port = def.Coordinator.Port
 	}
@@ -591,6 +592,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("queues.enabled", "QUEUE_ENABLED")
 
 	// Coordinator service configuration (flat structure)
+	l.bindEnv("coordinatorID", "COORDINATOR_ID")
 	l.bindEnv("coordinatorHost", "COORDINATOR_HOST")
 	l.bindEnv("coordinatorPort", "COORDINATOR_PORT")
 
