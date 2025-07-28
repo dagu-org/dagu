@@ -45,7 +45,7 @@ const (
 
 const (
 	// Longer intervals since we use file events as primary notification
-	reloadInterval    = 30 * time.Second // Backup polling interval
+	reloadInterval    = 30 * time.Second      // Backup polling interval
 	processingDelay   = 10 * time.Millisecond // Small delay to prevent busy loop
 	shutdownTimeout   = 5 * time.Second
 	pollingInterval   = 2 * time.Second // For filenotify poller fallback

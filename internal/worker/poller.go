@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 // Poller handles polling for tasks from the coordinator
 type Poller struct {
 	workerID     string
@@ -110,7 +109,7 @@ func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*
 	if err != nil {
 		// Get updated metrics after failure
 		afterMetrics := p.dispatcher.Metrics()
-		
+
 		// Check if this was first failure after being connected
 		if beforeMetrics.IsConnected && !afterMetrics.IsConnected {
 			// First failure after being connected - log as ERROR

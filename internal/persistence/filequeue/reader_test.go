@@ -260,7 +260,7 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 	// Get a reader from the store
 	reader := store.Reader(ctx)
 
-	// Create a channel to receive items  
+	// Create a channel to receive items
 	ch := make(chan models.QueuedItem, 1)
 
 	// Start the reader
@@ -269,7 +269,7 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 
 	// Track which queues we've seen
 	seenQueues := make(map[string]bool)
-	
+
 	// Process first two items and return retry
 	for i := 0; i < 2; i++ {
 		select {
