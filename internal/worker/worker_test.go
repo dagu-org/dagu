@@ -519,6 +519,11 @@ func (m *mockDispatcher) Cleanup(_ context.Context) error {
 	return nil
 }
 
+func (m *mockDispatcher) GetWorkers(_ context.Context) ([]*coordinatorv1.WorkerInfo, error) {
+	// Return empty list by default for tests
+	return []*coordinatorv1.WorkerInfo{}, nil
+}
+
 func TestWorkerErrorHandling(t *testing.T) {
 	t.Run("DispatcherFailure", func(t *testing.T) {
 		// Create worker with a mock dispatcher that always fails

@@ -76,6 +76,11 @@ func (m *MockDispatcher) Cleanup(ctx context.Context) error {
 	return nil
 }
 
+func (m *MockDispatcher) GetWorkers(_ context.Context) ([]*coordinatorv1.WorkerInfo, error) {
+	// Return empty list by default for tests
+	return []*coordinatorv1.WorkerInfo{}, nil
+}
+
 func (m *MockDispatcher) updateState(err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

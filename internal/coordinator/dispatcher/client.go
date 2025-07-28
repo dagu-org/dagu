@@ -16,9 +16,11 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/status"
 )
 
 type Client interface {
@@ -29,6 +31,9 @@ type Client interface {
 
 	// Poll retrieves a task from the coordinator.
 	Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
+
+	// GetWorkers retrieves the list of workers from the coordinator
+	GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error)
 
 	// Metrics returns the metrics for the coordinator client
 	Metrics() Metrics
@@ -359,6 +364,67 @@ func (d *dispatcher) recordSuccess(ctx context.Context) {
 	d.state.IsConnected = true
 	d.state.ConsecutiveFails = 0
 	d.state.LastError = nil
+}
+
+// GetWorkers retrieves the list of workers from all coordinators
+func (d *dispatcher) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error) {
+	// Get coordinator resolver from discovery
+	resolver := d.discovery.Resolver(ctx, models.ServiceNameCoordinator)
+
+	// Try to get members
+	members, err := resolver.Members(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
+	}
+
+	// Collect workers from all coordinators
+	var allWorkers []*coordinatorv1.WorkerInfo
+	var lastErr error
+
+	for _, member := range members {
+		// Get or create client for this member
+		c, err := d.getOrCreateClient(ctx, member)
+		if err != nil {
+			logger.Warn(ctx, "Failed to connect to coordinator",
+				"id", member.ID,
+				"address", member.HostPort,
+				"err", err)
+			lastErr = err
+			continue
+		}
+
+		// Try to get workers from this coordinator
+		resp, err := c.client.GetWorkers(ctx, &coordinatorv1.GetWorkersRequest{})
+		if err != nil {
+			logger.Warn(ctx, "Failed to get workers from coordinator",
+				"id", member.ID,
+				"address", member.HostPort,
+				"err", err)
+			lastErr = err
+
+			// If this is a connection error, remove the client from cache
+			if st, ok := status.FromError(err); ok && st.Code() == codes.Unavailable {
+				d.removeClient(member.ID)
+			}
+			continue
+		}
+
+		// Append workers from this coordinator
+		if resp != nil && resp.Workers != nil {
+			allWorkers = append(allWorkers, resp.Workers...)
+		}
+	}
+
+	// If we got some workers, return them even if some coordinators failed
+	if len(allWorkers) > 0 {
+		return allWorkers, nil
+	}
+
+	// All attempts failed and no workers found
+	if lastErr != nil {
+		return nil, fmt.Errorf("failed to get workers from any coordinator: %w", lastErr)
+	}
+	return nil, nil
 }
 
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration
