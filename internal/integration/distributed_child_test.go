@@ -60,7 +60,7 @@ steps:
 		})
 
 		// Give worker time to connect
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)

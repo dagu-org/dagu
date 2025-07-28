@@ -77,7 +77,7 @@ steps:
 		}
 
 		// Give workers time to connect
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -184,7 +184,7 @@ steps:
 		}
 
 		// Give workers time to connect
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -330,7 +330,7 @@ steps:
 		}
 
 		// Give workers time to connect
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -347,7 +347,7 @@ steps:
 		}()
 
 		// Wait a bit to ensure parallel execution has started on workers
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// Cancel the execution
 		cancel()
@@ -466,7 +466,7 @@ steps:
 		})
 
 		// Give worker time to connect
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -483,7 +483,7 @@ steps:
 		}()
 
 		// Wait to ensure both local and distributed executions have started
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// Cancel the execution
 		execCancel()
@@ -591,7 +591,7 @@ steps:
 		}
 
 		// Give workers time to connect
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -608,7 +608,7 @@ steps:
 		}()
 
 		// Wait to ensure concurrent execution has started across workers
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// Cancel the execution
 		cancel()

@@ -386,7 +386,9 @@ func TestAgent_Retry(t *testing.T) {
 
 func TestAgent_HandleHTTP(t *testing.T) {
 	t.Parallel()
+
 	t.Run("HTTP_Valid", func(t *testing.T) {
+		t.Parallel()
 		th := test.Setup(t)
 
 		// Start a long-running DAG
@@ -417,9 +419,14 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Stop the DAG
 		dagAgent.Abort()
+		
+		// Give the process a moment to handle the signal and update status
+		time.Sleep(100 * time.Millisecond)
+		
 		dag.AssertLatestStatus(t, status.Cancel)
 	})
 	t.Run("HTTP_InvalidRequest", func(t *testing.T) {
+		t.Parallel()
 		th := test.Setup(t)
 
 		// Start a long-running DAG
@@ -450,6 +457,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		dag.AssertLatestStatus(t, status.Cancel)
 	})
 	t.Run("HTTP_HandleCancel", func(t *testing.T) {
+		t.Parallel()
 		th := test.Setup(t)
 
 		// Start a long-running DAG

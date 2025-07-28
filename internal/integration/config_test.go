@@ -6,13 +6,17 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDAGExecution(t *testing.T) {
 	t.Parallel()
 
+	th := test.Setup(t)
+
 	t.Run("Depends", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: "1"
     command: "echo 1"
@@ -28,7 +32,8 @@ func TestDAGExecution(t *testing.T) {
 	})
 
 	t.Run("Pipe", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params:
   - NAME: "foo"
 steps:
@@ -47,7 +52,7 @@ steps:
 	})
 
 	t.Run("DotEnv", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
 
 		// Create dotenv files
 		dotenv1Path := test.TestdataPath(t, "integration/dotenv1")
@@ -72,7 +77,8 @@ steps:
 	})
 
 	t.Run("NamedParams", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params:
   NAME: "Dagu"
   AGE: 30
@@ -98,7 +104,8 @@ steps:
 	})
 
 	t.Run("NamedParamsList", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params:
   - NAME: "Dagu"
   - AGE: 30
@@ -124,7 +131,8 @@ steps:
 	})
 
 	t.Run("PositionalParams", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params: "foo bar"
 
 steps:
@@ -146,7 +154,8 @@ steps:
 	})
 
 	t.Run("PositionalParamsScript", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params: "foo bar"
 
 steps:
@@ -169,7 +178,8 @@ steps:
 	})
 
 	t.Run("Script", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params:
   - NAME: "foo"
 steps:
@@ -189,7 +199,8 @@ steps:
 	})
 
 	t.Run("RegexPrecondition", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: test
     command: echo abc run def
@@ -214,7 +225,8 @@ steps:
 	})
 
 	t.Run("JSON", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: get config
     command: |
@@ -237,7 +249,8 @@ steps:
 	})
 
 	t.Run("EnvVar", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `env:
   - DATA_DIR: /tmp/dagu_test_integration
   - PROCESS_DATE: "`+"`"+`date '+%Y%m%d_%H%M%S'`+"`"+`"
@@ -268,7 +281,8 @@ steps:
 	})
 
 	t.Run("EnvScript", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `env:
   - "E1": foo
   - "E2": bar
@@ -293,7 +307,8 @@ steps:
 	})
 
 	t.Run("SpecialVars", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: step1
     command: echo $DAG_RUN_LOG_FILE
@@ -330,7 +345,8 @@ steps:
 	})
 
 	t.Run("JQ", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: extract_value
     executor: jq
@@ -355,7 +371,8 @@ steps:
 	})
 
 	t.Run("JSONVar", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: get_config
     command: |
@@ -378,7 +395,8 @@ steps:
 	})
 
 	t.Run("PerlScript", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: step1
     command: perl
@@ -399,7 +417,8 @@ steps:
 	})
 
 	t.Run("Workdir", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `env:
   - WORKDIR: $HOME
   - TILDE: ~/
@@ -426,7 +445,8 @@ steps:
 	})
 
 	t.Run("Issue-810", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `params: bar
 steps:
   - name: step1
@@ -472,7 +492,8 @@ steps:
 	})
 
 	t.Run("ShellOptions", func(t *testing.T) {
-		th := test.Setup(t)
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: step1
     description: test step
@@ -665,4 +686,39 @@ func TestComplexDependencies(t *testing.T) {
 		"MERGE":   "merge",
 		"FINAL":   "final",
 	})
+}
+
+func TestChainExecution(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	// Load chain DAG
+	dag := th.DAG(t, `type: chain
+steps:
+  - name: step1
+    command: echo "step 1"
+  - name: step2
+    command: echo "step 2"
+  - name: step3
+    command: echo "step 3"
+`)
+
+	// Run the DAG
+	agent := dag.Agent()
+	require.NoError(t, agent.Run(agent.Context))
+
+	// Verify successful completion
+	dag.AssertLatestStatus(t, status.Success)
+
+	// Get the latest status to verify execution order
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, dagRunStatus)
+	require.Len(t, dagRunStatus.Nodes, 3)
+
+	// Verify steps ran in order (chain type adds implicit dependencies)
+	require.Equal(t, "step1", dagRunStatus.Nodes[0].Step.Name)
+	require.Equal(t, "step2", dagRunStatus.Nodes[1].Step.Name)
+	require.Equal(t, "step3", dagRunStatus.Nodes[2].Step.Name)
 }

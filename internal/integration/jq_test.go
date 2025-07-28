@@ -11,6 +11,8 @@ func TestJQExecutor(t *testing.T) {
 	t.Parallel()
 
 	t.Run("MultipleOutputsWithRawTrue", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-array-raw
@@ -34,6 +36,8 @@ func TestJQExecutor(t *testing.T) {
 	})
 
 	t.Run("MultipleOutputsWithRawFalse", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-array-json
@@ -57,6 +61,8 @@ func TestJQExecutor(t *testing.T) {
 	})
 
 	t.Run("StringOutputWithRawTrue", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-strings-raw
@@ -80,6 +86,8 @@ func TestJQExecutor(t *testing.T) {
 	})
 
 	t.Run("StringOutputWithRawFalse", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-strings-json
@@ -103,6 +111,8 @@ func TestJQExecutor(t *testing.T) {
 	})
 
 	t.Run("TSVOutputWithRawTrue", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-tsv

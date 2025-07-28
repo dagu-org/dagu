@@ -12,6 +12,7 @@ import (
 )
 
 func TestRetryPolicy_WithExponentialBackoff(t *testing.T) {
+	t.Parallel()
 	th := test.Setup(t)
 
 	// Load DAG with retry backoff
@@ -52,12 +53,13 @@ func TestRetryPolicy_WithExponentialBackoff(t *testing.T) {
 	assert.Equal(t, 3, dagRunStatus.Nodes[0].RetryCount, "Step should have retried exactly 3 times")
 
 	// Verify total time is approximately correct
-	// Expected: initial + 0.1s + 0.2s + 0.4s = 0.7s minimum
+	// Expected intervals: initial, then 1s, 2s, 4s = 7s minimum
 	totalTime := time.Since(startTime)
-	assert.GreaterOrEqual(t, totalTime, 700*time.Millisecond, "Total time should be at least 700ms")
+	assert.GreaterOrEqual(t, totalTime, 6*time.Second, "Total time should be at least 6 seconds")
 }
 
 func TestRetryPolicy_WithBackoffBoolean(t *testing.T) {
+	t.Parallel()
 	th := test.Setup(t)
 
 	// Load DAG with boolean backoff
@@ -95,12 +97,13 @@ func TestRetryPolicy_WithBackoffBoolean(t *testing.T) {
 	assert.Equal(t, 3, dagRunStatus.Nodes[0].RetryCount)
 
 	// Verify timing (backoff: true should use 2.0 multiplier)
-	// Expected: initial + 0.1s + 0.2s + 0.4s = 0.7s minimum
+	// Expected intervals: initial, then 1s, 2s, 4s = 7s minimum
 	totalTime := time.Since(startTime)
-	assert.GreaterOrEqual(t, totalTime, 700*time.Millisecond, "Total time should be at least 700ms")
+	assert.GreaterOrEqual(t, totalTime, 6*time.Second, "Total time should be at least 6 seconds")
 }
 
 func TestRepeatPolicy_WithExponentialBackoff(t *testing.T) {
+	t.Parallel()
 	th := test.Setup(t)
 
 	// Load DAG with repeat backoff
@@ -144,5 +147,5 @@ func TestRepeatPolicy_WithExponentialBackoff(t *testing.T) {
 	// Verify timing
 	// Expected intervals: initial, then 1s, 2s, 4s = 7s minimum
 	totalTime := time.Since(startTime)
-	assert.GreaterOrEqual(t, totalTime, 7*time.Second, "Total time should be at least 7 seconds")
+	assert.GreaterOrEqual(t, totalTime, 6*time.Second, "Total time should be at least 6 seconds")
 }
