@@ -32,7 +32,7 @@
     "@babel/core": "^7.28.0",
     "@babel/preset-react": "^7.27.1",
     "@eslint/eslintrc": "^3.3.1",
-    "@eslint/js": "^9.31.0",
+    "@eslint/js": "^9.32.0",
     "@tailwindcss/postcss": "^4.1.11",
     "@types/lodash-es": "^4.17.12",
     "@types/react": "^19.1.8",
