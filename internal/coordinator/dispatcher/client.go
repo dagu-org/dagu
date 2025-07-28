@@ -47,7 +47,7 @@ var (
 )
 
 // New creates a new coordinator client with the given configuration
-func New(ctx context.Context, monitor models.ServiceMonitor, config *Config) digraph.Dispatcher {
+func New(monitor models.ServiceMonitor, config *Config) digraph.Dispatcher {
 	return &dispatcher{
 		config:    config,
 		discovery: monitor,
@@ -103,6 +103,7 @@ func (d *dispatcher) attemptDispatch(ctx context.Context, members []models.HostI
 				"coordinator_id", member.ID,
 				"address", member.HostPort,
 				"error", err)
+			d.removeClient(member.ID) // Remove failed client
 			continue
 		}
 

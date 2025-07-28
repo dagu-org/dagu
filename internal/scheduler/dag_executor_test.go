@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
+	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
@@ -43,26 +43,15 @@ steps:
 		runStore := filedagrun.New(filepath.Join(tmpDir, "data"))
 		procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
 		dagRunMgr := dagrun.New(runStore, procStore, th.Config.Paths.Executable, tmpDir)
+		dispatcher := dispatcher.New(th.ServiceMonitor, dispatcher.DefaultConfig())
+
+		dagExecutor := scheduler.NewDAGExecutor(dispatcher, dagRunMgr)
+		t.Cleanup(func() {
+			dagExecutor.Close(th.Context)
+		})
 
 		// Test 1: HandleJob with distributed execution and START operation
 		t.Run("HandleJob_Distributed_START", func(t *testing.T) {
-			// Setup coordinator (without starting it to avoid dispatch)
-			coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
-
-			// Create coordinator client factory
-			coordinatorFactory := coordinatorclient.NewFactory().
-				WithHost(coord.Config.Coordinator.Host).
-				WithPort(coord.Config.Coordinator.Port).
-				WithInsecure()
-
-			// Create DAG executor
-			dagExecutor := scheduler.NewDAGExecutor(coordinatorFactory, dagRunMgr)
-			t.Cleanup(func() {
-				if err := dagExecutor.Close(); err != nil {
-					t.Logf("Failed to close DAGExecutor: %v", err)
-				}
-			})
-
 			// Load DAG and set worker selector for distributed execution
 			dag, err := digraph.Load(context.Background(), testFile)
 			require.NoError(t, err)
@@ -86,22 +75,8 @@ steps:
 
 		// Test 2: ExecuteDAG with distributed execution
 		t.Run("ExecuteDAG_Distributed", func(t *testing.T) {
-			// Setup coordinator
-			coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
-
-			// Create coordinator client factory
-			coordinatorFactory := coordinatorclient.NewFactory().
-				WithHost(coord.Config.Coordinator.Host).
-				WithPort(coord.Config.Coordinator.Port).
-				WithInsecure()
-
 			// Create DAG executor
-			dagExecutor := scheduler.NewDAGExecutor(coordinatorFactory, dagRunMgr)
-			t.Cleanup(func() {
-				if err := dagExecutor.Close(); err != nil {
-					t.Logf("Failed to close DAGExecutor: %v", err)
-				}
-			})
+			dagExecutor := scheduler.NewDAGExecutor(dispatcher, dagRunMgr)
 
 			// Load DAG and set worker selector
 			dag, err := digraph.Load(context.Background(), testFile)
@@ -157,22 +132,8 @@ steps:
 
 		// Test 4: HandleJob with RETRY operation
 		t.Run("HandleJob_RETRY", func(t *testing.T) {
-			// Setup coordinator
-			coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
-
-			// Create coordinator client factory
-			coordinatorFactory := coordinatorclient.NewFactory().
-				WithHost(coord.Config.Coordinator.Host).
-				WithPort(coord.Config.Coordinator.Port).
-				WithInsecure()
-
 			// Create DAG executor
-			dagExecutor := scheduler.NewDAGExecutor(coordinatorFactory, dagRunMgr)
-			t.Cleanup(func() {
-				if err := dagExecutor.Close(); err != nil {
-					t.Logf("Failed to close DAGExecutor: %v", err)
-				}
-			})
+			dagExecutor := scheduler.NewDAGExecutor(dispatcher, dagRunMgr)
 
 			// Load DAG and set worker selector
 			dag, err := digraph.Load(context.Background(), testFile)

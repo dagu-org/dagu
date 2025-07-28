@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
-	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -46,20 +44,18 @@ import (
 // - HandleJob(): Entry point for new scheduled jobs (handles persistence)
 // - ExecuteDAG(): Executes/dispatches already-persisted jobs (no persistence)
 type DAGExecutor struct {
-	coordinatorClientFactory *coordinatorclient.Factory
-	coordinatorClient        coordinatorclient.Client
-	coordinatorClientMu      sync.Mutex
-	dagRunManager            dagrun.Manager
+	dispacher     digraph.Dispatcher
+	dagRunManager dagrun.Manager
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
 func NewDAGExecutor(
-	coordinatorClientFactory *coordinatorclient.Factory,
+	dispatcher digraph.Dispatcher,
 	dagRunManager dagrun.Manager,
 ) *DAGExecutor {
 	return &DAGExecutor{
-		coordinatorClientFactory: coordinatorClientFactory,
-		dagRunManager:            dagRunManager,
+		dispacher:     dispatcher,
+		dagRunManager: dagRunManager,
 	}
 }
 
@@ -149,34 +145,7 @@ func (e *DAGExecutor) ExecuteDAG(
 // This ensures backward compatibility - DAGs without workerSelector continue
 // to run locally even when a coordinator is configured.
 func (e *DAGExecutor) shouldUseDistributedExecution(dag *digraph.DAG) bool {
-	return e.coordinatorClientFactory != nil && dag != nil && len(dag.WorkerSelector) > 0
-}
-
-// getCoordinatorClient returns the coordinator client, creating it lazily if needed.
-// Returns nil if no coordinator is configured.
-func (e *DAGExecutor) getCoordinatorClient(ctx context.Context) (coordinatorclient.Client, error) {
-	// If no factory configured, distributed execution is disabled
-	if e.coordinatorClientFactory == nil {
-		return nil, nil
-	}
-
-	// Check if client already exists
-	e.coordinatorClientMu.Lock()
-	defer e.coordinatorClientMu.Unlock()
-
-	if e.coordinatorClient != nil {
-		return e.coordinatorClient, nil
-	}
-
-	// Create client
-	client, err := e.coordinatorClientFactory.Build(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create coordinator client: %w", err)
-	}
-
-	e.coordinatorClient = client
-	logger.Info(ctx, "Coordinator client initialized for distributed execution")
-	return client, nil
+	return e.dispacher != nil && dag != nil && len(dag.WorkerSelector) > 0
 }
 
 // dispatchToCoordinator dispatches a task to the coordinator for distributed execution.
@@ -188,18 +157,7 @@ func (e *DAGExecutor) getCoordinatorClient(ctx context.Context) (coordinatorclie
 // 2. Forward the task to the selected worker
 // 3. Track the execution status
 func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinatorv1.Task) error {
-	client, err := e.getCoordinatorClient(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get coordinator client: %w", err)
-	}
-
-	if client == nil {
-		// Should not happen if shouldUseDistributedExecution is checked
-		return errors.New("coordinator client not available")
-	}
-
-	err = client.Dispatch(ctx, task)
-	if err != nil {
+	if err := e.dispacher.Dispatch(ctx, task); err != nil {
 		return fmt.Errorf("failed to dispatch task: %w", err)
 	}
 
@@ -212,14 +170,9 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 }
 
 // Close closes any resources held by the DAGExecutor, including the coordinator client
-func (e *DAGExecutor) Close() error {
-	e.coordinatorClientMu.Lock()
-	defer e.coordinatorClientMu.Unlock()
-
-	if e.coordinatorClient != nil {
-		err := e.coordinatorClient.Close()
-		e.coordinatorClient = nil
-		return err
+func (e *DAGExecutor) Close(ctx context.Context) {
+	if e.dispacher != nil {
+		e.dispacher.Cleanup(ctx)
+		e.dispacher = nil
 	}
-	return nil
 }

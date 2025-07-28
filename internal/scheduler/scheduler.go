@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	dagstatus "github.com/dagu-org/dagu/internal/digraph/status"
@@ -44,6 +43,7 @@ type Scheduler struct {
 	dagRunStore         models.DAGRunStore
 	queueStore          models.QueueStore
 	procStore           models.ProcStore
+	serviceMonitor      models.ServiceMonitor
 	cancel              context.CancelFunc
 	lock                sync.Mutex
 	queueConfigs        sync.Map
@@ -65,7 +65,8 @@ func New(
 	drs models.DAGRunStore,
 	qs models.QueueStore,
 	ps models.ProcStore,
-	coordinatorClientFactory *coordinatorclient.Factory,
+	sm models.ServiceMonitor,
+	dispatcher digraph.Dispatcher,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Global.Location
 	if timeLoc == nil {
@@ -79,7 +80,7 @@ func New(
 	}
 
 	// Create DAG executor
-	dagExecutor := NewDAGExecutor(coordinatorClientFactory, drm)
+	dagExecutor := NewDAGExecutor(dispatcher, drm)
 
 	// Create health server
 	healthServer := NewHealthServer(cfg.Scheduler.Port)
@@ -460,9 +461,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 
 	// Close DAG executor to release gRPC connections
 	if s.dagExecutor != nil {
-		if err := s.dagExecutor.Close(); err != nil {
-			logger.Error(ctx, "Failed to close DAG executor", "err", err)
-		}
+		s.dagExecutor.Close(ctx)
 	}
 
 	// Release directory lock

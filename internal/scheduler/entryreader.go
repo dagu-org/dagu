@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -56,10 +55,7 @@ type entryReaderImpl struct {
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
-func NewEntryReader(dir string, dagCli models.DAGStore, drm dagrun.Manager, executable, workDir string, coordinatorClientFactory *coordinatorclient.Factory) EntryReader {
-	// Create DAG executor
-	dagExecutor := NewDAGExecutor(coordinatorClientFactory, drm)
-
+func NewEntryReader(dir string, dagCli models.DAGStore, drm dagrun.Manager, de *DAGExecutor, executable, workDir string) EntryReader {
 	return &entryReaderImpl{
 		targetDir:   dir,
 		lock:        sync.Mutex{},
@@ -68,7 +64,7 @@ func NewEntryReader(dir string, dagCli models.DAGStore, drm dagrun.Manager, exec
 		dagRunMgr:   drm,
 		executable:  executable,
 		workDir:     workDir,
-		dagExecutor: dagExecutor,
+		dagExecutor: de,
 	}
 }
 

@@ -699,7 +699,7 @@ func (a *Agent) createDispatcher(ctx context.Context) digraph.Dispatcher {
 		dispatcherCfg.Insecure = true
 	}
 
-	return dispatcher.New(ctx, a.monitor, dispatcherCfg)
+	return dispatcher.New(a.monitor, dispatcherCfg)
 }
 
 // dryRun performs a dry-run of the DAG. It only simulates the execution of
