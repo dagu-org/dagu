@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
@@ -19,8 +18,8 @@ func (a *API) GetWorkers(ctx context.Context, _ api.GetWorkersRequestObject) (ap
 	errors := []string{}
 	workers := []api.Worker{}
 
-	// Check if coordinator client factory is available
-	if a.coordinatorClientFactory == nil {
+	// Check if coordinator client is available
+	if a.coordinatorCli == nil {
 		errors = append(errors, "Coordinator service not configured")
 		return api.GetWorkers200JSONResponse{
 			Workers: workers,
@@ -28,25 +27,8 @@ func (a *API) GetWorkers(ctx context.Context, _ api.GetWorkersRequestObject) (ap
 		}, nil
 	}
 
-	// Build coordinator client on demand
-	coordinatorClient, err := a.coordinatorClientFactory.Build(ctx)
-	if err != nil {
-		logger.Error(ctx, "Failed to build coordinator client", "err", err)
-		errors = append(errors, fmt.Sprintf("Failed to connect to coordinator: %v", err))
-		return api.GetWorkers200JSONResponse{
-			Workers: workers,
-			Errors:  errors,
-		}, nil
-	}
-	defer func() {
-		if err := coordinatorClient.Close(); err != nil {
-			logger.Error(ctx, "Failed to close coordinator client", "err", err)
-		}
-	}()
-
-	// Call the coordinator to get workers
-	grpcClient := coordinatorClient.GetGRPCClient()
-	resp, err := grpcClient.GetWorkers(ctx, &coordinatorv1.GetWorkersRequest{})
+	// Call the dispatcher to get workers from all coordinators
+	workerInfos, err := a.coordinatorCli.GetWorkers(ctx)
 	if err != nil {
 		// Check if it's a connection error
 		if st, ok := status.FromError(err); ok {
@@ -64,7 +46,7 @@ func (a *API) GetWorkers(ctx context.Context, _ api.GetWorkersRequestObject) (ap
 	}
 
 	// Transform the response
-	for _, w := range resp.Workers {
+	for _, w := range workerInfos {
 		// Transform protobuf health status to API health status
 		var healthStatus api.WorkerHealthStatus
 		switch w.HealthStatus {

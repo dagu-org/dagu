@@ -11,7 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/config"
-	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
+	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/frontend/auth"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -26,15 +26,15 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagStore                 models.DAGStore
-	dagRunStore              models.DAGRunStore
-	dagRunMgr                dagrun.Manager
-	remoteNodes              map[string]config.RemoteNode
-	apiBasePath              string
-	logEncodingCharset       string
-	config                   *config.Config
-	metricsRegistry          *prometheus.Registry
-	coordinatorClientFactory *coordinatorclient.Factory
+	dagStore           models.DAGStore
+	dagRunStore        models.DAGRunStore
+	dagRunMgr          dagrun.Manager
+	remoteNodes        map[string]config.RemoteNode
+	apiBasePath        string
+	logEncodingCharset string
+	config             *config.Config
+	metricsRegistry    *prometheus.Registry
+	coordinatorCli     dispatcher.Client
 }
 
 func New(
@@ -42,7 +42,7 @@ func New(
 	drs models.DAGRunStore,
 	drm dagrun.Manager,
 	cfg *config.Config,
-	coordinatorClientFactory *coordinatorclient.Factory,
+	coordinatorCli dispatcher.Client,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
 	for _, n := range cfg.Server.RemoteNodes {
@@ -50,14 +50,14 @@ func New(
 	}
 
 	return &API{
-		dagStore:                 dr,
-		dagRunStore:              drs,
-		dagRunMgr:                drm,
-		logEncodingCharset:       cfg.UI.LogEncodingCharset,
-		remoteNodes:              remoteNodes,
-		apiBasePath:              cfg.Server.APIBasePath,
-		config:                   cfg,
-		coordinatorClientFactory: coordinatorClientFactory,
+		dagStore:           dr,
+		dagRunStore:        drs,
+		dagRunMgr:          drm,
+		logEncodingCharset: cfg.UI.LogEncodingCharset,
+		remoteNodes:        remoteNodes,
+		apiBasePath:        cfg.Server.APIBasePath,
+		config:             cfg,
+		coordinatorCli:     coordinatorCli,
 	}
 }
 

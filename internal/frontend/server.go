@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	coordinatorclient "github.com/dagu-org/dagu/internal/coordinator/client"
+	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	apiv1 "github.com/dagu-org/dagu/internal/frontend/api/v1"
 	apiv2 "github.com/dagu-org/dagu/internal/frontend/api/v2"
@@ -39,14 +39,14 @@ type Server struct {
 }
 
 // NewServer creates a new Server instance with the given configuration and client
-func NewServer(cfg *config.Config, dr models.DAGStore, drs models.DAGRunStore, drm dagrun.Manager, coordinatorClientFactory *coordinatorclient.Factory) *Server {
+func NewServer(cfg *config.Config, dr models.DAGStore, drs models.DAGRunStore, drm dagrun.Manager, coordinatorCli dispatcher.Client) *Server {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
 	}
 	return &Server{
 		apiV1:  apiv1.New(dr, drs, drm, cfg),
-		apiV2:  apiv2.New(dr, drs, drm, cfg, coordinatorClientFactory),
+		apiV2:  apiv2.New(dr, drs, drm, cfg, coordinatorCli),
 		config: cfg,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
