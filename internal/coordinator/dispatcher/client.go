@@ -29,6 +29,17 @@ type Client interface {
 
 	// Poll retrieves a task from the coordinator.
 	Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
+
+	// Metrics returns the metrics for the coordinator client
+	Metrics() Metrics
+}
+
+// Metrics defines the metrics for the coordinator client
+type Metrics struct {
+	FailCount        int   // Total number of failures
+	IsConnected      bool  // Whether the client is currently connected
+	ConsecutiveFails int   // Number of consecutive failures
+	LastError        error // Last error encountered
 }
 
 var _ Client = (*dispatcher)(nil)
@@ -38,8 +49,19 @@ type dispatcher struct {
 	config    *Config
 	discovery models.ServiceMonitor
 
-	mu      sync.RWMutex
-	clients map[string]*client // Cache of gRPC clients by coordinator ID
+	clientsMu sync.RWMutex
+	clients   map[string]*client // Cache of gRPC clients by coordinator ID
+
+	stateMu sync.RWMutex // Mutex for state access
+	state   *Metrics     // Connection state tracking
+}
+
+// Metrics implements Client.
+func (d *dispatcher) Metrics() Metrics {
+	d.stateMu.RLock()
+	defer d.stateMu.RUnlock()
+
+	return *d.state
 }
 
 // client holds the gRPC connection and clients for the coordinator service.
@@ -62,6 +84,9 @@ func New(monitor models.ServiceMonitor, config *Config) digraph.Dispatcher {
 		config:    config,
 		discovery: monitor,
 		clients:   make(map[string]*client),
+		state: &Metrics{
+			IsConnected: true, // Assume connected initially
+		},
 	}
 }
 
@@ -180,6 +205,7 @@ func (d *dispatcher) attemptCall(ctx context.Context, members []models.HostInfo,
 				"address", member.HostPort,
 				"error", err)
 			d.removeClient(member.ID) // Remove failed client
+			d.recordFailure(err)
 			continue
 		}
 
@@ -189,6 +215,7 @@ func (d *dispatcher) attemptCall(ctx context.Context, members []models.HostInfo,
 				"coordinator_id", member.ID,
 				"address", member.HostPort,
 				"error", err)
+			d.recordFailure(err)
 			continue
 		}
 
@@ -199,8 +226,10 @@ func (d *dispatcher) attemptCall(ctx context.Context, members []models.HostInfo,
 				"address", member.HostPort,
 				"error", err)
 			lastErr = err
+			d.recordFailure(err)
 		} else {
-			// Success - return immediately
+			// Success - record and return immediately
+			d.recordSuccess(ctx)
 			return nil
 		}
 	}
@@ -235,16 +264,16 @@ func (d *dispatcher) isHealthy(ctx context.Context, member models.HostInfo) erro
 // getOrCreateClient gets an existing client or creates a new one for the given member
 func (d *dispatcher) getOrCreateClient(ctx context.Context, member models.HostInfo) (*client, error) {
 	// Try to get existing client with read lock
-	d.mu.RLock()
+	d.clientsMu.RLock()
 	if c, exists := d.clients[member.ID]; exists {
-		d.mu.RUnlock()
+		d.clientsMu.RUnlock()
 		return c, nil
 	}
-	d.mu.RUnlock()
+	d.clientsMu.RUnlock()
 
 	// Need to create new client, acquire write lock
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.clientsMu.Lock()
+	defer d.clientsMu.Unlock()
 
 	// Double-check after acquiring write lock
 	if c, exists := d.clients[member.ID]; exists {
@@ -285,8 +314,8 @@ func (d *dispatcher) createClient(_ context.Context, member models.HostInfo) (*c
 
 // removeClient removes a client from the cache
 func (d *dispatcher) removeClient(coordinatorID string) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.clientsMu.Lock()
+	defer d.clientsMu.Unlock()
 
 	if c, exists := d.clients[coordinatorID]; exists {
 		_ = c.conn.Close()
@@ -296,8 +325,8 @@ func (d *dispatcher) removeClient(coordinatorID string) {
 
 // Cleanup cleans up all connections
 func (d *dispatcher) Cleanup(ctx context.Context) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.clientsMu.Lock()
+	defer d.clientsMu.Unlock()
 
 	for id, c := range d.clients {
 		if err := c.conn.Close(); err != nil {
@@ -310,6 +339,34 @@ func (d *dispatcher) Cleanup(ctx context.Context) error {
 	// Clear the map
 	d.clients = make(map[string]*client)
 	return nil
+}
+
+// recordFailure updates the state for a failed coordinator connection/operation
+func (d *dispatcher) recordFailure(err error) {
+	d.stateMu.Lock()
+	defer d.stateMu.Unlock()
+
+	d.state.IsConnected = false
+	d.state.ConsecutiveFails++
+	d.state.FailCount++
+	d.state.LastError = err
+}
+
+// recordSuccess updates the state for a successful coordinator operation
+func (d *dispatcher) recordSuccess(ctx context.Context) {
+	d.stateMu.Lock()
+	defer d.stateMu.Unlock()
+
+	// Log recovery if this was a disconnection
+	if !d.state.IsConnected && d.state.ConsecutiveFails > 0 {
+		logger.Info(ctx, "Dispatcher connection recovered",
+			"previous_consecutive_failures", d.state.ConsecutiveFails)
+	}
+
+	// Reset consecutive failures on success
+	d.state.IsConnected = true
+	d.state.ConsecutiveFails = 0
+	d.state.LastError = nil
 }
 
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration
