@@ -163,6 +163,8 @@ smtp:
 errorMail:
   from: "error@example.com"
   to: "admin@example.com"
+  cc: "cc@example.com"
+  bcc: "bcc@example.com"
   prefix: "[ERROR]"
   attachLogs: true
 
@@ -170,6 +172,8 @@ errorMail:
 infoMail:
   from: "info@example.com"
   to: "user@example.com"
+  cc: "cc@example.com"
+  bcc: "bcc@ecample.com"
   prefix: "[INFO]"
   attachLogs: true
 `)
@@ -183,11 +187,15 @@ infoMail:
 
 		assert.Equal(t, "error@example.com", th.ErrorMail.From)
 		assert.Equal(t, []string{"admin@example.com"}, th.ErrorMail.To)
+		assert.Equal(t, []string{"cc@example.com"}, th.ErrorMail.Cc)
+		assert.Equal(t, []string{"bcc@example.com"}, th.ErrorMail.Bcc)
 		assert.Equal(t, "[ERROR]", th.ErrorMail.Prefix)
 		assert.True(t, th.ErrorMail.AttachLogs)
 
 		assert.Equal(t, "info@example.com", th.InfoMail.From)
 		assert.Equal(t, []string{"user@example.com"}, th.InfoMail.To)
+		assert.Equal(t, []string{"cc@example.com"}, th.InfoMail.Cc)
+		assert.Equal(t, []string{"bcc@example.com"}, th.InfoMail.Bcc)
 		assert.Equal(t, "[INFO]", th.InfoMail.Prefix)
 		assert.True(t, th.InfoMail.AttachLogs)
 	})
@@ -227,6 +235,14 @@ errorMail:
     - "admin1@example.com"
     - "admin2@example.com"
     - "admin3@example.com"
+  cc:
+	- "cc1@example.com"
+	- "cc2@example.com"
+	- "cc3@example.com"
+  bcc:
+	- "bcc1@example.com"
+	- "bcc2@example.com"
+	- "bcc3@example.com"
   prefix: "[ERROR]"
   attachLogs: true
 
@@ -235,6 +251,10 @@ infoMail:
   from: "info@example.com"
   to:
     - "user@example.com"
+  cc:
+	- "cc@example.com"
+  bcc:
+	- "bcc@example.com"
   prefix: "[INFO]"
   attachLogs: false
 `)
@@ -245,12 +265,16 @@ infoMail:
 		// Check error mail with multiple recipients
 		assert.Equal(t, "error@example.com", th.ErrorMail.From)
 		assert.Equal(t, []string{"admin1@example.com", "admin2@example.com", "admin3@example.com"}, th.ErrorMail.To)
+		assert.Equal(t, []string{"cc1@example.com", "cc2@example.com", "cc3@example.com"}, th.ErrorMail.Cc)
+		assert.Equal(t, []string{"bcc1@example.com", "bcc2@example.com", "bcc3@example.com"}, th.ErrorMail.Bcc)
 		assert.Equal(t, "[ERROR]", th.ErrorMail.Prefix)
 		assert.True(t, th.ErrorMail.AttachLogs)
 
 		// Check info mail with single recipient as array
 		assert.Equal(t, "info@example.com", th.InfoMail.From)
 		assert.Equal(t, []string{"user@example.com"}, th.InfoMail.To)
+		assert.Equal(t, []string{"cc@example.com"}, th.InfoMail.Cc)
+		assert.Equal(t, []string{"bcc@example.com"}, th.InfoMail.Bcc)
 		assert.Equal(t, "[INFO]", th.InfoMail.Prefix)
 		assert.False(t, th.InfoMail.AttachLogs)
 	})

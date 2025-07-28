@@ -171,4 +171,84 @@ func TestMail(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("MultipleCcRecipients", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			ccField   any
+			expected  any
+			expectErr bool
+		}{
+			{
+				name:     "SingleCcRecipientString",
+				ccField:  "single@example.com",
+				expected: []string{"single@example.com"},
+			},
+			{
+				name:     "MultipleCcRecipientsArray",
+				ccField:  []string{"user1@example.com", "user2@example.com", "user3@example.com"},
+				expected: []string{"user1@example.com", "user2@example.com", "user3@example.com"},
+			},
+			{
+				name:     "MultipleCcRecipientsAnyArray",
+				ccField:  []any{"user1@example.com", "user2@example.com"},
+				expected: []string{"user1@example.com", "user2@example.com"},
+			},
+			{
+				name:      "EmptyString",
+				ccField:   "",
+				expected:  nil,
+				expectErr: false, // Should be no error because empty cc field should not throw any error
+			},
+			{
+				name:      "EmptyArray",
+				ccField:   []string{},
+				expected:  nil,
+				expectErr: false, // Should be no error because empty cc field should not throw any error
+			},
+			{
+				name:     "ArrayWithEmptyStrings",
+				ccField:  []any{"user1@example.com", "", "user2@example.com"},
+				expected: []string{"user1@example.com", "user2@example.com"},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				step := digraph.Step{
+					ExecutorConfig: digraph.ExecutorConfig{
+						Config: map[string]any{
+							"from":    "test@example.com",
+							"to":      "testTo@example.com",
+							"cc":      tt.ccField,
+							"subject": "Test Subject",
+							"message": "Test Message",
+						},
+					},
+				}
+
+				ctx := context.Background()
+				ctx = digraph.SetupEnvForTest(ctx, &digraph.DAG{
+					SMTP: &digraph.SMTPConfig{},
+				}, nil, digraph.DAGRunRef{}, "", "", nil)
+
+				exec, err := newMail(ctx, step)
+				assert.NoError(t, err)
+				assert.NotNil(t, exec)
+
+				mailExec, ok := exec.(*mail)
+				assert.True(t, ok)
+
+				// Test Run method to validate the to field handling
+				if tt.expectErr {
+					err := mailExec.Run(ctx)
+					assert.Error(t, err)
+				} else {
+					// We can't actually run the mail sending without mocking,
+					// but we can verify the config is set correctly
+					assert.Equal(t, tt.ccField, mailExec.cfg.Cc)
+				}
+			})
+		}
+	})
 }
