@@ -79,7 +79,7 @@ var (
 )
 
 // New creates a new coordinator client with the given configuration
-func New(monitor models.ServiceMonitor, config *Config) digraph.Dispatcher {
+func New(monitor models.ServiceMonitor, config *Config) Client {
 	return &dispatcher{
 		config:    config,
 		discovery: monitor,
@@ -92,10 +92,6 @@ func New(monitor models.ServiceMonitor, config *Config) digraph.Dispatcher {
 
 // Dispatch sends a task to the coordinator
 func (d *dispatcher) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
-	if err := d.config.Validate(); err != nil {
-		return fmt.Errorf("invalid configuration: %w", err)
-	}
-
 	// Get coordinator resolver from discovery
 	resolver := d.discovery.Resolver(ctx, models.ServiceNameCoordinator)
 
@@ -145,10 +141,6 @@ func (d *dispatcher) Dispatch(ctx context.Context, task *coordinatorv1.Task) err
 
 // Poll implements Client.
 func (d *dispatcher) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
-	if err := d.config.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
-	}
-
 	// Get coordinator resolver from discovery
 	resolver := d.discovery.Resolver(ctx, models.ServiceNameCoordinator)
 

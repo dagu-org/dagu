@@ -24,8 +24,6 @@ By default, the worker ID is set to hostname@PID, but can be overridden.
 Flags:
   --worker.id string                       Worker instance ID (default: hostname@PID)
   --worker.max-active-runs int             Maximum number of active runs (default: 100)
-  --worker.coordinator-host string         Coordinator gRPC server host (default: 127.0.0.1)
-  --worker.coordinator-port int            Coordinator gRPC server port (default: 50055)
   --worker.labels -l string                Worker labels for capability matching (format: key1=value1,key2=value2)
 
 TLS Configuration (uses global peer settings):
@@ -38,7 +36,6 @@ TLS Configuration (uses global peer settings):
 Example:
   dagu worker
   dagu worker --worker.max-active-runs=50
-  dagu worker --worker.coordinator-host=coordinator.example.com --worker.coordinator-port=50055
   dagu worker --worker.id=worker-1 --worker.max-active-runs=200
   
   # Worker with labels for capability matching:
@@ -46,7 +43,6 @@ Example:
   dagu worker --worker.labels cpu-arch=amd64,instance-type=m5.xlarge
   
   # For TLS connections (when coordinator has TLS enabled):
-  dagu worker --peer.insecure=false --worker.coordinator-host=coordinator.example.com
   dagu worker --peer.insecure=false --peer.cert-file=client.crt --peer.key-file=client.key
   dagu worker --peer.insecure=false --peer.client-ca-file=ca.crt
   dagu worker --peer.insecure=false --peer.skip-tls-verify  # For self-signed certificates
@@ -60,8 +56,6 @@ This process runs continuously in the foreground until terminated.
 var workerFlags = []commandLineFlag{
 	workerIDFlag,
 	workerMaxActiveRunsFlag,
-	workerCoordinatorHostFlag,
-	workerCoordinatorPortFlag,
 	workerLabelsFlag,
 	// Peer configuration flags for TLS
 	peerInsecureFlag,
@@ -75,30 +69,19 @@ func runWorker(ctx *Context, _ []string) error {
 	// Use config values directly - viper binding handles flag overrides
 	workerID := ctx.Config.Worker.ID
 	maxActiveRuns := ctx.Config.Worker.MaxActiveRuns
-	coordinatorHost := ctx.Config.Worker.CoordinatorHost
-	coordinatorPort := ctx.Config.Worker.CoordinatorPort
-
-	// Build TLS configuration from global peer config
-	tlsConfig := &worker.TLSConfig{
-		Insecure:      ctx.Config.Global.Peer.Insecure,
-		SkipTLSVerify: ctx.Config.Global.Peer.SkipTLSVerify,
-		CertFile:      ctx.Config.Global.Peer.CertFile,
-		KeyFile:       ctx.Config.Global.Peer.KeyFile,
-		CAFile:        ctx.Config.Global.Peer.ClientCaFile,
-	}
 
 	// Create and start the worker
 	labels := ctx.Config.Worker.Labels
 	if labels == nil {
 		labels = make(map[string]string)
 	}
-	w := worker.NewWorker(workerID, maxActiveRuns, coordinatorHost, coordinatorPort, tlsConfig, ctx.DAGRunMgr, labels)
+
+	coordinatorCli := ctx.NewCoordinatorClient()
+	w := worker.NewWorker(workerID, maxActiveRuns, coordinatorCli, ctx.DAGRunMgr, labels)
 
 	logger.Info(ctx, "Starting worker",
 		"worker_id", workerID,
 		"max_active_runs", maxActiveRuns,
-		"coordinator_host", coordinatorHost,
-		"coordinator_port", coordinatorPort,
 		"labels", labels)
 
 	// Start the worker in a goroutine to allow for graceful shutdown

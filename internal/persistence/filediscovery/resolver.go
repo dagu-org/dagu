@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/logger"
@@ -17,6 +18,7 @@ type resolver struct {
 	serviceName  models.ServiceName
 	staleTimeout time.Duration
 	dirLock      dirlock.DirLock
+	mu           sync.Mutex
 }
 
 // newResolver creates a new resolver for a specific service
@@ -46,6 +48,9 @@ func (r *resolver) Members(ctx context.Context) ([]models.HostInfo, error) {
 		return []models.HostInfo{}, nil
 	}
 
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	// Acquire lock for reading and cleaning
 	if r.dirLock != nil {
 		if err := r.dirLock.TryLock(); err != nil {
@@ -54,6 +59,9 @@ func (r *resolver) Members(ctx context.Context) ([]models.HostInfo, error) {
 		} else {
 			// Ensure we unlock when done
 			defer func() {
+				if !r.dirLock.IsHeldByMe() {
+					return
+				}
 				if err := r.dirLock.Unlock(); err != nil {
 					logger.Error(ctx, "Failed to unlock service directory", "service", r.serviceName, "err", err)
 				}

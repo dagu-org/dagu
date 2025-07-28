@@ -169,22 +169,6 @@ var (
 		bindViper:    true,
 	}
 
-	// workerCoordinatorHostFlag is the coordinator host for worker connection.
-	workerCoordinatorHostFlag = commandLineFlag{
-		name:         "worker.coordinator-host",
-		defaultValue: "127.0.0.1",
-		usage:        "Coordinator gRPC server host (default: 127.0.0.1)",
-		bindViper:    true,
-	}
-
-	// workerCoordinatorPortFlag is the coordinator port for worker connection.
-	workerCoordinatorPortFlag = commandLineFlag{
-		name:         "worker.coordinator-port",
-		defaultValue: "50055",
-		usage:        "Coordinator gRPC server port (default: 50055)",
-		bindViper:    true,
-	}
-
 	// workerLabelsFlag is the labels for worker capabilities.
 	workerLabelsFlag = commandLineFlag{
 		name:      "worker.labels",

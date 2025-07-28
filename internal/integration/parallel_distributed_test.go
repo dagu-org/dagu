@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -46,14 +45,8 @@ steps:
 		// Setup and start coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Set environment variables for the worker configuration
-		t.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1")
-		t.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port()))
-
-		// Create worker TLS config
-		tlsConfig := &worker.TLSConfig{
-			Insecure: true,
-		}
+		// Get dispatcher client from coordinator
+		dispatcherClient := coord.GetDispatcherClient(t)
 
 		// Create and start multiple workers to handle parallel execution
 		workers := make([]*worker.Worker, 2)
@@ -61,9 +54,7 @@ steps:
 			workerInst := worker.NewWorker(
 				fmt.Sprintf("test-worker-%d", i+1),
 				10, // maxActiveRuns
-				"127.0.0.1",
-				coord.Port(),
-				tlsConfig,
+				dispatcherClient,
 				coord.DAGRunMgr,
 				map[string]string{"type": "test-worker"},
 			)
@@ -163,23 +154,15 @@ steps:
 		// Setup and start coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Set environment variables for the worker configuration
-		t.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1")
-		t.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port()))
-
-		// Create workers with same type
-		tlsConfig := &worker.TLSConfig{
-			Insecure: true,
-		}
+		// Get dispatcher client from coordinator
+		dispatcherClient := coord.GetDispatcherClient(t)
 
 		// Create multiple workers of the same type
 		for i := 0; i < 3; i++ {
 			workerInst := worker.NewWorker(
 				fmt.Sprintf("test-worker-%d", i+1),
 				10,
-				"127.0.0.1",
-				coord.Port(),
-				tlsConfig,
+				dispatcherClient,
 				coord.DAGRunMgr,
 				map[string]string{"type": "test-worker"},
 			)
@@ -255,10 +238,6 @@ steps:
 		// Setup coordinator without matching workers
 		coord := test.SetupCoordinator(t)
 
-		// Set environment variables for the worker configuration
-		t.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1")
-		t.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port()))
-
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
@@ -300,10 +279,6 @@ steps:
 		tmpDir := t.TempDir()
 		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
 
-		// Set environment variables for the worker configuration
-		require.NoError(t, os.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1"))
-		require.NoError(t, os.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port())))
-
 		// Create DAG run manager for workers
 		logDir := filepath.Join(tmpDir, "logs")
 		dataDir := filepath.Join(tmpDir, "data")
@@ -320,10 +295,8 @@ steps:
 		procStore := fileproc.New(procDir)
 		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable, coord.Config.Global.WorkDir)
 
-		// Create worker TLS config
-		tlsConfig := &worker.TLSConfig{
-			Insecure: true,
-		}
+		// Get dispatcher client from coordinator
+		dispatcherClient := coord.GetDispatcherClient(t)
 
 		// Create and start multiple workers to handle parallel execution
 		workers := make([]*worker.Worker, 2)
@@ -331,9 +304,7 @@ steps:
 			workerInst := worker.NewWorker(
 				fmt.Sprintf("test-worker-%d", i+1),
 				10, // maxActiveRuns
-				"127.0.0.1",
-				coord.Port(),
-				tlsConfig,
+				dispatcherClient,
 				dagRunMgr,
 				map[string]string{"type": "test-worker"},
 			)
@@ -448,10 +419,6 @@ steps:
 		tmpDir := t.TempDir()
 		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
 
-		// Set environment variables for the worker configuration
-		require.NoError(t, os.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1"))
-		require.NoError(t, os.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port())))
-
 		// Create DAG run manager for worker
 		logDir := filepath.Join(tmpDir, "logs")
 		dataDir := filepath.Join(tmpDir, "data")
@@ -469,16 +436,13 @@ steps:
 		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable, coord.Config.Global.WorkDir)
 
 		// Create worker for distributed execution
-		tlsConfig := &worker.TLSConfig{
-			Insecure: true,
-		}
+		// Get dispatcher client from coordinator
+		dispatcherClient := coord.GetDispatcherClient(t)
 
 		workerInst := worker.NewWorker(
 			"test-worker-1",
 			10,
-			"127.0.0.1",
-			coord.Port(),
-			tlsConfig,
+			dispatcherClient,
 			dagRunMgr,
 			map[string]string{"type": "test-worker"},
 		)
@@ -576,10 +540,6 @@ steps:
 		tmpDir := t.TempDir()
 		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
 
-		// Set environment variables for the worker configuration
-		require.NoError(t, os.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1"))
-		require.NoError(t, os.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port())))
-
 		// Create DAG run manager
 		logDir := filepath.Join(tmpDir, "logs")
 		dataDir := filepath.Join(tmpDir, "data")
@@ -596,10 +556,8 @@ steps:
 		procStore := fileproc.New(procDir)
 		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable, coord.Config.Global.WorkDir)
 
-		// Create multiple workers to handle concurrent execution
-		tlsConfig := &worker.TLSConfig{
-			Insecure: true,
-		}
+		// Get dispatcher client from coordinator
+		dispatcherClient := coord.GetDispatcherClient(t)
 
 		numWorkers := 3
 		workers := make([]*worker.Worker, numWorkers)
@@ -607,9 +565,7 @@ steps:
 			workerInst := worker.NewWorker(
 				fmt.Sprintf("test-worker-%d", i+1),
 				5, // maxActiveRuns per worker
-				"127.0.0.1",
-				coord.Port(),
-				tlsConfig,
+				dispatcherClient,
 				dagRunMgr,
 				map[string]string{"type": "test-worker"},
 			)

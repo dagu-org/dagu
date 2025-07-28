@@ -170,6 +170,22 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.DAGRunMgr, coordinatorClientFactory), nil
 }
 
+// NewCoordinatorClient creates a new coordinator client using the global peer configuration.
+func (c *Context) NewCoordinatorClient() dispatcher.Client {
+	dispatcherCfg := dispatcher.DefaultConfig()
+	dispatcherCfg.CAFile = c.Config.Global.Peer.ClientCaFile
+	dispatcherCfg.CertFile = c.Config.Global.Peer.CertFile
+	dispatcherCfg.KeyFile = c.Config.Global.Peer.KeyFile
+	dispatcherCfg.SkipTLSVerify = c.Config.Global.Peer.SkipTLSVerify
+	dispatcherCfg.Insecure = c.Config.Global.Peer.Insecure
+
+	if err := dispatcherCfg.Validate(); err != nil {
+		logger.Error(c.Context, "Invalid dispatcher configuration", "err", err)
+		return nil
+	}
+	return dispatcher.New(c.ServiceMonitor, dispatcherCfg)
+}
+
 // NewScheduler creates a new NewScheduler instance using the default client.
 // It builds a DAG job manager to handle scheduled executions.
 func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
@@ -181,10 +197,10 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
 
-	dispatcher := dispatcher.New(c.ServiceMonitor, dispatcher.DefaultConfig())
-	de := scheduler.NewDAGExecutor(dispatcher, c.DAGRunMgr)
+	coordinatorCli := c.NewCoordinatorClient()
+	de := scheduler.NewDAGExecutor(coordinatorCli, c.DAGRunMgr)
 	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable, c.Config.Global.WorkDir)
-	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceMonitor, dispatcher)
+	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceMonitor, coordinatorCli)
 }
 
 // NewCoordinatorClientFactory creates a configured coordinator client factory.

@@ -688,16 +688,12 @@ func (a *Agent) createDispatcher(ctx context.Context) digraph.Dispatcher {
 	dispatcherCfg := dispatcher.DefaultConfig()
 	dispatcherCfg.MaxRetries = 10
 
-	// Configure TLS if provided
-	if cfg.Global.Peer.CertFile != "" {
-		dispatcherCfg.CAFile = cfg.Global.Peer.ClientCaFile
-		dispatcherCfg.CertFile = cfg.Global.Peer.CertFile
-		dispatcherCfg.KeyFile = cfg.Global.Peer.KeyFile
-		dispatcherCfg.SkipTLSVerify = cfg.Global.Peer.SkipTLSVerify
-	} else if cfg.Global.Peer.Insecure {
-		// Use insecure connection (h2c)
-		dispatcherCfg.Insecure = true
-	}
+	// Configure the dispatcher based on the global configuration
+	dispatcherCfg.CAFile = cfg.Global.Peer.ClientCaFile
+	dispatcherCfg.CertFile = cfg.Global.Peer.CertFile
+	dispatcherCfg.KeyFile = cfg.Global.Peer.KeyFile
+	dispatcherCfg.SkipTLSVerify = cfg.Global.Peer.SkipTLSVerify
+	dispatcherCfg.Insecure = cfg.Global.Peer.Insecure
 
 	return dispatcher.New(a.monitor, dispatcherCfg)
 }

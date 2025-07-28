@@ -10,9 +10,12 @@ package worker_test
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/backoff"
+	"github.com/dagu-org/dagu/internal/coordinator/dispatcher"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/dagu-org/dagu/internal/worker"
@@ -62,11 +65,15 @@ func (m *MockTaskExecutor) GetExecutedTasks() []string {
 	return result
 }
 
-// createTestWorker creates a worker with a mock dagrun.Manager for testing
-func createTestWorker(workerID string, maxActiveRuns int, host string, port int, tlsConfig *worker.TLSConfig) *worker.Worker {
+// createTestWorker creates a worker with a mock dagrun.Manager and dispatcher for testing
+func createTestWorker(t *testing.T, workerID string, maxActiveRuns int, coord *test.Coordinator) *worker.Worker {
 	mockMgr := dagrun.New(nil, nil, "dagu", ".")
 	labels := make(map[string]string)
-	return worker.NewWorker(workerID, maxActiveRuns, host, port, tlsConfig, mockMgr, labels)
+
+	// Create dispatcher client for the coordinator
+	dispatcherClient := coord.GetDispatcherClient(t)
+
+	return worker.NewWorker(workerID, maxActiveRuns, dispatcherClient, mockMgr, labels)
 }
 
 func TestWorkerConnection(t *testing.T) {
@@ -75,9 +82,7 @@ func TestWorkerConnection(t *testing.T) {
 		coord := test.SetupCoordinator(t)
 
 		// Create worker with instant mock executor
-		w := createTestWorker("test-worker-1", 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
-			Insecure: true,
-		})
+		w := createTestWorker(t, "test-worker-1", 1, coord)
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker in a goroutine
@@ -110,9 +115,7 @@ func TestWorkerConnection(t *testing.T) {
 
 		// Create worker with custom ID and instant mock executor
 		customID := "custom-worker-id"
-		w := createTestWorker(customID, 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
-			Insecure: true,
-		})
+		w := createTestWorker(t, customID, 1, coord)
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
@@ -147,9 +150,7 @@ func TestWorkerPolling(t *testing.T) {
 		}
 
 		// Create worker
-		w := createTestWorker("test-worker", 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
-			Insecure: true,
-		})
+		w := createTestWorker(t, "test-worker", 1, coord)
 		w.SetTaskExecutor(mockExecutor)
 
 		// Start worker
@@ -205,11 +206,10 @@ func TestWorkerPolling(t *testing.T) {
 		workers := make([]*worker.Worker, 3)
 		for i := 0; i < 3; i++ {
 			workers[i] = createTestWorker(
+				t,
 				"",
 				2, // 2 concurrent runs each
-				"127.0.0.1",
-				coord.Port(),
-				&worker.TLSConfig{Insecure: true},
+				coord,
 			)
 			workers[i].SetTaskExecutor(mockExecutor)
 		}
@@ -269,12 +269,9 @@ func TestWorkerReconnection(t *testing.T) {
 	t.Run("ReconnectAfterCoordinatorRestart", func(t *testing.T) {
 		// Setup coordinator
 		coord := test.SetupCoordinator(t)
-		port := coord.Port()
 
 		// Create worker with instant mock executor
-		w := createTestWorker("test-worker", 1, "127.0.0.1", port, &worker.TLSConfig{
-			Insecure: true,
-		})
+		w := createTestWorker(t, "test-worker", 1, coord)
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
@@ -314,9 +311,7 @@ func TestWorkerWithTLS(t *testing.T) {
 		coord := test.SetupCoordinator(t)
 
 		// Create worker with insecure connection and instant mock executor
-		w := createTestWorker("test-worker", 1, "127.0.0.1", coord.Port(), &worker.TLSConfig{
-			Insecure: true,
-		})
+		w := createTestWorker(t, "test-worker", 1, coord)
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
@@ -344,7 +339,7 @@ func TestWorkerWithTLS(t *testing.T) {
 		coord := test.SetupCoordinator(t)
 
 		// Create worker with nil TLS config (should default to insecure) and instant mock executor
-		w := createTestWorker("test-worker", 1, "127.0.0.1", coord.Port(), nil)
+		w := createTestWorker(t, "test-worker", 1, coord)
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
@@ -374,9 +369,7 @@ func TestWorkerShutdown(t *testing.T) {
 		coord := test.SetupCoordinator(t)
 
 		// Create worker with instant mock executor
-		w := createTestWorker("test-worker", 2, "127.0.0.1", coord.Port(), &worker.TLSConfig{
-			Insecure: true,
-		})
+		w := createTestWorker(t, "test-worker", 2, coord)
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Start worker
@@ -403,10 +396,12 @@ func TestWorkerShutdown(t *testing.T) {
 	})
 
 	t.Run("StopWithoutStart", func(t *testing.T) {
-		// Create worker with instant mock executor
-		w := createTestWorker("test-worker", 1, "127.0.0.1", 50055, &worker.TLSConfig{
-			Insecure: true,
-		})
+		// Create worker with instant mock executor (no coordinator needed)
+		mockMgr := dagrun.New(nil, nil, "dagu", ".")
+		labels := make(map[string]string)
+		// Create a mock dispatcher that doesn't connect
+		mockDispatcher := &mockDispatcher{}
+		w := worker.NewWorker("test-worker", 1, mockDispatcher, mockMgr, labels)
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
 		// Stop should work without error even if not started
@@ -436,9 +431,7 @@ func TestWorkerConcurrency(t *testing.T) {
 		}
 
 		// Create worker with specific max concurrent runs
-		w := createTestWorker("test-worker", maxConcurrent, "127.0.0.1", coord.Port(), &worker.TLSConfig{
-			Insecure: true,
-		})
+		w := createTestWorker(t, "test-worker", maxConcurrent, coord)
 		w.SetTaskExecutor(mockExecutor)
 
 		// Start worker
@@ -485,36 +478,93 @@ func TestWorkerConcurrency(t *testing.T) {
 	})
 }
 
+// mockDispatcher is a mock implementation of dispatcher.Client for testing
+type mockDispatcher struct {
+	pollError    error
+	PollFunc     func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
+	DispatchFunc func(ctx context.Context, task *coordinatorv1.Task) error
+
+	// State tracking
+	consecutiveFails int
+}
+
+func (m *mockDispatcher) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
+	if m.DispatchFunc != nil {
+		return m.DispatchFunc(ctx, task)
+	}
+	return m.pollError
+}
+
+func (m *mockDispatcher) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+	if m.PollFunc != nil {
+		return m.PollFunc(ctx, policy, req)
+	}
+	if m.pollError != nil {
+		m.consecutiveFails++
+		return nil, m.pollError
+	}
+	m.consecutiveFails = 0
+	return nil, nil
+}
+
+func (m *mockDispatcher) Metrics() dispatcher.Metrics {
+	return dispatcher.Metrics{
+		IsConnected:      m.pollError == nil && m.consecutiveFails == 0,
+		ConsecutiveFails: m.consecutiveFails,
+		LastError:        m.pollError,
+	}
+}
+
+func (m *mockDispatcher) Cleanup(_ context.Context) error {
+	return nil
+}
+
 func TestWorkerErrorHandling(t *testing.T) {
-	t.Run("InvalidCoordinatorAddress", func(t *testing.T) {
-		// Create worker with invalid coordinator address and instant mock executor
-		w := createTestWorker("test-worker", 1, "invalid-host", 99999, &worker.TLSConfig{
-			Insecure: true,
-		})
+	t.Run("DispatcherFailure", func(t *testing.T) {
+		// Create worker with a mock dispatcher that always fails
+		mockMgr := dagrun.New(nil, nil, "dagu", ".")
+		labels := make(map[string]string)
+
+		var pollCalled atomic.Bool
+		mockDispatcher := &mockDispatcher{
+			pollError: status.Error(codes.Unavailable, "connection failed"),
+		}
+		// Override the Poll method to track calls
+		mockDispatcher.PollFunc = func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+			pollCalled.Store(true)
+			mockDispatcher.consecutiveFails++
+			return nil, mockDispatcher.pollError
+		}
+
+		w := worker.NewWorker("test-worker", 1, mockDispatcher, mockMgr, labels)
 		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
 
-		// Start should fail with connection error
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		// Start worker with a short timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 
-		err := w.Start(ctx)
-		// The worker will keep retrying, so we'll get a context deadline exceeded
-		require.Error(t, err)
-	})
+		// Run worker in background
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = w.Start(ctx) // Will run until context is cancelled
+		}()
 
-	t.Run("ContextCancellationDuringHealthCheck", func(t *testing.T) {
-		// Create worker pointing to non-existent coordinator with instant mock executor
-		w := createTestWorker("test-worker", 1, "127.0.0.1", 65535, &worker.TLSConfig{
-			Insecure: true,
-		})
-		w.SetTaskExecutor(&MockTaskExecutor{ExecutionTime: 0})
+		// Wait a bit to ensure polling started
+		time.Sleep(100 * time.Millisecond)
 
-		// Start with very short timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-		defer cancel()
+		// Verify that polling was attempted
+		require.True(t, pollCalled.Load(), "Poll should have been called")
 
-		err := w.Start(ctx)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "context")
+		// Cancel and wait
+		cancel()
+		wg.Wait()
+
+		// Verify dispatcher is in failed state
+		metrics := mockDispatcher.Metrics()
+		require.False(t, metrics.IsConnected)
+		require.Greater(t, metrics.ConsecutiveFails, 0)
+		require.NotNil(t, metrics.LastError)
 	})
 }

@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"strconv"
 	"testing"
 	"time"
 
@@ -34,22 +33,14 @@ steps:
 		// Setup and start coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Set environment variables for the worker configuration
-		t.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1")
-		t.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port()))
-
-		// Create worker TLS config
-		tlsConfig := &worker.TLSConfig{
-			Insecure: true,
-		}
+		// Get dispatcher client from coordinator
+		dispatcherClient := coord.GetDispatcherClient(t)
 
 		// Create and start worker with selector labels
 		workerInst := worker.NewWorker(
 			"test-worker-1",
 			10, // maxActiveRuns
-			"127.0.0.1",
-			coord.Port(),
-			tlsConfig,
+			dispatcherClient,
 			coord.DAGRunMgr,
 			map[string]string{"type": "test-worker"},
 		)
@@ -125,10 +116,6 @@ steps:
 `
 		// Setup coordinator without any matching workers
 		coord := test.SetupCoordinator(t)
-
-		// Set environment variables for the worker configuration
-		t.Setenv("DAGU_WORKER_COORDINATOR_HOST", "127.0.0.1")
-		t.Setenv("DAGU_WORKER_COORDINATOR_PORT", strconv.Itoa(coord.Port()))
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
