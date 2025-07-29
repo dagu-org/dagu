@@ -31,6 +31,10 @@ Install and run your first workflow in under 2 minutes.
 
 ::: code-group
 
+```bash [npm]
+npm install -g dagu
+```
+
 ```bash [macOS/Linux]
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
 ```

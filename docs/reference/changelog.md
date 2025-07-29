@@ -16,6 +16,7 @@
 - **Scheduler Health Check**: Added health check endpoint for scheduler monitoring (#1129) - Thanks to [@jonasban](https://github.com/jonasban) for the feature request
 - **Default DAG Sorting Configuration**: Added configuration for default DAG list sorting (#1135)
 - **GitHub Repository Link**: Added GitHub repository link to sidebar
+- **npm Installation Support**: Added global npm package for easy cross-platform installation via `npm install -g dagu`
 
 ### Improvements
 - **Output Capture**: Fixed maximum size setting for output capture

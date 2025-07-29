@@ -4,7 +4,15 @@ Install Dagu on your system.
 
 ## Quick Install
 
-### Script Install (Recommended)
+### npm
+
+```bash
+npm install -g dagu
+```
+
+This installs Dagu globally with automatic platform detection.
+
+### Script Install
 
 ```bash
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
@@ -26,6 +34,12 @@ docker run -d \
 Visit http://localhost:8080
 
 ## Package Managers
+
+### npm
+
+```bash
+npm install -g dagu
+```
 
 ### Homebrew
 

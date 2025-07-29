@@ -110,7 +110,10 @@ Dagu is designed to orchestrate workflows across various domains, particularly t
 ## Quick Start
 
 ```bash
-# Install
+# Install via npm
+npm install -g dagu
+
+# Or via script
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
 
 # Create dagu configuration directory
@@ -140,10 +143,19 @@ dagu start-all
 
 ## Installation
 
-### macOS / Linux
+### npm
 
 ```bash
-# Latest
+# Install globally
+npm install -g dagu
+```
+
+The npm package includes pre-built binaries for all major platforms.
+
+### Installer Script
+
+```bash
+# Latest via installer script
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
 
 # Specific version
@@ -151,11 +163,15 @@ curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.s
 
 # Install to a specific directory
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --prefix /path/to/install
+```
 
-# Homebrew
+### Homebrew
+
+```
+# Install
 brew install dagu-org/brew/dagu
 
-# Homebrew (upgrade)
+# Upgrade
 brew upgrade dagu-org/brew/dagu
 ```
 
@@ -282,13 +298,6 @@ steps:
   - name: gpu-training
     command: python train_model.py ${REGION}
 ```
-
-## Roadmap
-
-- [x] Run steps in a DAG across multiple machines (distributed execution) - **Available in v1.18.0**
-- [ ] Track artifacts by dropping files in `$DAGU_ARTIFACTS`
-- [ ] Pause executions for webhooks, approvals, or any event (human-in-the-loop, event-driven workflows)
-- [ ] Integrate with AI agents via MCP (Model Context Protocol)
 
 ## Building from Source
 
