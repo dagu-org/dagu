@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/robfig/cron/v3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -274,15 +275,20 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	sc2, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceMonitor, th.CoordinatorCli)
 	require.NoError(t, err)
 
-	// Try to start second scheduler - should fail due to lock conflict
-	err = sc2.Start(ctx)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "scheduler lock is already held by another process")
+	// Try to start second scheduler - should wait for lock
+	go func() {
+		err := sc2.Start(ctx)
+		assert.NoError(t, err)
+	}()
+
+	time.Sleep(time.Millisecond * 500)
+	// Check if second scheduler is still not running
+	require.False(t, sc2.IsRunning(), "Second scheduler should not be running while first one is active")
 
 	// Stop first scheduler
 	sc1.Stop(ctx)
 
-	// Wait for first scheduler to finish
+	// Wait for the second scheduler start
 	select {
 	case err := <-errCh1:
 		require.NoError(t, err)
@@ -290,23 +296,11 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 		t.Fatal("First scheduler did not stop in time")
 	}
 
-	// Now second scheduler should be able to start
-	errCh2 := make(chan error, 1)
-	go func() {
-		errCh2 <- sc2.Start(ctx)
-	}()
+	require.False(t, sc1.IsRunning(), "First scheduler should not be running after stop")
 
 	// Give second scheduler time to start
 	time.Sleep(time.Millisecond * 100)
 
-	// Stop second scheduler
-	sc2.Stop(ctx)
-
-	// Wait for second scheduler to finish
-	select {
-	case err := <-errCh2:
-		require.NoError(t, err)
-	case <-time.After(5 * time.Second):
-		t.Fatal("Second scheduler did not stop in time")
-	}
+	// Check if second scheduler is running
+	require.True(t, sc2.IsRunning(), "Second scheduler should be running after first one stopped")
 }

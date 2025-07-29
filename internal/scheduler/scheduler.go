@@ -51,6 +51,8 @@ type Scheduler struct {
 	dagExecutor         *DAGExecutor
 	healthServer        *HealthServer // Health check server for monitoring
 	disableHealthServer bool          // Disable health server when running from start-all
+	heartbeatCancel     context.CancelFunc
+	heartbeatDone       chan struct{}
 }
 
 type queueConfig struct {
@@ -72,7 +74,7 @@ func New(
 		timeLoc = time.Local
 	}
 
-	dirLock := dirlock.New(filepath.Join(cfg.Paths.DataDir, "scheduler"),
+	dirLock := dirlock.New(filepath.Join(cfg.Paths.DataDir, "scheduler", "locks"),
 		&dirlock.LockOptions{
 			StaleThreshold: cfg.Scheduler.LockStaleThreshold,
 			RetryInterval:  cfg.Scheduler.LockRetryInterval,
@@ -157,7 +159,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 		go func() {
 			defer wgQueue.Done()
-			go s.handleQueue(ctx, queueCh, done)
+			s.handleQueue(ctx, queueCh, done)
 		}()
 
 		qr = s.queueStore.Reader(ctx)
@@ -171,12 +173,14 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
 	)
 
-	// Start heartbeat for the scheduler lock
-	var wgHeartbeat sync.WaitGroup
-	wgHeartbeat.Add(1)
+	// Start heartbeat for the scheduler lock with its own context
+	heartbeatCtx, heartbeatCancel := context.WithCancel(ctx)
+	s.heartbeatCancel = heartbeatCancel
+	s.heartbeatDone = make(chan struct{})
+
 	go func() {
-		defer wgHeartbeat.Done()
-		s.startHeartbeat(ctx)
+		defer close(s.heartbeatDone)
+		s.startHeartbeat(heartbeatCtx)
 	}()
 
 	// Go routine to handle OS signals and context cancellation
@@ -212,7 +216,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	s.start(ctx)
 
 	wgQueue.Wait()
-	wgHeartbeat.Wait()
 
 	return nil
 }
@@ -452,6 +455,11 @@ func (*Scheduler) NextTick(now time.Time) time.Time {
 	return now.Add(time.Minute).Truncate(time.Second * 60)
 }
 
+// IsRunning returns whether the scheduler is currently running.
+func (s *Scheduler) IsRunning() bool {
+	return s.running.Load()
+}
+
 // Stop stops the scheduler.
 func (s *Scheduler) Stop(ctx context.Context) {
 	if !s.running.CompareAndSwap(true, false) {
@@ -468,6 +476,11 @@ func (s *Scheduler) Stop(ctx context.Context) {
 	}
 	s.lock.Unlock()
 
+	if s.heartbeatCancel != nil {
+		logger.Info(ctx, "Stopping scheduler heartbeat")
+		s.heartbeatCancel()
+	}
+
 	// Stop health check server if it was started
 	if s.healthServer != nil && !s.disableHealthServer {
 		if err := s.healthServer.Stop(ctx); err != nil {
@@ -480,7 +493,6 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		s.dagExecutor.Close(ctx)
 	}
 
-	// Release directory lock
 	if err := s.dirLock.Unlock(); err != nil {
 		logger.Error(ctx, "Failed to release scheduler lock in Stop", "err", err)
 	} else {
