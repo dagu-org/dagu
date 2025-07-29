@@ -1,135 +1,109 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-const { getBinaryPath, getPlatformPackage, setPlatformBinary, getPlatformInfo } = require('./lib/platform');
-const { downloadBinary, downloadBinaryFromNpm } = require('./lib/download');
-const { validateBinary } = require('./lib/validate');
+const fs = require("fs");
+const path = require("path");
+const zlib = require("zlib");
+const https = require("https");
 
-async function install() {
-  console.log('Installing Dagu...');
-  
-  try {
-    // Check if running in CI or with --ignore-scripts
-    if (process.env.npm_config_ignore_scripts === 'true') {
-      console.log('Skipping postinstall script (--ignore-scripts flag detected)');
-      return;
-    }
-    
-    // Try to resolve platform-specific package
-    const platformPackage = getPlatformPackage();
-    if (!platformPackage) {
-      console.error(`
-Error: Unsupported platform: ${process.platform}-${process.arch}
+const { getPlatformPackage } = require("./lib/platform");
 
-Dagu does not provide pre-built binaries for this platform.
-Please build from source: https://github.com/dagu-org/dagu#building-from-source
-      `);
-      process.exit(1);
-    }
-    
-    console.log(`Detected platform: ${process.platform}-${process.arch}`);
-    console.log(`Looking for package: ${platformPackage}`);
-    
-    // Check for cross-platform scenario
-    const { checkCrossPlatformScenario } = require('./lib/platform');
-    const crossPlatformWarning = checkCrossPlatformScenario();
-    if (crossPlatformWarning) {
-      console.warn(`\n${crossPlatformWarning.message}\n`);
-    }
-    
-    // Check if binary already exists from optionalDependency
-    const existingBinary = getBinaryPath();
-    if (existingBinary && fs.existsSync(existingBinary)) {
-      console.log('Using pre-installed binary from optional dependency');
-      
-      // Validate the binary
-      if (await validateBinary(existingBinary)) {
-        console.log('✓ Dagu installation complete!');
-        return;
-      } else {
-        console.warn('Binary validation failed, attempting to download...');
-      }
-    }
-  } catch (e) {
-    console.log('Optional dependency not found, downloading binary...');
-  }
-  
-  // Fallback: Download binary
-  try {
-    const binaryPath = path.join(__dirname, 'bin', process.platform === 'win32' ? 'dagu.exe' : 'dagu');
-    
-    // Create bin directory if it doesn't exist
-    const binDir = path.dirname(binaryPath);
-    if (!fs.existsSync(binDir)) {
-      fs.mkdirSync(binDir, { recursive: true });
-    }
-    
-    // Skip download in development if flag file exists
-    if (fs.existsSync(path.join(__dirname, '.skip-install'))) {
-      console.log('Development mode: skipping binary download (.skip-install file found)');
-      return;
-    }
-    
-    // Download the binary
-    await downloadBinary(binaryPath, { method: 'auto' });
-    
-    // Validate the downloaded binary
-    if (await validateBinary(binaryPath)) {
-      setPlatformBinary(binaryPath);
-      console.log('✓ Dagu installation complete!');
-      
-      // Print warning about optionalDependencies if none were found
-      if (!hasAnyOptionalDependency()) {
-        console.warn(`
-⚠ WARNING: optionalDependencies may be disabled in your environment.
-For better performance and reliability, consider enabling them.
-See: https://docs.npmjs.com/cli/v8/using-npm/config#optional
-`);
-      }
-    } else {
-      throw new Error('Downloaded binary validation failed');
-    }
-  } catch (error) {
-    console.error('Failed to install Dagu:', error.message);
-    console.error(`
-Platform details:
-${JSON.stringify(getPlatformInfo(), null, 2)}
+// Windows binaries end with .exe so we need to special case them.
+const binaryName = process.platform === "win32" ? "dagu.exe" : "dagu";
 
-Please try one of the following:
-1. Install manually from: https://github.com/dagu-org/dagu/releases
-2. Build from source: https://github.com/dagu-org/dagu#building-from-source
-3. Report this issue: https://github.com/dagu-org/dagu/issues
-    `);
-    process.exit(1);
+// Adjust the version you want to install. You can also make this dynamic.
+const PACKAGE_VERSION = require("./package.json").version;
+
+// Compute the path we want to emit the fallback binary to
+const fallbackBinaryPath = path.join(__dirname, binaryName);
+
+function makeRequest(url) {
+  return new Promise((resolve, reject) => {
+    https
+      .get(url, (response) => {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          const chunks = [];
+          response.on("data", (chunk) => chunks.push(chunk));
+          response.on("end", () => {
+            resolve(Buffer.concat(chunks));
+          });
+        } else if (
+          response.statusCode >= 300 &&
+          response.statusCode < 400 &&
+          response.headers.location
+        ) {
+          // Follow redirects
+          makeRequest(response.headers.location).then(resolve, reject);
+        } else {
+          reject(
+            new Error(
+              `npm responded with status code ${response.statusCode} when downloading the package!`
+            )
+          );
+        }
+      })
+      .on("error", (error) => {
+        reject(error);
+      });
+  });
+}
+
+function extractFileFromTarball(tarballBuffer, filepath) {
+  // Tar archives are organized in 512 byte blocks.
+  // Blocks can either be header blocks or data blocks.
+  // Header blocks contain file names of the archive in the first 100 bytes, terminated by a null byte.
+  // The size of a file is contained in bytes 124-135 of a header block and in octal format.
+  // The following blocks will be data blocks containing the file.
+  let offset = 0;
+  while (offset < tarballBuffer.length) {
+    const header = tarballBuffer.subarray(offset, offset + 512);
+    offset += 512;
+
+    const fileName = header.toString("utf-8", 0, 100).replace(/\0.*/g, "");
+    const fileSize = parseInt(
+      header.toString("utf-8", 124, 136).replace(/\0.*/g, ""),
+      8
+    );
+
+    if (fileName === filepath) {
+      return tarballBuffer.subarray(offset, offset + fileSize);
+    }
+
+    // Clamp offset to the uppoer multiple of 512
+    offset = (offset + fileSize + 511) & ~511;
   }
 }
 
-// Check if any optional dependency is installed
-function hasAnyOptionalDependency() {
-  const pkg = require('./package.json');
-  const optionalDeps = Object.keys(pkg.optionalDependencies || {});
-  
-  for (const dep of optionalDeps) {
-    try {
-      require.resolve(dep);
-      return true;
-    } catch (e) {
-      // Continue checking
-    }
-  }
-  
-  return false;
+async function downloadBinaryFromNpm() {
+  console.log({
+    getPlatformPackage,
+  });
+  // Determine package name for this platform
+  const platformSpecificPackageName = getPlatformPackage();
+
+  const url = `https://registry.npmjs.org/@dagu-org/${platformSpecificPackageName}/-/${platformSpecificPackageName}-${PACKAGE_VERSION}.tgz`;
+  console.log(`Downloading binary distribution package from ${url}...`);
+  // Download the tarball of the right binary distribution package
+  const tarballDownloadBuffer = await makeRequest(url);
+  const tarballBuffer = zlib.unzipSync(tarballDownloadBuffer);
+
+  console.log(fallbackBinaryPath);
+
+  // Extract binary from package and write to disk
+  fs.writeFileSync(
+    fallbackBinaryPath,
+    extractFileFromTarball(tarballBuffer, `package/bin/${binaryName}`),
+    { mode: 0o755 } // Make binary file executable
+  );
 }
 
-// Handle errors gracefully
-process.on('unhandledRejection', (error) => {
-  console.error('Installation error:', error);
-  process.exit(1);
-});
-
-// Run installation
-install().catch((error) => {
-  console.error('Installation failed:', error);
-  process.exit(1);
-});
+// Skip downloading the binary if it was already installed via optionalDependencies
+if (!isPlatformSpecificPackageInstalled()) {
+  console.log(
+    "Platform specific package not found. Will manually download binary."
+  );
+  downloadBinaryFromNpm();
+} else {
+  console.log(
+    "Platform specific package already installed. Will fall back to manually downloading binary."
+  );
+}

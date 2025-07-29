@@ -25,10 +25,10 @@
   "license": "GPL-3.0",
   "author": "Dagu Contributors",
   "bin": {
-    "dagu": "./bin/dagu"
+    "dagu": "bin/cli"
   },
   "scripts": {
-    "postinstall": "node install.js"
+    "postinstall": "node ./install.js"
   },
   "dependencies": {
     "tar": "^7.4.3"
