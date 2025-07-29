@@ -172,10 +172,10 @@ curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.s
 
 ```
 # Install
-brew install dagu-org/brew/dagu
+brew install dagu
 
 # Upgrade
-brew upgrade dagu-org/brew/dagu
+brew upgrade dagu
 ```
 
 ### Docker
