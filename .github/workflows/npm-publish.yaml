@@ -1,18 +1,16 @@
 name: Publish to NPM
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (e.g., 1.16.4)'
+        description: "Version to publish (e.g., 1.16.4)"
         required: true
         type: string
 
 env:
   VERSION: ${{ github.event.release.tag_name || inputs.version }}
-  NODE_VERSION: '20'
+  NODE_VERSION: "20"
 
 jobs:
   # First, publish all platform-specific packages
@@ -88,7 +86,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
       - name: Download release asset
         env:
@@ -101,7 +99,7 @@ jobs:
           else
             RELEASE_TAG="${{ github.event.release.tag_name }}"
           fi
-          
+
           echo "Downloading asset: ${{ matrix.asset }}"
           gh release download "${RELEASE_TAG}" \
             --repo ${{ github.repository }} \
@@ -112,10 +110,10 @@ jobs:
         run: |
           mkdir -p npm/${{ matrix.package }}/bin
           cd npm/${{ matrix.package }}/bin
-          
+
           # All assets are now .tar.gz
           tar -xzf /tmp/${{ matrix.asset }} dagu || tar -xzf /tmp/${{ matrix.asset }} dagu.exe
-          
+
           # Verify binary exists
           if [[ "${{ matrix.platform }}" == "win32" ]]; then
             test -f dagu.exe
@@ -131,7 +129,6 @@ jobs:
           VERSION="${{ env.VERSION }}"
           VERSION="${VERSION#v}"
           npm version "${VERSION}" --no-git-tag-version --allow-same-version
-
 
       - name: Publish to NPM
         run: |
@@ -162,36 +159,36 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
       - name: Update main package version and dependencies
         run: |
           cd npm/dagu
-          
+
           # Strip 'v' prefix if present
           VERSION="${{ env.VERSION }}"
           VERSION="${VERSION#v}"
-          
+
           # Update package version
           npm version "$VERSION" --no-git-tag-version --allow-same-version
-          
+
           # Update all optionalDependencies to match the version
           cat > update-deps.js << 'EOF'
           const fs = require('fs');
           const pkg = require('./package.json');
           const version = process.argv[2];
-          
+
           // Update all optional dependencies to the new version
           Object.keys(pkg.optionalDependencies || {}).forEach(dep => {
             pkg.optionalDependencies[dep] = version;
           });
-          
+
           fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
-          
+
           console.log('Updated package.json:');
           console.log(JSON.stringify(pkg, null, 2));
           EOF
-          
+
           node update-deps.js "${VERSION}"
 
       - name: Wait for npm registry propagation
