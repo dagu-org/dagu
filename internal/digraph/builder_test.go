@@ -3,6 +3,7 @@ package digraph_test
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -13,7 +14,11 @@ import (
 )
 
 func TestBuild(t *testing.T) {
+	t.Parallel()
+
 	t.Run("SkipIfSuccessful", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 skipIfSuccessful: true
 steps:
@@ -26,6 +31,8 @@ steps:
 		assert.True(t, th.SkipIfSuccessful)
 	})
 	t.Run("ParamsWithSubstitution", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 params: "TEST_PARAM $1"
 `)
@@ -35,6 +42,8 @@ params: "TEST_PARAM $1"
 		th.AssertParam(t, "1=TEST_PARAM", "2=TEST_PARAM")
 	})
 	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 params: x="a b c" y="d e f"
 `)
@@ -44,6 +53,8 @@ params: x="a b c" y="d e f"
 		th.AssertParam(t, "x=a b c", "y=d e f")
 	})
 	t.Run("ParamsAsMap", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 params:
   - FOO: foo
@@ -60,6 +71,8 @@ params:
 		)
 	})
 	t.Run("ParamsAsMapOverride", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 params:
   - FOO: foo
@@ -76,6 +89,8 @@ params:
 		)
 	})
 	t.Run("ParamsWithComplexValues", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 params: first P1=foo P2=${A001} P3=` + "`/bin/echo BAR`" + ` X=bar Y=${P1} Z="A B C"
 env:
@@ -95,6 +110,8 @@ env:
 		)
 	})
 	t.Run("mailOn", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 steps:
   - name: "1"
@@ -111,6 +128,8 @@ mailOn:
 		assert.True(t, th.MailOn.Success)
 	})
 	t.Run("ValidTags", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 tags: daily,monthly
 steps:
@@ -124,6 +143,8 @@ steps:
 		assert.True(t, th.HasTag("monthly"))
 	})
 	t.Run("ValidTagsList", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 tags:
   - daily
@@ -139,6 +160,8 @@ steps:
 		assert.True(t, th.HasTag("monthly"))
 	})
 	t.Run("LogDir", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 logDir: /tmp/logs
 steps:
@@ -151,6 +174,8 @@ steps:
 		assert.Equal(t, "/tmp/logs", th.LogDir)
 	})
 	t.Run("MailConfig", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 # SMTP server settings
 smtp:
@@ -192,6 +217,8 @@ infoMail:
 		assert.True(t, th.InfoMail.AttachLogs)
 	})
 	t.Run("SMTPNumericPort", func(t *testing.T) {
+		t.Parallel()
+
 		// Test SMTP configuration with numeric port
 		data := []byte(`
 smtp:
@@ -212,6 +239,8 @@ steps:
 		assert.Equal(t, "password", dag.SMTP.Password)
 	})
 	t.Run("MailConfigMultipleRecipients", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 # SMTP server settings
 smtp:
@@ -255,6 +284,8 @@ infoMail:
 		assert.False(t, th.InfoMail.AttachLogs)
 	})
 	t.Run("MaxHistRetentionDays", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 histRetentionDays: 365
 `)
@@ -276,6 +307,8 @@ steps:
 		assert.Equal(t, time.Duration(10*time.Second), th.MaxCleanUpTime)
 	})
 	t.Run("ChainTypeBasic", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 name: chain-basic-test
 type: chain
@@ -306,6 +339,8 @@ steps:
 		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends)
 	})
 	t.Run("ChainTypeWithExplicitDepends", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 name: chain-explicit-depends-test
 type: chain
@@ -344,6 +379,8 @@ steps:
 		assert.Equal(t, []string{"process-both"}, th.Steps[4].Depends) // cleanup
 	})
 	t.Run("InvalidType", func(t *testing.T) {
+		t.Parallel()
+
 		// Test will fail with an error containing "invalid type"
 		data := []byte(`
 name: invalid-type-test
@@ -400,6 +437,8 @@ steps:
 		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends) // step4 should depend on step3
 	})
 	t.Run("Preconditions", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 preconditions:
   - condition: "test -f file.txt"
@@ -412,6 +451,8 @@ preconditions:
 		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
 	t.Run("maxActiveRuns", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 maxActiveRuns: 5
 `)
@@ -421,6 +462,8 @@ maxActiveRuns: 5
 		assert.Equal(t, 5, th.MaxActiveRuns)
 	})
 	t.Run("MaxActiveSteps", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 maxActiveSteps: 3
 `)
@@ -430,6 +473,8 @@ maxActiveSteps: 3
 		assert.Equal(t, 3, th.MaxActiveSteps)
 	})
 	t.Run("MaxOutputSize", func(t *testing.T) {
+		t.Parallel()
+
 		// Test custom maxOutputSize
 		data := []byte(`
 name: test-max-output-size
@@ -459,6 +504,8 @@ steps:
 		assert.Equal(t, 0, th2.MaxOutputSize) // Default 1MB
 	})
 	t.Run("ValidationError", func(t *testing.T) {
+		t.Parallel()
+
 		type testCase struct {
 			name        string
 			yaml        string
@@ -1403,9 +1450,12 @@ func (th *DAG) AssertParam(t *testing.T, params ...string) {
 }
 
 // testLoad and helper functions have been removed - all tests now use inline YAML
-
 func TestBuild_QueueConfiguration(t *testing.T) {
+	t.Parallel()
+
 	t.Run("MaxActiveRunsDefaultsToOne", func(t *testing.T) {
+		t.Parallel()
+
 		// Test that when maxActiveRuns is not specified, it defaults to 1
 		data := []byte(`
 steps:
@@ -1419,6 +1469,8 @@ steps:
 	})
 
 	t.Run("MaxActiveRunsNegativeValuePreserved", func(t *testing.T) {
+		t.Parallel()
+
 		// Test that negative values are preserved (they mean queueing is disabled)
 		// Create a simple DAG YAML with negative maxActiveRuns
 		data := []byte(`
@@ -1438,6 +1490,8 @@ func TestStepIDValidation(t *testing.T) {
 	t.Parallel()
 
 	t.Run("ValidID", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 name: test-valid-id
 steps:
@@ -1452,6 +1506,8 @@ steps:
 	})
 
 	t.Run("InvalidIDFormat", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 name: test-invalid-id
 steps:
@@ -1465,6 +1521,8 @@ steps:
 	})
 
 	t.Run("DuplicateIDs", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 name: test-duplicate-ids
 steps:
@@ -1481,6 +1539,8 @@ steps:
 	})
 
 	t.Run("IDConflictsWithStepName", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 name: test-id-name-conflict
 steps:
@@ -1496,6 +1556,8 @@ steps:
 	})
 
 	t.Run("NameConflictsWithStepID", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 name: test-name-id-conflict
 steps:
@@ -1528,6 +1590,8 @@ func TestStepIDInDependencies(t *testing.T) {
 	t.Parallel()
 
 	t.Run("DependOnStepByID", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 name: test-depend-by-id
 steps:
@@ -1546,6 +1610,8 @@ steps:
 	})
 
 	t.Run("DependOnStepByNameWhenIDExists", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 name: test-depend-by-name
 steps:
@@ -1563,6 +1629,8 @@ steps:
 	})
 
 	t.Run("MultipleDependenciesWithIDs", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 name: test-multiple-deps
 steps:
@@ -1638,6 +1706,8 @@ steps:
 }
 
 func TestResolveStepDependencies(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		yaml     string
@@ -1751,6 +1821,8 @@ steps:
 }
 
 func TestResolveStepDependencies_Errors(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		yaml        string
@@ -1788,6 +1860,8 @@ steps:
 }
 
 func TestBuildOTel(t *testing.T) {
+	t.Parallel()
+
 	t.Run("BasicOTelConfig", func(t *testing.T) {
 		yaml := `
 name: test
@@ -1847,5 +1921,138 @@ steps:
 		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		assert.Nil(t, dag.OTel)
+	})
+}
+
+func TestStepLevelEnv(t *testing.T) {
+	t.Run("BasicStepEnv", func(t *testing.T) {
+		yaml := `
+name: test
+steps:
+  - name: step1
+    command: echo $STEP_VAR
+    env:
+      - STEP_VAR: step_value
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.Equal(t, []string{"STEP_VAR=step_value"}, dag.Steps[0].Env)
+	})
+
+	t.Run("StepEnvOverridesDAGEnv", func(t *testing.T) {
+		yaml := `
+name: test
+env:
+  - SHARED_VAR: dag_value
+  - DAG_ONLY: dag_only_value
+steps:
+  - name: step1
+    command: echo $SHARED_VAR
+    env:
+      - SHARED_VAR: step_value
+      - STEP_ONLY: step_only_value
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		// Check DAG-level env
+		assert.Contains(t, dag.Env, "SHARED_VAR=dag_value")
+		assert.Contains(t, dag.Env, "DAG_ONLY=dag_only_value")
+		// Check step-level env
+		assert.Contains(t, dag.Steps[0].Env, "SHARED_VAR=step_value")
+		assert.Contains(t, dag.Steps[0].Env, "STEP_ONLY=step_only_value")
+	})
+
+	t.Run("StepEnvAsMap", func(t *testing.T) {
+		yaml := `
+name: test
+steps:
+  - name: step1
+    command: echo test
+    env:
+      FOO: foo_value
+      BAR: bar_value
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.Contains(t, dag.Steps[0].Env, "FOO=foo_value")
+		assert.Contains(t, dag.Steps[0].Env, "BAR=bar_value")
+	})
+
+	t.Run("StepEnvWithSubstitution", func(t *testing.T) {
+		yaml := `
+name: test
+env:
+  - BASE_PATH: /tmp
+steps:
+  - name: step1
+    command: echo $FULL_PATH
+    env:
+      - FULL_PATH: ${BASE_PATH}/data
+      - COMPUTED: "` + "`echo computed_value`" + `"
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.Contains(t, dag.Steps[0].Env, "FULL_PATH=${BASE_PATH}/data")
+		assert.Contains(t, dag.Steps[0].Env, "COMPUTED=`echo computed_value`")
+	})
+
+	t.Run("MultipleStepsWithDifferentEnvs", func(t *testing.T) {
+		yaml := `
+name: test
+steps:
+  - name: step1
+    command: echo $ENV_VAR
+    env:
+      - ENV_VAR: value1
+  - name: step2
+    command: echo $ENV_VAR
+    env:
+      - ENV_VAR: value2
+  - name: step3
+    command: echo $ENV_VAR
+    # No env, should inherit DAG env only
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 3)
+		assert.Equal(t, []string{"ENV_VAR=value1"}, dag.Steps[0].Env)
+		assert.Equal(t, []string{"ENV_VAR=value2"}, dag.Steps[1].Env)
+		assert.Empty(t, dag.Steps[2].Env)
+	})
+
+	t.Run("StepEnvComplexValues", func(t *testing.T) {
+		yaml := `
+name: test
+steps:
+  - name: step1
+    command: echo test
+    env:
+      - PATH: "/custom/bin:${PATH}"
+      - JSON_CONFIG: '{"key": "value", "nested": {"foo": "bar"}}'
+      - MULTI_LINE: |
+          line1
+          line2
+`
+		ctx := context.Background()
+		// Set PATH env var for substitution test
+		origPath := os.Getenv("PATH")
+		defer func() { os.Setenv("PATH", origPath) }()
+		os.Setenv("PATH", "/usr/bin")
+
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.Contains(t, dag.Steps[0].Env, "PATH=/custom/bin:${PATH}")
+		assert.Contains(t, dag.Steps[0].Env, `JSON_CONFIG={"key": "value", "nested": {"foo": "bar"}}`)
+		assert.Contains(t, dag.Steps[0].Env, "MULTI_LINE=line1\nline2\n")
 	})
 }
