@@ -59,14 +59,23 @@ Dagu is designed for small teams of 1-3 people to easily manage complex workflow
 
 ## Recent Updates
 
-### v1.18 (upcoming)
-- **OpenID Connect (OIDC) Support**: OpenID Connect authentication for secure access (implemented by [@Arvintian](https://github.com/Arvintian))
-- **Distributed Execution**: Run steps in a DAG across multiple machines
-- **Failover Scheduler**: Multiple scheduler instances for high availability with automatic failover
-- **Step-level Environment Variables**: Define environment variables specific to individual steps, overriding DAG-level variables
-- **Health check endpoint for scheduler**: HTTP health check endpoint for monitoring scheduler status (default: `http://localhost:8090/health`). Which is enabled automatically when running `dagu scheduler`.
+### v1.19 - upcoming
+- **DAG-level Container Support**: Define container images for entire DAGs, allowing all steps to run in a specified container for reproducibility
 
-### v1.17
+### v1.18 - 2025-07-29
+- **OpenID Connect (OIDC) Support**: OpenID Connect authentication for secure access ([@Arvintian](https://github.com/Arvintian))
+- **Distributed Execution**: Run steps across multiple machines with worker processes
+- **High Availability**: Redundant scheduler instances with automatic failover
+- **Step-level Environment Variables**: Define environment variables specific to individual steps ([@admerzeau](https://github.com/admerzeau))
+- **Scheduler Health Check**: HTTP health check endpoint for monitoring (default: `http://localhost:8090/health`) - automatically enabled with `dagu scheduler` ([@jonasban](https://github.com/jonasban))
+- **Enhanced Repeat Policy**: Explicit `until` and `while` modes for clearer repeat logic ([@thefishhat](https://github.com/thefishhat))
+- **Exponential Backoff**: Added exponential backoff support for retry policies ([@Sarvesh-11](https://github.com/Sarvesh-11))
+- **Live Log Loading**: Real-time log streaming in the Web UI ([@tapir](https://github.com/tapir))
+- **Partial Success Status**: Step-level partial success for sub-DAG executions ([@ghansham](https://github.com/ghansham))
+- **Multiple Email Recipients**: Support for multiple recipients in email notifications
+- **UI Improvements**: Manual sidebar toggle, better DAG sorting, and various enhancements ([@ghansham](https://github.com/ghansham))
+
+### v1.17 - 2025-06-18
 - **OpenTelemetry Support (OTEL)**: Distributed tracing with W3C trace context propagation (requested by [@jeremydelattre59](https://github.com/jeremydelattre59))
 - **Windows Support (Beta)**: Initial PowerShell and cmd.exe compatibility - basic functionality works but may have limitations ([@pdoronila](https://github.com/pdoronila))
 - **Hierarchical DAG**: Nested workflows with parameter passing
