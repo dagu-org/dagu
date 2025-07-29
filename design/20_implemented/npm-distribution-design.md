@@ -288,11 +288,11 @@ jobs:
             asset: dagu_${{ github.event.release.tag_name }}_Windows_x86_64.zip
     
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
       
       - name: Download release asset
@@ -328,11 +328,11 @@ jobs:
     needs: publish-platform-packages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
           
       - name: Update main package version

@@ -110,7 +110,7 @@ steps:
     executor:
       type: docker
       config:
-        image: python:3.11
+        image: python:3.13
         autoRemove: true
         host:
           binds:
@@ -131,7 +131,7 @@ steps:
     executor:
       type: docker
       config:
-        image: node:20
+        image: node:22
         autoRemove: true
         container:
           env:
@@ -182,7 +182,7 @@ steps:
     executor:
       type: docker
       config:
-        image: python:3.11
+        image: python:3.13
         autoRemove: true
         container:
           workingDir: /app

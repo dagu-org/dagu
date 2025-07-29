@@ -38,7 +38,7 @@ steps:
 executor:
   type: docker
   config:
-    image: python:3.11
+    image: python:3.13
     pull: always        # always, missing, never
     platform: linux/amd64
     autoRemove: true
@@ -50,7 +50,7 @@ executor:
 executor:
   type: docker
   config:
-    image: node:20
+    image: node:22
     host:
       binds:
         - /host/data:/container/data:ro # Read-only
@@ -107,7 +107,7 @@ steps:
     executor:
       type: docker
       config:
-        image: python:3.11-slim
+        image: python:3.13-slim
         autoRemove: true
         host:
           binds:
@@ -118,7 +118,7 @@ steps:
     executor:
       type: docker
       config:
-        image: apache/spark:3.4.0
+        image: apache/spark:3.5.6
         autoRemove: true
         host:
           binds:
@@ -146,7 +146,7 @@ steps:
     executor:
       type: docker
       config:
-        image: golang:1.21
+        image: golang:1.24
         autoRemove: true
         host:
           binds:
@@ -161,7 +161,7 @@ steps:
     executor:
       type: docker
       config:
-        image: golang:1.21
+        image: golang:1.24
         autoRemove: true
         host:
           binds:
@@ -191,7 +191,7 @@ steps:
     executor:
       type: docker
       config:
-        image: mysql:8.0
+        image: mysql:9.4
         autoRemove: true
         container:
           env:
@@ -257,7 +257,7 @@ steps:
     executor:
       type: docker
       config:
-        image: rust:1.70
+        image: rust:1.88
         autoRemove: true
         host:
           binds:
@@ -285,7 +285,7 @@ steps:
     executor:
       type: docker
       config:
-        image: golang:1.21
+        image: golang:1.24
         platform: linux/amd64
         autoRemove: true
     command: GOARCH=amd64 go build
@@ -294,7 +294,7 @@ steps:
     executor:
       type: docker
       config:
-        image: golang:1.21
+        image: golang:1.24
         platform: linux/arm64
         autoRemove: true
     command: GOARCH=arm64 go build
@@ -320,7 +320,7 @@ steps:
     executor:
       type: docker
       config:
-        image: python:3.11
+        image: python:3.13
         autoRemove: true
     command: python process.py || echo "No data to process"
 ```
