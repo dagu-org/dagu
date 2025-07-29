@@ -1,5 +1,63 @@
 # Changelog
 
+## v1.18.0 (2025-07-29)
+
+### New Features
+- **Step-level Environment Variables**: Added support for environment variables at the step level (#1148) - Thanks to [@admerzeau](https://github.com/admerzeau) for reporting
+- **Enhanced Repeat Policy**: Added explicit `until` and `while` modes for clearer repeat logic (#1050) - Thanks to [@thefishhat](https://github.com/thefishhat)
+- **Live Log Loading**: Added real-time log streaming in the Web UI with reload button (#1085) - Thanks to [@tapir](https://github.com/tapir) for reporting
+- **Exponential Backoff for RetryPolicy**: Added support for exponential backoff in retry policies (#1096, #1093) - Thanks to [@Sarvesh-11](https://github.com/Sarvesh-11)
+- **OpenID Connect (OIDC) Authentication**: Added OIDC support for Web UI authentication (#1107) - Thanks to [@Arvintian](https://github.com/Arvintian)
+- **Partial Success Status**: Added step-level partial success status for sub-DAG executions (#1115) - Thanks to [@ghansham](https://github.com/ghansham) for the feature request
+- **Distributed Workflow Execution**: Implemented distributed task execution via worker processes (#1116, #1145)
+- **Multiple Email Recipients**: Added support for multiple recipients in email notifications (#1125)
+- **High Availability Support**: Added redundant scheduler support for high availability (#1147)
+- **TLS/mTLS Support**: Added TLS/mTLS support for coordinator service
+- **Scheduler Health Check**: Added health check endpoint for scheduler monitoring (#1129) - Thanks to [@jonasban](https://github.com/jonasban) for the feature request
+- **Default DAG Sorting Configuration**: Added configuration for default DAG list sorting (#1135)
+- **GitHub Repository Link**: Added GitHub repository link to sidebar
+
+### Improvements
+- **Output Capture**: Fixed maximum size setting for output capture
+- **Web UI Sidebar**: Replaced automatic hover with manual toggle control, added persistence (#1121) - Thanks to [@ghansham](https://github.com/ghansham) for feedback
+- **DAG Sorting**: Moved sorting logic from frontend to backend for proper pagination (#1123, #1134) - Thanks to [@ghansham](https://github.com/ghansham) for reporting
+- **Dependency Upgrades**: Updated multiple dependencies (#1127) - Thanks to [@reneleonhardt](https://github.com/reneleonhardt)
+- **Duration Display**: Fixed invalid date display in duration fields (#1137)
+- **Orphaned DAG Handling**: Fixed handling of orphaned running DAGs after unexpected restarts (#1122)
+- **Log File Migration**: Fixed log file path migration from legacy format (#1124)
+- **Pagination**: Fixed hardcoded pagination limit (#1126)
+- **DAG State Preservation**: Preserve previous DAG state when dequeuing (#1118)
+
+### Bug Fixes
+- **Installation Script**: Fixed installer script issues (#1091) - Thanks to [@Sarvesh-11](https://github.com/Sarvesh-11)
+- **DAG List Sorting**: Fixed sort key issue in DAG list (#1134) - Thanks to [@ghansham](https://github.com/ghansham) for reporting
+- **Next Run Display**: Fixed next run display for timezones (#1138)
+
+### Documentation
+- **OIDC Documentation**: Added comprehensive OIDC authentication documentation
+- **Heartbeat Interval**: Documented heartbeat interval behavior
+
+### Contributors
+
+Thanks to our contributors for this release:
+
+| Contribution | Author |
+|--------------|--------|
+| Installation script fixes, exponential backoff for retry policies | [@Sarvesh-11](https://github.com/Sarvesh-11) |
+| Dependency upgrades | [@reneleonhardt](https://github.com/reneleonhardt) |
+| Enhanced repeat policy with while/until modes | [@thefishhat](https://github.com/thefishhat) |
+| OIDC authentication implementation | [@Arvintian](https://github.com/Arvintian) |
+| Step-level environment variables feature request | [@admerzeau](https://github.com/admerzeau) |
+| Live log loading feature request | [@tapir](https://github.com/tapir) |
+| Partial success status request, DAG sorting issue, sidebar improvements | [@ghansham](https://github.com/ghansham) |
+| Scheduler health check feature request | [@jonasban](https://github.com/jonasban) |
+
+### New Contributors
+- [@Sarvesh-11](https://github.com/Sarvesh-11) made their first contribution in [#1091](https://github.com/dagu-org/dagu/pull/1091)
+- [@reneleonhardt](https://github.com/reneleonhardt) made their first contribution in [#1127](https://github.com/dagu-org/dagu/pull/1127)
+
+**Full Changelog**: [v1.17.4...v1.18.0](https://github.com/dagu-org/dagu/compare/v1.17.4...v1.18.0)
+
 ## v1.17.4 (2025-06-30)
 
 ### New Features
