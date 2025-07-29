@@ -12,6 +12,20 @@ dagu scheduler
 
 Or use `dagu start-all` to run both scheduler and web server.
 
+### High Availability
+
+Dagu supports running multiple scheduler instances for high availability with automatic failover:
+
+```bash
+# Start primary scheduler
+dagu scheduler
+
+# Start standby schedulers (on other machines)
+dagu scheduler  # Will wait for lock and take over if primary fails
+```
+
+The scheduler uses directory-based locking to ensure only one instance is active at a time. When the primary scheduler fails, a standby automatically takes over within 30 seconds.
+
 ### Health Check Monitoring
 
 The scheduler provides an optional HTTP health check endpoint for monitoring:

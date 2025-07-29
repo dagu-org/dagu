@@ -39,6 +39,9 @@ Dagu follows a simple philosophy: **do one thing well with minimal dependencies*
 ### 2. Scheduler
 - Monitors and triggers DAGs based on cron expressions
 - Consumes queued DAG runs and executes them
+- Supports high availability through directory-based locking
+- Automatic failover when primary scheduler fails
+- See [Scheduling](/features/scheduling) for details
 
 ### 3. Agent
 - Manages complete lifecycle of a single DAG run
@@ -110,8 +113,11 @@ Dagu follows the XDG Base Directory specification for file organization:
 │               ├── step1.stdout.log
 │               ├── step1.stderr.log
 │               └── status.yaml
-└── suspend/           # Workflow suspend flags
-    └── my-workflow.suspend
+├── suspend/           # Workflow suspend flags
+│   └── my-workflow.suspend
+└── scheduler/         # Scheduler coordination
+    └── locks/         # Directory-based locks for HA
+        └── .dagu_lock.<hostname@pid>.<timestamp>/
 ```
 
 ### Storage Components Explained
