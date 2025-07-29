@@ -356,6 +356,91 @@ func TestConcurrency(t *testing.T) {
 	})
 }
 
+func TestHeartbeat(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	t.Run("heartbeat updates lock timestamp", func(t *testing.T) {
+		lock, err := New(tmpDir, nil)
+		require.NoError(t, err)
+
+		// Acquire lock
+		err = lock.TryLock()
+		require.NoError(t, err)
+
+		// Get the dirLock to access internal state
+		dl := lock.(*dirLock)
+		initialLockPath := dl.lockPath
+
+		// Wait a bit to ensure timestamp difference
+		time.Sleep(10 * time.Millisecond)
+
+		// Heartbeat
+		err = lock.Heartbeat(context.Background())
+		require.NoError(t, err)
+
+		// Verify lock path was updated (new lock file created)
+		require.NotEqual(t, initialLockPath, dl.lockPath)
+
+		// Verify lock is still held
+		require.True(t, lock.IsHeldByMe())
+
+		// Cleanup
+		err = lock.Unlock()
+		require.NoError(t, err)
+	})
+
+	t.Run("heartbeat without lock fails", func(t *testing.T) {
+		lock, err := New(tmpDir, nil)
+		require.NoError(t, err)
+
+		err = lock.Heartbeat(context.Background())
+		require.ErrorIs(t, err, ErrNotLocked)
+	})
+
+	t.Run("concurrent heartbeat and check", func(t *testing.T) {
+		// Use a different temp dir to avoid conflicts
+		isolatedDir := t.TempDir()
+		lock, err := New(isolatedDir, nil)
+		require.NoError(t, err)
+
+		err = lock.TryLock()
+		require.NoError(t, err)
+
+		// Run heartbeat and checks concurrently
+		done := make(chan bool)
+		errCh := make(chan error, 1)
+		go func() {
+			for i := 0; i < 5; i++ {
+				err := lock.Heartbeat(context.Background())
+				if err != nil {
+					errCh <- err
+					return
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+			done <- true
+		}()
+
+		// Check lock status while heartbeat is running
+		for i := 0; i < 5; i++ {
+			require.True(t, lock.IsLocked())
+			require.True(t, lock.IsHeldByMe())
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		select {
+		case err := <-errCh:
+			t.Fatalf("Heartbeat failed: %v", err)
+		case <-done:
+			// Success
+		}
+
+		// Cleanup
+		err = lock.Unlock()
+		require.NoError(t, err)
+	})
+}
+
 func TestEdgeCases(t *testing.T) {
 	t.Run("non-existent directory", func(t *testing.T) {
 		nonExistentDir := filepath.Join(t.TempDir(), "non-existent")

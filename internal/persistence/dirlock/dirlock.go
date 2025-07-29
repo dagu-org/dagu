@@ -12,6 +12,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
 // Error types for lock operations
@@ -52,6 +55,10 @@ type DirLock interface {
 	// Info returns information about current lock holder
 	// Returns nil if not locked
 	Info() (*LockInfo, error)
+
+	// Heartbeat updates the lock timestamp to prevent staleness
+	// Must be called periodically while holding the lock
+	Heartbeat(ctx context.Context) error
 }
 
 // LockOptions configures lock behavior
@@ -71,6 +78,7 @@ type LockInfo struct {
 
 // dirLock implements the DirLock interface
 type dirLock struct {
+	id        string
 	targetDir string
 	lockPath  string
 	opts      *LockOptions
@@ -96,9 +104,47 @@ func New(directory string, opts *LockOptions) (DirLock, error) {
 	}
 
 	return &dirLock{
+		id:        generateID(),
 		targetDir: directory,
 		opts:      opts,
 	}, nil
+}
+
+// Heartbeat updates the lock's last heartbeat time to prevent it from being
+// considered stale. This is an atomic operation that should be called
+// periodically while the lock is held to keep it alive. This removes the old
+// lock path and creates a new one with the current timestamp.
+func (l *dirLock) Heartbeat(ctx context.Context) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if !l.isHeld {
+		return ErrNotLocked
+	}
+
+	if l.lockPath == "" {
+		return errors.New("lock path is empty")
+	}
+
+	// Create new lock path with current timestamp
+	lockName := fmt.Sprintf(".dagu_lock.%s.%d", l.id, time.Now().UnixNano())
+	newLockPath := filepath.Join(l.targetDir, lockName)
+
+	// Create new lock directory first
+	err := os.Mkdir(newLockPath, 0700)
+	if err != nil {
+		return fmt.Errorf("failed to create new lock directory: %w", err)
+	}
+
+	// Update the lock path to the new one
+	l.lockPath = newLockPath
+
+	// Clean stale locks
+	if err := l.cleanStale(); err != nil {
+		logger.Errorf(ctx, "Failed to clean stale locks: %v", err)
+	}
+
+	return nil
 }
 
 // TryLock attempts to acquire lock without blocking
@@ -135,7 +181,7 @@ func (l *dirLock) TryLock() error {
 	}
 
 	// Create lock directory with timestamp only
-	lockName := fmt.Sprintf(".dagu_lock.%d", time.Now().UnixNano())
+	lockName := fmt.Sprintf(".dagu_lock.%s.%d", l.id, time.Now().UnixNano())
 	l.lockPath = filepath.Join(l.targetDir, lockName)
 
 	err = os.Mkdir(l.lockPath, 0700)
@@ -182,19 +228,36 @@ func (l *dirLock) Unlock() error {
 	defer l.mu.Unlock()
 
 	if !l.isHeld {
-		return ErrNotLocked
+		return nil
 	}
 
-	if l.lockPath == "" {
-		return errors.New("lock path is empty")
+	// Remove all lock directories belonging to this instance
+	entries, err := os.ReadDir(l.targetDir)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read directory: %w", err)
 	}
 
-	// Remove lock directory
-	if err := os.RemoveAll(l.lockPath); err != nil {
-		// Check if directory was already removed
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove lock directory: %w", err)
+	var removeErrors []error
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), ".dagu_lock.") {
+			// Check if this lock belongs to us
+			id, err := getID(entry.Name())
+			if err != nil {
+				continue // Invalid lock file, skip
+			}
+			if id == l.id {
+				// This is our lock, remove it
+				lockPath := filepath.Join(l.targetDir, entry.Name())
+				if err := os.RemoveAll(lockPath); err != nil && !os.IsNotExist(err) {
+					removeErrors = append(removeErrors, fmt.Errorf("failed to remove lock %s: %w", lockPath, err))
+				}
+			}
 		}
+	}
+
+	// If we had any errors removing locks, return the first one
+	if len(removeErrors) > 0 {
+		return removeErrors[0]
 	}
 
 	l.isHeld = false
@@ -228,7 +291,50 @@ func (l *dirLock) IsLocked() bool {
 func (l *dirLock) IsHeldByMe() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return l.isHeld
+	if !l.isHeld {
+		return false
+	}
+
+	// check if the file exists
+	_, err := os.Stat(l.lockPath)
+	if os.IsNotExist(err) {
+		// If the lock path does not exist, it means it was removed
+		l.isHeld = false
+		return false
+	}
+
+	// check if newer lock exists
+	entries, err := os.ReadDir(l.targetDir)
+	if err != nil {
+		return false
+	}
+
+	ourTimestamp, err := getTimestamp(filepath.Base(l.lockPath))
+	if err != nil {
+		return false // Invalid lock path, assume not held
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), ".dagu_lock.") {
+			id, err := getID(entry.Name())
+			if err != nil {
+				continue // Invalid lock file, skip
+			}
+			if id == l.id {
+				continue // This is our lock
+			}
+			timestamp, err := getTimestamp(entry.Name())
+			if err != nil {
+				continue // Invalid timestamp, skip
+			}
+			if timestamp > ourTimestamp {
+				// Found a newer lock, we don't hold the lock
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 // Info returns information about current lock holder
@@ -242,13 +348,8 @@ func (l *dirLock) Info() (*LockInfo, error) {
 		if entry.IsDir() && strings.HasPrefix(entry.Name(), ".dagu_lock.") {
 			if !l.isStale(entry.Name()) {
 				// Extract timestamp from lock directory name
-				// Format: .dagu_lock.<timestamp>
-				parts := strings.Split(entry.Name(), ".")
-				if len(parts) != 3 {
-					continue
-				}
-
-				timestamp, err := strconv.ParseInt(parts[2], 10, 64)
+				// Format: .dagu_lock.<id>.<timestamp>
+				timestamp, err := getTimestamp(entry.Name())
 				if err != nil {
 					continue
 				}
@@ -309,14 +410,7 @@ func (l *dirLock) cleanStale() error {
 
 // isStale checks if a lock directory is stale based on age
 func (l *dirLock) isStale(lockDirName string) bool {
-	// Parse timestamp from directory name
-	// Format: .dagu_lock.<timestamp>
-	parts := strings.Split(lockDirName, ".")
-	if len(parts) != 3 {
-		return true // Invalid format, consider stale
-	}
-
-	timestamp, err := strconv.ParseInt(parts[2], 10, 64)
+	timestamp, err := getTimestamp(lockDirName)
 	if err != nil {
 		return true // Invalid timestamp
 	}
@@ -324,4 +418,43 @@ func (l *dirLock) isStale(lockDirName string) bool {
 	// Check age
 	age := time.Now().UnixNano() - timestamp
 	return age > int64(l.opts.StaleThreshold.Nanoseconds())
+}
+
+// getTimestamp extracts the timestamp from a lock directory name
+func getTimestamp(lockDirName string) (int64, error) {
+	// Format: .dagu_lock.<id>.<timestamp>
+	parts := strings.Split(lockDirName, ".")
+	if len(parts) != 4 {
+		return 0, ErrInvalidLockFile
+	}
+
+	timestamp, err := strconv.ParseInt(parts[3], 10, 64)
+	if err != nil {
+		return 0, ErrInvalidLockFile
+	}
+
+	return timestamp, nil
+}
+
+// getID extracts the identifier from the lock directory name
+func getID(lockDirName string) (string, error) {
+	// Format: .dagu_lock.<id>.<timestamp>
+	parts := strings.Split(lockDirName, ".")
+	if len(parts) != 4 {
+		return "", ErrInvalidLockFile
+	}
+
+	return parts[2], nil
+}
+
+func generateID() string {
+	// Generate an identifier for this lock instance
+	host, err := os.Hostname()
+	if err != nil {
+		host = "unknown"
+	}
+	pid := os.Getpid()
+	id := fileutil.SafeName(fmt.Sprintf("%s@%d", host, pid))
+	// replace '.' with '_' to avoid issues in directory names
+	return strings.ReplaceAll(id, ".", "_")
 }
