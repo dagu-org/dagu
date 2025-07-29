@@ -64,14 +64,6 @@ type Global struct {
 	// ConfigPath is the path to the configuration file used to load settings.
 	ConfigPath string
 
-	// SchedulerLockStaleThreshold is the time after which a scheduler lock is considered stale.
-	// Default is 30 seconds.
-	SchedulerLockStaleThreshold time.Duration
-
-	// SchedulerLockRetryInterval is the interval between lock acquisition attempts.
-	// Default is 50 milliseconds.
-	SchedulerLockRetryInterval time.Duration
-
 	// Peer contains configuration for peer connections over gRPC.
 	Peer Peer
 }
@@ -294,7 +286,16 @@ type Worker struct {
 
 // Scheduler represents the scheduler configuration
 type Scheduler struct {
+	// Port is the port on which the scheduler's health check server listens.
 	Port int // Health check server port (default: 8090)
+
+	// SchedulerLockStaleThreshold is the time after which a scheduler lock is considered stale.
+	// Default is 30 seconds.
+	LockStaleThreshold time.Duration
+
+	// SchedulerLockRetryInterval is the interval between lock acquisition attempts.
+	// Default is 5 seconds.
+	LockRetryInterval time.Duration
 }
 
 // Peer holds the certificate and TLS configuration for peer connections over gRPC.

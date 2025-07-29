@@ -54,8 +54,8 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 	helper := Setup(t, schedulerOpts...)
 
 	// Update config for scheduler-specific settings
-	helper.Config.Global.SchedulerLockStaleThreshold = 30 * time.Second
-	helper.Config.Global.SchedulerLockRetryInterval = 50 * time.Millisecond
+	helper.Config.Scheduler.LockStaleThreshold = 30 * time.Second
+	helper.Config.Scheduler.LockRetryInterval = 50 * time.Millisecond
 
 	// Create additional stores needed for scheduler
 	ds := filedag.New(helper.Config.Paths.DAGsDir, filedag.WithFlagsBaseDir(helper.Config.Paths.SuspendFlagsDir))

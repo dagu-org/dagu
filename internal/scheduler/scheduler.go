@@ -51,6 +51,8 @@ type Scheduler struct {
 	dagExecutor         *DAGExecutor
 	healthServer        *HealthServer // Health check server for monitoring
 	disableHealthServer bool          // Disable health server when running from start-all
+	heartbeatCancel     context.CancelFunc
+	heartbeatDone       chan struct{}
 }
 
 type queueConfig struct {
@@ -72,11 +74,11 @@ func New(
 		timeLoc = time.Local
 	}
 
-	// Initialize directory lock for scheduler
-	dirLock, err := createSchedulerLock(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize scheduler lock at %s: %w", schedulerLockDir(cfg), err)
-	}
+	dirLock := dirlock.New(filepath.Join(cfg.Paths.DataDir, "scheduler", "locks"),
+		&dirlock.LockOptions{
+			StaleThreshold: cfg.Scheduler.LockStaleThreshold,
+			RetryInterval:  cfg.Scheduler.LockRetryInterval,
+		})
 
 	// Create DAG executor
 	dagExecutor := NewDAGExecutor(coordinatorCli, drm)
@@ -106,23 +108,17 @@ func (s *Scheduler) DisableHealthServer() {
 }
 
 func (s *Scheduler) Start(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	s.cancel = cancel
+	defer cancel()
+
 	// Acquire directory lock first to prevent multiple scheduler instances
-	if err := s.dirLock.TryLock(); err != nil {
-		if errors.Is(err, dirlock.ErrLockConflict) {
-			lockInfo, infoErr := s.dirLock.Info()
-			if infoErr == nil && lockInfo != nil {
-				return fmt.Errorf("scheduler lock is already held by another process (acquired at %s): %w",
-					lockInfo.AcquiredAt.Format(time.RFC3339), err)
-			}
-			return fmt.Errorf("scheduler lock is already held by another process: %w", err)
-		}
+	logger.Info(ctx, "Waiting to acquire scheduler lock")
+	if err := s.dirLock.Lock(ctx); err != nil {
 		return fmt.Errorf("failed to acquire scheduler lock: %w", err)
 	}
 
-	logger.Info(ctx, "Acquired scheduler lock",
-		"lockDir", schedulerLockDir(s.config),
-		"staleThreshold", s.config.Global.SchedulerLockStaleThreshold.String(),
-		"retryInterval", s.config.Global.SchedulerLockRetryInterval.String())
+	logger.Info(ctx, "Acquired scheduler lock")
 
 	// Start health check server only if not disabled
 	if !s.disableHealthServer {
@@ -133,20 +129,14 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	// Ensure lock is always released
 	defer func() {
-		if s.dirLock.IsHeldByMe() {
-			if err := s.dirLock.Unlock(); err != nil {
-				logger.Error(ctx, "Failed to release scheduler lock in defer", "err", err)
-			} else {
-				logger.Info(ctx, "Released scheduler lock in defer")
-			}
+		if err := s.dirLock.Unlock(); err != nil {
+			logger.Error(ctx, "Failed to release scheduler lock in defer", "err", err)
+		} else {
+			logger.Info(ctx, "Released scheduler lock in defer")
 		}
 	}()
 
 	sig := make(chan os.Signal, 1)
-
-	ctx, cancel := context.WithCancel(ctx)
-	s.cancel = cancel
-	defer cancel()
 
 	// Set scheduler as running
 	setSchedulerRunning(true)
@@ -162,14 +152,14 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	// Start queue reader only if queues are enabled
 	var qr models.QueueReader
-	var wg sync.WaitGroup
+	var wgQueue sync.WaitGroup
 	if s.config.Queues.Enabled {
 		queueCh := make(chan models.QueuedItem, 1)
-		wg.Add(1)
+		wgQueue.Add(1)
 
 		go func() {
-			defer wg.Done()
-			go s.handleQueue(ctx, queueCh, done)
+			defer wgQueue.Done()
+			s.handleQueue(ctx, queueCh, done)
 		}()
 
 		qr = s.queueStore.Reader(ctx)
@@ -183,10 +173,20 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
 	)
 
-	// Go routine to handle OS signals and context cancellation
-	wg.Add(1)
+	// Start heartbeat for the scheduler lock with its own context
+	heartbeatCtx, heartbeatCancel := context.WithCancel(ctx)
+	s.heartbeatCancel = heartbeatCancel
+	s.heartbeatDone = make(chan struct{})
+
 	go func() {
-		defer wg.Done()
+		defer close(s.heartbeatDone)
+		s.startHeartbeat(heartbeatCtx)
+	}()
+
+	// Go routine to handle OS signals and context cancellation
+	wgQueue.Add(1)
+	go func() {
+		defer wgQueue.Done()
 		select {
 		case <-done:
 			if qr != nil {
@@ -215,8 +215,28 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	// Start the scheduler loop (it blocks)
 	s.start(ctx)
 
-	wg.Wait()
+	wgQueue.Wait()
+
 	return nil
+}
+
+func (s *Scheduler) startHeartbeat(ctx context.Context) {
+	ticker := time.NewTicker(time.Second * 7)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if err := s.dirLock.Heartbeat(ctx); err != nil {
+				logger.Error(ctx, "Failed to send heartbeat for scheduler lock", "err", err)
+			}
+
+		case <-ctx.Done():
+			ticker.Stop()
+			logger.Info(ctx, "Stopping scheduler heartbeat due to context cancellation")
+			return
+		}
+	}
 }
 
 // handleQueue processes queued DAG runs from the persistence layer.
@@ -435,6 +455,11 @@ func (*Scheduler) NextTick(now time.Time) time.Time {
 	return now.Add(time.Minute).Truncate(time.Second * 60)
 }
 
+// IsRunning returns whether the scheduler is currently running.
+func (s *Scheduler) IsRunning() bool {
+	return s.running.Load()
+}
+
 // Stop stops the scheduler.
 func (s *Scheduler) Stop(ctx context.Context) {
 	if !s.running.CompareAndSwap(true, false) {
@@ -451,6 +476,11 @@ func (s *Scheduler) Stop(ctx context.Context) {
 	}
 	s.lock.Unlock()
 
+	if s.heartbeatCancel != nil {
+		logger.Info(ctx, "Stopping scheduler heartbeat")
+		s.heartbeatCancel()
+	}
+
 	// Stop health check server if it was started
 	if s.healthServer != nil && !s.disableHealthServer {
 		if err := s.healthServer.Stop(ctx); err != nil {
@@ -463,13 +493,10 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		s.dagExecutor.Close(ctx)
 	}
 
-	// Release directory lock
-	if s.dirLock.IsHeldByMe() {
-		if err := s.dirLock.Unlock(); err != nil {
-			logger.Error(ctx, "Failed to release scheduler lock in Stop", "err", err)
-		} else {
-			logger.Info(ctx, "Released scheduler lock in Stop")
-		}
+	if err := s.dirLock.Unlock(); err != nil {
+		logger.Error(ctx, "Failed to release scheduler lock in Stop", "err", err)
+	} else {
+		logger.Info(ctx, "Released scheduler lock in Stop")
 	}
 
 	logger.Info(ctx, "Scheduler stopped")
@@ -477,6 +504,12 @@ func (s *Scheduler) Stop(ctx context.Context) {
 
 // run executes the scheduled jobs at the current time.
 func (s *Scheduler) run(ctx context.Context, now time.Time) {
+	// Ensure the lock is held while running jobs
+	if !s.dirLock.IsHeldByMe() {
+		logger.Error(ctx, "Scheduler lock is not held, cannot run jobs")
+		return
+	}
+
 	// Get jobs scheduled to run at or before the current time
 	// Subtract a small buffer to avoid edge cases with exact timing
 	jobs, err := s.er.Next(ctx, now.Add(-time.Second).In(s.location))
@@ -572,49 +605,4 @@ func Now() time.Time {
 	}
 
 	return fixedTime
-}
-
-// ForceUnlock forcibly removes the scheduler lock (administrative operation).
-// This function can be used to clean up abandoned locks when a scheduler process
-// has terminated unexpectedly.
-func ForceUnlock(cfg *config.Config) error {
-	if err := dirlock.ForceUnlock(schedulerLockDir(cfg)); err != nil {
-		return fmt.Errorf("failed to force unlock scheduler lock: %w", err)
-	}
-
-	return nil
-}
-
-// IsLocked checks if the scheduler lock is currently held by any process.
-func IsLocked(cfg *config.Config) bool {
-	lock, err := createSchedulerLock(cfg)
-	if err != nil {
-		return false
-	}
-
-	return lock.IsLocked()
-}
-
-// LockInfo returns information about the current scheduler lock holder.
-func LockInfo(cfg *config.Config) (*dirlock.LockInfo, error) {
-	lock, err := createSchedulerLock(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create lock instance: %w", err)
-	}
-
-	return lock.Info()
-}
-
-// schedulerLockDir returns the directory path where the scheduler lock is stored.
-func schedulerLockDir(cfg *config.Config) string {
-	return filepath.Join(cfg.Paths.DataDir, "scheduler.lock")
-}
-
-// createSchedulerLock creates a new directory lock instance for the scheduler
-// using the configuration settings from the provided config.
-func createSchedulerLock(cfg *config.Config) (dirlock.DirLock, error) {
-	return dirlock.New(schedulerLockDir(cfg), &dirlock.LockOptions{
-		StaleThreshold: cfg.Global.SchedulerLockStaleThreshold,
-		RetryInterval:  cfg.Global.SchedulerLockRetryInterval,
-	})
 }
