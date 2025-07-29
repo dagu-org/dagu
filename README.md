@@ -7,7 +7,7 @@
   <p>
     <a href="https://docs.dagu.cloud/reference/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
     <a href="https://github.com/dagu-org/dagu/actions/workflows/ci.yaml"><img src="https://img.shields.io/github/actions/workflow/status/dagu-org/dagu/ci.yaml?style=flat-square" alt="Build Status"></a>
-    <a href="https:////scord.gg/gpahPUjGRk"><img src="https://img.shields.io/discord/1095289480774172772?style=flat-square&logo=discord" alt="Discord"></a>
+    <a href="https://discord.gg/gpahPUjGRk"><img src="https://img.shields.io/discord/1095289480774172772?style=flat-square&logo=discord" alt="Discord"></a>
     <a href="https://bsky.app/profile/dagu-org.bsky.social"><img src="https://img.shields.io/badge/Bluesky-0285FF?style=flat-square&logo=bluesky&logoColor=white" alt="Bluesky"></a>
   </p>
   
@@ -15,8 +15,7 @@
     <a href="https://docs.dagu.cloud">Docs</a> |
     <a href="#quick-start">Quick Start</a> |
     <a href="#features">Features</a> |
-    <a href="#installation">Installation</a> |
-    <a href="https://discord.gg/gpahPUjGRk">Community</a>
+    <a href="#installation">Installation</a>
   </p>
 </div>
 
@@ -63,6 +62,7 @@ Dagu is designed for small teams of 1-3 people to easily manage complex workflow
 ### v1.18 (upcoming)
 - **OpenID Connect (OIDC) Support**: OpenID Connect authentication for secure access (implemented by [@Arvintian](https://github.com/Arvintian))
 - **Distributed Execution**: Run steps in a DAG across multiple machines
+- **Failover Scheduler**: Multiple scheduler instances for high availability with automatic failover
 
 ### v1.17
 - **OpenTelemetry Support (OTEL)**: Distributed tracing with W3C trace context propagation (requested by [@jeremydelattre59](https://github.com/jeremydelattre59))
