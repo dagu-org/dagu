@@ -47,7 +47,8 @@ async function validateBinary(binaryPath) {
     
     proc.on('close', (code) => {
       // Check if the binary executed successfully and returned version info
-      if (code === 0 && stdout.toLowerCase().includes('dagu')) {
+      // Dagu version command returns version string to stderr like "1.18.0" or "v1.17.4-86-gd5a422f1-250729135655"
+      if (code === 0 && stderr.trim().length > 0) {
         resolve(true);
       } else {
         console.error(`Binary validation failed: exit code ${code}`);
