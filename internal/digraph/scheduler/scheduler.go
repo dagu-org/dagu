@@ -361,6 +361,24 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 		}
 	}
 
+	// Add step-level environment variables
+	envVars := &executor.SyncMap{}
+	for _, v := range node.Step().Env {
+		parts := strings.SplitN(v, "=", 2)
+		if len(parts) != 2 {
+			logger.Error(ctx, "Invalid environment variable format", "var", v)
+			continue
+		}
+		val, err := env.EvalString(ctx, v)
+		if err != nil {
+			logger.Error(ctx, "Failed to evaluate environment variable", "var", v, "err", err)
+			continue
+		}
+		envVars.Store(parts[0], val)
+	}
+
+	env.ForceLoadOutputVariables(envVars)
+
 	return executor.WithEnv(ctx, env)
 }
 
