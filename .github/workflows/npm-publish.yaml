@@ -210,3 +210,51 @@ jobs:
           }
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Verify the published packages
+  verify-packages:
+    needs: [publish-platform-packages, publish-main-package]
+    if: always()
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            test-install: npm install -g dagu
+          - os: macos-latest
+            test-install: npm install -g dagu
+          - os: windows-latest
+            test-install: npm install -g dagu
+
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Wait for npm propagation
+        shell: bash
+        run: |
+          # Wait for package to be available with retries
+          echo "Checking npm package availability..."
+          for i in {1..30}; do
+            if npm view dagu version 2>/dev/null; then
+              echo "Package is available!"
+              break
+            fi
+            echo "Attempt $i/30: Package not yet available, waiting 10 seconds..."
+            sleep 10
+          done
+
+      - name: Test installation
+        run: |
+          ${{ matrix.test-install }}
+
+      - name: Verify installation
+        run: |
+          dagu version
+
+      - name: Test basic functionality
+        run: |
+          dagu help
