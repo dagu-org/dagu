@@ -722,3 +722,49 @@ steps:
 	require.Equal(t, "step2", dagRunStatus.Nodes[1].Step.Name)
 	require.Equal(t, "step3", dagRunStatus.Nodes[2].Step.Name)
 }
+
+func TestStepLevelEnvVars(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	// Load chain DAG
+	dag := th.DAG(t, `
+env:
+  - MY_VAR: "dag_value"
+  - MY_VAR2: "dag_value2"
+
+steps:
+  - name: step1
+    env:
+      MY_VAR: "step1_value"
+    command: echo $MY_VAR
+    output: OUT1
+
+  - name: step2
+    env:
+      MY_VAR: $MY_VAR2
+    command: echo $MY_VAR
+    output: OUT2
+
+  - name: step3
+    env:
+      MY_VAR: "`+"`echo dynamic value`"+`"
+    command: echo $MY_VAR
+    output: OUT3
+`)
+
+	// Run the DAG
+	agent := dag.Agent()
+	require.NoError(t, agent.Run(agent.Context))
+
+	// Verify successful completion
+	dag.AssertLatestStatus(t, status.Success)
+
+	// Assert the output contains the step-level environment variable
+	dag.AssertOutputs(t, map[string]any{
+		"OUT1": "step1_value",
+		"OUT2": "dag_value2",
+		"OUT3": "dynamic value",
+	})
+}

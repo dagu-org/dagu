@@ -150,6 +150,23 @@ steps:
     command: echo "Running in $ENV"
 ```
 
+### Step-Level Environment
+
+Steps can have their own environment variables that override DAG-level ones:
+
+```yaml
+env:
+  - ENV: production
+
+steps:
+  - name: dev-test
+    command: echo "Running in $ENV"
+    env:
+      - ENV: development  # Overrides DAG-level
+      - TEST_FLAG: true
+    # Output: Running in development
+```
+
 ### Load from .env Files
 
 ```yaml

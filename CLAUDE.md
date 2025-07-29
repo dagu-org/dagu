@@ -945,8 +945,47 @@ open http://localhost:8080
 - **Cost Effective**: No licensing, minimal infrastructure
 - **Proven Reliability**: Used in production worldwide
 
-## The Future of Workflow Orchestration
+## Git Commit Guidelines
+- Keep commit messages to one line unless body is absolutely necessary
+- **NEVER EVER use `git add -A` or `git add .`** - ALWAYS stage specific files only
+- **CRITICAL: Using `git add -A` is FORBIDDEN. Always use `git add <specific-file>`**
+- Follow conventional commit format (fix:, feat:, docs:, etc.)
+- For commits fixing bugs or adding features based on user reports add:
+  ```
+  git commit --trailer "Reported-by:<name>"
+  ```
+  Where `<name>` is the name of the user
+- For commits related to a Github issue, add:
+  ```
+  git commit --trailer "Github-Issue:#<number>"
+  ```
+- **NEVER mention co-authored-by or similar aspects**
+- **NEVER mention the tool used to create the commit message or PR**
+- **NEVER ever include *Generated with* or similar in commit messages**
+- **NEVER ever include *Co-Authored-By* or similar in commit messages**
 
-Dagu proves that powerful doesn't mean complex. While other tools require teams of engineers to maintain, Dagu empowers individual developers to build robust automation. It's the missing link between simple cron jobs and heavyweight orchestration platforms.
+# Pull Request Guidelines
+When creating pull requests, follow this style:
+- Start with a clear problem statement explaining the user need
+- Describe the solution concisely as a few paragraphs at most
+- Include issue reference and feedback-from credits on separate lines
+- Use **Changes** section with bullet points for what was modified
+- Include an **Example** section with a practical YAML snippet
+- Example format:
+  ```
+  **Overview:**
+  Users need to [problem description]. They have to [current workaround].
 
-In a world of over-engineered solutions, Dagu stands out by doing less, but doing it perfectly. It's not trying to be everything to everyone - it's focused on being the best tool for running workflows reliably and simply.
+  As a solution, [what was implemented].
+
+  Refs: #XXX
+  Feedback-by: @user1 and @user2
+
+  **Changes:**
+  - [Specific change 1]
+  - [Specific change 2]
+  - [Documentation/examples added]
+
+  **Example:** (optional)
+
+  **Notes:** (optional)

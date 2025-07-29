@@ -137,6 +137,8 @@ type stepDef struct {
 	Parallel any `yaml:"parallel,omitempty"`
 	// WorkerSelector specifies required worker labels for execution.
 	WorkerSelector map[string]string `yaml:"workerSelector,omitempty"`
+	// Env specifies the environment variables for the step.
+	Env any `yaml:"env,omitempty"`
 }
 
 // continueOnDef defines the conditions to continue on failure or skipped.

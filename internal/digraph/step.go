@@ -65,6 +65,8 @@ type Step struct {
 	WorkerSelector map[string]string `json:"workerSelector,omitempty"`
 	// Parallel contains the configuration for parallel execution.
 	Parallel *ParallelConfig `json:"parallel,omitempty"`
+	// Env contains environment variables for the step.
+	Env []string `json:"env,omitempty"`
 }
 
 // setup sets the default values for the step.

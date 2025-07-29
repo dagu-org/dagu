@@ -98,6 +98,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "signalOnStop", fn: buildSignalOnStop},
 	{name: "precondition", fn: buildStepPrecondition},
 	{name: "output", fn: buildOutput},
+	{name: "env", fn: buildStepEnvs},
 	{name: "validate", fn: validateStep},
 }
 
@@ -1064,6 +1065,23 @@ func buildOutput(_ BuildContext, def stepDef, step *Step) error {
 	}
 
 	step.Output = def.Output
+	return nil
+}
+
+func buildStepEnvs(ctx BuildContext, def stepDef, step *Step) error {
+	if def.Env == nil {
+		return nil
+	}
+	// For step environment variables, we load them without evaluation. They will
+	// be evaluated later when the step is executed.
+	ctx.opts.NoEval = true
+	vars, err := loadVariables(ctx, def.Env)
+	if err != nil {
+		return err
+	}
+	for k, v := range vars {
+		step.Env = append(step.Env, fmt.Sprintf("%s=%s", k, v))
+	}
 	return nil
 }
 
