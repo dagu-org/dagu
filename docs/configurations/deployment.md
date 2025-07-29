@@ -74,7 +74,7 @@ docker run -d \
 Basic deployment using the official Docker image:
 
 ```yaml
-# docker-compose.yml
+# compose.yml
 services:
   dagu:
     image: "ghcr.io/dagu-org/dagu:latest"
@@ -103,7 +103,7 @@ volumes:
 For custom configuration with separate volumes:
 
 ```yaml
-# docker-compose.yml with custom paths
+# compose.yml with custom paths
 services:
   dagu:
     image: "ghcr.io/dagu-org/dagu:latest"
@@ -130,7 +130,7 @@ services:
 For Docker-in-Docker support (to run Docker executors):
 
 ```yaml
-# docker-compose.yml with Docker-in-Docker
+# compose.yml with Docker-in-Docker
 services:
   dagu:
     image: "ghcr.io/dagu-org/dagu:latest"

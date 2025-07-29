@@ -26,7 +26,7 @@ volumes:
 ```
 
 ```bash
-docker-compose -f docker-compose-keycloak.yml up -d
+docker compose -f docker-compose-keycloak.yml up -d
 ```
 
 ### 2. Configure Keycloak
@@ -111,7 +111,7 @@ auth:
 
 ```bash
 # 1. Start Keycloak
-docker-compose -f docker-compose-keycloak.yml up -d
+docker compose -f docker-compose-keycloak.yml up -d
 
 # 2. Configure realm and client as above
 

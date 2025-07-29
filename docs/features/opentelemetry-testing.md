@@ -203,7 +203,7 @@ In Jaeger, you should see:
 ### Using OpenTelemetry Collector
 
 ```yaml
-# docker-compose.yaml
+# compose.yaml
 version: '3.8'
 services:
   jaeger:
@@ -270,7 +270,7 @@ service:
 
 Start the stack:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ## Debugging OpenTelemetry Issues

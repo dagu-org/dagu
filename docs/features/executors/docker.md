@@ -237,7 +237,7 @@ steps:
 ### Docker Compose Setup
 
 ```yaml
-# docker-compose.yml for Dagu with Docker support
+# compose.yml for Dagu with Docker support
 services:
   dagu:
     image: ghcr.io/dagu-org/dagu:latest

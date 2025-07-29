@@ -81,7 +81,7 @@ sudo journalctl -u dagu -f
 
 ### Docker Compose
 
-`docker-compose.yml`:
+`compose.yml`:
 
 ```yaml
 version: '3.8'
@@ -146,13 +146,13 @@ volumes:
 
 ```bash
 # Start
-docker-compose up -d
+docker compose up -d
 
 # Logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop
-docker-compose down
+docker compose down
 ```
 
 With authentication (`.env` file):
