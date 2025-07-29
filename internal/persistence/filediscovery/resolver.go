@@ -31,7 +31,7 @@ func newResolver(baseDir string, serviceName models.ServiceName) *resolver {
 	serviceDir := filepath.Join(baseDir, string(serviceName))
 
 	// Create directory lock for this service
-	lock, _ := dirlock.New(serviceDir, &dirlock.LockOptions{
+	lock := dirlock.New(serviceDir, &dirlock.LockOptions{
 		StaleThreshold: 5 * time.Second,       // Lock is stale after 5 seconds
 		RetryInterval:  50 * time.Millisecond, // Retry every 50ms
 	})
@@ -76,9 +76,6 @@ func (r *resolver) Members(ctx context.Context) ([]models.HostInfo, error) {
 		} else {
 			// Ensure we unlock when done
 			defer func() {
-				if !r.dirLock.IsHeldByMe() {
-					return
-				}
 				if err := r.dirLock.Unlock(); err != nil {
 					logger.Error(ctx, "Failed to unlock service directory", "service", r.serviceName, "err", err)
 				}

@@ -42,7 +42,7 @@ type DualQueue struct {
 // NewDualQueue creates a new queue with the specified base directory and name
 // It initializes the queue files for high and low priority
 func NewDualQueue(baseDir, name string) *DualQueue {
-	dirLock, _ := dirlock.New(baseDir, &dirlock.LockOptions{
+	dirLock := dirlock.New(baseDir, &dirlock.LockOptions{
 		StaleThreshold: 30, // seconds
 		RetryInterval:  50, // milliseconds
 	})

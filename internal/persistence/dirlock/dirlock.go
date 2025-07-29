@@ -87,11 +87,8 @@ type dirLock struct {
 }
 
 // New creates a new directory lock instance
-func New(directory string, opts *LockOptions) (DirLock, error) {
-	if directory == "" {
-		return nil, errors.New("directory cannot be empty")
-	}
 
+func New(directory string, opts *LockOptions) DirLock {
 	// Set default options if not provided
 	if opts == nil {
 		opts = &LockOptions{}
@@ -107,7 +104,7 @@ func New(directory string, opts *LockOptions) (DirLock, error) {
 		id:        generateID(),
 		targetDir: directory,
 		opts:      opts,
-	}, nil
+	}
 }
 
 // Heartbeat updates the lock's last heartbeat time to prevent it from being
