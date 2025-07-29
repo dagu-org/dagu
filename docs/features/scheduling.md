@@ -26,6 +26,8 @@ dagu scheduler  # Will wait for lock and take over if primary fails
 
 The scheduler uses directory-based locking to ensure only one instance is active at a time. When the primary scheduler fails, a standby automatically takes over within 30 seconds.
 
+The first scheduler updates the lock file every 7 seconds to ensure it remains the active instance, tolerating 4 missed updates before considering the lock stale. This allows a standby scheduler to take over if the primary fails.
+
 ### Health Check Monitoring
 
 The scheduler provides an optional HTTP health check endpoint for monitoring:
