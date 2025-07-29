@@ -221,7 +221,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 }
 
 func (s *Scheduler) startHeartbeat(ctx context.Context) {
-	ticker := time.NewTicker(time.Second * 15)
+	ticker := time.NewTicker(time.Second * 7)
 	defer ticker.Stop()
 
 	for {
