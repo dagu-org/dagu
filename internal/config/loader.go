@@ -124,13 +124,11 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Set global configuration values.
 	cfg.Global = Global{
-		Debug:                       def.Debug,
-		LogFormat:                   def.LogFormat,
-		TZ:                          def.TZ,
-		WorkDir:                     def.WorkDir,
-		DefaultShell:                def.DefaultShell,
-		SchedulerLockStaleThreshold: 30 * time.Second,
-		SchedulerLockRetryInterval:  50 * time.Millisecond,
+		Debug:        def.Debug,
+		LogFormat:    def.LogFormat,
+		TZ:           def.TZ,
+		WorkDir:      def.WorkDir,
+		DefaultShell: def.DefaultShell,
 	}
 
 	// Set Peer configuration if provided
@@ -141,22 +139,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 			ClientCaFile:  def.Peer.ClientCaFile,
 			SkipTLSVerify: def.Peer.SkipTLSVerify,
 			Insecure:      def.Peer.Insecure,
-		}
-	}
-
-	if def.SchedulerLockStaleThreshold != "" {
-		if duration, err := time.ParseDuration(def.SchedulerLockStaleThreshold); err == nil {
-			cfg.Global.SchedulerLockStaleThreshold = duration
-		} else {
-			l.warnings = append(l.warnings, fmt.Sprintf("Invalid schedulerLockStaleThreshold value: %s, using default 30s", def.SchedulerLockStaleThreshold))
-		}
-	}
-
-	if def.SchedulerLockRetryInterval != "" {
-		if duration, err := time.ParseDuration(def.SchedulerLockRetryInterval); err == nil {
-			cfg.Global.SchedulerLockRetryInterval = duration
-		} else {
-			l.warnings = append(l.warnings, fmt.Sprintf("Invalid schedulerLockRetryInterval value: %s, using default 50ms", def.SchedulerLockRetryInterval))
 		}
 	}
 
@@ -317,13 +299,39 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	// Set scheduler configuration
 	if def.Scheduler != nil {
 		cfg.Scheduler.Port = def.Scheduler.Port
-	} else {
-		// Set default scheduler port only if scheduler config was not provided at all
-		cfg.Scheduler.Port = 8090
+
+		// Parse scheduler lock stale threshold
+		if def.Scheduler.LockStaleThreshold != "" {
+			if duration, err := time.ParseDuration(def.Scheduler.LockStaleThreshold); err == nil {
+				cfg.Scheduler.LockStaleThreshold = duration
+			} else {
+				l.warnings = append(l.warnings, fmt.Sprintf("Invalid scheduler.lockStaleThreshold value: %s", def.Scheduler.LockStaleThreshold))
+			}
+		}
+
+		// Parse scheduler lock retry interval
+		if def.Scheduler.LockRetryInterval != "" {
+			if duration, err := time.ParseDuration(def.Scheduler.LockRetryInterval); err == nil {
+				cfg.Scheduler.LockRetryInterval = duration
+			} else {
+				l.warnings = append(l.warnings, fmt.Sprintf("Invalid scheduler.lockRetryInterval value: %s", def.Scheduler.LockRetryInterval))
+			}
+		}
+	}
+
+	if cfg.Scheduler.Port <= 0 {
+		cfg.Scheduler.Port = 8090 // Default scheduler port
+	}
+	if cfg.Scheduler.LockStaleThreshold <= 0 {
+		cfg.Scheduler.LockStaleThreshold = 30 * time.Second // Default to 30 seconds if not set
+	}
+	if cfg.Scheduler.LockRetryInterval <= 0 {
+		cfg.Scheduler.LockRetryInterval = 5 * time.Second // Default to 5 seconds if not set
 	}
 
 	// Incorporate legacy field values, which may override existing settings.
 	l.LoadLegacyFields(&cfg, def)
+
 	// Load legacy environment variable overrides.
 	l.LoadLegacyEnv(&cfg)
 
@@ -502,9 +510,9 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	// Queue settings
 	viper.SetDefault("queues.enabled", true)
 
-	// Scheduler lock settings
-	viper.SetDefault("schedulerLockStaleThreshold", "30s")
-	viper.SetDefault("schedulerLockRetryInterval", "50ms")
+	// Scheduler settings
+	viper.SetDefault("scheduler.lockStaleThreshold", "30s")
+	viper.SetDefault("scheduler.lockRetryInterval", "5s")
 
 	// Peer settings
 	viper.SetDefault("peer.insecure", true) // Default to insecure (h2c)
@@ -526,9 +534,9 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("workDir", "WORK_DIR")
 	l.bindEnv("defaultShell", "DEFAULT_SHELL")
 
-	// Scheduler lock configurations
-	l.bindEnv("schedulerLockStaleThreshold", "SCHEDULER_LOCK_STALE_THRESHOLD")
-	l.bindEnv("schedulerLockRetryInterval", "SCHEDULER_LOCK_RETRY_INTERVAL")
+	// Scheduler configurations
+	l.bindEnv("scheduler.lockStaleThreshold", "SCHEDULER_LOCK_STALE_THRESHOLD")
+	l.bindEnv("scheduler.lockRetryInterval", "SCHEDULER_LOCK_RETRY_INTERVAL")
 
 	// UI configurations
 	l.bindEnv("ui.maxDashboardPageLimit", "UI_MAX_DASHBOARD_PAGE_LIMIT")

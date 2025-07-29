@@ -121,8 +121,8 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	logger.Info(ctx, "Acquired scheduler lock",
 		"lockDir", schedulerLockDir(s.config),
-		"staleThreshold", s.config.Global.SchedulerLockStaleThreshold.String(),
-		"retryInterval", s.config.Global.SchedulerLockRetryInterval.String())
+		"staleThreshold", s.config.Scheduler.LockStaleThreshold.String(),
+		"retryInterval", s.config.Scheduler.LockRetryInterval.String())
 
 	// Start health check server only if not disabled
 	if !s.disableHealthServer {
@@ -614,7 +614,7 @@ func schedulerLockDir(cfg *config.Config) string {
 // using the configuration settings from the provided config.
 func createSchedulerLock(cfg *config.Config) (dirlock.DirLock, error) {
 	return dirlock.New(schedulerLockDir(cfg), &dirlock.LockOptions{
-		StaleThreshold: cfg.Global.SchedulerLockStaleThreshold,
-		RetryInterval:  cfg.Global.SchedulerLockRetryInterval,
+		StaleThreshold: cfg.Scheduler.LockStaleThreshold,
+		RetryInterval:  cfg.Scheduler.LockRetryInterval,
 	})
 }

@@ -62,6 +62,8 @@ tls:
   keyFile: "/path/to/key.pem"
 scheduler:
   port: 7890
+  lockStaleThreshold: 50s
+  lockRetryInterval: 10s
 `
 	err := os.WriteFile(configFile, []byte(configContent), 0600)
 	require.NoError(t, err)
@@ -119,6 +121,17 @@ scheduler:
 
 	// Verify scheduler settings.
 	assert.Equal(t, 7890, cfg.Scheduler.Port)
+	// Default scheduler lock settings should be applied
+	assert.Equal(t, 50*time.Second, cfg.Scheduler.LockStaleThreshold)
+	assert.Equal(t, 10*time.Second, cfg.Scheduler.LockRetryInterval)
+
+	// Verify new distributed execution fields have defaults
+	assert.Equal(t, "", cfg.Coordinator.Host)
+	assert.Equal(t, 0, cfg.Coordinator.Port)
+	assert.Equal(t, "", cfg.Worker.ID)
+	assert.Equal(t, 100, cfg.Worker.MaxActiveRuns) // Default is 100
+	assert.Nil(t, cfg.Worker.Labels)
+	assert.Equal(t, "/var/dagu/data/discovery", cfg.Paths.DiscoveryDir) // Auto-generated from dataDir
 
 	// Verify UI settings.
 	assert.Equal(t, "Test Dagu", cfg.UI.NavbarTitle)
@@ -155,6 +168,17 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	// Permissions should be set to true
 	assert.True(t, cfg.Server.Permissions[config.PermissionWriteDAGs])
 	assert.True(t, cfg.Server.Permissions[config.PermissionRunDAGs])
+
+	// Scheduler defaults
+	assert.Equal(t, 8090, cfg.Scheduler.Port)
+	assert.Equal(t, 30*time.Second, cfg.Scheduler.LockStaleThreshold)
+	assert.Equal(t, 5*time.Second, cfg.Scheduler.LockRetryInterval)
+
+	// Worker defaults
+	assert.Equal(t, 100, cfg.Worker.MaxActiveRuns)
+
+	// Peer defaults
+	assert.True(t, cfg.Global.Peer.Insecure)
 }
 
 func TestValidateConfig_BasicAuthError(t *testing.T) {
