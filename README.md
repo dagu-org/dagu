@@ -122,12 +122,6 @@ Dagu is designed to orchestrate workflows across various domains, particularly t
 # Install via npm
 npm install -g dagu
 
-# Or via script
-curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
-
-# Create dagu configuration directory
-mkdir -p ~/.config/dagu/dags
-
 # Create your first workflow
 mkdir -p ~/.config/dagu/dags
 cat > ~/.config/dagu/dags/hello.yaml << 'EOF'
