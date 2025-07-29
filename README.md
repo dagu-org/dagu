@@ -63,6 +63,8 @@ Dagu is designed for small teams of 1-3 people to easily manage complex workflow
 - **OpenID Connect (OIDC) Support**: OpenID Connect authentication for secure access (implemented by [@Arvintian](https://github.com/Arvintian))
 - **Distributed Execution**: Run steps in a DAG across multiple machines
 - **Failover Scheduler**: Multiple scheduler instances for high availability with automatic failover
+- **Step-level Environment Variables**: Define environment variables specific to individual steps, overriding DAG-level variables
+- **Health check endpoint for scheduler**: HTTP health check endpoint for monitoring scheduler status (default: `http://localhost:8090/health`). Which is enabled automatically when running `dagu scheduler`.
 
 ### v1.17
 - **OpenTelemetry Support (OTEL)**: Distributed tracing with W3C trace context propagation (requested by [@jeremydelattre59](https://github.com/jeremydelattre59))

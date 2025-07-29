@@ -4,6 +4,8 @@ Dagu provides multiple ways to handle data and variables in your DAGs, from simp
 
 ## Environment Variables
 
+### DAG-Level Environment Variables
+
 Define variables accessible throughout the DAG:
 
 ```yaml
@@ -14,6 +16,43 @@ steps:
   - name: task
     dir: ${SOME_DIR}
     command: python main.py ${SOME_FILE}
+```
+
+### Step-Level Environment Variables
+
+You can also define environment variables specific to individual steps. Step-level variables override DAG-level variables with the same name:
+
+```yaml
+env:
+  - SHARED_VAR: dag_value
+  - DAG_ONLY: dag_only_value
+
+steps:
+  - name: step with custom env
+    command: echo $SHARED_VAR
+    env:
+      - SHARED_VAR: step_value  # Overrides the DAG-level value
+      - STEP_ONLY: step_only_value
+    # Output: step_value
+  
+  - name: step with DAG env
+    command: echo $SHARED_VAR $DAG_ONLY
+    # Output: dag_value dag_only_value
+```
+
+Step environment variables support the same features as DAG-level variables, including command substitution and references to other variables:
+
+```yaml
+env:
+  - BASE_PATH: /data
+
+steps:
+  - name: process data
+    command: python process.py
+    env:
+      - INPUT_PATH: ${BASE_PATH}/input
+      - TIMESTAMP: "`date +%Y%m%d_%H%M%S`"
+      - WORKER_ID: worker_${HOSTNAME}
 ```
 
 ## Dotenv Files

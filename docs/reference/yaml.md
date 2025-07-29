@@ -219,7 +219,7 @@ Each step in the `steps` array can have these fields:
 | `stdout` | string | Redirect stdout to file | - |
 | `stderr` | string | Redirect stderr to file | - |
 | `output` | string | Capture output to variable | - |
-| `env` | array | Step-specific environment | - |
+| `env` | array/object | Step-specific environment variables (overrides DAG-level) | - |
 | `params` | string | Parameters for sub-DAG | - |
 
 ### Parallel Execution
@@ -576,6 +576,7 @@ steps:
     depends: transform-data
     env:
       - LOAD_TIMEOUT: 600
+      - DB_CONNECTION: ${PROD_DB}
     
   - name: validate-results
     command: python validate_results.py --date=${DATE}
