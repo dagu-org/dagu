@@ -5,7 +5,7 @@ const path = require("path");
 const zlib = require("zlib");
 const https = require("https");
 
-const { getPlatformPackage } = require("./lib/platform");
+const { getPlatformPackage, isPlatformSpecificPackageInstalled } = require("./lib/platform");
 
 // Windows binaries end with .exe so we need to special case them.
 const binaryName = process.platform === "win32" ? "dagu.exe" : "dagu";
