@@ -2,17 +2,10 @@
 layout: doc
 ---
 
-<div class="logo-section">
-  <div class="logo-container">
-    <img src="/logo-light.svg" alt="Dagu Logo" class="logo-light logo-icon">
-    <img src="/logo-dark.webp" alt="Dagu Logo" class="logo-dark logo-icon">
-    <span class="logo-text">Dagu</span>
-  </div>
-</div>
+<img src="/dagu-logo.webp" alt="dagu Logo" style="display: block; margin: 0 auto; max-width: 100%">
 
 <div class="tagline" style="text-align: center;">
   <h1>A lightweight and powerful workflow engine for enterprise & small teams</h1>
-  <p>Deployable on-premise, in the cloud, or on IoT devices. Low-code declarative workflow definitions that anyone can understand.</p>
 </div>
 
 
