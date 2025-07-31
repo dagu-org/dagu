@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"sync"
 
 	"github.com/containerd/platforms"
@@ -50,56 +49,13 @@ steps:
 ```
 */
 
-type PullPolicy int
-
-const (
-	PullPolicyAlways PullPolicy = iota
-	PullPolicyNever
-	PullPolicyMissing
-)
-
-var pullPolicyMap = map[string]PullPolicy{
-	"always":  PullPolicyAlways,
-	"missing": PullPolicyMissing,
-	"never":   PullPolicyNever,
-}
-
-func boolToPullPolicy(b bool) PullPolicy {
-	if b {
-		return PullPolicyAlways
-	}
-	return PullPolicyNever
-}
-
-func parsePullPolicy(_ context.Context, raw any) (PullPolicy, error) {
-	switch value := raw.(type) {
-	case string:
-		// Try to parse the string as a pull policy
-		pull, ok := pullPolicyMap[value]
-		if ok {
-			return pull, nil
-		}
-
-		// If the string is not a valid pull policy, try to parse it as a boolean
-		b, err := strconv.ParseBool(value)
-		if err != nil {
-			return PullPolicyMissing, fmt.Errorf("failed to parse pull policy as boolean: %w", err)
-		}
-		return boolToPullPolicy(b), nil
-	case bool:
-		return boolToPullPolicy(value), nil
-	default:
-		return PullPolicyMissing, fmt.Errorf("invalid pull policy type: %T", raw)
-	}
-}
-
 var _ Executor = (*docker)(nil)
 
 type docker struct {
 	image         string
 	platform      string
 	containerName string
-	pull          PullPolicy
+	pull          digraph.PullPolicy
 	autoRemove    bool
 	step          digraph.Step
 	stdout        io.Writer
@@ -157,10 +113,10 @@ func (e *docker) getPlatform(ctx context.Context, cli *client.Client) (specs.Pla
 }
 
 func (e *docker) shouldPullImage(ctx context.Context, cli *client.Client, platform *specs.Platform) (bool, error) {
-	if e.pull == PullPolicyAlways {
+	if e.pull == digraph.PullPolicyAlways {
 		return true, nil
 	}
-	if e.pull == PullPolicyNever {
+	if e.pull == digraph.PullPolicyNever {
 		return false, nil
 	}
 
@@ -452,10 +408,10 @@ func newDocker(
 		}
 	}
 
-	pull := PullPolicyMissing
+	pull := digraph.PullPolicyMissing
 	if raw, ok := execCfg.Config["pull"]; ok {
 		var err error
-		pull, err = parsePullPolicy(ctx, raw)
+		pull, err = digraph.ParsePullPolicy(raw)
 		if err != nil {
 			return nil, err
 		}

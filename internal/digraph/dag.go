@@ -2,12 +2,14 @@ package digraph
 
 import (
 	// nolint // gosec
+
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -109,6 +111,8 @@ type DAG struct {
 	LocalDAGs map[string]*DAG `json:"localDAGs,omitempty"`
 	// YamlData contains the raw YAML data of the DAG.
 	YamlData []byte `json:"yamlData,omitempty"`
+	// Container contains the container definition for the DAG.
+	Container *Container `json:"container,omitempty"`
 }
 
 // CreateTask creates a coordinator task from this DAG for distributed execution.
@@ -147,6 +151,150 @@ func (d *DAG) CreateTask(
 	}
 
 	return task
+}
+
+// HasTag checks if the DAG has the given tag.
+func (d *DAG) HasTag(tag string) bool {
+	for _, t := range d.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
+// SockAddr returns the unix socket address for the DAG.
+// The address is used to communicate with the agent process.
+func (d *DAG) SockAddr(dagRunID string) string {
+	if d.Location != "" {
+		return SockAddr(d.Location, "")
+	}
+	return SockAddr(d.Name, dagRunID)
+}
+
+// SockAddrForChildDAGRun returns the unix socket address for a specific dag-run ID.
+// This is used to control child dag-runs.
+func (d *DAG) SockAddrForChildDAGRun(dagRunID string) string {
+	return SockAddr(d.GetName(), dagRunID)
+}
+
+// GetName returns the name of the DAG.
+// If the name is not set, it returns the default name (filename without extension).
+func (d *DAG) GetName() string {
+	name := d.Name
+	if name != "" {
+		return name
+	}
+	return defaultName(d.Location)
+}
+
+// String implements the Stringer interface.
+// String returns a formatted string representation of the DAG
+func (d *DAG) String() string {
+	var sb strings.Builder
+
+	sb.WriteString("{\n")
+	fmt.Fprintf(&sb, "\tName: %s\n", d.Name)
+	fmt.Fprintf(&sb, "\tDescription: %s\n", strings.TrimSpace(d.Description))
+	fmt.Fprintf(&sb, "\tParams: %v\n", strings.Join(d.Params, ", "))
+	fmt.Fprintf(&sb, "\tLogDir: %v\n", d.LogDir)
+
+	for i, step := range d.Steps {
+		fmt.Fprintf(&sb, "\tStep%d: %s\n", i, step.String())
+	}
+
+	sb.WriteString("}\n")
+	return sb.String()
+}
+
+// Validate performs basic validation of the DAG structure
+func (d *DAG) Validate() error {
+	// Ensure all referenced steps exist
+	stepMap := make(map[string]bool)
+	for _, step := range d.Steps {
+		stepMap[step.Name] = true
+	}
+
+	// Check dependencies
+	for _, step := range d.Steps {
+		for _, dep := range step.Depends {
+			if !stepMap[dep] {
+				var errList error = ErrorList{
+					wrapError("depends", dep, fmt.Errorf("step %s depends on non-existent step", step.Name)),
+				}
+				return errList
+			}
+		}
+	}
+
+	return nil
+}
+
+// initializeDefaults sets the default values for the DAG.
+func (d *DAG) initializeDefaults() {
+	// Set the name if not set.
+	if d.Name == "" {
+		d.Name = defaultName(d.Location)
+	}
+
+	// Set default type to chain if not specified.
+	if d.Type == "" {
+		d.Type = TypeChain
+	}
+
+	// Set default history retention days to 30 if not specified.
+	if d.HistRetentionDays == 0 {
+		d.HistRetentionDays = defaultDAGRunRetentionDays
+	}
+
+	// Set default max cleanup time to 60 seconds if not specified.
+	if d.MaxCleanUpTime == 0 {
+		d.MaxCleanUpTime = defaultMaxCleanUpTime
+	}
+
+	// Set default max active runs to 1 only when not specified (0).
+	// MaxActiveRuns < 0 means queueing is disabled for this DAG.
+	if d.MaxActiveRuns == 0 {
+		d.MaxActiveRuns = 1
+	}
+
+	// Set default max output size to 1MB if not specified.
+	if d.MaxOutputSize == 0 {
+		d.MaxOutputSize = 1024 * 1024 // 1MB
+	}
+
+	// Ensure we have a valid working directory
+	var workDir = "."
+	if d.Location != "" {
+		workDir = filepath.Dir(d.Location)
+	}
+
+	// Setup steps and handlers with the working directory
+	d.setupSteps(workDir)
+	d.setupHandlers(workDir)
+}
+
+// setupSteps initializes all steps
+func (d *DAG) setupSteps(workDir string) {
+	for i := range d.Steps {
+		d.Steps[i].setup(workDir)
+	}
+}
+
+// setupHandlers initializes all event handlers
+func (d *DAG) setupHandlers(workDir string) {
+	handlers := []*Step{
+		d.HandlerOn.Exit,
+		d.HandlerOn.Success,
+		d.HandlerOn.Failure,
+		d.HandlerOn.Cancel,
+	}
+
+	for _, handler := range handlers {
+		if handler != nil {
+			handler.setup(workDir)
+		}
+	}
 }
 
 // TaskOption is a function that modifies a coordinatorv1.Task.
@@ -326,147 +474,79 @@ var handlerMapping = map[string]HandlerType{
 	"onExit":    HandlerOnExit,
 }
 
-// HasTag checks if the DAG has the given tag.
-func (d *DAG) HasTag(tag string) bool {
-	for _, t := range d.Tags {
-		if t == tag {
-			return true
+// Container defines the container configuration for the DAG.
+type Container struct {
+	// Image is the container image to use.
+	Image string `yaml:"image,omitempty"`
+	// PullPolicy is the policy to pull the image (e.g., "Always", "IfNotPresent").
+	PullPolicy PullPolicy `yaml:"pullPolicy,omitempty"`
+	// Env specifies environment variables for the container.
+	Env []string `yaml:"env,omitempty"` // List of environment variables in "key=value" format
+	// Volumes specifies the volumes to mount in the container.
+	Volumes []string `yaml:"volumes,omitempty"` // Map of volume names to volume definitions
+	// User is the user to run the container as.
+	User string `yaml:"user,omitempty"` // User to run the container as
+	// WorkDir is the working directory inside the container.
+	WorkDir string `yaml:"workDir,omitempty"` // Working directory inside the container
+	// Platform specifies the platform for the container (e.g., "linux/amd64").
+	Platform string `yaml:"platform,omitempty"` // Platform for the container
+	// Ports specifies the ports to expose from the container.
+	Ports []string `yaml:"ports,omitempty"` // List of ports to expose
+	// Network is the network configuration for the container.
+	Network string `yaml:"network,omitempty"` // Network configuration for the container
+	// KeepContainer is the flag to keep the container after the DAG run.
+	KeepContainer bool `yaml:"keepContainer,omitempty"` // Keep the container after the DAG run
+}
+
+type PullPolicy int
+
+const (
+	PullPolicyAlways PullPolicy = iota
+	PullPolicyNever
+	PullPolicyMissing
+)
+
+var pullPolicyMap = map[string]PullPolicy{
+	"always":  PullPolicyAlways,
+	"missing": PullPolicyMissing,
+	"never":   PullPolicyNever,
+}
+
+// boolToPullPolicy converts a boolean to a PullPolicy.
+func boolToPullPolicy(b bool) PullPolicy {
+	if b {
+		return PullPolicyAlways
+	}
+	return PullPolicyNever
+}
+
+// ParsePullPolicy parses a pull policy from a raw value.
+func ParsePullPolicy(raw any) (PullPolicy, error) {
+	switch value := raw.(type) {
+	case nil:
+		// If the value is nil, return PullPolicyMissing
+		return PullPolicyMissing, nil
+	case string:
+		if value == "" {
+			// If the string is empty, return PullPolicyMissing
+			return PullPolicyMissing, nil
 		}
-	}
-	return false
-}
-
-// SockAddr returns the unix socket address for the DAG.
-// The address is used to communicate with the agent process.
-func (d *DAG) SockAddr(dagRunID string) string {
-	if d.Location != "" {
-		return SockAddr(d.Location, "")
-	}
-	return SockAddr(d.Name, dagRunID)
-}
-
-// SockAddrForChildDAGRun returns the unix socket address for a specific dag-run ID.
-// This is used to control child dag-runs.
-func (d *DAG) SockAddrForChildDAGRun(dagRunID string) string {
-	return SockAddr(d.GetName(), dagRunID)
-}
-
-// GetName returns the name of the DAG.
-// If the name is not set, it returns the default name (filename without extension).
-func (d *DAG) GetName() string {
-	name := d.Name
-	if name != "" {
-		return name
-	}
-	return defaultName(d.Location)
-}
-
-// String implements the Stringer interface.
-// String returns a formatted string representation of the DAG
-func (d *DAG) String() string {
-	var sb strings.Builder
-
-	sb.WriteString("{\n")
-	fmt.Fprintf(&sb, "\tName: %s\n", d.Name)
-	fmt.Fprintf(&sb, "\tDescription: %s\n", strings.TrimSpace(d.Description))
-	fmt.Fprintf(&sb, "\tParams: %v\n", strings.Join(d.Params, ", "))
-	fmt.Fprintf(&sb, "\tLogDir: %v\n", d.LogDir)
-
-	for i, step := range d.Steps {
-		fmt.Fprintf(&sb, "\tStep%d: %s\n", i, step.String())
-	}
-
-	sb.WriteString("}\n")
-	return sb.String()
-}
-
-// Validate performs basic validation of the DAG structure
-func (d *DAG) Validate() error {
-	// Ensure all referenced steps exist
-	stepMap := make(map[string]bool)
-	for _, step := range d.Steps {
-		stepMap[step.Name] = true
-	}
-
-	// Check dependencies
-	for _, step := range d.Steps {
-		for _, dep := range step.Depends {
-			if !stepMap[dep] {
-				var errList error = ErrorList{
-					wrapError("depends", dep, fmt.Errorf("step %s depends on non-existent step", step.Name)),
-				}
-				return errList
-			}
+		// Try to parse the string as a pull policy
+		pull, ok := pullPolicyMap[value]
+		if ok {
+			return pull, nil
 		}
-	}
 
-	return nil
-}
-
-// initializeDefaults sets the default values for the DAG.
-func (d *DAG) initializeDefaults() {
-	// Set the name if not set.
-	if d.Name == "" {
-		d.Name = defaultName(d.Location)
-	}
-
-	// Set default type to chain if not specified.
-	if d.Type == "" {
-		d.Type = TypeChain
-	}
-
-	// Set default history retention days to 30 if not specified.
-	if d.HistRetentionDays == 0 {
-		d.HistRetentionDays = defaultDAGRunRetentionDays
-	}
-
-	// Set default max cleanup time to 60 seconds if not specified.
-	if d.MaxCleanUpTime == 0 {
-		d.MaxCleanUpTime = defaultMaxCleanUpTime
-	}
-
-	// Set default max active runs to 1 only when not specified (0).
-	// MaxActiveRuns < 0 means queueing is disabled for this DAG.
-	if d.MaxActiveRuns == 0 {
-		d.MaxActiveRuns = 1
-	}
-
-	// Set default max output size to 1MB if not specified.
-	if d.MaxOutputSize == 0 {
-		d.MaxOutputSize = 1024 * 1024 // 1MB
-	}
-
-	// Ensure we have a valid working directory
-	var workDir = "."
-	if d.Location != "" {
-		workDir = filepath.Dir(d.Location)
-	}
-
-	// Setup steps and handlers with the working directory
-	d.setupSteps(workDir)
-	d.setupHandlers(workDir)
-}
-
-// setupSteps initializes all steps
-func (d *DAG) setupSteps(workDir string) {
-	for i := range d.Steps {
-		d.Steps[i].setup(workDir)
-	}
-}
-
-// setupHandlers initializes all event handlers
-func (d *DAG) setupHandlers(workDir string) {
-	handlers := []*Step{
-		d.HandlerOn.Exit,
-		d.HandlerOn.Success,
-		d.HandlerOn.Failure,
-		d.HandlerOn.Cancel,
-	}
-
-	for _, handler := range handlers {
-		if handler != nil {
-			handler.setup(workDir)
+		// If the string is not a valid pull policy, try to parse it as a boolean
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return PullPolicyMissing, fmt.Errorf("failed to parse pull policy as boolean: %w", err)
 		}
+		return boolToPullPolicy(b), nil
+	case bool:
+		return boolToPullPolicy(value), nil
+	default:
+		return PullPolicyMissing, fmt.Errorf("invalid pull policy type: %T", raw)
 	}
 }
 
