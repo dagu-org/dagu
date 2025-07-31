@@ -1,6 +1,6 @@
 <div align="center">
   <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
-  <h3>A lightweight and powerful workflow engine for enterprise & small teams</h3>
+  <h3>A lightweight and powerful workflow engine</h3>
   <p>Self-contained. Language agnostic. Lightweight.</p>
   
   <p>
@@ -17,7 +17,7 @@
   </p>
 </div>
 
-# Overview - Orchestrate workflows without complexity
+# Overview - Workflow Engine for Small Teams
 
 Dagu */dah-goo/* is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
 
@@ -37,7 +37,7 @@ Note: For a list of features, please refer to the [documentation](https://docs.d
 
 Workflow jobs are defined as commands. Therefore, legacy scripts that have been in operation for a long time within a company or organization can be used as-is without modification. There is no need to learn a complex new language, and you can start using it right away.
 
-Dagu is designed for small teams of 1-3 people to easily manage complex workflows. It aims to be an ideal choice for teams that find large-scale, high-cost infrastructure like Airflow to be overkill and are looking for a simpler solution. It requires no database management and only needs a shared filesystem, allowing you to focus on your high-value work.
+Dagu is designed for enterprise & small teams to easily manage complex workflows. It aims to be an ideal choice for teams that find large-scale, high-cost infrastructure like Airflow to be overkill and are looking for a simpler solution. It requires no database management and only needs a shared filesystem, allowing you to focus on your high-value work.
 
 ## Use Cases
 
@@ -135,6 +135,19 @@ dagu start-all
 
 Visit http://localhost:8080
 
+## Documentation
+
+Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
+
+**Helpful Links**:
+
+- [Feature by Examples](https://docs.dagu.cloud/writing-workflows/examples) - Explore useful features with examples
+- [Distributed Execution](https://docs.dagu.cloud/features/distributed-execution) - How to run workflows across multiple machines
+- [Scheduling](https://docs.dagu.cloud/features/scheduling) - Learn about flexible scheduling options (start, stop, restart) with cron syntax
+- [Authentication](https://docs.dagu.cloud/configurations/authentication) - Configure authentication for the Web UI
+- [Configuration](https://docs.dagu.cloud/configurations/reference) - Detailed configuration options for customizing Dagu
+- [Changelog](https://docs.dagu.cloud/reference/changelog) - Keep up with the latest updates and changes
+
 ## Development
 
 ### Building from Source
@@ -162,19 +175,6 @@ pnpm dev
 ```
 
 Navigate to http://localhost:8081 to view the frontend.
-
-## Documentation
-
-Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
-
-**Helpful Links**:
-
-- [Feature by Examples](https://docs.dagu.cloud/writing-workflows/examples) - Explore useful features with examples
-- [Distributed Execution](https://docs.dagu.cloud/features/distributed-execution) - How to run workflows across multiple machines
-- [Scheduling](https://docs.dagu.cloud/features/scheduling) - Learn about flexible scheduling options (start, stop, restart) with cron syntax
-- [Authentication](https://docs.dagu.cloud/configurations/authentication) - Configure authentication for the Web UI
-- [Configuration](https://docs.dagu.cloud/configurations/reference) - Detailed configuration options for customizing Dagu
-- [Changelog](https://docs.dagu.cloud/reference/changelog) - Keep up with the latest updates and changes
 
 ## Discussion
 
