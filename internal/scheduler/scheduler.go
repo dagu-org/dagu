@@ -297,7 +297,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			alive, err = s.procStore.CountAlive(ctx, dag.QueueName())
+			alive, err = s.procStore.CountAlive(ctx, dag.QueueProcName())
 			if err != nil {
 				logger.Error(ctx, "Failed to count alive processes", "err", err, "data", data)
 				goto SEND_RESULT
