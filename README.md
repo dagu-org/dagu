@@ -17,39 +17,6 @@
   </p>
 </div>
 
-
-<!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
-
-<!-- code_chunk_output -->
-
-- [Overview - Orchestrate workflows without complexity](#overview---orchestrate-workflows-without-complexity)
-  - [Use Cases](#use-cases)
-  - [Quick Demos](#quick-demos)
-  - [Quick Start](#quick-start)
-    - [1. Install dagu](#1-install-dagu)
-    - [2. Create your first workflow](#2-create-your-first-workflow)
-    - [3. Run the workflow](#3-run-the-workflow)
-    - [4. Check the status and view logs](#4-check-the-status-and-view-logs)
-    - [5. Explore the Web UI](#5-explore-the-web-ui)
-  - [Development](#development)
-    - [Building from Source](#building-from-source)
-      - [Prerequisites](#prerequisites)
-      - [1. Clone the repository and build server](#1-clone-the-repository-and-build-server)
-      - [2. Run the frontend development server](#2-run-the-frontend-development-server)
-  - [Documentation](#documentation)
-  - [Discussion](#discussion)
-  - [Recent Updates](#recent-updates)
-    - [v1.18 - 2025-07-29](#v118---2025-07-29)
-  - [Contributing](#contributing)
-  - [Acknowledgements](#acknowledgements)
-    - [Contributors](#contributors)
-    - [Sponsors & Supporters](#sponsors--supporters)
-  - [License](#license)
-
-<!-- /code_chunk_output -->
-
-
-
 # Overview - Orchestrate workflows without complexity
 
 Dagu */dah-goo/* is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
