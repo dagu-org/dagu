@@ -112,6 +112,13 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	s.cancel = cancel
 	defer cancel()
 
+	// Start health check server only if not disabled
+	if !s.disableHealthServer {
+		if err := s.healthServer.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start health check server: %w", err)
+		}
+	}
+
 	// Acquire directory lock first to prevent multiple scheduler instances
 	logger.Info(ctx, "Waiting to acquire scheduler lock")
 	if err := s.dirLock.Lock(ctx); err != nil {
@@ -119,13 +126,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	}
 
 	logger.Info(ctx, "Acquired scheduler lock")
-
-	// Start health check server only if not disabled
-	if !s.disableHealthServer {
-		if err := s.healthServer.Start(ctx); err != nil {
-			return fmt.Errorf("failed to start health check server: %w", err)
-		}
-	}
 
 	// Ensure lock is always released
 	defer func() {
