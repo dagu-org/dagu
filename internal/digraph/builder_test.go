@@ -1971,7 +1971,7 @@ steps:
 		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.Container)
-		
+
 		assert.Equal(t, "node:18-alpine", dag.Container.Image)
 		assert.Equal(t, digraph.PullPolicyMissing, dag.Container.PullPolicy)
 		assert.Contains(t, dag.Container.Env, "NODE_ENV=production")
@@ -2116,6 +2116,109 @@ steps:
 		_, err := digraph.LoadYAML(ctx, []byte(yaml))
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "image is required when container is specified")
+	})
+}
+
+func TestContainerExecutorIntegration(t *testing.T) {
+	t.Run("StepInheritsContainerExecutor", func(t *testing.T) {
+		yaml := `
+name: test
+container:
+  image: python:3.11-slim
+steps:
+  - name: step1
+    command: python script.py
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		// Step should have docker executor type when DAG has container
+		assert.Equal(t, "docker", dag.Steps[0].ExecutorConfig.Type)
+	})
+
+	t.Run("ExplicitExecutorOverridesContainer", func(t *testing.T) {
+		yaml := `
+name: test
+container:
+  image: python:3.11-slim
+steps:
+  - name: step1
+    command: echo test
+    executor: shell
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		// Explicit executor should override DAG-level container
+		assert.Equal(t, "shell", dag.Steps[0].ExecutorConfig.Type)
+	})
+
+	t.Run("NoContainerNoExecutor", func(t *testing.T) {
+		yaml := `
+name: test
+steps:
+  - name: step1
+    command: echo test
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		// No container and no executor means default (empty) executor
+		assert.Equal(t, "", dag.Steps[0].ExecutorConfig.Type)
+	})
+
+	t.Run("StepWithDockerExecutorConfig", func(t *testing.T) {
+		yaml := `
+name: test
+container:
+  image: node:18-alpine
+steps:
+  - name: step1
+    command: node app.js
+    executor:
+      type: docker
+      config:
+        image: python:3.11
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		// Step-level docker config should override DAG container
+		assert.Equal(t, "docker", dag.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "python:3.11", dag.Steps[0].ExecutorConfig.Config["image"])
+	})
+
+	t.Run("MultipleStepsWithContainer", func(t *testing.T) {
+		yaml := `
+name: test
+container:
+  image: alpine:latest
+steps:
+  - name: step1
+    command: echo "step 1"
+  - name: step2
+    command: echo "step 2"
+    executor: shell
+  - name: step3
+    command: echo "step 3"
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 3)
+
+		// Step 1 and 3 should inherit docker executor
+		assert.Equal(t, "docker", dag.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "shell", dag.Steps[1].ExecutorConfig.Type)
+		assert.Equal(t, "docker", dag.Steps[2].ExecutorConfig.Type)
 	})
 }
 
