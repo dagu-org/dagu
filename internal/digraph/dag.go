@@ -195,9 +195,9 @@ func WithStep(step string) TaskOption {
 	}
 }
 
-// QueueName returns the name of the queue for this DAG.
+// QueueProcName returns the name of the queue for this DAG.
 // If the queue is not set, it returns the DAG name as the default queue name.
-func (d *DAG) QueueName() string {
+func (d *DAG) QueueProcName() string {
 	// If the queue is not set, return the default queue name.
 	if d.Queue == "" {
 		return d.Name
