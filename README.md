@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./assets/images/dagu-logo.webp" width="480" alt="dagu Logo">
+  <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
   <h3>A lightweight and powerful workflow engine for enterprise & small teams</h3>
   <p>Self-contained. Language agnostic. Lightweight.</p>
   
@@ -70,11 +70,11 @@ Note: For a list of features, please refer to the [documentation](https://docs.d
 
 Workflow jobs are defined as commands. Therefore, legacy scripts that have been in operation for a long time within a company or organization can be used as-is without modification. There is no need to learn a complex new language, and you can start using it right away.
 
-dagu is designed for small teams of 1-3 people to easily manage complex workflows. It aims to be an ideal choice for teams that find large-scale, high-cost infrastructure like Airflow to be overkill and are looking for a simpler solution. It requires no database management and only needs a shared filesystem, allowing you to focus on your high-value work.
+Dagu is designed for small teams of 1-3 people to easily manage complex workflows. It aims to be an ideal choice for teams that find large-scale, high-cost infrastructure like Airflow to be overkill and are looking for a simpler solution. It requires no database management and only needs a shared filesystem, allowing you to focus on your high-value work.
 
 ## Use Cases
 
-dagu is designed to orchestrate workflows across various domains, particularly those involving multi-step batch jobs and complex data dependencies. Example applications include:
+Dagu is designed to orchestrate workflows across various domains, particularly those involving multi-step batch jobs and complex data dependencies. Example applications include:
 
 * AI/ML & Data Science - Automating machine learning workflows, including data ingestion, feature engineering, model training, validation, and deployment.
 * Geospatial & Environmental Analysis - Processing datasets from sources such as satellites (earth observation), aerial/terrestrial sensors, seismic surveys, and ground-based radar. Common uses include numerical weather prediction and natural resource management.
@@ -142,7 +142,7 @@ Note: see [documentation](https://docs.dagu.cloud/getting-started/installation) 
 cat > ./hello.yaml << 'EOF'
 steps:
   - name: hello
-    command: echo "Hello from dagu!"
+    command: echo "Hello from Dagu!"
   - name: world  
     command: echo "Running step 2"
 EOF
@@ -200,6 +200,14 @@ Navigate to http://localhost:8081 to view the frontend.
 
 Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
 
+**Helpful Links**:
+
+- [Feature by Examples](https://docs.dagu.cloud/writing-workflows/examples) - Explore useful features with examples
+- [Distributed Execution](https://docs.dagu.cloud/features/distributed-execution) - How to run workflows across multiple machines
+- [Scheduling](https://docs.dagu.cloud/features/scheduling) - Learn about flexible scheduling options (start, stop, restart) with cron syntax
+- [Authentication](https://docs.dagu.cloud/configurations/authentication) - Configure authentication for the Web UI
+- [Configuration](https://docs.dagu.cloud/configurations/reference) - Detailed configuration options for customizing Dagu
+
 ## Discussion
 
 For discussions, support, and sharing ideas, join our community on [Discord](https://discord.gg/gpahPUjGRk).
@@ -235,14 +243,14 @@ For detailed contribution guidelines, please refer to our [CONTRIBUTING.md](./CO
   <img src="https://contrib.rocks/image?repo=dagu-org/dagu" />
 </a>
 
-Thanks to all the contributors who have helped make dagu better! Your contributions, whether through code, documentation, or feedback, are invaluable to the project.
+Thanks to all the contributors who have helped make Dagu better! Your contributions, whether through code, documentation, or feedback, are invaluable to the project.
 
 ### Sponsors & Supporters
 
 <a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a>
 <a href="https://github.com/yurivish"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyurivish.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yurivish"></a>
 
-Thanks for supporting dagu’s development! Join our supporters: [GitHub Sponsors](https://github.com/sponsors/dagu-org)
+Thanks for supporting Dagu’s development! Join our supporters: [GitHub Sponsors](https://github.com/sponsors/dagu-org)
 
 ## License
 
@@ -251,5 +259,5 @@ GNU GPLv3 - See [LICENSE](./LICENSE)
 ---
 
 <div align="center">
-  <p>If you find dagu useful, please ⭐ star this repository</p>
+  <p>If you find Dagu useful, please ⭐ star this repository</p>
 </div>
