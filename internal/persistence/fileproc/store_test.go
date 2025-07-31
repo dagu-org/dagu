@@ -37,7 +37,7 @@ func TestStore(t *testing.T) {
 	}()
 
 	// Check if the count is 1
-	count, err := store.CountAlive(ctx, dagRun.Name)
+	count, err := store.CountAlive(ctx, "test_dag")
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 1, count, "expected 1 proc file")
 
@@ -45,7 +45,7 @@ func TestStore(t *testing.T) {
 	<-done
 
 	// Check if the count is 0
-	count, err = store.CountAlive(ctx, dagRun.Name)
+	count, err = store.CountAlive(ctx, "test_dag")
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 0, count, "expected 0 proc files")
 }
