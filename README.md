@@ -182,20 +182,7 @@ For discussions, support, and sharing ideas, join our community on [Discord](htt
 
 ## Recent Updates
 
-### v1.18 - 2025-07-29
-- **OpenID Connect (OIDC) Support**: OpenID Connect authentication for secure access ([@Arvintian](https://github.com/Arvintian))
-- **Distributed Execution**: Run steps across multiple machines with worker processes
-- **High Availability**: Redundant scheduler instances with automatic failover
-- **Step-level Environment Variables**: Define environment variables specific to individual steps ([@admerzeau](https://github.com/admerzeau))
-- **Scheduler Health Check**: HTTP health check endpoint for monitoring (default: `http://localhost:8090/health`) - automatically enabled with `dagu scheduler` ([@jonasban](https://github.com/jonasban))
-- **Enhanced Repeat Policy**: Explicit `until` and `while` modes for clearer repeat logic ([@thefishhat](https://github.com/thefishhat))
-- **Exponential Backoff**: Added exponential backoff support for retry policies ([@Sarvesh-11](https://github.com/Sarvesh-11))
-- **Live Log Loading**: Real-time log streaming in the Web UI ([@tapir](https://github.com/tapir))
-- **Partial Success Status**: Step-level partial success for sub-DAG executions ([@ghansham](https://github.com/ghansham))
-- **Multiple Email Recipients**: Support for multiple recipients in email notifications
-- **UI Improvements**: Manual sidebar toggle, better DAG sorting, and various enhancements ([@ghansham](https://github.com/ghansham))
-
-[Full changelog](https://docs.dagu.cloud/reference/changelog)
+Changelog of recent updates can be found in the [Changelog](https://docs.dagu.cloud/reference/changelog) section of the documentation.
 
 ## Contributing
 
