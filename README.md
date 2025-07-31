@@ -43,7 +43,7 @@
   - [Contributing](#contributing)
   - [Acknowledgements](#acknowledgements)
     - [Contributors](#contributors)
-    - [Sponsors \& Supporters](#sponsors--supporters)
+    - [Sponsors & Supporters](#sponsors--supporters)
   - [License](#license)
 
 <!-- /code_chunk_output -->
@@ -225,8 +225,7 @@ For discussions, support, and sharing ideas, join our community on [Discord](htt
 
 We welcome contributions of all kinds! If you have ideas, suggestions, or improvements, please open an issue or submit a pull request.
 
-- [Discord Community](https://discord.gg/gpahPUjGRk)
-- [GitHub Issues](https://github.com/dagu-org/dagu/issues)
+For detailed contribution guidelines, please refer to our [CONTRIBUTING.md](./CONTRIBUTING.md) file.
 
 ## Acknowledgements
 
