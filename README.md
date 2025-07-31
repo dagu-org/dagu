@@ -135,6 +135,19 @@ dagu start-all
 
 Visit http://localhost:8080
 
+## Documentation
+
+Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
+
+**Helpful Links**:
+
+- [Feature by Examples](https://docs.dagu.cloud/writing-workflows/examples) - Explore useful features with examples
+- [Distributed Execution](https://docs.dagu.cloud/features/distributed-execution) - How to run workflows across multiple machines
+- [Scheduling](https://docs.dagu.cloud/features/scheduling) - Learn about flexible scheduling options (start, stop, restart) with cron syntax
+- [Authentication](https://docs.dagu.cloud/configurations/authentication) - Configure authentication for the Web UI
+- [Configuration](https://docs.dagu.cloud/configurations/reference) - Detailed configuration options for customizing Dagu
+- [Changelog](https://docs.dagu.cloud/reference/changelog) - Keep up with the latest updates and changes
+
 ## Development
 
 ### Building from Source
@@ -162,19 +175,6 @@ pnpm dev
 ```
 
 Navigate to http://localhost:8081 to view the frontend.
-
-## Documentation
-
-Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
-
-**Helpful Links**:
-
-- [Feature by Examples](https://docs.dagu.cloud/writing-workflows/examples) - Explore useful features with examples
-- [Distributed Execution](https://docs.dagu.cloud/features/distributed-execution) - How to run workflows across multiple machines
-- [Scheduling](https://docs.dagu.cloud/features/scheduling) - Learn about flexible scheduling options (start, stop, restart) with cron syntax
-- [Authentication](https://docs.dagu.cloud/configurations/authentication) - Configure authentication for the Web UI
-- [Configuration](https://docs.dagu.cloud/configurations/reference) - Detailed configuration options for customizing Dagu
-- [Changelog](https://docs.dagu.cloud/reference/changelog) - Keep up with the latest updates and changes
 
 ## Discussion
 
