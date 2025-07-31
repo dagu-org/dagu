@@ -2100,6 +2100,23 @@ steps:
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse pull policy")
 	})
+
+	t.Run("ContainerWithoutImage", func(t *testing.T) {
+		yaml := `
+name: test
+container:
+  pullPolicy: always
+  env:
+    - FOO: bar
+steps:
+  - name: step1
+    command: echo test
+`
+		ctx := context.Background()
+		_, err := digraph.LoadYAML(ctx, []byte(yaml))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "image is required when container is specified")
+	})
 }
 
 func TestStepLevelEnv(t *testing.T) {

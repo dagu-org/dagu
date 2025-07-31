@@ -500,6 +500,19 @@ type Container struct {
 
 type PullPolicy int
 
+func (p PullPolicy) String() string {
+	switch p {
+	case PullPolicyAlways:
+		return "always"
+	case PullPolicyNever:
+		return "never"
+	case PullPolicyMissing:
+		return "missing"
+	default:
+		return "unknown"
+	}
+}
+
 const (
 	PullPolicyAlways PullPolicy = iota
 	PullPolicyNever

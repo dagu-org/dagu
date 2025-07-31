@@ -24,6 +24,12 @@ type BuildContext struct {
 	opts BuildOpts
 }
 
+// StepBuildContext is the context for building a step.
+type StepBuildContext struct {
+	BuildContext
+	dag *DAG
+}
+
 func (c BuildContext) WithOpts(opts BuildOpts) BuildContext {
 	copy := c
 	copy.opts = opts
@@ -67,8 +73,6 @@ var builderRegistry = []builderEntry{
 	{name: "container", fn: buildContainer},
 	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
-	{name: "steps", fn: buildSteps},
-	{name: "validateSteps", fn: validateSteps},
 	{name: "logDir", fn: buildLogDir},
 	{name: "handlers", fn: buildHandlers},
 	{name: "smtpConfig", fn: buildSMTPConfig},
@@ -79,6 +83,8 @@ var builderRegistry = []builderEntry{
 	{name: "maxActiveRuns", fn: buildMaxActiveRuns},
 	{name: "preconditions", fn: buildPrecondition},
 	{name: "otel", fn: buildOTel},
+	{name: "steps", fn: buildSteps},
+	{name: "validateSteps", fn: validateSteps},
 }
 
 type builderEntry struct {
@@ -109,7 +115,7 @@ type stepBuilderEntry struct {
 }
 
 // StepBuilderFn is a function that builds a part of the step.
-type StepBuilderFn func(ctx BuildContext, def stepDef, step *Step) error
+type StepBuilderFn func(ctx StepBuildContext, def stepDef, step *Step) error
 
 // build builds a DAG from the specification.
 func build(ctx BuildContext, spec *definition) (*DAG, error) {
@@ -258,6 +264,11 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
 	if spec.Container == nil {
 		return nil
+	}
+
+	// Validate required fields
+	if spec.Container.Image == "" {
+		return wrapError("container.image", spec.Container.Image, fmt.Errorf("image is required when container is specified"))
 	}
 
 	pullPolicy, err := ParsePullPolicy(spec.Container.PullPolicy)
@@ -427,30 +438,32 @@ func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
 // The handlers are executed when the DAG is stopped, succeeded, failed, or
 // cancelled.
 func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
+
 	if spec.HandlerOn.Exit != nil {
 		spec.HandlerOn.Exit.Name = HandlerOnExit.String()
-		if dag.HandlerOn.Exit, err = buildStep(ctx, *spec.HandlerOn.Exit); err != nil {
+		if dag.HandlerOn.Exit, err = buildStep(buildCtx, *spec.HandlerOn.Exit); err != nil {
 			return err
 		}
 	}
 
 	if spec.HandlerOn.Success != nil {
 		spec.HandlerOn.Success.Name = HandlerOnSuccess.String()
-		if dag.HandlerOn.Success, err = buildStep(ctx, *spec.HandlerOn.Success); err != nil {
+		if dag.HandlerOn.Success, err = buildStep(buildCtx, *spec.HandlerOn.Success); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Failure != nil {
 		spec.HandlerOn.Failure.Name = HandlerOnFailure.String()
-		if dag.HandlerOn.Failure, err = buildStep(ctx, *spec.HandlerOn.Failure); err != nil {
+		if dag.HandlerOn.Failure, err = buildStep(buildCtx, *spec.HandlerOn.Failure); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Cancel != nil {
 		spec.HandlerOn.Cancel.Name = HandlerOnCancel.String()
-		if dag.HandlerOn.Cancel, err = buildStep(ctx, *spec.HandlerOn.Cancel); err != nil {
+		if dag.HandlerOn.Cancel, err = buildStep(buildCtx, *spec.HandlerOn.Cancel); err != nil {
 			return
 		}
 	}
@@ -571,6 +584,8 @@ func skipIfSuccessful(_ BuildContext, spec *definition, dag *DAG) error {
 
 // buildSteps builds the steps for the DAG.
 func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
+	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
+
 	switch v := spec.Steps.(type) {
 	case nil:
 		return nil
@@ -585,7 +600,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 			return wrapError("steps", v, err)
 		}
 		for _, stepDef := range stepDefs {
-			step, err := buildStep(ctx, stepDef)
+			step, err := buildStep(buildCtx, stepDef)
 			if err != nil {
 				return err
 			}
@@ -608,7 +623,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		}
 		for name, stepDef := range stepDefs {
 			stepDef.Name = name
-			step, err := buildStep(ctx, stepDef)
+			step, err := buildStep(buildCtx, stepDef)
 			if err != nil {
 				return err
 			}
@@ -834,7 +849,7 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 }
 
 // buildStep builds a step from the step definition.
-func buildStep(ctx BuildContext, def stepDef) (*Step, error) {
+func buildStep(ctx StepBuildContext, def stepDef) (*Step, error) {
 	step := &Step{
 		Name:           def.Name,
 		ID:             def.ID,
@@ -858,7 +873,7 @@ func buildStep(ctx BuildContext, def stepDef) (*Step, error) {
 	return step, nil
 }
 
-func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
+func buildContinueOn(_ StepBuildContext, def stepDef, step *Step) error {
 	if def.ContinueOn == nil {
 		return nil
 	}
@@ -882,7 +897,7 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 }
 
 // buildRetryPolicy builds the retry policy for a step.
-func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
+func buildRetryPolicy(_ StepBuildContext, def stepDef, step *Step) error {
 	if def.RetryPolicy != nil {
 		switch v := def.RetryPolicy.Limit.(type) {
 		case int:
@@ -995,7 +1010,7 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 // - Boolean true is equivalent to "while" mode with unconditional repetition
 //
 // Precedence: condition > exitCode > unconditional repeat
-func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
+func buildRepeatPolicy(_ StepBuildContext, def stepDef, step *Step) error {
 	if def.RepeatPolicy == nil {
 		return nil
 	}
@@ -1094,7 +1109,7 @@ func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-func buildOutput(_ BuildContext, def stepDef, step *Step) error {
+func buildOutput(_ StepBuildContext, def stepDef, step *Step) error {
 	if def.Output == "" {
 		return nil
 	}
@@ -1108,14 +1123,14 @@ func buildOutput(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-func buildStepEnvs(ctx BuildContext, def stepDef, step *Step) error {
+func buildStepEnvs(ctx StepBuildContext, def stepDef, step *Step) error {
 	if def.Env == nil {
 		return nil
 	}
 	// For step environment variables, we load them without evaluation. They will
 	// be evaluated later when the step is executed.
 	ctx.opts.NoEval = true
-	vars, err := loadVariables(ctx, def.Env)
+	vars, err := loadVariables(ctx.BuildContext, def.Env)
 	if err != nil {
 		return err
 	}
@@ -1125,7 +1140,7 @@ func buildStepEnvs(ctx BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-func validateStep(_ BuildContext, def stepDef, step *Step) error {
+func validateStep(_ StepBuildContext, def stepDef, step *Step) error {
 	if step.Name == "" {
 		return wrapError("name", step.Name, ErrStepNameRequired)
 	}
@@ -1166,13 +1181,13 @@ func validateStep(_ BuildContext, def stepDef, step *Step) error {
 // maxStepNameLen is the maximum length of a step name.
 const maxStepNameLen = 40
 
-func buildStepPrecondition(ctx BuildContext, def stepDef, step *Step) error {
+func buildStepPrecondition(ctx StepBuildContext, def stepDef, step *Step) error {
 	// Parse both `preconditions` and `precondition` fields.
-	conditions, err := parsePrecondition(ctx, def.Preconditions)
+	conditions, err := parsePrecondition(ctx.BuildContext, def.Preconditions)
 	if err != nil {
 		return err
 	}
-	condition, err := parsePrecondition(ctx, def.Precondition)
+	condition, err := parsePrecondition(ctx.BuildContext, def.Precondition)
 	if err != nil {
 		return err
 	}
@@ -1181,7 +1196,7 @@ func buildStepPrecondition(ctx BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
+func buildSignalOnStop(_ StepBuildContext, def stepDef, step *Step) error {
 	if def.SignalOnStop != nil {
 		sigDef := *def.SignalOnStop
 		sig := getSignalNum(sigDef)
@@ -1194,7 +1209,7 @@ func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 }
 
 // buildChildDAG parses the child DAG definition and sets up the step to run a child DAG.
-func buildChildDAG(ctx BuildContext, def stepDef, step *Step) error {
+func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
 	name := def.Run
 
 	// if the run field is not set, return nil.
@@ -1208,7 +1223,7 @@ func buildChildDAG(ctx BuildContext, def stepDef, step *Step) error {
 		// Parse the params to convert them to string format
 		ctxCopy := ctx
 		ctxCopy.opts.NoEval = true // Disable evaluation for params parsing
-		paramPairs, err := parseParamValue(ctxCopy, def.Params)
+		paramPairs, err := parseParamValue(ctxCopy.BuildContext, def.Params)
 		if err != nil {
 			return wrapError("params", def.Params, err)
 		}
@@ -1237,7 +1252,7 @@ func buildChildDAG(ctx BuildContext, def stepDef, step *Step) error {
 }
 
 // buildDepends parses the depends field in the step definition.
-func buildDepends(_ BuildContext, def stepDef, step *Step) error {
+func buildDepends(_ StepBuildContext, def stepDef, step *Step) error {
 	deps, err := parseStringOrArray(def.Depends)
 	if err != nil {
 		return wrapError("depends", def.Depends, ErrDependsMustBeStringOrArray)
@@ -1254,9 +1269,13 @@ func buildDepends(_ BuildContext, def stepDef, step *Step) error {
 
 // buildExecutor parses the executor field in the step definition.
 // Case 1: executor is nil
+//
+//	Case 1.1: DAG level 'container' field is set
+//	Case 1.2: No executor is set, use default executor
+//
 // Case 2: executor is a string
 // Case 3: executor is a struct
-func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
+func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 	const (
 		executorKeyType   = "type"
 		executorKeyConfig = "config"
@@ -1266,6 +1285,10 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 
 	// Case 1: executor is nil
 	if executor == nil {
+		if ctx.dag.Container != nil {
+			// Translate the container configuration to executor config
+			return translateExecutorConfig(ctx, def, step)
+		}
 		return nil
 	}
 
@@ -1313,6 +1336,22 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 		return wrapError("executor", val, ErrExecutorConfigMustBeStringOrMap)
 
 	}
+
+	return nil
+}
+
+func translateExecutorConfig(ctx StepBuildContext, def stepDef, step *Step) error {
+	// If the executor is nil, but the DAG has a container field,
+	// we translate the container configuration to executor config.
+	if ctx.dag.Container == nil {
+		return nil // No container configuration to translate
+	}
+
+	// Translate container fields to executor config
+	step.ExecutorConfig.Type = "docker"
+
+	// The other fields will be retrieved from the container configuration on
+	// execution time, so we don't need to set them here.
 
 	return nil
 }
@@ -1388,7 +1427,7 @@ func parseStringOrArray(v any) ([]string, error) {
 // - Direct array reference: parallel: ${ITEMS}
 // - Static array: parallel: [item1, item2]
 // - Object configuration: parallel: {items: [...], maxConcurrent: 5}
-func buildParallel(ctx BuildContext, def stepDef, step *Step) error {
+func buildParallel(ctx StepBuildContext, def stepDef, step *Step) error {
 	if def.Parallel == nil {
 		return nil
 	}
