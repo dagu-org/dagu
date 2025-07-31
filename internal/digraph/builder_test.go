@@ -1924,6 +1924,184 @@ steps:
 	})
 }
 
+func TestContainer(t *testing.T) {
+	t.Run("BasicContainer", func(t *testing.T) {
+		yaml := `
+name: test
+container:
+  image: python:3.11-slim
+  pullPolicy: always
+steps:
+  - name: step1
+    command: python script.py
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Container)
+		assert.Equal(t, "python:3.11-slim", dag.Container.Image)
+		assert.Equal(t, digraph.PullPolicyAlways, dag.Container.PullPolicy)
+	})
+
+	t.Run("ContainerWithAllFields", func(t *testing.T) {
+		yaml := `
+name: test
+container:
+  image: node:18-alpine
+  pullPolicy: missing
+  env:
+    - NODE_ENV: production
+    - API_KEY: secret123
+  volumes:
+    - /data:/data:ro
+    - /output:/output:rw
+  user: "1000:1000"
+  workDir: /app
+  platform: linux/amd64
+  ports:
+    - "8080:8080"
+    - "9090:9090"
+  network: bridge
+  keepContainer: true
+steps:
+  - name: step1
+    command: node app.js
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Container)
+		
+		assert.Equal(t, "node:18-alpine", dag.Container.Image)
+		assert.Equal(t, digraph.PullPolicyMissing, dag.Container.PullPolicy)
+		assert.Contains(t, dag.Container.Env, "NODE_ENV=production")
+		assert.Contains(t, dag.Container.Env, "API_KEY=secret123")
+		assert.Equal(t, []string{"/data:/data:ro", "/output:/output:rw"}, dag.Container.Volumes)
+		assert.Equal(t, "1000:1000", dag.Container.User)
+		assert.Equal(t, "/app", dag.Container.WorkDir)
+		assert.Equal(t, "linux/amd64", dag.Container.Platform)
+		assert.Equal(t, []string{"8080:8080", "9090:9090"}, dag.Container.Ports)
+		assert.Equal(t, "bridge", dag.Container.Network)
+		assert.True(t, dag.Container.KeepContainer)
+	})
+
+	t.Run("ContainerEnvAsMap", func(t *testing.T) {
+		yaml := `
+name: test
+container:
+  image: alpine
+  env:
+    FOO: bar
+    BAZ: qux
+steps:
+  - name: step1
+    command: echo test
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Container)
+		assert.Contains(t, dag.Container.Env, "FOO=bar")
+		assert.Contains(t, dag.Container.Env, "BAZ=qux")
+	})
+
+	t.Run("ContainerPullPolicyVariations", func(t *testing.T) {
+		testCases := []struct {
+			name       string
+			pullPolicy string
+			expected   digraph.PullPolicy
+		}{
+			{"always", "always", digraph.PullPolicyAlways},
+			{"never", "never", digraph.PullPolicyNever},
+			{"missing", "missing", digraph.PullPolicyMissing},
+			{"true", "true", digraph.PullPolicyAlways},
+			{"false", "false", digraph.PullPolicyNever},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				yaml := `
+name: test
+container:
+  image: alpine
+  pullPolicy: ` + tc.pullPolicy + `
+steps:
+  - name: step1
+    command: echo test
+`
+				ctx := context.Background()
+				dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+				require.NoError(t, err)
+				require.NotNil(t, dag.Container)
+				assert.Equal(t, tc.expected, dag.Container.PullPolicy)
+			})
+		}
+	})
+
+	t.Run("ContainerPullPolicyBoolean", func(t *testing.T) {
+		// Test with boolean true
+		yaml := `
+name: test
+container:
+  image: alpine
+  pullPolicy: true
+steps:
+  - name: step1
+    command: echo test
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Container)
+		assert.Equal(t, digraph.PullPolicyAlways, dag.Container.PullPolicy)
+	})
+
+	t.Run("ContainerWithoutPullPolicy", func(t *testing.T) {
+		yaml := `
+name: test
+container:
+  image: alpine
+steps:
+  - name: step1
+    command: echo test
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Container)
+		assert.Equal(t, digraph.PullPolicyMissing, dag.Container.PullPolicy)
+	})
+
+	t.Run("NoContainer", func(t *testing.T) {
+		yaml := `
+name: test
+steps:
+  - name: step1
+    command: echo test
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		assert.Nil(t, dag.Container)
+	})
+
+	t.Run("InvalidPullPolicy", func(t *testing.T) {
+		yaml := `
+name: test
+container:
+  image: alpine
+  pullPolicy: invalid_policy
+steps:
+  - name: step1
+    command: echo test
+`
+		ctx := context.Background()
+		_, err := digraph.LoadYAML(ctx, []byte(yaml))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse pull policy")
+	})
+}
+
 func TestStepLevelEnv(t *testing.T) {
 	t.Run("BasicStepEnv", func(t *testing.T) {
 		yaml := `

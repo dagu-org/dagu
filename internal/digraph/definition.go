@@ -71,7 +71,7 @@ type definition struct {
 	// WorkerSelector specifies required worker labels for execution.
 	WorkerSelector map[string]string
 	// Container is the container definition for the DAG.
-	Container containerDef
+	Container *containerDef
 }
 
 // handlerOnDef defines the steps to be executed on different events.
@@ -200,7 +200,7 @@ type containerDef struct {
 	// Image is the container image to use.
 	Image string `yaml:"image,omitempty"`
 	// PullPolicy is the policy to pull the image (e.g., "Always", "IfNotPresent").
-	PullPolicy string `yaml:"pullPolicy,omitempty"`
+	PullPolicy any `yaml:"pullPolicy,omitempty"`
 	// Env specifies environment variables for the container.
 	Env any `yaml:"env,omitempty"` // Can be a map or struct
 	// Volumes specifies the volumes to mount in the container.

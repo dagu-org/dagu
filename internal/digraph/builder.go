@@ -64,6 +64,7 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "params", fn: buildParams},
 	{metadata: true, name: "name", fn: buildName},
 	{metadata: true, name: "type", fn: buildType},
+	{name: "container", fn: buildContainer},
 	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
 	{name: "steps", fn: buildSteps},
@@ -252,6 +253,45 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 	}
 	dag.RestartSchedule, err = buildScheduler(restarts)
 	return err
+}
+
+func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
+	if spec.Container == nil {
+		return nil
+	}
+
+	pullPolicy, err := ParsePullPolicy(spec.Container.PullPolicy)
+	if err != nil {
+		return wrapError("container.pullPolicy", spec.Container.PullPolicy, err)
+	}
+
+	vars, err := loadVariables(ctx, spec.Container.Env)
+	if err != nil {
+		return wrapError("container.env", spec.Container.Env, err)
+	}
+
+	var envs []string
+	for k, v := range vars {
+		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	container := Container{
+		Image:         spec.Container.Image,
+		PullPolicy:    pullPolicy,
+		Env:           envs,
+		Volumes:       spec.Container.Volumes,
+		User:          spec.Container.User,
+		WorkDir:       spec.Container.WorkDir,
+		Platform:      spec.Container.Platform,
+		Ports:         spec.Container.Ports,
+		Network:       spec.Container.Network,
+		KeepContainer: spec.Container.KeepContainer,
+	}
+
+	dag.Container = &container
+
+	return nil
+
 }
 
 func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
