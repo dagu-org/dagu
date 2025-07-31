@@ -174,6 +174,7 @@ Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
 - [Scheduling](https://docs.dagu.cloud/features/scheduling) - Learn about flexible scheduling options (start, stop, restart) with cron syntax
 - [Authentication](https://docs.dagu.cloud/configurations/authentication) - Configure authentication for the Web UI
 - [Configuration](https://docs.dagu.cloud/configurations/reference) - Detailed configuration options for customizing Dagu
+- [Changelog](https://docs.dagu.cloud/reference/changelog) - Keep up with the latest updates and changes
 
 ## Discussion
 
