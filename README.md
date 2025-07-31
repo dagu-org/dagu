@@ -102,9 +102,36 @@ dagu is designed to orchestrate workflows across various domains, particularly t
 
 ### 1. Install dagu
 
+**npm**:
 ```bash
 # Install via npm
 npm install -g dagu
+```
+
+**Homebrew**:
+
+```bash
+brew install dagu-org/brew/dagu
+
+# Upgrade to latest version
+brew upgrade dagu-org/brew/dagu
+```
+
+**macOS/Linux**:
+
+```bash
+# Install via script
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
+```
+
+**Docker**:
+
+```bash
+docker run --rm \
+  -v ~/.dagu:/var/lib/dagu \
+  -p 8080:8080 \
+  ghcr.io/dagu-org/dagu:latest \
+  dagu start-all
 ```
 
 Note: see [documentation](https://docs.dagu.cloud/getting-started/installation) for other methods.

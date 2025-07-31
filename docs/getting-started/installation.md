@@ -44,7 +44,7 @@ npm install -g dagu
 ### Homebrew
 
 ```bash
-brew install dagu
+brew install dagu-org/brew/dagu
 ```
 
 ### Manual Download
