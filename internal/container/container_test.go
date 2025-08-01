@@ -1,7 +1,6 @@
 package container
 
 import (
-	"context"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -18,8 +17,6 @@ import (
 // which cannot be triggered in practice because we always pass valid struct pointers.
 // These error checks exist as defensive programming for potential future changes.
 func TestParseMapConfig(t *testing.T) {
-	ctx := context.Background()
-
 	tests := []struct {
 		name        string
 		input       map[string]any
@@ -576,7 +573,7 @@ func TestParseMapConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseMapConfig(ctx, tt.input)
+			result, err := ParseMapConfig(tt.input)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -609,8 +606,6 @@ func TestParseMapConfig(t *testing.T) {
 }
 
 func TestParseContainer(t *testing.T) {
-	ctx := context.Background()
-
 	tests := []struct {
 		name        string
 		input       digraph.Container
@@ -626,7 +621,7 @@ func TestParseContainer(t *testing.T) {
 			expected: &Container{
 				image:      "alpine:latest",
 				pull:       digraph.PullPolicyAlways, // Zero value of PullPolicy
-				autoRemove: true, // Default when KeepContainer is false
+				autoRemove: true,                     // Default when KeepContainer is false
 				containerConfig: &container.Config{
 					Image: "alpine:latest",
 				},
@@ -646,15 +641,15 @@ func TestParseContainer(t *testing.T) {
 		{
 			name: "full container configuration",
 			input: digraph.Container{
-				Image:      "ubuntu:20.04",
-				PullPolicy: digraph.PullPolicyAlways,
-				Env:        []string{"FOO=bar", "BAZ=qux"},
-				Volumes:    []string{"/host/data:/data:ro", "myvolume:/app"},
-				User:       "1000:1000",
-				WorkDir:    "/workspace",
-				Platform:   "linux/arm64",
-				Ports:      []string{"8080:80", "9090"},
-				Network:    "mynetwork",
+				Image:         "ubuntu:20.04",
+				PullPolicy:    digraph.PullPolicyAlways,
+				Env:           []string{"FOO=bar", "BAZ=qux"},
+				Volumes:       []string{"/host/data:/data:ro", "myvolume:/app"},
+				User:          "1000:1000",
+				WorkDir:       "/workspace",
+				Platform:      "linux/arm64",
+				Ports:         []string{"8080:80", "9090"},
+				Network:       "mynetwork",
 				KeepContainer: true,
 			},
 			expected: &Container{
@@ -668,7 +663,7 @@ func TestParseContainer(t *testing.T) {
 					User:       "1000:1000",
 					WorkingDir: "/workspace",
 					ExposedPorts: nat.PortSet{
-						"80/tcp": {},
+						"80/tcp":   {},
 						"9090/tcp": {},
 					},
 				},
@@ -1087,7 +1082,7 @@ func TestParseContainer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseContainer(ctx, tt.input)
+			result, err := ParseContainer(tt.input)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -1106,7 +1101,7 @@ func TestParseContainer(t *testing.T) {
 			assert.Equal(t, tt.expected.containerConfig.Env, result.containerConfig.Env)
 			assert.Equal(t, tt.expected.containerConfig.User, result.containerConfig.User)
 			assert.Equal(t, tt.expected.containerConfig.WorkingDir, result.containerConfig.WorkingDir)
-			
+
 			// Compare exposed ports
 			if tt.expected.containerConfig.ExposedPorts != nil {
 				assert.Equal(t, tt.expected.containerConfig.ExposedPorts, result.containerConfig.ExposedPorts)

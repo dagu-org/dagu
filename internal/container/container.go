@@ -54,7 +54,7 @@ type Container struct {
 }
 
 // ParseContainer parses digraph.Container into Container struct
-func ParseContainer(ctx context.Context, ct digraph.Container) (*Container, error) {
+func ParseContainer(ct digraph.Container) (*Container, error) {
 	// Validate required fields
 	if ct.Image == "" {
 		return nil, ErrImageRequired
@@ -267,7 +267,7 @@ func isStandardNetworkMode(network string) bool {
 }
 
 // ParseMapConfig parses executorConfig into Container struct
-func ParseMapConfig(ctx context.Context, data map[string]any) (*Container, error) {
+func ParseMapConfig(data map[string]any) (*Container, error) {
 	ret := struct {
 		Container     container.Config         `mapstructure:"container"`
 		Host          container.HostConfig     `mapstructure:"host"`

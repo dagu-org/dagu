@@ -89,7 +89,7 @@ func newDocker(
 	)
 
 	if len(execCfg.Config) > 0 {
-		ct, err = container.ParseMapConfig(ctx, execCfg.Config)
+		ct, err = container.ParseMapConfig(execCfg.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse executor config: %w", err)
 		}
@@ -97,7 +97,7 @@ func newDocker(
 
 	env := GetEnv(ctx)
 	if env.DAG.Container != nil {
-		ct, err = container.ParseContainer(ctx, *env.DAG.Container)
+		ct, err = container.ParseContainer(*env.DAG.Container)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse DAG container config: %w", err)
 		}
