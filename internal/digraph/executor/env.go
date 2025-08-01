@@ -151,14 +151,21 @@ func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 
 // EvalString evaluates the given string with the variables within the execution context.
 func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
-	env := digraph.GetEnv(ctx)
-	opts = append(opts, cmdutil.WithVariables(env.Envs))
-	opts = append(opts, cmdutil.WithVariables(e.Envs))
+	dagEnv := digraph.GetEnv(ctx)
+
+	// Collect environment variables for evaluating the string
+	// Environment variable precedence:
+	// 1. Variables (output values)
+	// 2. Step level environment variables
+	// 3. DAG level environment variables
+
 	opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
-	// Add step map if available
-	if len(e.StepMap) > 0 {
-		opts = append(opts, cmdutil.WithStepMap(e.StepMap))
-	}
+	opts = append(opts, cmdutil.WithVariables(e.Envs))
+	opts = append(opts, cmdutil.WithVariables(dagEnv.Envs))
+
+	// Step data for special variables such as step ID and exit code
+	opts = append(opts, cmdutil.WithStepMap(e.StepMap))
+
 	return cmdutil.EvalString(ctx, s, opts...)
 }
 
