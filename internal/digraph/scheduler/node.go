@@ -169,6 +169,7 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 		if continueOn.Failure {
 			return true
 		}
+
 	case status.NodeCancel:
 		return false
 
@@ -176,6 +177,7 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 		if continueOn.Skipped {
 			return true
 		}
+		return false
 
 	case status.NodePartialSuccess:
 		// Partial success is treated like success for continue on

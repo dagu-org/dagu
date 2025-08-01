@@ -990,6 +990,17 @@ func TestNodeShouldContinue(t *testing.T) {
 			},
 			expectContinue: true,
 		},
+
+		{
+			name:       "don't continue on skipped when continueOn.skipped is false, even with exit code 0 in exitCode",
+			nodeStatus: status.NodeSkipped,
+			exitCode:   0,
+			continueOnSettings: digraph.ContinueOn{
+				Skipped:  false,
+				ExitCode: []int{0, 1, 2},
+			},
+			expectContinue: false,
+		},
 	}
 
 	for _, tt := range tests {
