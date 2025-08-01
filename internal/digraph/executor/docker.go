@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -81,18 +82,42 @@ func newDocker(
 	ctx context.Context, step digraph.Step,
 ) (Executor, error) {
 	execCfg := step.ExecutorConfig
-	cfg, err := container.ParseMapConfig(ctx, execCfg.Config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse container config: %w", err)
+
+	var (
+		ct  *container.Container
+		err error
+	)
+
+	if len(execCfg.Config) > 0 {
+		ct, err = container.ParseMapConfig(ctx, execCfg.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse executor config: %w", err)
+		}
+	}
+
+	env := GetEnv(ctx)
+	if env.DAG.Container != nil {
+		ct, err = container.ParseContainer(ctx, *env.DAG.Container)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse DAG container config: %w", err)
+		}
+	}
+
+	if ct == nil {
+		return nil, ErrExecutorConfigRequired
 	}
 
 	return &docker{
-		container: *cfg,
+		container: *ct,
 		step:      step,
 		stdout:    os.Stdout,
 		stderr:    os.Stderr,
 	}, nil
 }
+
+var (
+	ErrExecutorConfigRequired = errors.New("executor config is required")
+)
 
 func init() {
 	Register("docker", newDocker)
