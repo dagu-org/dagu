@@ -474,14 +474,13 @@ var handlerMapping = map[string]HandlerType{
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
 func SockAddr(name, dagRunID string) string {
+	// Create MD5 hash of the combined name and dag-run ID and take first 6 chars
+	hashLength := 6
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(name+dagRunID)))[:hashLength] // nolint:gosec
+
 	maxSocketNameLength := 50 // Maximum length for socket name
 	name = fileutil.SafeName(name)
 	dagRunID = fileutil.SafeName(dagRunID)
-
-	// Create MD5 hash of the combined name and dag-run ID and take first 8 chars
-	combined := name + dagRunID
-	hashLength := 6
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength] // nolint:gosec
 
 	// Calculate the total length with the full name
 	prefix := "@dagu_"
