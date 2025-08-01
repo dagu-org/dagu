@@ -480,7 +480,6 @@ func SockAddr(name, dagRunID string) string {
 
 	maxSocketNameLength := 50 // Maximum length for socket name
 	name = fileutil.SafeName(name)
-	dagRunID = fileutil.SafeName(dagRunID)
 
 	// Calculate the total length with the full name
 	prefix := "@dagu_"
