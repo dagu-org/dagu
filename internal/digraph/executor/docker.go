@@ -71,6 +71,8 @@ func (e *docker) Run(ctx context.Context) error {
 
 	defer cancelFunc()
 
+	// Evaluate environment variables and command substitutions in the args.
+
 	return e.container.Run(
 		ctx,
 		append([]string{e.step.Command}, e.step.Args...),
