@@ -155,12 +155,12 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOptio
 
 	// Collect environment variables for evaluating the string
 	// Environment variable precedence:
-	// 1. Variables (output values)
-	// 2. Step level environment variables
+	// 1. Step level environment variables
+	// 2. Variables (output values)
 	// 3. DAG level environment variables
 
-	opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
 	opts = append(opts, cmdutil.WithVariables(e.Envs))
+	opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
 	opts = append(opts, cmdutil.WithVariables(dagEnv.Envs))
 
 	// Step data for special variables such as step ID and exit code
