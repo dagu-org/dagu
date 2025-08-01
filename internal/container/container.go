@@ -100,7 +100,7 @@ func ParseContainer(ctx context.Context, ct digraph.Container) (*Container, erro
 	if ct.Network != "" {
 		networkMode := parseNetworkMode(ct.Network)
 		hostConfig.NetworkMode = networkMode
-		
+
 		// If it's a custom network, add it to the endpoints config
 		if !isStandardNetworkMode(ct.Network) {
 			networkConfig.EndpointsConfig = map[string]*network.EndpointSettings{
@@ -180,12 +180,12 @@ func parsePorts(ports []string) (nat.PortSet, nat.PortMap, error) {
 	for _, portSpec := range ports {
 		// Remove any whitespace
 		portSpec = strings.TrimSpace(portSpec)
-		
+
 		// Split by colon to get components
 		parts := strings.Split(portSpec, ":")
-		
+
 		var hostIP, hostPort, containerPort, proto string
-		
+
 		switch len(parts) {
 		case 1:
 			// Format: "80" or "80/tcp"
@@ -202,7 +202,7 @@ func parsePorts(ports []string) (nat.PortSet, nat.PortMap, error) {
 		default:
 			return nil, nil, fmt.Errorf("%w: %s", ErrInvalidPortFormat, portSpec)
 		}
-		
+
 		// Extract protocol if specified
 		if strings.Contains(containerPort, "/") {
 			protoParts := strings.Split(containerPort, "/")
@@ -214,24 +214,24 @@ func parsePorts(ports []string) (nat.PortSet, nat.PortMap, error) {
 		} else {
 			proto = "tcp" // Default to TCP
 		}
-		
+
 		// Validate protocol
 		if proto != "tcp" && proto != "udp" && proto != "sctp" {
 			return nil, nil, fmt.Errorf("%w: invalid protocol %s in %s", ErrInvalidPortFormat, proto, portSpec)
 		}
-		
+
 		// Create the nat.Port
 		natPort := nat.Port(containerPort + "/" + proto)
-		
+
 		// Add to exposed ports
 		exposedPorts[natPort] = struct{}{}
-		
+
 		// Add to port bindings if host port is specified
 		if hostPort != "" {
 			if hostIP == "" {
 				hostIP = "0.0.0.0" // Default to all interfaces
 			}
-			
+
 			portBindings[natPort] = []nat.PortBinding{
 				{
 					HostIP:   hostIP,
@@ -240,7 +240,7 @@ func parsePorts(ports []string) (nat.PortSet, nat.PortMap, error) {
 			}
 		}
 	}
-	
+
 	return exposedPorts, portBindings, nil
 }
 
@@ -262,7 +262,7 @@ func parseNetworkMode(network string) container.NetworkMode {
 
 // isStandardNetworkMode checks if the network mode is a standard Docker network mode
 func isStandardNetworkMode(network string) bool {
-	return network == "bridge" || network == "host" || network == "none" || 
+	return network == "bridge" || network == "host" || network == "none" ||
 		strings.HasPrefix(network, "container:") || network == ""
 }
 
@@ -416,7 +416,8 @@ func (c *Container) Run(ctx context.Context, cmd []string, stdout, stderr io.Wri
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(stdout, reader)
+		// Output pull-image log to stderr instead of stdout
+		_, err = io.Copy(stderr, reader)
 		if err != nil {
 			return err
 		}
