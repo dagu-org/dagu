@@ -6,7 +6,9 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -602,6 +604,528 @@ func TestParseMapConfig(t *testing.T) {
 			assert.Equal(t, tt.expected.execOptions.User, result.execOptions.User)
 			assert.Equal(t, tt.expected.execOptions.WorkingDir, result.execOptions.WorkingDir)
 			assert.Equal(t, tt.expected.execOptions.Env, result.execOptions.Env)
+		})
+	}
+}
+
+func TestParseContainer(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		input       digraph.Container
+		expected    *Container
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "minimal container with image only",
+			input: digraph.Container{
+				Image: "alpine:latest",
+			},
+			expected: &Container{
+				image:      "alpine:latest",
+				pull:       digraph.PullPolicyAlways, // Zero value of PullPolicy
+				autoRemove: true, // Default when KeepContainer is false
+				containerConfig: &container.Config{
+					Image: "alpine:latest",
+				},
+				hostConfig:    &container.HostConfig{},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "error when image is empty",
+			input: digraph.Container{
+				Platform: "linux/amd64",
+			},
+			expectError: true,
+			errorMsg:    "image is required",
+		},
+		{
+			name: "full container configuration",
+			input: digraph.Container{
+				Image:      "ubuntu:20.04",
+				PullPolicy: digraph.PullPolicyAlways,
+				Env:        []string{"FOO=bar", "BAZ=qux"},
+				Volumes:    []string{"/host/data:/data:ro", "myvolume:/app"},
+				User:       "1000:1000",
+				WorkDir:    "/workspace",
+				Platform:   "linux/arm64",
+				Ports:      []string{"8080:80", "9090"},
+				Network:    "mynetwork",
+				KeepContainer: true,
+			},
+			expected: &Container{
+				image:      "ubuntu:20.04",
+				platform:   "linux/arm64",
+				pull:       digraph.PullPolicyAlways,
+				autoRemove: false, // KeepContainer is true
+				containerConfig: &container.Config{
+					Image:      "ubuntu:20.04",
+					Env:        []string{"FOO=bar", "BAZ=qux"},
+					User:       "1000:1000",
+					WorkingDir: "/workspace",
+					ExposedPorts: nat.PortSet{
+						"80/tcp": {},
+						"9090/tcp": {},
+					},
+				},
+				hostConfig: &container.HostConfig{
+					Binds: []string{"/host/data:/data:ro"},
+					Mounts: []mount.Mount{
+						{
+							Type:     mount.TypeVolume,
+							Source:   "myvolume",
+							Target:   "/app",
+							ReadOnly: false,
+						},
+					},
+					PortBindings: nat.PortMap{
+						"80/tcp": []nat.PortBinding{
+							{
+								HostIP:   "0.0.0.0",
+								HostPort: "8080",
+							},
+						},
+					},
+					NetworkMode: "mynetwork",
+				},
+				networkConfig: &network.NetworkingConfig{
+					EndpointsConfig: map[string]*network.EndpointSettings{
+						"mynetwork": {},
+					},
+				},
+				execOptions: &container.ExecOptions{},
+			},
+		},
+		{
+			name: "standard network modes",
+			input: digraph.Container{
+				Image:   "nginx",
+				Network: "host",
+			},
+			expected: &Container{
+				image:      "nginx",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "nginx",
+				},
+				hostConfig: &container.HostConfig{
+					NetworkMode: "host",
+				},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "container network reference",
+			input: digraph.Container{
+				Image:   "nginx",
+				Network: "container:myapp",
+			},
+			expected: &Container{
+				image:      "nginx",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "nginx",
+				},
+				hostConfig: &container.HostConfig{
+					NetworkMode: "container:myapp",
+				},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "bind mount with default rw mode",
+			input: digraph.Container{
+				Image:   "alpine",
+				Volumes: []string{"/host/path:/container/path"},
+			},
+			expected: &Container{
+				image:      "alpine",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "alpine",
+				},
+				hostConfig: &container.HostConfig{
+					Binds: []string{"/host/path:/container/path:rw"},
+				},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "relative bind mount",
+			input: digraph.Container{
+				Image:   "alpine",
+				Volumes: []string{"./data:/data:ro"},
+			},
+			expected: &Container{
+				image:      "alpine",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "alpine",
+				},
+				hostConfig: &container.HostConfig{
+					Binds: []string{"./data:/data:ro"},
+				},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "home directory bind mount",
+			input: digraph.Container{
+				Image:   "alpine",
+				Volumes: []string{"~/data:/data:rw"},
+			},
+			expected: &Container{
+				image:      "alpine",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "alpine",
+				},
+				hostConfig: &container.HostConfig{
+					Binds: []string{"~/data:/data:rw"},
+				},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "port with IP address",
+			input: digraph.Container{
+				Image: "nginx",
+				Ports: []string{"127.0.0.1:8080:80/tcp"},
+			},
+			expected: &Container{
+				image:      "nginx",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "nginx",
+					ExposedPorts: nat.PortSet{
+						"80/tcp": {},
+					},
+				},
+				hostConfig: &container.HostConfig{
+					PortBindings: nat.PortMap{
+						"80/tcp": []nat.PortBinding{
+							{
+								HostIP:   "127.0.0.1",
+								HostPort: "8080",
+							},
+						},
+					},
+				},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "udp port",
+			input: digraph.Container{
+				Image: "dns-server",
+				Ports: []string{"53:53/udp"},
+			},
+			expected: &Container{
+				image:      "dns-server",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "dns-server",
+					ExposedPorts: nat.PortSet{
+						"53/udp": {},
+					},
+				},
+				hostConfig: &container.HostConfig{
+					PortBindings: nat.PortMap{
+						"53/udp": []nat.PortBinding{
+							{
+								HostIP:   "0.0.0.0",
+								HostPort: "53",
+							},
+						},
+					},
+				},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "invalid volume format - too few parts",
+			input: digraph.Container{
+				Image:   "alpine",
+				Volumes: []string{"/data"},
+			},
+			expectError: true,
+			errorMsg:    "invalid volume format: /data",
+		},
+		{
+			name: "invalid volume format - too many parts",
+			input: digraph.Container{
+				Image:   "alpine",
+				Volumes: []string{"/host:/container:ro:extra"},
+			},
+			expectError: true,
+			errorMsg:    "invalid volume format: /host:/container:ro:extra",
+		},
+		{
+			name: "invalid volume mode",
+			input: digraph.Container{
+				Image:   "alpine",
+				Volumes: []string{"/data:/data:invalid"},
+			},
+			expectError: true,
+			errorMsg:    "invalid volume format: invalid mode invalid in /data:/data:invalid",
+		},
+		{
+			name: "invalid port format - too many parts",
+			input: digraph.Container{
+				Image: "nginx",
+				Ports: []string{"1.2.3.4:8080:80:extra"},
+			},
+			expectError: true,
+			errorMsg:    "invalid port format: 1.2.3.4:8080:80:extra",
+		},
+		{
+			name: "invalid port protocol delimiter",
+			input: digraph.Container{
+				Image: "nginx",
+				Ports: []string{"80/tcp/extra"},
+			},
+			expectError: true,
+			errorMsg:    "invalid port format: invalid protocol in 80/tcp/extra",
+		},
+		{
+			name: "invalid port protocol",
+			input: digraph.Container{
+				Image: "nginx",
+				Ports: []string{"80/invalid"},
+			},
+			expectError: true,
+			errorMsg:    "invalid port format: invalid protocol invalid in 80/invalid",
+		},
+		{
+			name: "sctp port protocol",
+			input: digraph.Container{
+				Image: "sctp-server",
+				Ports: []string{"132/sctp"},
+			},
+			expected: &Container{
+				image:      "sctp-server",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "sctp-server",
+					ExposedPorts: nat.PortSet{
+						"132/sctp": {},
+					},
+				},
+				hostConfig:    &container.HostConfig{},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "whitespace in port specification",
+			input: digraph.Container{
+				Image: "nginx",
+				Ports: []string{" 8080:80 "},
+			},
+			expected: &Container{
+				image:      "nginx",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "nginx",
+					ExposedPorts: nat.PortSet{
+						"80/tcp": {},
+					},
+				},
+				hostConfig: &container.HostConfig{
+					PortBindings: nat.PortMap{
+						"80/tcp": []nat.PortBinding{
+							{
+								HostIP:   "0.0.0.0",
+								HostPort: "8080",
+							},
+						},
+					},
+				},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "empty network uses default",
+			input: digraph.Container{
+				Image:   "nginx",
+				Network: "",
+			},
+			expected: &Container{
+				image:      "nginx",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "nginx",
+				},
+				hostConfig: &container.HostConfig{
+					NetworkMode: "", // Empty string for default
+				},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "bridge network mode",
+			input: digraph.Container{
+				Image:   "nginx",
+				Network: "bridge",
+			},
+			expected: &Container{
+				image:      "nginx",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "nginx",
+				},
+				hostConfig: &container.HostConfig{
+					NetworkMode: "bridge",
+				},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "none network mode",
+			input: digraph.Container{
+				Image:   "nginx",
+				Network: "none",
+			},
+			expected: &Container{
+				image:      "nginx",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "nginx",
+				},
+				hostConfig: &container.HostConfig{
+					NetworkMode: "none",
+				},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "keep container false sets autoRemove true",
+			input: digraph.Container{
+				Image:         "alpine",
+				KeepContainer: false,
+			},
+			expected: &Container{
+				image:      "alpine",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "alpine",
+				},
+				hostConfig:    &container.HostConfig{},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "keep container true sets autoRemove false",
+			input: digraph.Container{
+				Image:         "alpine",
+				KeepContainer: true,
+			},
+			expected: &Container{
+				image:      "alpine",
+				autoRemove: false,
+				containerConfig: &container.Config{
+					Image: "alpine",
+				},
+				hostConfig:    &container.HostConfig{},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "pull policy propagation",
+			input: digraph.Container{
+				Image:      "alpine",
+				PullPolicy: digraph.PullPolicyNever,
+			},
+			expected: &Container{
+				image:      "alpine",
+				pull:       digraph.PullPolicyNever,
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "alpine",
+				},
+				hostConfig:    &container.HostConfig{},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+		{
+			name: "platform propagation",
+			input: digraph.Container{
+				Image:    "alpine",
+				Platform: "linux/386",
+			},
+			expected: &Container{
+				image:      "alpine",
+				platform:   "linux/386",
+				autoRemove: true,
+				containerConfig: &container.Config{
+					Image: "alpine",
+				},
+				hostConfig:    &container.HostConfig{},
+				networkConfig: &network.NetworkingConfig{},
+				execOptions:   &container.ExecOptions{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ParseContainer(ctx, tt.input)
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected.image, result.image)
+			assert.Equal(t, tt.expected.platform, result.platform)
+			assert.Equal(t, tt.expected.pull, result.pull)
+			assert.Equal(t, tt.expected.autoRemove, result.autoRemove)
+
+			// Compare container config
+			assert.Equal(t, tt.expected.containerConfig.Image, result.containerConfig.Image)
+			assert.Equal(t, tt.expected.containerConfig.Env, result.containerConfig.Env)
+			assert.Equal(t, tt.expected.containerConfig.User, result.containerConfig.User)
+			assert.Equal(t, tt.expected.containerConfig.WorkingDir, result.containerConfig.WorkingDir)
+			
+			// Compare exposed ports
+			if tt.expected.containerConfig.ExposedPorts != nil {
+				assert.Equal(t, tt.expected.containerConfig.ExposedPorts, result.containerConfig.ExposedPorts)
+			}
+
+			// Compare host config
+			assert.Equal(t, tt.expected.hostConfig.Binds, result.hostConfig.Binds)
+			if tt.expected.hostConfig.Mounts != nil {
+				assert.Equal(t, tt.expected.hostConfig.Mounts, result.hostConfig.Mounts)
+			}
+			if tt.expected.hostConfig.PortBindings != nil {
+				assert.Equal(t, tt.expected.hostConfig.PortBindings, result.hostConfig.PortBindings)
+			}
+			assert.Equal(t, tt.expected.hostConfig.NetworkMode, result.hostConfig.NetworkMode)
+
+			// Compare network config
+			if tt.expected.networkConfig.EndpointsConfig != nil {
+				assert.Equal(t, tt.expected.networkConfig.EndpointsConfig, result.networkConfig.EndpointsConfig)
+			}
 		})
 	}
 }
