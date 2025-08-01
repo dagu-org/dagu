@@ -37,13 +37,35 @@ func GetEnv(ctx context.Context) Env {
 // including the variables (environment variables and DAG variables) that are
 // available to the step.
 type Env struct {
+	// Embedded execution metadata from parent DAG run containing DAGRunID,
+	// RootDAGRun reference, DAG configuration, database interface,
+	// DAG-level environment variables, and coordinator dispatcher
 	digraph.Env
 
-	Variables  *SyncMap
-	Step       digraph.Step
-	Envs       map[string]string
-	StepMap    map[string]cmdutil.StepInfo // Map of step ID to step info
-	WorkingDir string                      // Working directory for the step
+	// Thread-safe map storing output variables from previously executed steps
+	// in the format "key=value". These variables are populated when a step
+	// completes and has an Output field defined, making the step's stdout
+	// available to subsequent steps via variable substitution
+	Variables *SyncMap
+
+	// The current step being executed within this environment context
+	Step digraph.Step
+
+	// Additional environment variables specific to this step execution,
+	// including DAG_RUN_STEP_NAME and PWD. These take precedence over
+	// Variables and DAG-level Envs during variable evaluation
+	Envs map[string]string
+
+	// Maps step IDs to their execution information (stdout, stderr, exitCode)
+	// allowing steps to reference outputs from other steps using expressions
+	// like ${stepID.stdout} or ${stepID.exitCode} in their configurations
+	StepMap map[string]cmdutil.StepInfo
+
+	// Resolved absolute path for the step's working directory, determined by:
+	// 1. Step's Dir field if specified (resolved to absolute path)
+	// 2. Current working directory if Dir is not specified
+	// This path is also set as the PWD environment variable
+	WorkingDir string
 }
 
 func (e Env) VariablesMap() map[string]string {
@@ -153,11 +175,18 @@ func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
 	dagEnv := digraph.GetEnv(ctx)
 
-	// Collect environment variables for evaluating the string
-	// Environment variable precedence:
-	// 1. Step level environment variables
-	// 2. Variables (output values)
-	// 3. DAG level environment variables
+	// Collect environment variables for evaluating the string.
+	// Variables are processed sequentially, and once a variable is replaced,
+	// it cannot be overridden by subsequent maps.
+	// Therefore, the effective precedence (highest to lowest) is:
+	// 1. Step level environment variables (e.Envs) - processed first, highest precedence
+	// 2. Output variables from previous steps (e.Variables) - processed second
+	// 3. DAG level environment variables (dagEnv.Envs) - processed third
+	// 4. Additional options passed as parameters - processed last
+	//
+	// Example: If step env has FOO="step" and DAG env has FOO="dag",
+	// ${FOO} will be replaced with "step" in the first iteration,
+	// leaving no ${FOO} for the DAG env to replace.
 
 	opts = append(opts, cmdutil.WithVariables(e.Envs))
 	opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
