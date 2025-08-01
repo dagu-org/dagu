@@ -46,6 +46,11 @@ type Container struct {
 	execOptions *container.ExecOptions
 }
 
+// ParseContainer parses digraph.Container into Container struct
+func ParseContainer(ctx context.Context, ct digraph.Container) (*Container, error) {
+}
+
+// ParseMapConfig parses executorConfig into Container struct
 func ParseMapConfig(ctx context.Context, data map[string]any) (*Container, error) {
 	ret := struct {
 		Container     container.Config         `mapstructure:"container"`
