@@ -227,9 +227,8 @@ func TestGetKeepaliveFile_TempDirCleanup(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, info.IsDir())
 
-	// Verify it's in the expected location
-	expectedDir := filepath.Join(os.TempDir(), "dagu-keepalive")
-	assert.Equal(t, expectedDir, tmpDir)
+	// Verify it's in temp directory
+	assert.True(t, strings.HasPrefix(path, os.TempDir()))
 }
 
 func TestGetKeepaliveFile_OverwriteExisting(t *testing.T) {
@@ -248,22 +247,22 @@ func TestGetKeepaliveFile_OverwriteExisting(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = os.Remove(path1) }()
 
-	// Modify the file
-	err = os.WriteFile(path1, []byte("modified"), 0755)
-	require.NoError(t, err)
-
-	// Get keepalive file again - should overwrite
+	// Get keepalive file again - should create a new file
 	path2, err := GetKeepaliveFile(platform)
 	require.NoError(t, err)
+	defer func() { _ = os.Remove(path2) }()
 
-	// Should be the same path
-	assert.Equal(t, path1, path2)
+	// Should be different paths now since we create unique files
+	assert.NotEqual(t, path1, path2)
 
-	// Check content is restored (not "modified")
-	content, err := os.ReadFile(path2)
+	// Both files should exist and contain the keepalive binary
+	content1, err := os.ReadFile(path1)
 	require.NoError(t, err)
-	assert.NotEqual(t, "modified", string(content))
-	assert.Greater(t, len(content), 10) // Should be a real binary
+	content2, err := os.ReadFile(path2)
+	require.NoError(t, err)
+
+	assert.Equal(t, content1, content2)  // Same binary content
+	assert.Greater(t, len(content1), 10) // Should be a real binary
 }
 
 // Helper function to check if we have a binary for the current platform

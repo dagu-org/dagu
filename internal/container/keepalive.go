@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -75,16 +74,25 @@ func GetKeepaliveFile(platform specs.Platform) (string, error) {
 		return "", fmt.Errorf("failed to read keepalive binary: %w", err)
 	}
 
-	// Create temp directory for keepalive binaries
-	tmpDir := filepath.Join(os.TempDir(), "dagu-keepalive")
-	if err := os.MkdirAll(tmpDir, 0750); err != nil { // #nosec G301
-		return "", fmt.Errorf("failed to create temp directory: %w", err)
+	// Create a unique temporary file for each keepalive binary
+	tmpFile, err := os.CreateTemp("", fmt.Sprintf("dagu-keepalive-%s-*", filename))
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
-
-	// Write to temp file (needs to be executable)
-	tmpPath := filepath.Join(tmpDir, filename)
-	if err := os.WriteFile(tmpPath, data, 0755); err != nil { //nolint:gosec // Binary needs exec permission
+	tmpPath := tmpFile.Name()
+	
+	// Write the binary data and close the file
+	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
 		return "", fmt.Errorf("failed to write keepalive binary: %w", err)
+	}
+	tmpFile.Close()
+
+	// Set executable permissions
+	if err := os.Chmod(tmpPath, 0755); err != nil {
+		os.Remove(tmpPath)
+		return "", fmt.Errorf("failed to set executable permissions: %w", err)
 	}
 
 	return tmpPath, nil
