@@ -435,7 +435,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Stop the process and remove it from the store.
 	if err := proc.Stop(ctx); err != nil {
-		logger.Error(ctx, "failed to stop the heartbeat", "err", err)
+		logger.Error(ctx, "Failed to stop the heartbeat", "err", err)
 	}
 
 	if coordinatorCli != nil {
