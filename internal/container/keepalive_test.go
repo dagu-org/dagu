@@ -190,11 +190,11 @@ func TestGetKeepaliveFile_Concurrent(t *testing.T) {
 			path, err := GetKeepaliveFile(platform)
 			assert.NoError(t, err)
 			assert.NotEmpty(t, path)
-			
+
 			// Verify file exists
 			_, err = os.Stat(path)
 			assert.NoError(t, err)
-			
+
 			done <- true
 		}()
 	}
@@ -255,10 +255,10 @@ func TestGetKeepaliveFile_OverwriteExisting(t *testing.T) {
 	// Get keepalive file again - should overwrite
 	path2, err := GetKeepaliveFile(platform)
 	require.NoError(t, err)
-	
+
 	// Should be the same path
 	assert.Equal(t, path1, path2)
-	
+
 	// Check content is restored (not "modified")
 	content, err := os.ReadFile(path2)
 	require.NoError(t, err)
@@ -279,10 +279,10 @@ func hasBinaryForCurrentPlatform() bool {
 func hasBinaryForPlatform(targetPlatform specs.Platform) bool {
 	// In CI or when all binaries are built, all platforms should be available
 	// For local development, we might only have binaries for the current platform
-	
+
 	// Check if the target platform is in our supported list
 	_, osSupported := osMapping[targetPlatform.OS]
 	_, archSupported := archMapping[targetPlatform.Architecture]
-	
+
 	return osSupported && archSupported
 }

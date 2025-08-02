@@ -1,6 +1,8 @@
 package integration_test
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph/status"
@@ -55,17 +57,18 @@ func TestContainer(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		dag             string
+		dagFunc         func(tempDir string) string
 		expectedOutputs map[string]any
 	}{
 		{
 			name: "volume_bind_mount_persistence",
-			dag: `
+			dagFunc: func(tempDir string) string {
+				return fmt.Sprintf(`
 name: test-bind-mount
 container:
   image: alpine:3
   volumes:
-    - /tmp/dagu-test:/data:rw
+    - %s:/data:rw
 steps:
   - name: write_data
     command: sh -c "echo 'Hello from step 1' > /data/test.txt"
@@ -77,7 +80,8 @@ steps:
   - name: read_all
     command: cat /data/test.txt
     output: OUT2
-`,
+`, tempDir)
+			},
 			expectedOutputs: map[string]any{
 				"OUT1": "Hello from step 1",
 				"OUT2": "Hello from step 1\nHello from step 3",
@@ -85,7 +89,8 @@ steps:
 		},
 		{
 			name: "basic",
-			dag: `
+			dagFunc: func(tempDir string) string {
+				return `
 name: test-basic
 env:
   - FOO: BAR
@@ -95,14 +100,16 @@ steps:
   - name: s1
     command: echo 123 abc $FOO
     output: OUT1
-`,
+`
+			},
 			expectedOutputs: map[string]any{
 				"OUT1": "123 abc BAR",
 			},
 		},
 		{
 			name: "command_with_args",
-			dag: `
+			dagFunc: func(tempDir string) string {
+				return `
 name: test-command-with-args
 container:
   image: alpine:3
@@ -110,14 +117,16 @@ steps:
   - name: s1
     command: echo hello world
     output: OUT1
-`,
+`
+			},
 			expectedOutputs: map[string]any{
 				"OUT1": "hello world",
 			},
 		},
 		{
 			name: "working_directory",
-			dag: `
+			dagFunc: func(tempDir string) string {
+				return `
 name: test-working-dir
 container:
   image: alpine:3
@@ -126,14 +135,16 @@ steps:
   - name: s1
     command: "pwd"
     output: OUT1
-`,
+`
+			},
 			expectedOutputs: map[string]any{
 				"OUT1": "/tmp",
 			},
 		},
 		{
 			name: "container_with_user",
-			dag: `
+			dagFunc: func(tempDir string) string {
+				return `
 name: test-user
 container:
   image: alpine:3
@@ -142,14 +153,16 @@ steps:
   - name: s1
     command: "whoami"
     output: OUT1
-`,
+`
+			},
 			expectedOutputs: map[string]any{
 				"OUT1": "nobody",
 			},
 		},
 		{
 			name: "volume_named_persistence",
-			dag: `
+			dagFunc: func(tempDir string) string {
+				return `
 name: test-named-volume
 container:
   image: alpine:3
@@ -164,7 +177,8 @@ steps:
   - name: list_files
     command: "ls -la /data/"
     output: OUT2
-`,
+`
+			},
 			expectedOutputs: map[string]any{
 				"OUT1": "Data in named volume",
 			},
@@ -175,8 +189,15 @@ steps:
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
+			// Create a unique temporary directory for this test
+			tempDir, err := os.MkdirTemp("", fmt.Sprintf("dagu-test-%s-*", tc.name))
+			if err != nil {
+				t.Fatalf("Failed to create temp dir: %v", err)
+			}
+			defer os.RemoveAll(tempDir)
+
 			th := test.Setup(t)
-			dag := th.DAG(t, tc.dag)
+			dag := th.DAG(t, tc.dagFunc(tempDir))
 			dag.Agent().RunSuccess(t)
 			dag.AssertLatestStatus(t, status.Success)
 			dag.AssertOutputs(t, tc.expectedOutputs)
