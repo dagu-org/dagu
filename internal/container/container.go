@@ -34,11 +34,11 @@ var (
 )
 
 type Container struct {
-	image         string
-	platform      string
-	containerName string
-	pull          digraph.PullPolicy
-	autoRemove    bool
+	image      string
+	platform   string
+	nameOrID   string
+	pull       digraph.PullPolicy
+	autoRemove bool
 	// containerConfig is the configuration for new container creation
 	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#Config
 	containerConfig *container.Config
@@ -51,6 +51,8 @@ type Container struct {
 	// execOptions is configuration for exec in existing container
 	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#ExecOptions
 	execOptions *container.ExecOptions
+	mu          sync.Mutex
+	client      *client.Client
 }
 
 // ParseContainer parses digraph.Container into Container struct
@@ -321,7 +323,7 @@ func ParseMapConfig(data map[string]any) (*Container, error) {
 	return &Container{
 		image:           ret.Image,
 		platform:        ret.Platform,
-		containerName:   ret.ContainerName,
+		nameOrID:        ret.ContainerName,
 		pull:            pull,
 		containerConfig: &ret.Container,
 		hostConfig:      &ret.Host,
@@ -386,10 +388,30 @@ func (c *Container) shouldPullImage(ctx context.Context, cli *client.Client, pla
 	return true, nil
 }
 
+// Open creates a new client
+func (c *Container) Open(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return err
+	}
+	c.client = cli
+	return nil
+}
+
+func (c *Container) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.client == nil {
+		return
+	}
+	_ = c.client.Close()
+	c.client = nil
+}
+
 func (c *Container) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer) error {
-	cli, err := client.NewClientWithOpts(
-		client.FromEnv, client.WithAPIVersionNegotiation(),
-	)
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return err
 	}
@@ -398,10 +420,14 @@ func (c *Container) Run(ctx context.Context, cmd []string, stdout, stderr io.Wri
 		_ = cli.Close()
 	}()
 
-	if c.image == "" {
-		return c.execInContainer(ctx, cli, cmd, stdout, stderr)
+	if c.image != "" {
+		return c.execNewContainer(ctx, cli, cmd, stdout, stderr)
 	}
 
+	return c.execInContainer(ctx, cli, cmd, stdout, stderr)
+}
+
+func (c *Container) execNewContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer) error {
 	platform, err := c.getPlatform(ctx, cli)
 	if err != nil {
 		return err
@@ -411,6 +437,7 @@ func (c *Container) Run(ctx context.Context, cmd []string, stdout, stderr io.Wri
 	if err != nil {
 		return err
 	}
+
 	if pull {
 		reader, err := cli.ImagePull(ctx, c.image, image.PullOptions{Platform: platforms.Format(platform)})
 		if err != nil {
@@ -428,7 +455,7 @@ func (c *Container) Run(ctx context.Context, cmd []string, stdout, stderr io.Wri
 	containerConfig.Image = c.image
 
 	resp, err := cli.ContainerCreate(
-		ctx, &containerConfig, c.hostConfig, c.networkConfig, &platform, c.containerName,
+		ctx, &containerConfig, c.hostConfig, c.networkConfig, &platform, c.nameOrID,
 	)
 	if err != nil {
 		return err
@@ -458,14 +485,14 @@ func (c *Container) Run(ctx context.Context, cmd []string, stdout, stderr io.Wri
 }
 
 func (c *Container) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer) error {
-	// Check if containerInfo exists and is running
-	containerInfo, err := cli.ContainerInspect(ctx, c.containerName)
+	// Check if info exists and is running
+	info, err := cli.ContainerInspect(ctx, c.nameOrID)
 	if err != nil {
-		return fmt.Errorf("failed to inspect container %s: %w", c.containerName, err)
+		return fmt.Errorf("failed to inspect container %s: %w", c.nameOrID, err)
 	}
 
-	if !containerInfo.State.Running {
-		return fmt.Errorf("container %s is not running", c.containerName)
+	if !info.State.Running {
+		return fmt.Errorf("container %s is not running", c.nameOrID)
 	}
 
 	// Create exec configuration
@@ -482,7 +509,7 @@ func (c *Container) execInContainer(ctx context.Context, cli *client.Client, cmd
 	}
 
 	// Create exec instance
-	containerID, err := cli.ContainerExecCreate(ctx, c.containerName, execOpts)
+	containerID, err := cli.ContainerExecCreate(ctx, c.nameOrID, execOpts)
 	if err != nil {
 		return fmt.Errorf("failed to create exec: %w", err)
 	}

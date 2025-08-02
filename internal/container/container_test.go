@@ -44,7 +44,7 @@ func TestParseMapConfig(t *testing.T) {
 				"containerName": "my-container",
 			},
 			expected: &Container{
-				containerName:   "my-container",
+				nameOrID:        "my-container",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
 				hostConfig:      &container.HostConfig{},
@@ -87,11 +87,11 @@ func TestParseMapConfig(t *testing.T) {
 				},
 			},
 			expected: &Container{
-				image:         "ubuntu:20.04",
-				containerName: "test-container",
-				platform:      "linux/arm64",
-				pull:          digraph.PullPolicyAlways,
-				autoRemove:    true,
+				image:      "ubuntu:20.04",
+				nameOrID:   "test-container",
+				platform:   "linux/arm64",
+				pull:       digraph.PullPolicyAlways,
+				autoRemove: true,
 				containerConfig: &container.Config{
 					Env:        []string{"FOO=bar"},
 					WorkingDir: "/app",
@@ -433,7 +433,7 @@ func TestParseMapConfig(t *testing.T) {
 			},
 			expected: &Container{
 				image:           "alpine",
-				containerName:   "123",
+				nameOrID:        "123",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
 				hostConfig:      &container.HostConfig{},
@@ -449,7 +449,7 @@ func TestParseMapConfig(t *testing.T) {
 			},
 			expected: &Container{
 				image:           "123",
-				containerName:   "test",
+				nameOrID:        "test",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
 				hostConfig:      &container.HostConfig{},
@@ -545,7 +545,7 @@ func TestParseMapConfig(t *testing.T) {
 			},
 			expected: &Container{
 				image:           "alpine",
-				containerName:   "",
+				nameOrID:        "",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
 				hostConfig:      &container.HostConfig{},
@@ -561,7 +561,7 @@ func TestParseMapConfig(t *testing.T) {
 			},
 			expected: &Container{
 				image:           "",
-				containerName:   "test",
+				nameOrID:        "test",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
 				hostConfig:      &container.HostConfig{},
@@ -583,7 +583,7 @@ func TestParseMapConfig(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected.image, result.image)
-			assert.Equal(t, tt.expected.containerName, result.containerName)
+			assert.Equal(t, tt.expected.nameOrID, result.nameOrID)
 			assert.Equal(t, tt.expected.platform, result.platform)
 			assert.Equal(t, tt.expected.pull, result.pull)
 			assert.Equal(t, tt.expected.autoRemove, result.autoRemove)

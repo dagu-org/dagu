@@ -46,7 +46,7 @@ type docker struct {
 	stderr    io.Writer
 	context   context.Context
 	cancel    func()
-	container container.Container
+	container *container.Container
 }
 
 func (e *docker) SetStdout(out io.Writer) {
@@ -71,7 +71,10 @@ func (e *docker) Run(ctx context.Context) error {
 
 	defer cancelFunc()
 
-	// Evaluate environment variables and command substitutions in the args.
+	if err := e.container.Open(ctx); err != nil {
+		return fmt.Errorf("failed to setup container: %w", err)
+	}
+	defer e.container.Close()
 
 	return e.container.Run(
 		ctx,
@@ -85,32 +88,28 @@ func newDocker(
 ) (Executor, error) {
 	execCfg := step.ExecutorConfig
 
-	var (
-		ct  *container.Container
-		err error
-	)
+	var ct *container.Container
 
 	if len(execCfg.Config) > 0 {
+		var err error
 		ct, err = container.ParseMapConfig(execCfg.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse executor config: %w", err)
 		}
-	}
-
-	env := GetEnv(ctx)
-	if env.DAG.Container != nil {
+	} else {
+		env := GetEnv(ctx)
+		if env.DAG.Container == nil {
+			return nil, ErrExecutorConfigRequired
+		}
+		var err error
 		ct, err = container.ParseContainer(*env.DAG.Container)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse DAG container config: %w", err)
 		}
 	}
 
-	if ct == nil {
-		return nil, ErrExecutorConfigRequired
-	}
-
 	return &docker{
-		container: *ct,
+		container: ct,
 		step:      step,
 		stdout:    os.Stdout,
 		stderr:    os.Stderr,
