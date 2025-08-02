@@ -89,7 +89,7 @@ steps:
 		},
 		{
 			name: "basic",
-			dagFunc: func(tempDir string) string {
+			dagFunc: func(_ string) string {
 				return `
 name: test-basic
 env:
@@ -108,7 +108,7 @@ steps:
 		},
 		{
 			name: "command_with_args",
-			dagFunc: func(tempDir string) string {
+			dagFunc: func(_ string) string {
 				return `
 name: test-command-with-args
 container:
@@ -125,7 +125,7 @@ steps:
 		},
 		{
 			name: "working_directory",
-			dagFunc: func(tempDir string) string {
+			dagFunc: func(_ string) string {
 				return `
 name: test-working-dir
 container:
@@ -143,7 +143,7 @@ steps:
 		},
 		{
 			name: "container_with_user",
-			dagFunc: func(tempDir string) string {
+			dagFunc: func(_ string) string {
 				return `
 name: test-user
 container:
@@ -161,7 +161,7 @@ steps:
 		},
 		{
 			name: "volume_named_persistence",
-			dagFunc: func(tempDir string) string {
+			dagFunc: func(_ string) string {
 				return `
 name: test-named-volume
 container:
@@ -194,7 +194,9 @@ steps:
 			if err != nil {
 				t.Fatalf("Failed to create temp dir: %v", err)
 			}
-			defer os.RemoveAll(tempDir)
+			defer func() {
+				_ = os.RemoveAll(tempDir)
+			}()
 
 			th := test.Setup(t)
 			dag := th.DAG(t, tc.dagFunc(tempDir))
