@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/dagu-org/dagu/internal/container"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -39,6 +40,7 @@ steps:
 */
 
 var _ Executor = (*docker)(nil)
+var _ ExitCoder = (*docker)(nil)
 
 type docker struct {
 	step      digraph.Step
@@ -47,6 +49,8 @@ type docker struct {
 	context   context.Context
 	cancel    func()
 	container *container.Container
+	mu        sync.Mutex
+	exitCode  int
 }
 
 func (e *docker) SetStdout(out io.Writer) {
@@ -71,16 +75,29 @@ func (e *docker) Run(ctx context.Context) error {
 
 	defer cancelFunc()
 
-	if err := e.container.Open(ctx); err != nil {
+	if err := e.container.Open(); err != nil {
 		return fmt.Errorf("failed to setup container: %w", err)
 	}
 	defer e.container.Close()
 
-	return e.container.Run(
+	exitCode, err := e.container.Run(
 		ctx,
 		append([]string{e.step.Command}, e.step.Args...),
 		e.stdout, e.stderr,
 	)
+
+	e.mu.Lock()
+	e.exitCode = exitCode
+	e.mu.Unlock()
+
+	return err
+}
+
+// ExitCode implements ExitCoder.
+func (e *docker) ExitCode() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.exitCode
 }
 
 func newDocker(

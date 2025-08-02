@@ -389,7 +389,7 @@ func (c *Container) shouldPullImage(ctx context.Context, cli *client.Client, pla
 }
 
 // Open creates a new client
-func (c *Container) Open(ctx context.Context) error {
+func (c *Container) Open() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -410,10 +410,11 @@ func (c *Container) Close() {
 	c.client = nil
 }
 
-func (c *Container) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer) error {
+// Run executes the command in the container and returns exit code
+func (c *Container) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer) (int, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		return err
+		return 1, err
 	}
 
 	defer func() {
@@ -427,26 +428,26 @@ func (c *Container) Run(ctx context.Context, cmd []string, stdout, stderr io.Wri
 	return c.execInContainer(ctx, cli, cmd, stdout, stderr)
 }
 
-func (c *Container) execNewContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer) error {
+func (c *Container) execNewContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer) (int, error) {
 	platform, err := c.getPlatform(ctx, cli)
 	if err != nil {
-		return err
+		return 1, err
 	}
 
 	pull, err := c.shouldPullImage(ctx, cli, &platform)
 	if err != nil {
-		return err
+		return 1, err
 	}
 
 	if pull {
 		reader, err := cli.ImagePull(ctx, c.image, image.PullOptions{Platform: platforms.Format(platform)})
 		if err != nil {
-			return err
+			return 1, err
 		}
 		// Output pull-image log to stderr instead of stdout
 		_, err = io.Copy(stderr, reader)
 		if err != nil {
-			return err
+			return 1, err
 		}
 	}
 
@@ -458,7 +459,7 @@ func (c *Container) execNewContainer(ctx context.Context, cli *client.Client, cm
 		ctx, &containerConfig, c.hostConfig, c.networkConfig, &platform, c.nameOrID,
 	)
 	if err != nil {
-		return err
+		return 1, err
 	}
 
 	var once sync.Once
@@ -478,21 +479,21 @@ func (c *Container) execNewContainer(ctx context.Context, cli *client.Client, cm
 	if err := cli.ContainerStart(
 		ctx, resp.ID, container.StartOptions{},
 	); err != nil {
-		return err
+		return 1, err
 	}
 
 	return c.attachAndWait(ctx, cli, resp.ID, stdout, stderr)
 }
 
-func (c *Container) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer) error {
+func (c *Container) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer) (int, error) {
 	// Check if info exists and is running
 	info, err := cli.ContainerInspect(ctx, c.nameOrID)
 	if err != nil {
-		return fmt.Errorf("failed to inspect container %s: %w", c.nameOrID, err)
+		return 1, fmt.Errorf("failed to inspect container %s: %w", c.nameOrID, err)
 	}
 
 	if !info.State.Running {
-		return fmt.Errorf("container %s is not running", c.nameOrID)
+		return 1, fmt.Errorf("container %s is not running", c.nameOrID)
 	}
 
 	// Create exec configuration
@@ -511,13 +512,13 @@ func (c *Container) execInContainer(ctx context.Context, cli *client.Client, cmd
 	// Create exec instance
 	containerID, err := cli.ContainerExecCreate(ctx, c.nameOrID, execOpts)
 	if err != nil {
-		return fmt.Errorf("failed to create exec: %w", err)
+		return 1, fmt.Errorf("failed to create exec: %w", err)
 	}
 
 	// Start exec instance
 	resp, err := cli.ContainerExecAttach(ctx, containerID.ID, container.ExecAttachOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to start exec: %w", err)
+		return 1, fmt.Errorf("failed to start exec: %w", err)
 	}
 	defer resp.Close()
 
@@ -532,28 +533,26 @@ func (c *Container) execInContainer(ctx context.Context, cli *client.Client, cmd
 	for {
 		inspectResp, err := cli.ContainerExecInspect(ctx, containerID.ID)
 		if err != nil {
-			return fmt.Errorf("failed to inspect exec: %w", err)
+			return 1, fmt.Errorf("failed to inspect exec: %w", err)
 		}
 
 		if !inspectResp.Running {
 			if inspectResp.ExitCode != 0 {
-				return fmt.Errorf("exec failed with exit code: %d", inspectResp.ExitCode)
+				return inspectResp.ExitCode, fmt.Errorf("exec failed with exit code: %d", inspectResp.ExitCode)
 			}
-			break
+			return inspectResp.ExitCode, nil
 		}
 
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return 1, ctx.Err()
 		default:
 			// Continue waiting
 		}
 	}
-
-	return nil
 }
 
-func (c *Container) attachAndWait(ctx context.Context, cli *client.Client, containerID string, stdout, stderr io.Writer) error {
+func (c *Container) attachAndWait(ctx context.Context, cli *client.Client, containerID string, stdout, stderr io.Writer) (int, error) {
 	out, err := cli.ContainerLogs(
 		ctx, containerID, container.LogsOptions{
 			ShowStdout: true,
@@ -562,7 +561,7 @@ func (c *Container) attachAndWait(ctx context.Context, cli *client.Client, conta
 		},
 	)
 	if err != nil {
-		return err
+		return 1, err
 	}
 	defer func() {
 		_ = out.Close()
@@ -583,16 +582,17 @@ func (c *Container) attachAndWait(ctx context.Context, cli *client.Client, conta
 	select {
 	case err := <-errCh:
 		if err != nil {
-			return err
+			return 1, err
 		}
 	case status := <-statusCh:
 		if status.StatusCode != 0 {
-			return fmt.Errorf("exit status %v", status.StatusCode)
+			return int(status.StatusCode), fmt.Errorf("exit status %v", status.StatusCode)
 		}
+		return int(status.StatusCode), nil
 	}
 
 	// Wait for log copying to complete
 	wg.Wait()
 
-	return nil
+	return 0, nil
 }
