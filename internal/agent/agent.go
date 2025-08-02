@@ -16,9 +16,11 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/container"
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -294,6 +296,22 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Handle dry execution.
 	if a.dry {
 		return a.dryRun(ctx)
+	}
+
+	// Create a new container if the DAG has a container configuration.
+	if a.dag.Container != nil {
+		containerClient, err := container.NewFromContainerConfig(*a.dag.Container)
+		if err != nil {
+			return fmt.Errorf("failed to create container client: %w", err)
+		}
+		if err := containerClient.Init(ctx); err != nil {
+			return fmt.Errorf("failed to initialize container client: %w", err)
+		}
+
+		// Set the container client in the context for the execution.
+		ctx = executor.WithContainerClient(ctx, containerClient)
+
+		defer containerClient.Close(ctx)
 	}
 
 	// Open the run file to write the status.

@@ -58,8 +58,7 @@ type Client struct {
 
 // ExecOptions specifies options to execute commands in the container.
 type ExecOptions struct {
-	Env        []string // Environment variables
-	WorkingDir string   // Working directory
+	WorkingDir string // Working directory
 }
 
 // Init initialize the client
@@ -85,15 +84,20 @@ func (c *Client) Init(ctx context.Context) error {
 func (c *Client) Close(ctx context.Context) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.cli == nil {
-		return
+
+	if c.id != "" && c.autoRemove {
+		if err := c.cli.ContainerRemove(ctx, c.id, container.RemoveOptions{Force: true}); err != nil {
+			logger.Error(ctx, "docker executor: remove container", "err", err)
+		}
+		c.id = ""
 	}
+
 	_ = c.cli.Close()
 	c.cli = nil
 }
 
 // Exec executes the command in the running container
-func (c *Client) Exec(ctx context.Context, workDir string, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {
+func (c *Client) Exec(ctx context.Context, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {
 	c.mu.Lock()
 	if c.id == "" {
 		c.mu.Unlock()
@@ -257,11 +261,6 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 		Cmd:          cmd,
 		Env:          c.execOptions.Env,
 		WorkingDir:   c.execOptions.WorkingDir,
-	}
-
-	// Append additional envs passed by the additional exec options
-	for _, env := range opts.Env {
-		execOpts.Env = append(execOpts.Env, env)
 	}
 
 	// Override the working dir if specified

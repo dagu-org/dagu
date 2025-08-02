@@ -42,6 +42,21 @@ steps:
 var _ Executor = (*docker)(nil)
 var _ ExitCoder = (*docker)(nil)
 
+type containerClientCtxKey = struct{}
+
+// WithContainerClient creates a new context with a client for container
+func WithContainerClient(ctx context.Context, cli *container.Client) context.Context {
+	return context.WithValue(ctx, containerClientCtxKey{}, cli)
+}
+
+// getContainerClient retrieves the container client from the context.
+func getContainerClient(ctx context.Context) *container.Client {
+	if cli, ok := ctx.Value(containerClientCtxKey{}).(*container.Client); ok {
+		return cli
+	}
+	return nil
+}
+
 type docker struct {
 	step      digraph.Step
 	stdout    io.Writer
@@ -74,6 +89,23 @@ func (e *docker) Run(ctx context.Context) error {
 	e.cancel = cancelFunc
 
 	defer cancelFunc()
+
+	cli := getContainerClient(ctx)
+	if cli != nil {
+		// If it exists, use the client from the context
+		// This allows sharing the same container client across multiple executors.
+		execOpts := container.ExecOptions{WorkingDir: e.step.Dir}
+		exitCode, err := cli.Exec(
+			ctx,
+			append([]string{e.step.Command}, e.step.Args...),
+			e.stdout, e.stderr,
+			execOpts,
+		)
+		e.mu.Lock()
+		e.exitCode = exitCode
+		e.mu.Unlock()
+		return err
+	}
 
 	if err := e.container.Init(ctx); err != nil {
 		return fmt.Errorf("failed to setup container: %w", err)
