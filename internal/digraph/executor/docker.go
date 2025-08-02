@@ -94,7 +94,8 @@ func (e *docker) Run(ctx context.Context) error {
 	if cli != nil {
 		// If it exists, use the client from the context
 		// This allows sharing the same container client across multiple executors.
-		execOpts := container.ExecOptions{WorkingDir: e.step.Dir}
+		// Don't set WorkingDir - use the container's default working directory
+		execOpts := container.ExecOptions{}
 		exitCode, err := cli.Exec(
 			ctx,
 			append([]string{e.step.Command}, e.step.Args...),
@@ -144,16 +145,6 @@ func newDocker(
 		ct, err = container.NewFromMapConfig(execCfg.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse executor config: %w", err)
-		}
-	} else {
-		env := GetEnv(ctx)
-		if env.DAG.Container == nil {
-			return nil, ErrExecutorConfigRequired
-		}
-		var err error
-		ct, err = container.NewFromContainerConfig(*env.DAG.Container)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse DAG container config: %w", err)
 		}
 	}
 

@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/containerd/platforms"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -48,9 +50,10 @@ type Client struct {
 	networkConfig *network.NetworkingConfig
 	// execOptions is configuration for exec in existing container
 	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#ExecOptions
-	execOptions *container.ExecOptions
-	mu          sync.Mutex
-	cli         *client.Client
+	execOptions  *container.ExecOptions
+	mu           sync.Mutex
+	cli          *client.Client
+	keepAliveTmp string
 
 	cancelMu sync.Mutex
 	cancel   func()
@@ -103,8 +106,10 @@ func (c *Client) Exec(ctx context.Context, cmd []string, stdout, stderr io.Write
 		c.mu.Unlock()
 		return 1, ErrContainerIsNotRunning
 	}
+	cli := c.cli
+	c.mu.Unlock()
 
-	return c.execInContainer(ctx, c.cli, cmd, stdout, stderr, opts)
+	return c.execInContainer(ctx, cli, cmd, stdout, stderr, opts)
 }
 
 // CreateContainerKeepAlive creates the container that lives while the DAG running
@@ -123,10 +128,11 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		c.keepAliveTmp = hostPath
 
 		// Setup the volume bind for the keepalive binary
 		targetPath := "/__dagu_runner/keepalive"
-		bind := hostPath + ":" + targetPath
+		bind := hostPath + ":" + targetPath + ":ro"
 		c.hostConfig.Binds = append(c.hostConfig.Binds, bind)
 		cmd = []string{targetPath}
 	}
@@ -161,6 +167,19 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 	}
 	c.cancel()
 	c.cancel = nil
+
+	if c.id == "" {
+		return
+	}
+
+	if err := c.cli.ContainerStop(ctx, c.id, container.StopOptions{}); err != nil {
+		logger.Error(ctx, "docker executor: stop container", "err", err)
+	}
+	// Remove the temporary keep alive file if it exists
+	if err := os.Remove(c.keepAliveTmp); err != nil && !os.IsNotExist(err) {
+		logger.Error(ctx, "docker executor: remove keep alive file", "err", err)
+	}
+	c.keepAliveTmp = ""
 }
 
 // Run executes the command in the container and returns exit code
@@ -240,14 +259,19 @@ func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd 
 }
 
 func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {
+	// Get container ID from context
+	c.mu.Lock()
+	containerID := c.id
+	c.mu.Unlock()
+
 	// Check if info exists and is running
-	info, err := cli.ContainerInspect(ctx, c.id)
+	info, err := cli.ContainerInspect(ctx, containerID)
 	if err != nil {
-		return 1, fmt.Errorf("failed to inspect container %s: %w", c.id, err)
+		return 1, fmt.Errorf("failed to inspect container %s: %w", containerID, err)
 	}
 
 	if !info.State.Running {
-		return 1, fmt.Errorf("container %s is not running", c.id)
+		return 1, fmt.Errorf("container %s is not running", containerID)
 	}
 
 	// Create exec configuration
@@ -269,13 +293,13 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 	}
 
 	// Create exec instance
-	containerID, err := cli.ContainerExecCreate(ctx, c.id, execOpts)
+	execCreateResp, err := cli.ContainerExecCreate(ctx, containerID, execOpts)
 	if err != nil {
 		return 1, fmt.Errorf("failed to create exec: %w", err)
 	}
 
 	// Start exec instance
-	resp, err := cli.ContainerExecAttach(ctx, containerID.ID, container.ExecAttachOptions{})
+	resp, err := cli.ContainerExecAttach(ctx, execCreateResp.ID, container.ExecAttachOptions{})
 	if err != nil {
 		return 1, fmt.Errorf("failed to start exec: %w", err)
 	}
@@ -288,9 +312,16 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 		}
 	}()
 
+	time.Sleep(500 * time.Millisecond) // Give some time for the exec to start
+
+	client, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return 1, fmt.Errorf("failed to create docker client: %w", err)
+	}
+
 	// Wait for exec to complete
 	for {
-		inspectResp, err := cli.ContainerExecInspect(ctx, containerID.ID)
+		inspectResp, err := client.ContainerExecInspect(ctx, execCreateResp.ID)
 		if err != nil {
 			return 1, fmt.Errorf("failed to inspect exec: %w", err)
 		}

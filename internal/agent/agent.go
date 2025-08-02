@@ -307,11 +307,17 @@ func (a *Agent) Run(ctx context.Context) error {
 		if err := containerClient.Init(ctx); err != nil {
 			return fmt.Errorf("failed to initialize container client: %w", err)
 		}
+		if err := containerClient.CreateContainerKeepAlive(ctx); err != nil {
+			return fmt.Errorf("failed to create keepalive container: %w", err)
+		}
 
 		// Set the container client in the context for the execution.
 		ctx = executor.WithContainerClient(ctx, containerClient)
 
-		defer containerClient.Close(ctx)
+		defer func() {
+			containerClient.StopContainerKeepAlive(ctx)
+			containerClient.Close(ctx)
+		}()
 	}
 
 	// Open the run file to write the status.
