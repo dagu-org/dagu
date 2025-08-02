@@ -27,11 +27,13 @@ var (
 	ErrImageRequired                    = errors.New("image is required")
 	ErrInvalidVolumeFormat              = errors.New("invalid volume format")
 	ErrInvalidPortFormat                = errors.New("invalid port format")
+	ErrContainerIsNotRunning            = errors.New("container is not running")
 )
 
 type Client struct {
 	image      string
 	platform   string
+	platformO  specs.Platform
 	id         string
 	pull       digraph.PullPolicy
 	autoRemove bool
@@ -49,10 +51,19 @@ type Client struct {
 	execOptions *container.ExecOptions
 	mu          sync.Mutex
 	cli         *client.Client
+
+	cancelMu sync.Mutex
+	cancel   func()
 }
 
-// Open creates a new client
-func (c *Client) Open() error {
+// ExecOptions specifies options to execute commands in the container.
+type ExecOptions struct {
+	Env        []string // Environment variables
+	WorkingDir string   // Working directory
+}
+
+// Init initialize the client
+func (c *Client) Init(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -60,11 +71,18 @@ func (c *Client) Open() error {
 		return err
 	}
 	c.cli = cli
+
+	platform, err := c.getPlatform(ctx, cli)
+	if err != nil {
+		return err
+	}
+	c.platformO = platform
+
 	return nil
 }
 
-// Close closes the client
-func (c *Client) Close() {
+// Destroy destroys the client
+func (c *Client) Close(ctx context.Context) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.cli == nil {
@@ -74,12 +92,79 @@ func (c *Client) Close() {
 	c.cli = nil
 }
 
+// Exec executes the command in the running container
+func (c *Client) Exec(ctx context.Context, workDir string, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {
+	c.mu.Lock()
+	if c.id == "" {
+		c.mu.Unlock()
+		return 1, ErrContainerIsNotRunning
+	}
+
+	return c.execInContainer(ctx, c.cli, cmd, stdout, stderr, opts)
+}
+
+// CreateContainerKeepAlive creates the container that lives while the DAG running
+func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
+	if c.id != "" {
+		return fmt.Errorf("container already exists. id=%s", c.id)
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Use the command to keep alive the container
+	var cmd []string
+	if len(c.containerConfig.Cmd) == 0 {
+		hostPath, err := GetKeepaliveFile(c.platformO)
+		if err != nil {
+			return err
+		}
+
+		// Setup the volume bind for the keepalive binary
+		targetPath := "/__dagu_runner/keepalive"
+		bind := hostPath + ":" + targetPath
+		c.hostConfig.Binds = append(c.hostConfig.Binds, bind)
+		cmd = []string{targetPath}
+	}
+
+	// Set init true to prevent zombie subprocess issues
+	init := true
+	c.hostConfig.Init = &init
+
+	ctx, cancel := context.WithCancel(ctx)
+	c.cancelMu.Lock()
+	c.cancel = cancel
+	c.cancelMu.Unlock()
+
+	id, err := c.startNewContainer(ctx, c.cli, cmd)
+	if err != nil {
+		c.mu.Unlock()
+		return fmt.Errorf("failed to start a new container: %w", err)
+	}
+
+	c.id = id
+
+	return nil
+}
+
+// StopContainerKeepAlive stops the container running keep alive command
+func (c *Client) StopContainerKeepAlive(ctx context.Context) {
+	c.cancelMu.Lock()
+	defer c.cancelMu.Unlock()
+
+	if c.cancel == nil {
+		return
+	}
+	c.cancel()
+	c.cancel = nil
+}
+
 // Run executes the command in the container and returns exit code
 func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer) (int, error) {
 	c.mu.Lock()
 	if c.id != "" {
 		c.mu.Unlock()
-		return c.execInContainer(ctx, c.cli, cmd, stdout, stderr)
+		return c.execInContainer(ctx, c.cli, cmd, stdout, stderr, ExecOptions{})
 	}
 
 	id, err := c.startNewContainer(ctx, c.cli, cmd)
@@ -112,21 +197,16 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 }
 
 func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd []string) (string, error) {
-	platform, err := c.getPlatform(ctx, cli)
+	pull, err := c.shouldPullImage(ctx, cli, &c.platformO)
 	if err != nil {
 		return "", err
 	}
 
-	pull, err := c.shouldPullImage(ctx, cli, &platform)
-	if err != nil {
-		return "", err
-	}
-
-	logger.Info(ctx, "Creating a new container", "platform", platform, "image", c.image)
+	logger.Info(ctx, "Creating a new container", "platform", c.platform, "image", c.image)
 
 	if pull {
 		logger.Infof(ctx, "Pulling the image %q", c.image)
-		reader, err := cli.ImagePull(ctx, c.image, image.PullOptions{Platform: platforms.Format(platform)})
+		reader, err := cli.ImagePull(ctx, c.image, image.PullOptions{Platform: platforms.Format(c.platformO)})
 		if err != nil {
 			return "", err
 		}
@@ -136,11 +216,13 @@ func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd 
 	}
 
 	containerConfig := *c.containerConfig
-	containerConfig.Cmd = cmd
+	if len(cmd) > 0 {
+		containerConfig.Cmd = cmd
+	}
 	containerConfig.Image = c.image
 
 	resp, err := cli.ContainerCreate(
-		ctx, &containerConfig, c.hostConfig, c.networkConfig, &platform, c.id,
+		ctx, &containerConfig, c.hostConfig, c.networkConfig, &c.platformO, c.id,
 	)
 	if err != nil {
 		return "", err
@@ -153,7 +235,7 @@ func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd 
 	return resp.ID, cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
 }
 
-func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer) (int, error) {
+func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {
 	// Check if info exists and is running
 	info, err := cli.ContainerInspect(ctx, c.id)
 	if err != nil {
@@ -175,6 +257,16 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 		Cmd:          cmd,
 		Env:          c.execOptions.Env,
 		WorkingDir:   c.execOptions.WorkingDir,
+	}
+
+	// Append additional envs passed by the additional exec options
+	for _, env := range opts.Env {
+		execOpts.Env = append(execOpts.Env, env)
+	}
+
+	// Override the working dir if specified
+	if opts.WorkingDir != "" {
+		execOpts.WorkingDir = opts.WorkingDir
 	}
 
 	// Create exec instance

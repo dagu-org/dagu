@@ -328,10 +328,6 @@ build-keepalive:
 	zig build-exe main.zig -target arm-linux-musleabi -O ReleaseSmall -mcpu=generic+v6 -femit-bin=../assets/keepalive_linux_armv6 && \
 	zig build-exe main.zig -target powerpc64le-linux-musl -O ReleaseSmall -femit-bin=../assets/keepalive_linux_ppc64le && \
 	zig build-exe main.zig -target s390x-linux-musl -O ReleaseSmall -femit-bin=../assets/keepalive_linux_s390x && \
-	echo "Building Windows binaries..." && \
-	zig build-exe main.zig -target x86-windows -O ReleaseSmall -femit-bin=../assets/keepalive_windows_386.exe && \
-	zig build-exe main.zig -target x86_64-windows -O ReleaseSmall -femit-bin=../assets/keepalive_windows_amd64.exe && \
-	zig build-exe main.zig -target aarch64-windows -O ReleaseSmall -femit-bin=../assets/keepalive_windows_arm64.exe && \
 	echo "Skipping BSD targets (require additional setup)..."
 	@chmod +x internal/container/assets/keepalive_* 2>/dev/null || true
 	@echo "${COLOR_GREEN}Cleaning up build artifacts...${COLOR_RESET}"

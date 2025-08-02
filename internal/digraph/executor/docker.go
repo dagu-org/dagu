@@ -75,10 +75,10 @@ func (e *docker) Run(ctx context.Context) error {
 
 	defer cancelFunc()
 
-	if err := e.container.Open(); err != nil {
+	if err := e.container.Init(ctx); err != nil {
 		return fmt.Errorf("failed to setup container: %w", err)
 	}
-	defer e.container.Close()
+	defer e.container.Close(ctx)
 
 	exitCode, err := e.container.Run(
 		ctx,

@@ -14,9 +14,8 @@ import (
 var assetsFS embed.FS
 
 var osMapping = map[string]string{
-	"linux":   "linux",
-	"darwin":  "darwin",
-	"windows": "windows",
+	"linux":  "linux",
+	"darwin": "darwin",
 }
 
 var archMapping = map[string]string{
