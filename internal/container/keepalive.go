@@ -83,7 +83,7 @@ func GetKeepaliveFile(platform specs.Platform) (string, error) {
 
 	// Write to temp file (needs to be executable)
 	tmpPath := filepath.Join(tmpDir, filename)
-	if err := os.WriteFile(tmpPath, data, 0700); err != nil { //nolint:gosec // Binary needs exec permission
+	if err := os.WriteFile(tmpPath, data, 0755); err != nil { //nolint:gosec // Binary needs exec permission
 		return "", fmt.Errorf("failed to write keepalive binary: %w", err)
 	}
 
