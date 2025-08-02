@@ -134,7 +134,7 @@ func (e *docker) ExitCode() int {
 }
 
 func newDocker(
-	ctx context.Context, step digraph.Step,
+	_ context.Context, step digraph.Step,
 ) (Executor, error) {
 	execCfg := step.ExecutorConfig
 

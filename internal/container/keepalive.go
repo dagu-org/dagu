@@ -77,13 +77,13 @@ func GetKeepaliveFile(platform specs.Platform) (string, error) {
 
 	// Create temp directory for keepalive binaries
 	tmpDir := filepath.Join(os.TempDir(), "dagu-keepalive")
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+	if err := os.MkdirAll(tmpDir, 0750); err != nil { // #nosec G301
 		return "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	// Write to temp file
+	// Write to temp file (needs to be executable)
 	tmpPath := filepath.Join(tmpDir, filename)
-	if err := os.WriteFile(tmpPath, data, 0755); err != nil {
+	if err := os.WriteFile(tmpPath, data, 0700); err != nil { //nolint:gosec // Binary needs exec permission
 		return "", fmt.Errorf("failed to write keepalive binary: %w", err)
 	}
 

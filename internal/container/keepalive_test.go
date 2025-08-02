@@ -130,7 +130,7 @@ func TestGetKeepaliveFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Skip tests for binaries we don't have in the test environment
-			if !tt.wantErr && !hasBinaryForPlatform(currentOS, currentArch, tt.platform) {
+			if !tt.wantErr && !hasBinaryForPlatform(tt.platform) {
 				t.Skipf("Skipping test for %s/%s on %s/%s", tt.platform.OS, tt.platform.Architecture, currentOS, currentArch)
 			}
 
@@ -167,7 +167,7 @@ func TestGetKeepaliveFile(t *testing.T) {
 			}
 
 			// Clean up
-			os.Remove(path)
+			_ = os.Remove(path)
 		})
 	}
 }
@@ -219,7 +219,7 @@ func TestGetKeepaliveFile_TempDirCleanup(t *testing.T) {
 	// Get keepalive file
 	path, err := GetKeepaliveFile(platform)
 	require.NoError(t, err)
-	defer os.Remove(path)
+	defer func() { _ = os.Remove(path) }()
 
 	// Check temp directory exists
 	tmpDir := filepath.Dir(path)
@@ -246,7 +246,7 @@ func TestGetKeepaliveFile_OverwriteExisting(t *testing.T) {
 	// Get keepalive file first time
 	path1, err := GetKeepaliveFile(platform)
 	require.NoError(t, err)
-	defer os.Remove(path1)
+	defer func() { _ = os.Remove(path1) }()
 
 	// Modify the file
 	err = os.WriteFile(path1, []byte("modified"), 0755)
@@ -272,11 +272,11 @@ func hasBinaryForCurrentPlatform() bool {
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
 	}
-	return hasBinaryForPlatform(runtime.GOOS, runtime.GOARCH, platform)
+	return hasBinaryForPlatform(platform)
 }
 
 // Helper function to check if we expect to have a binary for a given platform
-func hasBinaryForPlatform(hostOS, hostArch string, targetPlatform specs.Platform) bool {
+func hasBinaryForPlatform(targetPlatform specs.Platform) bool {
 	// In CI or when all binaries are built, all platforms should be available
 	// For local development, we might only have binaries for the current platform
 	
