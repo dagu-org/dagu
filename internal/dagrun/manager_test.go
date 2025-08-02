@@ -172,7 +172,7 @@ steps:
 		require.NoError(t, err)
 
 		// Wait for it to start running
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 
 		// Get the latest status - should be running
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
