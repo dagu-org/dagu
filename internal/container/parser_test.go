@@ -20,7 +20,7 @@ func TestParseMapConfig(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       map[string]any
-		expected    *Container
+		expected    *Client
 		expectError bool
 		errorMsg    string
 	}{
@@ -29,7 +29,7 @@ func TestParseMapConfig(t *testing.T) {
 			input: map[string]any{
 				"image": "alpine:latest",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine:latest",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
@@ -43,7 +43,7 @@ func TestParseMapConfig(t *testing.T) {
 			input: map[string]any{
 				"containerName": "my-container",
 			},
-			expected: &Container{
+			expected: &Client{
 				nameOrID:        "my-container",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
@@ -86,7 +86,7 @@ func TestParseMapConfig(t *testing.T) {
 					"Env":        []string{"BAR=baz"},
 				},
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "ubuntu:20.04",
 				nameOrID:   "test-container",
 				platform:   "linux/arm64",
@@ -119,7 +119,7 @@ func TestParseMapConfig(t *testing.T) {
 					"AutoRemove": true,
 				},
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyMissing,
 				autoRemove:      true,
@@ -140,7 +140,7 @@ func TestParseMapConfig(t *testing.T) {
 					"AutoRemove": false,
 				},
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyMissing,
 				autoRemove:      true,
@@ -158,7 +158,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image":      "alpine",
 				"autoRemove": "true",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyMissing,
 				autoRemove:      true,
@@ -174,7 +174,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image":      "alpine",
 				"autoRemove": "false",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyMissing,
 				autoRemove:      false,
@@ -190,7 +190,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image":      "alpine",
 				"autoRemove": "1",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyMissing,
 				autoRemove:      true,
@@ -206,7 +206,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image":      "alpine",
 				"autoRemove": "0",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyMissing,
 				autoRemove:      false,
@@ -240,7 +240,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  "never",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyNever,
 				containerConfig: &container.Config{},
@@ -255,7 +255,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  "missing",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
@@ -270,7 +270,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  true,
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyAlways,
 				containerConfig: &container.Config{},
@@ -285,7 +285,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  false,
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyNever,
 				containerConfig: &container.Config{},
@@ -300,7 +300,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  "true",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyAlways,
 				containerConfig: &container.Config{},
@@ -335,7 +335,7 @@ func TestParseMapConfig(t *testing.T) {
 					"Env": "FOO=bar", // String instead of slice
 				},
 			},
-			expected: &Container{
+			expected: &Client{
 				image: "alpine",
 				pull:  digraph.PullPolicyMissing,
 				containerConfig: &container.Config{
@@ -391,7 +391,7 @@ func TestParseMapConfig(t *testing.T) {
 				"network":   map[string]any{},
 				"exec":      map[string]any{},
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
@@ -415,7 +415,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image":    "alpine",
 				"platform": 123, // Not a string
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				platform:        "123",
 				pull:            digraph.PullPolicyMissing,
@@ -431,7 +431,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image":         "alpine",
 				"containerName": 123, // Not a string
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				nameOrID:        "123",
 				pull:            digraph.PullPolicyMissing,
@@ -447,7 +447,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image":         123, // Not a string
 				"containerName": "test",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "123",
 				nameOrID:        "test",
 				pull:            digraph.PullPolicyMissing,
@@ -466,7 +466,7 @@ func TestParseMapConfig(t *testing.T) {
 				"network":   nil,
 				"exec":      nil,
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
@@ -481,7 +481,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  nil,
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
@@ -496,7 +496,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  "",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
@@ -511,7 +511,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image":      "alpine",
 				"autoRemove": nil,
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				autoRemove:      false,
 				pull:            digraph.PullPolicyMissing,
@@ -527,7 +527,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image":    "alpine",
 				"platform": nil,
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				platform:        "",
 				pull:            digraph.PullPolicyMissing,
@@ -543,7 +543,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image":         "alpine",
 				"containerName": nil,
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "alpine",
 				nameOrID:        "",
 				pull:            digraph.PullPolicyMissing,
@@ -559,7 +559,7 @@ func TestParseMapConfig(t *testing.T) {
 				"image":         nil,
 				"containerName": "test",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:           "",
 				nameOrID:        "test",
 				pull:            digraph.PullPolicyMissing,
@@ -573,7 +573,7 @@ func TestParseMapConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseMapConfig(tt.input)
+			result, err := NewFromMapConfig(tt.input)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -609,7 +609,7 @@ func TestParseContainer(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       digraph.Container
-		expected    *Container
+		expected    *Client
 		expectError bool
 		errorMsg    string
 	}{
@@ -618,7 +618,7 @@ func TestParseContainer(t *testing.T) {
 			input: digraph.Container{
 				Image: "alpine:latest",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "alpine:latest",
 				pull:       digraph.PullPolicyAlways, // Zero value of PullPolicy
 				autoRemove: true,                     // Default when KeepContainer is false
@@ -652,7 +652,7 @@ func TestParseContainer(t *testing.T) {
 				Network:       "mynetwork",
 				KeepContainer: true,
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "ubuntu:20.04",
 				platform:   "linux/arm64",
 				pull:       digraph.PullPolicyAlways,
@@ -701,7 +701,7 @@ func TestParseContainer(t *testing.T) {
 				Image:   "nginx",
 				Network: "host",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "nginx",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -720,7 +720,7 @@ func TestParseContainer(t *testing.T) {
 				Image:   "nginx",
 				Network: "container:myapp",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "nginx",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -739,7 +739,7 @@ func TestParseContainer(t *testing.T) {
 				Image:   "alpine",
 				Volumes: []string{"/host/path:/container/path"},
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "alpine",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -758,7 +758,7 @@ func TestParseContainer(t *testing.T) {
 				Image:   "alpine",
 				Volumes: []string{"./data:/data:ro"},
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "alpine",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -777,7 +777,7 @@ func TestParseContainer(t *testing.T) {
 				Image:   "alpine",
 				Volumes: []string{"~/data:/data:rw"},
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "alpine",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -796,7 +796,7 @@ func TestParseContainer(t *testing.T) {
 				Image: "nginx",
 				Ports: []string{"127.0.0.1:8080:80/tcp"},
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "nginx",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -825,7 +825,7 @@ func TestParseContainer(t *testing.T) {
 				Image: "dns-server",
 				Ports: []string{"53:53/udp"},
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "dns-server",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -908,7 +908,7 @@ func TestParseContainer(t *testing.T) {
 				Image: "sctp-server",
 				Ports: []string{"132/sctp"},
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "sctp-server",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -928,7 +928,7 @@ func TestParseContainer(t *testing.T) {
 				Image: "nginx",
 				Ports: []string{" 8080:80 "},
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "nginx",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -957,7 +957,7 @@ func TestParseContainer(t *testing.T) {
 				Image:   "nginx",
 				Network: "",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "nginx",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -976,7 +976,7 @@ func TestParseContainer(t *testing.T) {
 				Image:   "nginx",
 				Network: "bridge",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "nginx",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -995,7 +995,7 @@ func TestParseContainer(t *testing.T) {
 				Image:   "nginx",
 				Network: "none",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "nginx",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -1014,7 +1014,7 @@ func TestParseContainer(t *testing.T) {
 				Image:         "alpine",
 				KeepContainer: false,
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "alpine",
 				autoRemove: true,
 				containerConfig: &container.Config{
@@ -1031,7 +1031,7 @@ func TestParseContainer(t *testing.T) {
 				Image:         "alpine",
 				KeepContainer: true,
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "alpine",
 				autoRemove: false,
 				containerConfig: &container.Config{
@@ -1048,7 +1048,7 @@ func TestParseContainer(t *testing.T) {
 				Image:      "alpine",
 				PullPolicy: digraph.PullPolicyNever,
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "alpine",
 				pull:       digraph.PullPolicyNever,
 				autoRemove: true,
@@ -1066,7 +1066,7 @@ func TestParseContainer(t *testing.T) {
 				Image:    "alpine",
 				Platform: "linux/386",
 			},
-			expected: &Container{
+			expected: &Client{
 				image:      "alpine",
 				platform:   "linux/386",
 				autoRemove: true,
@@ -1082,7 +1082,7 @@ func TestParseContainer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseContainer(tt.input)
+			result, err := NewFromContainerConfig(tt.input)
 
 			if tt.expectError {
 				require.Error(t, err)

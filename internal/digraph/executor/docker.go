@@ -48,7 +48,7 @@ type docker struct {
 	stderr    io.Writer
 	context   context.Context
 	cancel    func()
-	container *container.Container
+	container *container.Client
 	mu        sync.Mutex
 	exitCode  int
 }
@@ -105,11 +105,11 @@ func newDocker(
 ) (Executor, error) {
 	execCfg := step.ExecutorConfig
 
-	var ct *container.Container
+	var ct *container.Client
 
 	if len(execCfg.Config) > 0 {
 		var err error
-		ct, err = container.ParseMapConfig(execCfg.Config)
+		ct, err = container.NewFromMapConfig(execCfg.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse executor config: %w", err)
 		}
@@ -119,7 +119,7 @@ func newDocker(
 			return nil, ErrExecutorConfigRequired
 		}
 		var err error
-		ct, err = container.ParseContainer(*env.DAG.Container)
+		ct, err = container.NewFromContainerConfig(*env.DAG.Container)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse DAG container config: %w", err)
 		}
