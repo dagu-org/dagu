@@ -16,9 +16,11 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/container"
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -296,6 +298,28 @@ func (a *Agent) Run(ctx context.Context) error {
 		return a.dryRun(ctx)
 	}
 
+	// Create a new container if the DAG has a container configuration.
+	if a.dag.Container != nil {
+		containerClient, err := container.NewFromContainerConfig(*a.dag.Container)
+		if err != nil {
+			return fmt.Errorf("failed to create container client: %w", err)
+		}
+		if err := containerClient.Init(ctx); err != nil {
+			return fmt.Errorf("failed to initialize container client: %w", err)
+		}
+		if err := containerClient.CreateContainerKeepAlive(ctx); err != nil {
+			return fmt.Errorf("failed to create keepalive container: %w", err)
+		}
+
+		// Set the container client in the context for the execution.
+		ctx = executor.WithContainerClient(ctx, containerClient)
+
+		defer func() {
+			containerClient.StopContainerKeepAlive(ctx)
+			containerClient.Close(ctx)
+		}()
+	}
+
 	// Open the run file to write the status.
 	// TODO: Check if the run file already exists and if it does, return an error.
 	// This is to prevent duplicate execution of the same DAG run.
@@ -417,7 +441,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Stop the process and remove it from the store.
 	if err := proc.Stop(ctx); err != nil {
-		logger.Error(ctx, "failed to stop the heartbeat", "err", err)
+		logger.Error(ctx, "Failed to stop the heartbeat", "err", err)
 	}
 
 	if coordinatorCli != nil {

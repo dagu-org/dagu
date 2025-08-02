@@ -1,7 +1,10 @@
 package digraph_test
 
 import (
+	"crypto/md5"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,8 +17,12 @@ import (
 )
 
 func TestDAG(t *testing.T) {
+	t.Parallel()
+
 	th := test.Setup(t)
 	t.Run("String", func(t *testing.T) {
+		t.Parallel()
+
 		dag := th.DAG(t, `steps:
   - name: "1"
     command: "true"
@@ -27,7 +34,9 @@ func TestDAG(t *testing.T) {
 	})
 }
 
-func TestUnixSocket(t *testing.T) {
+func TestSockAddr(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Location", func(t *testing.T) {
 		dag := &digraph.DAG{Location: "testdata/testDag.yml"}
 		require.Regexp(t, `^/tmp/@dagu_testdata_testDag_yml_[0-9a-f]+\.sock$`, dag.SockAddr(""))
@@ -40,9 +49,188 @@ func TestUnixSocket(t *testing.T) {
 		require.LessOrEqual(t, 50, len(dag.SockAddr("")))
 		require.Equal(
 			t,
-			"/tmp/@dagu_testdata_testDagVeryLongNameThat_21bace.sock",
+			"/tmp/@dagu_testdata_testDagVeryLongNameThat_b92b71.sock",
 			dag.SockAddr(""),
 		)
+	})
+	t.Run("BasicFunctionality", func(t *testing.T) {
+		t.Parallel()
+
+		// Test basic socket address generation
+		addr := digraph.SockAddr("mydag", "run123")
+
+		// Should start with /tmp/@dagu_
+		require.True(t, strings.HasPrefix(addr, "/tmp/@dagu_"))
+
+		// Should end with .sock
+		require.True(t, strings.HasSuffix(addr, ".sock"))
+
+		// Should contain the safe name
+		require.Contains(t, addr, "mydag")
+
+		// Should have a 6-character hash
+		parts := strings.Split(addr, "_")
+		lastPart := parts[len(parts)-1]
+		hashPart := strings.TrimSuffix(lastPart, ".sock")
+		require.Len(t, hashPart, 6)
+
+		// Should be deterministic - same inputs produce same output
+		addr2 := digraph.SockAddr("mydag", "run123")
+		require.Equal(t, addr, addr2)
+	})
+
+	t.Run("DifferentInputsProduceDifferentHashes", func(t *testing.T) {
+		t.Parallel()
+
+		addr1 := digraph.SockAddr("dag1", "run1")
+		addr2 := digraph.SockAddr("dag1", "run2")
+		addr3 := digraph.SockAddr("dag2", "run1")
+
+		// Different dagRunIDs should produce different addresses
+		require.NotEqual(t, addr1, addr2)
+
+		// Different names should produce different addresses
+		require.NotEqual(t, addr1, addr3)
+	})
+
+	t.Run("SafeNameHandling", func(t *testing.T) {
+		t.Parallel()
+
+		// Test that unsafe characters are handled properly
+		addr := digraph.SockAddr("my/dag\\with:special*chars", "run|with<>chars")
+
+		// Extract just the socket name part (after /tmp/)
+		socketName := strings.TrimPrefix(addr, "/tmp/")
+
+		// Should not contain any of the unsafe characters in the socket name
+		// (but "/" is expected in the full path as "/tmp/")
+		require.NotContains(t, socketName, "/")
+		require.NotContains(t, socketName, "\\")
+		require.NotContains(t, socketName, ":")
+		require.NotContains(t, socketName, "*")
+		require.NotContains(t, socketName, "|")
+		require.NotContains(t, socketName, "<")
+		require.NotContains(t, socketName, ">")
+	})
+
+	t.Run("MaxSocketLengthEnforcement", func(t *testing.T) {
+		t.Parallel()
+
+		// Test that very long names are truncated to keep total length <= 50
+		veryLongName := strings.Repeat("a", 100)
+		addr := digraph.SockAddr(veryLongName, "run123")
+
+		// Extract just the socket name part (after /tmp/)
+		socketName := strings.TrimPrefix(addr, "/tmp/")
+		require.LessOrEqual(t, len(socketName), 50)
+
+		// Should still have all required parts
+		require.True(t, strings.HasPrefix(socketName, "@dagu_"))
+		require.True(t, strings.HasSuffix(socketName, ".sock"))
+	})
+
+	t.Run("EdgeCaseTruncation", func(t *testing.T) {
+		t.Parallel()
+
+		// Test edge case where name needs to be truncated to exactly fit
+		// Format: @dagu_ (6) + name (?) + _ (1) + hash (6) + .sock (5) = 50
+		// So max name length = 50 - 6 - 1 - 6 - 5 = 32
+
+		// Test with name that will need truncation
+		name32 := strings.Repeat("x", 32)
+		name33 := strings.Repeat("x", 33)
+
+		addr32 := digraph.SockAddr(name32, "run123")
+		addr33 := digraph.SockAddr(name33, "run123")
+
+		socketName32 := strings.TrimPrefix(addr32, "/tmp/")
+		socketName33 := strings.TrimPrefix(addr33, "/tmp/")
+
+		// Both should be exactly 50 characters or less
+		require.LessOrEqual(t, len(socketName32), 50)
+		require.LessOrEqual(t, len(socketName33), 50)
+
+		// The 33-char name should be truncated
+		require.Contains(t, socketName32, name32)
+		require.NotContains(t, socketName33, name33) // Full name won't fit
+	})
+
+	t.Run("EmptyInputs", func(t *testing.T) {
+		t.Parallel()
+
+		// Test with empty strings
+		addr1 := digraph.SockAddr("", "")
+		addr2 := digraph.SockAddr("dag", "")
+		addr3 := digraph.SockAddr("", "run")
+
+		// All should produce valid socket addresses
+		require.True(t, strings.HasPrefix(addr1, "/tmp/@dagu_"))
+		require.True(t, strings.HasPrefix(addr2, "/tmp/@dagu_"))
+		require.True(t, strings.HasPrefix(addr3, "/tmp/@dagu_"))
+
+		// All should end with .sock
+		require.True(t, strings.HasSuffix(addr1, ".sock"))
+		require.True(t, strings.HasSuffix(addr2, ".sock"))
+		require.True(t, strings.HasSuffix(addr3, ".sock"))
+	})
+
+	t.Run("HashConsistency", func(t *testing.T) {
+		t.Parallel()
+
+		// Verify that the hash is based on the combined name+dagRunID
+		name := "testdag"
+		runID := "testrun"
+
+		addr := digraph.SockAddr(name, runID)
+
+		// Extract the hash part
+		parts := strings.Split(addr, "_")
+		lastPart := parts[len(parts)-1]
+		hash := strings.TrimSuffix(lastPart, ".sock")
+
+		// The hash should be the first 6 characters of MD5(name+runID)
+		expectedHash := fmt.Sprintf("%x", md5.Sum([]byte(name+runID)))[:6]
+		require.Equal(t, expectedHash, hash)
+	})
+
+	t.Run("DAGMethodsUseSockAddr", func(t *testing.T) {
+		t.Parallel()
+
+		// Test DAG.SockAddr method behavior
+
+		// When Location is set, it uses Location
+		dag1 := &digraph.DAG{
+			Name:     "mydag",
+			Location: "path/to/dag.yml",
+		}
+		addr1 := dag1.SockAddr("run123")
+		expectedAddr1 := digraph.SockAddr("path/to/dag.yml", "")
+		require.Equal(t, expectedAddr1, addr1)
+
+		// When Location is not set, it uses Name and dagRunID
+		dag2 := &digraph.DAG{
+			Name: "mydag",
+		}
+		addr2 := dag2.SockAddr("run123")
+		expectedAddr2 := digraph.SockAddr("mydag", "run123")
+		require.Equal(t, expectedAddr2, addr2)
+	})
+
+	t.Run("SockAddrForChildDAGRun", func(t *testing.T) {
+		t.Parallel()
+
+		// Test SockAddrForChildDAGRun always uses GetName() and dagRunID
+		dag := &digraph.DAG{
+			Name:     "parentdag",
+			Location: "path/to/parent.yml",
+		}
+
+		childRunID := "child-run-456"
+		addr := dag.SockAddrForChildDAGRun(childRunID)
+
+		// Should use the DAG name (not location) with the child run ID
+		expectedAddr := digraph.SockAddr("parentdag", childRunID)
+		require.Equal(t, expectedAddr, addr)
 	})
 }
 
@@ -59,7 +247,11 @@ func TestMarshalJSON(t *testing.T) {
 }
 
 func TestScheduleJSON(t *testing.T) {
+	t.Parallel()
+
 	t.Run("MarshalUnmarshalJSON", func(t *testing.T) {
+		t.Parallel()
+
 		// Create a Schedule with a valid cron expression
 		original := digraph.Schedule{
 			Expression: "0 0 * * *", // Run at midnight every day
@@ -100,6 +292,8 @@ func TestScheduleJSON(t *testing.T) {
 	})
 
 	t.Run("UnmarshalInvalidCron", func(t *testing.T) {
+		t.Parallel()
+
 		// Test unmarshaling with an invalid cron expression
 		invalidJSON := `{"expression":"invalid cron"}`
 
@@ -111,7 +305,11 @@ func TestScheduleJSON(t *testing.T) {
 }
 
 func TestDAG_CreateTask(t *testing.T) {
+	t.Parallel()
+
 	t.Run("BasicTaskCreation", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &digraph.DAG{
 			Name:     "test-dag",
 			YamlData: []byte("name: test-dag\nsteps:\n  - name: step1\n    command: echo hello"),
@@ -146,6 +344,8 @@ func TestDAG_CreateTask(t *testing.T) {
 	})
 
 	t.Run("WithRootDagRunOption", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &digraph.DAG{
 			Name: "child-dag",
 		}
@@ -168,6 +368,8 @@ func TestDAG_CreateTask(t *testing.T) {
 	})
 
 	t.Run("WithParentDagRunOption", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &digraph.DAG{
 			Name: "child-dag",
 		}
@@ -190,6 +392,8 @@ func TestDAG_CreateTask(t *testing.T) {
 	})
 
 	t.Run("WithMultipleOptions", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &digraph.DAG{
 			Name:     "grandchild-dag",
 			YamlData: []byte("name: grandchild-dag"),
@@ -224,6 +428,8 @@ func TestDAG_CreateTask(t *testing.T) {
 	})
 
 	t.Run("EmptyWorkerSelector", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &digraph.DAG{
 			Name: "test-dag",
 		}
@@ -237,6 +443,8 @@ func TestDAG_CreateTask(t *testing.T) {
 	})
 
 	t.Run("OptionsWithEmptyRefs", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &digraph.DAG{
 			Name: "test-dag",
 		}
@@ -261,6 +469,8 @@ func TestDAG_CreateTask(t *testing.T) {
 	})
 
 	t.Run("PartiallyEmptyRefs", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &digraph.DAG{
 			Name: "test-dag",
 		}
@@ -284,6 +494,8 @@ func TestDAG_CreateTask(t *testing.T) {
 	})
 
 	t.Run("CustomTaskOption", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &digraph.DAG{
 			Name: "test-dag",
 		}
@@ -306,6 +518,8 @@ func TestDAG_CreateTask(t *testing.T) {
 	})
 
 	t.Run("NilYamlData", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &digraph.DAG{
 			Name:     "test-dag",
 			YamlData: nil,
@@ -320,6 +534,8 @@ func TestDAG_CreateTask(t *testing.T) {
 	})
 
 	t.Run("AllOperationTypes", func(t *testing.T) {
+		t.Parallel()
+
 		dag := &digraph.DAG{
 			Name: "test-dag",
 		}
@@ -338,7 +554,11 @@ func TestDAG_CreateTask(t *testing.T) {
 }
 
 func TestTaskOption_Functions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("WithRootDagRun", func(t *testing.T) {
+		t.Parallel()
+
 		task := &coordinatorv1.Task{}
 		ref := digraph.DAGRunRef{Name: "root", ID: "123"}
 
@@ -349,6 +569,8 @@ func TestTaskOption_Functions(t *testing.T) {
 	})
 
 	t.Run("WithParentDagRun", func(t *testing.T) {
+		t.Parallel()
+
 		task := &coordinatorv1.Task{}
 		ref := digraph.DAGRunRef{Name: "parent", ID: "456"}
 
@@ -359,6 +581,8 @@ func TestTaskOption_Functions(t *testing.T) {
 	})
 
 	t.Run("WithTaskParams", func(t *testing.T) {
+		t.Parallel()
+
 		task := &coordinatorv1.Task{}
 
 		digraph.WithTaskParams("key1=value1 key2=value2")(task)
@@ -367,6 +591,8 @@ func TestTaskOption_Functions(t *testing.T) {
 	})
 
 	t.Run("WithWorkerSelector", func(t *testing.T) {
+		t.Parallel()
+
 		task := &coordinatorv1.Task{}
 		selector := map[string]string{
 			"gpu":    "true",
@@ -379,6 +605,8 @@ func TestTaskOption_Functions(t *testing.T) {
 	})
 
 	t.Run("WithStep", func(t *testing.T) {
+		t.Parallel()
+
 		task := &coordinatorv1.Task{}
 
 		digraph.WithStep("step-name")(task)

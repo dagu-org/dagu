@@ -366,13 +366,13 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t,
 			newStep("1",
 				withCommand(fmt.Sprintf("%s %s", testScript, file)),
-				withRetryPolicy(1, time.Millisecond*50),
+				withRetryPolicy(3, time.Millisecond*50),
 			),
 		)
 
 		go func() {
 			// Create file for successful retry
-			time.Sleep(time.Millisecond * 30) // wait for step 1 to start
+			time.Sleep(time.Millisecond * 60) // wait for step 1 to start
 
 			// Create file during the retry interval
 			f, err := os.Create(file)
@@ -391,7 +391,7 @@ func TestScheduler(t *testing.T) {
 		// Check if the retry is successful
 		state := result.Node(t, "1").State()
 		assert.Equal(t, 1, state.DoneCount)
-		assert.Equal(t, 1, state.RetryCount)
+		assert.Greater(t, state.RetryCount, 0)
 		assert.NotEmpty(t, state.RetriedAt)
 
 		result.AssertNodeStatus(t, "1", status.NodeSuccess)

@@ -30,7 +30,7 @@ import (
 //
 // ```
 // It returns an error if the command is not nil but empty.
-func buildCommand(_ BuildContext, def stepDef, step *Step) error {
+func buildCommand(_ StepBuildContext, def stepDef, step *Step) error {
 	command := def.Command
 
 	// Case 1: command is nil

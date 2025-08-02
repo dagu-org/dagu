@@ -46,6 +46,8 @@ type Scheduler struct {
 	mu        sync.RWMutex
 	pause     time.Duration
 	lastError error
+
+	handlerMu sync.RWMutex
 	handlers  map[digraph.HandlerType]*Node
 
 	metrics struct {
@@ -275,6 +277,10 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	}
 
 	eventHandlers = append(eventHandlers, digraph.HandlerOnExit)
+
+	sc.handlerMu.RLock()
+	defer sc.handlerMu.RUnlock()
+
 	for _, handler := range eventHandlers {
 		if handlerNode := sc.handlers[handler]; handlerNode != nil {
 			logger.Info(ctx, "Handler execution started", "handler", handlerNode.Name())
@@ -487,6 +493,8 @@ func (sc *Scheduler) isError() bool {
 
 // HandlerNode returns the handler node with the given name.
 func (sc *Scheduler) HandlerNode(name digraph.HandlerType) *Node {
+	sc.handlerMu.RLock()
+	defer sc.handlerMu.RUnlock()
 	if v, ok := sc.handlers[name]; ok {
 		return v
 	}
@@ -586,6 +594,8 @@ func (sc *Scheduler) setup(ctx context.Context) (err error) {
 	}
 
 	// Initialize handlers
+	sc.handlerMu.Lock()
+	defer sc.handlerMu.Unlock()
 	sc.handlers = map[digraph.HandlerType]*Node{}
 	if sc.onExit != nil {
 		sc.handlers[digraph.HandlerOnExit] = &Node{Data: newSafeData(NodeData{Step: *sc.onExit})}

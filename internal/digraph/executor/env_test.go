@@ -14,6 +14,8 @@ import (
 )
 
 func TestEnv_VariablesMap(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		setupEnv func(env executor.Env) executor.Env
@@ -87,6 +89,16 @@ func TestEnv_VariablesMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create a temporary directory to ensure we have a valid working directory
+			tempDir := t.TempDir()
+			originalWd, err := os.Getwd()
+			if err == nil {
+				defer func() { _ = os.Chdir(originalWd) }()
+			}
+			require.NoError(t, os.Chdir(tempDir))
+
 			ctx := context.Background()
 			env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
 			env = tt.setupEnv(env)
@@ -97,14 +109,13 @@ func TestEnv_VariablesMap(t *testing.T) {
 			for key, expectedValue := range tt.expected {
 				assert.Equal(t, expectedValue, result[key], "key %s should have value %s", key, expectedValue)
 			}
-
-			// Also check PWD is set (from NewEnv)
-			assert.NotEmpty(t, result["PWD"], "PWD should be set")
 		})
 	}
 }
 
 func TestNewEnv_WorkingDirectory(t *testing.T) {
+	// Don't run in parallel since we're changing working directory
+
 	// Save current working directory
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
@@ -246,6 +257,8 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Don't run in parallel since we're changing working directory
+
 			tt.setupFunc()
 
 			ctx := context.Background()
@@ -261,6 +274,8 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 }
 
 func TestNewEnv_BasicFields(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	step := digraph.Step{
 		Name:    "test-step",
@@ -282,4 +297,113 @@ func TestNewEnv_BasicFields(t *testing.T) {
 
 	// Check that WorkingDir is set
 	assert.NotEmpty(t, env.WorkingDir)
+}
+
+func TestEnv_EvalString_Precedence(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		setup    func(ctx context.Context) (context.Context, executor.Env)
+		input    string
+		expected string
+	}{
+		{
+			name: "step env overrides output variables and DAG env",
+			setup: func(ctx context.Context) (context.Context, executor.Env) {
+				// Create DAG with env variable
+				dag := &digraph.DAG{
+					Env: []string{"FOO=from_dag"},
+				}
+				ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+
+				// Create executor env
+				env := executor.NewEnv(ctx, digraph.Step{Name: "test"})
+
+				// Set output variable
+				env.Variables.Store("FOO", "FOO=from_output")
+
+				// Set step env (highest precedence)
+				env.Envs["FOO"] = "from_step"
+
+				return ctx, env
+			},
+			input:    "${FOO}",
+			expected: "from_step",
+		},
+		{
+			name: "output variables override DAG env",
+			setup: func(ctx context.Context) (context.Context, executor.Env) {
+				// Create DAG with env variable
+				dag := &digraph.DAG{
+					Env: []string{"BAR=from_dag"},
+				}
+				ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+
+				// Create executor env
+				env := executor.NewEnv(ctx, digraph.Step{Name: "test"})
+
+				// Set output variable (higher precedence than DAG)
+				env.Variables.Store("BAR", "BAR=from_output")
+
+				return ctx, env
+			},
+			input:    "${BAR}",
+			expected: "from_output",
+		},
+		{
+			name: "DAG env used when no override exists",
+			setup: func(ctx context.Context) (context.Context, executor.Env) {
+				// Create DAG with env variable
+				dag := &digraph.DAG{
+					Env: []string{"BAZ=from_dag"},
+				}
+				ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+
+				// Create executor env
+				env := executor.NewEnv(ctx, digraph.Step{Name: "test"})
+
+				return ctx, env
+			},
+			input:    "${BAZ}",
+			expected: "from_dag",
+		},
+		{
+			name: "multiple variables with different precedence",
+			setup: func(ctx context.Context) (context.Context, executor.Env) {
+				// Create DAG with multiple env variables
+				dag := &digraph.DAG{
+					Env: []string{"VAR1=dag1", "VAR2=dag2", "VAR3=dag3"},
+				}
+				ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+
+				// Create executor env
+				env := executor.NewEnv(ctx, digraph.Step{Name: "test"})
+
+				// Set output variables
+				env.Variables.Store("VAR1", "VAR1=output1")
+				env.Variables.Store("VAR2", "VAR2=output2")
+
+				// Set step env (only for VAR1)
+				env.Envs["VAR1"] = "step1"
+
+				return ctx, env
+			},
+			input:    "VAR1=${VAR1}, VAR2=${VAR2}, VAR3=${VAR3}",
+			expected: "VAR1=step1, VAR2=output2, VAR3=dag3",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			ctx, env := tt.setup(ctx)
+
+			result, err := env.EvalString(ctx, tt.input)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

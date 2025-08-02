@@ -70,6 +70,8 @@ type definition struct {
 	OTel any
 	// WorkerSelector specifies required worker labels for execution.
 	WorkerSelector map[string]string
+	// Container is the container definition for the DAG.
+	Container *containerDef
 }
 
 // handlerOnDef defines the steps to be executed on different events.
@@ -191,4 +193,28 @@ type mailConfigDef struct {
 type mailOnDef struct {
 	Failure bool // Send mail on failure
 	Success bool // Send mail on success
+}
+
+// containerDef defines the container configuration for the DAG.
+type containerDef struct {
+	// Image is the container image to use.
+	Image string `yaml:"image,omitempty"`
+	// PullPolicy is the policy to pull the image (e.g., "Always", "IfNotPresent").
+	PullPolicy any `yaml:"pullPolicy,omitempty"`
+	// Env specifies environment variables for the container.
+	Env any `yaml:"env,omitempty"` // Can be a map or struct
+	// Volumes specifies the volumes to mount in the container.
+	Volumes []string `yaml:"volumes,omitempty"` // Map of volume names to volume definitions
+	// User is the user to run the container as.
+	User string `yaml:"user,omitempty"` // User to run the container as
+	// WorkDir is the working directory inside the container.
+	WorkDir string `yaml:"workDir,omitempty"` // Working directory inside the container
+	// Platform specifies the platform for the container (e.g., "linux/amd64").
+	Platform string `yaml:"platform,omitempty"` // Platform for the container
+	// Ports specifies the ports to expose from the container.
+	Ports []string `yaml:"ports,omitempty"` // List of ports to expose
+	// Network is the network configuration for the container.
+	Network string `yaml:"network,omitempty"` // Network configuration for the container
+	// KeepContainer is the flag to keep the container after the DAG run.
+	KeepContainer bool `yaml:"keepContainer,omitempty"` // Keep the container after the DAG run
 }
