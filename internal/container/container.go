@@ -331,8 +331,8 @@ func ParseMapConfig(data map[string]any) (*Container, error) {
 	}, nil
 }
 
-// Platform returns the platform of the container
-func (c *Container) Platform(ctx context.Context, cli *client.Client) (specs.Platform, error) {
+// getPlatform returns the platform of the container
+func (c *Container) getPlatform(ctx context.Context, cli *client.Client) (specs.Platform, error) {
 	// Extract platform from the current input and fallback to the current docker host platform.
 	var platform specs.Platform
 	if c.platform != "" {
@@ -353,7 +353,7 @@ func (c *Container) Platform(ctx context.Context, cli *client.Client) (specs.Pla
 	return platform, nil
 }
 
-func (c *Container) ShouldPullImage(ctx context.Context, cli *client.Client, platform *specs.Platform) (bool, error) {
+func (c *Container) shouldPullImage(ctx context.Context, cli *client.Client, platform *specs.Platform) (bool, error) {
 	if c.pull == digraph.PullPolicyAlways {
 		return true, nil
 	}
@@ -402,12 +402,12 @@ func (c *Container) Run(ctx context.Context, cmd []string, stdout, stderr io.Wri
 		return c.execInContainer(ctx, cli, cmd, stdout, stderr)
 	}
 
-	platform, err := c.Platform(ctx, cli)
+	platform, err := c.getPlatform(ctx, cli)
 	if err != nil {
 		return err
 	}
 
-	pull, err := c.ShouldPullImage(ctx, cli, &platform)
+	pull, err := c.shouldPullImage(ctx, cli, &platform)
 	if err != nil {
 		return err
 	}
