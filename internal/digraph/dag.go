@@ -286,6 +286,8 @@ type SMTPConfig struct {
 type MailConfig struct {
 	From       string   `json:"from,omitempty"`
 	To         []string `json:"to,omitempty"`
+	Cc         []string `json:"cc,omitempty"`
+	Bcc        []string `json:"bcc,omitempty"`
 	Prefix     string   `json:"prefix,omitempty"`
 	AttachLogs bool     `json:"attachLogs,omitempty"`
 }

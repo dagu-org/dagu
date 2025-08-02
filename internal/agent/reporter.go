@@ -20,7 +20,7 @@ type Sender interface {
 }
 
 // SenderFn is a function type for sending reports.
-type SenderFn func(ctx context.Context, from string, to []string, subject, body string, attachments []string) error
+type SenderFn func(ctx context.Context, from string, to []string, cc []string, bcc []string, subject, body string, attachments []string) error
 
 // reporter is responsible for reporting the status of the scheduler
 // to the user.
@@ -41,10 +41,12 @@ func (r *reporter) reportStep(
 	if nodeStatus == status.NodeError && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
 		fromAddress := dag.ErrorMail.From
 		toAddresses := dag.ErrorMail.To
+		ccAddresses := dag.ErrorMail.Cc
+		bccAddresses := dag.ErrorMail.Bcc
 		subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, dagStatus.Status)
 		html := renderHTMLWithDAGInfo(dagStatus)
 		attachments := addAttachments(dag.ErrorMail.AttachLogs, dagStatus.Nodes)
-		return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
+		return r.senderFn(ctx, fromAddress, toAddresses, ccAddresses, bccAddresses, subject, html, attachments)
 	}
 	return nil
 }
@@ -67,19 +69,23 @@ func (r *reporter) send(ctx context.Context, dag *digraph.DAG, dagStatus models.
 		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
 			fromAddress := dag.ErrorMail.From
 			toAddresses := dag.ErrorMail.To
+			ccAddresses := dag.ErrorMail.Cc
+			bccAddresses := dag.ErrorMail.Bcc
 			subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, dagStatus.Status)
 			html := renderHTMLWithDAGInfo(dagStatus)
 			attachments := addAttachments(dag.ErrorMail.AttachLogs, dagStatus.Nodes)
-			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
+			return r.senderFn(ctx, fromAddress, toAddresses, ccAddresses, bccAddresses, subject, html, attachments)
 		}
 	} else if dagStatus.Status == status.Success || dagStatus.Status == status.PartialSuccess {
 		if dag.MailOn != nil && dag.MailOn.Success && dag.InfoMail != nil {
 			fromAddress := dag.InfoMail.From
 			toAddresses := dag.InfoMail.To
+			ccAddresses := dag.InfoMail.Cc
+			bccAddresses := dag.InfoMail.Bcc
 			subject := fmt.Sprintf("%s %s (%s)", dag.InfoMail.Prefix, dag.Name, dagStatus.Status)
 			html := renderHTMLWithDAGInfo(dagStatus)
 			attachments := addAttachments(dag.InfoMail.AttachLogs, dagStatus.Nodes)
-			_ = r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
+			_ = r.senderFn(ctx, fromAddress, toAddresses, ccAddresses, bccAddresses, subject, html, attachments)
 		}
 	}
 	return nil

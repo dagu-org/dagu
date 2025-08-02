@@ -64,6 +64,11 @@ steps:
           - manager@example.com
           - stakeholders@example.com
         from: noreply@example.com
+        cc:
+          - vp@example.com
+          - svp@example.com
+        bcc:
+          - evp@example.com
         subject: "Daily Report Ready"
         message: "The daily report has been generated."
         
@@ -73,6 +78,8 @@ steps:
       config:
         to: admin@example.com  # Single recipient still works
         from: system@example.com
+        cc: teamlead@example.com
+        bcc: manager@example.com 
         subject: "System Update"
         message: "System maintenance completed."
 ```
