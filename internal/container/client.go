@@ -10,12 +10,14 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/go-viper/mapstructure/v2"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -30,7 +32,7 @@ var (
 type Client struct {
 	image      string
 	platform   string
-	nameOrID   string
+	id         string
 	pull       digraph.PullPolicy
 	autoRemove bool
 	// containerConfig is the configuration for new container creation
@@ -46,7 +48,7 @@ type Client struct {
 	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#ExecOptions
 	execOptions *container.ExecOptions
 	mu          sync.Mutex
-	client      *client.Client
+	cli         *client.Client
 }
 
 // Open creates a new client
@@ -57,39 +59,36 @@ func (c *Client) Open() error {
 	if err != nil {
 		return err
 	}
-	c.client = cli
+	c.cli = cli
 	return nil
 }
 
+// Close closes the client
 func (c *Client) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.client == nil {
+	if c.cli == nil {
 		return
 	}
-	_ = c.client.Close()
-	c.client = nil
+	_ = c.cli.Close()
+	c.cli = nil
 }
 
 // Run executes the command in the container and returns exit code
 func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer) (int, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return 1, err
-	}
-
-	defer func() {
-		_ = cli.Close()
-	}()
-
 	c.mu.Lock()
-	if c.nameOrID != "" {
+	if c.id != "" {
 		c.mu.Unlock()
-		return c.execInContainer(ctx, cli, cmd, stdout, stderr)
+		return c.execInContainer(ctx, c.cli, cmd, stdout, stderr)
 	}
 
-	id, err := c.startNewContainer(ctx, cli, cmd)
-	c.nameOrID = id
+	id, err := c.startNewContainer(ctx, c.cli, cmd)
+	if err != nil {
+		c.mu.Unlock()
+		return 1, fmt.Errorf("failed to start a new container: %w", err)
+	}
+
+	c.id = id
 	c.mu.Unlock()
 
 	var once sync.Once
@@ -100,16 +99,16 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 
 		once.Do(func() {
 			c.mu.Lock()
-			id := c.nameOrID
+			id := c.id
 			c.mu.Unlock()
 
-			if err := cli.ContainerRemove(ctx, id, container.RemoveOptions{Force: true}); err != nil {
+			if err := c.cli.ContainerRemove(ctx, id, container.RemoveOptions{Force: true}); err != nil {
 				logger.Error(ctx, "docker executor: remove container", "err", err)
 			}
 		})
 	}()
 
-	return c.attachAndWait(ctx, cli, id, stdout, stderr)
+	return c.attachAndWait(ctx, c.cli, id, stdout, stderr)
 }
 
 func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd []string) (string, error) {
@@ -141,7 +140,7 @@ func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd 
 	containerConfig.Image = c.image
 
 	resp, err := cli.ContainerCreate(
-		ctx, &containerConfig, c.hostConfig, c.networkConfig, &platform, c.nameOrID,
+		ctx, &containerConfig, c.hostConfig, c.networkConfig, &platform, c.id,
 	)
 	if err != nil {
 		return "", err
@@ -156,13 +155,13 @@ func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd 
 
 func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer) (int, error) {
 	// Check if info exists and is running
-	info, err := cli.ContainerInspect(ctx, c.nameOrID)
+	info, err := cli.ContainerInspect(ctx, c.id)
 	if err != nil {
-		return 1, fmt.Errorf("failed to inspect container %s: %w", c.nameOrID, err)
+		return 1, fmt.Errorf("failed to inspect container %s: %w", c.id, err)
 	}
 
 	if !info.State.Running {
-		return 1, fmt.Errorf("container %s is not running", c.nameOrID)
+		return 1, fmt.Errorf("container %s is not running", c.id)
 	}
 
 	// Create exec configuration
@@ -179,7 +178,7 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 	}
 
 	// Create exec instance
-	containerID, err := cli.ContainerExecCreate(ctx, c.nameOrID, execOpts)
+	containerID, err := cli.ContainerExecCreate(ctx, c.id, execOpts)
 	if err != nil {
 		return 1, fmt.Errorf("failed to create exec: %w", err)
 	}
@@ -253,6 +252,7 @@ func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containe
 		if err != nil {
 			return 1, err
 		}
+
 	case status := <-statusCh:
 		if status.StatusCode != 0 {
 			return int(status.StatusCode), fmt.Errorf("exit status %v", status.StatusCode)
@@ -319,4 +319,140 @@ func (c *Client) shouldPullImage(ctx context.Context, cli *client.Client, platfo
 
 	// We don't have the correct image
 	return true, nil
+}
+
+// NewFromContainerConfig parses digraph.Container into Container struct
+func NewFromContainerConfig(ct digraph.Container) (*Client, error) {
+	// Validate required fields
+	if ct.Image == "" {
+		return nil, ErrImageRequired
+	}
+
+	// Initialize Docker configuration structs
+	containerConfig := &container.Config{
+		Image:      ct.Image,
+		Env:        ct.Env,
+		User:       ct.User,
+		WorkingDir: ct.WorkDir,
+	}
+
+	hostConfig := &container.HostConfig{}
+	networkConfig := &network.NetworkingConfig{}
+	execOptions := &container.ExecOptions{}
+
+	// Parse volumes
+	if len(ct.Volumes) > 0 {
+		binds, mounts, err := parseVolumes(ct.Volumes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse volumes: %w", err)
+		}
+		if len(binds) > 0 {
+			hostConfig.Binds = binds
+		}
+		if len(mounts) > 0 {
+			hostConfig.Mounts = mounts
+		}
+	}
+
+	// Parse ports
+	if len(ct.Ports) > 0 {
+		exposedPorts, portBindings, err := parsePorts(ct.Ports)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse ports: %w", err)
+		}
+		containerConfig.ExposedPorts = exposedPorts
+		hostConfig.PortBindings = portBindings
+	}
+
+	// Parse network mode
+	if ct.Network != "" {
+		networkMode := parseNetworkMode(ct.Network)
+		hostConfig.NetworkMode = networkMode
+
+		// If it's a custom network, add it to the endpoints config
+		if !isStandardNetworkMode(ct.Network) {
+			networkConfig.EndpointsConfig = map[string]*network.EndpointSettings{
+				ct.Network: {},
+			}
+		}
+	}
+
+	// autoRemove is the inverse of KeepContainer
+	autoRemove := !ct.KeepContainer
+
+	return &Client{
+		image:           ct.Image,
+		platform:        ct.Platform,
+		pull:            ct.PullPolicy,
+		autoRemove:      autoRemove,
+		containerConfig: containerConfig,
+		hostConfig:      hostConfig,
+		networkConfig:   networkConfig,
+		execOptions:     execOptions,
+	}, nil
+}
+
+// NewFromMapConfig parses executorConfig into Container struct
+func NewFromMapConfig(data map[string]any) (*Client, error) {
+	ret := struct {
+		Container     container.Config         `mapstructure:"container"`
+		Host          container.HostConfig     `mapstructure:"host"`
+		Network       network.NetworkingConfig `mapstructure:"network"`
+		Exec          container.ExecOptions    `mapstructure:"exec"`
+		AutoRemove    any                      `mapstructure:"autoRemove"`
+		Pull          any                      `mapstructure:"pull"`
+		Platform      string                   `mapstructure:"platform"`
+		ContainerName string                   `mapstructure:"containerName"`
+		Image         string                   `mapstructure:"image"`
+	}{}
+
+	md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:           &ret,
+		WeaklyTypedInput: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create decoder: %w", err)
+	}
+	if err := md.Decode(data); err != nil {
+		return nil, fmt.Errorf("failed to decode config: %w", err)
+	}
+
+	var autoRemove bool
+	if ret.Host.AutoRemove {
+		ret.Host.AutoRemove = false // Prevent removal by sdk
+		autoRemove = true
+	}
+
+	pull := digraph.PullPolicyMissing
+	if ret.Pull != nil {
+		parsed, err := digraph.ParsePullPolicy(ret.Pull)
+		if err != nil {
+			return nil, err
+		}
+		pull = parsed
+	}
+
+	if ret.ContainerName == "" && ret.Image == "" {
+		return nil, ErrImageOrContainerShouldNotBeEmpty
+	}
+
+	if ret.AutoRemove != nil {
+		v, err := stringutil.ParseBool(ret.AutoRemove)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate autoRemove value: %w", err)
+		}
+		autoRemove = v
+	}
+
+	return &Client{
+		image:           ret.Image,
+		platform:        ret.Platform,
+		id:              ret.ContainerName,
+		pull:            pull,
+		containerConfig: &ret.Container,
+		hostConfig:      &ret.Host,
+		networkConfig:   &ret.Network,
+		execOptions:     &ret.Exec,
+		autoRemove:      autoRemove,
+	}, nil
 }
