@@ -310,6 +310,41 @@ bin:
 	@mkdir -p ${BIN_DIR}
 	@go build -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME} ./cmd
 
+# build-keepalive builds the keepalive binary for all architectures using Zig.
+.PHONY: build-keepalive
+build-keepalive:
+	@echo "${COLOR_GREEN}Building keepalive binaries with Zig for all architectures...${COLOR_RESET}"
+	@mkdir -p internal/container/assets
+	@rm -rf internal/container/assets/keepalive_*
+	@cd internal/container/keepalive && \
+	echo "Building Darwin binaries..." && \
+	zig build-exe main.zig -target x86_64-macos -O ReleaseSmall -femit-bin=../assets/keepalive_darwin_amd64 && \
+	zig build-exe main.zig -target aarch64-macos -O ReleaseSmall -femit-bin=../assets/keepalive_darwin_arm64 && \
+	echo "Building Linux binaries..." && \
+	zig build-exe main.zig -target x86-linux-musl -O ReleaseSmall -femit-bin=../assets/keepalive_linux_386 && \
+	zig build-exe main.zig -target x86_64-linux-musl -O ReleaseSmall -femit-bin=../assets/keepalive_linux_amd64 && \
+	zig build-exe main.zig -target aarch64-linux-musl -O ReleaseSmall -femit-bin=../assets/keepalive_linux_arm64 && \
+	zig build-exe main.zig -target arm-linux-musleabihf -O ReleaseSmall -mcpu=generic+v7a -femit-bin=../assets/keepalive_linux_armv7 && \
+	zig build-exe main.zig -target arm-linux-musleabi -O ReleaseSmall -mcpu=generic+v6 -femit-bin=../assets/keepalive_linux_armv6 && \
+	zig build-exe main.zig -target powerpc64le-linux-musl -O ReleaseSmall -femit-bin=../assets/keepalive_linux_ppc64le && \
+	zig build-exe main.zig -target s390x-linux-musl -O ReleaseSmall -femit-bin=../assets/keepalive_linux_s390x && \
+	echo "Building Windows binaries..." && \
+	zig build-exe main.zig -target x86-windows -O ReleaseSmall -femit-bin=../assets/keepalive_windows_386.exe && \
+	zig build-exe main.zig -target x86_64-windows -O ReleaseSmall -femit-bin=../assets/keepalive_windows_amd64.exe && \
+	zig build-exe main.zig -target aarch64-windows -O ReleaseSmall -femit-bin=../assets/keepalive_windows_arm64.exe && \
+	echo "Skipping BSD targets (require additional setup)..."
+	@chmod +x internal/container/assets/keepalive_* 2>/dev/null || true
+	@echo "${COLOR_GREEN}Cleaning up build artifacts...${COLOR_RESET}"
+	@rm -f internal/container/assets/keepalive_*.o internal/container/assets/keepalive_*.obj
+	@echo "${COLOR_GREEN}Generating checksums...${COLOR_RESET}"
+	@cd internal/container/assets && \
+		if command -v sha256sum >/dev/null 2>&1; then \
+			sha256sum keepalive_* > keepalive_checksums.txt; \
+		else \
+			shasum -a 256 keepalive_* > keepalive_checksums.txt; \
+		fi
+	@echo "${COLOR_GREEN}Done! Checksums saved to internal/container/assets/keepalive_checksums.txt${COLOR_RESET}"
+
 .PHONY: ui
 # ui builds the frontend codes.
 ui: clean-ui build-ui cp-assets
