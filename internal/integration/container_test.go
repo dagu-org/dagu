@@ -59,6 +59,31 @@ func TestContainer(t *testing.T) {
 		expectedOutputs map[string]any
 	}{
 		{
+			name: "volume_bind_mount_persistence",
+			dag: `
+name: test-bind-mount
+container:
+  image: alpine:3
+  volumes:
+    - /tmp/dagu-test:/data:rw
+steps:
+  - name: write_data
+    command: sh -c "echo 'Hello from step 1' > /data/test.txt"
+  - name: read_data
+    command: cat /data/test.txt
+    output: OUT1
+  - name: append_data
+    command: sh -c "echo 'Hello from step 3' >> /data/test.txt"
+  - name: read_all
+    command: cat /data/test.txt
+    output: OUT2
+`,
+			expectedOutputs: map[string]any{
+				"OUT1": "Hello from step 1",
+				"OUT2": "Hello from step 1\nHello from step 3",
+			},
+		},
+		{
 			name: "basic",
 			dag: `
 name: test-basic
@@ -75,110 +100,75 @@ steps:
 				"OUT1": "123 abc BAR",
 			},
 		},
-		// 		{
-		// 			name: "command_with_args",
-		// 			dag: `
-		// name: test-command-with-args
-		// container:
-		//   image: alpine:3
-		// steps:
-		//   - name: s1
-		//     command: echo hello world
-		//     output: OUT1
-		// `,
-		// 			expectedOutputs: map[string]any{
-		// 				"OUT1": "hello world",
-		// 			},
-		// 		},
-		// 		{
-		// 			name: "working_directory",
-		// 			dag: `
-		// name: test-working-dir
-		// container:
-		//   image: alpine:3
-		//   workDir: /tmp
-		// steps:
-		//   - name: s1
-		//     command: "pwd"
-		//     output: OUT1
-		// `,
-		// 			expectedOutputs: map[string]any{
-		// 				"OUT1": "/tmp",
-		// 			},
-		// 		},
-		// 		{
-		// 			name: "container_with_user",
-		// 			dag: `
-		// name: test-user
-		// container:
-		//   image: alpine:3
-		//   user: "nobody"
-		// steps:
-		//   - name: s1
-		//     command: "whoami"
-		//     output: OUT1
-		// `,
-		// 			expectedOutputs: map[string]any{
-		// 				"OUT1": "nobody",
-		// 			},
-		// 		},
-		// 		{
-		// 			name: "volume_bind_mount_persistence",
-		// 			dag: `
-		// name: test-bind-mount
-		// container:
-		//   image: alpine:3
-		//   volumes:
-		//     - /tmp/dagu-test:/data:rw
-		// steps:
-		//   - name: write_data
-		//     command: "echo 'Hello from step 1' > /data/test.txt"
-		//   - name: read_data
-		//     command: "cat /data/test.txt"
-		//     output: OUT1
-		//     depends:
-		//       - write_data
-		//   - name: append_data
-		//     command: "echo 'Hello from step 3' >> /data/test.txt"
-		//     depends:
-		//       - read_data
-		//   - name: read_all
-		//     command: "cat /data/test.txt"
-		//     output: OUT2
-		//     depends:
-		//       - append_data
-		// `,
-		// 			expectedOutputs: map[string]any{
-		// 				"OUT1": "Hello from step 1",
-		// 				"OUT2": "Hello from step 1\nHello from step 3",
-		// 			},
-		// 		},
-		// 		{
-		// 			name: "volume_named_persistence",
-		// 			dag: `
-		// name: test-named-volume
-		// container:
-		//   image: alpine:3
-		//   volumes:
-		//     - test-volume:/data
-		// steps:
-		//   - name: create_file
-		//     command: "echo 'Data in named volume' > /data/volume.txt"
-		//   - name: verify_file
-		//     command: "cat /data/volume.txt"
-		//     output: OUT1
-		//     depends:
-		//       - create_file
-		//   - name: list_files
-		//     command: "ls -la /data/"
-		//     output: OUT2
-		//     depends:
-		//       - create_file
-		// `,
-		// 			expectedOutputs: map[string]any{
-		// 				"OUT1": "Data in named volume",
-		// 			},
-		// 		},
+		{
+			name: "command_with_args",
+			dag: `
+name: test-command-with-args
+container:
+  image: alpine:3
+steps:
+  - name: s1
+    command: echo hello world
+    output: OUT1
+`,
+			expectedOutputs: map[string]any{
+				"OUT1": "hello world",
+			},
+		},
+		{
+			name: "working_directory",
+			dag: `
+name: test-working-dir
+container:
+  image: alpine:3
+  workDir: /tmp
+steps:
+  - name: s1
+    command: "pwd"
+    output: OUT1
+`,
+			expectedOutputs: map[string]any{
+				"OUT1": "/tmp",
+			},
+		},
+		{
+			name: "container_with_user",
+			dag: `
+name: test-user
+container:
+  image: alpine:3
+  user: "nobody"
+steps:
+  - name: s1
+    command: "whoami"
+    output: OUT1
+`,
+			expectedOutputs: map[string]any{
+				"OUT1": "nobody",
+			},
+		},
+		{
+			name: "volume_named_persistence",
+			dag: `
+name: test-named-volume
+container:
+  image: alpine:3
+  volumes:
+    - test-volume:/data
+steps:
+  - name: create_file
+    command: sh -c "echo 'Data in named volume' > /data/volume.txt"
+  - name: verify_file
+    command: "cat /data/volume.txt"
+    output: OUT1
+  - name: list_files
+    command: "ls -la /data/"
+    output: OUT2
+`,
+			expectedOutputs: map[string]any{
+				"OUT1": "Data in named volume",
+			},
+		},
 	}
 
 	for _, tc := range testCases {
