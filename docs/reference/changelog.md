@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.18.6 (2025-08-03)
+
+### Bug Fixes
+- **Scheduler**: Fixed health check server startup race condition when multiple scheduler instances are deployed (#1157) - Thanks to [@jonasban](https://github.com/jonasban) for reporting
+
+### Improvements
+- **Node.js**: Upgraded to Node.js 22 (#1150) - Thanks to [@reneleonhardt](https://github.com/reneleonhardt)
+
+### New Features
+- **npm Package Verification**: Added automatic verification after npm package publishing (#1149)
+- **npm Installation**: Added support for installing Dagu via npm
+
+### Contributors
+
+Thanks to our contributors for this release:
+
+| Contribution                           | Author                                   |
+| -------------------------------------- | ---------------------------------------- |
+| Health check race condition (report) | [@jonasban](https://github.com/jonasban) |
+| Upgraded Node.js to 22 | [@reneleonhardt](https://github.com/reneleonhardt) |
+
+**Full Changelog**: [v1.18.0...v1.18.6](https://github.com/dagu-org/dagu/compare/v1.18.5...v1.18.6)
+
 ## v1.18.0 (2025-07-29)
 
 ### New Features
@@ -94,10 +117,10 @@ Thanks to our contributors for this release:
 | Scheduler refactoring for improved maintainability | [@thefishhat](https://github.com/thefishhat) |
 | Interactive DAG selection feature request | [@yottahmd](https://github.com/yottahmd) |
 | OpenTelemetry distributed tracing feature request | [@jeremydelattre59](https://github.com/jeremydelattre59) |
-| SSH executor double pipe operator bug report | [@NebulaCoding1029](https://github.com/NebulaCoding1029) |
-| 'f' key interference in DAG editor bug report | [@NebulaCoding1029](https://github.com/NebulaCoding1029) |
+| SSH executor double pipe operator (report) | [@NebulaCoding1029](https://github.com/NebulaCoding1029) |
+| 'f' key interference in DAG editor (report) | [@NebulaCoding1029](https://github.com/NebulaCoding1029) |
 | Log cleanup feature request | [@NebulaCoding1029](https://github.com/NebulaCoding1029) |
-| Scheduler queue bug report | Jochen |
+| Scheduler queue bug (report) | Jochen |
 
 ## v1.17.3 (2025-06-25)
 
