@@ -118,9 +118,6 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 		return fmt.Errorf("container already exists. id=%s", c.id)
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	// Use the command to keep alive the container
 	var cmd []string
 	if len(c.containerConfig.Cmd) == 0 {
@@ -148,7 +145,6 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 
 	id, err := c.startNewContainer(ctx, c.cli, cmd)
 	if err != nil {
-		c.mu.Unlock()
 		return fmt.Errorf("failed to start a new container: %w", err)
 	}
 

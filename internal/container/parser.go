@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-connections/nat"
@@ -36,6 +37,14 @@ func parseVolumes(volumes []string) ([]string, []mount.Mount, error) {
 
 		// Determine if it's a bind mount or volume
 		if filepath.IsAbs(source) || strings.HasPrefix(source, ".") || strings.HasPrefix(source, "~") {
+			if !filepath.IsAbs(source) {
+				p, err := fileutil.ResolvePath(source)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to resolve path %s: %w", source, err)
+				}
+				source = p
+			}
+
 			// It's a bind mount
 			bindStr := vol
 			if len(parts) == 2 {

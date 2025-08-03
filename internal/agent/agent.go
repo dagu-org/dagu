@@ -298,27 +298,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		return a.dryRun(ctx)
 	}
 
-	// Create a new container if the DAG has a container configuration.
-	if a.dag.Container != nil {
-		containerClient, err := container.NewFromContainerConfig(*a.dag.Container)
-		if err != nil {
-			return fmt.Errorf("failed to create container client: %w", err)
-		}
-		if err := containerClient.Init(ctx); err != nil {
-			return fmt.Errorf("failed to initialize container client: %w", err)
-		}
-		if err := containerClient.CreateContainerKeepAlive(ctx); err != nil {
-			return fmt.Errorf("failed to create keepalive container: %w", err)
-		}
-
-		// Set the container client in the context for the execution.
-		ctx = executor.WithContainerClient(ctx, containerClient)
-
-		defer func() {
-			containerClient.StopContainerKeepAlive(ctx)
-			containerClient.Close(ctx)
-		}()
-	}
+	// initErr is used to capture any initialization errors that occur
+	// before the agent starts running the DAG.
+	var initErr error
 
 	// Open the run file to write the status.
 	// TODO: Check if the run file already exists and if it does, return an error.
@@ -327,6 +309,13 @@ func (a *Agent) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to open execution history: %w", err)
 	}
 	defer func() {
+		if initErr != nil {
+			st := a.Status(ctx)
+			st.Status = status.Error
+			if err := attempt.Write(ctx, st); err != nil {
+				logger.Error(ctx, "Status write failed", "err", err)
+			}
+		}
 		if err := attempt.Close(ctx); err != nil {
 			logger.Error(ctx, "Failed to close runstore store", "err", err)
 		}
@@ -340,6 +329,34 @@ func (a *Agent) Run(ctx context.Context) error {
 	// the local client (e.g., the frontend server, scheduler, etc).
 	if err := a.setupSocketServer(ctx); err != nil {
 		return fmt.Errorf("failed to setup unix socket server: %w", err)
+	}
+
+	// Create a new container if the DAG has a container configuration.
+	if a.dag.Container != nil {
+		containerClient, err := container.NewFromContainerConfig(*a.dag.Container)
+		if err != nil {
+			logger.Error(ctx, "Failed to create container client", "err", err)
+			initErr = fmt.Errorf("failed to create container client: %w", err)
+			return initErr
+		}
+		if err := containerClient.Init(ctx); err != nil {
+			logger.Error(ctx, "Failed to initialize container client", "err", err)
+			initErr = fmt.Errorf("failed to initialize container client: %w", err)
+			return initErr
+		}
+		if err := containerClient.CreateContainerKeepAlive(ctx); err != nil {
+			logger.Error(ctx, "Failed to create keepalive container", "err", err)
+			initErr = fmt.Errorf("failed to create keepalive container: %w", err)
+			return initErr
+		}
+
+		// Set the container client in the context for the execution.
+		ctx = executor.WithContainerClient(ctx, containerClient)
+
+		defer func() {
+			containerClient.StopContainerKeepAlive(ctx)
+			containerClient.Close(ctx)
+		}()
 	}
 
 	listenerErrCh := make(chan error)
