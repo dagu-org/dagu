@@ -157,6 +157,55 @@ steps:
 
 The workflow continues even if `optional-task` fails. The overall status will be `partial success` if any step fails but does not block the execution of subsequent steps due to `continueOn`.
 
+## Status Management
+
+DAGs progress through different statuses during their lifecycle:
+
+### Execution States
+
+- **queued**: DAG is waiting to be executed
+- **running**: DAG is currently executing
+- **success**: All steps completed successfully
+- **partial_success**: Some steps failed but execution continued (via `continueOn`)
+- **failed**: DAG execution failed
+- **cancelled**: DAG was manually cancelled
+
+### Status Transitions
+
+```mermaid
+graph LR
+    Q[queued] --> R[running]
+    R --> S[success]
+    R --> PS[partial_success]
+    R --> F[failed]
+    R --> C[cancelled]
+```
+
+### Step Status
+
+Individual steps have their own statuses:
+
+- **pending**: Step is waiting for dependencies
+- **running**: Step is executing
+- **success**: Step completed successfully
+- **failed**: Step execution failed
+- **cancelled**: Step was cancelled
+- **skipped**: Step was skipped (precondition not met)
+
+### Status Hooks
+
+React to status changes with handlers:
+
+```yaml
+handlerOn:
+  success:
+    command: notify-team.sh "Workflow completed"
+  failure:
+    command: alert-oncall.sh "Workflow failed"
+  partial_success:
+    command: log-partial.sh "Some steps failed"
+```
+
 ## Executors
 
 ### Shell (Default)
