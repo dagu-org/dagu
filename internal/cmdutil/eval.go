@@ -106,7 +106,7 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 	value := input
 
 	// If we have a StepMap but no variables, still need to expand step references
-	if len(options.Variables) == 0 && options.StepMap != nil {
+	if len(options.Variables) == 0 && len(options.StepMap) > 0 {
 		value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
 	} else {
 		// Process variables as before

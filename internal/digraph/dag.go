@@ -1,8 +1,7 @@
 package digraph
 
 import (
-	// nolint // gosec
-	"crypto/md5"
+	"crypto/md5" // nolint:gosec
 	"encoding/json"
 	"fmt"
 	"os"
@@ -109,6 +108,8 @@ type DAG struct {
 	LocalDAGs map[string]*DAG `json:"localDAGs,omitempty"`
 	// YamlData contains the raw YAML data of the DAG.
 	YamlData []byte `json:"yamlData,omitempty"`
+	// Container contains the container definition for the DAG.
+	Container *Container `json:"container,omitempty"`
 }
 
 // CreateTask creates a coordinator task from this DAG for distributed execution.
@@ -147,6 +148,150 @@ func (d *DAG) CreateTask(
 	}
 
 	return task
+}
+
+// HasTag checks if the DAG has the given tag.
+func (d *DAG) HasTag(tag string) bool {
+	for _, t := range d.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
+// SockAddr returns the unix socket address for the DAG.
+// The address is used to communicate with the agent process.
+func (d *DAG) SockAddr(dagRunID string) string {
+	if d.Location != "" {
+		return SockAddr(d.Location, "")
+	}
+	return SockAddr(d.Name, dagRunID)
+}
+
+// SockAddrForChildDAGRun returns the unix socket address for a specific dag-run ID.
+// This is used to control child dag-runs.
+func (d *DAG) SockAddrForChildDAGRun(dagRunID string) string {
+	return SockAddr(d.GetName(), dagRunID)
+}
+
+// GetName returns the name of the DAG.
+// If the name is not set, it returns the default name (filename without extension).
+func (d *DAG) GetName() string {
+	name := d.Name
+	if name != "" {
+		return name
+	}
+	return defaultName(d.Location)
+}
+
+// String implements the Stringer interface.
+// String returns a formatted string representation of the DAG
+func (d *DAG) String() string {
+	var sb strings.Builder
+
+	sb.WriteString("{\n")
+	fmt.Fprintf(&sb, "\tName: %s\n", d.Name)
+	fmt.Fprintf(&sb, "\tDescription: %s\n", strings.TrimSpace(d.Description))
+	fmt.Fprintf(&sb, "\tParams: %v\n", strings.Join(d.Params, ", "))
+	fmt.Fprintf(&sb, "\tLogDir: %v\n", d.LogDir)
+
+	for i, step := range d.Steps {
+		fmt.Fprintf(&sb, "\tStep%d: %s\n", i, step.String())
+	}
+
+	sb.WriteString("}\n")
+	return sb.String()
+}
+
+// Validate performs basic validation of the DAG structure
+func (d *DAG) Validate() error {
+	// Ensure all referenced steps exist
+	stepMap := make(map[string]bool)
+	for _, step := range d.Steps {
+		stepMap[step.Name] = true
+	}
+
+	// Check dependencies
+	for _, step := range d.Steps {
+		for _, dep := range step.Depends {
+			if !stepMap[dep] {
+				var errList error = ErrorList{
+					wrapError("depends", dep, fmt.Errorf("step %s depends on non-existent step", step.Name)),
+				}
+				return errList
+			}
+		}
+	}
+
+	return nil
+}
+
+// initializeDefaults sets the default values for the DAG.
+func (d *DAG) initializeDefaults() {
+	// Set the name if not set.
+	if d.Name == "" {
+		d.Name = defaultName(d.Location)
+	}
+
+	// Set default type to chain if not specified.
+	if d.Type == "" {
+		d.Type = TypeChain
+	}
+
+	// Set default history retention days to 30 if not specified.
+	if d.HistRetentionDays == 0 {
+		d.HistRetentionDays = defaultDAGRunRetentionDays
+	}
+
+	// Set default max cleanup time to 60 seconds if not specified.
+	if d.MaxCleanUpTime == 0 {
+		d.MaxCleanUpTime = defaultMaxCleanUpTime
+	}
+
+	// Set default max active runs to 1 only when not specified (0).
+	// MaxActiveRuns < 0 means queueing is disabled for this DAG.
+	if d.MaxActiveRuns == 0 {
+		d.MaxActiveRuns = 1
+	}
+
+	// Set default max output size to 1MB if not specified.
+	if d.MaxOutputSize == 0 {
+		d.MaxOutputSize = 1024 * 1024 // 1MB
+	}
+
+	// Ensure we have a valid working directory
+	var workDir = "."
+	if d.Location != "" {
+		workDir = filepath.Dir(d.Location)
+	}
+
+	// Setup steps and handlers with the working directory
+	d.setupSteps(workDir)
+	d.setupHandlers(workDir)
+}
+
+// setupSteps initializes all steps
+func (d *DAG) setupSteps(workDir string) {
+	for i := range d.Steps {
+		d.Steps[i].setup(workDir)
+	}
+}
+
+// setupHandlers initializes all event handlers
+func (d *DAG) setupHandlers(workDir string) {
+	handlers := []*Step{
+		d.HandlerOn.Exit,
+		d.HandlerOn.Success,
+		d.HandlerOn.Failure,
+		d.HandlerOn.Cancel,
+	}
+
+	for _, handler := range handlers {
+		if handler != nil {
+			handler.setup(workDir)
+		}
+	}
 }
 
 // TaskOption is a function that modifies a coordinatorv1.Task.
@@ -326,161 +471,15 @@ var handlerMapping = map[string]HandlerType{
 	"onExit":    HandlerOnExit,
 }
 
-// HasTag checks if the DAG has the given tag.
-func (d *DAG) HasTag(tag string) bool {
-	for _, t := range d.Tags {
-		if t == tag {
-			return true
-		}
-	}
-	return false
-}
-
-// SockAddr returns the unix socket address for the DAG.
-// The address is used to communicate with the agent process.
-func (d *DAG) SockAddr(dagRunID string) string {
-	if d.Location != "" {
-		return SockAddr(d.Location, "")
-	}
-	return SockAddr(d.Name, dagRunID)
-}
-
-// SockAddrForChildDAGRun returns the unix socket address for a specific dag-run ID.
-// This is used to control child dag-runs.
-func (d *DAG) SockAddrForChildDAGRun(dagRunID string) string {
-	return SockAddr(d.GetName(), dagRunID)
-}
-
-// GetName returns the name of the DAG.
-// If the name is not set, it returns the default name (filename without extension).
-func (d *DAG) GetName() string {
-	name := d.Name
-	if name != "" {
-		return name
-	}
-	return defaultName(d.Location)
-}
-
-// String implements the Stringer interface.
-// String returns a formatted string representation of the DAG
-func (d *DAG) String() string {
-	var sb strings.Builder
-
-	sb.WriteString("{\n")
-	fmt.Fprintf(&sb, "\tName: %s\n", d.Name)
-	fmt.Fprintf(&sb, "\tDescription: %s\n", strings.TrimSpace(d.Description))
-	fmt.Fprintf(&sb, "\tParams: %v\n", strings.Join(d.Params, ", "))
-	fmt.Fprintf(&sb, "\tLogDir: %v\n", d.LogDir)
-
-	for i, step := range d.Steps {
-		fmt.Fprintf(&sb, "\tStep%d: %s\n", i, step.String())
-	}
-
-	sb.WriteString("}\n")
-	return sb.String()
-}
-
-// Validate performs basic validation of the DAG structure
-func (d *DAG) Validate() error {
-	// Ensure all referenced steps exist
-	stepMap := make(map[string]bool)
-	for _, step := range d.Steps {
-		stepMap[step.Name] = true
-	}
-
-	// Check dependencies
-	for _, step := range d.Steps {
-		for _, dep := range step.Depends {
-			if !stepMap[dep] {
-				var errList error = ErrorList{
-					wrapError("depends", dep, fmt.Errorf("step %s depends on non-existent step", step.Name)),
-				}
-				return errList
-			}
-		}
-	}
-
-	return nil
-}
-
-// initializeDefaults sets the default values for the DAG.
-func (d *DAG) initializeDefaults() {
-	// Set the name if not set.
-	if d.Name == "" {
-		d.Name = defaultName(d.Location)
-	}
-
-	// Set default type to chain if not specified.
-	if d.Type == "" {
-		d.Type = TypeChain
-	}
-
-	// Set default history retention days to 30 if not specified.
-	if d.HistRetentionDays == 0 {
-		d.HistRetentionDays = defaultDAGRunRetentionDays
-	}
-
-	// Set default max cleanup time to 60 seconds if not specified.
-	if d.MaxCleanUpTime == 0 {
-		d.MaxCleanUpTime = defaultMaxCleanUpTime
-	}
-
-	// Set default max active runs to 1 only when not specified (0).
-	// MaxActiveRuns < 0 means queueing is disabled for this DAG.
-	if d.MaxActiveRuns == 0 {
-		d.MaxActiveRuns = 1
-	}
-
-	// Set default max output size to 1MB if not specified.
-	if d.MaxOutputSize == 0 {
-		d.MaxOutputSize = 1024 * 1024 // 1MB
-	}
-
-	// Ensure we have a valid working directory
-	var workDir = "."
-	if d.Location != "" {
-		workDir = filepath.Dir(d.Location)
-	}
-
-	// Setup steps and handlers with the working directory
-	d.setupSteps(workDir)
-	d.setupHandlers(workDir)
-}
-
-// setupSteps initializes all steps
-func (d *DAG) setupSteps(workDir string) {
-	for i := range d.Steps {
-		d.Steps[i].setup(workDir)
-	}
-}
-
-// setupHandlers initializes all event handlers
-func (d *DAG) setupHandlers(workDir string) {
-	handlers := []*Step{
-		d.HandlerOn.Exit,
-		d.HandlerOn.Success,
-		d.HandlerOn.Failure,
-		d.HandlerOn.Cancel,
-	}
-
-	for _, handler := range handlers {
-		if handler != nil {
-			handler.setup(workDir)
-		}
-	}
-}
-
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
 func SockAddr(name, dagRunID string) string {
+	// Create MD5 hash of the combined name and dag-run ID and take first 6 chars
+	hashLength := 6
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(name+dagRunID)))[:hashLength] // nolint:gosec
+
 	maxSocketNameLength := 50 // Maximum length for socket name
 	name = fileutil.SafeName(name)
-	dagRunID = fileutil.SafeName(dagRunID)
-
-	// Create MD5 hash of the combined name and dag-run ID and take first 8 chars
-	combined := name + dagRunID
-	hashLength := 6
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength] // nolint:gosec
 
 	// Calculate the total length with the full name
 	prefix := "@dagu_"

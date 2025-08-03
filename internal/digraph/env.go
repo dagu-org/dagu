@@ -68,6 +68,13 @@ func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, 
 		envs[parts[0]] = parts[1]
 	}
 
+	for _, kv := range dag.Env {
+		parts := strings.SplitN(kv, "=", 2)
+		if len(parts) == 2 {
+			envs[parts[0]] = parts[1]
+		}
+	}
+
 	return context.WithValue(ctx, envCtxKey{}, Env{
 		RootDAGRun:     rootDAGRun,
 		DAG:            dag,

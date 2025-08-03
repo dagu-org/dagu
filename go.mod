@@ -28,7 +28,6 @@ require (
 	github.com/oapi-codegen/oapi-codegen/v2 v2.5.0
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/opencontainers/image-spec v1.1.1
-	github.com/pkg/errors v0.9.1
 	github.com/rhysd/changelog-from-release/v3 v3.9.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/samber/slog-multi v1.4.1
@@ -72,6 +71,7 @@ require (
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/oklog/run v1.0.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/samber/slog-common v0.19.0 // indirect

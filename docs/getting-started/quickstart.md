@@ -137,9 +137,9 @@ Key concepts:
 - **Dependencies**: Control execution order
 - **Commands**: Any shell command you can run
 
-## Practical Example
+## Parameters
 
-Here's a practical backup workflow:
+You can define parameters for workflows to make them reusable:
 
 ```yaml
 # backup.yaml
@@ -224,6 +224,29 @@ handlerOn:
     command: echo "Workflow failed!" | mail -s "Alert" admin@example.com
   success:
     command: echo "Success at $(date)"
+```
+
+## Using Containers
+
+Run all steps in Docker containers:
+
+```yaml
+# Using a container for all steps
+container:
+  image: python:3.11
+  volumes:
+    - ./data:/data
+
+steps:
+  - name: python-task
+    # write data to a file
+    command: |
+      python -c "with open('/data/output.txt', 'w') as f: f.write('Hello from Dagu!')"
+    
+  - name: process-data
+    # read data from the file
+    command: |
+      python -c "with open('/data/output.txt') as f: print(f.read())"
 ```
 
 ## Scheduling

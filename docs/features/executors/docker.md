@@ -2,7 +2,28 @@
 
 Run workflow steps in Docker containers for isolated, reproducible execution.
 
-## Basic Usage
+## Container Field
+
+Use the `container` field at the DAG level to run all steps in containers:
+
+```yaml
+# All steps run in this container
+container:
+  image: python:3.11
+  volumes:
+    - ./data:/data
+  env:
+    - PYTHONPATH=/app
+
+steps:
+  - name: install
+    command: pip install -r requirements.txt
+    
+  - name: process
+    command: python process.py /data/input.csv
+```
+
+## Step-Level Container Configuration
 
 ```yaml
 steps:
@@ -30,7 +51,30 @@ steps:
     command: ./maintenance.sh
 ```
 
-## Configuration Options
+## Container Field Configuration
+
+The `container` field supports all Docker configuration options:
+
+```yaml
+container:
+  image: node:20                    # Required
+  pullPolicy: missing               # always, missing, never
+  env:
+    - NODE_ENV=production
+    - API_KEY=${API_KEY}           # From host environment
+  volumes:
+    - ./src:/app                   # Bind mount
+    - /data:/data:ro               # Read-only mount
+  workDir: /app                    # Working directory
+  platform: linux/amd64            # Platform specification
+  user: "1000:1000"                # User and group
+  ports:
+    - "8080:8080"                  # Port mapping
+  network: host                    # Network mode
+  keepContainer: true              # Keep container running
+```
+
+## Configuration Options for Docker Executor
 
 ### Image Management
 
@@ -97,128 +141,30 @@ executor:
       cpuShares: 512
 ```
 
-## Real-World Examples
-
-### Data Processing Pipeline
-
-```yaml
-steps:
-  - name: extract
-    executor:
-      type: docker
-      config:
-        image: python:3.13-slim
-        autoRemove: true
-        host:
-          binds:
-            - ./data:/data
-    command: python extract.py /data/raw.csv
-
-  - name: transform
-    executor:
-      type: docker
-      config:
-        image: apache/spark:3.5.6
-        autoRemove: true
-        host:
-          binds:
-            - ./data:/data
-          memory: 2147483648  # 2GB
-    command: spark-submit transform.py
-
-  - name: load
-    executor:
-      type: docker
-      config:
-        image: postgres:17
-        autoRemove: true
-        container:
-          env:
-            - PGPASSWORD=${DB_PASSWORD}
-    command: psql -h db -U user -f load.sql
-```
-
-### Build and Deploy
-
-```yaml
-steps:
-  - name: build
-    executor:
-      type: docker
-      config:
-        image: golang:1.24
-        autoRemove: true
-        host:
-          binds:
-            - .:/app
-        container:
-          workingDir: /app
-          env:
-            - CGO_ENABLED=0
-    command: go build -o server .
-
-  - name: test
-    executor:
-      type: docker
-      config:
-        image: golang:1.24
-        autoRemove: true
-        host:
-          binds:
-            - .:/app
-        container:
-          workingDir: /app
-    command: go test ./...
-
-  - name: package
-    executor:
-      type: docker
-      config:
-        image: docker:latest
-        autoRemove: true
-        host:
-          binds:
-            - /var/run/docker.sock:/var/run/docker.sock
-            - .:/workspace
-    command: docker build -t myapp:${VERSION} /workspace
-```
-
-### Database Operations
-
-```yaml
-steps:
-  - name: backup
-    executor:
-      type: docker
-      config:
-        image: mysql:9.4
-        autoRemove: true
-        container:
-          env:
-            - MYSQL_PWD=${DB_PASSWORD}
-        host:
-          binds:
-            - ./backups:/backups
-    command: |
-      mysqldump -h db.example.com -u root \
-        --all-databases --single-transaction \
-        > /backups/backup-$(date +%Y%m%d).sql
-
-  - name: compress
-    executor:
-      type: docker
-      config:
-        image: alpine
-        autoRemove: true
-        host:
-          binds:
-            - ./backups:/backups
-    command: gzip /backups/backup-*.sql
-```
-
 ## Docker in Docker
 
-### Using Host Docker Socket
+### Using Container Field with Docker Socket
+
+```yaml
+# Run all steps with Docker access
+container:
+  image: docker:latest
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - ./workspace:/workspace
+
+steps:
+  - name: list-containers
+    command: docker ps
+    
+  - name: build-image
+    command: docker build -t myapp:latest /workspace
+    
+  - name: run-tests
+    command: docker run --rm myapp:latest npm test
+```
+
+### Using Executor with Docker Socket
 
 ```yaml
 steps:
@@ -245,6 +191,37 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./dags:/var/lib/dagu/dags
     user: "0:0"  # Run as root for Docker access
+```
+
+## Container Lifecycle Management
+
+The `keepContainer` option prevents the container from being removed after the workflow completes, allowing for debugging and inspection:
+
+```yaml
+# Container stays alive for entire workflow
+container:
+  image: postgres:16
+  keepContainer: true
+  env:
+    - POSTGRES_PASSWORD=secret
+  ports:
+    - "5432:5432"
+
+steps:
+  - name: start-db
+    command: docker-entrypoint.sh postgres
+    
+  - name: wait-for-db
+    command: pg_isready -U postgres
+    retryPolicy:
+      limit: 10
+      intervalSec: 2
+      
+  - name: create-schema
+    command: psql -U postgres -c "CREATE DATABASE myapp;"
+    
+  - name: run-migrations
+    command: psql -U postgres myapp -f migrations.sql
 ```
 
 ## Advanced Patterns
@@ -299,47 +276,6 @@ steps:
         autoRemove: true
     command: GOARCH=arm64 go build
 ```
-
-## Error Handling
-
-### Continue on Specific Exit Codes
-
-```yaml
-steps:
-  - name: check-data
-    executor:
-      type: docker
-      config:
-        image: alpine
-        autoRemove: true
-    command: test -f /data/input.csv
-    continueOn:
-      exitCode: [1]  # File not found is OK
-
-  - name: process-if-exists
-    executor:
-      type: docker
-      config:
-        image: python:3.13
-        autoRemove: true
-    command: python process.py || echo "No data to process"
-```
-
-## Performance Tips
-
-1. **Use specific tags** instead of `latest` for reproducibility
-2. **Set `pull: missing`** to use cached images
-3. **Remove containers** with `autoRemove: true`
-4. **Mount only necessary directories** to minimize overhead
-5. **Use multi-stage builds** for smaller final images
-
-## Security Considerations
-
-- **Docker socket access** grants full control over host Docker
-- **Run as non-root** when possible using `container.user`
-- **Use read-only mounts** for input data
-- **Avoid mounting sensitive host directories**
-- **Set resource limits** to prevent resource exhaustion
 
 ## See Also
 
