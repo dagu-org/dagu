@@ -876,6 +876,73 @@ Run commands in Docker containers.
 
 <div class="example-card">
 
+### Container Field
+
+```yaml
+# DAG-level container for all steps
+container:
+  image: python:3.11
+  env:
+    - PYTHONPATH=/app
+  volumes:
+    - ./src:/app
+
+steps:
+  - name: install
+    command: pip install -r requirements.txt
+    
+  - name: test
+    command: pytest tests/
+    
+  - name: build
+    command: python setup.py build
+```
+
+Containerized workflow execution.
+
+<a href="/reference/yaml#container-configuration" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Container Workflow
+
+```yaml
+container:
+  image: python:3.11-slim
+  volumes:
+    - ./data:/data
+    - ./scripts:/scripts:ro
+  workDir: /app
+
+steps:
+  - name: install-deps
+    command: pip install -r requirements.txt
+    
+  - name: process-data
+    command: python process.py /data/input.csv
+    env:
+      - DEBUG=true
+    
+  - name: generate-report
+    executor:
+      type: docker
+      config:
+        image: node:20
+        volumes:
+          - ./reports:/reports
+    command: node generate-report.js
+```
+
+Complete containerized workflow.
+
+<a href="/features/executors/docker" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
 ### SSH Remote Execution
 
 ```yaml
@@ -1274,6 +1341,75 @@ steps:
 Use queues to manage workflow execution priority and concurrency.
 
 <a href="/features/queues" class="learn-more">Learn more →</a>
+
+</div>
+
+</div>
+
+## Container Patterns
+
+<div class="examples-grid">
+
+<div class="example-card">
+
+### Data Science Workflow
+
+```yaml
+container:
+  image: jupyter/scipy-notebook
+  volumes:
+    - ./notebooks:/home/jovyan/work
+    - ./data:/data
+
+steps:
+  - name: prepare-data
+    command: python -m nbconvert --execute prepare.ipynb
+    
+  - name: train-model
+    executor:
+      type: docker
+      config:
+        image: tensorflow/tensorflow:latest-gpu
+    command: python train.py --epochs=100
+    
+  - name: evaluate
+    command: python evaluate.py
+```
+
+ML pipeline with specialized containers.
+
+<a href="/features/executors/docker" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Keep Container Running
+
+```yaml
+# Use keepContainer at DAG level
+container:
+  image: postgres:16
+  keepContainer: true
+  env:
+    - POSTGRES_PASSWORD=secret
+  ports:
+    - "5432:5432"
+
+steps:
+  - name: start-db
+    command: postgres -D /var/lib/postgresql/data
+    
+  - name: wait-for-db
+    command: pg_isready -U postgres -h localhost
+    retryPolicy:
+      limit: 10
+      intervalSec: 2
+```
+
+Keep container running for entire workflow.
+
+<a href="/reference/yaml#container-configuration" class="learn-more">Learn more →</a>
 
 </div>
 

@@ -109,6 +109,29 @@ schedule:
 | `histRetentionDays` | integer | History retention days | `30` |
 | `maxOutputSize` | integer | Max output size per step (bytes) | `1048576` |
 
+### Container Configuration
+
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| `container` | object | Default container configuration for all steps | - |
+
+```yaml
+container:
+  image: python:3.11
+  pullPolicy: missing      # always, missing, never
+  env:
+    - API_KEY=${API_KEY}
+  volumes:
+    - /data:/data:ro
+  workDir: /app
+  platform: linux/amd64
+  user: "1000:1000"
+  ports:
+    - "8080:8080"
+  network: host
+  keepContainer: false     # Keep container after DAG run
+```
+
 ### Queue Configuration
 
 | Field | Type | Description | Default |
@@ -545,6 +568,16 @@ env:
 dotenv:
   - /etc/dagu/production.env
 
+# Default container for all steps
+container:
+  image: python:3.11-slim
+  pullPolicy: missing
+  env:
+    - PYTHONUNBUFFERED=1
+  volumes:
+    - ./data:/data
+    - ./scripts:/scripts:ro
+
 preconditions:
   - condition: "`date +%u`"
     expected: "re:[1-5]"  # Weekdays only
@@ -572,11 +605,15 @@ steps:
       failure: false
     
   - name: load-data
-    command: python load.py --date=${DATE}
+    # Use different executor for this step
+    executor:
+      type: docker
+      config:
+        image: postgres:16
+        env:
+          - PGPASSWORD=${DB_PASSWORD}
+    command: psql -h ${DB_HOST} -U ${DB_USER} -f load.sql
     depends: transform-data
-    env:
-      - LOAD_TIMEOUT: 600
-      - DB_CONNECTION: ${PROD_DB}
     
   - name: validate-results
     command: python validate_results.py --date=${DATE}
