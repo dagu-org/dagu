@@ -26,6 +26,7 @@ __debug_bin*
 
 # Misc files
 .aider*
+.serena
 
 # Local configuration files
 *.local.md
