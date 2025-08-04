@@ -116,6 +116,61 @@ dagu start-all
 
 Visit http://localhost:8080
 
+## Docker-Compose
+
+Dagu supports running multiple services in high-availability (HA) mode. 
+
+### 1. Create a `compose.yml` file in your project directory.
+
+```yaml
+services:
+  dagu-1:
+    image: ghcr.io/dagu-org/dagu:latest
+    volumes:
+      - ./dagu:/var/lib/dagu
+    environment:
+      - DAGU_COORDINATOR_PORT=50055
+    ports:
+      - 8080:8080
+      - 50055:50055
+    command: ["dagu", "start-all"]
+
+  dagu-2:
+    image: ghcr.io/dagu-org/dagu:latest
+    volumes:
+      - ./dagu:/var/lib/dagu
+    environment:
+      - DAGU_COORDINATOR_PORT=50056 # Use a different port for the second instance
+    ports:
+      - 8081:8080
+      - 50056:50056
+    command: ["dagu", "start-all"]
+
+volumes:
+  dagu:
+    driver: local
+```
+
+Notes:
+- If the primary scheduler instance fails, the standby instance will automatically take over. The web servers are stateless and can be scaled horizontally using shared storage. For more details, see the [High Availability](https://docs.dagu.cloud/features/scheduling#high-availability) documentation.
+- Port `50055` is used for gRPC communication between the coordinator and its workers. For more information, refer to the [Distributed Execution](https://docs.dagu.cloud/features/distributed-execution) documentation.
+- Dagu uses a shared volume for service discovery, so you must set a unique `DAGU_COORDINATOR_PORT` for each service instance if they are running on the same host.
+- If you are not running separate workers and instead execute DAGs locally on the scheduler instances, you can omit the `DAGU_COORDINATOR_PORT` environment variable.
+
+### 2. Start Docker Compose
+
+You can now start Dagu by typing:
+
+```bash
+docker compose up -d
+```
+
+To stop the containers, run:
+
+```bash
+docker compose stop
+```
+
 ## Documentation
 
 Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
