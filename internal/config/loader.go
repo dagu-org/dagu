@@ -595,8 +595,8 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("queues.enabled", "QUEUE_ENABLED")
 
 	// Coordinator service configuration (flat structure)
-	l.bindEnv("coordinatorHost", "COORDINATOR_HOST")
-	l.bindEnv("coordinatorPort", "COORDINATOR_PORT")
+	l.bindEnv("coordinator.host", "COORDINATOR_HOST")
+	l.bindEnv("coordinator.port", "COORDINATOR_PORT")
 
 	// Worker configuration (nested structure)
 	l.bindEnv("worker.id", "WORKER_ID")
