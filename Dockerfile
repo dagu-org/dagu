@@ -28,6 +28,7 @@ FROM --platform=$TARGETPLATFORM ubuntu:24.04
 ARG USER="dagu"
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
+ARG DAGU_HOME="/var/lib/dagu"
 
 # WORKAROUND — Ubuntu 24.04 switched repo signatures to Ed25519.
 # Older base images ship an outdated ubuntu-keyring that cannot verify
@@ -81,10 +82,15 @@ RUN set -eux; \
 # Delete the default ubuntu user
 RUN userdel -f ubuntu
 
+# Create the DAGU_HOME directory and set permissions
+RUN mkdir -p "${DAGU_HOME}" && \
+    chown -R "${USER_UID}:${USER_GID}" "${DAGU_HOME}" && \
+    chmod 755 "${DAGU_HOME}"
+
 WORKDIR /home/dagu
 ENV DAGU_HOST=0.0.0.0
 ENV DAGU_PORT=8080
-ENV DAGU_HOME=/var/lib/dagu
+ENV DAGU_HOME=${DAGU_HOME}
 ENV DAGU_TZ="Etc/UTC"
 ENV PUID=${USER_UID}
 ENV PGID=${USER_GID}
