@@ -45,19 +45,21 @@ func (z *ZombieDetector) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			if running.CompareAndSwap(false, true) {
-				go func() {
-					defer running.Store(false)
-					defer func() {
-						if r := recover(); r != nil {
-							logger.Error(ctx, "Zombie detection check panicked", "panic", r)
-						}
-					}()
-					z.detectAndCleanZombies(ctx)
-				}()
-			} else {
+			if !running.CompareAndSwap(false, true) {
 				logger.Warn(ctx, "Skipping zombie detection, previous check still running")
+				continue
 			}
+
+			go func() {
+				defer running.Store(false)
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error(ctx, "Zombie detection check panicked", "panic", r)
+					}
+				}()
+				z.detectAndCleanZombies(ctx)
+			}()
+
 		case <-ctx.Done():
 			logger.Info(ctx, "Stopping zombie detector")
 			return
