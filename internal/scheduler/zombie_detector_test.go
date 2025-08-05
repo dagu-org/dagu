@@ -167,7 +167,7 @@ func TestZombieDetector_Start(t *testing.T) {
 
 	// Set up expectations
 	callCount := atomic.Int32{}
-	dagRunStore.On("ListStatuses", ctx, mock.Anything).Return([]*models.DAGRunStatus{}, nil).Run(func(args mock.Arguments) {
+	dagRunStore.On("ListStatuses", ctx, mock.Anything).Return([]*models.DAGRunStatus{}, nil).Run(func(_ mock.Arguments) {
 		callCount.Add(1)
 	})
 
@@ -329,7 +329,7 @@ func TestZombieDetector_concurrency(t *testing.T) {
 
 	// Make detectAndCleanZombies take longer than the interval
 	slowCallCount := atomic.Int32{}
-	dagRunStore.On("ListStatuses", ctx, mock.Anything).Return([]*models.DAGRunStatus{}, nil).Run(func(args mock.Arguments) {
+	dagRunStore.On("ListStatuses", ctx, mock.Anything).Return([]*models.DAGRunStatus{}, nil).Run(func(_ mock.Arguments) {
 		slowCallCount.Add(1)
 		time.Sleep(30 * time.Millisecond) // Slower than interval
 	})
