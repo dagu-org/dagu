@@ -317,6 +317,15 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 				l.warnings = append(l.warnings, fmt.Sprintf("Invalid scheduler.lockRetryInterval value: %s", def.Scheduler.LockRetryInterval))
 			}
 		}
+
+		// Parse scheduler zombie detection interval
+		if def.Scheduler.ZombieDetectionInterval != "" {
+			if duration, err := time.ParseDuration(def.Scheduler.ZombieDetectionInterval); err == nil {
+				cfg.Scheduler.ZombieDetectionInterval = duration
+			} else {
+				l.warnings = append(l.warnings, fmt.Sprintf("Invalid scheduler.zombieDetectionInterval value: %s", def.Scheduler.ZombieDetectionInterval))
+			}
+		}
 	}
 
 	if cfg.Scheduler.Port <= 0 {
@@ -327,6 +336,11 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 	if cfg.Scheduler.LockRetryInterval <= 0 {
 		cfg.Scheduler.LockRetryInterval = 5 * time.Second // Default to 5 seconds if not set
+	}
+	// Only set default if not explicitly configured (including env vars)
+	// Check if the value is still zero after parsing, which means it wasn't set
+	if cfg.Scheduler.ZombieDetectionInterval == 0 && !viper.IsSet("scheduler.zombieDetectionInterval") {
+		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second // Default to 45 seconds if not set
 	}
 
 	// Incorporate legacy field values, which may override existing settings.
@@ -537,6 +551,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	// Scheduler configurations
 	l.bindEnv("scheduler.lockStaleThreshold", "SCHEDULER_LOCK_STALE_THRESHOLD")
 	l.bindEnv("scheduler.lockRetryInterval", "SCHEDULER_LOCK_RETRY_INTERVAL")
+	l.bindEnv("scheduler.zombieDetectionInterval", "SCHEDULER_ZOMBIE_DETECTION_INTERVAL")
 
 	// UI configurations
 	l.bindEnv("ui.maxDashboardPageLimit", "UI_MAX_DASHBOARD_PAGE_LIMIT")

@@ -113,6 +113,7 @@ scheduler:
   port: 8090              # Health check port (0 to disable)
   lockStaleThreshold: "30s"  # Time after which a scheduler lock is considered stale
   lockRetryInterval: "5s"   # Interval between lock acquisition attempts
+  zombieDetectionInterval: "45s"  # Interval for detecting zombie DAG runs (0 to disable)
 ```
 
 ## Environment Variables
@@ -186,6 +187,7 @@ All options support `DAGU_` prefix.
 - `DAGU_SCHEDULER_PORT` - Health check server port (default: `8090`)
 - `DAGU_SCHEDULER_LOCK_STALE_THRESHOLD` - Time after which a scheduler lock is considered stale (default: `30s`)
 - `DAGU_SCHEDULER_LOCK_RETRY_INTERVAL` - Interval between lock acquisition attempts (default: `5s`)
+- `DAGU_SCHEDULER_ZOMBIE_DETECTION_INTERVAL` - Interval for detecting zombie DAG runs (default: `45s`, `0` to disable)
 
 ### Legacy Environment Variables (Deprecated)
 These variables are maintained for backward compatibility but should not be used in new deployments:

@@ -296,6 +296,11 @@ type Scheduler struct {
 	// SchedulerLockRetryInterval is the interval between lock acquisition attempts.
 	// Default is 5 seconds.
 	LockRetryInterval time.Duration
+
+	// ZombieDetectionInterval is the interval between checks for zombie DAG runs.
+	// A zombie DAG run is one marked as running but whose process is no longer alive.
+	// Set to 0 to disable zombie detection. Default is 45 seconds.
+	ZombieDetectionInterval time.Duration
 }
 
 // Peer holds the certificate and TLS configuration for peer connections over gRPC.
