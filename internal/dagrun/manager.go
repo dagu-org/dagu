@@ -299,7 +299,7 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun digraph.DAGRunRef) 
 
 	// If the status is running, ensure if the process is still alive
 	if dagRun.ID == st.Root.ID && st.Status == status.Running {
-		if err := m.checkAndUpdateStaleRunningStatus(ctx, st); err != nil {
+		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
 			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
 		}
 	}
@@ -334,7 +334,7 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *digraph.
 	// If querying the current status fails, even if the status is running,
 	// check if the process is actually alive before marking as error.
 	if st.Status == status.Running {
-		if err := m.checkAndUpdateStaleRunningStatus(ctx, st); err != nil {
+		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
 			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
 		}
 	}
@@ -422,7 +422,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 
 	// If querying the current status fails, ensure if the status is running,
 	if st.Status == status.Running {
-		if err := m.checkAndUpdateStaleRunningStatus(ctx, st); err != nil {
+		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
 			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
 		}
 	}
@@ -683,25 +683,27 @@ func (m *Manager) createTempDAGFile(dagName string, yamlData []byte) (string, er
 // and updates its status to error if the process is not alive.
 func (m *Manager) checkAndUpdateStaleRunningStatus(
 	ctx context.Context,
+	att models.DAGRunAttempt,
 	st *models.DAGRunStatus,
 ) error {
+	dag, err := att.ReadDAG(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to read DAG for stale status check: %w", err)
+	}
 	dagRun := digraph.DAGRunRef{
-		Name: st.Name,
+		Name: dag.QueueProcName(),
 		ID:   st.DAGRunID,
 	}
-
 	alive, err := m.procStore.IsRunAlive(ctx, dagRun)
 	if err != nil {
 		// Log but don't fail - we can't determine if it's alive
 		logger.Error(ctx, "Failed to check if DAG run is alive", "err", err)
 		return nil
 	}
-
 	if alive {
 		// Process is still alive, nothing to do
 		return nil
 	}
-
 	// Process is not alive, update status to error
 	st.Status = status.Error
 
