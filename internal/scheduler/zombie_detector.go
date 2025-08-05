@@ -141,7 +141,11 @@ func (z *ZombieDetector) updateStatus(ctx context.Context,
 	if err := attempt.Open(ctx); err != nil {
 		return fmt.Errorf("open attempt: %w", err)
 	}
-	defer attempt.Close(ctx)
+	defer func() {
+		if err := attempt.Close(ctx); err != nil {
+			logger.Error(ctx, "Failed to close attempt", "err", err)
+		}
+	}()
 
 	if err := attempt.Write(ctx, status); err != nil {
 		return fmt.Errorf("write status: %w", err)
