@@ -235,10 +235,12 @@ func TestRegistryAuthManager_GetAuthHeader(t *testing.T) {
 	// Test with DOCKER_AUTH_CONFIG env var
 	t.Run("DOCKER_AUTH_CONFIG fallback", func(t *testing.T) {
 		oldEnv := os.Getenv("DOCKER_AUTH_CONFIG")
-		defer os.Setenv("DOCKER_AUTH_CONFIG", oldEnv)
+		defer func() {
+			_ = os.Setenv("DOCKER_AUTH_CONFIG", oldEnv)
+		}()
 
 		dockerConfig := `{"auths":{"gcr.io":{"username":"_json_key","password":"key"}}}`
-		os.Setenv("DOCKER_AUTH_CONFIG", dockerConfig)
+		require.NoError(t, os.Setenv("DOCKER_AUTH_CONFIG", dockerConfig))
 
 		manager := NewRegistryAuthManager(nil)
 
@@ -278,8 +280,10 @@ func TestRegistryAuthManager_GetAuthHeader(t *testing.T) {
 	// Test with no auth configured
 	t.Run("No auth", func(t *testing.T) {
 		oldEnv := os.Getenv("DOCKER_AUTH_CONFIG")
-		defer os.Setenv("DOCKER_AUTH_CONFIG", oldEnv)
-		os.Unsetenv("DOCKER_AUTH_CONFIG")
+		defer func() {
+			_ = os.Setenv("DOCKER_AUTH_CONFIG", oldEnv)
+		}()
+		require.NoError(t, os.Unsetenv("DOCKER_AUTH_CONFIG"))
 
 		manager := NewRegistryAuthManager(nil)
 
@@ -353,3 +357,4 @@ func TestRegistryAuthManager_ComplexJSONAuth(t *testing.T) {
 	assert.Equal(t, "mypass", decoded.Password)
 	assert.Equal(t, "myregistry.com", decoded.ServerAddress)
 }
+

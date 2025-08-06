@@ -72,7 +72,7 @@ func (r *RegistryAuthManager) GetAuthHeader(imageName string) (string, error) {
 
 // getAuthConfig returns the authentication config for the given image
 func (r *RegistryAuthManager) getAuthConfig(imageName string) (*registry.AuthConfig, error) {
-	if r.auths == nil || len(r.auths) == 0 {
+	if len(r.auths) == 0 {
 		return nil, nil
 	}
 
@@ -195,3 +195,4 @@ func EncodeBasicAuth(username, password string) string {
 	auth := username + ":" + password
 	return base64.StdEncoding.EncodeToString([]byte(auth))
 }
+

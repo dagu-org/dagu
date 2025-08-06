@@ -530,7 +530,7 @@ func NewFromContainerConfigWithAuth(ct digraph.Container, registryAuths map[stri
 	}
 
 	// Set up registry authentication if provided
-	if registryAuths != nil && len(registryAuths) > 0 {
+	if len(registryAuths) > 0 {
 		client.authManager = NewRegistryAuthManager(registryAuths)
 	}
 
@@ -607,7 +607,7 @@ func NewFromMapConfigWithAuth(data map[string]any, registryAuths map[string]*dig
 	}
 
 	// Set up registry authentication if provided
-	if registryAuths != nil && len(registryAuths) > 0 {
+	if len(registryAuths) > 0 {
 		client.authManager = NewRegistryAuthManager(registryAuths)
 	}
 
