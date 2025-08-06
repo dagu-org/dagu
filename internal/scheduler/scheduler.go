@@ -371,34 +371,31 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			// For now we need to wait for the DAG started
+			// Wait for the DAG to be picked up by checking process heartbeat
 		WAIT_FOR_RUN:
 			for {
-				// Check if the dag is running
-				attempt, err = s.dagRunStore.FindAttempt(ctx, data)
-				if err != nil {
-					logger.Error(ctx, "Failed to find run", "err", err, "data", data)
-					continue
+				// Check if the process is alive (has heartbeat)
+				procRef := digraph.DAGRunRef{
+					Name: dag.QueueProcName(),
+					ID:   data.ID,
 				}
-				status, err := attempt.ReadStatus(ctx)
+				isAlive, err := s.procStore.IsRunAlive(ctx, procRef)
 				if err != nil {
-					if errors.Is(err, models.ErrCorruptedStatusFile) {
-						logger.Error(ctx, "Status file became corrupted during wait, marking as invalid", "err", err, "data", data)
-					} else {
-						logger.Error(ctx, "Failed to read status", "err", err, "data", data)
-					}
-					result = models.QueuedItemProcessingResultDiscard
-					goto SEND_RESULT
-				}
-				if status.Status != dagstatus.Queued {
-					logger.Info(ctx, "DAG run is no longer queued", "data", data, "status", status.Status)
+					logger.Error(ctx, "Failed to check if run is alive", "err", err, "data", data)
+					// Continue checking on error, don't immediately fail
+				} else if isAlive {
+					// Process has started and has heartbeat
+					logger.Info(ctx, "DAG run has started (heartbeat detected)", "data", data)
 					result = models.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN
 				}
+				
+				// Check timeout
 				if time.Since(startedAt) > 10*time.Second {
 					logger.Error(ctx, "Timeout waiting for run to start", "data", data)
 					break WAIT_FOR_RUN
 				}
+				
 				select {
 				case <-time.After(500 * time.Millisecond):
 				case <-ctx.Done():

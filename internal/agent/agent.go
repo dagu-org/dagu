@@ -310,6 +310,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	defer func() {
 		if initErr != nil {
+			logger.Error(ctx, "Failed to initialize DAG execution", "err", err)
 			st := a.Status(ctx)
 			st.Status = status.Error
 			if err := attempt.Write(ctx, st); err != nil {
@@ -335,17 +336,14 @@ func (a *Agent) Run(ctx context.Context) error {
 	if a.dag.Container != nil {
 		containerClient, err := container.NewFromContainerConfigWithAuth(*a.dag.Container, a.dag.RegistryAuths)
 		if err != nil {
-			logger.Error(ctx, "Failed to create container client", "err", err)
 			initErr = fmt.Errorf("failed to create container client: %w", err)
 			return initErr
 		}
 		if err := containerClient.Init(ctx); err != nil {
-			logger.Error(ctx, "Failed to initialize container client", "err", err)
 			initErr = fmt.Errorf("failed to initialize container client: %w", err)
 			return initErr
 		}
 		if err := containerClient.CreateContainerKeepAlive(ctx); err != nil {
-			logger.Error(ctx, "Failed to create keepalive container", "err", err)
 			initErr = fmt.Errorf("failed to create keepalive container: %w", err)
 			return initErr
 		}
@@ -376,7 +374,8 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// It returns error if it failed to start the unix socket server.
 	if err := <-listenerErrCh; err != nil {
-		return fmt.Errorf("failed to start the unix socket server: %w", err)
+		initErr = fmt.Errorf("failed to start the unix socket server: %w", err)
+		return initErr
 	}
 
 	// Start progress display if enabled
@@ -455,7 +454,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	})
 
 	// Add registry authentication to context for docker executors
-	if a.dag.RegistryAuths != nil && len(a.dag.RegistryAuths) > 0 {
+	if len(a.dag.RegistryAuths) > 0 {
 		ctx = executor.WithRegistryAuth(ctx, a.dag.RegistryAuths)
 	}
 
