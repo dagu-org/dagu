@@ -66,10 +66,11 @@ Configuration precedence: System defaults → Base config → DAG config
 ## Guide Sections
 
 1. **[Basics](/writing-workflows/basics)** - Steps, commands, dependencies
-2. **[Control Flow](/writing-workflows/control-flow)** - Parallel execution, conditions, loops
-3. **[Data & Variables](/writing-workflows/data-variables)** - Parameters, outputs, data passing
-4. **[Error Handling](/writing-workflows/error-handling)** - Retries, failures, notifications
-5. **[Advanced Patterns](/writing-workflows/advanced)** - Composition, optimization, best practices
+2. **[Container](/writing-workflows/container)** - Run workflows in Docker containers
+3. **[Control Flow](/writing-workflows/control-flow)** - Parallel execution, conditions, loops
+4. **[Data & Variables](/writing-workflows/data-variables)** - Parameters, outputs, data passing
+5. **[Error Handling](/writing-workflows/error-handling)** - Retries, failures, notifications
+6. **[Advanced Patterns](/writing-workflows/advanced)** - Composition, optimization, best practices
 
 ## Complete Example
 

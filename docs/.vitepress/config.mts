@@ -37,6 +37,7 @@ export default defineConfig({
         items: [
           { text: "Introduction", link: "/writing-workflows/" },
           { text: "Basic DAG", link: "/writing-workflows/basic-dag" },
+          { text: "Container", link: "/writing-workflows/container" },
           { text: "Variables", link: "/writing-workflows/variables" },
           { text: "Step Execution", link: "/writing-workflows/step-execution" },
           { text: "Conditional Logic", link: "/writing-workflows/conditional-logic" },
