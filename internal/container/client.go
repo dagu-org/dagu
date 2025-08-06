@@ -227,7 +227,7 @@ func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd 
 
 	if pull {
 		logger.Infof(ctx, "Pulling the image %q", c.image)
-		
+
 		// Get pull options with authentication if configured
 		var pullOpts image.PullOptions
 		if c.authManager != nil {
@@ -239,7 +239,7 @@ func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd 
 		} else {
 			pullOpts = image.PullOptions{Platform: platforms.Format(c.platformO)}
 		}
-		
+
 		reader, err := cli.ImagePull(ctx, c.image, pullOpts)
 		if err != nil {
 			return "", err
@@ -528,12 +528,12 @@ func NewFromContainerConfigWithAuth(ct digraph.Container, registryAuths map[stri
 		networkConfig:   networkConfig,
 		execOptions:     execOptions,
 	}
-	
+
 	// Set up registry authentication if provided
 	if registryAuths != nil && len(registryAuths) > 0 {
 		client.authManager = NewRegistryAuthManager(registryAuths)
 	}
-	
+
 	return client, nil
 }
 
@@ -605,11 +605,11 @@ func NewFromMapConfigWithAuth(data map[string]any, registryAuths map[string]*dig
 		execOptions:     &ret.Exec,
 		autoRemove:      autoRemove,
 	}
-	
+
 	// Set up registry authentication if provided
 	if registryAuths != nil && len(registryAuths) > 0 {
 		client.authManager = NewRegistryAuthManager(registryAuths)
 	}
-	
+
 	return client, nil
 }

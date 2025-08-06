@@ -257,7 +257,7 @@ func TestRegistryAuthManager_GetAuthHeader(t *testing.T) {
 	// Test with _json special entry
 	t.Run("JSON config in DAG", func(t *testing.T) {
 		dockerConfig := `{"auths":{"ghcr.io":{"auth":"dGVzdDp0ZXN0"}}}`
-		
+
 		manager := NewRegistryAuthManager(map[string]*digraph.AuthConfig{
 			"_json": {
 				Auth: dockerConfig,

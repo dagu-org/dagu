@@ -38,11 +38,11 @@ func TestDAGRegistryAuths(t *testing.T) {
 
 		assert.NotNil(t, dag.RegistryAuths)
 		assert.Len(t, dag.RegistryAuths, 2)
-		
+
 		dockerAuth, exists := dag.RegistryAuths["docker.io"]
 		assert.True(t, exists)
 		assert.Equal(t, "docker-user", dockerAuth.Username)
-		
+
 		ghcrAuth, exists := dag.RegistryAuths["ghcr.io"]
 		assert.True(t, exists)
 		assert.Equal(t, "github-user", ghcrAuth.Username)

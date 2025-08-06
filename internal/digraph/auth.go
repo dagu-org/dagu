@@ -6,7 +6,7 @@ package digraph
 type AuthConfig struct {
 	// Username for registry authentication
 	Username string `json:"username,omitempty"`
-	// Password for registry authentication  
+	// Password for registry authentication
 	Password string `json:"password,omitempty"`
 	// Auth can be used instead of username/password for pre-encoded credentials
 	// This should be base64(username:password)
