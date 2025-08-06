@@ -16,6 +16,8 @@ type ProcStore interface {
 	CountAlive(ctx context.Context, name string) (int, error)
 	// IsRunAlive checks if a specific DAG run is currently alive.
 	IsRunAlive(ctx context.Context, dagRun digraph.DAGRunRef) (bool, error)
+	// ListAlive returns list of running DAG runs by the name.
+	ListAlive(ctx context.Context, name string) ([]digraph.DAGRunRef, error)
 }
 
 // ProcHandle represents a process that is associated with a dag-run.

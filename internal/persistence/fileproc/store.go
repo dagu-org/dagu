@@ -39,6 +39,17 @@ func (s *Store) CountAlive(ctx context.Context, name string) (int, error) {
 	return procGroup.Count(ctx)
 }
 
+// ListAlive implements models.ProcStore.
+func (s *Store) ListAlive(ctx context.Context, name string) ([]digraph.DAGRunRef, error) {
+	pgBaseDir := filepath.Join(s.baseDir, name)
+	pg, _ := s.procGroups.LoadOrStore(name, NewProcGroup(pgBaseDir, name, s.staleTime))
+	procGroup, ok := pg.(*ProcGroup)
+	if !ok {
+		return nil, fmt.Errorf("invalid type in procGroups map: expected *ProcGroup, got %T", pg)
+	}
+	return procGroup.ListAlive(ctx)
+}
+
 // Acquire implements models.ProcStore.
 func (s *Store) Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (models.ProcHandle, error) {
 	pgBaseDir := filepath.Join(s.baseDir, dagRun.Name)
