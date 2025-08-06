@@ -166,27 +166,28 @@ func getAuthFromDockerConfig(configJSON string, imageName string) (*registry.Aut
 
 // extractRegistry extracts the registry hostname from an image name
 func extractRegistry(imageName string) string {
-	// Remove tag if present
-	parts := strings.Split(imageName, ":")
-	imageName = parts[0]
-
 	// Remove digest if present
-	parts = strings.Split(imageName, "@")
-	imageName = parts[0]
-
-	// Split by slash
-	parts = strings.Split(imageName, "/")
-
-	// Check if first part looks like a registry
-	if len(parts) >= 2 {
-		firstPart := parts[0]
-		// Check if it contains a dot (domain) or colon (port) or is localhost
-		if strings.Contains(firstPart, ".") || strings.Contains(firstPart, ":") || firstPart == "localhost" {
-			return firstPart
-		}
+	if idx := strings.Index(imageName, "@"); idx != -1 {
+		imageName = imageName[:idx]
 	}
 
-	// Default to Docker Hub
+	// Split by slash to get potential registry
+	parts := strings.Split(imageName, "/")
+
+	if len(parts) == 1 {
+		// No slash means Docker Hub official image (e.g., "ubuntu")
+		return "docker.io"
+	}
+
+	// Check if first part looks like a registry
+	firstPart := parts[0]
+
+	// Registry if: contains dot (domain), contains colon (port), or is localhost
+	if strings.Contains(firstPart, ".") || strings.Contains(firstPart, ":") || firstPart == "localhost" {
+		return firstPart
+	}
+
+	// Otherwise it's Docker Hub (e.g., "user/image")
 	return "docker.io"
 }
 
@@ -195,4 +196,3 @@ func EncodeBasicAuth(username, password string) string {
 	auth := username + ":" + password
 	return base64.StdEncoding.EncodeToString([]byte(auth))
 }
-

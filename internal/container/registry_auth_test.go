@@ -357,4 +357,3 @@ func TestRegistryAuthManager_ComplexJSONAuth(t *testing.T) {
 	assert.Equal(t, "mypass", decoded.Password)
 	assert.Equal(t, "myregistry.com", decoded.ServerAddress)
 }
-
