@@ -432,6 +432,14 @@ func (m *mockProcStore) IsRunAlive(ctx context.Context, dagRun digraph.DAGRunRef
 	return args.Bool(0), args.Error(1)
 }
 
+func (m *mockProcStore) ListAlive(ctx context.Context, name string) ([]digraph.DAGRunRef, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]digraph.DAGRunRef), args.Error(1)
+}
+
 // Mock DAGRunAttempt
 type mockDAGRunAttempt struct {
 	mock.Mock

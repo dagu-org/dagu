@@ -438,9 +438,11 @@ func (sc *Scheduler) Signal(
 	for _, node := range graph.nodes {
 		// for a repetitive task, we'll wait for the job to finish
 		// until time reaches max wait time
-		if node.Step().RepeatPolicy.RepeatMode == "" {
-			node.Signal(ctx, sig, allowOverride)
+		if node.Step().RepeatPolicy.RepeatMode != "" {
+			logger.Info(ctx, "Waiting the repeat node finish", "step", node.Step().Name)
+			continue
 		}
+		node.Signal(ctx, sig, allowOverride)
 	}
 
 	if done != nil {

@@ -69,21 +69,98 @@ func (m *Manager) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.Loa
 // If the DAG is not running, it logs a message and returns nil.
 func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, dagRunID string) error {
 	logger.Info(ctx, "Stopping", "name", dag.Name)
-	addr := dag.SockAddr(dagRunID)
-	if !fileutil.FileExists(addr) {
-		logger.Info(ctx, "The DAG is not running", "name", dag.Name)
+
+	if dagRunID == "" {
+		// If DAGRunID is not specified, stop all matching DAG runs
+		// Get the list of running DAG runs for the queue proc name
+		aliveRuns, err := m.procStore.ListAlive(ctx, dag.QueueProcName())
+		if err != nil {
+			return fmt.Errorf("failed to list alive DAG runs: %w", err)
+		}
+
+		// If no runs are alive, nothing to stop
+		if len(aliveRuns) == 0 {
+			logger.Info(ctx, "No running DAG runs found", "name", dag.Name)
+			return nil
+		}
+
+		// Collect all matching DAG run IDs
+		var matchingRunIDs []string
+		for _, runRef := range aliveRuns {
+			// Find the attempt for this run
+			attempt, err := m.dagRunStore.FindAttempt(ctx, runRef)
+			if err != nil {
+				logger.Warn(ctx, "Failed to find attempt for running DAG", "runRef", runRef, "err", err)
+				continue
+			}
+
+			// Read the DAG to check if it matches
+			runDAG, err := attempt.ReadDAG(ctx)
+			if err != nil {
+				logger.Warn(ctx, "Failed to read DAG for running attempt", "runRef", runRef, "err", err)
+				continue
+			}
+
+			// Check if the DAG name matches
+			if runDAG.Name == dag.Name {
+				matchingRunIDs = append(matchingRunIDs, runRef.ID)
+				logger.Info(ctx, "Found matching DAG run to stop", "name", dag.Name, "runID", runRef.ID)
+			}
+		}
+
+		// If no matching DAGs were found
+		if len(matchingRunIDs) == 0 {
+			logger.Info(ctx, "No matching DAG run found to stop", "name", dag.Name)
+			return nil
+		}
+
+		// Stop all matching DAG runs
+		var stopErrors []error
+		for _, runID := range matchingRunIDs {
+			if err := m.stopSingleDAGRun(ctx, dag, runID); err != nil {
+				stopErrors = append(stopErrors, fmt.Errorf("failed to stop DAG run %s: %w", runID, err))
+			}
+		}
+
+		// If any errors occurred, return them
+		if len(stopErrors) > 0 {
+			return fmt.Errorf("errors occurred while stopping DAG runs: %v", stopErrors)
+		}
+
 		return nil
 	}
 
-	// In case the socket exists, we try to send a stop request
-	client := sock.NewClient(addr)
-	_, err := client.Request("POST", "/stop")
-	if err == nil {
+	// If dagRunID is specified, stop just that specific run
+	return m.stopSingleDAGRun(ctx, dag, dagRunID)
+}
+
+// stopSingleDAGRun stops a single DAG run by its ID
+func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string) error {
+	procRunRef := digraph.NewDAGRunRef(dag.QueueProcName(), dagRunID)
+
+	// Check if the process is running using proc store
+	alive, err := m.procStore.IsRunAlive(ctx, procRunRef)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve status from proc store: %w", err)
+	}
+	if !alive {
+		logger.Info(ctx, "The DAG is not running", "name", dag.Name, "runID", dagRunID)
 		return nil
+	}
+
+	addr := dag.SockAddr(dagRunID)
+	if fileutil.FileExists(addr) {
+		// In case the socket exists, we try to send a stop request
+		client := sock.NewClient(addr)
+		if _, err := client.Request("POST", "/stop"); err == nil {
+			logger.Info(ctx, "Successfully stopped DAG via socket", "name", dag.Name, "runID", dagRunID)
+			return nil
+		}
 	}
 
 	// Try to find the running dag-run attempt and request cancel
-	run, err := m.dagRunStore.FindAttempt(ctx, digraph.NewDAGRunRef(dag.Name, dagRunID))
+	runRef := digraph.NewDAGRunRef(dag.Name, dagRunID)
+	run, err := m.dagRunStore.FindAttempt(ctx, runRef)
 	if err == nil {
 		if err := run.RequestCancel(ctx); err != nil {
 			return fmt.Errorf("failed to request cancel for dag-run %s: %w", dagRunID, err)
@@ -92,7 +169,7 @@ func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, dagRunID string) e
 		return nil
 	}
 
-	return fmt.Errorf("failed to stop DAG %s: %w", dag.Name, err)
+	return fmt.Errorf("failed to stop DAG %s (run %s): %w", dag.Name, dagRunID, err)
 }
 
 // GenDAGRunID generates a unique ID for a dag-run using UUID version 7.

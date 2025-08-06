@@ -180,3 +180,80 @@ func (pg *ProcGroup) IsRunAlive(ctx context.Context, dagRun digraph.DAGRunRef) (
 
 	return false, nil
 }
+
+// ListAlive returns a list of alive DAG runs by scanning process files.
+func (pg *ProcGroup) ListAlive(ctx context.Context) ([]digraph.DAGRunRef, error) {
+	pg.mu.Lock()
+	defer pg.mu.Unlock()
+
+	// If directory does not exist, return empty list
+	if _, err := os.Stat(pg.baseDir); errors.Is(err, os.ErrNotExist) {
+		return []digraph.DAGRunRef{}, nil
+	}
+
+	// Grep for all proc files in the directory
+	files, err := filepath.Glob(filepath.Join(pg.baseDir, procFilePrefix+"*.proc"))
+	if err != nil {
+		return nil, err
+	}
+
+	var aliveRuns []digraph.DAGRunRef
+	for _, file := range files {
+		basename := filepath.Base(file)
+		if !procFileRegex.MatchString(basename) {
+			continue
+		}
+		// Check if the file is stale
+		if !pg.isStale(ctx, file) {
+			// Extract the run ID from the filename
+			// Format: proc_YYYYMMDD_HHMMSSZ_<runID>.proc
+			runID := extractRunIDFromFileName(basename)
+			if runID != "" {
+				aliveRuns = append(aliveRuns, digraph.DAGRunRef{
+					Name: pg.name,
+					ID:   runID,
+				})
+			}
+			continue
+		}
+		// File is stale, remove it
+		if err := os.Remove(file); err != nil {
+			logger.Error(ctx, "failed to remove stale file %s: %v", file, err)
+		}
+	}
+
+	return aliveRuns, nil
+}
+
+// extractRunIDFromFileName extracts the run ID from a proc file name.
+// Format: proc_YYYYMMDD_HHMMSSZ_<runID>.proc
+func extractRunIDFromFileName(filename string) string {
+	// Remove the prefix and suffix
+	if !procFileRegex.MatchString(filename) {
+		return ""
+	}
+	// Remove "proc_" prefix and ".proc" suffix
+	trimmed := filename[len(procFilePrefix):]
+	trimmed = trimmed[:len(trimmed)-5] // Remove ".proc"
+
+	// Find the second underscore (after the date) to extract run ID
+	// Format after removing prefix: YYYYMMDD_HHMMSSZ_<runID>
+	firstUnderscore := -1
+	secondUnderscore := -1
+	for i, r := range trimmed {
+		if r == '_' {
+			if firstUnderscore == -1 {
+				firstUnderscore = i
+			} else if secondUnderscore == -1 {
+				secondUnderscore = i
+				break
+			}
+		}
+	}
+
+	if secondUnderscore != -1 && secondUnderscore < len(trimmed)-1 {
+		return trimmed[secondUnderscore+1:]
+	}
+
+	return ""
+}

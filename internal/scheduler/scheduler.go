@@ -389,13 +389,13 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 					result = models.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN
 				}
-				
+
 				// Check timeout
 				if time.Since(startedAt) > 10*time.Second {
 					logger.Error(ctx, "Timeout waiting for run to start", "data", data)
 					break WAIT_FOR_RUN
 				}
-				
+
 				select {
 				case <-time.After(500 * time.Millisecond):
 				case <-ctx.Done():
