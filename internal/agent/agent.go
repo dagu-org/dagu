@@ -333,7 +333,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new container if the DAG has a container configuration.
 	if a.dag.Container != nil {
-		containerClient, err := container.NewFromContainerConfig(*a.dag.Container)
+		containerClient, err := container.NewFromContainerConfigWithAuth(*a.dag.Container, a.dag.RegistryAuths)
 		if err != nil {
 			logger.Error(ctx, "Failed to create container client", "err", err)
 			initErr = fmt.Errorf("failed to create container client: %w", err)
@@ -453,6 +453,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	go execWithRecovery(ctx, func() {
 		a.watchCancelRequested(ctx, attempt)
 	})
+
+	// Add registry authentication to context for docker executors
+	if a.dag.RegistryAuths != nil && len(a.dag.RegistryAuths) > 0 {
+		ctx = executor.WithRegistryAuth(ctx, a.dag.RegistryAuths)
+	}
 
 	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
 
