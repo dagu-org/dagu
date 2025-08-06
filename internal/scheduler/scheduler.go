@@ -53,6 +53,7 @@ type Scheduler struct {
 	disableHealthServer bool          // Disable health server when running from start-all
 	heartbeatCancel     context.CancelFunc
 	heartbeatDone       chan struct{}
+	zombieDetector      *ZombieDetector // Zombie DAG run detector
 }
 
 type queueConfig struct {
@@ -182,6 +183,26 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		defer close(s.heartbeatDone)
 		s.startHeartbeat(heartbeatCtx)
 	}()
+
+	// Start zombie detector if enabled
+	if s.config.Scheduler.ZombieDetectionInterval > 0 {
+		s.zombieDetector = NewZombieDetector(
+			s.dagRunStore,
+			s.procStore,
+			s.config.Scheduler.ZombieDetectionInterval,
+		)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error(ctx, "Zombie detector panicked", "panic", r)
+				}
+			}()
+			s.zombieDetector.Start(ctx)
+		}()
+		logger.Info(ctx, "Started zombie detector", "interval", s.config.Scheduler.ZombieDetectionInterval)
+	} else {
+		logger.Info(ctx, "Zombie detector disabled")
+	}
 
 	// Go routine to handle OS signals and context cancellation
 	wgQueue.Add(1)

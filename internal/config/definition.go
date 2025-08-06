@@ -285,4 +285,8 @@ type schedulerDef struct {
 	// LockRetryInterval is the interval between lock acquisition attempts.
 	// Default is 5 second.
 	LockRetryInterval string `mapstructure:"lockRetryInterval"`
+
+	// ZombieDetectionInterval is the interval between checks for zombie DAG runs.
+	// Default is 45 seconds. Set to 0 to disable.
+	ZombieDetectionInterval string `mapstructure:"zombieDetectionInterval"`
 }

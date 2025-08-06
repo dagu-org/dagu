@@ -42,6 +42,21 @@ When enabled, access the health endpoint at `http://localhost:8090/health`.
 
 **Note**: The health check only runs when using `dagu scheduler` directly, not with `dagu start-all`.
 
+### Zombie Detection
+
+The scheduler automatically detects and cleans up "zombie" DAG runs - processes marked as running but no longer alive (e.g., due to system crashes or force kills):
+
+```yaml
+# config.yaml
+scheduler:
+  zombieDetectionInterval: 45s  # Check interval (default: 45s, set to 0 to disable)
+```
+
+When a zombie is detected, its status is automatically updated from "running" to "error". This ensures:
+- Accurate status reporting
+- Queue slots are freed for new runs
+- No manual intervention required
+
 ## Basic Scheduling
 
 Schedule workflows with cron expressions:

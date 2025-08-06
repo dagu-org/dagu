@@ -255,6 +255,10 @@ For a detailed list of changes, bug fixes, and new features, please refer to the
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
+| `DAGU_SCHEDULER_PORT` | `8090` | Health check server port |
+| `DAGU_SCHEDULER_LOCK_STALE_THRESHOLD` | `30s` | Scheduler lock stale threshold |
+| `DAGU_SCHEDULER_LOCK_RETRY_INTERVAL` | `5s` | Lock retry interval |
+| `DAGU_SCHEDULER_ZOMBIE_DETECTION_INTERVAL` | `45s` | Zombie DAG detection interval (0 to disable) |
 | `DAGU_QUEUE_ENABLED` | `true` | Enable queue system |
 
 ### Worker Configuration

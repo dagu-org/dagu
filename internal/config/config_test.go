@@ -64,6 +64,7 @@ scheduler:
   port: 7890
   lockStaleThreshold: 50s
   lockRetryInterval: 10s
+  zombieDetectionInterval: 60s
 `
 	err := os.WriteFile(configFile, []byte(configContent), 0600)
 	require.NoError(t, err)
@@ -124,6 +125,7 @@ scheduler:
 	// Default scheduler lock settings should be applied
 	assert.Equal(t, 50*time.Second, cfg.Scheduler.LockStaleThreshold)
 	assert.Equal(t, 10*time.Second, cfg.Scheduler.LockRetryInterval)
+	assert.Equal(t, 60*time.Second, cfg.Scheduler.ZombieDetectionInterval)
 
 	// Verify new distributed execution fields have defaults
 	assert.Equal(t, "", cfg.Coordinator.Host)
@@ -173,6 +175,7 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	assert.Equal(t, 8090, cfg.Scheduler.Port)
 	assert.Equal(t, 30*time.Second, cfg.Scheduler.LockStaleThreshold)
 	assert.Equal(t, 5*time.Second, cfg.Scheduler.LockRetryInterval)
+	assert.Equal(t, 45*time.Second, cfg.Scheduler.ZombieDetectionInterval)
 
 	// Worker defaults
 	assert.Equal(t, 100, cfg.Worker.MaxActiveRuns)
