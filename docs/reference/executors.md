@@ -102,6 +102,30 @@ steps:
     command: ./test
 ```
 
+### Registry Authentication
+
+```yaml
+# Configure authentication for private registries
+registryAuths:
+  docker.io:
+    username: ${DOCKER_USERNAME}
+    password: ${DOCKER_PASSWORD}
+  ghcr.io:
+    username: ${GITHUB_USER}
+    password: ${GITHUB_TOKEN}
+
+steps:
+  - name: use-private-image
+    executor:
+      type: docker
+      config:
+        image: ghcr.io/myorg/private-app:latest
+        autoRemove: true
+    command: ./run.sh
+```
+
+Authentication can also be configured via `DOCKER_AUTH_CONFIG` environment variable.
+
 ### Volume Mounts
 
 ```yaml
