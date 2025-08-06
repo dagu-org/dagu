@@ -3,6 +3,7 @@ package digraph
 import (
 	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -71,6 +72,7 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "name", fn: buildName},
 	{metadata: true, name: "type", fn: buildType},
 	{name: "container", fn: buildContainer},
+	{name: "registryAuths", fn: buildRegistryAuths},
 	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
 	{name: "logDir", fn: buildLogDir},
@@ -302,7 +304,142 @@ func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
 	dag.Container = &container
 
 	return nil
+}
 
+func buildRegistryAuths(ctx BuildContext, spec *definition, dag *DAG) error {
+	if spec.RegistryAuths == nil {
+		return nil
+	}
+
+	dag.RegistryAuths = make(map[string]*AuthConfig)
+
+	switch v := spec.RegistryAuths.(type) {
+	case string:
+		// Handle as a JSON string (e.g., from environment variable)
+		expandedJSON := v
+		if !ctx.opts.NoEval {
+			expandedJSON = os.ExpandEnv(v)
+		}
+		
+		// For now, store the entire JSON string as a single entry
+		// The actual parsing will be done by the registry manager
+		dag.RegistryAuths["_json"] = &AuthConfig{
+			Auth: expandedJSON,
+		}
+		
+	case map[string]any:
+		// Handle as a map of registry to auth config
+		for registry, authData := range v {
+			authConfig := &AuthConfig{}
+			
+			switch auth := authData.(type) {
+			case string:
+				// Simple string value - treat as JSON auth config
+				if !ctx.opts.NoEval {
+					auth = os.ExpandEnv(auth)
+				}
+				authConfig.Auth = auth
+				
+			case map[string]any:
+				// Auth config object with username/password fields
+				if username, ok := auth["username"].(string); ok {
+					authConfig.Username = username
+					if !ctx.opts.NoEval {
+						authConfig.Username = os.ExpandEnv(authConfig.Username)
+					}
+				}
+				
+				if password, ok := auth["password"].(string); ok {
+					authConfig.Password = password
+					if !ctx.opts.NoEval {
+						authConfig.Password = os.ExpandEnv(authConfig.Password)
+					}
+				}
+				
+				if authStr, ok := auth["auth"].(string); ok {
+					authConfig.Auth = authStr
+					if !ctx.opts.NoEval {
+						authConfig.Auth = os.ExpandEnv(authConfig.Auth)
+					}
+				}
+			}
+			
+			dag.RegistryAuths[registry] = authConfig
+		}
+		
+	case map[any]any:
+		// Handle YAML's default map type
+		for registryKey, authData := range v {
+			registry, ok := registryKey.(string)
+			if !ok {
+				continue
+			}
+			
+			authConfig := &AuthConfig{}
+			
+			switch auth := authData.(type) {
+			case string:
+				// Simple string value - treat as JSON auth config
+				if !ctx.opts.NoEval {
+					auth = os.ExpandEnv(auth)
+				}
+				authConfig.Auth = auth
+				
+			case map[string]any:
+				// Auth config object with username/password fields
+				if username, ok := auth["username"].(string); ok {
+					authConfig.Username = username
+					if !ctx.opts.NoEval {
+						authConfig.Username = os.ExpandEnv(authConfig.Username)
+					}
+				}
+				
+				if password, ok := auth["password"].(string); ok {
+					authConfig.Password = password
+					if !ctx.opts.NoEval {
+						authConfig.Password = os.ExpandEnv(authConfig.Password)
+					}
+				}
+				
+				if authStr, ok := auth["auth"].(string); ok {
+					authConfig.Auth = authStr
+					if !ctx.opts.NoEval {
+						authConfig.Auth = os.ExpandEnv(authConfig.Auth)
+					}
+				}
+				
+			case map[any]any:
+				// Handle nested YAML map type
+				if username, ok := auth["username"].(string); ok {
+					authConfig.Username = username
+					if !ctx.opts.NoEval {
+						authConfig.Username = os.ExpandEnv(authConfig.Username)
+					}
+				}
+				
+				if password, ok := auth["password"].(string); ok {
+					authConfig.Password = password
+					if !ctx.opts.NoEval {
+						authConfig.Password = os.ExpandEnv(authConfig.Password)
+					}
+				}
+				
+				if authStr, ok := auth["auth"].(string); ok {
+					authConfig.Auth = authStr
+					if !ctx.opts.NoEval {
+						authConfig.Auth = os.ExpandEnv(authConfig.Auth)
+					}
+				}
+			}
+			
+			dag.RegistryAuths[registry] = authConfig
+		}
+		
+	default:
+		return wrapError("registryAuths", spec.RegistryAuths, fmt.Errorf("invalid type: %T", spec.RegistryAuths))
+	}
+
+	return nil
 }
 
 func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {

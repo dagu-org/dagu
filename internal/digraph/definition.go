@@ -72,6 +72,9 @@ type definition struct {
 	WorkerSelector map[string]string
 	// Container is the container definition for the DAG.
 	Container *containerDef
+	// RegistryAuths maps registry hostnames to authentication configs.
+	// Can be either a JSON string or a map of registry to auth config.
+	RegistryAuths any
 }
 
 // handlerOnDef defines the steps to be executed on different events.

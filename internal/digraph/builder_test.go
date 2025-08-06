@@ -2354,3 +2354,147 @@ steps:
 		assert.Contains(t, dag.Steps[0].Env, "MULTI_LINE=line1\nline2\n")
 	})
 }
+
+func TestBuildRegistryAuths(t *testing.T) {
+	t.Run("Parse registryAuths from YAML", func(t *testing.T) {
+		yaml := `
+name: test-dag
+registryAuths:
+  docker.io:
+    username: docker-user
+    password: docker-pass
+  ghcr.io:
+    username: github-user
+    password: github-token
+  gcr.io:
+    auth: Z2NyLXVzZXI6Z2NyLXBhc3M= # base64("gcr-user:gcr-pass")
+
+container:
+  image: docker.io/myapp:latest
+
+steps:
+  - name: test
+    command: echo hello
+`
+		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// Check that registryAuths were parsed correctly
+		assert.NotNil(t, dag.RegistryAuths)
+		assert.Len(t, dag.RegistryAuths, 3)
+
+		// Check docker.io auth
+		dockerAuth, exists := dag.RegistryAuths["docker.io"]
+		assert.True(t, exists)
+		assert.Equal(t, "docker-user", dockerAuth.Username)
+		assert.Equal(t, "docker-pass", dockerAuth.Password)
+
+		// Check ghcr.io auth
+		ghcrAuth, exists := dag.RegistryAuths["ghcr.io"]
+		assert.True(t, exists)
+		assert.Equal(t, "github-user", ghcrAuth.Username)
+		assert.Equal(t, "github-token", ghcrAuth.Password)
+
+		// Check gcr.io auth (with pre-encoded auth field)
+		gcrAuth, exists := dag.RegistryAuths["gcr.io"]
+		assert.True(t, exists)
+		assert.Equal(t, "Z2NyLXVzZXI6Z2NyLXBhc3M=", gcrAuth.Auth)
+		assert.Empty(t, gcrAuth.Username) // Should be empty when auth is provided
+		assert.Empty(t, gcrAuth.Password) // Should be empty when auth is provided
+	})
+
+	t.Run("Empty registryAuths", func(t *testing.T) {
+		yaml := `
+name: test-dag
+steps:
+  - name: test
+    command: echo hello
+`
+		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// Should be nil when not specified
+		assert.Nil(t, dag.RegistryAuths)
+	})
+
+	t.Run("registryAuths with environment variables", func(t *testing.T) {
+		// Set environment variables for testing
+		t.Setenv("DOCKER_USER", "env-docker-user")
+		t.Setenv("DOCKER_PASS", "env-docker-pass")
+
+		yaml := `
+name: test-dag
+registryAuths:
+  docker.io:
+    username: ${DOCKER_USER}
+    password: ${DOCKER_PASS}
+
+steps:
+  - name: test
+    command: echo hello
+`
+		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// Check that environment variables were expanded
+		dockerAuth, exists := dag.RegistryAuths["docker.io"]
+		assert.True(t, exists)
+		assert.Equal(t, "env-docker-user", dockerAuth.Username)
+		assert.Equal(t, "env-docker-pass", dockerAuth.Password)
+	})
+
+	t.Run("registryAuths as JSON string", func(t *testing.T) {
+		// Simulate DOCKER_AUTH_CONFIG style JSON string
+		jsonAuth := `{"docker.io": {"username": "json-user", "password": "json-pass"}}`
+		t.Setenv("DOCKER_AUTH_JSON", jsonAuth)
+
+		yaml := `
+name: test-dag
+registryAuths: ${DOCKER_AUTH_JSON}
+
+steps:
+  - name: test
+    command: echo hello
+`
+		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// Should have stored the JSON string as _json entry
+		assert.NotNil(t, dag.RegistryAuths)
+		jsonEntry, exists := dag.RegistryAuths["_json"]
+		assert.True(t, exists)
+		assert.Equal(t, jsonAuth, jsonEntry.Auth)
+	})
+
+	t.Run("registryAuths with string values per registry", func(t *testing.T) {
+		yaml := `
+name: test-dag
+registryAuths:
+  docker.io: '{"username": "user1", "password": "pass1"}'
+  ghcr.io: '{"username": "user2", "password": "pass2"}'
+
+steps:
+  - name: test
+    command: echo hello
+`
+		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// Check docker.io - should have the JSON string in Auth field
+		dockerAuth, exists := dag.RegistryAuths["docker.io"]
+		assert.True(t, exists)
+		assert.Equal(t, `{"username": "user1", "password": "pass1"}`, dockerAuth.Auth)
+		assert.Empty(t, dockerAuth.Username)
+		assert.Empty(t, dockerAuth.Password)
+
+		// Check ghcr.io
+		ghcrAuth, exists := dag.RegistryAuths["ghcr.io"]
+		assert.True(t, exists)
+		assert.Equal(t, `{"username": "user2", "password": "pass2"}`, ghcrAuth.Auth)
+	})
+}
