@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.19.0 (2025-08-06)
+
+### New Features
+- **DAG-level Container Field**: Added support for running all steps in a single container with DAG-level container configuration (#1154)
+- **Zombie DAG Detection**: Added automatic detection and cleanup of zombie DAG runs with configurable detection interval (#1163) - Thanks to [@jonasban](https://github.com/jonasban) for feedback
+- **Container Registry Authentication**: Added support for pulling images from private registries with username/password and token-based authentication (#1165) - Thanks to [@vnghia](https://github.com/vnghia) for the feature request
+
+### Improvements
+- **Scheduler Health Check**: Fixed health check server startup to work correctly with multiple scheduler instances (#1157) - Thanks to [@jonasban](https://github.com/jonasban) for reporting
+- **Stop Operation**: Fixed stop operation to properly handle multiple running instances of the same DAG (#1167) - Thanks to [@jeremydelattre59](https://github.com/jeremydelattre59) for reporting
+- **Scheduler Queue Processing**: Fixed scheduler to use heartbeat monitoring instead of status files for more reliable process detection (#1166) - Thanks to [@jrisch](https://github.com/jrisch) for feedback
+- **Environment Variables**: Corrected environment variable mapping for coordinator host and port configuration (#1162)
+- **Docker Permissions**: Ensured DAGU_HOME directory has proper permissions in Docker containers (#1161)
+
+### Bug Fixes
+- **Continue On Skipped**: Fixed exit code 0 incorrectly triggering continuation for skipped steps with repeat policies (#1158) - Thanks to [@jeremydelattre59](https://github.com/jeremydelattre59) for reporting and [@thefishhat](https://github.com/thefishhat) for the fix
+- **Queue Processing**: Fixed process store to correctly use queue name when specified (#1155) - Thanks to [@jonasban](https://github.com/jonasban) and [@ghansham](https://github.com/ghansham) for reporting
+
+### Documentation
+- **Docker Compose Example**: Added example configuration for Docker Compose setup
+- **Roadmap**: Updated project roadmap based on general features
+
+### Contributors
+
+Thanks to our contributors for this release:
+
+| Contribution                           | Author                                   |
+| -------------------------------------- | ---------------------------------------- |
+| Zombie DAG detection feedback, health check and queue processing bug reports | [@jonasban](https://github.com/jonasban) |
+| Continue on skipped bug report, stop operation issue report | [@jeremydelattre59](https://github.com/jeremydelattre59) |
+| Exit code continuation fix | [@thefishhat](https://github.com/thefishhat) |
+| Queue processing bug report | [@ghansham](https://github.com/ghansham) |
+| Container registry authentication feature request | [@vnghia](https://github.com/vnghia) |
+| Scheduler heartbeat monitoring feedback | [@jrisch](https://github.com/jrisch) |
+
+**Full Changelog**: [v1.18.6...v1.19.0](https://github.com/dagu-org/dagu/compare/v1.18.6...v1.19.0)
+
 ## v1.18.6 (2025-08-03)
 
 ### Bug Fixes
