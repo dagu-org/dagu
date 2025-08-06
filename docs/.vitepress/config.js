@@ -27,6 +27,7 @@ const fullSidebar = [
     items: [
       { text: "Introduction", link: "/writing-workflows/" },
       { text: "Basics", link: "/writing-workflows/basics" },
+      { text: "Container", link: "/writing-workflows/container" },
       { text: "Examples", link: "/writing-workflows/examples/" },
       { text: "Parameters", link: "/writing-workflows/parameters" },
       { text: "Control Flow", link: "/writing-workflows/control-flow" },
