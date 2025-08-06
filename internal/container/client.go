@@ -54,6 +54,8 @@ type Client struct {
 	mu           sync.Mutex
 	cli          *client.Client
 	keepAliveTmp string
+	// authManager handles registry authentication
+	authManager *RegistryAuthManager
 
 	cancelMu sync.Mutex
 	cancel   func()
@@ -225,7 +227,20 @@ func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd 
 
 	if pull {
 		logger.Infof(ctx, "Pulling the image %q", c.image)
-		reader, err := cli.ImagePull(ctx, c.image, image.PullOptions{Platform: platforms.Format(c.platformO)})
+
+		// Get pull options with authentication if configured
+		var pullOpts image.PullOptions
+		if c.authManager != nil {
+			var err error
+			pullOpts, err = c.authManager.GetPullOptions(c.image, platforms.Format(c.platformO))
+			if err != nil {
+				return "", fmt.Errorf("failed to get pull options: %w", err)
+			}
+		} else {
+			pullOpts = image.PullOptions{Platform: platforms.Format(c.platformO)}
+		}
+
+		reader, err := cli.ImagePull(ctx, c.image, pullOpts)
 		if err != nil {
 			return "", err
 		}
@@ -441,6 +456,11 @@ func (c *Client) shouldPullImage(ctx context.Context, cli *client.Client, platfo
 
 // NewFromContainerConfig parses digraph.Container into Container struct
 func NewFromContainerConfig(ct digraph.Container) (*Client, error) {
+	return NewFromContainerConfigWithAuth(ct, nil)
+}
+
+// NewFromContainerConfigWithAuth parses digraph.Container into Container struct with registry auth
+func NewFromContainerConfigWithAuth(ct digraph.Container, registryAuths map[string]*digraph.AuthConfig) (*Client, error) {
 	// Validate required fields
 	if ct.Image == "" {
 		return nil, ErrImageRequired
@@ -498,7 +518,7 @@ func NewFromContainerConfig(ct digraph.Container) (*Client, error) {
 	// autoRemove is the inverse of KeepContainer
 	autoRemove := !ct.KeepContainer
 
-	return &Client{
+	client := &Client{
 		image:           ct.Image,
 		platform:        ct.Platform,
 		pull:            ct.PullPolicy,
@@ -507,11 +527,23 @@ func NewFromContainerConfig(ct digraph.Container) (*Client, error) {
 		hostConfig:      hostConfig,
 		networkConfig:   networkConfig,
 		execOptions:     execOptions,
-	}, nil
+	}
+
+	// Set up registry authentication if provided
+	if len(registryAuths) > 0 {
+		client.authManager = NewRegistryAuthManager(registryAuths)
+	}
+
+	return client, nil
 }
 
 // NewFromMapConfig parses executorConfig into Container struct
 func NewFromMapConfig(data map[string]any) (*Client, error) {
+	return NewFromMapConfigWithAuth(data, nil)
+}
+
+// NewFromMapConfigWithAuth parses executorConfig into Container struct with registry auth
+func NewFromMapConfigWithAuth(data map[string]any, registryAuths map[string]*digraph.AuthConfig) (*Client, error) {
 	ret := struct {
 		Container     container.Config         `mapstructure:"container"`
 		Host          container.HostConfig     `mapstructure:"host"`
@@ -562,7 +594,7 @@ func NewFromMapConfig(data map[string]any) (*Client, error) {
 		autoRemove = v
 	}
 
-	return &Client{
+	client := &Client{
 		image:           ret.Image,
 		platform:        ret.Platform,
 		id:              ret.ContainerName,
@@ -572,5 +604,12 @@ func NewFromMapConfig(data map[string]any) (*Client, error) {
 		networkConfig:   &ret.Network,
 		execOptions:     &ret.Exec,
 		autoRemove:      autoRemove,
-	}, nil
+	}
+
+	// Set up registry authentication if provided
+	if len(registryAuths) > 0 {
+		client.authManager = NewRegistryAuthManager(registryAuths)
+	}
+
+	return client, nil
 }

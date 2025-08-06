@@ -43,6 +43,7 @@ var _ Executor = (*docker)(nil)
 var _ ExitCoder = (*docker)(nil)
 
 type containerClientCtxKey = struct{}
+type registryAuthCtxKey = struct{}
 
 // WithContainerClient creates a new context with a client for container
 func WithContainerClient(ctx context.Context, cli *container.Client) context.Context {
@@ -53,6 +54,19 @@ func WithContainerClient(ctx context.Context, cli *container.Client) context.Con
 func getContainerClient(ctx context.Context) *container.Client {
 	if cli, ok := ctx.Value(containerClientCtxKey{}).(*container.Client); ok {
 		return cli
+	}
+	return nil
+}
+
+// WithRegistryAuth creates a new context with registry authentication.
+func WithRegistryAuth(ctx context.Context, auths map[string]*digraph.AuthConfig) context.Context {
+	return context.WithValue(ctx, registryAuthCtxKey{}, auths)
+}
+
+// getRegistryAuth retrieves the registry authentication from the context.
+func getRegistryAuth(ctx context.Context) map[string]*digraph.AuthConfig {
+	if auths, ok := ctx.Value(registryAuthCtxKey{}).(map[string]*digraph.AuthConfig); ok {
+		return auths
 	}
 	return nil
 }
@@ -134,7 +148,7 @@ func (e *docker) ExitCode() int {
 }
 
 func newDocker(
-	_ context.Context, step digraph.Step,
+	ctx context.Context, step digraph.Step,
 ) (Executor, error) {
 	execCfg := step.ExecutorConfig
 
@@ -142,7 +156,9 @@ func newDocker(
 
 	if len(execCfg.Config) > 0 {
 		var err error
-		ct, err = container.NewFromMapConfig(execCfg.Config)
+		// Get registry auth from context if available
+		registryAuths := getRegistryAuth(ctx)
+		ct, err = container.NewFromMapConfigWithAuth(execCfg.Config, registryAuths)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse executor config: %w", err)
 		}

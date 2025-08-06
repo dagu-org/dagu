@@ -110,6 +110,9 @@ type DAG struct {
 	YamlData []byte `json:"yamlData,omitempty"`
 	// Container contains the container definition for the DAG.
 	Container *Container `json:"container,omitempty"`
+	// RegistryAuths maps registry hostnames to authentication configs.
+	// Optional: If not specified, falls back to DOCKER_AUTH_CONFIG or docker config.
+	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
 }
 
 // CreateTask creates a coordinator task from this DAG for distributed execution.

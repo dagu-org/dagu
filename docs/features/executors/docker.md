@@ -74,6 +74,133 @@ container:
   keepContainer: true              # Keep container running
 ```
 
+## Registry Authentication
+
+Access private container registries with authentication configured at the DAG level:
+
+```yaml
+# Option 1: Structured format with username/password
+registryAuths:
+  docker.io:
+    username: ${DOCKER_USERNAME}
+    password: ${DOCKER_PASSWORD}
+  ghcr.io:
+    username: ${GITHUB_USER}
+    password: ${GITHUB_TOKEN}
+
+# Use private images in your workflow
+container:
+  image: ghcr.io/myorg/private-app:latest
+
+steps:
+  - name: process
+    command: python process.py
+```
+
+### Authentication Methods
+
+**Using Environment Variables:**
+
+```yaml
+# Set DOCKER_AUTH_CONFIG with standard Docker format
+registryAuths: ${DOCKER_AUTH_CONFIG}
+
+# DOCKER_AUTH_CONFIG uses the same format as ~/.docker/config.json:
+# {
+#   "auths": {
+#     "docker.io": {
+#       "auth": "base64(username:password)"
+#     }
+#   }
+# }
+```
+
+**Pre-encoded Authentication:**
+
+```yaml
+registryAuths:
+  gcr.io:
+    auth: ${GCR_AUTH_BASE64}  # base64(username:password)
+```
+
+**Per-Registry JSON Configuration:**
+
+```yaml
+registryAuths:
+  # JSON string for specific registry
+  "123456789012.dkr.ecr.us-east-1.amazonaws.com": |
+    {
+      "username": "AWS",
+      "password": "${ECR_AUTH_TOKEN}"
+    }
+```
+
+### Authentication Priority
+
+Dagu checks for registry credentials in this order:
+
+1. **DAG-level `registryAuths`** - Configured in your DAG file
+2. **`DOCKER_AUTH_CONFIG` environment variable** - Standard Docker authentication (same format as `~/.docker/config.json`)
+3. **No authentication** - For public registries
+
+> **Note:** The `DOCKER_AUTH_CONFIG` format is fully compatible with Docker's standard `~/.docker/config.json` file. You can copy the contents of your Docker config file directly into the environment variable.
+
+### Using Docker Config File
+
+You can export your existing Docker configuration as an environment variable:
+
+```bash
+# Export your Docker config as an environment variable
+export DOCKER_AUTH_CONFIG=$(cat ~/.docker/config.json)
+
+# Then run your DAG - it will use the Docker credentials automatically
+dagu run my-workflow.yaml
+```
+
+### Security Best Practices
+
+- Use environment variables for sensitive credentials
+- Never commit credentials directly in DAG files
+- Consider using secret management systems
+- Rotate credentials regularly
+- Use read-only credentials when possible
+
+### Example: Multi-Registry Workflow
+
+```yaml
+registryAuths:
+  docker.io:
+    username: ${DOCKERHUB_USER}
+    password: ${DOCKERHUB_TOKEN}
+  ghcr.io:
+    username: ${GITHUB_USER}
+    password: ${GITHUB_TOKEN}
+  gcr.io:
+    auth: ${GCR_AUTH}
+
+steps:
+  - name: fetch-from-dockerhub
+    executor:
+      type: docker
+      config:
+        image: myorg/processor:latest  # from Docker Hub
+    command: process-data
+    
+  - name: fetch-from-github
+    executor:
+      type: docker
+      config:
+        image: ghcr.io/myorg/analyzer:v2  # from GitHub
+    command: analyze-results
+    
+  - name: fetch-from-gcr
+    executor:
+      type: docker
+      config:
+        image: gcr.io/myproject/reporter:stable  # from GCR
+    command: generate-report
+```
+
 ## Configuration Options for Docker Executor
 
 ### Image Management
