@@ -17,7 +17,6 @@ import (
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/status"
-	dagstatus "github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/dirlock"
@@ -286,7 +285,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			var (
 				dag       *digraph.DAG
 				attempt   models.DAGRunAttempt
-				status    *models.DAGRunStatus
+				st        *models.DAGRunStatus
 				err       error
 				result    = models.QueuedItemProcessingResultRetry
 				startedAt time.Time
@@ -325,7 +324,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			status, err = attempt.ReadStatus(ctx)
+			st, err = attempt.ReadStatus(ctx)
 			if err != nil {
 				if errors.Is(err, models.ErrCorruptedStatusFile) {
 					logger.Error(ctx, "Status file is corrupted, marking as invalid", "err", err, "data", data)
@@ -336,8 +335,8 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			if status.Status != dagstatus.Queued {
-				logger.Info(ctx, "Skipping item from queue", "data", data, "status", status.Status)
+			if st.Status != status.Queued {
+				logger.Info(ctx, "Skipping item from queue", "data", data, "status", st.Status)
 				result = models.QueuedItemProcessingResultDiscard
 				goto SEND_RESULT
 			}
