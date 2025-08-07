@@ -1449,7 +1449,7 @@ func TestStatus_String(t *testing.T) {
 		{status.None, "not started"},
 		{status.Running, "running"},
 		{status.Error, "failed"},
-		{status.Cancel, "canceled"},
+		{status.Cancel, "cancelled"},
 		{status.Success, "finished"},
 		{status.Queued, "queued"},
 		{status.Status(999), "not started"}, // Invalid status defaults to "not started"
