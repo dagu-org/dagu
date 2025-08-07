@@ -2450,7 +2450,7 @@ export enum NodeStatusLabel {
     not_started = "not started",
     running = "running",
     failed = "failed",
-    canceled = "canceled",
+    canceled = "cancelled",
     finished = "finished",
     skipped = "skipped",
     partial_success = "partial success"

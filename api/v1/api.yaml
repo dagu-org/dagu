@@ -650,7 +650,7 @@ components:
         - "not started"
         - "running"
         - "failed"
-        - "canceled"
+        - "cancelled"
         - "finished"
         - "skipped"
         - "partial success"

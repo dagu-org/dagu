@@ -111,7 +111,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
         dagRunToDisplay.status !== null && (
           <div className="flex flex-wrap items-center gap-4 text-sm">
             {/* Status */}
-            {dagRunToDisplay.status && (
+            {dagRunToDisplay.status !== undefined && (
               <div className="flex items-center gap-2">
                 <StatusChip status={dagRunToDisplay.status} size="md">
                   {dagRunToDisplay.statusLabel || ''}
