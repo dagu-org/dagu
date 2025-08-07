@@ -11,44 +11,6 @@ import (
 func TestScheduler_QueueMethods(t *testing.T) {
 	t.Parallel()
 
-	t.Run("getQueueNameForDAG_WithExplicitQueue", func(t *testing.T) {
-		cfg := &config.Config{
-			Queues: config.Queues{
-				Enabled: true,
-				Config:  []config.QueueConfig{},
-			},
-		}
-
-		s := &Scheduler{config: cfg}
-
-		dag := &digraph.DAG{
-			Name:  "test-dag",
-			Queue: "customQueue",
-		}
-
-		queueName := s.getQueueNameForDAG(dag)
-		assert.Equal(t, "customQueue", queueName)
-	})
-
-	t.Run("getQueueNameForDAG_DefaultsToDAGName", func(t *testing.T) {
-		cfg := &config.Config{
-			Queues: config.Queues{
-				Enabled: true,
-				Config:  []config.QueueConfig{},
-			},
-		}
-
-		s := &Scheduler{config: cfg}
-
-		dag := &digraph.DAG{
-			Name:  "my-pipeline",
-			Queue: "", // Empty queue should default to DAG name
-		}
-
-		queueName := s.getQueueNameForDAG(dag)
-		assert.Equal(t, "my-pipeline", queueName)
-	})
-
 	t.Run("getQueueConfigByName_GlobalConfigExists", func(t *testing.T) {
 		cfg := &config.Config{
 			Queues: config.Queues{

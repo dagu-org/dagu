@@ -341,11 +341,8 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			// Determine the queue name for this DAG
-			queueName = s.getQueueNameForDAG(dag)
-
 			// Check concurrency limits based on queue configuration
-			queueCfg = s.getQueueConfigByName(queueName, dag)
+			queueCfg = s.getQueueConfigByName(dag.QueueProcName(), dag)
 			if alive >= queueCfg.MaxConcurrency {
 				logger.Info(ctx, "Queue concurrency limit reached", "queue", queueName, "limit", queueCfg.MaxConcurrency, "alive", alive)
 				goto SEND_RESULT
@@ -392,7 +389,8 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 
 				// Check timeout
 				if time.Since(startedAt) > 10*time.Second {
-					logger.Error(ctx, "Timeout waiting for run to start", "data", data)
+					logger.Error(ctx, "Discarding due to timeout waiting for the run to be alive (10sec)", "data", data)
+					result = models.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN
 				}
 
@@ -412,15 +410,6 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			item.Result <- result
 		}
 	}
-}
-
-// getQueueNameForDAG determines the queue name for a given DAG.
-// It returns the DAG's explicitly assigned queue name, or the DAG name if none is specified.
-func (s *Scheduler) getQueueNameForDAG(dag *digraph.DAG) string {
-	if dag.Queue != "" {
-		return dag.Queue
-	}
-	return dag.Name
 }
 
 // getQueueConfigByName gets the queue configuration by queue name.
