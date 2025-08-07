@@ -295,7 +295,7 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 				item.status = statusNone
 				retryAfter := time.Now().Add(queueRetryDelay)
 				q.queueRetryTime.Store(data.Name, retryAfter)
-				logger.Info(ctx, "Queue full, delaying retry", "name", data.Name, "retryAfter", retryAfter.Format(time.RFC3339))
+				logger.Info(ctx, "Max active runs is reached, delaying retry", "name", data.Name, "retryAfter", retryAfter.Format(time.RFC3339))
 			case models.QueuedItemProcessingResultSuccess:
 				logger.Info(ctx, "Item processed successfully", "name", data.Name, "dagRunId", data.ID)
 				item.status = statusDone

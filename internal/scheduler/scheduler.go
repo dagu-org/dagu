@@ -16,7 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
-	dagstatus "github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/dirlock"
@@ -285,7 +285,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			var (
 				dag       *digraph.DAG
 				attempt   models.DAGRunAttempt
-				status    *models.DAGRunStatus
+				st        *models.DAGRunStatus
 				err       error
 				result    = models.QueuedItemProcessingResultRetry
 				startedAt time.Time
@@ -324,7 +324,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			status, err = attempt.ReadStatus(ctx)
+			st, err = attempt.ReadStatus(ctx)
 			if err != nil {
 				if errors.Is(err, models.ErrCorruptedStatusFile) {
 					logger.Error(ctx, "Status file is corrupted, marking as invalid", "err", err, "data", data)
@@ -335,17 +335,14 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			if status.Status != dagstatus.Queued {
-				logger.Info(ctx, "Skipping item from queue", "data", data, "status", status.Status)
+			if st.Status != status.Queued {
+				logger.Info(ctx, "Skipping item from queue", "data", data, "status", st.Status)
 				result = models.QueuedItemProcessingResultDiscard
 				goto SEND_RESULT
 			}
 
-			// Determine the queue name for this DAG
-			queueName = s.getQueueNameForDAG(dag)
-
 			// Check concurrency limits based on queue configuration
-			queueCfg = s.getQueueConfigByName(queueName, dag)
+			queueCfg = s.getQueueConfigByName(dag.QueueProcName(), dag)
 			if alive >= queueCfg.MaxConcurrency {
 				logger.Info(ctx, "Queue concurrency limit reached", "queue", queueName, "limit", queueCfg.MaxConcurrency, "alive", alive)
 				goto SEND_RESULT
@@ -392,7 +389,11 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 
 				// Check timeout
 				if time.Since(startedAt) > 10*time.Second {
-					logger.Error(ctx, "Timeout waiting for run to start", "data", data)
+					logger.Error(ctx, "Cancelling due to timeout waiting for the run to be alive (10sec)", "data", data)
+					if err := s.markStatusFailed(ctx, attempt); err != nil {
+						logger.Error(ctx, "Failed to mark the status cancelled")
+					}
+					result = models.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN
 				}
 
@@ -414,13 +415,27 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 	}
 }
 
-// getQueueNameForDAG determines the queue name for a given DAG.
-// It returns the DAG's explicitly assigned queue name, or the DAG name if none is specified.
-func (s *Scheduler) getQueueNameForDAG(dag *digraph.DAG) string {
-	if dag.Queue != "" {
-		return dag.Queue
+func (s *Scheduler) markStatusFailed(ctx context.Context, attempt models.DAGRunAttempt) error {
+	st, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to read status to update status: %w", err)
 	}
-	return dag.Name
+	if err := attempt.Open(ctx); err != nil {
+		return fmt.Errorf("failed to open attempt: %w", err)
+	}
+	defer func() {
+		if err := attempt.Close(ctx); err != nil {
+			logger.Error(ctx, "Failed to close attempt", "err", err)
+		}
+	}()
+	if st.Status != status.Queued {
+		logger.Info(ctx, "Tried to mark a queued item 'cancelled' but it's different status now", "status", st.Status.String())
+	}
+	st.Status = status.Cancel // Mark it cancel
+	if err := attempt.Write(ctx, *st); err != nil {
+		return fmt.Errorf("failed to open attempt: %w", err)
+	}
+	return nil
 }
 
 // getQueueConfigByName gets the queue configuration by queue name.
