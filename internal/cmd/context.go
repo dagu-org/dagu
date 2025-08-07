@@ -309,7 +309,7 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 			os.Exit(1)
 		}
 		if err := runFunc(ctx, args); err != nil {
-			logger.Error(ctx.Context, "Command failed", "err", err)
+			fmt.Printf("Command failed with following error: \n%v\n", err)
 			os.Exit(1)
 		}
 		return nil
