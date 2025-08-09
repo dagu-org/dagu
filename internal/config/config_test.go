@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/test"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -148,7 +149,7 @@ scheduler:
 func TestLoadConfig_Defaults(t *testing.T) {
 	viper.Reset()
 	// When no config file is provided, the defaults should be applied.
-	cfg, err := config.Load()
+	cfg, err := config.Load(config.WithConfigFile(test.TestdataPath(t, "config/empty.yaml")))
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 
