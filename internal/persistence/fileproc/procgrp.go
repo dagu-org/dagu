@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,7 +17,7 @@ import (
 
 // ProcGroup is a struct that manages process files for a given DAG name.
 type ProcGroup struct {
-	name      string
+	groupName string
 	baseDir   string
 	staleTime time.Duration
 	mu        sync.Mutex
@@ -31,10 +30,10 @@ const procFilePrefix = "proc_"
 var procFileRegex = regexp.MustCompile(`^proc_\d{8}_\d{6}Z_.*\.proc$`)
 
 // NewProcGroup creates a new instance of a ProcGroup with the specified base directory and DAG name.
-func NewProcGroup(baseDir, name string, staleTime time.Duration) *ProcGroup {
+func NewProcGroup(baseDir, groupName string, staleTime time.Duration) *ProcGroup {
 	return &ProcGroup{
 		baseDir:   baseDir,
-		name:      name,
+		groupName: groupName,
 		staleTime: staleTime,
 	}
 }
@@ -49,8 +48,8 @@ func (pg *ProcGroup) Count(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 
-	// Grep for all proc files in the directory
-	files, err := filepath.Glob(filepath.Join(pg.baseDir, procFilePrefix+"*.proc"))
+	// Grep for all proc files in subdirectories
+	files, err := filepath.Glob(filepath.Join(pg.baseDir, "*", procFilePrefix+"*.proc"))
 	if err != nil {
 		return 0, err
 	}
@@ -125,10 +124,6 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 // GetProc retrieves a proc file for the specified dag-run reference.
 // It returns a new Proc instance with the generated file name.
 func (pg *ProcGroup) Acquire(_ context.Context, dagRun digraph.DAGRunRef) (*ProcHandle, error) {
-	// Sanity check the dag-run reference
-	if pg.name != dagRun.Name {
-		return nil, fmt.Errorf("DAG name %s does not match proc file name %s", dagRun.Name, pg.name)
-	}
 	// Generate the proc file name
 	fileName := pg.getFileName(models.NewUTC(time.Now()), dagRun)
 	return NewProcHandler(fileName, models.ProcMeta{
@@ -140,7 +135,7 @@ func (pg *ProcGroup) Acquire(_ context.Context, dagRun digraph.DAGRunRef) (*Proc
 func (pg *ProcGroup) getFileName(t models.TimeInUTC, dagRun digraph.DAGRunRef) string {
 	timestamp := t.Format(dateTimeFormatUTC)
 	fileName := procFilePrefix + timestamp + "Z_" + dagRun.ID + ".proc"
-	return filepath.Join(pg.baseDir, fileName)
+	return filepath.Join(pg.baseDir, dagRun.Name, fileName)
 }
 
 // dateTimeFormat is the format used for the timestamp in the queue file name
@@ -157,7 +152,7 @@ func (pg *ProcGroup) IsRunAlive(ctx context.Context, dagRun digraph.DAGRunRef) (
 	}
 
 	// Look for proc files with the specific run ID
-	pattern := filepath.Join(pg.baseDir, procFilePrefix+"*_"+dagRun.ID+".proc")
+	pattern := filepath.Join(pg.baseDir, dagRun.Name, procFilePrefix+"*_"+dagRun.ID+".proc")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
 		return false, err
@@ -192,7 +187,7 @@ func (pg *ProcGroup) ListAlive(ctx context.Context) ([]digraph.DAGRunRef, error)
 	}
 
 	// Grep for all proc files in the directory
-	files, err := filepath.Glob(filepath.Join(pg.baseDir, procFilePrefix+"*.proc"))
+	files, err := filepath.Glob(filepath.Join(pg.baseDir, "*", procFilePrefix+"*.proc"))
 	if err != nil {
 		return nil, err
 	}
@@ -208,9 +203,10 @@ func (pg *ProcGroup) ListAlive(ctx context.Context) ([]digraph.DAGRunRef, error)
 			// Extract the run ID from the filename
 			// Format: proc_YYYYMMDD_HHMMSSZ_<runID>.proc
 			runID := extractRunIDFromFileName(basename)
+			dagName := filepath.Base(filepath.Dir(file))
 			if runID != "" {
 				aliveRuns = append(aliveRuns, digraph.DAGRunRef{
-					Name: pg.name,
+					Name: dagName,
 					ID:   runID,
 				})
 			}

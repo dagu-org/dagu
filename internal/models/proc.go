@@ -8,16 +8,15 @@ import (
 
 // ProcStore is an interface for managing process storage.
 type ProcStore interface {
-	// Acquire creates a new process for a given dag-run.
+	// Acquire creates a new process for a given group name and DAG-run reference.
 	// It automatically starts the heartbeat for the process.
-	Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (ProcHandle, error)
-	// CountAlive retrieves the number of processes associated with a given DAG name.
-	// It only counts the processes that are alive.
-	CountAlive(ctx context.Context, name string) (int, error)
+	Acquire(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (ProcHandle, error)
+	// CountAlive retrieves the number of processes associated with a group name.
+	CountAlive(ctx context.Context, groupName string) (int, error)
 	// IsRunAlive checks if a specific DAG run is currently alive.
-	IsRunAlive(ctx context.Context, dagRun digraph.DAGRunRef) (bool, error)
-	// ListAlive returns list of running DAG runs by the name.
-	ListAlive(ctx context.Context, name string) ([]digraph.DAGRunRef, error)
+	IsRunAlive(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (bool, error)
+	// ListAlive returns list of running DAG runs by the group name.
+	ListAlive(ctx context.Context, groupName string) ([]digraph.DAGRunRef, error)
 }
 
 // ProcHandle represents a process that is associated with a dag-run.
