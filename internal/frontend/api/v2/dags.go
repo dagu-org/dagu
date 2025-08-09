@@ -458,9 +458,10 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 
 func (a *API) startDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunID string) error {
 	if err := a.dagRunMgr.StartDAGRunAsync(ctx, dag, dagrun.StartOptions{
-		Params:   params,
-		DAGRunID: dagRunID,
-		Quiet:    true,
+		Params:    params,
+		DAGRunID:  dagRunID,
+		Quiet:     true,
+		Immediate: true,
 	}); err != nil {
 		return fmt.Errorf("error starting DAG: %w", err)
 	}

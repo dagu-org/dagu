@@ -6,6 +6,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -32,7 +33,7 @@ type Props = {
   /** Function to close the modal */
   dismissModal: () => void;
   /** Function called when the user submits the form */
-  onSubmit: (params: string, dagRunId?: string) => void;
+  onSubmit: (params: string, dagRunId?: string, immediate?: boolean) => void;
   /** Action type: 'start' or 'enqueue' */
   action?: 'start' | 'enqueue';
 };
@@ -59,6 +60,7 @@ function StartDAGModal({
 
   const [params, setParams] = React.useState<Parameter[]>([]);
   const [dagRunId, setDAGRunId] = React.useState<string>('');
+  const [immediate, setImmediate] = React.useState<boolean>(false);
 
   // Update params when default params change
   React.useEffect(() => {
@@ -100,7 +102,7 @@ function StartDAGModal({
 
         if (isInputFocused || !activeElement) {
           e.preventDefault();
-          onSubmit(stringifyParams(params), dagRunId || undefined);
+          onSubmit(stringifyParams(params), dagRunId || undefined, immediate);
         }
       }
     };
@@ -109,7 +111,7 @@ function StartDAGModal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [visible, params, dagRunId, onSubmit, dismissModal]);
+  }, [visible, params, dagRunId, immediate, onSubmit, dismissModal]);
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
@@ -121,6 +123,17 @@ function StartDAGModal({
         </DialogHeader>
 
         <div className="py-4 space-y-4">
+          {/* Immediate execution checkbox */}
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="immediate"
+              checked={immediate}
+              onCheckedChange={(checked) => setImmediate(checked as boolean)}
+            />
+            <Label htmlFor="immediate" className="cursor-pointer">
+              Start immediately (bypass queue)
+            </Label>
+          </div>
           {/* Optional DAGRun ID field */}
           <div className="space-y-2">
             <Label htmlFor="dagRun-id">DAG-Run ID (optional)</Label>
@@ -201,10 +214,10 @@ function StartDAGModal({
           <Button
             ref={submitButtonRef}
             onClick={() => {
-              onSubmit(stringifyParams(params), dagRunId || undefined);
+              onSubmit(stringifyParams(params), dagRunId || undefined, immediate);
             }}
           >
-            {action === 'enqueue' ? 'Enqueue' : 'Start'}
+            {immediate ? 'Start Immediately' : (action === 'enqueue' ? 'Enqueue' : 'Start')}
           </Button>
         </DialogFooter>
       </DialogContent>
