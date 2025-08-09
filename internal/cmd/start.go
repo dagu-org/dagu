@@ -325,7 +325,7 @@ func executeDAGRun(ctx *Context, d *digraph.DAG, parent digraph.DAGRunRef, dagRu
 		dr,
 		ctx.DAGRunStore,
 		ctx.ProcStore,
-		ctx.ServiceMonitor,
+		ctx.ServiceRegistry,
 		root,
 		agent.Options{
 			ParentDAGRun:    parent,

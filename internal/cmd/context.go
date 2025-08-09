@@ -41,11 +41,11 @@ type Context struct {
 	Config  *config.Config
 	Quiet   bool
 
-	DAGRunStore    models.DAGRunStore
-	DAGRunMgr      dagrun.Manager
-	ProcStore      models.ProcStore
-	QueueStore     models.QueueStore
-	ServiceMonitor models.ServiceMonitor
+	DAGRunStore     models.DAGRunStore
+	DAGRunMgr       dagrun.Manager
+	ProcStore       models.ProcStore
+	QueueStore      models.QueueStore
+	ServiceRegistry models.ServiceRegistry
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -129,16 +129,16 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	sm := filediscovery.New(cfg.Paths.DiscoveryDir)
 
 	return &Context{
-		Context:        ctx,
-		Command:        cmd,
-		Config:         cfg,
-		Quiet:          quiet,
-		DAGRunStore:    drs,
-		DAGRunMgr:      drm,
-		Flags:          flags,
-		ProcStore:      ps,
-		QueueStore:     qs,
-		ServiceMonitor: sm,
+		Context:         ctx,
+		Command:         cmd,
+		Config:          cfg,
+		Quiet:           quiet,
+		DAGRunStore:     drs,
+		DAGRunMgr:       drm,
+		Flags:           flags,
+		ProcStore:       ps,
+		QueueStore:      qs,
+		ServiceRegistry: sm,
 	}, nil
 }
 
@@ -182,7 +182,7 @@ func (c *Context) NewCoordinatorClient() coordinator.Client {
 		logger.Error(c.Context, "Invalid coordinator client configuration", "err", err)
 		return nil
 	}
-	return coordinator.New(c.ServiceMonitor, coordinatorCliCfg)
+	return coordinator.New(c.ServiceRegistry, coordinatorCliCfg)
 }
 
 // NewScheduler creates a new NewScheduler instance using the default client.
@@ -199,7 +199,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	coordinatorCli := c.NewCoordinatorClient()
 	de := scheduler.NewDAGExecutor(coordinatorCli, c.DAGRunMgr)
 	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable, c.Config.Global.WorkDir)
-	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceMonitor, coordinatorCli)
+	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli)
 }
 
 // StringParam retrieves a string parameter from the command line flags.

@@ -52,7 +52,7 @@ func SetupServer(t *testing.T, opts ...HelperOption) Server {
 func (srv *Server) runServer(t *testing.T) {
 	t.Helper()
 
-	coordinatorCli := coordinator.New(srv.ServiceMonitor, coordinator.DefaultConfig())
+	coordinatorCli := coordinator.New(srv.ServiceRegistry, coordinator.DefaultConfig())
 	server := frontend.NewServer(srv.Config, srv.DAGStore, srv.DAGRunStore, srv.DAGRunMgr, coordinatorCli)
 	err := server.Serve(srv.Context)
 	require.NoError(t, err, "failed to start server")

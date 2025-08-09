@@ -58,8 +58,8 @@ type Agent struct {
 	// procStore is the database to store the process information.
 	procStore models.ProcStore
 
-	// monitor is the discovery service monitor to find the coordinator service.
-	monitor models.ServiceMonitor
+	// registry is the discovery service registry to find the coordinator service.
+	registry models.ServiceRegistry
 
 	// dagRunMgr is the runstore dagRunMgr to communicate with the history.
 	dagRunMgr dagrun.Manager
@@ -149,7 +149,7 @@ func New(
 	ds models.DAGStore,
 	drs models.DAGRunStore,
 	ps models.ProcStore,
-	sm models.ServiceMonitor,
+	reg models.ServiceRegistry,
 	root digraph.DAGRunRef,
 	opts Options,
 ) *Agent {
@@ -166,7 +166,7 @@ func New(
 		dagStore:     ds,
 		dagRunStore:  drs,
 		procStore:    ps,
-		monitor:      sm,
+		registry:     reg,
 		stepRetry:    opts.StepRetry,
 	}
 
@@ -717,7 +717,7 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 
 // createCoordinatorClient creates a coordinator client factory for distributed execution
 func (a *Agent) createCoordinatorClient(ctx context.Context) digraph.Dispatcher {
-	if a.monitor == nil {
+	if a.registry == nil {
 		logger.Debug(ctx, "Service monitor is not configured, skipping coordinator client creation")
 		return nil
 	}
@@ -740,7 +740,7 @@ func (a *Agent) createCoordinatorClient(ctx context.Context) digraph.Dispatcher 
 	coordinatorCliCfg.SkipTLSVerify = cfg.Global.Peer.SkipTLSVerify
 	coordinatorCliCfg.Insecure = cfg.Global.Peer.Insecure
 
-	return coordinator.New(a.monitor, coordinatorCliCfg)
+	return coordinator.New(a.registry, coordinatorCliCfg)
 }
 
 // dryRun performs a dry-run of the DAG. It only simulates the execution of

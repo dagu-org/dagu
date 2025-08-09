@@ -56,8 +56,8 @@ var _ Client = (*clientImpl)(nil)
 
 // clientImpl is the concrete implementation
 type clientImpl struct {
-	config    *Config
-	discovery models.ServiceMonitor
+	config   *Config
+	registry models.ServiceRegistry
 
 	clientsMu sync.RWMutex
 	clients   map[string]*client // Cache of gRPC clients by coordinator ID
@@ -81,11 +81,11 @@ var (
 )
 
 // New creates a new coordinator client with the given configuration
-func New(monitor models.ServiceMonitor, config *Config) Client {
+func New(registry models.ServiceRegistry, config *Config) Client {
 	return &clientImpl{
-		config:    config,
-		discovery: monitor,
-		clients:   make(map[string]*client),
+		config:   config,
+		registry: registry,
+		clients:  make(map[string]*client),
 		state: &Metrics{
 			IsConnected: true, // Assume connected initially
 		},
@@ -95,7 +95,7 @@ func New(monitor models.ServiceMonitor, config *Config) Client {
 // Dispatch sends a task to the coordinator
 func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
 	// Get coordinator resolver from discovery
-	resolver := cli.discovery.Resolver(ctx, models.ServiceNameCoordinator)
+	resolver := cli.registry.Resolver(ctx, models.ServiceNameCoordinator)
 
 	// Set up retry policy
 	basePolicy := backoff.NewExponentialBackoffPolicy(cli.config.RetryInterval)
@@ -144,7 +144,7 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 // Poll implements Client.
 func (cli *clientImpl) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 	// Get coordinator resolver from discovery
-	resolver := cli.discovery.Resolver(ctx, models.ServiceNameCoordinator)
+	resolver := cli.registry.Resolver(ctx, models.ServiceNameCoordinator)
 
 	var task *coordinatorv1.Task
 	err := backoff.Retry(ctx, func(ctx context.Context) error {
@@ -374,7 +374,7 @@ func (cli *clientImpl) recordSuccess(ctx context.Context) {
 // GetWorkers retrieves the list of workers from all coordinators
 func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error) {
 	// Get coordinator resolver from discovery
-	resolver := cli.discovery.Resolver(ctx, models.ServiceNameCoordinator)
+	resolver := cli.registry.Resolver(ctx, models.ServiceNameCoordinator)
 
 	// Try to get members
 	members, err := resolver.Members(ctx)
@@ -436,7 +436,7 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 // Heartbeat sends a heartbeat to coordinators
 func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) error {
 	// Get coordinator resolver from discovery
-	resolver := cli.discovery.Resolver(ctx, models.ServiceNameCoordinator)
+	resolver := cli.registry.Resolver(ctx, models.ServiceNameCoordinator)
 
 	// Try to get members
 	members, err := resolver.Members(ctx)

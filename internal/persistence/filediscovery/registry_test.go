@@ -21,14 +21,14 @@ func TestMonitor_StartStop(t *testing.T) {
 		ID:       "test-instance",
 		HostPort: "localhost:8080",
 	}
-	err := monitor.Start(ctx, models.ServiceNameCoordinator, hostInfo)
+	err := monitor.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
 
 	// Check that discovery directory was created
 	assert.DirExists(t, tmpDir)
 
 	// Stop should not error
-	monitor.Stop(ctx)
+	monitor.Unregister(ctx)
 }
 
 func TestMonitor_Resolver(t *testing.T) {
@@ -57,9 +57,9 @@ func TestMonitor_RegisterInstance(t *testing.T) {
 		ID:       "test-coordinator",
 		HostPort: "localhost:8080",
 	}
-	err := monitor.Start(ctx, models.ServiceNameCoordinator, hostInfo)
+	err := monitor.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
-	defer monitor.Stop(ctx)
+	defer monitor.Unregister(ctx)
 
 	// Check that instance file was created
 	serviceDir := filepath.Join(tmpDir, string(models.ServiceNameCoordinator))
@@ -85,9 +85,9 @@ func TestMonitor_Heartbeat(t *testing.T) {
 		ID:       "test-heartbeat",
 		HostPort: "localhost:8080",
 	}
-	err := monitor.Start(ctx, models.ServiceNameCoordinator, hostInfo)
+	err := monitor.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
-	defer monitor.Stop(ctx)
+	defer monitor.Unregister(ctx)
 
 	// Get initial heartbeat time
 	resolver := monitor.Resolver(ctx, models.ServiceNameCoordinator)
@@ -116,7 +116,7 @@ func TestMonitor_StopRemovesInstance(t *testing.T) {
 		ID:       "test-stop",
 		HostPort: "localhost:8080",
 	}
-	err := monitor.Start(ctx, models.ServiceNameCoordinator, hostInfo)
+	err := monitor.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
 
 	// Verify it exists
@@ -126,7 +126,7 @@ func TestMonitor_StopRemovesInstance(t *testing.T) {
 	assert.Len(t, members, 1)
 
 	// Stop monitor
-	monitor.Stop(ctx)
+	monitor.Unregister(ctx)
 
 	// Verify instance file was removed
 	serviceDir := filepath.Join(tmpDir, string(models.ServiceNameCoordinator))
@@ -145,9 +145,9 @@ func TestMonitor_ConcurrentAccess(t *testing.T) {
 		ID:       "test-concurrent",
 		HostPort: "localhost:8080",
 	}
-	err := monitor.Start(ctx, models.ServiceNameCoordinator, hostInfo)
+	err := monitor.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
-	defer monitor.Stop(ctx)
+	defer monitor.Unregister(ctx)
 
 	// Concurrent resolver access
 	done := make(chan bool)
@@ -176,9 +176,9 @@ func TestMonitor_HeartbeatRecreatesFile(t *testing.T) {
 		ID:       "test-recreate",
 		HostPort: "localhost:8080",
 	}
-	err := monitor.Start(ctx, models.ServiceNameCoordinator, hostInfo)
+	err := monitor.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
-	defer monitor.Stop(ctx)
+	defer monitor.Unregister(ctx)
 
 	// Verify file exists
 	instanceFile := filepath.Join(tmpDir, string(models.ServiceNameCoordinator), "test-recreate.json")
@@ -238,10 +238,10 @@ func TestMonitor_MultipleInstances(t *testing.T) {
 	monitors := make([]*Monitor, len(instances))
 	for i, inst := range instances {
 		monitor := New(tmpDir)
-		err := monitor.Start(ctx, inst.serviceName, inst.hostInfo)
+		err := monitor.Register(ctx, inst.serviceName, inst.hostInfo)
 		require.NoError(t, err)
 		monitors[i] = monitor
-		defer monitor.Stop(ctx)
+		defer monitor.Unregister(ctx)
 	}
 
 	// Use any monitor to resolve services

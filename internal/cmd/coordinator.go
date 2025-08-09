@@ -72,7 +72,7 @@ var coordinatorFlags = []commandLineFlag{
 }
 
 func runCoordinator(ctx *Context, _ []string) error {
-	coordinator, err := newCoordinator(ctx, ctx.Config, ctx.ServiceMonitor)
+	coordinator, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
@@ -94,7 +94,7 @@ func runCoordinator(ctx *Context, _ []string) error {
 
 // newCoordinator creates a new Coordinator service instance.
 // It sets up a gRPC server and listener for distributed task coordination.
-func newCoordinator(ctx context.Context, cfg *config.Config, serviceMonitor models.ServiceMonitor) (*coordinator.Service, error) {
+func newCoordinator(ctx context.Context, cfg *config.Config, registry models.ServiceRegistry) (*coordinator.Service, error) {
 	// Generate instance ID
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -141,7 +141,7 @@ func newCoordinator(ctx context.Context, cfg *config.Config, serviceMonitor mode
 	handler := coordinator.NewHandler()
 
 	// Create and return service
-	return coordinator.NewService(grpcServer, handler, listener, healthServer, serviceMonitor, instanceID), nil
+	return coordinator.NewService(grpcServer, handler, listener, healthServer, registry, instanceID), nil
 }
 
 // loadCoordinatorTLSCredentials loads TLS credentials for the coordinator server.

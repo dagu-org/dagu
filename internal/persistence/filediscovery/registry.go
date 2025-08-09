@@ -38,8 +38,8 @@ func New(discoveryDir string) *Monitor {
 	}
 }
 
-// Start begins monitoring services and registers this instance
-func (m *Monitor) Start(ctx context.Context, serviceName models.ServiceName, hostInfo models.HostInfo) error {
+// Register begins monitoring services and registers this instance
+func (m *Monitor) Register(ctx context.Context, serviceName models.ServiceName, hostInfo models.HostInfo) error {
 	m.instanceMu.Lock()
 	defer m.instanceMu.Unlock()
 
@@ -98,8 +98,8 @@ func (m *Monitor) Resolver(_ context.Context, serviceName models.ServiceName) mo
 	return r
 }
 
-// Stop stops the service monitor
-func (m *Monitor) Stop(ctx context.Context) {
+// Unregister stops the service monitor
+func (m *Monitor) Unregister(ctx context.Context) {
 	m.instanceMu.Lock()
 
 	if m.cancel == nil {

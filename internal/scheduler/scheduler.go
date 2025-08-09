@@ -50,7 +50,8 @@ type Scheduler struct {
 	dirLock             dirlock.DirLock // File-based lock to prevent multiple scheduler instances
 	dagExecutor         *DAGExecutor
 	healthServer        *HealthServer // Health check server for monitoring
-	disableHealthServer bool          // Disable health server when running from start-all
+	serviceRegistry     models.ServiceRegistry
+	disableHealthServer bool // Disable health server when running from start-all
 	heartbeatCancel     context.CancelFunc
 	heartbeatDone       chan struct{}
 	zombieDetector      *ZombieDetector // Zombie DAG run detector
@@ -67,7 +68,7 @@ func New(
 	drs models.DAGRunStore,
 	qs models.QueueStore,
 	ps models.ProcStore,
-	_ models.ServiceMonitor, // Currently unused but kept for API compatibility
+	reg models.ServiceRegistry,
 	coordinatorCli digraph.Dispatcher,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Global.Location
@@ -88,18 +89,19 @@ func New(
 	healthServer := NewHealthServer(cfg.Scheduler.Port)
 
 	return &Scheduler{
-		logDir:       cfg.Paths.LogDir,
-		stopChan:     make(chan struct{}),
-		location:     timeLoc,
-		er:           er,
-		hm:           drm,
-		dagRunStore:  drs,
-		queueStore:   qs,
-		procStore:    ps,
-		config:       cfg,
-		dirLock:      dirLock,
-		dagExecutor:  dagExecutor,
-		healthServer: healthServer,
+		logDir:          cfg.Paths.LogDir,
+		stopChan:        make(chan struct{}),
+		location:        timeLoc,
+		er:              er,
+		hm:              drm,
+		dagRunStore:     drs,
+		queueStore:      qs,
+		procStore:       ps,
+		config:          cfg,
+		dirLock:         dirLock,
+		dagExecutor:     dagExecutor,
+		healthServer:    healthServer,
+		serviceRegistry: reg,
 	}, nil
 }
 

@@ -366,7 +366,7 @@ type mockServiceMonitor struct {
 	resolver models.ServiceResolver
 }
 
-func (m *mockServiceMonitor) Start(_ context.Context, _ models.ServiceName, _ models.HostInfo) error {
+func (m *mockServiceMonitor) Register(_ context.Context, _ models.ServiceName, _ models.HostInfo) error {
 	return nil
 }
 
@@ -374,7 +374,7 @@ func (m *mockServiceMonitor) Resolver(_ context.Context, _ models.ServiceName) m
 	return m.resolver
 }
 
-func (m *mockServiceMonitor) Stop(_ context.Context) {
+func (m *mockServiceMonitor) Unregister(_ context.Context) {
 	// No-op
 }
 

@@ -116,13 +116,13 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 
 	helper := Helper{
-		Context:        createDefaultContext(),
-		Config:         cfg,
-		DAGRunMgr:      drm,
-		DAGStore:       dagStore,
-		DAGRunStore:    runStore,
-		ProcStore:      procStore,
-		ServiceMonitor: serviceMonitor,
+		Context:         createDefaultContext(),
+		Config:          cfg,
+		DAGRunMgr:       drm,
+		DAGStore:        dagStore,
+		DAGRunStore:     runStore,
+		ProcStore:       procStore,
+		ServiceRegistry: serviceMonitor,
 
 		tmpDir: tmpDir,
 	}
@@ -161,15 +161,15 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 // Helper provides test utilities and configuration
 type Helper struct {
-	Context        context.Context
-	Cancel         context.CancelFunc
-	Config         *config.Config
-	LoggingOutput  *SyncBuffer
-	DAGStore       models.DAGStore
-	DAGRunStore    models.DAGRunStore
-	DAGRunMgr      dagrun.Manager
-	ProcStore      models.ProcStore
-	ServiceMonitor models.ServiceMonitor
+	Context         context.Context
+	Cancel          context.CancelFunc
+	Config          *config.Config
+	LoggingOutput   *SyncBuffer
+	DAGStore        models.DAGStore
+	DAGRunStore     models.DAGRunStore
+	DAGRunMgr       dagrun.Manager
+	ProcStore       models.ProcStore
+	ServiceRegistry models.ServiceRegistry
 
 	tmpDir string
 }
@@ -378,7 +378,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.DAGStore,
 		d.DAGRunStore,
 		d.ProcStore,
-		d.ServiceMonitor,
+		d.ServiceRegistry,
 		root,
 		helper.opts,
 	)

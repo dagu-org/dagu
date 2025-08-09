@@ -4,17 +4,18 @@ import (
 	"context"
 )
 
-// ServiceMonitor monitors service availability
-type ServiceMonitor interface {
-	// Start begins monitoring services and registers this instance.
-	// It should return an error if the monitor cannot start.
-	Start(ctx context.Context, serviceName ServiceName, hostInfo HostInfo) error
+// ServiceRegistry is responsible for registering and persisting
+// running service information.
+type ServiceRegistry interface {
+	// Register registers services for the given service name and host info.
+	// It returns an error if the registry failed to start heartbeat.
+	Register(ctx context.Context, serviceName ServiceName, hostInfo HostInfo) error
+
+	// Unregister un-registers current service.
+	Unregister(ctx context.Context)
 
 	// Resolver returns the service resolver used by this monitor
 	Resolver(ctx context.Context, serviceName ServiceName) ServiceResolver
-
-	// Stop stops the service monitor. It should clean up any resources used.
-	Stop(ctx context.Context)
 }
 
 // ServiceName represents the name of a service in the service discovery system
@@ -23,6 +24,7 @@ type ServiceName string
 const (
 	// ServiceNameCoordinator is the name of the coordinator service
 	ServiceNameCoordinator ServiceName = "coordinator"
+	// ServiceNameScheduler is the name of the scheduler service
 )
 
 // ServiceResolver resolves service endpoints

@@ -15,13 +15,13 @@ import (
 )
 
 type Service struct {
-	server         *grpc.Server
-	handler        *Handler
-	grpcListener   net.Listener
-	healthServer   *health.Server
-	serviceMonitor models.ServiceMonitor
-	instanceID     string
-	hostPort       string
+	server       *grpc.Server
+	handler      *Handler
+	grpcListener net.Listener
+	healthServer *health.Server
+	registry     models.ServiceRegistry
+	instanceID   string
+	hostPort     string
 }
 
 func NewService(
@@ -29,17 +29,17 @@ func NewService(
 	handler *Handler,
 	grpcListener net.Listener,
 	healthServer *health.Server,
-	serviceMonitor models.ServiceMonitor,
+	registry models.ServiceRegistry,
 	instanceID string,
 ) *Service {
 	return &Service{
-		server:         server,
-		handler:        handler,
-		grpcListener:   grpcListener,
-		healthServer:   healthServer,
-		serviceMonitor: serviceMonitor,
-		instanceID:     instanceID,
-		hostPort:       grpcListener.Addr().String(),
+		server:       server,
+		handler:      handler,
+		grpcListener: grpcListener,
+		healthServer: healthServer,
+		registry:     registry,
+		instanceID:   instanceID,
+		hostPort:     grpcListener.Addr().String(),
 	}
 }
 
@@ -52,12 +52,12 @@ func (srv *Service) Start(ctx context.Context) error {
 	srv.healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	// Register with service discovery if monitor is available
-	if srv.serviceMonitor != nil {
+	if srv.registry != nil {
 		hostInfo := models.HostInfo{
 			ID:       srv.instanceID,
 			HostPort: srv.hostPort,
 		}
-		if err := srv.serviceMonitor.Start(ctx, models.ServiceNameCoordinator, hostInfo); err != nil {
+		if err := srv.registry.Register(ctx, models.ServiceNameCoordinator, hostInfo); err != nil {
 			return fmt.Errorf("failed to register with service discovery: %w", err)
 		}
 		logger.Info(ctx, "Registered with service discovery",
@@ -82,8 +82,8 @@ func (srv *Service) Stop(ctx context.Context) error {
 	srv.healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 
 	// Unregister from service discovery if monitor is available
-	if srv.serviceMonitor != nil {
-		srv.serviceMonitor.Stop(ctx)
+	if srv.registry != nil {
+		srv.registry.Unregister(ctx)
 		logger.Info(ctx, "Unregistered from service discovery",
 			"instance_id", srv.instanceID)
 	}

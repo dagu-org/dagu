@@ -67,7 +67,7 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 	drm := dagrun.New(drs, ps, helper.Config.Paths.Executable, helper.Config.Global.WorkDir)
 
 	// Create entry reader
-	coordinatorCli := coordinator.New(helper.ServiceMonitor, coordinator.DefaultConfig())
+	coordinatorCli := coordinator.New(helper.ServiceRegistry, coordinator.DefaultConfig())
 	de := scheduler.NewDAGExecutor(coordinatorCli, drm)
 	em := scheduler.NewEntryReader(helper.Config.Paths.DAGsDir, ds, drm, de, "", "")
 
@@ -98,7 +98,7 @@ func (s *Scheduler) NewSchedulerInstance(t *testing.T) (*scheduler.Scheduler, er
 		s.DAGRunStore,
 		s.QueueStore,
 		s.ProcStore,
-		s.ServiceMonitor,
+		s.ServiceRegistry,
 		s.CoordinatorCli,
 	)
 }
