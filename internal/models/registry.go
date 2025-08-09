@@ -28,13 +28,6 @@ const (
 	// ServiceNameScheduler is the name of the scheduler service
 )
 
-// ServiceResolver resolves service endpoints
-// This interface is now internal to the implementation and not exposed publicly.
-type ServiceResolver interface {
-	// Members returns the list of active hosts for the service.
-	Members(ctx context.Context) ([]HostInfo, error)
-}
-
 // HostInfo contains information about a host in the service discovery system
 type HostInfo struct {
 	// ID is a unique identifier for the host

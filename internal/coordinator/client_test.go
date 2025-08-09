@@ -54,10 +54,8 @@ func TestClientDispatch(t *testing.T) {
 		defer server.Stop()
 
 		monitor := &mockServiceMonitor{
-			resolver: &mockResolver{
-				members: []models.HostInfo{
-					{ID: "coord-1", HostPort: addr},
-				},
+			members: []models.HostInfo{
+				{ID: "coord-1", HostPort: addr},
 			},
 		}
 
@@ -81,9 +79,7 @@ func TestClientDispatch(t *testing.T) {
 		config.RequestTimeout = 100 * time.Millisecond
 
 		monitor := &mockServiceMonitor{
-			resolver: &mockResolver{
-				members: []models.HostInfo{}, // No coordinators
-			},
+			members: []models.HostInfo{}, // No coordinators
 		}
 
 		client := coordinator.New(monitor, config)
@@ -125,11 +121,7 @@ func TestClientPoll(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		resolver: &mockResolver{
-			members: []models.HostInfo{
-				{ID: "coord-1", HostPort: addr},
-			},
-		},
+		members: []models.HostInfo{{HostPort: addr}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -174,11 +166,7 @@ func TestClientGetWorkers(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		resolver: &mockResolver{
-			members: []models.HostInfo{
-				{ID: "coord-1", HostPort: addr},
-			},
-		},
+		members: []models.HostInfo{{HostPort: addr}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -209,11 +197,7 @@ func TestClientHeartbeat(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		resolver: &mockResolver{
-			members: []models.HostInfo{
-				{ID: "coord-1", HostPort: addr},
-			},
-		},
+		members: []models.HostInfo{{HostPort: addr}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -255,11 +239,7 @@ func TestClientMetrics(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		resolver: &mockResolver{
-			members: []models.HostInfo{
-				{ID: "coord-1", HostPort: addr},
-			},
-		},
+		members: []models.HostInfo{{HostPort: addr}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -299,11 +279,7 @@ func TestClientCleanup(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		resolver: &mockResolver{
-			members: []models.HostInfo{
-				{ID: "coord-1", HostPort: addr},
-			},
-		},
+		members: []models.HostInfo{{HostPort: addr}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -346,9 +322,7 @@ func TestClientDispatcherInterface(t *testing.T) {
 	}
 
 	// Should fail gracefully with no coordinators
-	monitor.resolver = &mockResolver{
-		members: []models.HostInfo{},
-	}
+	monitor.members = []models.HostInfo{}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -363,38 +337,27 @@ func TestClientDispatcherInterface(t *testing.T) {
 // Mock implementations
 
 type mockServiceMonitor struct {
-	resolver models.ServiceResolver
+	members   []models.HostInfo
+	err       error
+	onMembers func()
 }
 
 func (m *mockServiceMonitor) Register(_ context.Context, _ models.ServiceName, _ models.HostInfo) error {
 	return nil
 }
 
-func (m *mockServiceMonitor) GetServiceMembers(ctx context.Context, _ models.ServiceName) ([]models.HostInfo, error) {
-	if m.resolver != nil {
-		return m.resolver.Members(ctx)
+func (m *mockServiceMonitor) GetServiceMembers(_ context.Context, _ models.ServiceName) ([]models.HostInfo, error) {
+	if m.onMembers != nil {
+		m.onMembers()
 	}
-	return nil, nil
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.members, nil
 }
 
 func (m *mockServiceMonitor) Unregister(_ context.Context) {
 	// No-op
-}
-
-type mockResolver struct {
-	members   []models.HostInfo
-	err       error
-	onMembers func()
-}
-
-func (r *mockResolver) Members(_ context.Context) ([]models.HostInfo, error) {
-	if r.onMembers != nil {
-		r.onMembers()
-	}
-	if r.err != nil {
-		return nil, r.err
-	}
-	return r.members, nil
 }
 
 type mockCoordinatorService struct {
