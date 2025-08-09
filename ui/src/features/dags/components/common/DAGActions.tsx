@@ -441,23 +441,37 @@ function DAGActions({
           dag={dag}
           visible={isEnqueueModal}
           action="enqueue"
-          onSubmit={async (params, dagRunId) => {
+          onSubmit={async (params, dagRunId, immediate) => {
             setIsEnqueueModal(false);
             const body: { params: string; dagRunId?: string } = { params };
             if (dagRunId) {
               body.dagRunId = dagRunId;
             }
-            const { error } = await client.POST('/dags/{fileName}/enqueue', {
-              params: {
-                path: {
-                  fileName: fileName,
-                },
-                query: {
-                  remoteNode: appBarContext.selectedRemoteNode || 'local',
-                },
-              },
-              body,
-            });
+            
+            // Use /start endpoint if immediate is true, otherwise use /enqueue
+            const { error } = await (immediate 
+              ? client.POST('/dags/{fileName}/start', {
+                  params: {
+                    path: {
+                      fileName: fileName,
+                    },
+                    query: {
+                      remoteNode: appBarContext.selectedRemoteNode || 'local',
+                    },
+                  },
+                  body,
+                })
+              : client.POST('/dags/{fileName}/enqueue', {
+                  params: {
+                    path: {
+                      fileName: fileName,
+                    },
+                    query: {
+                      remoteNode: appBarContext.selectedRemoteNode || 'local',
+                    },
+                  },
+                  body,
+                }));
             if (error) {
               alert(error.message || 'An error occurred');
               return;

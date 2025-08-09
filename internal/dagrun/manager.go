@@ -192,6 +192,9 @@ func (m *Manager) StartDAGRunAsync(ctx context.Context, dag *digraph.DAG, opts S
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
+	if opts.Immediate {
+		args = append(args, "--no-queue")
+	}
 	if opts.DAGRunID != "" {
 		args = append(args, fmt.Sprintf("--run-id=%s", opts.DAGRunID))
 	}
@@ -574,9 +577,10 @@ func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef
 
 // StartOptions contains options for initiating a dag-run.
 type StartOptions struct {
-	Params   string // Parameters to pass to the DAG
-	Quiet    bool   // Whether to run in quiet mode
-	DAGRunID string // ID for the dag-run
+	Params    string // Parameters to pass to the DAG
+	Quiet     bool   // Whether to run in quiet mode
+	DAGRunID  string // ID for the dag-run
+	Immediate bool   // Start immediately without enqueue
 }
 
 // EnqueueOptions contains options for enqueuing a dag-run.
