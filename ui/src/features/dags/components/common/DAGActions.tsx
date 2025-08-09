@@ -14,6 +14,7 @@ import dayjs from '@/lib/dayjs';
 import StatusChip from '@/ui/StatusChip';
 import { Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
@@ -57,6 +58,7 @@ function DAGActions({
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
+  const navigate = useNavigate();
   const [isEnqueueModal, setIsEnqueueModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
@@ -449,7 +451,7 @@ function DAGActions({
             }
             
             // Use /start endpoint if immediate is true, otherwise use /enqueue
-            const { error } = await (immediate 
+            const { data, error } = await (immediate 
               ? client.POST('/dags/{fileName}/start', {
                   params: {
                     path: {
@@ -476,10 +478,16 @@ function DAGActions({
               alert(error.message || 'An error occurred');
               return;
             }
-            reloadData();
-            // Navigate to status tab after execution
-            if (navigateToStatusTab) {
-              navigateToStatusTab();
+            
+            // Navigate to DAG-run detail page
+            if (data?.dagRunId && dag?.name) {
+              navigate(`/dag-runs/${dag.name}/${data.dagRunId}`);
+            } else {
+              reloadData();
+              // Navigate to status tab after execution
+              if (navigateToStatusTab) {
+                navigateToStatusTab();
+              }
             }
           }}
           dismissModal={() => {
