@@ -14,11 +14,7 @@ import (
 )
 
 func TestBuild(t *testing.T) {
-	t.Parallel()
-
 	t.Run("SkipIfSuccessful", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 skipIfSuccessful: true
 steps:
@@ -31,8 +27,6 @@ steps:
 		assert.True(t, th.SkipIfSuccessful)
 	})
 	t.Run("ParamsWithSubstitution", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 params: "TEST_PARAM $1"
 `)
@@ -42,8 +36,6 @@ params: "TEST_PARAM $1"
 		th.AssertParam(t, "1=TEST_PARAM", "2=TEST_PARAM")
 	})
 	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 params: x="a b c" y="d e f"
 `)
@@ -53,8 +45,6 @@ params: x="a b c" y="d e f"
 		th.AssertParam(t, "x=a b c", "y=d e f")
 	})
 	t.Run("ParamsAsMap", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 params:
   - FOO: foo
@@ -71,8 +61,6 @@ params:
 		)
 	})
 	t.Run("ParamsAsMapOverride", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 params:
   - FOO: foo
@@ -89,8 +77,6 @@ params:
 		)
 	})
 	t.Run("ParamsWithComplexValues", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 params: first P1=foo P2=${A001} P3=` + "`/bin/echo BAR`" + ` X=bar Y=${P1} Z="A B C"
 env:
@@ -110,8 +96,6 @@ env:
 		)
 	})
 	t.Run("mailOn", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 steps:
   - name: "1"
@@ -128,8 +112,6 @@ mailOn:
 		assert.True(t, th.MailOn.Success)
 	})
 	t.Run("ValidTags", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 tags: daily,monthly
 steps:
@@ -143,8 +125,6 @@ steps:
 		assert.True(t, th.HasTag("monthly"))
 	})
 	t.Run("ValidTagsList", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 tags:
   - daily
@@ -160,8 +140,6 @@ steps:
 		assert.True(t, th.HasTag("monthly"))
 	})
 	t.Run("LogDir", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 logDir: /tmp/logs
 steps:
@@ -174,8 +152,6 @@ steps:
 		assert.Equal(t, "/tmp/logs", th.LogDir)
 	})
 	t.Run("MailConfig", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 # SMTP server settings
 smtp:
@@ -217,8 +193,6 @@ infoMail:
 		assert.True(t, th.InfoMail.AttachLogs)
 	})
 	t.Run("SMTPNumericPort", func(t *testing.T) {
-		t.Parallel()
-
 		// Test SMTP configuration with numeric port
 		data := []byte(`
 smtp:
@@ -239,8 +213,6 @@ steps:
 		assert.Equal(t, "password", dag.SMTP.Password)
 	})
 	t.Run("MailConfigMultipleRecipients", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 # SMTP server settings
 smtp:
@@ -284,8 +256,6 @@ infoMail:
 		assert.False(t, th.InfoMail.AttachLogs)
 	})
 	t.Run("MaxHistRetentionDays", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 histRetentionDays: 365
 `)
@@ -307,8 +277,6 @@ steps:
 		assert.Equal(t, time.Duration(10*time.Second), th.MaxCleanUpTime)
 	})
 	t.Run("ChainTypeBasic", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 name: chain-basic-test
 type: chain
@@ -339,8 +307,6 @@ steps:
 		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends)
 	})
 	t.Run("ChainTypeWithExplicitDepends", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 name: chain-explicit-depends-test
 type: chain
@@ -379,8 +345,6 @@ steps:
 		assert.Equal(t, []string{"process-both"}, th.Steps[4].Depends) // cleanup
 	})
 	t.Run("InvalidType", func(t *testing.T) {
-		t.Parallel()
-
 		// Test will fail with an error containing "invalid type"
 		data := []byte(`
 name: invalid-type-test
@@ -437,8 +401,6 @@ steps:
 		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends) // step4 should depend on step3
 	})
 	t.Run("Preconditions", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 preconditions:
   - condition: "test -f file.txt"
@@ -451,8 +413,6 @@ preconditions:
 		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
 	t.Run("maxActiveRuns", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 maxActiveRuns: 5
 `)
@@ -462,8 +422,6 @@ maxActiveRuns: 5
 		assert.Equal(t, 5, th.MaxActiveRuns)
 	})
 	t.Run("MaxActiveSteps", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 maxActiveSteps: 3
 `)
@@ -473,8 +431,6 @@ maxActiveSteps: 3
 		assert.Equal(t, 3, th.MaxActiveSteps)
 	})
 	t.Run("MaxOutputSize", func(t *testing.T) {
-		t.Parallel()
-
 		// Test custom maxOutputSize
 		data := []byte(`
 name: test-max-output-size
@@ -504,8 +460,6 @@ steps:
 		assert.Equal(t, 0, th2.MaxOutputSize) // Default 1MB
 	})
 	t.Run("ValidationError", func(t *testing.T) {
-		t.Parallel()
-
 		type testCase struct {
 			name        string
 			yaml        string
@@ -549,8 +503,6 @@ steps:
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
 				data := []byte(tc.yaml)
 				ctx := context.Background()
 				_, err := digraph.LoadYAML(ctx, data)
