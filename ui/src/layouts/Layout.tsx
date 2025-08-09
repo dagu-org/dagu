@@ -173,7 +173,9 @@ function Content({ title, navbarColor, children }: LayoutProps) {
               ? 'shadow-md border-b border-border'
               : 'border-b border-transparent',
             // Use theme-aware classes when no custom color is set
-            !navbarColor || navbarColor.trim() === '' ? 'bg-primary text-primary-foreground' : ''
+            !navbarColor || navbarColor.trim() === ''
+              ? 'bg-primary text-primary-foreground'
+              : ''
           )}
           style={
             navbarColor && navbarColor.trim() !== ''

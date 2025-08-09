@@ -12,24 +12,26 @@ type Props = {
 // Initialize Mermaid with dynamic theme support
 const initializeMermaid = () => {
   const isDarkMode = document.documentElement.classList.contains('dark');
-  
+
   mermaid.initialize({
     securityLevel: 'loose',
     startOnLoad: false,
     maxTextSize: 99999999,
     theme: isDarkMode ? 'dark' : 'default',
-    themeVariables: isDarkMode ? {
-      background: 'transparent',
-      primaryColor: '#18181b', // zinc-900
-      primaryTextColor: '#e4e4e7', // zinc-200
-      primaryBorderColor: '#3f3f46', // zinc-700
-      lineColor: '#71717a', // zinc-500
-      sectionBkgColor: 'transparent',
-      altSectionBkgColor: 'transparent',
-      gridColor: 'transparent',
-      secondaryColor: 'transparent',
-      tertiaryColor: 'transparent',
-    } : {},
+    themeVariables: isDarkMode
+      ? {
+          background: 'transparent',
+          primaryColor: '#18181b', // zinc-900
+          primaryTextColor: '#e4e4e7', // zinc-200
+          primaryBorderColor: '#3f3f46', // zinc-700
+          lineColor: '#71717a', // zinc-500
+          sectionBkgColor: 'transparent',
+          altSectionBkgColor: 'transparent',
+          gridColor: 'transparent',
+          secondaryColor: 'transparent',
+          tertiaryColor: 'transparent',
+        }
+      : {},
     flowchart: {
       curve: 'basis',
       useMaxWidth: false,
@@ -89,7 +91,7 @@ function Mermaid({
     try {
       // Reinitialize Mermaid to pick up current theme
       initializeMermaid();
-      
+
       // Clear previous content
       mermaidRef.current.innerHTML = '';
 

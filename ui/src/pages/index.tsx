@@ -251,13 +251,15 @@ function Dashboard(): React.ReactElement | null {
                   onChange={(e) => {
                     const newDate = e.target.value;
                     if (!newDate) return; // Handle empty input
-                    
+
                     const date = dayjs(newDate);
                     if (!date.isValid()) return; // Handle invalid dates
-                    
+
                     const startOfDay =
                       config.tzOffsetInSec !== undefined
-                        ? date.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+                        ? date
+                            .utcOffset(config.tzOffsetInSec / 60)
+                            .startOf('day')
                         : date.startOf('day');
                     const endOfDay =
                       config.tzOffsetInSec !== undefined

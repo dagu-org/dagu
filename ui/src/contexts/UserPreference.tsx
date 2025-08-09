@@ -1,4 +1,10 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 
 export type Theme = 'dark' | 'light';
 
@@ -28,8 +34,10 @@ export function UserPreferencesProvider({
         pageLimit: 50,
         theme: 'dark', // Default to dark theme
       };
-      const prefs = saved ? { ...defaultPrefs, ...JSON.parse(saved) } : defaultPrefs;
-      
+      const prefs = saved
+        ? { ...defaultPrefs, ...JSON.parse(saved) }
+        : defaultPrefs;
+
       // Apply theme class immediately during initialization
       const root = document.documentElement;
       if (prefs.theme === 'dark') {
@@ -37,7 +45,7 @@ export function UserPreferencesProvider({
       } else {
         root.classList.remove('dark');
       }
-      
+
       return prefs;
     } catch {
       // Fallback to defaults if parsing fails
@@ -77,7 +85,9 @@ export function UserPreferencesProvider({
   }, [preferences.theme, updatePreference]);
 
   return (
-    <UserPreferencesContext.Provider value={{ preferences, updatePreference, toggleTheme }}>
+    <UserPreferencesContext.Provider
+      value={{ preferences, updatePreference, toggleTheme }}
+    >
       {children}
     </UserPreferencesContext.Provider>
   );
