@@ -79,8 +79,15 @@ func (m *Monitor) Register(ctx context.Context, serviceName models.ServiceName, 
 	return nil
 }
 
-// Resolver returns the service resolver for a specific service
-func (m *Monitor) Resolver(_ context.Context, serviceName models.ServiceName) models.ServiceResolver {
+// GetServiceMembers returns the list of active hosts for the given service.
+// This method combines service resolution and member discovery.
+func (m *Monitor) GetServiceMembers(ctx context.Context, serviceName models.ServiceName) ([]models.HostInfo, error) {
+	resolver := m.getResolver(serviceName)
+	return resolver.Members(ctx)
+}
+
+// getResolver returns the service resolver for a specific service (internal method)
+func (m *Monitor) getResolver(serviceName models.ServiceName) *resolver {
 	m.mu.RLock()
 	r, exists := m.resolvers[serviceName]
 	m.mu.RUnlock()

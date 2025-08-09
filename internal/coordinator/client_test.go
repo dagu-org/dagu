@@ -370,8 +370,11 @@ func (m *mockServiceMonitor) Register(_ context.Context, _ models.ServiceName, _
 	return nil
 }
 
-func (m *mockServiceMonitor) Resolver(_ context.Context, _ models.ServiceName) models.ServiceResolver {
-	return m.resolver
+func (m *mockServiceMonitor) GetServiceMembers(ctx context.Context, _ models.ServiceName) ([]models.HostInfo, error) {
+	if m.resolver != nil {
+		return m.resolver.Members(ctx)
+	}
+	return nil, nil
 }
 
 func (m *mockServiceMonitor) Unregister(_ context.Context) {

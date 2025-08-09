@@ -14,8 +14,9 @@ type ServiceRegistry interface {
 	// Unregister un-registers current service.
 	Unregister(ctx context.Context)
 
-	// Resolver returns the service resolver used by this monitor
-	Resolver(ctx context.Context, serviceName ServiceName) ServiceResolver
+	// GetServiceMembers returns the list of active hosts for the given service.
+	// This method combines service resolution and member discovery.
+	GetServiceMembers(ctx context.Context, serviceName ServiceName) ([]HostInfo, error)
 }
 
 // ServiceName represents the name of a service in the service discovery system
@@ -28,6 +29,7 @@ const (
 )
 
 // ServiceResolver resolves service endpoints
+// This interface is now internal to the implementation and not exposed publicly.
 type ServiceResolver interface {
 	// Members returns the list of active hosts for the service.
 	Members(ctx context.Context) ([]HostInfo, error)

@@ -2,6 +2,7 @@ package fileserviceregistry
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,21 +32,31 @@ func TestRegistry_RegisterUnregister(t *testing.T) {
 	registry.Unregister(ctx)
 }
 
-func TestRegistry_Resolver(t *testing.T) {
+func TestRegistry_GetServiceMembers(t *testing.T) {
 	tmpDir := t.TempDir()
 	registry := New(tmpDir)
 
-	// Get resolver for coordinator service
-	resolver1 := registry.Resolver(context.Background(), models.ServiceNameCoordinator)
-	assert.NotNil(t, resolver1)
-
-	// Getting the same service should return the same resolver
-	resolver2 := registry.Resolver(context.Background(), models.ServiceNameCoordinator)
-	assert.Equal(t, resolver1, resolver2)
-
-	// Different service should return different resolver
-	resolver3 := registry.Resolver(context.Background(), "other-service")
-	assert.NotEqual(t, resolver1, resolver3)
+	ctx := context.Background()
+	
+	// Test getting members for empty service
+	members, err := registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
+	require.NoError(t, err)
+	assert.Empty(t, members)
+	
+	// Register a service
+	hostInfo := models.HostInfo{
+		ID:       "test-instance",
+		HostPort: "localhost:8080",
+	}
+	err = registry.Register(ctx, models.ServiceNameCoordinator, hostInfo)
+	require.NoError(t, err)
+	defer registry.Unregister(ctx)
+	
+	// Now should find the registered member
+	members, err = registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
+	require.NoError(t, err)
+	assert.Len(t, members, 1)
+	assert.Equal(t, "localhost:8080", members[0].HostPort)
 }
 
 func TestRegistry_RegisterInstance(t *testing.T) {
@@ -67,9 +78,8 @@ func TestRegistry_RegisterInstance(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, entries, 1)
 
-	// Verify resolver can find the registered instance
-	resolver := registry.Resolver(ctx, models.ServiceNameCoordinator)
-	members, err := resolver.Members(ctx)
+	// Verify registry can find the registered instance
+	members, err := registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
 	require.NoError(t, err)
 	require.Len(t, members, 1)
 	assert.Equal(t, "localhost:8080", members[0].HostPort)
@@ -90,8 +100,7 @@ func TestRegistry_Heartbeat(t *testing.T) {
 	defer registry.Unregister(ctx)
 
 	// Get initial heartbeat time
-	resolver := registry.Resolver(ctx, models.ServiceNameCoordinator)
-	members1, err := resolver.Members(ctx)
+	members1, err := registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
 	require.NoError(t, err)
 	require.Len(t, members1, 1)
 
@@ -101,7 +110,7 @@ func TestRegistry_Heartbeat(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify heartbeat was updated
-	members2, err := resolver.Members(ctx)
+	members2, err := registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
 	require.NoError(t, err)
 	require.Len(t, members2, 1)
 	assert.Equal(t, members1[0].ID, members2[0].ID)
@@ -120,8 +129,7 @@ func TestRegistry_UnregisterRemovesInstance(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify it exists
-	resolver := registry.Resolver(ctx, models.ServiceNameCoordinator)
-	members, err := resolver.Members(ctx)
+	members, err := registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
 	require.NoError(t, err)
 	assert.Len(t, members, 1)
 
@@ -153,9 +161,10 @@ func TestRegistry_ConcurrentAccess(t *testing.T) {
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
 		go func(i int) {
-			serviceName := models.ServiceName(string(models.ServiceNameCoordinator) + string(rune(i)))
-			resolver := registry.Resolver(context.Background(), serviceName)
-			assert.NotNil(t, resolver)
+			serviceName := models.ServiceName(fmt.Sprintf("%s-%d", models.ServiceNameCoordinator, i))
+			// Just verify we can get members without error
+			_, err := registry.GetServiceMembers(context.Background(), serviceName)
+			assert.NoError(t, err)
 			done <- true
 		}(i)
 	}
@@ -248,12 +257,12 @@ func TestRegistry_MultipleInstances(t *testing.T) {
 	resolver := registries[0]
 
 	// Check coordinator service has 2 instances
-	coordMembers, err := resolver.Resolver(ctx, models.ServiceNameCoordinator).Members(ctx)
+	coordMembers, err := resolver.GetServiceMembers(ctx, models.ServiceNameCoordinator)
 	require.NoError(t, err)
 	assert.Len(t, coordMembers, 2)
 
 	// Check worker service has 1 instance
-	workerMembers, err := resolver.Resolver(ctx, "worker").Members(ctx)
+	workerMembers, err := resolver.GetServiceMembers(ctx, "worker")
 	require.NoError(t, err)
 	assert.Len(t, workerMembers, 1)
 	assert.Equal(t, "worker1.example.com:8080", workerMembers[0].HostPort)
