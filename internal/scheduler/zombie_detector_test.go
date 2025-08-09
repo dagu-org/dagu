@@ -78,10 +78,10 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 
 		// Process is alive
 		procRef := digraph.DAGRunRef{
-			Name: dag.QueueProcName(),
+			Name: dag.Name,
 			ID:   "run-123",
 		}
-		procStore.On("IsRunAlive", ctx, procRef).Return(true, nil)
+		procStore.On("IsRunAlive", ctx, dag.ProcGroup(), procRef).Return(true, nil)
 
 		detector.detectAndCleanZombies(ctx)
 
@@ -121,10 +121,10 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 
 		// Process is NOT alive (zombie)
 		procRef := digraph.DAGRunRef{
-			Name: dag.QueueProcName(),
+			Name: dag.Name,
 			ID:   "run-123",
 		}
-		procStore.On("IsRunAlive", ctx, procRef).Return(false, nil)
+		procStore.On("IsRunAlive", ctx, dag.ProcGroup(), procRef).Return(false, nil)
 
 		// Expect status update
 		attempt.On("Open", ctx).Return(nil)
@@ -264,10 +264,10 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		attempt.On("ReadDAG", ctx).Return(dag, nil)
 
 		procRef := digraph.DAGRunRef{
-			Name: dag.QueueProcName(),
+			Name: dag.Name,
 			ID:   "run-123",
 		}
-		procStore.On("IsRunAlive", ctx, procRef).Return(false, errors.New("check error"))
+		procStore.On("IsRunAlive", ctx, dag.ProcGroup(), procRef).Return(false, errors.New("check error"))
 
 		err := detector.checkAndCleanZombie(ctx, status)
 		assert.Error(t, err)
@@ -299,10 +299,10 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		attempt.On("ReadDAG", ctx).Return(dag, nil)
 
 		procRef := digraph.DAGRunRef{
-			Name: dag.QueueProcName(),
+			Name: dag.Name,
 			ID:   "run-123",
 		}
-		procStore.On("IsRunAlive", ctx, procRef).Return(false, nil)
+		procStore.On("IsRunAlive", ctx, dag.ProcGroup(), procRef).Return(false, nil)
 
 		// Fail to open attempt
 		attempt.On("Open", ctx).Return(errors.New("open error"))
@@ -417,23 +417,23 @@ type mockProcStore struct {
 	mock.Mock
 }
 
-func (m *mockProcStore) Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (models.ProcHandle, error) {
-	args := m.Called(ctx, dagRun)
+func (m *mockProcStore) Acquire(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (models.ProcHandle, error) {
+	args := m.Called(ctx, groupName, dagRun)
 	return args.Get(0).(models.ProcHandle), args.Error(1)
 }
 
-func (m *mockProcStore) CountAlive(ctx context.Context, name string) (int, error) {
-	args := m.Called(ctx, name)
+func (m *mockProcStore) CountAlive(ctx context.Context, groupName string) (int, error) {
+	args := m.Called(ctx, groupName)
 	return args.Int(0), args.Error(1)
 }
 
-func (m *mockProcStore) IsRunAlive(ctx context.Context, dagRun digraph.DAGRunRef) (bool, error) {
-	args := m.Called(ctx, dagRun)
+func (m *mockProcStore) IsRunAlive(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (bool, error) {
+	args := m.Called(ctx, groupName, dagRun)
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *mockProcStore) ListAlive(ctx context.Context, name string) ([]digraph.DAGRunRef, error) {
-	args := m.Called(ctx, name)
+func (m *mockProcStore) ListAlive(ctx context.Context, groupName string) ([]digraph.DAGRunRef, error) {
+	args := m.Called(ctx, groupName)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

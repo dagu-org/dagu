@@ -343,14 +343,25 @@ func WithStep(step string) TaskOption {
 	}
 }
 
-// QueueProcName returns the name of the queue for this DAG.
-// If the queue is not set, it returns the DAG name as the default queue name.
-func (d *DAG) QueueProcName() string {
+// ProcGroup returns the name of the process group for this DAG.
+// The process group name is used to identify and manage related DAG executions.
+//
+// Returns:
+//   - If Queue is set: returns the Queue value
+//   - If Queue is empty: returns the DAG name as the default
+//
+// The process group name is used by the process store to:
+//  1. Manage heartbeat files for active DAG runs
+//  2. Enforce concurrency limits (max concurrent runs) across DAGs in the same group
+//
+// This allows the scheduler to control how many DAGs can run simultaneously
+// within the same process group.
+func (d *DAG) ProcGroup() string {
 	// If the queue is not set, return the default queue name.
-	if d.Queue == "" {
-		return d.Name
+	if d.Queue != "" {
+		return d.Queue
 	}
-	return d.Queue
+	return d.Name
 }
 
 // FileName returns the filename of the DAG without the extension.

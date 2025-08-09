@@ -103,11 +103,7 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *models.DAG
 	}
 
 	// Check if process is alive
-	procRef := digraph.DAGRunRef{
-		Name: dag.QueueProcName(),
-		ID:   st.DAGRunID,
-	}
-	alive, err := z.procStore.IsRunAlive(ctx, procRef)
+	alive, err := z.procStore.IsRunAlive(ctx, dag.ProcGroup(), digraph.DAGRunRef{Name: dag.Name, ID: st.DAGRunID})
 	if err != nil {
 		return fmt.Errorf("check alive: %w", err)
 	}
