@@ -247,7 +247,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a process for heartbeat. We need to acquire proc file by queue name or dag name.
 	// This is to ensure queue scheduler can limit the number of active processes for the same queue.
-	proc, err := a.procStore.Acquire(ctx, digraph.NewDAGRunRef(a.dag.QueueProcName(), a.dagRunID))
+	proc, err := a.procStore.Acquire(ctx, a.dag.ProcGroup(), digraph.NewDAGRunRef(a.dag.Name, a.dagRunID))
 	if err != nil {
 		return fmt.Errorf("failed to get process: %w", err)
 	}

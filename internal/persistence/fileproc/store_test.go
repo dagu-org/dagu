@@ -24,7 +24,8 @@ func TestStore(t *testing.T) {
 	}
 
 	// Get the process for the dag-run
-	proc, err := store.Acquire(ctx, dagRun)
+	// Using different group name (queue) vs dag name to test hierarchy
+	proc, err := store.Acquire(ctx, "test_queue", dagRun)
 	require.NoError(t, err, "failed to get proc")
 
 	// Stop the process after a short delay
@@ -36,8 +37,11 @@ func TestStore(t *testing.T) {
 		close(done)
 	}()
 
+	// Give time for the heartbeat to start
+	time.Sleep(time.Millisecond * 50)
+
 	// Check if the count is 1
-	count, err := store.CountAlive(ctx, "test_dag")
+	count, err := store.CountAlive(ctx, "test_queue")
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 1, count, "expected 1 proc file")
 
@@ -45,7 +49,7 @@ func TestStore(t *testing.T) {
 	<-done
 
 	// Check if the count is 0
-	count, err = store.CountAlive(ctx, "test_dag")
+	count, err = store.CountAlive(ctx, "test_queue")
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 0, count, "expected 0 proc files")
 }
@@ -64,7 +68,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 		}
 
 		// Test when no process file exists
-		alive, err := store.IsRunAlive(ctx, dagRun)
+		alive, err := store.IsRunAlive(ctx, "queue-1", dagRun)
 		require.NoError(t, err)
 		require.False(t, alive)
 	})
@@ -76,14 +80,15 @@ func TestStore_IsRunAlive(t *testing.T) {
 		}
 
 		// Create a process and start heartbeat
-		proc, err := store.Acquire(ctx, dagRun)
+		// Use different group name (queue-2) vs dag name (test-dag)
+		proc, err := store.Acquire(ctx, "queue-2", dagRun)
 		require.NoError(t, err)
 
 		// Give a moment for the heartbeat to start
 		time.Sleep(time.Millisecond * 50)
 
 		// Check if the run is alive
-		alive, err := store.IsRunAlive(ctx, dagRun)
+		alive, err := store.IsRunAlive(ctx, "queue-2", dagRun)
 		require.NoError(t, err)
 		require.True(t, alive)
 
@@ -92,7 +97,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check again - should be false now
-		alive, err = store.IsRunAlive(ctx, dagRun)
+		alive, err = store.IsRunAlive(ctx, "queue-2", dagRun)
 		require.NoError(t, err)
 		require.False(t, alive)
 	})
@@ -103,7 +108,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 			Name: "test-dag-3",
 			ID:   "run-789",
 		}
-		proc1, err := store.Acquire(ctx, dagRun1)
+		proc1, err := store.Acquire(ctx, "queue-3", dagRun1)
 		require.NoError(t, err)
 
 		// Give a moment for the heartbeat to start
@@ -114,12 +119,12 @@ func TestStore_IsRunAlive(t *testing.T) {
 			Name: "test-dag-3",
 			ID:   "run-999",
 		}
-		alive, err := store.IsRunAlive(ctx, dagRun2)
+		alive, err := store.IsRunAlive(ctx, "queue-3", dagRun2)
 		require.NoError(t, err)
 		require.False(t, alive)
 
 		// Check the original run is still alive
-		alive, err = store.IsRunAlive(ctx, dagRun1)
+		alive, err = store.IsRunAlive(ctx, "queue-3", dagRun1)
 		require.NoError(t, err)
 		require.True(t, alive)
 
@@ -141,7 +146,8 @@ func TestStore_IsRunAlive(t *testing.T) {
 		}
 
 		// Create a process
-		proc, err := shortStore.Acquire(ctx, dagRun)
+		// Use different group name vs dag name
+		proc, err := shortStore.Acquire(ctx, "stale-queue", dagRun)
 		require.NoError(t, err)
 
 		// Stop the heartbeat immediately
@@ -150,7 +156,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 
 		// Check if the run is alive (should become false when stale)
 		require.Eventually(t, func() bool {
-			alive, err := shortStore.IsRunAlive(ctx, dagRun)
+			alive, err := shortStore.IsRunAlive(ctx, "stale-queue", dagRun)
 			return err == nil && !alive
 		}, 200*time.Millisecond, 10*time.Millisecond, "expected process to become stale")
 	})

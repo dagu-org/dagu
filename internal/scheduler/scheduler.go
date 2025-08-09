@@ -318,7 +318,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
-			alive, err = s.procStore.CountAlive(ctx, dag.QueueProcName())
+			alive, err = s.procStore.CountAlive(ctx, dag.ProcGroup())
 			if err != nil {
 				logger.Error(ctx, "Failed to count alive processes", "err", err, "data", data)
 				goto SEND_RESULT
@@ -342,7 +342,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			}
 
 			// Check concurrency limits based on queue configuration
-			queueCfg = s.getQueueConfigByName(dag.QueueProcName(), dag)
+			queueCfg = s.getQueueConfig(dag.ProcGroup(), dag)
 			if alive >= queueCfg.MaxConcurrency {
 				logger.Info(ctx, "Queue concurrency limit reached", "queue", queueName, "limit", queueCfg.MaxConcurrency, "alive", alive)
 				goto SEND_RESULT
@@ -372,11 +372,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 		WAIT_FOR_RUN:
 			for {
 				// Check if the process is alive (has heartbeat)
-				procRef := digraph.DAGRunRef{
-					Name: dag.QueueProcName(),
-					ID:   data.ID,
-				}
-				isAlive, err := s.procStore.IsRunAlive(ctx, procRef)
+				isAlive, err := s.procStore.IsRunAlive(ctx, dag.ProcGroup(), digraph.DAGRunRef{Name: dag.Name, ID: data.ID})
 				if err != nil {
 					logger.Error(ctx, "Failed to check if run is alive", "err", err, "data", data)
 					// Continue checking on error, don't immediately fail
@@ -440,7 +436,7 @@ func (s *Scheduler) markStatusFailed(ctx context.Context, attempt models.DAGRunA
 
 // getQueueConfigByName gets the queue configuration by queue name.
 // It checks global queue configurations first, then falls back to DAG's maxActiveRuns.
-func (s *Scheduler) getQueueConfigByName(queueName string, dag *digraph.DAG) queueConfig {
+func (s *Scheduler) getQueueConfig(queueName string, dag *digraph.DAG) queueConfig {
 	// Check global queue configurations
 	for _, queueCfg := range s.config.Queues.Config {
 		if queueCfg.Name == queueName {
