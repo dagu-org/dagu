@@ -1,9 +1,10 @@
 import logoDark from '@/assets/images/logo_dark.png';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
-import { BarChart2, GitBranch, List, Search, Server, PanelLeft, Github } from 'lucide-react';
+import { BarChart2, GitBranch, List, Search, Server, PanelLeft, Github, MessageSquare } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { FeedbackDialog } from '@/components/FeedbackDialog';
 
 // Reusable Icon component using Lucide React
 function Icon({
@@ -42,6 +43,8 @@ export const mainListItems = React.forwardRef<
 
   // State for hover
   const [isHovered, setIsHovered] = React.useState(false);
+  // State for feedback dialog
+  const [feedbackOpen, setFeedbackOpen] = React.useState(false);
 
   return (
     <div ref={ref} className="flex flex-col h-full">
@@ -137,6 +140,22 @@ export const mainListItems = React.forwardRef<
           onClick={onNavItemClick}
         />
       </nav>
+      {/* Feedback button */}
+      <div className="px-2 pb-1">
+        <button
+          onClick={() => setFeedbackOpen(true)}
+          className={cn(
+            'flex items-center justify-center transition-all duration-200 w-full',
+            isOpen
+              ? 'h-9 px-3 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground'
+              : 'w-8 h-8 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground mx-auto'
+          )}
+          title="Send Feedback"
+        >
+          <MessageSquare size={18} />
+          {isOpen && <span className="ml-3 text-xs font-medium">Send Feedback</span>}
+        </button>
+      </div>
       {/* GitHub link */}
       <div className="px-2 py-2">
         <a
@@ -163,6 +182,8 @@ export const mainListItems = React.forwardRef<
           </div>
         </div>
       )}
+      {/* Feedback Dialog */}
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </div>
   );
 });
