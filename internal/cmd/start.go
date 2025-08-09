@@ -117,7 +117,7 @@ func runStart(ctx *Context, args []string) error {
 		return executeDAGRun(ctx, dag, digraph.DAGRunRef{}, dagRunID, root)
 	}
 
-	runningCount, err := ctx.ProcStore.CountAlive(ctx, dag.QueueProcName())
+	runningCount, err := ctx.ProcStore.CountAlive(ctx, dag.Name)
 	if err == nil && runningCount == 0 {
 		// If there are no running processes, we can execute the DAG-run directly
 		return executeDAGRun(ctx, dag, digraph.DAGRunRef{}, dagRunID, root)

@@ -6,7 +6,6 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -60,7 +59,19 @@ function StartDAGModal({
 
   const [params, setParams] = React.useState<Parameter[]>([]);
   const [dagRunId, setDAGRunId] = React.useState<string>('');
-  const [immediate, setImmediate] = React.useState<boolean>(false);
+
+  // Get runConfig with default values if not specified
+  const runConfig = React.useMemo(() => {
+    const dagWithRunConfig = dag as typeof dag & {
+      runConfig?: { allowEditParams?: boolean; allowEditRunId?: boolean };
+    };
+    console.log(dag.name, ' : ', dag);
+    return {
+      allowEditParams: dagWithRunConfig.runConfig?.allowEditParams ?? true,
+
+      allowEditRunId: dagWithRunConfig.runConfig?.allowEditRunId ?? true,
+    };
+  }, [dag]);
 
   // Update params when default params change
   React.useEffect(() => {
@@ -102,7 +113,7 @@ function StartDAGModal({
 
         if (isInputFocused || !activeElement) {
           e.preventDefault();
-          onSubmit(stringifyParams(params), dagRunId || undefined, immediate);
+          onSubmit(stringifyParams(params), dagRunId || undefined, false);
         }
       }
     };
@@ -111,38 +122,41 @@ function StartDAGModal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [visible, params, dagRunId, immediate, onSubmit, dismissModal]);
+  }, [visible, params, dagRunId, onSubmit, dismissModal]);
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>
-            Start the DAG
-          </DialogTitle>
+          <DialogTitle>Start the DAG</DialogTitle>
         </DialogHeader>
 
         <div className="py-4 space-y-4">
-          {/* Immediate execution checkbox */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="immediate"
-              checked={immediate}
-              onCheckedChange={(checked) => setImmediate(checked as boolean)}
-            />
-            <Label htmlFor="immediate" className="cursor-pointer">
-              Start immediately (bypass queue)
-            </Label>
-          </div>
-          {/* Optional DAGRun ID field */}
+          {/* DAGRun ID field - always show but make read-only when editing is disabled */}
           <div className="space-y-2">
             <Label htmlFor="dagRun-id">DAG-Run ID (optional)</Label>
             <Input
               id="dagRun-id"
               placeholder="Enter custom DAG-Run ID"
               value={dagRunId}
-              onChange={(e) => setDAGRunId(e.target.value)}
+              readOnly={!runConfig.allowEditRunId}
+              disabled={!runConfig.allowEditRunId}
+              className={
+                !runConfig.allowEditRunId
+                  ? 'bg-gray-100 cursor-not-allowed'
+                  : ''
+              }
+              onChange={(e) => {
+                if (runConfig.allowEditRunId) {
+                  setDAGRunId(e.target.value);
+                }
+              }}
             />
+            {!runConfig.allowEditRunId && (
+              <p className="text-sm text-gray-500">
+                Custom run IDs are disabled for this DAG
+              </p>
+            )}
           </div>
           {parsedParams.map((p, i) => {
             if (p.Name != undefined) {
@@ -154,8 +168,15 @@ function StartDAGModal({
                     placeholder={p.Value}
                     ref={i === 0 ? ref : undefined}
                     value={params.find((pp) => pp.Name == p.Name)?.Value || ''}
+                    readOnly={!runConfig.allowEditParams}
+                    disabled={!runConfig.allowEditParams}
+                    className={
+                      !runConfig.allowEditParams
+                        ? 'bg-gray-100 cursor-not-allowed'
+                        : ''
+                    }
                     onChange={(e) => {
-                      if (p.Name) {
+                      if (p.Name && runConfig.allowEditParams) {
                         setParams(
                           params.map((pp) => {
                             if (pp.Name == p.Name) {
@@ -171,6 +192,11 @@ function StartDAGModal({
                       }
                     }}
                   />
+                  {!runConfig.allowEditParams && (
+                    <p className="text-sm text-gray-500">
+                      Parameter editing is disabled for this DAG
+                    </p>
+                  )}
                 </div>
               );
             } else {
@@ -182,21 +208,35 @@ function StartDAGModal({
                     placeholder={p.Value}
                     ref={i === 0 ? ref : undefined}
                     value={params.find((_, j) => i == j)?.Value || ''}
+                    readOnly={!runConfig.allowEditParams}
+                    disabled={!runConfig.allowEditParams}
+                    className={
+                      !runConfig.allowEditParams
+                        ? 'bg-gray-100 cursor-not-allowed'
+                        : ''
+                    }
                     onChange={(e) => {
-                      setParams(
-                        params.map((pp, j) => {
-                          if (j == i) {
-                            return {
-                              ...pp,
-                              Value: e.target.value,
-                            };
-                          } else {
-                            return pp;
-                          }
-                        })
-                      );
+                      if (runConfig.allowEditParams) {
+                        setParams(
+                          params.map((pp, j) => {
+                            if (j == i) {
+                              return {
+                                ...pp,
+                                Value: e.target.value,
+                              };
+                            } else {
+                              return pp;
+                            }
+                          })
+                        );
+                      }
                     }}
                   />
+                  {!runConfig.allowEditParams && (
+                    <p className="text-sm text-gray-500">
+                      Parameter editing is disabled for this DAG
+                    </p>
+                  )}
                 </div>
               );
             }
@@ -214,10 +254,10 @@ function StartDAGModal({
           <Button
             ref={submitButtonRef}
             onClick={() => {
-              onSubmit(stringifyParams(params), dagRunId || undefined, immediate);
+              onSubmit(stringifyParams(params), dagRunId || undefined, false);
             }}
           >
-            {immediate ? 'Start Immediately' : (action === 'enqueue' ? 'Enqueue' : 'Start')}
+            {action === 'enqueue' ? 'Enqueue' : 'Start'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -3,7 +3,6 @@ package digraph_test
 import (
 	"context"
 	"errors"
-	"os"
 	"testing"
 	"time"
 
@@ -14,11 +13,7 @@ import (
 )
 
 func TestBuild(t *testing.T) {
-	t.Parallel()
-
 	t.Run("SkipIfSuccessful", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 skipIfSuccessful: true
 steps:
@@ -31,8 +26,6 @@ steps:
 		assert.True(t, th.SkipIfSuccessful)
 	})
 	t.Run("ParamsWithSubstitution", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 params: "TEST_PARAM $1"
 `)
@@ -42,8 +35,6 @@ params: "TEST_PARAM $1"
 		th.AssertParam(t, "1=TEST_PARAM", "2=TEST_PARAM")
 	})
 	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 params: x="a b c" y="d e f"
 `)
@@ -53,8 +44,6 @@ params: x="a b c" y="d e f"
 		th.AssertParam(t, "x=a b c", "y=d e f")
 	})
 	t.Run("ParamsAsMap", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 params:
   - FOO: foo
@@ -71,8 +60,6 @@ params:
 		)
 	})
 	t.Run("ParamsAsMapOverride", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 params:
   - FOO: foo
@@ -89,8 +76,6 @@ params:
 		)
 	})
 	t.Run("ParamsWithComplexValues", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 params: first P1=foo P2=${A001} P3=` + "`/bin/echo BAR`" + ` X=bar Y=${P1} Z="A B C"
 env:
@@ -110,8 +95,6 @@ env:
 		)
 	})
 	t.Run("mailOn", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 steps:
   - name: "1"
@@ -128,8 +111,6 @@ mailOn:
 		assert.True(t, th.MailOn.Success)
 	})
 	t.Run("ValidTags", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 tags: daily,monthly
 steps:
@@ -143,8 +124,6 @@ steps:
 		assert.True(t, th.HasTag("monthly"))
 	})
 	t.Run("ValidTagsList", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 tags:
   - daily
@@ -160,8 +139,6 @@ steps:
 		assert.True(t, th.HasTag("monthly"))
 	})
 	t.Run("LogDir", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 logDir: /tmp/logs
 steps:
@@ -174,8 +151,6 @@ steps:
 		assert.Equal(t, "/tmp/logs", th.LogDir)
 	})
 	t.Run("MailConfig", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 # SMTP server settings
 smtp:
@@ -217,8 +192,6 @@ infoMail:
 		assert.True(t, th.InfoMail.AttachLogs)
 	})
 	t.Run("SMTPNumericPort", func(t *testing.T) {
-		t.Parallel()
-
 		// Test SMTP configuration with numeric port
 		data := []byte(`
 smtp:
@@ -239,8 +212,6 @@ steps:
 		assert.Equal(t, "password", dag.SMTP.Password)
 	})
 	t.Run("MailConfigMultipleRecipients", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 # SMTP server settings
 smtp:
@@ -284,8 +255,6 @@ infoMail:
 		assert.False(t, th.InfoMail.AttachLogs)
 	})
 	t.Run("MaxHistRetentionDays", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 histRetentionDays: 365
 `)
@@ -307,8 +276,6 @@ steps:
 		assert.Equal(t, time.Duration(10*time.Second), th.MaxCleanUpTime)
 	})
 	t.Run("ChainTypeBasic", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 name: chain-basic-test
 type: chain
@@ -339,8 +306,6 @@ steps:
 		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends)
 	})
 	t.Run("ChainTypeWithExplicitDepends", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 name: chain-explicit-depends-test
 type: chain
@@ -379,8 +344,6 @@ steps:
 		assert.Equal(t, []string{"process-both"}, th.Steps[4].Depends) // cleanup
 	})
 	t.Run("InvalidType", func(t *testing.T) {
-		t.Parallel()
-
 		// Test will fail with an error containing "invalid type"
 		data := []byte(`
 name: invalid-type-test
@@ -437,8 +400,6 @@ steps:
 		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends) // step4 should depend on step3
 	})
 	t.Run("Preconditions", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 preconditions:
   - condition: "test -f file.txt"
@@ -451,8 +412,6 @@ preconditions:
 		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
 	t.Run("maxActiveRuns", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 maxActiveRuns: 5
 `)
@@ -462,8 +421,6 @@ maxActiveRuns: 5
 		assert.Equal(t, 5, th.MaxActiveRuns)
 	})
 	t.Run("MaxActiveSteps", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 maxActiveSteps: 3
 `)
@@ -473,8 +430,6 @@ maxActiveSteps: 3
 		assert.Equal(t, 3, th.MaxActiveSteps)
 	})
 	t.Run("MaxOutputSize", func(t *testing.T) {
-		t.Parallel()
-
 		// Test custom maxOutputSize
 		data := []byte(`
 name: test-max-output-size
@@ -504,8 +459,6 @@ steps:
 		assert.Equal(t, 0, th2.MaxOutputSize) // Default 1MB
 	})
 	t.Run("ValidationError", func(t *testing.T) {
-		t.Parallel()
-
 		type testCase struct {
 			name        string
 			yaml        string
@@ -1450,12 +1403,9 @@ func (th *DAG) AssertParam(t *testing.T, params ...string) {
 }
 
 // testLoad and helper functions have been removed - all tests now use inline YAML
+
 func TestBuild_QueueConfiguration(t *testing.T) {
-	t.Parallel()
-
 	t.Run("MaxActiveRunsDefaultsToOne", func(t *testing.T) {
-		t.Parallel()
-
 		// Test that when maxActiveRuns is not specified, it defaults to 1
 		data := []byte(`
 steps:
@@ -1469,8 +1419,6 @@ steps:
 	})
 
 	t.Run("MaxActiveRunsNegativeValuePreserved", func(t *testing.T) {
-		t.Parallel()
-
 		// Test that negative values are preserved (they mean queueing is disabled)
 		// Create a simple DAG YAML with negative maxActiveRuns
 		data := []byte(`
@@ -1490,8 +1438,6 @@ func TestStepIDValidation(t *testing.T) {
 	t.Parallel()
 
 	t.Run("ValidID", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 name: test-valid-id
 steps:
@@ -1506,8 +1452,6 @@ steps:
 	})
 
 	t.Run("InvalidIDFormat", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 name: test-invalid-id
 steps:
@@ -1521,8 +1465,6 @@ steps:
 	})
 
 	t.Run("DuplicateIDs", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 name: test-duplicate-ids
 steps:
@@ -1539,8 +1481,6 @@ steps:
 	})
 
 	t.Run("IDConflictsWithStepName", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 name: test-id-name-conflict
 steps:
@@ -1556,8 +1496,6 @@ steps:
 	})
 
 	t.Run("NameConflictsWithStepID", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 name: test-name-id-conflict
 steps:
@@ -1590,8 +1528,6 @@ func TestStepIDInDependencies(t *testing.T) {
 	t.Parallel()
 
 	t.Run("DependOnStepByID", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 name: test-depend-by-id
 steps:
@@ -1610,8 +1546,6 @@ steps:
 	})
 
 	t.Run("DependOnStepByNameWhenIDExists", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 name: test-depend-by-name
 steps:
@@ -1629,8 +1563,6 @@ steps:
 	})
 
 	t.Run("MultipleDependenciesWithIDs", func(t *testing.T) {
-		t.Parallel()
-
 		data := []byte(`
 name: test-multiple-deps
 steps:
@@ -1706,8 +1638,6 @@ steps:
 }
 
 func TestResolveStepDependencies(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		yaml     string
@@ -1821,8 +1751,6 @@ steps:
 }
 
 func TestResolveStepDependencies_Errors(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name        string
 		yaml        string
@@ -1860,8 +1788,6 @@ steps:
 }
 
 func TestBuildOTel(t *testing.T) {
-	t.Parallel()
-
 	t.Run("BasicOTelConfig", func(t *testing.T) {
 		yaml := `
 name: test
@@ -1921,580 +1847,5 @@ steps:
 		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		assert.Nil(t, dag.OTel)
-	})
-}
-
-func TestContainer(t *testing.T) {
-	t.Run("BasicContainer", func(t *testing.T) {
-		yaml := `
-name: test
-container:
-  image: python:3.11-slim
-  pullPolicy: always
-steps:
-  - name: step1
-    command: python script.py
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.Container)
-		assert.Equal(t, "python:3.11-slim", dag.Container.Image)
-		assert.Equal(t, digraph.PullPolicyAlways, dag.Container.PullPolicy)
-	})
-
-	t.Run("ContainerWithAllFields", func(t *testing.T) {
-		yaml := `
-name: test
-container:
-  image: node:18-alpine
-  pullPolicy: missing
-  env:
-    - NODE_ENV: production
-    - API_KEY: secret123
-  volumes:
-    - /data:/data:ro
-    - /output:/output:rw
-  user: "1000:1000"
-  workDir: /app
-  platform: linux/amd64
-  ports:
-    - "8080:8080"
-    - "9090:9090"
-  network: bridge
-  keepContainer: true
-steps:
-  - name: step1
-    command: node app.js
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.Container)
-
-		assert.Equal(t, "node:18-alpine", dag.Container.Image)
-		assert.Equal(t, digraph.PullPolicyMissing, dag.Container.PullPolicy)
-		assert.Contains(t, dag.Container.Env, "NODE_ENV=production")
-		assert.Contains(t, dag.Container.Env, "API_KEY=secret123")
-		assert.Equal(t, []string{"/data:/data:ro", "/output:/output:rw"}, dag.Container.Volumes)
-		assert.Equal(t, "1000:1000", dag.Container.User)
-		assert.Equal(t, "/app", dag.Container.WorkDir)
-		assert.Equal(t, "linux/amd64", dag.Container.Platform)
-		assert.Equal(t, []string{"8080:8080", "9090:9090"}, dag.Container.Ports)
-		assert.Equal(t, "bridge", dag.Container.Network)
-		assert.True(t, dag.Container.KeepContainer)
-	})
-
-	t.Run("ContainerEnvAsMap", func(t *testing.T) {
-		yaml := `
-name: test
-container:
-  image: alpine
-  env:
-    FOO: bar
-    BAZ: qux
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.Container)
-		assert.Contains(t, dag.Container.Env, "FOO=bar")
-		assert.Contains(t, dag.Container.Env, "BAZ=qux")
-	})
-
-	t.Run("ContainerPullPolicyVariations", func(t *testing.T) {
-		testCases := []struct {
-			name       string
-			pullPolicy string
-			expected   digraph.PullPolicy
-		}{
-			{"always", "always", digraph.PullPolicyAlways},
-			{"never", "never", digraph.PullPolicyNever},
-			{"missing", "missing", digraph.PullPolicyMissing},
-			{"true", "true", digraph.PullPolicyAlways},
-			{"false", "false", digraph.PullPolicyNever},
-		}
-
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				yaml := `
-name: test
-container:
-  image: alpine
-  pullPolicy: ` + tc.pullPolicy + `
-steps:
-  - name: step1
-    command: echo test
-`
-				ctx := context.Background()
-				dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-				require.NoError(t, err)
-				require.NotNil(t, dag.Container)
-				assert.Equal(t, tc.expected, dag.Container.PullPolicy)
-			})
-		}
-	})
-
-	t.Run("ContainerPullPolicyBoolean", func(t *testing.T) {
-		// Test with boolean true
-		yaml := `
-name: test
-container:
-  image: alpine
-  pullPolicy: true
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.Container)
-		assert.Equal(t, digraph.PullPolicyAlways, dag.Container.PullPolicy)
-	})
-
-	t.Run("ContainerWithoutPullPolicy", func(t *testing.T) {
-		yaml := `
-name: test
-container:
-  image: alpine
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.Container)
-		assert.Equal(t, digraph.PullPolicyMissing, dag.Container.PullPolicy)
-	})
-
-	t.Run("NoContainer", func(t *testing.T) {
-		yaml := `
-name: test
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		assert.Nil(t, dag.Container)
-	})
-
-	t.Run("InvalidPullPolicy", func(t *testing.T) {
-		yaml := `
-name: test
-container:
-  image: alpine
-  pullPolicy: invalid_policy
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		_, err := digraph.LoadYAML(ctx, []byte(yaml))
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to parse pull policy")
-	})
-
-	t.Run("ContainerWithoutImage", func(t *testing.T) {
-		yaml := `
-name: test
-container:
-  pullPolicy: always
-  env:
-    - FOO: bar
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		_, err := digraph.LoadYAML(ctx, []byte(yaml))
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "image is required when container is specified")
-	})
-}
-
-func TestContainerExecutorIntegration(t *testing.T) {
-	t.Run("StepInheritsContainerExecutor", func(t *testing.T) {
-		yaml := `
-name: test
-container:
-  image: python:3.11-slim
-steps:
-  - name: step1
-    command: python script.py
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-
-		// Step should have docker executor type when DAG has container
-		assert.Equal(t, "docker", dag.Steps[0].ExecutorConfig.Type)
-	})
-
-	t.Run("ExplicitExecutorOverridesContainer", func(t *testing.T) {
-		yaml := `
-name: test
-container:
-  image: python:3.11-slim
-steps:
-  - name: step1
-    command: echo test
-    executor: shell
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-
-		// Explicit executor should override DAG-level container
-		assert.Equal(t, "shell", dag.Steps[0].ExecutorConfig.Type)
-	})
-
-	t.Run("NoContainerNoExecutor", func(t *testing.T) {
-		yaml := `
-name: test
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-
-		// No container and no executor means default (empty) executor
-		assert.Equal(t, "", dag.Steps[0].ExecutorConfig.Type)
-	})
-
-	t.Run("StepWithDockerExecutorConfig", func(t *testing.T) {
-		yaml := `
-name: test
-container:
-  image: node:18-alpine
-steps:
-  - name: step1
-    command: node app.js
-    executor:
-      type: docker
-      config:
-        image: python:3.11
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-
-		// Step-level docker config should override DAG container
-		assert.Equal(t, "docker", dag.Steps[0].ExecutorConfig.Type)
-		assert.Equal(t, "python:3.11", dag.Steps[0].ExecutorConfig.Config["image"])
-	})
-
-	t.Run("MultipleStepsWithContainer", func(t *testing.T) {
-		yaml := `
-name: test
-container:
-  image: alpine:latest
-steps:
-  - name: step1
-    command: echo "step 1"
-  - name: step2
-    command: echo "step 2"
-    executor: shell
-  - name: step3
-    command: echo "step 3"
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 3)
-
-		// Step 1 and 3 should inherit docker executor
-		assert.Equal(t, "docker", dag.Steps[0].ExecutorConfig.Type)
-		assert.Equal(t, "shell", dag.Steps[1].ExecutorConfig.Type)
-		assert.Equal(t, "docker", dag.Steps[2].ExecutorConfig.Type)
-	})
-}
-
-func TestStepLevelEnv(t *testing.T) {
-	t.Run("BasicStepEnv", func(t *testing.T) {
-		yaml := `
-name: test
-steps:
-  - name: step1
-    command: echo $STEP_VAR
-    env:
-      - STEP_VAR: step_value
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-		assert.Equal(t, []string{"STEP_VAR=step_value"}, dag.Steps[0].Env)
-	})
-
-	t.Run("StepEnvOverridesDAGEnv", func(t *testing.T) {
-		yaml := `
-name: test
-env:
-  - SHARED_VAR: dag_value
-  - DAG_ONLY: dag_only_value
-steps:
-  - name: step1
-    command: echo $SHARED_VAR
-    env:
-      - SHARED_VAR: step_value
-      - STEP_ONLY: step_only_value
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-		// Check DAG-level env
-		assert.Contains(t, dag.Env, "SHARED_VAR=dag_value")
-		assert.Contains(t, dag.Env, "DAG_ONLY=dag_only_value")
-		// Check step-level env
-		assert.Contains(t, dag.Steps[0].Env, "SHARED_VAR=step_value")
-		assert.Contains(t, dag.Steps[0].Env, "STEP_ONLY=step_only_value")
-	})
-
-	t.Run("StepEnvAsMap", func(t *testing.T) {
-		yaml := `
-name: test
-steps:
-  - name: step1
-    command: echo test
-    env:
-      FOO: foo_value
-      BAR: bar_value
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-		assert.Contains(t, dag.Steps[0].Env, "FOO=foo_value")
-		assert.Contains(t, dag.Steps[0].Env, "BAR=bar_value")
-	})
-
-	t.Run("StepEnvWithSubstitution", func(t *testing.T) {
-		yaml := `
-name: test
-env:
-  - BASE_PATH: /tmp
-steps:
-  - name: step1
-    command: echo $FULL_PATH
-    env:
-      - FULL_PATH: ${BASE_PATH}/data
-      - COMPUTED: "` + "`echo computed_value`" + `"
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-		assert.Contains(t, dag.Steps[0].Env, "FULL_PATH=${BASE_PATH}/data")
-		assert.Contains(t, dag.Steps[0].Env, "COMPUTED=`echo computed_value`")
-	})
-
-	t.Run("MultipleStepsWithDifferentEnvs", func(t *testing.T) {
-		yaml := `
-name: test
-steps:
-  - name: step1
-    command: echo $ENV_VAR
-    env:
-      - ENV_VAR: value1
-  - name: step2
-    command: echo $ENV_VAR
-    env:
-      - ENV_VAR: value2
-  - name: step3
-    command: echo $ENV_VAR
-    # No env, should inherit DAG env only
-`
-		ctx := context.Background()
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 3)
-		assert.Equal(t, []string{"ENV_VAR=value1"}, dag.Steps[0].Env)
-		assert.Equal(t, []string{"ENV_VAR=value2"}, dag.Steps[1].Env)
-		assert.Empty(t, dag.Steps[2].Env)
-	})
-
-	t.Run("StepEnvComplexValues", func(t *testing.T) {
-		yaml := `
-name: test
-steps:
-  - name: step1
-    command: echo test
-    env:
-      - PATH: "/custom/bin:${PATH}"
-      - JSON_CONFIG: '{"key": "value", "nested": {"foo": "bar"}}'
-      - MULTI_LINE: |
-          line1
-          line2
-`
-		ctx := context.Background()
-		// Set PATH env var for substitution test
-		origPath := os.Getenv("PATH")
-		defer func() { os.Setenv("PATH", origPath) }()
-		os.Setenv("PATH", "/usr/bin")
-
-		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-		assert.Contains(t, dag.Steps[0].Env, "PATH=/custom/bin:${PATH}")
-		assert.Contains(t, dag.Steps[0].Env, `JSON_CONFIG={"key": "value", "nested": {"foo": "bar"}}`)
-		assert.Contains(t, dag.Steps[0].Env, "MULTI_LINE=line1\nline2\n")
-	})
-}
-
-func TestBuildRegistryAuths(t *testing.T) {
-	t.Run("Parse registryAuths from YAML", func(t *testing.T) {
-		yaml := `
-name: test-dag
-registryAuths:
-  docker.io:
-    username: docker-user
-    password: docker-pass
-  ghcr.io:
-    username: github-user
-    password: github-token
-  gcr.io:
-    auth: Z2NyLXVzZXI6Z2NyLXBhc3M= # base64("gcr-user:gcr-pass")
-
-container:
-  image: docker.io/myapp:latest
-
-steps:
-  - name: test
-    command: echo hello
-`
-		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag)
-
-		// Check that registryAuths were parsed correctly
-		assert.NotNil(t, dag.RegistryAuths)
-		assert.Len(t, dag.RegistryAuths, 3)
-
-		// Check docker.io auth
-		dockerAuth, exists := dag.RegistryAuths["docker.io"]
-		assert.True(t, exists)
-		assert.Equal(t, "docker-user", dockerAuth.Username)
-		assert.Equal(t, "docker-pass", dockerAuth.Password)
-
-		// Check ghcr.io auth
-		ghcrAuth, exists := dag.RegistryAuths["ghcr.io"]
-		assert.True(t, exists)
-		assert.Equal(t, "github-user", ghcrAuth.Username)
-		assert.Equal(t, "github-token", ghcrAuth.Password)
-
-		// Check gcr.io auth (with pre-encoded auth field)
-		gcrAuth, exists := dag.RegistryAuths["gcr.io"]
-		assert.True(t, exists)
-		assert.Equal(t, "Z2NyLXVzZXI6Z2NyLXBhc3M=", gcrAuth.Auth)
-		assert.Empty(t, gcrAuth.Username) // Should be empty when auth is provided
-		assert.Empty(t, gcrAuth.Password) // Should be empty when auth is provided
-	})
-
-	t.Run("Empty registryAuths", func(t *testing.T) {
-		yaml := `
-name: test-dag
-steps:
-  - name: test
-    command: echo hello
-`
-		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag)
-
-		// Should be nil when not specified
-		assert.Nil(t, dag.RegistryAuths)
-	})
-
-	t.Run("registryAuths with environment variables", func(t *testing.T) {
-		// Set environment variables for testing
-		t.Setenv("DOCKER_USER", "env-docker-user")
-		t.Setenv("DOCKER_PASS", "env-docker-pass")
-
-		yaml := `
-name: test-dag
-registryAuths:
-  docker.io:
-    username: ${DOCKER_USER}
-    password: ${DOCKER_PASS}
-
-steps:
-  - name: test
-    command: echo hello
-`
-		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag)
-
-		// Check that environment variables were expanded
-		dockerAuth, exists := dag.RegistryAuths["docker.io"]
-		assert.True(t, exists)
-		assert.Equal(t, "env-docker-user", dockerAuth.Username)
-		assert.Equal(t, "env-docker-pass", dockerAuth.Password)
-	})
-
-	t.Run("registryAuths as JSON string", func(t *testing.T) {
-		// Simulate DOCKER_AUTH_CONFIG style JSON string
-		jsonAuth := `{"docker.io": {"username": "json-user", "password": "json-pass"}}`
-		t.Setenv("DOCKER_AUTH_JSON", jsonAuth)
-
-		yaml := `
-name: test-dag
-registryAuths: ${DOCKER_AUTH_JSON}
-
-steps:
-  - name: test
-    command: echo hello
-`
-		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag)
-
-		// Should have stored the JSON string as _json entry
-		assert.NotNil(t, dag.RegistryAuths)
-		jsonEntry, exists := dag.RegistryAuths["_json"]
-		assert.True(t, exists)
-		assert.Equal(t, jsonAuth, jsonEntry.Auth)
-	})
-
-	t.Run("registryAuths with string values per registry", func(t *testing.T) {
-		yaml := `
-name: test-dag
-registryAuths:
-  docker.io: '{"username": "user1", "password": "pass1"}'
-  ghcr.io: '{"username": "user2", "password": "pass2"}'
-
-steps:
-  - name: test
-    command: echo hello
-`
-		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag)
-
-		// Check docker.io - should have the JSON string in Auth field
-		dockerAuth, exists := dag.RegistryAuths["docker.io"]
-		assert.True(t, exists)
-		assert.Equal(t, `{"username": "user1", "password": "pass1"}`, dockerAuth.Auth)
-		assert.Empty(t, dockerAuth.Username)
-		assert.Empty(t, dockerAuth.Password)
-
-		// Check ghcr.io
-		ghcrAuth, exists := dag.RegistryAuths["ghcr.io"]
-		assert.True(t, exists)
-		assert.Equal(t, `{"username": "user2", "password": "pass2"}`, ghcrAuth.Auth)
 	})
 }

@@ -107,7 +107,7 @@ paths:
           required: false
           schema:
             type: "string"
-            enum: ["name"]
+            enum: ["name", "status", "lastRun", "schedule", "suspended"]
             default: "name"
           description: "Field to sort by"
         - name: "order"
@@ -1514,6 +1514,19 @@ components:
           description: "List of tags for categorizing and filtering DAGs"
           items:
             type: string
+        runConfig:
+          type: object
+          description: "Configuration for controlling user interactions when starting DAG runs"
+          properties:
+            allowEditParams:
+              type: boolean
+              description: "Allow users to edit parameters when starting the DAG"
+              default: true
+            allowEditRunId:
+              type: boolean
+              description: "Allow users to specify custom run IDs"
+              default: true
+          additionalProperties: false
       required:
         - name
 
@@ -1588,7 +1601,7 @@ components:
         - "not started"
         - "running"
         - "failed"
-        - "cancelled"
+        - "canceled"
         - "finished"
         - "skipped"
         - "partial success"
@@ -1664,6 +1677,19 @@ components:
           description: "List of tags for categorizing and filtering DAGs"
           items:
             type: string
+        runConfig:
+          type: object
+          description: "Configuration for controlling user interactions when starting DAG runs"
+          properties:
+            allowEditParams:
+              type: boolean
+              description: "Allow users to edit parameters when starting the DAG"
+              default: true
+            allowEditRunId:
+              type: boolean
+              description: "Allow users to specify custom run IDs"
+              default: true
+          additionalProperties: false
       required:
         - name
 

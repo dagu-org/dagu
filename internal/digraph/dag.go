@@ -1,7 +1,8 @@
 package digraph
 
 import (
-	"crypto/md5" // nolint:gosec
+	// nolint // gosec
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -102,17 +103,18 @@ type DAG struct {
 	MaxOutputSize int `json:"maxOutputSize,omitempty"`
 	// OTel contains the OpenTelemetry configuration for the DAG.
 	OTel *OTelConfig `json:"otel,omitempty"`
+	// RunConfig contains configuration for controlling user interactions during DAG runs.
+	RunConfig *RunConfig `json:"runConfig,omitempty"`
+	// Container contains the container configuration for the DAG.
+	Container *Container `json:"container,omitempty"`
+	// RegistryAuths contains authentication configurations for Docker registries.
+	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
 	// BuildErrors contains any errors encountered while building the DAG.
 	BuildErrors []error
 	// LocalDAGs contains DAGs defined in the same file, keyed by DAG name
 	LocalDAGs map[string]*DAG `json:"localDAGs,omitempty"`
 	// YamlData contains the raw YAML data of the DAG.
 	YamlData []byte `json:"yamlData,omitempty"`
-	// Container contains the container definition for the DAG.
-	Container *Container `json:"container,omitempty"`
-	// RegistryAuths maps registry hostnames to authentication configs.
-	// Optional: If not specified, falls back to DOCKER_AUTH_CONFIG or docker config.
-	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
 }
 
 // CreateTask creates a coordinator task from this DAG for distributed execution.
@@ -151,6 +153,195 @@ func (d *DAG) CreateTask(
 	}
 
 	return task
+}
+
+// TaskOption is a function that modifies a coordinatorv1.Task.
+type TaskOption func(*coordinatorv1.Task)
+
+// WithRootDagRun sets the root DAG run name and ID in the task.
+func WithRootDagRun(ref DAGRunRef) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		if ref.Name == "" || ref.ID == "" {
+			return // No root DAG run reference provided
+		}
+		task.RootDagRunName = ref.Name
+		task.RootDagRunId = ref.ID
+	}
+}
+
+// WithParentDagRun sets the parent DAG run name and ID in the task.
+func WithParentDagRun(ref DAGRunRef) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		if ref.Name == "" || ref.ID == "" {
+			return // No parent DAG run reference provided
+		}
+		task.ParentDagRunName = ref.Name
+		task.ParentDagRunId = ref.ID
+	}
+}
+
+// WithTaskParams sets the parameters for the task.
+func WithTaskParams(params string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.Params = params
+	}
+}
+
+// WithWorkerSelector sets the worker selector labels for the task.
+func WithWorkerSelector(selector map[string]string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.WorkerSelector = selector
+	}
+}
+
+// WithStep sets the step name for retry operations.
+func WithStep(step string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.Step = step
+	}
+}
+
+// QueueName returns the name of the queue for this DAG.
+// If the queue is not set, it returns the DAG name as the default queue name.
+func (d *DAG) QueueName() string {
+	// If the queue is not set, return the default queue name.
+	if d.Queue == "" {
+		return d.Name
+	}
+	return d.Queue
+}
+
+// QueueProcName returns the name used for process tracking in the queue.
+// This is an alias for QueueName for backward compatibility.
+func (d *DAG) QueueProcName() string {
+	return d.QueueName()
+}
+
+// FileName returns the filename of the DAG without the extension.
+func (d *DAG) FileName() string {
+	if d.Location == "" {
+		return ""
+	}
+	return fileutil.TrimYAMLFileExtension(filepath.Base(d.Location))
+}
+
+// Schedule contains the cron expression and the parsed cron schedule.
+type Schedule struct {
+	// Expression is the cron expression.
+	Expression string `json:"expression"`
+	// Parsed is the parsed cron schedule.
+	Parsed cron.Schedule `json:"-"`
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (s Schedule) MarshalJSON() ([]byte, error) {
+	// Create a temporary struct for marshaling
+	type ScheduleAlias struct {
+		Expression string `json:"expression"`
+	}
+
+	return json.Marshal(ScheduleAlias{
+		Expression: s.Expression,
+	})
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+// and also parses the cron expression to populate the Parsed field.
+func (s *Schedule) UnmarshalJSON(data []byte) error {
+	// Create a temporary struct for unmarshaling
+	type ScheduleAlias struct {
+		Expression string `json:"expression"`
+	}
+
+	var alias ScheduleAlias
+	if err := json.Unmarshal(data, &alias); err != nil {
+		return err
+	}
+
+	s.Expression = alias.Expression
+
+	// Parse the cron expression to populate the Parsed field
+	if s.Expression != "" {
+		parsed, err := cron.ParseStandard(s.Expression)
+		if err != nil {
+			return fmt.Errorf("invalid cron expression %q: %w", s.Expression, err)
+		}
+		s.Parsed = parsed
+	}
+
+	return nil
+}
+
+// HandlerOn contains the steps to be executed on different events in the DAG.
+type HandlerOn struct {
+	Failure *Step `json:"failure,omitempty"`
+	Success *Step `json:"success,omitempty"`
+	Cancel  *Step `json:"cancel,omitempty"`
+	Exit    *Step `json:"exit,omitempty"`
+}
+
+// MailOn contains the conditions to send mail.
+type MailOn struct {
+	Failure bool `json:"failure,omitempty"`
+	Success bool `json:"success,omitempty"`
+}
+
+// SMTPConfig contains the SMTP configuration.
+type SMTPConfig struct {
+	Host     string `json:"host,omitempty"`
+	Port     string `json:"port,omitempty"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
+// MailConfig contains the mail configuration.
+type MailConfig struct {
+	From       string   `json:"from,omitempty"`
+	To         []string `json:"to,omitempty"`
+	Prefix     string   `json:"prefix,omitempty"`
+	AttachLogs bool     `json:"attachLogs,omitempty"`
+}
+
+// OTelConfig contains the OpenTelemetry configuration.
+type OTelConfig struct {
+	Enabled  bool              `json:"enabled,omitempty"`
+	Endpoint string            `json:"endpoint,omitempty"`
+	Headers  map[string]string `json:"headers,omitempty"`
+	Insecure bool              `json:"insecure,omitempty"`
+	Timeout  time.Duration     `json:"timeout,omitempty"`
+	Resource map[string]any    `json:"resource,omitempty"`
+}
+
+// RunConfig contains configuration for controlling user interactions during DAG runs.
+type RunConfig struct {
+	AllowEditParams bool `json:"allowEditParams,omitempty"` // Allow users to edit parameters when starting DAG
+	AllowEditRunId  bool `json:"allowEditRunId,omitempty"`  // Allow users to specify custom run IDs
+}
+
+// HandlerType is the type of the handler.
+type HandlerType string
+
+const (
+	HandlerOnSuccess HandlerType = "onSuccess"
+	HandlerOnFailure HandlerType = "onFailure"
+	HandlerOnCancel  HandlerType = "onCancel"
+	HandlerOnExit    HandlerType = "onExit"
+)
+
+func (h HandlerType) String() string {
+	return string(h)
+}
+
+// ParseHandlerType converts a string to a HandlerType.
+func ParseHandlerType(s string) HandlerType {
+	return handlerMapping[s]
+}
+
+var handlerMapping = map[string]HandlerType{
+	"onSuccess": HandlerOnSuccess,
+	"onFailure": HandlerOnFailure,
+	"onCancel":  HandlerOnCancel,
+	"onExit":    HandlerOnExit,
 }
 
 // HasTag checks if the DAG has the given tag.
@@ -297,192 +488,17 @@ func (d *DAG) setupHandlers(workDir string) {
 	}
 }
 
-// TaskOption is a function that modifies a coordinatorv1.Task.
-type TaskOption func(*coordinatorv1.Task)
-
-// WithRootDagRun sets the root DAG run name and ID in the task.
-func WithRootDagRun(ref DAGRunRef) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		if ref.Name == "" || ref.ID == "" {
-			return // No root DAG run reference provided
-		}
-		task.RootDagRunName = ref.Name
-		task.RootDagRunId = ref.ID
-	}
-}
-
-// WithParentDagRun sets the parent DAG run name and ID in the task.
-func WithParentDagRun(ref DAGRunRef) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		if ref.Name == "" || ref.ID == "" {
-			return // No parent DAG run reference provided
-		}
-		task.ParentDagRunName = ref.Name
-		task.ParentDagRunId = ref.ID
-	}
-}
-
-// WithTaskParams sets the parameters for the task.
-func WithTaskParams(params string) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		task.Params = params
-	}
-}
-
-// WithWorkerSelector sets the worker selector labels for the task.
-func WithWorkerSelector(selector map[string]string) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		task.WorkerSelector = selector
-	}
-}
-
-// WithStep sets the step name for retry operations.
-func WithStep(step string) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		task.Step = step
-	}
-}
-
-// QueueProcName returns the name of the queue for this DAG.
-// If the queue is not set, it returns the DAG name as the default queue name.
-func (d *DAG) QueueProcName() string {
-	// If the queue is not set, return the default queue name.
-	if d.Queue == "" {
-		return d.Name
-	}
-	return d.Queue
-}
-
-// FileName returns the filename of the DAG without the extension.
-func (d *DAG) FileName() string {
-	if d.Location == "" {
-		return ""
-	}
-	return fileutil.TrimYAMLFileExtension(filepath.Base(d.Location))
-}
-
-// Schedule contains the cron expression and the parsed cron schedule.
-type Schedule struct {
-	// Expression is the cron expression.
-	Expression string `json:"expression"`
-	// Parsed is the parsed cron schedule.
-	Parsed cron.Schedule `json:"-"`
-}
-
-// MarshalJSON implements the json.Marshaler interface.
-func (s Schedule) MarshalJSON() ([]byte, error) {
-	// Create a temporary struct for marshaling
-	type ScheduleAlias struct {
-		Expression string `json:"expression"`
-	}
-
-	return json.Marshal(ScheduleAlias{
-		Expression: s.Expression,
-	})
-}
-
-// UnmarshalJSON implements the json.Unmarshaler interface.
-// and also parses the cron expression to populate the Parsed field.
-func (s *Schedule) UnmarshalJSON(data []byte) error {
-	// Create a temporary struct for unmarshaling
-	type ScheduleAlias struct {
-		Expression string `json:"expression"`
-	}
-
-	var alias ScheduleAlias
-	if err := json.Unmarshal(data, &alias); err != nil {
-		return err
-	}
-
-	s.Expression = alias.Expression
-
-	// Parse the cron expression to populate the Parsed field
-	if s.Expression != "" {
-		parsed, err := cron.ParseStandard(s.Expression)
-		if err != nil {
-			return fmt.Errorf("invalid cron expression %q: %w", s.Expression, err)
-		}
-		s.Parsed = parsed
-	}
-
-	return nil
-}
-
-// HandlerOn contains the steps to be executed on different events in the DAG.
-type HandlerOn struct {
-	Failure *Step `json:"failure,omitempty"`
-	Success *Step `json:"success,omitempty"`
-	Cancel  *Step `json:"cancel,omitempty"`
-	Exit    *Step `json:"exit,omitempty"`
-}
-
-// MailOn contains the conditions to send mail.
-type MailOn struct {
-	Failure bool `json:"failure,omitempty"`
-	Success bool `json:"success,omitempty"`
-}
-
-// SMTPConfig contains the SMTP configuration.
-type SMTPConfig struct {
-	Host     string `json:"host,omitempty"`
-	Port     string `json:"port,omitempty"`
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
-}
-
-// MailConfig contains the mail configuration.
-type MailConfig struct {
-	From       string   `json:"from,omitempty"`
-	To         []string `json:"to,omitempty"`
-	Prefix     string   `json:"prefix,omitempty"`
-	AttachLogs bool     `json:"attachLogs,omitempty"`
-}
-
-// OTelConfig contains the OpenTelemetry configuration.
-type OTelConfig struct {
-	Enabled  bool              `json:"enabled,omitempty"`
-	Endpoint string            `json:"endpoint,omitempty"`
-	Headers  map[string]string `json:"headers,omitempty"`
-	Insecure bool              `json:"insecure,omitempty"`
-	Timeout  time.Duration     `json:"timeout,omitempty"`
-	Resource map[string]any    `json:"resource,omitempty"`
-}
-
-// HandlerType is the type of the handler.
-type HandlerType string
-
-const (
-	HandlerOnSuccess HandlerType = "onSuccess"
-	HandlerOnFailure HandlerType = "onFailure"
-	HandlerOnCancel  HandlerType = "onCancel"
-	HandlerOnExit    HandlerType = "onExit"
-)
-
-func (h HandlerType) String() string {
-	return string(h)
-}
-
-// ParseHandlerType converts a string to a HandlerType.
-func ParseHandlerType(s string) HandlerType {
-	return handlerMapping[s]
-}
-
-var handlerMapping = map[string]HandlerType{
-	"onSuccess": HandlerOnSuccess,
-	"onFailure": HandlerOnFailure,
-	"onCancel":  HandlerOnCancel,
-	"onExit":    HandlerOnExit,
-}
-
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
 func SockAddr(name, dagRunID string) string {
-	// Create MD5 hash of the combined name and dag-run ID and take first 6 chars
-	hashLength := 6
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(name+dagRunID)))[:hashLength] // nolint:gosec
-
 	maxSocketNameLength := 50 // Maximum length for socket name
 	name = fileutil.SafeName(name)
+	dagRunID = fileutil.SafeName(dagRunID)
+
+	// Create MD5 hash of the combined name and dag-run ID and take first 8 chars
+	combined := name + dagRunID
+	hashLength := 6
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength] // nolint:gosec
 
 	// Calculate the total length with the full name
 	prefix := "@dagu_"

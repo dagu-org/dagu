@@ -3,7 +3,6 @@ package digraph
 import (
 	"context"
 	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -23,12 +22,6 @@ type BuildContext struct {
 	ctx  context.Context
 	file string
 	opts BuildOpts
-}
-
-// StepBuildContext is the context for building a step.
-type StepBuildContext struct {
-	BuildContext
-	dag *DAG
 }
 
 func (c BuildContext) WithOpts(opts BuildOpts) BuildContext {
@@ -71,10 +64,10 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "params", fn: buildParams},
 	{metadata: true, name: "name", fn: buildName},
 	{metadata: true, name: "type", fn: buildType},
-	{name: "container", fn: buildContainer},
-	{name: "registryAuths", fn: buildRegistryAuths},
 	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
+	{name: "steps", fn: buildSteps},
+	{name: "validateSteps", fn: validateSteps},
 	{name: "logDir", fn: buildLogDir},
 	{name: "handlers", fn: buildHandlers},
 	{name: "smtpConfig", fn: buildSMTPConfig},
@@ -85,8 +78,9 @@ var builderRegistry = []builderEntry{
 	{name: "maxActiveRuns", fn: buildMaxActiveRuns},
 	{name: "preconditions", fn: buildPrecondition},
 	{name: "otel", fn: buildOTel},
-	{name: "steps", fn: buildSteps},
-	{name: "validateSteps", fn: validateSteps},
+	{metadata: true, name: "runConfig", fn: buildRunConfig},
+	{name: "container", fn: buildContainer},
+	{name: "registryAuths", fn: buildRegistryAuths},
 }
 
 type builderEntry struct {
@@ -107,7 +101,6 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "signalOnStop", fn: buildSignalOnStop},
 	{name: "precondition", fn: buildStepPrecondition},
 	{name: "output", fn: buildOutput},
-	{name: "env", fn: buildStepEnvs},
 	{name: "validate", fn: validateStep},
 }
 
@@ -117,7 +110,7 @@ type stepBuilderEntry struct {
 }
 
 // StepBuilderFn is a function that builds a part of the step.
-type StepBuilderFn func(ctx StepBuildContext, def stepDef, step *Step) error
+type StepBuilderFn func(ctx BuildContext, def stepDef, step *Step) error
 
 // build builds a DAG from the specification.
 func build(ctx BuildContext, spec *definition) (*DAG, error) {
@@ -263,185 +256,6 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 	return err
 }
 
-func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
-	if spec.Container == nil {
-		return nil
-	}
-
-	// Validate required fields
-	if spec.Container.Image == "" {
-		return wrapError("container.image", spec.Container.Image, fmt.Errorf("image is required when container is specified"))
-	}
-
-	pullPolicy, err := ParsePullPolicy(spec.Container.PullPolicy)
-	if err != nil {
-		return wrapError("container.pullPolicy", spec.Container.PullPolicy, err)
-	}
-
-	vars, err := loadVariables(ctx, spec.Container.Env)
-	if err != nil {
-		return wrapError("container.env", spec.Container.Env, err)
-	}
-
-	var envs []string
-	for k, v := range vars {
-		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	container := Container{
-		Image:         spec.Container.Image,
-		PullPolicy:    pullPolicy,
-		Env:           envs,
-		Volumes:       spec.Container.Volumes,
-		User:          spec.Container.User,
-		WorkDir:       spec.Container.WorkDir,
-		Platform:      spec.Container.Platform,
-		Ports:         spec.Container.Ports,
-		Network:       spec.Container.Network,
-		KeepContainer: spec.Container.KeepContainer,
-	}
-
-	dag.Container = &container
-
-	return nil
-}
-
-func buildRegistryAuths(ctx BuildContext, spec *definition, dag *DAG) error {
-	if spec.RegistryAuths == nil {
-		return nil
-	}
-
-	dag.RegistryAuths = make(map[string]*AuthConfig)
-
-	switch v := spec.RegistryAuths.(type) {
-	case string:
-		// Handle as a JSON string (e.g., from environment variable)
-		expandedJSON := v
-		if !ctx.opts.NoEval {
-			expandedJSON = os.ExpandEnv(v)
-		}
-
-		// For now, store the entire JSON string as a single entry
-		// The actual parsing will be done by the registry manager
-		dag.RegistryAuths["_json"] = &AuthConfig{
-			Auth: expandedJSON,
-		}
-
-	case map[string]any:
-		// Handle as a map of registry to auth config
-		for registry, authData := range v {
-			authConfig := &AuthConfig{}
-
-			switch auth := authData.(type) {
-			case string:
-				// Simple string value - treat as JSON auth config
-				if !ctx.opts.NoEval {
-					auth = os.ExpandEnv(auth)
-				}
-				authConfig.Auth = auth
-
-			case map[string]any:
-				// Auth config object with username/password fields
-				if username, ok := auth["username"].(string); ok {
-					authConfig.Username = username
-					if !ctx.opts.NoEval {
-						authConfig.Username = os.ExpandEnv(authConfig.Username)
-					}
-				}
-
-				if password, ok := auth["password"].(string); ok {
-					authConfig.Password = password
-					if !ctx.opts.NoEval {
-						authConfig.Password = os.ExpandEnv(authConfig.Password)
-					}
-				}
-
-				if authStr, ok := auth["auth"].(string); ok {
-					authConfig.Auth = authStr
-					if !ctx.opts.NoEval {
-						authConfig.Auth = os.ExpandEnv(authConfig.Auth)
-					}
-				}
-			}
-
-			dag.RegistryAuths[registry] = authConfig
-		}
-
-	case map[any]any:
-		// Handle YAML's default map type
-		for registryKey, authData := range v {
-			registry, ok := registryKey.(string)
-			if !ok {
-				continue
-			}
-
-			authConfig := &AuthConfig{}
-
-			switch auth := authData.(type) {
-			case string:
-				// Simple string value - treat as JSON auth config
-				if !ctx.opts.NoEval {
-					auth = os.ExpandEnv(auth)
-				}
-				authConfig.Auth = auth
-
-			case map[string]any:
-				// Auth config object with username/password fields
-				if username, ok := auth["username"].(string); ok {
-					authConfig.Username = username
-					if !ctx.opts.NoEval {
-						authConfig.Username = os.ExpandEnv(authConfig.Username)
-					}
-				}
-
-				if password, ok := auth["password"].(string); ok {
-					authConfig.Password = password
-					if !ctx.opts.NoEval {
-						authConfig.Password = os.ExpandEnv(authConfig.Password)
-					}
-				}
-
-				if authStr, ok := auth["auth"].(string); ok {
-					authConfig.Auth = authStr
-					if !ctx.opts.NoEval {
-						authConfig.Auth = os.ExpandEnv(authConfig.Auth)
-					}
-				}
-
-			case map[any]any:
-				// Handle nested YAML map type
-				if username, ok := auth["username"].(string); ok {
-					authConfig.Username = username
-					if !ctx.opts.NoEval {
-						authConfig.Username = os.ExpandEnv(authConfig.Username)
-					}
-				}
-
-				if password, ok := auth["password"].(string); ok {
-					authConfig.Password = password
-					if !ctx.opts.NoEval {
-						authConfig.Password = os.ExpandEnv(authConfig.Password)
-					}
-				}
-
-				if authStr, ok := auth["auth"].(string); ok {
-					authConfig.Auth = authStr
-					if !ctx.opts.NoEval {
-						authConfig.Auth = os.ExpandEnv(authConfig.Auth)
-					}
-				}
-			}
-
-			dag.RegistryAuths[registry] = authConfig
-		}
-
-	default:
-		return wrapError("registryAuths", spec.RegistryAuths, fmt.Errorf("invalid type: %T", spec.RegistryAuths))
-	}
-
-	return nil
-}
-
 func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 	switch v := spec.Dotenv.(type) {
 	case nil:
@@ -575,32 +389,30 @@ func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
 // The handlers are executed when the DAG is stopped, succeeded, failed, or
 // cancelled.
 func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
-	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
-
 	if spec.HandlerOn.Exit != nil {
 		spec.HandlerOn.Exit.Name = HandlerOnExit.String()
-		if dag.HandlerOn.Exit, err = buildStep(buildCtx, *spec.HandlerOn.Exit); err != nil {
+		if dag.HandlerOn.Exit, err = buildStep(ctx, *spec.HandlerOn.Exit); err != nil {
 			return err
 		}
 	}
 
 	if spec.HandlerOn.Success != nil {
 		spec.HandlerOn.Success.Name = HandlerOnSuccess.String()
-		if dag.HandlerOn.Success, err = buildStep(buildCtx, *spec.HandlerOn.Success); err != nil {
+		if dag.HandlerOn.Success, err = buildStep(ctx, *spec.HandlerOn.Success); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Failure != nil {
 		spec.HandlerOn.Failure.Name = HandlerOnFailure.String()
-		if dag.HandlerOn.Failure, err = buildStep(buildCtx, *spec.HandlerOn.Failure); err != nil {
+		if dag.HandlerOn.Failure, err = buildStep(ctx, *spec.HandlerOn.Failure); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Cancel != nil {
 		spec.HandlerOn.Cancel.Name = HandlerOnCancel.String()
-		if dag.HandlerOn.Cancel, err = buildStep(buildCtx, *spec.HandlerOn.Cancel); err != nil {
+		if dag.HandlerOn.Cancel, err = buildStep(ctx, *spec.HandlerOn.Cancel); err != nil {
 			return
 		}
 	}
@@ -721,8 +533,6 @@ func skipIfSuccessful(_ BuildContext, spec *definition, dag *DAG) error {
 
 // buildSteps builds the steps for the DAG.
 func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
-	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
-
 	switch v := spec.Steps.(type) {
 	case nil:
 		return nil
@@ -737,7 +547,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 			return wrapError("steps", v, err)
 		}
 		for _, stepDef := range stepDefs {
-			step, err := buildStep(buildCtx, stepDef)
+			step, err := buildStep(ctx, stepDef)
 			if err != nil {
 				return err
 			}
@@ -760,7 +570,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		}
 		for name, stepDef := range stepDefs {
 			stepDef.Name = name
-			step, err := buildStep(buildCtx, stepDef)
+			step, err := buildStep(ctx, stepDef)
 			if err != nil {
 				return err
 			}
@@ -986,7 +796,7 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 }
 
 // buildStep builds a step from the step definition.
-func buildStep(ctx StepBuildContext, def stepDef) (*Step, error) {
+func buildStep(ctx BuildContext, def stepDef) (*Step, error) {
 	step := &Step{
 		Name:           def.Name,
 		ID:             def.ID,
@@ -1010,7 +820,7 @@ func buildStep(ctx StepBuildContext, def stepDef) (*Step, error) {
 	return step, nil
 }
 
-func buildContinueOn(_ StepBuildContext, def stepDef, step *Step) error {
+func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 	if def.ContinueOn == nil {
 		return nil
 	}
@@ -1034,7 +844,7 @@ func buildContinueOn(_ StepBuildContext, def stepDef, step *Step) error {
 }
 
 // buildRetryPolicy builds the retry policy for a step.
-func buildRetryPolicy(_ StepBuildContext, def stepDef, step *Step) error {
+func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 	if def.RetryPolicy != nil {
 		switch v := def.RetryPolicy.Limit.(type) {
 		case int:
@@ -1147,7 +957,7 @@ func buildRetryPolicy(_ StepBuildContext, def stepDef, step *Step) error {
 // - Boolean true is equivalent to "while" mode with unconditional repetition
 //
 // Precedence: condition > exitCode > unconditional repeat
-func buildRepeatPolicy(_ StepBuildContext, def stepDef, step *Step) error {
+func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 	if def.RepeatPolicy == nil {
 		return nil
 	}
@@ -1246,7 +1056,7 @@ func buildRepeatPolicy(_ StepBuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-func buildOutput(_ StepBuildContext, def stepDef, step *Step) error {
+func buildOutput(_ BuildContext, def stepDef, step *Step) error {
 	if def.Output == "" {
 		return nil
 	}
@@ -1260,24 +1070,7 @@ func buildOutput(_ StepBuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-func buildStepEnvs(ctx StepBuildContext, def stepDef, step *Step) error {
-	if def.Env == nil {
-		return nil
-	}
-	// For step environment variables, we load them without evaluation. They will
-	// be evaluated later when the step is executed.
-	ctx.opts.NoEval = true
-	vars, err := loadVariables(ctx.BuildContext, def.Env)
-	if err != nil {
-		return err
-	}
-	for k, v := range vars {
-		step.Env = append(step.Env, fmt.Sprintf("%s=%s", k, v))
-	}
-	return nil
-}
-
-func validateStep(_ StepBuildContext, def stepDef, step *Step) error {
+func validateStep(_ BuildContext, def stepDef, step *Step) error {
 	if step.Name == "" {
 		return wrapError("name", step.Name, ErrStepNameRequired)
 	}
@@ -1318,13 +1111,13 @@ func validateStep(_ StepBuildContext, def stepDef, step *Step) error {
 // maxStepNameLen is the maximum length of a step name.
 const maxStepNameLen = 40
 
-func buildStepPrecondition(ctx StepBuildContext, def stepDef, step *Step) error {
+func buildStepPrecondition(ctx BuildContext, def stepDef, step *Step) error {
 	// Parse both `preconditions` and `precondition` fields.
-	conditions, err := parsePrecondition(ctx.BuildContext, def.Preconditions)
+	conditions, err := parsePrecondition(ctx, def.Preconditions)
 	if err != nil {
 		return err
 	}
-	condition, err := parsePrecondition(ctx.BuildContext, def.Precondition)
+	condition, err := parsePrecondition(ctx, def.Precondition)
 	if err != nil {
 		return err
 	}
@@ -1333,7 +1126,7 @@ func buildStepPrecondition(ctx StepBuildContext, def stepDef, step *Step) error 
 	return nil
 }
 
-func buildSignalOnStop(_ StepBuildContext, def stepDef, step *Step) error {
+func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 	if def.SignalOnStop != nil {
 		sigDef := *def.SignalOnStop
 		sig := getSignalNum(sigDef)
@@ -1346,7 +1139,7 @@ func buildSignalOnStop(_ StepBuildContext, def stepDef, step *Step) error {
 }
 
 // buildChildDAG parses the child DAG definition and sets up the step to run a child DAG.
-func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
+func buildChildDAG(ctx BuildContext, def stepDef, step *Step) error {
 	name := def.Run
 
 	// if the run field is not set, return nil.
@@ -1360,7 +1153,7 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
 		// Parse the params to convert them to string format
 		ctxCopy := ctx
 		ctxCopy.opts.NoEval = true // Disable evaluation for params parsing
-		paramPairs, err := parseParamValue(ctxCopy.BuildContext, def.Params)
+		paramPairs, err := parseParamValue(ctxCopy, def.Params)
 		if err != nil {
 			return wrapError("params", def.Params, err)
 		}
@@ -1389,7 +1182,7 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
 }
 
 // buildDepends parses the depends field in the step definition.
-func buildDepends(_ StepBuildContext, def stepDef, step *Step) error {
+func buildDepends(_ BuildContext, def stepDef, step *Step) error {
 	deps, err := parseStringOrArray(def.Depends)
 	if err != nil {
 		return wrapError("depends", def.Depends, ErrDependsMustBeStringOrArray)
@@ -1406,13 +1199,9 @@ func buildDepends(_ StepBuildContext, def stepDef, step *Step) error {
 
 // buildExecutor parses the executor field in the step definition.
 // Case 1: executor is nil
-//
-//	Case 1.1: DAG level 'container' field is set
-//	Case 1.2: No executor is set, use default executor
-//
 // Case 2: executor is a string
 // Case 3: executor is a struct
-func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
+func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 	const (
 		executorKeyType   = "type"
 		executorKeyConfig = "config"
@@ -1422,10 +1211,6 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 
 	// Case 1: executor is nil
 	if executor == nil {
-		if ctx.dag.Container != nil {
-			// Translate the container configuration to executor config
-			return translateExecutorConfig(ctx, def, step)
-		}
 		return nil
 	}
 
@@ -1473,22 +1258,6 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 		return wrapError("executor", val, ErrExecutorConfigMustBeStringOrMap)
 
 	}
-
-	return nil
-}
-
-func translateExecutorConfig(ctx StepBuildContext, def stepDef, step *Step) error {
-	// If the executor is nil, but the DAG has a container field,
-	// we translate the container configuration to executor config.
-	if ctx.dag.Container == nil {
-		return nil // No container configuration to translate
-	}
-
-	// Translate container fields to executor config
-	step.ExecutorConfig.Type = "docker"
-
-	// The other fields will be retrieved from the container configuration on
-	// execution time, so we don't need to set them here.
 
 	return nil
 }
@@ -1564,7 +1333,7 @@ func parseStringOrArray(v any) ([]string, error) {
 // - Direct array reference: parallel: ${ITEMS}
 // - Static array: parallel: [item1, item2]
 // - Object configuration: parallel: {items: [...], maxConcurrent: 5}
-func buildParallel(ctx StepBuildContext, def stepDef, step *Step) error {
+func buildParallel(ctx BuildContext, def stepDef, step *Step) error {
 	if def.Parallel == nil {
 		return nil
 	}
@@ -1761,5 +1530,154 @@ func buildOTel(_ BuildContext, spec *definition, dag *DAG) error {
 
 	default:
 		return wrapError("otel", v, fmt.Errorf("otel must be a map"))
+	}
+}
+
+// buildRunConfig builds the run configuration for the DAG.
+func buildRunConfig(_ BuildContext, spec *definition, dag *DAG) error {
+	if spec.RunConfig == nil {
+		// Set defaults if not specified
+		dag.RunConfig = &RunConfig{
+			AllowEditParams: true, // Default: allow editing parameters
+			AllowEditRunId:  true, // Default: allow editing run ID
+		}
+		return nil
+	}
+
+	// Copy the configuration from the definition
+	dag.RunConfig = &RunConfig{
+		AllowEditParams: spec.RunConfig.AllowEditParams,
+		AllowEditRunId:  spec.RunConfig.AllowEditRunId,
+	}
+
+	return nil
+}
+
+// buildContainer builds the container configuration for the DAG.
+func buildContainer(_ BuildContext, spec *definition, dag *DAG) error {
+	if spec.Container == nil {
+		return nil
+	}
+
+	switch v := spec.Container.(type) {
+	case map[string]any:
+		container := &Container{}
+
+		// Parse image
+		if image, ok := v["image"].(string); ok {
+			container.Image = image
+		}
+
+		// Parse pullPolicy
+		if pullPolicy, ok := v["pullPolicy"]; ok {
+			policy, err := ParsePullPolicy(pullPolicy)
+			if err != nil {
+				return wrapError("container.pullPolicy", pullPolicy, err)
+			}
+			container.PullPolicy = policy
+		}
+
+		// Parse env
+		if env, ok := v["env"].([]any); ok {
+			for _, e := range env {
+				if envStr, ok := e.(string); ok {
+					container.Env = append(container.Env, envStr)
+				}
+			}
+		}
+
+		// Parse volumes
+		if volumes, ok := v["volumes"].([]any); ok {
+			for _, vol := range volumes {
+				if volStr, ok := vol.(string); ok {
+					container.Volumes = append(container.Volumes, volStr)
+				}
+			}
+		}
+
+		// Parse user
+		if user, ok := v["user"].(string); ok {
+			container.User = user
+		}
+
+		// Parse workDir
+		if workDir, ok := v["workDir"].(string); ok {
+			container.WorkDir = workDir
+		}
+
+		// Parse platform
+		if platform, ok := v["platform"].(string); ok {
+			container.Platform = platform
+		}
+
+		// Parse ports
+		if ports, ok := v["ports"].([]any); ok {
+			for _, port := range ports {
+				if portStr, ok := port.(string); ok {
+					container.Ports = append(container.Ports, portStr)
+				}
+			}
+		}
+
+		// Parse network
+		if network, ok := v["network"].(string); ok {
+			container.Network = network
+		}
+
+		// Parse keepContainer
+		if keepContainer, ok := v["keepContainer"].(bool); ok {
+			container.KeepContainer = keepContainer
+		}
+
+		dag.Container = container
+		return nil
+
+	default:
+		return wrapError("container", v, fmt.Errorf("container must be a map"))
+	}
+}
+
+// buildRegistryAuths builds the registry authentication configurations for the DAG.
+func buildRegistryAuths(_ BuildContext, spec *definition, dag *DAG) error {
+	if spec.RegistryAuths == nil {
+		return nil
+	}
+
+	switch v := spec.RegistryAuths.(type) {
+	case map[string]any:
+		auths := make(map[string]*AuthConfig)
+
+		for registry, authData := range v {
+			switch authValue := authData.(type) {
+			case map[string]any:
+				auth := &AuthConfig{}
+
+				// Parse username
+				if username, ok := authValue["username"].(string); ok {
+					auth.Username = username
+				}
+
+				// Parse password
+				if password, ok := authValue["password"].(string); ok {
+					auth.Password = password
+				}
+
+				// Parse auth
+				if authStr, ok := authValue["auth"].(string); ok {
+					auth.Auth = authStr
+				}
+
+				auths[registry] = auth
+
+			default:
+				return wrapError("registryAuths."+registry, authValue, fmt.Errorf("registry auth must be a map"))
+			}
+		}
+
+		dag.RegistryAuths = auths
+		return nil
+
+	default:
+		return wrapError("registryAuths", v, fmt.Errorf("registryAuths must be a map"))
 	}
 }
