@@ -472,7 +472,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 	}
 
 	// Find the latest status by name
-	attempt, err := m.dagRunStore.LatestAttempt(ctx, dag.QueueProcName())
+	attempt, err := m.dagRunStore.LatestAttempt(ctx, dag.Name)
 	if err != nil {
 		// If the latest status is not found, return the default status
 		ret := models.InitialStatus(dag)
