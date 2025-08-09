@@ -37,12 +37,12 @@ func TestRegistry_GetServiceMembers(t *testing.T) {
 	registry := New(tmpDir)
 
 	ctx := context.Background()
-	
+
 	// Test getting members for empty service
 	members, err := registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
 	require.NoError(t, err)
 	assert.Empty(t, members)
-	
+
 	// Register a service
 	hostInfo := models.HostInfo{
 		ID:       "test-instance",
@@ -51,7 +51,7 @@ func TestRegistry_GetServiceMembers(t *testing.T) {
 	err = registry.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
 	defer registry.Unregister(ctx)
-	
+
 	// Now should find the registered member
 	members, err = registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
 	require.NoError(t, err)
@@ -157,7 +157,7 @@ func TestRegistry_ConcurrentAccess(t *testing.T) {
 	require.NoError(t, err)
 	defer registry.Unregister(ctx)
 
-	// Concurrent resolver access
+	// Concurrent finder access
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
 		go func(i int) {
@@ -244,7 +244,7 @@ func TestRegistry_MultipleInstances(t *testing.T) {
 	}
 
 	// Register all instances
-	registries := make([]*Monitor, len(instances))
+	registries := make([]*registry, len(instances))
 	for i, inst := range instances {
 		registry := New(tmpDir)
 		err := registry.Register(ctx, inst.serviceName, inst.hostInfo)
