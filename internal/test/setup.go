@@ -25,8 +25,8 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
-	"github.com/dagu-org/dagu/internal/persistence/filediscovery"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
+	"github.com/dagu-org/dagu/internal/persistence/fileserviceregistry"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -111,7 +111,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
 	procStore := fileproc.New(cfg.Paths.ProcDir)
-	serviceMonitor := filediscovery.New(cfg.Paths.DiscoveryDir)
+	serviceMonitor := fileserviceregistry.New(cfg.Paths.DiscoveryDir)
 
 	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 

@@ -1,4 +1,4 @@
-package filediscovery
+package fileserviceregistry
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 )
 
-// Monitor implements models.ServiceMonitor using file-based discovery
+// Monitor implements models.ServiceRegistry using file-based discovery
 type Monitor struct {
 	baseDir   string
 	resolvers map[models.ServiceName]*resolver
@@ -29,7 +29,7 @@ type Monitor struct {
 	heartbeatInterval time.Duration
 }
 
-// New creates a new file-based service monitor
+// New creates a new file-based service registry
 func New(discoveryDir string) *Monitor {
 	return &Monitor{
 		baseDir:           discoveryDir,
@@ -44,10 +44,10 @@ func (m *Monitor) Register(ctx context.Context, serviceName models.ServiceName, 
 	defer m.instanceMu.Unlock()
 
 	if m.cancel != nil {
-		return fmt.Errorf("monitor already started")
+		return fmt.Errorf("registry already started")
 	}
 
-	logger.Info(ctx, "Starting service monitor",
+	logger.Info(ctx, "Starting service registry",
 		"service_name", serviceName,
 		"instance_id", hostInfo.ID,
 		"address", hostInfo.HostPort)
@@ -98,7 +98,7 @@ func (m *Monitor) Resolver(_ context.Context, serviceName models.ServiceName) mo
 	return r
 }
 
-// Unregister stops the service monitor
+// Unregister stops the service registry
 func (m *Monitor) Unregister(ctx context.Context) {
 	m.instanceMu.Lock()
 
@@ -108,7 +108,7 @@ func (m *Monitor) Unregister(ctx context.Context) {
 		return
 	}
 
-	logger.Info(ctx, "Stopping service monitor",
+	logger.Info(ctx, "Stopping service registry",
 		"service_name", m.serviceName,
 		"instance_id", m.instanceInfo.ID,
 		"address", m.instanceInfo.HostPort)
@@ -142,7 +142,7 @@ func (m *Monitor) Unregister(ctx context.Context) {
 		// Clean shutdown
 	case <-time.After(5 * time.Second):
 		// Force shutdown after timeout
-		logger.Warn(ctx, "Timeout waiting for monitor shutdown")
+		logger.Warn(ctx, "Timeout waiting for registry shutdown")
 	}
 }
 

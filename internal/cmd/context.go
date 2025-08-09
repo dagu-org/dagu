@@ -22,9 +22,9 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
-	"github.com/dagu-org/dagu/internal/persistence/filediscovery"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
+	"github.com/dagu-org/dagu/internal/persistence/fileserviceregistry"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -126,7 +126,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
 	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.WorkDir)
 	qs := filequeue.New(cfg.Paths.QueueDir)
-	sm := filediscovery.New(cfg.Paths.DiscoveryDir)
+	sm := fileserviceregistry.New(cfg.Paths.DiscoveryDir)
 
 	return &Context{
 		Context:         ctx,

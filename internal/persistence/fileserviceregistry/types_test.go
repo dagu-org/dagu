@@ -1,4 +1,4 @@
-package filediscovery
+package fileserviceregistry
 
 import (
 	"os"
