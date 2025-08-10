@@ -738,17 +738,6 @@ components:
           description: "List of tags for categorizing and filtering DAGs"
           items:
             type: string
-        RunConfig:
-          type: object
-          description: "Configuration for controlling user interactions when starting DAG runs"
-          properties:
-            allowEditParams:
-              type: boolean
-              description: "Allow users to edit parameters when starting the DAG"
-            allowEditRunId:
-              type: boolean
-              description: "Allow users to specify custom run IDs"
-          additionalProperties: false
       required:
         - Name
 
