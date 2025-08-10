@@ -5,32 +5,10 @@ import (
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v2"
-	"github.com/dagu-org/dagu/internal/build"
-	"github.com/dagu-org/dagu/internal/metrics"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// initMetrics initializes the metrics collector and registry on first call
-func (a *API) initMetrics() {
-	if a.metricsRegistry != nil {
-		return // Already initialized
-	}
-
-	collector := metrics.NewCollector(
-		build.Version,
-		a.dagStore,
-		a.dagRunStore,
-		a.queueStore,
-		a.serviceRegistry,
-	)
-
-	a.metricsRegistry = metrics.NewRegistry(collector)
-}
-
 func (a *API) GetMetrics(_ context.Context, _ api.GetMetricsRequestObject) (api.GetMetricsResponseObject, error) {
-	// Initialize metrics on first call
-	a.initMetrics()
-
 	// Use promhttp handler to write metrics
 	handler := promhttp.HandlerFor(a.metricsRegistry, promhttp.HandlerOpts{})
 

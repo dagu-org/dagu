@@ -8,9 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/frontend"
+	"github.com/dagu-org/dagu/internal/metrics"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -53,7 +55,17 @@ func (srv *Server) runServer(t *testing.T) {
 	t.Helper()
 
 	cc := coordinator.New(srv.ServiceRegistry, coordinator.DefaultConfig())
-	server := frontend.NewServer(srv.Config, srv.DAGStore, srv.DAGRunStore, srv.QueueStore, srv.DAGRunMgr, cc, srv.ServiceRegistry)
+	
+	collector := metrics.NewCollector(
+		build.Version,
+		srv.DAGStore,
+		srv.DAGRunStore,
+		srv.QueueStore,
+		srv.ServiceRegistry,
+	)
+	mr := metrics.NewRegistry(collector)
+	
+	server := frontend.NewServer(srv.Config, srv.DAGStore, srv.DAGRunStore, srv.QueueStore, srv.DAGRunMgr, cc, srv.ServiceRegistry, mr)
 	err := server.Serve(srv.Context)
 	require.NoError(t, err, "failed to start server")
 }

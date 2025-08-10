@@ -47,6 +47,7 @@ func New(
 	cfg *config.Config,
 	cc coordinator.Client,
 	sr models.ServiceRegistry,
+	mr *prometheus.Registry,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
 	for _, n := range cfg.Server.RemoteNodes {
@@ -64,6 +65,7 @@ func New(
 		config:             cfg,
 		coordinatorCli:     cc,
 		serviceRegistry:    sr,
+		metricsRegistry:    mr,
 	}
 }
 

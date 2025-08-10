@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
@@ -19,6 +20,7 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/metrics"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
@@ -166,7 +168,17 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 	// Create coordinator client (may be nil if not configured)
 	cc := c.NewCoordinatorClient()
 
-	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.DAGRunMgr, cc, c.ServiceRegistry), nil
+	collector := metrics.NewCollector(
+		build.Version,
+		dr,
+		c.DAGRunStore,
+		c.QueueStore,
+		c.ServiceRegistry,
+	)
+
+	mr := metrics.NewRegistry(collector)
+
+	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr), nil
 }
 
 // NewCoordinatorClient creates a new coordinator client using the global peer configuration.
