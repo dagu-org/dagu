@@ -65,11 +65,26 @@ function StartDAGModal({
     const dagWithRunConfig = dag as typeof dag & {
       runConfig?: { allowEditParams?: boolean; allowEditRunId?: boolean };
     };
-    console.log(dag.name, ' : ', dag);
-    return {
-      allowEditParams: dagWithRunConfig.runConfig?.allowEditParams ?? true,
 
-      allowEditRunId: dagWithRunConfig.runConfig?.allowEditRunId ?? true,
+    // If runConfig exists, use its values
+    // Missing fields in the API response (undefined) mean they are false due to omitempty tags
+    if (dagWithRunConfig.runConfig) {
+      return {
+        allowEditParams:
+          dagWithRunConfig.runConfig.allowEditParams !== undefined
+            ? dagWithRunConfig.runConfig.allowEditParams
+            : true,
+        allowEditRunId:
+          dagWithRunConfig.runConfig.allowEditRunId !== undefined
+            ? dagWithRunConfig.runConfig.allowEditRunId
+            : true,
+      };
+    }
+
+    // Default behavior when runConfig is not specified
+    return {
+      allowEditParams: true,
+      allowEditRunId: true,
     };
   }, [dag]);
 

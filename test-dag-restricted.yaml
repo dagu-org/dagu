@@ -1,0 +1,31 @@
+name: test-restricted-dag
+description: "Test DAG with restricted runConfig"
+maxActiveRuns: 1
+histRetentionDays: 30
+
+# Test runConfig with false values
+runConfig:
+  allowEditParams: false
+  allowEditRunId: false
+
+params:
+  - foo: "1"
+
+steps:
+  - name: step1
+    command: echo start
+    dir: "/home/kriyanshi/.dagu/dags"
+  - name: foo
+    command: echo foo
+    depends: ["step1"]
+    dir: "/home/kriyanshi/.dagu/dags"
+    preconditions:
+      - condition: "$1"
+        expected: "foo"
+  - name: bar
+    command: echo foo
+    depends: ["step1"]
+    dir: "/home/kriyanshi/.dagu/dags"
+    preconditions:
+      - condition: "(and (eq $1 foo) (eq $1 bar))"
+        expected: "true"
