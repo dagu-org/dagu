@@ -78,9 +78,6 @@ type Model struct {
 	quitting bool
 	width    int
 	height   int
-
-	// DAG map for accessing full DAG objects
-	dagMap map[string]*digraph.DAG
 }
 
 // Result contains the final selections
@@ -144,9 +141,6 @@ func (m Model) updateDAGSelection(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if item, ok := m.list.SelectedItem().(DAGItem); ok {
 				m.choice = &item
 
-				// Get the actual DAG object to check runConfig
-				selectedDAG := m.dagMap[item.Name]
-
 				// Check if the selected DAG has parameters
 				hasParams := item.Params != ""
 
@@ -154,8 +148,6 @@ func (m Model) updateDAGSelection(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.state = StateEnteringParams
 					// Initialize parameter input with the display params
 					m.paramInput.SetValue(item.Params)
-					// Store the DAG reference and runConfig info
-					m.dag = selectedDAG
 					return m, textinput.Blink
 				} else {
 					// Skip to confirmation if no params needed
@@ -172,12 +164,6 @@ func (m Model) updateDAGSelection(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateParamInput(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Check if parameter editing is allowed
-	allowEditParams := true
-	if m.dag != nil && m.dag.RunConfig != nil {
-		allowEditParams = m.dag.RunConfig.AllowEditParams
-	}
-
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -187,25 +173,15 @@ func (m Model) updateParamInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "enter":
-			if allowEditParams {
-				m.params = m.paramInput.Value()
-			} else {
-				// Use the default parameters when editing is disabled
-				m.params = m.choice.Params
-			}
+			m.params = m.paramInput.Value()
 			m.state = StateConfirming
 			return m, nil
 		}
 	}
 
-	// Only update the input if editing is allowed
-	if allowEditParams {
-		var cmd tea.Cmd
-		m.paramInput, cmd = m.paramInput.Update(msg)
-		return m, cmd
-	}
-
-	return m, nil
+	var cmd tea.Cmd
+	m.paramInput, cmd = m.paramInput.Update(msg)
+	return m, cmd
 }
 
 func (m Model) updateConfirmation(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -277,39 +253,16 @@ func (m Model) viewParamInput() string {
 		Foreground(lipgloss.Color("241")).
 		MarginTop(2)
 
-	warningStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("208")).
-		MarginTop(1)
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		titleStyle.Render("Enter Parameters"),
+		selectedDAGStyle.Render(fmt.Sprintf("DAG: %s", m.choice.Name)),
+		"",
+		m.paramInput.View(),
+		"",
+		helpStyle.Render("Enter: Confirm • ESC: Back • Ctrl+C: Cancel"),
+	)
 
-	// Check if parameter editing is allowed
-	allowEditParams := true
-	if m.dag != nil && m.dag.RunConfig != nil {
-		allowEditParams = m.dag.RunConfig.AllowEditParams
-	}
-
-	var content []string
-	if allowEditParams {
-		content = append(content,
-			titleStyle.Render("Enter Parameters"),
-			selectedDAGStyle.Render(fmt.Sprintf("DAG: %s", m.choice.Name)),
-			"",
-			m.paramInput.View(),
-			"",
-			helpStyle.Render("Enter: Confirm • ESC: Back • Ctrl+C: Cancel"),
-		)
-	} else {
-		content = append(content,
-			titleStyle.Render("Parameters (Read-Only)"),
-			selectedDAGStyle.Render(fmt.Sprintf("DAG: %s", m.choice.Name)),
-			warningStyle.Render("Parameter editing is disabled for this DAG"),
-			"",
-			"Default parameters: "+m.choice.Params,
-			"",
-			helpStyle.Render("Enter: Continue with defaults • ESC: Back • Ctrl+C: Cancel"),
-		)
-	}
-
-	return docStyle.Render(lipgloss.JoinVertical(lipgloss.Left, content...))
+	return docStyle.Render(content)
 }
 
 func (m Model) viewConfirmation() string {
@@ -335,22 +288,12 @@ func (m Model) viewConfirmation() string {
 		Foreground(lipgloss.Color("241")).
 		MarginTop(1)
 
-	// Check if parameter editing was allowed
-	allowEditParams := true
-	if m.dag != nil && m.dag.RunConfig != nil {
-		allowEditParams = m.dag.RunConfig.AllowEditParams
-	}
-
 	var content []string
 	content = append(content, titleStyle.Render("Confirm Execution"))
 	content = append(content, fmt.Sprintf("Ready to run DAG: %s", dagNameStyle.Render(m.choice.Name)))
 
 	if m.params != "" {
-		paramLabel := "With parameters: "
-		if !allowEditParams {
-			paramLabel = "With default parameters: "
-		}
-		content = append(content, fmt.Sprintf("%s%s", paramLabel, paramStyle.Render(m.params)))
+		content = append(content, fmt.Sprintf("With parameters: %s", paramStyle.Render(m.params)))
 	}
 
 	content = append(content, "")
@@ -444,7 +387,6 @@ func PickDAGInteractive(ctx context.Context, dagStore models.DAGStore, dag *digr
 		list:       l,
 		paramInput: ti,
 		dag:        dag,
-		dagMap:     pickerModel.dagMap,
 	}
 
 	// Use the default delegate since we'll handle DAG updates differently
@@ -493,32 +435,6 @@ func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
 // PromptForParams prompts the user to enter parameters for a DAG
 func PromptForParams(dag *digraph.DAG) (string, error) {
 	if dag.DefaultParams == "" && len(dag.Params) == 0 {
-		return "", nil
-	}
-
-	// Check if parameter editing is allowed
-	allowEditParams := true
-	if dag.RunConfig != nil {
-		allowEditParams = dag.RunConfig.AllowEditParams
-	}
-
-	if !allowEditParams {
-		fmt.Println("\nParameter editing is disabled for this DAG.")
-		fmt.Println("Using default parameters:")
-
-		// Display default parameters if available
-		if dag.DefaultParams != "" {
-			fmt.Printf("  %s\n", dag.DefaultParams)
-			return dag.DefaultParams, nil
-		}
-
-		// Display current parameters if available
-		if len(dag.Params) > 0 {
-			params := strings.Join(dag.Params, " ")
-			fmt.Printf("  %s\n", params)
-			return params, nil
-		}
-
 		return "", nil
 	}
 
