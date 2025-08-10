@@ -127,7 +127,8 @@ func (f *finder) members(ctx context.Context) ([]models.HostInfo, error) {
 			ID:     info.ID,
 			Host:   info.Host,
 			Port:   info.Port,
-			Status: info.Status,
+			Status:    info.Status,
+			StartedAt: info.StartedAt,
 		})
 	}
 

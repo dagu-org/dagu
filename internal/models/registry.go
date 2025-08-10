@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"time"
 )
 
 // ServiceRegistry is responsible for registering and persisting
@@ -68,4 +69,6 @@ type HostInfo struct {
 	Port int
 	// Status is the operational status of the service instance
 	Status ServiceStatus
+	// StartedAt is when the service instance was started
+	StartedAt time.Time
 }

@@ -74,7 +74,8 @@ func (r *registry) Register(ctx context.Context, serviceName models.ServiceName,
 			Host:   hostInfo.Host,
 			Port:   hostInfo.Port,
 			PID:    os.Getpid(),
-			Status: hostInfo.Status,
+			Status:    hostInfo.Status,
+			StartedAt: time.Now(),
 		},
 	}
 
