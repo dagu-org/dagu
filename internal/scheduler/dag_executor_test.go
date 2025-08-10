@@ -43,7 +43,7 @@ steps:
 		runStore := filedagrun.New(filepath.Join(tmpDir, "data"))
 		procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
 		dagRunMgr := dagrun.New(runStore, procStore, th.Config.Paths.Executable, tmpDir)
-		coordinatorCli := coordinator.New(th.ServiceMonitor, coordinator.DefaultConfig())
+		coordinatorCli := coordinator.New(th.ServiceRegistry, coordinator.DefaultConfig())
 
 		dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, dagRunMgr)
 		t.Cleanup(func() {

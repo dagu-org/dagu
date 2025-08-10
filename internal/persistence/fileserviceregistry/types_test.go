@@ -1,10 +1,11 @@
-package filediscovery
+package fileserviceregistry
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,9 +14,11 @@ func TestWriteReadInstanceFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	original := &instanceInfo{
-		ID:       "test-instance",
-		HostPort: "testhost:8080",
-		PID:      1234,
+		ID:     "test-instance",
+		Host:   "testhost",
+		Port:   8080,
+		Status: models.ServiceStatusActive,
+		PID:    1234,
 	}
 
 	// Write instance file
@@ -32,7 +35,7 @@ func TestWriteReadInstanceFile(t *testing.T) {
 
 	// Compare
 	assert.Equal(t, original.ID, read.ID)
-	assert.Equal(t, original.HostPort, read.HostPort)
+	assert.Equal(t, original.Host, read.Host)
 	assert.Equal(t, original.PID, read.PID)
 }
 
@@ -40,9 +43,11 @@ func TestWriteInstanceFile_CreatesDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	info := &instanceInfo{
-		ID:       "test",
-		HostPort: "host:8080",
-		PID:      1234,
+		ID:     "test",
+		Host:   "host",
+		Port:   8080,
+		Status: models.ServiceStatusActive,
+		PID:    1234,
 	}
 
 	// Write to non-existent service directory
@@ -59,9 +64,11 @@ func TestWriteInstanceFile_Atomic(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	info := &instanceInfo{
-		ID:       "atomic-test",
-		HostPort: "host:8080",
-		PID:      1234,
+		ID:     "atomic-test",
+		Host:   "host",
+		Port:   8080,
+		Status: models.ServiceStatusActive,
+		PID:    1234,
 	}
 
 	// Write initial file
@@ -70,14 +77,16 @@ func TestWriteInstanceFile_Atomic(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update with new data
-	info.HostPort = "host:9090"
+	info.Host = "newhost"
+	info.Port = 9090
 	err = writeInstanceFile(filename, info)
 	require.NoError(t, err)
 
 	// Read and verify update
 	read, err := readInstanceFile(filename)
 	require.NoError(t, err)
-	assert.Equal(t, "host:9090", read.HostPort)
+	assert.Equal(t, "newhost", read.Host)
+	assert.Equal(t, 9090, read.Port)
 }
 
 func TestReadInstanceFile_Errors(t *testing.T) {
@@ -102,9 +111,11 @@ func TestRemoveInstanceFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	info := &instanceInfo{
-		ID:       "to-remove",
-		HostPort: "host:8080",
-		PID:      1234,
+		ID:     "to-remove",
+		Host:   "host",
+		Port:   8080,
+		Status: models.ServiceStatusActive,
+		PID:    1234,
 	}
 
 	// Write instance file
@@ -130,9 +141,11 @@ func TestInstanceInfo_Serialization(t *testing.T) {
 
 	// Test serialization
 	info := &instanceInfo{
-		ID:       "test-serialization",
-		HostPort: "host1:8080",
-		PID:      1234,
+		ID:     "test-serialization",
+		Host:   "host1",
+		Port:   8080,
+		Status: models.ServiceStatusActive,
+		PID:    1234,
 	}
 
 	filename := instanceFilePath(tmpDir, "service", info.ID)
@@ -142,6 +155,8 @@ func TestInstanceInfo_Serialization(t *testing.T) {
 	read, err := readInstanceFile(filename)
 	require.NoError(t, err)
 	assert.Equal(t, info.ID, read.ID)
-	assert.Equal(t, info.HostPort, read.HostPort)
+	assert.Equal(t, info.Host, read.Host)
+	assert.Equal(t, info.Port, read.Port)
+	assert.Equal(t, info.Status, read.Status)
 	assert.Equal(t, info.PID, read.PID)
 }

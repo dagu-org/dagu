@@ -536,6 +536,46 @@ export interface paths {
         patch: operations["updateChildDAGRunStepStatus"];
         trace?: never;
     };
+    "/services/scheduler": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get scheduler service status
+         * @description Returns status information about all registered scheduler instances
+         */
+        get: operations["getSchedulerStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/coordinator": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get coordinator service status
+         * @description Returns status information about all registered coordinator instances
+         */
+        get: operations["getCoordinatorStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/metrics": {
         parameters: {
             query?: never;
@@ -694,6 +734,46 @@ export interface components {
          * @enum {string}
          */
         NodeStatusLabel: NodeStatusLabel;
+        /** @description Response containing status of all scheduler instances */
+        SchedulerStatusResponse: {
+            /** @description List of all registered scheduler instances */
+            schedulers: components["schemas"]["SchedulerInstance"][];
+        };
+        /** @description Scheduler instance status information */
+        SchedulerInstance: {
+            /** @description Unique identifier of the scheduler instance */
+            instanceId: string;
+            /** @description Hostname where scheduler is running */
+            host: string;
+            /**
+             * @description Scheduler status (active = holds lock and scheduling)
+             * @enum {string}
+             */
+            status: SchedulerInstanceStatus;
+            /** @description RFC3339 timestamp when scheduler started */
+            startedAt: string;
+        };
+        /** @description Response containing status of all coordinator instances */
+        CoordinatorStatusResponse: {
+            /** @description List of all registered coordinator instances */
+            coordinators: components["schemas"]["CoordinatorInstance"][];
+        };
+        /** @description Coordinator instance status information */
+        CoordinatorInstance: {
+            /** @description Unique identifier of the coordinator instance */
+            instanceId: string;
+            /** @description Hostname where coordinator is running */
+            host: string;
+            /**
+             * @description Coordinator status
+             * @enum {string}
+             */
+            status: CoordinatorInstanceStatus;
+            /** @description RFC3339 timestamp when coordinator started */
+            startedAt: string;
+            /** @description Port number the coordinator is listening on */
+            port: number;
+        };
         /**
          * @description Health status of the worker based on heartbeat recency
          * @enum {string}
@@ -2362,6 +2442,70 @@ export interface operations {
             };
         };
     };
+    getSchedulerStatus: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchedulerStatusResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getCoordinatorStatus: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoordinatorStatusResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getMetrics: {
         parameters: {
             query?: never;
@@ -2450,10 +2594,20 @@ export enum NodeStatusLabel {
     not_started = "not started",
     running = "running",
     failed = "failed",
-    canceled = "cancelled",
+    cancelled = "cancelled",
     finished = "finished",
     skipped = "skipped",
     partial_success = "partial success"
+}
+export enum SchedulerInstanceStatus {
+    active = "active",
+    inactive = "inactive",
+    unknown = "unknown"
+}
+export enum CoordinatorInstanceStatus {
+    active = "active",
+    inactive = "inactive",
+    unknown = "unknown"
 }
 export enum WorkerHealthStatus {
     healthy = "healthy",

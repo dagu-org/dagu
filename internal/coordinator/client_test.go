@@ -3,6 +3,7 @@ package coordinator_test
 import (
 	"context"
 	"net"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +21,15 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
 )
+
+func parsePort(addr string) int {
+	parts := strings.Split(addr, ":")
+	if len(parts) < 2 {
+		return 0
+	}
+	port, _ := strconv.Atoi(parts[1])
+	return port
+}
 
 func TestClientNew(t *testing.T) {
 	config := coordinator.DefaultConfig()
@@ -54,10 +64,8 @@ func TestClientDispatch(t *testing.T) {
 		defer server.Stop()
 
 		monitor := &mockServiceMonitor{
-			resolver: &mockResolver{
-				members: []models.HostInfo{
-					{ID: "coord-1", HostPort: addr},
-				},
+			members: []models.HostInfo{
+				{ID: "coord-1", Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive},
 			},
 		}
 
@@ -81,9 +89,7 @@ func TestClientDispatch(t *testing.T) {
 		config.RequestTimeout = 100 * time.Millisecond
 
 		monitor := &mockServiceMonitor{
-			resolver: &mockResolver{
-				members: []models.HostInfo{}, // No coordinators
-			},
+			members: []models.HostInfo{}, // No coordinators
 		}
 
 		client := coordinator.New(monitor, config)
@@ -125,11 +131,7 @@ func TestClientPoll(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		resolver: &mockResolver{
-			members: []models.HostInfo{
-				{ID: "coord-1", HostPort: addr},
-			},
-		},
+		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -174,11 +176,7 @@ func TestClientGetWorkers(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		resolver: &mockResolver{
-			members: []models.HostInfo{
-				{ID: "coord-1", HostPort: addr},
-			},
-		},
+		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -209,11 +207,7 @@ func TestClientHeartbeat(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		resolver: &mockResolver{
-			members: []models.HostInfo{
-				{ID: "coord-1", HostPort: addr},
-			},
-		},
+		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -255,11 +249,7 @@ func TestClientMetrics(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		resolver: &mockResolver{
-			members: []models.HostInfo{
-				{ID: "coord-1", HostPort: addr},
-			},
-		},
+		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -299,11 +289,7 @@ func TestClientCleanup(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		resolver: &mockResolver{
-			members: []models.HostInfo{
-				{ID: "coord-1", HostPort: addr},
-			},
-		},
+		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -346,9 +332,7 @@ func TestClientDispatcherInterface(t *testing.T) {
 	}
 
 	// Should fail gracefully with no coordinators
-	monitor.resolver = &mockResolver{
-		members: []models.HostInfo{},
-	}
+	monitor.members = []models.HostInfo{}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -363,35 +347,31 @@ func TestClientDispatcherInterface(t *testing.T) {
 // Mock implementations
 
 type mockServiceMonitor struct {
-	resolver models.ServiceResolver
-}
-
-func (m *mockServiceMonitor) Start(_ context.Context, _ models.ServiceName, _ models.HostInfo) error {
-	return nil
-}
-
-func (m *mockServiceMonitor) Resolver(_ context.Context, _ models.ServiceName) models.ServiceResolver {
-	return m.resolver
-}
-
-func (m *mockServiceMonitor) Stop(_ context.Context) {
-	// No-op
-}
-
-type mockResolver struct {
 	members   []models.HostInfo
 	err       error
 	onMembers func()
 }
 
-func (r *mockResolver) Members(_ context.Context) ([]models.HostInfo, error) {
-	if r.onMembers != nil {
-		r.onMembers()
+func (m *mockServiceMonitor) Register(_ context.Context, _ models.ServiceName, _ models.HostInfo) error {
+	return nil
+}
+
+func (m *mockServiceMonitor) GetServiceMembers(_ context.Context, _ models.ServiceName) ([]models.HostInfo, error) {
+	if m.onMembers != nil {
+		m.onMembers()
 	}
-	if r.err != nil {
-		return nil, r.err
+	if m.err != nil {
+		return nil, m.err
 	}
-	return r.members, nil
+	return m.members, nil
+}
+
+func (m *mockServiceMonitor) Unregister(_ context.Context) {
+	// No-op
+}
+
+func (m *mockServiceMonitor) UpdateStatus(_ context.Context, _ models.ServiceName, _ models.ServiceStatus) error {
+	return nil
 }
 
 type mockCoordinatorService struct {

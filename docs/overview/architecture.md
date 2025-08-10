@@ -284,7 +284,7 @@ Dagu supports distributed execution through a coordinator-worker model. Workers 
 
 #### 1. Coordinator Service
 - **gRPC Server**: Listens on configurable port (default: 50055)
-- **Service Discovery**: Automatically registers in file-based discovery system
+- **Service Registry**: Automatically registers in file-based registry system
 - **Task Distribution**: Routes tasks to appropriate workers based on labels
 - **Long Polling**: Workers poll for tasks using efficient long-polling mechanism
 - **Health Monitoring**: Tracks worker heartbeats (10s intervals) and health status
@@ -292,13 +292,13 @@ Dagu supports distributed execution through a coordinator-worker model. Workers 
 - **Authentication**: Supports signing keys and mutual TLS
 
 #### 2. Worker Service
-- **Auto-Registration**: Workers automatically register in discovery system
+- **Auto-Registration**: Workers automatically register in registry system
 - **Task Polling**: Multiple concurrent pollers per worker
 - **Label-Based Routing**: Workers advertise capabilities via labels
 - **Task Execution**: Runs DAGs using the same execution engine
 - **Heartbeat**: Regular health updates every 10 seconds
 - **Graceful Shutdown**: Completes running tasks before terminating
-- **Automatic Cleanup**: Discovery files removed on shutdown
+- **Automatic Cleanup**: Registry files removed on shutdown
 
 #### 3. Task Routing
 
@@ -316,7 +316,7 @@ steps:
 ### Communication Protocol
 
 1. **Worker Registration**
-   - Workers register in file-based discovery system
+   - Workers register in file-based registry system
    - Connect to coordinator via gRPC
    - Send regular heartbeats with status updates
    - Advertise labels for capability matching
@@ -337,15 +337,15 @@ Worker health is determined by heartbeat recency:
 - **Healthy**: Last heartbeat < 5 seconds ago (green)
 - **Warning**: Last heartbeat 5-15 seconds ago (yellow)
 - **Unhealthy**: Last heartbeat > 15 seconds ago (red)
-- **Offline**: No heartbeat for > 30 seconds (removed from discovery)
+- **Offline**: No heartbeat for > 30 seconds (removed from registry)
 
-### Service Discovery
+### Service Registry
 
-The file-based service discovery system enables:
+The file-based service registry system enables:
 - **Automatic Registration**: Services register on startup
-- **Dynamic Discovery**: Coordinators discover workers automatically
+- **Dynamic Discovery**: Coordinators find workers automatically
 - **Heartbeat Tracking**: Regular updates maintain service health
-- **Shared Storage**: Discovery files stored in configurable directory
+- **Shared Storage**: Registry files stored in configurable directory
 - **Graceful Cleanup**: Stale entries removed automatically
 
 ### Security Features

@@ -31,7 +31,7 @@ func TestScheduler(t *testing.T) {
 		}
 
 		th := test.SetupScheduler(t)
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceMonitor, th.CoordinatorCli)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
 		require.NoError(t, err)
 
 		ctx := context.Background()
@@ -57,7 +57,7 @@ func TestScheduler(t *testing.T) {
 		}
 
 		th := test.SetupScheduler(t)
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceMonitor, th.CoordinatorCli)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
 		require.NoError(t, err)
 
 		go func() {
@@ -74,7 +74,7 @@ func TestScheduler(t *testing.T) {
 		scheduler.SetFixedTime(now)
 
 		th := test.SetupScheduler(t)
-		schedulerInstance, err := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceMonitor, th.CoordinatorCli)
+		schedulerInstance, err := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
 		require.NoError(t, err)
 
 		next := schedulerInstance.NextTick(now)
@@ -230,7 +230,7 @@ func TestScheduler_QueueDisabled(t *testing.T) {
 			Entries: []*scheduler.ScheduledJob{},
 		}
 
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceMonitor, th.CoordinatorCli)
+		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
 		require.NoError(t, err)
 
 		ctx := context.Background()
@@ -258,7 +258,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	th := test.SetupScheduler(t)
 
 	// Create first scheduler instance
-	sc1, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceMonitor, th.CoordinatorCli)
+	sc1, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
 	require.NoError(t, err)
 
 	// Start first scheduler
@@ -272,7 +272,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	// Create second scheduler instance with same config
-	sc2, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceMonitor, th.CoordinatorCli)
+	sc2, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
 	require.NoError(t, err)
 
 	// Try to start second scheduler - should wait for lock

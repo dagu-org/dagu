@@ -1,4 +1,4 @@
-package filediscovery
+package fileserviceregistry
 
 import (
 	"context"
@@ -12,8 +12,8 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/dirlock"
 )
 
-// resolver implements models.ServiceResolver for file-based discovery
-type resolver struct {
+// finder provides file-based service registry
+type finder struct {
 	baseDir      string
 	serviceName  models.ServiceName
 	staleTimeout time.Duration
@@ -26,8 +26,8 @@ type resolver struct {
 	cacheDuration time.Duration
 }
 
-// newResolver creates a new resolver for a specific service
-func newResolver(baseDir string, serviceName models.ServiceName) *resolver {
+// newFinder creates a new finder for a specific service
+func newFinder(baseDir string, serviceName models.ServiceName) *finder {
 	serviceDir := filepath.Join(baseDir, string(serviceName))
 
 	// Create directory lock for this service
@@ -36,7 +36,7 @@ func newResolver(baseDir string, serviceName models.ServiceName) *resolver {
 		RetryInterval:  50 * time.Millisecond, // Retry every 50ms
 	})
 
-	return &resolver{
+	return &finder{
 		baseDir:       baseDir,
 		serviceName:   serviceName,
 		staleTimeout:  30 * time.Second, // Consider instances stale after 30 seconds
@@ -45,39 +45,39 @@ func newResolver(baseDir string, serviceName models.ServiceName) *resolver {
 	}
 }
 
-// Members returns all active instances of the service
-func (r *resolver) Members(ctx context.Context) ([]models.HostInfo, error) {
-	r.mu.Lock()
+// members returns all active instances of the service
+func (f *finder) members(ctx context.Context) ([]models.HostInfo, error) {
+	f.mu.Lock()
 
 	// Check if we have a valid cache
-	if len(r.cachedMembers) > 0 && time.Since(r.cacheTime) < r.cacheDuration {
-		members := make([]models.HostInfo, len(r.cachedMembers))
-		copy(members, r.cachedMembers)
-		r.mu.Unlock()
+	if len(f.cachedMembers) > 0 && time.Since(f.cacheTime) < f.cacheDuration {
+		members := make([]models.HostInfo, len(f.cachedMembers))
+		copy(members, f.cachedMembers)
+		f.mu.Unlock()
 		return members, nil
 	}
-	r.mu.Unlock()
+	f.mu.Unlock()
 
-	serviceDir := filepath.Join(r.baseDir, string(r.serviceName))
+	serviceDir := filepath.Join(f.baseDir, string(f.serviceName))
 
 	// If directory doesn't exist, return empty list (no instances)
 	if _, err := os.Stat(serviceDir); os.IsNotExist(err) {
 		return []models.HostInfo{}, nil
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
 	// Acquire lock for reading and cleaning
-	if r.dirLock != nil {
-		if err := r.dirLock.TryLock(); err != nil {
+	if f.dirLock != nil {
+		if err := f.dirLock.TryLock(); err != nil {
 			// If we can't get the lock, still try to read (another process may be cleaning)
-			logger.Warn(ctx, "Could not acquire lock for service directory", "service", r.serviceName)
+			logger.Warn(ctx, "Could not acquire lock for service directory", "service", f.serviceName)
 		} else {
 			// Ensure we unlock when done
 			defer func() {
-				if err := r.dirLock.Unlock(); err != nil {
-					logger.Error(ctx, "Failed to unlock service directory", "service", r.serviceName, "err", err)
+				if err := f.dirLock.Unlock(); err != nil {
+					logger.Error(ctx, "Failed to unlock service directory", "service", f.serviceName, "err", err)
 				}
 			}()
 		}
@@ -112,7 +112,7 @@ func (r *resolver) Members(ctx context.Context) ([]models.HostInfo, error) {
 		}
 
 		// Check if instance is stale
-		if time.Since(fileInfo.ModTime()) > r.staleTimeout {
+		if time.Since(fileInfo.ModTime()) > f.staleTimeout {
 			staleFiles = append(staleFiles, instancePath)
 			continue
 		}
@@ -124,13 +124,16 @@ func (r *resolver) Members(ctx context.Context) ([]models.HostInfo, error) {
 		}
 
 		members = append(members, models.HostInfo{
-			ID:       info.ID,
-			HostPort: info.HostPort,
+			ID:        info.ID,
+			Host:      info.Host,
+			Port:      info.Port,
+			Status:    info.Status,
+			StartedAt: info.StartedAt,
 		})
 	}
 
 	// Second pass: remove stale files (only if we have the lock)
-	if r.dirLock != nil && len(staleFiles) > 0 {
+	if f.dirLock != nil && len(staleFiles) > 0 {
 		// We already have the lock from above, so we can safely remove stale files
 		for _, staleFile := range staleFiles {
 			if err := removeInstanceFile(staleFile); err != nil {
@@ -141,9 +144,9 @@ func (r *resolver) Members(ctx context.Context) ([]models.HostInfo, error) {
 
 	// Update cache if members is not empty
 	if len(members) > 0 {
-		r.cachedMembers = make([]models.HostInfo, len(members))
-		copy(r.cachedMembers, members)
-		r.cacheTime = time.Now()
+		f.cachedMembers = make([]models.HostInfo, len(members))
+		copy(f.cachedMembers, members)
+		f.cacheTime = time.Now()
 	}
 
 	return members, nil

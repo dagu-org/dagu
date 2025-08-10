@@ -27,6 +27,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-chi/httplog/v2"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Server represents the HTTP server for the frontend application
@@ -39,14 +40,14 @@ type Server struct {
 }
 
 // NewServer creates a new Server instance with the given configuration and client
-func NewServer(cfg *config.Config, dr models.DAGStore, drs models.DAGRunStore, drm dagrun.Manager, coordinatorCli coordinator.Client) *Server {
+func NewServer(cfg *config.Config, dr models.DAGStore, drs models.DAGRunStore, qs models.QueueStore, drm dagrun.Manager, cc coordinator.Client, sr models.ServiceRegistry, mr *prometheus.Registry) *Server {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
 	}
 	return &Server{
 		apiV1:  apiv1.New(dr, drs, drm, cfg),
-		apiV2:  apiv2.New(dr, drs, drm, cfg, coordinatorCli),
+		apiV2:  apiv2.New(dr, drs, qs, drm, cfg, cc, sr, mr),
 		config: cfg,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,

@@ -153,7 +153,7 @@ dagu coordinator \
   --peer.key-file=server-key.pem
 ```
 
-The coordinator service manages task distribution to workers for distributed execution with automatic service discovery and health monitoring.
+The coordinator service manages task distribution to workers for distributed execution with automatic service registry and health monitoring.
 
 #### Start Worker
 ```bash
@@ -169,7 +169,7 @@ dagu worker \
   --worker.max-active-runs=50
 ```
 
-Workers automatically register in the service discovery system and poll the coordinator for matching tasks based on their labels.
+Workers automatically register in the service registry system and poll the coordinator for matching tasks based on their labels.
 
 ### Interactive DAG Selection
 

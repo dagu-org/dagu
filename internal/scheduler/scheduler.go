@@ -50,10 +50,12 @@ type Scheduler struct {
 	dirLock             dirlock.DirLock // File-based lock to prevent multiple scheduler instances
 	dagExecutor         *DAGExecutor
 	healthServer        *HealthServer // Health check server for monitoring
-	disableHealthServer bool          // Disable health server when running from start-all
+	serviceRegistry     models.ServiceRegistry
+	disableHealthServer bool // Disable health server when running from start-all
 	heartbeatCancel     context.CancelFunc
 	heartbeatDone       chan struct{}
 	zombieDetector      *ZombieDetector // Zombie DAG run detector
+	instanceID          string          // Unique instance identifier for service registry
 }
 
 type queueConfig struct {
@@ -67,7 +69,7 @@ func New(
 	drs models.DAGRunStore,
 	qs models.QueueStore,
 	ps models.ProcStore,
-	_ models.ServiceMonitor, // Currently unused but kept for API compatibility
+	reg models.ServiceRegistry,
 	coordinatorCli digraph.Dispatcher,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Global.Location
@@ -88,18 +90,19 @@ func New(
 	healthServer := NewHealthServer(cfg.Scheduler.Port)
 
 	return &Scheduler{
-		logDir:       cfg.Paths.LogDir,
-		stopChan:     make(chan struct{}),
-		location:     timeLoc,
-		er:           er,
-		hm:           drm,
-		dagRunStore:  drs,
-		queueStore:   qs,
-		procStore:    ps,
-		config:       cfg,
-		dirLock:      dirLock,
-		dagExecutor:  dagExecutor,
-		healthServer: healthServer,
+		logDir:          cfg.Paths.LogDir,
+		stopChan:        make(chan struct{}),
+		location:        timeLoc,
+		er:              er,
+		hm:              drm,
+		dagRunStore:     drs,
+		queueStore:      qs,
+		procStore:       ps,
+		config:          cfg,
+		dirLock:         dirLock,
+		dagExecutor:     dagExecutor,
+		healthServer:    healthServer,
+		serviceRegistry: reg,
 	}, nil
 }
 
@@ -112,6 +115,33 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 	defer cancel()
+
+	// Generate instance ID if not already set
+	if s.instanceID == "" {
+		hostname, _ := os.Hostname()
+		s.instanceID = fmt.Sprintf("%s-%d-%d", hostname, os.Getpid(), time.Now().Unix())
+	}
+
+	// Register with service registry as inactive initially
+	if s.serviceRegistry != nil {
+		hostname, _ := os.Hostname()
+		hostInfo := models.HostInfo{
+			ID:        s.instanceID,
+			Host:      hostname,
+			Port:      s.config.Scheduler.Port, // Health check port (0 if disabled)
+			Status:    models.ServiceStatusInactive,
+			StartedAt: time.Now(),
+		}
+		if err := s.serviceRegistry.Register(ctx, models.ServiceNameScheduler, hostInfo); err != nil {
+			logger.Error(ctx, "Failed to register with service registry", "err", err)
+			// Continue anyway - service registry is not critical
+		} else {
+			logger.Info(ctx, "Registered with service registry as inactive",
+				"instance_id", s.instanceID,
+				"host", hostname,
+				"port", s.config.Scheduler.Port)
+		}
+	}
 
 	// Start health check server only if not disabled
 	if !s.disableHealthServer {
@@ -128,6 +158,15 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	logger.Info(ctx, "Acquired scheduler lock")
 
+	// Update status to active after acquiring lock
+	if s.serviceRegistry != nil {
+		if err := s.serviceRegistry.UpdateStatus(ctx, models.ServiceNameScheduler, models.ServiceStatusActive); err != nil {
+			logger.Error(ctx, "Failed to update status to active", "err", err)
+		} else {
+			logger.Info(ctx, "Updated scheduler status to active")
+		}
+	}
+
 	// Ensure lock is always released
 	defer func() {
 		if err := s.dirLock.Unlock(); err != nil {
@@ -138,10 +177,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	}()
 
 	sig := make(chan os.Signal, 1)
-
-	// Set scheduler as running
-	setSchedulerRunning(true)
-	defer setSchedulerRunning(false)
 
 	done := make(chan any)
 	defer close(done)
@@ -460,7 +495,6 @@ func (s *Scheduler) start(ctx context.Context) {
 	timer := time.NewTimer(0)
 
 	s.running.Store(true)
-	setSchedulerRunning(true)
 
 	for {
 		select {
@@ -494,7 +528,6 @@ func (s *Scheduler) Stop(ctx context.Context) {
 	if !s.running.CompareAndSwap(true, false) {
 		return
 	}
-	setSchedulerRunning(false)
 
 	close(s.stopChan)
 
@@ -508,6 +541,13 @@ func (s *Scheduler) Stop(ctx context.Context) {
 	if s.heartbeatCancel != nil {
 		logger.Info(ctx, "Stopping scheduler heartbeat")
 		s.heartbeatCancel()
+	}
+
+	// Update status to inactive before stopping
+	if s.serviceRegistry != nil {
+		if err := s.serviceRegistry.UpdateStatus(ctx, models.ServiceNameScheduler, models.ServiceStatusInactive); err != nil {
+			logger.Error(ctx, "Failed to update status to inactive", "err", err)
+		}
 	}
 
 	// Stop health check server if it was started
@@ -526,6 +566,12 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		logger.Error(ctx, "Failed to release scheduler lock in Stop", "err", err)
 	} else {
 		logger.Info(ctx, "Released scheduler lock in Stop")
+	}
+
+	// Unregister from service registry
+	if s.serviceRegistry != nil {
+		s.serviceRegistry.Unregister(ctx)
+		logger.Info(ctx, "Unregistered from service registry")
 	}
 
 	logger.Info(ctx, "Scheduler stopped")

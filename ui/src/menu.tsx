@@ -1,7 +1,7 @@
 import logoDark from '@/assets/images/logo_dark.png';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
-import { BarChart2, GitBranch, List, Search, Server, PanelLeft, Github, MessageSquare, Users } from 'lucide-react';
+import { BarChart2, GitBranch, List, Search, Server, PanelLeft, Github, MessageSquare, Users, Activity } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FeedbackDialog } from '@/components/FeedbackDialog';
@@ -119,42 +119,87 @@ export const mainListItems = React.forwardRef<
         )}
       </div>
       {/* Navigation */}
-      <nav className="flex-1 flex flex-col gap-2 py-2 px-2">
-        <NavItem
-          to="/dashboard"
-          text="Dashboard"
-          icon={<BarChart2 size={18} />}
-          isOpen={isOpen}
-          onClick={onNavItemClick}
-        />
-        <NavItem
-          to="/dag-runs"
-          text="DAG Runs"
-          icon={<List size={18} />}
-          isOpen={isOpen}
-          onClick={onNavItemClick}
-        />
-        <NavItem
-          to="/dags"
-          text="DAG Definitions"
-          icon={<GitBranch size={18} />}
-          isOpen={isOpen}
-          onClick={onNavItemClick}
-        />
-        <NavItem
-          to="/search"
-          text="Search DAG Definitions"
-          icon={<Search size={18} />}
-          isOpen={isOpen}
-          onClick={onNavItemClick}
-        />
-        <NavItem
-          to="/workers"
-          text="Workers"
-          icon={<Server size={18} />}
-          isOpen={isOpen}
-          onClick={onNavItemClick}
-        />
+      <nav className="flex-1 flex flex-col py-2 px-2">
+        {/* Overview Section */}
+        <div className="space-y-1">
+          {isOpen && (
+            <div className="px-3 py-1">
+              <span className="text-[10px] uppercase text-primary-foreground/40 font-medium">
+                Overview
+              </span>
+            </div>
+          )}
+          <NavItem
+            to="/dashboard"
+            text="Dashboard"
+            icon={<BarChart2 size={18} />}
+            isOpen={isOpen}
+            onClick={onNavItemClick}
+          />
+        </div>
+
+        {/* Workflows Section */}
+        <div className="space-y-1 mt-4">
+          {!isOpen && (
+            <div className="mx-auto w-4 border-t border-primary-foreground/30 mb-2" />
+          )}
+          {isOpen && (
+            <div className="px-3 py-1">
+              <span className="text-[10px] uppercase text-primary-foreground/40 font-medium">
+                Workflows
+              </span>
+            </div>
+          )}
+          <NavItem
+            to="/dag-runs"
+            text="DAG Runs"
+            icon={<List size={18} />}
+            isOpen={isOpen}
+            onClick={onNavItemClick}
+          />
+          <NavItem
+            to="/dags"
+            text="DAG Definitions"
+            icon={<GitBranch size={18} />}
+            isOpen={isOpen}
+            onClick={onNavItemClick}
+          />
+          <NavItem
+            to="/search"
+            text="Search DAG Definitions"
+            icon={<Search size={18} />}
+            isOpen={isOpen}
+            onClick={onNavItemClick}
+          />
+        </div>
+
+        {/* System Section */}
+        <div className="space-y-1 mt-4">
+          {!isOpen && (
+            <div className="mx-auto w-4 border-t border-primary-foreground/30 mb-2" />
+          )}
+          {isOpen && (
+            <div className="px-3 py-1">
+              <span className="text-[10px] uppercase text-primary-foreground/40 font-medium">
+                System
+              </span>
+            </div>
+          )}
+          <NavItem
+            to="/workers"
+            text="Workers"
+            icon={<Server size={18} />}
+            isOpen={isOpen}
+            onClick={onNavItemClick}
+          />
+          <NavItem
+            to="/system-status"
+            text="System Status"
+            icon={<Activity size={18} />}
+            isOpen={isOpen}
+            onClick={onNavItemClick}
+          />
+        </div>
       </nav>
       {/* Feedback button */}
       <div className="px-2 pb-1">
@@ -191,7 +236,7 @@ export const mainListItems = React.forwardRef<
         </a>
       </div>
       {/* GitHub link */}
-      <div className="px-2 pb-2">
+      <div className="px-2 pb-6 md:pb-1">
         <a
           href="https://github.com/dagu-org/dagu"
           target="_blank"

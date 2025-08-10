@@ -134,7 +134,7 @@ scheduler:
 	assert.Equal(t, "", cfg.Worker.ID)
 	assert.Equal(t, 100, cfg.Worker.MaxActiveRuns) // Default is 100
 	assert.Nil(t, cfg.Worker.Labels)
-	assert.Equal(t, "/var/dagu/data/discovery", cfg.Paths.DiscoveryDir) // Auto-generated from dataDir
+	assert.Equal(t, "/var/dagu/data/service-registry", cfg.Paths.ServiceRegistryDir) // Auto-generated from dataDir
 
 	// Verify UI settings.
 	assert.Equal(t, "Test Dagu", cfg.UI.NavbarTitle)

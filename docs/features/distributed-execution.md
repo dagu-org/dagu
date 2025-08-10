@@ -16,15 +16,15 @@ Distributed execution allows you to:
 The distributed execution system consists of:
 
 1. **Main Dagu Instance**: Runs the scheduler, web UI, and coordinator service
-2. **Coordinator Service**: gRPC server that distributes tasks to workers with automatic service discovery
+2. **Coordinator Service**: gRPC server that distributes tasks to workers with automatic service registry
 3. **Worker Nodes**: Poll the coordinator for tasks and execute them with heartbeat monitoring
-4. **Service Discovery**: File-based system for automatic worker registration and health tracking
+4. **Service Registry**: File-based system for automatic worker registration and health tracking
 5. **Shared Storage**: Required for DAG files and execution state
 
 ```
 Main Instance (Scheduler + UI + Coordinator)
          │                    │
-         │ Service Discovery  │ gRPC + Heartbeat
+         │ Service Registry   │ gRPC + Heartbeat
          │ (File-based)       │
          │                    │
     ┌────┴──────────┬─────────┴─────────────┐
@@ -38,11 +38,11 @@ Worker 1        Worker 2                Worker 3
         (DAG files, logs, state)
 ```
 
-### Service Discovery & Health Monitoring
+### Service Registry & Health Monitoring
 
-The distributed execution system features automatic service discovery and health monitoring:
+The distributed execution system features automatic service registry and health monitoring:
 
-- **File-based Service Discovery**: Workers automatically register themselves in a shared discovery directory
+- **File-based Service Registry**: Workers automatically register themselves in a shared service registry directory
 - **Heartbeat Mechanism**: Workers send regular heartbeats (every 10 seconds by default)
 - **Automatic Failover**: Tasks are automatically redistributed if a worker becomes unhealthy
 - **Dynamic Scaling**: Add or remove workers at runtime without coordinator restart
@@ -61,7 +61,7 @@ dagu start-all --host=0.0.0.0 --port=8080
 dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
 ```
 
-The coordinator automatically registers itself in the service discovery system and begins accepting worker connections.
+The coordinator automatically registers itself in the service registry system and begins accepting worker connections.
 
 ### Step 2: Deploy Workers
 
@@ -140,9 +140,9 @@ coordinator:
   host: 0.0.0.0
   port: 50055
 
-# Service discovery configuration
+# Service registry configuration
 paths:
-  discoveryDir: "~/.local/share/dagu/discovery"  # Directory for service discovery files
+  serviceRegistryDir: "~/.local/share/dagu/service-registry"  # Directory for service registry files
 
 # TLS configuration for peer connections (both coordinator and worker)
 peer:
@@ -184,8 +184,8 @@ export DAGU_COORDINATOR_PORT=50055
 export DAGU_WORKER_ID=worker-01
 export DAGU_WORKER_LABELS="gpu=true,region=us-east-1"
 
-# Service Discovery
-export DAGU_PATHS_DISCOVERY_DIR=/shared/dagu/discovery
+# Service Registry
+export DAGU_PATHS_SERVICE_REGISTRY_DIR=/shared/dagu/service-registry
 
 # Peer TLS configuration (for both coordinator and worker)
 export DAGU_PEER_INSECURE=true  # Default: true (use h2c)
@@ -240,37 +240,37 @@ curl -H "Authorization: Bearer $TOKEN" \
 }
 ```
 
-## Service Discovery Deep Dive
+## Service Registry Deep Dive
 
 ### How It Works
 
-The file-based service discovery system provides automatic worker registration and health monitoring:
+The file-based service registry system provides automatic worker registration and health monitoring:
 
-1. **Worker Registration**: When a worker starts, it creates a discovery file containing:
+1. **Worker Registration**: When a worker starts, it creates a registry file containing:
    - Worker ID
    - Host and port information
    - Process ID (PID)
    - Timestamp of registration
 
-2. **Heartbeat Updates**: Workers update their discovery files every 10 seconds with:
+2. **Heartbeat Updates**: Workers update their registry files every 10 seconds with:
    - Current timestamp
    - Health status
    - Active task count
 
-3. **Coordinator Monitoring**: The coordinator continuously monitors discovery files to:
+3. **Coordinator Monitoring**: The coordinator continuously monitors registry files to:
    - Track available workers
    - Detect unhealthy workers
    - Remove stale entries (no heartbeat for 30+ seconds)
 
-4. **Automatic Cleanup**: Discovery files are automatically removed when:
+4. **Automatic Cleanup**: Registry files are automatically removed when:
    - Worker shuts down gracefully
    - Worker process terminates unexpectedly
    - Heartbeat timeout exceeds threshold
 
-### Discovery Directory Structure
+### Registry Directory Structure
 
 ```
-~/.local/share/dagu/discovery/
+~/.local/share/dagu/service-registry/
 ├── coordinator/
 │   └── coordinator-primary-host1-50055.json
 └── worker/
@@ -279,15 +279,15 @@ The file-based service discovery system provides automatic worker registration a
     └── worker-cpu-03-host4-9012.json
 ```
 
-### Configuring Service Discovery
+### Configuring Service Registry
 
 ```yaml
-# Shared discovery directory (must be accessible by all nodes)
+# Shared registry directory (must be accessible by all nodes)
 paths:
-  discoveryDir: "/nfs/shared/dagu/discovery"  # NFS mount example
+  serviceRegistryDir: "/nfs/shared/dagu/service-registry"  # NFS mount example
 
 # Or use environment variable
-export DAGU_PATHS_DISCOVERY_DIR=/nfs/shared/dagu/discovery
+export DAGU_PATHS_SERVICE_REGISTRY_DIR=/nfs/shared/dagu/service-registry
 ```
 
 ## Security
@@ -343,7 +343,7 @@ services:
       worker
       --worker.labels=gpu=true,cuda=11.8
     volumes:
-      - ./data:/var/lib/dagu  # Shared storage for service discovery
+      - ./data:/var/lib/dagu  # Shared storage for service registry
     deploy:
       replicas: 2
       resources:
@@ -357,7 +357,7 @@ services:
       worker
       --worker.labels=cpu-only=true,region=us-east-1
     volumes:
-      - ./data:/var/lib/dagu  # Shared storage for service discovery
+      - ./data:/var/lib/dagu  # Shared storage for service registry
     deploy:
       replicas: 5
 ```
@@ -442,12 +442,12 @@ spec:
         args:
         - --worker.labels=cpu-optimized=true,region=us-east-1
         volumeMounts:
-        - name: discovery
-          mountPath: /var/lib/dagu/discovery
+        - name: service-registry
+          mountPath: /var/lib/dagu/service-registry
       volumes:
-      - name: discovery
+      - name: service-registry
         persistentVolumeClaim:
-          claimName: dagu-discovery-pvc
+          claimName: dagu-service-registry-pvc
 ```
 
 ## See Also

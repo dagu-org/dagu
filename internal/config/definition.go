@@ -185,17 +185,17 @@ type authOIDCDef struct {
 
 // PathsConfigDef represents the file system paths configuration.
 type pathsConfigDef struct {
-	DAGsDir         string `mapstructure:"dagsDir"`
-	Executable      string `mapstructure:"executable"`
-	LogDir          string `mapstructure:"logDir"`
-	DataDir         string `mapstructure:"dataDir"`
-	SuspendFlagsDir string `mapstructure:"suspendFlagsDir"`
-	AdminLogsDir    string `mapstructure:"adminLogsDir"`
-	BaseConfig      string `mapstructure:"baseConfig"`
-	DAGRunsDir      string `mapstructure:"dagRunsDir"`
-	QueueDir        string `mapstructure:"queueDir"`
-	ProcDir         string `mapstructure:"procDir"`
-	DiscoveryDir    string `mapstructure:"discoveryDir"`
+	DAGsDir            string `mapstructure:"dagsDir"`
+	Executable         string `mapstructure:"executable"`
+	LogDir             string `mapstructure:"logDir"`
+	DataDir            string `mapstructure:"dataDir"`
+	SuspendFlagsDir    string `mapstructure:"suspendFlagsDir"`
+	AdminLogsDir       string `mapstructure:"adminLogsDir"`
+	BaseConfig         string `mapstructure:"baseConfig"`
+	DAGRunsDir         string `mapstructure:"dagRunsDir"`
+	QueueDir           string `mapstructure:"queueDir"`
+	ProcDir            string `mapstructure:"procDir"`
+	ServiceRegistryDir string `mapstructure:"serviceRegistryDir"`
 }
 
 // uiDef holds the user interface configuration settings.

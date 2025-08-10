@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
@@ -19,12 +20,13 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/metrics"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
-	"github.com/dagu-org/dagu/internal/persistence/filediscovery"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
+	"github.com/dagu-org/dagu/internal/persistence/fileserviceregistry"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -41,11 +43,11 @@ type Context struct {
 	Config  *config.Config
 	Quiet   bool
 
-	DAGRunStore    models.DAGRunStore
-	DAGRunMgr      dagrun.Manager
-	ProcStore      models.ProcStore
-	QueueStore     models.QueueStore
-	ServiceMonitor models.ServiceMonitor
+	DAGRunStore     models.DAGRunStore
+	DAGRunMgr       dagrun.Manager
+	ProcStore       models.ProcStore
+	QueueStore      models.QueueStore
+	ServiceRegistry models.ServiceRegistry
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -126,19 +128,19 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
 	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.WorkDir)
 	qs := filequeue.New(cfg.Paths.QueueDir)
-	sm := filediscovery.New(cfg.Paths.DiscoveryDir)
+	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
 	return &Context{
-		Context:        ctx,
-		Command:        cmd,
-		Config:         cfg,
-		Quiet:          quiet,
-		DAGRunStore:    drs,
-		DAGRunMgr:      drm,
-		Flags:          flags,
-		ProcStore:      ps,
-		QueueStore:     qs,
-		ServiceMonitor: sm,
+		Context:         ctx,
+		Command:         cmd,
+		Config:          cfg,
+		Quiet:           quiet,
+		DAGRunStore:     drs,
+		DAGRunMgr:       drm,
+		Flags:           flags,
+		ProcStore:       ps,
+		QueueStore:      qs,
+		ServiceRegistry: sm,
 	}, nil
 }
 
@@ -164,9 +166,19 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 	}
 
 	// Create coordinator client (may be nil if not configured)
-	coordinatorCli := c.NewCoordinatorClient()
+	cc := c.NewCoordinatorClient()
 
-	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.DAGRunMgr, coordinatorCli), nil
+	collector := metrics.NewCollector(
+		build.Version,
+		dr,
+		c.DAGRunStore,
+		c.QueueStore,
+		c.ServiceRegistry,
+	)
+
+	mr := metrics.NewRegistry(collector)
+
+	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr), nil
 }
 
 // NewCoordinatorClient creates a new coordinator client using the global peer configuration.
@@ -182,7 +194,7 @@ func (c *Context) NewCoordinatorClient() coordinator.Client {
 		logger.Error(c.Context, "Invalid coordinator client configuration", "err", err)
 		return nil
 	}
-	return coordinator.New(c.ServiceMonitor, coordinatorCliCfg)
+	return coordinator.New(c.ServiceRegistry, coordinatorCliCfg)
 }
 
 // NewScheduler creates a new NewScheduler instance using the default client.
@@ -199,7 +211,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	coordinatorCli := c.NewCoordinatorClient()
 	de := scheduler.NewDAGExecutor(coordinatorCli, c.DAGRunMgr)
 	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable, c.Config.Global.WorkDir)
-	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceMonitor, coordinatorCli)
+	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli)
 }
 
 // StringParam retrieves a string parameter from the command line flags.
