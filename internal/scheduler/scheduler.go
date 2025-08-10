@@ -126,10 +126,11 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	if s.serviceRegistry != nil {
 		hostname, _ := os.Hostname()
 		hostInfo := models.HostInfo{
-			ID:     s.instanceID,
-			Host:   hostname,
-			Port:   s.config.Scheduler.Port, // Health check port (0 if disabled)
-			Status: models.ServiceStatusInactive,
+			ID:        s.instanceID,
+			Host:      hostname,
+			Port:      s.config.Scheduler.Port, // Health check port (0 if disabled)
+			Status:    models.ServiceStatusInactive,
+			StartedAt: time.Now(),
 		}
 		if err := s.serviceRegistry.Register(ctx, models.ServiceNameScheduler, hostInfo); err != nil {
 			logger.Error(ctx, "Failed to register with service registry", "err", err)
@@ -176,10 +177,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	}()
 
 	sig := make(chan os.Signal, 1)
-
-	// Set scheduler as running
-	setSchedulerRunning(true)
-	defer setSchedulerRunning(false)
 
 	done := make(chan any)
 	defer close(done)
@@ -498,7 +495,6 @@ func (s *Scheduler) start(ctx context.Context) {
 	timer := time.NewTimer(0)
 
 	s.running.Store(true)
-	setSchedulerRunning(true)
 
 	for {
 		select {
@@ -532,7 +528,6 @@ func (s *Scheduler) Stop(ctx context.Context) {
 	if !s.running.CompareAndSwap(true, false) {
 		return
 	}
-	setSchedulerRunning(false)
 
 	close(s.stopChan)
 

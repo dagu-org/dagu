@@ -1135,6 +1135,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /services/scheduler:
+    get:
+      summary: "Get scheduler service status"
+      description: "Returns status information about all registered scheduler instances"
+      operationId: "getSchedulerStatus"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerStatusResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /metrics:
     get:
       summary: "Get Prometheus metrics"
@@ -1592,6 +1615,41 @@ components:
         - "finished"
         - "skipped"
         - "partial success"
+
+    SchedulerStatusResponse:
+      type: object
+      description: "Response containing status of all scheduler instances"
+      properties:
+        schedulers:
+          type: array
+          description: "List of all registered scheduler instances"
+          items:
+            $ref: "#/components/schemas/SchedulerInstance"
+      required:
+        - schedulers
+
+    SchedulerInstance:
+      type: object
+      description: "Scheduler instance status information"
+      properties:
+        instanceId:
+          type: string
+          description: "Unique identifier of the scheduler instance"
+        host:
+          type: string
+          description: "Hostname where scheduler is running"
+        status:
+          type: string
+          enum: ["active", "inactive", "unknown"]
+          description: "Scheduler status (active = holds lock and scheduling)"
+        startedAt:
+          type: string
+          description: "RFC3339 timestamp when scheduler started"
+      required:
+        - instanceId
+        - host
+        - status
+        - startedAt
 
     WorkerHealthStatus:
       type: string
