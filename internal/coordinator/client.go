@@ -198,7 +198,8 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []models.HostInf
 		if err != nil {
 			logger.Warn(ctx, "Failed to connect to coordinator",
 				"coordinator_id", member.ID,
-				"address", member.HostPort,
+				"host", member.Host,
+				"port", member.Port,
 				"error", err)
 			cli.removeClient(member.ID) // Remove failed client
 			cli.recordFailure(err)
@@ -209,7 +210,8 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []models.HostInf
 		if err := cli.isHealthy(ctx, member); err != nil {
 			logger.Warn(ctx, "Failed to check coordinator health",
 				"coordinator_id", member.ID,
-				"address", member.HostPort,
+				"host", member.Host,
+				"port", member.Port,
 				"error", err)
 			cli.recordFailure(err)
 			continue
@@ -219,7 +221,8 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []models.HostInf
 		if err := callback(ctx, member, client); err != nil {
 			logger.Debug(ctx, "Failed to dispatch to coordinator",
 				"coordinator_id", member.ID,
-				"address", member.HostPort,
+				"host", member.Host,
+				"port", member.Port,
 				"error", err)
 			lastErr = err
 			cli.recordFailure(err)
@@ -295,10 +298,13 @@ func (cli *clientImpl) createClient(_ context.Context, member models.HostInfo) (
 		return nil, fmt.Errorf("failed to configure gRPC connection: %w", err)
 	}
 
+	// Construct address from host and port
+	address := fmt.Sprintf("%s:%d", member.Host, member.Port)
+
 	// Create gRPC connection
-	conn, err := grpc.NewClient(member.HostPort, dialOpts...)
+	conn, err := grpc.NewClient(address, dialOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create coordinator client for %s: %w", member.HostPort, err)
+		return nil, fmt.Errorf("failed to create coordinator client for %s: %w", address, err)
 	}
 
 	return &client{
@@ -383,7 +389,8 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 		if err != nil {
 			logger.Warn(ctx, "Failed to connect to coordinator",
 				"id", member.ID,
-				"address", member.HostPort,
+				"host", member.Host,
+				"port", member.Port,
 				"err", err)
 			lastErr = err
 			continue
@@ -394,7 +401,8 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 		if err != nil {
 			logger.Warn(ctx, "Failed to get workers from coordinator",
 				"id", member.ID,
-				"address", member.HostPort,
+				"host", member.Host,
+				"port", member.Port,
 				"err", err)
 			lastErr = err
 

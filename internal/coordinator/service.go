@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/logger"
@@ -53,9 +54,21 @@ func (srv *Service) Start(ctx context.Context) error {
 
 	// Register with service discovery if monitor is available
 	if srv.registry != nil {
+		// Parse host and port from hostPort
+		host, portStr, err := net.SplitHostPort(srv.hostPort)
+		if err != nil {
+			return fmt.Errorf("failed to parse host:port: %w", err)
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			return fmt.Errorf("failed to parse port number: %w", err)
+		}
+		
 		hostInfo := models.HostInfo{
-			ID:       srv.instanceID,
-			HostPort: srv.hostPort,
+			ID:     srv.instanceID,
+			Host:   host,
+			Port:   port,
+			Status: models.ServiceStatusActive, // Coordinator is active when serving
 		}
 		if err := srv.registry.Register(ctx, models.ServiceNameCoordinator, hostInfo); err != nil {
 			return fmt.Errorf("failed to register with service discovery: %w", err)

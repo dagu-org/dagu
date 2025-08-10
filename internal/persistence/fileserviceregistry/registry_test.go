@@ -19,8 +19,10 @@ func TestRegistry_RegisterUnregister(t *testing.T) {
 
 	ctx := context.Background()
 	hostInfo := models.HostInfo{
-		ID:       "test-instance",
-		HostPort: "localhost:8080",
+		ID:     "test-instance",
+		Host:   "localhost",
+		Port:   8080,
+		Status: models.ServiceStatusActive,
 	}
 	err := registry.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
@@ -45,8 +47,10 @@ func TestRegistry_GetServiceMembers(t *testing.T) {
 
 	// Register a service
 	hostInfo := models.HostInfo{
-		ID:       "test-instance",
-		HostPort: "localhost:8080",
+		ID:     "test-instance",
+		Host:   "localhost",
+		Port:   8080,
+		Status: models.ServiceStatusActive,
 	}
 	err = registry.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
@@ -56,7 +60,7 @@ func TestRegistry_GetServiceMembers(t *testing.T) {
 	members, err = registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
 	require.NoError(t, err)
 	assert.Len(t, members, 1)
-	assert.Equal(t, "localhost:8080", members[0].HostPort)
+	assert.Equal(t, "localhost:8080", fmt.Sprintf("%s:%d", members[0].Host, members[0].Port))
 }
 
 func TestRegistry_RegisterInstance(t *testing.T) {
@@ -65,8 +69,10 @@ func TestRegistry_RegisterInstance(t *testing.T) {
 
 	ctx := context.Background()
 	hostInfo := models.HostInfo{
-		ID:       "test-coordinator",
-		HostPort: "localhost:8080",
+		ID:     "test-coordinator",
+		Host:   "localhost",
+		Port:   8080,
+		Status: models.ServiceStatusActive,
 	}
 	err := registry.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
@@ -82,7 +88,7 @@ func TestRegistry_RegisterInstance(t *testing.T) {
 	members, err := registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
 	require.NoError(t, err)
 	require.Len(t, members, 1)
-	assert.Equal(t, "localhost:8080", members[0].HostPort)
+	assert.Equal(t, "localhost:8080", fmt.Sprintf("%s:%d", members[0].Host, members[0].Port))
 }
 
 func TestRegistry_Heartbeat(t *testing.T) {
@@ -92,8 +98,10 @@ func TestRegistry_Heartbeat(t *testing.T) {
 
 	ctx := context.Background()
 	hostInfo := models.HostInfo{
-		ID:       "test-heartbeat",
-		HostPort: "localhost:8080",
+		ID:     "test-heartbeat",
+		Host:   "localhost",
+		Port:   8080,
+		Status: models.ServiceStatusActive,
 	}
 	err := registry.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
@@ -122,8 +130,10 @@ func TestRegistry_UnregisterRemovesInstance(t *testing.T) {
 
 	ctx := context.Background()
 	hostInfo := models.HostInfo{
-		ID:       "test-stop",
-		HostPort: "localhost:8080",
+		ID:     "test-stop",
+		Host:   "localhost",
+		Port:   8080,
+		Status: models.ServiceStatusActive,
 	}
 	err := registry.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
@@ -150,8 +160,10 @@ func TestRegistry_ConcurrentAccess(t *testing.T) {
 
 	ctx := context.Background()
 	hostInfo := models.HostInfo{
-		ID:       "test-concurrent",
-		HostPort: "localhost:8080",
+		ID:     "test-concurrent",
+		Host:   "localhost",
+		Port:   8080,
+		Status: models.ServiceStatusActive,
 	}
 	err := registry.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
@@ -182,8 +194,10 @@ func TestRegistry_HeartbeatRecreatesFile(t *testing.T) {
 
 	ctx := context.Background()
 	hostInfo := models.HostInfo{
-		ID:       "test-recreate",
-		HostPort: "localhost:8080",
+		ID:     "test-recreate",
+		Host:   "localhost",
+		Port:   8080,
+		Status: models.ServiceStatusActive,
 	}
 	err := registry.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
@@ -208,7 +222,7 @@ func TestRegistry_HeartbeatRecreatesFile(t *testing.T) {
 	info, err := readInstanceFile(instanceFile)
 	require.NoError(t, err)
 	assert.Equal(t, "test-recreate", info.ID)
-	assert.Equal(t, "localhost:8080", info.HostPort)
+	assert.Equal(t, "localhost:8080", fmt.Sprintf("%s:%d", info.Host, info.Port))
 }
 
 func TestRegistry_MultipleInstances(t *testing.T) {
@@ -223,22 +237,28 @@ func TestRegistry_MultipleInstances(t *testing.T) {
 		{
 			serviceName: models.ServiceNameCoordinator,
 			hostInfo: models.HostInfo{
-				ID:       "coord-1",
-				HostPort: "coord1.example.com:9090",
+				ID:     "coord-1",
+				Host:   "coord1.example.com",
+				Port:   9090,
+				Status: models.ServiceStatusActive,
 			},
 		},
 		{
 			serviceName: models.ServiceNameCoordinator,
 			hostInfo: models.HostInfo{
-				ID:       "coord-2",
-				HostPort: "coord2.example.com:9090",
+				ID:     "coord-2",
+				Host:   "coord2.example.com",
+				Port:   9090,
+				Status: models.ServiceStatusActive,
 			},
 		},
 		{
 			serviceName: "worker",
 			hostInfo: models.HostInfo{
-				ID:       "worker-1",
-				HostPort: "worker1.example.com:8080",
+				ID:     "worker-1",
+				Host:   "worker1.example.com",
+				Port:   8080,
+				Status: models.ServiceStatusActive,
 			},
 		},
 	}
@@ -265,5 +285,5 @@ func TestRegistry_MultipleInstances(t *testing.T) {
 	workerMembers, err := resolver.GetServiceMembers(ctx, "worker")
 	require.NoError(t, err)
 	assert.Len(t, workerMembers, 1)
-	assert.Equal(t, "worker1.example.com:8080", workerMembers[0].HostPort)
+	assert.Equal(t, "worker1.example.com:8080", fmt.Sprintf("%s:%d", workerMembers[0].Host, workerMembers[0].Port))
 }

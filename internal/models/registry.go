@@ -17,6 +17,9 @@ type ServiceRegistry interface {
 	// GetServiceMembers returns the list of active hosts for the given service.
 	// This method combines service resolution and member discovery.
 	GetServiceMembers(ctx context.Context, serviceName ServiceName) ([]HostInfo, error)
+
+	// UpdateStatus updates the status of the current registered instance
+	UpdateStatus(ctx context.Context, serviceName ServiceName, status ServiceStatus) error
 }
 
 // ServiceName represents the name of a service in the service discovery system
@@ -26,12 +29,65 @@ const (
 	// ServiceNameCoordinator is the name of the coordinator service
 	ServiceNameCoordinator ServiceName = "coordinator"
 	// ServiceNameScheduler is the name of the scheduler service
+	ServiceNameScheduler ServiceName = "scheduler"
 )
+
+// ServiceStatus represents the operational status of a service instance
+type ServiceStatus int
+
+const (
+	// ServiceStatusUnknown indicates unknown status
+	ServiceStatusUnknown ServiceStatus = iota
+	// ServiceStatusActive indicates the service is active (e.g., scheduler holds lock)
+	ServiceStatusActive
+	// ServiceStatusInactive indicates the service is inactive (e.g., scheduler waiting for lock)
+	ServiceStatusInactive
+)
+
+// String returns the string representation of the service status
+func (s ServiceStatus) String() string {
+	switch s {
+	case ServiceStatusActive:
+		return "active"
+	case ServiceStatusInactive:
+		return "inactive"
+	default:
+		return "unknown"
+	}
+}
+
+// MarshalJSON implements json.Marshaler for ServiceStatus
+func (s ServiceStatus) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + s.String() + `"`), nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler for ServiceStatus
+func (s *ServiceStatus) UnmarshalJSON(data []byte) error {
+	// Remove quotes if present
+	str := string(data)
+	if len(str) >= 2 && str[0] == '"' && str[len(str)-1] == '"' {
+		str = str[1 : len(str)-1]
+	}
+	
+	switch str {
+	case "active":
+		*s = ServiceStatusActive
+	case "inactive":
+		*s = ServiceStatusInactive
+	default:
+		*s = ServiceStatusUnknown
+	}
+	return nil
+}
 
 // HostInfo contains information about a host in the service discovery system
 type HostInfo struct {
 	// ID is a unique identifier for the host
 	ID string
-	// HostPort is the combined host and port in the format "host:port"
-	HostPort string
+	// Host is the hostname or IP address
+	Host string
+	// Port is the port number (0 if not applicable)
+	Port int
+	// Status is the operational status of the service instance
+	Status ServiceStatus
 }

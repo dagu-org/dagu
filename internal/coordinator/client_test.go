@@ -3,6 +3,7 @@ package coordinator_test
 import (
 	"context"
 	"net"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +21,16 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
 )
+
+func parsePort(addr string) int {
+	parts := strings.Split(addr, ":")
+	if len(parts) < 2 {
+		return 0
+	}
+	port, _ := strconv.Atoi(parts[1])
+	return port
+}
+
 
 func TestClientNew(t *testing.T) {
 	config := coordinator.DefaultConfig()
@@ -55,7 +66,7 @@ func TestClientDispatch(t *testing.T) {
 
 		monitor := &mockServiceMonitor{
 			members: []models.HostInfo{
-				{ID: "coord-1", HostPort: addr},
+				{ID: "coord-1", Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive},
 			},
 		}
 
@@ -121,7 +132,7 @@ func TestClientPoll(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		members: []models.HostInfo{{HostPort: addr}},
+		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -166,7 +177,7 @@ func TestClientGetWorkers(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		members: []models.HostInfo{{HostPort: addr}},
+		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -197,7 +208,7 @@ func TestClientHeartbeat(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		members: []models.HostInfo{{HostPort: addr}},
+		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -239,7 +250,7 @@ func TestClientMetrics(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		members: []models.HostInfo{{HostPort: addr}},
+		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -279,7 +290,7 @@ func TestClientCleanup(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		members: []models.HostInfo{{HostPort: addr}},
+		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -358,6 +369,10 @@ func (m *mockServiceMonitor) GetServiceMembers(_ context.Context, _ models.Servi
 
 func (m *mockServiceMonitor) Unregister(_ context.Context) {
 	// No-op
+}
+
+func (m *mockServiceMonitor) UpdateStatus(_ context.Context, _ models.ServiceName, _ models.ServiceStatus) error {
+	return nil
 }
 
 type mockCoordinatorService struct {

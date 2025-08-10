@@ -13,19 +13,24 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 )
 
+// registrationInfo holds information about a single service registration
+type registrationInfo struct {
+	instanceInfo *instanceInfo
+	fileName     string
+	serviceName  models.ServiceName
+	cancel       context.CancelFunc
+	wg           sync.WaitGroup
+}
+
 // registry implements models.ServiceRegistry using file-based discovery
 type registry struct {
 	baseDir string
 	finders map[models.ServiceName]*finder
 	mu      sync.RWMutex
 
-	// For this instance's registration
-	instanceInfo      *instanceInfo
-	fileName          string // File name for this instance
-	serviceName       models.ServiceName
-	instanceMu        sync.Mutex
-	cancel            context.CancelFunc
-	wg                sync.WaitGroup
+	// Map of service registrations (can have multiple)
+	registrations     map[models.ServiceName]*registrationInfo
+	registrationsMu   sync.Mutex
 	heartbeatInterval time.Duration
 }
 
@@ -34,45 +39,58 @@ func New(discoveryDir string) *registry {
 	return &registry{
 		baseDir:           discoveryDir,
 		finders:           make(map[models.ServiceName]*finder),
+		registrations:     make(map[models.ServiceName]*registrationInfo),
 		heartbeatInterval: 10 * time.Second, // default
 	}
 }
 
 // Register begins monitoring services and registers this instance
 func (r *registry) Register(ctx context.Context, serviceName models.ServiceName, hostInfo models.HostInfo) error {
-	r.instanceMu.Lock()
-	defer r.instanceMu.Unlock()
+	r.registrationsMu.Lock()
+	defer r.registrationsMu.Unlock()
 
-	if r.cancel != nil {
-		return fmt.Errorf("registry already started")
+	// Check if this service is already registered
+	if _, exists := r.registrations[serviceName]; exists {
+		return fmt.Errorf("service %s already registered", serviceName)
 	}
 
 	logger.Info(ctx, "Starting service registry",
 		"service_name", serviceName,
 		"instance_id", hostInfo.ID,
-		"address", hostInfo.HostPort)
+		"host", hostInfo.Host,
+		"port", hostInfo.Port,
+		"status", hostInfo.Status.String())
 
 	// Ensure base directory exists
 	if err := os.MkdirAll(r.baseDir, 0750); err != nil {
 		return fmt.Errorf("failed to create discovery directory: %w", err)
 	}
 
-	// Set instance info
-	r.serviceName = serviceName
-	r.instanceInfo = &instanceInfo{
-		ID:       hostInfo.ID,
-		HostPort: hostInfo.HostPort,
-		PID:      os.Getpid(),
+	// Create registration info
+	reg := &registrationInfo{
+		serviceName: serviceName,
+		instanceInfo: &instanceInfo{
+			ID:     hostInfo.ID,
+			Host:   hostInfo.Host,
+			Port:   hostInfo.Port,
+			PID:    os.Getpid(),
+			Status: hostInfo.Status,
+		},
 	}
 
+	// Generate file path
+	reg.fileName = filepath.Join(r.baseDir, string(serviceName), fmt.Sprintf("%s.json", fileutil.SafeName(hostInfo.ID)))
+
 	// Write initial instance file
-	r.fileName = r.instanceFilePath()
-	if err := writeInstanceFile(r.fileName, r.instanceInfo); err != nil {
+	if err := writeInstanceFile(reg.fileName, reg.instanceInfo); err != nil {
 		return fmt.Errorf("failed to write instance file: %w", err)
 	}
 
+	// Store registration
+	r.registrations[serviceName] = reg
+
 	// Start heartbeat for this instance
-	if err := r.startHeartbeat(ctx, r.heartbeatInterval); err != nil {
+	if err := r.startHeartbeat(ctx, serviceName, r.heartbeatInterval); err != nil {
 		return fmt.Errorf("failed to start heartbeat: %w", err)
 	}
 
@@ -105,69 +123,77 @@ func (r *registry) getFinder(serviceName models.ServiceName) *finder {
 	return f
 }
 
-// Unregister stops the service registry
+// Unregister stops all service registrations
 func (r *registry) Unregister(ctx context.Context) {
-	r.instanceMu.Lock()
+	r.registrationsMu.Lock()
+	registrations := r.registrations
+	r.registrations = make(map[models.ServiceName]*registrationInfo)
+	r.registrationsMu.Unlock()
 
-	if r.cancel == nil {
-		// Already stopped
-		r.instanceMu.Unlock()
-		return
-	}
+	// Stop all registrations
+	for serviceName, reg := range registrations {
+		logger.Info(ctx, "Stopping service registry",
+			"service_name", serviceName,
+			"instance_id", reg.instanceInfo.ID,
+			"host", reg.instanceInfo.Host,
+			"port", reg.instanceInfo.Port)
 
-	logger.Info(ctx, "Stopping service registry",
-		"service_name", r.serviceName,
-		"instance_id", r.instanceInfo.ID,
-		"address", r.instanceInfo.HostPort)
-
-	// Cancel the context to stop background goroutines
-	cancel := r.cancel
-	r.cancel = nil
-
-	// Stop this instance's registration if active
-	if r.instanceInfo != nil {
-		// Remove instance file
-		if err := removeInstanceFile(r.fileName); err != nil {
-			logger.Error(ctx, "Failed to remove instance file", "err", err, "file", r.instanceInfo.ID)
+		// Cancel the context to stop background goroutines
+		if reg.cancel != nil {
+			reg.cancel()
 		}
-		r.instanceInfo = nil
-	}
-	r.instanceMu.Unlock()
 
-	// Cancel context after releasing mutex to avoid deadlock
-	cancel()
+		// Remove instance file
+		if err := removeInstanceFile(reg.fileName); err != nil {
+			logger.Error(ctx, "Failed to remove instance file", "err", err, "file", reg.instanceInfo.ID)
+		}
 
-	// Wait for background goroutines with timeout
-	done := make(chan struct{})
-	go func() {
-		r.wg.Wait()
-		close(done)
-	}()
+		// Wait for background goroutines with timeout
+		done := make(chan struct{})
+		go func() {
+			reg.wg.Wait()
+			close(done)
+		}()
 
-	select {
-	case <-done:
-		// Clean shutdown
-	case <-time.After(5 * time.Second):
-		// Force shutdown after timeout
-		logger.Warn(ctx, "Timeout waiting for registry shutdown")
+		select {
+		case <-done:
+			// Clean shutdown
+		case <-time.After(5 * time.Second):
+			// Force shutdown after timeout
+			logger.Warn(ctx, "Timeout waiting for registry shutdown", "service", serviceName)
+		}
 	}
 }
 
-// instanceFilePath returns the full path for this instance's file
-func (r *registry) instanceFilePath() string {
-	return filepath.Join(r.baseDir, string(r.serviceName), fmt.Sprintf("%s.json", fileutil.SafeName(r.instanceInfo.ID)))
+// UpdateStatus updates the status of the registered instance for the given service
+func (r *registry) UpdateStatus(ctx context.Context, serviceName models.ServiceName, status models.ServiceStatus) error {
+	r.registrationsMu.Lock()
+	defer r.registrationsMu.Unlock()
+
+	reg, exists := r.registrations[serviceName]
+	if !exists {
+		return fmt.Errorf("not registered")
+	}
+
+	reg.instanceInfo.Status = status
+	return writeInstanceFile(reg.fileName, reg.instanceInfo)
 }
 
-// startHeartbeat starts a background goroutine to update heartbeat for this instance
-// Must be called with instanceMu held
-func (r *registry) startHeartbeat(ctx context.Context, interval time.Duration) error {
+// startHeartbeat starts a background goroutine to update heartbeat for a specific service instance
+// Must be called with registrationsMu held
+func (r *registry) startHeartbeat(ctx context.Context, serviceName models.ServiceName, interval time.Duration) error {
+	reg := r.registrations[serviceName]
+	if reg == nil {
+		return fmt.Errorf("service not registered")
+	}
+
 	// Create a cancellable context
 	ctx, cancel := context.WithCancel(ctx)
-	r.cancel = cancel
+	reg.cancel = cancel
 
-	r.wg.Add(1)
+	reg.wg.Add(1)
 	go func() {
-		defer r.wg.Done()
+		defer reg.wg.Done()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -176,33 +202,23 @@ func (r *registry) startHeartbeat(ctx context.Context, interval time.Duration) e
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				r.instanceMu.Lock()
-				if r.instanceInfo == nil {
-					r.instanceMu.Unlock()
-					continue
-				}
-
-				// Update file modification time for heartbeat
-				filename := r.fileName
-
 				// Check if file exists, recreate if needed
-				if _, err := os.Stat(filename); os.IsNotExist(err) {
+				if _, err := os.Stat(reg.fileName); os.IsNotExist(err) {
 					// File doesn't exist, recreate it
-					if err := writeInstanceFile(filename, r.instanceInfo); err != nil {
-						logger.Error(ctx, "Failed to recreate instance file", "err", err, "file", filename)
-						r.instanceMu.Unlock()
+					if err := writeInstanceFile(reg.fileName, reg.instanceInfo); err != nil {
+						logger.Error(ctx, "Failed to recreate instance file", "err", err, "file", reg.fileName)
 						continue
 					}
 				}
 
 				// Update modification time
 				now := time.Now()
-				if err := os.Chtimes(filename, now, now); err != nil {
-					logger.Error(ctx, "Failed to update heartbeat", "err", err, "file", filename)
+				if err := os.Chtimes(reg.fileName, now, now); err != nil {
+					logger.Error(ctx, "Failed to update heartbeat", "err", err, "file", reg.fileName)
 				}
-				r.instanceMu.Unlock()
 			}
 		}
 	}()
+
 	return nil
 }

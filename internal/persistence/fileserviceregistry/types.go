@@ -7,13 +7,16 @@ import (
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/models"
 )
 
 // instanceInfo represents the information stored for each service instance
 type instanceInfo struct {
-	ID       string `json:"id"`
-	HostPort string `json:"hostPort"`
-	PID      int    `json:"pid"`
+	ID     string                `json:"id"`
+	Host   string                `json:"host"`
+	Port   int                   `json:"port"`
+	PID    int                   `json:"pid"`
+	Status models.ServiceStatus  `json:"status"`
 }
 
 // instanceFilePath returns the file path for an instance

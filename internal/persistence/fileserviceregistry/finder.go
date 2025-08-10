@@ -122,10 +122,12 @@ func (f *finder) members(ctx context.Context) ([]models.HostInfo, error) {
 			// Skip invalid files
 			continue
 		}
-
+		
 		members = append(members, models.HostInfo{
-			ID:       info.ID,
-			HostPort: info.HostPort,
+			ID:     info.ID,
+			Host:   info.Host,
+			Port:   info.Port,
+			Status: info.Status,
 		})
 	}
 

@@ -55,6 +55,7 @@ type Scheduler struct {
 	heartbeatCancel     context.CancelFunc
 	heartbeatDone       chan struct{}
 	zombieDetector      *ZombieDetector // Zombie DAG run detector
+	instanceID          string          // Unique instance identifier for service registry
 }
 
 type queueConfig struct {
@@ -115,6 +116,32 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	s.cancel = cancel
 	defer cancel()
 
+	// Generate instance ID if not already set
+	if s.instanceID == "" {
+		hostname, _ := os.Hostname()
+		s.instanceID = fmt.Sprintf("%s-%d-%d", hostname, os.Getpid(), time.Now().Unix())
+	}
+
+	// Register with service discovery as inactive initially
+	if s.serviceRegistry != nil {
+		hostname, _ := os.Hostname()
+		hostInfo := models.HostInfo{
+			ID:     s.instanceID,
+			Host:   hostname,
+			Port:   s.config.Scheduler.Port, // Health check port (0 if disabled)
+			Status: models.ServiceStatusInactive,
+		}
+		if err := s.serviceRegistry.Register(ctx, models.ServiceNameScheduler, hostInfo); err != nil {
+			logger.Error(ctx, "Failed to register with service discovery", "err", err)
+			// Continue anyway - service discovery is not critical
+		} else {
+			logger.Info(ctx, "Registered with service discovery as inactive",
+				"instance_id", s.instanceID,
+				"host", hostname,
+				"port", s.config.Scheduler.Port)
+		}
+	}
+
 	// Start health check server only if not disabled
 	if !s.disableHealthServer {
 		if err := s.healthServer.Start(ctx); err != nil {
@@ -129,6 +156,15 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	}
 
 	logger.Info(ctx, "Acquired scheduler lock")
+
+	// Update status to active after acquiring lock
+	if s.serviceRegistry != nil {
+		if err := s.serviceRegistry.UpdateStatus(ctx, models.ServiceNameScheduler, models.ServiceStatusActive); err != nil {
+			logger.Error(ctx, "Failed to update status to active", "err", err)
+		} else {
+			logger.Info(ctx, "Updated scheduler status to active")
+		}
+	}
 
 	// Ensure lock is always released
 	defer func() {
@@ -512,6 +548,13 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		s.heartbeatCancel()
 	}
 
+	// Update status to inactive before stopping
+	if s.serviceRegistry != nil {
+		if err := s.serviceRegistry.UpdateStatus(ctx, models.ServiceNameScheduler, models.ServiceStatusInactive); err != nil {
+			logger.Error(ctx, "Failed to update status to inactive", "err", err)
+		}
+	}
+
 	// Stop health check server if it was started
 	if s.healthServer != nil && !s.disableHealthServer {
 		if err := s.healthServer.Stop(ctx); err != nil {
@@ -528,6 +571,12 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		logger.Error(ctx, "Failed to release scheduler lock in Stop", "err", err)
 	} else {
 		logger.Info(ctx, "Released scheduler lock in Stop")
+	}
+
+	// Unregister from service discovery
+	if s.serviceRegistry != nil {
+		s.serviceRegistry.Unregister(ctx)
+		logger.Info(ctx, "Unregistered from service discovery")
 	}
 
 	logger.Info(ctx, "Scheduler stopped")
