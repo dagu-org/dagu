@@ -825,19 +825,20 @@ export interface components {
             defaultParams?: string;
             /** @description List of tags for categorizing and filtering DAGs */
             tags?: string[];
-            /** @description Configuration for controlling user interactions when starting DAG runs */
-            runConfig?: {
-                /**
-                 * @description Allow users to edit parameters when starting the DAG
-                 * @default true
-                 */
-                allowEditParams: boolean;
-                /**
-                 * @description Allow users to specify custom run IDs
-                 * @default true
-                 */
-                allowEditRunId: boolean;
-            };
+            runConfig?: components["schemas"]["RunConfig"];
+        };
+        /** @description Configuration for controlling user interactions when starting DAG runs */
+        RunConfig: {
+            /**
+             * @description Allow users to edit parameters when starting the DAG
+             * @default true
+             */
+            allowEditParams: boolean;
+            /**
+             * @description Allow users to specify custom run IDs
+             * @default true
+             */
+            allowEditRunId: boolean;
         };
         LocalDag: {
             /** @description Name of the local DAG */

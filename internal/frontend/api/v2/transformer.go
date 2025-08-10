@@ -227,30 +227,21 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 		})
 	}
 
-	var runConfig *struct {
-		AllowEditParams *bool `json:"allowEditParams,omitempty"`
-		AllowEditRunId  *bool `json:"allowEditRunId,omitempty"`
-	}
-	if dag.RunConfig != nil {
-		// Always include the fields, even when they are false
-		allowEditParams := dag.RunConfig.AllowEditParams
-		allowEditRunId := dag.RunConfig.AllowEditRunId
-
-		runConfig = &struct {
-			AllowEditParams *bool `json:"allowEditParams,omitempty"`
-			AllowEditRunId  *bool `json:"allowEditRunId,omitempty"`
-		}{
-			AllowEditParams: &allowEditParams,
-			AllowEditRunId:  &allowEditRunId,
-		}
-	}
-
 	var preconditions []api.Condition
 	for _, p := range dag.Preconditions {
 		preconditions = append(preconditions, toPrecondition(p))
 	}
 
-	return &api.DAGDetails{
+	var runConfig *api.RunConfig = nil
+
+	if dag.RunConfig != nil {
+		runConfig = &api.RunConfig{
+			AllowEditParams: dag.RunConfig.AllowEditParams,
+			AllowEditRunId:  dag.RunConfig.AllowEditRunId,
+		}
+	}
+
+	ret := &api.DAGDetails{
 		Name:              dag.Name,
 		Description:       ptrOf(dag.Description),
 		DefaultParams:     ptrOf(dag.DefaultParams),
@@ -269,4 +260,6 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 		Tags:              ptrOf(dag.Tags),
 		RunConfig:         runConfig,
 	}
+
+	return ret
 }
