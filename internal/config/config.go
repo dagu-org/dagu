@@ -208,16 +208,16 @@ func (cfg *AuthOIDC) Enabled() bool {
 
 // Paths represents the file system paths configuration
 type PathsConfig struct {
-	DAGsDir         string
-	Executable      string
-	LogDir          string
-	DataDir         string
-	SuspendFlagsDir string
-	AdminLogsDir    string
-	BaseConfig      string
-	DAGRunsDir      string
-	QueueDir        string
-	ProcDir         string
+	DAGsDir            string
+	Executable         string
+	LogDir             string
+	DataDir            string
+	SuspendFlagsDir    string
+	AdminLogsDir       string
+	BaseConfig         string
+	DAGRunsDir         string
+	QueueDir           string
+	ProcDir            string
 	ServiceRegistryDir string // Directory for service registry files
 }
 

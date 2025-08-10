@@ -299,11 +299,11 @@ func TestResolver_Members_Caching(t *testing.T) {
 
 	// Create initial instances
 	instance1 := instanceInfo{
-		ID:       "instance-1",
+		ID:     "instance-1",
 		Host:   "host1",
 		Port:   8080,
 		Status: models.ServiceStatusActive,
-		PID:      1234,
+		PID:    1234,
 	}
 	filename := instanceFilePath(tmpDir, "test-service", instance1.ID)
 	err = writeInstanceFile(filename, &instance1)
@@ -320,11 +320,11 @@ func TestResolver_Members_Caching(t *testing.T) {
 
 	// Add another instance to disk
 	instance2 := instanceInfo{
-		ID:       "instance-2",
+		ID:     "instance-2",
 		Host:   "host2",
 		Port:   8081,
 		Status: models.ServiceStatusActive,
-		PID:      1235,
+		PID:    1235,
 	}
 	filename = instanceFilePath(tmpDir, "test-service", instance2.ID)
 	err = writeInstanceFile(filename, &instance2)
@@ -349,11 +349,11 @@ func TestResolver_Members_CacheExpiration(t *testing.T) {
 
 	// Create initial instance
 	instance1 := instanceInfo{
-		ID:       "instance-1",
+		ID:     "instance-1",
 		Host:   "host1",
 		Port:   8080,
 		Status: models.ServiceStatusActive,
-		PID:      1234,
+		PID:    1234,
 	}
 	filename := instanceFilePath(tmpDir, "test-service", instance1.ID)
 	err = writeInstanceFile(filename, &instance1)
@@ -371,11 +371,11 @@ func TestResolver_Members_CacheExpiration(t *testing.T) {
 
 	// Add another instance
 	instance2 := instanceInfo{
-		ID:       "instance-2",
+		ID:     "instance-2",
 		Host:   "host2",
 		Port:   8081,
 		Status: models.ServiceStatusActive,
-		PID:      1235,
+		PID:    1235,
 	}
 	filename = instanceFilePath(tmpDir, "test-service", instance2.ID)
 	err = writeInstanceFile(filename, &instance2)
@@ -406,11 +406,11 @@ func TestResolver_Members_NoCacheForEmptyMembers(t *testing.T) {
 	require.NoError(t, err)
 
 	instance := instanceInfo{
-		ID:       "instance-1",
+		ID:     "instance-1",
 		Host:   "host1",
 		Port:   8080,
 		Status: models.ServiceStatusActive,
-		PID:      1234,
+		PID:    1234,
 	}
 	filename := instanceFilePath(tmpDir, "test-service", instance.ID)
 	err = writeInstanceFile(filename, &instance)
@@ -481,11 +481,11 @@ func TestResolver_Members_CacheInvalidation(t *testing.T) {
 
 	// Create initial instance
 	instance1 := instanceInfo{
-		ID:       "instance-1",
+		ID:     "instance-1",
 		Host:   "host1",
 		Port:   8080,
 		Status: models.ServiceStatusActive,
-		PID:      1234,
+		PID:    1234,
 	}
 	filename := instanceFilePath(tmpDir, "test-service", instance1.ID)
 	err = writeInstanceFile(filename, &instance1)

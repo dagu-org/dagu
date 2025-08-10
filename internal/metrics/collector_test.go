@@ -237,7 +237,7 @@ func (m *mockServiceRegistry) UpdateStatus(ctx context.Context, serviceName mode
 func TestNewCollector(t *testing.T) {
 	serviceRegistry := &mockServiceRegistry{}
 	serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return([]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}}, nil)
-	
+
 	collector := NewCollector(
 		"1.0.0",
 		&mockDAGStore{},
@@ -289,7 +289,7 @@ func TestCollector_Collect_BasicMetrics(t *testing.T) {
 
 	serviceRegistry := &mockServiceRegistry{}
 	serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return([]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}}, nil).Maybe()
-	
+
 	collector := NewCollector(
 		"1.0.0",
 		dagStore,
@@ -342,7 +342,7 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 
 	serviceRegistry := &mockServiceRegistry{}
 	serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return([]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}}, nil).Maybe()
-	
+
 	collector := NewCollector(
 		"1.0.0",
 		dagStore,
@@ -499,12 +499,12 @@ func TestCollector_SchedulerStatus(t *testing.T) {
 	t.Run("Active scheduler", func(t *testing.T) {
 		serviceRegistry := &mockServiceRegistry{}
 		serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return(
-			[]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}}, 
+			[]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}},
 			nil,
 		).Maybe()
 
 		collector := NewCollector("1.0.0", dagStore, dagRunStore, queueStore, serviceRegistry)
-		
+
 		ch := make(chan prometheus.Metric, 100)
 		collector.Collect(ch)
 		close(ch)
@@ -525,12 +525,12 @@ func TestCollector_SchedulerStatus(t *testing.T) {
 	t.Run("Inactive scheduler", func(t *testing.T) {
 		serviceRegistry := &mockServiceRegistry{}
 		serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return(
-			[]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusInactive}}, 
+			[]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusInactive}},
 			nil,
 		).Maybe()
 
 		collector := NewCollector("1.0.0", dagStore, dagRunStore, queueStore, serviceRegistry)
-		
+
 		ch := make(chan prometheus.Metric, 100)
 		collector.Collect(ch)
 		close(ch)
@@ -551,12 +551,12 @@ func TestCollector_SchedulerStatus(t *testing.T) {
 	t.Run("No scheduler instances", func(t *testing.T) {
 		serviceRegistry := &mockServiceRegistry{}
 		serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return(
-			[]models.HostInfo{}, 
+			[]models.HostInfo{},
 			nil,
 		).Maybe()
 
 		collector := NewCollector("1.0.0", dagStore, dagRunStore, queueStore, serviceRegistry)
-		
+
 		ch := make(chan prometheus.Metric, 100)
 		collector.Collect(ch)
 		close(ch)

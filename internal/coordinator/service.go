@@ -63,7 +63,7 @@ func (srv *Service) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse port number: %w", err)
 		}
-		
+
 		hostInfo := models.HostInfo{
 			ID:     srv.instanceID,
 			Host:   host,

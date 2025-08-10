@@ -31,7 +31,6 @@ func parsePort(addr string) int {
 	return port
 }
 
-
 func TestClientNew(t *testing.T) {
 	config := coordinator.DefaultConfig()
 	monitor := &mockServiceMonitor{}

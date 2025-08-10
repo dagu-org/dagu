@@ -55,7 +55,7 @@ func (srv *Server) runServer(t *testing.T) {
 	t.Helper()
 
 	cc := coordinator.New(srv.ServiceRegistry, coordinator.DefaultConfig())
-	
+
 	collector := metrics.NewCollector(
 		build.Version,
 		srv.DAGStore,
@@ -64,7 +64,7 @@ func (srv *Server) runServer(t *testing.T) {
 		srv.ServiceRegistry,
 	)
 	mr := metrics.NewRegistry(collector)
-	
+
 	server := frontend.NewServer(srv.Config, srv.DAGStore, srv.DAGRunStore, srv.QueueStore, srv.DAGRunMgr, cc, srv.ServiceRegistry, mr)
 	err := server.Serve(srv.Context)
 	require.NoError(t, err, "failed to start server")
