@@ -726,8 +726,8 @@ func buildRunConfig(_ BuildContext, spec *definition, dag *DAG) error {
 		return nil
 	}
 	dag.RunConfig = &RunConfig{
-		AllowEditParams: spec.RunConfig.AllowEditParams,
-		AllowEditRunId:  spec.RunConfig.AllowEditRunId,
+		DisableParamEdit: spec.RunConfig.DisableParamEdit,
+		DisableRunIdEdit: spec.RunConfig.DisableRunIdEdit,
 	}
 	return nil
 }

@@ -830,15 +830,15 @@ export interface components {
         /** @description Configuration for controlling user interactions when starting DAG runs */
         RunConfig: {
             /**
-             * @description Allow users to edit parameters when starting the DAG
-             * @default true
+             * @description Disable parameter editing when starting the DAG
+             * @default false
              */
-            allowEditParams: boolean;
+            disableParamEdit: boolean;
             /**
-             * @description Allow users to specify custom run IDs
-             * @default true
+             * @description Disable custom run ID specification
+             * @default false
              */
-            allowEditRunId: boolean;
+            disableRunIdEdit: boolean;
         };
         LocalDag: {
             /** @description Name of the local DAG */

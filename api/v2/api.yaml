@@ -1806,17 +1806,17 @@ components:
       type: object
       description: "Configuration for controlling user interactions when starting DAG runs"
       properties:
-        allowEditParams:
+        disableParamEdit:
           type: boolean
-          description: "Allow users to edit parameters when starting the DAG"
-          default: true
-        allowEditRunId:
+          description: "Disable parameter editing when starting the DAG"
+          default: false
+        disableRunIdEdit:
           type: boolean
-          description: "Allow users to specify custom run IDs"
-          default: true
+          description: "Disable custom run ID specification"
+          default: false
       required:
-        - allowEditParams
-        - allowEditRunId
+        - disableParamEdit
+        - disableRunIdEdit
 
     LocalDag:
       type: object

@@ -226,6 +226,6 @@ type containerDef struct {
 
 // runConfigDef defines configuration for controlling user interactions during DAG runs.
 type runConfigDef struct {
-	AllowEditParams bool `yaml:"allowEditParams,omitempty"` // Allow users to edit parameters when starting DAG
-	AllowEditRunId  bool `yaml:"allowEditRunId,omitempty"`  // Allow users to specify custom run IDs
+	DisableParamEdit bool `yaml:"disableParamEdit,omitempty"` // Disable parameter editing when starting DAG
+	DisableRunIdEdit bool `yaml:"disableRunIdEdit,omitempty"` // Disable custom run ID specification
 }

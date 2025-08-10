@@ -335,15 +335,15 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "allowEditParams": {
+        "disableParamEdit": {
           "type": "boolean",
-          "default": true,
-          "description": "When false, prevents users from modifying DAG parameters when parameters are already defined in the DAG. Defaults to true (users can edit parameters)."
+          "default": false,
+          "description": "When true, prevents users from modifying DAG parameters when starting the DAG. Defaults to false (users can edit parameters)."
         },
-        "allowEditRunId": {
+        "disableRunIdEdit": {
           "type": "boolean",
-          "default": true,
-          "description": "When false, prevents users from entering custom run IDs when starting the DAG. Defaults to true (users can enter custom run IDs)."
+          "default": false,
+          "description": "When true, prevents users from entering custom run IDs when starting the DAG. Defaults to false (users can enter custom run IDs)."
         }
       },
       "description": "Configuration for controlling user interactions when starting DAG runs. Allows restricting parameter editing and custom run ID input."

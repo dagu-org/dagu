@@ -376,10 +376,10 @@ func (d *DAG) FileName() string {
 
 // RunConfig contains configuration for controlling user interactions during DAG runs.
 type RunConfig struct {
-	// AllowEditParams controls whether users can edit parameters when starting a DAG.
-	AllowEditParams bool `json:"allowEditParams,omitempty"`
-	// AllowEditRunId controls whether users can specify custom run IDs.
-	AllowEditRunId bool `json:"allowEditRunId,omitempty"`
+	// DisableParamEdit when set to true, prevents users from editing parameters when starting a DAG.
+	DisableParamEdit bool `json:"disableParamEdit,omitempty"`
+	// DisableRunIdEdit when set to true, prevents users from specifying custom run IDs.
+	DisableRunIdEdit bool `json:"disableRunIdEdit,omitempty"`
 }
 
 // Schedule contains the cron expression and the parsed cron schedule.

@@ -63,32 +63,13 @@ function StartDAGModal({
   const [immediate, setImmediate] = React.useState<boolean>(false);
 
   // Get runConfig with default values if not specified
-  const runConfig = React.useMemo(() => {
-    const dagWithRunConfig = dag as typeof dag & {
-      runConfig?: { allowEditParams?: boolean; allowEditRunId?: boolean };
-    };
+  const dagWithRunConfig = dag as typeof dag & {
+    runConfig?: { disableParamEdit?: boolean; disableRunIdEdit?: boolean };
+  };
 
-    // If runConfig exists, use its values
-    // Missing fields in the API response (undefined) mean they are false due to omitempty tags
-    if (dagWithRunConfig.runConfig) {
-      return {
-        allowEditParams:
-          dagWithRunConfig.runConfig.allowEditParams !== undefined
-            ? dagWithRunConfig.runConfig.allowEditParams
-            : true,
-        allowEditRunId:
-          dagWithRunConfig.runConfig.allowEditRunId !== undefined
-            ? dagWithRunConfig.runConfig.allowEditRunId
-            : true,
-      };
-    }
-
-    // Default behavior when runConfig is not specified
-    return {
-      allowEditParams: true,
-      allowEditRunId: true,
-    };
-  }, [dag]);
+  // Determine if editing is disabled
+  const paramsReadOnly = dagWithRunConfig.runConfig?.disableParamEdit ?? false;
+  const runIdReadOnly = dagWithRunConfig.runConfig?.disableRunIdEdit ?? false;
 
   // Update params when default params change
   React.useEffect(() => {
@@ -150,6 +131,23 @@ function StartDAGModal({
           </DialogTitle>
         </DialogHeader>
 
+        {(paramsReadOnly || runIdReadOnly) && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              <strong>Note:</strong> This DAG has restrictions:
+              {paramsReadOnly && runIdReadOnly && (
+                <span> Parameter editing and custom run IDs are disabled.</span>
+              )}
+              {paramsReadOnly && !runIdReadOnly && (
+                <span> Parameter editing is disabled.</span>
+              )}
+              {!paramsReadOnly && runIdReadOnly && (
+                <span> Custom run IDs are disabled.</span>
+              )}
+            </p>
+          </div>
+        )}
+
         <div className="py-4 space-y-4">
           {/* Immediate execution checkbox */}
           <div className="flex items-center space-x-2">
@@ -169,24 +167,19 @@ function StartDAGModal({
               id="dagRun-id"
               placeholder="Enter custom DAG-Run ID"
               value={dagRunId}
-              readOnly={!runConfig.allowEditRunId}
-              disabled={!runConfig.allowEditRunId}
+              readOnly={runIdReadOnly}
+              disabled={runIdReadOnly}
               className={
-                !runConfig.allowEditRunId
+                runIdReadOnly
                   ? 'bg-gray-100 cursor-not-allowed'
                   : ''
               }
               onChange={(e) => {
-                if (runConfig.allowEditRunId) {
+                if (!runIdReadOnly) {
                   setDAGRunId(e.target.value);
                 }
               }}
             />
-            {!runConfig.allowEditRunId && (
-              <p className="text-sm text-gray-500">
-                Custom run IDs are disabled for this DAG
-              </p>
-            )}
           </div>
           {parsedParams.map((p, i) => {
             if (p.Name != undefined) {
@@ -198,15 +191,15 @@ function StartDAGModal({
                     placeholder={p.Value}
                     ref={i === 0 ? ref : undefined}
                     value={params.find((pp) => pp.Name == p.Name)?.Value || ''}
-                    readOnly={!runConfig.allowEditParams}
-                    disabled={!runConfig.allowEditParams}
+                    readOnly={paramsReadOnly}
+                    disabled={paramsReadOnly}
                     className={
-                      !runConfig.allowEditParams
+                      paramsReadOnly
                         ? 'bg-gray-100 cursor-not-allowed'
                         : ''
                     }
                     onChange={(e) => {
-                      if (p.Name && runConfig.allowEditParams) {
+                      if (p.Name && !paramsReadOnly) {
                         setParams(
                           params.map((pp) => {
                             if (pp.Name == p.Name) {
@@ -222,11 +215,6 @@ function StartDAGModal({
                       }
                     }}
                   />
-                  {!runConfig.allowEditParams && (
-                    <p className="text-sm text-gray-500">
-                      Parameter editing is disabled for this DAG
-                    </p>
-                  )}
                 </div>
               );
             } else {
@@ -238,15 +226,15 @@ function StartDAGModal({
                     placeholder={p.Value}
                     ref={i === 0 ? ref : undefined}
                     value={params.find((_, j) => i == j)?.Value || ''}
-                    readOnly={!runConfig.allowEditParams}
-                    disabled={!runConfig.allowEditParams}
+                    readOnly={paramsReadOnly}
+                    disabled={paramsReadOnly}
                     className={
-                      !runConfig.allowEditParams
+                      paramsReadOnly
                         ? 'bg-gray-100 cursor-not-allowed'
                         : ''
                     }
                     onChange={(e) => {
-                      if (!runConfig.allowEditParams) return;
+                      if (paramsReadOnly) return;
                       setParams(
                         params.map((pp, j) => {
                           if (j == i) {
@@ -261,11 +249,6 @@ function StartDAGModal({
                       );
                     }}
                   />
-                  {!runConfig.allowEditParams && (
-                    <p className="text-sm text-gray-500">
-                      Parameter editing is disabled for this DAG
-                    </p>
-                  )}
                 </div>
               );
             }

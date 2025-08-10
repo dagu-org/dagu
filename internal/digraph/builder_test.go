@@ -430,6 +430,18 @@ maxActiveSteps: 3
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, 3, th.MaxActiveSteps)
 	})
+	t.Run("RunConfig", func(t *testing.T) {
+		data := []byte(`
+runConfig:
+  disableParamEdit: true
+  disableRunIdEdit: true
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.NotNil(t, dag.RunConfig)
+		assert.True(t, dag.RunConfig.DisableParamEdit)
+		assert.True(t, dag.RunConfig.DisableRunIdEdit)
+	})
 	t.Run("MaxOutputSize", func(t *testing.T) {
 		// Test custom maxOutputSize
 		data := []byte(`

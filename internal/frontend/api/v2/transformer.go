@@ -236,8 +236,8 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 
 	if dag.RunConfig != nil {
 		runConfig = &api.RunConfig{
-			AllowEditParams: dag.RunConfig.AllowEditParams,
-			AllowEditRunId:  dag.RunConfig.AllowEditRunId,
+			DisableParamEdit: dag.RunConfig.DisableParamEdit,
+			DisableRunIdEdit: dag.RunConfig.DisableRunIdEdit,
 		}
 	}
 
