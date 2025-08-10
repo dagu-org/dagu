@@ -58,30 +58,6 @@ func (s ServiceStatus) String() string {
 	}
 }
 
-// MarshalJSON implements json.Marshaler for ServiceStatus
-func (s ServiceStatus) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + s.String() + `"`), nil
-}
-
-// UnmarshalJSON implements json.Unmarshaler for ServiceStatus
-func (s *ServiceStatus) UnmarshalJSON(data []byte) error {
-	// Remove quotes if present
-	str := string(data)
-	if len(str) >= 2 && str[0] == '"' && str[len(str)-1] == '"' {
-		str = str[1 : len(str)-1]
-	}
-	
-	switch str {
-	case "active":
-		*s = ServiceStatusActive
-	case "inactive":
-		*s = ServiceStatusInactive
-	default:
-		*s = ServiceStatusUnknown
-	}
-	return nil
-}
-
 // HostInfo contains information about a host in the service registry system
 type HostInfo struct {
 	// ID is a unique identifier for the host

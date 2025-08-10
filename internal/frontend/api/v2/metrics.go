@@ -7,7 +7,6 @@ import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/metrics"
-	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -19,11 +18,10 @@ func (a *API) initMetrics() {
 
 	collector := metrics.NewCollector(
 		build.Version,
-		"",                           // Build date not available in current build package
-		scheduler.IsSchedulerRunning, // Use global scheduler status
 		a.dagStore,
 		a.dagRunStore,
-		nil, // Queue store not available in API struct yet
+		a.queueStore,
+		a.serviceRegistry,
 	)
 
 	a.metricsRegistry = metrics.NewRegistry(collector)

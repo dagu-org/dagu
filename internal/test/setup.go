@@ -26,6 +26,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
+	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/persistence/fileserviceregistry"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -111,6 +112,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
 	procStore := fileproc.New(cfg.Paths.ProcDir)
+	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
 	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable, cfg.Global.WorkDir)
@@ -122,6 +124,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		DAGStore:        dagStore,
 		DAGRunStore:     runStore,
 		ProcStore:       procStore,
+		QueueStore:      queueStore,
 		ServiceRegistry: serviceMonitor,
 
 		tmpDir: tmpDir,
@@ -169,6 +172,7 @@ type Helper struct {
 	DAGRunStore     models.DAGRunStore
 	DAGRunMgr       dagrun.Manager
 	ProcStore       models.ProcStore
+	QueueStore      models.QueueStore
 	ServiceRegistry models.ServiceRegistry
 
 	tmpDir string

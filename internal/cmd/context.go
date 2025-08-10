@@ -164,9 +164,9 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 	}
 
 	// Create coordinator client (may be nil if not configured)
-	coordinatorCli := c.NewCoordinatorClient()
+	cc := c.NewCoordinatorClient()
 
-	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.DAGRunMgr, coordinatorCli), nil
+	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.DAGRunMgr, cc, c.ServiceRegistry), nil
 }
 
 // NewCoordinatorClient creates a new coordinator client using the global peer configuration.

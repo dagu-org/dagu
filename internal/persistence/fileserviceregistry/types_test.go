@@ -1,10 +1,8 @@
 package fileserviceregistry
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/models"
@@ -161,38 +159,4 @@ func TestInstanceInfo_Serialization(t *testing.T) {
 	assert.Equal(t, info.Port, read.Port)
 	assert.Equal(t, info.Status, read.Status)
 	assert.Equal(t, info.PID, read.PID)
-}
-
-func TestStatusJSONFormat(t *testing.T) {
-	info := &instanceInfo{
-		ID:     "test",
-		Host:   "localhost",
-		Port:   8080,
-		PID:    1234,
-		Status: models.ServiceStatusActive,
-	}
-
-	data, err := json.Marshal(info)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	jsonStr := string(data)
-	t.Logf("JSON output: %s", jsonStr)
-
-	// Verify it contains "active" string, not number
-	if !strings.Contains(jsonStr, `"status":"active"`) {
-		t.Errorf("Expected JSON to contain status as string 'active', got: %s", jsonStr)
-	}
-
-	// Test unmarshaling
-	var decoded instanceInfo
-	err = json.Unmarshal(data, &decoded)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if decoded.Status != models.ServiceStatusActive {
-		t.Errorf("Expected status to be ServiceStatusActive, got: %v", decoded.Status)
-	}
 }
