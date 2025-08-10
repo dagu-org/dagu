@@ -27,7 +27,7 @@ func TestRegistry_RegisterUnregister(t *testing.T) {
 	err := registry.Register(ctx, models.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
 
-	// Check that discovery directory was created
+	// Check that service registry directory was created
 	assert.DirExists(t, tmpDir)
 
 	// Stop should not error

@@ -111,7 +111,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
 	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
 	procStore := fileproc.New(cfg.Paths.ProcDir)
-	serviceMonitor := fileserviceregistry.New(cfg.Paths.DiscoveryDir)
+	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
 	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 

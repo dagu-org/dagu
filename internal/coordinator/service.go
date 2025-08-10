@@ -52,7 +52,7 @@ func (srv *Service) Start(ctx context.Context) error {
 	// Also set the overall server status
 	srv.healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
-	// Register with service discovery if monitor is available
+	// Register with service registry if monitor is available
 	if srv.registry != nil {
 		// Parse host and port from hostPort
 		host, portStr, err := net.SplitHostPort(srv.hostPort)
@@ -71,9 +71,9 @@ func (srv *Service) Start(ctx context.Context) error {
 			Status: models.ServiceStatusActive, // Coordinator is active when serving
 		}
 		if err := srv.registry.Register(ctx, models.ServiceNameCoordinator, hostInfo); err != nil {
-			return fmt.Errorf("failed to register with service discovery: %w", err)
+			return fmt.Errorf("failed to register with service registry: %w", err)
 		}
-		logger.Info(ctx, "Registered with service discovery",
+		logger.Info(ctx, "Registered with service registry",
 			"instance_id", srv.instanceID,
 			"address", srv.hostPort)
 	}
@@ -94,10 +94,10 @@ func (srv *Service) Stop(ctx context.Context) error {
 	srv.healthServer.SetServingStatus(coordinatorv1.CoordinatorService_ServiceDesc.ServiceName, grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 	srv.healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 
-	// Unregister from service discovery if monitor is available
+	// Unregister from service registry if monitor is available
 	if srv.registry != nil {
 		srv.registry.Unregister(ctx)
-		logger.Info(ctx, "Unregistered from service discovery",
+		logger.Info(ctx, "Unregistered from service registry",
 			"instance_id", srv.instanceID)
 	}
 

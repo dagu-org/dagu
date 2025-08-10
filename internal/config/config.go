@@ -218,7 +218,7 @@ type PathsConfig struct {
 	DAGRunsDir      string
 	QueueDir        string
 	ProcDir         string
-	DiscoveryDir    string // Directory for service discovery files
+	ServiceRegistryDir string // Directory for service registry files
 }
 
 type UI struct {

@@ -273,12 +273,12 @@ dagu coordinator \
 ```
 
 The coordinator service enables distributed task execution by:
-- Automatically registering in the service discovery system
+- Automatically registering in the service registry system
 - Accepting task polling requests from workers
 - Matching tasks to workers based on labels
 - Tracking worker health via heartbeats (every 10 seconds)
 - Providing task distribution API with automatic failover
-- Managing worker lifecycle through file-based discovery
+- Managing worker lifecycle through file-based registry
 
 ### `worker`
 
@@ -328,7 +328,7 @@ dagu worker \
   --peer.skip-tls-verify
 ```
 
-Workers automatically register in the service discovery system, send regular heartbeats, and poll the coordinator for tasks matching their labels to execute them locally.
+Workers automatically register in the service registry system, send regular heartbeats, and poll the coordinator for tasks matching their labels to execute them locally.
 
 ## Configuration
 

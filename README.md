@@ -154,7 +154,7 @@ volumes:
 Notes:
 - If the primary scheduler instance fails, the standby instance will automatically take over. The web servers are stateless and can be scaled horizontally using shared storage. For more details, see the [High Availability](https://docs.dagu.cloud/features/scheduling#high-availability) documentation.
 - Port `50055` is used for gRPC communication between the coordinator and its workers. For more information, refer to the [Distributed Execution](https://docs.dagu.cloud/features/distributed-execution) documentation.
-- Dagu uses a shared volume for service discovery, so you must set a unique `DAGU_COORDINATOR_PORT` for each service instance if they are running on the same host.
+- Dagu uses a shared volume for service registry, so you must set a unique `DAGU_COORDINATOR_PORT` for each service instance if they are running on the same host.
 - If you are not running separate workers and instead execute DAGs locally on the scheduler instances, you can omit the `DAGU_COORDINATOR_PORT` environment variable.
 
 ### 2. Start Docker Compose
@@ -225,7 +225,7 @@ For a detailed list of changes, bug fixes, and new features, please refer to the
 | `DAGU_DAG_RUNS_DIR` | `{dataDir}/dag-runs` | Directory for DAG run data |
 | `DAGU_PROC_DIR` | `{dataDir}/proc` | Directory for process data |
 | `DAGU_QUEUE_DIR` | `{dataDir}/queue` | Directory for queue data |
-| `DAGU_DISCOVERY_DIR` | `{dataDir}/discovery` | Directory for service discovery |
+| `DAGU_SERVICE_REGISTRY_DIR` | `{dataDir}/service-registry` | Directory for service registry |
 
 ### Authentication
 

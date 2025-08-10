@@ -126,7 +126,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
 	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.WorkDir)
 	qs := filequeue.New(cfg.Paths.QueueDir)
-	sm := fileserviceregistry.New(cfg.Paths.DiscoveryDir)
+	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
 	return &Context{
 		Context:         ctx,

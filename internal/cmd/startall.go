@@ -159,7 +159,7 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Stop all services gracefully
 	logger.Info(ctx, "Stopping all services...")
 
-	// Stop coordinator first to unregister from service discovery
+	// Stop coordinator first to unregister from service registry
 	if err := coordinator.Stop(ctx); err != nil {
 		logger.Error(ctx, "Failed to stop coordinator", "err", err)
 	}

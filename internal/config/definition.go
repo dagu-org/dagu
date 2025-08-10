@@ -195,7 +195,7 @@ type pathsConfigDef struct {
 	DAGRunsDir      string `mapstructure:"dagRunsDir"`
 	QueueDir        string `mapstructure:"queueDir"`
 	ProcDir         string `mapstructure:"procDir"`
-	DiscoveryDir    string `mapstructure:"discoveryDir"`
+	ServiceRegistryDir string `mapstructure:"serviceRegistryDir"`
 }
 
 // uiDef holds the user interface configuration settings.

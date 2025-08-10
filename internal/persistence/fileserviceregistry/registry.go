@@ -22,7 +22,7 @@ type registrationInfo struct {
 	wg           sync.WaitGroup
 }
 
-// registry implements models.ServiceRegistry using file-based discovery
+// registry implements models.ServiceRegistry using file-based service registry
 type registry struct {
 	baseDir string
 	finders map[models.ServiceName]*finder
@@ -35,9 +35,9 @@ type registry struct {
 }
 
 // New creates a new file-based service registry
-func New(discoveryDir string) *registry {
+func New(serviceRegistryDir string) *registry {
 	return &registry{
-		baseDir:           discoveryDir,
+		baseDir:           serviceRegistryDir,
 		finders:           make(map[models.ServiceName]*finder),
 		registrations:     make(map[models.ServiceName]*registrationInfo),
 		heartbeatInterval: 10 * time.Second, // default
@@ -63,7 +63,7 @@ func (r *registry) Register(ctx context.Context, serviceName models.ServiceName,
 
 	// Ensure base directory exists
 	if err := os.MkdirAll(r.baseDir, 0750); err != nil {
-		return fmt.Errorf("failed to create discovery directory: %w", err)
+		return fmt.Errorf("failed to create service registry directory: %w", err)
 	}
 
 	// Create registration info
@@ -98,7 +98,7 @@ func (r *registry) Register(ctx context.Context, serviceName models.ServiceName,
 }
 
 // GetServiceMembers returns the list of active hosts for the given service.
-// This method combines service resolution and member discovery.
+// This method combines service resolution and member lookup.
 func (r *registry) GetServiceMembers(ctx context.Context, serviceName models.ServiceName) ([]models.HostInfo, error) {
 	finder := r.getFinder(serviceName)
 	return finder.members(ctx)
@@ -166,7 +166,7 @@ func (r *registry) Unregister(ctx context.Context) {
 }
 
 // UpdateStatus updates the status of the registered instance for the given service
-func (r *registry) UpdateStatus(ctx context.Context, serviceName models.ServiceName, status models.ServiceStatus) error {
+func (r *registry) UpdateStatus(_ context.Context, serviceName models.ServiceName, status models.ServiceStatus) error {
 	r.registrationsMu.Lock()
 	defer r.registrationsMu.Unlock()
 

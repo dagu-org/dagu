@@ -122,7 +122,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.instanceID = fmt.Sprintf("%s-%d-%d", hostname, os.Getpid(), time.Now().Unix())
 	}
 
-	// Register with service discovery as inactive initially
+	// Register with service registry as inactive initially
 	if s.serviceRegistry != nil {
 		hostname, _ := os.Hostname()
 		hostInfo := models.HostInfo{
@@ -132,10 +132,10 @@ func (s *Scheduler) Start(ctx context.Context) error {
 			Status: models.ServiceStatusInactive,
 		}
 		if err := s.serviceRegistry.Register(ctx, models.ServiceNameScheduler, hostInfo); err != nil {
-			logger.Error(ctx, "Failed to register with service discovery", "err", err)
-			// Continue anyway - service discovery is not critical
+			logger.Error(ctx, "Failed to register with service registry", "err", err)
+			// Continue anyway - service registry is not critical
 		} else {
-			logger.Info(ctx, "Registered with service discovery as inactive",
+			logger.Info(ctx, "Registered with service registry as inactive",
 				"instance_id", s.instanceID,
 				"host", hostname,
 				"port", s.config.Scheduler.Port)
@@ -573,10 +573,10 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		logger.Info(ctx, "Released scheduler lock in Stop")
 	}
 
-	// Unregister from service discovery
+	// Unregister from service registry
 	if s.serviceRegistry != nil {
 		s.serviceRegistry.Unregister(ctx)
-		logger.Info(ctx, "Unregistered from service discovery")
+		logger.Info(ctx, "Unregistered from service registry")
 	}
 
 	logger.Info(ctx, "Scheduler stopped")

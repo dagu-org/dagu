@@ -15,14 +15,14 @@ type ServiceRegistry interface {
 	Unregister(ctx context.Context)
 
 	// GetServiceMembers returns the list of active hosts for the given service.
-	// This method combines service resolution and member discovery.
+	// This method combines service resolution and member lookup.
 	GetServiceMembers(ctx context.Context, serviceName ServiceName) ([]HostInfo, error)
 
 	// UpdateStatus updates the status of the current registered instance
 	UpdateStatus(ctx context.Context, serviceName ServiceName, status ServiceStatus) error
 }
 
-// ServiceName represents the name of a service in the service discovery system
+// ServiceName represents the name of a service in the service registry system
 type ServiceName string
 
 const (
@@ -51,6 +51,8 @@ func (s ServiceStatus) String() string {
 		return "active"
 	case ServiceStatusInactive:
 		return "inactive"
+	case ServiceStatusUnknown:
+		return "unknown"
 	default:
 		return "unknown"
 	}
@@ -80,7 +82,7 @@ func (s *ServiceStatus) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// HostInfo contains information about a host in the service discovery system
+// HostInfo contains information about a host in the service registry system
 type HostInfo struct {
 	// ID is a unique identifier for the host
 	ID string

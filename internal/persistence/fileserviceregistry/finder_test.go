@@ -242,7 +242,7 @@ func TestResolver_RemovesStaleFiles(t *testing.T) {
 func TestResolver_RealWorldScenario(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Simulate coordinator service discovery
+	// Simulate coordinator service registry
 	coordinatorFinder := newFinder(tmpDir, models.ServiceNameCoordinator)
 	// Disable caching for this test to ensure we see updates immediately
 	coordinatorFinder.cacheDuration = 0

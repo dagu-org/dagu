@@ -24,7 +24,7 @@ import (
 )
 
 // Client abstracts handling communication with the coordinator service using
-// service discovery and gRPC.
+// service registry and gRPC.
 type Client interface {
 	digraph.Dispatcher
 
@@ -103,7 +103,7 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 	policy := backoff.WithJitter(basePolicy, backoff.FullJitter)
 
 	return backoff.Retry(ctx, func(ctx context.Context) error {
-		// Get all available coordinators from discovery
+		// Get all available coordinators from registry
 		members, err := cli.registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
 		if err != nil {
 			return fmt.Errorf("failed to get coordinator members: %w", err)
@@ -142,7 +142,7 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 func (cli *clientImpl) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 	var task *coordinatorv1.Task
 	err := backoff.Retry(ctx, func(ctx context.Context) error {
-		// Get all available coordinators from discovery
+		// Get all available coordinators from registry
 		members, err := cli.registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
 		if err != nil {
 			return fmt.Errorf("failed to get coordinator members: %w", err)

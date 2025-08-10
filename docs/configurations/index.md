@@ -73,7 +73,7 @@ docker run -d \
 
 **[Distributed Execution](/features/distributed-execution)**
 - Coordinator and worker setup
-- Service discovery configuration
+- Service registry configuration
 - Worker labels and routing
 
 **[Configuration Reference](/configurations/reference)**

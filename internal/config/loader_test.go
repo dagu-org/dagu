@@ -56,17 +56,17 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_KEY_FILE":  "/test/key.pem",
 
 		// File paths
-		"DAGU_DAGS_DIR":          "/test/dags",
-		"DAGU_EXECUTABLE":        "/test/bin/dagu",
-		"DAGU_LOG_DIR":           "/test/logs",
-		"DAGU_DATA_DIR":          "/test/data",
-		"DAGU_SUSPEND_FLAGS_DIR": "/test/suspend",
-		"DAGU_ADMIN_LOG_DIR":     "/test/admin",
-		"DAGU_BASE_CONFIG":       "/test/base.yaml",
-		"DAGU_DAG_RUNS_DIR":      "/test/runs",
-		"DAGU_PROC_DIR":          "/test/proc",
-		"DAGU_QUEUE_DIR":         "/test/queue",
-		"DAGU_DISCOVERY_DIR":     "/test/discovery",
+		"DAGU_DAGS_DIR":             "/test/dags",
+		"DAGU_EXECUTABLE":           "/test/bin/dagu",
+		"DAGU_LOG_DIR":              "/test/logs",
+		"DAGU_DATA_DIR":             "/test/data",
+		"DAGU_SUSPEND_FLAGS_DIR":    "/test/suspend",
+		"DAGU_ADMIN_LOG_DIR":        "/test/admin",
+		"DAGU_BASE_CONFIG":          "/test/base.yaml",
+		"DAGU_DAG_RUNS_DIR":         "/test/runs",
+		"DAGU_PROC_DIR":             "/test/proc",
+		"DAGU_QUEUE_DIR":            "/test/queue",
+		"DAGU_SERVICE_REGISTRY_DIR": "/test/service-registry",
 
 		// UI customization
 		"DAGU_LATEST_STATUS_TODAY": "true",
@@ -156,7 +156,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	assert.Equal(t, "/test/runs", cfg.Paths.DAGRunsDir)
 	assert.Equal(t, "/test/proc", cfg.Paths.ProcDir)
 	assert.Equal(t, "/test/queue", cfg.Paths.QueueDir)
-	assert.Equal(t, "/test/discovery", cfg.Paths.DiscoveryDir)
+	assert.Equal(t, "/test/service-registry", cfg.Paths.ServiceRegistryDir)
 
 	// UI customization
 	assert.True(t, cfg.Server.LatestStatusToday)
@@ -515,7 +515,7 @@ paths:
 		assert.Equal(t, "/custom/data/dag-runs", cfg.Paths.DAGRunsDir)
 		assert.Equal(t, "/custom/data/proc", cfg.Paths.ProcDir)
 		assert.Equal(t, "/custom/data/queue", cfg.Paths.QueueDir)
-		assert.Equal(t, "/custom/data/discovery", cfg.Paths.DiscoveryDir)
+		assert.Equal(t, "/custom/data/service-registry", cfg.Paths.ServiceRegistryDir)
 	})
 }
 

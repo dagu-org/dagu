@@ -58,7 +58,7 @@ type Agent struct {
 	// procStore is the database to store the process information.
 	procStore models.ProcStore
 
-	// registry is the discovery service registry to find the coordinator service.
+	// registry is the service registry to find the coordinator service.
 	registry models.ServiceRegistry
 
 	// dagRunMgr is the runstore dagRunMgr to communicate with the history.

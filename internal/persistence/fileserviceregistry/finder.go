@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/dirlock"
 )
 
-// finder provides file-based service discovery
+// finder provides file-based service registry
 type finder struct {
 	baseDir      string
 	serviceName  models.ServiceName
