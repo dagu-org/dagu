@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { RefreshButton } from '@/components/ui/refresh-button';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
@@ -83,7 +84,7 @@ function Dashboard(): React.ReactElement | null {
     });
   };
 
-  const { data, error, isLoading } = useQuery('/dag-runs', {
+  const { data, error, isLoading, mutate } = useQuery('/dag-runs', {
     params: {
       query: {
         remoteNode: appBarContext.selectedRemoteNode || 'local',
@@ -274,7 +275,6 @@ function Dashboard(): React.ReactElement | null {
                 )}
               </div>
               <Button
-                variant="outline"
                 size="sm"
                 onClick={() => {
                   const now = dayjs();
@@ -288,10 +288,13 @@ function Dashboard(): React.ReactElement | null {
                       : now.endOf('day');
                   handleDateChange(startOfDay.unix(), endOfDay.unix());
                 }}
-                className="h-7 px-2 text-xs"
+                className="px-4"
               >
                 Today
               </Button>
+              <RefreshButton 
+                onRefresh={() => mutate()} 
+              />
             </div>
           </div>
         </div>
