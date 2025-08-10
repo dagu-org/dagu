@@ -29,7 +29,7 @@ paths:
   dagRunsDir: ""            # Auto: {dataDir}/dag-runs
   queueDir: ""              # Auto: {dataDir}/queue
   procDir: ""               # Auto: {dataDir}/proc
-  discoveryDir: ""          # Auto: {dataDir}/discovery
+  serviceRegistryDir: ""    # Auto: {dataDir}/service-registry
   executable: ""            # Auto: current executable path
 
 # Permissions
@@ -144,7 +144,7 @@ All options support `DAGU_` prefix.
 - `DAGU_DAG_RUNS_DIR` - DAG run data directory
 - `DAGU_QUEUE_DIR` - Queue data directory
 - `DAGU_PROC_DIR` - Process data directory
-- `DAGU_DISCOVERY_DIR` - Service discovery data directory
+- `DAGU_SERVICE_REGISTRY_DIR` - Service registry data directory
 - `DAGU_EXECUTABLE` - Path to Dagu executable
 
 ### Authentication
@@ -291,7 +291,7 @@ Automatically set during DAG execution:
 │   ├── dag-runs/      # DAG run history
 │   ├── queue/         # Queue data
 │   ├── proc/          # Process data
-│   └── discovery/     # Service discovery data
+│   └── service-registry/  # Service registry data
 └── suspend/           # DAG suspend flags
 ```
 
@@ -305,7 +305,7 @@ $DAGU_HOME/
 │   ├── dag-runs/      # DAG run history
 │   ├── queue/         # Queue data
 │   ├── proc/          # Process data
-│   └── discovery/     # Service discovery data
+│   └── service-registry/  # Service registry data
 ├── suspend/           # DAG suspend flags
 ├── config.yaml        # Main configuration
 └── base.yaml          # Shared DAG defaults

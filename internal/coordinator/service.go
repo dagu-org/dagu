@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/logger"
@@ -15,13 +16,13 @@ import (
 )
 
 type Service struct {
-	server         *grpc.Server
-	handler        *Handler
-	grpcListener   net.Listener
-	healthServer   *health.Server
-	serviceMonitor models.ServiceMonitor
-	instanceID     string
-	hostPort       string
+	server       *grpc.Server
+	handler      *Handler
+	grpcListener net.Listener
+	healthServer *health.Server
+	registry     models.ServiceRegistry
+	instanceID   string
+	hostPort     string
 }
 
 func NewService(
@@ -29,17 +30,17 @@ func NewService(
 	handler *Handler,
 	grpcListener net.Listener,
 	healthServer *health.Server,
-	serviceMonitor models.ServiceMonitor,
+	registry models.ServiceRegistry,
 	instanceID string,
 ) *Service {
 	return &Service{
-		server:         server,
-		handler:        handler,
-		grpcListener:   grpcListener,
-		healthServer:   healthServer,
-		serviceMonitor: serviceMonitor,
-		instanceID:     instanceID,
-		hostPort:       grpcListener.Addr().String(),
+		server:       server,
+		handler:      handler,
+		grpcListener: grpcListener,
+		healthServer: healthServer,
+		registry:     registry,
+		instanceID:   instanceID,
+		hostPort:     grpcListener.Addr().String(),
 	}
 }
 
@@ -51,16 +52,28 @@ func (srv *Service) Start(ctx context.Context) error {
 	// Also set the overall server status
 	srv.healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
-	// Register with service discovery if monitor is available
-	if srv.serviceMonitor != nil {
+	// Register with service registry if monitor is available
+	if srv.registry != nil {
+		// Parse host and port from hostPort
+		host, portStr, err := net.SplitHostPort(srv.hostPort)
+		if err != nil {
+			return fmt.Errorf("failed to parse host:port: %w", err)
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			return fmt.Errorf("failed to parse port number: %w", err)
+		}
+
 		hostInfo := models.HostInfo{
-			ID:       srv.instanceID,
-			HostPort: srv.hostPort,
+			ID:     srv.instanceID,
+			Host:   host,
+			Port:   port,
+			Status: models.ServiceStatusActive, // Coordinator is active when serving
 		}
-		if err := srv.serviceMonitor.Start(ctx, models.ServiceNameCoordinator, hostInfo); err != nil {
-			return fmt.Errorf("failed to register with service discovery: %w", err)
+		if err := srv.registry.Register(ctx, models.ServiceNameCoordinator, hostInfo); err != nil {
+			return fmt.Errorf("failed to register with service registry: %w", err)
 		}
-		logger.Info(ctx, "Registered with service discovery",
+		logger.Info(ctx, "Registered with service registry",
 			"instance_id", srv.instanceID,
 			"address", srv.hostPort)
 	}
@@ -81,10 +94,10 @@ func (srv *Service) Stop(ctx context.Context) error {
 	srv.healthServer.SetServingStatus(coordinatorv1.CoordinatorService_ServiceDesc.ServiceName, grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 	srv.healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
 
-	// Unregister from service discovery if monitor is available
-	if srv.serviceMonitor != nil {
-		srv.serviceMonitor.Stop(ctx)
-		logger.Info(ctx, "Unregistered from service discovery",
+	// Unregister from service registry if monitor is available
+	if srv.registry != nil {
+		srv.registry.Unregister(ctx)
+		logger.Info(ctx, "Unregistered from service registry",
 			"instance_id", srv.instanceID)
 	}
 

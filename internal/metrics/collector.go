@@ -17,11 +17,10 @@ import (
 type Collector struct {
 	startTime       time.Time
 	version         string
-	buildDate       string
-	schedulerStatus func() bool // Function to check if scheduler is running
 	dagStore        models.DAGStore
 	dagRunStore     models.DAGRunStore
 	queueStore      models.QueueStore
+	serviceRegistry models.ServiceRegistry
 
 	// Metric descriptors
 	infoDesc             *prometheus.Desc
@@ -37,26 +36,25 @@ type Collector struct {
 
 // NewCollector creates a new metrics collector
 func NewCollector(
-	version, buildDate string,
-	schedulerStatus func() bool,
+	version string,
 	dagStore models.DAGStore,
 	dagRunStore models.DAGRunStore,
 	queueStore models.QueueStore,
+	serviceRegistry models.ServiceRegistry,
 ) *Collector {
 	return &Collector{
 		startTime:       time.Now(),
 		version:         version,
-		buildDate:       buildDate,
-		schedulerStatus: schedulerStatus,
 		dagStore:        dagStore,
 		dagRunStore:     dagRunStore,
 		queueStore:      queueStore,
+		serviceRegistry: serviceRegistry,
 
 		// Initialize metric descriptors
 		infoDesc: prometheus.NewDesc(
 			"dagu_info",
 			"Dagu build information",
-			[]string{"version", "build_date", "go_version"},
+			[]string{"version", "go_version"},
 			nil,
 		),
 		uptimeDesc: prometheus.NewDesc(
@@ -114,13 +112,17 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
+	// Create a context with timeout for metrics collection
+	// This prevents metrics collection from hanging indefinitely
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	// System info
 	ch <- prometheus.MustNewConstMetric(
 		c.infoDesc,
 		prometheus.GaugeValue,
 		1,
 		c.version,
-		c.buildDate,
 		runtime.Version(),
 	)
 
@@ -132,15 +134,24 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	)
 
 	// Collect DAG run metrics
-	c.collectDAGRunMetrics(ch)
+	c.collectDAGRunMetrics(ctx, ch)
 
 	// Collect DAG metrics
-	c.collectDAGMetrics(ch)
+	c.collectDAGMetrics(ctx, ch)
 
 	// Scheduler status
 	schedulerRunning := float64(0)
-	if c.schedulerStatus != nil && c.schedulerStatus() {
-		schedulerRunning = 1
+	if c.serviceRegistry != nil {
+		members, err := c.serviceRegistry.GetServiceMembers(ctx, models.ServiceNameScheduler)
+		if err == nil {
+			// Check if any scheduler instance is active
+			for _, member := range members {
+				if member.Status == models.ServiceStatusActive {
+					schedulerRunning = 1
+					break
+				}
+			}
+		}
 	}
 	ch <- prometheus.MustNewConstMetric(
 		c.schedulerRunningDesc,
@@ -149,11 +160,11 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	)
 }
 
-func (c *Collector) collectDAGRunMetrics(ch chan<- prometheus.Metric) {
+func (c *Collector) collectDAGRunMetrics(ctx context.Context, ch chan<- prometheus.Metric) {
 	// Get all DAG run statuses
 	// NOTE: ListStatuses by default returns only the last 24 hours of data
 	// This means metrics only reflect recent DAG runs, not the entire history
-	statuses, err := c.dagRunStore.ListStatuses(context.Background())
+	statuses, err := c.dagRunStore.ListStatuses(ctx)
 	if err != nil {
 		// Log error but don't fail collection
 		return
@@ -204,7 +215,7 @@ func (c *Collector) collectDAGRunMetrics(ch chan<- prometheus.Metric) {
 	// Future enhancement: Add queue name (DAG name) as a label for per-DAG queue metrics
 	queuedCount := float64(0)
 	if c.queueStore != nil {
-		items, err := c.queueStore.All(context.Background())
+		items, err := c.queueStore.All(ctx)
 		if err == nil {
 			queuedCount = float64(len(items))
 		}
@@ -227,9 +238,9 @@ func (c *Collector) collectDAGRunMetrics(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (c *Collector) collectDAGMetrics(ch chan<- prometheus.Metric) {
+func (c *Collector) collectDAGMetrics(ctx context.Context, ch chan<- prometheus.Metric) {
 	// Get all DAGs using List with empty options to get all
-	result, _, err := c.dagStore.List(context.Background(), models.ListDAGsOptions{})
+	result, _, err := c.dagStore.List(ctx, models.ListDAGsOptions{})
 	if err != nil {
 		// Log error but don't fail collection
 		return

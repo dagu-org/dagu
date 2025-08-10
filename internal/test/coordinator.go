@@ -52,7 +52,7 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	handler := coordinator.NewHandler()
 
 	// Create service with ServiceMonitor from helper
-	service := coordinator.NewService(grpcServer, handler, listener, healthServer, helper.ServiceMonitor, "test-coordinator")
+	service := coordinator.NewService(grpcServer, handler, listener, healthServer, helper.ServiceRegistry, "test-coordinator")
 
 	coord := &Coordinator{
 		Helper:       helper,
@@ -122,7 +122,7 @@ func (c *Coordinator) GetCoordinatorClient(t *testing.T) coordinator.Client {
 	config.Insecure = true
 
 	// Create coordinator client - cast to Client interface
-	return coordinator.New(c.ServiceMonitor, config)
+	return coordinator.New(c.ServiceRegistry, config)
 }
 
 // WithCoordinatorConfig creates a coordinator configuration option

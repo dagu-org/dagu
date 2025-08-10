@@ -14,6 +14,7 @@ import Search from './pages/search';
 import DAGRuns from './pages/dag-runs';
 import DAGRunDetails from './pages/dag-runs/dag-run';
 import Workers from './pages/workers';
+import SystemStatus from './pages/system-status';
 
 type Props = {
   config: Config;
@@ -93,6 +94,7 @@ function App({ config }: Props) {
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/system-status" element={<SystemStatus />} />
                     <Route path="/dags/" element={<DAGs />} />
                     <Route
                       path="/dags/:fileName/:tab"

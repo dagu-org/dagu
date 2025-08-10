@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -205,32 +206,57 @@ func (m *mockQueueStore) Reader(ctx context.Context) models.QueueReader {
 	return args.Get(0).(models.QueueReader)
 }
 
+type mockServiceRegistry struct {
+	mock.Mock
+}
+
+func (m *mockServiceRegistry) Register(ctx context.Context, serviceName models.ServiceName, hostInfo models.HostInfo) error {
+	args := m.Called(ctx, serviceName, hostInfo)
+	return args.Error(0)
+}
+
+func (m *mockServiceRegistry) Unregister(ctx context.Context) {
+	m.Called(ctx)
+}
+
+func (m *mockServiceRegistry) GetServiceMembers(ctx context.Context, serviceName models.ServiceName) ([]models.HostInfo, error) {
+	args := m.Called(ctx, serviceName)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.HostInfo), args.Error(1)
+}
+
+func (m *mockServiceRegistry) UpdateStatus(ctx context.Context, serviceName models.ServiceName, status models.ServiceStatus) error {
+	args := m.Called(ctx, serviceName, status)
+	return args.Error(0)
+}
+
 // Tests
 
 func TestNewCollector(t *testing.T) {
+	serviceRegistry := &mockServiceRegistry{}
+	serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return([]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}}, nil)
+
 	collector := NewCollector(
 		"1.0.0",
-		"2023-01-01",
-		func() bool { return true },
 		&mockDAGStore{},
 		&mockDAGRunStore{},
 		&mockQueueStore{},
+		serviceRegistry,
 	)
 
 	assert.NotNil(t, collector)
 	assert.Equal(t, "1.0.0", collector.version)
-	assert.Equal(t, "2023-01-01", collector.buildDate)
-	assert.True(t, collector.schedulerStatus())
 }
 
 func TestCollector_Describe(t *testing.T) {
 	collector := NewCollector(
 		"1.0.0",
-		"2023-01-01",
-		nil,
 		&mockDAGStore{},
 		&mockDAGRunStore{},
 		&mockQueueStore{},
+		nil,
 	)
 
 	ch := make(chan *prometheus.Desc, 10)
@@ -261,13 +287,15 @@ func TestCollector_Collect_BasicMetrics(t *testing.T) {
 	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*models.DAGRunStatus{}, nil)
 	queueStore.On("All", mock.Anything).Return([]models.QueuedItemData{}, nil)
 
+	serviceRegistry := &mockServiceRegistry{}
+	serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return([]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}}, nil).Maybe()
+
 	collector := NewCollector(
 		"1.0.0",
-		"2023-01-01",
-		func() bool { return true },
 		dagStore,
 		dagRunStore,
 		queueStore,
+		serviceRegistry,
 	)
 
 	// Test uptime metric (should be > 0)
@@ -312,13 +340,15 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 	// Mock queue store response
 	queueStore.On("All", mock.Anything).Return([]models.QueuedItemData{nil, nil}, nil)
 
+	serviceRegistry := &mockServiceRegistry{}
+	serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return([]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}}, nil).Maybe()
+
 	collector := NewCollector(
 		"1.0.0",
-		"2023-01-01",
-		func() bool { return true },
 		dagStore,
 		dagRunStore,
 		queueStore,
+		serviceRegistry,
 	)
 
 	registry := prometheus.NewRegistry()
@@ -396,11 +426,10 @@ func TestCollector_Collect_WithErrors(t *testing.T) {
 
 	collector := NewCollector(
 		"1.0.0",
-		"2023-01-01",
-		nil,
 		dagStore,
 		dagRunStore,
 		queueStore,
+		nil,
 	)
 
 	ch := make(chan prometheus.Metric, 10)
@@ -431,11 +460,10 @@ func TestNewRegistry(t *testing.T) {
 
 	collector := NewCollector(
 		"1.0.0",
-		"2023-01-01",
-		nil,
 		dagStore,
 		dagRunStore,
 		queueStore,
+		nil,
 	)
 
 	registry := NewRegistry(collector)
@@ -452,4 +480,97 @@ func TestNewRegistry(t *testing.T) {
 		metricNames[*m.Name] = true
 	}
 	assert.True(t, metricNames["go_goroutines"]) // Example Go metric
+}
+
+func TestCollector_SchedulerStatus(t *testing.T) {
+	dagStore := &mockDAGStore{}
+	dagRunStore := &mockDAGRunStore{}
+	queueStore := &mockQueueStore{}
+
+	// Set up default mock responses
+	dagStore.On("List", mock.Anything, mock.Anything).Return(
+		models.PaginatedResult[*digraph.DAG]{Items: []*digraph.DAG{}, TotalCount: 0},
+		[]string{},
+		nil,
+	)
+	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*models.DAGRunStatus{}, nil)
+	queueStore.On("All", mock.Anything).Return([]models.QueuedItemData{}, nil)
+
+	t.Run("Active scheduler", func(t *testing.T) {
+		serviceRegistry := &mockServiceRegistry{}
+		serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return(
+			[]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}},
+			nil,
+		).Maybe()
+
+		collector := NewCollector("1.0.0", dagStore, dagRunStore, queueStore, serviceRegistry)
+
+		ch := make(chan prometheus.Metric, 100)
+		collector.Collect(ch)
+		close(ch)
+
+		// Check scheduler_running metric is 1
+		schedulerRunningFound := false
+		for metric := range ch {
+			dto := &dto.Metric{}
+			_ = metric.Write(dto)
+			if strings.Contains(metric.Desc().String(), "scheduler_running") {
+				schedulerRunningFound = true
+				assert.Equal(t, float64(1), dto.Gauge.GetValue())
+			}
+		}
+		assert.True(t, schedulerRunningFound, "scheduler_running metric not found")
+	})
+
+	t.Run("Inactive scheduler", func(t *testing.T) {
+		serviceRegistry := &mockServiceRegistry{}
+		serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return(
+			[]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusInactive}},
+			nil,
+		).Maybe()
+
+		collector := NewCollector("1.0.0", dagStore, dagRunStore, queueStore, serviceRegistry)
+
+		ch := make(chan prometheus.Metric, 100)
+		collector.Collect(ch)
+		close(ch)
+
+		// Check scheduler_running metric is 0
+		schedulerRunningFound := false
+		for metric := range ch {
+			dto := &dto.Metric{}
+			_ = metric.Write(dto)
+			if strings.Contains(metric.Desc().String(), "scheduler_running") {
+				schedulerRunningFound = true
+				assert.Equal(t, float64(0), dto.Gauge.GetValue())
+			}
+		}
+		assert.True(t, schedulerRunningFound, "scheduler_running metric not found")
+	})
+
+	t.Run("No scheduler instances", func(t *testing.T) {
+		serviceRegistry := &mockServiceRegistry{}
+		serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return(
+			[]models.HostInfo{},
+			nil,
+		).Maybe()
+
+		collector := NewCollector("1.0.0", dagStore, dagRunStore, queueStore, serviceRegistry)
+
+		ch := make(chan prometheus.Metric, 100)
+		collector.Collect(ch)
+		close(ch)
+
+		// Check scheduler_running metric is 0
+		schedulerRunningFound := false
+		for metric := range ch {
+			dto := &dto.Metric{}
+			_ = metric.Write(dto)
+			if strings.Contains(metric.Desc().String(), "scheduler_running") {
+				schedulerRunningFound = true
+				assert.Equal(t, float64(0), dto.Gauge.GetValue())
+			}
+		}
+		assert.True(t, schedulerRunningFound, "scheduler_running metric not found")
+	})
 }

@@ -29,20 +29,25 @@ type API struct {
 	dagStore           models.DAGStore
 	dagRunStore        models.DAGRunStore
 	dagRunMgr          dagrun.Manager
+	queueStore         models.QueueStore
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
 	config             *config.Config
 	metricsRegistry    *prometheus.Registry
 	coordinatorCli     coordinator.Client
+	serviceRegistry    models.ServiceRegistry
 }
 
 func New(
 	dr models.DAGStore,
 	drs models.DAGRunStore,
+	qs models.QueueStore,
 	drm dagrun.Manager,
 	cfg *config.Config,
-	coordinatorCli coordinator.Client,
+	cc coordinator.Client,
+	sr models.ServiceRegistry,
+	mr *prometheus.Registry,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
 	for _, n := range cfg.Server.RemoteNodes {
@@ -52,12 +57,15 @@ func New(
 	return &API{
 		dagStore:           dr,
 		dagRunStore:        drs,
+		queueStore:         qs,
 		dagRunMgr:          drm,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,
 		apiBasePath:        cfg.Server.APIBasePath,
 		config:             cfg,
-		coordinatorCli:     coordinatorCli,
+		coordinatorCli:     cc,
+		serviceRegistry:    sr,
+		metricsRegistry:    mr,
 	}
 }
 

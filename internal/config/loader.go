@@ -229,7 +229,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.Paths.DAGRunsDir = fileutil.ResolvePathOrBlank(def.Paths.DAGRunsDir)
 		cfg.Paths.QueueDir = fileutil.ResolvePathOrBlank(def.Paths.QueueDir)
 		cfg.Paths.ProcDir = fileutil.ResolvePathOrBlank(def.Paths.ProcDir)
-		cfg.Paths.DiscoveryDir = fileutil.ResolvePathOrBlank(def.Paths.DiscoveryDir)
+		cfg.Paths.ServiceRegistryDir = fileutil.ResolvePathOrBlank(def.Paths.ServiceRegistryDir)
 	}
 
 	// Set UI configuration if provided.
@@ -359,8 +359,8 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	if cfg.Paths.QueueDir == "" {
 		cfg.Paths.QueueDir = filepath.Join(cfg.Paths.DataDir, "queue")
 	}
-	if cfg.Paths.DiscoveryDir == "" {
-		cfg.Paths.DiscoveryDir = filepath.Join(cfg.Paths.DataDir, "discovery")
+	if cfg.Paths.ServiceRegistryDir == "" {
+		cfg.Paths.ServiceRegistryDir = filepath.Join(cfg.Paths.DataDir, "service-registry")
 	}
 
 	// Ensure the executable path is set.
@@ -601,7 +601,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("paths.dagRunsDir", "DAG_RUNS_DIR")
 	l.bindEnv("paths.procDir", "PROC_DIR")
 	l.bindEnv("paths.queueDir", "QUEUE_DIR")
-	l.bindEnv("paths.discoveryDir", "DISCOVERY_DIR")
+	l.bindEnv("paths.serviceRegistryDir", "SERVICE_REGISTRY_DIR")
 
 	// UI customization
 	l.bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")

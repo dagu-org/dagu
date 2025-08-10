@@ -4,6 +4,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Status } from '../../api/v2/schema';
 import { Button } from '../../components/ui/button';
+import { RefreshButton } from '../../components/ui/refresh-button';
 import { DateRangePicker } from '../../components/ui/date-range-picker';
 import { Input } from '../../components/ui/input';
 import {
@@ -312,6 +313,7 @@ function DAGRuns() {
             <Search size={16} className="mr-1" />
             Search
           </Button>
+          <RefreshButton onRefresh={async () => { await mutate(); }} />
         </div>
         <DateRangePicker
           fromDate={fromDate}
