@@ -71,6 +71,7 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "params", fn: buildParams},
 	{metadata: true, name: "name", fn: buildName},
 	{metadata: true, name: "type", fn: buildType},
+	{metadata: true, name: "runConfig", fn: buildRunConfig},
 	{name: "container", fn: buildContainer},
 	{name: "registryAuths", fn: buildRegistryAuths},
 	{name: "dotenv", fn: buildDotenv},
@@ -716,6 +717,18 @@ func maxHistoryRetentionDays(_ BuildContext, spec *definition, dag *DAG) error {
 // skipIfSuccessful sets the skipIfSuccessful field for the DAG.
 func skipIfSuccessful(_ BuildContext, spec *definition, dag *DAG) error {
 	dag.SkipIfSuccessful = spec.SkipIfSuccessful
+	return nil
+}
+
+// buildRunConfig builds the run configuration for the DAG.
+func buildRunConfig(_ BuildContext, spec *definition, dag *DAG) error {
+	if spec.RunConfig == nil {
+		return nil
+	}
+	dag.RunConfig = &RunConfig{
+		DisableParamEdit: spec.RunConfig.DisableParamEdit,
+		DisableRunIdEdit: spec.RunConfig.DisableRunIdEdit,
+	}
 	return nil
 }
 

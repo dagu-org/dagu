@@ -72,6 +72,8 @@ type definition struct {
 	WorkerSelector map[string]string
 	// Container is the container definition for the DAG.
 	Container *containerDef
+	// RunConfig contains configuration for controlling user interactions during DAG runs.
+	RunConfig *runConfigDef
 	// RegistryAuths maps registry hostnames to authentication configs.
 	// Can be either a JSON string or a map of registry to auth config.
 	RegistryAuths any
@@ -220,4 +222,10 @@ type containerDef struct {
 	Network string `yaml:"network,omitempty"` // Network configuration for the container
 	// KeepContainer is the flag to keep the container after the DAG run.
 	KeepContainer bool `yaml:"keepContainer,omitempty"` // Keep the container after the DAG run
+}
+
+// runConfigDef defines configuration for controlling user interactions during DAG runs.
+type runConfigDef struct {
+	DisableParamEdit bool `yaml:"disableParamEdit,omitempty"` // Disable parameter editing when starting DAG
+	DisableRunIdEdit bool `yaml:"disableRunIdEdit,omitempty"` // Disable custom run ID specification
 }

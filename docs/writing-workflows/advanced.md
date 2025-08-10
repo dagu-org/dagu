@@ -179,6 +179,52 @@ steps:
         --output=global-summary.json
 ```
 
+## Restricting Runtime Parameters
+
+Control how users can interact with your DAGs at runtime using the `runConfig` field:
+
+### Enforcing Fixed Parameters
+
+Prevent users from modifying critical parameters:
+
+```yaml
+name: production-deployment
+runConfig:
+  disableParamEdit: true  # Parameters cannot be changed
+  disableRunIdEdit: false # Custom run IDs still allowed
+
+params:
+  - ENVIRONMENT: production  # Always production
+  - DB_HOST: prod.db.example.com
+  - SAFETY_MODE: enabled
+
+steps:
+  - name: deploy
+    command: ./deploy.sh --env=${ENVIRONMENT} --db=${DB_HOST}
+```
+
+### Enforcing Run ID Format
+
+Ensure consistent run ID naming:
+
+```yaml
+name: audit-workflow
+runConfig:
+  disableParamEdit: false  # Parameters can be changed
+  disableRunIdEdit: true   # Must use auto-generated run IDs
+
+steps:
+  - name: audit
+    command: ./audit.sh --run-id=${DAG_RUN_ID}
+```
+
+### Use Cases
+
+- **Production Workflows**: Prevent accidental parameter changes in critical workflows
+- **Compliance**: Ensure audit trails use consistent, auto-generated run IDs
+- **Safety**: Lock down dangerous parameters while allowing safe customization
+- **Templates**: Create reusable workflows with fixed configurations
+
 ## Resource Management
 
 ### Concurrency Control

@@ -232,7 +232,16 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 		preconditions = append(preconditions, toPrecondition(p))
 	}
 
-	return &api.DAGDetails{
+	var runConfig *api.RunConfig = nil
+
+	if dag.RunConfig != nil {
+		runConfig = &api.RunConfig{
+			DisableParamEdit: dag.RunConfig.DisableParamEdit,
+			DisableRunIdEdit: dag.RunConfig.DisableRunIdEdit,
+		}
+	}
+
+	ret := &api.DAGDetails{
 		Name:              dag.Name,
 		Description:       ptrOf(dag.Description),
 		DefaultParams:     ptrOf(dag.DefaultParams),
@@ -249,5 +258,8 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 		Schedule:          ptrOf(schedules),
 		Steps:             ptrOf(steps),
 		Tags:              ptrOf(dag.Tags),
+		RunConfig:         runConfig,
 	}
+
+	return ret
 }

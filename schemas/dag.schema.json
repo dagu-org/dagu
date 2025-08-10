@@ -330,6 +330,23 @@
     "otel": {
       "$ref": "#/definitions/otelConfig",
       "description": "OpenTelemetry tracing configuration for distributed tracing of DAG execution."
+    },
+    "runConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "disableParamEdit": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, prevents users from modifying DAG parameters when starting the DAG. Defaults to false (users can edit parameters)."
+        },
+        "disableRunIdEdit": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, prevents users from entering custom run IDs when starting the DAG. Defaults to false (users can enter custom run IDs)."
+        }
+      },
+      "description": "Configuration for controlling user interactions when starting DAG runs. Allows restricting parameter editing and custom run ID input."
     }
   },
   "definitions": {

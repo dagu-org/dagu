@@ -110,6 +110,8 @@ type DAG struct {
 	YamlData []byte `json:"yamlData,omitempty"`
 	// Container contains the container definition for the DAG.
 	Container *Container `json:"container,omitempty"`
+	// RunConfig contains configuration for controlling user interactions during DAG runs.
+	RunConfig *RunConfig `json:"runConfig,omitempty"`
 	// RegistryAuths maps registry hostnames to authentication configs.
 	// Optional: If not specified, falls back to DOCKER_AUTH_CONFIG or docker config.
 	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
@@ -370,6 +372,14 @@ func (d *DAG) FileName() string {
 		return ""
 	}
 	return fileutil.TrimYAMLFileExtension(filepath.Base(d.Location))
+}
+
+// RunConfig contains configuration for controlling user interactions during DAG runs.
+type RunConfig struct {
+	// DisableParamEdit when set to true, prevents users from editing parameters when starting a DAG.
+	DisableParamEdit bool `json:"disableParamEdit,omitempty"`
+	// DisableRunIdEdit when set to true, prevents users from specifying custom run IDs.
+	DisableRunIdEdit bool `json:"disableRunIdEdit,omitempty"`
 }
 
 // Schedule contains the cron expression and the parsed cron schedule.

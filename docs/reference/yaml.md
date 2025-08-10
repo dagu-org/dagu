@@ -97,6 +97,7 @@ schedule:
 | `delaySec` | integer | Initial delay before start (seconds) | `0` |
 | `maxCleanUpTimeSec` | integer | Max cleanup time (seconds) | `300` |
 | `preconditions` | array | Workflow-level preconditions | - |
+| `runConfig` | object | User interaction controls when starting DAG | - |
 
 ### Data Fields
 
@@ -218,6 +219,33 @@ handlerOn:
   exit:
     command: ./always-run.sh
 ```
+
+### RunConfig
+
+The `runConfig` field allows you to control user interactions when starting DAG runs:
+
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| `disableParamEdit` | boolean | Prevent parameter editing when starting DAG | `false` |
+| `disableRunIdEdit` | boolean | Prevent custom run ID input when starting DAG | `false` |
+
+Example usage:
+
+```yaml
+# Prevent users from modifying parameters at runtime
+runConfig:
+  disableParamEdit: true
+  disableRunIdEdit: false
+
+params:
+  - ENVIRONMENT: production  # Users cannot change this
+  - VERSION: 1.0.0           # This is fixed
+```
+
+This is useful when:
+- You want to enforce specific parameter values for production workflows
+- You need consistent run IDs for tracking purposes
+- You want to prevent accidental parameter changes
 
 ## Step Fields
 

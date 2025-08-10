@@ -692,6 +692,7 @@ export interface components {
             defaultParams?: string;
             /** @description List of tags for categorizing and filtering DAGs */
             tags?: string[];
+            runConfig?: components["schemas"]["RunConfig"];
         };
         /** @description Schedule configuration for DAG-run creation */
         Schedule: {
@@ -812,6 +813,20 @@ export interface components {
             defaultParams?: string;
             /** @description List of tags for categorizing and filtering DAGs */
             tags?: string[];
+            runConfig?: components["schemas"]["RunConfig"];
+        };
+        /** @description Configuration for controlling user interactions when starting DAG runs */
+        RunConfig: {
+            /**
+             * @description Disable parameter editing when starting the DAG
+             * @default false
+             */
+            disableParamEdit: boolean;
+            /**
+             * @description Disable custom run ID specification
+             * @default false
+             */
+            disableRunIdEdit: boolean;
         };
         LocalDag: {
             /** @description Name of the local DAG */

@@ -1560,6 +1560,8 @@ components:
           description: "List of tags for categorizing and filtering DAGs"
           items:
             type: string
+        runConfig:
+          $ref: "#/components/schemas/RunConfig"
       required:
         - name
 
@@ -1784,8 +1786,26 @@ components:
           description: "List of tags for categorizing and filtering DAGs"
           items:
             type: string
+        runConfig:
+          $ref: "#/components/schemas/RunConfig"
       required:
         - name
+
+    RunConfig:
+      type: object
+      description: "Configuration for controlling user interactions when starting DAG runs"
+      properties:
+        disableParamEdit:
+          type: boolean
+          description: "Disable parameter editing when starting the DAG"
+          default: false
+        disableRunIdEdit:
+          type: boolean
+          description: "Disable custom run ID specification"
+          default: false
+      required:
+        - disableParamEdit
+        - disableRunIdEdit
 
     LocalDag:
       type: object
