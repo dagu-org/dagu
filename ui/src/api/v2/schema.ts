@@ -698,12 +698,12 @@ export interface components {
                  * @description Allow users to edit parameters when starting the DAG
                  * @default true
                  */
-                allowEditParams: boolean;
+                allowEditParams?: boolean;
                 /**
                  * @description Allow users to specify custom run IDs
                  * @default true
                  */
-                allowEditRunId: boolean;
+                allowEditRunId?: boolean;
             };
         };
         /** @description Schedule configuration for DAG-run creation */
@@ -831,12 +831,12 @@ export interface components {
                  * @description Allow users to edit parameters when starting the DAG
                  * @default true
                  */
-                allowEditParams: boolean;
+                allowEditParams?: boolean;
                 /**
                  * @description Allow users to specify custom run IDs
                  * @default true
                  */
-                allowEditRunId: boolean;
+                allowEditRunId?: boolean;
             };
         };
         LocalDag: {
@@ -2563,11 +2563,7 @@ export interface operations {
     };
 }
 export enum PathsDagsGetParametersQuerySort {
-    name = "name",
-    status = "status",
-    lastRun = "lastRun",
-    schedule = "schedule",
-    suspended = "suspended"
+    name = "name"
 }
 export enum PathsDagsGetParametersQueryOrder {
     asc = "asc",
@@ -2624,7 +2620,7 @@ export enum NodeStatusLabel {
     not_started = "not started",
     running = "running",
     failed = "failed",
-    canceled = "canceled",
+    cancelled = "cancelled",
     finished = "finished",
     skipped = "skipped",
     partial_success = "partial success"
