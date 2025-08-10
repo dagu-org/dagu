@@ -6,6 +6,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -59,6 +60,7 @@ function StartDAGModal({
 
   const [params, setParams] = React.useState<Parameter[]>([]);
   const [dagRunId, setDAGRunId] = React.useState<string>('');
+  const [immediate, setImmediate] = React.useState<boolean>(false);
 
   // Get runConfig with default values if not specified
   const runConfig = React.useMemo(() => {
@@ -128,7 +130,7 @@ function StartDAGModal({
 
         if (isInputFocused || !activeElement) {
           e.preventDefault();
-          onSubmit(stringifyParams(params), dagRunId || undefined, false);
+          onSubmit(stringifyParams(params), dagRunId || undefined, immediate);
         }
       }
     };
@@ -137,17 +139,30 @@ function StartDAGModal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [visible, params, dagRunId, onSubmit, dismissModal]);
+  }, [visible, params, dagRunId, immediate, onSubmit, dismissModal]);
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Start the DAG</DialogTitle>
+          <DialogTitle>
+            Start the DAG
+          </DialogTitle>
         </DialogHeader>
 
         <div className="py-4 space-y-4">
-          {/* DAGRun ID field - always show but make read-only when editing is disabled */}
+          {/* Immediate execution checkbox */}
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="immediate"
+              checked={immediate}
+              onCheckedChange={(checked) => setImmediate(checked as boolean)}
+            />
+            <Label htmlFor="immediate" className="cursor-pointer">
+              Start immediately (bypass queue)
+            </Label>
+          </div>
+          {/* Optional DAGRun ID field */}
           <div className="space-y-2">
             <Label htmlFor="dagRun-id">DAG-Run ID (optional)</Label>
             <Input
@@ -231,20 +246,19 @@ function StartDAGModal({
                         : ''
                     }
                     onChange={(e) => {
-                      if (runConfig.allowEditParams) {
-                        setParams(
-                          params.map((pp, j) => {
-                            if (j == i) {
-                              return {
-                                ...pp,
-                                Value: e.target.value,
-                              };
-                            } else {
-                              return pp;
-                            }
-                          })
-                        );
-                      }
+                      if (!runConfig.allowEditParams) return;
+                      setParams(
+                        params.map((pp, j) => {
+                          if (j == i) {
+                            return {
+                              ...pp,
+                              Value: e.target.value,
+                            };
+                          } else {
+                            return pp;
+                          }
+                        })
+                      );
                     }}
                   />
                   {!runConfig.allowEditParams && (
@@ -269,10 +283,10 @@ function StartDAGModal({
           <Button
             ref={submitButtonRef}
             onClick={() => {
-              onSubmit(stringifyParams(params), dagRunId || undefined, false);
+              onSubmit(stringifyParams(params), dagRunId || undefined, immediate);
             }}
           >
-            {action === 'enqueue' ? 'Enqueue' : 'Start'}
+            {immediate ? 'Start Immediately' : (action === 'enqueue' ? 'Enqueue' : 'Start')}
           </Button>
         </DialogFooter>
       </DialogContent>

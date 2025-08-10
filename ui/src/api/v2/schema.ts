@@ -698,12 +698,12 @@ export interface components {
                  * @description Allow users to edit parameters when starting the DAG
                  * @default true
                  */
-                allowEditParams?: boolean;
+                allowEditParams: boolean;
                 /**
                  * @description Allow users to specify custom run IDs
                  * @default true
                  */
-                allowEditRunId?: boolean;
+                allowEditRunId: boolean;
             };
         };
         /** @description Schedule configuration for DAG-run creation */
@@ -831,12 +831,12 @@ export interface components {
                  * @description Allow users to edit parameters when starting the DAG
                  * @default true
                  */
-                allowEditParams?: boolean;
+                allowEditParams: boolean;
                 /**
                  * @description Allow users to specify custom run IDs
                  * @default true
                  */
-                allowEditRunId?: boolean;
+                allowEditRunId: boolean;
             };
         };
         LocalDag: {
