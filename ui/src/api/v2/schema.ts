@@ -556,6 +556,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/services/coordinator": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get coordinator service status
+         * @description Returns status information about all registered coordinator instances
+         */
+        get: operations["getCoordinatorStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/metrics": {
         parameters: {
             query?: never;
@@ -732,6 +752,27 @@ export interface components {
             status: SchedulerInstanceStatus;
             /** @description RFC3339 timestamp when scheduler started */
             startedAt: string;
+        };
+        /** @description Response containing status of all coordinator instances */
+        CoordinatorStatusResponse: {
+            /** @description List of all registered coordinator instances */
+            coordinators: components["schemas"]["CoordinatorInstance"][];
+        };
+        /** @description Coordinator instance status information */
+        CoordinatorInstance: {
+            /** @description Unique identifier of the coordinator instance */
+            instanceId: string;
+            /** @description Hostname where coordinator is running */
+            host: string;
+            /**
+             * @description Coordinator status
+             * @enum {string}
+             */
+            status: CoordinatorInstanceStatus;
+            /** @description RFC3339 timestamp when coordinator started */
+            startedAt: string;
+            /** @description Port number the coordinator is listening on */
+            port: number;
         };
         /**
          * @description Health status of the worker based on heartbeat recency
@@ -2433,6 +2474,38 @@ export interface operations {
             };
         };
     };
+    getCoordinatorStatus: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoordinatorStatusResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getMetrics: {
         parameters: {
             query?: never;
@@ -2527,6 +2600,11 @@ export enum NodeStatusLabel {
     partial_success = "partial success"
 }
 export enum SchedulerInstanceStatus {
+    active = "active",
+    inactive = "inactive",
+    unknown = "unknown"
+}
+export enum CoordinatorInstanceStatus {
     active = "active",
     inactive = "inactive",
     unknown = "unknown"

@@ -1,7 +1,7 @@
 import logoDark from '@/assets/images/logo_dark.png';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
-import { BarChart2, GitBranch, List, Search, Server, PanelLeft, Github, MessageSquare, Users } from 'lucide-react';
+import { BarChart2, GitBranch, List, Search, Server, PanelLeft, Github, MessageSquare, Users, Activity } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FeedbackDialog } from '@/components/FeedbackDialog';
@@ -152,6 +152,13 @@ export const mainListItems = React.forwardRef<
           to="/workers"
           text="Workers"
           icon={<Server size={18} />}
+          isOpen={isOpen}
+          onClick={onNavItemClick}
+        />
+        <NavItem
+          to="/system-status"
+          text="System Status"
+          icon={<Activity size={18} />}
           isOpen={isOpen}
           onClick={onNavItemClick}
         />

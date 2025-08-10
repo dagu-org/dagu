@@ -1158,6 +1158,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /services/coordinator:
+    get:
+      summary: "Get coordinator service status"
+      description: "Returns status information about all registered coordinator instances"
+      operationId: "getCoordinatorStatus"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoordinatorStatusResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /metrics:
     get:
       summary: "Get Prometheus metrics"
@@ -1650,6 +1673,45 @@ components:
         - host
         - status
         - startedAt
+
+    CoordinatorStatusResponse:
+      type: object
+      description: "Response containing status of all coordinator instances"
+      properties:
+        coordinators:
+          type: array
+          description: "List of all registered coordinator instances"
+          items:
+            $ref: "#/components/schemas/CoordinatorInstance"
+      required:
+        - coordinators
+
+    CoordinatorInstance:
+      type: object
+      description: "Coordinator instance status information"
+      properties:
+        instanceId:
+          type: string
+          description: "Unique identifier of the coordinator instance"
+        host:
+          type: string
+          description: "Hostname where coordinator is running"
+        status:
+          type: string
+          enum: ["active", "inactive", "unknown"]
+          description: "Coordinator status"
+        startedAt:
+          type: string
+          description: "RFC3339 timestamp when coordinator started"
+        port:
+          type: integer
+          description: "Port number the coordinator is listening on"
+      required:
+        - instanceId
+        - host
+        - status
+        - startedAt
+        - port
 
     WorkerHealthStatus:
       type: string
