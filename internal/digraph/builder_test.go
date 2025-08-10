@@ -502,8 +502,6 @@ steps:
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
 				data := []byte(tc.yaml)
 				ctx := context.Background()
 				_, err := digraph.LoadYAML(ctx, data)

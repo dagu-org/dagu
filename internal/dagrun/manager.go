@@ -73,7 +73,7 @@ func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, dagRunID string) e
 	if dagRunID == "" {
 		// If DAGRunID is not specified, stop all matching DAG runs
 		// Get the list of running DAG runs for the queue proc name
-		aliveRuns, err := m.procStore.ListAlive(ctx, dag.QueueProcName())
+		aliveRuns, err := m.procStore.ListAlive(ctx, dag.ProcGroup())
 		if err != nil {
 			return fmt.Errorf("failed to list alive DAG runs: %w", err)
 		}
@@ -136,10 +136,8 @@ func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, dagRunID string) e
 
 // stopSingleDAGRun stops a single DAG run by its ID
 func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string) error {
-	procRunRef := digraph.NewDAGRunRef(dag.QueueProcName(), dagRunID)
-
 	// Check if the process is running using proc store
-	alive, err := m.procStore.IsRunAlive(ctx, procRunRef)
+	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), digraph.NewDAGRunRef(dag.Name, dagRunID))
 	if err != nil {
 		return fmt.Errorf("failed to retrieve status from proc store: %w", err)
 	}
@@ -461,7 +459,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 	var dagStatus *models.DAGRunStatus
 
 	// Find the proc store to check if the DAG is running
-	alive, _ := m.procStore.CountAlive(ctx, dag.QueueProcName())
+	alive, _ := m.procStore.CountAlive(ctx, dag.ProcGroup())
 	if alive > 0 {
 		items, _ := m.dagRunStore.ListStatuses(
 			ctx, models.WithName(dag.Name), models.WithStatuses([]status.Status{status.Running}),
@@ -472,7 +470,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 	}
 
 	// Find the latest status by name
-	attempt, err := m.dagRunStore.LatestAttempt(ctx, dag.QueueProcName())
+	attempt, err := m.dagRunStore.LatestAttempt(ctx, dag.Name)
 	if err != nil {
 		// If the latest status is not found, return the default status
 		ret := models.InitialStatus(dag)
@@ -772,10 +770,10 @@ func (m *Manager) checkAndUpdateStaleRunningStatus(
 		return fmt.Errorf("failed to read DAG for stale status check: %w", err)
 	}
 	dagRun := digraph.DAGRunRef{
-		Name: dag.QueueProcName(),
+		Name: dag.Name,
 		ID:   st.DAGRunID,
 	}
-	alive, err := m.procStore.IsRunAlive(ctx, dagRun)
+	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), dagRun)
 	if err != nil {
 		// Log but don't fail - we can't determine if it's alive
 		logger.Error(ctx, "Failed to check if DAG run is alive", "err", err)

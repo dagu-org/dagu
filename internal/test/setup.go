@@ -497,7 +497,8 @@ func TestdataPath(t *testing.T, filename string) string {
 	t.Helper()
 
 	rootDir := getProjectRoot(t)
-	return filepath.Join(rootDir, "internal", "testdata", filename)
+
+	return filepath.Join(rootDir, "internal", "testdata", filepath.Clean(filename))
 }
 
 // ReadTestdata reads the content of a testdata file.

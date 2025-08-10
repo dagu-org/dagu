@@ -29,9 +29,9 @@ func New(baseDir string) *Store {
 }
 
 // CountAlive implements models.ProcStore.
-func (s *Store) CountAlive(ctx context.Context, name string) (int, error) {
-	pgBaseDir := filepath.Join(s.baseDir, name)
-	pg, _ := s.procGroups.LoadOrStore(name, NewProcGroup(pgBaseDir, name, s.staleTime))
+func (s *Store) CountAlive(ctx context.Context, groupName string) (int, error) {
+	pgBaseDir := filepath.Join(s.baseDir, groupName)
+	pg, _ := s.procGroups.LoadOrStore(groupName, NewProcGroup(pgBaseDir, groupName, s.staleTime))
 	procGroup, ok := pg.(*ProcGroup)
 	if !ok {
 		return 0, fmt.Errorf("invalid type in procGroups map: expected *ProcGroup, got %T", pg)
@@ -40,9 +40,9 @@ func (s *Store) CountAlive(ctx context.Context, name string) (int, error) {
 }
 
 // ListAlive implements models.ProcStore.
-func (s *Store) ListAlive(ctx context.Context, name string) ([]digraph.DAGRunRef, error) {
-	pgBaseDir := filepath.Join(s.baseDir, name)
-	pg, _ := s.procGroups.LoadOrStore(name, NewProcGroup(pgBaseDir, name, s.staleTime))
+func (s *Store) ListAlive(ctx context.Context, groupName string) ([]digraph.DAGRunRef, error) {
+	pgBaseDir := filepath.Join(s.baseDir, groupName)
+	pg, _ := s.procGroups.LoadOrStore(groupName, NewProcGroup(pgBaseDir, groupName, s.staleTime))
 	procGroup, ok := pg.(*ProcGroup)
 	if !ok {
 		return nil, fmt.Errorf("invalid type in procGroups map: expected *ProcGroup, got %T", pg)
@@ -51,9 +51,9 @@ func (s *Store) ListAlive(ctx context.Context, name string) ([]digraph.DAGRunRef
 }
 
 // Acquire implements models.ProcStore.
-func (s *Store) Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (models.ProcHandle, error) {
-	pgBaseDir := filepath.Join(s.baseDir, dagRun.Name)
-	pg, _ := s.procGroups.LoadOrStore(dagRun.Name, NewProcGroup(pgBaseDir, dagRun.Name, s.staleTime))
+func (s *Store) Acquire(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (models.ProcHandle, error) {
+	pgBaseDir := filepath.Join(s.baseDir, groupName)
+	pg, _ := s.procGroups.LoadOrStore(groupName, NewProcGroup(pgBaseDir, groupName, s.staleTime))
 	procGroup, ok := pg.(*ProcGroup)
 	if !ok {
 		return nil, fmt.Errorf("invalid type in procGroups map: expected *ProcGroup, got %T", pg)
@@ -69,9 +69,9 @@ func (s *Store) Acquire(ctx context.Context, dagRun digraph.DAGRunRef) (models.P
 }
 
 // IsRunAlive implements models.ProcStore.
-func (s *Store) IsRunAlive(ctx context.Context, dagRun digraph.DAGRunRef) (bool, error) {
-	pgBaseDir := filepath.Join(s.baseDir, dagRun.Name)
-	pg, _ := s.procGroups.LoadOrStore(dagRun.Name, NewProcGroup(pgBaseDir, dagRun.Name, s.staleTime))
+func (s *Store) IsRunAlive(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (bool, error) {
+	pgBaseDir := filepath.Join(s.baseDir, groupName)
+	pg, _ := s.procGroups.LoadOrStore(groupName, NewProcGroup(pgBaseDir, groupName, s.staleTime))
 	procGroup, ok := pg.(*ProcGroup)
 	if !ok {
 		return false, fmt.Errorf("invalid type in procGroups map: expected *ProcGroup, got %T", pg)
