@@ -122,11 +122,7 @@
     },
     "type": {
       "type": "string",
-      "enum": [
-        "graph",
-        "chain",
-        "agent"
-      ],
+      "enum": ["graph", "chain", "agent"],
       "default": "chain",
       "description": "Execution type for steps. 'chain' (default) executes steps sequentially in the order they are defined, with each step automatically depending on the previous one. 'graph' uses dependency-based execution where steps run based on their 'depends' field. 'agent' is reserved for future agent-based execution."
     },
@@ -309,6 +305,10 @@
       ],
       "description": "Default parameters that can be overridden when triggering the DAG. Can be positional (accessed as $1, $2) or named (accessed as ${KEY})."
     },
+    "container": {
+      "$ref": "#/definitions/container",
+      "description": "Default container configuration for all steps in the DAG. Steps can override this configuration with their own container settings."
+    },
     "steps": {
       "oneOf": [
         {
@@ -352,9 +352,7 @@
   "definitions": {
     "step": {
       "type": "object",
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -383,13 +381,7 @@
               "properties": {
                 "type": {
                   "type": "string",
-                  "enum": [
-                    "docker",
-                    "http",
-                    "mail",
-                    "ssh",
-                    "jq"
-                  ],
+                  "enum": ["docker", "http", "mail", "ssh", "jq"],
                   "description": "Type of executor to use for this step"
                 },
                 "config": {
@@ -398,9 +390,7 @@
                   "description": "Executor-specific configuration options"
                 }
               },
-              "required": [
-                "type"
-              ]
+              "required": ["type"]
             }
           ],
           "description": "Specialized executor configuration for running the step (e.g., docker for containerized execution, http for API calls, mail for sending emails)."
@@ -571,10 +561,7 @@
                 },
                 {
                   "type": "string",
-                  "enum": [
-                    "while",
-                    "until"
-                  ]
+                  "enum": ["while", "until"]
                 }
               ],
               "description": "Determines if and how the step should be repeated. Can be a boolean or a string ('while' or 'until')."
@@ -615,15 +602,8 @@
             },
             "exitCode": {
               "oneOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "integer"
-                  }
-                }
+                { "type": "integer" },
+                { "type": "array", "items": { "type": "integer" } }
               ],
               "description": "Exit code or list of exit codes that will stop repetition. If not specified, all non-zero exit codes will trigger repetition."
             }
@@ -735,9 +715,7 @@
                   "description": "Maximum number of concurrent executions (default: 8, maximum: 1000)"
                 }
               },
-              "required": [
-                "items"
-              ],
+              "required": ["items"],
               "additionalProperties": false,
               "description": "Parallel execution configuration with concurrency control"
             }
@@ -750,6 +728,22 @@
             "type": "string"
           },
           "description": "Key-value pairs specifying worker label requirements for executing this step. The step will only run on workers that have all specified labels with matching values. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels."
+        },
+        "env": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": true
+            }
+          ],
+          "description": "Environment variables specific to this step. These override DAG-level environment variables with the same name. Can use shell expansions, references to other environment variables, or command substitutions."
         }
       }
     },
@@ -852,6 +846,66 @@
         }
       },
       "description": "OpenTelemetry configuration for distributed tracing. Enables detailed execution traces for DAGs and steps, providing visibility into workflow performance and debugging."
+    },
+    "container": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Container image to use (e.g., 'python:3.11', 'node:20'). Required when using container configuration."
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["always", "never", "missing"],
+          "default": "missing",
+          "description": "Image pull policy. 'always' pulls the image every time, 'never' uses only local images, 'missing' pulls only if not present locally."
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Environment variables to set in the container. Format: 'KEY=value'. Supports variable expansion (e.g., 'API_KEY=${API_KEY}')."
+        },
+        "volumes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Volume mounts for the container. Format: 'host_path:container_path[:mode]' where mode is 'ro' for read-only or 'rw' (default) for read-write."
+        },
+        "user": {
+          "type": "string",
+          "description": "User (and optionally group) to run the container as. Format: 'user' or 'user:group' (e.g., '1000' or '1000:1000')."
+        },
+        "workDir": {
+          "type": "string",
+          "description": "Working directory inside the container. Commands will be executed from this directory."
+        },
+        "platform": {
+          "type": "string",
+          "description": "Platform for the container (e.g., 'linux/amd64', 'linux/arm64'). Useful for ensuring compatibility on different architectures."
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ports to expose from the container. Format: 'host_port:container_port' or just 'container_port'."
+        },
+        "network": {
+          "type": "string",
+          "description": "Network mode for the container (e.g., 'host', 'bridge', 'none', or a custom network name)."
+        },
+        "keepContainer": {
+          "type": "boolean",
+          "default": false,
+          "description": "Keep the container running after the step completes. Useful for debugging or when running services that need to persist between steps."
+        }
+      },
+      "required": ["image"],
+      "description": "Container configuration that can be specified at DAG or step level. When used, automatically sets the executor to docker."
     }
   }
 }
