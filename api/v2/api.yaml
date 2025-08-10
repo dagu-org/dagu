@@ -1561,18 +1561,7 @@ components:
           items:
             type: string
         runConfig:
-          type: object
-          description: "Configuration for controlling user interactions when starting DAG runs"
-          properties:
-            allowEditParams:
-              type: boolean
-              description: "Allow users to edit parameters when starting the DAG"
-              default: true
-            allowEditRunId:
-              type: boolean
-              description: "Allow users to specify custom run IDs"
-              default: true
-          additionalProperties: false
+          $ref: "#/components/schemas/RunConfig"
       required:
         - name
 
@@ -1801,7 +1790,7 @@ components:
           $ref: "#/components/schemas/RunConfig"
       required:
         - name
-    
+
     RunConfig:
       type: object
       description: "Configuration for controlling user interactions when starting DAG runs"
