@@ -293,7 +293,7 @@ function Dashboard(): React.ReactElement | null {
                 Today
               </Button>
               <RefreshButton 
-                onRefresh={() => mutate()} 
+                onRefresh={async () => { await mutate(); }} 
               />
             </div>
           </div>

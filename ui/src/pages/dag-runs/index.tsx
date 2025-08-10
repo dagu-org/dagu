@@ -313,7 +313,7 @@ function DAGRuns() {
             <Search size={16} className="mr-1" />
             Search
           </Button>
-          <RefreshButton onRefresh={() => mutate()} />
+          <RefreshButton onRefresh={async () => { await mutate(); }} />
         </div>
         <DateRangePicker
           fromDate={fromDate}
