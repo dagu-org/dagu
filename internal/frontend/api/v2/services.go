@@ -41,12 +41,14 @@ func (a *API) GetSchedulerStatus(ctx context.Context, _ api.GetSchedulerStatusRe
 
 	// Convert members to API response
 	for _, member := range members {
-		status := api.SchedulerInstanceStatusUnknown
+		var status api.SchedulerInstanceStatus
 		switch member.Status {
 		case models.ServiceStatusActive:
 			status = api.SchedulerInstanceStatusActive
 		case models.ServiceStatusInactive:
 			status = api.SchedulerInstanceStatusInactive
+		case models.ServiceStatusUnknown:
+			status = api.SchedulerInstanceStatusUnknown
 		}
 
 		schedulers = append(schedulers, api.SchedulerInstance{
