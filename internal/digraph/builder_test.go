@@ -2186,6 +2186,132 @@ steps:
 	})
 }
 
+func TestSSHConfiguration(t *testing.T) {
+	t.Run("BasicSSHConfig", func(t *testing.T) {
+		yaml := `
+name: test
+ssh:
+  user: testuser
+  host: example.com
+  port: 2222
+  key: ~/.ssh/id_rsa
+steps:
+  - name: step1
+    command: echo hello
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.SSH)
+		assert.Equal(t, "testuser", dag.SSH.User)
+		assert.Equal(t, "example.com", dag.SSH.Host)
+		assert.Equal(t, "2222", dag.SSH.Port)
+		assert.Equal(t, "~/.ssh/id_rsa", dag.SSH.Key)
+	})
+
+	t.Run("SSHConfigWithStrictHostKey", func(t *testing.T) {
+		yaml := `
+name: test
+ssh:
+  user: testuser
+  host: example.com
+  strictHostKey: false
+  knownHostFile: ~/.ssh/custom_known_hosts
+steps:
+  - name: step1
+    command: echo hello
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.SSH)
+		assert.Equal(t, "testuser", dag.SSH.User)
+		assert.Equal(t, "example.com", dag.SSH.Host)
+		assert.Equal(t, "22", dag.SSH.Port) // Default port
+		assert.False(t, dag.SSH.StrictHostKey)
+		assert.Equal(t, "~/.ssh/custom_known_hosts", dag.SSH.KnownHostFile)
+	})
+
+	t.Run("SSHConfigDefaultValues", func(t *testing.T) {
+		yaml := `
+name: test
+ssh:
+  user: testuser
+  host: example.com
+steps:
+  - name: step1
+    command: echo hello
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.SSH)
+		assert.Equal(t, "22", dag.SSH.Port)        // Should default to 22
+		assert.True(t, dag.SSH.StrictHostKey)      // Should default to true for security
+		assert.Equal(t, "", dag.SSH.KnownHostFile) // Empty, will use default ~/.ssh/known_hosts at runtime
+	})
+}
+
+func TestSSHInheritance(t *testing.T) {
+	t.Run("StepInheritsSSHFromDAG", func(t *testing.T) {
+		yaml := `
+name: test
+ssh:
+  user: testuser
+  host: example.com
+  key: ~/.ssh/id_rsa
+steps:
+  - name: step1
+    command: echo hello
+  - name: step2
+    command: ls -la
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 2)
+
+		// Both steps should inherit SSH executor
+		for _, step := range dag.Steps {
+			assert.Equal(t, "ssh", step.ExecutorConfig.Type)
+		}
+	})
+
+	t.Run("StepOverridesSSHConfig", func(t *testing.T) {
+		yaml := `
+name: test
+ssh:
+  user: defaultuser
+  host: default.com
+  key: ~/.ssh/default_key
+steps:
+  - name: step1
+    command: echo hello
+    executor:
+      type: ssh
+      config:
+        user: overrideuser
+        ip: override.com
+  - name: step2
+    command: echo world
+    executor:
+      type: command
+`
+		ctx := context.Background()
+		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 2)
+
+		// Step 1 should have overridden values
+		step1 := dag.Steps[0]
+		assert.Equal(t, "ssh", step1.ExecutorConfig.Type)
+
+		// Step 2 should use command executor
+		step2 := dag.Steps[1]
+		assert.Equal(t, "command", step2.ExecutorConfig.Type)
+	})
+}
+
 func TestStepLevelEnv(t *testing.T) {
 	t.Run("BasicStepEnv", func(t *testing.T) {
 		yaml := `

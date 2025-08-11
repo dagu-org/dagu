@@ -943,20 +943,26 @@ Complete containerized workflow.
 
 <div class="example-card">
 
-### SSH Remote Execution
+### SSH Configuration
 
 ```yaml
+# Configure SSH once for all steps
+ssh:
+  user: deploy
+  host: production.example.com
+  key: ~/.ssh/deploy_key
+
 steps:
-  - name: remote
+  - name: check-health
     executor:
       type: ssh
-      config:
-        host: server.example.com
-        user: deploy
-    command: ./deploy.sh
+    command: curl -f localhost:8080/health
+    
+  - name: restart-service
+    executor:
+      type: ssh
+    command: systemctl restart myapp
 ```
-
-Execute commands on remote servers.
 
 <a href="/features/executors/ssh" class="learn-more">Learn more →</a>
 

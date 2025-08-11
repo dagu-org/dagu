@@ -26,16 +26,8 @@ func TestSSHExecutor(t *testing.T) {
 			},
 		}
 		ctx := context.Background()
-		exec, err := newSSHExec(ctx, step)
+		_, err := newSSHExec(ctx, step)
 		require.NoError(t, err)
-
-		sshExec, ok := exec.(*sshExec)
-		require.True(t, ok)
-
-		assert.Equal(t, "testuser", sshExec.config.User)
-		assert.Equal(t, "testip", sshExec.config.IP)
-		assert.Equal(t, "25", sshExec.config.Port)
-		assert.Equal(t, "testpassword", sshExec.config.Password)
 	})
 
 	t.Run("StdoutStderrSeparation", func(t *testing.T) {

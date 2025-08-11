@@ -74,6 +74,7 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "runConfig", fn: buildRunConfig},
 	{name: "container", fn: buildContainer},
 	{name: "registryAuths", fn: buildRegistryAuths},
+	{name: "ssh", fn: buildSSH},
 	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
 	{name: "logDir", fn: buildLogDir},
@@ -729,6 +730,54 @@ func buildRunConfig(_ BuildContext, spec *definition, dag *DAG) error {
 		DisableParamEdit: spec.RunConfig.DisableParamEdit,
 		DisableRunIdEdit: spec.RunConfig.DisableRunIdEdit,
 	}
+	return nil
+}
+
+// buildSSH builds the SSH configuration for the DAG.
+func buildSSH(_ BuildContext, spec *definition, dag *DAG) error {
+	if spec.SSH == nil {
+		return nil
+	}
+
+	// Parse port - can be string or number
+	port := ""
+	switch v := spec.SSH.Port.(type) {
+	case string:
+		port = v
+	case int:
+		port = fmt.Sprintf("%d", v)
+	case int64:
+		port = fmt.Sprintf("%d", v)
+	case uint64:
+		port = fmt.Sprintf("%d", v)
+	case float64:
+		port = fmt.Sprintf("%.0f", v)
+	case nil:
+		port = ""
+	default:
+		return fmt.Errorf("invalid SSH port type: %T", v)
+	}
+
+	// Set default port if not specified
+	if port == "" {
+		port = "22"
+	}
+
+	// Default strictHostKey to true if not explicitly set
+	strictHostKey := true
+	if spec.SSH.StrictHostKey != nil {
+		strictHostKey = *spec.SSH.StrictHostKey
+	}
+
+	dag.SSH = &SSHConfig{
+		User:          spec.SSH.User,
+		Host:          spec.SSH.Host,
+		Port:          port,
+		Key:           spec.SSH.Key,
+		StrictHostKey: strictHostKey,
+		KnownHostFile: spec.SSH.KnownHostFile,
+	}
+
 	return nil
 }
 
@@ -1421,7 +1470,8 @@ func buildDepends(_ StepBuildContext, def stepDef, step *Step) error {
 // Case 1: executor is nil
 //
 //	Case 1.1: DAG level 'container' field is set
-//	Case 1.2: No executor is set, use default executor
+//	Case 1.2: DAG 'ssh' field is set
+//	Case 1.3: No executor is set, use default executor
 //
 // Case 2: executor is a string
 // Case 3: executor is a struct
@@ -1438,6 +1488,8 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 		if ctx.dag.Container != nil {
 			// Translate the container configuration to executor config
 			return translateExecutorConfig(ctx, def, step)
+		} else if ctx.dag.SSH != nil {
+			return translateSSHConfig(ctx, def, step)
 		}
 		return nil
 	}
@@ -1499,6 +1551,19 @@ func translateExecutorConfig(ctx StepBuildContext, def stepDef, step *Step) erro
 
 	// Translate container fields to executor config
 	step.ExecutorConfig.Type = "docker"
+
+	// The other fields will be retrieved from the container configuration on
+	// execution time, so we don't need to set them here.
+
+	return nil
+}
+
+func translateSSHConfig(ctx StepBuildContext, def stepDef, step *Step) error {
+	if ctx.dag.SSH == nil {
+		return nil // No container configuration to translate
+	}
+
+	step.ExecutorConfig.Type = "ssh"
 
 	// The other fields will be retrieved from the container configuration on
 	// execution time, so we don't need to set them here.

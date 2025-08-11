@@ -77,6 +77,8 @@ type definition struct {
 	// RegistryAuths maps registry hostnames to authentication configs.
 	// Can be either a JSON string or a map of registry to auth config.
 	RegistryAuths any
+	// SSH is the default SSH configuration for the DAG.
+	SSH *sshDef
 }
 
 // handlerOnDef defines the steps to be executed on different events.
@@ -228,4 +230,20 @@ type containerDef struct {
 type runConfigDef struct {
 	DisableParamEdit bool `yaml:"disableParamEdit,omitempty"` // Disable parameter editing when starting DAG
 	DisableRunIdEdit bool `yaml:"disableRunIdEdit,omitempty"` // Disable custom run ID specification
+}
+
+// sshDef defines the SSH configuration for the DAG.
+type sshDef struct {
+	// User is the SSH user.
+	User string `yaml:"user,omitempty"`
+	// Host is the SSH host.
+	Host string `yaml:"host,omitempty"`
+	// Port is the SSH port (can be string or number).
+	Port any `yaml:"port,omitempty"`
+	// Key is the path to the SSH private key.
+	Key string `yaml:"key,omitempty"`
+	// StrictHostKey enables strict host key checking. Defaults to true if not specified.
+	StrictHostKey *bool `yaml:"strictHostKey,omitempty"`
+	// KnownHostFile is the path to the known_hosts file. Defaults to ~/.ssh/known_hosts.
+	KnownHostFile string `yaml:"knownHostFile,omitempty"`
 }

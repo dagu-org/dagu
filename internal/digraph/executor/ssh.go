@@ -2,126 +2,67 @@ package executor
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"strings"
 
-	"github.com/go-viper/mapstructure/v2"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/sshutil"
 )
 
 var _ Executor = (*sshExec)(nil)
 
+type sshClientCtxKey = struct{}
+
+// WithSSHClient creates a new context with sshutil.client
+func WithSSHClient(ctx context.Context, cli *sshutil.Client) context.Context {
+	return context.WithValue(ctx, sshClientCtxKey{}, cli)
+}
+
+// getSSHClientFromContext retrieves the sshutil.Client from the context.
+func getSSHClientFromContext(ctx context.Context) *sshutil.Client {
+	if cli, ok := ctx.Value(containerClientCtxKey{}).(*sshutil.Client); ok {
+		return cli
+	}
+	return nil
+}
+
 type sshExec struct {
-	step      digraph.Step
-	config    *sshExecConfig
-	sshConfig *ssh.ClientConfig
-	stdout    io.Writer
-	stderr    io.Writer
-	session   *ssh.Session
+	step    digraph.Step
+	client  *sshutil.Client
+	stdout  io.Writer
+	stderr  io.Writer
+	session *ssh.Session
 }
 
-type sshExecConfigDefinition struct {
-	User                  string
-	IP                    string
-	Port                  string
-	Key                   string
-	Password              string
-	StrictHostKeyChecking bool
-}
+func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
+	var client *sshutil.Client
 
-type sshExecConfig struct {
-	User     string
-	IP       string
-	Port     string
-	Key      string
-	Password string
-}
-
-// selectSSHAuthMethod selects the authentication method based on the configuration.
-// If the key is provided, it will use the public key authentication method.
-// Otherwise, it will use the password authentication method.
-func selectSSHAuthMethod(cfg *sshExecConfig) (ssh.AuthMethod, error) {
-	var signer ssh.Signer
-
-	if len(cfg.Key) != 0 {
-		// Create the Signer for this private key.
-		keyPath, err := fileutil.ResolvePath(cfg.Key)
+	if len(step.ExecutorConfig.Config) > 0 {
+		c, err := sshutil.FromMapConfig(ctx, step.ExecutorConfig.Config)
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve key path: %w", err)
+			return nil, fmt.Errorf("failed to setup ssh executor")
 		}
-		if signer, err = getPublicKeySigner(keyPath); err != nil {
-			return nil, err
-		}
-
-		return ssh.PublicKeys(signer), nil
+		client = c
+	}
+	if c := getSSHClientFromContext(ctx); c != nil {
+		client = c
 	}
 
-	return ssh.Password(cfg.Password), nil
-}
-
-func newSSHExec(_ context.Context, step digraph.Step) (Executor, error) {
-	def := new(sshExecConfigDefinition)
-	md, err := mapstructure.NewDecoder(
-		&mapstructure.DecoderConfig{Result: def, WeaklyTypedInput: true},
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create decoder: %w", err)
-	}
-
-	if err := md.Decode(step.ExecutorConfig.Config); err != nil {
-		return nil, fmt.Errorf("failed to decode ssh config: %w", err)
-	}
-
-	if def.Port == "0" || def.Port == "" {
-		def.Port = "22"
-	}
-
-	cfg := sshExecConfig{
-		User:     def.User,
-		IP:       def.IP,
-		Key:      def.Key,
-		Password: def.Password,
-		Port:     def.Port,
-	}
-
-	// StrictHostKeyChecking is not supported yet.
-	if def.StrictHostKeyChecking {
-		return nil, errStrictHostKey
-	}
-
-	// Select the authentication method.
-	authMethod, err := selectSSHAuthMethod(&cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	sshConfig := &ssh.ClientConfig{
-		User: cfg.User,
-		Auth: []ssh.AuthMethod{
-			authMethod,
-		},
-		// nolint: gosec
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	if client == nil {
+		return nil, fmt.Errorf("ssh configuration is not found")
 	}
 
 	return &sshExec{
-		step:      step,
-		config:    &cfg,
-		sshConfig: sshConfig,
-		stdout:    os.Stdout,
-		stderr:    os.Stderr,
+		step:   step,
+		client: client,
+		stdout: os.Stdout,
+		stderr: os.Stderr,
 	}, nil
 }
-
-var errStrictHostKey = errors.New("StrictHostKeyChecking is not supported yet")
 
 func (e *sshExec) SetStdout(out io.Writer) {
 	e.stdout = out
@@ -139,13 +80,7 @@ func (e *sshExec) Kill(_ os.Signal) error {
 }
 
 func (e *sshExec) Run(_ context.Context) error {
-	addr := net.JoinHostPort(e.config.IP, e.config.Port)
-	conn, err := ssh.Dial("tcp", addr, e.sshConfig)
-	if err != nil {
-		return err
-	}
-
-	session, err := conn.NewSession()
+	session, err := e.client.NewSession()
 	if err != nil {
 		return err
 	}
@@ -162,30 +97,6 @@ func (e *sshExec) Run(_ context.Context) error {
 		append([]string{e.step.Command}, e.step.Args...), " ",
 	)
 	return session.Run(command)
-}
-
-// referenced code:
-//
-//	https://go.googlesource.com/crypto/+/master/ssh/example_test.go
-//	https://gist.github.com/boyzhujian/73b5ecd37efd6f8dd38f56e7588f1b58
-func getPublicKeySigner(path string) (ssh.Signer, error) {
-	// A public key may be used to authenticate against the remote
-	// frontend by using an unencrypted PEM-encoded private key file.
-	//
-	// If you have an encrypted private key, the crypto/x509 package
-	// can be used to decrypt it.
-	key, err := os.ReadFile(path) //nolint:gosec
-	if err != nil {
-		return nil, err
-	}
-
-	// Create the Signer for this private key.
-	signer, err := ssh.ParsePrivateKey(key)
-	if err != nil {
-		return nil, err
-	}
-
-	return signer, nil
 }
 
 func init() {

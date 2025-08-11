@@ -115,6 +115,8 @@ type DAG struct {
 	// RegistryAuths maps registry hostnames to authentication configs.
 	// Optional: If not specified, falls back to DOCKER_AUTH_CONFIG or docker config.
 	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
+	// SSH contains the default SSH configuration for the DAG.
+	SSH *SSHConfig `json:"ssh,omitempty"`
 }
 
 // CreateTask creates a coordinator task from this DAG for distributed execution.
@@ -380,6 +382,22 @@ type RunConfig struct {
 	DisableParamEdit bool `json:"disableParamEdit,omitempty"`
 	// DisableRunIdEdit when set to true, prevents users from specifying custom run IDs.
 	DisableRunIdEdit bool `json:"disableRunIdEdit,omitempty"`
+}
+
+// SSHConfig contains the SSH configuration for the DAG.
+type SSHConfig struct {
+	// User is the SSH user.
+	User string `json:"user,omitempty"`
+	// Host is the SSH host.
+	Host string `json:"host,omitempty"`
+	// Port is the SSH port. Default is "22".
+	Port string `json:"port,omitempty"`
+	// Key is the path to the SSH private key.
+	Key string `json:"key,omitempty"`
+	// StrictHostKey enables strict host key checking. Defaults to true.
+	StrictHostKey bool `json:"strictHostKey,omitempty"`
+	// KnownHostFile is the path to the known_hosts file. Defaults to ~/.ssh/known_hosts.
+	KnownHostFile string `json:"knownHostFile,omitempty"`
 }
 
 // Schedule contains the cron expression and the parsed cron schedule.

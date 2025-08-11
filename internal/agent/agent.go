@@ -28,6 +28,7 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/otel"
 	"github.com/dagu-org/dagu/internal/sock"
+	"github.com/dagu-org/dagu/internal/sshutil"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -355,6 +356,22 @@ func (a *Agent) Run(ctx context.Context) error {
 			containerClient.StopContainerKeepAlive(ctx)
 			containerClient.Close(ctx)
 		}()
+	}
+
+	// Create SSH Client if the DAG has SSH configuration.
+	if a.dag.SSH != nil {
+		cli, err := sshutil.NewClient(&sshutil.Config{
+			User:          a.dag.SSH.User,
+			Host:          a.dag.SSH.Host,
+			Port:          a.dag.SSH.Port,
+			Key:           a.dag.SSH.Key,
+			StrictHostKey: a.dag.SSH.StrictHostKey,
+			KnownHostFile: a.dag.SSH.KnownHostFile,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to parse ssh config")
+		}
+		ctx = executor.WithSSHClient(ctx, cli)
 	}
 
 	listenerErrCh := make(chan error)
