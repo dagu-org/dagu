@@ -41,14 +41,19 @@ type sshExec struct {
 func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 	var client *sshutil.Client
 
-	if c := getSSHClientFromContext(ctx); c != nil {
-		client = c
-	} else {
+	if len(step.ExecutorConfig.Config) > 0 {
 		c, err := sshutil.FromMapConfig(ctx, step.ExecutorConfig.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to setup ssh executor")
 		}
 		client = c
+	}
+	if c := getSSHClientFromContext(ctx); c != nil {
+		client = c
+	}
+
+	if client == nil {
+		return nil, fmt.Errorf("ssh configuration is not found")
 	}
 
 	return &sshExec{

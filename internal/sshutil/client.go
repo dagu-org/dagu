@@ -1,7 +1,6 @@
 package sshutil
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"os"
@@ -14,11 +13,10 @@ import (
 
 type Client struct {
 	hostPort string
-	port     string
 	cfg      *ssh.ClientConfig
 }
 
-func NewClient(ctx context.Context, cfg *Config) (*Client, error) {
+func NewClient(cfg *Config) (*Client, error) {
 	authMethod, err := selectSSHAuthMethod(cfg)
 	if err != nil {
 		return nil, err
@@ -60,7 +58,7 @@ func (c *Client) NewSession() (*ssh.Session, error) {
 func getHostKeyCallback(strictHostKey bool, knownHostFile string) (ssh.HostKeyCallback, error) {
 	if !strictHostKey {
 		// User explicitly opted out of host key checking
-		return ssh.InsecureIgnoreHostKey(), nil
+		return ssh.InsecureIgnoreHostKey(), nil // nolint: gosec
 	}
 
 	// Default to ~/.ssh/known_hosts if not specified

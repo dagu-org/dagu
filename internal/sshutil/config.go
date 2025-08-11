@@ -58,5 +58,5 @@ func FromMapConfig(ctx context.Context, mapCfg map[string]any) (*Client, error) 
 		KnownHostFile: def.KnownHostFile,
 	}
 
-	return NewClient(ctx, cfg)
+	return NewClient(cfg)
 }

@@ -360,7 +360,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create SSH Client if the DAG has SSH configuration.
 	if a.dag.SSH != nil {
-		cli, err := sshutil.NewClient(ctx, &sshutil.Config{
+		cli, err := sshutil.NewClient(&sshutil.Config{
 			User:          a.dag.SSH.User,
 			Host:          a.dag.SSH.Host,
 			Port:          a.dag.SSH.Port,
