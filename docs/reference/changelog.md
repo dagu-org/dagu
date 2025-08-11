@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.20.0 (2025-08-10)
+
+### New Features
+- **DAG Run Configuration**: Added ability to lock parameters and run ID in DAG configuration for controlled execution (#1176) - Thanks to [@kriyanshii](https://github.com/kriyanshii)
+- **System Status UI**: Added comprehensive system health monitoring for scheduler and coordinator services (#1177)
+- **Manual Refresh Controls**: Added refresh buttons to Dashboard, DAG-runs, and DAG-definitions pages for immediate data updates (#1178)
+- **Immediate Execution Option**: Added checkbox to start DAGs immediately, bypassing the queue for urgent workflows (#1171)
+- **Feedback Integration**: Added feedback button to sidebar with Web3Forms integration for better user communication (#1173)
+- **Community Link**: Added Discord community link to navigation sidebar for easier access to support (#1175)
+- **Auto-Navigation**: Automatically navigate to DAG-run detail page after starting or enqueuing a DAG (#1172)
+
+### Improvements
+- **Queue Management**: Refactored process store to use hierarchical directory structure, separating group names (queues) from DAG names for better organization (#1174)
+- **Scheduler Timeout Handling**: Fixed scheduler queue reader to discard items when DAG runs don't become active within 10 seconds, preventing queue stacking (#1169) - Thanks to [@jrisch](https://github.com/jrisch) for reporting
+
+### Bug Fixes
+- **Status Display**: Fixed DAG header showing "0" instead of "not started" for DAGs that haven't been executed (#1168)
+
+### Documentation
+- **Roadmap**: Updated project roadmap with latest development priorities
+
+### Contributors
+
+Thanks to our contributors for this release:
+
+| Contribution                           | Author                                   |
+| -------------------------------------- | ---------------------------------------- |
+| DAG run configuration with parameter locking | [@kriyanshii](https://github.com/kriyanshii) |
+| Timeout issues report and feedback | [@jrisch](https://github.com/jrisch) |
+
+**Full Changelog**: [v1.19.0...v1.20.0](https://github.com/dagu-org/dagu/compare/v1.19.0...v1.20.0)
+
 ## v1.19.0 (2025-08-06)
 
 ### New Features
