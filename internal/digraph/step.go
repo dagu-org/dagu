@@ -120,6 +120,9 @@ type ExecutorConfig struct {
 	// See `executor.Register` in `internal/executor/executor.go`.
 	Type   string         `json:"type,omitempty"`
 	Config map[string]any `json:"config,omitempty"` // Config contains executor-specific configuration.
+	// Metadata contains additional metadata for the executor that is not passed to the executor itself.
+	// This is used internally for optimization purposes.
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 // IsCommand returns true if the executor is a command
