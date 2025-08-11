@@ -309,6 +309,10 @@
       "$ref": "#/definitions/container",
       "description": "Default container configuration for all steps in the DAG. Steps can override this configuration with their own container settings."
     },
+    "ssh": {
+      "$ref": "#/definitions/sshConfig",
+      "description": "Default SSH configuration for all steps in the DAG. Steps can override this configuration with their own SSH settings. Note: SSH and container configurations are mutually exclusive at the DAG level."
+    },
     "steps": {
       "oneOf": [
         {
@@ -906,6 +910,41 @@
       },
       "required": ["image"],
       "description": "Container configuration that can be specified at DAG or step level. When used, automatically sets the executor to docker."
+    },
+    "sshConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "SSH username for authentication."
+        },
+        "host": {
+          "type": "string",
+          "description": "Hostname or IP address of the SSH server."
+        },
+        "port": {
+          "type": "string",
+          "default": "22",
+          "description": "SSH port number. Defaults to 22."
+        },
+        "key": {
+          "type": "string",
+          "description": "Path to the SSH private key file. If not specified, defaults are tried: ~/.ssh/id_rsa, ~/.ssh/id_ecdsa, ~/.ssh/id_ed25519, ~/.ssh/id_dsa."
+        },
+        "strictHostKey": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable strict host key checking. When true (default), verifies the server's host key against known_hosts. Set to false only for testing."
+        },
+        "knownHostFile": {
+          "type": "string",
+          "default": "~/.ssh/known_hosts",
+          "description": "Path to the known_hosts file for host key verification. Defaults to ~/.ssh/known_hosts."
+        }
+      },
+      "required": ["user", "host"],
+      "description": "SSH configuration for remote command execution. Can be specified at DAG level for reuse across steps, or at step level for specific overrides. Note: Password authentication is not supported at DAG level for security reasons."
     }
   }
 }

@@ -2,7 +2,30 @@
 
 Execute commands on remote servers via SSH.
 
-## Basic Usage
+## DAG-Level Configuration
+
+You can configure SSH settings at the DAG level to avoid repetition:
+
+```yaml
+# DAG-level SSH configuration
+ssh:
+  user: deploy
+  host: production.example.com
+  port: 22
+  key: ~/.ssh/deploy_key
+  strictHostKey: true  # Default: true for security
+  knownHostFile: ~/.ssh/known_hosts  # Default: ~/.ssh/known_hosts
+
+steps:
+  # All SSH steps inherit DAG-level configuration
+  - name: check-health
+    command: curl -f http://localhost:8080/health
+
+  - name: restart-service
+    command: systemctl restart myapp
+```
+
+## Step-Level Configuration
 
 ```yaml
 steps:
@@ -18,147 +41,56 @@ steps:
 
 ## Configuration
 
+### DAG-Level Fields
+
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `user` | Yes | - | SSH username |
-| `ip` | Yes | - | Hostname or IP address |
+| `host` | Yes | - | Hostname or IP address |
 | `port` | No | "22" | SSH port |
-| `key` | No | - | Private key path |
+| `key` | No | Auto-detect | Private key path (see below) |
+| `strictHostKey` | No | `true` | Enable host key verification |
+| `knownHostFile` | No | `~/.ssh/known_hosts` | Known hosts file path |
+
+### Step-Level Fields
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `user` | Yes | - | SSH username |
+| `host` | Yes | - | Hostname or IP address |
+| `port` | No | "22" | SSH port |
+| `key` | No | Auto-detect | Private key path (see below) |
 | `password` | No | - | Password (not recommended) |
+| `strictHostKey` | No | `true` | Enable host key verification |
+| `knownHostFile` | No | `~/.ssh/known_hosts` | Known hosts file path |
 
-## Examples
+**Note:** Password authentication is not available at the DAG level for security reasons.
 
-### Custom Port
+### SSH Key Auto-Detection
 
-```yaml
-steps:
-  - name: custom-port
-    executor:
-      type: ssh
-      config:
-        user: admin
-        ip: example.com
-        port: "2222"
-        key: ~/.ssh/id_rsa
-    command: uptime
-```
+If no key is specified, Dagu automatically tries these default SSH keys in order:
+1. `~/.ssh/id_rsa`
+2. `~/.ssh/id_ecdsa`
+3. `~/.ssh/id_ed25519`
+4. `~/.ssh/id_dsa`
 
-### Multi-Server Deployment
+## Security Best Practices
 
-```yaml
-params:
-  - VERSION: ${VERSION}
+1. **Host Key Verification**: Always enabled by default (`strictHostKey: true`)
+   - Prevents man-in-the-middle attacks
+   - Uses `~/.ssh/known_hosts` by default
+   - Only disable for testing environments
 
-steps:
-  - name: deploy-web1
-    executor:
-      type: ssh
-      config:
-        user: deploy
-        ip: web1.example.com
-        key: ~/.ssh/deploy_key
-    command: |
-      cd /opt/app
-      git pull
-      ./deploy.sh ${VERSION}
+2. **Key-Based Authentication**: Strongly recommended
+   - DAG-level SSH only supports key-based authentication
+   - Use dedicated deployment keys with limited permissions
+   - Rotate keys regularly
 
-  - name: deploy-web2
-    executor:
-      type: ssh
-      config:
-        user: deploy
-        ip: web2.example.com
-        key: ~/.ssh/deploy_key
-    command: |
-      cd /opt/app
-      git pull
-      ./deploy.sh ${VERSION}
-    depends: deploy-web1
-```
-
-### Health Check with Retry
-
-```yaml
-steps:
-  - name: check-service
-    executor:
-      type: ssh
-      config:
-        user: monitor
-        ip: app.example.com
-        key: ~/.ssh/monitor_key
-    command: systemctl is-active nginx
-    retryPolicy:
-      limit: 3
-      intervalSec: 30
-```
-
-### Capture Remote Output
-
-```yaml
-steps:
-  - name: get-version
-    executor:
-      type: ssh
-      config:
-        user: admin
-        ip: server.example.com
-        key: ~/.ssh/admin_key
-    command: cat /opt/app/version.txt
-    output: REMOTE_VERSION
-
-  - name: log-version
-    command: echo "Remote version: ${REMOTE_VERSION}"
-```
-
-## Common Patterns
-
-### Database Backup
-
-```yaml
-steps:
-  - name: backup-db
-    executor:
-      type: ssh
-      config:
-        user: backup
-        ip: db.example.com
-        key: ~/.ssh/backup_key
-    command: |
-      BACKUP="/backups/db_$(date +%Y%m%d_%H%M%S).sql.gz"
-      mysqldump mydb | gzip > $BACKUP
-      echo $BACKUP
-    output: BACKUP_FILE
-```
-
-### Rolling Restart
-
-```yaml
-steps:
-  - name: restart-app1
-    executor:
-      type: ssh
-      config:
-        user: admin
-        ip: app1.example.com
-        key: ~/.ssh/admin_key
-    command: |
-      systemctl restart myapp
-      sleep 10
-      systemctl is-active myapp
-
-  - name: restart-app2
-    executor:
-      type: ssh
-      config:
-        user: admin
-        ip: app2.example.com
-        key: ~/.ssh/admin_key
-    command: |
-      systemctl restart myapp
-      sleep 10
-      systemctl is-active myapp
-```
+3. **Known Hosts Management**:
+   ```bash
+   # Add host to known_hosts before running DAGs
+   ssh-keyscan -H production.example.com >> ~/.ssh/known_hosts
+   ```
 
 ## See Also
 

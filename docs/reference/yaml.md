@@ -133,6 +133,60 @@ container:
   keepContainer: false     # Keep container after DAG run
 ```
 
+### SSH Configuration
+
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| `ssh` | object | Default SSH configuration for all steps | - |
+
+```yaml
+ssh:
+  user: deploy
+  host: production.example.com
+  port: "22"           # Optional, defaults to "22"
+  key: ~/.ssh/id_rsa   # Optional, defaults to standard keys
+  strictHostKey: true  # Optional, defaults to true for security
+  knownHostFile: ~/.ssh/known_hosts  # Optional, defaults to ~/.ssh/known_hosts
+```
+
+When configured at the DAG level, all steps using SSH executor will inherit these settings:
+
+```yaml
+# DAG-level SSH configuration
+ssh:
+  user: deploy
+  host: app.example.com
+  key: ~/.ssh/deploy_key
+
+steps:
+  # These steps inherit the DAG-level SSH configuration
+  - name: check-service
+    executor:
+      type: ssh
+    command: systemctl status myapp
+  
+  - name: restart-service
+    executor:
+      type: ssh
+    command: systemctl restart myapp
+  
+  # Step-level config overrides DAG-level
+  - name: backup-db
+    executor:
+      type: ssh
+      config:
+        user: backup      # Override user
+        host: db.example.com  # Override host
+        key: ~/.ssh/backup_key  # Override key
+    command: mysqldump mydb > backup.sql
+```
+
+**Important Notes:**
+- SSH and container fields are mutually exclusive at the DAG level
+- Step-level SSH configuration completely overrides DAG-level configuration (no partial overrides)
+- For security, password authentication is not supported at the DAG level
+- Default SSH keys are tried if no key is specified: `~/.ssh/id_rsa`, `~/.ssh/id_ecdsa`, `~/.ssh/id_ed25519`, `~/.ssh/id_dsa`
+
 ### Queue Configuration
 
 | Field | Type | Description | Default |
