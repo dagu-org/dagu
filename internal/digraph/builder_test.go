@@ -2246,8 +2246,8 @@ steps:
 		dag, err := digraph.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.SSH)
-		assert.Equal(t, "22", dag.SSH.Port) // Should default to 22
-		assert.True(t, dag.SSH.StrictHostKey) // Should default to true for security
+		assert.Equal(t, "22", dag.SSH.Port)        // Should default to 22
+		assert.True(t, dag.SSH.StrictHostKey)      // Should default to true for security
 		assert.Equal(t, "", dag.SSH.KnownHostFile) // Empty, will use default ~/.ssh/known_hosts at runtime
 	})
 }

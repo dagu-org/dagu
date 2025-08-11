@@ -768,7 +768,7 @@ func buildSSH(_ BuildContext, spec *definition, dag *DAG) error {
 	if spec.SSH.StrictHostKey != nil {
 		strictHostKey = *spec.SSH.StrictHostKey
 	}
-	
+
 	dag.SSH = &SSHConfig{
 		User:          spec.SSH.User,
 		Host:          spec.SSH.Host,
