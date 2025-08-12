@@ -96,16 +96,16 @@ maxActiveSteps: 2  # Run up to 2 steps in parallel
 
 steps:
   - name: task1
-    command: ./task1.sh
+    command: echo "Running task 1"
     depends: [] # Explicitly declare no dependency
   - name: task2
-    command: ./task2.sh
+    command: echo "Running task 2"
     depends: []
   - name: task3
-    command: ./task3.sh
+    command: echo "Running task 3"
     depends: []
   - name: task4
-    command: ./task4.sh
+    command: echo "Running task 4"
     depends: []
   # All start in parallel, limited by maxActiveSteps
 ```
@@ -154,7 +154,7 @@ timeoutSec: 3600  # 1 hour timeout
 
 steps:
   - name: long-task
-    command: ./process.sh
+    command: echo "Processing"
 ```
 
 ### Cleanup Timeout
@@ -164,7 +164,7 @@ maxCleanUpTimeSec: 300  # 5 minutes for cleanup
 
 handlerOn:
   exit:
-    command: ./cleanup.sh  # Must finish within 5 minutes
+    command: echo "Cleaning up"  # Must finish within 5 minutes
 ```
 
 ## Initial Delay
@@ -176,7 +176,7 @@ delaySec: 60  # Wait 60 seconds before starting
 
 steps:
   - name: delayed-task
-    command: ./task.sh
+    command: echo "Running task"
 ```
 
 ## Execution Order
@@ -200,18 +200,18 @@ steps:
 ```yaml
 steps:
   - name: setup
-    command: ./setup.sh
+    command: echo "Setting up"
   
   - name: task-a
-    command: ./task-a.sh
+    command: echo "Running task A"
     depends: setup
   
   - name: task-b
-    command: ./task-b.sh
+    command: echo "Running task B"
     depends: setup
   
   - name: finalize
-    command: ./finalize.sh
+    command: echo "Finalizing"
     depends:
       - task-a
       - task-b
@@ -245,7 +245,7 @@ steps:
 steps:
   # Service health check with backoff
   - name: wait-for-healthy
-    command: ./health-check.sh
+    command: echo "Health check OK"
     output: STATUS
     repeatPolicy:
       repeat: until

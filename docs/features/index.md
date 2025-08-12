@@ -128,7 +128,7 @@ steps:
     command: go run main.go
 
   - name: bash
-    command: ./script.sh
+    command: echo "Running script"
 ```
 
 ### Hierarchical Workflows

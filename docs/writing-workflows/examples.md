@@ -42,6 +42,13 @@ steps:
     parallel:
       items: [A, B, C]
       maxConcurrent: 2
+    params: "ITEM=${ITEM}"
+
+---
+name: processor
+steps:
+  - name: process
+    command: echo "Processing ${ITEM}"
 ```
 
 ```mermaid
@@ -72,15 +79,15 @@ Process multiple items simultaneously.
 ```yaml
 steps:
   - name: setup
-    command: ./setup.sh
+    command: echo "Setting up environment"
   - name: test-a
-    command: ./test-a.sh
+    command: echo "Running test suite A"
     depends: setup
   - name: test-b
-    command: ./test-b.sh
+    command: echo "Running test suite B"
     depends: setup
   - name: deploy
-    command: ./deploy.sh
+    command: echo "Deploying application"
     depends:
       - test-a
       - test-b
@@ -167,7 +174,7 @@ Control execution flow patterns.
 ```yaml
 steps:
   - name: deploy
-    command: ./deploy.sh
+    command: echo "Deploying application"
     preconditions:
       - condition: "${ENV}"
         expected: "production"
@@ -201,7 +208,7 @@ Run steps only when conditions are met.
 ```yaml
 steps:
   - name: conditional-task
-    command: ./process.sh
+    command: echo "Processing task"
     preconditions:
       - test -f /data/input.csv
       - test -s /data/input.csv  # File exists and is not empty
@@ -254,7 +261,7 @@ steps:
       limit: 30           # Maximum 5 minutes
   
   - name: monitor-job
-    command: ./check_job_status.sh
+    command: echo "COMPLETED"  # Simulates job status check
     output: JOB_STATUS
     repeatPolicy:
       repeat: until        # Repeat UNTIL job completes
@@ -277,13 +284,13 @@ Wait for external dependencies and job completion with clear semantics.
 ```yaml
 steps:
   - name: keep-alive-task
-    command: heartbeat.sh
+    command: echo "heartbeat"  # Sends heartbeat signal
     repeatPolicy:
       repeat: while        # Repeat indefinitely while successful
       intervalSec: 60
       
   - name: monitor-until-done
-    command: check-status.sh
+    command: echo "Checking status"
     repeatPolicy:
       repeat: until        # Repeat until exit code 0
       exitCode: [0]
@@ -310,11 +317,11 @@ Execute steps with clear repeat semantics.
 ```yaml
 steps:
   - name: optional-task
-    command: ./nice-to-have.sh
+    command: exit 1  # This will fail
     continueOn:
       failure: true
   - name: required-task
-    command: ./must-succeed.sh
+    command: echo "This must succeed"
 ```
 
 Handle non-critical failures gracefully.
@@ -330,14 +337,14 @@ Handle non-critical failures gracefully.
 ```yaml
 steps:
   - name: optional-feature
-    command: ./enable-feature.sh
+    command: echo "Enabling feature"
     preconditions:
       - condition: "${FEATURE_FLAG}"
         expected: "enabled"
     continueOn:
       skipped: true
   - name: main-process
-    command: ./process.sh
+    command: echo "Processing main task"
 ```
 
 Continue workflow when preconditions aren't met.
@@ -386,7 +393,7 @@ Automatically retry failed steps.
 ```yaml
 steps:
   - name: api-with-smart-retry
-    command: ./api_call.sh
+    command: curl -f https://api.example.com/data
     retryPolicy:
       limit: 5
       intervalSec: 30
@@ -486,14 +493,14 @@ Gradually increase polling intervals to reduce load.
 ```yaml
 handlerOn:
   success:
-    command: ./notify-success.sh
+    command: echo "SUCCESS - Workflow completed"
   failure:
-    command: ./cleanup-on-fail.sh
+    command: echo "FAILURE - Cleaning up failed workflow"
   exit:
-    command: ./always-cleanup.sh
+    command: echo "EXIT - Always cleanup"
 steps:
   - name: main
-    command: ./process.sh
+    command: echo "Processing main task"
 ```
 
 ```mermaid
@@ -796,13 +803,13 @@ steps:
       set -e
       
       echo "Starting process..."
-      ./prepare.sh
+      echo "Preparing environment"
       
       echo "Running main task..."
-      ./main-process.sh
+      echo "Running main process"
       
       echo "Cleaning up..."
-      ./cleanup.sh
+      echo "Cleaning up"
 ```
 
 Run multi-line scripts.
@@ -1028,7 +1035,7 @@ API integration with JSON processing pipeline.
 schedule: "5 4 * * *"  # Run at 04:05 daily
 steps:
   - name: scheduled job
-    command: job.sh
+    command: echo "Running scheduled job"
 ```
 
 Use cron expressions to schedule DAGs.
@@ -1047,11 +1054,11 @@ schedule: "0 */4 * * *"    # Every 4 hours
 skipIfSuccessful: true     # Skip if already succeeded
 steps:
   - name: extract
-    command: extract_data.sh
+    command: echo "Extracting data"
   - name: transform
-    command: transform_data.sh
+    command: echo "Transforming data"
   - name: load
-    command: load_data.sh
+    command: echo "Loading data"
 ```
 
 Prevent unnecessary executions when already successful.
@@ -1070,7 +1077,7 @@ queue: "batch"        # Assign to named queue
 maxActiveRuns: 2      # Max concurrent runs
 steps:
   - name: process
-    command: process_data.sh
+    command: echo "Processing data"
 ```
 
 Control concurrent DAG execution.
@@ -1098,7 +1105,7 @@ queue: "critical"
 maxActiveRuns: 3
 steps:
   - name: critical-task
-    command: ./process.sh
+    command: echo "Processing critical task"
 ```
 
 Configure queues globally and per-DAG.
@@ -1122,7 +1129,7 @@ smtp:
   password: "${SMTP_PASS}"
 steps:
   - name: critical-job
-    command: ./important.sh
+    command: echo "Running critical job"
     mailOnError: true
 ```
 
@@ -1148,7 +1155,7 @@ histRetentionDays: 30    # Keep 30 days of history
 schedule: "0 0 * * *"     # Daily at midnight
 steps:
   - name: archive-old-data
-    command: ./archive.sh
+    command: echo "Archiving old data"
   - name: cleanup-temp
     command: rm -rf /tmp/archive/*
 ```
@@ -1168,7 +1175,7 @@ name: log-processor
 maxOutputSize: 10485760   # 10MB max output per step
 steps:
   - name: process-large-logs
-    command: ./analyze-logs.sh
+    command: echo "Analyzing logs"
     stdout: /logs/analysis.out
   - name: summarize
     command: tail -n 1000 /logs/analysis.out
@@ -1190,11 +1197,11 @@ logDir: /data/etl/logs/${DAG_NAME}
 histRetentionDays: 90
 steps:
   - name: extract
-    command: ./extract.sh
+    command: echo "Extracting data"
     stdout: extract.log
     stderr: extract.err
   - name: transform
-    command: ./transform.py
+    command: echo "Transforming data"
     stdout: transform.log
 ```
 
@@ -1214,11 +1221,11 @@ timeoutSec: 7200          # 2 hour timeout
 maxCleanUpTimeSec: 600    # 10 min cleanup window
 steps:
   - name: data-processing
-    command: ./heavy-process.sh
+    command: sleep 5 && echo "Processing data"
     signalOnStop: SIGTERM
 handlerOn:
   exit:
-    command: ./cleanup-resources.sh
+    command: echo "Cleaning up resources"
 ```
 
 Ensure workflows don't run forever and clean up properly.
@@ -1255,7 +1262,7 @@ handlerOn:
         -d '{"service": "critical-service", "status": "failed"}'
 steps:
   - name: health-check
-    command: ./health-check.sh
+    command: echo "Checking health"
     retryPolicy:
       limit: 3
       intervalSec: 30
@@ -1281,7 +1288,7 @@ otel:
     deployment.environment: "${ENV}"
 steps:
   - name: fetch-data
-    command: ./fetch.sh
+    command: echo "Fetching data"
   - name: process-data
     command: python process.py
     depends: fetch-data
@@ -1308,15 +1315,15 @@ delaySec: 10              # 10 second initial delay
 skipIfSuccessful: true    # Skip if already succeeded
 steps:
   - name: validate
-    command: ./validate.sh
+    command: echo "Validating configuration"
   - name: process-batch-1
-    command: ./process.sh batch1
+    command: echo "Processing batch 1"
     depends: validate
   - name: process-batch-2
-    command: ./process.sh batch2
+    command: echo "Processing batch 2"
     depends: validate
   - name: process-batch-3
-    command: ./process.sh batch3
+    command: echo "Processing batch 3"
     depends: validate
 ```
 
@@ -1337,11 +1344,11 @@ histRetentionDays: 60     # Keep 60 days history
 maxOutputSize: 20971520   # 20MB output limit
 steps:
   - name: prepare-data
-    command: ./prepare.sh
+    command: echo "Preparing data"
   - name: run-computation
-    command: ./compute.sh --intensive
+    command: echo "Running intensive computation"
   - name: store-results
-    command: ./store.sh
+    command: echo "Storing results"
 ```
 
 Use queues to manage workflow execution priority and concurrency.
@@ -1489,9 +1496,9 @@ params:
   - TYPE: "batch"
 steps:
   - name: extract
-    command: ./extract.sh ${TYPE}
+    command: echo "Extracting ${TYPE} data"
   - name: transform
-    command: ./transform.sh
+    command: echo "Transforming data"
 ```
 
 Define multiple workflows in a single file.
@@ -1530,12 +1537,12 @@ handlerOn:
   success:
     command: echo "ETL completed successfully"
   failure:
-    command: ./cleanup_on_failure.sh
+    command: echo "Cleaning up after failure"
   exit:
-    command: ./final_cleanup.sh
+    command: echo "Final cleanup"
 steps:
   - name: validate-environment
-    command: ./validate_env.sh ${ENVIRONMENT}
+    command: echo "Validating environment: ${ENVIRONMENT}"
 ```
 
 Complete DAG with all configuration options.
@@ -1639,7 +1646,7 @@ steps:
     
   # Runs locally (no selector)
   - name: notify-completion
-    command: ./notify.sh "Processing complete"
+    command: echo "Processing complete"
     depends: process-on-gpu
 
 ---

@@ -65,7 +65,7 @@ Schedule workflows with cron expressions:
 schedule: "0 2 * * *"  # Daily at 2 AM
 steps:
   - name: nightly-job
-    command: ./process.sh
+    command: echo "Processing scheduled task"
 ```
 
 ## Multiple Schedules
@@ -78,7 +78,7 @@ schedule:
   - "0 14 * * SAT,SUN"  # Weekends at 2 PM
 steps:
   - name: job
-    command: ./job.sh
+    command: echo "Running job"
 ```
 
 ## Timezone Support
@@ -101,7 +101,7 @@ schedule:
   stop: "0 18 * * *"   # Stop at 6 PM
 steps:
   - name: service
-    command: ./service.sh
+    command: echo "Running service"
 ```
 
 Multiple start/stop times:
@@ -139,7 +139,7 @@ skipIfSuccessful: true   # Skip if last run succeeded
 
 steps:
   - name: quick-check
-    command: ./check.sh
+    command: echo "Checking status"
 ```
 
 ## Queue Management
@@ -153,7 +153,7 @@ queue: batch-jobs # Named queue (defaults to DAG name)
 schedule: "*/10 * * * *"
 steps:
   - name: process
-    command: ./batch.sh
+    command: echo "Running batch process"
 ```
 
 Disable queue processing:

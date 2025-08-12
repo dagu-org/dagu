@@ -107,7 +107,7 @@ steps:
     command: split -l ${BATCH_SIZE} input.csv batch_
     
   - name: process
-    command: ./process.sh batch_*
+    command: echo "Processing batch files"
     maxActiveSteps: ${PARALLELISM}
     
   - name: merge

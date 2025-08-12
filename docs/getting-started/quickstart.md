@@ -176,19 +176,19 @@ steps:
     command: echo "Starting"
     
   - name: task1
-    command: ./process-images.sh
+    command: echo "Processing images"
     depends: prepare
     
   - name: task2
-    command: ./process-videos.sh
+    command: echo "Processing videos"
     depends: prepare
     
   - name: task3
-    command: ./process-docs.sh
+    command: echo "Processing documents"
     depends: prepare
     
   - name: combine
-    command: ./merge-results.sh
+    command: echo "Merging all results"
     depends: [task1, task2, task3]
 ```
 
@@ -215,7 +215,7 @@ steps:
       intervalSec: 30
       
   - name: process
-    command: unzip data.zip && ./process.sh
+    command: echo "Unzipping data and processing"
     continueOn:
       failure: true  # Continue even if this fails
       
@@ -259,7 +259,7 @@ schedule: "0 2 * * *"  # 2 AM daily
 
 steps:
   - name: run
-    command: ./nightly-process.sh
+    command: echo "Running nightly process"
 ```
 
 The workflow will execute every day at 2 AM.

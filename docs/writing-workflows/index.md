@@ -16,7 +16,7 @@ env:                       # Environment variables
 
 steps:                     # Workflow steps
   - name: process
-    command: ./process.sh ${DATE}
+    command: echo "Processing for date ${DATE}"
 ```
 
 ## Base Configuration
@@ -58,7 +58,7 @@ env:
 
 steps:
   - name: process
-    command: ./process.sh
+    command: echo "Processing"
 ```
 
 Configuration precedence: System defaults → Base config → DAG config
@@ -106,7 +106,7 @@ steps:
 
 handlerOn:
   failure:
-    command: ./notify_failure.sh "${DATE}"
+    command: echo "Notifying failure for ${DATE}"
 ```
 
 ## Common Patterns
@@ -115,13 +115,13 @@ handlerOn:
 ```yaml
 steps:
   - name: extract
-    command: ./extract.sh
+    command: echo "Extracting data"
     
   - name: transform
-    command: ./transform.sh
+    command: echo "Transforming data"
     
   - name: load
-    command: ./load.sh
+    command: echo "Loading data"
 ```
 
 ### Conditional Execution
@@ -131,7 +131,7 @@ steps:
     command: npm test
     
   - name: deploy
-    command: ./deploy.sh
+    command: echo "Deploying application"
     preconditions:
       - condition: "${BRANCH}"
         expected: "main"
@@ -141,7 +141,7 @@ steps:
 ```yaml
 steps:
   - name: prepare
-    command: ./prepare.sh
+    command: echo "Preparing environment"
     
   - name: process-files
     parallel: [file1, file2, file3]
@@ -154,7 +154,7 @@ steps:
 name: process-file
 steps:
   - name: process
-    command: ./process.sh --file ${FILE}
+    command: echo "Processing" --file ${FILE}
 ```
 
 The above example runs `process-file` in different processes for each file in parallel.

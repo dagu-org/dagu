@@ -22,7 +22,7 @@ schedule: "*/10 * * * *"    # Every 10 minutes
 
 steps:
   - name: process
-    command: ./batch-process.sh
+    command: echo "Processing batch"
 ```
 
 ### Disable Queueing
@@ -35,7 +35,7 @@ maxActiveRuns: -1           # Never queue - always run
 
 steps:
   - name: check
-    command: ./check-alerts.sh
+    command: echo "Checking alerts"
 ```
 
 ## Global Queue Configuration
