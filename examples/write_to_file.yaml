@@ -1,4 +1,0 @@
-steps:
-  - name: write hello to '/tmp/hello.txt'
-    command: echo hello
-    stdout: /tmp/hello.txt

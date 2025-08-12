@@ -1,7 +1,0 @@
-steps:
-  - name: step1
-    command: bash
-    script: |
-      for s in {1..64}; do trap "echo trap $s" $s; done
-      sleep 60
-    signalOnStop: "SIGINT"
