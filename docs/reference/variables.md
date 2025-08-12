@@ -122,7 +122,7 @@ params:
 
 steps:
   - name: deploy
-    command: ./deploy.sh $1 --env=${ENVIRONMENT} --version=${VERSION}
+    command: echo "Deploying $1 to ${ENVIRONMENT} version ${VERSION}"
 ```
 
 Run with:
@@ -234,7 +234,7 @@ Reference step properties using IDs:
 steps:
   - name: risky-operation
     id: risky
-    command: ./might-fail.sh
+    command: 'sh -c "if [ $((RANDOM % 2)) -eq 0 ]; then echo Success; else echo Failed && exit 1; fi"'
     continueOn:
       failure: true
       

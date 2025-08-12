@@ -140,7 +140,7 @@ otel:
     service.name: "dagu-${DAG_NAME}"  # Override specific attributes
 steps:
   - name: process
-    command: ./process.sh
+    command: echo "Processing with telemetry"
 ```
 
 ## Integration Examples

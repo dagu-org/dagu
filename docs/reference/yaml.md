@@ -267,11 +267,11 @@ handlerOn:
   success:
     command: echo "Workflow succeeded"
   failure:
-    command: ./notify-failure.sh
+    command: echo "Notifying failure"
   cancel:
-    command: ./cleanup.sh
+    command: echo "Cleaning up"
   exit:
-    command: ./always-run.sh
+    command: echo "Always running"
 ```
 
 ### RunConfig
@@ -364,7 +364,7 @@ steps:
 ```yaml
 steps:
   - name: conditional-step
-    command: ./deploy.sh
+    command: echo "Deploying"
     preconditions:
       - condition: "${ENVIRONMENT}"
         expected: "production"
@@ -372,7 +372,7 @@ steps:
         expected: "main"
     
   - name: optional-step
-    command: ./optional.sh
+    command: echo "Running optional task"
     continueOn:
       failure: true
       skipped: true
@@ -451,7 +451,7 @@ steps:
       limit: 30
       
   - name: repeat-until-with-backoff
-    command: check-status.sh
+    command: echo "Checking status"
     output: STATUS
     repeatPolicy:
       repeat: until        # Repeat UNTIL status is ready
@@ -619,11 +619,11 @@ All steps without dependencies run in parallel:
 ```yaml
 steps:
   - name: task1
-    command: ./task1.sh
+    command: echo "Running task 1"
   - name: task2
-    command: ./task2.sh
+    command: echo "Running task 2"
   - name: task3
-    command: ./task3.sh
+    command: echo "Running task 3"
 ```
 
 ## Complete Example

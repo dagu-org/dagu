@@ -45,7 +45,7 @@ When set to `true`, the workflow continues when a step is skipped due to unmet p
 ```yaml
 steps:
   - name: conditional-task
-    command: ./process.sh
+    command: echo "Processing"
     preconditions:
       - condition: "${ENABLE_FEATURE}"
         expected: "true"
@@ -60,7 +60,7 @@ An array of specific exit codes that should not stop the workflow. This is usefu
 ```yaml
 steps:
   - name: check-service
-    command: ./health-check.sh
+    command: echo "Health check OK"
     continueOn:
       exitCode: [0, 1, 2]  # 0=healthy, 1=warning, 2=maintenance
 ```
@@ -72,7 +72,7 @@ An array of patterns to match against the command's stdout output. Supports both
 ```yaml
 steps:
   - name: validate-data
-    command: ./validate.sh
+    command: echo "Validating"
     continueOn:
       output:
         - "WARNING"                    # Literal string match (substring)
@@ -94,7 +94,7 @@ When set to `true`, the step is marked as successful if any of the continue cond
 ```yaml
 steps:
   - name: best-effort-optimization
-    command: ./optimize.sh
+    command: echo "Optimizing"
     continueOn:
       failure: true
       markSuccess: true  # Step shows as successful in UI/logs
@@ -109,12 +109,12 @@ For steps that are nice-to-have but not critical:
 ```yaml
 steps:
   - name: cache-warmup
-    command: ./warm-cache.sh
+    command: echo "Warming cache"
     continueOn:
       failure: true
       
   - name: main-process
-    command: ./process.sh
+    command: echo "Processing"
 ```
 
 ### Handling Known Exit Codes
@@ -129,7 +129,7 @@ steps:
       exitCode: [0, 1]  # 0=no changes, 1=changes exist
       
   - name: process-changes
-    command: ./handle-changes.sh
+    command: echo "Handling changes"
 ```
 
 ### Warning Detection
@@ -157,12 +157,12 @@ Build workflows that degrade gracefully:
 ```yaml
 steps:
   - name: try-optimal-method
-    command: ./process-optimal.sh
+    command: echo "Processing with optimal settings"
     continueOn:
       failure: true
       
   - name: fallback-method
-    command: ./process-fallback.sh
+    command: echo "Processing with fallback settings"
     preconditions:
       - condition: "${TRY_OPTIMAL_METHOD_EXIT_CODE}"
         expected: "re:[1-9][0-9]*"  # Only run if previous failed
@@ -184,7 +184,7 @@ steps:
       exitCode: [1]
       
   - name: handle-deployment-issue
-    command: ./fix-deployment.sh
+    command: echo "Fixing deployment"
 ```
 
 ## Interaction with Other Features
@@ -196,7 +196,7 @@ steps:
 ```yaml
 steps:
   - name: flaky-service
-    command: ./call-service.sh
+    command: echo "Calling service"
     retryPolicy:
       limit: 3
       intervalSec: 5
@@ -211,11 +211,11 @@ Steps that continue on failure still trigger `onFailure` handlers:
 ```yaml
 handlerOn:
   failure:
-    command: ./log-failure.sh
+    command: echo "Logging failure"
 
 steps:
   - name: optional-step
-    command: ./optional.sh
+    command: echo "Running optional task"
     continueOn:
       failure: true  # Continues, but failure handler still runs
 ```
@@ -254,7 +254,7 @@ steps:
 ```yaml
 steps:
   - name: run-migration
-    command: ./migrate.sh
+    command: echo "Running migration"
     continueOn:
       output:
         - "re:WARNING:.*already exists"
@@ -262,7 +262,7 @@ steps:
       exitCode: [0, 1]  # 1 might indicate warnings
       
   - name: verify-migration
-    command: ./verify-db.sh
+    command: echo "Verifying database"
 ```
 
 ### Multi-Cloud Deployment
@@ -270,17 +270,17 @@ steps:
 ```yaml
 steps:
   - name: deploy-aws
-    command: ./deploy.sh aws
+    command: echo "Deploying to AWS"
     continueOn:
       failure: true  # Continue even if AWS fails
       
   - name: deploy-gcp
-    command: ./deploy.sh gcp
+    command: echo "Deploying to GCP"
     continueOn:
       failure: true  # Continue even if GCP fails
       
   - name: verify-deployment
-    command: ./verify-any-cloud.sh
+    command: echo "Verifying cloud deployment"
     continueOn:
       failure: false  # At least one cloud must be working
 ```

@@ -31,7 +31,7 @@ steps:
     command: wget https://example.com/b.zip
     
   - name: merge
-    command: ./merge.sh a.zip b.zip
+    command: echo "Merging a.zip and b.zip"
     depends:
       - download-a
       - download-b
@@ -42,24 +42,24 @@ steps:
 ```yaml
 steps:
   - name: setup
-    command: ./setup.sh
+    command: echo "Setting up environment"
     
   - name: test-unit
-    command: ./test-unit.sh
+    command: echo "Running unit tests"
     depends: setup
     
   - name: test-integration
-    command: ./test-integration.sh
+    command: echo "Running integration tests"
     depends: setup
     
   - name: build
-    command: ./build.sh
+    command: echo "Building application"
     depends:
       - test-unit
       - test-integration
       
   - name: deploy
-    command: ./deploy.sh
+    command: echo "Deploying application"
     depends: build
 ```
 
@@ -72,7 +72,7 @@ Run steps only when conditions are met.
 ```yaml
 steps:
   - name: production-only
-    command: ./deploy-prod.sh
+    command: echo "Deploying to production"
     preconditions:
       - condition: "${ENVIRONMENT}"
         expected: "production"
@@ -83,7 +83,7 @@ steps:
 ```yaml
 steps:
   - name: check-branch
-    command: ./deploy.sh
+    command: echo "Deploying application"
     preconditions:
       - condition: "`git branch --show-current`"
         expected: "main"
@@ -94,7 +94,7 @@ steps:
 ```yaml
 steps:
   - name: weekday-only
-    command: ./batch-job.sh
+    command: echo "Running batch job"
     preconditions:
       - condition: "`date +%u`"
         expected: "re:[1-5]"  # Monday-Friday
@@ -112,7 +112,7 @@ All conditions must pass:
 ```yaml
 steps:
   - name: conditional-deploy
-    command: ./deploy.sh
+    command: echo "Deploying application"
     preconditions:
       - condition: "${ENVIRONMENT}"
         expected: "production"
@@ -127,7 +127,7 @@ steps:
 ```yaml
 steps:
   - name: process-if-exists
-    command: ./process.sh
+    command: echo "Processing"
     preconditions:
       - condition: "test -f /data/input.csv"
       - condition: "test -d /output"
@@ -266,7 +266,7 @@ The old boolean format is still supported but deprecated:
 ```yaml
 steps:
   - name: old-style
-    command: ./check.sh
+    command: echo "Checking status"
     repeatPolicy:
       repeat: true       # Deprecated: use 'while' or 'until' instead
       intervalSec: 60
@@ -281,12 +281,12 @@ Control workflow behavior when steps fail or produce specific outputs.
 ```yaml
 steps:
   - name: optional-cleanup
-    command: ./cleanup.sh
+    command: echo "Cleaning up"
     continueOn:
       failure: true
       
   - name: main-process
-    command: ./process.sh
+    command: echo "Processing"
 ```
 
 ### Continue on Specific Exit Codes
@@ -294,12 +294,12 @@ steps:
 ```yaml
 steps:
   - name: check-optional
-    command: ./check.sh
+    command: echo "Checking status"
     continueOn:
       exitCode: [0, 1, 2]  # Continue on these codes
       
   - name: process
-    command: ./process.sh
+    command: echo "Processing"
 ```
 
 ### Continue on Output Match
@@ -307,7 +307,7 @@ steps:
 ```yaml
 steps:
   - name: validate
-    command: ./validate.sh
+    command: echo "Validating"
     continueOn:
       output: 
         - "WARNING"
@@ -316,7 +316,7 @@ steps:
         - "re:error.*ignored"   # Regex: error...ignored pattern
       
   - name: process
-    command: ./process.sh
+    command: echo "Processing"
 ```
 
 ### Continue on Skipped
@@ -324,7 +324,7 @@ steps:
 ```yaml
 steps:
   - name: optional-feature
-    command: ./enable-feature.sh
+    command: echo "Enabling feature"
     preconditions:
       - condition: "${FEATURE_FLAG}"
         expected: "enabled"
@@ -332,7 +332,7 @@ steps:
       skipped: true  # Continue even if precondition fails
       
   - name: main-process
-    command: ./process.sh  # Runs regardless of optional feature
+    command: echo "Processing"  # Runs regardless of optional feature
 ```
 
 ### Mark as Success
@@ -340,7 +340,7 @@ steps:
 ```yaml
 steps:
   - name: best-effort
-    command: ./optional-task.sh
+    command: echo "Running optional task"
     continueOn:
       failure: true
       markSuccess: true  # Mark step as successful
@@ -354,7 +354,7 @@ Combine multiple conditions for sophisticated control flow:
 steps:
   # Tool with complex exit code meanings
   - name: analysis-tool
-    command: ./analyze.sh
+    command: echo "Analyzing data"
     continueOn:
       exitCode: [0, 3, 4, 5]  # Various non-error states
       output:
@@ -364,20 +364,20 @@ steps:
       
   # Graceful degradation pattern
   - name: try-advanced-method
-    command: ./process-advanced.sh
+    command: echo "Processing with advanced settings"
     continueOn:
       failure: true
       output: ["FALLBACK REQUIRED", "re:.*not available.*"]
       
   - name: fallback-method
-    command: ./process-simple.sh
+    command: echo "Processing with simple settings"
     preconditions:
       - condition: "${TRY_ADVANCED_METHOD_EXIT_CODE}"
         expected: "re:[1-9][0-9]*"
         
   # Skip pattern with continuation
   - name: optional-feature
-    command: ./feature.sh
+    command: echo "Running feature"
     preconditions:
       - condition: "${ENABLE_FEATURE}"
         expected: "true"
@@ -398,7 +398,7 @@ preconditions:
 
 steps:
   - name: process
-    command: ./daily-job.sh
+    command: echo "Running daily job"
 ```
 
 ### Skip If Already Successful
@@ -409,7 +409,7 @@ skipIfSuccessful: true  # Skip if already ran successfully today (e.g., run manu
 
 steps:
   - name: hourly-sync
-    command: ./sync.sh
+    command: echo "Syncing data"
 ```
 
 ## Advanced Patterns
@@ -422,19 +422,19 @@ params:
 
 steps:
   - name: build
-    command: ./build.sh
+    command: echo "Building application"
     preconditions:
       - condition: "${ACTION}"
         expected: "re:build|deploy"
         
   - name: test
-    command: ./test.sh
+    command: echo "Running tests"
     preconditions:
       - condition: "${ACTION}"
         expected: "re:test|deploy"
     
   - name: deploy
-    command: ./deploy.sh
+    command: echo "Deploying application"
     preconditions:
       - condition: "${ACTION}"
         expected: "deploy"

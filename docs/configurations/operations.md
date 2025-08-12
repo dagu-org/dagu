@@ -257,7 +257,7 @@ Per-step notification:
 ```yaml
 steps:
   - name: critical-task
-    command: ./process.sh
+    command: echo "Processing"
     mailOnError: true
 ```
 

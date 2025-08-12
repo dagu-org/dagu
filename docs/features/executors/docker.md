@@ -48,7 +48,7 @@ steps:
         exec:
           user: root
           workingDir: /app
-    command: ./maintenance.sh
+    command: echo "Running maintenance"
 ```
 
 ## Container Field Configuration

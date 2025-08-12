@@ -41,7 +41,7 @@ steps:
       
   # Custom backoff multiplier
   - name: gentle-backoff
-    command: ./check-service.sh
+    command: echo "Checking service health"
     retryPolicy:
       limit: 4
       intervalSec: 1
@@ -50,7 +50,7 @@ steps:
       
   # Backoff with max interval cap
   - name: capped-backoff
-    command: ./sync-data.sh
+    command: echo "Syncing data"
     retryPolicy:
       limit: 10
       intervalSec: 1
@@ -79,7 +79,7 @@ steps:
       
   # Continue on specific exit codes
   - name: check-status
-    command: check-status.sh
+    command: echo "Checking status"
     continueOn:
       exitCode: [0, 1, 2]  # 0=success, 1=warning, 2=info
       
@@ -107,7 +107,7 @@ steps:
 steps:
   # Database migration with known warnings
   - name: migrate-db
-    command: ./migrate.sh
+    command: echo "Running migration"
     continueOn:
       output:
         - "re:WARNING:.*already exists"

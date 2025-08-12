@@ -66,7 +66,7 @@ params:
 
 steps:
   - name: deploy
-    command: ./deploy.sh ${ENV} ${REGION}
+    command: echo "Deploying to ${ENV} in ${REGION}"
 ```
 
 Override at runtime:
@@ -100,11 +100,11 @@ steps:
     command: echo "Begin"
     
   - name: task1
-    command: ./heavy-task-1.sh
+    command: 'sh -c "echo Starting heavy task 1; sleep 2; echo Completed heavy task 1"'
     depends: start
     
   - name: task2
-    command: ./heavy-task-2.sh
+    command: 'sh -c "echo Starting heavy task 2; sleep 2; echo Completed heavy task 2"'
     depends: start
     
   - name: finish
@@ -150,7 +150,7 @@ Continue on failure:
 ```yaml
 steps:
   - name: optional-task
-    command: ./might-fail.sh
+    command: 'sh -c "if [ $((RANDOM % 2)) -eq 0 ]; then echo Success; else echo Failed && exit 1; fi"'
     continueOn:
       failure: true
 ```
@@ -252,7 +252,7 @@ steps:
         user: ubuntu
         host: server.example.com
         key: ~/.ssh/id_rsa
-    command: ./remote-script.sh
+    command: echo "Running remote script"
 ```
 
 See [SSH Executor](/features/executors/ssh) for more details.
@@ -315,7 +315,7 @@ handlerOn:
       echo "Workflow failed" | mail -s "Alert" admin@example.com
       
   cancel:
-    command: ./cleanup.sh
+    command: echo "Cleaning up resources"
     
   exit:
     command: echo "Always runs"

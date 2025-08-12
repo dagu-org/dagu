@@ -383,16 +383,6 @@ peer:
   clientCaFile: /etc/dagu/tls/ca.pem
 ```
 
-## Validation
-
-```bash
-# Check config syntax
-dagu validate --config ~/.config/dagu/config.yaml
-
-# Test with dry run
-dagu start-all --config ~/.config/dagu/config.yaml --dry-run
-```
-
 ## Default Values
 
 ### Key Defaults

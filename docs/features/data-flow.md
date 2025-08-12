@@ -161,7 +161,7 @@ params:
 steps:
   - name: process
     command: |
-      ./process.sh \
+      echo "Processing data" \
         --env=${ENVIRONMENT} \
         --batch=${BATCH_SIZE} \
         --dry-run=${DRY_RUN}
@@ -191,7 +191,7 @@ Reference step properties using the `id` field:
 steps:
   - name: risky-operation
     id: risky
-    command: ./might-fail.sh
+    command: 'sh -c "if [ $((RANDOM % 2)) -eq 0 ]; then echo Success; else echo Failed && exit 1; fi"'
     continueOn:
       failure: true
       

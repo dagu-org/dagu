@@ -126,7 +126,7 @@ steps:
 name: fork-join-analysis
 steps:
   - name: prepare
-    command: ./prepare-dataset.sh
+    command: echo "Preparing dataset"
     output: DATASET
     
   # Fork: Parallel analysis
@@ -200,7 +200,7 @@ params:
 
 steps:
   - name: deploy
-    command: ./deploy.sh --env=${ENVIRONMENT} --db=${DB_HOST}
+    command: echo "Deploying to ${ENVIRONMENT} with DB ${DB_HOST}"
 ```
 
 ### Enforcing Run ID Format
@@ -215,7 +215,7 @@ runConfig:
 
 steps:
   - name: audit
-    command: ./audit.sh --run-id=${DAG_RUN_ID}
+    command: echo "Auditing run ${DAG_RUN_ID}"
 ```
 
 ### Use Cases
@@ -236,16 +236,16 @@ maxActiveSteps: 1       # Max 1 steps running concurrently
 
 steps:
   - name: cpu-intensive
-    command: ./heavy-computation.sh
+    command: 'sh -c "echo Starting heavy computation; sleep 3; echo Completed"'
       
   - name: memory-intensive
-    command: ./process-large-data.sh
+    command: echo "Processing large dataset"
       
   - name: io-intensive
     parallel:
       items: ${FILE_LIST}
       maxConcurrent: 3  # Limit parallel I/O
-    command: ./process-file.sh ${ITEM}
+    command: echo "Processing file ${ITEM}"
 ```
 
 ### Queue-Based Resource Management
@@ -257,7 +257,7 @@ maxActiveRuns: 2        # Queue allows 2 concurrent
 
 steps:
   - name: resource-heavy
-    command: ./intensive-task.sh
+    command: 'sh -c "echo Starting intensive task; sleep 2; echo Done"'
     
   - name: light-task
     command: echo "Quick task"

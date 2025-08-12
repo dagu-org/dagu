@@ -225,7 +225,7 @@ Prevent steps from running forever:
 ```yaml
 steps:
   - name: long-task
-    command: ./process.sh
+    command: echo "Processing data"
     timeoutSec: 300  # 5 minutes
 ```
 

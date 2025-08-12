@@ -121,7 +121,7 @@ steps:
       config:
         image: ghcr.io/myorg/private-app:latest
         autoRemove: true
-    command: ./run.sh
+    command: echo "Running"
 ```
 
 Authentication can also be configured via `DOCKER_AUTH_CONFIG` environment variable.
@@ -232,7 +232,7 @@ steps:
           workingDir: /app
           env:
             - DEBUG=true
-    command: ./debug.sh
+    command: echo "Debug mode"
 ```
 
 ### Complete Docker Example
@@ -307,7 +307,7 @@ steps:
     command: |
       export APP_ENV=production
       cd /opt/app
-      ./deploy.sh
+      echo "Deploying"
 ```
 
 ### Multiple Commands
