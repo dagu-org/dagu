@@ -68,15 +68,33 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 		return nil, err
 	}
 
-	// Validate the spec
-	dag, err := a.dagRunMgr.LoadYAML(ctx, []byte(spec), digraph.WithName(request.FileName))
+	// Validate the spec - use WithAllowBuildErrors to return DAG even with errors
+	dag, err := a.dagRunMgr.LoadYAML(ctx, []byte(spec), 
+		digraph.WithName(request.FileName),
+		digraph.WithAllowBuildErrors())
 	var errs []string
 
 	var loadErrs digraph.ErrorList
 	if errors.As(err, &loadErrs) {
 		errs = loadErrs.ToStringList()
 	} else if err != nil {
+		// If we still get an error with AllowBuildErrors, something is seriously wrong
 		return nil, err
+	}
+	
+	// If dag is still nil (shouldn't happen with AllowBuildErrors), create a minimal DAG
+	if dag == nil {
+		dag = &digraph.DAG{
+			Name: request.FileName,
+		}
+		if err != nil {
+			errs = append(errs, err.Error())
+		}
+	} else if len(dag.BuildErrors) > 0 {
+		// Extract build errors from the DAG
+		for _, buildErr := range dag.BuildErrors {
+			errs = append(errs, buildErr.Error())
+		}
 	}
 
 	return &api.GetDAGSpec200JSONResponse{
@@ -161,17 +179,18 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 }
 
 func (a *API) GetDAGDAGRunHistory(ctx context.Context, request api.GetDAGDAGRunHistoryRequestObject) (api.GetDAGDAGRunHistoryResponseObject, error) {
+	// Try to get metadata, but if it fails (e.g., due to errors), use the fileName as the DAG name
 	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
+	var dagName string
 	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
-		}
+		// For DAGs with errors, we can still try to get history using the fileName as the name
+		dagName = request.FileName
+	} else {
+		dagName = dag.Name
 	}
 
 	defaultHistoryLimit := 30
-	recentHistory := a.dagRunMgr.ListRecentStatus(ctx, dag.Name, defaultHistoryLimit)
+	recentHistory := a.dagRunMgr.ListRecentStatus(ctx, dagName, defaultHistoryLimit)
 
 	var dagRuns []api.DAGRunDetails
 	for _, status := range recentHistory {
@@ -217,11 +236,20 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 		return strings.Compare(localDAGs[i].Name, localDAGs[j].Name) <= 0
 	})
 
+	// Extract build errors if any
+	var errs []string
+	if len(dag.BuildErrors) > 0 {
+		for _, buildErr := range dag.BuildErrors {
+			errs = append(errs, buildErr.Error())
+		}
+	}
+
 	return api.GetDAGDetails200JSONResponse{
 		Dag:          details,
 		LatestDAGRun: toDAGRunDetails(dagStatus),
 		Suspended:    a.dagStore.IsSuspended(ctx, fileName),
 		LocalDags:    localDAGs,
+		Errors:       errs,
 	}, nil
 }
 
@@ -347,12 +375,20 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		suspended := a.dagStore.IsSuspended(ctx, item.FileName())
 		dagRun := toDAGRunSummary(dagStatus)
 
+		// Include any build errors from the DAG
+		var dagErrors []string
+		if item.BuildErrors != nil {
+			for _, err := range item.BuildErrors {
+				dagErrors = append(dagErrors, err.Error())
+			}
+		}
+
 		dagFile := api.DAGFile{
 			FileName:     item.FileName(),
 			LatestDAGRun: dagRun,
 			Suspended:    suspended,
 			Dag:          toDAG(item),
-			Errors:       []string{},
+			Errors:       dagErrors,
 		}
 
 		dagFiles = append(dagFiles, dagFile)
@@ -382,12 +418,17 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 	dagFileName := request.FileName
 	dagRunId := request.DagRunId
 
+	// Try to get metadata first
 	dag, err := a.dagStore.GetMetadata(ctx, dagFileName)
 	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", dagFileName),
+		// For DAGs with errors, try to load with AllowBuildErrors
+		dag, err = a.dagStore.GetDetails(ctx, dagFileName, digraph.WithAllowBuildErrors())
+		if err != nil {
+			return nil, &Error{
+				HTTPStatus: http.StatusNotFound,
+				Code:       api.ErrorCodeNotFound,
+				Message:    fmt.Sprintf("DAG %s not found", dagFileName),
+			}
 		}
 	}
 

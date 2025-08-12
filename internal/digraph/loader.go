@@ -164,11 +164,25 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
+		if opts.AllowBuildErrors {
+			// Return a minimal DAG with the error recorded
+			return &DAG{
+				Name:        opts.Name,
+				BuildErrors: []error{err},
+			}, nil
+		}
 		return nil, ErrorList{err}
 	}
 
 	def, err := decode(raw)
 	if err != nil {
+		if opts.AllowBuildErrors {
+			// Return a minimal DAG with the error recorded
+			return &DAG{
+				Name:        opts.Name,
+				BuildErrors: []error{err},
+			}, nil
+		}
 		return nil, ErrorList{err}
 	}
 
@@ -229,6 +243,15 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*DAG, error) {
 	// Load all DAGs from the file
 	dags, err := loadDAGsFromFile(ctx, filePath, baseDef)
 	if err != nil {
+		if ctx.opts.AllowBuildErrors {
+			// Return a minimal DAG with the error recorded
+			dag := &DAG{
+				Name:        defaultName(filePath),
+				Location:    filePath,
+				BuildErrors: []error{err},
+			}
+			return dag, nil
+		}
 		return nil, err
 	}
 

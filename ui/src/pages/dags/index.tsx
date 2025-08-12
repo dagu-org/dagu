@@ -79,10 +79,9 @@ function DAGs() {
     let errorCount = 0;
     if (data && data.dags) {
       for (const val of data.dags) {
-        if (!val.errors?.length) {
-          dagFiles.push(val);
-        } else {
-          errorCount += 1;
+        dagFiles.push(val); // Always add the DAG to the list
+        if (val.errors?.length) {
+          errorCount += 1; // Count DAGs with errors
         }
       }
     }

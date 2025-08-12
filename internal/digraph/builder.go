@@ -153,7 +153,6 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		if ctx.opts.AllowBuildErrors {
 			// If we are allowing build errors, return the DAG with the errors.
 			dag.BuildErrors = errs
-			dag.Steps = nil // Clear steps if there are build errors
 		} else {
 			// If we are not allowing build errors, return an error.
 			return nil, fmt.Errorf("failed to build DAG: %w", errs)
@@ -926,6 +925,15 @@ func validateSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	// Third pass: resolve step IDs to names in depends fields
 	if err := resolveStepDependencies(dag); err != nil {
 		return err
+	}
+
+	// Fourth pass: validate dependencies exist
+	for _, step := range dag.Steps {
+		for _, dep := range step.Depends {
+			if _, exists := stepNames[dep]; !exists {
+				return wrapError("depends", dep, fmt.Errorf("step %s depends on non-existent step %s", step.Name, dep))
+			}
+		}
 	}
 
 	return nil
