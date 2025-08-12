@@ -846,3 +846,53 @@ steps:
 		assert.Equal(t, expected, result.Items[i].Name)
 	}
 }
+
+func TestListIncludesDAGsWithErrors(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := New(tmpDir)
+	ctx := context.Background()
+
+	// Create a valid DAG
+	validDAG := `
+steps:
+  - name: step1
+    command: echo hello
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "valid.yaml"), []byte(validDAG), 0644)
+	require.NoError(t, err)
+
+	// Create a DAG with errors (references non-existent step)
+	errorDAG := `
+nonexistent: error-dag
+steps:
+  - name: step1
+    command: echo hello
+`
+	err = os.WriteFile(filepath.Join(tmpDir, "error.yaml"), []byte(errorDAG), 0644)
+	require.NoError(t, err)
+
+	// List all DAGs
+	result, errList, err := store.List(ctx, models.ListDAGsOptions{})
+	require.NoError(t, err)
+
+	// Should include both DAGs
+	assert.Equal(t, 2, len(result.Items))
+
+	// Check that both DAGs are present
+	dagNames := make(map[string]bool)
+	hasErrors := false
+	for _, dag := range result.Items {
+		t.Logf("Found DAG: %s, BuildErrors: %v", dag.Name, dag.BuildErrors)
+		dagNames[dag.Name] = true
+		if len(dag.BuildErrors) > 0 {
+			hasErrors = true
+		}
+	}
+
+	assert.True(t, dagNames["valid"], "valid should be in the list")
+	assert.True(t, dagNames["error"], "error should be in the list")
+	assert.True(t, hasErrors, "At least one DAG should have build errors")
+
+	// Error list might contain warnings but should not fail
+	t.Logf("Error list: %v", errList)
+}

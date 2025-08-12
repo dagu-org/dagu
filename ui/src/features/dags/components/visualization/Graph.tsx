@@ -115,7 +115,7 @@ const Graph: React.FC<Props> = ({
   };
 
   const graph = React.useMemo(() => {
-    if (!steps) return '';
+    if (!steps || steps.length === 0) return '';
 
     const dat: string[] = [];
     dat.push(`flowchart ${flowchart};`);

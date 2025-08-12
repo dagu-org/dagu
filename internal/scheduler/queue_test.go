@@ -9,7 +9,6 @@ import (
 )
 
 func TestScheduler_QueueMethods(t *testing.T) {
-	t.Skip("Skipping test - getQueueConfig method not implemented yet")
 	t.Parallel()
 
 	t.Run("getQueueConfigByName_GlobalConfigExists", func(t *testing.T) {

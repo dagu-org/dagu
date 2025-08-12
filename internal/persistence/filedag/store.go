@@ -241,8 +241,11 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 		}
 
 		// Read the file and parse the DAG.
-		dag, err := store.GetMetadata(ctx, dagName)
+		// Use WithAllowBuildErrors to include DAGs with errors in the list
+		filePath := filepath.Join(store.baseDir, entry.Name())
+		dag, err := digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval(), digraph.WithAllowBuildErrors())
 		if err != nil {
+			// If it completely fails to load, skip it
 			errList = append(errList, fmt.Sprintf("reading %s failed: %s", dagName, err))
 			continue
 		}

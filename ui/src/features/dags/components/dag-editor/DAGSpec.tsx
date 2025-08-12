@@ -141,25 +141,62 @@ function DAGSpec({ fileName }: Props) {
     errors?: string[]
   ) => (
     <div className="space-y-6">
+      {errors?.length ? (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+          <div className="border-b border-slate-100 dark:border-slate-800 bg-red-50 dark:bg-red-900/10 px-6 py-4">
+            <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Configuration Errors
+            </h2>
+          </div>
+          <div className="p-6">
+            <div className="space-y-3">
+              {errors.map((e, i) => (
+                <div
+                  key={i}
+                  className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-red-600 dark:text-red-400 font-mono text-sm break-words"
+                >
+                  {e}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
         <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             Graph
           </h2>
-          <FlowchartSwitch
-            value={cookie['flowchart']}
-            onChange={onChangeFlowchart}
-          />
+          {!errors?.length && (
+            <FlowchartSwitch
+              value={cookie['flowchart']}
+              onChange={onChangeFlowchart}
+            />
+          )}
         </div>
         <div className="p-6">
-          <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
-            <Graph
-              steps={dag.steps}
-              type="config"
-              flowchart={flowchart}
-              showIcons={false}
-            />
-          </BorderedBox>
+          {errors?.length || !dag.steps || dag.steps.length === 0 ? (
+            <div className="py-8 px-4 text-center">
+              <AlertTriangle className="h-12 w-12 text-yellow-500 dark:text-yellow-400 mx-auto mb-4" />
+              <p className="text-slate-600 dark:text-slate-400 mb-2">
+                Cannot render graph due to configuration errors
+              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-500">
+                Please fix the errors above and save the configuration to view the graph
+              </p>
+            </div>
+          ) : (
+            <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
+              <Graph
+                steps={dag.steps}
+                type="config"
+                flowchart={flowchart}
+                showIcons={false}
+              />
+            </BorderedBox>
+          )}
         </div>
       </div>
 
@@ -173,29 +210,6 @@ function DAGSpec({ fileName }: Props) {
           <DAGAttributes dag={dag} />
         </div>
       </div>
-
-      {errors?.length ? (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-l-4 border-red-500 dark:border-red-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-          <div className="border-b border-slate-100 dark:border-slate-800 bg-red-50 dark:bg-red-900/10 px-6 py-4">
-            <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Configuration Errors
-            </h2>
-          </div>
-          <div className="p-6">
-            <div className="space-y-3">
-              {errors.map((e, i) => (
-                <div
-                  key={i}
-                  className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-red-600 dark:text-red-400 font-mono text-sm"
-                >
-                  {e}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {dag.steps ? (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
@@ -270,7 +284,7 @@ function DAGSpec({ fileName }: Props) {
                         {localDag.dag ? (
                           renderDAGContent(localDag.dag, localDag.errors)
                         ) : (
-                          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-l-4 border-red-500 dark:border-red-700 shadow-sm p-6">
+                          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
                             <div className="text-red-600 dark:text-red-400">
                               <AlertTriangle className="h-5 w-5 inline mr-2" />
                               Failed to load local DAG: {localDag.name}

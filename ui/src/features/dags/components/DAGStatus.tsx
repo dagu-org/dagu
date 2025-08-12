@@ -215,20 +215,22 @@ function DAGStatus({ dagRun, fileName }: Props) {
   return (
     <div className="space-y-6">
       {/* DAG Visualization Card */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-        <div className="border-b border-border bg-muted/30 px-6 py-4">
-          <h2 className="text-lg font-semibold text-foreground">
-            Graph
-          </h2>
+      {dagRun.nodes && dagRun.nodes.length > 0 && (
+        <div className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+          <div className="border-b border-border bg-muted/30 px-6 py-4">
+            <h2 className="text-lg font-semibold text-foreground">
+              Graph
+            </h2>
+          </div>
+          <div className="p-6">
+            <DAGGraph
+              dagRun={dagRun}
+              onSelectStep={onSelectStepOnGraph}
+              onRightClickStep={onRightClickStepOnGraph}
+            />
+          </div>
         </div>
-        <div className="p-6">
-          <DAGGraph
-            dagRun={dagRun}
-            onSelectStep={onSelectStepOnGraph}
-            onRightClickStep={onRightClickStepOnGraph}
-          />
-        </div>
-      </div>
+      )}
 
       <DAGContext.Consumer>
         {(props) => (
