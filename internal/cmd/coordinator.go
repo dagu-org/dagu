@@ -141,7 +141,7 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry models.Ser
 	handler := coordinator.NewHandler()
 
 	// Create and return service
-	return coordinator.NewService(grpcServer, handler, listener, healthServer, registry, instanceID), nil
+	return coordinator.NewService(grpcServer, handler, listener, healthServer, registry, instanceID, cfg.Coordinator.Host), nil
 }
 
 // loadCoordinatorTLSCredentials loads TLS credentials for the coordinator server.

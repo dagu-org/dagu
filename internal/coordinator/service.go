@@ -16,13 +16,14 @@ import (
 )
 
 type Service struct {
-	server       *grpc.Server
-	handler      *Handler
-	grpcListener net.Listener
-	healthServer *health.Server
-	registry     models.ServiceRegistry
-	instanceID   string
-	hostPort     string
+	server        *grpc.Server
+	handler       *Handler
+	grpcListener  net.Listener
+	healthServer  *health.Server
+	registry      models.ServiceRegistry
+	instanceID    string
+	hostPort      string
+	configuredHost string
 }
 
 func NewService(
@@ -32,15 +33,17 @@ func NewService(
 	healthServer *health.Server,
 	registry models.ServiceRegistry,
 	instanceID string,
+	configuredHost string,
 ) *Service {
 	return &Service{
-		server:       server,
-		handler:      handler,
-		grpcListener: grpcListener,
-		healthServer: healthServer,
-		registry:     registry,
-		instanceID:   instanceID,
-		hostPort:     grpcListener.Addr().String(),
+		server:        server,
+		handler:       handler,
+		grpcListener:  grpcListener,
+		healthServer:  healthServer,
+		registry:      registry,
+		instanceID:    instanceID,
+		hostPort:      grpcListener.Addr().String(),
+		configuredHost: configuredHost,
 	}
 }
 
@@ -54,8 +57,8 @@ func (srv *Service) Start(ctx context.Context) error {
 
 	// Register with service registry if monitor is available
 	if srv.registry != nil {
-		// Parse host and port from hostPort
-		host, portStr, err := net.SplitHostPort(srv.hostPort)
+		// Parse port from listener address
+		_, portStr, err := net.SplitHostPort(srv.hostPort)
 		if err != nil {
 			return fmt.Errorf("failed to parse host:port: %w", err)
 		}
@@ -66,7 +69,7 @@ func (srv *Service) Start(ctx context.Context) error {
 
 		hostInfo := models.HostInfo{
 			ID:     srv.instanceID,
-			Host:   host,
+			Host:   srv.configuredHost,
 			Port:   port,
 			Status: models.ServiceStatusActive, // Coordinator is active when serving
 		}
@@ -75,6 +78,8 @@ func (srv *Service) Start(ctx context.Context) error {
 		}
 		logger.Info(ctx, "Registered with service registry",
 			"instance_id", srv.instanceID,
+			"configured_host", srv.configuredHost,
+			"port", port,
 			"address", srv.hostPort)
 	}
 
