@@ -17,7 +17,7 @@
   </p>
 </div>
 
-# Overview - Workflow Engine for Small Teams
+## Overview
 
 Dagu */dah-goo/* is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
 
@@ -38,13 +38,29 @@ Note: For a list of features, please refer to the [documentation](https://docs.d
 Workflow jobs are defined as commands. Therefore, legacy scripts that have been in operation for a long time within a company or organization can be used as-is without modification. There is no need to learn a complex new language, and you can start using it right away.
 
 Dagu is designed for enterprise & small teams to easily manage complex workflows. It aims to be an ideal choice for teams that find large-scale, high-cost infrastructure like Airflow to be overkill and are looking for a simpler solution. It requires no database management and only needs a shared filesystem, allowing you to focus on your high-value work.
-index.md
 
-## CLI
+### CLI Preview
 ![Demo CLI](./assets/images/demo-cli.webp)
 
-## Web UI
+### Web UI Preview
 ![Demo Web UI](./assets/images/demo-web-ui.webp)
+
+## Table of Contents
+
+- Quick Start
+  - [Quick Start](#quick-start)
+  - [Docker-Compose](#docker-compose)
+- Documentation
+  - [Documentation](#documentation)
+  - [Environment Variables](#environment-variables)
+  - [Architecture](#architecture)
+  - [Roadmap](#roadmap)
+- Development & Contributing
+  - [Development](#development)
+  - [Discussion](#discussion)
+  - [Contributing](#contributing)
+  - [Acknowledgements](#acknowledgements)
+- [License](#license)
 
 ## Quick Start
 
@@ -315,6 +331,152 @@ pnpm dev
 ```
 
 Navigate to http://localhost:8081 to view the frontend.
+
+## Architecture
+
+### How Dagu Works
+
+```mermaid
+graph LR
+    subgraph "You Write"
+        YAML[YAML<br/>Workflow]
+    end
+    
+    subgraph "Dagu Processes"
+        Parse[Parse]
+        Schedule[Schedule]
+        Execute[Execute]
+        Store[Store]
+    end
+    
+    subgraph "Your Code Runs"
+        Tasks[Scripts<br/>Commands<br/>Containers]
+    end
+    
+    YAML --> Parse
+    Parse --> Schedule
+    Schedule --> Execute
+    Execute --> Tasks
+    Tasks --> Store
+```
+
+### System Components
+
+```mermaid
+graph TB
+    subgraph "User Interface"
+        CLI[Command Line]
+        Web[Web Dashboard]
+        API[REST API]
+    end
+    
+    subgraph "Core Engine"
+        Server[Server]
+        Agent[Agent<br/>Runs workflows]
+        Scheduler[Scheduler<br/>Handles cron]
+        DAG[DAG Engine<br/>Process workflows]
+    end
+    
+    subgraph "Storage"
+        Files[File System<br/>No database needed]
+    end
+    
+    CLI --> Server
+    Web --> Server
+    API --> Server
+    
+    Server --> Agent
+    Server --> Scheduler
+    Scheduler --> Agent
+    Agent --> DAG
+    
+    Agent --> Files
+    DAG --> Files
+```
+
+### Workflow Journey
+
+```mermaid
+sequenceDiagram
+    participant You
+    participant Dagu
+    participant YourCode as Your Code
+    
+    You->>Dagu: Write workflow (YAML)
+    You->>Dagu: Run workflow
+    Dagu->>Dagu: Parse and validate
+    Dagu->>Dagu: Build execution plan
+    
+    loop Each step
+        Dagu->>YourCode: Run task
+        YourCode-->>Dagu: Return output
+        Dagu->>Dagu: Save progress
+    end
+    
+    Dagu-->>You: Show results
+    You->>Dagu: View logs and status
+```
+
+### Scaling Options
+
+```mermaid
+graph LR
+    subgraph "Single Machine"
+        Single[One Dagu<br/>Does everything]
+    end
+    
+    subgraph "Multiple Machines"
+        Coord[Coordinator]
+        W1[Worker 1]
+        W2[Worker 2]
+        WN[Worker N]
+        
+        Coord --> W1
+        Coord --> W2
+        Coord --> WN
+    end
+    
+    Single -."Scale when needed".-> Coord
+```
+
+### Storage Structure
+
+```mermaid
+graph TD
+    subgraph "Everything is Files"
+        Home[~/.dagu]
+        
+        Home --> Dags[dags/<br/>Your workflows]
+        Home --> Logs[logs/<br/>Execution logs]
+        Home --> Data[data/<br/>Runtime data]
+        
+        Data --> History[History]
+        Data --> State[Current state]
+        Data --> Queue[Task queue]
+    end
+```
+
+### Architecture Benefits
+
+| Feature | Why It Matters |
+|---------|----------------|
+| Single Binary | Download and run - no complex setup |
+| No Database | Simple files - easy backup and version control |
+| Run Anything | Bash, Python, Docker, SSH - your choice |
+| Works Offline | No cloud dependency |
+| Scales Simply | Start small, add workers when needed |
+| Full Visibility | Built-in logs, metrics, and monitoring |
+
+### Component Roles
+
+| Component | What It Does |
+|-----------|-------------|
+| CLI | Run commands from terminal |
+| Web UI | Visual dashboard and control |
+| Agent | Orchestrates workflow execution |
+| Scheduler | Handles cron and timing |
+| DAG Engine | Processes workflow logic |
+| File Storage | Keeps everything organized |
 
 ## Roadmap
 
