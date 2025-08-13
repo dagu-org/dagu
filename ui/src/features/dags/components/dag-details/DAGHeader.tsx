@@ -1,6 +1,6 @@
-import { Calendar, Terminal, Timer } from 'lucide-react';
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Calendar, Terminal, Timer, RefreshCw } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
@@ -25,7 +25,9 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   navigateToStatusTab,
 }) => {
   const navigate = useNavigate();
+  const params = useParams<{ tab?: string }>();
   const rootDAGRunContext = React.useContext(RootDAGRunContext);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   // Use the DAG-run from context if available, otherwise use the prop
   const dagRunToDisplay = rootDAGRunContext.data || currentDAGRun;
@@ -43,6 +45,44 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
       `/dags/${fileName}?childDAGRunId=${dagRunToDisplay.parentDAGRunId}&dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`
     );
   };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    refreshFn();
+    setTimeout(() => setIsRefreshing(false), 600);
+  };
+
+  // Add keyboard shortcut for refresh
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Get current tab (default to 'status' if not set)
+      const currentTab = params.tab || 'status';
+      
+      // Only trigger on status tab and when not typing
+      if (currentTab !== 'status') return;
+      
+      // Check if user is typing in an input field
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.contentEditable === 'true' ||
+        target.closest('.monaco-editor') ||
+        target.closest('[role="textbox"]')
+      ) {
+        return;
+      }
+      
+      // Check for 'r' key without modifiers
+      if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        handleRefresh();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [params.tab, handleRefresh]);
 
   return (
     <div className="bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 rounded-2xl p-6 mb-6 border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -110,14 +150,26 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
       {dagRunToDisplay.status !== undefined &&
         dagRunToDisplay.status !== null && (
           <div className="flex flex-wrap items-center gap-4 text-sm">
-            {/* Status */}
-            {dagRunToDisplay.status !== undefined && (
-              <div className="flex items-center gap-2">
+            {/* Status and Refresh */}
+            <div className="flex items-center gap-2">
+              {dagRunToDisplay.status !== undefined && (
                 <StatusChip status={dagRunToDisplay.status} size="md">
                   {dagRunToDisplay.statusLabel || ''}
                 </StatusChip>
-              </div>
-            )}
+              )}
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="relative group inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                title="Refresh (R)"
+              >
+                <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+                <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                  R
+                </span>
+              </button>
+            </div>
 
             {/* Metadata items */}
             <div className="flex flex-wrap items-center gap-4 lg:gap-6 text-sm">
