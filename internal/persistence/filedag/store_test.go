@@ -21,7 +21,7 @@ func TestStore(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	dr := New(tmpDir)
+	dr := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	require.False(t, dr.IsSuspended(ctx, "test"))
@@ -38,7 +38,7 @@ func TestListDAGsInSubdirectories(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Create DAG files in different directory levels
@@ -93,7 +93,7 @@ func TestGetMetadata(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Test successful metadata retrieval
@@ -123,7 +123,7 @@ func TestGetDetails(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Test successful details retrieval
@@ -154,7 +154,7 @@ func TestGetSpec(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Test successful spec retrieval
@@ -181,7 +181,7 @@ func TestCreate(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Test successful creation
@@ -213,7 +213,7 @@ func TestUpdateSpec(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Create initial DAG
@@ -254,7 +254,7 @@ func TestDelete(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Create DAG to delete
@@ -287,7 +287,7 @@ func TestRename(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Create DAG to rename
@@ -334,7 +334,7 @@ func TestGrep(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Create DAGs with different content
@@ -395,7 +395,7 @@ func TestTagList(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Create DAGs with different tags
@@ -445,7 +445,7 @@ func TestLoadSpec(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Test valid spec
@@ -470,7 +470,7 @@ func TestListWithPagination(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Create multiple DAGs
@@ -502,7 +502,7 @@ func TestListAlphabeticalSorting(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Create DAGs in non-alphabetical order
@@ -555,7 +555,7 @@ func TestListWithFiltering(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Create DAGs with different names and tags
@@ -606,7 +606,7 @@ func TestListWithSortAndOrder(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Create DAGs with different names
@@ -734,7 +734,7 @@ func TestListWithSortingAndPagination(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Create multiple DAGs for pagination testing
@@ -849,7 +849,7 @@ steps:
 
 func TestListIncludesDAGsWithErrors(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := New(tmpDir)
+	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
 	// Create a valid DAG

@@ -58,7 +58,7 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 	helper.Config.Scheduler.LockRetryInterval = 50 * time.Millisecond
 
 	// Create additional stores needed for scheduler
-	ds := filedag.New(helper.Config.Paths.DAGsDir, filedag.WithFlagsBaseDir(helper.Config.Paths.SuspendFlagsDir))
+	ds := filedag.New(helper.Config.Paths.DAGsDir, filedag.WithFlagsBaseDir(helper.Config.Paths.SuspendFlagsDir), filedag.WithSkipExamples(true))
 	drs := filedagrun.New(helper.Config.Paths.DAGRunsDir)
 	ps := fileproc.New(helper.Config.Paths.ProcDir)
 	qs := filequeue.New(helper.Config.Paths.QueueDir)

@@ -239,12 +239,22 @@ func (c *Context) dagStore(cache *fileutil.Cache[*digraph.DAG], searchPaths []st
 	}
 
 	// Create a flag store based on the suspend flags directory.
-	return filedag.New(
+	store := filedag.New(
 		c.Config.Paths.DAGsDir,
 		filedag.WithFlagsBaseDir(c.Config.Paths.SuspendFlagsDir),
 		filedag.WithSearchPaths(searchPaths),
 		filedag.WithFileCache(cache),
-	), nil
+		filedag.WithSkipExamples(c.Config.Global.SkipExamples),
+	)
+
+	// Initialize the store (creates example DAGs if needed)
+	if s, ok := store.(*filedag.Storage); ok {
+		if err := s.Initialize(); err != nil {
+			return nil, fmt.Errorf("failed to initialize DAG store: %w", err)
+		}
+	}
+
+	return store, nil
 }
 
 // OpenLogFile creates and opens a log file for a given dag-run.

@@ -109,7 +109,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		cfg.Coordinator.Port = options.CoordinatorPort
 	}
 
-	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir))
+	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir), filedag.WithSkipExamples(true))
 	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
 	procStore := fileproc.New(cfg.Paths.ProcDir)
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
