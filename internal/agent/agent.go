@@ -309,6 +309,14 @@ func (a *Agent) Run(ctx context.Context) error {
 	if err := attempt.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open execution history: %w", err)
 	}
+
+	// Update the status to running
+	st := a.Status(ctx)
+	st.Status = status.Running
+	if err := attempt.Write(ctx, st); err != nil {
+		logger.Error(ctx, "Status write failed", "err", err)
+	}
+
 	defer func() {
 		if initErr != nil {
 			logger.Error(ctx, "Failed to initialize DAG execution", "err", err)
