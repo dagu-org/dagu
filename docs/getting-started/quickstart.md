@@ -28,6 +28,18 @@ See [Installation Guide](/getting-started/installation) for more options.
 
 ## Your First Workflow
 
+::: info Example DAGs
+When you first start Dagu with an empty DAGs directory, it automatically creates several example workflows to help you get started:
+- `example-01-basic-sequential.yaml` - Basic sequential execution
+- `example-02-parallel-execution.yaml` - Parallel task execution
+- `example-03-complex-dependencies.yaml` - Complex dependency graphs
+- `example-04-scheduling.yaml` - Scheduled workflows
+- `example-05-nested-workflows.yaml` - Nested sub-workflows
+- `example-06-container-workflow.yaml` - Container-based workflows
+
+To skip creating these examples, set `DAGU_SKIP_EXAMPLES=true` or add `skipExamples: true` to your config file.
+:::
+
 ### 1. Create a workflow
 
 ::: code-group
