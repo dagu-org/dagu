@@ -14,7 +14,7 @@ import (
 
 func TestQueueReader(t *testing.T) {
 	th := test.Setup(t)
-	ctx, cancel := context.WithTimeout(th.Context, 3*time.Second) // Allow for processing delay
+	ctx, cancel := context.WithTimeout(th.Context, 5*time.Second) // Allow for processing delay
 	defer cancel()
 
 	// Create a new store
@@ -45,7 +45,7 @@ func TestQueueReader(t *testing.T) {
 
 	// Wait for items to be received
 	receivedItems := make([]models.QueuedItem, 0, 2)
-	timeout := time.After(3 * time.Second) // Account for processingDelay between items
+	timeout := time.After(5 * time.Second) // Account for processingDelay between items
 
 	for i := 0; i < 2; i++ {
 		select {
@@ -181,7 +181,7 @@ func TestQueueReaderContextCancellation(t *testing.T) {
 
 func TestQueueReaderRetryDelay(t *testing.T) {
 	th := test.Setup(t)
-	ctx, cancel := context.WithTimeout(th.Context, 3*time.Second)
+	ctx, cancel := context.WithTimeout(th.Context, 5*time.Second)
 	defer cancel()
 
 	// Create a new store
@@ -209,7 +209,7 @@ func TestQueueReaderRetryDelay(t *testing.T) {
 	select {
 	case item := <-ch:
 		item.Result <- models.QueuedItemProcessingResultRetry
-	case <-time.After(1 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for first item")
 	}
 
@@ -225,7 +225,7 @@ func TestQueueReaderRetryDelay(t *testing.T) {
 	select {
 	case item := <-ch:
 		item.Result <- models.QueuedItemProcessingResultSuccess
-	case <-time.After(2500 * time.Millisecond):
+	case <-time.After(3 * time.Second):
 		t.Fatal("timeout waiting for retry")
 	}
 
@@ -235,7 +235,7 @@ func TestQueueReaderRetryDelay(t *testing.T) {
 
 func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 	th := test.Setup(t)
-	ctx, cancel := context.WithTimeout(th.Context, 3*time.Second)
+	ctx, cancel := context.WithTimeout(th.Context, 5*time.Second)
 	defer cancel()
 
 	// Create a new store
@@ -276,7 +276,7 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 		case item := <-ch:
 			seenQueues[item.Data().Name] = true
 			item.Result <- models.QueuedItemProcessingResultRetry
-		case <-time.After(1 * time.Second):
+		case <-time.After(2 * time.Second):
 			t.Fatal("timeout waiting for item")
 		}
 	}

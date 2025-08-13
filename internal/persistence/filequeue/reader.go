@@ -45,8 +45,8 @@ const (
 
 const (
 	// Longer intervals since we use file events as primary notification
-	reloadInterval    = 30 * time.Second      // Backup polling interval
-	processingDelay   = 10 * time.Millisecond // Small delay to prevent busy loop
+	reloadInterval    = 10 * time.Second // Backup polling interval
+	processingDelay   = 1 * time.Second  // Small delay to prevent busy loop
 	shutdownTimeout   = 5 * time.Second
 	pollingInterval   = 2 * time.Second // For filenotify poller fallback
 	processingTimeout = 8 * time.Second
@@ -372,14 +372,14 @@ func (q *queueReaderImpl) IsRunning() bool {
 
 // setupWatcher sets up the file watcher for the base directory and existing subdirectories
 func (q *queueReaderImpl) setupWatcher(ctx context.Context, watcher filenotify.FileWatcher, baseDir string) error {
-	// Watch the base directory for new queue files and subdirectories
-	if err := watcher.Add(baseDir); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to watch base directory %s: %w", baseDir, err)
-	}
-
 	// Create base directory if it doesn't exist
 	if err := os.MkdirAll(baseDir, 0750); err != nil {
 		return fmt.Errorf("failed to create base directory %s: %w", baseDir, err)
+	}
+
+	// Watch the base directory for new queue files and subdirectories
+	if err := watcher.Add(baseDir); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to watch base directory %s: %w", baseDir, err)
 	}
 
 	// Watch existing
