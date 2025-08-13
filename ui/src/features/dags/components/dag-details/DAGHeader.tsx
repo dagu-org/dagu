@@ -1,4 +1,4 @@
-import { Calendar, Terminal, Timer } from 'lucide-react';
+import { Calendar, Terminal, Timer, RefreshCw } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
@@ -26,6 +26,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 }) => {
   const navigate = useNavigate();
   const rootDAGRunContext = React.useContext(RootDAGRunContext);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   // Use the DAG-run from context if available, otherwise use the prop
   const dagRunToDisplay = rootDAGRunContext.data || currentDAGRun;
@@ -42,6 +43,12 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
     navigate(
       `/dags/${fileName}?childDAGRunId=${dagRunToDisplay.parentDAGRunId}&dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`
     );
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    refreshFn();
+    setTimeout(() => setIsRefreshing(false), 600);
   };
 
   return (
@@ -110,14 +117,22 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
       {dagRunToDisplay.status !== undefined &&
         dagRunToDisplay.status !== null && (
           <div className="flex flex-wrap items-center gap-4 text-sm">
-            {/* Status */}
-            {dagRunToDisplay.status !== undefined && (
-              <div className="flex items-center gap-2">
+            {/* Status and Refresh */}
+            <div className="flex items-center gap-2">
+              {dagRunToDisplay.status !== undefined && (
                 <StatusChip status={dagRunToDisplay.status} size="md">
                   {dagRunToDisplay.statusLabel || ''}
                 </StatusChip>
-              </div>
-            )}
+              )}
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
 
             {/* Metadata items */}
             <div className="flex flex-wrap items-center gap-4 lg:gap-6 text-sm">

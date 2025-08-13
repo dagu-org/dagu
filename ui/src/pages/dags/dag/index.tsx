@@ -73,7 +73,7 @@ function DAGDetails() {
   );
 
   // Fetch DAG details
-  const { data: dagData } = useQuery(
+  const { data: dagData, mutate: mutateDag } = useQuery(
     '/dags/{fileName}',
     {
       params: {
@@ -90,7 +90,7 @@ function DAGDetails() {
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
 
   // Fetch specific DAG-run data if dagRunId is provided
-  const { data: dagRunResponse } = useQuery(
+  const { data: dagRunResponse, mutate: mutateDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     {
       params: {
@@ -109,7 +109,7 @@ function DAGDetails() {
   );
 
   // Fetch child DAG-run data if needed
-  const { data: childDAGRunResponse } = useQuery(
+  const { data: childDAGRunResponse, mutate: mutateChildDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}',
     {
       params: {
@@ -163,11 +163,16 @@ function DAGDetails() {
     }
   }, [currentDAGRun, dagData?.latestDAGRun, rootDAGRunData]);
 
-  // Refresh function (placeholder for now)
+  // Refresh function
   const refreshData = useCallback(() => {
-    // This could be implemented to trigger a refresh of the data
-    // For now it's a placeholder
-  }, []);
+    mutateDag();
+    if (dagRunId && !childDAGRunId) {
+      mutateDagRun();
+    }
+    if (childDAGRunId) {
+      mutateChildDagRun();
+    }
+  }, [mutateDag, mutateDagRun, mutateChildDagRun, dagRunId, childDAGRunId]);
 
   // Determine which DAG-run to display in the header
   // We want to show the header even when content is loading

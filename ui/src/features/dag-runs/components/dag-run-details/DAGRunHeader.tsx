@@ -1,4 +1,4 @@
-import { Calendar, Terminal, Timer } from 'lucide-react';
+import { Calendar, Terminal, Timer, RefreshCw } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v2/schema';
@@ -13,6 +13,7 @@ interface DAGRunHeaderProps {
 
 const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
   const navigate = useNavigate();
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   // Format duration utility function
   const formatDuration = (startDate: string, endDate: string): string => {
@@ -44,6 +45,12 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
         `/dag-runs/${dagRun.rootDAGRunName}/${dagRun.rootDAGRunId}?${searchParams.toString()}`
       );
     }
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    refreshFn();
+    setTimeout(() => setIsRefreshing(false), 600);
   };
 
   return (
@@ -96,13 +103,21 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
       {/* Status and metadata row */}
       {dagRun.status != Status.NotStarted && (
         <div className="flex flex-wrap items-center gap-2 lg:gap-6">
-          {/* Status and actions */}
+          {/* Status, Refresh and actions */}
           <div className="flex items-center gap-3">
             {dagRun.status && (
               <StatusChip status={dagRun.status} size="md">
                 {dagRun.statusLabel || ''}
               </StatusChip>
             )}
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
             <DAGRunActions
               dagRun={dagRun}
               name={dagRun.name}
