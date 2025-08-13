@@ -64,6 +64,9 @@ type Global struct {
 	// ConfigPath is the path to the configuration file used to load settings.
 	ConfigPath string
 
+	// SkipExamples disables the automatic creation of example DAGs when the DAGs directory is empty.
+	SkipExamples bool
+
 	// Peer contains configuration for peer connections over gRPC.
 	Peer Peer
 }

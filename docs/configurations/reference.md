@@ -16,6 +16,7 @@ tz: "America/New_York"
 debug: false
 logFormat: "text"         # "text" or "json"
 headless: false
+skipExamples: false       # Skip creating example DAGs
 
 # Directories (must be under "paths" key)
 paths:
@@ -130,6 +131,7 @@ All options support `DAGU_` prefix.
 - `DAGU_LOG_FORMAT` - Log format (`text`/`json`)
 - `DAGU_HEADLESS` - Run without UI
 - `DAGU_LATEST_STATUS_TODAY` - Show only today's status
+- `DAGU_SKIP_EXAMPLES` - Skip automatic creation of example DAGs (default: `false`)
 
 ### Directories
 - `DAGU_HOME` - Set all directories to this path

@@ -102,6 +102,8 @@ Note: see [documentation](https://docs.dagu.cloud/getting-started/installation) 
 
 ### 2. Create your first workflow
 
+> **Note**: When you first start Dagu with an empty DAGs directory, it automatically creates example workflows to help you get started. To skip this, set `DAGU_SKIP_EXAMPLES=true`.
+
 ```bash
 cat > ./hello.yaml << 'EOF'
 steps:
@@ -360,63 +362,6 @@ graph LR
     Tasks --> Store
 ```
 
-### System Components
-
-```mermaid
-graph TB
-    subgraph "User Interface"
-        CLI[Command Line]
-        Web[Web Dashboard]
-        API[REST API]
-    end
-    
-    subgraph "Core Engine"
-        Server[Server]
-        Agent[Agent<br/>Runs workflows]
-        Scheduler[Scheduler<br/>Handles cron]
-        DAG[DAG Engine<br/>Process workflows]
-    end
-    
-    subgraph "Storage"
-        Files[File System<br/>No database needed]
-    end
-    
-    CLI --> Server
-    Web --> Server
-    API --> Server
-    
-    Server --> Agent
-    Server --> Scheduler
-    Scheduler --> Agent
-    Agent --> DAG
-    
-    Agent --> Files
-    DAG --> Files
-```
-
-### Workflow Journey
-
-```mermaid
-sequenceDiagram
-    participant You
-    participant Dagu
-    participant YourCode as Your Code
-    
-    You->>Dagu: Write workflow (YAML)
-    You->>Dagu: Run workflow
-    Dagu->>Dagu: Parse and validate
-    Dagu->>Dagu: Build execution plan
-    
-    loop Each step
-        Dagu->>YourCode: Run task
-        YourCode-->>Dagu: Return output
-        Dagu->>Dagu: Save progress
-    end
-    
-    Dagu-->>You: Show results
-    You->>Dagu: View logs and status
-```
-
 ### Scaling Options
 
 ```mermaid
@@ -455,28 +400,6 @@ graph TD
         Data --> Queue[Task queue]
     end
 ```
-
-### Architecture Benefits
-
-| Feature | Why It Matters |
-|---------|----------------|
-| Single Binary | Download and run - no complex setup |
-| No Database | Simple files - easy backup and version control |
-| Run Anything | Bash, Python, Docker, SSH - your choice |
-| Works Offline | No cloud dependency |
-| Scales Simply | Start small, add workers when needed |
-| Full Visibility | Built-in logs, metrics, and monitoring |
-
-### Component Roles
-
-| Component | What It Does |
-|-----------|-------------|
-| CLI | Run commands from terminal |
-| Web UI | Visual dashboard and control |
-| Agent | Orchestrates workflow execution |
-| Scheduler | Handles cron and timing |
-| DAG Engine | Processes workflow logic |
-| File Storage | Keeps everything organized |
 
 ## Roadmap
 

@@ -29,6 +29,7 @@ type Options struct {
 	FlagsBaseDir string                        // Base directory for flag store
 	FileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
 	SearchPaths  []string                      // Additional search paths for DAG files
+	SkipExamples bool                          // Skip creating example DAGs
 }
 
 // WithFileCache returns a DAGRepositoryOption that sets the file cache for DAG objects
@@ -49,6 +50,13 @@ func WithFlagsBaseDir(dir string) Option {
 func WithSearchPaths(paths []string) Option {
 	return func(o *Options) {
 		o.SearchPaths = paths
+	}
+}
+
+// WithSkipExamples returns a DAGRepositoryOption that disables example DAG creation
+func WithSkipExamples(skip bool) Option {
+	return func(o *Options) {
+		o.SkipExamples = skip
 	}
 }
 
@@ -77,6 +85,7 @@ func New(baseDir string, opts ...Option) models.DAGStore {
 		flagsBaseDir: options.FlagsBaseDir,
 		fileCache:    options.FileCache,
 		searchPaths:  searchPaths,
+		skipExamples: options.SkipExamples,
 	}
 }
 
@@ -86,6 +95,12 @@ type Storage struct {
 	flagsBaseDir string                        // Base directory for flag store
 	fileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
 	searchPaths  []string                      // Additional search paths for DAG files
+	skipExamples bool                          // Skip creating example DAGs
+}
+
+// Initialize ensures the storage is ready and creates example DAGs if needed
+func (store *Storage) Initialize() error {
+	return store.ensureDirExist()
 }
 
 // GetMetadata retrieves the metadata of a DAG by its name.
@@ -202,6 +217,13 @@ func (store *Storage) ensureDirExist() error {
 	if !fileExists(store.baseDir) {
 		if err := os.MkdirAll(store.baseDir, 0750); err != nil {
 			return err
+		}
+		// Create example DAGs for first-time users
+		_ = store.createExampleDAGs() // Errors are logged internally
+	} else {
+		// Check if directory is empty and create examples if needed
+		if shouldCreateExamples(store.baseDir) {
+			_ = store.createExampleDAGs() // Errors are logged internally
 		}
 	}
 	return nil
@@ -513,6 +535,59 @@ var (
 		`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`,
 	)
 )
+
+// shouldCreateExamples checks if we should create example DAGs
+func shouldCreateExamples(dir string) bool {
+	// Check for marker file that indicates examples were already created
+	markerFile := filepath.Join(dir, ".examples-created")
+	if fileExists(markerFile) {
+		return false
+	}
+
+	// Check if directory is empty (no YAML files)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() && fileutil.IsYAMLFile(entry.Name()) {
+			// Found at least one YAML file, don't create examples
+			return false
+		}
+	}
+
+	return true
+}
+
+// createExampleDAGs creates example DAG files for first-time users
+func (store *Storage) createExampleDAGs() error {
+	// Check if we should skip example creation
+	if store.skipExamples {
+		return nil
+	}
+
+	logger.Info(context.Background(), "Creating example DAGs for first-time users", "dir", store.baseDir)
+
+	// Create each example DAG
+	for filename, content := range exampleDAGs {
+		filePath := filepath.Join(store.baseDir, filename)
+		if err := os.WriteFile(filePath, []byte(content), defaultPerm); err != nil {
+			logger.Error(context.Background(), "Failed to create example DAG", "file", filename, "err", err)
+			// Continue creating other examples even if one fails
+		}
+	}
+
+	// Create marker file to indicate examples were created
+	markerFile := filepath.Join(store.baseDir, ".examples-created")
+	markerContent := []byte("# This file indicates that example DAGs have been created.\n# Delete this file to re-create examples on next startup.\n")
+	if err := os.WriteFile(markerFile, markerContent, defaultPerm); err != nil {
+		logger.Error(context.Background(), "Failed to create examples marker file", "err", err)
+	}
+
+	logger.Info(context.Background(), "Example DAGs created successfully. Check the web UI to explore them!")
+	return nil
+}
 
 // findDAGFile finds the DAG file with the given file name.
 func findDAGFile(name string) (string, error) {

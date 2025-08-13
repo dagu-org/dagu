@@ -129,6 +129,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		TZ:           def.TZ,
 		WorkDir:      def.WorkDir,
 		DefaultShell: def.DefaultShell,
+		SkipExamples: viper.GetBool("skipExamples"),
 	}
 
 	// Set Peer configuration if provided
@@ -489,6 +490,7 @@ func (l *ConfigLoader) setupViperConfigPath(configDir string) {
 func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	// File paths
 	viper.SetDefault("workDir", "") // Defaults to DAG location if empty.
+	viper.SetDefault("skipExamples", false) // Defaults to creating examples
 	viper.SetDefault("paths.dagsDir", resolver.DAGsDir)
 	viper.SetDefault("paths.suspendFlagsDir", resolver.SuspendFlagsDir)
 	viper.SetDefault("paths.dataDir", resolver.DataDir)
@@ -547,6 +549,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	// Global configurations
 	l.bindEnv("workDir", "WORK_DIR")
 	l.bindEnv("defaultShell", "DEFAULT_SHELL")
+	l.bindEnv("skipExamples", "SKIP_EXAMPLES")
 
 	// Scheduler configurations
 	l.bindEnv("scheduler.lockStaleThreshold", "SCHEDULER_LOCK_STALE_THRESHOLD")
