@@ -24,8 +24,7 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 	}
 
 	spec := []byte(`steps:
-  - name: step1
-    command: echo hello
+  - command: echo hello
 `)
 
 	if err := a.dagStore.Create(ctx, request.Body.Name, spec); err != nil {
@@ -69,7 +68,7 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 	}
 
 	// Validate the spec - use WithAllowBuildErrors to return DAG even with errors
-	dag, err := a.dagRunMgr.LoadYAML(ctx, []byte(spec), 
+	dag, err := a.dagRunMgr.LoadYAML(ctx, []byte(spec),
 		digraph.WithName(request.FileName),
 		digraph.WithAllowBuildErrors())
 	var errs []string
@@ -81,7 +80,7 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 		// If we still get an error with AllowBuildErrors, something is seriously wrong
 		return nil, err
 	}
-	
+
 	// If dag is still nil (shouldn't happen with AllowBuildErrors), create a minimal DAG
 	if dag == nil {
 		dag = &digraph.DAG{
