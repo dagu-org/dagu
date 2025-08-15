@@ -16,7 +16,7 @@
 
 ## Overview - Orchestrate workflows without complexity
 
-Dagu */dah-goo/* is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
+Dagu */dah-goo/* is a self-contained workflow engine with built-in Web UI. It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format. It allows you to schedule the execution of DAGs with Cron expressions, and natively support running containers, executing commands over SSH.
 
 ```yaml
 steps:
@@ -326,73 +326,6 @@ pnpm dev
 ```
 
 Navigate to http://localhost:8081 to view the frontend.
-
-## Architecture
-
-### How Dagu Works
-
-```mermaid
-graph LR
-    subgraph "You Write"
-        YAML[YAML<br/>Workflow]
-    end
-    
-    subgraph "Dagu Processes"
-        Parse[Parse]
-        Schedule[Schedule]
-        Execute[Execute]
-        Store[Store]
-    end
-    
-    subgraph "Your Code Runs"
-        Tasks[Scripts<br/>Commands<br/>Containers]
-    end
-    
-    YAML --> Parse
-    Parse --> Schedule
-    Schedule --> Execute
-    Execute --> Tasks
-    Tasks --> Store
-```
-
-### Scaling Options
-
-```mermaid
-graph LR
-    subgraph "Single Machine"
-        Single[One Dagu<br/>Does everything]
-    end
-    
-    subgraph "Multiple Machines"
-        Coord[Coordinator]
-        W1[Worker 1]
-        W2[Worker 2]
-        WN[Worker N]
-        
-        Coord --> W1
-        Coord --> W2
-        Coord --> WN
-    end
-    
-    Single -."Scale when needed".-> Coord
-```
-
-### Storage Structure
-
-```mermaid
-graph TD
-    subgraph "Everything is Files"
-        Home[~/.dagu]
-        
-        Home --> Dags[dags/<br/>Your workflows]
-        Home --> Logs[logs/<br/>Execution logs]
-        Home --> Data[data/<br/>Runtime data]
-        
-        Data --> History[History]
-        Data --> State[Current state]
-        Data --> Queue[Task queue]
-    end
-```
 
 ## Roadmap
 
