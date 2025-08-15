@@ -780,9 +780,28 @@ func buildSSH(_ BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
+// generateStepName generates an automatic name for a step using the pattern step-{index}
+func generateStepName(existingNames map[string]struct{}, index int) string {
+	// Start with the expected name based on index
+	baseName := fmt.Sprintf("step-%d", index+1)
+	name := baseName
+
+	// Handle the rare case where user explicitly named a step "step-N"
+	counter := index + 1
+	for {
+		if _, exists := existingNames[name]; !exists {
+			existingNames[name] = struct{}{}
+			return name
+		}
+		counter++
+		name = fmt.Sprintf("step-%d", counter)
+	}
+}
+
 // buildSteps builds the steps for the DAG.
 func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
+	existingNames := make(map[string]struct{})
 
 	switch v := spec.Steps.(type) {
 	case nil:
@@ -797,7 +816,14 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		if err := md.Decode(v); err != nil {
 			return wrapError("steps", v, err)
 		}
-		for _, stepDef := range stepDefs {
+		for i, stepDef := range stepDefs {
+			// Auto-generate name if not provided
+			if stepDef.Name == "" {
+				stepDef.Name = generateStepName(existingNames, i)
+			} else {
+				existingNames[stepDef.Name] = struct{}{}
+			}
+
 			step, err := buildStep(buildCtx, stepDef)
 			if err != nil {
 				return err
@@ -821,6 +847,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		}
 		for name, stepDef := range stepDefs {
 			stepDef.Name = name
+			existingNames[stepDef.Name] = struct{}{}
 			step, err := buildStep(buildCtx, stepDef)
 			if err != nil {
 				return err
@@ -868,8 +895,10 @@ func validateSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	stepIDs := make(map[string]struct{})
 
 	for _, step := range dag.Steps {
+		// Names should always exist at this point (explicit or auto-generated)
 		if step.Name == "" {
-			return wrapError("steps", step, ErrStepNameRequired)
+			// This should not happen if generation works correctly
+			return wrapError("steps", step, fmt.Errorf("internal error: step name not generated"))
 		}
 
 		if _, exists := stepNames[step.Name]; exists {

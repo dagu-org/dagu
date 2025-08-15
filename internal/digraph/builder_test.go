@@ -1450,6 +1450,143 @@ steps:
 	})
 }
 
+func TestOptionalStepNames(t *testing.T) {
+	t.Parallel()
+
+	t.Run("AutoGenerateNames", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: echo "hello"
+  - command: npm test
+  - command: go build
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		
+		require.Len(t, th.Steps, 3)
+		assert.Equal(t, "step-1", th.Steps[0].Name)
+		assert.Equal(t, "step-2", th.Steps[1].Name)
+		assert.Equal(t, "step-3", th.Steps[2].Name)
+	})
+
+	t.Run("MixedExplicitAndGenerated", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: setup.sh
+  - name: build
+    command: make all
+  - command: test.sh
+    depends: build
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		
+		require.Len(t, th.Steps, 3)
+		assert.Equal(t, "step-1", th.Steps[0].Name)
+		assert.Equal(t, "build", th.Steps[1].Name)
+		assert.Equal(t, "step-3", th.Steps[2].Name)
+	})
+
+	t.Run("HandleNameConflicts", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: echo "first"
+  - name: step-2
+    command: echo "explicit"
+  - command: echo "third"
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		
+		require.Len(t, th.Steps, 3)
+		assert.Equal(t, "step-1", th.Steps[0].Name)
+		assert.Equal(t, "step-2", th.Steps[1].Name)
+		assert.Equal(t, "step-3", th.Steps[2].Name)
+	})
+
+	t.Run("DependenciesWithGeneratedNames", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: git pull
+  - command: npm install
+    depends: step-1
+  - command: npm test
+    depends: step-2
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		
+		require.Len(t, th.Steps, 3)
+		assert.Equal(t, "step-1", th.Steps[0].Name)
+		assert.Equal(t, "step-2", th.Steps[1].Name)
+		assert.Equal(t, "step-3", th.Steps[2].Name)
+		
+		// Check dependencies are correctly resolved
+		assert.Equal(t, []string{"step-1"}, th.Steps[1].Depends)
+		assert.Equal(t, []string{"step-2"}, th.Steps[2].Depends)
+	})
+
+	t.Run("OutputVariablesWithGeneratedNames", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: echo "v1.0.0"
+    output: VERSION
+  - command: echo "Building version ${VERSION}"
+    depends: step-1
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		
+		require.Len(t, th.Steps, 2)
+		assert.Equal(t, "step-1", th.Steps[0].Name)
+		assert.Equal(t, "step-2", th.Steps[1].Name)
+		assert.Equal(t, "VERSION", th.Steps[0].Output)
+		assert.Equal(t, []string{"step-1"}, th.Steps[1].Depends)
+	})
+
+	t.Run("BackwardCompatibility", func(t *testing.T) {
+		t.Parallel()
+
+		// Ensure existing DAGs with explicit names still work
+		data := []byte(`
+steps:
+  - name: setup
+    command: echo "setup"
+  - name: test
+    command: echo "test"
+    depends: setup
+  - name: deploy
+    command: echo "deploy"
+    depends: test
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		
+		require.Len(t, th.Steps, 3)
+		assert.Equal(t, "setup", th.Steps[0].Name)
+		assert.Equal(t, "test", th.Steps[1].Name)
+		assert.Equal(t, "deploy", th.Steps[2].Name)
+		assert.Equal(t, []string{"setup"}, th.Steps[1].Depends)
+		assert.Equal(t, []string{"test"}, th.Steps[2].Depends)
+	})
+}
+
 func TestStepIDValidation(t *testing.T) {
 	t.Parallel()
 
