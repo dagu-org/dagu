@@ -37,6 +37,7 @@ dagu start [options] DAG_NAME_OR_FILE [-- PARAMS...]
 - `--params, -p` - Parameters as JSON
 - `--run-id, -r` - Custom run ID
 - `--no-queue, -n` - Execute immediately
+- `--singleton, -s` - Prevent starting if DAG is already running (returns error)
 
 ```bash
 # Basic run
@@ -50,6 +51,9 @@ dagu start etl.yaml -- DATE=2024-01-01 ENV=prod
 
 # Custom run ID
 dagu start --run-id batch-001 etl.yaml
+
+# Singleton mode (prevents multiple concurrent runs)
+dagu start --singleton critical-job.yaml
 ```
 
 ### `stop`

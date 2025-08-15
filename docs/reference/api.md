@@ -398,7 +398,8 @@ Creates and starts a DAG run with optional parameters.
 ```json
 {
   "params": "{\"env\": \"production\", \"version\": \"1.2.3\"}",
-  "dagRunId": "custom-run-id"
+  "dagRunId": "custom-run-id",
+  "singleton": false
 }
 ```
 
@@ -407,11 +408,20 @@ Creates and starts a DAG run with optional parameters.
 |-------|------|-------------|----------|
 | params | string | JSON string of parameters | No |
 | dagRunId | string | Custom run ID | No |
+| singleton | boolean | If true, prevent starting if DAG is already running (returns 409) | No |
 
 **Response (200)**:
 ```json
 {
   "dagRunId": "20240101_120000_abc123"
+}
+```
+
+**Response (409)** - When `singleton: true` and DAG is already running:
+```json
+{
+  "code": "already_running",
+  "message": "DAG example_dag is already running, cannot start in singleton mode"
 }
 ```
 
@@ -1349,6 +1359,32 @@ curl -X POST "http://localhost:8080/api/v2/dags/data-processing-pipeline/start" 
 ```json
 {
   "dagRunId": "manual_20240211_160000"
+}
+```
+
+### Start a DAG with Singleton Mode
+```bash
+curl -X POST "http://localhost:8080/api/v2/dags/critical-job/start" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer your-token" \
+     -d '{
+       "singleton": true,
+       "params": "{\"priority\": \"high\"}"
+     }'
+```
+
+**Response if DAG is not running (200)**:
+```json
+{
+  "dagRunId": "20240211_161500_xyz789"
+}
+```
+
+**Response if DAG is already running (409)**:
+```json
+{
+  "code": "already_running",
+  "message": "DAG critical-job is already running, cannot start in singleton mode"
 }
 ```
 
