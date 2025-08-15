@@ -21,7 +21,7 @@ func TestDAGExecution(t *testing.T) {
   - command: "echo 1"
     output: NO_NAME_STEP_OUT
   - command: "echo ${NO_NAME_STEP_OUT}=1"
-    output: OUT1
+    output: NO_NAME_STEP_OUT2
 `)
 		agent := dag.Agent()
 
@@ -29,7 +29,7 @@ func TestDAGExecution(t *testing.T) {
 
 		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
-			"OUT1": "1=1",
+			"NO_NAME_STEP_OUT2": "1=1",
 		})
 	})
 	t.Run("Depends", func(t *testing.T) {
