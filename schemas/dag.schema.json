@@ -356,12 +356,11 @@
   "definitions": {
     "step": {
       "type": "object",
-      "required": ["name"],
       "additionalProperties": false,
       "properties": {
         "name": {
           "type": "string",
-          "description": "Unique identifier for the step within this DAG. Required field."
+          "description": "Unique identifier for the step within this DAG. If omitted, Dagu will automatically generate a name."
         },
         "id": {
           "type": "string",
