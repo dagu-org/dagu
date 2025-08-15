@@ -14,9 +14,9 @@
   </p>
 </div>
 
-## Overview - Orchestrate workflows without complexity
+## Overview
 
-Dagu */dah-goo/* is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
+Dagu */dah-goo/* is a lightweight, versatile workflow engine for **small teams**. It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format. It allows you to schedule the execution of DAGs with Cron expressions, and natively support running containers, executing commands over SSH.
 
 ```yaml
 steps:
@@ -24,15 +24,19 @@ steps:
   - command: echo "This is a second step" # STEP 2
 ```
 
-By declaratively defining job processes, complex workflows can be visualized, making troubleshooting and recovery easier. Viewing logs and retrying jobs can be performed from the Web UI, eliminating the need to log into a server via SSH.
+Dagu is a single binary and it uses the file system as the database and stores the data in plain JSON files. Therefore, no DBMS or cloud service is required.
 
-It is equipped with many features to meet the detailed requirements of enterprise environments. It operates even in environments without internet access. Being a statically compiled binary, it includes all dependencies, allowing it to run in any environment, including on-premise, cloud, and IoT devices. It is a lightweight workflow engine that meets enterprise requirements.
+### Why Not Use an Existing Workflow Scheduler Like Airflow?
+There are many existing tools such as Airflow, but many of these require you to write code in a programming language like Python to define your DAG. For systems that have been in operation for a long time, there may already be complex jobs with hundreds of thousands of lines of code written in languages like Perl or Shell Script. Adding another layer of complexity on top of these codes can reduce maintainability. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for smaller projects with fewer people.
 
-Note: For a list of features, please refer to the [documentation](https://docs.dagu.cloud/features/).
-
-Workflow jobs are defined as commands. Therefore, legacy scripts that have been in operation for a long time within a company or organization can be used as-is without modification. There is no need to learn a complex new language, and you can start using it right away.
-
-Dagu is designed for enterprise & small teams to easily manage complex workflows. It aims to be an ideal choice for teams that find large-scale, high-cost infrastructure like Airflow to be overkill and are looking for a simpler solution. It requires no database management and only needs a shared filesystem, allowing you to focus on your high-value work.
+## Highlights
+- **Simple Installation**: Single binary, no dependencies
+- **Intuitive Web UI**: Visualize, monitor, and control workflows
+- **YAML-based**: Define workflows in simple YAML files
+- **Built-in Executors**: Support for Containers, HTTP, SSH, and more
+- **Queue Management**: Control concurrent executions and prioritize workflows
+- **Distributed Execution**: Route tasks to specific workers based on labels
+- **Zero Config**: No database required, works out of the box
 
 ### CLI Preview
 ![Demo CLI](./assets/images/demo-cli.webp)
@@ -326,73 +330,6 @@ pnpm dev
 ```
 
 Navigate to http://localhost:8081 to view the frontend.
-
-## Architecture
-
-### How Dagu Works
-
-```mermaid
-graph LR
-    subgraph "You Write"
-        YAML[YAML<br/>Workflow]
-    end
-    
-    subgraph "Dagu Processes"
-        Parse[Parse]
-        Schedule[Schedule]
-        Execute[Execute]
-        Store[Store]
-    end
-    
-    subgraph "Your Code Runs"
-        Tasks[Scripts<br/>Commands<br/>Containers]
-    end
-    
-    YAML --> Parse
-    Parse --> Schedule
-    Schedule --> Execute
-    Execute --> Tasks
-    Tasks --> Store
-```
-
-### Scaling Options
-
-```mermaid
-graph LR
-    subgraph "Single Machine"
-        Single[One Dagu<br/>Does everything]
-    end
-    
-    subgraph "Multiple Machines"
-        Coord[Coordinator]
-        W1[Worker 1]
-        W2[Worker 2]
-        WN[Worker N]
-        
-        Coord --> W1
-        Coord --> W2
-        Coord --> WN
-    end
-    
-    Single -."Scale when needed".-> Coord
-```
-
-### Storage Structure
-
-```mermaid
-graph TD
-    subgraph "Everything is Files"
-        Home[~/.dagu]
-        
-        Home --> Dags[dags/<br/>Your workflows]
-        Home --> Logs[logs/<br/>Execution logs]
-        Home --> Data[data/<br/>Runtime data]
-        
-        Data --> History[History]
-        Data --> State[Current state]
-        Data --> Queue[Task queue]
-    end
-```
 
 ## Roadmap
 
