@@ -9,11 +9,9 @@ container:
   image: python:3.11
 
 steps:
-  - name: install
-    command: pip install pandas numpy
+  - command: pip install pandas numpy  # Install dependencies
     
-  - name: process
-    command: python process.py
+  - command: python process.py          # Process data
 ```
 
 All steps run in the same container instance, sharing the filesystem and installed packages.
@@ -29,14 +27,11 @@ container:
   workDir: /app
 
 steps:
-  - name: install
-    command: npm install
+  - command: npm install    # Install dependencies
     
-  - name: build
-    command: npm run build
+  - command: npm run build  # Build the application
     
-  - name: test
-    command: npm test
+  - command: npm test       # Run tests
 ```
 
 ## With Environment Variables

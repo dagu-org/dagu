@@ -10,14 +10,11 @@ Define execution order with step dependencies.
 
 ```yaml
 steps:
-  - name: download
-    command: wget https://example.com/data.zip
+  - command: wget https://example.com/data.zip  # Download archive
     
-  - name: extract
-    command: unzip data.zip
+  - command: unzip data.zip                     # Extract files
     
-  - name: process
-    command: python process.py
+  - command: python process.py                  # Process data
 ```
 
 ### Multiple Dependencies

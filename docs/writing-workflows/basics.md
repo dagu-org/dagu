@@ -8,8 +8,7 @@ Create `hello.yaml`:
 
 ```yaml
 steps:
-  - name: hello
-    command: echo "Hello from Dagu!"
+  - command: echo "Hello from Dagu!"
 ```
 
 Run it:
@@ -80,16 +79,14 @@ Auto-generated names follow the pattern `{type}_{number}`:
 
 ```yaml
 steps:
-  - name: download
-    command: wget https://example.com/data.csv
+  - command: wget https://example.com/data.csv
 ```
 
 ### Multi-line Scripts
 
 ```yaml
 steps:
-  - name: process
-    script: |
+  - script: |
       #!/bin/bash
       set -e
       

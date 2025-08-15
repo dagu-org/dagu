@@ -6,8 +6,7 @@ The default executor for running system commands.
 
 ```yaml
 steps:
-  - name: hello
-    command: echo "Hello, World!"  # Shell executor is default
+  - command: echo "Hello, World!"  # Shell executor is default
 ```
 
 ## Errexit Mode (Exit on Error)
