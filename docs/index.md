@@ -49,22 +49,18 @@ brew install dagu-org/brew/dagu
 ```bash [Binary]
 mkdir -p ~/.config/dagu/dags && cat > ~/.config/dagu/dags/hello.yaml << 'EOF'
 steps:
-  - name: hello
-    command: echo "Hello from Dagu!"
+  - command: echo "Hello from Dagu!"
     
-  - name: world
-    command: echo "Running step 2"
+  - command: echo "Running step 2"
 EOF
 ```
 
 ```bash [Docker]
 mkdir -p ~/.dagu/dags && cat > ~/.dagu/dags/hello.yaml << 'EOF'
 steps:
-  - name: hello
-    command: echo "Hello from Dagu!"
+  - command: echo "Hello from Dagu!"
     
-  - name: world
-    command: echo "Running step 2"
+  - command: echo "Running step 2"
 EOF
 ```
 

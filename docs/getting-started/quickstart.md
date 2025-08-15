@@ -47,22 +47,18 @@ To skip creating these examples, set `DAGU_SKIP_EXAMPLES=true` or add `skipExamp
 ```bash [Binary]
 mkdir -p ~/.config/dagu/dags && cat > ~/.config/dagu/dags/hello.yaml << 'EOF'
 steps:
-  - name: hello
-    command: echo "Hello from Dagu!"
+  - command: echo "Hello from Dagu!"
     
-  - name: world
-    command: echo "Running step 2"
+  - command: echo "Running step 2"
 EOF
 ```
 
 ```bash [Docker]
 mkdir -p ~/.dagu/dags && cat > ~/.dagu/dags/hello.yaml << 'EOF'
 steps:
-  - name: hello
-    command: echo "Hello from Dagu!"
+  - command: echo "Hello from Dagu!"
     
-  - name: world
-    command: echo "Running step 2"
+  - command: echo "Running step 2"
 EOF
 ```
 
@@ -137,11 +133,9 @@ A workflow is a YAML file that defines steps and their dependencies:
 
 ```yaml
 steps:
-  - name: step1
-    command: echo "First step"
+  - command: echo "First step"
     
-  - name: step2
-    command: echo "Second step"  # Runs after step1 automatically
+  - command: echo "Second step"  # Runs after first step automatically
 ```
 
 Key concepts:

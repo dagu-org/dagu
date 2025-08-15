@@ -110,7 +110,6 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "precondition", fn: buildStepPrecondition},
 	{name: "output", fn: buildOutput},
 	{name: "env", fn: buildStepEnvs},
-	{name: "validate", fn: validateStep},
 }
 
 type stepBuilderEntry struct {
@@ -780,9 +779,60 @@ func buildSSH(_ BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
+// generateTypedStepName generates a type-based name for a step after it's been built
+func generateTypedStepName(existingNames map[string]struct{}, step *Step, index int) string {
+	var prefix string
+
+	// Determine prefix based on the built step's properties
+	if step.ExecutorConfig.Type != "" {
+		switch step.ExecutorConfig.Type {
+		case ExecutorTypeDAG, ExecutorTypeDAGLegacy:
+			prefix = "dag"
+		case ExecutorTypeParallel:
+			prefix = "parallel"
+		case "http":
+			prefix = "http"
+		case "docker":
+			prefix = "container"
+		case "ssh":
+			prefix = "ssh"
+		case "mail":
+			prefix = "mail"
+		case "jq":
+			prefix = "jq"
+		default:
+			prefix = "exec"
+		}
+	} else if step.Parallel != nil {
+		prefix = "parallel"
+	} else if step.ChildDAG != nil {
+		prefix = "dag"
+	} else if step.Script != "" {
+		prefix = "script"
+	} else if step.Command != "" {
+		prefix = "cmd"
+	} else {
+		prefix = "step"
+	}
+
+	// Generate unique name with the prefix
+	counter := index + 1
+	name := fmt.Sprintf("%s_%d", prefix, counter)
+
+	for {
+		if _, exists := existingNames[name]; !exists {
+			existingNames[name] = struct{}{}
+			return name
+		}
+		counter++
+		name = fmt.Sprintf("%s_%d", prefix, counter)
+	}
+}
+
 // buildSteps builds the steps for the DAG.
 func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
+	existingNames := make(map[string]struct{})
 
 	switch v := spec.Steps.(type) {
 	case nil:
@@ -797,11 +847,24 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		if err := md.Decode(v); err != nil {
 			return wrapError("steps", v, err)
 		}
-		for _, stepDef := range stepDefs {
+
+		var builtSteps []*Step
+		for i, stepDef := range stepDefs {
 			step, err := buildStep(buildCtx, stepDef)
 			if err != nil {
 				return err
 			}
+			if step.Name == "" {
+				step.Name = generateTypedStepName(existingNames, step, i)
+			}
+			if err := validateStep(buildCtx, stepDef, step); err != nil {
+				return err
+			}
+			builtSteps = append(builtSteps, step)
+		}
+
+		// Add all built steps to the DAG
+		for _, step := range builtSteps {
 			dag.Steps = append(dag.Steps, *step)
 		}
 
@@ -821,6 +884,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		}
 		for name, stepDef := range stepDefs {
 			stepDef.Name = name
+			existingNames[stepDef.Name] = struct{}{}
 			step, err := buildStep(buildCtx, stepDef)
 			if err != nil {
 				return err
@@ -868,8 +932,10 @@ func validateSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	stepIDs := make(map[string]struct{})
 
 	for _, step := range dag.Steps {
+		// Names should always exist at this point (explicit or auto-generated)
 		if step.Name == "" {
-			return wrapError("steps", step, ErrStepNameRequired)
+			// This should not happen if generation works correctly
+			return wrapError("steps", step, fmt.Errorf("internal error: step name not generated"))
 		}
 
 		if _, exists := stepNames[step.Name]; exists {

@@ -14,6 +14,24 @@ func TestDAGExecution(t *testing.T) {
 
 	th := test.Setup(t)
 
+	t.Run("NoName", func(t *testing.T) {
+		t.Parallel()
+
+		dag := th.DAG(t, `steps:
+  - command: "echo 1"
+    output: NO_NAME_STEP_OUT
+  - command: "echo ${NO_NAME_STEP_OUT}=1"
+    output: NO_NAME_STEP_OUT2
+`)
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, status.Success)
+		dag.AssertOutputs(t, map[string]any{
+			"NO_NAME_STEP_OUT2": "1=1",
+		})
+	})
 	t.Run("Depends", func(t *testing.T) {
 		t.Parallel()
 

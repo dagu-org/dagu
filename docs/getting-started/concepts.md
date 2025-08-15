@@ -27,11 +27,9 @@ The basic unit of execution. Each step runs a command:
 
 ```yaml
 steps:
-  - name: download
-    command: curl -O https://example.com/data.csv
+  - command: curl -O https://example.com/data.csv  # Download data
     
-  - name: process
-    command: python analyze.py data.csv
+  - command: python analyze.py data.csv           # Process data
 ```
 
 ### Dependencies
@@ -124,8 +122,7 @@ Run steps based on conditions:
 
 ```yaml
 steps:
-  - name: process
-    command: python process.py
+  - command: python process.py
     preconditions:
       - condition: "test -f /data/input.csv"
 ```
@@ -138,8 +135,7 @@ Built-in retry mechanism:
 
 ```yaml
 steps:
-  - name: fetch
-    command: curl -f https://flaky-api.com/data
+  - command: curl -f https://flaky-api.com/data
     retryPolicy:
       limit: 3
       intervalSec: 30
@@ -149,8 +145,7 @@ Continue on failure:
 
 ```yaml
 steps:
-  - name: optional-task
-    command: 'sh -c "if [ $((RANDOM % 2)) -eq 0 ]; then echo Success; else echo Failed && exit 1; fi"'
+  - command: 'sh -c "if [ $((RANDOM % 2)) -eq 0 ]; then echo Success; else echo Failed && exit 1; fi"'
     continueOn:
       failure: true
 ```

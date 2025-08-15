@@ -12,10 +12,8 @@ Quick reference for all Dagu features. Each example is minimal and copy-paste re
 
 ```yaml
 steps:
-  - name: first
-    command: echo "Step 1"
-  - name: second
-    command: echo "Step 2"
+  - command: echo "Step 1"
+  - command: echo "Step 2"
 ```
 
 ```mermaid
@@ -135,7 +133,7 @@ steps:
     command: echo "First"
   - name: step2
     command: echo "Second"
-    depends: step1  # Explicit dependency required
+    depends: step1  # Explicit dependency required in graph type
 ```
 
 ```mermaid
@@ -1558,11 +1556,8 @@ Complete DAG with all configuration options.
 ```yaml
 # Steps as array (recommended)
 steps:
-  - name: step1
-    command: echo "hello"
-  - name: step2
-    command: echo "world"
-    depends: step1
+  - command: echo "hello"
+  - command: echo "world"  # Runs after first step automatically
 
 ---
 

@@ -1,8 +1,5 @@
 <div align="center">
   <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
-  <h3>A lightweight and powerful workflow engine</h3>
-  <p>Self-contained. Language agnostic. Local-first.</p>
-  
   <p>
     <a href="https://docs.dagu.cloud/reference/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
     <a href="https://github.com/dagu-org/dagu/actions/workflows/ci.yaml"><img src="https://img.shields.io/github/actions/workflow/status/dagu-org/dagu/ci.yaml?style=flat-square" alt="Build Status"></a>
@@ -17,16 +14,14 @@
   </p>
 </div>
 
-## Overview
+## Overview - Orchestrate workflows without complexity
 
 Dagu */dah-goo/* is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
 
 ```yaml
 steps:
-  - name: step1
-    command: sleep 1 && echo "Hello, dagu!"
-  - name: step2
-    command: sleep 1 && echo "This is a second step"
+  - command: echo "Hello, dagu!" # STEP 1
+  - command: echo "This is a second step" # STEP 2
 ```
 
 By declaratively defining job processes, complex workflows can be visualized, making troubleshooting and recovery easier. Viewing logs and retrying jobs can be performed from the Web UI, eliminating the need to log into a server via SSH.
@@ -107,10 +102,8 @@ Note: see [documentation](https://docs.dagu.cloud/getting-started/installation) 
 ```bash
 cat > ./hello.yaml << 'EOF'
 steps:
-  - name: hello
-    command: echo "Hello from Dagu!"
-  - name: world  
-    command: echo "Running step 2"
+  - command: echo "Hello from Dagu!"
+  - command: echo "Running step 2"
 EOF
 ```
 

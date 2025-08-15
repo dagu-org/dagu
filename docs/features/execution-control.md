@@ -185,14 +185,9 @@ steps:
 
 ```yaml
 steps:
-  - name: first
-    command: echo "1"
-  - name: second
-    command: echo "2"
-    depends: first
-  - name: third
-    command: echo "3"
-    depends: second
+  - command: echo "1"
+  - command: echo "2"  # Runs after step 1
+  - command: echo "3"  # Runs after step 2
 ```
 
 ### Parallel with Dependencies

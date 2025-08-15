@@ -8,8 +8,7 @@ Create `hello.yaml`:
 
 ```yaml
 steps:
-  - name: hello
-    command: echo "Hello from Dagu!"
+  - command: echo "Hello from Dagu!"
 ```
 
 Run it:
@@ -47,20 +46,47 @@ handlerOn:
 
 The basic unit of execution.
 
+### Step Names
+
+Step names are optional. When omitted, Dagu automatically generates names based on the step type:
+
+```yaml
+steps:
+  - command: echo "First step"    # Auto-named: cmd_1
+  - script: |                      # Auto-named: script_2
+      echo "Multi-line"
+      echo "Script"
+  - name: explicit-name            # Explicit name
+    command: echo "Third step"
+  - executor:                      # Auto-named: http_4
+      type: http
+      config:
+        url: https://api.example.com
+  - run: child-workflow            # Auto-named: dag_5
+```
+
+Auto-generated names follow the pattern `{type}_{number}`:
+- `cmd_N` - Command steps
+- `script_N` - Script steps  
+- `http_N` - HTTP executor steps
+- `dag_N` - DAG executor steps
+- `container_N` - Docker/container steps
+- `ssh_N` - SSH executor steps
+- `mail_N` - Mail executor steps
+- `jq_N` - JQ executor steps
+
 ### Simple Commands
 
 ```yaml
 steps:
-  - name: download
-    command: wget https://example.com/data.csv
+  - command: wget https://example.com/data.csv
 ```
 
 ### Multi-line Scripts
 
 ```yaml
 steps:
-  - name: process
-    script: |
+  - script: |
       #!/bin/bash
       set -e
       
