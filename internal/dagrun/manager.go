@@ -193,6 +193,9 @@ func (m *Manager) StartDAGRunAsync(ctx context.Context, dag *digraph.DAG, opts S
 	if opts.Immediate {
 		args = append(args, "--no-queue")
 	}
+	if opts.Singleton {
+		args = append(args, "--singleton")
+	}
 	if opts.DAGRunID != "" {
 		args = append(args, fmt.Sprintf("--run-id=%s", opts.DAGRunID))
 	}
@@ -579,6 +582,7 @@ type StartOptions struct {
 	Quiet     bool   // Whether to run in quiet mode
 	DAGRunID  string // ID for the dag-run
 	Immediate bool   // Start immediately without enqueue
+	Singleton bool   // Prevent starting if DAG is already running
 }
 
 // EnqueueOptions contains options for enqueuing a dag-run.

@@ -54,7 +54,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, dagRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag}
+var startFlags = []commandLineFlag{paramsFlag, dagRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag, singletonFlag}
 
 // runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
@@ -101,6 +101,14 @@ func runStart(ctx *Context, args []string) error {
 	if attempt != nil {
 		// If the dag-run ID already exists, we cannot start a new run with the same ID
 		return fmt.Errorf("dag-run ID %s already exists for DAG %s", dagRunID, dag.Name)
+	}
+
+	// Check singleton flag - if enabled and DAG is already running, fail
+	if singletonEnabled, _ := ctx.Command.Flags().GetBool("singleton"); singletonEnabled {
+		runningCount, err := ctx.ProcStore.CountAlive(ctx, dag.ProcGroup())
+		if err == nil && runningCount > 0 {
+			return fmt.Errorf("DAG %s is already running, cannot start in singleton mode", dag.Name)
+		}
 	}
 
 	// Log root dag-run

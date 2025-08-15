@@ -62,4 +62,24 @@ func TestDAG(t *testing.T) {
 		require.NotNil(t, apiResp.Dags)
 		require.NotNil(t, apiResp.Pagination)
 	})
+
+	t.Run("ExecuteDAGWithSingleton", func(t *testing.T) {
+		// Create a new DAG
+		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAG201JSONResponse{
+			Name: "test_singleton_dag",
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		// Execute the DAG with singleton flag
+		singleton := true
+		resp := server.Client().Post("/api/v2/dags/test_singleton_dag/start", api.ExecuteDAGJSONRequestBody{
+			Singleton: &singleton,
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var execResp api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &execResp)
+		require.NotEmpty(t, execResp.DagRunId, "expected a non-empty dag-run ID")
+
+		// Clean up
+		_ = server.Client().Delete("/api/v2/dags/test_singleton_dag").ExpectStatus(http.StatusNoContent).Send(t)
+	})
 }

@@ -61,6 +61,14 @@ var (
 		shorthand: "n",
 	}
 
+	// singletonFlag is used to indicate that the dag-run should fail if the DAG is already running.
+	singletonFlag = commandLineFlag{
+		name:      "singleton",
+		usage:     "Prevent starting if DAG is already running (returns 409 conflict)",
+		isBool:    true,
+		shorthand: "s",
+	}
+
 	// Unique dag-run ID required for retrying a dag-run.
 	// This flag must be provided when using the retry command.
 	dagRunIDFlagRetry = commandLineFlag{
