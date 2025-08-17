@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.21.0 (2025-08-17)
+
+### New Features
+- **Optional Step Names**: Made step names optional to remove the 40-character limit restriction, allowing more flexibility in workflow definitions (#1193) - Thanks to [@jonathonc](https://github.com/jonathonc) for raising the issue
+- **Singleton DAG Execution**: Added `--singleton` flag to ensure only one instance of a DAG runs at a time, preventing duplicate executions (#1195) - Thanks to [@Kaiden0001](https://github.com/Kaiden0001) for the feature request
+- **DAG-level SSH Configuration**: Implemented DAG-level SSH config for better control over remote executions across all steps (#1184)
+- **Example DAGs for New Users**: Auto-create example DAGs when starting Dagu for the first time, helping new users get started quickly (#1190)
+- **DAG-run Details Refresh**: Added refresh button to the DAG-run details page for immediate status updates (#1192)
+- **Invalid DAG Handling**: Improved UI handling of invalid DAG configurations with better error messages and graceful degradation (#1186)
+
+### Improvements
+- **Queue Directory Management**: Ensure queue directory is created before starting file watch to prevent startup errors (#1191)
+- **Coordinator Hostname Resolution**: Register configured hostname instead of resolved IP in coordinator.json for better network configuration (#1188) - Thanks to [@peterbuga](https://github.com/peterbuga) for reporting and proposing the solution
+
+### Documentation
+- **Examples Update**: Updated and cleaned up example DAGs to reflect current best practices (#1185)
+- **Architecture Documentation**: Updated architecture diagrams and documentation
+
+### Contributors
+
+Thanks to our contributors for this release:
+
+| Contribution                           | Author                                   |
+| -------------------------------------- | ---------------------------------------- |
+| Optional step names feature request (40 char limit issue) | [@jonathonc](https://github.com/jonathonc) |
+| Singleton flag feature request (split start API) | [@Kaiden0001](https://github.com/Kaiden0001) |
+| Coordinator hostname resolution issue and solution | [@peterbuga](https://github.com/peterbuga) |
+
+**Full Changelog**: [v1.20.0...v1.21.0](https://github.com/dagu-org/dagu/compare/v1.20.0...v1.21.0)
+
 ## v1.20.0 (2025-08-10)
 
 ### New Features
