@@ -35,10 +35,14 @@ Workflow jobs are defined as commands. Therefore, legacy scripts that have been 
 Dagu is designed for enterprise & small teams to easily manage complex workflows. It aims to be an ideal choice for teams that find large-scale, high-cost infrastructure like Airflow to be overkill and are looking for a simpler solution. It requires no database management and only needs a shared filesystem, allowing you to focus on your high-value work.
 
 ### CLI Preview
-![Demo CLI](./assets/images/demo-cli.webp)
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/8d2d8b28-ce3c-4f02-9f99-3eb21b6e4331" width="500" controls></video>
+</p>
 
 ### Web UI Preview
-![Demo Web UI](./assets/images/demo-web-ui.webp)
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/f7f94a30-e2b1-488d-b9c1-ba7c03384614" width="500" controls></video>
+</p>
 
 ## Table of Contents
 
