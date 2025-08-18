@@ -465,7 +465,15 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	dagRunId := valueOf(request.Body.DagRunId)
+	var dagRunId, params string
+	var singleton bool
+
+	if request.Body != nil {
+		dagRunId = valueOf(request.Body.DagRunId)
+		params = valueOf(request.Body.Params)
+		singleton = valueOf(request.Body.Singleton)
+	}
+
 	if dagRunId == "" {
 		var err error
 		dagRunId, err = a.dagRunMgr.GenDAGRunID(ctx)
@@ -488,7 +496,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	}
 
 	// Check singleton flag - if enabled and DAG is already running, return 409
-	if valueOf(request.Body.Singleton) {
+	if singleton {
 		dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
 		if err == nil && dagStatus.Status == status.Running {
 			return nil, &Error{
@@ -499,7 +507,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	if err := a.startDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId, valueOf(request.Body.Singleton)); err != nil {
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, singleton); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
@@ -513,7 +521,7 @@ func (a *API) startDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunI
 		Params:    params,
 		DAGRunID:  dagRunID,
 		Quiet:     true,
-		Immediate: true,
+		Immediate: false,
 		Singleton: singleton,
 	}); err != nil {
 		return fmt.Errorf("error starting DAG: %w", err)

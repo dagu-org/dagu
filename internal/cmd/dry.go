@@ -87,7 +87,6 @@ func runDry(ctx *Context, args []string) error {
 		ctx.DAGRunMgr,
 		dr,
 		ctx.DAGRunStore,
-		ctx.ProcStore,
 		ctx.ServiceRegistry,
 		root,
 		agent.Options{Dry: true},

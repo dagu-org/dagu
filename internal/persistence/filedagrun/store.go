@@ -189,7 +189,9 @@ func (store *Store) collectStatusesFromRoots(
 
 				run, err := dagRun.LatestAttempt(ctx, store.cache)
 				if err != nil {
-					logger.Error(ctx, "Failed to get latest run", "err", err)
+					if !errors.Is(err, models.ErrNoStatusData) {
+						logger.Error(ctx, "Failed to get latest run", "err", err)
+					}
 					continue
 				}
 
