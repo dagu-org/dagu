@@ -56,9 +56,6 @@ type Agent struct {
 	// dagRunStore is the database to store the run history.
 	dagRunStore models.DAGRunStore
 
-	// procStore is the database to store the process information.
-	procStore models.ProcStore
-
 	// registry is the service registry to find the coordinator service.
 	registry models.ServiceRegistry
 
@@ -149,7 +146,6 @@ func New(
 	drm dagrun.Manager,
 	ds models.DAGStore,
 	drs models.DAGRunStore,
-	ps models.ProcStore,
 	reg models.ServiceRegistry,
 	root digraph.DAGRunRef,
 	opts Options,
@@ -166,7 +162,6 @@ func New(
 		dagRunMgr:    drm,
 		dagStore:     ds,
 		dagRunStore:  drs,
-		procStore:    ps,
 		registry:     reg,
 		stepRetry:    opts.StepRetry,
 	}
@@ -245,17 +240,6 @@ func (a *Agent) Run(ctx context.Context) error {
 	if err := a.checkIsAlreadyRunning(ctx); err != nil {
 		return err
 	}
-
-	// Create a process for heartbeat. We need to acquire proc file by queue name or dag name.
-	// This is to ensure queue scheduler can limit the number of active processes for the same queue.
-	proc, err := a.procStore.Acquire(ctx, a.dag.ProcGroup(), digraph.NewDAGRunRef(a.dag.Name, a.dagRunID))
-	if err != nil {
-		return fmt.Errorf("failed to get process: %w", err)
-	}
-	defer func() {
-		// Stop the process and remove it from the store.
-		_ = proc.Stop(ctx)
-	}()
 
 	if !a.dry {
 		// Setup the attempt for the dag-run.
@@ -484,11 +468,6 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
-
-	// Stop the process and remove it from the store.
-	if err := proc.Stop(ctx); err != nil {
-		logger.Error(ctx, "Failed to stop the heartbeat", "err", err)
-	}
 
 	if coordinatorCli != nil {
 		// Cleanup the coordinator client resources if it was created.

@@ -13,7 +13,8 @@ import (
 func TestStartCommand(t *testing.T) {
 	th := test.SetupCommand(t)
 
-	dagStart := th.DAG(t, `steps:
+	dagStart := th.DAG(t, `maxActiveRuns: 1
+steps:
   - name: "1"
     command: "true"
 `)

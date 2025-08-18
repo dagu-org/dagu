@@ -78,6 +78,9 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	// Set the log level to debug
 	_ = os.Setenv("DEBUG", "true")
 
+	// Set the CI flag
+	_ = os.Setenv("CI", "true")
+
 	// Disable the DAG run queue for tests
 	_ = os.Setenv("DISABLE_DAG_RUN_QUEUE", "true")
 
@@ -381,7 +384,6 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.DAGRunMgr,
 		d.DAGStore,
 		d.DAGRunStore,
-		d.ProcStore,
 		d.ServiceRegistry,
 		root,
 		helper.opts,

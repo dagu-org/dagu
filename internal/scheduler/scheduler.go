@@ -403,6 +403,9 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				goto SEND_RESULT
 			}
 
+			// Wait until the DAG to be alive
+			time.Sleep(500 * time.Millisecond)
+
 			// Wait for the DAG to be picked up by checking process heartbeat
 		WAIT_FOR_RUN:
 			for {
@@ -414,16 +417,34 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				} else if isAlive {
 					// Process has started and has heartbeat
 					logger.Info(ctx, "DAG run has started (heartbeat detected)", "data", data)
-					result = models.QueuedItemProcessingResultDiscard
+					result = models.QueuedItemProcessingResultSuccess
 					break WAIT_FOR_RUN
 				}
 
 				// Check timeout
-				if time.Since(startedAt) > 10*time.Second {
+				if time.Since(startedAt) > 30*time.Second {
 					logger.Error(ctx, "Cancelling due to timeout waiting for the run to be alive (10sec)", "data", data)
+
+					// Somehow it's failed to execute. Mark it failed and discard from queue.
 					if err := s.markStatusFailed(ctx, attempt); err != nil {
 						logger.Error(ctx, "Failed to mark the status cancelled")
 					}
+
+					logger.Info(ctx, "Discard the queue item due to timeout", "data", data)
+					result = models.QueuedItemProcessingResultDiscard
+					break WAIT_FOR_RUN
+				}
+
+				// Check status if it's already finished
+				st, err = attempt.ReadStatus(ctx)
+				if err != nil {
+					logger.Error(ctx, "Failed to read status. Is it corrupted?", "err", err, "data", data)
+					result = models.QueuedItemProcessingResultDiscard
+					break WAIT_FOR_RUN
+				}
+
+				if st.Status != status.Queued {
+					logger.Info(ctx, "Looks like the DAG is already executed", "data", data, "status", st.Status.String())
 					result = models.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN
 				}
@@ -461,6 +482,7 @@ func (s *Scheduler) markStatusFailed(ctx context.Context, attempt models.DAGRunA
 	}()
 	if st.Status != status.Queued {
 		logger.Info(ctx, "Tried to mark a queued item 'cancelled' but it's different status now", "status", st.Status.String())
+		return nil
 	}
 	st.Status = status.Cancel // Mark it cancel
 	if err := attempt.Write(ctx, *st); err != nil {
