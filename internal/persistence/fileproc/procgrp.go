@@ -13,10 +13,13 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/persistence/dirlock"
 )
 
 // ProcGroup is a struct that manages process files for a given DAG name.
 type ProcGroup struct {
+	dirlock.DirLock
+
 	groupName string
 	baseDir   string
 	staleTime time.Duration
@@ -31,7 +34,12 @@ var procFileRegex = regexp.MustCompile(`^proc_\d{8}_\d{6}Z_.*\.proc$`)
 
 // NewProcGroup creates a new instance of a ProcGroup with the specified base directory and DAG name.
 func NewProcGroup(baseDir, groupName string, staleTime time.Duration) *ProcGroup {
+	dirLock := dirlock.New(baseDir, &dirlock.LockOptions{
+		StaleThreshold: 5 * time.Second,
+		RetryInterval:  100 * time.Millisecond,
+	})
 	return &ProcGroup{
+		DirLock:   dirLock,
 		baseDir:   baseDir,
 		groupName: groupName,
 		staleTime: staleTime,

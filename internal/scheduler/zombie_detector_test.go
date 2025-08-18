@@ -412,9 +412,20 @@ func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun digraph.DAGRu
 	return args.Error(0)
 }
 
+var _ models.ProcStore = (*mockProcStore)(nil)
+
 // Mock ProcStore
 type mockProcStore struct {
 	mock.Mock
+}
+
+// TryLock implements models.ProcStore.
+func (m *mockProcStore) TryLock(_ context.Context, _ string) error {
+	return nil
+}
+
+// Unlock implements models.ProcStore.
+func (m *mockProcStore) Unlock(_ context.Context, _ string) {
 }
 
 func (m *mockProcStore) Acquire(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (models.ProcHandle, error) {

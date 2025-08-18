@@ -81,7 +81,7 @@ func (e *DAGExecutor) HandleJob(
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
 		logger.Info(ctx, "Enqueueing DAG for distributed execution",
 			"dag", dag.Name,
-			"runID", runID,
+			"runId", runID,
 			"workerSelector", dag.WorkerSelector)
 
 		if err := e.dagRunManager.EnqueueDAGRun(ctx, dag, dagrun.EnqueueOptions{

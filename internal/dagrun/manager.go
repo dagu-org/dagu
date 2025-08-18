@@ -459,8 +459,6 @@ func (*Manager) currentStatus(_ context.Context, dag *digraph.DAG, dagRunID stri
 // If the DAG is running, it attempts to get the current status from the socket.
 // If that fails or no status exists, it returns an initial status or an error.
 func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models.DAGRunStatus, error) {
-	var dagStatus *models.DAGRunStatus
-
 	// Find the proc store to check if the DAG is running
 	alive, _ := m.procStore.CountAlive(ctx, dag.ProcGroup())
 	if alive > 0 {
@@ -501,15 +499,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models
 		}
 	}
 
-	// If querying the current status fails, ensure if the status is running,
-	if st.Status == status.Running {
-		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
-			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
-		}
-	}
-	dagStatus = st
-
-	return *dagStatus, nil
+	return *st, nil
 }
 
 // ListRecentStatus retrieves the n most recent statuses for a DAG by name.

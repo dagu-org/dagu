@@ -20,9 +20,7 @@ steps:
   - name: "1"
     script: "echo $1"
   - name: "2"
-    script: "sleep 100"
-    depends:
-      - "1"
+    script: "sleep 1"
 `)
 
 		go func() {

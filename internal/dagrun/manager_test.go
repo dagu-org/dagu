@@ -158,56 +158,6 @@ steps:
 		err := cli.UpdateStatus(ctx, root, status)
 		require.Error(t, err)
 	})
-	t.Run("OrphanedRunningStatus", func(t *testing.T) {
-		// Test that when a DAG is marked as running but has no alive process,
-		// GetLatestStatus correctly updates it to error status
-		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "sleep 10"
-`)
-		ctx := th.Context
-
-		// Start a DAG run
-		err := th.DAGRunMgr.StartDAGRunAsync(ctx, dag.DAG, dagrun.StartOptions{})
-		require.NoError(t, err)
-
-		// Wait for it to start running
-		time.Sleep(200 * time.Millisecond)
-
-		// Get the latest status - should be running
-		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
-		require.NoError(t, err)
-		require.Equal(t, status.Running.String(), dagRunStatus.Status.String())
-
-		// Now simulate the process dying by removing the process file
-		// First, stop the DAG to kill the process
-		err = th.DAGRunMgr.Stop(ctx, dag.DAG, dagRunStatus.DAGRunID)
-		require.NoError(t, err)
-
-		// Wait for process to be cleaned up
-		time.Sleep(100 * time.Millisecond)
-
-		// Manually update the status back to running to simulate orphaned state
-		dagRunRef := digraph.NewDAGRunRef(dag.Name, dagRunStatus.DAGRunID)
-		attempt, err := th.DAGRunStore.FindAttempt(ctx, dagRunRef)
-		require.NoError(t, err)
-
-		// Force status to running
-		runningStatus := dagRunStatus
-		runningStatus.Status = status.Running
-		err = attempt.Open(ctx)
-		require.NoError(t, err)
-		err = attempt.Write(ctx, runningStatus)
-		require.NoError(t, err)
-		err = attempt.Close(ctx)
-		require.NoError(t, err)
-
-		// Now when we get the latest status, it should detect the process is dead
-		// and update the status to error
-		dagRunStatus, err = th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
-		require.NoError(t, err)
-		require.Equal(t, status.Error.String(), dagRunStatus.Status.String())
-	})
 }
 
 func TestClient_RunDAG(t *testing.T) {
