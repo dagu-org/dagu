@@ -2,10 +2,8 @@ package dirlock
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -58,7 +56,6 @@ func TestTryLock(t *testing.T) {
 
 	t.Run("lock conflict", func(t *testing.T) {
 		lock1 := New(tmpDir, nil)
-
 		lock2 := New(tmpDir, nil)
 
 		// First lock succeeds
@@ -153,7 +150,6 @@ func TestLock(t *testing.T) {
 
 	t.Run("context cancellation", func(t *testing.T) {
 		lock1 := New(tmpDir, nil)
-
 		lock2 := New(tmpDir, nil)
 
 		// First lock acquired
@@ -221,7 +217,6 @@ func TestIsLocked(t *testing.T) {
 
 	t.Run("with lock", func(t *testing.T) {
 		lock1 := New(tmpDir, nil)
-
 		lock2 := New(tmpDir, nil)
 
 		err := lock1.TryLock()
@@ -243,9 +238,13 @@ func TestStaleDetection(t *testing.T) {
 
 	t.Run("clean stale lock", func(t *testing.T) {
 		// Create a stale lock manually
-		staleLockName := fmt.Sprintf(".dagu_lock.%d", time.Now().Add(-60*time.Second).UnixNano())
-		staleLockPath := filepath.Join(tmpDir, staleLockName)
-		err := os.Mkdir(staleLockPath, 0700)
+		lockPath := filepath.Join(tmpDir, ".dagu_lock")
+		err := os.Mkdir(lockPath, 0700)
+		require.NoError(t, err)
+
+		// Set modification time to past
+		pastTime := time.Now().Add(-60 * time.Second)
+		err = os.Chtimes(lockPath, pastTime, pastTime)
 		require.NoError(t, err)
 
 		lock := New(tmpDir, &LockOptions{
@@ -256,9 +255,8 @@ func TestStaleDetection(t *testing.T) {
 		err = lock.TryLock()
 		require.NoError(t, err)
 
-		// Verify stale lock was removed
-		_, err = os.Stat(staleLockPath)
-		require.True(t, os.IsNotExist(err))
+		// Verify lock is held
+		require.True(t, lock.IsHeldByMe())
 
 		// Cleanup
 		err = lock.Unlock()
@@ -339,9 +337,11 @@ func TestHeartbeat(t *testing.T) {
 		err := lock.TryLock()
 		require.NoError(t, err)
 
-		// Get the dirLock to access internal state
-		dl := lock.(*dirLock)
-		initialLockPath := dl.lockPath
+		// Get initial lock info
+		info1, err := lock.Info()
+		require.NoError(t, err)
+		require.NotNil(t, info1)
+		initialTime := info1.AcquiredAt
 
 		// Wait a bit to ensure timestamp difference
 		time.Sleep(10 * time.Millisecond)
@@ -350,8 +350,13 @@ func TestHeartbeat(t *testing.T) {
 		err = lock.Heartbeat(context.Background())
 		require.NoError(t, err)
 
-		// Verify lock path was updated (new lock file created)
-		require.NotEqual(t, initialLockPath, dl.lockPath)
+		// Get updated lock info
+		info2, err := lock.Info()
+		require.NoError(t, err)
+		require.NotNil(t, info2)
+
+		// Verify timestamp was updated
+		require.True(t, info2.AcquiredAt.After(initialTime))
 
 		// Verify lock is still held
 		require.True(t, lock.IsHeldByMe())
@@ -428,41 +433,33 @@ func TestEdgeCases(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("invalid lock directory format", func(t *testing.T) {
+	t.Run("info returns correct data", func(t *testing.T) {
 		tmpDir := t.TempDir()
-
-		// Create invalid lock directories
-		invalidNames := []string{
-			".dagu_lock",
-			".dagu_lock.",
-			".dagu_lock.abc",
-			".dagu_lock.123.456",
-		}
-
-		for _, name := range invalidNames {
-			err := os.Mkdir(filepath.Join(tmpDir, name), 0700)
-			require.NoError(t, err)
-		}
-
 		lock := New(tmpDir, nil)
 
-		// Should clean up invalid locks and succeed
-		err := lock.TryLock()
+		// No lock initially
+		info, err := lock.Info()
+		require.NoError(t, err)
+		require.Nil(t, info)
+
+		// Acquire lock
+		err = lock.TryLock()
 		require.NoError(t, err)
 
-		// Verify all invalid locks were removed
-		entries, err := os.ReadDir(tmpDir)
+		// Get info
+		info, err = lock.Info()
 		require.NoError(t, err)
+		require.NotNil(t, info)
+		require.Equal(t, ".dagu_lock", info.LockDirName)
+		require.WithinDuration(t, time.Now(), info.AcquiredAt, 1*time.Second)
 
-		validLockCount := 0
-		for _, entry := range entries {
-			if strings.HasPrefix(entry.Name(), ".dagu_lock.") {
-				validLockCount++
-			}
-		}
-		require.Equal(t, 1, validLockCount)
-
+		// Cleanup
 		err = lock.Unlock()
 		require.NoError(t, err)
+
+		// No lock after unlock
+		info, err = lock.Info()
+		require.NoError(t, err)
+		require.Nil(t, info)
 	})
 }

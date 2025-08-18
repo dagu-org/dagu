@@ -100,6 +100,25 @@ func handleRestartProcess(ctx *Context, d *digraph.DAG, dagRunID string) error {
 	}
 
 	// Execute the exact same DAG with the same parameters but a new dag-run ID
+	if err := ctx.ProcStore.TryLock(ctx, d.ProcGroup()); err != nil {
+		logger.Debug(ctx, "failed to lock process group", "err", err)
+		return errMaxRunReached
+	}
+	defer ctx.ProcStore.Unlock(ctx, d.ProcGroup())
+
+	// Acquire process handle
+	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), digraph.NewDAGRunRef(d.Name, dagRunID))
+	if err != nil {
+		logger.Debug(ctx, "failed to acquire process handle", "err", err)
+		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
+	}
+	defer func() {
+		_ = proc.Stop(ctx)
+	}()
+
+	// Unlock the process group
+	ctx.ProcStore.Unlock(ctx, d.ProcGroup())
+
 	return executeDAG(ctx, ctx.DAGRunMgr, d)
 }
 
@@ -134,7 +153,6 @@ func executeDAG(ctx *Context, cli dagrun.Manager, dag *digraph.DAG) error {
 		cli,
 		dr,
 		ctx.DAGRunStore,
-		ctx.ProcStore,
 		ctx.ServiceRegistry,
 		digraph.NewDAGRunRef(dag.Name, dagRunID),
 		agent.Options{Dry: false})

@@ -67,6 +67,25 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}
 
+	// Try lock proc store to avoid race
+	if err := ctx.ProcStore.TryLock(ctx, dag.ProcGroup()); err != nil {
+		return fmt.Errorf("failed to lock process group: %w", err)
+	}
+	defer ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
+
+	// Acquire process handle
+	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), digraph.NewDAGRunRef(dag.Name, dagRunID))
+	if err != nil {
+		logger.Debug(ctx, "failed to acquire process handle", "err", err)
+		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
+	}
+	defer func() {
+		_ = proc.Stop(ctx)
+	}()
+
+	// Unlock the process group before start DAG
+	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
+
 	// The retry command is currently only supported for root DAGs.
 	if err := executeRetry(ctx, dag, status, status.DAGRun(), stepName); err != nil {
 		return fmt.Errorf("failed to execute retry: %w", err)
@@ -102,7 +121,6 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 		ctx.DAGRunMgr,
 		dr,
 		ctx.DAGRunStore,
-		ctx.ProcStore,
 		ctx.ServiceRegistry,
 		rootRun,
 		agent.Options{
