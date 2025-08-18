@@ -50,10 +50,14 @@ steps:
 - Modularize workflows by nesting them.
 
 ### CLI Preview
-![Demo CLI](./assets/images/demo-cli.webp)
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/8d2d8b28-ce3c-4f02-9f99-3eb21b6e4331" width="500" controls></video>
+</p>
 
 ### Web UI Preview
-![Demo Web UI](./assets/images/demo-web-ui.webp)
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/f7f94a30-e2b1-488d-b9c1-ba7c03384614" width="500" controls></video>
+</p>
 
 ## Table of Contents
 
