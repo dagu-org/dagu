@@ -420,12 +420,12 @@ type mockProcStore struct {
 }
 
 // TryLock implements models.ProcStore.
-func (m *mockProcStore) TryLock(ctx context.Context, groupName string) error {
+func (m *mockProcStore) TryLock(_ context.Context, _ string) error {
 	return nil
 }
 
 // Unlock implements models.ProcStore.
-func (m *mockProcStore) Unlock(ctx context.Context, groupName string) {
+func (m *mockProcStore) Unlock(_ context.Context, _ string) {
 }
 
 func (m *mockProcStore) Acquire(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (models.ProcHandle, error) {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
@@ -28,7 +29,7 @@ func New(baseDir string) *Store {
 }
 
 // Lock locks process group
-func (s *Store) TryLock(ctx context.Context, groupName string) error {
+func (s *Store) TryLock(_ context.Context, groupName string) error {
 	procGroup := s.newProcGroup(groupName)
 	return procGroup.TryLock()
 }
@@ -36,7 +37,9 @@ func (s *Store) TryLock(ctx context.Context, groupName string) error {
 // Lock locks process group
 func (s *Store) Unlock(ctx context.Context, groupName string) {
 	procGroup := s.newProcGroup(groupName)
-	procGroup.Unlock()
+	if err := procGroup.Unlock(); err != nil {
+		logger.Error(ctx, "Failed to unlock the proc group", "err", err)
+	}
 }
 
 // CountAlive implements models.ProcStore.
@@ -75,7 +78,7 @@ func (s *Store) newProcGroup(groupName string) *ProcGroup {
 	if pg, ok := s.procGroups.Load(groupName); ok {
 		return pg.(*ProcGroup)
 	}
-	
+
 	// Create a new ProcGroup only if it doesn't exist
 	pgBaseDir := filepath.Join(s.baseDir, groupName)
 	newPG := NewProcGroup(pgBaseDir, groupName, s.staleTime)
