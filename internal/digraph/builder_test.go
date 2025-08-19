@@ -1444,6 +1444,65 @@ steps:
 	})
 }
 
+func TestShorthandCommandSyntax(t *testing.T) {
+	t.Parallel()
+	
+	t.Run("SimpleShorthandCommands", func(t *testing.T) {
+		t.Parallel()
+		
+		data := []byte(`
+steps:
+  - echo "hello"
+  - ls -la
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Len(t, dag.Steps, 2)
+		
+		// First step
+		assert.Equal(t, "echo \"hello\"", dag.Steps[0].CmdWithArgs)
+		assert.Equal(t, "echo", dag.Steps[0].Command)
+		assert.Equal(t, []string{"hello"}, dag.Steps[0].Args)
+		assert.Equal(t, "cmd_1", dag.Steps[0].Name) // Auto-generated name
+		
+		// Second step
+		assert.Equal(t, "ls -la", dag.Steps[1].CmdWithArgs)
+		assert.Equal(t, "ls", dag.Steps[1].Command)
+		assert.Equal(t, []string{"-la"}, dag.Steps[1].Args)
+		assert.Equal(t, "cmd_2", dag.Steps[1].Name) // Auto-generated name
+	})
+	
+	t.Run("MixedShorthandAndStandardSyntax", func(t *testing.T) {
+		t.Parallel()
+		
+		data := []byte(`
+steps:
+  - echo "starting"
+  - name: build
+    command: make build
+    env:
+      DEBUG: "true"
+  - ls -la
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Len(t, dag.Steps, 3)
+		
+		// First step (shorthand)
+		assert.Equal(t, "echo \"starting\"", dag.Steps[0].CmdWithArgs)
+		assert.Equal(t, "cmd_1", dag.Steps[0].Name)
+		
+		// Second step (standard)
+		assert.Equal(t, "make build", dag.Steps[1].CmdWithArgs)
+		assert.Equal(t, "build", dag.Steps[1].Name)
+		assert.Contains(t, dag.Steps[1].Env, "DEBUG=true")
+		
+		// Third step (shorthand)
+		assert.Equal(t, "ls -la", dag.Steps[2].CmdWithArgs)
+		assert.Equal(t, "cmd_3", dag.Steps[2].Name)
+	})
+}
+
 func TestOptionalStepNames(t *testing.T) {
 	t.Parallel()
 

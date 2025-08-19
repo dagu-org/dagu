@@ -854,13 +854,26 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		return nil
 
 	case []any:
+		// Convert string steps to map format for shorthand syntax support
+		normalized := make([]any, len(v))
+		for i, item := range v {
+			switch step := item.(type) {
+			case string:
+				// Shorthand: convert string to map with command field
+				normalized[i] = map[string]any{"command": step}
+			default:
+				// Keep as-is (already a map or other structure)
+				normalized[i] = item
+			}
+		}
+		
 		var stepDefs []stepDef
 		md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 			ErrorUnused: true,
 			Result:      &stepDefs,
 		})
-		if err := md.Decode(v); err != nil {
-			return wrapError("steps", v, err)
+		if err := md.Decode(normalized); err != nil {
+			return wrapError("steps", normalized, err)
 		}
 
 		var builtSteps []*Step
