@@ -1109,14 +1109,18 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 		// To field not specified
 	case string:
 		// Single recipient
+		v = strings.TrimSpace(v)
 		if v != "" {
 			toAddresses = []string{v}
 		}
 	case []any:
 		// Multiple recipients
 		for _, addr := range v {
-			if str, ok := addr.(string); ok && str != "" {
-				toAddresses = append(toAddresses, str)
+			if str, ok := addr.(string); ok {
+				str = strings.TrimSpace(str)
+				if str != "" {
+					toAddresses = append(toAddresses, str)
+				}
 			}
 		}
 	default:
@@ -1129,9 +1133,9 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 	}
 
 	return &MailConfig{
-		From:       def.From,
+		From:       strings.TrimSpace(def.From),
 		To:         toAddresses,
-		Prefix:     def.Prefix,
+		Prefix:     strings.TrimSpace(def.Prefix),
 		AttachLogs: def.AttachLogs,
 	}, nil
 }
@@ -1407,7 +1411,7 @@ func buildOutput(_ StepBuildContext, def stepDef, step *Step) error {
 		return nil
 	}
 
-	step.Output = def.Output
+	step.Output = strings.TrimSpace(def.Output)
 	return nil
 }
 
@@ -1498,7 +1502,7 @@ func buildSignalOnStop(_ StepBuildContext, def stepDef, step *Step) error {
 
 // buildChildDAG parses the child DAG definition and sets up the step to run a child DAG.
 func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
-	name := def.Run
+	name := strings.TrimSpace(def.Run)
 
 	// if the run field is not set, return nil.
 	if name == "" {
@@ -1587,7 +1591,7 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 	case string:
 		// Case 2: executor is a string
 		// This can be an executor with default configuration.
-		step.ExecutorConfig.Type = val
+		step.ExecutorConfig.Type = strings.TrimSpace(val)
 
 	case map[string]any:
 		// Case 3: executor is a struct
@@ -1601,7 +1605,7 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 				if !ok {
 					return wrapError("executor.type", v, ErrExecutorTypeMustBeString)
 				}
-				step.ExecutorConfig.Type = typ
+				step.ExecutorConfig.Type = strings.TrimSpace(typ)
 
 			case executorKeyConfig:
 				// Executor config is a map of string keys and values.
