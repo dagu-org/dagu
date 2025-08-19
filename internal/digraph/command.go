@@ -41,6 +41,7 @@ func buildCommand(_ StepBuildContext, def stepDef, step *Step) error {
 	switch val := command.(type) {
 	case string:
 		// Case 2: command is a string
+		val = strings.TrimSpace(val)
 		if val == "" {
 			return wrapError("command", val, ErrStepCommandIsEmpty)
 		}
@@ -50,7 +51,7 @@ func buildCommand(_ StepBuildContext, def stepDef, step *Step) error {
 		if err != nil {
 			return wrapError("command", val, fmt.Errorf("failed to parse command: %w", err))
 		}
-		step.Command = cmd
+		step.Command = strings.TrimSpace(cmd)
 		step.Args = args
 
 	case []any:
@@ -65,6 +66,7 @@ func buildCommand(_ StepBuildContext, def stepDef, step *Step) error {
 				// This is useful when the value is an integer for example.
 				val = fmt.Sprintf("%v", v)
 			}
+			val = strings.TrimSpace(val)
 			if command == "" {
 				command = val
 				continue

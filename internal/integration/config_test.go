@@ -531,6 +531,30 @@ steps:
 			},
 		})
 	})
+
+	t.Run("Issue1203_ScriptWithCarriageReturn", func(t *testing.T) {
+		t.Parallel()
+
+		// Issue #1203: Scripts with trailing \r cause file path errors
+		// Example: "can't open file '/path/to/file.py\r': [Errno 2] No such file or directory"
+		tmpFile := th.TempFile(t, "script-trimming-issue", nil)
+
+		// Create a DAG with script containing \r - this should fail
+		dag := th.DAG(t, "steps:\n"+
+			"  - name: script_with_cr\n"+
+			"    command: bash\n"+
+			"    script: \"test -f "+tmpFile+"\\r\"\n")
+
+		agent := dag.Agent()
+
+		// This should fail because bash tries to execute "test -f /etc/passwd\r"
+		// The \r becomes part of the filename, so it looks for "/etc/passwd\r" which doesn't exist
+		err := agent.Run(agent.Context)
+		require.NoError(t, err)
+
+		// The test should fail with the current implementation
+		dag.AssertLatestStatus(t, status.Success)
+	})
 }
 
 func TestCallSubDAG(t *testing.T) {

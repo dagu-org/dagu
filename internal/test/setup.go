@@ -189,6 +189,16 @@ func (h Helper) Cleanup() {
 	_ = os.RemoveAll(h.tmpDir)
 }
 
+// TempFile creates a temp file with specified name and content.
+func (h Helper) TempFile(t *testing.T, name string, data []byte) string {
+	t.Helper()
+
+	filename := filepath.Join(h.tmpDir, name)
+	err := os.WriteFile(filename, data, 0600)
+	require.NoError(t, err)
+	return filename
+}
+
 // DAG creates a test DAG from YAML content
 func (h Helper) DAG(t *testing.T, yamlContent string) DAG {
 	t.Helper()

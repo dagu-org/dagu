@@ -16,13 +16,13 @@ import (
 )
 
 type Service struct {
-	server        *grpc.Server
-	handler       *Handler
-	grpcListener  net.Listener
-	healthServer  *health.Server
-	registry      models.ServiceRegistry
-	instanceID    string
-	hostPort      string
+	server         *grpc.Server
+	handler        *Handler
+	grpcListener   net.Listener
+	healthServer   *health.Server
+	registry       models.ServiceRegistry
+	instanceID     string
+	hostPort       string
 	configuredHost string
 }
 
@@ -36,13 +36,13 @@ func NewService(
 	configuredHost string,
 ) *Service {
 	return &Service{
-		server:        server,
-		handler:       handler,
-		grpcListener:  grpcListener,
-		healthServer:  healthServer,
-		registry:      registry,
-		instanceID:    instanceID,
-		hostPort:      grpcListener.Addr().String(),
+		server:         server,
+		handler:        handler,
+		grpcListener:   grpcListener,
+		healthServer:   healthServer,
+		registry:       registry,
+		instanceID:     instanceID,
+		hostPort:       grpcListener.Addr().String(),
 		configuredHost: configuredHost,
 	}
 }

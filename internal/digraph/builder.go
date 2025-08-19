@@ -73,6 +73,7 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "type", fn: buildType},
 	{metadata: true, name: "runConfig", fn: buildRunConfig},
 	{name: "container", fn: buildContainer},
+	{name: "workerSelector", fn: buildWorkerSelector},
 	{name: "registryAuths", fn: buildRegistryAuths},
 	{name: "ssh", fn: buildSSH},
 	{name: "dotenv", fn: buildDotenv},
@@ -124,18 +125,17 @@ type StepBuilderFn func(ctx StepBuildContext, def stepDef, step *Step) error
 func build(ctx BuildContext, spec *definition) (*DAG, error) {
 	dag := &DAG{
 		Location:       ctx.file,
-		Name:           spec.Name,
-		Group:          spec.Group,
-		Description:    spec.Description,
-		Type:           spec.Type,
+		Name:           strings.TrimSpace(spec.Name),
+		Group:          strings.TrimSpace(spec.Group),
+		Description:    strings.TrimSpace(spec.Description),
+		Type:           strings.TrimSpace(spec.Type),
 		Timeout:        time.Second * time.Duration(spec.TimeoutSec),
 		Delay:          time.Second * time.Duration(spec.DelaySec),
 		RestartWait:    time.Second * time.Duration(spec.RestartWaitSec),
 		Tags:           parseTags(spec.Tags),
 		MaxActiveSteps: spec.MaxActiveSteps,
-		Queue:          spec.Queue,
+		Queue:          strings.TrimSpace(spec.Queue),
 		MaxOutputSize:  spec.MaxOutputSize,
-		WorkerSelector: spec.WorkerSelector,
 	}
 
 	var errs ErrorList
@@ -303,6 +303,21 @@ func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
 
 	dag.Container = &container
 
+	return nil
+}
+
+func buildWorkerSelector(ctx BuildContext, spec *definition, dag *DAG) error {
+	if len(spec.WorkerSelector) == 0 {
+		return nil
+	}
+
+	ret := make(map[string]string)
+
+	for key, val := range spec.WorkerSelector {
+		ret[strings.TrimSpace(key)] = strings.TrimSpace(val)
+	}
+
+	dag.WorkerSelector = ret
 	return nil
 }
 
@@ -1094,14 +1109,18 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 		// To field not specified
 	case string:
 		// Single recipient
+		v = strings.TrimSpace(v)
 		if v != "" {
 			toAddresses = []string{v}
 		}
 	case []any:
 		// Multiple recipients
 		for _, addr := range v {
-			if str, ok := addr.(string); ok && str != "" {
-				toAddresses = append(toAddresses, str)
+			if str, ok := addr.(string); ok {
+				str = strings.TrimSpace(str)
+				if str != "" {
+					toAddresses = append(toAddresses, str)
+				}
 			}
 		}
 	default:
@@ -1114,9 +1133,9 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 	}
 
 	return &MailConfig{
-		From:       def.From,
+		From:       strings.TrimSpace(def.From),
 		To:         toAddresses,
-		Prefix:     def.Prefix,
+		Prefix:     strings.TrimSpace(def.Prefix),
 		AttachLogs: def.AttachLogs,
 	}, nil
 }
@@ -1124,15 +1143,15 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 // buildStep builds a step from the step definition.
 func buildStep(ctx StepBuildContext, def stepDef) (*Step, error) {
 	step := &Step{
-		Name:           def.Name,
-		ID:             def.ID,
-		Description:    def.Description,
-		Shell:          def.Shell,
+		Name:           strings.TrimSpace(def.Name),
+		ID:             strings.TrimSpace(def.ID),
+		Description:    strings.TrimSpace(def.Description),
+		Shell:          strings.TrimSpace(def.Shell),
 		ShellPackages:  def.ShellPackages,
-		Script:         def.Script,
-		Stdout:         def.Stdout,
-		Stderr:         def.Stderr,
-		Dir:            def.Dir,
+		Script:         strings.TrimSpace(def.Script),
+		Stdout:         strings.TrimSpace(def.Stdout),
+		Stderr:         strings.TrimSpace(def.Stderr),
+		Dir:            strings.TrimSpace(def.Dir),
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
 	}
@@ -1392,7 +1411,7 @@ func buildOutput(_ StepBuildContext, def stepDef, step *Step) error {
 		return nil
 	}
 
-	step.Output = def.Output
+	step.Output = strings.TrimSpace(def.Output)
 	return nil
 }
 
@@ -1483,7 +1502,7 @@ func buildSignalOnStop(_ StepBuildContext, def stepDef, step *Step) error {
 
 // buildChildDAG parses the child DAG definition and sets up the step to run a child DAG.
 func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
-	name := def.Run
+	name := strings.TrimSpace(def.Run)
 
 	// if the run field is not set, return nil.
 	if name == "" {
@@ -1572,7 +1591,7 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 	case string:
 		// Case 2: executor is a string
 		// This can be an executor with default configuration.
-		step.ExecutorConfig.Type = val
+		step.ExecutorConfig.Type = strings.TrimSpace(val)
 
 	case map[string]any:
 		// Case 3: executor is a struct
@@ -1586,7 +1605,7 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 				if !ok {
 					return wrapError("executor.type", v, ErrExecutorTypeMustBeString)
 				}
-				step.ExecutorConfig.Type = typ
+				step.ExecutorConfig.Type = strings.TrimSpace(typ)
 
 			case executorKeyConfig:
 				// Executor config is a map of string keys and values.
