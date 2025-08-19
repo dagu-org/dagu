@@ -73,6 +73,7 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "type", fn: buildType},
 	{metadata: true, name: "runConfig", fn: buildRunConfig},
 	{name: "container", fn: buildContainer},
+	{name: "workerSelector", fn: buildWorkerSelector},
 	{name: "registryAuths", fn: buildRegistryAuths},
 	{name: "ssh", fn: buildSSH},
 	{name: "dotenv", fn: buildDotenv},
@@ -124,18 +125,17 @@ type StepBuilderFn func(ctx StepBuildContext, def stepDef, step *Step) error
 func build(ctx BuildContext, spec *definition) (*DAG, error) {
 	dag := &DAG{
 		Location:       ctx.file,
-		Name:           spec.Name,
-		Group:          spec.Group,
-		Description:    spec.Description,
-		Type:           spec.Type,
+		Name:           strings.TrimSpace(spec.Name),
+		Group:          strings.TrimSpace(spec.Group),
+		Description:    strings.TrimSpace(spec.Description),
+		Type:           strings.TrimSpace(spec.Type),
 		Timeout:        time.Second * time.Duration(spec.TimeoutSec),
 		Delay:          time.Second * time.Duration(spec.DelaySec),
 		RestartWait:    time.Second * time.Duration(spec.RestartWaitSec),
 		Tags:           parseTags(spec.Tags),
 		MaxActiveSteps: spec.MaxActiveSteps,
-		Queue:          spec.Queue,
+		Queue:          strings.TrimSpace(spec.Queue),
 		MaxOutputSize:  spec.MaxOutputSize,
-		WorkerSelector: spec.WorkerSelector,
 	}
 
 	var errs ErrorList
@@ -303,6 +303,21 @@ func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
 
 	dag.Container = &container
 
+	return nil
+}
+
+func buildWorkerSelector(ctx BuildContext, spec *definition, dag *DAG) error {
+	if len(spec.WorkerSelector) == 0 {
+		return nil
+	}
+
+	ret := make(map[string]string)
+
+	for key, val := range spec.WorkerSelector {
+		ret[strings.TrimSpace(key)] = strings.TrimSpace(val)
+	}
+
+	dag.WorkerSelector = ret
 	return nil
 }
 
@@ -1124,15 +1139,15 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 // buildStep builds a step from the step definition.
 func buildStep(ctx StepBuildContext, def stepDef) (*Step, error) {
 	step := &Step{
-		Name:           def.Name,
-		ID:             def.ID,
-		Description:    def.Description,
-		Shell:          def.Shell,
+		Name:           strings.TrimSpace(def.Name),
+		ID:             strings.TrimSpace(def.ID),
+		Description:    strings.TrimSpace(def.Description),
+		Shell:          strings.TrimSpace(def.Shell),
 		ShellPackages:  def.ShellPackages,
-		Script:         def.Script,
-		Stdout:         def.Stdout,
-		Stderr:         def.Stderr,
-		Dir:            def.Dir,
+		Script:         strings.TrimSpace(def.Script),
+		Stdout:         strings.TrimSpace(def.Stdout),
+		Stderr:         strings.TrimSpace(def.Stderr),
+		Dir:            strings.TrimSpace(def.Dir),
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
 	}
