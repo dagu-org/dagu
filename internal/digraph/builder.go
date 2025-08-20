@@ -1911,30 +1911,59 @@ func parseParallelItems(items []any) ([]ParallelItem, error) {
 	return result, nil
 }
 
-// injectChainDependencies adds implicit dependencies for chain type execution
+// injectChainDependencies adds implicit dependencies for chain type execution.
+// In chain execution, each step depends on all previous steps unless explicitly configured otherwise.
 func injectChainDependencies(dag *DAG, prevSteps []*Step, step *Step) {
-	// Only inject dependencies for chain type
-	if dag.Type != TypeChain {
+	// Early returns for cases where we shouldn't inject dependencies
+	if dag.Type != TypeChain || step.ExplicitlyNoDeps || len(prevSteps) == 0 {
 		return
 	}
 
-	// Only add implicit dependency if the step doesn't already have dependencies
-	// and wasn't explicitly set to have no dependencies
-	if step.ExplicitlyNoDeps {
-		return
-	}
-
-	seen := make(map[string]bool)
+	// Build a set of existing dependencies for efficient lookup
+	existingDeps := make(map[string]struct{}, len(step.Depends))
 	for _, dep := range step.Depends {
-		seen[dep] = true
+		existingDeps[dep] = struct{}{}
 	}
 
-	for _, ps := range prevSteps {
-		if _, exists := seen[ps.Name]; !exists {
-			step.Depends = append(step.Depends, ps.Name)
-			seen[ps.Name] = true
+	// Add each previous step as a dependency if not already present
+	for _, prevStep := range prevSteps {
+		depKey := getStepKey(prevStep)
+
+		// Skip if this dependency already exists
+		if _, exists := existingDeps[depKey]; exists {
+			continue
 		}
+
+		// Also check alternate key (ID vs Name) to avoid duplicates
+		altKey := getStepAlternateKey(prevStep, depKey)
+		if altKey != "" {
+			if _, exists := existingDeps[altKey]; exists {
+				continue
+			}
+		}
+
+		step.Depends = append(step.Depends, depKey)
+		existingDeps[depKey] = struct{}{}
 	}
+}
+
+// getStepKey returns the preferred identifier for a step (ID if available, otherwise Name)
+func getStepKey(step *Step) string {
+	if step.ID != "" {
+		return step.ID
+	}
+	return step.Name
+}
+
+// getStepAlternateKey returns the alternate identifier for a step, or empty string if none
+func getStepAlternateKey(step *Step, primaryKey string) string {
+	if step.ID != "" && primaryKey == step.ID {
+		return step.Name
+	}
+	if step.ID != "" && primaryKey == step.Name {
+		return step.ID
+	}
+	return ""
 }
 
 // buildOTel builds the OpenTelemetry configuration for the DAG.
