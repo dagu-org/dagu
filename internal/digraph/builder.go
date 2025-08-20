@@ -847,44 +847,65 @@ func generateTypedStepName(existingNames map[string]struct{}, step *Step, index 
 // buildSteps builds the steps for the DAG.
 func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
-	existingNames := make(map[string]struct{})
+	names := make(map[string]struct{})
 
 	switch v := spec.Steps.(type) {
 	case nil:
 		return nil
 
 	case []any:
-		var stepDefs []stepDef
-		md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			ErrorUnused: true,
-			Result:      &stepDefs,
-		})
-		if err := md.Decode(v); err != nil {
-			return wrapError("steps", v, err)
-		}
+		// Convert string steps to map format for shorthand syntax support
+		normalized := normalizeStepData(ctx, v)
 
 		var builtSteps []*Step
-		for i, stepDef := range stepDefs {
-			step, err := buildStep(buildCtx, stepDef)
-			if err != nil {
-				return err
+		var prevSteps []*Step
+		for i, raw := range normalized {
+			switch v := raw.(type) {
+			case map[string]any:
+				step, err := buildStepFromRaw(buildCtx, i, v, names)
+				if err != nil {
+					return err
+				}
+
+				injectChainDependencies(dag, prevSteps, step)
+				builtSteps = append(builtSteps, step)
+
+				// prepare for the next step
+				prevSteps = []*Step{step}
+
+			case []any:
+				var tempSteps []*Step
+				var normalized = normalizeStepData(ctx, v)
+				for _, nested := range normalized {
+					switch vv := nested.(type) {
+					case map[string]any:
+						step, err := buildStepFromRaw(buildCtx, i, vv, names)
+						if err != nil {
+							return err
+						}
+
+						injectChainDependencies(dag, prevSteps, step)
+
+						builtSteps = append(builtSteps, step)
+						tempSteps = append(tempSteps, step)
+
+					default:
+						return wrapError("steps", raw, ErrInvalidStepData)
+					}
+				}
+
+				// prepare for the next step
+				prevSteps = tempSteps
+
+			default:
+				return wrapError("steps", raw, ErrInvalidStepData)
 			}
-			if step.Name == "" {
-				step.Name = generateTypedStepName(existingNames, step, i)
-			}
-			if err := validateStep(buildCtx, stepDef, step); err != nil {
-				return err
-			}
-			builtSteps = append(builtSteps, step)
 		}
 
 		// Add all built steps to the DAG
 		for _, step := range builtSteps {
 			dag.Steps = append(dag.Steps, *step)
 		}
-
-		// Inject chain dependencies if type is chain
-		injectChainDependencies(dag)
 
 		return nil
 
@@ -899,7 +920,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		}
 		for name, stepDef := range stepDefs {
 			stepDef.Name = name
-			existingNames[stepDef.Name] = struct{}{}
+			names[stepDef.Name] = struct{}{}
 			step, err := buildStep(buildCtx, stepDef)
 			if err != nil {
 				return err
@@ -907,15 +928,52 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 			dag.Steps = append(dag.Steps, *step)
 		}
 
-		// Inject chain dependencies if type is chain
-		injectChainDependencies(dag)
-
 		return nil
 
 	default:
 		return wrapError("steps", v, ErrStepsMustBeArrayOrMap)
 
 	}
+}
+
+// normalizedStepData converts string to map[string]any for subsequent process
+func normalizeStepData(ctx BuildContext, data []any) []any {
+	// Convert string steps to map format for shorthand syntax support
+	normalized := make([]any, len(data))
+	for i, item := range data {
+		switch step := item.(type) {
+		case string:
+			// Shorthand: convert string to map with command field
+			normalized[i] = map[string]any{"command": step}
+		default:
+			// Keep as-is (already a map or other structure)
+			normalized[i] = item
+		}
+	}
+	return normalized
+}
+
+// buildStepFromRaw build Step from give raw data (map[string]any)
+func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names map[string]struct{}) (*Step, error) {
+	var stepDef stepDef
+	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		ErrorUnused: true,
+		Result:      &stepDef,
+	})
+	if err := md.Decode(raw); err != nil {
+		return nil, wrapError("steps", raw, err)
+	}
+	step, err := buildStep(ctx, stepDef)
+	if err != nil {
+		return nil, err
+	}
+	if step.Name == "" {
+		step.Name = generateTypedStepName(names, step, idx)
+	}
+	if err := validateStep(ctx, stepDef, step); err != nil {
+		return nil, err
+	}
+	return step, nil
 }
 
 // stepIDPattern defines the valid format for step IDs
@@ -1853,29 +1911,59 @@ func parseParallelItems(items []any) ([]ParallelItem, error) {
 	return result, nil
 }
 
-// injectChainDependencies adds implicit dependencies for chain type execution
-func injectChainDependencies(dag *DAG) {
-	// Only inject dependencies for chain type
-	if dag.Type != TypeChain {
+// injectChainDependencies adds implicit dependencies for chain type execution.
+// In chain execution, each step depends on all previous steps unless explicitly configured otherwise.
+func injectChainDependencies(dag *DAG, prevSteps []*Step, step *Step) {
+	// Early returns for cases where we shouldn't inject dependencies
+	if dag.Type != TypeChain || step.ExplicitlyNoDeps || len(prevSteps) == 0 {
 		return
 	}
 
-	// Need at least 2 steps to create a chain
-	if len(dag.Steps) < 2 {
-		return
+	// Build a set of existing dependencies for efficient lookup
+	existingDeps := make(map[string]struct{}, len(step.Depends))
+	for _, dep := range step.Depends {
+		existingDeps[dep] = struct{}{}
 	}
 
-	// For each step starting from the second one
-	for i := 1; i < len(dag.Steps); i++ {
-		step := &dag.Steps[i]
-		prevStep := &dag.Steps[i-1]
+	// Add each previous step as a dependency if not already present
+	for _, prevStep := range prevSteps {
+		depKey := getStepKey(prevStep)
 
-		// Only add implicit dependency if the step doesn't already have dependencies
-		// and wasn't explicitly set to have no dependencies
-		if len(step.Depends) == 0 && !step.ExplicitlyNoDeps {
-			step.Depends = []string{prevStep.Name}
+		// Skip if this dependency already exists
+		if _, exists := existingDeps[depKey]; exists {
+			continue
 		}
+
+		// Also check alternate key (ID vs Name) to avoid duplicates
+		altKey := getStepAlternateKey(prevStep, depKey)
+		if altKey != "" {
+			if _, exists := existingDeps[altKey]; exists {
+				continue
+			}
+		}
+
+		step.Depends = append(step.Depends, depKey)
+		existingDeps[depKey] = struct{}{}
 	}
+}
+
+// getStepKey returns the preferred identifier for a step (ID if available, otherwise Name)
+func getStepKey(step *Step) string {
+	if step.ID != "" {
+		return step.ID
+	}
+	return step.Name
+}
+
+// getStepAlternateKey returns the alternate identifier for a step, or empty string if none
+func getStepAlternateKey(step *Step, primaryKey string) string {
+	if step.ID != "" && primaryKey == step.ID {
+		return step.Name
+	}
+	if step.ID != "" && primaryKey == step.Name {
+		return step.ID
+	}
+	return ""
 }
 
 // buildOTel builds the OpenTelemetry configuration for the DAG.
