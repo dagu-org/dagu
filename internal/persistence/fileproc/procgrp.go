@@ -179,6 +179,8 @@ func (pg *ProcGroup) IsRunAlive(ctx context.Context, dagRun digraph.DAGRunRef) (
 		if err := os.Remove(file); err != nil {
 			logger.Error(ctx, "failed to remove stale file %s: %v", file, err)
 		}
+		// Remove parent directory if it's empty
+		_ = os.Remove(filepath.Dir(file))
 	}
 
 	return false, nil

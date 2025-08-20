@@ -61,6 +61,8 @@ func (p *ProcHandle) Stop(_ context.Context) error {
 		// Wait for the heartbeat goroutine to finish
 		p.wg.Wait()
 	}
+	// Remove parent directory if it's empty
+	_ = os.Remove(filepath.Dir(p.fileName))
 	return nil
 }
 
