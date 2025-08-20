@@ -18,13 +18,21 @@
 
 Dagu */dah-goo/* is a lightweight, versatile workflow engine for **small teams**. It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format. It allows you to schedule the execution of DAGs with Cron expressions, and natively support running containers, executing commands over SSH.
 
+Example DAG:
 ```yaml
 steps:
-  - command: echo "Hello, dagu!" # STEP 1
-  - command: echo "This is a second step" # STEP 2
+  - echo "Hello, dagu!"
+  - echo "This is a second step"
 ```
-
-Dagu is a single binary and it uses the file system as the database and stores the data in plain JSON files. Therefore, no DBMS or cloud service is required.
+Or
+```yaml
+steps:
+  - step: step 1
+    command: echo "Hello, dagu!"
+  - step: step 2
+    command: echo "This is a second step"
+    depends: step 1
+```
 
 ### Why Not Use an Existing Workflow Scheduler Like Airflow?
 There are many existing tools such as Airflow, but many of these require you to write code in a programming language like Python to define your DAG. For systems that have been in operation for a long time, there may already be complex jobs with hundreds of thousands of lines of code written in languages like Perl or Shell Script. Adding another layer of complexity on top of these codes can reduce maintainability. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for smaller projects with fewer people.
