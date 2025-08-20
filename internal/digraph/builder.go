@@ -1924,8 +1924,16 @@ func injectChainDependencies(dag *DAG, prevSteps []*Step, step *Step) {
 		return
 	}
 
+	seen := make(map[string]bool)
+	for _, dep := range step.Depends {
+		seen[dep] = true
+	}
+
 	for _, ps := range prevSteps {
-		step.Depends = append(step.Depends, ps.Name)
+		if _, exists := seen[ps.Name]; !exists {
+			step.Depends = append(step.Depends, ps.Name)
+			seen[ps.Name] = true
+		}
 	}
 }
 
