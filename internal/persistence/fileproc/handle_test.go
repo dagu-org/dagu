@@ -73,3 +73,37 @@ func TestProcHandle_Restart(t *testing.T) {
 	require.Error(t, err, "file should be deleted")
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
+
+func TestProcHandle_RemovesEmptyParentDir(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	ctx := context.Background()
+
+	// Create a subdirectory for the proc file
+	subDir := filepath.Join(tmpDir, "subdir")
+	err := os.MkdirAll(subDir, 0750)
+	require.NoError(t, err)
+
+	fileName := filepath.Join(subDir, "test_proc")
+	proc := NewProcHandler(fileName, models.ProcMeta{})
+
+	err = proc.startHeartbeat(ctx)
+	require.NoError(t, err)
+
+	// Check if the file is created
+	_, err = os.Stat(fileName)
+	require.NoError(t, err)
+
+	// Stop the process
+	err = proc.Stop(ctx)
+	require.NoError(t, err)
+
+	// Check if the file is deleted
+	_, err = os.Stat(fileName)
+	require.ErrorIs(t, err, os.ErrNotExist)
+
+	// Check if the parent directory is also removed
+	_, err = os.Stat(subDir)
+	require.ErrorIs(t, err, os.ErrNotExist, "empty parent directory should be removed")
+}

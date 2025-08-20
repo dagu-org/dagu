@@ -94,6 +94,10 @@ func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRunID string) ([]m
 			items = append(items, item)
 		}
 	}
+
+	// Remove directory if it's empty
+	_ = os.Remove(q.baseDir)
+
 	return items, nil
 }
 
