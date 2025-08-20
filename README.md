@@ -1,5 +1,8 @@
 <div align="center">
   <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
+  <br/>
+  <p><strong>A lightweight, versatile workflow engine for small teams, defined in simple YAML</strong></p>
+
   <p>
     <a href="https://docs.dagu.cloud/reference/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
     <a href="https://github.com/dagu-org/dagu/actions/workflows/ci.yaml"><img src="https://img.shields.io/github/actions/workflow/status/dagu-org/dagu/ci.yaml?style=flat-square" alt="Build Status"></a>
@@ -16,27 +19,43 @@
 
 ## Overview
 
-Dagu */dah-goo/* is a lightweight, versatile workflow engine for **small teams**. It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format. It allows you to schedule the execution of DAGs with Cron expressions, and natively support running containers, executing commands over SSH.
+Dagu */dah-goo/* is a workflow engine that executes DAGs (Directed Acyclic Graphs) without requiring you to write Python code. Workflows are defined in a simple, declarative YAML format, making them easy to create, read, and maintain.
 
+It's designed to be a simpler, self-contained alternative to complex tools like Airflow, especially for teams that already manage numerous scripts (e.g., Shell, Perl) and don't want to add another layer of programming complexity.
+
+Example DAG:
 ```yaml
 steps:
-  - command: echo "Hello, dagu!" # STEP 1
-  - command: echo "This is a second step" # STEP 2
+  - echo "Hello, dagu!"
+  - echo "This is a second step"
 ```
 
-Dagu is a single binary and it uses the file system as the database and stores the data in plain JSON files. Therefore, no DBMS or cloud service is required.
+With parallel steps:
+```yaml
+steps:
+  - echo "Step 1"
+  - 
+    - echo "Step 2a - runs in parallel"
+    - echo "Step 2b - runs in parallel"
+  - echo "Step 3 - waits for parallel steps"
+```
 
-### Why Not Use an Existing Workflow Scheduler Like Airflow?
-There are many existing tools such as Airflow, but many of these require you to write code in a programming language like Python to define your DAG. For systems that have been in operation for a long time, there may already be complex jobs with hundreds of thousands of lines of code written in languages like Perl or Shell Script. Adding another layer of complexity on top of these codes can reduce maintainability. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for smaller projects with fewer people.
+Or with explicit dependencies:
+```yaml
+steps:
+  - name: step 1
+    command: echo "Hello, dagu!"
+  - name: step 2
+    command: echo "This is a second step"
+    depends: step 1
+```
 
 ## Highlights
-- **Simple Installation**: Single binary, no dependencies
-- **Intuitive Web UI**: Visualize, monitor, and control workflows
-- **YAML-based**: Define workflows in simple YAML files
-- **Built-in Executors**: Support for Containers, HTTP, SSH, and more
-- **Queue Management**: Control concurrent executions and prioritize workflows
-- **Distributed Execution**: Route tasks to specific workers based on labels
-- **Zero Config**: No database required, works out of the box
+- **Zero-Dependency Installation**: Get started instantly with a single binary. No database or message queue required.
+- **Intuitive UI & CLI**: Visualize, monitor, and manage your workflows through a clean web interface or a powerful command-line tool.
+- **Built-in Executors**: Natively supports running shell commands, containers, remote commands over SSH.
+- **Distributed & Scalable**: Run in High-Availability (HA) mode and distribute tasks to a fleet of workers using labels.
+- **Powerful Control Flow**: Natively supports parallel execution, conditionals, retries, timeouts, and more.
 
 ### CLI Preview
 ![Demo CLI](./assets/images/demo-cli.webp)
@@ -450,9 +469,14 @@ Changelog of recent updates can be found in the [Changelog](https://docs.dagu.cl
 
 ## Contributing
 
-We welcome contributions of all kinds! If you have ideas, suggestions, or improvements, please open an issue or submit a pull request.
+We welcome contributions of all kinds! Whether you're a developer, a designer, or a user, your help is valued. Here are a few ways to get involved:
 
-For detailed contribution guidelines, please refer to our [CONTRIBUTING.md](./CONTRIBUTING.md) file.
+- ⭐ Star the project on GitHub.
+- 🤔 Suggest new features by opening an issue.
+- 👋 Join the discussion on our Discord server.
+- 🧑‍💻 Contribute code: Check out our good first issue label for tasks perfect for new contributors.
+
+For more details, see our [Contribution Guide](./CONTRIBUTING.md) and our [public Roadmap](#roadmap) to see what's planned.
 
 ## Acknowledgements
 

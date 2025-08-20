@@ -318,9 +318,9 @@
         {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/step"
+            "$ref": "#/definitions/stepItem"
           },
-          "description": "List of steps that define the DAG. Steps can depend on each other, forming a directed acyclic graph."
+          "description": "List of steps that define the DAG. Steps can be: 1) Step objects with full configuration, 2) Strings for simple commands (shorthand syntax), or 3) Nested arrays containing parallel steps that run simultaneously."
         },
         {
           "type": "object",
@@ -354,6 +354,32 @@
     }
   },
   "definitions": {
+    "stepItem": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/step"
+        },
+        {
+          "type": "string",
+          "description": "Shorthand syntax: a simple command string that will be converted to a step with 'command' field"
+        },
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/definitions/step"
+              },
+              {
+                "type": "string",
+                "description": "Shorthand syntax: a simple command string"
+              }
+            ]
+          },
+          "description": "Nested array representing parallel steps. All steps in this array will run simultaneously, automatically depending on the previous sequential step, and the next sequential step will depend on all of them."
+        }
+      ]
+    },
     "step": {
       "type": "object",
       "additionalProperties": false,

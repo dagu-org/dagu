@@ -44,6 +44,7 @@ var (
 	ErrExecutorConfigMustBeString          = errors.New("executor config key must be string")
 	ErrDuplicateFunction                   = errors.New("duplicate function")
 	ErrFuncParamsMismatch                  = errors.New("func params and args given to func command do not match")
+	ErrInvalidStepData                     = errors.New("invalid step data")
 	ErrStepNameRequired                    = errors.New("step name must be specified")
 	ErrStepNameDuplicate                   = errors.New("step name must be unique")
 	ErrStepNameTooLong                     = errors.New("step name must be less than 40 characters")
