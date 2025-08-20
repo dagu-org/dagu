@@ -75,11 +75,33 @@ Auto-generated names follow the pattern `{type}_{number}`:
 - `mail_N` - Mail executor steps
 - `jq_N` - JQ executor steps
 
+For parallel steps (see below), the pattern is `parallel_{group}_{type}_{index}`.
+
 ### Simple Commands
 
 ```yaml
 steps:
   - command: wget https://example.com/data.csv
+```
+
+### Shorthand Command Syntax
+
+For simple commands, you can use an even more concise syntax:
+
+```yaml
+steps:
+  - echo "Hello World"
+  - ls -la
+  - python script.py
+```
+
+This is equivalent to:
+
+```yaml
+steps:
+  - command: echo "Hello World"
+  - command: ls -la
+  - command: python script.py
 ```
 
 ### Multi-line Scripts
@@ -129,6 +151,8 @@ steps:
 
 ### Parallel Execution
 
+You can run steps in parallel using explicit dependencies:
+
 ```yaml
 steps:
   - name: setup
@@ -145,6 +169,81 @@ steps:
   - name: finish
     command: echo "All tasks complete"
     depends: [task1, task2]
+```
+
+### Shorthand Parallel Syntax
+
+For simpler cases, you can use nested arrays to define parallel steps with automatic dependency management:
+
+```yaml
+steps:
+  - echo "Step 1: Sequential"
+  - 
+    - echo "Step 2a: Parallel"
+    - echo "Step 2b: Parallel"
+    - echo "Step 2c: Parallel"
+  - echo "Step 3: Sequential"
+```
+
+In this syntax:
+- Steps in a nested array run in parallel
+- They automatically depend on the previous sequential step
+- The next sequential step automatically depends on all parallel steps
+
+This is equivalent to:
+
+```yaml
+steps:
+  - name: cmd_1
+    command: echo "Step 1: Sequential"
+    
+  - name: parallel_2_echo_1
+    command: echo "Step 2a: Parallel"
+    depends: cmd_1
+    
+  - name: parallel_2_echo_2
+    command: echo "Step 2b: Parallel"
+    depends: cmd_1
+    
+  - name: parallel_2_echo_3
+    command: echo "Step 2c: Parallel"
+    depends: cmd_1
+    
+  - name: cmd_3
+    command: echo "Step 3: Sequential"
+    depends: [parallel_2_echo_1, parallel_2_echo_2, parallel_2_echo_3]
+```
+
+You can have multiple parallel groups:
+
+```yaml
+steps:
+  - echo "Start"
+  - 
+    - echo "First parallel group - task 1"
+    - echo "First parallel group - task 2"
+  - echo "Middle sequential step"
+  -
+    - echo "Second parallel group - task 1"
+    - echo "Second parallel group - task 2"
+    - echo "Second parallel group - task 3"
+  - echo "End"
+```
+
+You can also mix shorthand and standard syntax:
+
+```yaml
+steps:
+  - name: setup
+    command: ./setup.sh
+  - 
+    - echo "Parallel task 1"
+    - name: test
+      command: npm test
+      env:
+        - NODE_ENV: test
+  - name: cleanup
+    command: ./cleanup.sh
 ```
 
 ## Working Directory

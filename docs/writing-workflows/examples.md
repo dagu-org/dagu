@@ -31,7 +31,42 @@ Execute steps one after another.
 
 <div class="example-card">
 
-### Parallel Execution
+### Parallel Execution (Array Syntax)
+
+```yaml
+steps:
+  - echo "Setup"
+  - 
+    - echo "Task A"
+    - echo "Task B"
+    - echo "Task C"
+  - echo "Cleanup"
+```
+
+```mermaid
+graph TD
+    A[Setup] --> B[Task A]
+    A --> C[Task B]
+    A --> D[Task C]
+    B --> E[Cleanup]
+    C --> E
+    D --> E
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lime,stroke-width:1.6px,color:#333
+    style C stroke:lime,stroke-width:1.6px,color:#333
+    style D stroke:lime,stroke-width:1.6px,color:#333
+    style E stroke:green,stroke-width:1.6px,color:#333
+```
+
+Run steps in parallel using nested arrays.
+
+<a href="/writing-workflows/basics#shorthand-parallel-syntax" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Parallel Execution (Iterator)
 
 ```yaml
 steps:

@@ -309,11 +309,45 @@ Each step in the `steps` array can have these fields:
 
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
-| `name` | string | **Required** - Step name | - |
+| `name` | string | Step name (optional - auto-generated if not provided) | Auto-generated |
 | `command` | string | Command to execute | - |
 | `script` | string | Inline script (alternative to command) | - |
 | `run` | string | Run another DAG | - |
 | `depends` | string/array | Step dependencies | - |
+
+### Step Definition Formats
+
+Steps can be defined in multiple formats:
+
+#### Standard Format
+```yaml
+steps:
+  - name: my-step
+    command: echo "Hello"
+```
+
+#### Shorthand String Format
+```yaml
+steps:
+  - echo "Hello"     # Equivalent to: {command: echo "Hello"}
+  - ls -la          # Equivalent to: {command: ls -la}
+```
+
+#### Nested Array Format (Parallel Steps)
+```yaml
+steps:
+  - echo "Sequential step 1"
+  - 
+    - echo "Parallel step 2a"
+    - echo "Parallel step 2b"
+  - echo "Sequential step 3"
+```
+
+In the nested array format:
+- Steps within a nested array run in parallel
+- They automatically depend on the previous sequential step
+- The next sequential step automatically depends on all parallel steps in the group
+- Auto-generated names follow the pattern: `parallel_{group}_{command}_{index}`
 
 ### Execution Fields
 
