@@ -271,7 +271,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 
 		// The proc file will be in a subdirectory like testSubDir/YYYY-MM-DD/
 		procDir := filepath.Dir(proc.fileName)
-		
+
 		// Ensure directory exists
 		err = os.MkdirAll(procDir, 0750)
 		require.NoError(t, err)
