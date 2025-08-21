@@ -118,7 +118,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
-	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable)
 
 	helper := Helper{
 		Context:         createDefaultContext(),

@@ -2987,7 +2987,7 @@ func TestBuildWorkingDir(t *testing.T) {
 	t.Run("explicit workingDir", func(t *testing.T) {
 		yaml := `
 name: test-dag
-workingDir: /custom/working/dir
+workingDir: /tmp
 steps:
   - name: test
     command: echo hello
@@ -2995,11 +2995,11 @@ steps:
 		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag)
-		assert.Equal(t, "/custom/working/dir", dag.WorkingDir)
+		assert.Equal(t, "/tmp", dag.WorkingDir)
 	})
 
 	t.Run("workingDir with env var expansion", func(t *testing.T) {
-		t.Setenv("TEST_DIR", "/expanded/dir")
+		t.Setenv("TEST_DIR", "/tmp/dir")
 		yaml := `
 name: test-dag
 workingDir: ${TEST_DIR}/subdir
@@ -3010,7 +3010,7 @@ steps:
 		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag)
-		assert.Equal(t, "/expanded/dir/subdir", dag.WorkingDir)
+		assert.Equal(t, "/tmp/dir/subdir", dag.WorkingDir)
 	})
 
 	t.Run("default workingDir when no file", func(t *testing.T) {

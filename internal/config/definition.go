@@ -35,10 +35,6 @@ type Definition struct {
 	// Use APIBasePath instead.
 	APIBaseURL string `mapstructure:"apiBaseURL"`
 
-	// WorkDir specifies the default working directory for DAG (Directed Acyclic Graph) files.
-	// If not explicitly provided, it defaults to the directory where the DAG file resides.
-	WorkDir string `mapstructure:"workDir"`
-
 	// DefaultShell specifies the default shell to use for command execution.
 	// If not provided, platform-specific defaults are used (PowerShell on Windows, $SHELL on Unix).
 	DefaultShell string `mapstructure:"defaultShell"`

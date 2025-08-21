@@ -532,6 +532,10 @@ func buildWorkingDir(ctx BuildContext, spec *definition, dag *DAG) error {
 		wd := spec.WorkingDir
 		if !ctx.opts.NoEval {
 			wd = os.ExpandEnv(wd)
+			_ = os.MkdirAll(wd, 0755)
+			if err := os.Chdir(wd); err != nil {
+				return fmt.Errorf("failed to chdir to working directory: %w", err)
+			}
 		}
 		dag.WorkingDir = wd
 
@@ -542,7 +546,7 @@ func buildWorkingDir(ctx BuildContext, spec *definition, dag *DAG) error {
 	default:
 		dir, err := os.Getwd()
 		if err != nil {
-			return wrapError("workingDir", dag.Name, fmt.Errorf("failed to get working directory: %w", err))
+			return fmt.Errorf("failed to get working directory: %w", err)
 		}
 		dag.WorkingDir = dir
 	}

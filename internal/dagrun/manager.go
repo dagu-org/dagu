@@ -28,7 +28,6 @@ func New(
 	drs models.DAGRunStore,
 	ps models.ProcStore,
 	executable string,
-	workDir string,
 ) Manager {
 	var configFile string
 	if cfg := config.UsedConfigFile.Load(); cfg != nil {
@@ -41,7 +40,6 @@ func New(
 		dagRunStore: drs,
 		procStore:   ps,
 		executable:  executable,
-		workDir:     workDir,
 		configFile:  configFile,
 	}
 }
@@ -54,7 +52,6 @@ type Manager struct {
 	procStore   models.ProcStore   // Store interface for process management
 
 	executable string // Path to the executable used to run DAGs
-	workDir    string // Working directory for executing commands
 	configFile string // Path to the config file (if any)
 }
 
@@ -207,7 +204,7 @@ func (m *Manager) StartDAGRunAsync(ctx context.Context, dag *digraph.DAG, opts S
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
 	executor.SetupCommand(cmd)
-	cmd.Dir = m.workDir
+	cmd.Dir = dag.WorkingDir
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -242,7 +239,7 @@ func (m *Manager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts Enqueu
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
 	executor.SetupCommand(cmd)
-	cmd.Dir = m.workDir
+	cmd.Dir = dag.WorkingDir
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -256,16 +253,17 @@ func (m *Manager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts Enqueu
 	return nil
 }
 
-func (m *Manager) DequeueDAGRun(_ context.Context, dagRun digraph.DAGRunRef) error {
+func (m *Manager) DequeueDAGRun(_ context.Context, dag *digraph.DAG, dagRun digraph.DAGRunRef) error {
 	args := []string{"dequeue", fmt.Sprintf("--dag-run=%s", dagRun.String())}
 	if m.configFile != "" {
 		args = append(args, "--config")
 		args = append(args, m.configFile)
 	}
+
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
 	executor.SetupCommand(cmd)
-	cmd.Dir = m.workDir
+	cmd.Dir = dag.WorkingDir
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -294,7 +292,7 @@ func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts Restart
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
 	executor.SetupCommand(cmd)
-	cmd.Dir = m.workDir
+	cmd.Dir = dag.WorkingDir
 	cmd.Env = os.Environ()
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start restart command: %w", err)
@@ -330,7 +328,7 @@ func (m *Manager) runRetryCommand(ctx context.Context, args []string, dag *digra
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
 	executor.SetupCommand(cmd)
-	cmd.Dir = m.workDir
+	cmd.Dir = dag.WorkingDir
 	cmd.Env = os.Environ()
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start retry command: %w", err)
@@ -634,7 +632,7 @@ func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) erro
 	// nolint:gosec
 	cmd := exec.CommandContext(ctx, m.executable, args...)
 	executor.SetupCommand(cmd)
-	cmd.Dir = m.workDir
+	cmd.Dir = "" // Working directory will be set in the process
 	cmd.Env = os.Environ()
 
 	// Execute and capture output

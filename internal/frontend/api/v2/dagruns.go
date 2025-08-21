@@ -492,7 +492,7 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 		}
 	}
 
-	if err := a.dagRunMgr.DequeueDAGRun(ctx, dagRun); err != nil {
+	if err := a.dagRunMgr.DequeueDAGRun(ctx, dag, dagRun); err != nil {
 		return nil, fmt.Errorf("error dequeueing dag-run: %w", err)
 	}
 

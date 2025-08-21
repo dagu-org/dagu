@@ -50,12 +50,11 @@ type entryReaderImpl struct {
 	dagStore    models.DAGStore
 	dagRunMgr   dagrun.Manager
 	executable  string
-	workDir     string
 	dagExecutor *DAGExecutor
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
-func NewEntryReader(dir string, dagCli models.DAGStore, drm dagrun.Manager, de *DAGExecutor, executable, workDir string) EntryReader {
+func NewEntryReader(dir string, dagCli models.DAGStore, drm dagrun.Manager, de *DAGExecutor, executable string) EntryReader {
 	return &entryReaderImpl{
 		targetDir:   dir,
 		lock:        sync.Mutex{},
@@ -63,7 +62,6 @@ func NewEntryReader(dir string, dagCli models.DAGStore, drm dagrun.Manager, de *
 		dagStore:    dagCli,
 		dagRunMgr:   drm,
 		executable:  executable,
-		workDir:     workDir,
 		dagExecutor: de,
 	}
 }
@@ -115,7 +113,6 @@ func (er *entryReaderImpl) createJob(dag *digraph.DAG, next time.Time, schedule 
 	return &DAGRunJob{
 		DAG:         dag,
 		Executable:  er.executable,
-		WorkDir:     er.workDir,
 		Next:        next,
 		Schedule:    schedule,
 		Client:      er.dagRunMgr,

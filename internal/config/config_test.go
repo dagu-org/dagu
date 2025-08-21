@@ -79,7 +79,6 @@ scheduler:
 	assert.Equal(t, true, cfg.Global.Debug)
 	assert.Equal(t, "json", cfg.Global.LogFormat)
 	assert.Equal(t, "UTC", cfg.Global.TZ)
-	assert.Equal(t, "/var/dagu/work", cfg.Global.WorkDir)
 	assert.NotNil(t, cfg.Global.Location)
 	assert.Equal(t, 0, cfg.Global.TzOffsetInSec)
 

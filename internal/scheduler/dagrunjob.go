@@ -30,7 +30,6 @@ var _ Job = (*DAGRunJob)(nil)
 type DAGRunJob struct {
 	DAG         *digraph.DAG
 	Executable  string
-	WorkDir     string
 	Next        time.Time
 	Schedule    cron.Schedule
 	Client      dagrun.Manager

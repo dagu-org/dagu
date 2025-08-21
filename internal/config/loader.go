@@ -127,7 +127,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		Debug:        def.Debug,
 		LogFormat:    def.LogFormat,
 		TZ:           def.TZ,
-		WorkDir:      def.WorkDir,
 		DefaultShell: def.DefaultShell,
 		SkipExamples: viper.GetBool("skipExamples"),
 	}
