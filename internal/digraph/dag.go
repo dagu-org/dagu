@@ -252,7 +252,7 @@ func (d *DAG) LoadEnv(ctx context.Context) {
 	for _, env := range d.Env {
 		parts := strings.SplitN(env, "=", 2)
 		if len(parts) == 2 {
-			os.Setenv(parts[0], parts[1])
+			_ = os.Setenv(parts[0], parts[1])
 		}
 	}
 }
