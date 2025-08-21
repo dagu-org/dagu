@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmdutil"
-	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/joho/godotenv"
 )
 
 // BuilderFn is a function that builds a part of the DAG.
@@ -72,6 +70,7 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "name", fn: buildName},
 	{metadata: true, name: "type", fn: buildType},
 	{metadata: true, name: "runConfig", fn: buildRunConfig},
+	{name: "workingDir", fn: buildWorkingDir},
 	{name: "container", fn: buildContainer},
 	{name: "workerSelector", fn: buildWorkerSelector},
 	{name: "registryAuths", fn: buildRegistryAuths},
@@ -460,7 +459,7 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *DAG) error {
 func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 	switch v := spec.Dotenv.(type) {
 	case nil:
-		return nil
+		dag.Dotenv = append(dag.Dotenv, ".env")
 
 	case string:
 		dag.Dotenv = append(dag.Dotenv, v)
@@ -479,25 +478,7 @@ func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 	}
 
 	if !ctx.opts.NoEval {
-		var relativeTos []string
-		if ctx.file != "" {
-			relativeTos = append(relativeTos, ctx.file)
-		}
-
-		resolver := fileutil.NewFileResolver(relativeTos)
-		for _, filePath := range dag.Dotenv {
-			filePath, err := cmdutil.EvalString(ctx.ctx, filePath)
-			if err != nil {
-				return wrapError("dotenv", filePath, fmt.Errorf("failed to evaluate dotenv file path %s: %w", filePath, err))
-			}
-			resolvedPath, err := resolver.ResolveFilePath(filePath)
-			if err != nil {
-				continue
-			}
-			if err := godotenv.Overload(resolvedPath); err != nil {
-				return wrapError("dotenv", filePath, fmt.Errorf("failed to load dotenv file %s: %w", filePath, err))
-			}
-		}
+		dag.loadDotEnv(ctx.ctx, []string{dag.WorkingDir})
 	}
 
 	return nil
@@ -533,6 +514,30 @@ func buildName(ctx BuildContext, spec *definition, dag *DAG) error {
 	}
 	if !regexName.MatchString(dag.Name) {
 		return wrapError("name", dag.Name, ErrNameInvalidChars)
+	}
+
+	return nil
+}
+
+func buildWorkingDir(ctx BuildContext, spec *definition, dag *DAG) error {
+	switch {
+	case spec.WorkingDir != "":
+		wd := spec.WorkingDir
+		if !ctx.opts.NoEval {
+			wd = os.ExpandEnv(wd)
+		}
+		dag.WorkingDir = wd
+
+	case ctx.file != "":
+		wd := filepath.Dir(ctx.file)
+		dag.WorkingDir = wd
+
+	default:
+		dir, err := os.Getwd()
+		if err != nil {
+			return wrapError("workingDir", dag.Name, fmt.Errorf("failed to get working directory: %w", err))
+		}
+		dag.WorkingDir = dir
 	}
 
 	return nil

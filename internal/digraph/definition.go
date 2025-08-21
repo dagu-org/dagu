@@ -15,6 +15,8 @@ type definition struct {
 	// "chain" executes steps in the order they are defined.
 	// "agent" is reserved for future agent-based execution.
 	Type string
+	// WorkingDir is working directory for DAG execution
+	WorkingDir string
 	// Dotenv is the path to the dotenv file (string or []string).
 	Dotenv any
 	// Schedule is the cron schedule to run the DAG.
