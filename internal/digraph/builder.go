@@ -294,11 +294,17 @@ func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
 		Env:           envs,
 		Volumes:       spec.Container.Volumes,
 		User:          spec.Container.User,
-		WorkDir:       spec.Container.WorkDir,
 		Platform:      spec.Container.Platform,
 		Ports:         spec.Container.Ports,
 		Network:       spec.Container.Network,
 		KeepContainer: spec.Container.KeepContainer,
+	}
+
+	// Backward compatibility
+	if spec.Container.WorkDir != "" {
+		container.WorkingDir = spec.Container.WorkDir
+	} else {
+		container.WorkingDir = spec.Container.WorkingDir
 	}
 
 	dag.Container = &container

@@ -648,7 +648,7 @@ func TestParseContainer(t *testing.T) {
 				Env:           []string{"FOO=bar", "BAZ=qux"},
 				Volumes:       []string{"/host/data:/data:ro", "myvolume:/app"},
 				User:          "1000:1000",
-				WorkDir:       "/workspace",
+				WorkingDir:    "/workspace",
 				Platform:      "linux/arm64",
 				Ports:         []string{"8080:80", "9090"},
 				Network:       "mynetwork",

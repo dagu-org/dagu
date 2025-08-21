@@ -471,7 +471,7 @@ func NewFromContainerConfigWithAuth(workDir string, ct digraph.Container, regist
 		Image:      ct.Image,
 		Env:        ct.Env,
 		User:       ct.User,
-		WorkingDir: ct.WorkDir,
+		WorkingDir: ct.GetWorkingDir(),
 	}
 
 	hostConfig := &container.HostConfig{}

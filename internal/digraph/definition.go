@@ -102,7 +102,7 @@ type stepDef struct {
 	// WorkingDir is the working directory of the step.
 	WorkingDir string `yaml:"workingDir,omitempty"`
 	// Dir is the working directory of the step.
-	// @deprecated: use WorkingDir instead
+	// Deprecated: use WorkingDir instead
 	Dir string `yaml:"dir,omitempty"`
 	// Executor is the executor configuration.
 	Executor any `yaml:"executor,omitempty"`
@@ -219,7 +219,10 @@ type containerDef struct {
 	Volumes []string `yaml:"volumes,omitempty"` // Map of volume names to volume definitions
 	// User is the user to run the container as.
 	User string `yaml:"user,omitempty"` // User to run the container as
+	// WorkingDir is the working directory inside the container.
+	WorkingDir string `yaml:"workingDir,omitempty"` // Working directory inside the container
 	// WorkDir is the working directory inside the container.
+	// Deprecated: use WorkingDir instead
 	WorkDir string `yaml:"workDir,omitempty"` // Working directory inside the container
 	// Platform specifies the platform for the container (e.g., "linux/amd64").
 	Platform string `yaml:"platform,omitempty"` // Platform for the container

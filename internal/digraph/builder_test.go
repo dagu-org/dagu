@@ -2336,7 +2336,7 @@ steps:
 		assert.Contains(t, dag.Container.Env, "API_KEY=secret123")
 		assert.Equal(t, []string{"/data:/data:ro", "/output:/output:rw"}, dag.Container.Volumes)
 		assert.Equal(t, "1000:1000", dag.Container.User)
-		assert.Equal(t, "/app", dag.Container.WorkDir)
+		assert.Equal(t, "/app", dag.Container.GetWorkingDir())
 		assert.Equal(t, "linux/amd64", dag.Container.Platform)
 		assert.Equal(t, []string{"8080:8080", "9090:9090"}, dag.Container.Ports)
 		assert.Equal(t, "bridge", dag.Container.Network)
