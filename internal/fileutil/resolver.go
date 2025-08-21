@@ -2,7 +2,6 @@ package fileutil
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 )
 
@@ -19,10 +18,6 @@ func NewFileResolver(relativeTos []string) *FileResolver {
 }
 
 // ResolveFilePath attempts to find a file in multiple locations in the following order:
-// 1. As an absolute path
-// 2. Relative to the DAG directory
-// 3. Relative to the base config directory
-// 4. Relative to the user's home directory
 func (r *FileResolver) ResolveFilePath(file string) (string, error) {
 	// Check if it's an absolute path
 	if filepath.IsAbs(file) {
@@ -62,12 +57,6 @@ func (r *FileResolver) getSearchPaths(file string) ([]string, error) {
 			dir := filepath.Dir(relativeTo)
 			paths = append(paths, filepath.Join(dir, file))
 		}
-	}
-
-	// Add home directory path
-	homeDir, err := os.UserHomeDir()
-	if err == nil && homeDir != "" {
-		paths = append(paths, filepath.Join(homeDir, file))
 	}
 
 	return paths, nil

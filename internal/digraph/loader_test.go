@@ -3,7 +3,6 @@ package digraph_test
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -85,7 +84,6 @@ func TestLoad(t *testing.T) {
 		require.Len(t, dag.Steps, 1)
 		assert.Equal(t, "1", dag.Steps[0].Name, "1")
 		assert.Equal(t, "true", dag.Steps[0].Command, "true")
-		assert.Equal(t, filepath.Dir(testDAG), dag.Steps[0].Dir)
 	})
 	t.Run("OverrideConfig", func(t *testing.T) {
 		t.Parallel()

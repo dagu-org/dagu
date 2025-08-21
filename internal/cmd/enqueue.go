@@ -50,7 +50,10 @@ func runEnqueue(ctx *Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	dag.Location = "" // Queued dag-runs must not have a location
+	// Queued dag-runs must not have a location because it is used to generate
+	// unix pipe. If two DAGs has same location, they can not run at the same time.
+	// Queued DAGs can be run at the same time depending on the `maxActiveRuns` setting.
+	dag.Location = ""
 
 	return enqueueDAGRun(ctx, dag, runID)
 }

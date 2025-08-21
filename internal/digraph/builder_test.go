@@ -3,7 +3,9 @@ package digraph_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -2312,7 +2314,7 @@ container:
     - /data:/data:ro
     - /output:/output:rw
   user: "1000:1000"
-  workDir: /app
+  workingDir: /app
   platform: linux/amd64
   ports:
     - "8080:8080"
@@ -2334,7 +2336,7 @@ steps:
 		assert.Contains(t, dag.Container.Env, "API_KEY=secret123")
 		assert.Equal(t, []string{"/data:/data:ro", "/output:/output:rw"}, dag.Container.Volumes)
 		assert.Equal(t, "1000:1000", dag.Container.User)
-		assert.Equal(t, "/app", dag.Container.WorkDir)
+		assert.Equal(t, "/app", dag.Container.GetWorkingDir())
 		assert.Equal(t, "linux/amd64", dag.Container.Platform)
 		assert.Equal(t, []string{"8080:8080", "9090:9090"}, dag.Container.Ports)
 		assert.Equal(t, "bridge", dag.Container.Network)
@@ -2978,5 +2980,117 @@ steps:
 		ghcrAuth, exists := dag.RegistryAuths["ghcr.io"]
 		assert.True(t, exists)
 		assert.Equal(t, `{"username": "user2", "password": "pass2"}`, ghcrAuth.Auth)
+	})
+}
+
+func TestBuildWorkingDir(t *testing.T) {
+	t.Run("explicit workingDir", func(t *testing.T) {
+		yaml := `
+name: test-dag
+workingDir: /tmp
+steps:
+  - name: test
+    command: echo hello
+`
+		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		assert.Equal(t, "/tmp", dag.WorkingDir)
+	})
+
+	t.Run("workingDir with env var expansion", func(t *testing.T) {
+		t.Setenv("TEST_DIR", "/tmp/dir")
+		yaml := `
+name: test-dag
+workingDir: ${TEST_DIR}/subdir
+steps:
+  - name: test
+    command: echo hello
+`
+		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		assert.Equal(t, "/tmp/dir/subdir", dag.WorkingDir)
+	})
+
+	t.Run("default workingDir when no file", func(t *testing.T) {
+		yaml := `
+name: test-dag
+steps:
+  - name: test
+    command: echo hello
+`
+		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// Should be current working directory
+		expectedDir, err := os.Getwd()
+		require.NoError(t, err)
+		assert.Equal(t, expectedDir, dag.WorkingDir)
+	})
+}
+
+func TestDAGLoadEnv(t *testing.T) {
+	t.Run("LoadEnv with dotenv and env vars", func(t *testing.T) {
+		// Create a temp directory with a .env file
+		tempDir := t.TempDir()
+		envFile := filepath.Join(tempDir, ".env")
+		envContent := "LOAD_ENV_DOTENV_VAR=from_file\n"
+		err := os.WriteFile(envFile, []byte(envContent), 0644)
+		require.NoError(t, err)
+
+		yaml := fmt.Sprintf(`
+name: test-dag
+workingDir: %s
+dotenv: .env
+env:
+  - LOAD_ENV_ENV_VAR: from_dag
+  - LOAD_ENV_ANOTHER_VAR: another_value
+steps:
+  - name: test
+    command: echo hello
+`, tempDir)
+
+		dag, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(yaml), digraph.BuildOpts{NoEval: true})
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// Call LoadEnv
+		dag.LoadEnv(context.Background())
+
+		// Verify environment variables were set
+		assert.Equal(t, "from_file", os.Getenv("LOAD_ENV_DOTENV_VAR"))
+		assert.Equal(t, "from_dag", os.Getenv("LOAD_ENV_ENV_VAR"))
+		assert.Equal(t, "another_value", os.Getenv("LOAD_ENV_ANOTHER_VAR"))
+
+		// Clean up
+		os.Unsetenv("LOAD_ENV_DOTENV_VAR")
+		os.Unsetenv("LOAD_ENV_ENV_VAR")
+		os.Unsetenv("LOAD_ENV_ANOTHER_VAR")
+	})
+
+	t.Run("LoadEnv with missing dotenv file", func(t *testing.T) {
+		yaml := `
+name: test-dag
+dotenv: nonexistent.env
+env:
+  - TEST_VAR_LOAD_ENV: test_value
+steps:
+  - name: test
+    command: echo hello
+`
+		dag, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(yaml), digraph.BuildOpts{NoEval: true})
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// LoadEnv should not fail even if dotenv file doesn't exist
+		dag.LoadEnv(context.Background())
+
+		// Environment variables from env should still be set
+		assert.Equal(t, "test_value", os.Getenv("TEST_VAR_LOAD_ENV"))
+
+		// Clean up
+		os.Unsetenv("TEST_VAR_LOAD_ENV")
 	})
 }

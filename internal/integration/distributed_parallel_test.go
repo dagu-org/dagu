@@ -296,7 +296,7 @@ steps:
 
 		runStore := filedagrun.New(dataDir)
 		procStore := fileproc.New(procDir)
-		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable, coord.Config.Global.WorkDir)
+		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable)
 
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
@@ -436,7 +436,7 @@ steps:
 
 		runStore := filedagrun.New(dataDir)
 		procStore := fileproc.New(procDir)
-		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable, coord.Config.Global.WorkDir)
+		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable)
 
 		// Create worker for distributed execution
 		// Get dispatcher client from coordinator
@@ -557,7 +557,7 @@ steps:
 
 		runStore := filedagrun.New(dataDir)
 		procStore := fileproc.New(procDir)
-		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable, coord.Config.Global.WorkDir)
+		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable)
 
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)

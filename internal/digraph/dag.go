@@ -1,6 +1,7 @@
 package digraph
 
 import (
+	"context"
 	"crypto/md5" // nolint:gosec
 	"encoding/json"
 	"fmt"
@@ -10,8 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"
 )
 
@@ -33,7 +37,12 @@ const (
 
 // DAG contains all information about a DAG.
 type DAG struct {
+	// WorkingDir is the working directory to run the DAG.
+	// Default value is the directory of DAG file.
+	// If the source is not a DAG file, current directory when it's created.
+	WorkingDir string `json:"workingDir,omitempty"`
 	// Location is the absolute path to the DAG file.
+	// It is used to generate unix socket name and can be blank
 	Location string `json:"location,omitempty"`
 	// Group is the group name of the DAG. This is optional.
 	Group string `json:"group,omitempty"`
@@ -234,6 +243,51 @@ func (d *DAG) Validate() error {
 	return nil
 }
 
+// LoadEnv loads required environment variable
+func (d *DAG) LoadEnv(ctx context.Context) {
+	// Load dotenv
+	d.loadDotEnv(ctx, []string{d.WorkingDir})
+
+	// Load env
+	for _, env := range d.Env {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			_ = os.Setenv(parts[0], parts[1])
+		}
+	}
+}
+
+// loadDotEnv loads dotenv file
+func (d *DAG) loadDotEnv(ctx context.Context, relativeTos []string) {
+	resolver := fileutil.NewFileResolver(relativeTos)
+	candidates := append([]string{".env"}, d.Dotenv...)
+
+	for _, filePath := range candidates {
+		if strings.TrimSpace(filePath) == "" {
+			continue
+		}
+		filePath, err := cmdutil.EvalString(ctx, filePath)
+		if err != nil {
+			logger.Warn(ctx, "Failed to eval filepath", "filePath", filePath, "err", err)
+			continue
+		}
+		resolvedPath, err := resolver.ResolveFilePath(filePath)
+		if err != nil {
+			continue
+		}
+		if !fileutil.FileExists(resolvedPath) {
+			continue
+		}
+		if err := godotenv.Load(resolvedPath); err != nil {
+			logger.Warn(ctx, "Failed to load .env", "file", resolvedPath, "err", err)
+			continue
+		}
+
+		// Load the first found one
+		return
+	}
+}
+
 // initializeDefaults sets the default values for the DAG.
 func (d *DAG) initializeDefaults() {
 	// Set the name if not set.
@@ -265,39 +319,6 @@ func (d *DAG) initializeDefaults() {
 	// Set default max output size to 1MB if not specified.
 	if d.MaxOutputSize == 0 {
 		d.MaxOutputSize = 1024 * 1024 // 1MB
-	}
-
-	// Ensure we have a valid working directory
-	var workDir = "."
-	if d.Location != "" {
-		workDir = filepath.Dir(d.Location)
-	}
-
-	// Setup steps and handlers with the working directory
-	d.setupSteps(workDir)
-	d.setupHandlers(workDir)
-}
-
-// setupSteps initializes all steps
-func (d *DAG) setupSteps(workDir string) {
-	for i := range d.Steps {
-		d.Steps[i].setup(workDir)
-	}
-}
-
-// setupHandlers initializes all event handlers
-func (d *DAG) setupHandlers(workDir string) {
-	handlers := []*Step{
-		d.HandlerOn.Exit,
-		d.HandlerOn.Success,
-		d.HandlerOn.Failure,
-		d.HandlerOn.Cancel,
-	}
-
-	for _, handler := range handlers {
-		if handler != nil {
-			handler.setup(workDir)
-		}
 	}
 }
 

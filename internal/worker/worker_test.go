@@ -370,7 +370,7 @@ func TestWorkerHeartbeat(t *testing.T) {
 
 func TestWorkerStopWithoutStart(t *testing.T) {
 	t.Run("StopUnstartedWorker", func(t *testing.T) {
-		mockMgr := dagrun.New(nil, nil, "dagu", ".")
+		mockMgr := dagrun.New(nil, nil, "dagu")
 		labels := make(map[string]string)
 
 		// Create a mock coordinator client that doesn't connect
@@ -480,7 +480,7 @@ func TestRunningTaskTracking(t *testing.T) {
 
 func TestWorkerConnectionFailure(t *testing.T) {
 	t.Run("HandleConnectionFailure", func(t *testing.T) {
-		mockMgr := dagrun.New(nil, nil, "dagu", ".")
+		mockMgr := dagrun.New(nil, nil, "dagu")
 		labels := make(map[string]string)
 
 		// Create worker with a mock coordinator client that always fails
@@ -547,7 +547,7 @@ func (m *mockTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Task
 
 // createTestWorker creates a worker with a mock dagrun.Manager and coordinator client for testing
 func createTestWorker(t *testing.T, workerID string, maxActiveRuns int, coord *test.Coordinator) *worker.Worker {
-	mockMgr := dagrun.New(nil, nil, "dagu", ".")
+	mockMgr := dagrun.New(nil, nil, "dagu")
 	labels := make(map[string]string)
 
 	// Create coordinator client for the coordinator

@@ -12,7 +12,7 @@ import (
 )
 
 // parseVolumes parses volume specifications into bind mounts and volume mounts
-func parseVolumes(volumes []string) ([]string, []mount.Mount, error) {
+func parseVolumes(workDir string, volumes []string) ([]string, []mount.Mount, error) {
 	var binds []string
 	var mounts []mount.Mount
 
@@ -38,18 +38,31 @@ func parseVolumes(volumes []string) ([]string, []mount.Mount, error) {
 		// Determine if it's a bind mount or volume
 		if filepath.IsAbs(source) || strings.HasPrefix(source, ".") || strings.HasPrefix(source, "~") {
 			if !filepath.IsAbs(source) {
-				p, err := fileutil.ResolvePath(source)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to resolve path %s: %w", source, err)
+				if workDir != "" && strings.HasPrefix(source, ".") {
+					// Handle relative paths starting with "." or "./"
+					if source == "." || source == "./" {
+						source = workDir
+					} else if strings.HasPrefix(source, "./") {
+						source = filepath.Join(workDir, source[2:])
+					} else {
+						source = filepath.Join(workDir, source[1:])
+					}
+					source = filepath.Clean(source)
+				} else {
+					p, err := fileutil.ResolvePath(source)
+					if err != nil {
+						return nil, nil, fmt.Errorf("failed to resolve path %s: %w", source, err)
+					}
+					source = p
 				}
-				source = p
 			}
 
 			// It's a bind mount
-			bindStr := vol
-			if len(parts) == 2 {
-				// Add default rw mode if not specified
-				bindStr = source + ":" + target + ":rw"
+			bindStr := source + ":" + target
+			if readOnly {
+				bindStr += ":ro"
+			} else {
+				bindStr += ":rw"
 			}
 			binds = append(binds, bindStr)
 		} else {

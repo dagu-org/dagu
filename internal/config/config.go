@@ -53,10 +53,6 @@ type Global struct {
 	// Location represents the time location for the application based on the TZ setting.
 	Location *time.Location
 
-	// WorkDir specifies the default working directory for DAG (Directed Acyclic Graph) files.
-	// If not explicitly provided, it defaults to the directory where the DAG file resides.
-	WorkDir string
-
 	// DefaultShell specifies the default shell to use for command execution.
 	// If not provided, platform-specific defaults are used (PowerShell on Windows, $SHELL on Unix).
 	DefaultShell string

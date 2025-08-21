@@ -73,6 +73,7 @@ steps:
 		t.Parallel()
 
 		// Create dotenv files
+		// It should load the first found dot env file only
 		dotenv1Path := test.TestdataPath(t, "integration/dotenv1")
 		dotenv2Path := test.TestdataPath(t, "integration/dotenv2")
 
@@ -82,7 +83,7 @@ steps:
 steps:
   - name: step1
     command: echo "${ENV1} ${ENV2}"
-    output: OUT1 #123 abc
+    output: OUT1 #123 456
 `)
 		agent := dag.Agent()
 
@@ -90,7 +91,7 @@ steps:
 
 		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
-			"OUT1": "123 abc",
+			"OUT1": "123 456",
 		})
 	})
 
@@ -808,5 +809,36 @@ steps:
 		"OUT1": "step1_value",
 		"OUT2": "dag_value2",
 		"OUT3": "dynamic value",
+	})
+}
+
+func TestStepWorkingDir(t *testing.T) {
+	t.Parallel()
+
+	// Create temp directories for testing
+	tempDir := t.TempDir()
+	stepWorkDir := tempDir + "/step"
+
+	// Create directories
+	require.NoError(t, os.MkdirAll(stepWorkDir, 0755))
+
+	th := test.Setup(t)
+
+	// Test that step workingDir works
+	dag := th.DAG(t, `
+name: test-step-working-dir
+steps:
+  - name: step-with-dir
+    workingDir: `+stepWorkDir+`
+    command: pwd
+    output: STEP_DIR
+`)
+
+	agent := dag.Agent()
+	agent.RunSuccess(t)
+
+	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertOutputs(t, map[string]any{
+		"STEP_DIR": stepWorkDir,
 	})
 }

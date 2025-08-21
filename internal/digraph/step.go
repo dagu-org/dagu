@@ -69,14 +69,6 @@ type Step struct {
 	Env []string `json:"env,omitempty"`
 }
 
-// setup sets the default values for the step.
-func (s *Step) setup(workDir string) {
-	// If the working directory is not set, use the directory of the DAG file.
-	if s.Dir == "" {
-		s.Dir = workDir
-	}
-}
-
 // String returns a formatted string representation of the step
 func (s *Step) String() string {
 	fields := []struct {

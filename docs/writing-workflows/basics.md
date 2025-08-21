@@ -8,7 +8,7 @@ Create `hello.yaml`:
 
 ```yaml
 steps:
-  - command: echo "Hello from Dagu!"
+  - echo "Hello from Dagu!"
 ```
 
 Run it:
@@ -52,7 +52,7 @@ Step names are optional. When omitted, Dagu automatically generates names based 
 
 ```yaml
 steps:
-  - command: echo "First step"    # Auto-named: cmd_1
+  - echo "First step"              # Auto-named: cmd_1
   - script: |                      # Auto-named: script_2
       echo "Multi-line"
       echo "Script"
@@ -77,13 +77,6 @@ Auto-generated names follow the pattern `{type}_{number}`:
 
 For parallel steps (see below), the pattern is `parallel_{group}_{type}_{index}`.
 
-### Simple Commands
-
-```yaml
-steps:
-  - command: wget https://example.com/data.csv
-```
-
 ### Shorthand Command Syntax
 
 For simple commands, you can use an even more concise syntax:
@@ -99,9 +92,14 @@ This is equivalent to:
 
 ```yaml
 steps:
-  - command: echo "Hello World"
-  - command: ls -la
-  - command: python script.py
+  - name: step 1
+    command: echo "Hello World"
+  - name: step 2
+    command: ls -la
+    depends: step 1
+  - name: step 3
+    command: python script.py
+    depends: step 2
 ```
 
 ### Multi-line Scripts

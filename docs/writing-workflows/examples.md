@@ -12,8 +12,8 @@ Quick reference for all Dagu features. Each example is minimal and copy-paste re
 
 ```yaml
 steps:
-  - command: echo "Step 1"
-  - command: echo "Step 2"
+  - echo "Step 1"
+  - echo "Step 2"
 ```
 
 ```mermaid
@@ -954,7 +954,7 @@ container:
   volumes:
     - ./data:/data
     - ./scripts:/scripts:ro
-  workDir: /app
+  workingDir: /app
 
 steps:
   - name: install-deps
@@ -1591,8 +1591,8 @@ Complete DAG with all configuration options.
 ```yaml
 # Steps as array (recommended)
 steps:
-  - command: echo "hello"
-  - command: echo "world"  # Runs after first step automatically
+  - echo "hello"
+  - echo "world"  # Runs after first step automatically
 
 ---
 
