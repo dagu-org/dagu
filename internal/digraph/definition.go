@@ -99,7 +99,10 @@ type stepDef struct {
 	ID string `yaml:"id,omitempty"`
 	// Description is the description of the step.
 	Description string `yaml:"description,omitempty"`
+	// WorkingDir is the working directory of the step.
+	WorkingDir string `yaml:"workingDir,omitempty"`
 	// Dir is the working directory of the step.
+	// @deprecated: use WorkingDir instead
 	Dir string `yaml:"dir,omitempty"`
 	// Executor is the executor configuration.
 	Executor any `yaml:"executor,omitempty"`

@@ -811,3 +811,34 @@ steps:
 		"OUT3": "dynamic value",
 	})
 }
+
+func TestStepWorkingDir(t *testing.T) {
+	t.Parallel()
+
+	// Create temp directories for testing
+	tempDir := t.TempDir()
+	stepWorkDir := tempDir + "/step"
+	
+	// Create directories
+	require.NoError(t, os.MkdirAll(stepWorkDir, 0755))
+	
+	th := test.Setup(t)
+	
+	// Test that step workingDir works
+	dag := th.DAG(t, `
+name: test-step-working-dir
+steps:
+  - name: step-with-dir
+    workingDir: `+stepWorkDir+`
+    command: pwd
+    output: STEP_DIR
+`)
+	
+	agent := dag.Agent()
+	agent.RunSuccess(t)
+	
+	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertOutputs(t, map[string]any{
+		"STEP_DIR": stepWorkDir,
+	})
+}

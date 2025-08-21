@@ -320,39 +320,6 @@ func (d *DAG) initializeDefaults() {
 	if d.MaxOutputSize == 0 {
 		d.MaxOutputSize = 1024 * 1024 // 1MB
 	}
-
-	// Ensure we have a valid working directory
-	var workDir = "."
-	if d.Location != "" {
-		workDir = filepath.Dir(d.Location)
-	}
-
-	// Setup steps and handlers with the working directory
-	d.setupSteps(workDir)
-	d.setupHandlers(workDir)
-}
-
-// setupSteps initializes all steps
-func (d *DAG) setupSteps(workDir string) {
-	for i := range d.Steps {
-		d.Steps[i].setup(workDir)
-	}
-}
-
-// setupHandlers initializes all event handlers
-func (d *DAG) setupHandlers(workDir string) {
-	handlers := []*Step{
-		d.HandlerOn.Exit,
-		d.HandlerOn.Success,
-		d.HandlerOn.Failure,
-		d.HandlerOn.Cancel,
-	}
-
-	for _, handler := range handlers {
-		if handler != nil {
-			handler.setup(workDir)
-		}
-	}
 }
 
 // TaskOption is a function that modifies a coordinatorv1.Task.

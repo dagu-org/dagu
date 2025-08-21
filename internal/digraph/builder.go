@@ -98,6 +98,7 @@ type builderEntry struct {
 }
 
 var stepBuilderRegistry = []stepBuilderEntry{
+	{name: "workingDir", fn: buildStepWorkingDir},
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "depends", fn: buildDepends},
@@ -1214,7 +1215,6 @@ func buildStep(ctx StepBuildContext, def stepDef) (*Step, error) {
 		Script:         strings.TrimSpace(def.Script),
 		Stdout:         strings.TrimSpace(def.Stdout),
 		Stderr:         strings.TrimSpace(def.Stderr),
-		Dir:            strings.TrimSpace(def.Dir),
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
 	}
@@ -1619,6 +1619,17 @@ func buildDepends(_ StepBuildContext, def stepDef, step *Step) error {
 		step.ExplicitlyNoDeps = true
 	}
 
+	return nil
+}
+
+// buildStepWorkingDir builds working dir field
+func buildStepWorkingDir(ctx StepBuildContext, def stepDef, step *Step) error {
+	if def.Dir != "" {
+		step.Dir = def.Dir
+	}
+	if def.WorkingDir != "" {
+		step.Dir = def.WorkingDir
+	}
 	return nil
 }
 
