@@ -39,7 +39,14 @@ func parseVolumes(workDir string, volumes []string) ([]string, []mount.Mount, er
 		if filepath.IsAbs(source) || strings.HasPrefix(source, ".") || strings.HasPrefix(source, "~") {
 			if !filepath.IsAbs(source) {
 				if workDir != "" && strings.HasPrefix(source, ".") {
-					source = filepath.Join(workDir, source[1:])
+					// Handle relative paths starting with "." or "./"
+					if source == "." || source == "./" {
+						source = workDir
+					} else if strings.HasPrefix(source, "./") {
+						source = filepath.Join(workDir, source[2:])
+					} else {
+						source = filepath.Join(workDir, source[1:])
+					}
 					source = filepath.Clean(source)
 				} else {
 					p, err := fileutil.ResolvePath(source)
@@ -51,10 +58,11 @@ func parseVolumes(workDir string, volumes []string) ([]string, []mount.Mount, er
 			}
 
 			// It's a bind mount
-			bindStr := vol
-			if len(parts) == 2 {
-				// Add default rw mode if not specified
-				bindStr = source + ":" + target + ":rw"
+			bindStr := source + ":" + target
+			if readOnly {
+				bindStr += ":ro"
+			} else {
+				bindStr += ":rw"
 			}
 			binds = append(binds, bindStr)
 		} else {

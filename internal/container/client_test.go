@@ -1,6 +1,8 @@
 package container
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -758,18 +760,23 @@ func TestParseContainer(t *testing.T) {
 				Image:   "alpine",
 				Volumes: []string{"./data:/data:ro"},
 			},
-			expected: &Client{
-				image:      "alpine",
-				autoRemove: true,
-				containerConfig: &container.Config{
-					Image: "alpine",
-				},
-				hostConfig: &container.HostConfig{
-					Binds: []string{"./data:/data:ro"},
-				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
-			},
+			expected: func() *Client {
+				// Relative paths are resolved to absolute paths
+				cwd, _ := os.Getwd()
+				resolvedPath := filepath.Join(cwd, "data")
+				return &Client{
+					image:      "alpine",
+					autoRemove: true,
+					containerConfig: &container.Config{
+						Image: "alpine",
+					},
+					hostConfig: &container.HostConfig{
+						Binds: []string{resolvedPath + ":/data:ro"},
+					},
+					networkConfig: &network.NetworkingConfig{},
+					execOptions:   &container.ExecOptions{},
+				}
+			}(),
 		},
 		{
 			name: "home directory bind mount",
@@ -777,18 +784,23 @@ func TestParseContainer(t *testing.T) {
 				Image:   "alpine",
 				Volumes: []string{"~/data:/data:rw"},
 			},
-			expected: &Client{
-				image:      "alpine",
-				autoRemove: true,
-				containerConfig: &container.Config{
-					Image: "alpine",
-				},
-				hostConfig: &container.HostConfig{
-					Binds: []string{"~/data:/data:rw"},
-				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
-			},
+			expected: func() *Client {
+				// Home directory paths are resolved to absolute paths
+				homeDir, _ := os.UserHomeDir()
+				resolvedPath := filepath.Join(homeDir, "data")
+				return &Client{
+					image:      "alpine",
+					autoRemove: true,
+					containerConfig: &container.Config{
+						Image: "alpine",
+					},
+					hostConfig: &container.HostConfig{
+						Binds: []string{resolvedPath + ":/data:rw"},
+					},
+					networkConfig: &network.NetworkingConfig{},
+					execOptions:   &container.ExecOptions{},
+				}
+			}(),
 		},
 		{
 			name: "port with IP address",
