@@ -123,8 +123,8 @@ Note: see [documentation](https://docs.dagu.cloud/getting-started/installation) 
 ```bash
 cat > ./hello.yaml << 'EOF'
 steps:
-  - command: echo "Hello from Dagu!"
-  - command: echo "Running step 2"
+  - echo "Hello from Dagu!"
+  - echo "Running step 2"
 EOF
 ```
 

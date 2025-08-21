@@ -47,18 +47,16 @@ To skip creating these examples, set `DAGU_SKIP_EXAMPLES=true` or add `skipExamp
 ```bash [Binary]
 mkdir -p ~/.config/dagu/dags && cat > ~/.config/dagu/dags/hello.yaml << 'EOF'
 steps:
-  - command: echo "Hello from Dagu!"
-    
-  - command: echo "Running step 2"
+  - echo "Hello from Dagu!"
+  - echo "Running step 2"
 EOF
 ```
 
 ```bash [Docker]
 mkdir -p ~/.dagu/dags && cat > ~/.dagu/dags/hello.yaml << 'EOF'
 steps:
-  - command: echo "Hello from Dagu!"
-    
-  - command: echo "Running step 2"
+  - echo "Hello from Dagu!"
+  - echo "Running step 2"
 EOF
 ```
 
@@ -133,15 +131,45 @@ A workflow is a YAML file that defines steps and their dependencies:
 
 ```yaml
 steps:
-  - command: echo "First step"
-    
-  - command: echo "Second step"  # Runs after first step automatically
+  - echo "First step"
+  - echo "Second step"  # Runs after first step automatically
 ```
 
 Key concepts:
 - **Steps**: Individual tasks that run commands
 - **Dependencies**: Control execution order
 - **Commands**: Any shell command you can run
+
+## Working Directory
+
+By default, DAGs execute in the directory where the YAML file is located. You can override this with `workingDir`:
+
+```yaml
+# All relative paths are resolved from workingDir
+workingDir: /app/project
+
+steps:
+  - ls -la           # Lists files in /app/project
+  - cat ./config.yml  # Reads /app/project/config.yml
+```
+
+This is especially important when:
+- Loading `.env` files (loaded from workingDir by default)
+- Using relative paths in container volumes
+- Reading/writing files with relative paths
+
+```yaml
+workingDir: /app/data
+dotenv: .env              # Loads /app/data/.env
+
+container:
+  image: python:3.11
+  volumes:
+    - ./input:/data       # Mounts /app/data/input to /data in container
+
+steps:
+  - python process.py ./results.csv  # Works with /app/data/results.csv
+```
 
 ## Parameters
 

@@ -105,7 +105,8 @@ schedule:
 |-------|------|-------------|---------|
 | `params` | array | Default parameters | `[]` |
 | `env` | array | Environment variables | `[]` |
-| `dotenv` | array | .env files to load | `[]` |
+| `dotenv` | string/array | .env files to load | `[".env"]` |
+| `workingDir` | string | Working directory for the DAG | Directory of DAG file |
 | `logDir` | string | Custom log directory | System default |
 | `histRetentionDays` | integer | History retention days | `30` |
 | `maxOutputSize` | integer | Max output size per step (bytes) | `1048576` |
@@ -186,6 +187,47 @@ steps:
 - Step-level SSH configuration completely overrides DAG-level configuration (no partial overrides)
 - For security, password authentication is not supported at the DAG level
 - Default SSH keys are tried if no key is specified: `~/.ssh/id_rsa`, `~/.ssh/id_ecdsa`, `~/.ssh/id_ed25519`, `~/.ssh/id_dsa`
+
+### Working Directory and Volume Resolution
+
+When using container volumes with relative paths, the paths are resolved relative to the DAG's `workingDir`:
+
+```yaml
+# DAG with working directory and container volumes
+workingDir: /app/project
+container:
+  image: python:3.11
+  volumes:
+    - ./data:/data        # Resolves to /app/project/data:/data
+    - .:/workspace        # Resolves to /app/project:/workspace
+    - /abs/path:/other   # Absolute paths are unchanged
+
+steps:
+  - name: process
+    command: python process.py
+```
+
+**Working Directory Inheritance:**
+- Steps inherit `workingDir` from the DAG if not explicitly set
+- Step-level `workingDir` overrides DAG-level `workingDir`
+- Both `dir` and `workingDir` set the working directory (use one or the other)
+
+```yaml
+# Example of workingDir inheritance
+workingDir: /project          # DAG-level working directory
+
+steps:
+  - name: uses-dag-dir
+    command: pwd               # Outputs: /project
+  
+  - name: custom-dir
+    workingDir: /custom        # Override DAG workingDir
+    command: pwd               # Outputs: /custom
+  
+  - name: also-custom
+    dir: /another              # Alternative to workingDir
+    command: pwd               # Outputs: /another
+```
 
 ### Queue Configuration
 
@@ -354,6 +396,7 @@ In the nested array format:
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
 | `dir` | string | Working directory | Current directory |
+| `workingDir` | string | Working directory (alternative to `dir`, inherits from DAG) | DAG's workingDir |
 | `shell` | string | Shell to use | System default |
 | `stdout` | string | Redirect stdout to file | - |
 | `stderr` | string | Redirect stderr to file | - |
@@ -572,6 +615,54 @@ env:
 steps:
   - name: call-api
     command: curl -H "X-API-Key: ${API_KEY}" ${API_URL}
+```
+
+### Loading Environment from .env Files
+
+The `dotenv` field allows loading environment variables from `.env` files:
+
+```yaml
+# Default behavior - loads .env file if it exists
+# No dotenv field needed, defaults to [".env"]
+
+# Load specific .env file
+dotenv: .env.production
+
+# Load multiple .env files (later files override earlier ones)
+dotenv:
+  - .env.defaults
+  - .env.local
+
+# Disable .env loading
+dotenv: []
+```
+
+**Important Notes:**
+- If `dotenv` is not specified, Dagu automatically tries to load `.env` file
+- Files are loaded relative to the DAG's `workingDir`
+- Later files in the array override variables from earlier files
+- System environment variables take precedence over .env file variables
+- .env files are loaded at DAG startup, before any steps execute
+
+**Example .env file:**
+```bash
+# .env file
+DATABASE_URL=postgres://localhost/mydb
+API_KEY=secret123
+DEBUG=true
+```
+
+```yaml
+# DAG using .env variables
+workingDir: /app
+dotenv: .env          # Optional, this is the default
+
+steps:
+  - name: connect-db
+    command: psql ${DATABASE_URL}
+  
+  - name: debug-mode
+    command: echo "Debug is ${DEBUG}"
 ```
 
 ### Command Substitution

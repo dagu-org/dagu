@@ -27,9 +27,8 @@ The basic unit of execution. Each step runs a command:
 
 ```yaml
 steps:
-  - command: curl -O https://example.com/data.csv  # Download data
-    
-  - command: python analyze.py data.csv           # Process data
+  - curl -O https://example.com/data.csv  # Download data
+  - python analyze.py data.csv           # Process data
 ```
 
 ### Dependencies

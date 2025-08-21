@@ -4,9 +4,8 @@ Dagu is a powerful workflow engine designed to be deployable in environments whe
 
 ```yaml
 steps:
-  - command: sleep 1 && echo "Hello, Dagu!"
-    
-  - command: sleep 1 && echo "This is a second step"
+  - sleep 1 && echo "Hello, Dagu!"
+  - sleep 1 && echo "This is a second step"
 ```
 
 By declaratively defining the processes within a job, complex workflows become visualized, making troubleshooting and recovery easier. Viewing log and retry can be performed from the Web UI, eliminating the need to manually log into a server via SSH.
