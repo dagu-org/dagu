@@ -32,7 +32,7 @@ basePath: "/dagu"
 apiBasePath: "/api/v1"
 tz: "UTC"
 logFormat: "json"
-workDir: "/var/dagu/work"
+workingDir: "/var/dagu/work"
 headless: true
 paths:
   dagsDir: "/var/dagu/dags"

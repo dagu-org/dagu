@@ -954,7 +954,7 @@ container:
   volumes:
     - ./data:/data
     - ./scripts:/scripts:ro
-  workDir: /app
+  workingDir: /app
 
 steps:
   - name: install-deps

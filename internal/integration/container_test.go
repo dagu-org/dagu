@@ -130,7 +130,7 @@ steps:
 name: test-working-dir
 container:
   image: alpine:3
-  workDir: /tmp
+  workingDir: /tmp
 steps:
   - name: s1
     command: "pwd"

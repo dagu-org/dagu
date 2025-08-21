@@ -124,7 +124,7 @@ container:
     - API_KEY=${API_KEY}
   volumes:
     - /data:/data:ro
-  workDir: /app
+  workingDir: /app
   platform: linux/amd64
   user: "1000:1000"
   ports:

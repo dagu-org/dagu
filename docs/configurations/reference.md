@@ -21,7 +21,6 @@ skipExamples: false       # Skip creating example DAGs
 # Directories (must be under "paths" key)
 paths:
   dagsDir: "~/.config/dagu/dags"
-  workDir: ""               # Default working directory
   logDir: "~/.local/share/dagu/logs"
   dataDir: "~/.local/share/dagu/data"
   suspendFlagsDir: "~/.local/share/dagu/suspend"

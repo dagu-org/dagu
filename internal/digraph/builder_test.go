@@ -2314,7 +2314,7 @@ container:
     - /data:/data:ro
     - /output:/output:rw
   user: "1000:1000"
-  workDir: /app
+  workingDir: /app
   platform: linux/amd64
   ports:
     - "8080:8080"

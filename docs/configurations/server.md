@@ -38,7 +38,6 @@ headless: false           # Run without Web UI
 # Directory Paths (must be under "paths" key)
 paths:
   dagsDir: "~/.config/dagu/dags"                    # DAG definitions
-  workDir: ""                                       # Default working directory
   logDir: "~/.local/share/dagu/logs"                # Log files
   dataDir: "~/.local/share/dagu/data"               # Application data
   suspendFlagsDir: "~/.local/share/dagu/suspend"    # Suspend flags

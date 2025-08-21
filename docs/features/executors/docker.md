@@ -65,7 +65,7 @@ container:
   volumes:
     - ./src:/app                   # Bind mount
     - /data:/data:ro               # Read-only mount
-  workDir: /app                    # Working directory
+  workingDir: /app                    # Working directory
   platform: linux/amd64            # Platform specification
   user: "1000:1000"                # User and group
   ports:

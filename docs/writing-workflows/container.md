@@ -24,7 +24,7 @@ container:
   volumes:
     - ./src:/app
     - ./data:/data
-  workDir: /app
+  workingDir: /app
 
 steps:
   - command: npm install    # Install dependencies
@@ -82,7 +82,7 @@ container:
     - /host:/container
   env:                       # Environment variables
     - KEY=value
-  workDir: /app             # Working directory
+  workingDir: /app             # Working directory
   user: "1000:1000"         # User/group
   platform: linux/amd64     # Platform
   ports:                    # Port mappings
