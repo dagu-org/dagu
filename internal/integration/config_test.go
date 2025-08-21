@@ -73,6 +73,7 @@ steps:
 		t.Parallel()
 
 		// Create dotenv files
+		// It should load the first found dot env file only
 		dotenv1Path := test.TestdataPath(t, "integration/dotenv1")
 		dotenv2Path := test.TestdataPath(t, "integration/dotenv2")
 
@@ -82,7 +83,7 @@ steps:
 steps:
   - name: step1
     command: echo "${ENV1} ${ENV2}"
-    output: OUT1 #123 abc
+    output: OUT1 #123 456
 `)
 		agent := dag.Agent()
 
@@ -90,7 +91,7 @@ steps:
 
 		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
-			"OUT1": "123 abc",
+			"OUT1": "123 456",
 		})
 	})
 
