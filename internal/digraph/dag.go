@@ -260,8 +260,9 @@ func (d *DAG) LoadEnv(ctx context.Context) {
 // loadDotEnv loads dotenv file
 func (d *DAG) loadDotEnv(ctx context.Context, relativeTos []string) {
 	resolver := fileutil.NewFileResolver(relativeTos)
+	candidates := append([]string{".env"}, d.Dotenv...)
 
-	for _, filePath := range d.Dotenv {
+	for _, filePath := range candidates {
 		if strings.TrimSpace(filePath) == "" {
 			continue
 		}
