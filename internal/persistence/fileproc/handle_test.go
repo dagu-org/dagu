@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,7 @@ func TestProcHandle(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
+		time.Sleep(10 * time.Millisecond) // short sleep for check file existence
 		err := proc.Stop(ctx)
 		require.NoError(t, err)
 		close(done)
