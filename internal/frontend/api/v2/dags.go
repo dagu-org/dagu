@@ -496,13 +496,13 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	}
 
 	// Check singleton flag - if enabled and DAG is already running, return 409
-	if singleton {
+	if singleton || dag.MaxActiveRuns == 1 {
 		dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
 		if err == nil && dagStatus.Status == status.Running {
 			return nil, &Error{
 				HTTPStatus: http.StatusConflict,
 				Code:       api.ErrorCodeAlreadyRunning,
-				Message:    fmt.Sprintf("DAG %s is already running, cannot start in singleton mode", dag.Name),
+				Message:    fmt.Sprintf("DAG %s is already running, cannot start (max_active_run = 1)", dag.Name),
 			}
 		}
 	}
@@ -518,11 +518,10 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 
 func (a *API) startDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunID string, singleton bool) error {
 	if err := a.dagRunMgr.StartDAGRunAsync(ctx, dag, dagrun.StartOptions{
-		Params:    params,
-		DAGRunID:  dagRunID,
-		Quiet:     true,
-		Immediate: false,
-		Singleton: singleton,
+		Params:   params,
+		DAGRunID: dagRunID,
+		Quiet:    true,
+		NoQueue:  singleton || dag.MaxActiveRuns == 1,
 	}); err != nil {
 		return fmt.Errorf("error starting DAG: %w", err)
 	}
