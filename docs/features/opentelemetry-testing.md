@@ -337,8 +337,8 @@ otel:
 cat > perf-test-no-otel.yaml << 'EOF'
 name: perf-test
 steps:
-  - command: echo "Step 1"
-  - command: echo "Step 2"  # Runs sequentially after Step 1
+  - echo "Step 1"
+  - echo "Step 2"  # Runs sequentially after Step 1
 EOF
 
 # Time execution without OTel
@@ -356,8 +356,8 @@ otel:
   endpoint: "localhost:4317"
   insecure: true
 steps:
-  - command: echo "Step 1"
-  - command: echo "Step 2"  # Runs sequentially after Step 1
+  - echo "Step 1"
+  - echo "Step 2"  # Runs sequentially after Step 1
 EOF
 
 # Time execution with OTel

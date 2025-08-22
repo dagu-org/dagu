@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmdutil"
-	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/joho/godotenv"
 )
 
 // BuilderFn is a function that builds a part of the DAG.
@@ -72,7 +70,9 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "name", fn: buildName},
 	{metadata: true, name: "type", fn: buildType},
 	{metadata: true, name: "runConfig", fn: buildRunConfig},
+	{name: "workingDir", fn: buildWorkingDir},
 	{name: "container", fn: buildContainer},
+	{name: "workerSelector", fn: buildWorkerSelector},
 	{name: "registryAuths", fn: buildRegistryAuths},
 	{name: "ssh", fn: buildSSH},
 	{name: "dotenv", fn: buildDotenv},
@@ -98,6 +98,7 @@ type builderEntry struct {
 }
 
 var stepBuilderRegistry = []stepBuilderEntry{
+	{name: "workingDir", fn: buildStepWorkingDir},
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "depends", fn: buildDepends},
@@ -124,18 +125,17 @@ type StepBuilderFn func(ctx StepBuildContext, def stepDef, step *Step) error
 func build(ctx BuildContext, spec *definition) (*DAG, error) {
 	dag := &DAG{
 		Location:       ctx.file,
-		Name:           spec.Name,
-		Group:          spec.Group,
-		Description:    spec.Description,
-		Type:           spec.Type,
+		Name:           strings.TrimSpace(spec.Name),
+		Group:          strings.TrimSpace(spec.Group),
+		Description:    strings.TrimSpace(spec.Description),
+		Type:           strings.TrimSpace(spec.Type),
 		Timeout:        time.Second * time.Duration(spec.TimeoutSec),
 		Delay:          time.Second * time.Duration(spec.DelaySec),
 		RestartWait:    time.Second * time.Duration(spec.RestartWaitSec),
 		Tags:           parseTags(spec.Tags),
 		MaxActiveSteps: spec.MaxActiveSteps,
-		Queue:          spec.Queue,
+		Queue:          strings.TrimSpace(spec.Queue),
 		MaxOutputSize:  spec.MaxOutputSize,
-		WorkerSelector: spec.WorkerSelector,
 	}
 
 	var errs ErrorList
@@ -294,15 +294,36 @@ func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
 		Env:           envs,
 		Volumes:       spec.Container.Volumes,
 		User:          spec.Container.User,
-		WorkDir:       spec.Container.WorkDir,
 		Platform:      spec.Container.Platform,
 		Ports:         spec.Container.Ports,
 		Network:       spec.Container.Network,
 		KeepContainer: spec.Container.KeepContainer,
 	}
 
+	// Backward compatibility
+	if spec.Container.WorkDir != "" {
+		container.WorkingDir = spec.Container.WorkDir
+	} else {
+		container.WorkingDir = spec.Container.WorkingDir
+	}
+
 	dag.Container = &container
 
+	return nil
+}
+
+func buildWorkerSelector(ctx BuildContext, spec *definition, dag *DAG) error {
+	if len(spec.WorkerSelector) == 0 {
+		return nil
+	}
+
+	ret := make(map[string]string)
+
+	for key, val := range spec.WorkerSelector {
+		ret[strings.TrimSpace(key)] = strings.TrimSpace(val)
+	}
+
+	dag.WorkerSelector = ret
 	return nil
 }
 
@@ -445,7 +466,7 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *DAG) error {
 func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 	switch v := spec.Dotenv.(type) {
 	case nil:
-		return nil
+		dag.Dotenv = append(dag.Dotenv, ".env")
 
 	case string:
 		dag.Dotenv = append(dag.Dotenv, v)
@@ -464,25 +485,7 @@ func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 	}
 
 	if !ctx.opts.NoEval {
-		var relativeTos []string
-		if ctx.file != "" {
-			relativeTos = append(relativeTos, ctx.file)
-		}
-
-		resolver := fileutil.NewFileResolver(relativeTos)
-		for _, filePath := range dag.Dotenv {
-			filePath, err := cmdutil.EvalString(ctx.ctx, filePath)
-			if err != nil {
-				return wrapError("dotenv", filePath, fmt.Errorf("failed to evaluate dotenv file path %s: %w", filePath, err))
-			}
-			resolvedPath, err := resolver.ResolveFilePath(filePath)
-			if err != nil {
-				continue
-			}
-			if err := godotenv.Overload(resolvedPath); err != nil {
-				return wrapError("dotenv", filePath, fmt.Errorf("failed to load dotenv file %s: %w", filePath, err))
-			}
-		}
+		dag.loadDotEnv(ctx.ctx, []string{dag.WorkingDir})
 	}
 
 	return nil
@@ -518,6 +521,34 @@ func buildName(ctx BuildContext, spec *definition, dag *DAG) error {
 	}
 	if !regexName.MatchString(dag.Name) {
 		return wrapError("name", dag.Name, ErrNameInvalidChars)
+	}
+
+	return nil
+}
+
+func buildWorkingDir(ctx BuildContext, spec *definition, dag *DAG) error {
+	switch {
+	case spec.WorkingDir != "":
+		wd := spec.WorkingDir
+		if !ctx.opts.NoEval {
+			wd = os.ExpandEnv(wd)
+			_ = os.MkdirAll(wd, 0755)
+			if err := os.Chdir(wd); err != nil {
+				return fmt.Errorf("failed to chdir to working directory: %w", err)
+			}
+		}
+		dag.WorkingDir = wd
+
+	case ctx.file != "":
+		wd := filepath.Dir(ctx.file)
+		dag.WorkingDir = wd
+
+	default:
+		dir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get working directory: %w", err)
+		}
+		dag.WorkingDir = dir
 	}
 
 	return nil
@@ -832,44 +863,65 @@ func generateTypedStepName(existingNames map[string]struct{}, step *Step, index 
 // buildSteps builds the steps for the DAG.
 func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
-	existingNames := make(map[string]struct{})
+	names := make(map[string]struct{})
 
 	switch v := spec.Steps.(type) {
 	case nil:
 		return nil
 
 	case []any:
-		var stepDefs []stepDef
-		md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			ErrorUnused: true,
-			Result:      &stepDefs,
-		})
-		if err := md.Decode(v); err != nil {
-			return wrapError("steps", v, err)
-		}
+		// Convert string steps to map format for shorthand syntax support
+		normalized := normalizeStepData(ctx, v)
 
 		var builtSteps []*Step
-		for i, stepDef := range stepDefs {
-			step, err := buildStep(buildCtx, stepDef)
-			if err != nil {
-				return err
+		var prevSteps []*Step
+		for i, raw := range normalized {
+			switch v := raw.(type) {
+			case map[string]any:
+				step, err := buildStepFromRaw(buildCtx, i, v, names)
+				if err != nil {
+					return err
+				}
+
+				injectChainDependencies(dag, prevSteps, step)
+				builtSteps = append(builtSteps, step)
+
+				// prepare for the next step
+				prevSteps = []*Step{step}
+
+			case []any:
+				var tempSteps []*Step
+				var normalized = normalizeStepData(ctx, v)
+				for _, nested := range normalized {
+					switch vv := nested.(type) {
+					case map[string]any:
+						step, err := buildStepFromRaw(buildCtx, i, vv, names)
+						if err != nil {
+							return err
+						}
+
+						injectChainDependencies(dag, prevSteps, step)
+
+						builtSteps = append(builtSteps, step)
+						tempSteps = append(tempSteps, step)
+
+					default:
+						return wrapError("steps", raw, ErrInvalidStepData)
+					}
+				}
+
+				// prepare for the next step
+				prevSteps = tempSteps
+
+			default:
+				return wrapError("steps", raw, ErrInvalidStepData)
 			}
-			if step.Name == "" {
-				step.Name = generateTypedStepName(existingNames, step, i)
-			}
-			if err := validateStep(buildCtx, stepDef, step); err != nil {
-				return err
-			}
-			builtSteps = append(builtSteps, step)
 		}
 
 		// Add all built steps to the DAG
 		for _, step := range builtSteps {
 			dag.Steps = append(dag.Steps, *step)
 		}
-
-		// Inject chain dependencies if type is chain
-		injectChainDependencies(dag)
 
 		return nil
 
@@ -884,7 +936,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		}
 		for name, stepDef := range stepDefs {
 			stepDef.Name = name
-			existingNames[stepDef.Name] = struct{}{}
+			names[stepDef.Name] = struct{}{}
 			step, err := buildStep(buildCtx, stepDef)
 			if err != nil {
 				return err
@@ -892,15 +944,52 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 			dag.Steps = append(dag.Steps, *step)
 		}
 
-		// Inject chain dependencies if type is chain
-		injectChainDependencies(dag)
-
 		return nil
 
 	default:
 		return wrapError("steps", v, ErrStepsMustBeArrayOrMap)
 
 	}
+}
+
+// normalizedStepData converts string to map[string]any for subsequent process
+func normalizeStepData(ctx BuildContext, data []any) []any {
+	// Convert string steps to map format for shorthand syntax support
+	normalized := make([]any, len(data))
+	for i, item := range data {
+		switch step := item.(type) {
+		case string:
+			// Shorthand: convert string to map with command field
+			normalized[i] = map[string]any{"command": step}
+		default:
+			// Keep as-is (already a map or other structure)
+			normalized[i] = item
+		}
+	}
+	return normalized
+}
+
+// buildStepFromRaw build Step from give raw data (map[string]any)
+func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names map[string]struct{}) (*Step, error) {
+	var stepDef stepDef
+	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		ErrorUnused: true,
+		Result:      &stepDef,
+	})
+	if err := md.Decode(raw); err != nil {
+		return nil, wrapError("steps", raw, err)
+	}
+	step, err := buildStep(ctx, stepDef)
+	if err != nil {
+		return nil, err
+	}
+	if step.Name == "" {
+		step.Name = generateTypedStepName(names, step, idx)
+	}
+	if err := validateStep(ctx, stepDef, step); err != nil {
+		return nil, err
+	}
+	return step, nil
 }
 
 // stepIDPattern defines the valid format for step IDs
@@ -1094,14 +1183,18 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 		// To field not specified
 	case string:
 		// Single recipient
+		v = strings.TrimSpace(v)
 		if v != "" {
 			toAddresses = []string{v}
 		}
 	case []any:
 		// Multiple recipients
 		for _, addr := range v {
-			if str, ok := addr.(string); ok && str != "" {
-				toAddresses = append(toAddresses, str)
+			if str, ok := addr.(string); ok {
+				str = strings.TrimSpace(str)
+				if str != "" {
+					toAddresses = append(toAddresses, str)
+				}
 			}
 		}
 	default:
@@ -1114,9 +1207,9 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 	}
 
 	return &MailConfig{
-		From:       def.From,
+		From:       strings.TrimSpace(def.From),
 		To:         toAddresses,
-		Prefix:     def.Prefix,
+		Prefix:     strings.TrimSpace(def.Prefix),
 		AttachLogs: def.AttachLogs,
 	}, nil
 }
@@ -1124,15 +1217,14 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 // buildStep builds a step from the step definition.
 func buildStep(ctx StepBuildContext, def stepDef) (*Step, error) {
 	step := &Step{
-		Name:           def.Name,
-		ID:             def.ID,
-		Description:    def.Description,
-		Shell:          def.Shell,
+		Name:           strings.TrimSpace(def.Name),
+		ID:             strings.TrimSpace(def.ID),
+		Description:    strings.TrimSpace(def.Description),
+		Shell:          strings.TrimSpace(def.Shell),
 		ShellPackages:  def.ShellPackages,
-		Script:         def.Script,
-		Stdout:         def.Stdout,
-		Stderr:         def.Stderr,
-		Dir:            def.Dir,
+		Script:         strings.TrimSpace(def.Script),
+		Stdout:         strings.TrimSpace(def.Stdout),
+		Stderr:         strings.TrimSpace(def.Stderr),
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
 	}
@@ -1392,7 +1484,7 @@ func buildOutput(_ StepBuildContext, def stepDef, step *Step) error {
 		return nil
 	}
 
-	step.Output = def.Output
+	step.Output = strings.TrimSpace(def.Output)
 	return nil
 }
 
@@ -1483,7 +1575,7 @@ func buildSignalOnStop(_ StepBuildContext, def stepDef, step *Step) error {
 
 // buildChildDAG parses the child DAG definition and sets up the step to run a child DAG.
 func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
-	name := def.Run
+	name := strings.TrimSpace(def.Run)
 
 	// if the run field is not set, return nil.
 	if name == "" {
@@ -1540,6 +1632,17 @@ func buildDepends(_ StepBuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
+// buildStepWorkingDir builds working dir field
+func buildStepWorkingDir(ctx StepBuildContext, def stepDef, step *Step) error {
+	if def.Dir != "" {
+		step.Dir = def.Dir
+	}
+	if def.WorkingDir != "" {
+		step.Dir = def.WorkingDir
+	}
+	return nil
+}
+
 // buildExecutor parses the executor field in the step definition.
 // Case 1: executor is nil
 //
@@ -1572,7 +1675,7 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 	case string:
 		// Case 2: executor is a string
 		// This can be an executor with default configuration.
-		step.ExecutorConfig.Type = val
+		step.ExecutorConfig.Type = strings.TrimSpace(val)
 
 	case map[string]any:
 		// Case 3: executor is a struct
@@ -1586,7 +1689,7 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 				if !ok {
 					return wrapError("executor.type", v, ErrExecutorTypeMustBeString)
 				}
-				step.ExecutorConfig.Type = typ
+				step.ExecutorConfig.Type = strings.TrimSpace(typ)
 
 			case executorKeyConfig:
 				// Executor config is a map of string keys and values.
@@ -1834,29 +1937,59 @@ func parseParallelItems(items []any) ([]ParallelItem, error) {
 	return result, nil
 }
 
-// injectChainDependencies adds implicit dependencies for chain type execution
-func injectChainDependencies(dag *DAG) {
-	// Only inject dependencies for chain type
-	if dag.Type != TypeChain {
+// injectChainDependencies adds implicit dependencies for chain type execution.
+// In chain execution, each step depends on all previous steps unless explicitly configured otherwise.
+func injectChainDependencies(dag *DAG, prevSteps []*Step, step *Step) {
+	// Early returns for cases where we shouldn't inject dependencies
+	if dag.Type != TypeChain || step.ExplicitlyNoDeps || len(prevSteps) == 0 {
 		return
 	}
 
-	// Need at least 2 steps to create a chain
-	if len(dag.Steps) < 2 {
-		return
+	// Build a set of existing dependencies for efficient lookup
+	existingDeps := make(map[string]struct{}, len(step.Depends))
+	for _, dep := range step.Depends {
+		existingDeps[dep] = struct{}{}
 	}
 
-	// For each step starting from the second one
-	for i := 1; i < len(dag.Steps); i++ {
-		step := &dag.Steps[i]
-		prevStep := &dag.Steps[i-1]
+	// Add each previous step as a dependency if not already present
+	for _, prevStep := range prevSteps {
+		depKey := getStepKey(prevStep)
 
-		// Only add implicit dependency if the step doesn't already have dependencies
-		// and wasn't explicitly set to have no dependencies
-		if len(step.Depends) == 0 && !step.ExplicitlyNoDeps {
-			step.Depends = []string{prevStep.Name}
+		// Skip if this dependency already exists
+		if _, exists := existingDeps[depKey]; exists {
+			continue
 		}
+
+		// Also check alternate key (ID vs Name) to avoid duplicates
+		altKey := getStepAlternateKey(prevStep, depKey)
+		if altKey != "" {
+			if _, exists := existingDeps[altKey]; exists {
+				continue
+			}
+		}
+
+		step.Depends = append(step.Depends, depKey)
+		existingDeps[depKey] = struct{}{}
 	}
+}
+
+// getStepKey returns the preferred identifier for a step (ID if available, otherwise Name)
+func getStepKey(step *Step) string {
+	if step.ID != "" {
+		return step.ID
+	}
+	return step.Name
+}
+
+// getStepAlternateKey returns the alternate identifier for a step, or empty string if none
+func getStepAlternateKey(step *Step, primaryKey string) string {
+	if step.ID != "" && primaryKey == step.ID {
+		return step.Name
+	}
+	if step.ID != "" && primaryKey == step.Name {
+		return step.ID
+	}
+	return ""
 }
 
 // buildOTel builds the OpenTelemetry configuration for the DAG.

@@ -78,22 +78,30 @@ func (e Env) VariablesMap() map[string]string {
 
 // NewEnv creates a new execution context with the given step.
 func NewEnv(ctx context.Context, step digraph.Step) Env {
+	parentEnv := digraph.GetEnv(ctx)
+	parentDAG := parentEnv.DAG
+
 	var workingDir string
 
-	// Resolve working directory for the step
-	if dir := step.Dir; dir != "" {
-		dir, err := fileutil.ResolvePath(dir)
+	switch {
+	case step.Dir != "":
+		dir, err := fileutil.ResolvePath(step.Dir)
 		if err == nil {
 			workingDir = dir
 		} else {
 			logger.Warn(ctx, "Failed to resolve working directory for step", "step", step.Name, "dir", dir, "err", err)
+			workingDir = parentEnv.DAG.WorkingDir
 		}
-	} else {
+
+	case parentDAG != nil && parentDAG.WorkingDir != "":
+		workingDir = parentDAG.WorkingDir
+
+	default:
 		// Use the current working directory if not specified
 		if wd, err := os.Getwd(); err == nil {
 			workingDir = wd
 		} else {
-			logger.Warn(ctx, "Failed to get current working directory", "err", err)
+			logger.Error(ctx, "Failed to get current working directory", "err", err)
 		}
 	}
 

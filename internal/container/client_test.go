@@ -1,6 +1,8 @@
 package container
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -646,7 +648,7 @@ func TestParseContainer(t *testing.T) {
 				Env:           []string{"FOO=bar", "BAZ=qux"},
 				Volumes:       []string{"/host/data:/data:ro", "myvolume:/app"},
 				User:          "1000:1000",
-				WorkDir:       "/workspace",
+				WorkingDir:    "/workspace",
 				Platform:      "linux/arm64",
 				Ports:         []string{"8080:80", "9090"},
 				Network:       "mynetwork",
@@ -758,18 +760,23 @@ func TestParseContainer(t *testing.T) {
 				Image:   "alpine",
 				Volumes: []string{"./data:/data:ro"},
 			},
-			expected: &Client{
-				image:      "alpine",
-				autoRemove: true,
-				containerConfig: &container.Config{
-					Image: "alpine",
-				},
-				hostConfig: &container.HostConfig{
-					Binds: []string{"./data:/data:ro"},
-				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
-			},
+			expected: func() *Client {
+				// Relative paths are resolved to absolute paths
+				cwd, _ := os.Getwd()
+				resolvedPath := filepath.Join(cwd, "data")
+				return &Client{
+					image:      "alpine",
+					autoRemove: true,
+					containerConfig: &container.Config{
+						Image: "alpine",
+					},
+					hostConfig: &container.HostConfig{
+						Binds: []string{resolvedPath + ":/data:ro"},
+					},
+					networkConfig: &network.NetworkingConfig{},
+					execOptions:   &container.ExecOptions{},
+				}
+			}(),
 		},
 		{
 			name: "home directory bind mount",
@@ -777,18 +784,23 @@ func TestParseContainer(t *testing.T) {
 				Image:   "alpine",
 				Volumes: []string{"~/data:/data:rw"},
 			},
-			expected: &Client{
-				image:      "alpine",
-				autoRemove: true,
-				containerConfig: &container.Config{
-					Image: "alpine",
-				},
-				hostConfig: &container.HostConfig{
-					Binds: []string{"~/data:/data:rw"},
-				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
-			},
+			expected: func() *Client {
+				// Home directory paths are resolved to absolute paths
+				homeDir, _ := os.UserHomeDir()
+				resolvedPath := filepath.Join(homeDir, "data")
+				return &Client{
+					image:      "alpine",
+					autoRemove: true,
+					containerConfig: &container.Config{
+						Image: "alpine",
+					},
+					hostConfig: &container.HostConfig{
+						Binds: []string{resolvedPath + ":/data:rw"},
+					},
+					networkConfig: &network.NetworkingConfig{},
+					execOptions:   &container.ExecOptions{},
+				}
+			}(),
 		},
 		{
 			name: "port with IP address",
@@ -1082,7 +1094,7 @@ func TestParseContainer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := NewFromContainerConfig(tt.input)
+			result, err := NewFromContainerConfig("", tt.input)
 
 			if tt.expectError {
 				require.Error(t, err)

@@ -455,12 +455,12 @@ func (c *Client) shouldPullImage(ctx context.Context, cli *client.Client, platfo
 }
 
 // NewFromContainerConfig parses digraph.Container into Container struct
-func NewFromContainerConfig(ct digraph.Container) (*Client, error) {
-	return NewFromContainerConfigWithAuth(ct, nil)
+func NewFromContainerConfig(workDir string, ct digraph.Container) (*Client, error) {
+	return NewFromContainerConfigWithAuth(workDir, ct, nil)
 }
 
 // NewFromContainerConfigWithAuth parses digraph.Container into Container struct with registry auth
-func NewFromContainerConfigWithAuth(ct digraph.Container, registryAuths map[string]*digraph.AuthConfig) (*Client, error) {
+func NewFromContainerConfigWithAuth(workDir string, ct digraph.Container, registryAuths map[string]*digraph.AuthConfig) (*Client, error) {
 	// Validate required fields
 	if ct.Image == "" {
 		return nil, ErrImageRequired
@@ -471,7 +471,7 @@ func NewFromContainerConfigWithAuth(ct digraph.Container, registryAuths map[stri
 		Image:      ct.Image,
 		Env:        ct.Env,
 		User:       ct.User,
-		WorkingDir: ct.WorkDir,
+		WorkingDir: ct.GetWorkingDir(),
 	}
 
 	hostConfig := &container.HostConfig{}
@@ -480,7 +480,7 @@ func NewFromContainerConfigWithAuth(ct digraph.Container, registryAuths map[stri
 
 	// Parse volumes
 	if len(ct.Volumes) > 0 {
-		binds, mounts, err := parseVolumes(ct.Volumes)
+		binds, mounts, err := parseVolumes(workDir, ct.Volumes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse volumes: %w", err)
 		}

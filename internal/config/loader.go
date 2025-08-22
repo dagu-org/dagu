@@ -127,7 +127,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		Debug:        def.Debug,
 		LogFormat:    def.LogFormat,
 		TZ:           def.TZ,
-		WorkDir:      def.WorkDir,
 		DefaultShell: def.DefaultShell,
 		SkipExamples: viper.GetBool("skipExamples"),
 	}
@@ -489,7 +488,7 @@ func (l *ConfigLoader) setupViperConfigPath(configDir string) {
 // setDefaultValues establishes the default configuration values for various keys.
 func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	// File paths
-	viper.SetDefault("workDir", "") // Defaults to DAG location if empty.
+	viper.SetDefault("workDir", "")         // Defaults to DAG location if empty.
 	viper.SetDefault("skipExamples", false) // Defaults to creating examples
 	viper.SetDefault("paths.dagsDir", resolver.DAGsDir)
 	viper.SetDefault("paths.suspendFlagsDir", resolver.SuspendFlagsDir)

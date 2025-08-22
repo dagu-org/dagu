@@ -126,7 +126,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	ps := fileproc.New(cfg.Paths.ProcDir)
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
-	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.WorkDir)
+	drm := dagrun.New(drs, ps, cfg.Paths.Executable)
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
@@ -150,7 +150,6 @@ func (c *Context) HistoryManager(drs models.DAGRunStore) dagrun.Manager {
 		drs,
 		c.ProcStore,
 		c.Config.Paths.Executable,
-		c.Config.Global.WorkDir,
 	)
 }
 
@@ -210,7 +209,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 
 	coordinatorCli := c.NewCoordinatorClient()
 	de := scheduler.NewDAGExecutor(coordinatorCli, c.DAGRunMgr)
-	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable, c.Config.Global.WorkDir)
+	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable)
 	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli)
 }
 

@@ -251,6 +251,61 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		require.True(t, os.IsNotExist(err))
 	})
 
+	t.Run("StaleProcessRemovesEmptyDir", func(t *testing.T) {
+		// Create a unique subdirectory for this test
+		testSubDir := filepath.Join(baseDir, "stale-test-subdir")
+		err := os.MkdirAll(testSubDir, 0750)
+		require.NoError(t, err)
+
+		// Create a ProcGroup with very short stale time
+		shortPG := NewProcGroup(testSubDir, name, time.Millisecond*100)
+
+		dagRun := digraph.DAGRunRef{
+			Name: name,
+			ID:   "run-stale-dir",
+		}
+
+		// Create a process in a subdirectory
+		proc, err := shortPG.Acquire(ctx, dagRun)
+		require.NoError(t, err)
+
+		// The proc file will be in a subdirectory like testSubDir/YYYY-MM-DD/
+		procDir := filepath.Dir(proc.fileName)
+
+		// Ensure directory exists
+		err = os.MkdirAll(procDir, 0750)
+		require.NoError(t, err)
+
+		// Create the proc file with old timestamp
+		fd, err := os.OpenFile(proc.fileName, os.O_CREATE|os.O_RDWR, 0600)
+		require.NoError(t, err)
+
+		// Write an old timestamp
+		buf := make([]byte, 8)
+		oldTime := time.Now().Add(-time.Second * 10)
+		binary.BigEndian.PutUint64(buf, uint64(oldTime.Unix()))
+		_, err = fd.WriteAt(buf, 0)
+		require.NoError(t, err)
+		_ = fd.Close()
+
+		// Set old modification time
+		err = os.Chtimes(proc.fileName, oldTime, oldTime)
+		require.NoError(t, err)
+
+		// Check if the run is alive (should be false and file should be cleaned up)
+		alive, err := shortPG.IsRunAlive(ctx, dagRun)
+		require.NoError(t, err)
+		require.False(t, alive)
+
+		// Verify file was removed
+		_, err = os.Stat(proc.fileName)
+		require.True(t, os.IsNotExist(err))
+
+		// Verify the parent directory was also removed (if it's empty)
+		_, err = os.Stat(procDir)
+		require.True(t, os.IsNotExist(err), "empty parent directory should be removed")
+	})
+
 	t.Run("InvalidFilePattern", func(t *testing.T) {
 		dagRun := digraph.DAGRunRef{
 			Name: name,

@@ -31,10 +31,10 @@ steps:
         image: alpine:3
         autoRemove: true
     command: echo 123 abc $FOO
-    output: OUT1
+    output: DOCKER_EXEC_OUT1
 `,
 			expectedOutputs: map[string]any{
-				"OUT1": "123 abc BAR",
+				"DOCKER_EXEC_OUT1": "123 abc BAR",
 			},
 		},
 	}
@@ -74,17 +74,17 @@ steps:
     command: sh -c "echo 'Hello from step 1' > /data/test.txt"
   - name: read_data
     command: cat /data/test.txt
-    output: OUT1
+    output: BIND_MOUNT_OUT1
   - name: append_data
     command: sh -c "echo 'Hello from step 3' >> /data/test.txt"
   - name: read_all
     command: cat /data/test.txt
-    output: OUT2
+    output: BIND_MOUNT_OUT2
 `, tempDir)
 			},
 			expectedOutputs: map[string]any{
-				"OUT1": "Hello from step 1",
-				"OUT2": "Hello from step 1\nHello from step 3",
+				"BIND_MOUNT_OUT1": "Hello from step 1",
+				"BIND_MOUNT_OUT2": "Hello from step 1\nHello from step 3",
 			},
 		},
 		{
@@ -99,11 +99,11 @@ container:
 steps:
   - name: s1
     command: echo 123 abc $FOO
-    output: OUT1
+    output: CONTAINER_BASIC_OUT1
 `
 			},
 			expectedOutputs: map[string]any{
-				"OUT1": "123 abc BAR",
+				"CONTAINER_BASIC_OUT1": "123 abc BAR",
 			},
 		},
 		{
@@ -116,11 +116,11 @@ container:
 steps:
   - name: s1
     command: echo hello world
-    output: OUT1
+    output: CMD_WITH_ARGS_OUT1
 `
 			},
 			expectedOutputs: map[string]any{
-				"OUT1": "hello world",
+				"CMD_WITH_ARGS_OUT1": "hello world",
 			},
 		},
 		{
@@ -130,15 +130,15 @@ steps:
 name: test-working-dir
 container:
   image: alpine:3
-  workDir: /tmp
+  workingDir: /tmp
 steps:
   - name: s1
     command: "pwd"
-    output: OUT1
+    output: WORK_DIR_OUT1
 `
 			},
 			expectedOutputs: map[string]any{
-				"OUT1": "/tmp",
+				"WORK_DIR_OUT1": "/tmp",
 			},
 		},
 		{
@@ -152,11 +152,11 @@ container:
 steps:
   - name: s1
     command: "whoami"
-    output: OUT1
+    output: WITH_USER_OUT1
 `
 			},
 			expectedOutputs: map[string]any{
-				"OUT1": "nobody",
+				"WITH_USER_OUT1": "nobody",
 			},
 		},
 		{
@@ -173,14 +173,55 @@ steps:
     command: sh -c "echo 'Data in named volume' > /data/volume.txt"
   - name: verify_file
     command: "cat /data/volume.txt"
-    output: OUT1
+    output: NAMED_VOL_OUT1
   - name: list_files
     command: "ls -la /data/"
-    output: OUT2
+    output: NAMED_VOL_OUT2
 `
 			},
 			expectedOutputs: map[string]any{
-				"OUT1": "Data in named volume",
+				"NAMED_VOL_OUT1": "Data in named volume",
+			},
+		},
+		{
+			name: "relative_volume_with_working_dir",
+			dagFunc: func(tempDir string) string {
+				// Create a subdirectory to use as working directory
+				subDir := fmt.Sprintf("%s/work", tempDir)
+				if err := os.MkdirAll(subDir, 0755); err != nil {
+					t.Fatalf("Failed to create subdirectory: %v", err)
+				}
+
+				// Create a test file in the working directory
+				testFile := fmt.Sprintf("%s/initial.txt", subDir)
+				if err := os.WriteFile(testFile, []byte("Initial content"), 0644); err != nil {
+					t.Fatalf("Failed to create test file: %v", err)
+				}
+
+				return fmt.Sprintf(`
+name: test-relative-volume
+workingDir: %s
+container:
+  image: alpine:3
+  volumes:
+    - ./:/workspace:rw
+steps:
+  - name: read_initial
+    command: cat /workspace/initial.txt
+    output: WORK_DIR_VOL_OUT1
+  - name: write_new
+    command: sh -c "echo 'New content' > /workspace/new.txt"
+  - name: verify_new
+    command: cat /workspace/new.txt
+    output: WORK_DIR_VOL_OUT2
+  - name: list_workspace
+    command: ls -la /workspace/
+    output: WORK_DIR_VOL_OUT3
+`, subDir)
+			},
+			expectedOutputs: map[string]any{
+				"WORK_DIR_VOL_OUT1": "Initial content",
+				"WORK_DIR_VOL_OUT2": "New content",
 			},
 		},
 	}

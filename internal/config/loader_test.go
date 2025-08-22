@@ -122,7 +122,6 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	assert.True(t, cfg.Server.Headless)
 
 	// Global configurations
-	assert.Equal(t, "/test/work", cfg.Global.WorkDir)
 	assert.Equal(t, "/bin/zsh", cfg.Global.DefaultShell)
 
 	// UI configurations

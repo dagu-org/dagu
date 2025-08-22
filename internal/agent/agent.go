@@ -327,7 +327,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new container if the DAG has a container configuration.
 	if a.dag.Container != nil {
-		containerClient, err := container.NewFromContainerConfigWithAuth(*a.dag.Container, a.dag.RegistryAuths)
+		containerClient, err := container.NewFromContainerConfigWithAuth(a.dag.WorkingDir, *a.dag.Container, a.dag.RegistryAuths)
 		if err != nil {
 			initErr = fmt.Errorf("failed to create container client: %w", err)
 			return initErr

@@ -1,5 +1,8 @@
 <div align="center">
   <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
+  <br/>
+  <p><strong>A lightweight, versatile workflow engine for small teams, defined in simple YAML</strong></p>
+
   <p>
     <a href="https://docs.dagu.cloud/reference/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
     <a href="https://github.com/dagu-org/dagu/actions/workflows/ci.yaml"><img src="https://img.shields.io/github/actions/workflow/status/dagu-org/dagu/ci.yaml?style=flat-square" alt="Build Status"></a>
@@ -14,25 +17,43 @@
   </p>
 </div>
 
-## Overview - Orchestrate workflows without complexity
+## Overview
 
-Dagu */dah-goo/* is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
+Dagu */dah-goo/* is a workflow engine that executes DAGs (Directed Acyclic Graphs) without requiring you to write Python code. Workflows are defined in a simple, declarative YAML format, making them easy to create, read, and maintain.
 
+Example DAG:
 ```yaml
 steps:
-  - command: echo "Hello, dagu!" # STEP 1
-  - command: echo "This is a second step" # STEP 2
+  - echo "Hello, dagu!"
+  - echo "This is a second step"
 ```
 
-By declaratively defining job processes, complex workflows can be visualized, making troubleshooting and recovery easier. Viewing logs and retrying jobs can be performed from the Web UI, eliminating the need to log into a server via SSH.
+With parallel steps:
+```yaml
+steps:
+  - echo "Step 1"
+  - 
+    - echo "Step 2a - runs in parallel"
+    - echo "Step 2b - runs in parallel"
+  - echo "Step 3 - waits for parallel steps"
+```
 
-It is equipped with many features to meet the detailed requirements of enterprise environments. It operates even in environments without internet access. Being a statically compiled binary, it includes all dependencies, allowing it to run in any environment, including on-premise, cloud, and IoT devices. It is a lightweight workflow engine that meets enterprise requirements.
+Or with explicit dependencies:
+```yaml
+steps:
+  - name: step 1
+    command: echo "Hello, dagu!"
+  - name: step 2
+    command: echo "This is a second step"
+    depends: step 1
+```
 
-Note: For a list of features, please refer to the [documentation](https://docs.dagu.cloud/features/).
-
-Workflow jobs are defined as commands. Therefore, legacy scripts that have been in operation for a long time within a company or organization can be used as-is without modification. There is no need to learn a complex new language, and you can start using it right away.
-
-Dagu is designed for enterprise & small teams to easily manage complex workflows. It aims to be an ideal choice for teams that find large-scale, high-cost infrastructure like Airflow to be overkill and are looking for a simpler solution. It requires no database management and only needs a shared filesystem, allowing you to focus on your high-value work.
+## Highlights
+- **Zero-Dependency Installation**: Get started instantly with a single binary. No database or message queue required.
+- **Intuitive UI & CLI**: Visualize, monitor, and manage your workflows through a clean web interface or a powerful command-line tool.
+- **Built-in Executors**: Natively supports running shell commands, containers, remote commands over SSH.
+- **Distributed & Scalable**: Run in High-Availability (HA) mode and distribute tasks to a fleet of workers using labels.
+- **Powerful Control Flow**: Natively supports parallel execution, conditionals, retries, timeouts, and more.
 
 ### CLI Preview
 <p align="center">
@@ -106,8 +127,8 @@ Note: see [documentation](https://docs.dagu.cloud/getting-started/installation) 
 ```bash
 cat > ./hello.yaml << 'EOF'
 steps:
-  - command: echo "Hello from Dagu!"
-  - command: echo "Running step 2"
+  - echo "Hello from Dagu!"
+  - echo "Running step 2"
 EOF
 ```
 
@@ -450,9 +471,14 @@ Changelog of recent updates can be found in the [Changelog](https://docs.dagu.cl
 
 ## Contributing
 
-We welcome contributions of all kinds! If you have ideas, suggestions, or improvements, please open an issue or submit a pull request.
+We welcome contributions of all kinds! Whether you're a developer, a designer, or a user, your help is valued. Here are a few ways to get involved:
 
-For detailed contribution guidelines, please refer to our [CONTRIBUTING.md](./CONTRIBUTING.md) file.
+- ⭐ Star the project on GitHub.
+- 🤔 Suggest new features by opening an issue.
+- 👋 Join the discussion on our Discord server.
+- 🧑‍💻 Contribute code: Check out our good first issue label for tasks perfect for new contributors.
+
+For more details, see our [Contribution Guide](./CONTRIBUTING.md) and our [public Roadmap](#roadmap) to see what's planned.
 
 ## Acknowledgements
 

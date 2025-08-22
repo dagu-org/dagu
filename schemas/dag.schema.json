@@ -30,7 +30,11 @@
           "description": "List of paths to .env files to load environment variables from. Files can be specified as absolute paths, or relative to: DAG file directory, base config directory, or user's home directory."
         }
       ],
-      "description": "Specifies candidate .env files to load environment variables from. By default, no env files are loaded unless explicitly specified."
+      "description": "Specifies .env files to load environment variables from. Defaults to [\".env\"] if not specified. Set to empty array [] to disable .env loading. Files are loaded relative to the DAG's workingDir."
+    },
+    "workingDir": {
+      "type": "string",
+      "description": "Working directory for the DAG. All relative paths (including dotenv files) are resolved relative to this directory. Defaults to the directory containing the DAG file."
     },
     "schedule": {
       "oneOf": [
@@ -318,9 +322,9 @@
         {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/step"
+            "$ref": "#/definitions/stepItem"
           },
-          "description": "List of steps that define the DAG. Steps can depend on each other, forming a directed acyclic graph."
+          "description": "List of steps that define the DAG. Steps can be: 1) Step objects with full configuration, 2) Strings for simple commands (shorthand syntax), or 3) Nested arrays containing parallel steps that run simultaneously."
         },
         {
           "type": "object",
@@ -354,6 +358,32 @@
     }
   },
   "definitions": {
+    "stepItem": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/step"
+        },
+        {
+          "type": "string",
+          "description": "Shorthand syntax: a simple command string that will be converted to a step with 'command' field"
+        },
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/definitions/step"
+              },
+              {
+                "type": "string",
+                "description": "Shorthand syntax: a simple command string"
+              }
+            ]
+          },
+          "description": "Nested array representing parallel steps. All steps in this array will run simultaneously, automatically depending on the previous sequential step, and the next sequential step will depend on all of them."
+        }
+      ]
+    },
     "step": {
       "type": "object",
       "additionalProperties": false,
@@ -370,9 +400,9 @@
           "type": "string",
           "description": "Brief description of what this step does. Helps document the step's purpose."
         },
-        "dir": {
+        "workingDir": {
           "type": "string",
-          "description": "Working directory in which this step's command or script will be executed."
+          "description": "Working directory for the step. Inherits from DAG's workingDir if not specified. Overrides DAG-level workingDir for this step."
         },
         "executor": {
           "oneOf": [
@@ -876,13 +906,13 @@
           "items": {
             "type": "string"
           },
-          "description": "Volume mounts for the container. Format: 'host_path:container_path[:mode]' where mode is 'ro' for read-only or 'rw' (default) for read-write."
+          "description": "Volume mounts for the container. Format: 'host_path:container_path[:mode]' where mode is 'ro' for read-only or 'rw' (default) for read-write. Relative paths (starting with './' or '.') are resolved relative to the DAG's workingDir."
         },
         "user": {
           "type": "string",
           "description": "User (and optionally group) to run the container as. Format: 'user' or 'user:group' (e.g., '1000' or '1000:1000')."
         },
-        "workDir": {
+        "workingDir": {
           "type": "string",
           "description": "Working directory inside the container. Commands will be executed from this directory."
         },

@@ -61,6 +61,18 @@
       ]
     },
     {
+      "name": "Retry",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/",
+      "args": [
+        "retry",
+        "--run-id=${input:runId}",
+        "${input:pathToSpec}",
+      ]
+    },
+    {
       "name": "Stop",
       "type": "go",
       "request": "launch",
@@ -111,6 +123,12 @@
       "type": "promptString",
       "description": "Enter the path to the spec file",
       "default": "${workspaceFolder}/examples/hello_world.yaml"
-    }
+    },
+    {
+      "id": "runId",
+      "type": "promptString",
+      "description": "Enter the run id",
+      "default": ""
+    },
   ]
 }

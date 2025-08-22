@@ -66,9 +66,6 @@ func TestMigrateHistoryCommand(t *testing.T) {
 			DAGRunsDir: dagRunsDir,
 			DAGsDir:    dagsDir,
 		},
-		Global: config.Global{
-			WorkDir: tempDir,
-		},
 	}
 
 	// Create stores

@@ -118,7 +118,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
-	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable, cfg.Global.WorkDir)
+	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable)
 
 	helper := Helper{
 		Context:         createDefaultContext(),
@@ -187,6 +187,16 @@ func (h Helper) Cleanup() {
 		h.Cancel()
 	}
 	_ = os.RemoveAll(h.tmpDir)
+}
+
+// TempFile creates a temp file with specified name and content.
+func (h Helper) TempFile(t *testing.T, name string, data []byte) string {
+	t.Helper()
+
+	filename := filepath.Join(h.tmpDir, name)
+	err := os.WriteFile(filename, data, 0600)
+	require.NoError(t, err)
+	return filename
 }
 
 // DAG creates a test DAG from YAML content
