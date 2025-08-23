@@ -611,20 +611,6 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		}
 	}
 
-	// Check queued DAG-runs
-	queuedRuns, err := a.queueStore.List(ctx, dag.ProcGroup())
-	if err != nil {
-		return nil, fmt.Errorf("failed to read queue: %w", err)
-	}
-	if dag.MaxActiveRuns > 0 && models.CountQueuedDAG(queuedRuns, dag.Name) >= dag.MaxActiveRuns {
-		// The same DAG is already in the queue
-		return nil, &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeMaxRunReached,
-			Message:    fmt.Sprintf("DAG %s is already in the queue, cannot enqueue", dag.Name),
-		}
-	}
-
 	if err := a.enqueueDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId); err != nil {
 		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
 	}
