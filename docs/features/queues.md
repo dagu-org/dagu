@@ -10,6 +10,18 @@ Dagu's queue system helps you:
 - Prioritize critical workflows
 - Prevent system overload
 
+**Additional Note: Queue-level vs DAG-level `maxActiveRuns`:**
+
+At the queue level, `maxActiveRuns` is enforced by the scheduler process.  
+- If a queue has a defined `maxActiveRuns`, any DAG assigned to that queue can run in parallel up to the queue’s limit, regardless of its own DAG-level `maxActiveRuns`.  
+- If a DAG is not assigned to a queue (i.e., no `queue: <string>` is set), it follows its own `maxActiveRuns` setting (default: `1`).  
+
+When starting a DAG run (via API or CLI) that belongs to a queue and has `maxActiveRuns > 0`, the system checks the sum of:  
+1. The DAG’s queued runs within that queue, plus  
+2. Its currently running instances.  
+
+If the new run would push this total beyond the DAG-level `maxActiveRuns` and the DAG is assigned to a queue, the request is rejected with an error. This enforces DAG-level `maxActiveRuns` will not be exceeded effectively.
+
 ## Basic Queue Configuration
 
 ### Assign to Queue

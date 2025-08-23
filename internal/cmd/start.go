@@ -103,6 +103,15 @@ func runStart(ctx *Context, args []string) error {
 		return fmt.Errorf("dag-run ID %s already exists for DAG %s", dagRunID, dag.Name)
 	}
 
+	// Count running DAG to check against maxActiveRuns setting (best effort).
+	liveCount, err := ctx.ProcStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return fmt.Errorf("failed to access proc store: %w", err)
+	}
+	if dag.MaxActiveRuns == 1 && liveCount > 0 {
+		return fmt.Errorf("DAG %s is already running, cannot start", dag.Name)
+	}
+
 	// Log root dag-run
 	logger.Info(ctx, "Executing root dag-run",
 		"dag", dag.Name,
@@ -113,6 +122,17 @@ func runStart(ctx *Context, args []string) error {
 	err = tryExecuteDAG(ctx, dag, dagRunID, root)
 	if errors.Is(err, errMaxRunReached) && !queueDisabled {
 		dag.Location = "" // Queued dag-runs must not have a location
+
+		// If the DAG has a queue configured and maxActiveRuns > 1, ensure the number
+		// of active runs in the queue does not exceed this limit.
+		// The scheduler only enforces maxActiveRuns at the global queue level.
+		queuedRuns, err := ctx.QueueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+		if err != nil {
+			return fmt.Errorf("failed to read queue: %w", err)
+		}
+		if dag.Queue != "" && dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
+			return fmt.Errorf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns)
+		}
 
 		// Enqueue the DAG-run for execution
 		return enqueueDAGRun(ctx, dag, dagRunID)

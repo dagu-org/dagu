@@ -30,6 +30,7 @@ type API struct {
 	dagRunStore        models.DAGRunStore
 	dagRunMgr          dagrun.Manager
 	queueStore         models.QueueStore
+	procStore          models.ProcStore
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
@@ -43,6 +44,7 @@ func New(
 	dr models.DAGStore,
 	drs models.DAGRunStore,
 	qs models.QueueStore,
+	ps models.ProcStore,
 	drm dagrun.Manager,
 	cfg *config.Config,
 	cc coordinator.Client,
@@ -58,6 +60,7 @@ func New(
 		dagStore:           dr,
 		dagRunStore:        drs,
 		queueStore:         qs,
+		procStore:          ps,
 		dagRunMgr:          drm,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,

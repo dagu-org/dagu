@@ -123,6 +123,20 @@ func (s *Store) List(ctx context.Context, name string) ([]models.QueuedItemData,
 	return items, nil
 }
 
+func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]models.QueuedItemData, error) {
+	items, err := s.List(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	var ret []models.QueuedItemData
+	for _, item := range items {
+		if item.Data().Name == dagName {
+			ret = append(ret, item)
+		}
+	}
+	return ret, nil
+}
+
 // DequeueByDAGRunID implements models.QueueStore.
 func (s *Store) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([]models.QueuedItemData, error) {
 	s.mu.Lock()
