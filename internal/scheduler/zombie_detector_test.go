@@ -420,7 +420,7 @@ type mockProcStore struct {
 }
 
 // CountAliveByDAGName implements models.ProcStore.
-func (m *mockProcStore) CountAliveByDAGName(ctx context.Context, groupName string, dagName string) (int, error) {
+func (m *mockProcStore) CountAliveByDAGName(_ context.Context, _, _ string) (int, error) {
 	return 0, nil
 }
 
