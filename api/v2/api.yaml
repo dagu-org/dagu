@@ -31,6 +31,8 @@ tags:
     description: "System operations for monitoring and managing the Dagu server"
   - name: "monitoring"
     description: "Prometheus-compatible metrics for monitoring Dagu operations"
+  - name: "queues"
+    description: "Operations for managing and monitoring execution queues"
 
 paths:
   /health:
@@ -1145,6 +1147,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /queues:
+    get:
+      summary: "List all execution queues with active DAG-runs"
+      description: "Retrieves all queues showing both running and queued DAG-runs, organized by queue/process group"
+      operationId: "listQueues"
+      tags:
+        - "queues"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuesResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /services/scheduler:
     get:
       summary: "Get scheduler service status"
@@ -1570,6 +1595,12 @@ components:
           description: "List of tags for categorizing and filtering DAGs"
           items:
             type: string
+        queue:
+          type: string
+          description: "Name of the queue this DAG is assigned to. If not specified, the DAG name itself becomes the queue name"
+        maxActiveRuns:
+          type: integer
+          description: "Maximum number of concurrent DAG-runs allowed from this DAG"
         runConfig:
           $ref: "#/components/schemas/RunConfig"
       required:
@@ -1780,6 +1811,9 @@ components:
         maxActiveRuns:
           type: integer
           description: "Maximum number of concurrent DAG-runs allowed from this DAG"
+        queue:
+          type: string
+          description: "Name of the queue this DAG is assigned to. If not specified, the DAG name itself becomes the queue name"
         maxActiveSteps:
           type: integer
           description: "Maximum number of concurrent steps allowed in a DAG run"
@@ -2305,6 +2339,85 @@ components:
         - dagRunId
         - dagName
         - startedAt
+
+    QueuesResponse:
+      type: object
+      description: "Response containing all queues with their active DAG-runs"
+      properties:
+        queues:
+          type: array
+          description: "List of all queues with their running and queued DAG-runs"
+          items:
+            $ref: "#/components/schemas/Queue"
+        summary:
+          $ref: "#/components/schemas/QueuesSummary"
+      required:
+        - queues
+        - summary
+
+    Queue:
+      type: object
+      description: "A queue/process group with its active DAG-runs"
+      properties:
+        name:
+          type: string
+          description: "Name of the queue (custom queue name or DAG name if no queue specified)"
+        type:
+          type: string
+          enum: ["custom", "dag-based"]
+          description: "Type of queue - 'custom' if explicitly defined, 'dag-based' if using DAG name"
+        maxConcurrency:
+          type: integer
+          description: "Maximum number of concurrent runs allowed. Only present for 'custom' type queues"
+          minimum: 1
+        running:
+          type: array
+          description: "List of currently running DAG-runs"
+          items:
+            $ref: "#/components/schemas/DAGRunSummary"
+        queued:
+          type: array
+          description: "List of DAG-runs waiting to execute"
+          items:
+            $ref: "#/components/schemas/DAGRunSummary"
+      required:
+        - name
+        - type
+        - running
+        - queued
+
+    QueuesSummary:
+      type: object
+      description: "Summary statistics across all queues"
+      properties:
+        totalQueues:
+          type: integer
+          description: "Total number of active queues"
+          minimum: 0
+        totalRunning:
+          type: integer
+          description: "Total DAG-runs currently executing"
+          minimum: 0
+        totalQueued:
+          type: integer
+          description: "Total DAG-runs waiting in queues"
+          minimum: 0
+        totalCapacity:
+          type: integer
+          description: "Sum of all queue maxConcurrency values"
+          minimum: 0
+        utilizationPercentage:
+          type: number
+          format: float
+          description: "System-wide utilization (totalRunning / totalCapacity * 100)"
+          minimum: 0.0
+          maximum: 100.0
+      required:
+        - totalQueues
+        - totalRunning
+        - totalQueued
+        - totalCapacity
+        - utilizationPercentage
 
 # Apply security requirements globally
 security:
