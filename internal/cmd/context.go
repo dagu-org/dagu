@@ -177,7 +177,7 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 
 	mr := metrics.NewRegistry(collector)
 
-	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr), nil
+	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr), nil
 }
 
 // NewCoordinatorClient creates a new coordinator client using the global peer configuration.

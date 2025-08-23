@@ -48,6 +48,11 @@ func (s *Store) CountAlive(ctx context.Context, groupName string) (int, error) {
 	return procGroup.Count(ctx)
 }
 
+func (s *Store) CountAliveByDAGName(ctx context.Context, groupName, dagName string) (int, error) {
+	procGroup := s.newProcGroup(groupName)
+	return procGroup.CountByDAGName(ctx, dagName)
+}
+
 // ListAlive implements models.ProcStore.
 func (s *Store) ListAlive(ctx context.Context, groupName string) ([]digraph.DAGRunRef, error) {
 	procGroup := s.newProcGroup(groupName)

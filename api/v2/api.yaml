@@ -1428,7 +1428,7 @@ components:
         - "unauthorized"
         - "bad_gateway"
         - "remote_node_error"
-        - "already_running"
+        - "max_run_reached"
         - "not_running"
         - "already_exists"
 

@@ -419,6 +419,11 @@ type mockProcStore struct {
 	mock.Mock
 }
 
+// CountAliveByDAGName implements models.ProcStore.
+func (m *mockProcStore) CountAliveByDAGName(ctx context.Context, groupName string, dagName string) (int, error) {
+	return 0, nil
+}
+
 // TryLock implements models.ProcStore.
 func (m *mockProcStore) TryLock(_ context.Context, _ string) error {
 	return nil

@@ -73,6 +73,24 @@ func runRetry(ctx *Context, args []string) error {
 	}
 	defer ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
+	// Count running DAG to check against maxActiveRuns setting (best effort).
+	liveCount, err := ctx.ProcStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return fmt.Errorf("failed to access proc store: %w", err)
+	}
+	if dag.MaxActiveRuns == 1 && liveCount > 0 {
+		return fmt.Errorf("DAG %s is already running, cannot start", dag.Name)
+	}
+
+	// Count queued DAG-runs
+	queuedRuns, err := ctx.QueueStore.List(ctx, dag.ProcGroup())
+	if err != nil {
+		return fmt.Errorf("failed to read queue: %w", err)
+	}
+	if dag.MaxActiveRuns > 0 && models.CountQueuedDAG(queuedRuns, dag.Name)+liveCount >= dag.MaxActiveRuns {
+		return fmt.Errorf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns)
+	}
+
 	// Acquire process handle
 	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), digraph.NewDAGRunRef(dag.Name, dagRunID))
 	if err != nil {

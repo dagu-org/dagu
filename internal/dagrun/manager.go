@@ -455,7 +455,7 @@ func (*Manager) currentStatus(_ context.Context, dag *digraph.DAG, dagRunID stri
 // If that fails or no status exists, it returns an initial status or an error.
 func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models.DAGRunStatus, error) {
 	// Find the proc store to check if the DAG is running
-	alive, _ := m.procStore.CountAlive(ctx, dag.ProcGroup())
+	alive, _ := m.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
 	if alive > 0 {
 		items, _ := m.dagRunStore.ListStatuses(
 			ctx, models.WithName(dag.Name), models.WithStatuses([]status.Status{status.Running}),

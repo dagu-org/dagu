@@ -42,6 +42,18 @@ type QueueReader interface {
 	IsRunning() bool
 }
 
+// CountQueuedDAG returns the number of queued item that has the same DAG name
+func CountQueuedDAG(items []QueuedItemData, dagName string) int {
+	var count int
+	for _, run := range items {
+		data := run.Data()
+		if data.Name == dagName {
+			count++
+		}
+	}
+	return count
+}
+
 // QueuePriority represents the priority of a queued item
 type QueuePriority int
 

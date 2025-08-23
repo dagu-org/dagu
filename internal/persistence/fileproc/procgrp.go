@@ -46,6 +46,41 @@ func NewProcGroup(baseDir, groupName string, staleTime time.Duration) *ProcGroup
 	}
 }
 
+func (pg *ProcGroup) CountByDAGName(ctx context.Context, dagName string) (int, error) {
+	pg.mu.Lock()
+	defer pg.mu.Unlock()
+
+	// If directory does not exist, return 0
+	if _, err := os.Stat(pg.baseDir); errors.Is(err, os.ErrNotExist) {
+		return 0, nil
+	}
+
+	// Grep for all proc files in subdirectories
+	files, err := filepath.Glob(filepath.Join(pg.baseDir, dagName, procFilePrefix+"*.proc"))
+	if err != nil {
+		return 0, err
+	}
+
+	aliveCount := 0
+	for _, file := range files {
+		if !procFileRegex.MatchString(filepath.Base(file)) {
+			continue
+		}
+		// Check if the file is stale
+		if !pg.isStale(ctx, file) {
+			aliveCount++
+			continue
+		}
+		// File is stale, remove it
+		if err := os.Remove(file); err != nil {
+			logger.Error(ctx, "failed to remove stale file %s: %v", file, err)
+		}
+		continue
+	}
+
+	return aliveCount, nil
+}
+
 // Count retrieves the count of alive proc files for the specified DAG name.
 func (pg *ProcGroup) Count(ctx context.Context) (int, error) {
 	pg.mu.Lock()
