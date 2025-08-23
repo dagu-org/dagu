@@ -593,7 +593,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		return nil, err
 	}
 
-	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
+	dag, err := a.dagStore.GetDetails(ctx, request.FileName, digraph.WithoutEval())
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -608,6 +608,24 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		dagRunId, err = a.dagRunMgr.GenDAGRunID(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error generating dag-run ID: %w", err)
+		}
+	}
+
+	// Check queued DAG-runs
+	queuedRuns, err := a.queueStore.List(ctx, dag.ProcGroup())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read queue: %w", err)
+	}
+
+	// If the DAG has a queue configured and maxActiveRuns > 1, ensure the number
+	// of active runs in the queue does not exceed this limit.
+	// The scheduler only enforces maxActiveRuns at the global queue level.
+	if dag.Queue != "" && dag.MaxActiveRuns > 1 && models.CountQueuedDAG(queuedRuns, dag.Name) >= dag.MaxActiveRuns {
+		// The same DAG is already in the queue
+		return nil, &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeMaxRunReached,
+			Message:    fmt.Sprintf("DAG %s is already in the queue, cannot enqueue", dag.Name),
 		}
 	}
 
