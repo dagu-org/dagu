@@ -456,7 +456,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		return nil, err
 	}
 
-	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
+	dag, err := a.dagStore.GetDetails(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
