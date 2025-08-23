@@ -168,7 +168,7 @@ type mockQueueStore struct {
 }
 
 // ListByDAGName implements models.QueueStore.
-func (m *mockQueueStore) ListByDAGName(ctx context.Context, name string, dagName string) ([]models.QueuedItemData, error) {
+func (m *mockQueueStore) ListByDAGName(_ context.Context, _, _ string) ([]models.QueuedItemData, error) {
 	return nil, nil
 }
 
