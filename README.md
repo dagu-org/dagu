@@ -1,7 +1,7 @@
 <div align="center">
   <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
   <br/>
-  <p><strong>A lightweight, versatile workflow engine for small teams, defined in simple YAML</strong></p>
+  <p>Dagu — a pragmatic <strong>D</strong>irected <strong>A</strong>cyclic <strong>G</strong>raph <strong>U</strong>tility</p>
 
   <p>
     <a href="https://docs.dagu.cloud/reference/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
@@ -17,12 +17,21 @@
   </p>
 </div>
 
-## Overview
+## What is Dagu?
 
-Dagu */dah-goo/* is a workflow engine that executes DAGs (Directed Acyclic Graphs) without requiring you to write Python code. Workflows are defined in a simple, declarative YAML format, making them easy to create, read, and maintain.
+Dagu is a DAG workflow orchestration engine that executes DAGs (Directed Acyclic Graphs) without requiring you to write Python code. The name combines "DAG" with "u" (utility), reflecting its purpose as a comprehensive utility for DAG management.
 
-Example DAG:
+With Dagu, you can define intricate pipelines using a simple, **declarative YAML format** – no Python boilerplate required. This code-free approach makes your workflows incredibly easy to create, read, and maintain, empowering everyone on your team to build and understand them.
+
+It is equipped with many features to meet the highly detailed requirements of enterprise environments.
+
+### How it Works
+Dagu executes your workflows, which are defined as a series of steps in a YAML file. These steps form a Directed Acyclic Graph (DAG), ensuring a clear and predictable flow of execution.
+
+For example, a simple sequential DAG:
 ```yaml
+schedule: "0 0 * * *" # Runs at 00:00 everyday
+
 steps:
   - echo "Hello, dagu!"
   - echo "This is a second step"
@@ -30,6 +39,8 @@ steps:
 
 With parallel steps:
 ```yaml
+schedule: "0 0 * * *" # Runs at 00:00 everyday
+
 steps:
   - echo "Step 1"
   - 
@@ -40,6 +51,8 @@ steps:
 
 Or with explicit dependencies:
 ```yaml
+schedule: "0 0 * * *" # Runs at 00:00 everyday
+
 steps:
   - name: step 1
     command: echo "Hello, dagu!"
@@ -49,11 +62,11 @@ steps:
 ```
 
 ## Highlights
-- **Zero-Dependency Installation**: Get started instantly with a single binary. No database or message queue required.
-- **Intuitive UI & CLI**: Visualize, monitor, and manage your workflows through a clean web interface or a powerful command-line tool.
-- **Built-in Executors**: Natively supports running shell commands, containers, remote commands over SSH.
-- **Distributed & Scalable**: Run in High-Availability (HA) mode and distribute tasks to a fleet of workers using labels.
-- **Powerful Control Flow**: Natively supports parallel execution, conditionals, retries, timeouts, and more.
+- ✨ **Simplicity First**: Define workflows in plain YAML. If you can write a list, you can build a DAG. No Python code required.
+- 🚀 **Zero-Dependency Installation**: Get started instantly with a single binary. No database or message queue required.
+- 🌐 **Distributed & Scalable**: Run in High-Availability (HA) mode and distribute tasks to a fleet of workers using labels.
+- 🎮 **Intuitive UI & CLI**: Visualize, monitor, and manage your workflows through a clean web interface or a powerful command-line tool.
+- 📦 **Built-in Power**: Natively supports running shell commands, containers, and remote commands over SSH without extra plugins.
 
 ### CLI Preview
 ![Demo CLI](./assets/images/demo-cli.webp)

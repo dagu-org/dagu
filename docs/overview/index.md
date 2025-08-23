@@ -1,20 +1,38 @@
-# Orchestrate workflows without complexity
+# What is Dagu?
 
-Dagu is a powerful workflow engine designed to be deployable in environments where Airflow cannot be installed, such as small devices, on-premise servers, and legacy systems. It allows you to declaratively define any batch job as a single DAG (Directed Acyclic Graph) in a simple YAML format.
+Dagu is a workflow engine that executes DAGs (Directed Acyclic Graphs) without requiring you to write Python code. The name combines "DAG" with "u" (utility), reflecting its purpose as a comprehensive utility for DAG management.
 
+With Dagu, you can define intricate pipelines using a simple, **declarative YAML format** – no Python boilerplate required. This code-free approach makes your workflows incredibly easy to create, read, and maintain, empowering everyone on your team to build and understand them.
+
+### How it Works
+Dagu executes your workflows, which are defined as a series of steps in a YAML file. These steps form a Directed Acyclic Graph (DAG), ensuring a clear and predictable flow of execution.
+
+For example, a simple sequential DAG:
 ```yaml
 steps:
-  - sleep 1 && echo "Hello, Dagu!"
-  - sleep 1 && echo "This is a second step"
+  - echo "Hello, dagu!"
+  - echo "This is a second step"
 ```
 
-By declaratively defining the processes within a job, complex workflows become visualized, making troubleshooting and recovery easier. Viewing log and retry can be performed from the Web UI, eliminating the need to manually log into a server via SSH.
+With parallel steps:
+```yaml
+steps:
+  - echo "Step 1"
+  - 
+    - echo "Step 2a - runs in parallel"
+    - echo "Step 2b - runs in parallel"
+  - echo "Step 3 - waits for parallel steps"
+```
 
-It is equipped with many features to meet the highly detailed requirements of enterprise environments. It operates even in environments without internet access and, being statically compiled, includes all dependencies, allowing it to be used in any environment, including on-premise, cloud, and IoT devices. It is a lightweight workflow engine that meets enterprise requirements.
-
-Workflow jobs are defined as commands. Therefore, legacy scripts that have been in operation for a long time within a company or organization can be used as-is without modification. There is no need to learn a complex new language, and you can start using it right away.
-
-Dagu is designed for small teams of 1-3 people to easily manage complex workflows. It aims to be an ideal choice for teams that find large-scale, high-cost infrastructure like Airflow to be overkill and are looking for a simpler solution.
+Or with explicit dependencies:
+```yaml
+steps:
+  - name: step 1
+    command: echo "Hello, dagu!"
+  - name: step 2
+    command: echo "This is a second step"
+    depends: step 1
+```
 
 ## Demo
 

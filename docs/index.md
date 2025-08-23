@@ -5,7 +5,8 @@ layout: doc
 <img src="/dagu-logo.webp" alt="dagu Logo" style="display: block; margin: 0 auto; max-width: 100%">
 
 <div class="tagline" style="text-align: center;">
-  <h1>A lightweight and powerful workflow engine for enterprise & small teams</h1>
+  <h2>Dagu — a pragmatic <strong>D</strong>irected <strong>A</strong>cyclic <strong>G</strong>raph <strong>U</strong>tility</h2>
+  <p>Dagu is a lightweight workflow engine that executes DAGs (Directed Acyclic Graphs) without requiring you to write Python code. The name combines &quot;DAG&quot; with &quot;u&quot; (utility), reflecting its purpose as a comprehensive utility for DAG management.</p>
 </div>
 
 
