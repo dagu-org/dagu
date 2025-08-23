@@ -407,22 +407,12 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	if err != nil {
 		return nil, fmt.Errorf("failed to access proc store: %w", err)
 	}
-	if dag.MaxActiveRuns == 1 {
-		if liveCount > 0 {
-			return nil, &Error{
-				HTTPStatus: http.StatusConflict,
-				Code:       api.ErrorCodeMaxRunReached,
-				Message:    fmt.Sprintf("DAG %s is already running, cannot retry", dag.Name),
-			}
-		}
-	}
-
 	// Count queued DAG-runs and check against maxActiveRuns
-	queuedRuns, err := a.queueStore.List(ctx, dag.ProcGroup())
+	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read queue: %w", err)
 	}
-	if dag.MaxActiveRuns > 0 && models.CountQueuedDAG(queuedRuns, dag.Name)+liveCount >= dag.MaxActiveRuns {
+	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
 		// The same DAG is already in the queue
 		return nil, &Error{
 			HTTPStatus: http.StatusConflict,

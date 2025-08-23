@@ -126,11 +126,11 @@ func runStart(ctx *Context, args []string) error {
 		// If the DAG has a queue configured and maxActiveRuns > 1, ensure the number
 		// of active runs in the queue does not exceed this limit.
 		// The scheduler only enforces maxActiveRuns at the global queue level.
-		queuedRuns, err := ctx.QueueStore.List(ctx, dag.ProcGroup())
+		queuedRuns, err := ctx.QueueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
 		if err != nil {
 			return fmt.Errorf("failed to read queue: %w", err)
 		}
-		if dag.Queue != "" && dag.MaxActiveRuns > 1 && models.CountQueuedDAG(queuedRuns, dag.Name)+liveCount >= dag.MaxActiveRuns {
+		if dag.Queue != "" && dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
 			return fmt.Errorf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns)
 		}
 

@@ -513,11 +513,11 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	}
 
 	// Count queued DAG-runs and check against maxActiveRuns
-	queuedRuns, err := a.queueStore.List(ctx, dag.ProcGroup())
+	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read queue: %w", err)
 	}
-	if dag.MaxActiveRuns > 0 && models.CountQueuedDAG(queuedRuns, dag.Name)+liveCount >= dag.MaxActiveRuns {
+	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
 		// The same DAG is already in the queue
 		return nil, &Error{
 			HTTPStatus: http.StatusConflict,
@@ -612,20 +612,20 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	}
 
 	// Check queued DAG-runs
-	queuedRuns, err := a.queueStore.List(ctx, dag.ProcGroup())
+	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read queue: %w", err)
 	}
 
-	// If the DAG has a queue configured and maxActiveRuns > 1, ensure the number
+	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
 	// of active runs in the queue does not exceed this limit.
 	// The scheduler only enforces maxActiveRuns at the global queue level.
-	if dag.Queue != "" && dag.MaxActiveRuns > 1 && models.CountQueuedDAG(queuedRuns, dag.Name) >= dag.MaxActiveRuns {
+	if dag.Queue != "" && dag.MaxActiveRuns > 0 && len(queuedRuns) >= dag.MaxActiveRuns {
 		// The same DAG is already in the queue
 		return nil, &Error{
 			HTTPStatus: http.StatusConflict,
 			Code:       api.ErrorCodeMaxRunReached,
-			Message:    fmt.Sprintf("DAG %s is already in the queue, cannot enqueue", dag.Name),
+			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot enqueue", dag.Name, dag.MaxActiveRuns),
 		}
 	}
 

@@ -28,6 +28,8 @@ type QueueStore interface {
 	List(ctx context.Context, name string) ([]QueuedItemData, error)
 	// All returns all items in the queue
 	All(ctx context.Context) ([]QueuedItemData, error)
+	// ListByDAGName returns all items that has a specific DAG name
+	ListByDAGName(ctx context.Context, name, dagName string) ([]QueuedItemData, error)
 	// Reader returns a QueueReader for reading from the queue
 	Reader(ctx context.Context) QueueReader
 }
@@ -40,18 +42,6 @@ type QueueReader interface {
 	Stop(ctx context.Context)
 	// IsRunning returns true if the queue reader is running
 	IsRunning() bool
-}
-
-// CountQueuedDAG returns the number of queued item that has the same DAG name
-func CountQueuedDAG(items []QueuedItemData, dagName string) int {
-	var count int
-	for _, run := range items {
-		data := run.Data()
-		if data.Name == dagName {
-			count++
-		}
-	}
-	return count
 }
 
 // QueuePriority represents the priority of a queued item
