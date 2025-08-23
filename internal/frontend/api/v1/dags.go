@@ -600,7 +600,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			}
 			return api.PostDAGAction200JSONResponse{}, nil
 		}
-		if err := a.dagRunManager.RetryDAGRun(ctx, dag, *request.Body.RequestId); err != nil {
+		if err := a.dagRunManager.RetryDAGRun(ctx, dag, *request.Body.RequestId, false); err != nil {
 			return nil, fmt.Errorf("error retrying DAG: %w", err)
 		}
 		return api.PostDAGAction200JSONResponse{}, nil

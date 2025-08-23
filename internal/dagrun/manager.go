@@ -301,9 +301,12 @@ func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts Restart
 }
 
 // RetryDAGRun retries a dag-run by executing the configured executable with the retry command.
-func (m *Manager) RetryDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string) error {
+func (m *Manager) RetryDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string, disableMaxActiveRuns bool) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--run-id=%s", dagRunID))
+	if disableMaxActiveRuns {
+		args = append(args, "--disable-max-active-runs")
+	}
 	return m.runRetryCommand(ctx, args, dag)
 }
 

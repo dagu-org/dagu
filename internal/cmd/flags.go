@@ -70,6 +70,23 @@ var (
 		required:  true,
 	}
 
+	// stepNameForRetry is used to indicate a specific step to retry
+	stepNameForRetry = commandLineFlag{
+		name:         "step",
+		shorthand:    "",
+		usage:        "Retry only the specified step (optional)",
+		defaultValue: "",
+	}
+
+	// noCheckMaxActiveRuns
+	disableMaxActiveRuns = commandLineFlag{
+		name:         "disable-max-active-runs",
+		shorthand:    "",
+		usage:        "Disable check for max active runs",
+		isBool:       true,
+		defaultValue: "",
+	}
+
 	// Unique dag-run ID used for starting a new dag-run.
 	// This is used to track and identify the execution instance and its status.
 	dagRunIDFlag = commandLineFlag{

@@ -438,7 +438,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		return api.RetryDAGRun200Response{}, nil
 	}
 
-	if err := a.dagRunMgr.RetryDAGRun(ctx, dag, request.Body.DagRunId); err != nil {
+	if err := a.dagRunMgr.RetryDAGRun(ctx, dag, request.Body.DagRunId, false); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 

@@ -129,7 +129,7 @@ func (e *DAGExecutor) ExecuteDAG(
 			DAGRunID: runID,
 		})
 	case coordinatorv1.Operation_OPERATION_RETRY:
-		return e.dagRunManager.RetryDAGRun(ctx, dag, runID)
+		return e.dagRunManager.RetryDAGRun(ctx, dag, runID, true)
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
 		return errors.New("operation not specified")
 	default:

@@ -237,7 +237,7 @@ func TestClient_RunDAG(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		err = cli.RetryDAGRun(ctx, dag.DAG, prevDAGRunID)
+		err = cli.RetryDAGRun(ctx, dag.DAG, prevDAGRunID, true)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
