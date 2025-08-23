@@ -540,11 +540,7 @@ func (a *API) startDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunI
 		Params:   params,
 		DAGRunID: dagRunID,
 		Quiet:    true,
-<<<<<<< HEAD
 		NoQueue:  singleton || dag.MaxActiveRuns == 1,
-=======
-		NoQueue:  false,
->>>>>>> f0292b39 (feat: check queued item agains max active runs)
 	}); err != nil {
 		return fmt.Errorf("error starting DAG: %w", err)
 	}
