@@ -20,7 +20,7 @@ When starting a DAG run (via API or CLI) that belongs to a queue and has `maxAct
 1. The DAG’s queued runs within that queue, plus  
 2. Its currently running instances.  
 
-If the new run would push this total beyond the DAG-level `maxActiveRuns`, the request is rejected with an error. This enforces DAG-level `maxActiveRuns` will not be exceeded effectively.
+If the new run would push this total beyond the DAG-level `maxActiveRuns` and the DAG is assigned to a queue, the request is rejected with an error. This enforces DAG-level `maxActiveRuns` will not be exceeded effectively.
 
 ## Basic Queue Configuration
 
