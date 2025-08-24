@@ -479,15 +479,11 @@ function DAGActions({
               return;
             }
             
-            // Navigate to DAG-run detail page
-            if (data?.dagRunId && dag?.name) {
-              navigate(`/dag-runs/${dag.name}/${data.dagRunId}`);
-            } else {
-              reloadData();
-              // Navigate to status tab after execution
-              if (navigateToStatusTab) {
-                navigateToStatusTab();
-              }
+            // Just refresh the current page data
+            reloadData();
+            // Navigate to status tab after execution (if available)
+            if (navigateToStatusTab) {
+              navigateToStatusTab();
             }
           }}
           dismissModal={() => {

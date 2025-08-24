@@ -2,6 +2,11 @@ import React from 'react';
 import { Layers, Activity, Search, RefreshCw } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '../../components/ui/tooltip';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useQuery } from '../../hooks/api';
 import type { components } from '../../api/v2/schema';
@@ -62,28 +67,37 @@ function Queues() {
       filtered = filtered.filter((queue) => queue.type === selectedQueueType);
     }
     
-    return filtered;
+    // Sort alphabetically by queue name for stable display
+    return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }, [data?.queues, searchText, selectedQueueType]);
 
   // Calculate metrics
   const metrics = React.useMemo(() => {
     const queues = data?.queues || [];
-    const totalQueues = queues.length;
+    
+    // Count queues by type
     const globalQueues = queues.filter(q => q.type === 'global').length;
     const dagBasedQueues = queues.filter(q => q.type === 'dag-based').length;
+    
+    // Count active queues (those with running or queued items)
+    const activeQueues = queues.filter(q => 
+      (q.running?.length || 0) > 0 || (q.queued?.length || 0) > 0
+    ).length;
+    
     const totalRunning = queues.reduce((sum, q) => sum + (q.running?.length || 0), 0);
     const totalQueued = queues.reduce((sum, q) => sum + (q.queued?.length || 0), 0);
     const totalActive = totalRunning + totalQueued;
     
-    // Calculate utilization for custom queues
-    const globalQueuesWithCapacity = queues.filter(q => q.type === 'global' && q.maxConcurrency);
-    const totalCapacity = globalQueuesWithCapacity.reduce((sum, q) => sum + (q.maxConcurrency || 0), 0);
-    const utilization = totalCapacity > 0 ? Math.round((totalRunning / totalCapacity) * 100) : 0;
+    // Calculate utilization for global queues only (DAG-based queues are isolated and don't compete for shared capacity)
+    const globalQueuesList = queues.filter(q => q.type === 'global');
+    const globalRunning = globalQueuesList.reduce((sum, q) => sum + (q.running?.length || 0), 0);
+    const globalCapacity = globalQueuesList.filter(q => q.maxConcurrency).reduce((sum, q) => sum + (q.maxConcurrency || 0), 0);
+    const utilization = globalCapacity > 0 ? Math.round((globalRunning / globalCapacity) * 100) : 0;
 
     return {
-      totalQueues,
       globalQueues,
       dagBasedQueues,
+      activeQueues,
       totalRunning,
       totalQueued,
       totalActive,
@@ -193,14 +207,28 @@ function Queues() {
                 <div className="w-2 h-2 rounded-full bg-purple-500" />
                 <span>Queued</span>
               </div>
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span>Global</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-gray-500" />
-                <span>DAG-based</span>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1 cursor-help">
+                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span>Global</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs">Shared queues with maxConcurrency limits that can process DAG runs from multiple DAGs</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1 cursor-help">
+                    <div className="w-2 h-2 rounded-full bg-gray-500" />
+                    <span>DAG-based</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs">Dedicated queues where each DAG has its own queue with maxActiveRuns limit (default 1)</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </div>
