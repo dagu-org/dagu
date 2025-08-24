@@ -67,11 +67,11 @@ queues:
   enabled: true          # Default: true
   config:
     - name: "critical"
-      maxActiveRuns: 5   # Maximum concurrent DAG runs
+      maxConcurrency: 5   # Maximum concurrent DAG runs
     - name: "batch"
-      maxActiveRuns: 1
+      maxConcurrency: 1
     - name: "default"
-      maxActiveRuns: 2
+      maxConcurrency: 2
 
 # Remote Nodes
 remoteNodes:

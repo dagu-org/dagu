@@ -1129,9 +1129,9 @@ queues:
   enabled: true
   config:
     - name: "critical"
-      maxActiveRuns: 5
+      maxConcurrency: 5
     - name: "batch"
-      maxActiveRuns: 1
+      maxConcurrency: 1
 
 # DAG file
 queue: "critical"

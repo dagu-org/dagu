@@ -243,8 +243,10 @@ type queuesDef struct {
 
 // queueConfigDef represents individual queue configuration
 type queueConfigDef struct {
-	Name          string `mapstructure:"name"`
-	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
+	Name string `mapstructure:"name"`
+	// Deprecated: use maxConcurrency
+	MaxActiveRuns  *int `mapstructure:"maxActiveRuns"`
+	MaxConcurrency int  `mapstructure:"maxConcurrency"`
 }
 
 // coordinatorDef holds the configuration for the coordinator service.
