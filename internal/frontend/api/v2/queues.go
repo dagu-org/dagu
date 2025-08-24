@@ -22,7 +22,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 		for _, queueCfg := range a.config.Queues.Config {
 			queue := &queueInfo{
 				name:           queueCfg.Name,
-				queueType:      "custom",
+				queueType:      "global",
 				maxConcurrency: queueCfg.MaxActiveRuns,
 				running:        []api.DAGRunSummary{},
 				queued:         []api.DAGRunSummary{},
@@ -121,8 +121,8 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			Queued:  q.queued,
 		}
 
-		// Only include maxConcurrency for custom queues
-		if q.queueType == "custom" && q.maxConcurrency > 0 {
+		// Only include maxConcurrency for global queues
+		if q.queueType == "global" && q.maxConcurrency > 0 {
 			queue.MaxConcurrency = &q.maxConcurrency
 			totalCapacity += q.maxConcurrency
 		}
@@ -171,9 +171,9 @@ func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, config *
 			queued:    []api.DAGRunSummary{},
 		}
 
-		// Check if this is a custom queue from config
-		if isCustomQueue(queueName, config) {
-			queue.queueType = "custom"
+		// Check if this is a global queue from config
+		if isGlobalQueue(queueName, config) {
+			queue.queueType = "global"
 			queue.maxConcurrency = getQueueMaxConcurrency(queueName, config)
 		}
 
@@ -182,8 +182,8 @@ func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, config *
 	return queue
 }
 
-// Helper function to check if a queue is custom (defined in config)
-func isCustomQueue(queueName string, config *config.Config) bool {
+// Helper function to check if a queue is global (defined in config)
+func isGlobalQueue(queueName string, config *config.Config) bool {
 	if config.Queues.Enabled && config.Queues.Config != nil {
 		for _, queueCfg := range config.Queues.Config {
 			if queueCfg.Name == queueName {

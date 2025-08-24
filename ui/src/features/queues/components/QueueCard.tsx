@@ -85,7 +85,7 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               )}
               <div className="flex items-center gap-2">
-                {queue.type === 'custom' ? (
+                {queue.type === 'global' ? (
                   <Settings className="h-4 w-4 text-blue-500" />
                 ) : (
                   <GitBranch className="h-4 w-4 text-gray-500" />
@@ -97,8 +97,8 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
               </div>
             </div>
             
-            {/* Utilization bar for custom queues */}
-            {queue.type === 'custom' && queue.maxConcurrency && (
+            {/* Utilization bar for global queues */}
+            {queue.type === 'global' && queue.maxConcurrency && (
               <div className="flex items-center gap-2">
                 <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
                   <div

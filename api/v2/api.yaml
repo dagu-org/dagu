@@ -2361,14 +2361,14 @@ components:
       properties:
         name:
           type: string
-          description: "Name of the queue (custom queue name or DAG name if no queue specified)"
+          description: "Name of the queue (global queue name or DAG name if no queue specified)"
         type:
           type: string
-          enum: ["custom", "dag-based"]
-          description: "Type of queue - 'custom' if explicitly defined, 'dag-based' if using DAG name"
+          enum: ["global", "dag-based"]
+          description: "Type of queue - 'global' if explicitly defined, 'dag-based' if using DAG name"
         maxConcurrency:
           type: integer
-          description: "Maximum number of concurrent runs allowed. Only present for 'custom' type queues"
+          description: "Maximum number of concurrent runs allowed. Only present for 'global' type queues"
           minimum: 1
         running:
           type: array

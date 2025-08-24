@@ -1101,14 +1101,14 @@ export interface components {
         };
         /** @description A queue/process group with its active DAG-runs */
         Queue: {
-            /** @description Name of the queue (custom queue name or DAG name if no queue specified) */
+            /** @description Name of the queue (global queue name or DAG name if no queue specified) */
             name: string;
             /**
-             * @description Type of queue - 'custom' if explicitly defined, 'dag-based' if using DAG name
+             * @description Type of queue - 'global' if explicitly defined, 'dag-based' if using DAG name
              * @enum {string}
              */
             type: QueueType;
-            /** @description Maximum number of concurrent runs allowed. Only present for 'custom' type queues */
+            /** @description Maximum number of concurrent runs allowed. Only present for 'global' type queues */
             maxConcurrency?: number;
             /** @description List of currently running DAG-runs */
             running: components["schemas"]["DAGRunSummary"][];
@@ -2744,6 +2744,6 @@ export enum RepeatMode {
     Until = "until"
 }
 export enum QueueType {
-    custom = "custom",
+    global = "global",
     dag_based = "dag-based"
 }
