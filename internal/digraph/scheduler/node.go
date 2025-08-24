@@ -687,16 +687,13 @@ func (n *Node) BuildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 			return nil, fmt.Errorf("failed to eval parallel variable %q: %w", parallel.Variable, err)
 		}
 
-		// Check if the value is JSON array or space-separated
-		if stringutil.IsJSONArray(value) {
-			if err := json.Unmarshal([]byte(value), &items); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal parallel variable %q: %w", parallel.Variable, err)
-			}
-		} else {
-			// Split by whitespace for space-separated items
-			for _, field := range strings.Fields(value) {
-				items = append(items, field)
-			}
+		// Parse the value using smart separator detection
+		parsedItems, err := stringutil.ParseSeparatedValues(value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse parallel variable %q: %w", parallel.Variable, err)
+		}
+		for _, item := range parsedItems {
+			items = append(items, item)
 		}
 	} else if len(parallel.Items) > 0 {
 		// Handle static items
