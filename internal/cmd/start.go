@@ -130,7 +130,7 @@ func runStart(ctx *Context, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to read queue: %w", err)
 		}
-		if dag.Queue != "" && dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
+		if dag.Queue != "" && dag.MaxActiveRuns > 1 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
 			return fmt.Errorf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns)
 		}
 
@@ -159,6 +159,8 @@ func tryExecuteDAG(ctx *Context, dag *digraph.DAG, dagRunID string, root digraph
 		return fmt.Errorf("failed to count live process for %s: %w", dag.ProcGroup(), errMaxRunReached)
 	}
 
+	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
+	// of active runs in the queue does not exceed this limit.
 	if dag.MaxActiveRuns > 0 && runningCount >= dag.MaxActiveRuns {
 		// It's not possible to run right now.
 		return fmt.Errorf("max active run is reached (%d >= %d): %w", runningCount, dag.MaxActiveRuns, errMaxRunReached)

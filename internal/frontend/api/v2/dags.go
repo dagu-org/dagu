@@ -517,6 +517,8 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	if err != nil {
 		return nil, fmt.Errorf("failed to read queue: %w", err)
 	}
+	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
+	// of active runs in the queue does not exceed this limit.
 	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
 		// The same DAG is already in the queue
 		return nil, &Error{
@@ -626,7 +628,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
 	// of active runs in the queue does not exceed this limit.
 	// The scheduler only enforces maxActiveRuns at the global queue level.
-	if dag.Queue != "" && dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
+	if dag.Queue != "" && dag.MaxActiveRuns > 1 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
 		// The same DAG is already in the queue
 		return nil, &Error{
 			HTTPStatus: http.StatusConflict,

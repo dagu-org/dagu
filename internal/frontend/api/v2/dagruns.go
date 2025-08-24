@@ -412,6 +412,8 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	if err != nil {
 		return nil, fmt.Errorf("failed to read queue: %w", err)
 	}
+	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
+	// of active runs in the queue does not exceed this limit.
 	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
 		// The same DAG is already in the queue
 		return nil, &Error{
