@@ -190,11 +190,11 @@ func TestStore_ListAllAlive(t *testing.T) {
 
 		proc1, err := store.Acquire(ctx, "queue1", dagRun1)
 		require.NoError(t, err)
-		defer proc1.Stop(ctx)
+		defer func() { _ = proc1.Stop(ctx) }()
 
 		proc2, err := store.Acquire(ctx, "queue1", dagRun2)
 		require.NoError(t, err)
-		defer proc2.Stop(ctx)
+		defer func() { _ = proc2.Stop(ctx) }()
 
 		// Give time for heartbeats to start
 		time.Sleep(time.Millisecond * 50)
@@ -232,15 +232,15 @@ func TestStore_ListAllAlive(t *testing.T) {
 
 		proc1, err := store.Acquire(ctx, "queue-alpha", dagRun1)
 		require.NoError(t, err)
-		defer proc1.Stop(ctx)
+		defer func() { _ = proc1.Stop(ctx) }()
 
 		proc2, err := store.Acquire(ctx, "queue-beta", dagRun2)
 		require.NoError(t, err)
-		defer proc2.Stop(ctx)
+		defer func() { _ = proc2.Stop(ctx) }()
 
 		proc3, err := store.Acquire(ctx, "queue-alpha", dagRun3)
 		require.NoError(t, err)
-		defer proc3.Stop(ctx)
+		defer func() { _ = proc3.Stop(ctx) }()
 
 		// Give time for heartbeats to start
 		time.Sleep(time.Millisecond * 50)
