@@ -41,13 +41,7 @@ type Props = {
 /**
  * Modal dialog for starting or enqueuing a DAG with parameters
  */
-function StartDAGModal({
-  visible,
-  dag,
-  dismissModal,
-  onSubmit,
-  action = 'start',
-}: Props) {
+function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
   const ref = React.useRef<HTMLInputElement>(null);
 
   // Parse default parameters from the DAG definition

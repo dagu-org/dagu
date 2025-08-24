@@ -5,6 +5,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 )
 
@@ -43,17 +44,28 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 
 	// Process running DAG runs
 	for groupName, dagRuns := range runningByGroup {
-		// Group name is the queue name
-		queue := getOrCreateQueue(queueMap, groupName, a.config)
+		var dag *digraph.DAG
+		var queue *queueInfo
 
 		// Convert each running DAG run to DAGRunSummary
 		for _, dagRun := range dagRuns {
-			// Get the DAG run status to convert to summary
+			// Get the DAG run attempt
 			attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
 			if err != nil {
 				continue // Skip if we can't find the attempt
 			}
 
+			// Get the DAG from the attempt (only once for the group)
+			if dag == nil {
+				dag, _ = attempt.ReadDAG(ctx)
+			}
+
+			// Get or create queue with the DAG info (only once for the group)
+			if queue == nil {
+				queue = getOrCreateQueue(queueMap, groupName, a.config, dag)
+			}
+
+			// Get the status and add to queue
 			runStatus, err := attempt.ReadStatus(ctx)
 			if err != nil {
 				continue // Skip if we can't read status
@@ -90,7 +102,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			queueName = dag.Name
 		}
 
-		queue := getOrCreateQueue(queueMap, queueName, a.config)
+		queue := getOrCreateQueue(queueMap, queueName, a.config, dag)
 
 		// Get the DAG run status to convert to summary
 		attempt, err := a.dagRunStore.FindAttempt(ctx, dagRunRef)
@@ -121,8 +133,8 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			Queued:  q.queued,
 		}
 
-		// Only include maxConcurrency for global queues
-		if q.queueType == "global" && q.maxConcurrency > 0 {
+		// Include maxConcurrency for both global and DAG-based queues
+		if q.maxConcurrency > 0 {
 			queue.MaxConcurrency = &q.maxConcurrency
 			totalCapacity += q.maxConcurrency
 		}
@@ -161,7 +173,7 @@ type queueInfo struct {
 }
 
 // Helper function to get or create queue in the map
-func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, config *config.Config) *queueInfo {
+func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, config *config.Config, dag *digraph.DAG) *queueInfo {
 	queue, exists := queueMap[queueName]
 	if !exists {
 		queue = &queueInfo{
@@ -175,6 +187,9 @@ func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, config *
 		if isGlobalQueue(queueName, config) {
 			queue.queueType = "global"
 			queue.maxConcurrency = getQueueMaxConcurrency(queueName, config)
+		} else if dag != nil {
+			// For DAG-based queues, use the DAG's MaxActiveRuns
+			queue.maxConcurrency = dag.MaxActiveRuns
 		}
 
 		queueMap[queueName] = queue

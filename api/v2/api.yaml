@@ -2368,7 +2368,7 @@ components:
           description: "Type of queue - 'global' if explicitly defined, 'dag-based' if using DAG name"
         maxConcurrency:
           type: integer
-          description: "Maximum number of concurrent runs allowed. Only present for 'global' type queues"
+          description: "Maximum number of concurrent runs allowed. For 'global' queues, this is the configured maxConcurrency. For 'dag-based' queues, this is the DAG's maxActiveRuns (default 1)"
           minimum: 1
         running:
           type: array

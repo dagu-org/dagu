@@ -32,7 +32,7 @@ function QueueMetrics({ metrics, isLoading }: QueueMetricsProps) {
       title: 'DAG-based Queues',
       value: metrics.dagBasedQueues,
       icon: <Layers className="h-5 w-5 text-gray-500" />,
-      tooltip: 'Number of DAG-based queues (each DAG has its own dedicated queue)',
+      tooltip: 'Number of DAG-based queues (each DAG has its own queue with maxActiveRuns limit, default 1)',
     },
     {
       title: 'Active Queues',
@@ -56,7 +56,7 @@ function QueueMetrics({ metrics, isLoading }: QueueMetricsProps) {
       title: 'Utilization',
       value: `${metrics.utilization}%`,
       icon: <BarChart3 className="h-5 w-5 text-orange-500" />,
-      tooltip: 'Percentage of global queue capacity being used (running DAG runs ÷ total maxConcurrency)',
+      tooltip: 'Percentage of global queue capacity being used (total running DAG runs ÷ global queue maxConcurrency)',
     },
   ];
 
