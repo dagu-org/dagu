@@ -519,8 +519,6 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	}
 	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
 	// of active runs in the queue does not exceed this limit.
-	// No need to check if maxActiveRuns <= 1 for enqueueing as queue level
-	// maxConcurrency will be the only cap.
 	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
 		// The same DAG is already in the queue
 		return nil, &Error{
