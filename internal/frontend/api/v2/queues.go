@@ -4,9 +4,191 @@ import (
 	"context"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 )
 
 // ListQueues implements api.StrictServerInterface.
 func (a *API) ListQueues(ctx context.Context, request api.ListQueuesRequestObject) (api.ListQueuesResponseObject, error) {
-	panic("unimplemented")
+	// Map to track queues and their DAG runs
+	queueMap := make(map[string]*queueInfo)
+	
+	// Track statistics
+	var totalRunning, totalQueued, totalCapacity int
+
+	// 1. Get all running DAG runs from ProcStore (real-time with heartbeats)
+	runningByGroup, err := a.procStore.ListAllAlive(ctx)
+	if err != nil {
+		return nil, &Error{
+			Code:       api.ErrorCodeInternalError,
+			Message:    "Failed to list running processes",
+			HTTPStatus: 500,
+		}
+	}
+
+	// Process running DAG runs
+	for groupName, dagRuns := range runningByGroup {
+		// Group name is the queue name
+		queue := getOrCreateQueue(queueMap, groupName, a.config)
+		
+		// Convert each running DAG run to DAGRunSummary
+		for _, dagRun := range dagRuns {
+			// Get the DAG run status to convert to summary
+			attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
+			if err != nil {
+				continue // Skip if we can't find the attempt
+			}
+			
+			runStatus, err := attempt.ReadStatus(ctx)
+			if err != nil {
+				continue // Skip if we can't read status
+			}
+			
+			runSummary := toDAGRunSummary(*runStatus)
+			queue.running = append(queue.running, runSummary)
+			totalRunning++
+		}
+	}
+
+	// 2. Get all queued items from QueueStore
+	allQueued, err := a.queueStore.All(ctx)
+	if err != nil {
+		return nil, &Error{
+			Code:       api.ErrorCodeInternalError,
+			Message:    "Failed to list queued items",
+			HTTPStatus: 500,
+		}
+	}
+
+	// Process queued DAG runs
+	for _, queuedItem := range allQueued {
+		dagRunRef := queuedItem.Data()
+		
+		// Determine queue name from the DAG
+		dag, err := a.dagStore.GetDetails(ctx, dagRunRef.Name)
+		if err != nil {
+			continue // Skip if we can't find the DAG
+		}
+		
+		queueName := dag.Queue
+		if queueName == "" {
+			queueName = dag.Name
+		}
+		
+		queue := getOrCreateQueue(queueMap, queueName, a.config)
+		
+		// Get the DAG run status to convert to summary
+		attempt, err := a.dagRunStore.FindAttempt(ctx, dagRunRef)
+		if err != nil {
+			continue // Skip if we can't find the attempt
+		}
+		
+		runStatus, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			continue // Skip if we can't read status
+		}
+		
+		// Only include if status is actually queued
+		if runStatus.Status == status.Queued {
+			runSummary := toDAGRunSummary(*runStatus)
+			queue.queued = append(queue.queued, runSummary)
+			totalQueued++
+		}
+	}
+
+	// Convert map to slice and calculate total capacity
+	queues := make([]api.Queue, 0, len(queueMap))
+	for _, q := range queueMap {
+		queue := api.Queue{
+			Name:    q.name,
+			Type:    api.QueueType(q.queueType),
+			Running: q.running,
+			Queued:  q.queued,
+		}
+		
+		// Only include maxConcurrency for custom queues
+		if q.queueType == "custom" && q.maxConcurrency > 0 {
+			queue.MaxConcurrency = &q.maxConcurrency
+			totalCapacity += q.maxConcurrency
+		}
+		
+		queues = append(queues, queue)
+	}
+
+	// Calculate utilization percentage
+	var utilizationPercentage float32
+	if totalCapacity > 0 {
+		utilizationPercentage = float32(totalRunning) / float32(totalCapacity) * 100
+	}
+
+	// Build response
+	response := api.QueuesResponse{
+		Queues: queues,
+		Summary: api.QueuesSummary{
+			TotalQueues:           len(queues),
+			TotalRunning:          totalRunning,
+			TotalQueued:           totalQueued,
+			TotalCapacity:         totalCapacity,
+			UtilizationPercentage: utilizationPercentage,
+		},
+	}
+
+	return api.ListQueues200JSONResponse(response), nil
+}
+
+// Helper struct to build queue information
+type queueInfo struct {
+	name           string
+	queueType      string
+	maxConcurrency int
+	running        []api.DAGRunSummary
+	queued         []api.DAGRunSummary
+}
+
+// Helper function to get or create queue in the map
+func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, config *config.Config) *queueInfo {
+	queue, exists := queueMap[queueName]
+	if !exists {
+		queue = &queueInfo{
+			name:      queueName,
+			queueType: "dag-based", // Default to dag-based
+			running:   []api.DAGRunSummary{},
+			queued:    []api.DAGRunSummary{},
+		}
+		
+		// Check if this is a custom queue from config
+		if isCustomQueue(queueName, config) {
+			queue.queueType = "custom"
+			queue.maxConcurrency = getQueueMaxConcurrency(queueName, config)
+		}
+		
+		queueMap[queueName] = queue
+	}
+	return queue
+}
+
+// Helper function to check if a queue is custom (defined in config)
+func isCustomQueue(queueName string, config *config.Config) bool {
+	if config.Queues.Enabled && config.Queues.Config != nil {
+		for _, queueCfg := range config.Queues.Config {
+			if queueCfg.Name == queueName {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Helper function to get queue max concurrency from config
+func getQueueMaxConcurrency(queueName string, config *config.Config) int {
+	if config.Queues.Enabled && config.Queues.Config != nil {
+		for _, queueCfg := range config.Queues.Config {
+			if queueCfg.Name == queueName {
+				return queueCfg.MaxActiveRuns
+			}
+		}
+	}
+	
+	// Default to 1 if not found
+	return 1
 }
