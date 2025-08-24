@@ -69,11 +69,16 @@ function Queues() {
   // Calculate metrics
   const metrics = React.useMemo(() => {
     const queues = data?.queues || [];
-    const totalQueues = queues.length;
+    
+    // Count queues by type
+    const globalQueues = queues.filter(q => q.type === 'global').length;
+    const dagBasedQueues = queues.filter(q => q.type === 'dag-based').length;
+    
     // Count active queues (those with running or queued items)
     const activeQueues = queues.filter(q => 
       (q.running?.length || 0) > 0 || (q.queued?.length || 0) > 0
     ).length;
+    
     const totalRunning = queues.reduce((sum, q) => sum + (q.running?.length || 0), 0);
     const totalQueued = queues.reduce((sum, q) => sum + (q.queued?.length || 0), 0);
     const totalActive = totalRunning + totalQueued;
@@ -84,9 +89,9 @@ function Queues() {
     const utilization = totalCapacity > 0 ? Math.round((totalRunning / totalCapacity) * 100) : 0;
 
     return {
-      totalQueues,
+      globalQueues,
+      dagBasedQueues,
       activeQueues,
-      totalCapacity,
       totalRunning,
       totalQueued,
       totalActive,
