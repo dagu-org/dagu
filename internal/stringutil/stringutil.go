@@ -176,9 +176,9 @@ func DetectSeparatorType(s string) SeparatorType {
 	tabCount := strings.Count(s, "\t")
 	quoteCount := strings.Count(s, `"`)
 
-	// Check for quoted strings pattern 
+	// Check for quoted strings pattern
 	// If we have quotes and the string starts or ends with a quote, or has quote-space patterns
-	if quoteCount >= 2 && (strings.HasPrefix(s, `"`) || strings.HasSuffix(s, `"`) || 
+	if quoteCount >= 2 && (strings.HasPrefix(s, `"`) || strings.HasSuffix(s, `"`) ||
 		strings.Contains(s, `" `) || strings.Contains(s, ` "`)) {
 		return SeparatorTypeQuoted
 	}
@@ -224,7 +224,7 @@ func ParseSeparatedValues(s string) ([]string, error) {
 		if err := json.Unmarshal([]byte(s), &items); err != nil {
 			return nil, fmt.Errorf("failed to parse JSON array: %w", err)
 		}
-		
+
 		var result []string
 		for _, item := range items {
 			switch v := item.(type) {
@@ -276,7 +276,7 @@ func parseNewlineSeparated(s string) []string {
 	lines := strings.FieldsFunc(s, func(r rune) bool {
 		return r == '\n' || r == '\r'
 	})
-	
+
 	var result []string
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -306,10 +306,10 @@ func parseQuotedStrings(s string) []string {
 	var current strings.Builder
 	inQuotes := false
 	i := 0
-	
+
 	for i < len(s) {
 		r := rune(s[i])
-		
+
 		if r == '"' {
 			if inQuotes {
 				// End of quoted string
@@ -335,15 +335,15 @@ func parseQuotedStrings(s string) []string {
 			}
 			continue // Skip the increment at the end since we already advanced i
 		}
-		
+
 		i++
 	}
-	
+
 	// Handle case where string ends while in quotes
 	if current.Len() > 0 {
 		result = append(result, current.String())
 	}
-	
+
 	return result
 }
 
