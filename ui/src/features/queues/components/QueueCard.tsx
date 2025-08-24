@@ -38,7 +38,10 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
   };
 
   // DAG Run row component
-  const DAGRunRow: React.FC<{ dagRun: components['schemas']['DAGRunSummary'] }> = ({ dagRun }) => (
+  const DAGRunRow: React.FC<{ 
+    dagRun: components['schemas']['DAGRunSummary'];
+    showQueuedAt?: boolean;
+  }> = ({ dagRun, showQueuedAt = false }) => (
     <tr
       onClick={() => onDAGRunClick(dagRun)}
       className="cursor-pointer hover:bg-muted/30 transition-colors"
@@ -50,7 +53,10 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
         </StatusChip>
       </td>
       <td className="py-1 px-2 text-xs text-muted-foreground">
-        {dagRun.startedAt ? formatDateTime(dagRun.startedAt) : 'N/A'}
+        {showQueuedAt 
+          ? (dagRun.queuedAt ? formatDateTime(dagRun.queuedAt) : 'N/A')
+          : (dagRun.startedAt ? formatDateTime(dagRun.startedAt) : 'N/A')
+        }
       </td>
       <td className="py-1 px-2 text-xs text-muted-foreground">
         {dagRun.dagRunId}
@@ -218,7 +224,7 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
                     </thead>
                     <tbody>
                       {queue.queued.map((dagRun) => (
-                        <DAGRunRow key={dagRun.dagRunId} dagRun={dagRun} />
+                        <DAGRunRow key={dagRun.dagRunId} dagRun={dagRun} showQueuedAt={true} />
                       ))}
                     </tbody>
                   </table>
