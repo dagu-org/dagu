@@ -9,14 +9,29 @@ import (
 )
 
 // ListQueues implements api.StrictServerInterface.
-func (a *API) ListQueues(ctx context.Context, request api.ListQueuesRequestObject) (api.ListQueuesResponseObject, error) {
+func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (api.ListQueuesResponseObject, error) {
 	// Map to track queues and their DAG runs
 	queueMap := make(map[string]*queueInfo)
 	
 	// Track statistics
 	var totalRunning, totalQueued, totalCapacity int
 
-	// 1. Get all running DAG runs from ProcStore (real-time with heartbeats)
+	// 1. First, add all configured queues from config.yaml
+	// This ensures configured queues appear even when empty
+	if a.config.Queues.Enabled && a.config.Queues.Config != nil {
+		for _, queueCfg := range a.config.Queues.Config {
+			queue := &queueInfo{
+				name:           queueCfg.Name,
+				queueType:      "custom",
+				maxConcurrency: queueCfg.MaxActiveRuns,
+				running:        []api.DAGRunSummary{},
+				queued:         []api.DAGRunSummary{},
+			}
+			queueMap[queueCfg.Name] = queue
+		}
+	}
+
+	// 2. Get all running DAG runs from ProcStore (real-time with heartbeats)
 	runningByGroup, err := a.procStore.ListAllAlive(ctx)
 	if err != nil {
 		return nil, &Error{
@@ -50,7 +65,7 @@ func (a *API) ListQueues(ctx context.Context, request api.ListQueuesRequestObjec
 		}
 	}
 
-	// 2. Get all queued items from QueueStore
+	// 3. Get all queued items from QueueStore
 	allQueued, err := a.queueStore.All(ctx)
 	if err != nil {
 		return nil, &Error{
