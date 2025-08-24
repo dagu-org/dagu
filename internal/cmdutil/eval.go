@@ -409,7 +409,6 @@ func ExpandReferences(ctx context.Context, input string, dataMap map[string]stri
 
 // ExpandReferencesWithSteps is like ExpandReferences but also handles step ID property access
 // like ${step_id.stdout}, ${step_id.stderr}, ${step_id.exit_code}
-// TODO: handle quoted value replacement
 func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo) string {
 	// Regex to match patterns like ${FOO.bar.baz}, capturing:
 	//   group 1 => FOO  (the top-level name)
