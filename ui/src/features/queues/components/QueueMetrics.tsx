@@ -4,7 +4,7 @@ import { Layers, Play, Clock, BarChart3, Settings, GitBranch } from 'lucide-reac
 interface QueueMetricsProps {
   metrics: {
     totalQueues: number;
-    customQueues: number;
+    globalQueues: number;
     dagBasedQueues: number;
     totalRunning: number;
     totalQueued: number;
@@ -23,8 +23,8 @@ function QueueMetrics({ metrics, isLoading }: QueueMetricsProps) {
       icon: <Layers className="h-5 w-5 text-muted-foreground" />,
     },
     {
-      title: 'Custom',
-      value: metrics.customQueues,
+      title: 'Global',
+      value: metrics.globalQueues,
       icon: <Settings className="h-5 w-5 text-blue-500" />,
     },
     {

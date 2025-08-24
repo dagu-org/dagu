@@ -69,20 +69,20 @@ function Queues() {
   const metrics = React.useMemo(() => {
     const queues = data?.queues || [];
     const totalQueues = queues.length;
-    const customQueues = queues.filter(q => q.type === 'custom').length;
+    const globalQueues = queues.filter(q => q.type === 'global').length;
     const dagBasedQueues = queues.filter(q => q.type === 'dag-based').length;
     const totalRunning = queues.reduce((sum, q) => sum + (q.running?.length || 0), 0);
     const totalQueued = queues.reduce((sum, q) => sum + (q.queued?.length || 0), 0);
     const totalActive = totalRunning + totalQueued;
     
     // Calculate utilization for custom queues
-    const customQueuesWithCapacity = queues.filter(q => q.type === 'custom' && q.maxConcurrency);
-    const totalCapacity = customQueuesWithCapacity.reduce((sum, q) => sum + (q.maxConcurrency || 0), 0);
+    const globalQueuesWithCapacity = queues.filter(q => q.type === 'global' && q.maxConcurrency);
+    const totalCapacity = globalQueuesWithCapacity.reduce((sum, q) => sum + (q.maxConcurrency || 0), 0);
     const utilization = totalCapacity > 0 ? Math.round((totalRunning / totalCapacity) * 100) : 0;
 
     return {
       totalQueues,
-      customQueues,
+      globalQueues,
       dagBasedQueues,
       totalRunning,
       totalQueued,
@@ -140,7 +140,7 @@ function Queues() {
                 className="h-7 px-2 text-xs border rounded bg-background"
               >
                 <option value="all">All Types</option>
-                <option value="custom">Custom</option>
+                <option value="global">Global</option>
                 <option value="dag-based">DAG-based</option>
               </select>
             </div>
@@ -195,7 +195,7 @@ function Queues() {
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span>Custom</span>
+                <span>Global</span>
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-gray-500" />

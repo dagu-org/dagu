@@ -18,9 +18,9 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
 
   const toggleExpanded = () => setIsExpanded(!isExpanded);
 
-  // Calculate utilization for custom queues
+  // Calculate utilization for global queues
   const utilization = React.useMemo(() => {
-    if (queue.type !== 'custom' || !queue.maxConcurrency) return null;
+    if (queue.type !== 'global' || !queue.maxConcurrency) return null;
     const running = queue.running?.length || 0;
     return Math.round((running / queue.maxConcurrency) * 100);
   }, [queue]);
@@ -38,7 +38,10 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
   };
 
   // DAG Run row component
-  const DAGRunRow: React.FC<{ dagRun: components['schemas']['DAGRunSummary'] }> = ({ dagRun }) => (
+  const DAGRunRow: React.FC<{ 
+    dagRun: components['schemas']['DAGRunSummary'];
+    showQueuedAt?: boolean;
+  }> = ({ dagRun, showQueuedAt = false }) => (
     <tr
       onClick={() => onDAGRunClick(dagRun)}
       className="cursor-pointer hover:bg-muted/30 transition-colors"
@@ -50,7 +53,10 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
         </StatusChip>
       </td>
       <td className="py-1 px-2 text-xs text-muted-foreground">
-        {dagRun.startedAt ? formatDateTime(dagRun.startedAt) : 'N/A'}
+        {showQueuedAt 
+          ? (dagRun.queuedAt ? formatDateTime(dagRun.queuedAt) : 'N/A')
+          : (dagRun.startedAt ? formatDateTime(dagRun.startedAt) : 'N/A')
+        }
       </td>
       <td className="py-1 px-2 text-xs text-muted-foreground">
         {dagRun.dagRunId}
@@ -79,7 +85,7 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               )}
               <div className="flex items-center gap-2">
-                {queue.type === 'custom' ? (
+                {queue.type === 'global' ? (
                   <Settings className="h-4 w-4 text-blue-500" />
                 ) : (
                   <GitBranch className="h-4 w-4 text-gray-500" />
@@ -91,15 +97,15 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
               </div>
             </div>
             
-            {/* Utilization bar for custom queues */}
-            {queue.type === 'custom' && queue.maxConcurrency && (
+            {/* Utilization bar for global queues */}
+            {queue.type === 'global' && queue.maxConcurrency && (
               <div className="flex items-center gap-2">
                 <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
                   <div
                     className={cn(
                       'h-full transition-all duration-300',
                       utilization && utilization > 80
-                        ? 'bg-red-500'
+                        ? 'bg-amber-600'
                         : utilization && utilization > 60
                         ? 'bg-orange-500'
                         : 'bg-green-500'
@@ -218,7 +224,7 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
                     </thead>
                     <tbody>
                       {queue.queued.map((dagRun) => (
-                        <DAGRunRow key={dagRun.dagRunId} dagRun={dagRun} />
+                        <DAGRunRow key={dagRun.dagRunId} dagRun={dagRun} showQueuedAt={true} />
                       ))}
                     </tbody>
                   </table>
