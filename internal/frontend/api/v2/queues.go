@@ -12,7 +12,7 @@ import (
 func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (api.ListQueuesResponseObject, error) {
 	// Map to track queues and their DAG runs
 	queueMap := make(map[string]*queueInfo)
-	
+
 	// Track statistics
 	var totalRunning, totalQueued, totalCapacity int
 
@@ -45,7 +45,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 	for groupName, dagRuns := range runningByGroup {
 		// Group name is the queue name
 		queue := getOrCreateQueue(queueMap, groupName, a.config)
-		
+
 		// Convert each running DAG run to DAGRunSummary
 		for _, dagRun := range dagRuns {
 			// Get the DAG run status to convert to summary
@@ -53,12 +53,12 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			if err != nil {
 				continue // Skip if we can't find the attempt
 			}
-			
+
 			runStatus, err := attempt.ReadStatus(ctx)
 			if err != nil {
 				continue // Skip if we can't read status
 			}
-			
+
 			runSummary := toDAGRunSummary(*runStatus)
 			queue.running = append(queue.running, runSummary)
 			totalRunning++
@@ -78,31 +78,31 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 	// Process queued DAG runs
 	for _, queuedItem := range allQueued {
 		dagRunRef := queuedItem.Data()
-		
+
 		// Determine queue name from the DAG
 		dag, err := a.dagStore.GetDetails(ctx, dagRunRef.Name)
 		if err != nil {
 			continue // Skip if we can't find the DAG
 		}
-		
+
 		queueName := dag.Queue
 		if queueName == "" {
 			queueName = dag.Name
 		}
-		
+
 		queue := getOrCreateQueue(queueMap, queueName, a.config)
-		
+
 		// Get the DAG run status to convert to summary
 		attempt, err := a.dagRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			continue // Skip if we can't find the attempt
 		}
-		
+
 		runStatus, err := attempt.ReadStatus(ctx)
 		if err != nil {
 			continue // Skip if we can't read status
 		}
-		
+
 		// Only include if status is actually queued
 		if runStatus.Status == status.Queued {
 			runSummary := toDAGRunSummary(*runStatus)
@@ -120,13 +120,13 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			Running: q.running,
 			Queued:  q.queued,
 		}
-		
+
 		// Only include maxConcurrency for custom queues
 		if q.queueType == "custom" && q.maxConcurrency > 0 {
 			queue.MaxConcurrency = &q.maxConcurrency
 			totalCapacity += q.maxConcurrency
 		}
-		
+
 		queues = append(queues, queue)
 	}
 
@@ -170,13 +170,13 @@ func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, config *
 			running:   []api.DAGRunSummary{},
 			queued:    []api.DAGRunSummary{},
 		}
-		
+
 		// Check if this is a custom queue from config
 		if isCustomQueue(queueName, config) {
 			queue.queueType = "custom"
 			queue.maxConcurrency = getQueueMaxConcurrency(queueName, config)
 		}
-		
+
 		queueMap[queueName] = queue
 	}
 	return queue
@@ -203,7 +203,7 @@ func getQueueMaxConcurrency(queueName string, config *config.Config) int {
 			}
 		}
 	}
-	
+
 	// Default to 1 if not found
 	return 1
 }
