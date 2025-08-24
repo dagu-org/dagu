@@ -99,7 +99,7 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
                     className={cn(
                       'h-full transition-all duration-300',
                       utilization && utilization > 80
-                        ? 'bg-red-500'
+                        ? 'bg-amber-600'
                         : utilization && utilization > 60
                         ? 'bg-orange-500'
                         : 'bg-green-500'
