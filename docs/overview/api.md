@@ -96,6 +96,16 @@ curl -X POST http://localhost:8080/api/v2/dags/my-dag.yaml/suspend \
   -d '{"suspend": false}'
 ```
 
+### Queue Management
+
+#### List Queues
+```bash
+# Get all queues with running and queued DAG runs
+curl http://localhost:8080/api/v2/queues
+```
+
+Shows all execution queues organized by queue name, including both custom queues and DAG-based queues. Returns queue summaries with running and queued DAG run counts.
+
 ### DAG Run Management
 
 #### List DAG Runs

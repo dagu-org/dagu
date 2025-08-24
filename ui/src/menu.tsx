@@ -1,7 +1,7 @@
 import logoDark from '@/assets/images/logo_dark.png';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
-import { BarChart2, GitBranch, List, Search, Server, PanelLeft, Github, MessageSquare, Users, Activity } from 'lucide-react';
+import { BarChart2, GitBranch, List, Search, Server, PanelLeft, Github, MessageSquare, Users, Activity, Layers } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FeedbackDialog } from '@/components/FeedbackDialog';
@@ -150,6 +150,13 @@ export const mainListItems = React.forwardRef<
               </span>
             </div>
           )}
+          <NavItem
+            to="/queues"
+            text="Queues"
+            icon={<Layers size={18} />}
+            isOpen={isOpen}
+            onClick={onNavItemClick}
+          />
           <NavItem
             to="/dag-runs"
             text="DAG Runs"
