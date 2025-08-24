@@ -61,10 +61,11 @@ func runEnqueue(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read queue: %w", err)
 	}
 
-	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
+	// If the DAG has a queue configured and maxActiveRuns > 1, ensure the number
 	// of active runs in the queue does not exceed this limit.
-	// The scheduler only enforces maxActiveRuns at the global queue level.
-	if dag.Queue != "" && dag.MaxActiveRuns > 0 && len(queuedRuns) >= dag.MaxActiveRuns {
+	// No need to check if maxActiveRuns <= 1 for enqueueing as queue level
+	// maxConcurrency will be the only cap.
+	if dag.Queue != "" && dag.MaxActiveRuns > 1 && len(queuedRuns) >= dag.MaxActiveRuns {
 		// The same DAG is already in the queue
 		return fmt.Errorf("DAG %s is already in the queue (maxActiveRuns=%d), cannot enqueue", dag.Name, dag.MaxActiveRuns)
 	}

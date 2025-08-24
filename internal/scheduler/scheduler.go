@@ -378,7 +378,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 
 			// Check concurrency limits based on queue configuration
 			queueCfg = s.getQueueConfig(dag.ProcGroup(), dag)
-			if alive >= queueCfg.MaxConcurrency {
+			if queueCfg.MaxConcurrency > 0 && alive >= queueCfg.MaxConcurrency {
 				logger.Info(ctx, "Queue concurrency limit reached", "queue", queueName, "limit", queueCfg.MaxConcurrency, "alive", alive)
 				goto SEND_RESULT
 			}

@@ -80,6 +80,8 @@ func runRetry(ctx *Context, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to read queue: %w", err)
 		}
+		// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
+		// of active runs in the queue does not exceed this limit.
 		if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
 			return fmt.Errorf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns)
 		}
