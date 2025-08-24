@@ -611,6 +611,12 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		}
 	}
 
+	// Get count of running DAGs to check against maxActiveRuns (best effort)
+	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to access proc store: %w", err)
+	}
+
 	// Check queued DAG-runs
 	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
 	if err != nil {
@@ -620,7 +626,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
 	// of active runs in the queue does not exceed this limit.
 	// The scheduler only enforces maxActiveRuns at the global queue level.
-	if dag.Queue != "" && dag.MaxActiveRuns > 0 && len(queuedRuns) >= dag.MaxActiveRuns {
+	if dag.Queue != "" && dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
 		// The same DAG is already in the queue
 		return nil, &Error{
 			HTTPStatus: http.StatusConflict,
