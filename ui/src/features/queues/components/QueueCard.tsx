@@ -18,9 +18,9 @@ function QueueCard({ queue, isSelected, onDAGRunClick }: QueueCardProps) {
 
   const toggleExpanded = () => setIsExpanded(!isExpanded);
 
-  // Calculate utilization for custom queues
+  // Calculate utilization for global queues
   const utilization = React.useMemo(() => {
-    if (queue.type !== 'custom' || !queue.maxConcurrency) return null;
+    if (queue.type !== 'global' || !queue.maxConcurrency) return null;
     const running = queue.running?.length || 0;
     return Math.round((running / queue.maxConcurrency) * 100);
   }, [queue]);
