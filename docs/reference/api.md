@@ -1282,6 +1282,105 @@ Updates the status of a step in a child DAG run.
 }
 ```
 
+## Queue Management Endpoints
+
+### List All Queues
+
+**Endpoint**: `GET /api/v2/queues`
+
+Retrieves all execution queues with their running and queued DAG runs. Queues are organized by queue name, with two types: "custom" (explicitly defined queues) and "dag-based" (DAG name used as queue name).
+
+**Response (200)**:
+```json
+{
+  "queues": [
+    {
+      "name": "etl-pipeline",
+      "type": "custom",
+      "maxConcurrency": 2,
+      "summary": {
+        "running": 1,
+        "queued": 2,
+        "total": 3
+      },
+      "runningDAGRuns": [
+        {
+          "dagRunId": "20240211_140000_abc123",
+          "name": "data_processing_pipeline",
+          "status": 1,
+          "statusLabel": "running",
+          "startedAt": "2024-02-11T14:00:00Z",
+          "finishedAt": "",
+          "log": "/logs/data_processing_pipeline/20240211_140000_abc123.log"
+        }
+      ],
+      "queuedDAGRuns": [
+        {
+          "dagRunId": "20240211_143000_def456",
+          "name": "ml_training_pipeline",
+          "status": 5,
+          "statusLabel": "queued",
+          "startedAt": "",
+          "finishedAt": "",
+          "log": "/logs/ml_training_pipeline/20240211_143000_def456.log"
+        },
+        {
+          "dagRunId": "20240211_144000_ghi789",
+          "name": "analytics_pipeline",
+          "status": 5,
+          "statusLabel": "queued",
+          "startedAt": "",
+          "finishedAt": "",
+          "log": "/logs/analytics_pipeline/20240211_144000_ghi789.log"
+        }
+      ]
+    },
+    {
+      "name": "backup_job",
+      "type": "dag-based",
+      "summary": {
+        "running": 1,
+        "queued": 0,
+        "total": 1
+      },
+      "runningDAGRuns": [
+        {
+          "dagRunId": "20240211_150000_backup",
+          "name": "backup_job",
+          "status": 1,
+          "statusLabel": "running",
+          "startedAt": "2024-02-11T15:00:00Z",
+          "finishedAt": "",
+          "log": "/logs/backup_job/20240211_150000_backup.log"
+        }
+      ],
+      "queuedDAGRuns": []
+    }
+  ]
+}
+```
+
+**Response Fields**:
+- `queues`: Array of queue objects containing running and queued DAG runs
+- `name`: Queue name (either custom queue name or DAG name for dag-based queues)
+- `type`: Queue type - "custom" for explicitly defined queues, "dag-based" for DAG name queues
+- `maxConcurrency`: Maximum concurrent runs (only present for custom queues)
+- `summary`: Count summary with running, queued, and total DAG runs
+- `runningDAGRuns`: Array of currently running DAG runs (uses DAGRunSummary schema)
+- `queuedDAGRuns`: Array of queued DAG runs waiting for execution (uses DAGRunSummary schema)
+
+**Queue Types**:
+- **Custom**: Explicitly defined queues with configurable `maxConcurrency`
+- **DAG-based**: Implicit queues where DAG name serves as the queue name
+
+**Error Response (500)**:
+```json
+{
+  "code": "internal_error",
+  "message": "Failed to retrieve queue information"
+}
+```
+
 ## Additional Endpoints
 
 ### List DAG Runs by Name
@@ -1612,6 +1711,10 @@ curl "http://localhost:8080/api/v2/dag-runs?status=1" \
 
 # Get queued DAG runs
 curl "http://localhost:8080/api/v2/dag-runs?status=5" \
+     -H "Authorization: Bearer your-token"
+
+# View all execution queues with running and queued DAG runs
+curl "http://localhost:8080/api/v2/queues" \
      -H "Authorization: Bearer your-token"
 ```
 
