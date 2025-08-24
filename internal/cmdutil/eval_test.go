@@ -505,6 +505,41 @@ func TestEvalString(t *testing.T) {
 			want:    "first second",
 			wantErr: false,
 		},
+		{
+			name:    "quoted JSON variable escaping",
+			input:   `params: "aJson="${ITEM}"`,
+			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `{"file": "file1.txt", "config": "prod"}`})},
+			want:    "params: \"aJson=\"{\\\"file\\\": \\\"file1.txt\\\", \\\"config\\\": \\\"prod\\\"}\"",
+			wantErr: false,
+		},
+		{
+			name:    "quoted file path with spaces",
+			input:   `path: "FILE=\"${ITEM}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": "/path/to/my file.txt"})},
+			want:    `path: "FILE=\"/path/to/my file.txt\""`,
+			wantErr: false,
+		},
+		{
+			name:    "quoted string with internal quotes",
+			input:   `value: "VAR=\"${ITEM}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `say "hello"`})},
+			want:    `value: "VAR=\"say "hello"\""`,
+			wantErr: false,
+		},
+		{
+			name:    "mixed quoted and unquoted variables",
+			input:   `unquoted ${ITEM} and quoted "value=\"${ITEM}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `{"test": "value"}`})},
+			want:    `unquoted {"test": "value"} and quoted "value=\"{"test": "value"}\""`,
+			wantErr: false,
+		},
+		{
+			name:    "quoted empty string",
+			input:   `empty: "VAL=\"${EMPTY}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"EMPTY": ""})},
+			want:    `empty: "VAL=\"\""`,
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
