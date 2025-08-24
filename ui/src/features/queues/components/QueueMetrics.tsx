@@ -1,11 +1,11 @@
 import React from 'react';
-import { Layers, Play, Clock, BarChart3, Settings, GitBranch } from 'lucide-react';
+import { Layers, Play, Clock, BarChart3, Activity } from 'lucide-react';
 
 interface QueueMetricsProps {
   metrics: {
     totalQueues: number;
-    globalQueues: number;
-    dagBasedQueues: number;
+    activeQueues: number;
+    totalCapacity: number;
     totalRunning: number;
     totalQueued: number;
     totalActive: number;
@@ -23,14 +23,14 @@ function QueueMetrics({ metrics, isLoading }: QueueMetricsProps) {
       icon: <Layers className="h-5 w-5 text-muted-foreground" />,
     },
     {
-      title: 'Global',
-      value: metrics.globalQueues,
-      icon: <Settings className="h-5 w-5 text-blue-500" />,
+      title: 'Active Queues',
+      value: metrics.activeQueues,
+      icon: <Activity className="h-5 w-5 text-blue-500" />,
     },
     {
-      title: 'DAG-based',
-      value: metrics.dagBasedQueues,
-      icon: <GitBranch className="h-5 w-5 text-gray-500" />,
+      title: 'Total Capacity',
+      value: metrics.totalCapacity,
+      icon: <BarChart3 className="h-5 w-5 text-blue-500" />,
     },
     {
       title: 'Running',

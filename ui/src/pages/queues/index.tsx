@@ -62,28 +62,31 @@ function Queues() {
       filtered = filtered.filter((queue) => queue.type === selectedQueueType);
     }
     
-    return filtered;
+    // Sort alphabetically by queue name for stable display
+    return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }, [data?.queues, searchText, selectedQueueType]);
 
   // Calculate metrics
   const metrics = React.useMemo(() => {
     const queues = data?.queues || [];
     const totalQueues = queues.length;
-    const globalQueues = queues.filter(q => q.type === 'global').length;
-    const dagBasedQueues = queues.filter(q => q.type === 'dag-based').length;
+    // Count active queues (those with running or queued items)
+    const activeQueues = queues.filter(q => 
+      (q.running?.length || 0) > 0 || (q.queued?.length || 0) > 0
+    ).length;
     const totalRunning = queues.reduce((sum, q) => sum + (q.running?.length || 0), 0);
     const totalQueued = queues.reduce((sum, q) => sum + (q.queued?.length || 0), 0);
     const totalActive = totalRunning + totalQueued;
     
-    // Calculate utilization for custom queues
+    // Calculate total capacity for global queues
     const globalQueuesWithCapacity = queues.filter(q => q.type === 'global' && q.maxConcurrency);
     const totalCapacity = globalQueuesWithCapacity.reduce((sum, q) => sum + (q.maxConcurrency || 0), 0);
     const utilization = totalCapacity > 0 ? Math.round((totalRunning / totalCapacity) * 100) : 0;
 
     return {
       totalQueues,
-      globalQueues,
-      dagBasedQueues,
+      activeQueues,
+      totalCapacity,
       totalRunning,
       totalQueued,
       totalActive,
