@@ -61,6 +61,25 @@
       ]
     },
     {
+      "name": "Start2",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/",
+      "args": [
+        "start",
+        "--root=1209-dag:0198db10-5fce-7311-a630-dabf32faad1d",
+        "--parent=1209-dag:0198db10-5fce-7311-a630-dabf32faad1d",
+        "--run-id=E5cBZJgQ3ELBJij951F3ebroNcP6Ra4XGapWmRBhzrdR",
+        "--no-queue",
+        "/var/folders/rm/msmb9ljs16n5xq3yg6dpz94r0000gn/T/dagu/local-dags/LaunchParallel-856449536.yaml",
+        "--config",
+        "/Users/hamadayouta/.dagu/config.yaml",
+        "--",
+        "aJson=\"{\"file\": \"file2.txt\", \"config\": \"prod\"}\""
+      ]
+    },
+    {
       "name": "Retry",
       "type": "go",
       "request": "launch",
