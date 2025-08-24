@@ -756,8 +756,8 @@ func (n *Node) BuildChildDAGRuns(ctx context.Context, childDAG *digraph.ChildDAG
 			variables := map[string]string{
 				"ITEM": param,
 			}
-			// Evaluate the step params with ITEM variable available
-			evaluatedStepParams, err := EvalString(ctx, childDAG.Params, cmdutil.WithVariables(variables))
+			params := childDAG.Params
+			evaluatedStepParams, err := EvalString(ctx, params, cmdutil.WithVariables(variables))
 			if err != nil {
 				return nil, fmt.Errorf("failed to eval step params: %w", err)
 			}

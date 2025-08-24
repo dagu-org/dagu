@@ -105,6 +105,16 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 	}
 	value := input
 
+	// Expand quoted values first
+	for _, vars := range options.Variables {
+		for k, v := range vars {
+			quoted := `"${` + k + `}"`
+			if strings.Contains(value, quoted) {
+				value = strings.ReplaceAll(value, quoted, strconv.Quote(v))
+			}
+		}
+	}
+
 	// If we have a StepMap but no variables, still need to expand step references
 	if len(options.Variables) == 0 && len(options.StepMap) > 0 {
 		value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
@@ -378,6 +388,7 @@ func ExpandReferences(ctx context.Context, input string, dataMap map[string]stri
 
 // ExpandReferencesWithSteps is like ExpandReferences but also handles step ID property access
 // like ${step_id.stdout}, ${step_id.stderr}, ${step_id.exit_code}
+// TODO: handle quoted value replacement
 func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo) string {
 	// Regex to match patterns like ${FOO.bar.baz}, capturing:
 	//   group 1 => FOO  (the top-level name)
