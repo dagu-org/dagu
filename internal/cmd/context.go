@@ -48,6 +48,8 @@ type Context struct {
 	ProcStore       models.ProcStore
 	QueueStore      models.QueueStore
 	ServiceRegistry models.ServiceRegistry
+
+	Proc models.ProcHandle
 }
 
 // LogToFile creates a new logger context with a file writer.
