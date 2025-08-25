@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -507,9 +508,9 @@ func TestEvalString(t *testing.T) {
 		},
 		{
 			name:    "quoted JSON variable escaping",
-			input:   `params: "aJson="${ITEM}"`,
+			input:   `params: aJson="${ITEM}"`,
 			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `{"file": "file1.txt", "config": "prod"}`})},
-			want:    "params: \"aJson=\"{\"file\": \"file1.txt\", \"config\": \"prod\"}\"",
+			want:    `params: aJson=` + strconv.Quote(`{"file": "file1.txt", "config": "prod"}`),
 			wantErr: false,
 		},
 		{

@@ -111,7 +111,7 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 		quotedRefPattern := regexp.MustCompile(`"\$\{([A-Za-z0-9_]\w*(?:\.[^}]+)?)\}"`)
 		value = quotedRefPattern.ReplaceAllStringFunc(value, func(match string) string {
 			// Extract the reference (VAR or VAR.path)
-			ref := match[2 : len(match)-2] // Remove "$ and }"
+			ref := match[3 : len(match)-2] // Remove "$ and }"
 
 			// Check if it's a JSON path reference
 			if strings.Contains(ref, ".") {
@@ -124,11 +124,13 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 					extracted = ExpandReferences(ctx, testRef, vars)
 				}
 				if extracted != testRef { // Successfully extracted
+					// strconv.Quote already includes the outer quotes
 					return strconv.Quote(extracted)
 				}
 			} else {
 				// Simple variable
 				if val, ok := vars[ref]; ok {
+					// strconv.Quote already includes the outer quotes
 					return strconv.Quote(val)
 				}
 			}
