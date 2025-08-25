@@ -175,6 +175,7 @@ func tryExecuteDAG(ctx *Context, dag *digraph.DAG, dagRunID string, root digraph
 	defer func() {
 		_ = proc.Stop(ctx)
 	}()
+	ctx.Proc = proc
 
 	// Unlock the process group
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())

@@ -32,7 +32,9 @@ func ExecuteAgent(ctx *Context, agentInstance *agent.Agent, dag *digraph.DAG, da
 			"dag", dag.Name,
 			"dagRunId", dagRunID,
 			"err", err)
-
+		if ctx.Proc != nil {
+			_ = ctx.Proc.Stop(ctx)
+		}
 		if ctx.Quiet {
 			os.Exit(1)
 		} else {
