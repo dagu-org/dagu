@@ -1,8 +1,6 @@
 # What is Dagu?
 
-Dagu is a workflow engine that executes DAGs (Directed Acyclic Graphs) without requiring you to write Python code. The name combines "DAG" with "u" (utility), reflecting its purpose as a comprehensive utility for DAG management.
-
-With Dagu, you can define intricate pipelines using a simple, **declarative YAML format** – no Python boilerplate required. This code-free approach makes your workflows incredibly easy to create, read, and maintain, empowering everyone on your team to build and understand them.
+Dagu is a lightweight workflow engine built in a single binary with modern Web UI. Define any workflow in a simple, declarative YAML format and execute arbitrary workflows on schedule. Natively support shell commands, remote execution via SSH, and docker image. Dagu is a lightweight alternative to Cron, Airflow, Rundeck, etc.
 
 ### How it Works
 Dagu executes your workflows, which are defined as a series of steps in a YAML file. These steps form a Directed Acyclic Graph (DAG), ensuring a clear and predictable flow of execution.
