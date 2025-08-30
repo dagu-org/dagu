@@ -1,14 +1,16 @@
-name: DockerImage
+name: DockerImage Manual
 
 on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
-      - "v[0-9]+.[0-9]+.[0-9]+-*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build (e.g. v1.16.9 or main)"
+        required: true
+        type: string
 
 jobs:
-  # Build and push ubuntu-based latest image
   docker-latest:
+    name: Build and push default image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -16,15 +18,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
-
-      - name: Extract version from tag
-        id: get_version
-        run: |
-          # Remove 'v' prefix from tag
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          # Get short SHA (first 7 characters)
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -37,6 +32,20 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.DAGU_GITHUB_TOKEN }}
+
+      - name: Resolve version
+        id: get_version
+        shell: bash
+        run: |
+          REF="${{ inputs.ref }}"
+          case "$REF" in
+            refs/tags/v*) VERSION="${REF#refs/tags/v}" ;;
+            v*)           VERSION="${REF#v}" ;;
+            refs/tags/*)  VERSION="${REF#refs/tags/}" ;;
+            *)            VERSION="${REF}" ;;
+          esac
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -48,10 +57,10 @@ jobs:
           build-args: |
             LDFLAGS=-X 'main.version=${{ env.VERSION }}-${{ env.SHORT_SHA }}'
           tags: |
-            ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
-  # Build and push alpine-based dev image
+
   docker-dev:
+    name: Build and push dev image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -59,15 +68,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
-
-      - name: Extract version from tag
-        id: get_version
-        run: |
-          # Remove 'v' prefix from tag
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          # Get short SHA (first 7 characters)
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -80,6 +82,20 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.DAGU_GITHUB_TOKEN }}
+
+      - name: Resolve version
+        id: get_version
+        shell: bash
+        run: |
+          REF="${{ inputs.ref }}"
+          case "$REF" in
+            refs/tags/v*) VERSION="${REF#refs/tags/v}" ;;
+            v*)           VERSION="${REF#v}" ;;
+            refs/tags/*)  VERSION="${REF#refs/tags/}" ;;
+            *)            VERSION="${REF}" ;;
+          esac
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -93,8 +109,9 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:dev
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}-dev
-  # Build and push ubuntu-based dev image
+
   docker-alpine:
+    name: Build and push alpine image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -102,15 +119,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
-
-      - name: Extract version from tag
-        id: get_version
-        run: |
-          # Remove 'v' prefix from tag
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          # Get short SHA (first 7 characters)
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -123,6 +133,20 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.DAGU_GITHUB_TOKEN }}
+
+      - name: Resolve version
+        id: get_version
+        shell: bash
+        run: |
+          REF="${{ inputs.ref }}"
+          case "$REF" in
+            refs/tags/v*) VERSION="${REF#refs/tags/v}" ;;
+            v*)           VERSION="${REF#v}" ;;
+            refs/tags/*)  VERSION="${REF#refs/tags/}" ;;
+            *)            VERSION="${REF}" ;;
+          esac
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
