@@ -1,7 +1,6 @@
 <div align="center">
   <img src="./assets/images/dagu-logo.webp" width="480" alt="Dagu Logo">
   <br/>
-  <p><strong>A lightweight, versatile workflow engine for small teams, defined in simple YAML</strong></p>
 
   <p>
     <a href="https://docs.dagu.cloud/reference/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
@@ -17,43 +16,38 @@
   </p>
 </div>
 
-## Overview
+## What is Dagu?
 
-Dagu */dah-goo/* is a workflow engine that executes DAGs (Directed Acyclic Graphs) without requiring you to write Python code. Workflows are defined in a simple, declarative YAML format, making them easy to create, read, and maintain.
+Dagu is a lightweight workflow engine packaged in a single binary, with a modern Web UI. Workflows are defined in a simple, declarative YAML format and can be executed on schedule. It supports shell commands, remote execution via SSH, and Docker images. Built-in error notifications and logging out of the box.
 
-Example DAG:
+### Motivation
+
+Legacy systems often have complex and implicit dependencies between jobs. When there are hundreds of cron jobs on a server, it can be difficult to keep track of these dependencies and to determine which job to rerun if one fails. It can also be a hassle to SSH into a server to view logs and manually rerun shell scripts one by one. Dagu aims to solve these problems by allowing you to explicitly visualize and manage pipeline dependencies as a DAG, and by providing a web UI for checking dependencies, execution status, and logs and for rerunning or stopping jobs with a simple mouse click.
+
+### Why Not Use an Existing Workflow Scheduler Like Airflow?
+
+There are many existing tools such as Airflow, but many of these require you to write code in a programming language like Python to define your DAG. For systems that have been in operation for a long time, there may already be complex jobs with hundreds of thousands of lines of code written in languages like Perl or Shell Script. Adding another layer of complexity on top of these codes can reduce maintainability. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
+
+### How it Works
+Dagu executes your workflows defined in a simple, declarative YAML format.
+
+For example, a simple sequential DAG:
 ```yaml
+schedule: "0 0 * * *" # Runs at 00:00 everyday
+
 steps:
   - echo "Hello, dagu!"
   - echo "This is a second step"
 ```
 
-With parallel steps:
-```yaml
-steps:
-  - echo "Step 1"
-  - 
-    - echo "Step 2a - runs in parallel"
-    - echo "Step 2b - runs in parallel"
-  - echo "Step 3 - waits for parallel steps"
-```
-
-Or with explicit dependencies:
-```yaml
-steps:
-  - name: step 1
-    command: echo "Hello, dagu!"
-  - name: step 2
-    command: echo "This is a second step"
-    depends: step 1
-```
-
 ## Highlights
-- **Zero-Dependency Installation**: Get started instantly with a single binary. No database or message queue required.
-- **Intuitive UI & CLI**: Visualize, monitor, and manage your workflows through a clean web interface or a powerful command-line tool.
-- **Built-in Executors**: Natively supports running shell commands, containers, remote commands over SSH.
-- **Distributed & Scalable**: Run in High-Availability (HA) mode and distribute tasks to a fleet of workers using labels.
-- **Powerful Control Flow**: Natively supports parallel execution, conditionals, retries, timeouts, and more.
+- Install by placing a single binary with zero dependency
+- Run without DBMS or any cloud service
+- Define workflows (DAG) in a declarative YAML format
+- Use existing programs, scripts, and container images without any modification
+- Schedule workflows with cron expressions
+- Run in HA mode and distribute tasks to workers through built-in queue system.
+- Modularize workflows by nesting them.
 
 ### CLI Preview
 <p align="center">
@@ -473,12 +467,12 @@ Changelog of recent updates can be found in the [Changelog](https://docs.dagu.cl
 
 We welcome contributions of all kinds! Whether you're a developer, a designer, or a user, your help is valued. Here are a few ways to get involved:
 
-- ⭐ Star the project on GitHub.
-- 🤔 Suggest new features by opening an issue.
-- 👋 Join the discussion on our Discord server.
-- 🧑‍💻 Contribute code: Check out our good first issue label for tasks perfect for new contributors.
+- Star the project on GitHub.
+- Suggest new features by opening an issue.
+- Join the discussion on our Discord server.
+- Contribute code: Check out our issues you can help with.
 
-For more details, see our [Contribution Guide](./CONTRIBUTING.md) and our [public Roadmap](#roadmap) to see what's planned.
+For more details, see our [Contribution Guide](./CONTRIBUTING.md) and our [Roadmap](#roadmap) to see what's planned.
 
 ## Acknowledgements
 
@@ -500,9 +494,3 @@ Thanks for supporting Dagu’s development! Join our supporters: [GitHub Sponsor
 ## License
 
 GNU GPLv3 - See [LICENSE](./LICENSE)
-
----
-
-<div align="center">
-  <p>If you find Dagu useful, please ⭐ star this repository</p>
-</div>

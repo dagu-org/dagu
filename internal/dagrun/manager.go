@@ -187,11 +187,8 @@ func (m *Manager) StartDAGRunAsync(ctx context.Context, dag *digraph.DAG, opts S
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	if opts.Immediate {
+	if opts.NoQueue {
 		args = append(args, "--no-queue")
-	}
-	if opts.Singleton {
-		args = append(args, "--singleton")
 	}
 	if opts.DAGRunID != "" {
 		args = append(args, fmt.Sprintf("--run-id=%s", opts.DAGRunID))
@@ -304,9 +301,12 @@ func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts Restart
 }
 
 // RetryDAGRun retries a dag-run by executing the configured executable with the retry command.
-func (m *Manager) RetryDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string) error {
+func (m *Manager) RetryDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string, disableMaxActiveRuns bool) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--run-id=%s", dagRunID))
+	if disableMaxActiveRuns {
+		args = append(args, "--disable-max-active-runs")
+	}
 	return m.runRetryCommand(ctx, args, dag)
 }
 
@@ -458,7 +458,7 @@ func (*Manager) currentStatus(_ context.Context, dag *digraph.DAG, dagRunID stri
 // If that fails or no status exists, it returns an initial status or an error.
 func (m *Manager) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (models.DAGRunStatus, error) {
 	// Find the proc store to check if the DAG is running
-	alive, _ := m.procStore.CountAlive(ctx, dag.ProcGroup())
+	alive, _ := m.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
 	if alive > 0 {
 		items, _ := m.dagRunStore.ListStatuses(
 			ctx, models.WithName(dag.Name), models.WithStatuses([]status.Status{status.Running}),
@@ -566,11 +566,10 @@ func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef
 
 // StartOptions contains options for initiating a dag-run.
 type StartOptions struct {
-	Params    string // Parameters to pass to the DAG
-	Quiet     bool   // Whether to run in quiet mode
-	DAGRunID  string // ID for the dag-run
-	Immediate bool   // Start immediately without enqueue
-	Singleton bool   // Prevent starting if DAG is already running
+	Params   string // Parameters to pass to the DAG
+	Quiet    bool   // Whether to run in quiet mode
+	DAGRunID string // ID for the dag-run
+	NoQueue  bool   // Do not allow queueing
 }
 
 // EnqueueOptions contains options for enqueuing a dag-run.

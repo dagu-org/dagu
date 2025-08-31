@@ -402,6 +402,27 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
 
+	// Get count of running DAGs to check against maxActiveRuns (best effort)
+	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to access proc store: %w", err)
+	}
+	// Count queued DAG-runs and check against maxActiveRuns
+	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read queue: %w", err)
+	}
+	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
+	// of active runs in the queue does not exceed this limit.
+	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
+		// The same DAG is already in the queue
+		return nil, &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeMaxRunReached,
+			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot retry", dag.Name, dag.MaxActiveRuns),
+		}
+	}
+
 	if request.Body.StepName != nil && *request.Body.StepName != "" {
 		if err := a.dagRunMgr.RetryDAGStep(ctx, dag, request.Body.DagRunId, *request.Body.StepName); err != nil {
 			return nil, fmt.Errorf("error retrying DAG step: %w", err)
@@ -409,7 +430,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		return api.RetryDAGRun200Response{}, nil
 	}
 
-	if err := a.dagRunMgr.RetryDAGRun(ctx, dag, request.Body.DagRunId); err != nil {
+	if err := a.dagRunMgr.RetryDAGRun(ctx, dag, request.Body.DagRunId, false); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 

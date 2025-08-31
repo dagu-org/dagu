@@ -419,6 +419,11 @@ type mockProcStore struct {
 	mock.Mock
 }
 
+// CountAliveByDAGName implements models.ProcStore.
+func (m *mockProcStore) CountAliveByDAGName(_ context.Context, _, _ string) (int, error) {
+	return 0, nil
+}
+
 // TryLock implements models.ProcStore.
 func (m *mockProcStore) TryLock(_ context.Context, _ string) error {
 	return nil
@@ -449,6 +454,14 @@ func (m *mockProcStore) ListAlive(ctx context.Context, groupName string) ([]digr
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]digraph.DAGRunRef), args.Error(1)
+}
+
+func (m *mockProcStore) ListAllAlive(ctx context.Context) (map[string][]digraph.DAGRunRef, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string][]digraph.DAGRunRef), args.Error(1)
 }
 
 // Mock DAGRunAttempt

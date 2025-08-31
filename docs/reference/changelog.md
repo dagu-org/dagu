@@ -1,5 +1,49 @@
 # Changelog
 
+## v1.22.0 (2025-08-24)
+
+### New Features
+- **Shorthand Step Syntax**: Added simplified step definition without requiring explicit name and command fields (#1206)
+  ```yaml
+  steps:
+    - echo "hello"
+  ```
+  Equivalent to:
+  ```yaml
+  steps:
+    - name: step 1
+      command: echo "hello"
+  ```
+- **Working Directory Support**: Added DAG-level and step-level working directory configuration with inheritance for better file path management
+- **Load Environment Support**: Enhanced environment variable loading capabilities with improved dotenv support
+- **Queue Dashboard UI**: Complete queue management interface with visual feedback and improved user experience (#1217)
+- **DAG Name Input Modal**: Improved UI for DAG name input and management with better validation (#1218)
+- **Max Active Runs Enforcement**: DAG-level `maxActiveRuns` configuration enforcement in API and CLI when starting DAG-runs (#1214) - Thanks to [@ghansham](https://github.com/ghansham) for feedback
+- **Queue Configuration Rename**: Renamed `queue.maxActiveRuns` to `queue.maxConcurrency` for clarity and consistency (#1215)
+
+### Improvements
+- **Directory Lock Management**: Improved directory lock and active process management for better reliability and reduced race conditions (#1202)
+- **Empty Directory Cleanup**: Automatic removal of empty directories for proc and queue management to keep storage clean (#1208)
+- **Default Start Command**: Made 'start' the default command, removing single flag requirement for better CLI usability
+- **Max Active Runs Logic**: Enhanced check logic for `maxActiveRuns` configuration with improved validation (#1216)
+- **Queue UI Enhancements**: Applied user feedback to improve queue UI usability and functionality (#1221, #1222)
+
+### Bug Fixes
+- **Script Execution**: Fixed script block execution that was failing with script parsing errors (#1204) - Thanks to [@Kaiden0001](https://github.com/Kaiden0001) for reporting the issue
+- **Parallel Execution**: Fixed parallel execution parameter handling for JSON references and complex data structures (#1219) - Thanks to [@tetedange13](https://github.com/tetedange13) for reporting the issue
+
+### Contributors
+
+Thanks to our contributors for this release:
+
+| Contribution                           | Author                                   |
+| -------------------------------------- | ---------------------------------------- |
+| Script execution bug report (command not found error) | [@Kaiden0001](https://github.com/Kaiden0001) |
+| Parallel execution with JSON references issue report | [@tetedange13](https://github.com/tetedange13) |
+| Queue feature implementation feedback | [@ghansham](https://github.com/ghansham) |
+
+**Full Changelog**: [v1.21.0...v1.22.0](https://github.com/dagu-org/dagu/compare/v1.21.0...v1.22.0)
+
 ## v1.21.0 (2025-08-17)
 
 ### New Features

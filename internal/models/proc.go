@@ -17,10 +17,15 @@ type ProcStore interface {
 	Acquire(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (ProcHandle, error)
 	// CountAlive retrieves the number of processes associated with a group name.
 	CountAlive(ctx context.Context, groupName string) (int, error)
+	// CountAlive retrieves the number of processes associated with a group name.
+	CountAliveByDAGName(ctx context.Context, groupName, dagName string) (int, error)
 	// IsRunAlive checks if a specific DAG run is currently alive.
 	IsRunAlive(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (bool, error)
 	// ListAlive returns list of running DAG runs by the group name.
 	ListAlive(ctx context.Context, groupName string) ([]digraph.DAGRunRef, error)
+	// ListAllAlive returns all running DAG runs across all groups.
+	// Returns a map where key is the group name and value is list of DAG runs.
+	ListAllAlive(ctx context.Context) (map[string][]digraph.DAGRunRef, error)
 }
 
 // ProcHandle represents a process that is associated with a dag-run.

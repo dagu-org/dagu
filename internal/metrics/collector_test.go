@@ -161,8 +161,15 @@ func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName st
 	return args.Error(0)
 }
 
+var _ models.QueueStore = (*mockQueueStore)(nil)
+
 type mockQueueStore struct {
 	mock.Mock
+}
+
+// ListByDAGName implements models.QueueStore.
+func (m *mockQueueStore) ListByDAGName(_ context.Context, _, _ string) ([]models.QueuedItemData, error) {
+	return nil, nil
 }
 
 func (m *mockQueueStore) Enqueue(ctx context.Context, name string, priority models.QueuePriority, dagRun digraph.DAGRunRef) error {

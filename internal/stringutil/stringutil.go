@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 const (
@@ -120,6 +121,236 @@ const (
 	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
 	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
 )
+
+// IsMultiLine checks if the given string contains multiple lines.
+// Returns true if the string contains line separators (\n, \r\n, or \r).
+func IsMultiLine(s string) bool {
+	return strings.ContainsAny(s, "\n\r")
+}
+
+// IsJSON checks if the given string is valid JSON.
+// Returns true if the string can be parsed as JSON, false otherwise.
+func IsJSON(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	return json.Valid([]byte(s))
+}
+
+// SeparatorType represents different types of separators for parsing text
+type SeparatorType int
+
+const (
+	SeparatorTypeJSON SeparatorType = iota
+	SeparatorTypeNewline
+	SeparatorTypeComma
+	SeparatorTypeSemicolon
+	SeparatorTypePipe
+	SeparatorTypeTab
+	SeparatorTypeQuoted
+	SeparatorTypeSpace
+)
+
+// DetectSeparatorType analyzes a string to determine the most likely separator type
+func DetectSeparatorType(s string) SeparatorType {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return SeparatorTypeSpace
+	}
+
+	// Check for JSON first
+	if IsJSONArray(s) {
+		return SeparatorTypeJSON
+	}
+
+	// Check for multiline (newline-separated)
+	if IsMultiLine(s) {
+		return SeparatorTypeNewline
+	}
+
+	// Count different separators to determine the most likely one
+	commaCount := strings.Count(s, ",")
+	semicolonCount := strings.Count(s, ";")
+	pipeCount := strings.Count(s, "|")
+	tabCount := strings.Count(s, "\t")
+	quoteCount := strings.Count(s, `"`)
+
+	// Check for quoted strings pattern
+	// If we have quotes and the string starts or ends with a quote, or has quote-space patterns
+	if quoteCount >= 2 && (strings.HasPrefix(s, `"`) || strings.HasSuffix(s, `"`) ||
+		strings.Contains(s, `" `) || strings.Contains(s, ` "`)) {
+		return SeparatorTypeQuoted
+	}
+
+	// Determine the most frequent separator (excluding spaces)
+	maxCount := 0
+	separatorType := SeparatorTypeSpace
+
+	if tabCount > maxCount && tabCount > 0 {
+		maxCount = tabCount
+		separatorType = SeparatorTypeTab
+	}
+	if pipeCount > maxCount && pipeCount > 0 {
+		maxCount = pipeCount
+		separatorType = SeparatorTypePipe
+	}
+	if semicolonCount > maxCount && semicolonCount > 0 {
+		maxCount = semicolonCount
+		separatorType = SeparatorTypeSemicolon
+	}
+	if commaCount > maxCount && commaCount > 0 {
+		separatorType = SeparatorTypeComma
+	}
+
+	return separatorType
+}
+
+// ParseSeparatedValues intelligently parses a string into separate values
+// based on detected separator patterns. Handles JSON arrays, various delimiters,
+// quoted strings, and space-separated values.
+func ParseSeparatedValues(s string) ([]string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, nil
+	}
+
+	separatorType := DetectSeparatorType(s)
+
+	switch separatorType {
+	case SeparatorTypeJSON:
+		// Handle JSON array
+		var items []any
+		if err := json.Unmarshal([]byte(s), &items); err != nil {
+			return nil, fmt.Errorf("failed to parse JSON array: %w", err)
+		}
+
+		var result []string
+		for _, item := range items {
+			switch v := item.(type) {
+			case string:
+				result = append(result, v)
+			case nil:
+				result = append(result, "null")
+			default:
+				// Convert other types to string representation
+				jsonBytes, err := json.Marshal(v)
+				if err != nil {
+					result = append(result, fmt.Sprintf("%v", v))
+				} else {
+					result = append(result, string(jsonBytes))
+				}
+			}
+		}
+		return result, nil
+
+	case SeparatorTypeNewline:
+		return parseNewlineSeparated(s), nil
+
+	case SeparatorTypeComma:
+		return parseDelimited(s, ","), nil
+
+	case SeparatorTypeSemicolon:
+		return parseDelimited(s, ";"), nil
+
+	case SeparatorTypePipe:
+		return parseDelimited(s, "|"), nil
+
+	case SeparatorTypeTab:
+		return parseDelimited(s, "\t"), nil
+
+	case SeparatorTypeQuoted:
+		return parseQuotedStrings(s), nil
+
+	case SeparatorTypeSpace:
+		return parseSpaceSeparated(s), nil
+
+	default:
+		// Fallback to space separation
+		return parseSpaceSeparated(s), nil
+	}
+}
+
+// parseNewlineSeparated splits a string by newlines and cleans up each line
+func parseNewlineSeparated(s string) []string {
+	lines := strings.FieldsFunc(s, func(r rune) bool {
+		return r == '\n' || r == '\r'
+	})
+
+	var result []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			result = append(result, line)
+		}
+	}
+	return result
+}
+
+// parseDelimited splits a string by the given delimiter and trims whitespace
+func parseDelimited(s, delimiter string) []string {
+	parts := strings.Split(s, delimiter)
+	var result []string
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
+}
+
+// parseQuotedStrings handles strings with quoted values like "item one" "item two"
+func parseQuotedStrings(s string) []string {
+	var result []string
+	var current strings.Builder
+	inQuotes := false
+	i := 0
+
+	for i < len(s) {
+		r := rune(s[i])
+
+		if r == '"' {
+			if inQuotes {
+				// End of quoted string
+				result = append(result, current.String())
+				current.Reset()
+				inQuotes = false
+			} else {
+				// Start of quoted string
+				inQuotes = true
+			}
+		} else if inQuotes {
+			// Inside quotes, collect everything
+			current.WriteRune(r)
+		} else if !unicode.IsSpace(r) {
+			// Outside quotes, collect non-space characters as unquoted value
+			for i < len(s) && !unicode.IsSpace(rune(s[i])) && rune(s[i]) != '"' {
+				current.WriteRune(rune(s[i]))
+				i++
+			}
+			if current.Len() > 0 {
+				result = append(result, current.String())
+				current.Reset()
+			}
+			continue // Skip the increment at the end since we already advanced i
+		}
+
+		i++
+	}
+
+	// Handle case where string ends while in quotes
+	if current.Len() > 0 {
+		result = append(result, current.String())
+	}
+
+	return result
+}
+
+// parseSpaceSeparated uses strings.Fields as fallback for space-separated values
+func parseSpaceSeparated(s string) []string {
+	return strings.Fields(s)
+}
 
 // RandomString generates a random string of length n using letters from letterBytes.
 func RandomString(n int) string {

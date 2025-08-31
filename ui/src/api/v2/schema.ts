@@ -536,6 +536,26 @@ export interface paths {
         patch: operations["updateChildDAGRunStepStatus"];
         trace?: never;
     };
+    "/queues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all execution queues with active DAG-runs
+         * @description Retrieves all queues showing both running and queued DAG-runs, organized by queue/process group
+         */
+        get: operations["listQueues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/services/scheduler": {
         parameters: {
             query?: never;
@@ -692,6 +712,10 @@ export interface components {
             defaultParams?: string;
             /** @description List of tags for categorizing and filtering DAGs */
             tags?: string[];
+            /** @description Name of the queue this DAG is assigned to. If not specified, the DAG name itself becomes the queue name */
+            queue?: string;
+            /** @description Maximum number of concurrent DAG-runs allowed from this DAG */
+            maxActiveRuns?: number;
             runConfig?: components["schemas"]["RunConfig"];
         };
         /** @description Schedule configuration for DAG-run creation */
@@ -805,6 +829,8 @@ export interface components {
             preconditions?: components["schemas"]["Condition"][];
             /** @description Maximum number of concurrent DAG-runs allowed from this DAG */
             maxActiveRuns?: number;
+            /** @description Name of the queue this DAG is assigned to. If not specified, the DAG name itself becomes the queue name */
+            queue?: string;
             /** @description Maximum number of concurrent steps allowed in a DAG run */
             maxActiveSteps?: number;
             /** @description List of parameter names that can be passed to DAG-runs created from this DAG */
@@ -1066,6 +1092,44 @@ export interface components {
             parentDagRunName?: string;
             /** @description ID of the parent DAG run */
             parentDagRunId?: string;
+        };
+        /** @description Response containing all queues with their active DAG-runs */
+        QueuesResponse: {
+            /** @description List of all queues with their running and queued DAG-runs */
+            queues: components["schemas"]["Queue"][];
+            summary: components["schemas"]["QueuesSummary"];
+        };
+        /** @description A queue/process group with its active DAG-runs */
+        Queue: {
+            /** @description Name of the queue (global queue name or DAG name if no queue specified) */
+            name: string;
+            /**
+             * @description Type of queue - 'global' if explicitly defined, 'dag-based' if using DAG name
+             * @enum {string}
+             */
+            type: QueueType;
+            /** @description Maximum number of concurrent runs allowed. Only present for 'global' type queues */
+            maxConcurrency?: number;
+            /** @description List of currently running DAG-runs */
+            running: components["schemas"]["DAGRunSummary"][];
+            /** @description List of DAG-runs waiting to execute */
+            queued: components["schemas"]["DAGRunSummary"][];
+        };
+        /** @description Summary statistics across all queues */
+        QueuesSummary: {
+            /** @description Total number of active queues */
+            totalQueues: number;
+            /** @description Total DAG-runs currently executing */
+            totalRunning: number;
+            /** @description Total DAG-runs waiting in queues */
+            totalQueued: number;
+            /** @description Sum of all queue maxConcurrency values */
+            totalCapacity: number;
+            /**
+             * Format: float
+             * @description System-wide utilization (totalRunning / totalCapacity * 100)
+             */
+            utilizationPercentage: number;
         };
     };
     responses: never;
@@ -1376,6 +1440,11 @@ export interface operations {
                     params?: string;
                     /** @description Optional ID for the DAG-run, if not provided a new one will be generated */
                     dagRunId?: string;
+                    /**
+                     * @description If true, prevent starting if DAG is already running (returns 409 conflict)
+                     * @default false
+                     */
+                    singleton?: boolean;
                 };
             };
         };
@@ -1390,6 +1459,15 @@ export interface operations {
                         /** @description ID of the created DAG-run */
                         dagRunId: string;
                     };
+                };
+            };
+            /** @description DAG is already running (singleton mode) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Generic error response */
@@ -2457,6 +2535,38 @@ export interface operations {
             };
         };
     };
+    listQueues: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueuesResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getSchedulerStatus: {
         parameters: {
             query?: {
@@ -2566,7 +2676,7 @@ export enum ErrorCode {
     unauthorized = "unauthorized",
     bad_gateway = "bad_gateway",
     remote_node_error = "remote_node_error",
-    already_running = "already_running",
+    max_run_reached = "max_run_reached",
     not_running = "not_running",
     already_exists = "already_exists"
 }
@@ -2632,4 +2742,8 @@ export enum WorkerHealthStatus {
 export enum RepeatMode {
     While = "while",
     Until = "until"
+}
+export enum QueueType {
+    global = "global",
+    dag_based = "dag-based"
 }

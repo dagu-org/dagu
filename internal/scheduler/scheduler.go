@@ -364,6 +364,8 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				if errors.Is(err, models.ErrCorruptedStatusFile) {
 					logger.Error(ctx, "Status file is corrupted, marking as invalid", "err", err, "data", data)
 					result = models.QueuedItemProcessingResultDiscard
+				} else if ctx.Err() != nil {
+					logger.Debug(ctx, "Context is cancelled", "err", err)
 				} else {
 					logger.Error(ctx, "Failed to read status", "err", err, "data", data)
 				}
@@ -378,7 +380,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 
 			// Check concurrency limits based on queue configuration
 			queueCfg = s.getQueueConfig(dag.ProcGroup(), dag)
-			if alive >= queueCfg.MaxConcurrency {
+			if queueCfg.MaxConcurrency > 0 && alive >= queueCfg.MaxConcurrency {
 				logger.Info(ctx, "Queue concurrency limit reached", "queue", queueName, "limit", queueCfg.MaxConcurrency, "alive", alive)
 				goto SEND_RESULT
 			}

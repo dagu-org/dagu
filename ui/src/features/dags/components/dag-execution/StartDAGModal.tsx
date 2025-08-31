@@ -41,13 +41,7 @@ type Props = {
 /**
  * Modal dialog for starting or enqueuing a DAG with parameters
  */
-function StartDAGModal({
-  visible,
-  dag,
-  dismissModal,
-  onSubmit,
-  action = 'start',
-}: Props) {
+function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
   const ref = React.useRef<HTMLInputElement>(null);
 
   // Parse default parameters from the DAG definition
@@ -60,7 +54,7 @@ function StartDAGModal({
 
   const [params, setParams] = React.useState<Parameter[]>([]);
   const [dagRunId, setDAGRunId] = React.useState<string>('');
-  const [immediate, setImmediate] = React.useState<boolean>(false);
+  const [enqueue, setEnqueue] = React.useState<boolean>(false);
 
   // Get runConfig with default values if not specified
   const dagWithRunConfig = dag as typeof dag & {
@@ -111,7 +105,7 @@ function StartDAGModal({
 
         if (isInputFocused || !activeElement) {
           e.preventDefault();
-          onSubmit(stringifyParams(params), dagRunId || undefined, immediate);
+          onSubmit(stringifyParams(params), dagRunId || undefined, !enqueue);
         }
       }
     };
@@ -120,15 +114,13 @@ function StartDAGModal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [visible, params, dagRunId, immediate, onSubmit, dismissModal]);
+  }, [visible, params, dagRunId, enqueue, onSubmit, dismissModal]);
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>
-            Start the DAG
-          </DialogTitle>
+          <DialogTitle>Start the DAG</DialogTitle>
         </DialogHeader>
 
         {(paramsReadOnly || runIdReadOnly) && (
@@ -149,15 +141,16 @@ function StartDAGModal({
         )}
 
         <div className="py-4 space-y-4">
-          {/* Immediate execution checkbox */}
+          {/* Enqueue checkbox */}
           <div className="flex items-center space-x-2">
             <Checkbox
-              id="immediate"
-              checked={immediate}
-              onCheckedChange={(checked) => setImmediate(checked as boolean)}
+              id="enqueue"
+              checked={enqueue}
+              onCheckedChange={(checked) => setEnqueue(checked as boolean)}
+              className="border-gray-400 dark:border-gray-500"
             />
-            <Label htmlFor="immediate" className="cursor-pointer">
-              Start immediately (bypass queue)
+            <Label htmlFor="enqueue" className="cursor-pointer">
+              Enqueue
             </Label>
           </div>
           {/* Optional DAGRun ID field */}
@@ -169,11 +162,7 @@ function StartDAGModal({
               value={dagRunId}
               readOnly={runIdReadOnly}
               disabled={runIdReadOnly}
-              className={
-                runIdReadOnly
-                  ? 'bg-gray-100 cursor-not-allowed'
-                  : ''
-              }
+              className={runIdReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}
               onChange={(e) => {
                 if (!runIdReadOnly) {
                   setDAGRunId(e.target.value);
@@ -194,9 +183,7 @@ function StartDAGModal({
                     readOnly={paramsReadOnly}
                     disabled={paramsReadOnly}
                     className={
-                      paramsReadOnly
-                        ? 'bg-gray-100 cursor-not-allowed'
-                        : ''
+                      paramsReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''
                     }
                     onChange={(e) => {
                       if (p.Name && !paramsReadOnly) {
@@ -229,9 +216,7 @@ function StartDAGModal({
                     readOnly={paramsReadOnly}
                     disabled={paramsReadOnly}
                     className={
-                      paramsReadOnly
-                        ? 'bg-gray-100 cursor-not-allowed'
-                        : ''
+                      paramsReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''
                     }
                     onChange={(e) => {
                       if (paramsReadOnly) return;
@@ -266,10 +251,14 @@ function StartDAGModal({
           <Button
             ref={submitButtonRef}
             onClick={() => {
-              onSubmit(stringifyParams(params), dagRunId || undefined, immediate);
+              onSubmit(
+                stringifyParams(params),
+                dagRunId || undefined,
+                !enqueue
+              );
             }}
           >
-            {immediate ? 'Start Immediately' : (action === 'enqueue' ? 'Enqueue' : 'Start')}
+            {enqueue ? 'Enqueue' : 'Start'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -5,7 +5,8 @@ layout: doc
 <img src="/dagu-logo.webp" alt="dagu Logo" style="display: block; margin: 0 auto; max-width: 100%">
 
 <div class="tagline" style="text-align: center;">
-  <h1>A lightweight and powerful workflow engine for enterprise & small teams</h1>
+  <h2>Lightweight Workflow Engine Alternative to Airflow & Cron</h2>
+  <p>Single binary with Web UI. Execute workflows defined in a simple, declarative YAML on a schedule. Natively support shell commands, remote execution via SSH, and docker image.</p>
 </div>
 
 

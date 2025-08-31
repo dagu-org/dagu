@@ -45,9 +45,6 @@ dagu start etl.yaml -- DATE=2024-01-01 ENV=prod
 # With positional parameters
 dagu start my-workflow.yaml -- value1 value2 value3
 
-# Singleton mode (prevent multiple concurrent runs)
-dagu start --singleton critical-job.yaml
-
 # Queue for later
 dagu enqueue my-workflow.yaml
 ```

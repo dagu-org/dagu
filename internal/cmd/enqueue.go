@@ -55,6 +55,21 @@ func runEnqueue(ctx *Context, args []string) error {
 	// Queued DAGs can be run at the same time depending on the `maxActiveRuns` setting.
 	dag.Location = ""
 
+	// Check queued DAG-runs
+	queuedRuns, err := ctx.QueueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return fmt.Errorf("failed to read queue: %w", err)
+	}
+
+	// If the DAG has a queue configured and maxActiveRuns > 1, ensure the number
+	// of active runs in the queue does not exceed this limit.
+	// No need to check if maxActiveRuns <= 1 for enqueueing as queue level
+	// maxConcurrency will be the only cap.
+	if dag.Queue != "" && dag.MaxActiveRuns > 1 && len(queuedRuns) >= dag.MaxActiveRuns {
+		// The same DAG is already in the queue
+		return fmt.Errorf("DAG %s is already in the queue (maxActiveRuns=%d), cannot enqueue", dag.Name, dag.MaxActiveRuns)
+	}
+
 	return enqueueDAGRun(ctx, dag, runID)
 }
 

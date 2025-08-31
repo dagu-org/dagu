@@ -9,6 +9,7 @@ import React from 'react';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
+import { DAGNameInputModal } from '../../../../components/DAGNameInputModal';
 
 /**
  * Props for the DAGEditButtons component
@@ -25,10 +26,55 @@ function DAGEditButtons({ fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const config = useConfig();
+  const [isRenameModalOpen, setIsRenameModalOpen] = React.useState(false);
+  const [renameError, setRenameError] = React.useState<string | null>(null);
+  const [isRenameLoading, setIsRenameLoading] = React.useState(false);
 
   if (!config.permissions.writeDags) {
     return null;
   }
+
+  const handleRenameClose = () => {
+    setIsRenameModalOpen(false);
+    setRenameError(null);
+  };
+
+  const handleRenameSubmit = async (newFileName: string) => {
+    setIsRenameLoading(true);
+    setRenameError(null);
+
+    try {
+      const { error } = await client.POST('/dags/{fileName}/rename', {
+        params: {
+          path: {
+            fileName: fileName,
+          },
+          query: {
+            remoteNode: appBarContext.selectedRemoteNode || 'local',
+          },
+        },
+        body: {
+          newFileName: newFileName,
+        },
+      });
+      
+      if (error) {
+        setRenameError(error.message || 'An error occurred');
+        setIsRenameLoading(false);
+        return;
+      }
+      
+      // Success - close modal and redirect
+      setIsRenameModalOpen(false);
+      
+      // Redirect to the new DAG page
+      const basePath = window.location.pathname.split('/dags')[0] || '';
+      window.location.href = `${basePath}/dags/${newFileName}`;
+    } catch {
+      setRenameError('An unexpected error occurred');
+      setIsRenameLoading(false);
+    }
+  };
 
   return (
     <div className="flex items-center gap-2">
@@ -36,39 +82,7 @@ function DAGEditButtons({ fileName }: Props) {
         variant="outline"
         size="sm"
         className="cursor-pointer"
-        onClick={async () => {
-          const newFileName = window.prompt(
-            'Please input the new DAG file name',
-            ''
-          );
-          if (!newFileName) {
-            return;
-          }
-          if (newFileName.indexOf(' ') != -1) {
-            alert('DAG file name cannot contain space');
-            return;
-          }
-          const { error } = await client.POST('/dags/{fileName}/rename', {
-            params: {
-              path: {
-                fileName: fileName,
-              },
-              query: {
-                remoteNode: appBarContext.selectedRemoteNode || 'local',
-              },
-            },
-            body: {
-              newFileName: newFileName,
-            },
-          });
-          if (error) {
-            alert(error.message || 'An error occurred');
-            return;
-          }
-          // Redirect to the new DAG page
-          const basePath = window.location.pathname.split('/dags')[0] || '';
-          window.location.href = `${basePath}/dags/${newFileName}`;
-        }}
+        onClick={() => setIsRenameModalOpen(true)}
       >
         <PencilLine className="h-4 w-4 mr-2" />
         Rename
@@ -104,6 +118,16 @@ function DAGEditButtons({ fileName }: Props) {
         <Trash2 className="h-4 w-4 mr-2" />
         Delete
       </Button>
+      
+      <DAGNameInputModal
+        isOpen={isRenameModalOpen}
+        onClose={handleRenameClose}
+        onSubmit={handleRenameSubmit}
+        mode="rename"
+        initialValue={fileName}
+        isLoading={isRenameLoading}
+        externalError={renameError}
+      />
     </div>
   );
 }

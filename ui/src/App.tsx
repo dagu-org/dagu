@@ -13,6 +13,7 @@ import DAGDetails from './pages/dags/dag';
 import Search from './pages/search';
 import DAGRuns from './pages/dag-runs';
 import DAGRunDetails from './pages/dag-runs/dag-run';
+import Queues from './pages/queues';
 import Workers from './pages/workers';
 import SystemStatus from './pages/system-status';
 
@@ -102,6 +103,7 @@ function App({ config }: Props) {
                     />
                     <Route path="/dags/:fileName/" element={<DAGDetails />} />
                     <Route path="/search/" element={<Search />} />
+                    <Route path="/queues" element={<Queues />} />
                     <Route path="/dag-runs" element={<DAGRuns />} />
                     <Route
                       path="/dag-runs/:name/:dagRunId"

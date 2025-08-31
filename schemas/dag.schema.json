@@ -684,8 +684,26 @@
           "description": "Name of a DAG to run."
         },
         "params": {
-          "type": "string",
-          "description": "Parameters to pass to the DAG."
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Space-separated positional parameters accessible as $1, $2, etc."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+            },
+            {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+            }
+          ],
+          "description": "Default parameters that can be overridden when triggering the DAG. Can be positional (accessed as $1, $2) or named (accessed as ${KEY})."
         },
         "parallel": {
           "oneOf": [

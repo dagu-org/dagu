@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -503,6 +504,86 @@ func TestEvalString(t *testing.T) {
 				WithVariables(map[string]string{"BAR": "second"}),
 			},
 			want:    "first second",
+			wantErr: false,
+		},
+		{
+			name:    "quoted JSON variable escaping",
+			input:   `params: aJson="${ITEM}"`,
+			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `{"file": "file1.txt", "config": "prod"}`})},
+			want:    `params: aJson=` + strconv.Quote(`{"file": "file1.txt", "config": "prod"}`),
+			wantErr: false,
+		},
+		{
+			name:    "quoted file path with spaces",
+			input:   `path: "FILE=\"${ITEM}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": "/path/to/my file.txt"})},
+			want:    `path: "FILE=\"/path/to/my file.txt\""`,
+			wantErr: false,
+		},
+		{
+			name:    "quoted string with internal quotes",
+			input:   `value: "VAR=\"${ITEM}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `say "hello"`})},
+			want:    `value: "VAR=\"say "hello"\""`,
+			wantErr: false,
+		},
+		{
+			name:    "mixed quoted and unquoted variables",
+			input:   `unquoted ${ITEM} and quoted "value=\"${ITEM}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `{"test": "value"}`})},
+			want:    `unquoted {"test": "value"} and quoted "value=\"{"test": "value"}\""`,
+			wantErr: false,
+		},
+		{
+			name:    "quoted empty string",
+			input:   `empty: "VAL=\"${EMPTY}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"EMPTY": ""})},
+			want:    `empty: "VAL=\"\""`,
+			wantErr: false,
+		},
+		{
+			name:    "quoted JSON path reference",
+			input:   `config: "file=\"${CONFIG.file}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"CONFIG": `{"file": "/path/to/config.json", "env": "prod"}`})},
+			want:    `config: "file=\"/path/to/config.json\""`,
+			wantErr: false,
+		},
+		{
+			name:    "quoted JSON path with spaces",
+			input:   `path: "value=\"${DATA.path}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"DATA": `{"path": "/my dir/file name.txt"}`})},
+			want:    `path: "value=\"/my dir/file name.txt\""`,
+			wantErr: false,
+		},
+		{
+			name:    "quoted nested JSON path",
+			input:   `nested: "result=\"${OBJ.nested.deep}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"OBJ": `{"nested": {"deep": "found it"}}`})},
+			want:    `nested: "result=\"found it\""`,
+			wantErr: false,
+		},
+		{
+			name:    "quoted JSON path with quotes in value",
+			input:   `msg: "text=\"${MSG.content}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"MSG": `{"content": "He said \"hello\""}`})},
+			want:    `msg: "text=\"He said "hello"\""`,
+			wantErr: false,
+		},
+		{
+			name:  "mixed quoted JSON path and simple variable",
+			input: `params: "${SIMPLE}" and config="file=\"${CONFIG.file}\""`,
+			opts: []EvalOption{WithVariables(map[string]string{
+				"SIMPLE": "value",
+				"CONFIG": `{"file": "app.conf"}`,
+			})},
+			want:    `params: "value" and config="file=\"app.conf\""`,
+			wantErr: false,
+		},
+		{
+			name:    "quoted non-existent JSON path",
+			input:   `missing: "val=\"${CONFIG.missing}\""`,
+			opts:    []EvalOption{WithVariables(map[string]string{"CONFIG": `{"file": "app.conf"}`})},
+			want:    `missing: "val=\"<nil>\""`,
 			wantErr: false,
 		},
 	}

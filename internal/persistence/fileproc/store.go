@@ -2,6 +2,7 @@ package fileproc
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -48,6 +49,11 @@ func (s *Store) CountAlive(ctx context.Context, groupName string) (int, error) {
 	return procGroup.Count(ctx)
 }
 
+func (s *Store) CountAliveByDAGName(ctx context.Context, groupName, dagName string) (int, error) {
+	procGroup := s.newProcGroup(groupName)
+	return procGroup.CountByDAGName(ctx, dagName)
+}
+
 // ListAlive implements models.ProcStore.
 func (s *Store) ListAlive(ctx context.Context, groupName string) ([]digraph.DAGRunRef, error) {
 	procGroup := s.newProcGroup(groupName)
@@ -71,6 +77,45 @@ func (s *Store) Acquire(ctx context.Context, groupName string, dagRun digraph.DA
 func (s *Store) IsRunAlive(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (bool, error) {
 	procGroup := s.newProcGroup(groupName)
 	return procGroup.IsRunAlive(ctx, dagRun)
+}
+
+// ListAllAlive implements models.ProcStore.
+// Returns all running DAG runs across all process groups.
+func (s *Store) ListAllAlive(ctx context.Context) (map[string][]digraph.DAGRunRef, error) {
+	result := make(map[string][]digraph.DAGRunRef)
+
+	// Create base directory if it doesn't exist
+	if _, err := os.Stat(s.baseDir); os.IsNotExist(err) {
+		return result, nil // No processes if directory doesn't exist
+	}
+
+	// Read all directories in the base directory - each directory is a process group
+	entries, err := os.ReadDir(s.baseDir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		groupName := entry.Name()
+		procGroup := s.newProcGroup(groupName)
+
+		// Get all alive processes for this group
+		aliveRuns, err := procGroup.ListAlive(ctx)
+		if err != nil {
+			logger.Warn(ctx, "Failed to list alive processes for group", "group", groupName, "err", err)
+			continue
+		}
+
+		if len(aliveRuns) > 0 {
+			result[groupName] = aliveRuns
+		}
+	}
+
+	return result, nil
 }
 
 func (s *Store) newProcGroup(groupName string) *ProcGroup {

@@ -149,12 +149,12 @@ const columnHelper = createColumnHelper<Data>();
 function getTzAndExp(exp: string) {
   const parts = exp.trim().split(/\s+/);
 
-  if (parts[0]?.startsWith("CRON_TZ=")) {
-    const timezone = parts[0]?.split("=")[1];
-    const cronExpr = parts?.slice(1).join(" ");
+  if (parts[0]?.startsWith('CRON_TZ=')) {
+    const timezone = parts[0]?.split('=')[1];
+    const cronExpr = parts?.slice(1).join(' ');
     return [timezone, cronExpr];
   } else {
-    return [parts.join(" ")];
+    return [parts.join(' ')];
   }
 }
 
@@ -167,13 +167,14 @@ function getNextSchedule(
   }
   try {
     const datesToRun = schedules.map((schedule) => {
-      const parsedCronExp = getTzAndExp(schedule.expression)
+      const parsedCronExp = getTzAndExp(schedule.expression);
       const options = {
-        tz: (parsedCronExp.length > 1 ? parsedCronExp[0] : getConfig().tz),
+        tz: parsedCronExp.length > 1 ? parsedCronExp[0] : getConfig().tz,
         iterator: true,
       };
       // Assuming 'parseExpression' is the correct method name based on library docs
-      const cronExp = (parsedCronExp.length > 1 ? parsedCronExp[1] : parsedCronExp[0])
+      const cronExp =
+        parsedCronExp.length > 1 ? parsedCronExp[1] : parsedCronExp[0];
       const interval = cronParser.parse(cronExp!, options);
       return interval.next();
     });
@@ -316,11 +317,17 @@ const defaultColumns = [
       }
       if (data.kind === ItemKind.DAG) {
         const name = data.dag.dag.name.toLowerCase();
+        const fileName = data.dag.fileName.toLowerCase();
         const description = (data.dag.dag.description || '').toLowerCase();
         const searchValue = String(filterValue).toLowerCase();
 
         // Search in name and description
-        if (name.includes(searchValue) || description.includes(searchValue)) {
+        console.log({ data });
+        if (
+          fileName.includes(searchValue) ||
+          name.includes(searchValue) ||
+          description.includes(searchValue)
+        ) {
           return true;
         }
 
@@ -395,10 +402,10 @@ const defaultColumns = [
       if (finishedAt && finishedAt !== '-') {
         const start = dayjs(startedAt);
         const end = dayjs(finishedAt);
-        
+
         if (start.isValid() && end.isValid()) {
           const durationMs = end.diff(start);
-          
+
           if (durationMs > 0) {
             // Format duration manually without using the custom format function
             const duration = dayjs.duration(durationMs);
@@ -406,15 +413,15 @@ const defaultColumns = [
             const hours = duration.hours();
             const minutes = duration.minutes();
             const seconds = duration.seconds();
-            
+
             const parts: string[] = [];
             if (days > 0) parts.push(`${days}d`);
             if (hours > 0) parts.push(`${hours}h`);
             if (minutes > 0) parts.push(`${minutes}m`);
             if (seconds > 0 && parts.length === 0) parts.push(`${seconds}s`);
-            
+
             const formattedDuration = parts.join(' ');
-            
+
             durationContent = (
               <div className="text-[10px] text-muted-foreground">
                 {formattedDuration}

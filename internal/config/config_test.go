@@ -582,11 +582,11 @@ queues:
   enabled: true
   config:
     - name: "globalQueue"
-      maxActiveRuns: 5
+      maxConcurrency: 5
     - name: "highPriorityQueue"
-      maxActiveRuns: 2
+      maxConcurrency: 2
     - name: "lowPriorityQueue"
-      maxActiveRuns: 10
+      maxConcurrency: 10
 `
 	err := os.WriteFile(configFile, []byte(configContent), 0600)
 	require.NoError(t, err)
@@ -623,7 +623,7 @@ queues:
   enabled: false
   config:
     - name: "testQueue"
-      maxActiveRuns: 3
+      maxConcurrency: 3
 `
 	err := os.WriteFile(configFile, []byte(configContent), 0600)
 	require.NoError(t, err)

@@ -32,16 +32,12 @@ Examples:
 	)
 }
 
-var retryFlags = []commandLineFlag{dagRunIDFlagRetry, {
-	name:         "step",
-	shorthand:    "",
-	usage:        "Retry only the specified step (optional)",
-	defaultValue: "",
-}}
+var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry, disableMaxActiveRuns}
 
 func runRetry(ctx *Context, args []string) error {
 	dagRunID, _ := ctx.StringParam("run-id")
 	stepName, _ := ctx.StringParam("step")
+	disableMaxActiveRuns := ctx.Command.Flags().Changed("disable-max-active-runs")
 
 	name, err := extractDAGName(ctx, args[0])
 	if err != nil {
@@ -72,6 +68,24 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to lock process group: %w", err)
 	}
 	defer ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
+
+	if !disableMaxActiveRuns {
+		liveCount, err := ctx.ProcStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+		if err != nil {
+			return fmt.Errorf("failed to access proc store: %w", err)
+		}
+		// Count queued DAG-runs and return error if the total of a new run plus
+		// active runs will exceed the maxActiveRuns.
+		queuedRuns, err := ctx.QueueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+		if err != nil {
+			return fmt.Errorf("failed to read queue: %w", err)
+		}
+		// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
+		// of active runs in the queue does not exceed this limit.
+		if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
+			return fmt.Errorf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns)
+		}
+	}
 
 	// Acquire process handle
 	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), digraph.NewDAGRunRef(dag.Name, dagRunID))

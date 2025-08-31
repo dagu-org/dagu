@@ -61,14 +61,6 @@ var (
 		shorthand: "n",
 	}
 
-	// singletonFlag is used to indicate that the dag-run should fail if the DAG is already running.
-	singletonFlag = commandLineFlag{
-		name:      "singleton",
-		usage:     "Prevent starting if DAG is already running (returns 409 conflict)",
-		isBool:    true,
-		shorthand: "s",
-	}
-
 	// Unique dag-run ID required for retrying a dag-run.
 	// This flag must be provided when using the retry command.
 	dagRunIDFlagRetry = commandLineFlag{
@@ -76,6 +68,23 @@ var (
 		shorthand: "r",
 		usage:     "Unique dag-run ID to retry a dag-run",
 		required:  true,
+	}
+
+	// stepNameForRetry is used to indicate a specific step to retry
+	stepNameForRetry = commandLineFlag{
+		name:         "step",
+		shorthand:    "",
+		usage:        "Retry only the specified step (optional)",
+		defaultValue: "",
+	}
+
+	// noCheckMaxActiveRuns
+	disableMaxActiveRuns = commandLineFlag{
+		name:         "disable-max-active-runs",
+		shorthand:    "",
+		usage:        "Disable check for max active runs",
+		isBool:       true,
+		defaultValue: "",
 	}
 
 	// Unique dag-run ID used for starting a new dag-run.

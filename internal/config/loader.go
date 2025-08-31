@@ -251,10 +251,15 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	if def.Queues != nil {
 		cfg.Queues.Enabled = def.Queues.Enabled
 		for _, queueDef := range def.Queues.Config {
-			cfg.Queues.Config = append(cfg.Queues.Config, QueueConfig{
+			queueConfig := QueueConfig{
 				Name:          queueDef.Name,
-				MaxActiveRuns: queueDef.MaxActiveRuns,
-			})
+				MaxActiveRuns: queueDef.MaxConcurrency,
+			}
+			// For backward compatibility
+			if queueDef.MaxActiveRuns != nil {
+				queueConfig.MaxActiveRuns = *queueDef.MaxActiveRuns
+			}
+			cfg.Queues.Config = append(cfg.Queues.Config, queueConfig)
 		}
 	}
 

@@ -251,20 +251,22 @@ build: ui bin
 .PHONY: build-image
 build-image: build-image-version
 
-.PHONY: build-image-latest
+.PHONY: build-image-version
 build-image-version:
-ifeq ($(VERSION),)
-	$(error "VERSION is not set")
-endif
-	echo "${COLOR_GREEN}Building the docker image with the version $(VERSION)...${COLOR_RESET}"
-	$(DOCKER_CMD) -t ghcr.io/dagu-org/${APP_NAME}:$(VERSION) -t ghcr.io/dagu-org/${APP_NAME}:latest .
+	@if [ -z "$(VERSION)" ]; then \
+		echo "${COLOR_RED}Error: VERSION is not set${COLOR_RESET}"; \
+		echo "Usage: make build-image VERSION={version}"; \
+		exit 1; \
+	fi
+	@echo "${COLOR_GREEN}Building the docker image with the version $(VERSION)...${COLOR_RESET}"
+	@$(DOCKER_CMD) -t ghcr.io/dagu-org/${APP_NAME}:$(VERSION) .
 
 # build-image-latest build the docker image with the latest tag and push to 
 # the registry.
 .PHONY: build-image-latest
 build-image-latest:
 	@echo "${COLOR_GREEN}Building the docker image...${COLOR_RESET}"
-	$(DOCKER_CMD) -t ghcr.io/dagu-org/${APP_NAME}:latest .
+	@$(DOCKER_CMD) -t ghcr.io/dagu-org/${APP_NAME}:latest .
 
 ${LOCAL_DIR}/merged:
 	@mkdir -p ${LOCAL_DIR}/merged
