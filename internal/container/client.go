@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -123,17 +124,32 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 	// Use the command to keep alive the container
 	var cmd []string
 	if len(c.containerConfig.Cmd) == 0 {
-		hostPath, err := GetKeepaliveFile(c.platformO)
-		if err != nil {
-			return err
-		}
-		c.keepAliveTmp = hostPath
+		// Detect if we're running in docker-in-docker environment
+		isDockerInDocker := c.isDockerInDocker()
 
-		// Setup the volume bind for the keepalive binary
-		targetPath := "/__dagu_runner/keepalive"
-		bind := hostPath + ":" + targetPath + ":ro"
-		c.hostConfig.Binds = append(c.hostConfig.Binds, bind)
-		cmd = []string{targetPath}
+		if isDockerInDocker {
+			// We're in a container, use a simple sleep command as fallback
+			logger.Info(ctx, "Detected docker-in-docker environment, using sleep for keepalive")
+			// Use a shell command that sleeps indefinitely
+			// Most images have sh, and this works across platforms
+			cmd = []string{"sh", "-c", "while true; do sleep 86400; done"}
+		} else {
+			// Standard environment, use the keepalive binary
+			hostPath, err := GetKeepaliveFile(c.platformO)
+			if err != nil {
+				// Fallback to sleep if keepalive binary fails
+				logger.Warn(ctx, "Failed to get keepalive binary, using sleep fallback", "err", err)
+				cmd = []string{"sh", "-c", "while true; do sleep 86400; done"}
+			} else {
+				c.keepAliveTmp = hostPath
+
+				// Setup the volume bind for the keepalive binary
+				targetPath := "/__dagu_runner/keepalive"
+				bind := hostPath + ":" + targetPath + ":ro"
+				c.hostConfig.Binds = append(c.hostConfig.Binds, bind)
+				cmd = []string{targetPath}
+			}
+		}
 	}
 
 	// Set init true to prevent zombie subprocess issues
@@ -397,6 +413,55 @@ func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containe
 	wg.Wait()
 
 	return 0, nil
+}
+
+// isDockerInDocker detects if we're running inside a Docker container
+func (c *Client) isDockerInDocker() bool {
+	// Check multiple indicators of running in a container
+
+	// 1. Check for /.dockerenv file (Docker specific)
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+
+	// 2. Check for /run/.containerenv file (Podman specific)
+	if _, err := os.Stat("/run/.containerenv"); err == nil {
+		return true
+	}
+
+	// 3. Check if we're in a container by looking at cgroup
+	if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
+		// Look for docker, containerd, or other container runtimes in cgroup
+		content := string(data)
+		if strings.Contains(content, "docker") ||
+			strings.Contains(content, "containerd") ||
+			strings.Contains(content, "kubepods") ||
+			strings.Contains(content, "lxc") {
+			return true
+		}
+	}
+
+	// 4. Check for Kubernetes environment variables
+	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		return true
+	}
+
+	// 5. Check if Docker socket is mounted (common in docker-in-docker setups)
+	if _, err := os.Stat("/var/run/docker.sock"); err == nil {
+		// Additional check: if docker.sock exists AND we have /.dockerenv or container indicators
+		// This helps distinguish between a host with Docker installed vs docker-in-docker
+		if _, err := os.Stat("/proc/1/cgroup"); err == nil {
+			if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
+				content := string(data)
+				// If cgroup shows we're in a container and docker.sock is mounted, it's docker-in-docker
+				if content != "0::/" && content != "" {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // getPlatform returns the platform of the container
