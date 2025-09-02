@@ -10,11 +10,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'; // Import Shadcn Tooltip
+import { Checkbox } from '@/components/ui/checkbox';
 import dayjs from '@/lib/dayjs';
 import StatusChip from '@/ui/StatusChip';
 import { Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
@@ -58,11 +58,11 @@ function DAGActions({
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
-  const navigate = useNavigate();
   const [isEnqueueModal, setIsEnqueueModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
   const [retryDagRunId, setRetryDagRunId] = React.useState<string>('');
+  const [stopAllRunning, setStopAllRunning] = React.useState(false);
 
   const client = useClient();
 
@@ -310,66 +310,111 @@ function DAGActions({
           title="Confirmation"
           buttonText="Stop"
           visible={isStopModal}
-          dismissModal={() => setIsStopModal(false)}
+          dismissModal={() => {
+            setIsStopModal(false);
+            setStopAllRunning(false);
+          }}
           onSubmit={async () => {
             setIsStopModal(false);
-            
-            // Use dag-run API - requires DAG name and ID
-            if (status?.name && status?.dagRunId) {
-              const { error } = await client.POST('/dag-runs/{name}/{dagRunId}/stop', {
+
+            // If stopAllRunning is checked, use the stop-all endpoint
+            if (stopAllRunning) {
+              const { error } = await client.POST('/dags/{fileName}/stop-all', {
                 params: {
+                  path: { fileName },
                   query: {
                     remoteNode: appBarContext.selectedRemoteNode || 'local',
-                  },
-                  path: {
-                    name: status.name,
-                    dagRunId: status.dagRunId,
                   },
                 },
               });
               if (error) {
-                console.error('Stop dag-run API error:', error);
-                alert(error.message || 'An error occurred');
+                console.error('Stop all API error:', error);
+                alert(
+                  error.message ||
+                    'An error occurred while stopping all instances'
+                );
                 return;
               }
+              setStopAllRunning(false);
               reloadData();
             } else {
-              console.error('Cannot stop DAG: missing DAG name or run ID');
-              alert('Cannot stop DAG: missing DAG name or run ID');
+              // Use dag-run API - requires DAG name and ID
+              if (status?.name && status?.dagRunId) {
+                const { error } = await client.POST(
+                  '/dag-runs/{name}/{dagRunId}/stop',
+                  {
+                    params: {
+                      query: {
+                        remoteNode: appBarContext.selectedRemoteNode || 'local',
+                      },
+                      path: {
+                        name: status.name,
+                        dagRunId: status.dagRunId,
+                      },
+                    },
+                  }
+                );
+                if (error) {
+                  console.error('Stop dag-run API error:', error);
+                  alert(error.message || 'An error occurred');
+                  return;
+                }
+                reloadData();
+              } else {
+                console.error('Cannot stop DAG: missing DAG name or run ID');
+                alert('Cannot stop DAG: missing DAG name or run ID');
+              }
             }
           }}
         >
           <div>
             <p className="mb-2">
-              {status?.name && status?.dagRunId 
-                ? `Do you really want to stop the dag-run "${status.name}"?`
-                : 'Do you really want to cancel the DAG?'
-              }
+              {stopAllRunning
+                ? `Do you really want to stop all running instances of this DAG?`
+                : status?.name && status?.dagRunId
+                  ? `Do you really want to stop the dag-run "${status.name}"?`
+                  : 'Do you really want to cancel the DAG?'}
             </p>
-            {status?.name && (
+            {!stopAllRunning && status?.name && (
               <LabeledItem label="DAG-Run-Name">
                 <span className="font-mono text-sm">{status.name}</span>
               </LabeledItem>
             )}
-            {status?.dagRunId && (
+            {!stopAllRunning && status?.dagRunId && (
               <LabeledItem label="DAG-Run-ID">
                 <span className="font-mono text-sm">{status.dagRunId}</span>
               </LabeledItem>
             )}
-            {status?.startedAt && (
+            {!stopAllRunning && status?.startedAt && (
               <LabeledItem label="Started At">
                 <span className="text-sm">
                   {dayjs(status.startedAt).format('YYYY-MM-DD HH:mm:ss Z')}
                 </span>
               </LabeledItem>
             )}
-            {status?.status !== undefined && (
+            {!stopAllRunning && status?.status !== undefined && (
               <LabeledItem label="Status">
                 <StatusChip status={status.status} size="sm">
                   {status.statusLabel || ''}
                 </StatusChip>
               </LabeledItem>
             )}
+            <div className="mt-4 flex items-center space-x-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+              <Checkbox
+                id="stop-all"
+                checked={stopAllRunning}
+                onCheckedChange={(checked) =>
+                  setStopAllRunning(checked as boolean)
+                }
+                className="border-amber-600 dark:border-amber-400 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600 data-[state=checked]:text-white dark:data-[state=checked]:text-black"
+              />
+              <label
+                htmlFor="stop-all"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-amber-700 dark:text-amber-300"
+              >
+                Stop all running instances
+              </label>
+            </div>
           </div>
         </ConfirmModal>
         <ConfirmModal
@@ -382,20 +427,23 @@ function DAGActions({
 
             // Use dag-run API - requires DAG name and ID
             if (status?.name && retryDagRunId) {
-              const { error } = await client.POST('/dag-runs/{name}/{dagRunId}/retry', {
-                params: {
-                  path: {
-                    name: status.name,
+              const { error } = await client.POST(
+                '/dag-runs/{name}/{dagRunId}/retry',
+                {
+                  params: {
+                    path: {
+                      name: status.name,
+                      dagRunId: retryDagRunId,
+                    },
+                    query: {
+                      remoteNode: appBarContext.selectedRemoteNode || 'local',
+                    },
+                  },
+                  body: {
                     dagRunId: retryDagRunId,
                   },
-                  query: {
-                    remoteNode: appBarContext.selectedRemoteNode || 'local',
-                  },
-                },
-                body: {
-                  dagRunId: retryDagRunId,
-                },
-              });
+                }
+              );
               if (error) {
                 alert(error.message || 'An error occurred');
                 return;
@@ -412,8 +460,7 @@ function DAGActions({
             <p className="mb-2">
               {status?.name && retryDagRunId
                 ? `Do you really want to retry the dag-run "${status.name}"?`
-                : 'Do you really want to rerun the following execution?'
-              }
+                : 'Do you really want to rerun the following execution?'}
             </p>
             <LabeledItem label="DAG-Run-Name">
               <span className="font-mono text-sm">{status?.name || 'N/A'}</span>
@@ -449,9 +496,9 @@ function DAGActions({
             if (dagRunId) {
               body.dagRunId = dagRunId;
             }
-            
+
             // Use /start endpoint if immediate is true, otherwise use /enqueue
-            const { data, error } = await (immediate 
+            const { error } = await (immediate
               ? client.POST('/dags/{fileName}/start', {
                   params: {
                     path: {
@@ -478,7 +525,7 @@ function DAGActions({
               alert(error.message || 'An error occurred');
               return;
             }
-            
+
             // Just refresh the current page data
             reloadData();
             // Navigate to status tab after execution (if available)

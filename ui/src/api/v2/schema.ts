@@ -236,6 +236,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dags/{fileName}/stop-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop all running instances of a DAG
+         * @description Terminates all currently running DAG-runs for the specified DAG
+         */
+        post: operations["stopAllDAGRuns"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dags/search": {
         parameters: {
             query?: never;
@@ -1108,7 +1128,7 @@ export interface components {
              * @enum {string}
              */
             type: QueueType;
-            /** @description Maximum number of concurrent runs allowed. Only present for 'global' type queues */
+            /** @description Maximum number of concurrent runs allowed. For 'global' queues, this is the configured maxConcurrency. For 'dag-based' queues, this is the DAG's maxActiveRuns (default 1) */
             maxConcurrency?: number;
             /** @description List of currently running DAG-runs */
             running: components["schemas"]["DAGRunSummary"][];
@@ -1778,6 +1798,53 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    stopAllDAGRuns: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successfully stopped all running instances */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Errors encountered */
+                        errors: string[];
+                    };
                 };
             };
             /** @description DAG not found */
