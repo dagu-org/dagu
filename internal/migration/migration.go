@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
@@ -150,7 +151,7 @@ func (m *HistoryMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 			continue
 		}
 
-		if statusFile == nil || statusFile.Status.RequestID == "" {
+		if statusFile == nil || statusFile.Status.RequestID == "" || statusFile.Status.Status == status.None {
 			result.SkippedRuns++
 			logger.Debug(ctx, "Skipping file with no valid status", "file", file.Name())
 			continue
@@ -194,7 +195,7 @@ func (m *HistoryMigrator) migrateRun(ctx context.Context, legacyStatusFile *lega
 	// Parse started time to get timestamp for CreateAttempt
 	startedAt, _ := m.parseTime(legacyStatus.StartedAt)
 	if startedAt.IsZero() {
-		startedAt = time.Now()
+		return fmt.Errorf("invalid history data: no started at time: %s - %s", legacyStatus.Name, legacyStatus.RequestID)
 	}
 
 	// Create attempt in new store
