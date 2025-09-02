@@ -1840,7 +1840,12 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @description Errors encountered */
+                        errors: string[];
+                    };
+                };
             };
             /** @description DAG not found */
             404: {
