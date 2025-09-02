@@ -314,10 +314,14 @@ steps:
 services:
   dagu:
     image: ghcr.io/dagu-org/dagu:latest
+    ports:
+      - 8080:8080
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./dags:/var/lib/dagu/dags
-    user: "0:0"  # Run as root for Docker access
+    entrypoint: ["dagu", "start-all"] # Override default entrypoint
+    user: "0:0"                       # Run as root for Docker access
+
 ```
 
 ## Container Lifecycle Management
