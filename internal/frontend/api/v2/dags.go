@@ -776,7 +776,7 @@ func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequ
 			errors = append(errors, fmt.Sprintf("failed to stop run %q: %s", runID, err))
 		}
 		if ctx.Err() != nil {
-			errors = append(errors, fmt.Sprintf("context is cancelled: %w", err))
+			errors = append(errors, fmt.Sprintf("context is cancelled: %s", err))
 			break
 		}
 	}
