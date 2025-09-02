@@ -223,10 +223,6 @@ steps:
   - name: custom-dir
     workingDir: /custom        # Override DAG workingDir
     command: pwd               # Outputs: /custom
-  
-  - name: also-custom
-    dir: /another              # Alternative to workingDir
-    command: pwd               # Outputs: /another
 ```
 
 ### Queue Configuration

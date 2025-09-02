@@ -251,11 +251,11 @@ Set where commands execute:
 ```yaml
 steps:
   - name: in-project
-    dir: /home/user/project
+    workingDir: /home/user/project
     command: python main.py
     
   - name: in-data
-    dir: /data/input
+    workingDir: /data/input
     command: ls -la
 ```
 

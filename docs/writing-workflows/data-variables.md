@@ -14,7 +14,7 @@ env:
   - SOME_FILE: ${SOME_DIR}/some_file 
 steps:
   - name: task
-    dir: ${SOME_DIR}
+    workingDir: ${SOME_DIR}
     command: python main.py ${SOME_FILE}
 ```
 
