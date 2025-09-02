@@ -146,8 +146,8 @@ services:
     volumes:
       - dagu:/var/lib/dagu
       - /var/run/docker.sock:/var/run/docker.sock
-    user: "0:0"
-    entrypoint: []
+    entrypoint: [] # Override default entrypoint
+    user: "0:0"    # Run as root for Docker access
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/health"]
       interval: 30s
