@@ -57,7 +57,7 @@ var (
 	ErrRequiredParameterNotFound           = errors.New("required parameter not found")
 	ErrScheduleKeyMustBeString             = errors.New("schedule key must be a string")
 	ErrInvalidSignal                       = errors.New("invalid signal")
-	ErrInvalidEnvValue                     = errors.New("invalid value for env")
+	ErrInvalidEnvValue                     = errors.New("env config should be map of strings or array of key=value formatted string")
 	ErrArgsMustBeConvertibleToIntOrString  = errors.New("args must be convertible to either int or string")
 	ErrExecutorTypeMustBeString            = errors.New("executor.type value must be string")
 	ErrExecutorConfigValueMustBeMap        = errors.New("executor.config value must be a map")

@@ -3,6 +3,7 @@ package digraph
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 )
@@ -26,6 +27,21 @@ func loadVariables(ctx BuildContext, strVariables any) (
 	case []any:
 		// Case 2. env is an array of maps.
 		for _, v := range a {
+			switch vv := v.(type) {
+			case map[string]any:
+				if err := parseKeyValue(vv, &pairs); err != nil {
+					return nil, wrapError("env", v, err)
+				}
+			case string:
+				// parse key=value string
+				parts := strings.SplitN(vv, "=", 2)
+				if len(parts) != 2 {
+					return nil, wrapError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
+				}
+				pairs = append(pairs, pair{key: parts[0], val: parts[1]})
+			default:
+				return nil, wrapError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
+			}
 			if aa, ok := v.(map[string]any); ok {
 				if err := parseKeyValue(aa, &pairs); err != nil {
 					return nil, wrapError("env", v, err)
