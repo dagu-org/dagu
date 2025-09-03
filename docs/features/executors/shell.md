@@ -153,7 +153,7 @@ steps:
       
   # Working directory
   - name: in-directory
-    dir: /app/src
+    workingDir: /app/src
     command: npm install
 ```
 

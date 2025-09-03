@@ -582,7 +582,7 @@ env:
   - API_KEY: ${SECRET_API_KEY}
 steps:
   - name: task
-    dir: ${SOME_DIR}
+    workingDir: ${SOME_DIR}
     command: python main.py ${SOME_FILE}
 ```
 
@@ -858,7 +858,7 @@ Run multi-line scripts.
 ```yaml
 steps:
   - name: step in specific directory
-    dir: /path/to/working/directory
+    workingDir: /path/to/working/directory
     command: pwd && ls -la
 ```
 

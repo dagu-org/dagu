@@ -23,6 +23,7 @@ func TestDockerExecutor(t *testing.T) {
 name: test-basic
 env:
   - FOO: BAR
+  - ABC=XYZ
 steps:
   - name: s1
     executor:
@@ -30,11 +31,11 @@ steps:
       config:
         image: alpine:3
         autoRemove: true
-    command: echo 123 abc $FOO
+    command: echo 123 abc $FOO $ABC
     output: DOCKER_EXEC_OUT1
 `,
 			expectedOutputs: map[string]any{
-				"DOCKER_EXEC_OUT1": "123 abc BAR",
+				"DOCKER_EXEC_OUT1": "123 abc BAR XYZ",
 			},
 		},
 	}

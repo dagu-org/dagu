@@ -809,6 +809,27 @@ Forcefully stops a running DAG run.
 }
 ```
 
+### Stop All DAG Runs
+
+**Endpoint**: `POST /api/v2/dags/{fileName}/stop-all`
+
+Forcefully stops all currently running instances of a DAG. This is useful when multiple instances of the same DAG are running simultaneously.
+
+**Response (200)**: 
+```json
+{
+  "errors": []
+}
+```
+
+**Error Response (404)**:
+```json
+{
+  "code": "not_found",
+  "message": "DAG not found"
+}
+```
+
 ### Retry DAG Run
 
 **Endpoint**: `POST /api/v2/dag-runs/{name}/{dagRunId}/retry`

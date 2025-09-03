@@ -589,6 +589,44 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dags/{fileName}/stop-all:
+    post:
+      summary: "Stop all running instances of a DAG"
+      description: "Terminates all currently running DAG-runs for the specified DAG"
+      operationId: "stopAllDAGRuns"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "Successfully stopped all running instances"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    description: "Errors encountered"
+                    items:
+                      type: string
+                    type: array
+                required:
+                  - errors
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/search:
     get:
       summary: "Search DAGs"

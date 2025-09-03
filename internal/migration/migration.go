@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
@@ -45,7 +46,7 @@ type MigrationResult struct {
 	MigratedRuns int
 	SkippedRuns  int
 	FailedRuns   int
-	Errors       []error
+	Errors       []string
 }
 
 // NeedsMigration checks if legacy data exists that needs migration
@@ -110,17 +111,11 @@ func (m *HistoryMigrator) Migrate(ctx context.Context) (*MigrationResult, error)
 
 		// Migrate all runs for this DAG
 		if err := m.migrateDAGHistory(ctx, entry.Name(), dagName, result); err != nil {
-			result.Errors = append(result.Errors, fmt.Errorf("failed to migrate DAG %s: %w", dagName, err))
+			migrationErr := fmt.Sprintf("failed to migrate DAG %s: %s", dagName, err)
+			result.Errors = append(result.Errors, migrationErr)
+			logger.Error(ctx, "Failed to migrate DAG", "dag", dagName, "error", err)
 		}
 	}
-
-	logger.Info(ctx, "Migration completed",
-		"total_dags", result.TotalDAGs,
-		"total_runs", result.TotalRuns,
-		"migrated", result.MigratedRuns,
-		"skipped", result.SkippedRuns,
-		"failed", result.FailedRuns,
-	)
 
 	return result, nil
 }
@@ -146,12 +141,16 @@ func (m *HistoryMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 		statusFile, err := m.readLegacyStatusFile(filePath)
 		if err != nil {
 			result.FailedRuns++
-			result.Errors = append(result.Errors, fmt.Errorf("failed to read legacy status file %s: %w", file.Name(), err))
+			readErr := fmt.Sprintf("failed to read legacy status file %s: %s", file.Name(), err)
+			result.Errors = append(result.Errors, readErr)
+			logger.Error(ctx, "Failed to read legacy status file", "file", file.Name(), "path", filePath, "error", err)
 			continue
 		}
 
-		if statusFile == nil || statusFile.Status.RequestID == "" {
+		if statusFile == nil || statusFile.Status.RequestID == "" || statusFile.Status.Status == status.None {
 			result.SkippedRuns++
+			err := fmt.Sprintf("skipped invalid status file %s, RequestID=%s, Status=%s", file.Name(), statusFile.Status.RequestID, statusFile.Status.Status.String())
+			result.Errors = append(result.Errors, err)
 			logger.Debug(ctx, "Skipping file with no valid status", "file", file.Name())
 			continue
 		}
@@ -168,7 +167,9 @@ func (m *HistoryMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 		// Convert and save - pass the directory name (without hash) as additional hint
 		if err := m.migrateRun(ctx, statusFile, dagName); err != nil {
 			result.FailedRuns++
-			result.Errors = append(result.Errors, fmt.Errorf("failed to migrate run %s: %w", requestID, err))
+			migrationErr := fmt.Sprintf("failed to migrate run %s: %s", requestID, err)
+			result.Errors = append(result.Errors, migrationErr)
+			logger.Error(ctx, "Failed to migrate run", "dag", statusFile.Status.Name, "request_id", requestID, "error", err)
 			continue
 		}
 
@@ -194,7 +195,7 @@ func (m *HistoryMigrator) migrateRun(ctx context.Context, legacyStatusFile *lega
 	// Parse started time to get timestamp for CreateAttempt
 	startedAt, _ := m.parseTime(legacyStatus.StartedAt)
 	if startedAt.IsZero() {
-		startedAt = time.Now()
+		return fmt.Errorf("invalid history data: no started at time: %s - %s", legacyStatus.Name, legacyStatus.RequestID)
 	}
 
 	// Create attempt in new store

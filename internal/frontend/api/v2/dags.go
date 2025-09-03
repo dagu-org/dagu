@@ -742,3 +742,46 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 		Errors:  errs,
 	}, nil
 }
+
+func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequestObject) (api.StopAllDAGRunsResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
+	// Get the DAG metadata to ensure it exists
+	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
+		}
+	}
+
+	// Get all running DAG-runs for this DAG
+	runningStatuses, err := a.dagRunStore.ListStatuses(ctx,
+		models.WithExactName(dag.Name),
+		models.WithStatuses([]status.Status{status.Running}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error listing running DAG-runs: %w", err)
+	}
+
+	// Stop each running DAG-run
+	var errors []string
+	for _, runningStatus := range runningStatuses {
+		runID := runningStatus.DAGRunID
+		err := a.dagRunMgr.Stop(ctx, dag, runID)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("failed to stop run %q: %s", runID, err))
+		}
+		if ctx.Err() != nil {
+			errors = append(errors, fmt.Sprintf("context is cancelled: %s", err))
+			break
+		}
+	}
+
+	return &api.StopAllDAGRuns200JSONResponse{
+		Errors: errors,
+	}, nil
+}
