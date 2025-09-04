@@ -8,7 +8,7 @@ Execute HTTP requests to web services and APIs.
 steps:
   - name: get-data
     executor: http
-    command: GET https://api.example.com/data
+    command: GET https://jsonplaceholder.typicode.com/todos/1
 ```
 
 ## Configuration
@@ -81,32 +81,6 @@ steps:
     command: echo "${USER_DATA}" | jq '.email'
 ```
 
-## Common Patterns
-
-### API Chaining
-
-```yaml
-steps:
-  - name: get-token
-    executor:
-      type: http
-      config:
-        silent: true
-        body: '{"username": "api", "password": "${API_PASS}"}'
-        headers:
-          Content-Type: application/json
-    command: POST https://api.example.com/auth
-    output: AUTH
-
-  - name: use-token
-    executor:
-      type: http
-      config:
-        headers:
-          Authorization: "Bearer ${AUTH.token}"
-    command: GET https://api.example.com/data
-```
-
 ### Error Handling
 
 ```yaml
@@ -151,8 +125,3 @@ steps:
           Authorization: "Bearer ${INTERNAL_TOKEN}"
     command: GET https://internal-api.company.local/data
 ```
-
-## See Also
-
-- [SSH Executor](/features/executors/ssh) - Remote command execution
-- [Data Flow](/features/data-flow) - Working with outputs

@@ -54,16 +54,13 @@ steps:
 
 ### Parameters
 
-Make workflows reusable with parameters:
-
 ```yaml
 params:
   - ENV: dev
   - REGION: us-east-1
 
 steps:
-  - name: deploy
-    command: echo "Deploying to ${ENV} in ${REGION}"
+  - echo "Deploying to ${ENV} in ${REGION}"
 ```
 
 Override at runtime:
@@ -77,92 +74,21 @@ Pass data between steps using `output`:
 
 ```yaml
 steps:
-  - name: get-date
-    command: date +%Y%m%d
+  - command: date +%Y%m%d
     output: TODAY
-    
-  - name: backup
-    command: tar -czf backup_${TODAY}.tar.gz /data
+  - tar -czf backup_${TODAY}.tar.gz /data
 ```
-
-## Execution Model
-
-### Parallel Execution
-
-Steps with the same dependencies run in parallel:
-
-```yaml
-steps:
-  - name: start
-    command: echo "Begin"
-    
-  - name: task1
-    command: 'sh -c "echo Starting heavy task 1; sleep 2; echo Completed heavy task 1"'
-    depends: start
-    
-  - name: task2
-    command: 'sh -c "echo Starting heavy task 2; sleep 2; echo Completed heavy task 2"'
-    depends: start
-    
-  - name: finish
-    command: echo "All done"
-    depends: [task1, task2]
-```
-
-Control parallelism with `maxActiveSteps`:
-
-```yaml
-maxActiveSteps: 2  # Only 2 steps run concurrently
-```
-
-### Conditional Execution
-
-Run steps based on conditions:
-
-```yaml
-steps:
-  - command: python process.py
-    preconditions:
-      - condition: "test -f /data/input.csv"
-```
-
-The `process` step only runs if the precondition matches.
-
-### Error Handling
-
-Built-in retry mechanism:
-
-```yaml
-steps:
-  - command: curl -f https://flaky-api.com/data
-    retryPolicy:
-      limit: 3
-      intervalSec: 30
-```
-
-Continue on failure:
-
-```yaml
-steps:
-  - command: 'sh -c "if [ $((RANDOM % 2)) -eq 0 ]; then echo Success; else echo Failed && exit 1; fi"'
-    continueOn:
-      failure: true
-```
-
-The workflow continues even if `optional-task` fails. The overall status will be `partial success` if any step fails but does not block the execution of subsequent steps due to `continueOn`.
 
 ## Status Management
 
-DAGs progress through different statuses during their lifecycle:
-
 ### Execution States
 
-- **queued**: DAG is waiting to be executed
-- **running**: DAG is currently executing
-- **success**: All steps completed successfully
-- **partial_success**: Some steps failed but execution continued (via `continueOn`)
-- **failed**: DAG execution failed
-- **cancelled**: DAG was manually cancelled
+- `queued`: DAG is waiting to be executed
+- `running`: DAG is currently executing
+- `success`: All steps completed successfully
+- `partial_success`: Some steps failed but execution continued (via `continueOn`)
+- `failed`: DAG execution failed
+- `cancelled`: DAG was manually cancelled
 
 ### Status Transitions
 
@@ -177,18 +103,14 @@ graph LR
 
 ### Step Status
 
-Individual steps have their own statuses:
-
-- **pending**: Step is waiting for dependencies
-- **running**: Step is executing
-- **success**: Step completed successfully
-- **failed**: Step execution failed
-- **cancelled**: Step was cancelled
-- **skipped**: Step was skipped (precondition not met)
+- `pending`: Step is waiting for dependencies
+- `running`: Step is executing
+- `success`: Step completed successfully
+- `failed`: Step execution failed
+- `cancelled`: Step was cancelled
+- `skipped`: Step was skipped (precondition not met)
 
 ### Status Hooks
-
-React to status changes with handlers:
 
 ```yaml
 handlerOn:
@@ -208,8 +130,7 @@ Runs commands in the system shell:
 
 ```yaml
 steps:
-  - name: example
-    command: echo "Hello"
+  - command: echo "Hello"
     shell: bash  # or sh, zsh
 ```
 
@@ -220,15 +141,13 @@ See [Shell Executor](/features/executors/shell) for more details.
 Execute in containers:
 
 ```yaml
+container:
+  image: python:3.11
+  workingDir: /app
+  volumes:
+    - /app/data:/data
 steps:
-  - name: python-task
-    executor:
-      type: docker
-      config:
-        image: python:3.11
-        volumes:
-          - /data:/data
-    command: python script.py
+  - python script.py
 ```
 
 See [Docker Executor](/features/executors/docker) for more details.
@@ -238,15 +157,13 @@ See [Docker Executor](/features/executors/docker) for more details.
 Run on remote machines:
 
 ```yaml
+ssh:
+  user: ubuntu
+  host: server.example.com
+  key: ~/.ssh/id_rsa
+
 steps:
-  - name: remote-task
-    executor:
-      type: ssh
-      config:
-        user: ubuntu
-        host: server.example.com
-        key: ~/.ssh/id_rsa
-    command: echo "Running remote script"
+  - echo "Running remote script"
 ```
 
 See [SSH Executor](/features/executors/ssh) for more details.
@@ -257,8 +174,7 @@ Make API calls:
 
 ```yaml
 steps:
-  - name: webhook
-    executor:
+  - executor:
       type: http
       config:
         method: POST
@@ -315,7 +231,7 @@ handlerOn:
     command: echo "Always runs"
 ```
 
-## What's Next?
+## See Also
 
 - [Writing Workflows](/writing-workflows/) - Create your own workflows
 - [Examples](/writing-workflows/examples) - Ready-to-use patterns

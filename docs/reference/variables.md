@@ -82,8 +82,7 @@ Define default positional parameters:
 params: first second third
 
 steps:
-  - name: use-params
-    command: echo "Args: $1 $2 $3"
+  - echo "Args: $1 $2 $3"
 ```
 
 Run with custom values:
@@ -102,8 +101,7 @@ params:
   - DEBUG: false
 
 steps:
-  - name: start-server
-    command: ./server --env=${ENVIRONMENT} --port=${PORT} --debug=${DEBUG}
+  - ./server --env=${ENVIRONMENT} --port=${PORT} --debug=${DEBUG}
 ```
 
 Override at runtime:
@@ -121,8 +119,7 @@ params:
   - VERSION: latest
 
 steps:
-  - name: deploy
-    command: echo "Deploying $1 to ${ENVIRONMENT} version ${VERSION}"
+  - echo "Deploying $1 to ${ENVIRONMENT} version ${VERSION}"
 ```
 
 Run with:
@@ -145,8 +142,7 @@ params:
   - USER_COUNT: "`wc -l < users.txt`"
 
 steps:
-  - name: use-substitution
-    command: echo "Deploy on ${TODAY} from ${HOSTNAME}"
+  - echo "Deploy on ${TODAY} from ${HOSTNAME}"
 ```
 
 ## Output Variables
@@ -157,13 +153,9 @@ Capture command output to use in later steps:
 
 ```yaml
 steps:
-  - name: get-version
-    command: cat VERSION
+  - command: cat VERSION
     output: VERSION
-    
-  - name: build
-    command: docker build -t myapp:${VERSION} .
-    depends: get-version
+  - docker build -t myapp:${VERSION} .
 ```
 
 ### Output Size Limits
@@ -175,8 +167,7 @@ Control maximum output size:
 maxOutputSize: 5242880  # 5MB
 
 steps:
-  - name: large-output
-    command: cat large-file.json
+  - command: cat large-file.json
     output: FILE_CONTENT  # Fails if > 5MB
 ```
 
@@ -186,8 +177,7 @@ Redirect to files instead of capturing:
 
 ```yaml
 steps:
-  - name: generate-report
-    command: python report.py
+  - command: python report.py
     stdout: /tmp/report.txt
     stderr: /tmp/errors.log
 ```
@@ -198,14 +188,11 @@ Access nested values in JSON output:
 
 ```yaml
 steps:
-  - name: get-config
-    command: |
+  - command: |
       echo '{"db": {"host": "localhost", "port": 5432}}'
     output: CONFIG
     
-  - name: connect
-    command: psql -h ${CONFIG.db.host} -p ${CONFIG.db.port}
-    depends: get-config
+  - psql -h ${CONFIG.db.host} -p ${CONFIG.db.port}
 ```
 
 ### Sub-workflow Output
@@ -214,16 +201,13 @@ Access outputs from nested workflows:
 
 ```yaml
 steps:
-  - name: run-etl
-    run: etl-workflow
+  - run: etl-workflow
     params: "DATE=${TODAY}"
     output: ETL_RESULT
     
-  - name: process-results
-    command: |
+  - |
       echo "Records processed: ${ETL_RESULT.outputs.record_count}"
       echo "Status: ${ETL_RESULT.outputs.status}"
-    depends: run-etl
 ```
 
 ## Step ID References
@@ -232,14 +216,12 @@ Reference step properties using IDs:
 
 ```yaml
 steps:
-  - name: risky-operation
-    id: risky
+  - id: risky
     command: 'sh -c "if [ $((RANDOM % 2)) -eq 0 ]; then echo Success; else echo Failed && exit 1; fi"'
     continueOn:
       failure: true
       
-  - name: check-result
-    command: |
+  - |
       if [ "${risky.exitCode}" = "0" ]; then
         echo "Success! Output was:"
         cat ${risky.stdout}
@@ -247,7 +229,6 @@ steps:
         echo "Failed with code ${risky.exitCode}"
         cat ${risky.stderr}
       fi
-    depends: risky-operation
 ```
 
 Available properties:
@@ -267,8 +248,7 @@ Variables are resolved in this order (highest to lowest):
 2. **Step-level environment**
    ```yaml
    steps:
-     - name: step
-       env:
+     - env:
          - VAR: step-value
    ```
 
@@ -287,18 +267,6 @@ Variables are resolved in this order (highest to lowest):
 5. **Dotenv files**
    ```yaml
    dotenv: .env
-   ```
-
-6. **Base configuration**
-   ```yaml
-   # ~/.config/dagu/base.yaml
-   env:
-     - VAR: base-value
-   ```
-
-7. **System environment**
-   ```bash
-   export VAR=system-value
    ```
 
 ## See Also

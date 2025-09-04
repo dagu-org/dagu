@@ -9,15 +9,13 @@ Build resilient workflows with retries, handlers, and notifications.
 ```yaml
 steps:
   # Basic retry with fixed interval
-  - name: flaky-api
-    command: curl https://api.example.com
+  - command: curl https://api.example.com
     retryPolicy:
       limit: 3
       intervalSec: 5
       
   # Retry specific errors
-  - name: api-call
-    command: make-request
+  - command: make-request
     retryPolicy:
       limit: 3
       intervalSec: 30
@@ -31,8 +29,7 @@ Increase retry intervals exponentially to avoid overwhelming failed services:
 ```yaml
 steps:
   # Exponential backoff with default multiplier (2.0)
-  - name: api-with-backoff
-    command: curl https://api.example.com/data
+  - command: curl https://api.example.com/data
     retryPolicy:
       limit: 5
       intervalSec: 2
@@ -40,8 +37,7 @@ steps:
       # Intervals: 2s, 4s, 8s, 16s, 32s
       
   # Custom backoff multiplier
-  - name: gentle-backoff
-    command: echo "Checking service health"
+  - command: echo "Checking service health"
     retryPolicy:
       limit: 4
       intervalSec: 1
@@ -49,8 +45,7 @@ steps:
       # Intervals: 1s, 1.5s, 2.25s, 3.375s
       
   # Backoff with max interval cap
-  - name: capped-backoff
-    command: echo "Syncing data"
+  - command: echo "Syncing data"
     retryPolicy:
       limit: 10
       intervalSec: 1
@@ -72,20 +67,17 @@ Control workflow execution flow when steps encounter errors or specific conditio
 ```yaml
 steps:
   # Continue on any failure
-  - name: optional-cleanup
-    command: rm -f /tmp/cache/*
+  - command: rm -f /tmp/cache/*
     continueOn:
       failure: true
       
   # Continue on specific exit codes
-  - name: check-status
-    command: echo "Checking status"
+  - command: echo "Checking status"
     continueOn:
       exitCode: [0, 1, 2]  # 0=success, 1=warning, 2=info
       
   # Continue on output patterns
-  - name: validate
-    command: validate.sh
+  - command: validate.sh
     continueOn:
       output: 
         - "WARNING"
@@ -94,8 +86,7 @@ steps:
         - "re:WARN-[0-9]+"   # Another regex
       
   # Mark as success when continuing
-  - name: best-effort
-    command: optimize.sh
+  - command: optimize.sh
     continueOn:
       failure: true
       markSuccess: true  # Shows as successful in UI
@@ -106,8 +97,7 @@ steps:
 ```yaml
 steps:
   # Database migration with known warnings
-  - name: migrate-db
-    command: echo "Running migration"
+  - command: echo "Running migration"
     continueOn:
       output:
         - "re:WARNING:.*already exists"
@@ -115,21 +105,18 @@ steps:
       exitCode: [0, 1]
       
   # Service health check with fallback
-  - name: check-primary
-    command: curl -f https://primary.example.com/health
+  - command: curl -f https://primary.example.com/health
     continueOn:
       exitCode: [0, 22, 7]  # 22=HTTP error, 7=connection failed
       
   # Conditional cleanup
-  - name: cleanup-temp
-    command: find /tmp -name "*.tmp" -mtime +7 -delete
+  - command: find /tmp -name "*.tmp" -mtime +7 -delete
     continueOn:
       failure: true       # Continue even if cleanup fails
       exitCode: [0, 1]   # find returns 1 if no files found
       
   # Tool with non-standard exit codes
-  - name: security-scan
-    command: security-scanner --strict
+  - command: security-scanner --strict
     continueOn:
       exitCode: [0, 4, 8]  # 0=clean, 4=warnings, 8=info
       output:
@@ -145,13 +132,10 @@ See the [Continue On Reference](/reference/continue-on) for complete documentati
 handlerOn:
   success:
     command: notify-success.sh
-    
   failure:
     command: alert-oncall.sh "${DAG_NAME} failed"
-    
   cancel:
     command: cleanup.sh
-    
   exit:
     command: rm -rf /tmp/dag-${DAG_RUN_ID}  # Always runs
 
@@ -191,13 +175,11 @@ errorMail:
 
 # Step-level
 steps:
-  - name: critical
-    command: backup.sh
+  - command: backup.sh
     mailOnError: true
     
   # Send custom email
-  - name: notify
-    executor:
+  - executor:
       type: mail
       config:
         to: team@company.com
@@ -219,16 +201,13 @@ maxCleanUpTimeSec: 300  # 5 minutes
 
 steps:
   # Step with graceful shutdown
-  - name: service
-    command: server.sh
+  - command: server.sh
     signalOnStop: SIGTERM  # Default
     
   # Always cleanup
-  - name: process
-    command: analyze.sh
+  - command: analyze.sh
     continueOn:
       failure: true
       
-  - name: cleanup
-    command: cleanup.sh  # Runs even if process fails
+  - cleanup.sh  # Runs even if process fails
 ```

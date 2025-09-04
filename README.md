@@ -28,16 +28,64 @@ Legacy systems often have complex and implicit dependencies between jobs. When t
 
 There are many existing tools such as Airflow, but many of these require you to write code in a programming language like Python to define your DAG. For systems that have been in operation for a long time, there may already be complex jobs with hundreds of thousands of lines of code written in languages like Perl or Shell Script. Adding another layer of complexity on top of these codes can reduce maintainability. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
 
-### How it Works
-Dagu executes your workflows defined in a simple, declarative YAML format.
+### Quick Examples
 
-For example, a simple sequential DAG:
+#### Simple Scheduled Workflow
+
 ```yaml
 schedule: "0 0 * * *" # Runs at 00:00 everyday
-
 steps:
   - echo "Hello, dagu!"
   - echo "This is a second step"
+```
+
+#### Running Shell Script
+
+```yaml
+steps:
+  - shell: bash  # Specify shell if needed
+    script: |
+      echo "Running script..."
+      echo "Dagu version: $(dagu version 2>&1)"
+```
+
+#### Executing in Docker Container
+
+```yaml
+container:
+  image: alpine:3.19
+steps:
+  - echo "Hello from inside the container"
+  - sh -lc "echo build > artifact.txt && cat artifact.txt"
+```
+
+#### Running Commands on Remote Server via SSH
+
+Configure SSH once at the DAG level; steps inherit the SSH executor by default.
+
+```yaml
+ssh:
+  user: deploy
+  host: server.example.com
+  # key: ~/.ssh/id_rsa   # Optional; if omitted and no password is set,
+steps:
+  - uptime
+```
+
+#### Run Sub-DAG with Parameters
+
+```yaml
+steps:
+  - name: call-child
+    run: child
+    params:
+      NAME: Dagu
+---
+name: child
+params:
+  NAME: World
+steps:
+  - echo "Hello ${NAME}!"
 ```
 
 ## Highlights

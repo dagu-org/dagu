@@ -149,22 +149,18 @@ Compose workflows from smaller workflows. Build modular, reusable components.
 ## Example: Data Pipeline with Nested Workflows
 
 ```yaml
-name: etl-pipeline
 schedule: "0 2 * * *"  # 2 AM daily
 
 steps:
-  - name: extract
-    command: python extract.py --date=${DATE}
+  - command: python extract.py --date=${DATE}
     output: RAW_DATA
     
-  - name: transform
-    run: transform-data
+  - run: transform-data
     parallel:
       items: [customers, orders, products]
     params: "TYPE=${ITEM} INPUT=${RAW_DATA}"
     
-  - name: load
-    command: python load.py
+  - command: python load.py
     retryPolicy:
       limit: 3
       intervalSec: 2
@@ -174,8 +170,7 @@ steps:
 name: transform-data
 params: [TYPE, INPUT]
 steps:
-  - name: process
-    command: python transform.py --type=${TYPE} --input=${INPUT}
+  - python transform.py --type=${TYPE} --input=${INPUT}
 ```
 
 ## Learn More

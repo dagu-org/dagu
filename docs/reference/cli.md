@@ -2,9 +2,9 @@
 
 Commands accept either DAG names (from YAML `name` field) or file paths.
 
-- **Both formats**: `start`, `stop`, `status`, `retry`
-- **File path only**: `dry`, `enqueue`
-- **DAG name only**: `restart`
+- Both formats: `start`, `stop`, `status`, `retry`
+- File path only: `dry`, `enqueue`
+- DAG name only: `restart`
 
 ## Global Options
 
