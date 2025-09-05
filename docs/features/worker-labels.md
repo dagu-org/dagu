@@ -52,16 +52,14 @@ Specify `workerSelector` on any step to route it to workers with matching labels
 ```yaml
 steps:
   # This task will only run on workers with gpu=true label
-  - name: train-model
-    run: train
+  - run: train
 
 ---
 name: train
 workerSelector:
   gpu: "true"
 steps:
-  - name: train
-    command: python train.py
+  - python train.py
 
 ```
 
@@ -83,11 +81,8 @@ dagu worker --worker.labels cpu=true
 
 # DAG
 steps:
-  - name: gpu-task
-    run: gpu-task
-
-  - name: cpu-task
-    run: cpu-task
+  - run: gpu-task
+  - run: cpu-task
 
 ---
 # Run on a worker with gpu
@@ -95,8 +90,7 @@ name: gpu-task
 workerSelector:
   gpu-task: "true"
 steps:
-  - name: gpu task
-    command: python gpu-task.py
+  - python gpu-task.py
 
 ---
 # Run on a worker with faster cpu
@@ -104,13 +98,5 @@ name: cpu-task
 workerSelector:
   cpu-task: "true"
 steps:
-  - name: cpu task
-    command: python cpu-task.py
+  - python cpu-task.py
 ```
-
-## See Also
-
-- [Distributed Execution](/features/distributed-execution) - Complete guide to distributed execution
-- [YAML Reference](/reference/yaml#distributed-execution) - workerSelector configuration
-- [CLI Reference](/reference/cli#worker) - Worker command options
-- [Configuration Reference](/configurations/reference#worker) - Worker configuration

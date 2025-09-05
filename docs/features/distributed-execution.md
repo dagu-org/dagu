@@ -86,11 +86,9 @@ dagu worker \
 Use `workerSelector` in your DAG definitions to route tasks:
 
 ```yaml
-name: distributed-pipeline
 steps:
   # This task requires GPU
-  - name: train-model
-    run: train-model
+  - run: train-model
     workerSelector:
       gpu: "true"
 
@@ -100,8 +98,7 @@ command: python train_model.py
 workerSelector:
   gpu: "true"
 steps:
-  - name: train-model
-    command: python train_model.py
+  - python train_model.py
 ```
 
 ## Worker Labels
@@ -361,98 +358,3 @@ services:
     deploy:
       replicas: 5
 ```
-
-### Kubernetes
-
-```yaml
-# Coordinator Deployment
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: dagu-coordinator
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: dagu-coordinator
-  template:
-    metadata:
-      labels:
-        app: dagu-coordinator
-    spec:
-      containers:
-      - name: dagu
-        image: dagu:latest
-        command: ["dagu", "start-all"]
-        args: ["--host=0.0.0.0"]
-        ports:
-        - containerPort: 8080
-          name: web
-        - containerPort: 50055
-          name: grpc
-
----
-# GPU Worker Deployment
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: dagu-worker-gpu
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: dagu-worker-gpu
-  template:
-    metadata:
-      labels:
-        app: dagu-worker-gpu
-    spec:
-      containers:
-      - name: worker
-        image: dagu:latest
-        command: ["dagu", "worker"]
-        args:
-        - --worker.labels=gpu=true,node-type=gpu-node
-        - --worker.coordinator-host=dagu-coordinator
-        - --worker.coordinator-port=50055
-        resources:
-          limits:
-            nvidia.com/gpu: 1
-
----
-# CPU Worker Deployment
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: dagu-worker-cpu
-spec:
-  replicas: 10
-  selector:
-    matchLabels:
-      app: dagu-worker-cpu
-  template:
-    metadata:
-      labels:
-        app: dagu-worker-cpu
-    spec:
-      containers:
-      - name: worker
-        image: dagu:latest
-        command: ["dagu", "worker"]
-        args:
-        - --worker.labels=cpu-optimized=true,region=us-east-1
-        volumeMounts:
-        - name: service-registry
-          mountPath: /var/lib/dagu/service-registry
-      volumes:
-      - name: service-registry
-        persistentVolumeClaim:
-          claimName: dagu-service-registry-pvc
-```
-
-## See Also
-
-- [Worker Labels](/features/worker-labels) - Detailed guide on worker label configuration
-- [Architecture](/overview/architecture#distributed-execution-architecture) - Technical architecture details
-- [CLI Reference](/reference/cli) - Complete command reference
-- [Configuration Reference](/configurations/reference) - All configuration options

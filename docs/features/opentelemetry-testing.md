@@ -19,7 +19,6 @@ docker run --rm --name jaeger \
 
 ```yaml
 # test-otel.yaml
-name: otel-test
 otel:
   enabled: true
   endpoint: "localhost:4317"
@@ -69,21 +68,18 @@ Open http://localhost:16686 in your browser:
 
 ```yaml
 # test-http-endpoint.yaml
-name: http-endpoint-test
 otel:
   enabled: true
   endpoint: "http://localhost:4318/v1/traces"
   insecure: true
 steps:
-  - name: test-step
-    command: echo "Testing HTTP endpoint"
+  - echo "Testing HTTP endpoint"
 ```
 
 ### With Authentication
 
 ```yaml
 # test-auth.yaml
-name: auth-test
 env:
   - OTEL_TOKEN: "your-auth-token"
 otel:
@@ -92,15 +88,13 @@ otel:
   headers:
     Authorization: "Bearer ${OTEL_TOKEN}"
 steps:
-  - name: secure-step
-    command: echo "Testing with auth"
+  - echo "Testing with auth"
 ```
 
 ### Custom Resource Attributes
 
 ```yaml
 # test-resources.yaml
-name: resource-test
 otel:
   enabled: true
   endpoint: "localhost:4317"
@@ -112,8 +106,7 @@ otel:
     team: "platform"
     region: "us-east-1"
 steps:
-  - name: test-step
-    command: echo "Testing resource attributes"
+  - echo "Testing resource attributes"
 ```
 
 ## Testing Nested DAGs
@@ -122,36 +115,25 @@ steps:
 
 ```yaml
 # parent-workflow.yaml
-name: parent-workflow
 otel:
   enabled: true
   endpoint: "localhost:4317"
   insecure: true
 
 steps:
-  - name: initialize
-    command: echo "Starting parent workflow"
-  
-  - name: run-etl
-    run: child-etl.yaml
+  - echo "Starting parent workflow"
+  - run: child-etl.yaml
     params: "SOURCE=production DATE=2024-01-01"
-    depends: initialize
-  
-  - name: run-analytics
-    run: child-analytics.yaml
+  - run: child-analytics.yaml
     params: "INPUT=${run-etl.output}"
-    depends: run-etl
-  
-  - name: finalize
-    command: echo "Parent workflow complete"
-    depends: run-analytics
+  - echo "Parent workflow complete"
+    
 ```
 
 ### 2. Create Child DAGs
 
 ```yaml
 # child-etl.yaml
-name: child-etl
 params:
   - SOURCE: dev
   - DATE: today
@@ -162,18 +144,13 @@ otel:
   insecure: true
 
 steps:
-  - name: extract
-    command: echo "Extracting from ${SOURCE}"
+  - command: echo "Extracting from ${SOURCE}"
     output: EXTRACTED_DATA
-  
-  - name: transform
-    command: echo "Transforming data" && echo "/tmp/data.csv"
-    depends: extract
+  - echo "Transforming data" && echo "/tmp/data.csv"
 ```
 
 ```yaml
 # child-analytics.yaml
-name: child-analytics
 params:
   - INPUT: ""
 
@@ -183,8 +160,7 @@ otel:
   insecure: true
 
 steps:
-  - name: analyze
-    command: echo "Analyzing ${INPUT}"
+  - echo "Analyzing ${INPUT}"
 ```
 
 ### 3. Run and Verify
@@ -350,7 +326,6 @@ time dagu start perf-test-no-otel.yaml
 ```bash
 # Create same DAG with OTel
 cat > perf-test-with-otel.yaml << 'EOF'
-name: perf-test
 otel:
   enabled: true
   endpoint: "localhost:4317"
@@ -384,7 +359,6 @@ If you have an existing observability platform:
 
 ```yaml
 # production-like-test.yaml
-name: prod-test
 otel:
   enabled: true
   endpoint: "${OTEL_ENDPOINT}"
@@ -396,8 +370,7 @@ otel:
     service.version: "${APP_VERSION}"
     deployment.environment: "${ENVIRONMENT}"
 steps:
-  - name: test
-    command: echo "Testing production setup"
+  - echo "Testing production setup"
 ```
 
 Run with environment variables:

@@ -4,12 +4,12 @@
 
 Executors extend Dagu's capabilities beyond simple shell commands. Available executors:
 
-- **[Shell](/features/executors/shell)** (default) - Execute shell commands
-- **[Docker](/features/executors/docker)** - Run commands in Docker containers
-- **[SSH](/features/executors/ssh)** - Execute commands on remote hosts
-- **[HTTP](/features/executors/http)** - Make HTTP requests
-- **[Mail](/features/executors/mail)** - Send emails
-- **[JQ](/features/executors/jq)** - Process JSON data
+- [Shell](/features/executors/shell) (default) - Execute shell commands
+- [Docker](/features/executors/docker) - Run commands in Docker containers
+- [SSH](/features/executors/ssh) - Execute commands on remote hosts
+- [HTTP](/features/executors/http) - Make HTTP requests
+- [Mail](/features/executors/mail) - Send emails
+- [JQ](/features/executors/jq) - Process JSON data
 
 ::: tip
 For detailed documentation on each executor, click the links above to visit the feature pages.
@@ -25,11 +25,9 @@ The default executor runs commands in the system shell.
 
 ```yaml
 steps:
-  - name: simple-command
-    command: echo "Hello World"
+  - command: echo "Hello World"
     
-  - name: with-specific-shell
-    command: echo $BASH_VERSION
+  - command: echo $BASH_VERSION
     shell: bash  # Use specific shell
 ```
 

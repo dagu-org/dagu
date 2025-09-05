@@ -6,13 +6,13 @@ How data moves through your workflows - from parameters to outputs, between step
 
 Dagu provides multiple mechanisms for passing data through workflows:
 
-- **Output Variables** - Capture command output for use in later steps
-- **Environment Variables** - Define variables accessible to all steps
-- **Parameters** - Pass runtime values into workflows
-- **File-based Passing** - Redirect output to files
-- **JSON Path References** - Access nested data structures
-- **Step ID References** - Reference step properties and files
-- **Child DAG Outputs** - Capture results from sub-workflows
+- Output Variables - Capture command output for use in later steps
+- Environment Variables - Define variables accessible to all steps
+- Parameters - Pass runtime values into workflows
+- File-based Passing - Redirect output to files
+- JSON Path References - Access nested data structures
+- Step ID References - Reference step properties and files
+- Child DAG Outputs - Capture results from sub-workflows
 
 ## Output Variables
 
@@ -20,12 +20,10 @@ Capture command output and use it in subsequent steps:
 
 ```yaml
 steps:
-  - name: get-version
-    command: cat VERSION
+  - command: cat VERSION
     output: VERSION
     
-  - name: build
-    command: docker build -t myapp:${VERSION} .
+  - docker build -t myapp:${VERSION} .
 ```
 
 ### How It Works
@@ -64,8 +62,7 @@ Access nested values in JSON output using dot notation:
 
 ```yaml
 steps:
-  - name: get-config
-    command: |
+  - |
       echo '{
         "database": {
           "host": "localhost",
@@ -77,8 +74,7 @@ steps:
       }'
     output: CONFIG
     
-  - name: connect
-    command: |
+  - |
       psql -h ${CONFIG.database.host} \
            -p ${CONFIG.database.port} \
            -U ${CONFIG.database.credentials.username}
@@ -90,16 +86,14 @@ Access array elements by index:
 
 ```yaml
 steps:
-  - name: get-servers
-    command: |
+  - command: |
       echo '[
         {"name": "web1", "ip": "10.0.1.1"},
         {"name": "web2", "ip": "10.0.1.2"}
       ]'
     output: SERVERS
     
-  - name: ping-first
-    command: ping -c 1 ${SERVERS[0].ip}
+  - ping -c 1 ${SERVERS[0].ip}
 ```
 
 ## Environment Variables
@@ -115,8 +109,7 @@ env:
   - API_URL: https://api.example.com
 
 steps:
-  - name: process
-    command: python process.py --log=${LOG_LEVEL} --data=${DATA_DIR}
+  - python process.py --log=${LOG_LEVEL} --data=${DATA_DIR}
 ```
 
 ### Variable Expansion
@@ -142,8 +135,7 @@ env:
   - HOSTNAME: "`hostname -f`"
 
 steps:
-  - name: backup
-    command: tar -czf backup-${TODAY}-${GIT_COMMIT}.tar.gz data/
+  - tar -czf backup-${TODAY}-${GIT_COMMIT}.tar.gz data/
 ```
 
 ## Parameters
@@ -159,8 +151,7 @@ params:
   - DRY_RUN: false
 
 steps:
-  - name: process
-    command: |
+  - |
       echo "Processing data" \
         --env=${ENVIRONMENT} \
         --batch=${BATCH_SIZE} \
@@ -189,14 +180,12 @@ Reference step properties using the `id` field:
 
 ```yaml
 steps:
-  - name: risky-operation
-    id: risky
+  - id: risky
     command: 'sh -c "if [ $((RANDOM % 2)) -eq 0 ]; then echo Success; else echo Failed && exit 1; fi"'
     continueOn:
       failure: true
       
-  - name: check-result
-    command: |
+  - command: |
       if [ "${risky.exitCode}" = "0" ]; then
         echo "Success! Checking output..."
         cat ${risky.stdout}
@@ -221,13 +210,11 @@ Capture outputs from nested workflows:
 ```yaml
 # parent.yaml
 steps:
-  - name: run-etl
-    run: etl-workflow
+  - run: etl-workflow
     params: "DATE=${TODAY}"
     output: ETL_RESULT
     
-  - name: process-results
-    command: |
+  - |
       echo "Status: ${ETL_RESULT.status}"
       echo "Records: ${ETL_RESULT.outputs.record_count}"
       echo "Duration: ${ETL_RESULT.outputs.duration}"
@@ -254,12 +241,10 @@ Access outputs from deeply nested workflows:
 
 ```yaml
 steps:
-  - name: orchestrate
-    run: main-pipeline
+  - run: main-pipeline
     output: PIPELINE
     
-  - name: report
-    command: |
+  - |
       # Access nested outputs
       echo "ETL Status: ${PIPELINE.outputs.ETL_OUTPUT.status}"
       echo "ML Score: ${PIPELINE.outputs.ML_OUTPUT.outputs.accuracy}"
@@ -271,14 +256,12 @@ When running parallel executions, outputs are aggregated:
 
 ```yaml
 steps:
-  - name: process-regions
-    run: region-processor
+  - run: region-processor
     parallel:
       items: ["us-east", "us-west", "eu-central"]
     output: RESULTS
     
-  - name: summarize
-    command: |
+  - |
       echo "Total regions: ${RESULTS.summary.total}"
       echo "Succeeded: ${RESULTS.summary.succeeded}"
       echo "Failed: ${RESULTS.summary.failed}"
@@ -323,25 +306,21 @@ Redirect output to files for large data:
 
 ```yaml
 steps:
-  - name: generate-report
-    command: python generate_report.py
+  - command: python generate_report.py
     stdout: /tmp/report.txt
     
-  - name: email-report
-    command: mail -s "Report" user@example.com < /tmp/report.txt
+  - mail -s "Report" user@example.com < /tmp/report.txt
 ```
 
 ### Working with Files
 
 ```yaml
 steps:
-  - name: extract
-    command: |
+  - |
       tar -xzf data.tar.gz -C /tmp/
       ls /tmp/data/ > /tmp/filelist.txt
     
-  - name: process-files
-    command: |
+  - |
       while read file; do
         process.sh "/tmp/data/$file"
       done < /tmp/filelist.txt
@@ -363,8 +342,7 @@ Dagu automatically sets these variables:
 Example usage:
 ```yaml
 steps:
-  - name: backup-logs
-    command: |
+  - |
       echo "Backing up logs for ${DAG_NAME} run ${DAG_RUN_ID}"
       cp ${DAG_RUN_LOG_FILE} /backup/
 ```
@@ -378,12 +356,10 @@ Control maximum output size to prevent memory issues:
 maxOutputSize: 5242880
 
 steps:
-  - name: large-output
-    command: cat large-file.json
+  - command: cat large-file.json
     output: DATA  # Fails if output > 5MB
     
-  - name: unlimited-file
-    command: generate-huge-file.sh
+  - command: generate-huge-file.sh
     stdout: /tmp/huge.txt  # No size limit with file redirection
 ```
 
@@ -408,80 +384,7 @@ params:
   - MESSAGE: "Param default"
 
 steps:
-  - name: show-precedence
-    env:
+  - env:
       - MESSAGE: "Step level"  # This wins
     command: echo "${MESSAGE}"
 ```
-
-## Advanced Patterns
-
-### Dynamic Data Processing
-
-Process files discovered at runtime:
-
-```yaml
-steps:
-  - name: find-csvs
-    command: find /data -name "*.csv" -type f
-    output: CSV_FILES
-    
-  - name: process-each
-    run: csv-processor
-    parallel: ${CSV_FILES}
-    params: "FILE=${ITEM}"
-```
-
-### Conditional Data Flow
-
-Route data based on conditions:
-
-```yaml
-steps:
-  - name: check-env
-    command: |
-      if [ "${ENVIRONMENT}" = "prod" ]; then
-        echo "production-config.json"
-      else
-        echo "staging-config.json"
-      fi
-    output: CONFIG_FILE
-    
-  - name: load-config
-    command: process --config=${CONFIG_FILE}
-```
-
-### Data Validation Pipeline
-
-```yaml
-steps:
-  - name: fetch-data
-    command: curl -s https://api.example.com/data
-    output: RAW_DATA
-    
-  - name: validate-json
-    command: echo '${RAW_DATA}' | jq empty
-    continueOn:
-      failure: false  # Stop if invalid JSON
-    depends: fetch-data
-    
-  - name: extract-fields
-    command: |
-      echo '${RAW_DATA}' | jq '{
-        id: .id,
-        total: .items | length,
-        sum: .items | map(.value) | add
-      }'
-    output: PROCESSED
-    depends: validate-json
-    
-  - name: save-results
-    command: echo '${PROCESSED}' > results.json
-    depends: extract-fields
-```
-
-## See Also
-
-- [Writing Workflows](/writing-workflows/data-variables) - Detailed variable guide
-- [Variables Reference](/reference/variables) - Complete variable reference
-- [Examples](/writing-workflows/examples) - Data flow examples
