@@ -147,28 +147,10 @@ By default, DAGs execute in the directory where the YAML file is located. You ca
 ```yaml
 # All relative paths are resolved from workingDir
 workingDir: /app/project
-
+dotenv: .env          # Loads /app/project/.env
 steps:
-  - ls -la           # Lists files in /app/project
+  - ls -la            # Lists files in /app/project
   - cat ./config.yml  # Reads /app/project/config.yml
-```
-
-This is especially important when:
-- Loading `.env` files (loaded from workingDir by default)
-- Using relative paths in container volumes
-- Reading/writing files with relative paths
-
-```yaml
-workingDir: /app/data
-dotenv: .env              # Loads /app/data/.env
-
-container:
-  image: python:3.11
-  volumes:
-    - ./input:/data       # Mounts /app/data/input to /data in container
-
-steps:
-  - python process.py ./results.csv  # Works with /app/data/results.csv
 ```
 
 ## Parameters
@@ -177,21 +159,16 @@ You can define parameters for workflows to make them reusable:
 
 ```yaml
 # backup.yaml
-name: daily-backup
 params:
   - SOURCE: /data
   - DEST: /backup
+  - TS: "`date +%Y%m%d_%H%M%S`"  # Command substitution
 
 steps:
-  - name: timestamp
-    command: date +%Y%m%d_%H%M%S
-    output: TS
-    
-  - name: backup
-    command: tar -czf ${DEST}/backup_${TS}.tar.gz ${SOURCE}
-    
-  - name: cleanup
-    command: find ${DEST} -name "backup_*.tar.gz" -mtime +7 -delete
+  # Backup files
+  - tar -czf ${DEST}/backup_${TS}.tar.gz ${SOURCE}
+  # Clean old backups
+  - find ${DEST} -name "backup_*.tar.gz" -mtime +7 -delete
 ```
 
 Run with parameters:
@@ -200,56 +177,18 @@ Run with parameters:
 dagu start backup.yaml -- SOURCE=/important/data DEST=/backups
 ```
 
-## Parallel Execution
-
-Run steps concurrently by specifying the same dependencies:
-
-```yaml
-steps:
-  - name: prepare
-    command: echo "Starting"
-    
-  - name: task1
-    command: echo "Processing images"
-    depends: prepare
-    
-  - name: task2
-    command: echo "Processing videos"
-    depends: prepare
-    
-  - name: task3
-    command: echo "Processing documents"
-    depends: prepare
-    
-  - name: combine
-    command: echo "Merging all results"
-    depends: [task1, task2, task3]
-```
-
-```mermaid
-graph LR
-    prepare --> task1
-    prepare --> task2
-    prepare --> task3
-    task1 --> combine
-    task2 --> combine
-    task3 --> combine
-```
-
 ## Error Handling
 
 Add retries and error handlers:
 
 ```yaml
 steps:
-  - name: download
-    command: curl -f https://example.com/data.zip -o data.zip
+  - command: curl -f https://example.com/data.zip -o data.zip
     retryPolicy:
       limit: 3
       intervalSec: 30
       
-  - name: process
-    command: echo "Unzipping data and processing"
+  - command: echo "Unzipping data and processing"
     continueOn:
       failure: true  # Continue even if this fails
       
@@ -270,17 +209,11 @@ container:
   image: python:3.11
   volumes:
     - ./data:/data
-
 steps:
-  - name: python-task
-    # write data to a file
-    command: |
-      python -c "with open('/data/output.txt', 'w') as f: f.write('Hello from Dagu!')"
-    
-  - name: process-data
-    # read data from the file
-    command: |
-      python -c "with open('/data/output.txt') as f: print(f.read())"
+  # write data to a file
+  - python -c "with open('/data/output.txt', 'w') as f: f.write('Hello from Dagu!')"
+  # read data from the file
+  - python -c "with open('/data/output.txt') as f: print(f.read())"
 ```
 
 ## Scheduling
@@ -288,12 +221,9 @@ steps:
 Run workflows automatically:
 
 ```yaml
-name: nightly-job
 schedule: "0 2 * * *"  # 2 AM daily
-
 steps:
-  - name: run
-    command: echo "Running nightly process"
+  - echo "Running nightly process"
 ```
 
 The workflow will execute every day at 2 AM.

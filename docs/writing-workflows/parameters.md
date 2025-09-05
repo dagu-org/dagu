@@ -5,26 +5,17 @@ Make workflows dynamic and reusable with runtime parameters.
 ## Parameter Definition
 
 ```yaml
-# Named parameters (recommended)
+# Named parameters
 params:
   - ENVIRONMENT: dev
   - PORT: 8080
   - DEBUG: false
 
-# List format
-params:
-  - DATABASE: postgres
-  - VERSION: latest
-
-# Positional parameters
+# Positional parameters (accessed as $1, $2, ...)
 params: first second third
 
-# Mixed
-params: "config.json ENVIRONMENT=prod"
-
 steps:
-  - name: use-params
-    command: ./app $1 --env=${ENVIRONMENT} --port=${PORT}
+  - echo $1 --env=${ENVIRONMENT} --port=${PORT}
 ```
 
 ## Passing Parameters
@@ -56,8 +47,7 @@ params:
   - LOG_PATH: ${LOG_DIR:-/var/log}  # With default
 
 steps:
-  - name: use
-    command: backup-${DATE}-${GIT_COMMIT}.tar.gz
+  - backup-${DATE}-${GIT_COMMIT}.tar.gz
 ```
 
 ## Using Parameters
@@ -70,24 +60,16 @@ params:
 
 steps:
   # In commands
-  - name: process
-    command: python processor.py --input ${INPUT} --threads ${THREADS}
+  - python processor.py --input ${INPUT} --threads ${THREADS}
     
   # In conditions
-  - name: test
-    command: npm test
+  - command: npm test
     preconditions:
       - condition: "${SKIP_TESTS}"
         expected: "false"
         
   # In environment
-  - name: run
-    env:
+  - env:
       - API_VERSION: ${VERSION:-v1}
     command: ./app
 ```
-
-## See Also
-
-- [Data & Variables](/writing-workflows/data-variables) - Complete variable guide
-- [Examples](/writing-workflows/examples) - Real-world examples

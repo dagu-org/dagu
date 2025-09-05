@@ -12,8 +12,7 @@ smtp:
   password: "${SMTP_PASS}"
 
 steps:
-  - name: send-notification
-    executor:
+  - executor:
       type: mail
       config:
         to: recipient@example.com
@@ -55,8 +54,7 @@ smtp:
 
 ```yaml
 steps:
-  - name: notify-team
-    executor:
+  - executor:
       type: mail
       config:
         to:
@@ -67,8 +65,7 @@ steps:
         subject: "Daily Report Ready"
         message: "The daily report has been generated."
         
-  - name: single-recipient
-    executor:
+  - executor:
       type: mail
       config:
         to: admin@example.com  # Single recipient still works
@@ -84,8 +81,7 @@ params:
   - ENVIRONMENT: production
 
 steps:
-  - name: deployment-notification
-    executor:
+  - executor:
       type: mail
       config:
         to: devops@company.com
@@ -127,8 +123,7 @@ handlerOn:
           Check logs: ${DAG_RUN_LOG_FILE}
 
 steps:
-  - name: process-data
-    command: python process_data.py
+  - echo "Run your main tasks here"
 ```
 
 ### Error Alerts
@@ -141,8 +136,7 @@ errorMail:
   attachLogs: true
 
 steps:
-  - name: critical-process
-    command: python critical_process.py
+  - command: echo "Run some critical task"
     mailOnError: true
 ```
 
@@ -150,12 +144,9 @@ steps:
 
 ```yaml
 steps:
-  - name: generate-report
-    command: python generate_report.py > report.pdf
-    output: REPORT_FILE
+  - echo "Generating report..." > report.txt
 
-  - name: send-report
-    executor:
+  - executor:
       type: mail
       config:
         to: management@company.com
@@ -163,37 +154,14 @@ steps:
         subject: "Weekly Report"
         message: "Please find the weekly report attached."
         attachments:
-          - ${REPORT_FILE}
-```
-
-## Common Patterns
-
-### Conditional Alerts
-
-```yaml
-steps:
-  - name: check-disk
-    command: df -h /data | awk 'NR==2 {print $5}' | sed 's/%//'
-    output: DISK_USAGE
-
-  - name: alert-if-high
-    executor:
-      type: mail
-      config:
-        to: sysadmin@company.com
-        from: monitoring@company.com
-        subject: "⚠️ High Disk Usage"
-        message: "Disk usage: ${DISK_USAGE}%"
-    preconditions:
-      - condition: "test ${DISK_USAGE} -gt 80"
+          - report.txt
 ```
 
 ### With Retry
 
 ```yaml
 steps:
-  - name: send-critical-alert
-    executor:
+  - executor:
       type: mail
       config:
         to: oncall@company.com
@@ -204,8 +172,3 @@ steps:
       limit: 3
       intervalSec: 60
 ```
-
-## See Also
-
-- [Notifications](/features/notifications) - Complete notification guide
-- [Error Handling](/writing-workflows/error-handling) - Handle failures

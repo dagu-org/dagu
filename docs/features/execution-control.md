@@ -10,8 +10,7 @@ Execute the same workflow with different parameters in parallel.
 
 ```yaml
 steps:
-  - name: process-files
-    run: file-processor
+  - run: file-processor
     parallel:
       items:
         - "file1.csv"
@@ -24,16 +23,14 @@ name: file-processor
 params:
   - FILE: ""
 steps:
-  - name: process
-    command: python process.py --file ${FILE}
+  - python process.py --file ${FILE}
 ```
 
 ### With Concurrency Control
 
 ```yaml
 steps:
-  - name: process-files
-    run: file-processor
+  - run: file-processor
     parallel:
       items: ${FILE_LIST}
       maxConcurrent: 2  # Process max 2 files at a time
@@ -44,12 +41,10 @@ steps:
 
 ```yaml
 steps:
-  - name: find-files
-    command: find /data -name "*.csv" -type f
+  - command: find /data -name "*.csv" -type f
     output: CSV_FILES
   
-  - name: process-files
-    run: file-processor
+  - run: file-processor
     parallel: ${CSV_FILES}
     params: "FILE=${ITEM}"
 ```
@@ -58,14 +53,12 @@ steps:
 
 ```yaml
 steps:
-  - name: parallel-tasks
-    run: task-processor
+  - run: task-processor
     parallel:
       items: [1, 2, 3]
     output: RESULTS
   
-  - name: summary
-    command: |
+  - |
       echo "Total: ${RESULTS.summary.total}"
       echo "Succeeded: ${RESULTS.summary.succeeded}"
       echo "Failed: ${RESULTS.summary.failed}"
@@ -95,17 +88,13 @@ Control how many steps run concurrently:
 maxActiveSteps: 2  # Run up to 2 steps in parallel
 
 steps:
-  - name: task1
-    command: echo "Running task 1"
+  - command: echo "Running task 1"
     depends: [] # Explicitly declare no dependency
-  - name: task2
-    command: echo "Running task 2"
+  - command: echo "Running task 2"
     depends: []
-  - name: task3
-    command: echo "Running task 3"
+  - command: echo "Running task 3"
     depends: []
-  - name: task4
-    command: echo "Running task 4"
+  - command: echo "Running task 4"
     depends: []
   # All start in parallel, limited by maxActiveSteps
 ```
@@ -153,8 +142,7 @@ Set execution time limits:
 timeoutSec: 3600  # 1 hour timeout
 
 steps:
-  - name: long-task
-    command: echo "Processing"
+  - echo "Processing"
 ```
 
 ### Cleanup Timeout
@@ -175,8 +163,7 @@ Delay workflow start:
 delaySec: 60  # Wait 60 seconds before starting
 
 steps:
-  - name: delayed-task
-    command: echo "Running task"
+  - echo "Running task"
 ```
 
 ## Execution Order
@@ -205,8 +192,7 @@ steps:
     command: echo "Running task B"
     depends: setup
   
-  - name: finalize
-    command: echo "Finalizing"
+  - command: echo "Finalizing"
     depends:
       - task-a
       - task-b
@@ -223,8 +209,7 @@ Control retry and repeat intervals with exponential backoff to avoid overwhelmin
 ```yaml
 steps:
   # API call with exponential backoff
-  - name: resilient-api-call
-    command: curl https://api.example.com/data
+  - command: curl https://api.example.com/data
     retryPolicy:
       limit: 6
       intervalSec: 1
@@ -239,8 +224,7 @@ steps:
 ```yaml
 steps:
   # Service health check with backoff
-  - name: wait-for-healthy
-    command: echo "Health check OK"
+  - command: echo "Health check OK"
     output: STATUS
     repeatPolicy:
       repeat: until
@@ -252,78 +236,3 @@ steps:
       limit: 50
       # Intervals: 2s, 3s, 4.5s, 6.75s, 10.125s...
 ```
-
-#### Practical Examples
-
-**Database Connection Retry**:
-```yaml
-steps:
-  - name: connect-db
-    command: psql -h db.example.com -c "SELECT 1"
-    retryPolicy:
-      limit: 10
-      intervalSec: 0.5
-      backoff: true        # true = 2.0 multiplier
-      maxIntervalSec: 30
-      # Quick initial retries, backing off to 30s max
-```
-
-**Service Startup Monitoring**:
-```yaml
-steps:
-  - name: start-service
-    command: systemctl start myservice
-    
-  - name: wait-for-ready
-    command: systemctl is-active myservice
-    repeatPolicy:
-      repeat: until
-      exitCode: [0]        # Exit 0 means service is active
-      intervalSec: 1
-      backoff: 2.0
-      maxIntervalSec: 60
-      limit: 30
-      # Check frequently at first, then less often
-```
-
-**API Polling with Rate Limit Awareness**:
-```yaml
-steps:
-  - name: poll-job-status
-    command: |
-      response=$(curl -s https://api.example.com/job/123)
-      echo "$response" | jq -r '.status'
-    output: JOB_STATUS
-    repeatPolicy:
-      repeat: until
-      condition: "${JOB_STATUS}"
-      expected: "re:completed|failed"
-      intervalSec: 5
-      backoff: 1.5
-      maxIntervalSec: 300  # Max 5 minutes between checks
-      limit: 100
-```
-
-### Backoff Benefits
-
-1. **Resource Efficiency**: Reduces load on failing services
-2. **Cost Optimization**: Fewer API calls means lower costs
-3. **Better Recovery**: Gives services time to recover
-4. **Rate Limit Compliance**: Naturally backs off when hitting limits
-5. **Network Stability**: Reduces network congestion during outages
-
-### Configuration Tips
-
-- **Start Small**: Begin with short intervals for quick recovery
-- **Choose Multipliers**: 
-  - `2.0`: Standard exponential (1, 2, 4, 8...)
-  - `1.5`: Gentler increase (1, 1.5, 2.25...)
-  - `3.0`: Aggressive backoff (1, 3, 9, 27...)
-- **Set Caps**: Always use `maxIntervalSec` to prevent excessive waits
-- **Consider Limits**: Set reasonable retry/repeat limits
-
-## See Also
-
-- [Error Handling](/writing-workflows/error-handling) - Handle failures gracefully
-- [Scheduling](/features/scheduling) - Schedule workflow execution
-- [Queues](/features/queues) - Detailed queue management

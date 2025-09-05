@@ -64,8 +64,7 @@ Schedule workflows with cron expressions:
 ```yaml
 schedule: "0 2 * * *"  # Daily at 2 AM
 steps:
-  - name: nightly-job
-    command: echo "Processing scheduled task"
+  - echo "Processing scheduled task"
 ```
 
 ## Multiple Schedules
@@ -77,8 +76,7 @@ schedule:
   - "0 9 * * MON-FRI"   # Weekdays at 9 AM
   - "0 14 * * SAT,SUN"  # Weekends at 2 PM
 steps:
-  - name: job
-    command: echo "Running job"
+  - echo "Running job"
 ```
 
 ## Timezone Support
@@ -100,8 +98,7 @@ schedule:
   start: "0 8 * * *"   # Start at 8 AM
   stop: "0 18 * * *"   # Stop at 6 PM
 steps:
-  - name: service
-    command: echo "Running service"
+  - echo "Running service"
 ```
 
 Multiple start/stop times:
@@ -138,8 +135,7 @@ schedule: "*/5 * * * *"  # Every 5 minutes
 skipIfSuccessful: true   # Skip if last run succeeded
 
 steps:
-  - name: quick-check
-    command: echo "Checking status"
+  - echo "Checking status"
 ```
 
 ## Queue Management
@@ -152,8 +148,7 @@ queue: batch-jobs # Named queue (defaults to DAG name)
 
 schedule: "*/10 * * * *"
 steps:
-  - name: process
-    command: echo "Running batch process"
+  - echo "Running batch process"
 ```
 
 Disable queue processing:
@@ -183,9 +178,3 @@ schedule:
   start: "0 2 * * SAT"   # Saturday 2 AM
   stop: "0 4 * * SAT"    # Saturday 4 AM
 ```
-
-## See Also
-
-- [Queues](/features/queues) - Advanced queue management
-- [Error Handling](/writing-workflows/error-handling) - Handle failures in scheduled jobs
-- [Monitoring](/configurations/operations#prometheus-metrics) - Track scheduled executions

@@ -20,8 +20,7 @@ otel:
   enabled: true
   endpoint: "localhost:4317"  # OTLP gRPC endpoint
 steps:
-  - name: process-data
-    command: python process.py
+  - python process.py
 ```
 
 ### Full Configuration
@@ -97,8 +96,7 @@ When a step executes another DAG, the trace context is automatically propagated:
 
 ```yaml
 steps:
-  - name: run-child-workflow
-    run: workflows/child-workflow.yaml
+  - run: workflows/child-workflow.yaml
     params: "PARAM1=value1"
 ```
 
@@ -139,8 +137,7 @@ otel:
   resource:
     service.name: "dagu-${DAG_NAME}"  # Override specific attributes
 steps:
-  - name: process
-    command: echo "Processing with telemetry"
+  - echo "Processing with telemetry"
 ```
 
 ## Integration Examples

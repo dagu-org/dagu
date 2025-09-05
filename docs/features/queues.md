@@ -27,14 +27,12 @@ If the new run would push this total beyond the DAG-level `maxActiveRuns` and th
 ### Assign to Queue
 
 ```yaml
-name: batch-processor
 queue: "batch"              # Assign to batch queue
 maxActiveRuns: 2            # Allow 2 concurrent runs
 schedule: "*/10 * * * *"    # Every 10 minutes
 
 steps:
-  - name: process
-    command: echo "Processing batch"
+  - echo "Processing batch"
 ```
 
 ### Disable Queueing
@@ -42,12 +40,11 @@ steps:
 For critical workflows that should always run:
 
 ```yaml
-name: critical-alert
+# critical-alert
 maxActiveRuns: -1           # Never queue - always run
 
 steps:
-  - name: check
-    command: echo "Checking alerts"
+  - echo "Checking alerts"
 ```
 
 ## Global Queue Configuration
@@ -103,45 +100,3 @@ dagu dequeue workflow.yaml
 # Remove specific run
 dagu dequeue --dag-run=workflow:batch-2024-01-15
 ```
-
-## Queue Behavior
-
-### FIFO Processing
-
-Queues process in First-In-First-Out order:
-
-```yaml
-# First workflow submitted
-name: report-1
-queue: "reporting"
-maxActiveRuns: 1
-
-# Second workflow submitted
-name: report-2
-queue: "reporting"
-maxActiveRuns: 1
-
-# report-1 runs first, report-2 waits
-```
-
-### Priority Handling
-
-Use different queues for priority:
-
-```yaml
-# High priority
-name: critical-job
-queue: "high-priority"
-maxActiveRuns: 5
-
-# Low priority
-name: maintenance
-queue: "low-priority"
-maxActiveRuns: 1
-```
-
-## See Also
-
-- [Execution Control](/features/execution-control) - Control workflow execution
-- [Scheduling](/features/scheduling) - Schedule workflows
-- [Configuration Reference](/configurations/reference) - Complete configuration guide

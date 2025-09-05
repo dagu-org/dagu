@@ -25,10 +25,6 @@ remoteNodes:
     # No auth configured - anonymous access
 ```
 
-### Environment Variables
-
-Remote nodes must be configured in YAML. Environment variables are not supported for remote node configuration.
-
 ## Authentication Types
 
 ### Basic Authentication
@@ -73,19 +69,3 @@ remoteNodes:
     isAuthToken: true
     authToken: token
 ```
-
-## Usage
-
-Remote nodes appear in the Dagu UI and can be accessed through the interface. Each remote node maintains its own:
-- DAG definitions
-- Execution history
-- Logs
-- Status
-
-## Notes
-
-- Each remote node can use different authentication
-- Remote nodes are read-only from the main instance
-- Authentication credentials are stored in the config file
-- Use strong passwords and tokens for production
-- Consider using TLS for all remote connections

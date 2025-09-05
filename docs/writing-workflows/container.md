@@ -41,13 +41,11 @@ container:
     - POSTGRES_DB=myapp
 
 steps:
-  - name: wait
-    command: pg_isready -U postgres
+  - command: pg_isready -U postgres
     retryPolicy:
       limit: 10
       
-  - name: migrate
-    command: psql -U postgres myapp -f schema.sql
+  - psql -U postgres myapp -f schema.sql
 ```
 
 ## Private Registry Authentication
@@ -63,8 +61,7 @@ container:
   image: ghcr.io/myorg/private-app:latest
 
 steps:
-  - name: run
-    command: ./app
+  - ./app
 ```
 
 Or use `DOCKER_AUTH_CONFIG` environment variable (same format as `~/.docker/config.json`).
@@ -95,18 +92,61 @@ container:
 - **Consistency**: Guaranteed same environment for all steps
 - **Simplicity**: No need to configure Docker executor for each step
 
-## When to Use
+## Execution Model and Entrypoint Behavior
 
-Use the `container` field when:
-- Multiple steps need the same dependencies
-- Steps produce files consumed by later steps
-- You want consistent environment across all steps
-- You're migrating from traditional scripts
+- **How it runs:** When you set a DAG‑level `container`, Dagu starts one
+  long‑lived container for the workflow and keeps it alive (using a simple
+  sleep loop). Each step then runs inside that container via `docker exec`.
+- **Entrypoint/CMD not used for steps:** Because steps are executed with
+  `docker exec`, your image’s `ENTRYPOINT` or `CMD` are not invoked for step
+  commands. Steps run directly in the running container process context.
+- **Implication:** If your image’s entrypoint is a dispatcher that expects a
+  subcommand (for example, `my-entrypoint sendConfirmationEmails` which then
+  calls `npm run sendConfirmationEmails`), the step command must invoke that
+  dispatcher explicitly.
 
-Use step-level Docker executor when:
-- Steps need different images
-- Steps require isolation from each other
-- You need fine-grained container control
+### Examples
+
+Image entrypoint expects a job name as its first argument:
+
+```yaml
+container:
+  image: myorg/myimage:latest
+
+steps:
+  # This will NOT pass through the image ENTRYPOINT automatically.
+  # Explicitly call the entrypoint script or the underlying command.
+  - my-entrypoint sendConfirmationEmails
+  # Or call the underlying command directly, if appropriate
+  - npm run sendConfirmationEmails
+```
+
+If your step needs a shell to interpret operators (like `&&`, redirects,
+or environment expansion), wrap it explicitly:
+
+```yaml
+steps:
+  - sh -c "npm run prep && npm run sendConfirmationEmails"
+```
+
+### When to use step-level Docker instead
+
+If you want each step to run via the image’s `ENTRYPOINT`/`CMD` (as with a
+fresh `docker run` per step), prefer the step‑level Docker executor instead of
+the DAG‑level `container`:
+
+```yaml
+steps:
+  - name: send-confirmation-emails
+    executor:
+      type: docker
+      config:
+        image: myorg/myimage:latest
+        autoRemove: true
+    # Here, Docker will honor ENTRYPOINT/CMD by default
+    # (or you can override using executor config options)
+    command: sendConfirmationEmails
+```
 
 ## See Also
 
