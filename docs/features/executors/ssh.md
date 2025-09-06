@@ -18,19 +18,15 @@ ssh:
 
 steps:
   # All SSH steps inherit DAG-level configuration
-  - name: check-health
-    command: curl -f http://localhost:8080/health
-
-  - name: restart-service
-    command: systemctl restart myapp
+  - curl -f http://localhost:8080/health
+  - systemctl restart myapp
 ```
 
 ## Step-Level Configuration
 
 ```yaml
 steps:
-  - name: remote-command
-    executor:
+  - executor:
       type: ssh
       config:
         user: ubuntu

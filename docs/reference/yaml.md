@@ -8,7 +8,6 @@ Dagu workflows are defined using YAML files. Each file represents a DAG (Directe
 
 ```yaml
 # Workflow metadata
-name: my-workflow          # Optional: defaults to filename
 description: "What this workflow does"
 tags: [production, etl]    # Optional: for organization
 
@@ -32,9 +31,9 @@ env:
 
 # Workflow steps
 steps:
-  - name: step-name
+  - name: step-name        # Optional
     command: echo "Hello"
-    depends: previous-step
+    depends: previous-step # Optional
 
 # Lifecycle handlers
 handlerOn:
@@ -134,6 +133,12 @@ container:
   keepContainer: false     # Keep container after DAG run
 ```
 
+> Note: A DAG‑level `container` is started once and kept alive while the
+> workflow runs; each step executes via `docker exec` inside that container.
+> This means step commands do not pass through the image’s `ENTRYPOINT`/`CMD`.
+> If your image’s entrypoint dispatches subcommands, invoke it explicitly in
+> the step command (see [Execution Model and Entrypoint Behavior](/writing-workflows/container#execution-model-and-entrypoint-behavior)).
+
 ### SSH Configuration
 
 | Field | Type | Description | Default |
@@ -161,19 +166,11 @@ ssh:
 
 steps:
   # These steps inherit the DAG-level SSH configuration
-  - name: check-service
-    executor:
-      type: ssh
-    command: systemctl status myapp
-  
-  - name: restart-service
-    executor:
-      type: ssh
-    command: systemctl restart myapp
+  - systemctl status myapp
+  - systemctl restart myapp
   
   # Step-level config overrides DAG-level
-  - name: backup-db
-    executor:
+  - executor:
       type: ssh
       config:
         user: backup      # Override user
@@ -203,8 +200,7 @@ container:
     - /abs/path:/other   # Absolute paths are unchanged
 
 steps:
-  - name: process
-    command: python process.py
+  - python process.py
 ```
 
 **Working Directory Inheritance:**
@@ -217,12 +213,9 @@ steps:
 workingDir: /project          # DAG-level working directory
 
 steps:
-  - name: uses-dag-dir
-    command: pwd               # Outputs: /project
-  
-  - name: custom-dir
-    workingDir: /custom        # Override DAG workingDir
-    command: pwd               # Outputs: /custom
+  - pwd                   # Outputs: /project
+  - workingDir: /custom   # Override DAG workingDir
+    command: pwd          # Outputs: /custom
 ```
 
 ### Queue Configuration
@@ -360,8 +353,7 @@ Steps can be defined in multiple formats:
 #### Standard Format
 ```yaml
 steps:
-  - name: my-step
-    command: echo "Hello"
+  - echo "Hello"
 ```
 
 #### Shorthand String Format
@@ -409,8 +401,7 @@ In the nested array format:
 
 ```yaml
 steps:
-  - name: process-files
-    run: file-processor
+  - run: file-processor
     parallel:
       items: [file1.csv, file2.csv, file3.csv]
       maxConcurrent: 2
@@ -436,16 +427,14 @@ steps:
 
 ```yaml
 steps:
-  - name: conditional-step
-    command: echo "Deploying"
+  - command: echo "Deploying"
     preconditions:
       - condition: "${ENVIRONMENT}"
         expected: "production"
       - condition: "`git branch --show-current`"
         expected: "main"
     
-  - name: optional-step
-    command: echo "Running optional task"
+  - command: echo "Running optional task"
     continueOn:
       failure: true
       skipped: true
@@ -499,15 +488,13 @@ See the [Continue On Reference](/reference/continue-on) for detailed documentati
 `interval * (backoff ^ attemptCount)`
 ```yaml
 steps:
-  - name: retry-example
-    command: curl https://api.example.com
+  - command: curl https://api.example.com
     retryPolicy:
       limit: 3
       intervalSec: 30
       exitCode: [1, 255]  # Retry only on specific codes
       
-  - name: retry-with-backoff
-    command: curl https://api.example.com
+  - command: curl https://api.example.com
     retryPolicy:
       limit: 5
       intervalSec: 2
@@ -515,16 +502,14 @@ steps:
       maxIntervalSec: 60   # Cap at 60 seconds
       exitCode: [429, 503] # Rate limit or unavailable
     
-  - name: repeat-while-example
-    command: check-process.sh
+  - command: check-process.sh
     repeatPolicy:
       repeat: while        # Repeat WHILE process is running
       exitCode: [0]        # Exit code 0 means process found
       intervalSec: 60
       limit: 30
       
-  - name: repeat-until-with-backoff
-    command: echo "Checking status"
+  - command: echo "Checking status"
     output: STATUS
     repeatPolicy:
       repeat: until        # Repeat UNTIL status is ready
@@ -544,8 +529,7 @@ steps:
 
 ```yaml
 steps:
-  - name: docker-step
-    executor:
+  - executor:
       type: docker
       config:
         image: python:3.11
@@ -566,8 +550,7 @@ When using distributed execution, specify `workerSelector` to route tasks to wor
 
 ```yaml
 steps:
-  - name: gpu-training
-    run: gpu-training
+  - run: gpu-training
 ---
 # Run on a worker with gpu
 name: gpu-training
@@ -575,8 +558,7 @@ workerSelector:
   gpu: "true"
   memory: "64G"
 steps:
-  - name: gpu-training
-    command: python train_model.py
+  - python train_model.py
 ```
 
 **Worker Selection Rules:**
@@ -597,8 +579,7 @@ params:
   - DOMAIN: example.com
 
 steps:
-  - name: greet
-    command: echo "Hello ${USER} from ${DOMAIN}"
+  - echo "Hello ${USER} from ${DOMAIN}"
 ```
 
 ### Environment Variables
@@ -609,8 +590,7 @@ env:
   - API_KEY: ${SECRET_API_KEY}  # From system env
 
 steps:
-  - name: call-api
-    command: curl -H "X-API-Key: ${API_KEY}" ${API_URL}
+  - curl -H "X-API-Key: ${API_KEY}" ${API_URL}
 ```
 
 ### Loading Environment from .env Files
@@ -654,22 +634,17 @@ workingDir: /app
 dotenv: .env          # Optional, this is the default
 
 steps:
-  - name: connect-db
-    command: psql ${DATABASE_URL}
-  
-  - name: debug-mode
-    command: echo "Debug is ${DEBUG}"
+  - psql ${DATABASE_URL}
+  - echo "Debug is ${DEBUG}"
 ```
 
 ### Command Substitution
 
 ```yaml
 steps:
-  - name: dynamic-date
-    command: echo "Today is `date +%Y-%m-%d`"
+  - echo "Today is `date +%Y-%m-%d`"
     
-  - name: git-branch
-    command: deploy.sh
+  - command: deploy.sh
     preconditions:
       - condition: "`git branch --show-current`"
         expected: "main"
@@ -679,26 +654,18 @@ steps:
 
 ```yaml
 steps:
-  - name: get-version
-    command: cat VERSION
+  - command: cat VERSION
     output: VERSION
-    
-  - name: build
-    command: docker build -t app:${VERSION} .
-    depends: get-version
+  - command: docker build -t app:${VERSION} .
 ```
 
 ### JSON Path Access
 
 ```yaml
 steps:
-  - name: get-config
-    command: cat config.json
+  - command: cat config.json
     output: CONFIG
-    
-  - name: use-config
-    command: echo "Port is ${CONFIG.server.port}"
-    depends: get-config
+  - command: echo "Port is ${CONFIG.server.port}"
 ```
 
 ## Special Variables
@@ -714,38 +681,6 @@ These variables are automatically available:
 | `DAG_RUN_STEP_STDOUT_FILE` | Step stdout file path |
 | `DAG_RUN_STEP_STDERR_FILE` | Step stderr file path |
 | `ITEM` | Current item in parallel execution |
-
-## Execution Types
-
-### Chain (Default)
-
-Steps execute based on dependencies:
-
-```yaml
-steps:
-  - name: A
-    command: echo "A"
-  - name: B
-    command: echo "B"
-    depends: A
-  - name: C
-    command: echo "C"
-    depends: B
-```
-
-### Parallel
-
-All steps without dependencies run in parallel:
-
-```yaml
-steps:
-  - name: task1
-    command: echo "Running task 1"
-  - name: task2
-    command: echo "Running task 2"
-  - name: task3
-    command: echo "Running task 3"
-```
 
 ## Complete Example
 
@@ -786,40 +721,33 @@ preconditions:
     expected: "re:[1-5]"  # Weekdays only
 
 steps:
-  - name: validate-environment
-    command: ./scripts/validate.sh
+  - ./scripts/validate.sh
     
-  - name: extract-data
-    command: python extract.py --date=${DATE}
+  - command: python extract.py --date=${DATE}
     depends: validate-environment
     output: RAW_DATA_PATH
     retryPolicy:
       limit: 3
       intervalSec: 300
     
-  - name: transform-data
-    run: transform-module
+  - run: transform-module
     parallel:
       items: [customers, orders, products]
       maxConcurrent: 2
     params: "TYPE=${ITEM} INPUT=${RAW_DATA_PATH}"
-    depends: extract-data
     continueOn:
       failure: false
-    
-  - name: load-data
-    # Use different executor for this step
-    executor:
+
+ # Use different executor for this step   
+  - executor:
       type: docker
       config:
         image: postgres:16
         env:
           - PGPASSWORD=${DB_PASSWORD}
     command: psql -h ${DB_HOST} -U ${DB_USER} -f load.sql
-    depends: transform-data
     
-  - name: validate-results
-    command: python validate_results.py --date=${DATE}
+  - command: python validate_results.py --date=${DATE}
     depends: load-data
     mailOnError: true
 

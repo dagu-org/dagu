@@ -23,8 +23,6 @@ graph LR
     style B stroke:lightblue,stroke-width:1.6px,color:#333
 ```
 
-Execute steps one after another.
-
 <a href="/writing-workflows/basics#sequential-execution" class="learn-more">Learn more →</a>
 
 </div>
@@ -58,8 +56,6 @@ graph TD
     style E stroke:green,stroke-width:1.6px,color:#333
 ```
 
-Run steps in parallel using nested arrays.
-
 <a href="/writing-workflows/basics#shorthand-parallel-syntax" class="learn-more">Learn more →</a>
 
 </div>
@@ -70,8 +66,7 @@ Run steps in parallel using nested arrays.
 
 ```yaml
 steps:
-  - name: process-items
-    run: processor
+  - run: processor
     parallel:
       items: [A, B, C]
       maxConcurrent: 2
@@ -80,8 +75,7 @@ steps:
 ---
 name: processor
 steps:
-  - name: process
-    command: echo "Processing ${ITEM}"
+  - echo "Processing ${ITEM}"
 ```
 
 ```mermaid
@@ -99,98 +93,7 @@ graph TD
     style E stroke:green,stroke-width:1.6px,color:#333
 ```
 
-Process multiple items simultaneously.
-
 <a href="/features/execution-control#parallel" class="learn-more">Learn more →</a>
-
-</div>
-
-<div class="example-card">
-
-### Complex Dependencies
-
-```yaml
-steps:
-  - name: setup
-    command: echo "Setting up environment"
-  - name: test-a
-    command: echo "Running test suite A"
-    depends: setup
-  - name: test-b
-    command: echo "Running test suite B"
-    depends: setup
-  - name: deploy
-    command: echo "Deploying application"
-    depends:
-      - test-a
-      - test-b
-```
-
-```mermaid
-graph TD
-    A[setup] --> B[test-a]
-    A --> C[test-b]
-    B --> D[deploy]
-    C --> D
-    style A stroke:lightblue,stroke-width:1.6px,color:#333
-    style B stroke:lightblue,stroke-width:1.6px,color:#333
-    style C stroke:lightblue,stroke-width:1.6px,color:#333
-    style D stroke:lightblue,stroke-width:1.6px,color:#333
-```
-
-Define complex dependency graphs.
-
-<a href="/writing-workflows/control-flow#dependencies" class="learn-more">Learn more →</a>
-
-</div>
-
-<div class="example-card">
-
-### Chain vs Graph Execution
-
-```yaml
-# Chain type (default) - automatic dependencies
-type: chain
-steps:
-  - name: download
-    command: wget data.csv
-  - name: process
-    command: python process.py  # Depends on download
-  - name: upload
-    command: aws s3 cp output.csv s3://bucket/
-
----
-
-# Graph type - explicit dependencies
-type: graph  
-steps:
-  - name: step1
-    command: echo "First"
-  - name: step2
-    command: echo "Second"
-    depends: step1  # Explicit dependency required in graph type
-```
-
-```mermaid
-graph LR
-    subgraph Chain[Chain Type]
-        A1[download] --> A2[process] --> A3[upload]
-    end
-    
-    subgraph Graph[Graph Type]
-        B1[step1] --> B2[step2]
-    end
-    
-    style A1 stroke:lightblue,stroke-width:1.6px,color:#333
-    style A2 stroke:lightblue,stroke-width:1.6px,color:#333
-    style A3 stroke:lightblue,stroke-width:1.6px,color:#333
-    style B1 stroke:lightblue,stroke-width:1.6px,color:#333
-    style B2 stroke:lightblue,stroke-width:1.6px,color:#333
-```
-
-Control execution flow patterns.
-
-<a href="/writing-workflows/control-flow#execution-types" class="learn-more">Learn more →</a>
 
 </div>
 
@@ -206,8 +109,7 @@ Control execution flow patterns.
 
 ```yaml
 steps:
-  - name: deploy
-    command: echo "Deploying application"
+  - command: echo "Deploying application"
     preconditions:
       - condition: "${ENV}"
         expected: "production"
@@ -227,8 +129,6 @@ flowchart TD
     style D stroke:gray,stroke-width:1.6px,color:#333
     style E stroke:lightblue,stroke-width:1.6px,color:#333
 ```
-
-Run steps only when conditions are met.
 
 <a href="/writing-workflows/control-flow#conditions" class="learn-more">Learn more →</a>
 
@@ -265,15 +165,12 @@ Multiple condition types and regex patterns.
 
 ```yaml
 steps:
-  - name: wait-for-service
-    command: curl -f http://service/health
+  - command: curl -f http://service/health
     repeatPolicy:
       repeat: true
       intervalSec: 10
       exitCode: [1]  # Repeat while exit code is 1
 ```
-
-Repeat steps until success.
 
 <a href="/writing-workflows/control-flow#repeat" class="learn-more">Learn more →</a>
 
@@ -285,26 +182,22 @@ Repeat steps until success.
 
 ```yaml
 steps:
-  - name: wait-for-service
-    command: curl -f http://service:8080/health
+  - command: curl -f http://service:8080/health
     repeatPolicy:
       repeat: until        # Repeat UNTIL service is healthy
       exitCode: [0]        # Exit code 0 means success
-      intervalSec: 10
-      limit: 30           # Maximum 5 minutes
+      intervalSec: 10      # Wait 10 seconds between attempts
+      limit: 30            # Maximum 5 minutes
   
-  - name: monitor-job
-    command: echo "COMPLETED"  # Simulates job status check
+  - command: echo "COMPLETED"  # Simulates job status check
     output: JOB_STATUS
     repeatPolicy:
       repeat: until        # Repeat UNTIL job completes
       condition: "${JOB_STATUS}"
       expected: "COMPLETED"
       intervalSec: 30
-      limit: 120          # Maximum 1 hour
+      limit: 120           # Maximum 1 hour (120 attempts)
 ```
-
-Wait for external dependencies and job completion with clear semantics.
 
 <a href="/writing-workflows/control-flow#repeat" class="learn-more">Learn more →</a>
 
@@ -316,22 +209,18 @@ Wait for external dependencies and job completion with clear semantics.
 
 ```yaml
 steps:
-  - name: keep-alive-task
-    command: echo "heartbeat"  # Sends heartbeat signal
+  - command: echo "heartbeat"  # Sends heartbeat signal
     repeatPolicy:
-      repeat: while        # Repeat indefinitely while successful
+      repeat: while            # Repeat indefinitely while successful
       intervalSec: 60
       
-  - name: monitor-until-done
-    command: echo "Checking status"
+  - command: echo "Checking status"
     repeatPolicy:
       repeat: until        # Repeat until exit code 0
       exitCode: [0]
       intervalSec: 30
-      limit: 20           # Maximum 10 minutes
+      limit: 20            # Maximum 10 minutes
 ```
-
-Execute steps with clear repeat semantics.
 
 <a href="/writing-workflows/control-flow#repeat-basic" class="learn-more">Learn more →</a>
 
@@ -349,15 +238,13 @@ Execute steps with clear repeat semantics.
 
 ```yaml
 steps:
-  - name: optional-task
-    command: exit 1  # This will fail
+  # Optional task that may fail
+  - command: exit 1  # This will fail
     continueOn:
       failure: true
-  - name: required-task
-    command: echo "This must succeed"
+  # This step always runs
+  - echo "This must succeed"
 ```
-
-Handle non-critical failures gracefully.
 
 <a href="/writing-workflows/error-handling#continue" class="learn-more">Learn more →</a>
 
@@ -369,18 +256,16 @@ Handle non-critical failures gracefully.
 
 ```yaml
 steps:
-  - name: optional-feature
-    command: echo "Enabling feature"
+  # Optional step that may be skipped
+  - command: echo "Enabling feature"
     preconditions:
       - condition: "${FEATURE_FLAG}"
         expected: "enabled"
     continueOn:
       skipped: true
-  - name: main-process
-    command: echo "Processing main task"
+  # This step always runs
+  - echo "Processing main task"
 ```
-
-Continue workflow when preconditions aren't met.
 
 <a href="/writing-workflows/control-flow#continue-on-skipped" class="learn-more">Learn more →</a>
 
@@ -392,28 +277,11 @@ Continue workflow when preconditions aren't met.
 
 ```yaml
 steps:
-  - name: api-call
-    command: curl https://api.example.com
+  - command: curl https://api.example.com
     retryPolicy:
       limit: 3
       intervalSec: 30
 ```
-
-```mermaid
-sequenceDiagram
-    participant D as Dagu
-    participant A as API
-    D->>A: Attempt 1
-    A-->>D: ❌ Failure
-    Note over D: Wait 30s
-    D->>A: Attempt 2 (Retry 1)
-    A-->>D: ❌ Failure
-    Note over D: Wait 30s
-    D->>A: Attempt 3 (Retry 2)
-    A-->>D: ✅ Success
-```
-
-Automatically retry failed steps.
 
 <a href="/writing-workflows/error-handling#retry" class="learn-more">Learn more →</a>
 
@@ -425,15 +293,12 @@ Automatically retry failed steps.
 
 ```yaml
 steps:
-  - name: api-with-smart-retry
-    command: curl -f https://api.example.com/data
+  - command: curl -f https://api.example.com/data
     retryPolicy:
       limit: 5
       intervalSec: 30
       exitCodes: [429, 503, 504]  # Rate limit, service unavailable
 ```
-
-Targeted retry policies for different error types.
 
 <a href="/writing-workflows/error-handling#retry" class="learn-more">Learn more →</a>
 
@@ -445,8 +310,7 @@ Targeted retry policies for different error types.
 
 ```yaml
 steps:
-  - name: api-with-backoff
-    command: curl https://api.example.com/data
+  - command: curl https://api.example.com/data
     retryPolicy:
       limit: 5
       intervalSec: 2
@@ -454,25 +318,6 @@ steps:
       maxIntervalSec: 60   # Cap at 60s
       # Intervals: 2s, 4s, 8s, 16s, 32s → 60s
 ```
-
-```mermaid
-sequenceDiagram
-    participant D as Dagu
-    participant A as API
-    D->>A: Attempt 1
-    A-->>D: ❌ Failure
-    Note over D: Wait 2s
-    D->>A: Retry 1
-    A-->>D: ❌ Failure
-    Note over D: Wait 4s
-    D->>A: Retry 2
-    A-->>D: ❌ Failure
-    Note over D: Wait 8s
-    D->>A: Retry 3
-    A-->>D: ✅ Success
-```
-
-Avoid overwhelming failed services with exponential backoff.
 
 <a href="/writing-workflows/error-handling#exponential-backoff" class="learn-more">Learn more →</a>
 
@@ -484,8 +329,7 @@ Avoid overwhelming failed services with exponential backoff.
 
 ```yaml
 steps:
-  - name: wait-for-service
-    command: nc -z localhost 8080
+  - command: nc -z localhost 8080
     repeatPolicy:
       repeat: while
       exitCode: [1]        # While connection fails
@@ -496,25 +340,6 @@ steps:
       # Check intervals: 1s, 2s, 4s, 8s, 16s, 30s...
 ```
 
-```mermaid
-graph LR
-    A[Check Service] -->|Fail| B[Wait 1s]
-    B --> C[Check Again]
-    C -->|Fail| D[Wait 2s]
-    D --> E[Check Again]
-    E -->|Fail| F[Wait 4s]
-    F --> G[Check Again]
-    G -->|Success| H[Continue]
-    
-    style A stroke:lightblue,stroke-width:1.6px,color:#333
-    style C stroke:lightblue,stroke-width:1.6px,color:#333
-    style E stroke:lightblue,stroke-width:1.6px,color:#333
-    style G stroke:lightblue,stroke-width:1.6px,color:#333
-    style H stroke:green,stroke-width:1.6px,color:#333
-```
-
-Gradually increase polling intervals to reduce load.
-
 <a href="/writing-workflows/control-flow#exponential-backoff-for-repeats" class="learn-more">Learn more →</a>
 
 </div>
@@ -524,16 +349,15 @@ Gradually increase polling intervals to reduce load.
 ### Lifecycle Handlers
 
 ```yaml
+steps:
+  - echo "Processing main task"
 handlerOn:
   success:
-    command: echo "SUCCESS - Workflow completed"
+    echo "SUCCESS - Workflow completed"
   failure:
-    command: echo "FAILURE - Cleaning up failed workflow"
+    echo "FAILURE - Cleaning up failed workflow"
   exit:
-    command: echo "EXIT - Always cleanup"
-steps:
-  - name: main
-    command: echo "Processing main task"
+    echo "EXIT - Always cleanup"
 ```
 
 ```mermaid
@@ -558,8 +382,6 @@ stateDiagram-v2
     class NotifySuccess,CleanupFail,AlwaysCleanup handler
 ```
 
-Run handlers on workflow events.
-
 <a href="/writing-workflows/error-handling#handlers" class="learn-more">Learn more →</a>
 
 </div>
@@ -581,12 +403,9 @@ env:
   - LOG_LEVEL: debug
   - API_KEY: ${SECRET_API_KEY}
 steps:
-  - name: task
-    workingDir: ${SOME_DIR}
+  - workingDir: ${SOME_DIR}
     command: python main.py ${SOME_FILE}
 ```
-
-Define variables accessible throughout the DAG.
 
 <a href="/writing-workflows/data-variables#env" class="learn-more">Learn more →</a>
 
@@ -600,18 +419,15 @@ Define variables accessible throughout the DAG.
 # Specify single dotenv file
 dotenv: .env
 
-# Or specify multiple candidate files
+# Or specify multiple candidate files (only the first found is used)
 dotenv:
   - .env
   - .env.local
   - configs/.env.prod
 
 steps:
-  - name: use-env-vars
-    command: echo "Database: ${DATABASE_URL}"
+  - echo "Database: ${DATABASE_URL}"
 ```
-
-Load environment variables from .env files.
 
 <a href="/writing-workflows/data-variables#dotenv" class="learn-more">Learn more →</a>
 
@@ -624,11 +440,8 @@ Load environment variables from .env files.
 ```yaml
 params: param1 param2  # Default values for $1 and $2
 steps:
-  - name: parameterized task
-    command: python main.py $1 $2
+  - python main.py $1 $2
 ```
-
-Define default positional parameters.
 
 <a href="/writing-workflows/data-variables#params" class="learn-more">Learn more →</a>
 
@@ -644,11 +457,8 @@ params:
   - BAR: "`echo 2`"  # Command substitution in defaults
   - ENVIRONMENT: dev
 steps:
-  - name: named params task
-    command: python main.py ${FOO} ${BAR} --env=${ENVIRONMENT}
+  - python main.py ${FOO} ${BAR} --env=${ENVIRONMENT}
 ```
-
-Define named parameters with defaults.
 
 <a href="/writing-workflows/data-variables#named-params" class="learn-more">Learn more →</a>
 
@@ -660,15 +470,10 @@ Define named parameters with defaults.
 
 ```yaml
 steps:
-  - name: get-version
-    command: cat VERSION
-    output: VERSION
-  - name: use-version
-    command: echo "Version is ${VERSION}"
-    depends: get-version
+  - command: echo `date +%Y%m%d`
+    output: TODAY
+  - echo "Today's date is ${TODAY}"
 ```
-
-Pass data between steps.
 
 <a href="/writing-workflows/data-variables#output" class="learn-more">Learn more →</a>
 
@@ -683,8 +488,7 @@ Pass data between steps.
 maxOutputSize: 5242880  # 5MB in bytes
 
 steps:
-  - name: large-output
-    command: "cat large-file.txt"
+  - command: "cat large-file.txt"
     output: CONTENT  # Will fail if file exceeds 5MB
 ```
 
@@ -700,16 +504,12 @@ Control output size limits to prevent memory issues.
 
 ```yaml
 steps:
-  - name: redirect stdout
-    command: "echo hello"
+  - command: "echo hello"
     stdout: "/tmp/hello"
   
-  - name: redirect stderr
-    command: "echo error message >&2"
+  - command: "echo error message >&2"
     stderr: "/tmp/error.txt"
 ```
-
-Send output to files instead of capturing.
 
 <a href="/writing-workflows/data-variables#redirect" class="learn-more">Learn more →</a>
 
@@ -721,15 +521,10 @@ Send output to files instead of capturing.
 
 ```yaml
 steps:
-  - name: child DAG
-    run: sub_workflow
+  - run: sub_workflow
     output: SUB_RESULT
-  - name: use nested output
-    command: echo "Result: ${SUB_RESULT.outputs.finalValue}"
-    depends: child DAG
+  - echo "Result: ${SUB_RESULT.outputs.finalValue}"
 ```
-
-Access nested JSON data with path references.
 
 <a href="/writing-workflows/data-variables#json-paths" class="learn-more">Learn more →</a>
 
@@ -741,18 +536,14 @@ Access nested JSON data with path references.
 
 ```yaml
 steps:
-  - name: extract customer data
-    id: extract
+  - id: extract
     command: python extract.py
     output: DATA
-  - name: process if valid
-    command: |
+  - command: |
       echo "Exit code: ${extract.exitCode}"
       echo "Stdout path: ${extract.stdout}"
     depends: extract
 ```
-
-Reference step properties using short IDs.
 
 <a href="/writing-workflows/data-variables#step-references" class="learn-more">Learn more →</a>
 
@@ -766,11 +557,8 @@ Reference step properties using short IDs.
 env:
   TODAY: "`date '+%Y%m%d'`"
 steps:
-  - name: use date
-    command: "echo hello, today is ${TODAY}"
+  - echo hello, today is ${TODAY}
 ```
-
-Use command output in configurations.
 
 <a href="/writing-workflows/data-variables#command-substitution" class="learn-more">Learn more →</a>
 
@@ -788,8 +576,7 @@ Use command output in configurations.
 
 ```yaml
 steps:
-  - name: script step
-    script: |
+  - script: |
       cd /tmp
       echo "hello world" > hello
       cat hello
@@ -808,8 +595,7 @@ Run shell script with default shell.
 
 ```yaml
 steps:
-  - name: python script
-    command: python
+  - command: python
     script: |
       import os
       import datetime
@@ -830,8 +616,7 @@ Execute script with specific interpreter.
 
 ```yaml
 steps:
-  - name: complex-task
-    script: |
+  - script: |
       #!/bin/bash
       set -e
       
@@ -845,8 +630,6 @@ steps:
       echo "Cleaning up"
 ```
 
-Run multi-line scripts.
-
 <a href="/writing-workflows/basics#scripts" class="learn-more">Learn more →</a>
 
 </div>
@@ -856,13 +639,13 @@ Run multi-line scripts.
 ### Working Directory
 
 ```yaml
+workingDir: /tmp
 steps:
-  - name: step in specific directory
-    workingDir: /path/to/working/directory
-    command: pwd && ls -la
+  - pwd               # Outputs: /tmp
+  - mkdir -p data
+  - workingDir: /tmp/data
+    command: pwd      # Outputs: /tmp/data
 ```
-
-Control where each step executes.
 
 <a href="/writing-workflows/basics#working-directory" class="learn-more">Learn more →</a>
 
@@ -874,15 +657,9 @@ Control where each step executes.
 
 ```yaml
 steps:
-  - name: bash specific
-    command: echo hello world | xargs echo
+  - command: echo hello world | xargs echo
     shell: bash
-  
-  - name: with pipes
-    command: echo hello world | xargs echo
 ```
-
-Specify shell or use pipes in commands.
 
 <a href="/writing-workflows/basics#shell" class="learn-more">Learn more →</a>
 
@@ -900,15 +677,12 @@ Specify shell or use pipes in commands.
 
 ```yaml
 steps:
-  - name: build
-    executor:
+  - executor:
       type: docker
       config:
         image: node:18
     command: npm run build
 ```
-
-Run commands in Docker containers.
 
 <a href="/features/executors/docker" class="learn-more">Learn more →</a>
 
@@ -928,17 +702,10 @@ container:
     - ./src:/app
 
 steps:
-  - name: install
-    command: pip install -r requirements.txt
-    
-  - name: test
-    command: pytest tests/
-    
-  - name: build
-    command: python setup.py build
+  - pip install -r requirements.txt
+  - pytest tests/
+  - python setup.py build
 ```
-
-Containerized workflow execution.
 
 <a href="/reference/yaml#container-configuration" class="learn-more">Learn more →</a>
 
@@ -957,16 +724,13 @@ container:
   workingDir: /app
 
 steps:
-  - name: install-deps
-    command: pip install -r requirements.txt
+  - pip install -r requirements.txt
     
-  - name: process-data
-    command: python process.py /data/input.csv
+  - command: python process.py /data/input.csv
     env:
       - DEBUG=true
     
-  - name: generate-report
-    executor:
+  - executor:
       type: docker
       config:
         image: node:20
@@ -974,8 +738,6 @@ steps:
           - ./reports:/reports
     command: node generate-report.js
 ```
-
-Complete containerized workflow.
 
 <a href="/features/executors/docker" class="learn-more">Learn more →</a>
 
@@ -993,15 +755,8 @@ ssh:
   key: ~/.ssh/deploy_key
 
 steps:
-  - name: check-health
-    executor:
-      type: ssh
-    command: curl -f localhost:8080/health
-    
-  - name: restart-service
-    executor:
-      type: ssh
-    command: systemctl restart myapp
+  - curl -f localhost:8080/health
+  - systemctl restart myapp
 ```
 
 <a href="/features/executors/ssh" class="learn-more">Learn more →</a>
@@ -1014,8 +769,7 @@ steps:
 
 ```yaml
 steps:
-  - name: webhook
-    executor:
+  - executor:
       type: http
       config:
         url: https://api.example.com/webhook
@@ -1037,18 +791,19 @@ Make HTTP API calls.
 
 ```yaml
 steps:
-  - name: get-data
-    command: curl -s https://api.example.com/users
+  # Fetch sample users from a public mock API
+  - executor:
+      type: http
+      config:
+        silent: true
+    command: GET https://reqres.in/api/users
     output: API_RESPONSE
-  
-  - name: extract-emails
-    executor: jq
-    command: '.data[] | select(.active == true) | .email'
+   
+  # Extract user emails from the JSON response
+  - executor: jq
+    command: '.data[] | .email'
     script: ${API_RESPONSE}
-    output: USER_EMAILS
 ```
-
-API integration with JSON processing pipeline.
 
 <a href="/features/executors/jq" class="learn-more">Learn more →</a>
 
@@ -1067,11 +822,8 @@ API integration with JSON processing pipeline.
 ```yaml
 schedule: "5 4 * * *"  # Run at 04:05 daily
 steps:
-  - name: scheduled job
-    command: echo "Running scheduled job"
+  - echo "Running scheduled job"
 ```
-
-Use cron expressions to schedule DAGs.
 
 <a href="/features/scheduling" class="learn-more">Learn more →</a>
 
@@ -1082,19 +834,13 @@ Use cron expressions to schedule DAGs.
 ### Skip Redundant Runs
 
 ```yaml
-name: Daily Data Processing
 schedule: "0 */4 * * *"    # Every 4 hours
 skipIfSuccessful: true     # Skip if already succeeded
 steps:
-  - name: extract
-    command: echo "Extracting data"
-  - name: transform
-    command: echo "Transforming data"
-  - name: load
-    command: echo "Loading data"
+  - echo "Extracting data"
+  - echo "Transforming data"
+  - echo "Loading data"
 ```
-
-Prevent unnecessary executions when already successful.
 
 <a href="/features/scheduling#skip-redundant" class="learn-more">Learn more →</a>
 
@@ -1105,15 +851,11 @@ Prevent unnecessary executions when already successful.
 ### Queue Management
 
 ```yaml
-name: batch-job
 queue: "batch"        # Assign to named queue
 maxActiveRuns: 2      # Max concurrent runs
 steps:
-  - name: process
-    command: echo "Processing data"
+  - echo "Processing data"
 ```
-
-Control concurrent DAG execution.
 
 <a href="/features/queues" class="learn-more">Learn more →</a>
 
@@ -1137,8 +879,7 @@ queues:
 queue: "critical"
 maxActiveRuns: 3
 steps:
-  - name: critical-task
-    command: echo "Processing critical task"
+  - echo "Processing critical task"
 ```
 
 Configure queues globally and per-DAG.
@@ -1161,12 +902,9 @@ smtp:
   username: "${SMTP_USER}"
   password: "${SMTP_PASS}"
 steps:
-  - name: critical-job
-    command: echo "Running critical job"
+  - command: echo "Running critical job"
     mailOnError: true
 ```
-
-Send email alerts on events.
 
 <a href="/features/notifications#email" class="learn-more">Learn more →</a>
 
@@ -1183,14 +921,11 @@ Send email alerts on events.
 ### History Retention
 
 ```yaml
-name: data-archiver
 histRetentionDays: 30    # Keep 30 days of history
 schedule: "0 0 * * *"     # Daily at midnight
 steps:
-  - name: archive-old-data
-    command: echo "Archiving old data"
-  - name: cleanup-temp
-    command: rm -rf /tmp/archive/*
+  - echo "Archiving old data"
+  - rm -rf /tmp/archive/*
 ```
 
 Control how long execution history is retained.
@@ -1204,17 +939,12 @@ Control how long execution history is retained.
 ### Output Size Management
 
 ```yaml
-name: log-processor
 maxOutputSize: 10485760   # 10MB max output per step
 steps:
-  - name: process-large-logs
-    command: echo "Analyzing logs"
+  - command: echo "Analyzing logs"
     stdout: /logs/analysis.out
-  - name: summarize
-    command: tail -n 1000 /logs/analysis.out
+  - tail -n 1000 /logs/analysis.out
 ```
-
-Prevent memory issues from large command outputs.
 
 <a href="/reference/yaml#data-fields" class="learn-more">Learn more →</a>
 
@@ -1225,16 +955,13 @@ Prevent memory issues from large command outputs.
 ### Custom Log Directory
 
 ```yaml
-name: etl-pipeline
 logDir: /data/etl/logs/${DAG_NAME}
 histRetentionDays: 90
 steps:
-  - name: extract
-    command: echo "Extracting data"
+  - command: echo "Extracting data"
     stdout: extract.log
     stderr: extract.err
-  - name: transform
-    command: echo "Transforming data"
+  - command: echo "Transforming data"
     stdout: transform.log
 ```
 
@@ -1249,19 +976,15 @@ Organize logs in custom directories with retention.
 ### Timeout & Cleanup
 
 ```yaml
-name: long-running-job
 timeoutSec: 7200          # 2 hour timeout
 maxCleanUpTimeSec: 600    # 10 min cleanup window
 steps:
-  - name: data-processing
-    command: sleep 5 && echo "Processing data"
+  - command: sleep 5 && echo "Processing data"
     signalOnStop: SIGTERM
 handlerOn:
   exit:
     command: echo "Cleaning up resources"
 ```
-
-Ensure workflows don't run forever and clean up properly.
 
 <a href="/reference/yaml#execution-control-fields" class="learn-more">Learn more →</a>
 
@@ -1272,7 +995,6 @@ Ensure workflows don't run forever and clean up properly.
 ### Production Monitoring
 
 ```yaml
-name: critical-service
 histRetentionDays: 365    # Keep 1 year for compliance
 maxOutputSize: 5242880    # 5MB output limit
 maxActiveRuns: 1          # No overlapping runs
@@ -1294,14 +1016,11 @@ handlerOn:
         -H "Content-Type: application/json" \
         -d '{"service": "critical-service", "status": "failed"}'
 steps:
-  - name: health-check
-    command: echo "Checking health"
+  - command: echo "Checking health"
     retryPolicy:
       limit: 3
       intervalSec: 30
 ```
-
-Production-ready configuration with monitoring and alerts.
 
 <a href="/reference/yaml" class="learn-more">Learn more →</a>
 
@@ -1312,7 +1031,6 @@ Production-ready configuration with monitoring and alerts.
 ### Distributed Tracing
 
 ```yaml
-name: data-pipeline
 otel:
   enabled: true
   endpoint: "otel-collector:4317"
@@ -1320,14 +1038,9 @@ otel:
     service.name: "dagu-${DAG_NAME}"
     deployment.environment: "${ENV}"
 steps:
-  - name: fetch-data
-    command: echo "Fetching data"
-  - name: process-data
-    command: python process.py
-    depends: fetch-data
-  - name: run-sub-pipeline
-    run: pipelines/transform
-    depends: process-data
+  - echo "Fetching data"
+  - python process.py
+  - run: pipelines/transform
 ```
 
 Enable OpenTelemetry tracing for observability.
@@ -1341,7 +1054,6 @@ Enable OpenTelemetry tracing for observability.
 ### Execution Control
 
 ```yaml
-name: batch-processor
 maxActiveSteps: 5         # Max 5 parallel steps
 maxActiveRuns: 2          # Max 2 concurrent DAG runs
 delaySec: 10              # 10 second initial delay
@@ -1360,8 +1072,6 @@ steps:
     depends: validate
 ```
 
-Control concurrency and execution behavior.
-
 <a href="/reference/yaml#execution-control-fields" class="learn-more">Learn more →</a>
 
 </div>
@@ -1371,20 +1081,14 @@ Control concurrency and execution behavior.
 ### Queue Assignment
 
 ```yaml
-name: heavy-computation
 queue: compute-queue      # Assign to specific queue
 histRetentionDays: 60     # Keep 60 days history
 maxOutputSize: 20971520   # 20MB output limit
 steps:
-  - name: prepare-data
-    command: echo "Preparing data"
-  - name: run-computation
-    command: echo "Running intensive computation"
-  - name: store-results
-    command: echo "Storing results"
+  - echo "Preparing data"
+  - echo "Running intensive computation"
+  - echo "Storing results"
 ```
-
-Use queues to manage workflow execution priority and concurrency.
 
 <a href="/features/queues" class="learn-more">Learn more →</a>
 
@@ -1408,21 +1112,14 @@ container:
     - ./data:/data
 
 steps:
-  - name: prepare-data
-    command: python -m nbconvert --execute prepare.ipynb
-    
-  - name: train-model
-    executor:
+  - python -m nbconvert --execute prepare.ipynb
+  - executor:
       type: docker
       config:
         image: tensorflow/tensorflow:latest-gpu
     command: python train.py --epochs=100
-    
-  - name: evaluate
-    command: python evaluate.py
+  - python evaluate.py
 ```
-
-ML pipeline with specialized containers.
 
 <a href="/features/executors/docker" class="learn-more">Learn more →</a>
 
@@ -1443,17 +1140,12 @@ container:
     - "5432:5432"
 
 steps:
-  - name: start-db
-    command: postgres -D /var/lib/postgresql/data
-    
-  - name: wait-for-db
-    command: pg_isready -U postgres -h localhost
+  - postgres -D /var/lib/postgresql/data
+  - command: pg_isready -U postgres -h localhost
     retryPolicy:
       limit: 10
       intervalSec: 2
 ```
-
-Keep container running for entire workflow.
 
 <a href="/reference/yaml#container-configuration" class="learn-more">Learn more →</a>
 
@@ -1471,12 +1163,9 @@ Keep container running for entire workflow.
 
 ```yaml
 steps:
-  - name: data-pipeline
-    run: etl.yaml
+  - run: etl.yaml
     params: "ENV=prod DATE=today"
-  - name: analyze
-    run: analyze.yaml
-    depends: data-pipeline
+  - run: analyze.yaml
 ```
 
 ```mermaid
@@ -1505,8 +1194,6 @@ graph TD
     style G stroke:lightblue,stroke-width:1.6px,color:#333
 ```
 
-Compose workflows from reusable parts.
-
 <a href="/features/executors/dag" class="learn-more">Learn more →</a>
 
 </div>
@@ -1516,10 +1203,8 @@ Compose workflows from reusable parts.
 ### Multiple DAGs in One File
 
 ```yaml
-name: main-workflow
 steps:
-  - name: process-data
-    run: data-processor
+  - run: data-processor
     params: "TYPE=daily"
 
 ---
@@ -1528,13 +1213,9 @@ name: data-processor
 params:
   - TYPE: "batch"
 steps:
-  - name: extract
-    command: echo "Extracting ${TYPE} data"
-  - name: transform
-    command: echo "Transforming data"
+  - echo "Extracting ${TYPE} data"
+  - echo "Transforming data"
 ```
-
-Define multiple workflows in a single file.
 
 <a href="/writing-workflows/advanced#multiple-dags" class="learn-more">Learn more →</a>
 
@@ -1545,7 +1226,6 @@ Define multiple workflows in a single file.
 ### Complete DAG Configuration
 
 ```yaml
-name: production-etl
 description: Daily ETL pipeline for analytics
 schedule: "0 2 * * *"
 skipIfSuccessful: true
@@ -1578,36 +1258,7 @@ steps:
     command: echo "Validating environment: ${ENVIRONMENT}"
 ```
 
-Complete DAG with all configuration options.
-
 <a href="/reference/yaml" class="learn-more">Learn more →</a>
-
-</div>
-
-<div class="example-card">
-
-### Steps as Map vs Array
-
-```yaml
-# Steps as array (recommended)
-steps:
-  - echo "hello"
-  - echo "world"  # Runs after first step automatically
-
----
-
-# Steps as map (alternative)
-steps:
-  step1:
-    command: echo "hello"
-  step2:
-    command: echo "world"
-    depends: step1
-```
-
-Two ways to define steps.
-
-<a href="/writing-workflows/basics#step-definition" class="learn-more">Learn more →</a>
 
 </div>
 
@@ -1623,16 +1274,10 @@ Two ways to define steps.
 ### GPU Task Routing
 
 ```yaml
-name: ml-training-pipeline
 steps:
-  - name: prepare-data
-    command: python prepare_dataset.py
-    
-  - name: train-model
-    run: train-model
-    
-  - name: evaluate-model
-    run: evaluate-model
+  - python prepare_dataset.py
+  - run: train-model
+  - run: evaluate-model
 
 ---
 name: train-model
@@ -1641,19 +1286,15 @@ workerSelector:
   cuda: "11.8"
   memory: "64G"
 steps:
-  - name: train-model
-    command: python train.py --gpu
+  - python train.py --gpu
 
 ---
 name: evaluate-model
 workerSelector:
   gpu: "true"
 steps:
-  - name: evaluate-model
-    command: python evaluate.py
+  - python evaluate.py
 ```
-
-Route GPU tasks to GPU-enabled workers.
 
 <a href="/features/distributed-execution" class="learn-more">Learn more →</a>
 
@@ -1664,20 +1305,15 @@ Route GPU tasks to GPU-enabled workers.
 ### Mixed Local and Distributed
 
 ```yaml
-name: hybrid-workflow
 steps:
   # Runs on any available worker (local or remote)
-  - name: fetch-data
-    command: wget https://data.example.com/dataset.tar.gz
+  - wget https://data.example.com/dataset.tar.gz
     
   # Must run on specific worker type
-  - name: process-on-gpu
-    run: process-on-gpu
+  - run: process-on-gpu
     
   # Runs locally (no selector)
-  - name: notify-completion
-    command: echo "Processing complete"
-    depends: process-on-gpu
+  - echo "Processing complete"
 
 ---
 name: process-on-gpu
@@ -1685,11 +1321,8 @@ workerSelector:
   gpu: "true"
   gpu-model: "nvidia-a100"
 steps:
-  - name: process-on-gpu
-    command: python gpu_process.py
+  - python gpu_process.py
 ```
-
-Combine local and distributed execution.
 
 <a href="/features/distributed-execution#task-routing" class="learn-more">Learn more →</a>
 
@@ -1700,21 +1333,17 @@ Combine local and distributed execution.
 ### Parallel Distributed Tasks
 
 ```yaml
-name: distributed-batch-processing
 steps:
-  - name: split-data
-    command: python split_data.py --chunks=10
+  - command: python split_data.py --chunks=10
     output: CHUNKS
     
-  - name: process-chunks
-    run: chunk-processor
+  - run: chunk-processor
     parallel:
       items: ${CHUNKS}
       maxConcurrent: 5
     params: "CHUNK=${ITEM}"
     
-  - name: merge-results
-    command: python merge_results.py
+  - python merge_results.py
 
 ---
 name: chunk-processor
@@ -1724,22 +1353,11 @@ workerSelector:
 params:
   - CHUNK: ""
 steps:
-  - name: process
-    command: python process_chunk.py ${CHUNK}
+  - python process_chunk.py ${CHUNK}
 ```
-
-Distribute parallel tasks across workers.
 
 <a href="/features/execution-control#parallel" class="learn-more">Learn more →</a>
 
 </div>
 
 </div>
-
-## Learn More
-
-- [Writing Workflows Guide](/writing-workflows/) - Complete guide to building workflows
-- [Feature Documentation](/features/) - Deep dive into all features
-- [Configuration Reference](/reference/yaml) - Complete YAML specification
-- [Distributed Execution](/features/distributed-execution) - Scale across multiple machines
-- [Worker Labels](/features/worker-labels) - Task routing with labels

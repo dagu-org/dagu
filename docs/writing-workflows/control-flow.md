@@ -25,37 +25,10 @@ steps:
   - name: download-b
     command: wget https://example.com/b.zip
     
-  - name: merge
-    command: echo "Merging a.zip and b.zip"
+  - command: echo "Merging a.zip and b.zip"
     depends:
       - download-a
       - download-b
-```
-
-### Complex Dependency Graphs
-
-```yaml
-steps:
-  - name: setup
-    command: echo "Setting up environment"
-    
-  - name: test-unit
-    command: echo "Running unit tests"
-    depends: setup
-    
-  - name: test-integration
-    command: echo "Running integration tests"
-    depends: setup
-    
-  - name: build
-    command: echo "Building application"
-    depends:
-      - test-unit
-      - test-integration
-      
-  - name: deploy
-    command: echo "Deploying application"
-    depends: build
 ```
 
 ## Conditional Execution
@@ -66,8 +39,7 @@ Run steps only when conditions are met.
 
 ```yaml
 steps:
-  - name: production-only
-    command: echo "Deploying to production"
+  - command: echo "Deploying to production"
     preconditions:
       - condition: "${ENVIRONMENT}"
         expected: "production"
@@ -77,8 +49,7 @@ steps:
 
 ```yaml
 steps:
-  - name: check-branch
-    command: echo "Deploying application"
+  - command: echo "Deploying application"
     preconditions:
       - condition: "`git branch --show-current`"
         expected: "main"
@@ -88,8 +59,8 @@ steps:
 
 ```yaml
 steps:
-  - name: weekday-only
-    command: echo "Running batch job"
+  # Run only on weekdays
+  - command: echo "Running batch job"
     preconditions:
       - condition: "`date +%u`"
         expected: "re:[1-5]"  # Monday-Friday
@@ -106,8 +77,7 @@ All conditions must pass:
 
 ```yaml
 steps:
-  - name: conditional-deploy
-    command: echo "Deploying application"
+  - command: echo "Deploying application"
     preconditions:
       - condition: "${ENVIRONMENT}"
         expected: "production"
@@ -121,8 +91,7 @@ steps:
 
 ```yaml
 steps:
-  - name: process-if-exists
-    command: echo "Processing"
+  - command: echo "Processing"
     preconditions:
       - condition: "test -f /data/input.csv"
       - condition: "test -d /output"
@@ -138,8 +107,7 @@ The 'while' mode repeats a step while a condition is true.
 
 ```yaml
 steps:
-  - name: wait-for-service
-    command: nc -z localhost 8080
+  - command: nc -z localhost 8080
     repeatPolicy:
       repeat: while
       exitCode: [1]      # Repeat WHILE connection fails (exit code 1)
@@ -153,8 +121,7 @@ The 'until' mode repeats a step until a condition becomes true.
 
 ```yaml
 steps:
-  - name: wait-for-completion
-    command: check-job-status.sh
+  - command: check-job-status.sh
     output: STATUS
     repeatPolicy:
       repeat: until
@@ -169,8 +136,7 @@ steps:
 #### While Process is Running
 ```yaml
 steps:
-  - name: monitor-process
-    command: pgrep -f "my-app"
+  - command: pgrep -f "my-app"
     repeatPolicy:
       repeat: while
       exitCode: [0]      # Exit code 0 means process found
@@ -180,8 +146,7 @@ steps:
 #### Until File Exists
 ```yaml
 steps:
-  - name: wait-for-output
-    command: test -f /tmp/output.csv
+  - command: test -f /tmp/output.csv
     repeatPolicy:
       repeat: until
       exitCode: [0]      # Exit code 0 means file exists
@@ -192,8 +157,7 @@ steps:
 #### While Condition with Output
 ```yaml
 steps:
-  - name: keep-alive
-    command: curl -s http://api/health
+  - command: curl -s http://api/health
     output: HEALTH_STATUS
     repeatPolicy:
       repeat: while
@@ -209,8 +173,7 @@ Gradually increase intervals between repeat attempts:
 ```yaml
 steps:
   # Exponential backoff with while mode
-  - name: wait-for-service-backoff
-    command: nc -z localhost 8080
+  - command: nc -z localhost 8080
     repeatPolicy:
       repeat: while
       exitCode: [1]        # Repeat while connection fails
@@ -220,8 +183,7 @@ steps:
       # Intervals: 1s, 2s, 4s, 8s, 16s, 32s...
       
   # Custom backoff multiplier with until mode
-  - name: monitor-job-backoff
-    command: check-job-status.sh
+  - command: check-job-status.sh
     output: STATUS
     repeatPolicy:
       repeat: until
@@ -233,8 +195,7 @@ steps:
       # Intervals: 5s, 7.5s, 11.25s, 16.875s...
       
   # Backoff with max interval cap
-  - name: poll-api-capped
-    command: curl -s https://api.example.com/status
+  - command: curl -s https://api.example.com/status
     output: API_STATUS
     repeatPolicy:
       repeat: until
@@ -249,93 +210,60 @@ steps:
 
 **Backoff Formula**: `interval * (backoff ^ attemptCount)`
 
-**Use Cases**:
-- **Service startup**: Start checking frequently, then reduce load
-- **API polling**: Avoid rate limits with increasing intervals  
-- **Resource monitoring**: Balance responsiveness with efficiency
-
-### Legacy Format (Deprecated)
-
-The old boolean format is still supported but deprecated:
-
-```yaml
-steps:
-  - name: old-style
-    command: echo "Checking status"
-    repeatPolicy:
-      repeat: true       # Deprecated: use 'while' or 'until' instead
-      intervalSec: 60
-```
-
 ## Continue On Conditions
-
-Control workflow behavior when steps fail or produce specific outputs.
 
 ### Continue on Failure
 
 ```yaml
 steps:
-  - name: optional-cleanup
-    command: echo "Cleaning up"
+  - command: echo "Cleaning up"
     continueOn:
       failure: true
-      
-  - name: main-process
-    command: echo "Processing"
+  - echo "Processing"
 ```
 
 ### Continue on Specific Exit Codes
 
 ```yaml
 steps:
-  - name: check-optional
-    command: echo "Checking status"
+  - command: echo "Checking status"
     continueOn:
       exitCode: [0, 1, 2]  # Continue on these codes
-      
-  - name: process
-    command: echo "Processing"
+  - echo "Processing"
 ```
 
 ### Continue on Output Match
 
 ```yaml
 steps:
-  - name: validate
-    command: echo "Validating"
+  - command: echo "Validating"
     continueOn:
       output: 
         - "WARNING"
         - "SKIP"
         - "re:^\[WARN\]"        # Regex: lines starting with [WARN]
         - "re:error.*ignored"   # Regex: error...ignored pattern
-      
-  - name: process
-    command: echo "Processing"
+  - echo "Processing"
 ```
 
 ### Continue on Skipped
 
 ```yaml
 steps:
-  - name: optional-feature
-    command: echo "Enabling feature"
+  - command: echo "Enabling feature"
     preconditions:
       - condition: "${FEATURE_FLAG}"
         expected: "enabled"
     continueOn:
       skipped: true  # Continue even if precondition fails
-      
-  - name: main-process
-    command: echo "Processing"  # Runs regardless of optional feature
+  - echo "Processing"  # Runs regardless of optional feature
 ```
 
 ### Mark as Success
 
 ```yaml
 steps:
-  - name: best-effort
-    command: echo "Running optional task"
+  - command: echo "Running optional task"
     continueOn:
       failure: true
       markSuccess: true  # Mark step as successful
@@ -348,8 +276,7 @@ Combine multiple conditions for sophisticated control flow:
 ```yaml
 steps:
   # Tool with complex exit code meanings
-  - name: analysis-tool
-    command: echo "Analyzing data"
+  - command: echo "Analyzing data"
     continueOn:
       exitCode: [0, 3, 4, 5]  # Various non-error states
       output:
@@ -358,21 +285,18 @@ steps:
       markSuccess: true
       
   # Graceful degradation pattern
-  - name: try-advanced-method
-    command: echo "Processing with advanced settings"
+  - command: echo "Processing with advanced settings"
     continueOn:
       failure: true
       output: ["FALLBACK REQUIRED", "re:.*not available.*"]
       
-  - name: fallback-method
-    command: echo "Processing with simple settings"
+  - command: echo "Processing with simple settings"
     preconditions:
       - condition: "${TRY_ADVANCED_METHOD_EXIT_CODE}"
         expected: "re:[1-9][0-9]*"
         
   # Skip pattern with continuation
-  - name: optional-feature
-    command: echo "Running feature"
+  - command: echo "Running feature"
     preconditions:
       - condition: "${ENABLE_FEATURE}"
         expected: "true"
@@ -392,8 +316,7 @@ preconditions:
     expected: "re:[1-5]"  # Weekdays only
 
 steps:
-  - name: process
-    command: echo "Running daily job"
+  - echo "Running daily job"
 ```
 
 ### Skip If Already Successful
@@ -403,8 +326,7 @@ schedule: "0 * * * *"  # Every hour
 skipIfSuccessful: true  # Skip if already ran successfully today (e.g., run manually)
 
 steps:
-  - name: hourly-sync
-    command: echo "Syncing data"
+  - echo "Syncing data"
 ```
 
 ## Advanced Patterns
@@ -416,27 +338,18 @@ params:
   - ACTION: "deploy"
 
 steps:
-  - name: build
-    command: echo "Building application"
+  - command: echo "Building application"
     preconditions:
       - condition: "${ACTION}"
         expected: "re:build|deploy"
         
-  - name: test
-    command: echo "Running tests"
+  - command: echo "Running tests"
     preconditions:
       - condition: "${ACTION}"
         expected: "re:test|deploy"
     
-  - name: deploy
-    command: echo "Deploying application"
+  - command: echo "Deploying application"
     preconditions:
       - condition: "${ACTION}"
         expected: "deploy"
 ```
-
-## See Also
-
-- [Error Handling](/writing-workflows/error-handling) - Handle failures gracefully
-- [Data & Variables](/writing-workflows/data-variables) - Pass data between steps
-- [Basics](/writing-workflows/basics) - Workflow fundamentals
