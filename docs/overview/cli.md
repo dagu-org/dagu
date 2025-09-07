@@ -198,6 +198,9 @@ dagu enqueue --run-id=custom-001 my-workflow.yaml
 # Add to queue with parameters
 dagu enqueue my-workflow.yaml -- KEY=value
 
+# Add to queue using a specific queue (override)
+dagu enqueue --queue=high-priority my-workflow.yaml
+
 # Remove from queue (requires DAG-name:run-id format)
 dagu dequeue --dag-run=my-workflow:custom-001
 ```

@@ -1521,6 +1521,8 @@ export interface operations {
                     params?: string;
                     /** @description Optional ID for the DAG-run, if not provided a new one will be generated */
                     dagRunId?: string;
+                    /** @description Override the DAG-level queue definition */
+                    queue?: string;
                 };
             };
         };

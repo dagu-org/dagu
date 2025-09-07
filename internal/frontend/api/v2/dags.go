@@ -604,6 +604,11 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		}
 	}
 
+	// Apply queue override if provided
+	if request.Body != nil && request.Body.Queue != nil && *request.Body.Queue != "" {
+		dag.Queue = *request.Body.Queue
+	}
+
 	dagRunId := valueOf(request.Body.DagRunId)
 	if dagRunId == "" {
 		var err error
@@ -647,10 +652,16 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 }
 
 func (a *API) enqueueDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunID string) error {
-	if err := a.dagRunMgr.EnqueueDAGRun(ctx, dag, dagrun.EnqueueOptions{
+	opts := dagrun.EnqueueOptions{
 		Params:   params,
 		DAGRunID: dagRunID,
-	}); err != nil {
+	}
+	if dag.Queue != "" {
+		opts.Queue = dag.Queue
+	}
+
+	// Enqueue the DAG-run
+	if err := a.dagRunMgr.EnqueueDAGRun(ctx, dag, opts); err != nil {
 		return fmt.Errorf("error enqueuing DAG: %w", err)
 	}
 

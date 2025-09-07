@@ -42,6 +42,11 @@ steps:
 			Args:        []string{"enqueue", `--run-id="test-dag-run"`, dagEnqueue.Location},
 			ExpectedOut: []string{"test-dag-run"},
 		},
+		{
+			Name:        "EnqueueWithQueueOverride",
+			Args:        []string{"enqueue", `--queue="custom-queue"`, dagEnqueue.Location},
+			ExpectedOut: []string{"Enqueued"},
+		},
 	}
 
 	for _, tc := range tests {

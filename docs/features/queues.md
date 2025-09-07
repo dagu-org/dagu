@@ -89,6 +89,9 @@ dagu enqueue workflow.yaml --run-id=batch-2024-01-15
 
 # With parameters
 dagu enqueue process.yaml -- DATE=2024-01-15 TYPE=daily
+
+# Override the queue at enqueue-time
+dagu enqueue --queue=high-priority workflow.yaml
 ```
 
 ### Remove from Queue

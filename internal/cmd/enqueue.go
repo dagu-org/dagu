@@ -26,7 +26,7 @@ Example:
 	)
 }
 
-var enqueueFlags = []commandLineFlag{paramsFlag, dagRunIDFlag}
+var enqueueFlags = []commandLineFlag{paramsFlag, dagRunIDFlag, queueFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
 	// Get Run ID from the context or generate a new one
@@ -45,11 +45,23 @@ func runEnqueue(ctx *Context, args []string) error {
 		return fmt.Errorf("invalid Run ID: %w", err)
 	}
 
+	// Get queue override from the context
+	queueOverride, err := ctx.StringParam("queue")
+	if err != nil {
+		return fmt.Errorf("failed to get queue override: %w", err)
+	}
+
 	// Load parameters and DAG
 	dag, _, err := loadDAGWithParams(ctx, args)
 	if err != nil {
 		return err
 	}
+
+	// Apply queue override if provided
+	if queueOverride != "" {
+		dag.Queue = queueOverride
+	}
+
 	// Queued dag-runs must not have a location because it is used to generate
 	// unix pipe. If two DAGs has same location, they can not run at the same time.
 	// Queued DAGs can be run at the same time depending on the `maxActiveRuns` setting.

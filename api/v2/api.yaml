@@ -338,6 +338,9 @@ paths:
                 dagRunId:
                   type: string
                   description: "Optional ID for the DAG-run, if not provided a new one will be generated"
+                queue:
+                  type: string
+                  description: "Override the DAG-level queue definition"
       responses:
         "200":
           description: "A successful response"

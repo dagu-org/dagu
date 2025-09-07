@@ -232,6 +232,10 @@ func (m *Manager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts Enqueu
 		args = append(args, "--config")
 		args = append(args, m.configFile)
 	}
+	if opts.Queue != "" {
+		args = append(args, "--queue")
+		args = append(args, opts.Queue)
+	}
 	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(m.executable, args...)
@@ -577,6 +581,7 @@ type EnqueueOptions struct {
 	Params   string // Parameters to pass to the DAG
 	Quiet    bool   // Whether to run in quiet mode
 	DAGRunID string // ID for the dag-run
+	Queue    string // Queue name to enqueue to
 }
 
 // RestartOptions contains options for restarting a dag-run.

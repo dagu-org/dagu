@@ -203,10 +203,13 @@ dagu enqueue [options] DAG_FILE [-- PARAMS...]
 **Options:**
 - `--run-id, -r` - Custom run ID
 - `--params, -p` - Parameters as JSON
+- `--queue, -u` - Override DAG-level queue name for this enqueue
 
 ```bash
 dagu enqueue my-workflow.yaml
 dagu enqueue --run-id=batch-001 etl.yaml -- TYPE=daily
+# Enqueue to a specific queue (override)
+dagu enqueue --queue=high-priority my-workflow.yaml
 ```
 
 ### `dequeue`
