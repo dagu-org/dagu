@@ -124,6 +124,13 @@ var (
 		required:  true,
 	}
 
+	// queueFlag is used to override the DAG-level queue definition.
+	queueFlag = commandLineFlag{
+		name:      "queue",
+		shorthand: "u",
+		usage:     "Override the DAG-level queue definition",
+	}
+
 	// rootDAGRunFlag reads the root DAG name for starting a child dag-run.
 	rootDAGRunFlag = commandLineFlag{
 		name:  "root",

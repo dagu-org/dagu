@@ -285,10 +285,9 @@ paths:
                 dagRunId:
                   type: string
                   description: "Optional ID for the DAG-run, if not provided a new one will be generated"
-                singleton:
-                  type: boolean
-                  description: "If true, prevent starting if DAG is already running (returns 409 conflict)"
-                  default: false
+                queue:
+                  type: string
+                  description: "Override the DAG-level queue definition"
       responses:
         "200":
           description: "A successful response"
@@ -338,6 +337,9 @@ paths:
                 dagRunId:
                   type: string
                   description: "Optional ID for the DAG-run, if not provided a new one will be generated"
+                queue:
+                  type: string
+                  description: "Override the DAG-level queue definition"
       responses:
         "200":
           description: "A successful response"
