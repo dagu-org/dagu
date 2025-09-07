@@ -91,20 +91,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 	for _, queuedItem := range allQueued {
 		dagRunRef := queuedItem.Data()
 
-		// Determine queue name from the DAG
-		dag, err := a.dagStore.GetDetails(ctx, dagRunRef.Name)
-		if err != nil {
-			continue // Skip if we can't find the DAG
-		}
-
-		queueName := dag.Queue
-		if queueName == "" {
-			queueName = dag.Name
-		}
-
-		queue := getOrCreateQueue(queueMap, queueName, a.config, dag)
-
-		// Get the DAG run status to convert to summary
+		// Get the DAG run attempt to read the status with queue override
 		attempt, err := a.dagRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			continue // Skip if we can't find the attempt
@@ -116,11 +103,39 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 		}
 
 		// Only include if status is actually queued
-		if runStatus.Status == status.Queued {
-			runSummary := toDAGRunSummary(*runStatus)
-			queue.queued = append(queue.queued, runSummary)
-			totalQueued++
+		if runStatus.Status != status.Queued {
+			continue
 		}
+
+		// Determine queue name - use stored queue override if available, otherwise use DAG definition
+		var queueName string
+		if runStatus.Queue != "" {
+			// Use the stored queue override
+			queueName = runStatus.Queue
+		} else {
+			// Fall back to DAG definition
+			dag, err := a.dagStore.GetDetails(ctx, dagRunRef.Name)
+			if err != nil {
+				continue // Skip if we can't find the DAG
+			}
+			queueName = dag.Queue
+			if queueName == "" {
+				queueName = dag.Name
+			}
+		}
+
+		// Get the DAG for queue configuration
+		dag, err := a.dagStore.GetDetails(ctx, dagRunRef.Name)
+		if err != nil {
+			continue // Skip if we can't find the DAG
+		}
+
+		queue := getOrCreateQueue(queueMap, queueName, a.config, dag)
+
+		// Convert to summary and add to queue
+		runSummary := toDAGRunSummary(*runStatus)
+		queue.queued = append(queue.queued, runSummary)
+		totalQueued++
 	}
 
 	// Convert map to slice and calculate total capacity

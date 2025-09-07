@@ -135,7 +135,7 @@ func runStart(ctx *Context, args []string) error {
 		}
 
 		// Enqueue the DAG-run for execution
-		return enqueueDAGRun(ctx, dag, dagRunID)
+		return enqueueDAGRun(ctx, dag, dagRunID, "")
 	}
 
 	return err // return executed result

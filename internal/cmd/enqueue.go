@@ -82,11 +82,11 @@ func runEnqueue(ctx *Context, args []string) error {
 		return fmt.Errorf("DAG %s is already in the queue (maxActiveRuns=%d), cannot enqueue", dag.Name, dag.MaxActiveRuns)
 	}
 
-	return enqueueDAGRun(ctx, dag, runID)
+	return enqueueDAGRun(ctx, dag, runID, queueOverride)
 }
 
 // enqueueDAGRun enqueues a dag-run to the queue.
-func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
+func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID, queueOverride string) error {
 	// Check if queues are enabled
 	if !ctx.Config.Queues.Enabled {
 		return fmt.Errorf("queues are disabled in configuration")
@@ -117,6 +117,11 @@ func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
 			digraph.NewDAGRunRef(dag.Name, dagRunID),
 			digraph.DAGRunRef{},
 		),
+	}
+
+	// Add queue override if provided
+	if queueOverride != "" {
+		opts = append(opts, models.WithQueue(queueOverride))
 	}
 
 	// As a prototype, we save the status to the database to enqueue the dag-run.

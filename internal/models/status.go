@@ -66,6 +66,13 @@ func WithAttemptID(attemptID string) StatusOption {
 	}
 }
 
+// WithQueue returns a StatusOption that sets the queue name
+func WithQueue(queue string) StatusOption {
+	return func(s *DAGRunStatus) {
+		s.Queue = queue
+	}
+}
+
 // WithQueuedAt returns a StatusOption that sets the finished time
 func WithQueuedAt(formattedTime string) StatusOption {
 	return func(s *DAGRunStatus) {
@@ -194,6 +201,7 @@ type DAGRunStatus struct {
 	Params        string               `json:"params,omitempty"`
 	ParamsList    []string             `json:"paramsList,omitempty"`
 	Preconditions []*digraph.Condition `json:"preconditions,omitempty"`
+	Queue         string               `json:"queue,omitempty"`
 }
 
 // DAGRun returns a reference to the dag-run associated with this status
