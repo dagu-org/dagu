@@ -172,14 +172,14 @@ func TestPollerErrorHandling(t *testing.T) {
 			}
 		}
 
-		executorError := fmt.Errorf("execution failed")
-		var executionAttempted atomic.Bool
-		mockExecutor := &mockTaskExecutor{
-			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
-				executionAttempted.Store(true)
-				return executorError
-			},
-		}
+        executorError := fmt.Errorf("execution failed")
+        var executionAttempted atomic.Bool
+        mockExecutor := &mockTaskExecutor{
+            ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
+                executionAttempted.Store(true)
+                return executorError
+            },
+        }
 
 		labels := make(map[string]string)
 		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
@@ -191,8 +191,8 @@ func TestPollerErrorHandling(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 		cancel()
 
-		// Verify execution was attempted despite error
-		assert.True(t, executionAttempted.Load())
+        // Verify execution was attempted despite error
+        assert.True(t, executionAttempted.Load())
 	})
 
 	t.Run("ContinueOnPollError", func(t *testing.T) {
@@ -215,14 +215,14 @@ func TestPollerErrorHandling(t *testing.T) {
 			return &coordinatorv1.Task{DagRunId: "success-after-retry"}, nil
 		}
 
-		var taskExecuted atomic.Bool
-		mockExecutor := &mockTaskExecutor{
-			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
-				taskExecuted.Store(true)
-				cancel() // Stop after execution
-				return nil
-			},
-		}
+        var taskExecuted atomic.Bool
+        mockExecutor := &mockTaskExecutor{
+            ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
+                taskExecuted.Store(true)
+                cancel() // Stop after execution
+                return nil
+            },
+        }
 
 		labels := make(map[string]string)
 		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
@@ -231,7 +231,7 @@ func TestPollerErrorHandling(t *testing.T) {
 		poller.Run(ctx)
 
 		// Should have retried and eventually succeeded
-		assert.True(t, taskExecuted.Load())
+        assert.True(t, taskExecuted.Load())
 		assert.GreaterOrEqual(t, atomic.LoadInt32(&pollAttempts), int32(4))
 	})
 }
