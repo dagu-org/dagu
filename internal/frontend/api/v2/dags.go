@@ -642,7 +642,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		}
 	}
 
-	if err := a.enqueueDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId, valueOf(request.Body.Queue)); err != nil {
+	if err := a.enqueueDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId); err != nil {
 		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
 	}
 
@@ -651,14 +651,13 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	}, nil
 }
 
-func (a *API) enqueueDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunID, queue string) error {
-	if err := a.dagRunMgr.EnqueueDAGRun(ctx, dag, dagrun.EnqueueOptions{
-		Params:   params,
-		DAGRunID: dagRunID,
-		Queue:    queue,
-	}); err != nil {
-		return fmt.Errorf("error enqueuing DAG: %w", err)
-	}
+func (a *API) enqueueDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunID string) error {
+    if err := a.dagRunMgr.EnqueueDAGRun(ctx, dag, dagrun.EnqueueOptions{
+        Params:   params,
+        DAGRunID: dagRunID,
+    }); err != nil {
+        return fmt.Errorf("error enqueuing DAG: %w", err)
+    }
 
 	// Wait for the DAG to be enqueued
 	timer := time.NewTimer(3 * time.Second)
