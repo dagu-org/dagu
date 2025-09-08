@@ -3,6 +3,7 @@ package scheduler
 import (
 	"bufio"
 	"io"
+	"sync"
 )
 
 // flushableMultiWriter creates a MultiWriter that can flush all underlying writers
@@ -51,4 +52,28 @@ func (fw *flushableMultiWriter) Flush() error {
 		}
 	}
 	return lastErr
+}
+
+// safeBufferedWriter wraps bufio.Writer with a mutex to make concurrent
+// Write and Flush safe across goroutines.
+type safeBufferedWriter struct {
+	mu sync.Mutex
+	bw *bufio.Writer
+}
+
+// newSafeBufferedWriter creates a thread-safe buffered writer
+func newSafeBufferedWriter(w io.Writer) *safeBufferedWriter {
+	return &safeBufferedWriter{bw: bufio.NewWriter(w)}
+}
+
+func (s *safeBufferedWriter) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.bw.Write(p)
+}
+
+func (s *safeBufferedWriter) Flush() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.bw.Flush()
 }
