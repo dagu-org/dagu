@@ -144,58 +144,35 @@ Visit http://localhost:8080
 
 ## Docker-Compose
 
-Dagu supports running multiple services in high-availability (HA) mode. 
-
-### 1. Create a `compose.yml` file in your project directory.
-
-```yaml
-services:
-  dagu-1:
-    image: ghcr.io/dagu-org/dagu:latest
-    volumes:
-      - ./dagu:/var/lib/dagu
-    environment:
-      - DAGU_COORDINATOR_PORT=50055
-    ports:
-      - 8080:8080
-      - 50055:50055
-    command: ["dagu", "start-all"]
-
-  dagu-2:
-    image: ghcr.io/dagu-org/dagu:latest
-    volumes:
-      - ./dagu:/var/lib/dagu
-    environment:
-      - DAGU_COORDINATOR_PORT=50056 # Use a different port for the second instance
-    ports:
-      - 8081:8080
-      - 50056:50056
-    command: ["dagu", "start-all"]
-
-volumes:
-  dagu:
-    driver: local
-```
-
-Notes:
-- If the primary scheduler instance fails, the standby instance will automatically take over. The web servers are stateless and can be scaled horizontally using shared storage. For more details, see the [High Availability](https://docs.dagu.cloud/features/scheduling#high-availability) documentation.
-- Port `50055` is used for gRPC communication between the coordinator and its workers. For more information, refer to the [Distributed Execution](https://docs.dagu.cloud/features/distributed-execution) documentation.
-- Dagu uses a shared volume for service registry, so you must set a unique `DAGU_COORDINATOR_PORT` for each service instance if they are running on the same host.
-- If you are not running separate workers and instead execute DAGs locally on the scheduler instances, you can omit the `DAGU_COORDINATOR_PORT` environment variable.
-
-### 2. Start Docker Compose
-
-You can now start Dagu by typing:
+Clone the repository and run with Docker Compose:
 
 ```bash
-docker compose up -d
+git clone https://github.com/dagu-org/dagu.git
+cd dagu
 ```
 
-To stop the containers, run:
+Run with minimal setup:
 
 ```bash
-docker compose stop
+docker compose -f compose.minimal.yaml up -d
+# Visit http://localhost:8080
 ```
+
+Stop containers:
+
+```bash
+docker compose -f compose.minimal.yaml down
+```
+
+You can also use the production-like configuration `compose.prod.yaml` with OpenTelemetry, Prometheus, and Grafana:
+
+```bash
+docker compose -f compose.prod.yaml up -d
+# Visit UI at http://localhost:8080
+# Jaeger at http://localhost:16686, Prometheus at http://localhost:9090, Grafana at http://localhost:3000
+```
+
+Note: It's just for demonstration purposes. For production, please customize the configuration as needed.
 
 ## Documentation
 
