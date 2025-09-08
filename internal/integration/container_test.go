@@ -284,13 +284,13 @@ steps:
 }
 
 func TestContainerStartup_Entrypoint_WithHealthyFallback(t *testing.T) {
-    t.Parallel()
+	t.Parallel()
 
-    th := test.Setup(t)
+	th := test.Setup(t)
 
-    // Use nginx which stays up by default; most tags have no healthcheck,
-    // so waitFor: healthy should fall back to running.
-    dag := th.DAG(t, `
+	// Use nginx which stays up by default; most tags have no healthcheck,
+	// so waitFor: healthy should fall back to running.
+	dag := th.DAG(t, `
 name: container-startup-entrypoint
 container:
   image: nginx:alpine
@@ -302,19 +302,19 @@ steps:
     output: ENTRYPOINT_OK
 `)
 
-    dag.Agent().RunSuccess(t)
-    dag.AssertLatestStatus(t, status.Success)
-    dag.AssertOutputs(t, map[string]any{
-        "ENTRYPOINT_OK": "entrypoint-ok",
-    })
+	dag.Agent().RunSuccess(t)
+	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertOutputs(t, map[string]any{
+		"ENTRYPOINT_OK": "entrypoint-ok",
+	})
 }
 
 func TestContainerStartup_Command_LongRunning(t *testing.T) {
-    t.Parallel()
+	t.Parallel()
 
-    th := test.Setup(t)
+	th := test.Setup(t)
 
-    dag := th.DAG(t, `
+	dag := th.DAG(t, `
 name: container-startup-command
 container:
   image: alpine:3
@@ -326,9 +326,9 @@ steps:
     output: COMMAND_OK
 `)
 
-    dag.Agent().RunSuccess(t)
-    dag.AssertLatestStatus(t, status.Success)
-    dag.AssertOutputs(t, map[string]any{
-        "COMMAND_OK": "command-ok",
-    })
+	dag.Agent().RunSuccess(t)
+	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertOutputs(t, map[string]any{
+		"COMMAND_OK": "command-ok",
+	})
 }

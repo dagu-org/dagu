@@ -230,8 +230,8 @@ type containerDef struct {
 	Ports []string `yaml:"ports,omitempty"` // List of ports to expose
 	// Network is the network configuration for the container.
 	Network string `yaml:"network,omitempty"` // Network configuration for the container
-    // KeepContainer is the flag to keep the container after the DAG run.
-    KeepContainer bool `yaml:"keepContainer,omitempty"` // Keep the container after the DAG run
+	// KeepContainer is the flag to keep the container after the DAG run.
+	KeepContainer bool `yaml:"keepContainer,omitempty"` // Keep the container after the DAG run
 	// Startup determines how the DAG-level container starts up.
 	Startup string `yaml:"startup,omitempty"`
 	// Command used when Startup == "command".

@@ -608,28 +608,28 @@ func (c *Client) waitRunning(ctx context.Context, cli *client.Client, id string)
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	var last string
-    for {
-        select {
-        case <-ctx.Done():
-            return fmt.Errorf("readiness timeout waiting for running; last state=%s: %w", last, ctx.Err())
-        case <-ticker.C:
-            info, err := cli.ContainerInspect(ctx, id)
-            if err != nil {
-                return fmt.Errorf("failed to inspect container %s: %w", id, err)
-            }
-            if info.State != nil {
-                if info.State.Running {
-                    logger.Info(ctx, "Container ready (running)", "id", id)
-                    return nil
-                }
-                // If the container has already exited or is dead, fail fast
-                if status := strings.ToLower(info.State.Status); status == "exited" || status == "dead" || status == "removing" { //nolint:gocritic
-                    return fmt.Errorf("container %s not running; status=%s, exitCode=%d", id, status, info.State.ExitCode)
-                }
-                last = fmt.Sprintf("running=%v,status=%s", info.State.Running, info.State.Status)
-            }
-        }
-    }
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("readiness timeout waiting for running; last state=%s: %w", last, ctx.Err())
+		case <-ticker.C:
+			info, err := cli.ContainerInspect(ctx, id)
+			if err != nil {
+				return fmt.Errorf("failed to inspect container %s: %w", id, err)
+			}
+			if info.State != nil {
+				if info.State.Running {
+					logger.Info(ctx, "Container ready (running)", "id", id)
+					return nil
+				}
+				// If the container has already exited or is dead, fail fast
+				if status := strings.ToLower(info.State.Status); status == "exited" || status == "dead" || status == "removing" { //nolint:gocritic
+					return fmt.Errorf("container %s not running; status=%s, exitCode=%d", id, status, info.State.ExitCode)
+				}
+				last = fmt.Sprintf("running=%v,status=%s", info.State.Running, info.State.Status)
+			}
+		}
+	}
 }
 
 // hasHealthcheck checks if the container has a healthcheck configured.
