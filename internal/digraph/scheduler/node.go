@@ -226,6 +226,21 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
+	// Periodically flush output buffers so logs appear while running
+	flushDone := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-flushDone:
+				return
+			case <-ticker.C:
+				_ = n.outputs.flushWriters()
+			}
+		}
+	}()
+
 	var exitCode int
 	if err := cmd.Run(ctx); err != nil {
 		n.SetError(err)
@@ -244,6 +259,10 @@ func (n *Node) Execute(ctx context.Context) error {
 	}
 
 	n.SetExitCode(exitCode)
+
+	// Stop periodic flushing and do a final flush
+	close(flushDone)
+	_ = n.outputs.flushWriters()
 
 	// Flush all output writers to ensure data is written before capturing output
 	// This is especially important for buffered writers
@@ -442,8 +461,10 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		step.Args = args
 
 	case step.Command == "":
-		// If the command is empty, use the default shell as the command
-		step.Command = shellCommand
+		// If the command is empty, use the default shell as the command if a script is provided.
+		if step.ExecutorConfig.IsCommand() && step.Script != "" {
+			step.Command = shellCommand
+		}
 
 	case step.Command != "" && len(step.Args) == 0:
 		// Shouldn't reach here except for testing.
@@ -882,16 +903,16 @@ type OutputCoordinator struct {
 
 	stdoutFileName string
 	stdoutFile     *os.File
-	stdoutWriter   *bufio.Writer
+	stdoutWriter   io.Writer
 
 	stderrFileName string
 	stderrFile     *os.File
-	stderrWriter   *bufio.Writer
+	stderrWriter   io.Writer
 
 	stdoutRedirectFile   *os.File
-	stdoutRedirectWriter *bufio.Writer
+	stdoutRedirectWriter io.Writer
 	StderrRedirectFile   *os.File
-	stderrRedirectWriter *bufio.Writer
+	stderrRedirectWriter io.Writer
 
 	// Output capture with size limits to prevent OOM
 	outputWriter   *os.File
@@ -989,9 +1010,17 @@ func (oc *OutputCoordinator) flushWriters() error {
 	defer oc.mu.Unlock()
 
 	var lastErr error
-	for _, w := range []*bufio.Writer{oc.stdoutWriter, oc.stderrWriter, oc.stdoutRedirectWriter, oc.stderrRedirectWriter} {
-		if w != nil {
-			if err := w.Flush(); err != nil {
+	for _, w := range []io.Writer{oc.stdoutWriter, oc.stderrWriter, oc.stdoutRedirectWriter, oc.stderrRedirectWriter} {
+		if w == nil {
+			continue
+		}
+		switch v := w.(type) {
+		case interface{ Flush() error }:
+			if err := v.Flush(); err != nil {
+				lastErr = err
+			}
+		case interface{ Sync() error }:
+			if err := v.Sync(); err != nil {
 				lastErr = err
 			}
 		}
@@ -1046,7 +1075,7 @@ func (oc *OutputCoordinator) setupStdoutRedirect(ctx context.Context, data NodeD
 	}
 
 	oc.stdoutRedirectFile = file
-	oc.stdoutRedirectWriter = bufio.NewWriter(oc.stdoutRedirectFile)
+	oc.stdoutRedirectWriter = newSafeBufferedWriter(oc.stdoutRedirectFile)
 
 	return nil
 }
@@ -1065,7 +1094,7 @@ func (oc *OutputCoordinator) setupStderrRedirect(ctx context.Context, data NodeD
 	}
 
 	oc.StderrRedirectFile = file
-	oc.stderrRedirectWriter = bufio.NewWriter(oc.StderrRedirectFile)
+	oc.stderrRedirectWriter = newSafeBufferedWriter(oc.StderrRedirectFile)
 
 	return nil
 }
@@ -1080,7 +1109,7 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
-	oc.stdoutWriter = bufio.NewWriter(oc.stdoutFile)
+	oc.stdoutWriter = newSafeBufferedWriter(oc.stdoutFile)
 	oc.stdoutFileName = data.State.Stdout
 
 	// stderr
@@ -1088,7 +1117,7 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 	if err != nil {
 		return fmt.Errorf("failed to open stderr file: %w", err)
 	}
-	oc.stderrWriter = bufio.NewWriter(oc.stderrFile)
+	oc.stderrWriter = newSafeBufferedWriter(oc.stderrFile)
 	oc.stderrFileName = data.State.Stderr
 
 	return nil
