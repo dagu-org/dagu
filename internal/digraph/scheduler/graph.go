@@ -26,10 +26,11 @@ type ExecutionGraph struct {
 // NewExecutionGraph creates a new execution graph with the given steps.
 func NewExecutionGraph(steps ...digraph.Step) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		nodeByID: make(map[int]*Node),
-		From:     make(map[int][]int),
-		To:       make(map[int][]int),
-		nodes:    []*Node{},
+		nodeByID:  make(map[int]*Node),
+		From:      make(map[int][]int),
+		To:        make(map[int][]int),
+		nodes:     []*Node{},
+		startedAt: time.Now(),
 	}
 	for _, step := range steps {
 		node := &Node{Data: newSafeData(NodeData{Step: step})}
@@ -47,10 +48,11 @@ func NewExecutionGraph(steps ...digraph.Step) (*ExecutionGraph, error) {
 // given nodes.
 func CreateRetryExecutionGraph(ctx context.Context, dag *digraph.DAG, nodes ...*Node) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		nodeByID: make(map[int]*Node),
-		From:     make(map[int][]int),
-		To:       make(map[int][]int),
-		nodes:    []*Node{},
+		nodeByID:  make(map[int]*Node),
+		From:      make(map[int][]int),
+		To:        make(map[int][]int),
+		nodes:     []*Node{},
+		startedAt: time.Now(),
 	}
 	steps := make(map[string]digraph.Step)
 	for _, step := range dag.Steps {
@@ -125,12 +127,6 @@ func (g *ExecutionGraph) Finish() {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.finishedAt = time.Now()
-}
-
-func (g *ExecutionGraph) Start() {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-	g.startedAt = time.Now()
 }
 
 func (g *ExecutionGraph) NodeData() []NodeData {
@@ -288,10 +284,11 @@ func (g *ExecutionGraph) runningCount() int {
 // Only the specified step will be reset for re-execution, leaving all downstream steps untouched.
 func CreateStepRetryGraph(_ context.Context, dag *digraph.DAG, nodes []*Node, stepName string) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		nodeByID: make(map[int]*Node),
-		From:     make(map[int][]int),
-		To:       make(map[int][]int),
-		nodes:    []*Node{},
+		nodeByID:  make(map[int]*Node),
+		From:      make(map[int][]int),
+		To:        make(map[int][]int),
+		nodes:     []*Node{},
+		startedAt: time.Now(),
 	}
 	steps := make(map[string]digraph.Step)
 	for _, step := range dag.Steps {

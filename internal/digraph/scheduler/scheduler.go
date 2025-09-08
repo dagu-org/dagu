@@ -104,9 +104,6 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 		ctx, cancel = context.WithCancel(ctx)
 	}
 	defer cancel()
-
-	// Start execution and ensure cleanup
-	graph.Start()
 	defer graph.Finish()
 
 	// Initialize node count metrics
