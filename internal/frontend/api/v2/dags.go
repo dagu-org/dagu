@@ -652,12 +652,18 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 }
 
 func (a *API) enqueueDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunID string) error {
-    if err := a.dagRunMgr.EnqueueDAGRun(ctx, dag, dagrun.EnqueueOptions{
-        Params:   params,
-        DAGRunID: dagRunID,
-    }); err != nil {
-        return fmt.Errorf("error enqueuing DAG: %w", err)
-    }
+	opts := dagrun.EnqueueOptions{
+		Params:   params,
+		DAGRunID: dagRunID,
+	}
+	if dag.Queue != "" {
+		opts.Queue = dag.Queue
+	}
+
+	// Enqueue the DAG-run
+	if err := a.dagRunMgr.EnqueueDAGRun(ctx, dag, opts); err != nil {
+		return fmt.Errorf("error enqueuing DAG: %w", err)
+	}
 
 	// Wait for the DAG to be enqueued
 	timer := time.NewTimer(3 * time.Second)
