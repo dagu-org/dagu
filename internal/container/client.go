@@ -587,20 +587,20 @@ func (c *Client) shouldPullImage(ctx context.Context, cli *client.Client, platfo
 // parseRestartPolicy parses a docker restart policy string into container.RestartPolicy.
 // Supported forms: "no", "always", "unless-stopped" (on-failure not supported).
 func parseRestartPolicy(s string) (container.RestartPolicy, error) {
-	s = strings.TrimSpace(strings.ToLower(s))
-	if s == "" {
-		return container.RestartPolicy{}, nil
-	}
-	switch {
-	case s == "no":
-		return container.RestartPolicy{Name: "no"}, nil
-	case s == "always":
-		return container.RestartPolicy{Name: "always"}, nil
-	case s == "unless-stopped":
-		return container.RestartPolicy{Name: "unless-stopped"}, nil
-	default:
-		return container.RestartPolicy{}, fmt.Errorf("invalid restartPolicy: %s (supported: no, always, unless-stopped)", s)
-	}
+    s = strings.TrimSpace(strings.ToLower(s))
+    if s == "" {
+        return container.RestartPolicy{}, nil
+    }
+    switch s { // use tagged switch to satisfy linter
+    case "no":
+        return container.RestartPolicy{Name: "no"}, nil
+    case "always":
+        return container.RestartPolicy{Name: "always"}, nil
+    case "unless-stopped":
+        return container.RestartPolicy{Name: "unless-stopped"}, nil
+    default:
+        return container.RestartPolicy{}, fmt.Errorf("invalid restartPolicy: %s (supported: no, always, unless-stopped)", s)
+    }
 }
 
 // waitRunning waits until the container is in running state or context times out.
@@ -673,18 +673,26 @@ func (c *Client) waitLogPattern(ctx context.Context, cli *client.Client, id stri
 	if err != nil {
 		return fmt.Errorf("invalid logPattern regex: %w", err)
 	}
-	reader, err := cli.ContainerLogs(ctx, id, container.LogsOptions{ShowStdout: true, ShowStderr: true, Follow: true, Tail: "all"})
-	if err != nil {
-		return fmt.Errorf("failed to read container logs: %w", err)
-	}
-	defer reader.Close()
+    reader, err := cli.ContainerLogs(ctx, id, container.LogsOptions{ShowStdout: true, ShowStderr: true, Follow: true, Tail: "all"})
+    if err != nil {
+        return fmt.Errorf("failed to read container logs: %w", err)
+    }
+    defer func() {
+        if cerr := reader.Close(); cerr != nil {
+            logger.Error(ctx, "docker executor: close logs reader", "err", cerr)
+        }
+    }()
 
 	pr, pw := io.Pipe()
 	// Demultiplex logs into a single stream
-	go func() {
-		defer pw.Close()
-		_, _ = stdcopy.StdCopy(pw, pw, reader)
-	}()
+    go func() {
+        defer func() {
+            if cerr := pw.Close(); cerr != nil {
+                logger.Error(ctx, "docker executor: close pipe writer", "err", cerr)
+            }
+        }()
+        _, _ = stdcopy.StdCopy(pw, pw, reader)
+    }()
 
 	scanner := bufio.NewScanner(pr)
 	// allow long lines
