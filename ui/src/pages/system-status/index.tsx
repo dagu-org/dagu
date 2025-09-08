@@ -19,10 +19,22 @@ function SystemStatus() {
     appBarContext.setTitle('System Status');
   }, [appBarContext]);
 
-  // Fetch all data
-  const { data: schedulerData, error: schedulerError } = useQuery('/services/scheduler');
+  // Fetch all data with remoteNode support
+  const { data: schedulerData, error: schedulerError } = useQuery('/services/scheduler', {
+    params: {
+      query: {
+        remoteNode: appBarContext.selectedRemoteNode || 'local',
+      },
+    },
+  });
 
-  const { data: coordinatorData, error: coordinatorError } = useQuery('/services/coordinator');
+  const { data: coordinatorData, error: coordinatorError } = useQuery('/services/coordinator', {
+    params: {
+      query: {
+        remoteNode: appBarContext.selectedRemoteNode || 'local',
+      },
+    },
+  });
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
