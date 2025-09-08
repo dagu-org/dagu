@@ -431,7 +431,14 @@ Creates and starts a DAG run with optional parameters.
 
 Adds a DAG run to the queue for later execution.
 
-**Request Body**: Same as Start DAG
+**Request Body**:
+```json
+{
+  "params": "{\"key\": \"value\"}",
+  "dagRunId": "optional-custom-id",
+  "queue": "optional-queue-override"
+}
+```
 
 **Response (200)**:
 ```json
@@ -1636,7 +1643,8 @@ curl -X POST "http://localhost:8080/api/v2/dags/ml-training-pipeline/enqueue" \
      -H "Authorization: Bearer your-token" \
      -d '{
        "params": "{\"model\": \"recommendation_v3\", \"dataset\": \"user_interactions_2024\"}",
-       "dagRunId": "ml_train_20240211_170000"
+       "dagRunId": "ml_train_20240211_170000",
+       "queue": "gpu-jobs"
      }'
 ```
 

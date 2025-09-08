@@ -79,7 +79,8 @@ curl -X POST http://localhost:8080/api/v2/dags/my-dag.yaml/start \
 curl -X POST http://localhost:8080/api/v2/dags/my-dag.yaml/enqueue \
   -H "Content-Type: application/json" \
   -d '{
-    "params": "{\"env\": \"production\"}"
+    "params": "{\"env\": \"production\"}",
+    "queue": "high-priority"  // optional: override queue
   }'
 ```
 
