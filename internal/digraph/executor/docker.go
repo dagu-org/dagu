@@ -110,9 +110,17 @@ func (e *docker) Run(ctx context.Context) error {
 		// This allows sharing the same container client across multiple executors.
 		// Don't set WorkingDir - use the container's default working directory
 		execOpts := container.ExecOptions{}
+
+		// Build command only when a command is explicitly provided.
+		// If command is empty, avoid passing an empty string which overrides image CMD.
+		var cmd []string
+		if e.step.Command != "" {
+			cmd = append([]string{e.step.Command}, e.step.Args...)
+		}
+
 		exitCode, err := cli.Exec(
 			ctx,
-			append([]string{e.step.Command}, e.step.Args...),
+			cmd,
 			e.stdout, e.stderr,
 			execOpts,
 		)
@@ -127,9 +135,15 @@ func (e *docker) Run(ctx context.Context) error {
 	}
 	defer e.container.Close(ctx)
 
+	// Build command only when explicitly provided; otherwise use image default CMD/ENTRYPOINT.
+	var cmd []string
+	if e.step.Command != "" {
+		cmd = append([]string{e.step.Command}, e.step.Args...)
+	}
+
 	exitCode, err := e.container.Run(
 		ctx,
-		append([]string{e.step.Command}, e.step.Args...),
+		cmd,
 		e.stdout, e.stderr,
 	)
 

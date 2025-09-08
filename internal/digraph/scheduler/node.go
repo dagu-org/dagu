@@ -442,8 +442,10 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		step.Args = args
 
 	case step.Command == "":
-		// If the command is empty, use the default shell as the command
-		step.Command = shellCommand
+		// If the command is empty, use the default shell as the command if a script is provided.
+		if step.ExecutorConfig.IsCommand() && step.Script != "" {
+			step.Command = shellCommand
+		}
 
 	case step.Command != "" && len(step.Args) == 0:
 		// Shouldn't reach here except for testing.
