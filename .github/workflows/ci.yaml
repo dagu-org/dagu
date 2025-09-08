@@ -54,6 +54,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Check formatting (go fmt)
+        run: |
+          go fmt ./...
+          # Fail if formatting changed any files
+          git diff --exit-code || (echo "Go files are not formatted. Please run 'go fmt ./...'" && exit 1)
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
