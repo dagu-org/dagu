@@ -69,8 +69,11 @@ func TestDAG(t *testing.T) {
 			Name: "test_singleton_dag",
 		}).ExpectStatus(http.StatusCreated).Send(t)
 
-		// Execute the DAG
-		resp := server.Client().Post("/api/v2/dags/test_singleton_dag/start", api.ExecuteDAGJSONRequestBody{}).ExpectStatus(http.StatusOK).Send(t)
+		// Execute the DAG with singleton flag
+		singleton := true
+		resp := server.Client().Post("/api/v2/dags/test_singleton_dag/start", api.ExecuteDAGJSONRequestBody{
+			Singleton: &singleton,
+		}).ExpectStatus(http.StatusOK).Send(t)
 
 		var execResp api.ExecuteDAG200JSONResponse
 		resp.Unmarshal(t, &execResp)

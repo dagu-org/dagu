@@ -466,10 +466,12 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	}
 
 	var dagRunId, params string
+	var singleton bool
 
 	if request.Body != nil {
 		dagRunId = valueOf(request.Body.DagRunId)
 		params = valueOf(request.Body.Params)
+		singleton = valueOf(request.Body.Singleton)
 	}
 
 	if dagRunId == "" {
@@ -499,8 +501,8 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		return nil, fmt.Errorf("failed to access proc store: %w", err)
 	}
 
-	// Check if DAG is already running and maxActiveRuns is 1, return 409
-	if dag.MaxActiveRuns == 1 {
+	// Check singleton flag - if enabled and DAG is already running, return 409
+	if singleton || dag.MaxActiveRuns == 1 {
 		if liveCount > 0 {
 			return nil, &Error{
 				HTTPStatus: http.StatusConflict,
@@ -526,7 +528,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	if err := a.startDAGRun(ctx, dag, params, dagRunId, false); err != nil {
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, singleton); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
