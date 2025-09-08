@@ -226,6 +226,21 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
+	// Periodically flush output buffers so logs appear while running
+	flushDone := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-flushDone:
+				return
+			case <-ticker.C:
+				_ = n.outputs.flushWriters()
+			}
+		}
+	}()
+
 	var exitCode int
 	if err := cmd.Run(ctx); err != nil {
 		n.SetError(err)
@@ -244,6 +259,10 @@ func (n *Node) Execute(ctx context.Context) error {
 	}
 
 	n.SetExitCode(exitCode)
+
+	// Stop periodic flushing and do a final flush
+	close(flushDone)
+	_ = n.outputs.flushWriters()
 
 	// Flush all output writers to ensure data is written before capturing output
 	// This is especially important for buffered writers
