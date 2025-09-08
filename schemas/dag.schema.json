@@ -901,6 +901,20 @@
     "container": {
       "type": "object",
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "startup": { "const": "command" } },
+            "required": ["startup"]
+          },
+          "then": {
+            "required": ["command"],
+            "properties": {
+              "command": { "minItems": 1 }
+            }
+          }
+        }
+      ],
       "properties": {
         "image": {
           "type": "string",
@@ -948,6 +962,31 @@
         "network": {
           "type": "string",
           "description": "Network mode for the container (e.g., 'host', 'bridge', 'none', or a custom network name)."
+        },
+        "startup": {
+          "type": "string",
+          "enum": ["keepalive", "entrypoint", "command"],
+          "default": "keepalive",
+          "description": "Startup mode for the DAG-level container: 'keepalive' uses an internal keepalive/sleep, 'entrypoint' honors the image's ENTRYPOINT/CMD, 'command' runs the provided command array."
+        },
+        "command": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Command to execute when startup is 'command'. Must be a non-empty array."
+        },
+        "waitFor": {
+          "type": "string",
+          "enum": ["running", "healthy"],
+          "default": "running",
+          "description": "Readiness condition before steps execute: 'running' waits for container to run; 'healthy' waits for Docker healthcheck to report healthy."
+        },
+        "logPattern": {
+          "type": "string",
+          "description": "Optional regex; if set, waits for this pattern to appear in container logs before steps run."
+        },
+        "restartPolicy": {
+          "type": "string",
+          "description": "Docker restart policy for the container: 'no', 'always', or 'unless-stopped'."
         },
         "keepContainer": {
           "type": "boolean",
