@@ -1,11 +1,13 @@
 package container
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -60,6 +62,15 @@ type Client struct {
 
 	cancelMu sync.Mutex
 	cancel   func()
+
+	// startup mode for DAG-level container: "keepalive" (default) | "entrypoint" | "command"
+	startup string
+	// readiness gate: "running" (default) | "healthy"
+	waitFor string
+	// command for startup when startup == "command"
+	startCmd []string
+	// optional regex to wait for in logs before proceeding
+	logPattern string
 }
 
 // ExecOptions specifies options to execute commands in the container.
@@ -121,35 +132,48 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 		return fmt.Errorf("container already exists. id=%s", c.id)
 	}
 
-	// Use the command to keep alive the container
+	// Choose startup mode and command
 	var cmd []string
-	if len(c.containerConfig.Cmd) == 0 {
-		// Detect if we're running in docker-in-docker environment
-		isDockerInDocker := c.isDockerInDocker()
+	mode := c.startup
+	if mode == "" {
+		mode = "keepalive"
+	}
+	switch mode {
+	case "keepalive":
+		if len(c.containerConfig.Cmd) == 0 {
+			// Detect if we're running in docker-in-docker environment
+			isDockerInDocker := c.isDockerInDocker()
 
-		if isDockerInDocker {
-			// We're in a container, use a simple sleep command as fallback
-			logger.Info(ctx, "Detected docker-in-docker environment, using sleep for keepalive")
-			// Use a shell command that sleeps indefinitely
-			// Most images have sh, and this works across platforms
-			cmd = []string{"sh", "-c", "while true; do sleep 86400; done"}
-		} else {
-			// Standard environment, use the keepalive binary
-			hostPath, err := GetKeepaliveFile(c.platformO)
-			if err != nil {
-				// Fallback to sleep if keepalive binary fails
-				logger.Warn(ctx, "Failed to get keepalive binary, using sleep fallback", "err", err)
+			if isDockerInDocker {
+				logger.Info(ctx, "Detected docker-in-docker environment, using sleep for keepalive")
 				cmd = []string{"sh", "-c", "while true; do sleep 86400; done"}
 			} else {
-				c.keepAliveTmp = hostPath
-
-				// Setup the volume bind for the keepalive binary
-				targetPath := "/__dagu_runner/keepalive"
-				bind := hostPath + ":" + targetPath + ":ro"
-				c.hostConfig.Binds = append(c.hostConfig.Binds, bind)
-				cmd = []string{targetPath}
+				// Standard environment, use the keepalive binary
+				hostPath, err := GetKeepaliveFile(c.platformO)
+				if err != nil {
+					// Fallback to sleep if keepalive binary fails
+					logger.Warn(ctx, "Failed to get keepalive binary, using sleep fallback", "err", err)
+					cmd = []string{"sh", "-c", "while true; do sleep 86400; done"}
+				} else {
+					c.keepAliveTmp = hostPath
+					// Setup the volume bind for the keepalive binary
+					targetPath := "/__dagu_runner/keepalive"
+					bind := hostPath + ":" + targetPath + ":ro"
+					c.hostConfig.Binds = append(c.hostConfig.Binds, bind)
+					cmd = []string{targetPath}
+				}
 			}
 		}
+	case "entrypoint":
+		// Respect image ENTRYPOINT/CMD: do not set cmd; run as-is
+		cmd = nil
+	case "command":
+		if len(c.startCmd) == 0 {
+			return fmt.Errorf("startup 'command' requires non-empty command array")
+		}
+		cmd = append([]string{}, c.startCmd...)
+	default:
+		return fmt.Errorf("invalid startup mode: %s", mode)
 	}
 
 	// Set init true to prevent zombie subprocess issues
@@ -167,6 +191,47 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 	}
 
 	c.id = id
+
+	// Readiness wait
+	waitMode := c.waitFor
+	if waitMode == "" {
+		waitMode = "running"
+	}
+	// Default timeout for readiness
+	readyCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	defer cancel()
+
+	switch waitMode {
+	case "running":
+		if err := c.waitRunning(readyCtx, c.cli, id); err != nil {
+			return err
+		}
+	case "healthy":
+		// If no healthcheck defined, warn and fallback to running
+		hasHealth, err := c.hasHealthcheck(readyCtx, c.cli, id)
+		if err != nil {
+			return err
+		}
+		if !hasHealth {
+			logger.Warn(ctx, "Selected waitFor=healthy but image has no healthcheck; falling back to running")
+			if err := c.waitRunning(readyCtx, c.cli, id); err != nil {
+				return err
+			}
+		} else {
+			if err := c.waitHealthy(readyCtx, c.cli, id); err != nil {
+				return err
+			}
+		}
+	default:
+		return fmt.Errorf("invalid waitFor mode: %s", waitMode)
+	}
+
+	// Optional log pattern wait after base readiness
+	if strings.TrimSpace(c.logPattern) != "" {
+		if err := c.waitLogPattern(readyCtx, c.cli, id, c.logPattern); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -519,6 +584,138 @@ func (c *Client) shouldPullImage(ctx context.Context, cli *client.Client, platfo
 	return true, nil
 }
 
+// parseRestartPolicy parses a docker restart policy string into container.RestartPolicy.
+// Supported forms: "no", "always", "unless-stopped" (on-failure not supported).
+func parseRestartPolicy(s string) (container.RestartPolicy, error) {
+	s = strings.TrimSpace(strings.ToLower(s))
+	if s == "" {
+		return container.RestartPolicy{}, nil
+	}
+	switch s { // use tagged switch to satisfy linter
+	case "no":
+		return container.RestartPolicy{Name: "no"}, nil
+	case "always":
+		return container.RestartPolicy{Name: "always"}, nil
+	case "unless-stopped":
+		return container.RestartPolicy{Name: "unless-stopped"}, nil
+	default:
+		return container.RestartPolicy{}, fmt.Errorf("invalid restartPolicy: %s (supported: no, always, unless-stopped)", s)
+	}
+}
+
+// waitRunning waits until the container is in running state or context times out.
+func (c *Client) waitRunning(ctx context.Context, cli *client.Client, id string) error {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	var last string
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("readiness timeout waiting for running; last state=%s: %w", last, ctx.Err())
+		case <-ticker.C:
+			info, err := cli.ContainerInspect(ctx, id)
+			if err != nil {
+				return fmt.Errorf("failed to inspect container %s: %w", id, err)
+			}
+			if info.State != nil {
+				if info.State.Running {
+					logger.Info(ctx, "Container ready (running)", "id", id)
+					return nil
+				}
+				// If the container has already exited or is dead, fail fast
+				if status := strings.ToLower(info.State.Status); status == "exited" || status == "dead" || status == "removing" { //nolint:gocritic
+					return fmt.Errorf("container %s not running; status=%s, exitCode=%d", id, status, info.State.ExitCode)
+				}
+				last = fmt.Sprintf("running=%v,status=%s", info.State.Running, info.State.Status)
+			}
+		}
+	}
+}
+
+// hasHealthcheck checks if the container has a healthcheck configured.
+func (c *Client) hasHealthcheck(ctx context.Context, cli *client.Client, id string) (bool, error) {
+	info, err := cli.ContainerInspect(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("failed to inspect container %s: %w", id, err)
+	}
+	return info.State != nil && info.State.Health != nil, nil
+}
+
+// waitHealthy waits until the container health status is healthy.
+func (c *Client) waitHealthy(ctx context.Context, cli *client.Client, id string) error {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	var last string
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("readiness timeout waiting for healthy; last health=%s: %w", last, ctx.Err())
+		case <-ticker.C:
+			info, err := cli.ContainerInspect(ctx, id)
+			if err != nil {
+				return fmt.Errorf("failed to inspect container %s: %w", id, err)
+			}
+			if info.State != nil && info.State.Health != nil {
+				status := info.State.Health.Status
+				last = status
+				if strings.ToLower(status) == "healthy" {
+					logger.Info(ctx, "Container ready (healthy)", "id", id)
+					return nil
+				}
+			}
+		}
+	}
+}
+
+// waitLogPattern follows container logs until the given regex pattern appears.
+func (c *Client) waitLogPattern(ctx context.Context, cli *client.Client, id string, pattern string) error {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return fmt.Errorf("invalid logPattern regex: %w", err)
+	}
+	reader, err := cli.ContainerLogs(ctx, id, container.LogsOptions{ShowStdout: true, ShowStderr: true, Follow: true, Tail: "all"})
+	if err != nil {
+		return fmt.Errorf("failed to read container logs: %w", err)
+	}
+	defer func() {
+		if cerr := reader.Close(); cerr != nil {
+			logger.Error(ctx, "docker executor: close logs reader", "err", cerr)
+		}
+	}()
+
+	pr, pw := io.Pipe()
+	// Demultiplex logs into a single stream
+	go func() {
+		defer func() {
+			if cerr := pw.Close(); cerr != nil {
+				logger.Error(ctx, "docker executor: close pipe writer", "err", cerr)
+			}
+		}()
+		_, _ = stdcopy.StdCopy(pw, pw, reader)
+	}()
+
+	scanner := bufio.NewScanner(pr)
+	// allow long lines
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if re.MatchString(line) {
+			logger.Info(ctx, "Container ready (log pattern matched)", "id", id, "pattern", pattern)
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("readiness timeout waiting for logPattern; pattern=%q: %w", pattern, ctx.Err())
+		default:
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading logs: %w", err)
+	}
+	return fmt.Errorf("log stream ended before pattern matched: %q", pattern)
+}
+
 // NewFromContainerConfig parses digraph.Container into Container struct
 func NewFromContainerConfig(workDir string, ct digraph.Container) (*Client, error) {
 	return NewFromContainerConfigWithAuth(workDir, ct, nil)
@@ -583,6 +780,15 @@ func NewFromContainerConfigWithAuth(workDir string, ct digraph.Container, regist
 	// autoRemove is the inverse of KeepContainer
 	autoRemove := !ct.KeepContainer
 
+	// Apply restart policy if specified
+	if ct.RestartPolicy != "" {
+		rp, err := parseRestartPolicy(ct.RestartPolicy)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse restartPolicy: %w", err)
+		}
+		hostConfig.RestartPolicy = rp
+	}
+
 	client := &Client{
 		image:           ct.Image,
 		platform:        ct.Platform,
@@ -593,6 +799,18 @@ func NewFromContainerConfigWithAuth(workDir string, ct digraph.Container, regist
 		networkConfig:   networkConfig,
 		execOptions:     execOptions,
 	}
+
+	// Startup and readiness configuration (defaults)
+	client.startup = strings.ToLower(strings.TrimSpace(string(ct.Startup)))
+	if client.startup == "" {
+		client.startup = "keepalive"
+	}
+	client.waitFor = strings.ToLower(strings.TrimSpace(string(ct.WaitFor)))
+	if client.waitFor == "" {
+		client.waitFor = "running"
+	}
+	client.startCmd = append([]string{}, ct.Command...)
+	client.logPattern = ct.LogPattern
 
 	// Set up registry authentication if provided
 	if len(registryAuths) > 0 {

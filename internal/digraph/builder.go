@@ -298,6 +298,11 @@ func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
 		Ports:         spec.Container.Ports,
 		Network:       spec.Container.Network,
 		KeepContainer: spec.Container.KeepContainer,
+		Startup:       ContainerStartup(strings.ToLower(strings.TrimSpace(spec.Container.Startup))),
+		Command:       append([]string{}, spec.Container.Command...),
+		WaitFor:       ContainerWaitFor(strings.ToLower(strings.TrimSpace(spec.Container.WaitFor))),
+		LogPattern:    spec.Container.LogPattern,
+		RestartPolicy: strings.TrimSpace(spec.Container.RestartPolicy),
 	}
 
 	// Backward compatibility

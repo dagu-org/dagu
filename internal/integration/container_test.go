@@ -282,3 +282,53 @@ steps:
 		"OUT1": "pull policy test",
 	})
 }
+
+func TestContainerStartup_Entrypoint_WithHealthyFallback(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	// Use nginx which stays up by default; most tags have no healthcheck,
+	// so waitFor: healthy should fall back to running.
+	dag := th.DAG(t, `
+name: container-startup-entrypoint
+container:
+  image: nginx:alpine
+  startup: entrypoint
+  waitFor: healthy
+steps:
+  - name: s1
+    command: echo entrypoint-ok
+    output: ENTRYPOINT_OK
+`)
+
+	dag.Agent().RunSuccess(t)
+	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertOutputs(t, map[string]any{
+		"ENTRYPOINT_OK": "entrypoint-ok",
+	})
+}
+
+func TestContainerStartup_Command_LongRunning(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `
+name: container-startup-command
+container:
+  image: alpine:3
+  startup: command
+  command: ["sh", "-c", "while true; do sleep 3600; done"]
+steps:
+  - name: s1
+    command: echo command-ok
+    output: COMMAND_OK
+`)
+
+	dag.Agent().RunSuccess(t)
+	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertOutputs(t, map[string]any{
+		"COMMAND_OK": "command-ok",
+	})
+}

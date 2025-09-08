@@ -30,7 +30,35 @@ type Container struct {
 	Network string `yaml:"network,omitempty"` // Network configuration for the container
 	// KeepContainer is the flag to keep the container after the DAG run.
 	KeepContainer bool `yaml:"keepContainer,omitempty"` // Keep the container after the DAG run
+	// Startup determines how the DAG-level container starts up.
+	// One of: "keepalive" (default), "entrypoint", "command".
+	Startup ContainerStartup `yaml:"startup,omitempty"`
+	// Command is used when Startup == "command".
+	Command []string `yaml:"command,omitempty"`
+	// WaitFor determines readiness gate before steps run: "running" (default) or "healthy".
+	WaitFor ContainerWaitFor `yaml:"waitFor,omitempty"`
+	// LogPattern optionally waits for a regex to appear in container logs before proceeding.
+	LogPattern string `yaml:"logPattern,omitempty"`
+	// RestartPolicy applies Docker restart policy for long-running containers ("no", "always", or "unless-stopped").
+	RestartPolicy string `yaml:"restartPolicy,omitempty"`
 }
+
+// ContainerStartup is an enum for DAG-level container startup modes.
+type ContainerStartup string
+
+const (
+	StartupKeepalive  ContainerStartup = "keepalive"
+	StartupEntrypoint ContainerStartup = "entrypoint"
+	StartupCommand    ContainerStartup = "command"
+)
+
+// ContainerWaitFor is an enum for container readiness conditions.
+type ContainerWaitFor string
+
+const (
+	WaitForRunning ContainerWaitFor = "running"
+	WaitForHealthy ContainerWaitFor = "healthy"
+)
 
 // GetWorkingDir returns workdir or working dir (backward compatibility)
 func (ct Container) GetWorkingDir() string {

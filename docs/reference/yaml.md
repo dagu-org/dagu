@@ -130,6 +130,11 @@ container:
   ports:
     - "8080:8080"
   network: host
+  startup: keepalive       # keepalive | entrypoint | command
+  command: ["sh", "-c", "my-daemon"]   # when startup: command
+  waitFor: running         # running | healthy
+  logPattern: "Ready to accept connections"  # optional regex
+  restartPolicy: unless-stopped              # optional: no|always|unless-stopped
   keepContainer: false     # Keep container after DAG run
 ```
 
@@ -138,6 +143,8 @@ container:
 > This means step commands do not pass through the image’s `ENTRYPOINT`/`CMD`.
 > If your image’s entrypoint dispatches subcommands, invoke it explicitly in
 > the step command (see [Execution Model and Entrypoint Behavior](/writing-workflows/container#execution-model-and-entrypoint-behavior)).
+> Readiness waiting (running/healthy and optional logPattern) times out after
+> 120 seconds with a clear error including the last known state.
 
 ### SSH Configuration
 

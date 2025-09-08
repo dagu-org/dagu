@@ -232,6 +232,16 @@ type containerDef struct {
 	Network string `yaml:"network,omitempty"` // Network configuration for the container
 	// KeepContainer is the flag to keep the container after the DAG run.
 	KeepContainer bool `yaml:"keepContainer,omitempty"` // Keep the container after the DAG run
+	// Startup determines how the DAG-level container starts up.
+	Startup string `yaml:"startup,omitempty"`
+	// Command used when Startup == "command".
+	Command []string `yaml:"command,omitempty"`
+	// WaitFor readiness condition: running|healthy
+	WaitFor string `yaml:"waitFor,omitempty"`
+	// LogPattern regex to wait for in container logs.
+	LogPattern string `yaml:"logPattern,omitempty"`
+	// RestartPolicy: no|always|unless-stopped
+	RestartPolicy string `yaml:"restartPolicy,omitempty"`
 }
 
 // runConfigDef defines configuration for controlling user interactions during DAG runs.

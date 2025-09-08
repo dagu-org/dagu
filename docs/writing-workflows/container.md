@@ -82,6 +82,11 @@ container:
   ports:                    # Port mappings
     - "8080:8080"
   network: host             # Network mode
+  startup: keepalive        # keepalive | entrypoint | command
+  command: ["sh", "-c", "my-daemon"] # when startup: command
+  waitFor: running          # running | healthy
+  logPattern: "Ready"       # optional regex; wait for log pattern
+  restartPolicy: unless-stopped  # optional Docker restart policy (no|always|unless-stopped)
   keepContainer: true       # Keep after workflow
 ```
 
@@ -95,8 +100,9 @@ container:
 ## Execution Model and Entrypoint Behavior
 
 - **How it runs:** When you set a DAG‑level `container`, Dagu starts one
-  long‑lived container for the workflow and keeps it alive (using a simple
-  sleep loop). Each step then runs inside that container via `docker exec`.
+  long‑lived container for the workflow. By default (`startup: keepalive`),
+  it runs a lightweight keepalive process (or sleep) so the container stays
+  up. Each step then runs inside that container via `docker exec`.
 - **Entrypoint/CMD not used for steps:** Because steps are executed with
   `docker exec`, your image’s `ENTRYPOINT` or `CMD` are not invoked for step
   commands. Steps run directly in the running container process context.
@@ -104,6 +110,44 @@ container:
   subcommand (for example, `my-entrypoint sendConfirmationEmails` which then
   calls `npm run sendConfirmationEmails`), the step command must invoke that
   dispatcher explicitly.
+
+### Startup Modes
+
+Choose how the DAG‑level container starts:
+
+```yaml
+container:
+  image: servercontainers/samba:latest
+  startup: entrypoint   # keepalive | entrypoint | command
+  waitFor: healthy      # running | healthy (default running)
+```
+
+```yaml
+container:
+  image: alpine:latest
+  startup: command
+  command: ["sh", "-c", "my-daemon --flag"]
+  restartPolicy: unless-stopped   # optional
+```
+
+- `keepalive` (default): preserves current behavior using an embedded
+  keepalive binary or `sh -c 'while true; sleep 86400; done'` in DinD.
+- `entrypoint`: honors the image’s `ENTRYPOINT`/`CMD` with no overrides.
+- `command`: runs a user‑provided `command` array instead of image defaults.
+
+Readiness before steps run:
+
+- `waitFor: running` (default): continue once the container is running.
+- `waitFor: healthy`: if image defines a Docker healthcheck, wait for healthy;
+  if not defined, Dagu falls back to `running` and logs a warning.
+- `logPattern`: optional regex; when set, steps start only after this pattern
+  appears in container logs (after the selected `waitFor` condition passes).
+
+Readiness timeout and errors:
+
+- Dagu waits up to 120 seconds for readiness (`running`/`healthy` and any
+  `logPattern`). On timeout, it fails the run and reports the mode and last
+  known state (for example, `status=exited, exitCode=1`).
 
 ### Examples
 
