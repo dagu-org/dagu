@@ -26,17 +26,7 @@ func EvalBool(ctx context.Context, value any) (bool, error) {
 // with the variables within the execution context.
 func EvalObject[T any](ctx context.Context, obj T) (T, error) {
 	vars := executor.GetEnv(ctx).VariablesMap()
-
-	result, err := cmdutil.EvalObject(ctx, obj, vars)
-	if err != nil {
-		return obj, err
-	}
-	// If the result is not of type T, we return the original object
-	if _, ok := result.(T); !ok {
-		return obj, fmt.Errorf("expected type %T but got %T", obj, result)
-	}
-	// If the result is of type T, we return it
-	return result.(T), nil
+	return cmdutil.EvalObject(ctx, obj, vars)
 }
 
 // GenerateChildDAGRunID generates a unique run ID based on the current DAG run ID, step name, and parameters.

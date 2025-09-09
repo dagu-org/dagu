@@ -40,11 +40,10 @@ func NewTracer(ctx context.Context, dag *digraph.DAG) (*Tracer, error) {
 		return &Tracer{tracer: otel.Tracer(TracerName)}, nil
 	}
 
-	cfgObj, err := cmdutil.EvalObject(ctx, *dag.OTel, map[string]string{})
+	cfg, err := cmdutil.EvalObject(ctx, *dag.OTel, map[string]string{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate OTel config: %w", err)
 	}
-	cfg := cfgObj.(digraph.OTelConfig)
 
 	exporter, err := createExporter(ctx, &cfg)
 	if err != nil {

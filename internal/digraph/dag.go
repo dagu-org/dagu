@@ -322,6 +322,18 @@ func (d *DAG) initializeDefaults() {
 	}
 }
 
+// ParamsMap returns the parameters as a map.
+func (d *DAG) ParamsMap() map[string]string {
+	params := make(map[string]string)
+	for _, p := range d.Params {
+		parts := strings.SplitN(p, "=", 2)
+		if len(parts) == 2 {
+			params[parts[0]] = parts[1]
+		}
+	}
+	return params
+}
+
 // TaskOption is a function that modifies a coordinatorv1.Task.
 type TaskOption func(*coordinatorv1.Task)
 
