@@ -1018,6 +1018,10 @@
           "type": "string",
           "description": "Path to the SSH private key file. If not specified, defaults are tried: ~/.ssh/id_rsa, ~/.ssh/id_ecdsa, ~/.ssh/id_ed25519, ~/.ssh/id_dsa."
         },
+        "password": {
+          "type": "string",
+          "description": "SSH password for authentication (not recommended; prefer key-based auth)."
+        },
         "strictHostKey": {
           "type": "boolean",
           "default": true,
@@ -1030,7 +1034,7 @@
         }
       },
       "required": ["user", "host"],
-      "description": "SSH configuration for remote command execution. Can be specified at DAG level for reuse across steps, or at step level for specific overrides. Note: Password authentication is not supported at DAG level for security reasons."
+      "description": "SSH configuration for remote command execution. Can be specified at DAG level for reuse across steps, or at step level for specific overrides. Password authentication is supported but key-based auth is recommended."
     }
   }
 }

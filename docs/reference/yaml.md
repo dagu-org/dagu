@@ -158,6 +158,7 @@ ssh:
   host: production.example.com
   port: "22"           # Optional, defaults to "22"
   key: ~/.ssh/id_rsa   # Optional, defaults to standard keys
+  password: "${SSH_PASSWORD}" # Optional; prefer keys for security
   strictHostKey: true  # Optional, defaults to true for security
   knownHostFile: ~/.ssh/known_hosts  # Optional, defaults to ~/.ssh/known_hosts
 ```
@@ -189,7 +190,7 @@ steps:
 **Important Notes:**
 - SSH and container fields are mutually exclusive at the DAG level
 - Step-level SSH configuration completely overrides DAG-level configuration (no partial overrides)
-- For security, password authentication is not supported at the DAG level
+- Password authentication is supported but not recommended; prefer key-based auth
 - Default SSH keys are tried if no key is specified: `~/.ssh/id_rsa`, `~/.ssh/id_ecdsa`, `~/.ssh/id_ed25519`, `~/.ssh/id_dsa`
 
 ### Working Directory and Volume Resolution

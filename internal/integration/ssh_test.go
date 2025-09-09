@@ -8,7 +8,7 @@ import (
 )
 
 // TestSSHIntegration spins up an SSH server inside a container using the
-// parent DAG, then runs a child SSH DAG that executes `hostname` over SSH.
+// parent DAG, then runs a child SSH DAG that echoes a deterministic string over SSH.
 // Pattern mirrors container_test.go: define YAML inline and assert outputs.
 func TestSSHIntegration(t *testing.T) {
 	t.Parallel()
@@ -34,10 +34,10 @@ steps:
     params: "HOST=127.0.0.1 PORT=2222 USER=root PASSWORD=root"
     output: SSH_RUN
 
-  - name: echo-host
-    command: echo "${SSH_RUN.outputs.HOSTNAME}"
+  - name: echo-result
+    command: echo "${SSH_RUN.outputs.RESULT}"
     depends: [run-ssh]
-    output: SSH_HOSTNAME
+    output: SSH_RESULT
 
 ---
 
@@ -52,7 +52,7 @@ params:
   PORT: ${PORT}
   USER: ${USER}
   PASSWORD: ${PASSWORD}
-# Provide SSH defaults; step will explicitly set executor config to ensure correctness.
+# Provide SSH defaults for the step executed via SSH.
 ssh:
   host: ${HOST}
   port: ${PORT}
@@ -60,14 +60,13 @@ ssh:
   password: ${PASSWORD}
   strictHostKey: false
 steps:
-  - command: hostname
-    output: HOSTNAME
+  - command: echo dagu-ssh-ok
+    output: RESULT
 `)
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, status.Success)
 	dag.AssertOutputs(t, map[string]any{
-		// We don't know the container hostname, only that it's non-empty
-		"SSH_HOSTNAME": test.NotEmpty{},
+		"SSH_RESULT": "dagu-ssh-ok",
 	})
 }
