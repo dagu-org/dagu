@@ -24,11 +24,11 @@ func WithSSHClient(ctx context.Context, cli *sshutil.Client) context.Context {
 
 // getSSHClientFromContext retrieves the sshutil.Client from the context.
 func getSSHClientFromContext(ctx context.Context) *sshutil.Client {
-    // Retrieve the SSH client stored in context by WithSSHClient
-    if cli, ok := ctx.Value(sshClientCtxKey{}).(*sshutil.Client); ok {
-        return cli
-    }
-    return nil
+	// Retrieve the SSH client stored in context by WithSSHClient
+	if cli, ok := ctx.Value(sshClientCtxKey{}).(*sshutil.Client); ok {
+		return cli
+	}
+	return nil
 }
 
 type sshExec struct {
@@ -40,19 +40,19 @@ type sshExec struct {
 }
 
 func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
-    var client *sshutil.Client
+	var client *sshutil.Client
 
-    // Prefer step-level SSH configuration if present
-    if len(step.ExecutorConfig.Config) > 0 {
-        c, err := sshutil.FromMapConfig(ctx, step.ExecutorConfig.Config)
-        if err != nil {
-            return nil, fmt.Errorf("failed to setup ssh executor")
-        }
-        client = c
-    } else if c := getSSHClientFromContext(ctx); c != nil {
-        // Fall back to DAG-level SSH client from context
-        client = c
-    }
+	// Prefer step-level SSH configuration if present
+	if len(step.ExecutorConfig.Config) > 0 {
+		c, err := sshutil.FromMapConfig(ctx, step.ExecutorConfig.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup ssh executor")
+		}
+		client = c
+	} else if c := getSSHClientFromContext(ctx); c != nil {
+		// Fall back to DAG-level SSH client from context
+		client = c
+	}
 
 	if client == nil {
 		return nil, fmt.Errorf("ssh configuration is not found")
