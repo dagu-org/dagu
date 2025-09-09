@@ -260,6 +260,8 @@ type sshDef struct {
 	Port any `yaml:"port,omitempty"`
 	// Key is the path to the SSH private key.
 	Key string `yaml:"key,omitempty"`
+	// Password is the SSH password.
+	Password string `yaml:"password,omitempty"`
 	// StrictHostKey enables strict host key checking. Defaults to true if not specified.
 	StrictHostKey *bool `yaml:"strictHostKey,omitempty"`
 	// KnownHostFile is the path to the known_hosts file. Defaults to ~/.ssh/known_hosts.

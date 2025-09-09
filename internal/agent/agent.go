@@ -358,6 +358,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			Host:          a.dag.SSH.Host,
 			Port:          a.dag.SSH.Port,
 			Key:           a.dag.SSH.Key,
+			Password:      a.dag.SSH.Password,
 			StrictHostKey: a.dag.SSH.StrictHostKey,
 			KnownHostFile: a.dag.SSH.KnownHostFile,
 		}, a.dag.ParamsMap())

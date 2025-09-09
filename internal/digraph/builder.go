@@ -808,6 +808,7 @@ func buildSSH(_ BuildContext, spec *definition, dag *DAG) error {
 		Host:          spec.SSH.Host,
 		Port:          port,
 		Key:           spec.SSH.Key,
+		Password:      spec.SSH.Password,
 		StrictHostKey: strictHostKey,
 		KnownHostFile: spec.SSH.KnownHostFile,
 	}

@@ -427,6 +427,8 @@ type SSHConfig struct {
 	Port string `json:"port,omitempty"`
 	// Key is the path to the SSH private key.
 	Key string `json:"key,omitempty"`
+	// Password is the SSH password.
+	Password string `json:"password,omitempty"`
 	// StrictHostKey enables strict host key checking. Defaults to true.
 	StrictHostKey bool `json:"strictHostKey,omitempty"`
 	// KnownHostFile is the path to the known_hosts file. Defaults to ~/.ssh/known_hosts.
