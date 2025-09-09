@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph/status"
@@ -12,6 +13,10 @@ import (
 // Pattern mirrors container_test.go: define YAML inline and assert outputs.
 func TestSSHIntegration(t *testing.T) {
 	t.Parallel()
+
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		t.Skip("Skipping SSH integration test on GitHub Actions environment")
+	}
 
 	th := test.Setup(t)
 
