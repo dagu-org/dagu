@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/container"
 	"github.com/dagu-org/dagu/internal/coordinator"
@@ -352,16 +353,23 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create SSH Client if the DAG has SSH configuration.
 	if a.dag.SSH != nil {
-		cli, err := sshutil.NewClient(&sshutil.Config{
+		sshConfig, err := cmdutil.EvalObject(ctx, sshutil.Config{
 			User:          a.dag.SSH.User,
 			Host:          a.dag.SSH.Host,
 			Port:          a.dag.SSH.Port,
 			Key:           a.dag.SSH.Key,
+			Password:      a.dag.SSH.Password,
 			StrictHostKey: a.dag.SSH.StrictHostKey,
 			KnownHostFile: a.dag.SSH.KnownHostFile,
-		})
+		}, a.dag.ParamsMap())
 		if err != nil {
-			return fmt.Errorf("failed to parse ssh config")
+			initErr = fmt.Errorf("failed to evaluate ssh config: %w", err)
+			return initErr
+		}
+		cli, err := sshutil.NewClient(&sshConfig)
+		if err != nil {
+			initErr = fmt.Errorf("failed to create ssh client: %w", err)
+			return initErr
 		}
 		ctx = executor.WithSSHClient(ctx, cli)
 	}

@@ -2,11 +2,26 @@ package cmdutil
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 )
 
-// EvalObject evaluates the given object based on its type.
-func EvalObject(ctx context.Context, obj any, vars map[string]string) (any, error) {
+// EvalObject recursively evaluates the string fields of the given object
+func EvalObject[T any](ctx context.Context, obj T, vars map[string]string) (T, error) {
+	result, err := evalObject(ctx, obj, vars)
+	if err != nil {
+		return obj, err
+	}
+	// If the result is not of type T, we return the original object
+	if _, ok := result.(T); !ok {
+		return obj, fmt.Errorf("expected type %T but got %T", obj, result)
+	}
+	// If the result is of type T, we return it
+	return result.(T), nil
+}
+
+// evalObject evaluates the given object based on its type.
+func evalObject(ctx context.Context, obj any, vars map[string]string) (any, error) {
 	v := reflect.ValueOf(obj)
 	// Handle different types
 	// nolint:exhaustive

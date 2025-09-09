@@ -13,6 +13,7 @@ ssh:
   host: production.example.com
   port: 22
   key: ~/.ssh/deploy_key
+  password: ${SSH_PASSWORD}  # Optional; prefer keys
   strictHostKey: true  # Default: true for security
   knownHostFile: ~/.ssh/known_hosts  # Default: ~/.ssh/known_hosts
 
@@ -45,6 +46,7 @@ steps:
 | `host` | Yes | - | Hostname or IP address |
 | `port` | No | "22" | SSH port |
 | `key` | No | Auto-detect | Private key path (see below) |
+| `password` | No | - | Password (not recommended) |
 | `strictHostKey` | No | `true` | Enable host key verification |
 | `knownHostFile` | No | `~/.ssh/known_hosts` | Known hosts file path |
 
@@ -60,7 +62,7 @@ steps:
 | `strictHostKey` | No | `true` | Enable host key verification |
 | `knownHostFile` | No | `~/.ssh/known_hosts` | Known hosts file path |
 
-**Note:** Password authentication is not available at the DAG level for security reasons.
+Note: Password authentication is supported at both DAG and step level, but key-based authentication is strongly recommended.
 
 ### SSH Key Auto-Detection
 
@@ -78,7 +80,7 @@ If no key is specified, Dagu automatically tries these default SSH keys in order
    - Only disable for testing environments
 
 2. **Key-Based Authentication**: Strongly recommended
-   - DAG-level SSH only supports key-based authentication
+   - Prefer keys over passwords at all times
    - Use dedicated deployment keys with limited permissions
    - Rotate keys regularly
 
