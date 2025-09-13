@@ -50,8 +50,6 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	}
 	// Wrap stderr with a tailing writer so we can include recent
 	// stderr output (rolling, up to limit) in error messages.
-	// If no stderr writer is configured, default to os.Stderr to
-	// preserve the inheritance behavior of exec.Cmd.
 	tw := newTailWriter(e.config.Stderr, 0)
 	e.stderrTail = tw
 	e.config.Stderr = tw

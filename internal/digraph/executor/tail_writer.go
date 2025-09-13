@@ -8,7 +8,7 @@ import (
 
 // defaultStderrTailLimit is the fallback maximum number of bytes
 // to retain from recent stderr output if no override is provided.
-const defaultStderrTailLimit = 1000
+const defaultStderrTailLimit = 5000
 
 // tailWriter forwards to an underlying writer and keeps a rolling
 // tail of recent output up to `max` bytes. Safe for concurrent use.
@@ -21,8 +21,7 @@ type tailWriter struct {
 
 // newTailWriter creates a tailWriter that keeps a rolling buffer
 // of recent output with a maximum size of `max` bytes. If max <= 0,
-// it tries to read from environment variable DAGU_STDERR_TAIL_LIMIT,
-// falling back to defaultStderrTailLimit when unset or invalid.
+// it falls back to defaultStderrTailLimit.
 // If out is nil, it defaults to os.Stderr to preserve exec's behavior.
 func newTailWriter(out io.Writer, max int) *tailWriter {
 	if out == nil {
