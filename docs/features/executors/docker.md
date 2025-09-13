@@ -33,6 +33,74 @@ steps:
     command: echo "hello from container"
 ```
 
+### Configuration Reference (step-level)
+
+Use these fields under `executor.config` for the Docker executor:
+
+```yaml
+steps:
+  - executor:
+      type: docker
+      config:
+        # Provide one of the following (see precedence note below):
+        image: alpine:latest         # Create a new container from this image
+        # containerName: my-running-container  # Exec into an existing container
+
+        # Image pull behavior (string or boolean)
+        pull: missing                # always | missing | never (true->always, false->never)
+
+        # Remove container after step finishes (for new containers)
+        autoRemove: true
+
+        # Target platform for pulling/creating the image
+        platform: linux/amd64
+
+        # Low-level Docker configs (passed through to Docker API)
+        container: {}                # container.Config (env, workingDir, user, exposedPorts, etc.)
+        host: {}                     # hostConfig (binds, portBindings, devices, restartPolicy, etc.)
+        network: {}                  # networkingConfig (endpoints, aliases, etc.)
+
+        # Exec options when using an existing container (containerName)
+        exec:                        # docker ExecOptions (when targeting an existing container)
+          user: root
+          workingDir: /work
+          env: ["DEBUG=1"]
+```
+
+Notes:
+- You must set either `image` or `containerName`. If both are omitted, the step fails validation.
+- Precedence: if `containerName` is set, the executor runs `docker exec` in that container. In this mode, `image`, `container`, `host`, and `network` are not used.
+- When creating a new container (`image` set) and `command` is omitted, Docker uses the image’s default `ENTRYPOINT`/`CMD`.
+- When executing in an existing container (`containerName` set), the container must be running; otherwise the step fails with “container is not running”. The `exec` block controls user/workingDir/env.
+- `host.autoRemove` from raw Docker config is ignored — use top‑level `config.autoRemove` instead.
+- `pull` accepts booleans for backward compatibility: `true` = `always`, `false` = `never`.
+
+### Behavior with DAG‑level `container`
+
+If the DAG has a top‑level `container:` configured, any step using the Docker executor runs inside that shared container via `docker exec`.
+
+- The step’s `config` (including `image`, `container/host/network`, and `exec`) is ignored in this case; only the step’s `command` and `args` are used.
+- To customize working directory or environment for steps in a DAG‑level container, set them on the DAG‑level `container` itself. If you need per‑step image semantics (honor `ENTRYPOINT`/`CMD`), remove the DAG‑level `container` and use the Docker executor per step.
+
+## Validation and Errors
+
+- Required fields:
+  - Step‑level: `config.image` or `config.containerName` must be provided (one is required). If `containerName` is provided, the target container must already be running.
+  - DAG‑level: `container.image` is required.
+- Volume format (DAG‑level `container.volumes`): `source:target[:ro|rw]`
+  - `source` may be absolute, relative to DAG workingDir (`.` or `./...`), or `~`-expanded; otherwise it is treated as a named volume.
+  - Only `ro` or `rw` are valid modes; invalid formats fail with “invalid volume format”.
+- Port format (DAG‑level `container.ports`):
+  - `"80"`, `"8080:80"`, `"127.0.0.1:8080:80"`, optional protocol on container port: `80/tcp|udp|sctp` (default tcp). Invalid forms fail with “invalid port format”.
+- Network (DAG‑level `container.network`):
+  - Accepts `bridge`, `host`, `none`, `container:<name|id>`, or a custom network name. Custom names are added to `EndpointsConfig` automatically.
+- Restart policy (DAG‑level `container.restartPolicy`): supported values are `no`, `always`, `unless-stopped`; other values fail validation.
+- Platform (DAG‑level and step‑level): `linux/amd64`, `linux/arm64`, etc.; invalid platform strings fail.
+- Startup/readiness (DAG‑level):
+  - `startup`: `keepalive` (default), `entrypoint`, `command`. Invalid values fail with an error.
+  - `waitFor`: `running` (default) or `healthy`. If `healthy` is selected but the image has no healthcheck, Dagu falls back to `running` and logs a warning.
+  - `logPattern`: must be a valid regex; invalid patterns fail. Readiness timeout is 120s; on timeout, Dagu reports the last known state.
+
 ## Container Field Configuration
 
 The `container` field supports all Docker configuration options:
