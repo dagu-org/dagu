@@ -68,6 +68,10 @@ steps:
     command: echo "Hello from container"
 ```
 
+::: tip
+If `command` is omitted for a step that creates a new container (`config.image`), Docker uses the image’s default `ENTRYPOINT`/`CMD`.
+:::
+
 ### Image Pull Options
 
 ```yaml
@@ -232,6 +236,14 @@ steps:
             - DEBUG=true
     command: echo "Debug mode"
 ```
+
+::: info
+Validation: Provide either `config.image` (create new container) or `config.containerName` (exec into existing). If both are omitted, the step fails. If both are set, `containerName` takes precedence and the step attempts to exec in that container; `image` and other Docker configs are ignored.
+:::
+
+::: warning
+When a DAG‑level `container:` is configured, Docker‑executor steps run inside that shared container via `docker exec`. In this case, the step’s Docker `config` (including `image`, `container/host/network`, and `exec`) is ignored; only the step’s `command` and `args` are used.
+:::
 
 ### Complete Docker Example
 

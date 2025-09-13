@@ -33,15 +33,19 @@ var (
 	ErrInvalidVolumeFormat              = errors.New("invalid volume format")
 	ErrInvalidPortFormat                = errors.New("invalid port format")
 	ErrContainerIsNotRunning            = errors.New("container is not running")
+	// Validation errors for docker executor map config
+	ErrConflictingImageAndContainerName = errors.New("cannot set both 'image' and 'containerName' in docker executor config")
+	ErrExecOnlyWithContainerName        = errors.New("'exec' options require 'containerName' (exec-in-existing mode)")
+	ErrInvalidOptionsWithContainerName  = errors.New("'container', 'host', 'network', 'pull', 'platform', or 'autoRemove' not supported with 'containerName'")
 )
 
 type Client struct {
-	image      string
-	platform   string
-	platformO  specs.Platform
-	id         string
-	pull       digraph.PullPolicy
-	autoRemove bool
+	image       string
+	platform    string
+	platformO   specs.Platform
+	containerID string
+	pull        digraph.PullPolicy
+	autoRemove  bool
 	// containerConfig is the configuration for new container creation
 	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#Config
 	containerConfig *container.Config
@@ -102,11 +106,11 @@ func (c *Client) Close(ctx context.Context) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.id != "" && c.autoRemove {
-		if err := c.cli.ContainerRemove(ctx, c.id, container.RemoveOptions{Force: true}); err != nil {
+	if c.containerID != "" && c.autoRemove {
+		if err := c.cli.ContainerRemove(ctx, c.containerID, container.RemoveOptions{Force: true}); err != nil {
 			logger.Error(ctx, "docker executor: remove container", "err", err)
 		}
-		c.id = ""
+		c.containerID = ""
 	}
 
 	_ = c.cli.Close()
@@ -116,7 +120,7 @@ func (c *Client) Close(ctx context.Context) {
 // Exec executes the command in the running container
 func (c *Client) Exec(ctx context.Context, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {
 	c.mu.Lock()
-	if c.id == "" {
+	if c.containerID == "" {
 		c.mu.Unlock()
 		return 1, ErrContainerIsNotRunning
 	}
@@ -128,8 +132,8 @@ func (c *Client) Exec(ctx context.Context, cmd []string, stdout, stderr io.Write
 
 // CreateContainerKeepAlive creates the container that lives while the DAG running
 func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
-	if c.id != "" {
-		return fmt.Errorf("container already exists. id=%s", c.id)
+	if c.containerID != "" {
+		return fmt.Errorf("container already exists. id=%s", c.containerID)
 	}
 
 	// Choose startup mode and command
@@ -190,7 +194,7 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 		return fmt.Errorf("failed to start a new container: %w", err)
 	}
 
-	c.id = id
+	c.containerID = id
 
 	// Readiness wait
 	waitMode := c.waitFor
@@ -247,11 +251,11 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 	c.cancel()
 	c.cancel = nil
 
-	if c.id == "" {
+	if c.containerID == "" {
 		return
 	}
 
-	if err := c.cli.ContainerStop(ctx, c.id, container.StopOptions{}); err != nil {
+	if err := c.cli.ContainerStop(ctx, c.containerID, container.StopOptions{}); err != nil {
 		logger.Error(ctx, "docker executor: stop container", "err", err)
 	}
 	// Remove the temporary keep alive file if it exists
@@ -264,7 +268,7 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 // Run executes the command in the container and returns exit code
 func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer) (int, error) {
 	c.mu.Lock()
-	if c.id != "" {
+	if c.containerID != "" {
 		c.mu.Unlock()
 		return c.execInContainer(ctx, c.cli, cmd, stdout, stderr, ExecOptions{})
 	}
@@ -275,7 +279,7 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 		return 1, fmt.Errorf("failed to start a new container: %w", err)
 	}
 
-	c.id = id
+	c.containerID = id
 	c.mu.Unlock()
 
 	var once sync.Once
@@ -286,7 +290,7 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 
 		once.Do(func() {
 			c.mu.Lock()
-			id := c.id
+			id := c.containerID
 			c.mu.Unlock()
 
 			if err := c.cli.ContainerRemove(ctx, id, container.RemoveOptions{Force: true}); err != nil {
@@ -337,7 +341,7 @@ func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd 
 	containerConfig.Image = c.image
 
 	resp, err := cli.ContainerCreate(
-		ctx, &containerConfig, c.hostConfig, c.networkConfig, &c.platformO, c.id,
+		ctx, &containerConfig, c.hostConfig, c.networkConfig, &c.platformO, c.containerID,
 	)
 	if err != nil {
 		return "", err
@@ -353,7 +357,7 @@ func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd 
 func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {
 	// Get container ID from context
 	c.mu.Lock()
-	containerID := c.id
+	containerID := c.containerID
 	c.mu.Unlock()
 
 	// Check if info exists and is running
@@ -869,6 +873,47 @@ func NewFromMapConfigWithAuth(data map[string]any, registryAuths map[string]*dig
 		return nil, ErrImageOrContainerShouldNotBeEmpty
 	}
 
+	// Extract original presence of keys to drive validation (avoid zero-value ambiguity)
+	hasKey := func(k string) bool {
+		_, ok := data[k]
+		return ok
+	}
+
+	nonEmptyMap := func(v any) bool {
+		if v == nil {
+			return false
+		}
+		if m, ok := v.(map[string]any); ok {
+			return len(m) > 0
+		}
+		return true // present and not a map or nil
+	}
+
+	// Determine mode-affecting flags based on input
+	hasImage := strings.TrimSpace(ret.Image) != ""
+	hasContainerName := strings.TrimSpace(ret.ContainerName) != ""
+	hasExec := hasKey("exec") && nonEmptyMap(data["exec"])
+	hasContainerCfg := hasKey("container") && nonEmptyMap(data["container"])
+	hasHostCfg := hasKey("host") && nonEmptyMap(data["host"])
+	hasNetworkCfg := hasKey("network") && nonEmptyMap(data["network"])
+	hasPull := hasKey("pull")
+	hasPlatform := hasKey("platform")
+	hasAutoRemove := hasKey("autoRemove")
+
+	// Validation rules:
+	// - image and containerName are mutually exclusive for step-level Docker executor
+	if hasImage && hasContainerName {
+		return nil, ErrConflictingImageAndContainerName
+	}
+	// - exec options are only valid with containerName (exec-in-existing mode)
+	if hasImage && hasExec && !hasContainerName {
+		return nil, ErrExecOnlyWithContainerName
+	}
+	// - containerName (exec mode) cannot specify new-container options
+	if hasContainerName && (hasContainerCfg || hasHostCfg || hasNetworkCfg || hasPull || hasPlatform || hasAutoRemove) {
+		return nil, ErrInvalidOptionsWithContainerName
+	}
+
 	if ret.AutoRemove != nil {
 		v, err := stringutil.ParseBool(ret.AutoRemove)
 		if err != nil {
@@ -877,10 +922,14 @@ func NewFromMapConfigWithAuth(data map[string]any, registryAuths map[string]*dig
 		autoRemove = v
 	}
 
+	image := strings.TrimSpace(ret.Image)
+	platform := strings.TrimSpace(ret.Platform)
+	containerID := strings.TrimSpace(ret.ContainerName)
+
 	client := &Client{
-		image:           ret.Image,
-		platform:        ret.Platform,
-		id:              ret.ContainerName,
+		image:           image,
+		platform:        platform,
+		containerID:     containerID,
 		pull:            pull,
 		containerConfig: &ret.Container,
 		hostConfig:      &ret.Host,

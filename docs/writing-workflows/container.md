@@ -90,6 +90,17 @@ container:
   keepContainer: true       # Keep after workflow
 ```
 
+### Validation and Errors
+
+- `image` is required.
+- `volumes` must use `source:target[:ro|rw]` format; relative paths are resolved from the DAG `workingDir`; invalid formats fail.
+- `ports` accept `"80"`, `"8080:80"`, `"127.0.0.1:8080:80"`; container port may have `/tcp|udp|sctp` (default tcp); invalid formats fail.
+- `network` accepts `bridge`, `host`, `none`, `container:<name|id>`, or a custom network name.
+- `restartPolicy` supports `no`, `always`, or `unless-stopped`; other values fail.
+- `startup` must be one of `keepalive` (default), `entrypoint`, `command`; invalid values fail.
+- `waitFor` must be `running` (default) or `healthy`; if `healthy` is chosen but no healthcheck exists, Dagu falls back to `running` with a warning.
+- `logPattern` must be a valid regex; readiness waits up to 120s (including `logPattern`), then errors with the last known state.
+
 ## Key Benefits
 
 - **Shared Environment**: All steps share the same filesystem and installed dependencies
@@ -191,6 +202,8 @@ steps:
     # (or you can override using executor config options)
     command: sendConfirmationEmails
 ```
+
+Note: When a DAG‑level `container:` is set, any step using the Docker executor runs inside that shared container via `docker exec`. In that case, the step‑level Docker `config` (such as `image`, `container/host/network`, and `exec`) is ignored, and only the step’s `command` and `args` are used. To apply step‑specific container settings, remove the DAG‑level `container` and use the step‑level Docker executor exclusively.
 
 ## See Also
 

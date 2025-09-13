@@ -46,7 +46,7 @@ func TestParseMapConfig(t *testing.T) {
 				"containerName": "my-container",
 			},
 			expected: &Client{
-				id:              "my-container",
+				containerID:     "my-container",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
 				hostConfig:      &container.HostConfig{},
@@ -63,13 +63,12 @@ func TestParseMapConfig(t *testing.T) {
 			errorMsg:    "containerName or image must be specified",
 		},
 		{
-			name: "full config with all fields",
+			name: "full config for new container (no containerName)",
 			input: map[string]any{
-				"image":         "ubuntu:20.04",
-				"containerName": "test-container",
-				"platform":      "linux/arm64",
-				"pull":          "always",
-				"autoRemove":    true,
+				"image":      "ubuntu:20.04",
+				"platform":   "linux/arm64",
+				"pull":       "always",
+				"autoRemove": true,
 				"container": map[string]any{
 					"Env":        []string{"FOO=bar"},
 					"WorkingDir": "/app",
@@ -82,15 +81,9 @@ func TestParseMapConfig(t *testing.T) {
 				"network": map[string]any{
 					"EndpointsConfig": map[string]any{},
 				},
-				"exec": map[string]any{
-					"User":       "root",
-					"WorkingDir": "/tmp",
-					"Env":        []string{"BAR=baz"},
-				},
 			},
 			expected: &Client{
 				image:      "ubuntu:20.04",
-				id:         "test-container",
 				platform:   "linux/arm64",
 				pull:       digraph.PullPolicyAlways,
 				autoRemove: true,
@@ -106,6 +99,25 @@ func TestParseMapConfig(t *testing.T) {
 				networkConfig: &network.NetworkingConfig{
 					EndpointsConfig: map[string]*network.EndpointSettings{},
 				},
+				execOptions: &container.ExecOptions{},
+			},
+		},
+		{
+			name: "exec mode with containerName and exec options",
+			input: map[string]any{
+				"containerName": "test-container",
+				"exec": map[string]any{
+					"User":       "root",
+					"WorkingDir": "/tmp",
+					"Env":        []string{"BAR=baz"},
+				},
+			},
+			expected: &Client{
+				containerID:     "test-container",
+				pull:            digraph.PullPolicyMissing,
+				containerConfig: &container.Config{},
+				hostConfig:      &container.HostConfig{},
+				networkConfig:   &network.NetworkingConfig{},
 				execOptions: &container.ExecOptions{
 					User:       "root",
 					WorkingDir: "/tmp",
@@ -412,6 +424,35 @@ func TestParseMapConfig(t *testing.T) {
 			errorMsg:    "containerName or image must be specified",
 		},
 		{
+			name: "error when both image and containerName provided",
+			input: map[string]any{
+				"image":         "alpine",
+				"containerName": "test",
+			},
+			expectError: true,
+			errorMsg:    "cannot set both 'image' and 'containerName'",
+		},
+		{
+			name: "error when exec provided with image only",
+			input: map[string]any{
+				"image": "alpine",
+				"exec": map[string]any{
+					"User": "root",
+				},
+			},
+			expectError: true,
+			errorMsg:    "exec' options require 'containerName",
+		},
+		{
+			name: "error when containerName with unsupported options",
+			input: map[string]any{
+				"containerName": "test",
+				"autoRemove":    true,
+			},
+			expectError: true,
+			errorMsg:    "not supported with 'containerName'",
+		},
+		{
 			name: "platform as non-string type",
 			input: map[string]any{
 				"image":    "alpine",
@@ -428,14 +469,12 @@ func TestParseMapConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "containerName as non-string type",
+			name: "containerName as non-string type (exec mode)",
 			input: map[string]any{
-				"image":         "alpine",
 				"containerName": 123, // Not a string
 			},
 			expected: &Client{
-				image:           "alpine",
-				id:              "123",
+				containerID:     "123",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
 				hostConfig:      &container.HostConfig{},
@@ -446,12 +485,10 @@ func TestParseMapConfig(t *testing.T) {
 		{
 			name: "image as non-string type",
 			input: map[string]any{
-				"image":         123, // Not a string
-				"containerName": "test",
+				"image": 123, // Not a string
 			},
 			expected: &Client{
 				image:           "123",
-				id:              "test",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
 				hostConfig:      &container.HostConfig{},
@@ -547,7 +584,7 @@ func TestParseMapConfig(t *testing.T) {
 			},
 			expected: &Client{
 				image:           "alpine",
-				id:              "",
+				containerID:     "",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
 				hostConfig:      &container.HostConfig{},
@@ -563,7 +600,7 @@ func TestParseMapConfig(t *testing.T) {
 			},
 			expected: &Client{
 				image:           "",
-				id:              "test",
+				containerID:     "test",
 				pull:            digraph.PullPolicyMissing,
 				containerConfig: &container.Config{},
 				hostConfig:      &container.HostConfig{},
@@ -585,7 +622,7 @@ func TestParseMapConfig(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected.image, result.image)
-			assert.Equal(t, tt.expected.id, result.id)
+			assert.Equal(t, tt.expected.containerID, result.containerID)
 			assert.Equal(t, tt.expected.platform, result.platform)
 			assert.Equal(t, tt.expected.pull, result.pull)
 			assert.Equal(t, tt.expected.autoRemove, result.autoRemove)
