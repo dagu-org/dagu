@@ -95,6 +95,25 @@ steps:
 		})
 	})
 
+	t.Run("CommandErrorIncludesLastStderrLine", func(t *testing.T) {
+		t.Parallel()
+
+		dag := th.DAG(t, `steps:
+  - name: fail
+    command: bash
+    script: |
+      echo first 1>&2
+      echo second 1>&2
+      exit 7
+`)
+		agent := dag.Agent()
+
+		err := agent.Run(agent.Context)
+		require.Error(t, err)
+		// Should contain the last stderr line
+		require.Contains(t, err.Error(), "second")
+	})
+
 	t.Run("NamedParams", func(t *testing.T) {
 		t.Parallel()
 

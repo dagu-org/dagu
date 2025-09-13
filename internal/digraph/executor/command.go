@@ -24,6 +24,8 @@ type commandExecutor struct {
 	cmd        *exec.Cmd
 	scriptFile string
 	exitCode   int
+	// stderrTail stores a rolling tail of recent stderr lines
+	stderrTail *tailWriter
 }
 
 // ExitCode implements ExitCoder.
@@ -46,6 +48,12 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 			_ = os.Remove(scriptFile)
 		}()
 	}
+	// Wrap stderr with a tailing writer so we can include recent
+	// stderr output (rolling, up to limit) in error messages.
+	tw := newTailWriter(e.config.Stderr, 0)
+	e.stderrTail = tw
+	e.config.Stderr = tw
+
 	cmd, err := e.config.newCmd(ctx, e.scriptFile)
 	if err != nil {
 		e.mu.Unlock()
@@ -57,12 +65,18 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	if err := e.cmd.Start(); err != nil {
 		e.exitCode = exitCodeFromError(err)
 		e.mu.Unlock()
+		if tail := e.stderrTail.Tail(); tail != "" {
+			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
+		}
 		return err
 	}
 	e.mu.Unlock()
 
 	if err := e.cmd.Wait(); err != nil {
 		e.exitCode = exitCodeFromError(err)
+		if tail := e.stderrTail.Tail(); tail != "" {
+			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
+		}
 		return err
 	}
 

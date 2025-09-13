@@ -104,6 +104,11 @@ func (e *docker) Run(ctx context.Context) error {
 
 	defer cancelFunc()
 
+	// Wrap stderr with a tail writer to capture recent output for inclusion in
+	// error messages.
+	tw := newTailWriter(e.stderr, 0)
+	e.stderr = tw
+
 	cli := getContainerClient(ctx)
 	if cli != nil {
 		// If it exists, use the client from the context
@@ -127,10 +132,18 @@ func (e *docker) Run(ctx context.Context) error {
 		e.mu.Lock()
 		e.exitCode = exitCode
 		e.mu.Unlock()
+		if err != nil {
+			if tail := tw.Tail(); tail != "" {
+				return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
+			}
+		}
 		return err
 	}
 
 	if err := e.container.Init(ctx); err != nil {
+		if tail := tw.Tail(); tail != "" {
+			return fmt.Errorf("failed to setup container: %w\nrecent stderr (tail):\n%s", err, tail)
+		}
 		return fmt.Errorf("failed to setup container: %w", err)
 	}
 	defer e.container.Close(ctx)
@@ -151,6 +164,11 @@ func (e *docker) Run(ctx context.Context) error {
 	e.exitCode = exitCode
 	e.mu.Unlock()
 
+	if err != nil {
+		if tail := tw.Tail(); tail != "" {
+			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
+		}
+	}
 	return err
 }
 

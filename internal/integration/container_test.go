@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDockerExecutor(t *testing.T) {
@@ -411,4 +412,29 @@ steps:
 	dag.AssertOutputs(t, map[string]any{
 		"EXEC_EXISTING_OUT": "hello-existing",
 	})
+}
+
+func TestDockerExecutor_ErrorIncludesRecentStderr(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `
+steps:
+  - name: fail
+    executor:
+      type: docker
+      config:
+        image: alpine:3
+        autoRemove: true
+    command: sh -c 'echo first 1>&2; echo second 1>&2; exit 7'
+`)
+
+	agent := dag.Agent()
+
+	err := agent.Run(agent.Context)
+	require.Error(t, err)
+	// Should contain recent stderr from docker executor
+	require.Contains(t, err.Error(), "first")
+	require.Contains(t, err.Error(), "second")
 }
