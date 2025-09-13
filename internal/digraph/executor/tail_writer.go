@@ -1,58 +1,66 @@
 package executor
 
 import (
-    "io"
-    "os"
-    "strings"
-    "sync"
+	"io"
+	"os"
+	"sync"
 )
 
-// tailWriter forwards to an underlying writer and keeps only
-// the last completed line written. Safe for concurrent use.
+// defaultStderrTailLimit is the fallback maximum number of bytes
+// to retain from recent stderr output if no override is provided.
+const defaultStderrTailLimit = 1000
+
+// tailWriter forwards to an underlying writer and keeps a rolling
+// tail of recent output up to `max` bytes. Safe for concurrent use.
 type tailWriter struct {
-    mu         sync.Mutex
-    underlying io.Writer // may be nil; defaults to os.Stderr
-    lastLine   string    // last completed line (without newline)
-    partial    string    // carry-over for incomplete line fragments
+	mu         sync.Mutex
+	underlying io.Writer // may be nil; defaults to os.Stderr
+	max        int       // maximum bytes to retain in buf
+	buf        string    // rolling buffer of recent output
 }
 
-// newTailWriter creates a tailWriter that keeps only the last line.
+// newTailWriter creates a tailWriter that keeps a rolling buffer
+// of recent output with a maximum size of `max` bytes. If max <= 0,
+// it tries to read from environment variable DAGU_STDERR_TAIL_LIMIT,
+// falling back to defaultStderrTailLimit when unset or invalid.
 // If out is nil, it defaults to os.Stderr to preserve exec's behavior.
-func newTailWriter(out io.Writer) *tailWriter {
-    if out == nil {
-        out = os.Stderr
-    }
-    return &tailWriter{underlying: out}
+func newTailWriter(out io.Writer, max int) *tailWriter {
+	if out == nil {
+		out = os.Stderr
+	}
+	if max <= 0 {
+		max = defaultStderrTailLimit
+	}
+	return &tailWriter{underlying: out, max: max}
 }
 
 func (t *tailWriter) Write(p []byte) (int, error) {
-    // Forward to underlying first
-    var n int
-    var err error
-    if t.underlying != nil {
-        n, err = t.underlying.Write(p)
-    } else {
-        n = len(p)
-    }
+	// Forward to underlying first
+	var n int
+	var err error
+	if t.underlying != nil {
+		n, err = t.underlying.Write(p)
+	} else {
+		n = len(p)
+	}
 
-    // Update last completed line
-    t.mu.Lock()
-    data := t.partial + string(p)
-    parts := strings.Split(data, "\n")
-    // All except last are complete lines
-    complete := parts[:len(parts)-1]
-    t.partial = parts[len(parts)-1]
-    if len(complete) > 0 {
-        t.lastLine = complete[len(complete)-1]
-    }
-    t.mu.Unlock()
+	// Update rolling buffer, keeping only the last `max` bytes
+	t.mu.Lock()
+	if len(p) > 0 {
+		t.buf += string(p)
+		if len(t.buf) > t.max {
+			// Keep only the last t.max bytes
+			t.buf = t.buf[len(t.buf)-t.max:]
+		}
+	}
+	t.mu.Unlock()
 
-    return n, err
+	return n, err
 }
 
-// Tail returns the last completed line. If none yet, returns empty string.
+// Tail returns the rolling tail buffer (up to max bytes).
 func (t *tailWriter) Tail() string {
-    t.mu.Lock()
-    defer t.mu.Unlock()
-    return t.lastLine
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.buf
 }

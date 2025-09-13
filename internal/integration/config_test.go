@@ -95,7 +95,7 @@ steps:
 		})
 	})
 
-	t.Run("CommandErrorIncludesLastStderrLine", func(t *testing.T) {
+	t.Run("CommandErrorIncludesRecentStderr", func(t *testing.T) {
 		t.Parallel()
 
 		dag := th.DAG(t, `steps:
@@ -110,7 +110,8 @@ steps:
 
 		err := agent.Run(agent.Context)
 		require.Error(t, err)
-		// Should contain the last stderr line
+		// Should contain recent stderr, not just the last line
+		require.Contains(t, err.Error(), "first")
 		require.Contains(t, err.Error(), "second")
 	})
 

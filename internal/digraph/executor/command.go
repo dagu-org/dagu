@@ -48,11 +48,11 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 			_ = os.Remove(scriptFile)
 		}()
 	}
-	// Wrap stderr with a tailing writer so we can include the last
-	// line in the returned error when a command fails.
+	// Wrap stderr with a tailing writer so we can include recent
+	// stderr output (rolling, up to limit) in error messages.
 	// If no stderr writer is configured, default to os.Stderr to
 	// preserve the inheritance behavior of exec.Cmd.
-	tw := newTailWriter(e.config.Stderr)
+	tw := newTailWriter(e.config.Stderr, 0)
 	e.stderrTail = tw
 	e.config.Stderr = tw
 
@@ -68,7 +68,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 		e.exitCode = exitCodeFromError(err)
 		e.mu.Unlock()
 		if tail := e.stderrTail.Tail(); tail != "" {
-			return fmt.Errorf("%w\nlast stderr lines:\n%s", err, tail)
+			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
 		}
 		return err
 	}
@@ -77,7 +77,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	if err := e.cmd.Wait(); err != nil {
 		e.exitCode = exitCodeFromError(err)
 		if tail := e.stderrTail.Tail(); tail != "" {
-			return fmt.Errorf("%w: %s", err, tail)
+			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
 		}
 		return err
 	}
