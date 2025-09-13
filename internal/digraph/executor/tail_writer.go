@@ -8,7 +8,7 @@ import (
 
 // defaultStderrTailLimit is the fallback maximum number of bytes
 // to retain from recent stderr output if no override is provided.
-const defaultStderrTailLimit = 5000
+const defaultStderrTailLimit = 1024
 
 // tailWriter forwards to an underlying writer and keeps a rolling
 // tail of recent output up to `max` bytes. Safe for concurrent use.
