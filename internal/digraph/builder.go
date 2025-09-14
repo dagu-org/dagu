@@ -2,6 +2,7 @@ package digraph
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -144,7 +145,13 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 			continue
 		}
 		if err := builder.fn(ctx, spec, dag); err != nil {
-			errs.Add(wrapError(builder.name, nil, err))
+			// Avoid duplicating field prefixes like "field 'steps': field 'steps': ..."
+			var le *LoadError
+			if errors.As(err, &le) && le.Field == builder.name {
+				errs.Add(err)
+			} else {
+				errs.Add(wrapError(builder.name, nil, err))
+			}
 		}
 	}
 

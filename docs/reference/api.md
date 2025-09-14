@@ -109,14 +109,20 @@ Retrieves DAG definitions with optional filtering by name and tags.
 
 **Endpoint**: `POST /api/v2/dags`
 
-Creates a new empty DAG file with the specified name.
+Creates a new DAG file with the specified name. Optionally initializes it with a provided YAML specification.
 
 **Request Body**:
 ```json
 {
-  "name": "my-new-dag"
+  "name": "my-new-dag",
+  "spec": "steps:\n  - command: echo hello"  // Optional - YAML spec to initialize the DAG
 }
 ```
+
+**Notes**:
+- If `spec` is provided, it will be validated before creation
+- If validation fails, returns 400 with error details
+- Without `spec`, creates a minimal DAG with a single echo step
 
 **Response (201)**:
 ```json
@@ -354,6 +360,58 @@ Updates the YAML specification of a DAG.
   "message": "Permission denied to edit DAGs"
 }
 ```
+
+### Validate DAG Specification
+
+**Endpoint**: `POST /api/v2/dags/validate`
+
+Validates a DAG YAML specification without persisting any changes. Returns a list of validation errors. When the spec can be partially parsed, the response may include parsed DAG details built with error-tolerant loading.
+
+**Request Body**:
+```json
+{
+  "spec": "steps:\n  - name: step1\n    command: echo hello\n  - name: step2\n    command: echo world\n    depends: [step1]",
+  "name": "optional-dag-name"  // Optional - name to use when spec omits a name
+}
+```
+
+**Response (200)**:
+```json
+{
+  "valid": true,
+  "errors": [],
+  "dag": {
+    "name": "example-dag",
+    "group": "default",
+    "description": "Validated DAG",
+    "schedule": [],
+    "params": [],
+    "defaultParams": "{}",
+    "tags": []
+  }
+}
+```
+
+**Response with errors (200)**:
+```json
+{
+  "valid": false,
+  "errors": [
+    "Step 'step2' depends on non-existent step 'missing_step'",
+    "Invalid cron expression in schedule: '* * * *'"
+  ],
+  "dag": {
+    "name": "example-dag",
+    // Partial DAG details when possible
+  }
+}
+```
+
+**Notes**:
+- Always returns 200 status - check `valid` field to determine if spec is valid
+- `errors` array contains human-readable validation messages
+- `dag` field may contain partial DAG details even when validation fails
+- Use this endpoint to validate DAG specs before creating or updating DAGs
 
 ### Rename DAG
 

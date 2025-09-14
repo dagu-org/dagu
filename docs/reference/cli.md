@@ -179,6 +179,32 @@ dagu start-all --host=0.0.0.0 --port=9000 # Production mode
 
 **Note:** This command now also starts the coordinator service for distributed execution.
 
+### `validate`
+
+Validate a DAG specification for structural correctness.
+
+```bash
+dagu validate [options] DAG_FILE
+```
+
+Checks structural correctness and references (e.g., step dependencies) without evaluating variables or executing the DAG. Returns validation errors in a human-readable format.
+
+```bash
+dagu validate my-workflow.yaml
+```
+
+**Output when valid:**
+```
+DAG spec is valid: my-workflow.yaml (name: my-workflow)
+```
+
+**Output when invalid:**
+```
+Validation failed for my-workflow.yaml
+- Step 'process' depends on non-existent step 'missing_step'
+- Invalid cron expression in schedule: '* * * *'
+```
+
 ### `dry`
 
 Validate a DAG without executing it.
