@@ -76,6 +76,7 @@ func TestRootCommand(t *testing.T) {
 			rootCmd.AddCommand(cmd.CmdStop())
 			rootCmd.AddCommand(cmd.CmdRestart())
 			rootCmd.AddCommand(cmd.CmdDry())
+			rootCmd.AddCommand(cmd.CmdValidate())
 			rootCmd.AddCommand(cmd.CmdStatus())
 			rootCmd.AddCommand(cmd.CmdVersion())
 			rootCmd.AddCommand(cmd.CmdServer())
@@ -164,6 +165,7 @@ func TestRootCommandStructure(t *testing.T) {
 		"stop",
 		"restart",
 		"dry",
+		"validate",
 		"status",
 		"version",
 		"server",
@@ -236,6 +238,7 @@ operations, or remote commands.
 	rootCmd.AddCommand(cmd.CmdStop())
 	rootCmd.AddCommand(cmd.CmdRestart())
 	rootCmd.AddCommand(cmd.CmdDry())
+	rootCmd.AddCommand(cmd.CmdValidate())
 	rootCmd.AddCommand(cmd.CmdStatus())
 	rootCmd.AddCommand(cmd.CmdVersion())
 	rootCmd.AddCommand(cmd.CmdServer())

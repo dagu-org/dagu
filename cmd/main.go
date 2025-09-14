@@ -32,6 +32,7 @@ func init() {
 	rootCmd.AddCommand(cmd.CmdStop())
 	rootCmd.AddCommand(cmd.CmdRestart())
 	rootCmd.AddCommand(cmd.CmdDry())
+	rootCmd.AddCommand(cmd.CmdValidate())
 	rootCmd.AddCommand(cmd.CmdStatus())
 	rootCmd.AddCommand(cmd.CmdVersion())
 	rootCmd.AddCommand(cmd.CmdServer())

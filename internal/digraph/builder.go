@@ -1,6 +1,7 @@
 package digraph
 
 import (
+    "errors"
 	"context"
 	"fmt"
 	"os"
@@ -139,14 +140,20 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 	}
 
 	var errs ErrorList
-	for _, builder := range builderRegistry {
-		if !builder.metadata && ctx.opts.OnlyMetadata {
-			continue
-		}
-		if err := builder.fn(ctx, spec, dag); err != nil {
-			errs.Add(wrapError(builder.name, nil, err))
-		}
-	}
+    for _, builder := range builderRegistry {
+        if !builder.metadata && ctx.opts.OnlyMetadata {
+            continue
+        }
+        if err := builder.fn(ctx, spec, dag); err != nil {
+            // Avoid duplicating field prefixes like "field 'steps': field 'steps': ..."
+            var le *LoadError
+            if errors.As(err, &le) && le.Field == builder.name {
+                errs.Add(err)
+            } else {
+                errs.Add(wrapError(builder.name, nil, err))
+            }
+        }
+    }
 
 	if len(errs) > 0 {
 		if ctx.opts.AllowBuildErrors {
