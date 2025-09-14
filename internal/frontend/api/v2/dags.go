@@ -38,6 +38,7 @@ func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRe
 	dag, err := a.dagRunMgr.LoadYAML(
 		ctx,
 		[]byte(request.Body.Spec),
+		digraph.WithoutEval(),
 		digraph.WithName(name),
 		digraph.WithAllowBuildErrors(),
 	)

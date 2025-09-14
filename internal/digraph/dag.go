@@ -222,6 +222,11 @@ func (d *DAG) String() string {
 
 // Validate performs basic validation of the DAG structure
 func (d *DAG) Validate() error {
+	// If Name is not set, return an error
+	if d.Name == "" {
+		return fmt.Errorf("DAG name is required")
+	}
+
 	// Ensure all referenced steps exist
 	stepMap := make(map[string]bool)
 	for _, step := range d.Steps {
