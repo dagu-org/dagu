@@ -18,6 +18,11 @@ import (
 	"github.com/dagu-org/dagu/internal/models"
 )
 
+// ValidateDAGSpec implements api.StrictServerInterface.
+func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRequestObject) (api.ValidateDAGSpecResponseObject, error) {
+	panic("unimplemented")
+}
+
 func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestObject) (api.CreateNewDAGResponseObject, error) {
 	if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
 		return nil, err

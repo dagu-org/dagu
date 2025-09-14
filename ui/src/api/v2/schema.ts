@@ -68,6 +68,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dags/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate a DAG specification
+         * @description Validates a DAG YAML specification without persisting any changes.
+         *
+         *     Returns a list of validation errors. When the spec can be partially parsed,
+         *     the response may also include parsed DAG details built with error-tolerant loading.
+         *
+         */
+        post: operations["validateDAGSpec"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dags/{fileName}": {
         parameters: {
             query?: never;
@@ -1340,6 +1364,53 @@ export interface operations {
                     "application/json": {
                         /** @description Name of the newly created DAG */
                         name: string;
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    validateDAGSpec: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description DAG specification in YAML format */
+                    spec: string;
+                    /** @description Optional name to use when the spec omits a name */
+                    name?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Validation result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description True if the spec is valid (no errors) */
+                        valid: boolean;
+                        dag?: components["schemas"]["DAGDetails"];
+                        /** @description List of validation errors */
+                        errors: string[];
                     };
                 };
             };
