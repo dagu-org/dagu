@@ -53,7 +53,7 @@ func runValidate(ctx *Context, args []string) error {
 	}
 
 	// Success
-	fmt.Fprintf(ctx.Command.OutOrStdout(), "DAG spec is valid: %s (name: %s)\n", args[0], dag.GetName())
+	_, _ = fmt.Fprintf(ctx.Command.OutOrStdout(), "DAG spec is valid: %s (name: %s)\n", args[0], dag.GetName())
 	return nil
 }
 
