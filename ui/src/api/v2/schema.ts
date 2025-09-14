@@ -1351,6 +1351,8 @@ export interface operations {
             content: {
                 "application/json": {
                     name: components["schemas"]["DAGName"];
+                    /** @description Optional DAG spec in YAML format to initialize the DAG. If provided, the spec will be validated before creation. */
+                    spec?: string;
                 };
             };
         };
@@ -1365,6 +1367,15 @@ export interface operations {
                         /** @description Name of the newly created DAG */
                         name: string;
                     };
+                };
+            };
+            /** @description Invalid DAG spec */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Generic error response */

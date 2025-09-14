@@ -20,51 +20,51 @@ import (
 
 // ValidateDAGSpec implements api.StrictServerInterface.
 func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRequestObject) (api.ValidateDAGSpecResponseObject, error) {
-    // Parse and validate the provided spec without persisting it.
-    // Use AllowBuildErrors so we can return partial DAG details alongside errors.
-    var name string
-    if request.Body != nil && request.Body.Name != nil {
-        name = *request.Body.Name
-    }
+	// Parse and validate the provided spec without persisting it.
+	// Use AllowBuildErrors so we can return partial DAG details alongside errors.
+	var name string
+	if request.Body != nil && request.Body.Name != nil {
+		name = *request.Body.Name
+	}
 
-    if request.Body == nil {
-        return nil, &Error{
-            HTTPStatus: http.StatusBadRequest,
-            Code:       api.ErrorCodeBadRequest,
-            Message:    "request body is required",
-        }
-    }
+	if request.Body == nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "request body is required",
+		}
+	}
 
-    dag, err := a.dagRunMgr.LoadYAML(
-        ctx,
-        []byte(request.Body.Spec),
-        digraph.WithName(name),
-        digraph.WithAllowBuildErrors(),
-    )
+	dag, err := a.dagRunMgr.LoadYAML(
+		ctx,
+		[]byte(request.Body.Spec),
+		digraph.WithName(name),
+		digraph.WithAllowBuildErrors(),
+	)
 
-    var errs []string
-    var loadErrs digraph.ErrorList
-    if errors.As(err, &loadErrs) {
-        errs = loadErrs.ToStringList()
-    } else if err != nil {
-        // Unexpected fatal error
-        return nil, err
-    }
+	var errs []string
+	var loadErrs digraph.ErrorList
+	if errors.As(err, &loadErrs) {
+		errs = loadErrs.ToStringList()
+	} else if err != nil {
+		// Unexpected fatal error
+		return nil, err
+	}
 
-    if dag != nil && len(dag.BuildErrors) > 0 {
-        for _, e := range dag.BuildErrors {
-            errs = append(errs, e.Error())
-        }
-    }
+	if dag != nil && len(dag.BuildErrors) > 0 {
+		for _, e := range dag.BuildErrors {
+			errs = append(errs, e.Error())
+		}
+	}
 
-    // Build response
-    details := toDAGDetails(dag)
+	// Build response
+	details := toDAGDetails(dag)
 
-    return &api.ValidateDAGSpec200JSONResponse{
-        Valid:  len(errs) == 0,
-        Dag:    details,
-        Errors: errs,
-    }, nil
+	return &api.ValidateDAGSpec200JSONResponse{
+		Valid:  len(errs) == 0,
+		Dag:    details,
+		Errors: errs,
+	}, nil
 }
 
 func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestObject) (api.CreateNewDAGResponseObject, error) {
@@ -72,9 +72,33 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 		return nil, err
 	}
 
-	spec := []byte(`steps:
+	// Determine spec to create with: provided spec or default template
+	var spec []byte
+	if request.Body.Spec != nil && strings.TrimSpace(*request.Body.Spec) != "" {
+		// Validate provided spec before creating
+		if _, err := a.dagRunMgr.LoadYAML(ctx, []byte(*request.Body.Spec), digraph.WithName(request.Body.Name)); err != nil {
+			var verrs digraph.ErrorList
+			if errors.As(err, &verrs) {
+				// Return 400 with summary of errors
+				return nil, &Error{
+					HTTPStatus: http.StatusBadRequest,
+					Code:       api.ErrorCodeBadRequest,
+					Message:    strings.Join(verrs.ToStringList(), "; "),
+				}
+			}
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+			}
+		}
+		spec = []byte(*request.Body.Spec)
+	} else {
+		// Default minimal spec
+		spec = []byte(`steps:
   - command: echo hello
 `)
+	}
 
 	if err := a.dagStore.Create(ctx, request.Body.Name, spec); err != nil {
 		if errors.Is(err, models.ErrDAGAlreadyExists) {
