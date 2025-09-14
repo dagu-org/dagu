@@ -102,6 +102,25 @@ dagu status my-workflow.yaml
 # or check log files in the configured log directory
 ```
 
+### Testing and Validation
+
+#### Validate DAG Specification
+```bash
+# Validate DAG structure and references
+dagu validate my-workflow.yaml
+
+# Returns human-readable validation errors if any
+```
+
+#### Dry Run
+```bash
+# Test DAG execution without running it
+dagu dry my-workflow.yaml
+
+# With parameters
+dagu dry my-workflow.yaml -- DATE=2024-01-01
+```
+
 ### Server Commands
 
 #### Start Everything

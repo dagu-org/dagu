@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### New Features
+- CLI: Added `dagu validate` command to validate DAG specifications without executing them. Prints human‑readable errors and exits with code 1 on failure.
+- API: Added `POST /api/v2/dags/validate` to validate DAG YAML. Returns `{ valid: boolean, errors: string[], dag?: DAGDetails }`.
+- API: `POST /api/v2/dags` now accepts optional `spec` to initialize a DAG. The spec is validated before creation and returns 400 on invalid input.
+
+### Improvements
+- Validation error messages are deduplicated at the source to avoid repeated prefixes like `field 'steps': field 'steps': ...`.
+
+
 ## v1.22.0 (2025-08-24)
 
 ### New Features

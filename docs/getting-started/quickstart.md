@@ -88,6 +88,16 @@ Progress: ███████████████████████�
 
 *Note: The output may vary if you are using Docker.*
 
+### 2.5. Validate (optional)
+
+Before running, you can validate the DAG structure without executing it:
+
+```bash
+dagu validate ~/.config/dagu/dags/hello.yaml
+```
+
+If there are issues, the command prints human‑readable errors and exits with code 1.
+
 ### 3. Check the status
 
 ::: code-group

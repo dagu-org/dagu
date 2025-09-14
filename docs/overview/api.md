@@ -57,9 +57,52 @@ curl http://localhost:8080/api/v2/dags/my-dag.yaml
 
 #### Create New DAG
 ```bash
+# Create with default template
 curl -X POST http://localhost:8080/api/v2/dags \
   -H "Content-Type: application/json" \
   -d '{"name": "my-new-dag"}'
+
+# Create with custom specification (validated before creation)
+curl -X POST http://localhost:8080/api/v2/dags \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-new-dag",
+    "spec": "steps:\n  - command: echo hello"
+  }'
+```
+
+#### Validate DAG Specification
+```bash
+curl -X POST http://localhost:8080/api/v2/dags/validate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "spec": "steps:\n  - command: echo hello",
+    "name": "optional-dag-name"
+  }'
+```
+
+Validates DAG specifications without saving. Returns a validity flag, validation errors, and parsed DAG details when possible.
+
+Example response (valid):
+```json
+{
+  "valid": true,
+  "errors": [],
+  "dag": {
+    "name": "my-new-dag"
+  }
+}
+```
+
+Example response (invalid):
+```json
+{
+  "valid": false,
+  "errors": [
+    "field 'steps': decoding failed due to the following error(s):",
+    "invalid keys: command1"
+  ]
+}
 ```
 
 ### DAG Execution Control
