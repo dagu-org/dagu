@@ -2,8 +2,11 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
@@ -13,6 +16,147 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/models"
 )
+
+// ExecuteDAGRunFromSpec implements api.StrictServerInterface.
+func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGRunFromSpecRequestObject) (api.ExecuteDAGRunFromSpecResponseObject, error) {
+	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
+	if request.Body == nil || request.Body.Spec == "" {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "spec is required",
+		}
+	}
+
+	// Determine dagRunId upfront (used for unique temp dir path)
+	var dagRunId, params string
+	var singleton bool
+	if request.Body.DagRunId != nil {
+		dagRunId = *request.Body.DagRunId
+	}
+	if dagRunId == "" {
+		var genErr error
+		dagRunId, genErr = a.dagRunMgr.GenDAGRunID(ctx)
+		if genErr != nil {
+			return nil, fmt.Errorf("error generating dag-run ID: %w", genErr)
+		}
+	}
+	if request.Body.Params != nil {
+		params = *request.Body.Params
+	}
+	if request.Body.Singleton != nil {
+		singleton = *request.Body.Singleton
+	}
+
+	// Create a temporary DAG directory and file from the provided spec
+	nameHint := "inline"
+	if request.Body.Name != nil && *request.Body.Name != "" {
+		// Validate provided name using shared digraph validation
+		if err := digraph.ValidateDAGName(*request.Body.Name); err != nil {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+			}
+		}
+		nameHint = *request.Body.Name
+	} else {
+		// Validate the DAG spec has a name
+		dag, err := digraph.LoadYAML(
+			ctx, []byte(request.Body.Spec),
+			digraph.WithoutEval(),
+		)
+		if err != nil {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+			}
+		}
+		// Validate ensures the DAG has a name
+		if err := dag.Validate(); err != nil {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+			}
+		}
+	}
+
+	tmpDir := filepath.Join(os.TempDir(), nameHint, dagRunId)
+	if err := os.MkdirAll(tmpDir, 0o750); err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	// Ensure cleanup on all return paths
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+	tfPath := filepath.Join(tmpDir, fmt.Sprintf("%s.yaml", nameHint))
+	if err := os.WriteFile(tfPath, []byte(request.Body.Spec), 0o600); err != nil {
+		return nil, fmt.Errorf("failed to write spec to temp file: %w", err)
+	}
+
+	// Load the DAG from the temp file to validate and prepare execution
+	var loadOpts []digraph.LoadOption
+	if request.Body.Name != nil && *request.Body.Name != "" {
+		loadOpts = append(loadOpts, digraph.WithName(*request.Body.Name))
+	}
+	dag, err := digraph.Load(ctx, tfPath, loadOpts...)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
+	}
+
+	// Ensure the dag-run ID is not already used for this DAG name
+	if _, err := a.dagRunStore.FindAttempt(ctx, digraph.DAGRunRef{Name: dag.Name, ID: dagRunId}); !errors.Is(err, models.ErrDAGRunIDNotFound) {
+		return nil, &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeAlreadyExists,
+			Message:    fmt.Sprintf("dag-run ID %s already exists for DAG %s", dagRunId, dag.Name),
+		}
+	}
+
+	// Concurrency checks similar to ExecuteDAG
+	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to access proc store: %w", err)
+	}
+	if singleton || dag.MaxActiveRuns == 1 {
+		if liveCount > 0 {
+			return nil, &Error{
+				HTTPStatus: http.StatusConflict,
+				Code:       api.ErrorCodeMaxRunReached,
+				Message:    fmt.Sprintf("DAG %s is already running, cannot start", dag.Name),
+			}
+		}
+	}
+
+	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read queue: %w", err)
+	}
+	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
+		return nil, &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeMaxRunReached,
+			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns),
+		}
+	}
+
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, singleton); err != nil {
+		return nil, fmt.Errorf("error starting dag-run: %w", err)
+	}
+
+	return api.ExecuteDAGRunFromSpec200JSONResponse{
+		DagRunId: dagRunId,
+	}, nil
+}
+
+// no sanitize helper: DAG name is validated by digraph.ValidateDAGName
 
 func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObject) (api.ListDAGRunsResponseObject, error) {
 	var opts []models.ListDAGRunStatusesOption

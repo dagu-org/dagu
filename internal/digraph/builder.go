@@ -527,12 +527,8 @@ func buildName(ctx BuildContext, spec *definition, dag *DAG) error {
 	if dag.Name == "" {
 		return nil
 	}
-
-	if len(dag.Name) > maxNameLen {
-		return wrapError("name", dag.Name, ErrNameTooLong)
-	}
-	if !regexName.MatchString(dag.Name) {
-		return wrapError("name", dag.Name, ErrNameInvalidChars)
+	if err := ValidateDAGName(dag.Name); err != nil {
+		return wrapError("name", dag.Name, err)
 	}
 
 	return nil
@@ -584,13 +580,6 @@ func buildType(_ BuildContext, spec *definition, dag *DAG) error {
 		return wrapError("type", dag.Type, fmt.Errorf("invalid type: %s (must be one of: graph, chain, agent)", dag.Type))
 	}
 }
-
-// regexName is a regular expression that matches valid names.
-// It allows alphanumeric characters, underscores, hyphens, and dots.
-var regexName = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
-
-// maxNameLen is the maximum length of a name.
-var maxNameLen = 40
 
 // buildEnvs builds the environment variables for the DAG.
 // Case 1: env is an array of maps with string keys and string values.
