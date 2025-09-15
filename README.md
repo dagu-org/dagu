@@ -11,14 +11,16 @@
   
   <p>
     <a href="https://dagu.cloud/">Website</a> |
-    <a href="https://docs.dagu.cloud/getting-started/quickstart">Quick Start</a> |
-    <a href="https://discord.gg/gpahPUjGRk">Discussions</a>
+    <a href="https://docs.dagu.cloud/writing-workflows/examples">Examples</a> |
+    <a href="https://discord.gg/gpahPUjGRk">Discord</a>
   </p>
 </div>
 
 ## What is Dagu?
 
-Dagu is a lightweight workflow engine packaged in a single binary, with a modern Web UI. Workflows are defined in a simple, declarative YAML format and can be executed on schedule. It supports shell commands, remote execution via SSH, and Docker images. Built-in error notifications and logging out of the box.
+Dagu is a lightweight workflow engine with a modern Web UI. Workflows are defined in a simple, declarative YAML format and can be executed on schedule. It supports shell commands, remote execution via SSH, and Docker images. Built-in error notifications and logging out of the box.
+
+For a quick feel of how it works, take a look at the [examples](https://docs.dagu.cloud/writing-workflows/examples).
 
 ### Motivation
 
