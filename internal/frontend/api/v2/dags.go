@@ -35,6 +35,10 @@ func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRe
 		}
 	}
 
+	if name == "" {
+		name = "validated-dag"
+	}
+
 	dag, err := a.dagRunMgr.LoadYAML(
 		ctx,
 		[]byte(request.Body.Spec),
