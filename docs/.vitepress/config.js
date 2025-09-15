@@ -32,8 +32,8 @@ const fullSidebar = [
       { text: "Parameters", link: "/writing-workflows/parameters" },
       { text: "Control Flow", link: "/writing-workflows/control-flow" },
       { text: "Data & Variables", link: "/writing-workflows/data-variables" },
+      { text: "Resource Limits", link: "/writing-workflows/resource-limits" },
       { text: "Error Handling", link: "/writing-workflows/error-handling" },
-      { text: "Advanced Patterns", link: "/writing-workflows/advanced" },
     ],
   },
   {
@@ -105,10 +105,20 @@ const fullSidebar = [
           },
         ],
       },
-      { text: "Deployment", link: "/configurations/deployment" },
+      {
+        text: "Deployment",
+        collapsed: false,
+        items: [
+          { text: "Overview", link: "/configurations/deployment" },
+          { text: "macOS Service", link: "/configurations/deployment/macos" },
+          { text: "Linux Systemd", link: "/configurations/deployment/systemd" },
+          { text: "Docker", link: "/configurations/deployment/docker" },
+          { text: "Docker Compose", link: "/configurations/deployment/docker-compose" },
+        ],
+      },
       { text: "Operations", link: "/configurations/operations" },
-      { text: "Advanced Setup", link: "/configurations/advanced" },
-      { text: "Configuration Reference", link: "/configurations/reference" },
+      { text: "Remote Nodes", link: "/configurations/remote-nodes" },
+      { text: "Reference", link: "/configurations/reference" },
     ],
   },
   {

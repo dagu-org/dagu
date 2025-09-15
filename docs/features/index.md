@@ -28,7 +28,7 @@ Dagu provides a comprehensive set of features for building and managing workflow
 ## Monitoring & Observability
 - [Error Notifications](/features/notifications)
 - [OpenTelemetry Tracing](/features/opentelemetry)
-- [Remote Instance Management](/configurations/advanced)
+- [Remote Instance Management](/configurations/remote-nodes)
 
 ## Advanced Features
 - [Distributed Execution](/features/distributed-execution)

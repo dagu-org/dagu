@@ -410,4 +410,4 @@ When not specified, these paths are automatically set based on `paths.dataDir`:
 
 - [Server Configuration](/configurations/server)
 - [Production Setup](/configurations/operations)
-- [Advanced Patterns](/configurations/advanced)
+- [Deployment Guides](/configurations/deployment)

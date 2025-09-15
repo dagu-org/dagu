@@ -307,5 +307,5 @@ handlerOn:
 ## See Also
 
 - [Server Configuration](/configurations/server) - Configure server settings
-- [Advanced Setup](/configurations/advanced) - High availability and scaling
+- [Deployment](/configurations/deployment) - Installation and deployment guides
 - [Reference](/configurations/reference) - Complete configuration reference

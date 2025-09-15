@@ -73,3 +73,34 @@ steps:
       - API_VERSION: ${VERSION:-v1}
     command: ./app
 ```
+
+## Enforcing Fixed Parameters
+
+Prevent users from modifying critical parameters:
+
+```yaml
+runConfig:
+  disableParamEdit: true  # Parameters cannot be changed
+  disableRunIdEdit: false # Custom run IDs still allowed
+
+params:
+  - ENVIRONMENT: production  # Always production
+  - DB_HOST: prod.db.example.com
+  - SAFETY_MODE: enabled
+
+steps:
+  - echo "Deploying to ${ENVIRONMENT} with DB ${DB_HOST}"
+```
+
+## Enforcing Run ID Format
+
+Ensure consistent run ID naming:
+
+```yaml
+runConfig:
+  disableParamEdit: false  # Parameters can be changed
+  disableRunIdEdit: true   # Must use auto-generated run IDs
+
+steps:
+  - echo "Auditing run ${DAG_RUN_ID}"
+```

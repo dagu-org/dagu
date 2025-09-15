@@ -15,4 +15,4 @@ Or explore the full configuration documentation:
 - [Configuration Overview](/configurations/) - Getting started with configuration
 - [Installation & Setup](/getting-started/installation) - Initial setup guide
 - [Operations Guide](/configurations/operations) - Production deployment
-- [Advanced Setup](/configurations/advanced) - Complex configurations
+- [Deployment Guides](/configurations/deployment) - Platform-specific installation
