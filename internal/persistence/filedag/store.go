@@ -159,7 +159,11 @@ func (store *Storage) LoadSpec(ctx context.Context, spec []byte, opts ...digraph
 // UpdateSpec updates the specification of a DAG by its name.
 func (store *Storage) UpdateSpec(ctx context.Context, name string, spec []byte) error {
 	// Validate the spec before saving it.
-	dag, err := digraph.LoadYAML(ctx, spec, digraph.WithoutEval())
+	dag, err := digraph.LoadYAML(ctx,
+		spec,
+		digraph.WithoutEval(),
+		digraph.WithName(name),
+	)
 	if err != nil {
 		return err
 	}

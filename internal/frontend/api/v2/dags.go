@@ -22,7 +22,7 @@ import (
 func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRequestObject) (api.ValidateDAGSpecResponseObject, error) {
 	// Parse and validate the provided spec without persisting it.
 	// Use AllowBuildErrors so we can return partial DAG details alongside errors.
-	var name string
+	name := "validated-dag"
 	if request.Body != nil && request.Body.Name != nil {
 		name = *request.Body.Name
 	}

@@ -119,18 +119,7 @@ function DAGEditor({
     document.documentElement.classList.contains('dark');
 
   return (
-    <div
-      className={`relative transition-all duration-300 ${
-        readOnly
-          ? 'border border-transparent bg-slate-50 dark:bg-zinc-800/50 rounded-lg'
-          : 'border-2 border-blue-400 dark:border-blue-600 bg-white dark:bg-zinc-900 rounded-lg shadow-lg shadow-blue-100 dark:shadow-blue-900/20'
-      } ${className}`}
-    >
-      {!readOnly && (
-        <div className="absolute top-0 right-0 z-10 bg-blue-500 dark:bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded-bl-md rounded-tr-md">
-          EDIT MODE
-        </div>
-      )}
+    <div className={`relative transition-all duration-300 rounded-lg ${className}`}>
       <MonacoEditor
         height="400px"
         language="yaml"

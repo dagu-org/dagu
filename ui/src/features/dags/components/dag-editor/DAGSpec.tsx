@@ -4,7 +4,7 @@
  * @module features/dags/components/dag-editor
  */
 import BorderedBox from '@/ui/BorderedBox';
-import { AlertTriangle, Code, Edit, Eye, Save, X } from 'lucide-react';
+import { AlertTriangle, Save } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
 import { components } from '../../../../api/v2/schema';
@@ -39,8 +39,8 @@ function DAGSpec({ fileName }: Props) {
   const config = useConfig();
   const { showToast } = useSimpleToast();
 
-  // State for editing mode and current YAML value
-  const [editing, setEditing] = React.useState(false);
+  // Editability is derived from permissions; no explicit toggle
+  const editable = !!config.permissions.writeDags;
   const [currentValue, setCurrentValue] = React.useState<string | undefined>();
   const [scrollPosition, setScrollPosition] = React.useState(0);
   const [activeTab, setActiveTab] = React.useState('parent');
@@ -125,7 +125,7 @@ function DAGSpec({ fileName }: Props) {
 
       return () => clearTimeout(timer);
     }
-  }, [scrollPosition, editing]);
+  }, [scrollPosition]);
 
   // Show loading indicator while fetching data
   if (isLoading) {
@@ -307,42 +307,22 @@ function DAGSpec({ fileName }: Props) {
               )}
 
               <div
-                className={`rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden ${editing
-                    ? 'bg-white dark:bg-slate-900 border-2 border-blue-400 dark:border-blue-600'
-                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
-                  }`}
+                className={
+                  'rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                }
               >
                 <div
-                  className={`border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center ${editing
-                      ? 'bg-blue-50 dark:bg-blue-900/10'
-                      : 'bg-slate-50 dark:bg-slate-800/50'
-                    }`}
+                  className={
+                    'border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50'
+                  }
                 >
                   <div className="flex items-center">
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mr-3">
                       Definition
                     </h2>
-                    <div
-                      className={`text-xs font-medium px-2 py-1 rounded-full transition-all duration-300 ${editing
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                        }`}
-                    >
-                      {editing ? (
-                        <div className="flex items-center">
-                          <Code className="h-3 w-3 mr-1" />
-                          <span>Editing</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center">
-                          <Eye className="h-3 w-3 mr-1" />
-                          <span>Viewing</span>
-                        </div>
-                      )}
-                    </div>
                   </div>
 
-                  {editing && config.permissions.writeDags ? (
+                  {editable ? (
                     <div className="flex gap-2">
                       <Button
                         id="save-config"
@@ -384,53 +364,26 @@ function DAGSpec({ fileName }: Props) {
                           // Show success toast notification
                           showToast('Changes saved successfully');
 
-                          setEditing(false);
                           props.refresh();
                         }}
                       >
                         <Save className="h-4 w-4 mr-1" />
                         Save Changes
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="cursor-pointer hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-900/20 dark:hover:text-red-400 dark:hover:border-red-800 transition-colors duration-200"
-                        onClick={() => {
-                          saveScrollPosition();
-                          setEditing(false);
-                        }}
-                      >
-                        <X className="h-4 w-4 mr-1" />
-                        Cancel
-                      </Button>
                     </div>
-                  ) : config.permissions.writeDags ? (
-                    <Button
-                      id="edit-config"
-                      variant="outline"
-                      size="sm"
-                      className="cursor-pointer hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 dark:hover:border-blue-800 transition-colors duration-200"
-                      onClick={() => {
-                        saveScrollPosition();
-                        setEditing(true);
-                      }}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
                   ) : null}
                 </div>
 
                 <div className="p-6">
                   <DAGEditor
-                    value={data.spec}
-                    readOnly={!editing || !config.permissions.writeDags}
+                    value={editable ? (currentValue ?? data.spec) : data.spec}
+                    readOnly={!editable}
                     lineNumbers={true}
                     onChange={
-                      editing && config.permissions.writeDags
+                      editable
                         ? (newValue) => {
-                          setCurrentValue(newValue || '');
-                        }
+                            setCurrentValue(newValue || '');
+                          }
                         : undefined
                     }
                   />
