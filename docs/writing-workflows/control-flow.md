@@ -31,6 +31,96 @@ steps:
       - download-b
 ```
 
+## Modular Workflows and Iteration Patterns
+
+### Nested Workflows
+
+Run other workflows as steps and compose them hierarchically.
+
+```yaml
+steps:
+  - run: workflows/extract.yaml
+    params: "SOURCE=production"
+
+  - run: workflows/transform.yaml
+    params: "INPUT=${extract.output}"
+
+  - run: workflows/load.yaml
+    params: "DATA=${transform.output}"
+```
+
+### Multiple DAGs in One File
+
+Define multiple DAGs separated by `---` and call by name.
+
+```yaml
+steps:
+  - run: data-processor
+    params: "TYPE=daily"
+
+---
+
+name: data-processor
+params:
+  - TYPE: "batch"
+steps:
+  - echo "Extracting ${TYPE} data"
+  - echo "Transforming data"
+```
+
+### Dynamic Iteration
+
+Discover work at runtime and iterate over it in parallel.
+
+```yaml
+steps:
+  - command: |
+      echo '["file1.csv","file2.csv","file3.csv"]'
+    output: TASK_LIST
+
+  - run: worker
+    parallel:
+      items: ${TASK_LIST}
+      maxConcurrent: 1
+    params: "FILE=${ITEM}"
+
+---
+name: worker
+params:
+  - FILE: ""
+steps:
+  - echo "Processing ${FILE}"
+
+```
+
+### Map-Reduce Pattern
+
+Split, map in parallel, then reduce results.
+
+```yaml
+steps:
+  - command: |
+      echo '["chunk1","chunk2","chunk3"]'
+    output: CHUNKS
+
+  - run: worker
+    parallel:
+      items: ${CHUNKS}
+      maxConcurrent: 3
+    params: "CHUNK=${ITEM}"
+    output: MAP_RESULTS
+
+  - |
+      echo "Reducing results from ${MAP_RESULTS.outputs}"
+---
+name: worker
+params:
+  - CHUNK: ""
+steps:
+  - command: echo "Processing ${CHUNK}"
+    output: RESULT
+```
+
 ## Conditional Execution
 
 Run steps only when conditions are met.
@@ -327,29 +417,4 @@ skipIfSuccessful: true  # Skip if already ran successfully today (e.g., run manu
 
 steps:
   - echo "Syncing data"
-```
-
-## Advanced Patterns
-
-### Conditional Branching
-
-```yaml
-params:
-  - ACTION: "deploy"
-
-steps:
-  - command: echo "Building application"
-    preconditions:
-      - condition: "${ACTION}"
-        expected: "re:build|deploy"
-        
-  - command: echo "Running tests"
-    preconditions:
-      - condition: "${ACTION}"
-        expected: "re:test|deploy"
-    
-  - command: echo "Deploying application"
-    preconditions:
-      - condition: "${ACTION}"
-        expected: "deploy"
 ```

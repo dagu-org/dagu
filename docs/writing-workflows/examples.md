@@ -479,7 +479,7 @@ graph TD
   style T stroke:lime,stroke-width:1.6px,color:#333
 ```
 
-<a href="/writing-workflows/advanced#multiple-dags" class="learn-more">Learn more →</a>
+<a href="/writing-workflows/control-flow#multiple-dags-in-one-file" class="learn-more">Learn more →</a>
 
 </div>
 

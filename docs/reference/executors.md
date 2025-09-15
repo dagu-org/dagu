@@ -646,7 +646,7 @@ steps:
 ## DAG Executor
 
 ::: info
-DAG executor allows running other workflows as steps. This is documented in the [Nested Workflows](/writing-workflows/advanced#nested-workflows) section.
+DAG executor allows running other workflows as steps. See [Nested Workflows](/writing-workflows/control-flow#nested-workflows).
 :::
 
 Execute other workflows as steps, enabling workflow composition.

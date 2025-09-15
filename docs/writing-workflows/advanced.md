@@ -1,6 +1,15 @@
-# Advanced Patterns
+# Patterns (Moved)
 
-Master complex workflow scenarios and optimization techniques.
+This content has been consolidated into the Control Flow guide. Please see:
+
+- /writing-workflows/control-flow#nested-workflows
+- /writing-workflows/control-flow#multiple-dags-in-one-file
+- /writing-workflows/control-flow#dynamic-iteration
+- /writing-workflows/control-flow#map-reduce-pattern
+- /writing-workflows/control-flow#fork-join-pattern
+- /writing-workflows/control-flow#scatter-gather-pattern
+
+Below are the original examples for convenience.
 
 ## Hierarchical Workflows
 

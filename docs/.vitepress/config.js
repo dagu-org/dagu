@@ -33,7 +33,6 @@ const fullSidebar = [
       { text: "Control Flow", link: "/writing-workflows/control-flow" },
       { text: "Data & Variables", link: "/writing-workflows/data-variables" },
       { text: "Error Handling", link: "/writing-workflows/error-handling" },
-      { text: "Advanced Patterns", link: "/writing-workflows/advanced" },
     ],
   },
   {
