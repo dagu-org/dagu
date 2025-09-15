@@ -107,8 +107,8 @@ const fullSidebar = [
       },
       { text: "Deployment", link: "/configurations/deployment" },
       { text: "Operations", link: "/configurations/operations" },
-      { text: "Advanced Setup", link: "/configurations/advanced" },
-      { text: "Configuration Reference", link: "/configurations/reference" },
+      { text: "Remote Nodes", link: "/configurations/remote-nodes" },
+      { text: "Reference", link: "/configurations/reference" },
     ],
   },
   {
