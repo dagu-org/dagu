@@ -105,7 +105,17 @@ const fullSidebar = [
           },
         ],
       },
-      { text: "Deployment", link: "/configurations/deployment" },
+      {
+        text: "Deployment",
+        collapsed: false,
+        items: [
+          { text: "Overview", link: "/configurations/deployment" },
+          { text: "macOS Service", link: "/configurations/deployment/macos" },
+          { text: "Linux Systemd", link: "/configurations/deployment/systemd" },
+          { text: "Docker", link: "/configurations/deployment/docker" },
+          { text: "Docker Compose", link: "/configurations/deployment/docker-compose" },
+        ],
+      },
       { text: "Operations", link: "/configurations/operations" },
       { text: "Remote Nodes", link: "/configurations/remote-nodes" },
       { text: "Reference", link: "/configurations/reference" },

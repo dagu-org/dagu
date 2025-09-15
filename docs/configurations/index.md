@@ -67,9 +67,9 @@ docker run -d \
 - Monitoring and metrics
 - Logging and alerting
 
-**[Advanced Setup](/configurations/advanced)**
-- Remote nodes
-- Queue management
+**[Remote Nodes](/configurations/remote-nodes)**
+- Configure remote instances
+- Multi-node setup
 
 **[Distributed Execution](/features/distributed-execution)**
 - Coordinator and worker setup
@@ -140,5 +140,5 @@ dagu start-all
 
 - [Set up authentication](/configurations/server#authentication) for production
 - [Configure monitoring](/configurations/operations#monitoring) for visibility
-- [Integrate with CI/CD](/configurations/advanced#cicd-integration) for automation
+- [Set up distributed execution](/features/distributed-execution) for scaling
 - [Review all options](/configurations/reference) for fine-tuning
