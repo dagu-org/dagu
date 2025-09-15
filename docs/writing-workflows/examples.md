@@ -2,7 +2,7 @@
 
 Quick reference for all Dagu features. Each example is minimal and copy-paste ready.
 
-## Basic Workflow Patterns
+## Basic Workflows
 
 <div class="examples-grid">
 
@@ -94,6 +94,33 @@ graph TD
 ```
 
 <a href="/features/execution-control#parallel" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Execution Mode: Chain vs Graph
+
+```yaml
+# Default (chain): steps run in order
+type: chain
+steps:
+  - echo "step 1"
+  - echo "step 2"  # Automatically depends on previous
+
+# Graph mode: only explicit dependencies
+---
+type: graph
+steps:
+  - name: a
+    command: echo A
+    depends: []   # Explicitly independent
+  - name: b
+    command: echo B
+    depends: []
+```
+
+<a href="/reference/changelog" class="learn-more">Learn more →</a>
 
 </div>
 
@@ -223,6 +250,196 @@ steps:
 ```
 
 <a href="/writing-workflows/control-flow#repeat-basic" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### DAG-Level Preconditions
+
+```yaml
+preconditions:
+  - condition: "`date +%u`"
+    expected: "re:[1-5]"  # Weekdays only
+
+steps:
+  - echo "Run on business days"
+```
+
+<a href="/writing-workflows/control-flow#dag-level-conditions" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Continue On: Exit Codes and Output
+
+```yaml
+steps:
+  - command: exit 3  # This will exit with code 3
+    continueOn:
+      exitCode: [0, 3]        # Treat 0 and 3 as non-fatal
+      output:
+        - "WARNING"
+        - "re:^INFO:.*"       # Regex match
+      markSuccess: true       # Mark as success when matched
+  - echo "Continue regardless"
+```
+
+<a href="/reference/continue-on" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Nested Workflows
+
+```yaml
+steps:
+  - run: etl.yaml
+    params: "ENV=prod DATE=today"
+  - run: analyze.yaml
+```
+
+```mermaid
+graph TD
+    subgraph Main[Main Workflow]
+        A{{data-pipeline}} --> B{{analyze}}
+    end
+    
+    subgraph ETL[etl.yaml]
+        C[extract] --> D[transform] --> E[load]
+    end
+    
+    subgraph Analysis[analyze.yaml]
+        F[aggregate] --> G[visualize]
+    end
+    
+    A -.-> C
+    B -.-> F
+    
+    style A stroke:lightblue,stroke-width:1.6px,color:#333
+    style B stroke:lightblue,stroke-width:1.6px,color:#333
+    style C stroke:lightblue,stroke-width:1.6px,color:#333
+    style D stroke:lightblue,stroke-width:1.6px,color:#333
+    style E stroke:lightblue,stroke-width:1.6px,color:#333
+    style F stroke:lightblue,stroke-width:1.6px,color:#333
+    style G stroke:lightblue,stroke-width:1.6px,color:#333
+```
+
+<a href="/features/executors/dag" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Multiple DAGs in One File
+
+```yaml
+steps:
+  - run: data-processor
+    params: "TYPE=daily"
+
+---
+
+name: data-processor
+params:
+  - TYPE: "batch"
+steps:
+  - echo "Extracting ${TYPE} data"
+  - echo "Transforming data"
+```
+
+<a href="/writing-workflows/advanced#multiple-dags" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Dispatch to Specific Workers
+
+```yaml
+steps:
+  - python prepare_dataset.py
+  - run: train-model
+  - run: evaluate-model
+
+---
+name: train-model
+workerSelector:
+  gpu: "true"
+  cuda: "11.8"
+  memory: "64G"
+steps:
+  - python train.py --gpu
+
+---
+name: evaluate-model
+workerSelector:
+  gpu: "true"
+steps:
+  - python evaluate.py
+```
+
+<a href="/features/distributed-execution" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Mixed Local and Worker Steps
+
+```yaml
+steps:
+  # Runs on any available worker (local or remote)
+  - wget https://data.example.com/dataset.tar.gz
+    
+  # Must run on specific worker type
+  - run: process-on-gpu
+    
+  # Runs locally (no selector)
+  - echo "Processing complete"
+
+---
+name: process-on-gpu
+workerSelector:
+  gpu: "true"
+  gpu-model: "nvidia-a100"
+steps:
+  - python gpu_process.py
+```
+
+<a href="/features/distributed-execution#task-routing" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Parallel Distributed Tasks
+
+```yaml
+steps:
+  - command: python split_data.py --chunks=10
+    output: CHUNKS
+  - run: chunk-processor
+    parallel:
+      items: ${CHUNKS}
+      maxConcurrent: 5
+    params: "CHUNK=${ITEM}"
+  - python merge_results.py
+
+---
+name: chunk-processor
+workerSelector:
+  memory: "16G"
+  cpu-cores: "8"
+params:
+  - CHUNK: ""
+steps:
+  - python process_chunk.py ${CHUNK}
+```
+
+<a href="/features/execution-control#parallel" class="learn-more">Learn more →</a>
 
 </div>
 
@@ -481,6 +698,53 @@ steps:
 
 <div class="example-card">
 
+### Parallel Outputs Aggregation
+
+```yaml
+steps:
+  - run: worker
+    parallel:
+      items: [east, west, eu]
+    params: "REGION=${ITEM}"
+    output: RESULTS
+
+  - |
+      echo "Total: ${RESULTS.summary.total}"
+      echo "First region: ${RESULTS.results[0].params}"
+      echo "First output: ${RESULTS.outputs[0].value}"
+
+---
+name: worker
+params:
+  - REGION: ""
+steps:
+  - command: echo ${REGION}
+    output: value
+```
+
+<a href="/features/execution-control#parallel" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Special Variables
+
+```yaml
+steps:
+  - |
+      echo "DAG: ${DAG_NAME}"
+      echo "Run: ${DAG_RUN_ID}"
+      echo "Step: ${DAG_RUN_STEP_NAME}"
+      echo "Log: ${DAG_RUN_LOG_FILE}"
+```
+
+<a href="/reference/variables#special-environment-variables" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
 ### Output Size Limits
 
 ```yaml
@@ -665,6 +929,24 @@ steps:
 
 </div>
 
+<div class="example-card">
+
+### Reproducible Env with Nix Shell
+
+```yaml
+steps:
+  - shell: nix-shell
+    shellPackages: [python3, curl, jq]
+    command: |
+      python3 --version
+      curl --version
+      jq --version
+```
+
+<a href="/features/executors/shell#nix-shell" class="learn-more">Learn more →</a>
+
+</div>
+
 </div>
 
 ## Executors & Integrations
@@ -673,24 +955,7 @@ steps:
 
 <div class="example-card">
 
-### Docker Executor
-
-```yaml
-steps:
-  - executor:
-      type: docker
-      config:
-        image: node:18
-    command: npm run build
-```
-
-<a href="/features/executors/docker" class="learn-more">Learn more →</a>
-
-</div>
-
-<div class="example-card">
-
-### Container Field
+### Container Workflow
 
 ```yaml
 # DAG-level container for all steps
@@ -713,30 +978,41 @@ steps:
 
 <div class="example-card">
 
-### Container Workflow
+### Keep Container Running
 
 ```yaml
+# Use keepContainer at DAG level
 container:
-  image: python:3.11-slim
-  volumes:
-    - ./data:/data
-    - ./scripts:/scripts:ro
-  workingDir: /app
+  image: postgres:16
+  keepContainer: true
+  env:
+    - POSTGRES_PASSWORD=secret
+  ports:
+    - "5432:5432"
 
 steps:
-  - pip install -r requirements.txt
-    
-  - command: python process.py /data/input.csv
-    env:
-      - DEBUG=true
-    
+  - postgres -D /var/lib/postgresql/data
+  - command: pg_isready -U postgres -h localhost
+    retryPolicy:
+      limit: 10
+      intervalSec: 2
+```
+
+<a href="/reference/yaml#container-configuration" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Per-Step Docker Executor
+
+```yaml
+steps:
   - executor:
       type: docker
       config:
-        image: node:20
-        volumes:
-          - ./reports:/reports
-    command: node generate-report.js
+        image: node:18
+    command: npm run build
 ```
 
 <a href="/features/executors/docker" class="learn-more">Learn more →</a>
@@ -745,7 +1021,7 @@ steps:
 
 <div class="example-card">
 
-### SSH Configuration
+### Remote Commands via SSH
 
 ```yaml
 # Configure SSH once for all steps
@@ -765,21 +1041,38 @@ steps:
 
 <div class="example-card">
 
+### Container Volumes: Relative Paths
+
+```yaml
+workingDir: /app/project
+container:
+  image: python:3.11
+  volumes:
+    - ./data:/data        # Resolves to /app/project/data:/data
+    - .:/workspace        # Resolves to /app/project:/workspace
+steps:
+  - python process.py
+```
+
+<a href="/reference/yaml#working-directory-and-volume-resolution" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
 ### HTTP Requests
 
 ```yaml
 steps:
-  - executor:
+  - command: POST https://api.example.com/webhook
+    executor:
       type: http
       config:
-        url: https://api.example.com/webhook
-        method: POST
         headers:
           Content-Type: application/json
         body: '{"status": "started"}'
+    
 ```
-
-Make HTTP API calls.
 
 <a href="/features/executors/http" class="learn-more">Learn more →</a>
 
@@ -792,20 +1085,131 @@ Make HTTP API calls.
 ```yaml
 steps:
   # Fetch sample users from a public mock API
-  - executor:
+  - command: GET https://reqres.in/api/users
+    executor:
       type: http
       config:
         silent: true
-    command: GET https://reqres.in/api/users
+    
     output: API_RESPONSE
    
   # Extract user emails from the JSON response
-  - executor: jq
-    command: '.data[] | .email'
+  - command: '.data[] | .email'
+    executor: jq
     script: ${API_RESPONSE}
 ```
 
 <a href="/features/executors/jq" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Container Startup & Readiness
+
+```yaml
+container:
+  image: alpine:latest
+  startup: command           # keepalive | entrypoint | command
+  command: ["sh", "-c", "my-daemon"]
+  waitFor: healthy           # running | healthy
+  logPattern: "Ready"        # Optional regex to wait for
+  restartPolicy: unless-stopped
+
+steps:
+  - echo "Service is ready"
+```
+
+<a href="/writing-workflows/container#startup-modes" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Private Registry Auth
+
+```yaml
+registryAuths:
+  ghcr.io:
+    username: ${GITHUB_USER}
+    password: ${GITHUB_TOKEN}
+
+container:
+  image: ghcr.io/myorg/private-app:latest
+
+steps:
+  - ./app
+```
+
+<a href="/features/executors/docker#registry-authentication" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Exec in Existing Container
+
+```yaml
+steps:
+  - executor:
+      type: docker
+      config:
+        containerName: my-running-container
+        exec:
+          user: root
+          workingDir: /work
+    command: echo "inside existing container"
+```
+
+<a href="/reference/executors#execute-in-existing-container" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### SSH: Advanced Options
+
+```yaml
+ssh:
+  user: deploy
+  host: app.example.com
+  port: 2222
+  key: ~/.ssh/deploy_key
+  strictHostKey: true
+  knownHostFile: ~/.ssh/known_hosts
+
+steps:
+  - systemctl status myapp
+```
+
+<a href="/reference/yaml#ssh-configuration" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Mail Executor
+
+```yaml
+smtp:
+  host: smtp.gmail.com
+  port: "587"
+  username: "${SMTP_USER}"
+  password: "${SMTP_PASS}"
+
+steps:
+  - executor:
+      type: mail
+      config:
+        to: team@example.com
+        from: noreply@example.com
+        subject: "Weekly Report"
+        message: "Attached."
+        attachments:
+          - report.txt
+```
+
+<a href="/features/executors/mail" class="learn-more">Learn more →</a>
 
 </div>
 
@@ -858,6 +1262,54 @@ steps:
 ```
 
 <a href="/features/queues" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Multiple Schedules
+
+```yaml
+schedule:
+  - "0 9 * * MON-FRI"   # Weekdays 9 AM
+  - "0 14 * * SAT,SUN"  # Weekends 2 PM
+steps:
+  - echo "Run on multiple times"
+```
+
+<a href="/features/scheduling#multiple-schedules" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Timezone
+
+```yaml
+schedule: "CRON_TZ=America/New_York 0 9 * * *"
+steps:
+  - echo "9AM New York"
+```
+
+<a href="/features/scheduling#timezone-support" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Start/Stop/Restart Windows
+
+```yaml
+schedule:
+  start: "0 8 * * *"     # Start 8 AM
+  restart: "0 12 * * *"  # Restart noon
+  stop: "0 18 * * *"     # Stop 6 PM
+restartWaitSec: 60
+steps:
+  - echo "Long-running service"
+```
+
+<a href="/features/scheduling#restart-schedule" class="learn-more">Learn more →</a>
 
 </div>
 
@@ -1078,12 +1530,10 @@ steps:
 
 <div class="example-card">
 
-### Queue Assignment
+### Queuing
 
 ```yaml
 queue: compute-queue      # Assign to specific queue
-histRetentionDays: 60     # Keep 60 days history
-maxOutputSize: 20971520   # 20MB output limit
 steps:
   - echo "Preparing data"
   - echo "Running intensive computation"
@@ -1094,130 +1544,35 @@ steps:
 
 </div>
 
-</div>
-
-## Container Patterns
-
-<div class="examples-grid">
-
 <div class="example-card">
 
-### Data Science Workflow
+### Limit History Retention
 
 ```yaml
-container:
-  image: jupyter/scipy-notebook
-  volumes:
-    - ./notebooks:/home/jovyan/work
-    - ./data:/data
-
+histRetentionDays: 60     # Keep 60 days history
 steps:
-  - python -m nbconvert --execute prepare.ipynb
-  - executor:
-      type: docker
-      config:
-        image: tensorflow/tensorflow:latest-gpu
-    command: python train.py --epochs=100
-  - python evaluate.py
+  - echo "Running periodic maintenance"
 ```
 
-<a href="/features/executors/docker" class="learn-more">Learn more →</a>
+<a href="/features/queues" class="learn-more">Learn more →</a>
 
 </div>
 
 <div class="example-card">
 
-### Keep Container Running
+### Lock Down Run Inputs
 
 ```yaml
-# Use keepContainer at DAG level
-container:
-  image: postgres:16
-  keepContainer: true
-  env:
-    - POSTGRES_PASSWORD=secret
-  ports:
-    - "5432:5432"
+runConfig:
+  disableParamEdit: true   # Prevent editing params at start
+  disableRunIdEdit: true   # Prevent custom run IDs
 
-steps:
-  - postgres -D /var/lib/postgresql/data
-  - command: pg_isready -U postgres -h localhost
-    retryPolicy:
-      limit: 10
-      intervalSec: 2
-```
-
-<a href="/reference/yaml#container-configuration" class="learn-more">Learn more →</a>
-
-</div>
-
-</div>
-
-## Advanced Patterns
-
-<div class="examples-grid">
-
-<div class="example-card">
-
-### Nested Workflows
-
-```yaml
-steps:
-  - run: etl.yaml
-    params: "ENV=prod DATE=today"
-  - run: analyze.yaml
-```
-
-```mermaid
-graph TD
-    subgraph Main[Main Workflow]
-        A{{data-pipeline}} --> B{{analyze}}
-    end
-    
-    subgraph ETL[etl.yaml]
-        C[extract] --> D[transform] --> E[load]
-    end
-    
-    subgraph Analysis[analyze.yaml]
-        F[aggregate] --> G[visualize]
-    end
-    
-    A -.-> C
-    B -.-> F
-    
-    style A stroke:lightblue,stroke-width:1.6px,color:#333
-    style B stroke:lightblue,stroke-width:1.6px,color:#333
-    style C stroke:lightblue,stroke-width:1.6px,color:#333
-    style D stroke:lightblue,stroke-width:1.6px,color:#333
-    style E stroke:lightblue,stroke-width:1.6px,color:#333
-    style F stroke:lightblue,stroke-width:1.6px,color:#333
-    style G stroke:lightblue,stroke-width:1.6px,color:#333
-```
-
-<a href="/features/executors/dag" class="learn-more">Learn more →</a>
-
-</div>
-
-<div class="example-card">
-
-### Multiple DAGs in One File
-
-```yaml
-steps:
-  - run: data-processor
-    params: "TYPE=daily"
-
----
-
-name: data-processor
 params:
-  - TYPE: "batch"
-steps:
-  - echo "Extracting ${TYPE} data"
-  - echo "Transforming data"
+  - ENVIRONMENT: production
+  - VERSION: 1.0.0
 ```
 
-<a href="/writing-workflows/advanced#multiple-dags" class="learn-more">Learn more →</a>
+<a href="/reference/yaml#runconfig" class="learn-more">Learn more →</a>
 
 </div>
 
@@ -1259,104 +1614,6 @@ steps:
 ```
 
 <a href="/reference/yaml" class="learn-more">Learn more →</a>
-
-</div>
-
-</div>
-
-
-## Distributed Execution
-
-<div class="examples-grid">
-
-<div class="example-card">
-
-### GPU Task Routing
-
-```yaml
-steps:
-  - python prepare_dataset.py
-  - run: train-model
-  - run: evaluate-model
-
----
-name: train-model
-workerSelector:
-  gpu: "true"
-  cuda: "11.8"
-  memory: "64G"
-steps:
-  - python train.py --gpu
-
----
-name: evaluate-model
-workerSelector:
-  gpu: "true"
-steps:
-  - python evaluate.py
-```
-
-<a href="/features/distributed-execution" class="learn-more">Learn more →</a>
-
-</div>
-
-<div class="example-card">
-
-### Mixed Local and Distributed
-
-```yaml
-steps:
-  # Runs on any available worker (local or remote)
-  - wget https://data.example.com/dataset.tar.gz
-    
-  # Must run on specific worker type
-  - run: process-on-gpu
-    
-  # Runs locally (no selector)
-  - echo "Processing complete"
-
----
-name: process-on-gpu
-workerSelector:
-  gpu: "true"
-  gpu-model: "nvidia-a100"
-steps:
-  - python gpu_process.py
-```
-
-<a href="/features/distributed-execution#task-routing" class="learn-more">Learn more →</a>
-
-</div>
-
-<div class="example-card">
-
-### Parallel Distributed Tasks
-
-```yaml
-steps:
-  - command: python split_data.py --chunks=10
-    output: CHUNKS
-    
-  - run: chunk-processor
-    parallel:
-      items: ${CHUNKS}
-      maxConcurrent: 5
-    params: "CHUNK=${ITEM}"
-    
-  - python merge_results.py
-
----
-name: chunk-processor
-workerSelector:
-  memory: "16G"
-  cpu-cores: "8"
-params:
-  - CHUNK: ""
-steps:
-  - python process_chunk.py ${CHUNK}
-```
-
-<a href="/features/execution-control#parallel" class="learn-more">Learn more →</a>
 
 </div>
 
