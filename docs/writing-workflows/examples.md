@@ -120,7 +120,22 @@ steps:
     depends: []
 ```
 
-<a href="/reference/changelog" class="learn-more">Learn more →</a>
+```mermaid
+graph LR
+  subgraph Chain
+    C1[step 1] --> C2[step 2]
+  end
+  subgraph Graph
+    G1[a]
+    G2[b]
+  end
+  style C1 stroke:lightblue,stroke-width:1.6px,color:#333
+  style C2 stroke:lightblue,stroke-width:1.6px,color:#333
+  style G1 stroke:lime,stroke-width:1.6px,color:#333
+  style G2 stroke:lime,stroke-width:1.6px,color:#333
+```
+
+<a href="/writing-workflows/basics#parallel-execution" class="learn-more">Learn more →</a>
 
 </div>
 
@@ -145,8 +160,8 @@ steps:
 ```mermaid
 flowchart TD
     A[Start] --> B{ENV == production?}
-    B -->|Yes| C[deploy]
-    B -->|No| D[Skip]
+    B --> |Yes| C[deploy]
+    B --> |No| D[Skip]
     C --> E[End]
     D --> E
     
@@ -163,7 +178,7 @@ flowchart TD
 
 <div class="example-card">
 
-### Advanced Preconditions
+### Complex Preconditions
 
 ```yaml
 steps:
@@ -180,7 +195,26 @@ steps:
         expected: "re:^[0-7][0-9]$"  # Less than 80% disk usage
 ```
 
-Multiple condition types and regex patterns.
+```mermaid
+flowchart TD
+  S[Start] --> C1{input.csv exists?}
+  C1 --> |No| SK[Skip]
+  C1 --> |Yes| C2{input.csv not empty?}
+  C2 --> |No| SK
+  C2 --> |Yes| C3{ENVIRONMENT==production?}
+  C3 --> |No| SK
+  C3 --> |Yes| C4{Day 01-09?}
+  C4 --> |No| SK
+  C4 --> |Yes| C5{Disk < 80%?}
+  C5 --> |No| SK
+  C5 --> |Yes| R[Processing task]
+  R --> E[End]
+  SK --> E
+  style S stroke:lightblue,stroke-width:1.6px,color:#333
+  style R stroke:green,stroke-width:1.6px,color:#333
+  style SK stroke:gray,stroke-width:1.6px,color:#333
+  style E stroke:lightblue,stroke-width:1.6px,color:#333
+```
 
 <a href="/writing-workflows/control-flow#preconditions" class="learn-more">Learn more →</a>
 
@@ -199,13 +233,23 @@ steps:
       exitCode: [1]  # Repeat while exit code is 1
 ```
 
+```mermaid
+flowchart TD
+  A[Execute curl -f /health] --> B{Exit code == 1?}
+  B --> |Yes| W[Wait intervalSec] --> A
+  B --> |No| N[Next step]
+  style A stroke:lightblue,stroke-width:1.6px,color:#333
+  style W stroke:lightblue,stroke-width:1.6px,color:#333
+  style N stroke:green,stroke-width:1.6px,color:#333
+```
+
 <a href="/writing-workflows/control-flow#repeat" class="learn-more">Learn more →</a>
 
 </div>
 
 <div class="example-card">
 
-### Repeat Until Success
+### Repeat Until Command Succeeds
 
 ```yaml
 steps:
@@ -215,7 +259,28 @@ steps:
       exitCode: [0]        # Exit code 0 means success
       intervalSec: 10      # Wait 10 seconds between attempts
       limit: 30            # Maximum 5 minutes
-  
+```
+
+```mermaid
+flowchart TD
+  H[Health check] --> D{exit code == 0?}
+  D --> |No| W[Wait 10s] --> H
+  D --> |Yes| Next[Proceed]
+  style H stroke:lightblue,stroke-width:1.6px,color:#333
+  style W stroke:lightblue,stroke-width:1.6px,color:#333
+  style Next stroke:green,stroke-width:1.6px,color:#333
+```
+
+<a href="/writing-workflows/control-flow#repeat" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Repeat Until Output Match
+
+```yaml
+ steps: 
   - command: echo "COMPLETED"  # Simulates job status check
     output: JOB_STATUS
     repeatPolicy:
@@ -224,6 +289,16 @@ steps:
       expected: "COMPLETED"
       intervalSec: 30
       limit: 120           # Maximum 1 hour (120 attempts)
+```
+
+```mermaid
+flowchart TD
+  S[Emit JOB_STATUS] --> C{JOB_STATUS == COMPLETED?}
+  C --> |No| W[Wait 30s] --> S
+  C --> |Yes| Next[Proceed]
+  style S stroke:lightblue,stroke-width:1.6px,color:#333
+  style W stroke:lightblue,stroke-width:1.6px,color:#333
+  style Next stroke:green,stroke-width:1.6px,color:#333
 ```
 
 <a href="/writing-workflows/control-flow#repeat" class="learn-more">Learn more →</a>
@@ -240,7 +315,18 @@ steps:
     repeatPolicy:
       repeat: while            # Repeat indefinitely while successful
       intervalSec: 60
-      
+```
+
+<a href="/writing-workflows/control-flow#repeat-basic" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Repeat Steps Until Success
+
+```yaml
+steps:
   - command: echo "Checking status"
     repeatPolicy:
       repeat: until        # Repeat until exit code 0
@@ -266,6 +352,20 @@ steps:
   - echo "Run on business days"
 ```
 
+```mermaid
+flowchart TD
+  A[Start] --> B{Weekday?}
+  B --> |Yes| C[Run on business days]
+  B --> |No| D[Skip]
+  C --> E[End]
+  D --> E
+  style A stroke:lightblue,stroke-width:1.6px,color:#333
+  style B stroke:lightblue,stroke-width:1.6px,color:#333
+  style C stroke:green,stroke-width:1.6px,color:#333
+  style D stroke:gray,stroke-width:1.6px,color:#333
+  style E stroke:lightblue,stroke-width:1.6px,color:#333
+```
+
 <a href="/writing-workflows/control-flow#dag-level-conditions" class="learn-more">Learn more →</a>
 
 </div>
@@ -284,6 +384,22 @@ steps:
         - "re:^INFO:.*"       # Regex match
       markSuccess: true       # Mark as success when matched
   - echo "Continue regardless"
+```
+
+```mermaid
+stateDiagram-v2
+  [*] --> Step
+  Step --> Next: exitCode in {0,3} or output matches
+  Step --> Failed: otherwise
+  Next --> [*]
+  Failed --> Next: continueOn.markSuccess
+  
+  classDef step stroke:lightblue,stroke-width:1.6px,color:#333
+  classDef next stroke:green,stroke-width:1.6px,color:#333
+  classDef fail stroke:red,stroke-width:1.6px,color:#333
+  class Step step
+  class Next next
+  class Failed fail
 ```
 
 <a href="/reference/continue-on" class="learn-more">Learn more →</a>
@@ -350,6 +466,19 @@ steps:
   - echo "Transforming data"
 ```
 
+```mermaid
+graph TD
+  M[Main] --> DP{{run: data-processor}}
+  subgraph data-processor
+    E["Extract TYPE data"] --> T[Transform]
+  end
+  DP -.-> E
+  style M stroke:lightblue,stroke-width:1.6px,color:#333
+  style DP stroke:lightblue,stroke-width:1.6px,color:#333
+  style E stroke:lime,stroke-width:1.6px,color:#333
+  style T stroke:lime,stroke-width:1.6px,color:#333
+```
+
 <a href="/writing-workflows/advanced#multiple-dags" class="learn-more">Learn more →</a>
 
 </div>
@@ -379,6 +508,19 @@ workerSelector:
   gpu: "true"
 steps:
   - python evaluate.py
+```
+
+```mermaid
+flowchart LR
+  P[prepare_dataset.py] --> TR[run: train-model]
+  TR --> |workerSelector gpu=true,cuda=11.8,memory=64G| GW[(GPU Worker)]
+  GW --> TE[python train.py --gpu]
+  TE --> EV[run: evaluate-model]
+  EV --> |gpu=true| GW2[(GPU Worker)]
+  GW2 --> EE[python evaluate.py]
+  style P,TR,EV stroke:lightblue,stroke-width:1.6px,color:#333
+  style GW,GW2 stroke:orange,stroke-width:1.6px,color:#333
+  style TE,EE stroke:green,stroke-width:1.6px,color:#333
 ```
 
 <a href="/features/distributed-execution" class="learn-more">Learn more →</a>
@@ -437,6 +579,19 @@ params:
   - CHUNK: ""
 steps:
   - python process_chunk.py ${CHUNK}
+```
+
+```mermaid
+graph TD
+  S[split_data -> CHUNKS] --> P{{"run: chunk-processor - parallel"}}
+  P --> C1[process CHUNK 1]
+  P --> C2[process CHUNK 2]
+  P --> Cn[process CHUNK N]
+  C1 --> M[merge_results]
+  C2 --> M
+  Cn --> M
+  style S,P,M stroke:lightblue,stroke-width:1.6px,color:#333
+  style C1,C2,Cn stroke:lime,stroke-width:1.6px,color:#333
 ```
 
 <a href="/features/execution-control#parallel" class="learn-more">Learn more →</a>
@@ -720,6 +875,21 @@ params:
 steps:
   - command: echo ${REGION}
     output: value
+```
+
+```mermaid
+graph TD
+  A[Run worker] --> B[east]
+  A --> C[west]
+  A --> D[eu]
+  B --> E[Aggregate RESULTS]
+  C --> E
+  D --> E
+  style A stroke:lightblue,stroke-width:1.6px,color:#333
+  style B stroke:lime,stroke-width:1.6px,color:#333
+  style C stroke:lime,stroke-width:1.6px,color:#333
+  style D stroke:lime,stroke-width:1.6px,color:#333
+  style E stroke:green,stroke-width:1.6px,color:#333
 ```
 
 <a href="/features/execution-control#parallel" class="learn-more">Learn more →</a>
@@ -1120,6 +1290,19 @@ steps:
   - echo "Service is ready"
 ```
 
+```mermaid
+stateDiagram-v2
+  [*] --> Starting
+  Starting --> Running: container running
+  Running --> Healthy: healthcheck ok
+  Running --> Ready: logPattern matched
+  Healthy --> Ready: logPattern matched
+  Ready --> [*]
+  
+  classDef node stroke:lightblue,stroke-width:1.6px,color:#333
+  class Starting,Running,Healthy,Ready node
+```
+
 <a href="/writing-workflows/container#startup-modes" class="learn-more">Learn more →</a>
 
 </div>
@@ -1159,6 +1342,15 @@ steps:
           user: root
           workingDir: /work
     command: echo "inside existing container"
+```
+
+```mermaid
+flowchart LR
+  S[Step] --> X[docker exec my-running-container]
+  X --> R[Command runs]
+  style S stroke:lightblue,stroke-width:1.6px,color:#333
+  style X stroke:lime,stroke-width:1.6px,color:#333
+  style R stroke:green,stroke-width:1.6px,color:#333
 ```
 
 <a href="/reference/executors#execute-in-existing-container" class="learn-more">Learn more →</a>
@@ -1207,6 +1399,13 @@ steps:
         message: "Attached."
         attachments:
           - report.txt
+```
+
+```mermaid
+flowchart LR
+  G[Generate report] --> M[Mail: Weekly Report]
+  style G stroke:lightblue,stroke-width:1.6px,color:#333
+  style M stroke:green,stroke-width:1.6px,color:#333
 ```
 
 <a href="/features/executors/mail" class="learn-more">Learn more →</a>
