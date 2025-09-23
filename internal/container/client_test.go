@@ -14,15 +14,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestParseMapConfig tests the ParseMapConfig function with 92.7% coverage.
+// TestLoadConfigFromMap covers LoadConfigFromMap with 92.7% coverage.
 // The uncovered lines (7.3%) are error handling for mapstructure.NewDecoder failures
 // which cannot be triggered in practice because we always pass valid struct pointers.
 // These error checks exist as defensive programming for potential future changes.
-func TestParseMapConfig(t *testing.T) {
+func TestLoadConfigFromMap(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       map[string]any
-		expected    *Client
+		expected    *Config
 		expectError bool
 		errorMsg    string
 	}{
@@ -31,13 +31,13 @@ func TestParseMapConfig(t *testing.T) {
 			input: map[string]any{
 				"image": "alpine:latest",
 			},
-			expected: &Client{
-				image:           "alpine:latest",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine:latest",
+				Pull:        digraph.PullPolicyMissing,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -45,13 +45,13 @@ func TestParseMapConfig(t *testing.T) {
 			input: map[string]any{
 				"containerName": "my-container",
 			},
-			expected: &Client{
-				containerID:     "my-container",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				ContainerName: "my-container",
+				Pull:          digraph.PullPolicyMissing,
+				Container:     &container.Config{},
+				Host:          &container.HostConfig{},
+				Network:       &network.NetworkingConfig{},
+				ExecOptions:   &container.ExecOptions{},
 			},
 		},
 		{
@@ -82,24 +82,24 @@ func TestParseMapConfig(t *testing.T) {
 					"EndpointsConfig": map[string]any{},
 				},
 			},
-			expected: &Client{
-				image:      "ubuntu:20.04",
-				platform:   "linux/arm64",
-				pull:       digraph.PullPolicyAlways,
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "ubuntu:20.04",
+				Platform:   "linux/arm64",
+				Pull:       digraph.PullPolicyAlways,
+				AutoRemove: true,
+				Container: &container.Config{
 					Env:        []string{"FOO=bar"},
 					WorkingDir: "/app",
 					User:       "1000",
 				},
-				hostConfig: &container.HostConfig{
+				Host: &container.HostConfig{
 					AutoRemove: false, // Should be false because autoRemove is handled separately
 					Privileged: true,
 				},
-				networkConfig: &network.NetworkingConfig{
+				Network: &network.NetworkingConfig{
 					EndpointsConfig: map[string]*network.EndpointSettings{},
 				},
-				execOptions: &container.ExecOptions{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -112,13 +112,13 @@ func TestParseMapConfig(t *testing.T) {
 					"Env":        []string{"BAR=baz"},
 				},
 			},
-			expected: &Client{
-				containerID:     "test-container",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions: &container.ExecOptions{
+			expected: &Config{
+				ContainerName: "test-container",
+				Pull:          digraph.PullPolicyMissing,
+				Container:     &container.Config{},
+				Host:          &container.HostConfig{},
+				Network:       &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{
 					User:       "root",
 					WorkingDir: "/tmp",
 					Env:        []string{"BAR=baz"},
@@ -133,16 +133,16 @@ func TestParseMapConfig(t *testing.T) {
 					"AutoRemove": true,
 				},
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyMissing,
-				autoRemove:      true,
-				containerConfig: &container.Config{},
-				hostConfig: &container.HostConfig{
+			expected: &Config{
+				Image:      "alpine",
+				Pull:       digraph.PullPolicyMissing,
+				AutoRemove: true,
+				Container:  &container.Config{},
+				Host: &container.HostConfig{
 					AutoRemove: false,
 				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -154,16 +154,16 @@ func TestParseMapConfig(t *testing.T) {
 					"AutoRemove": false,
 				},
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyMissing,
-				autoRemove:      true,
-				containerConfig: &container.Config{},
-				hostConfig: &container.HostConfig{
+			expected: &Config{
+				Image:      "alpine",
+				Pull:       digraph.PullPolicyMissing,
+				AutoRemove: true,
+				Container:  &container.Config{},
+				Host: &container.HostConfig{
 					AutoRemove: false,
 				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -172,14 +172,14 @@ func TestParseMapConfig(t *testing.T) {
 				"image":      "alpine",
 				"autoRemove": "true",
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyMissing,
-				autoRemove:      true,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyMissing,
+				AutoRemove:  true,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -188,14 +188,14 @@ func TestParseMapConfig(t *testing.T) {
 				"image":      "alpine",
 				"autoRemove": "false",
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyMissing,
-				autoRemove:      false,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyMissing,
+				AutoRemove:  false,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -204,14 +204,14 @@ func TestParseMapConfig(t *testing.T) {
 				"image":      "alpine",
 				"autoRemove": "1",
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyMissing,
-				autoRemove:      true,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyMissing,
+				AutoRemove:  true,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -220,14 +220,14 @@ func TestParseMapConfig(t *testing.T) {
 				"image":      "alpine",
 				"autoRemove": "0",
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyMissing,
-				autoRemove:      false,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyMissing,
+				AutoRemove:  false,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -254,13 +254,13 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  "never",
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyNever,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyNever,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -269,13 +269,13 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  "missing",
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyMissing,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -284,13 +284,13 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  true,
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyAlways,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyAlways,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -299,13 +299,13 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  false,
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyNever,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyNever,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -314,13 +314,13 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  "true",
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyAlways,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyAlways,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -349,15 +349,15 @@ func TestParseMapConfig(t *testing.T) {
 					"Env": "FOO=bar", // String instead of slice
 				},
 			},
-			expected: &Client{
-				image: "alpine",
-				pull:  digraph.PullPolicyMissing,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image: "alpine",
+				Pull:  digraph.PullPolicyMissing,
+				Container: &container.Config{
 					Env: []string{"FOO=bar"},
 				},
-				hostConfig:    &container.HostConfig{},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -405,13 +405,13 @@ func TestParseMapConfig(t *testing.T) {
 				"network":   map[string]any{},
 				"exec":      map[string]any{},
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyMissing,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -458,14 +458,14 @@ func TestParseMapConfig(t *testing.T) {
 				"image":    "alpine",
 				"platform": 123, // Not a string
 			},
-			expected: &Client{
-				image:           "alpine",
-				platform:        "123",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Platform:    "123",
+				Pull:        digraph.PullPolicyMissing,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -473,13 +473,13 @@ func TestParseMapConfig(t *testing.T) {
 			input: map[string]any{
 				"containerName": 123, // Not a string
 			},
-			expected: &Client{
-				containerID:     "123",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				ContainerName: "123",
+				Pull:          digraph.PullPolicyMissing,
+				Container:     &container.Config{},
+				Host:          &container.HostConfig{},
+				Network:       &network.NetworkingConfig{},
+				ExecOptions:   &container.ExecOptions{},
 			},
 		},
 		{
@@ -487,13 +487,13 @@ func TestParseMapConfig(t *testing.T) {
 			input: map[string]any{
 				"image": 123, // Not a string
 			},
-			expected: &Client{
-				image:           "123",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "123",
+				Pull:        digraph.PullPolicyMissing,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -505,13 +505,13 @@ func TestParseMapConfig(t *testing.T) {
 				"network":   nil,
 				"exec":      nil,
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyMissing,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -520,13 +520,13 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  nil,
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyMissing,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -535,13 +535,13 @@ func TestParseMapConfig(t *testing.T) {
 				"image": "alpine",
 				"pull":  "",
 			},
-			expected: &Client{
-				image:           "alpine",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Pull:        digraph.PullPolicyMissing,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -550,14 +550,14 @@ func TestParseMapConfig(t *testing.T) {
 				"image":      "alpine",
 				"autoRemove": nil,
 			},
-			expected: &Client{
-				image:           "alpine",
-				autoRemove:      false,
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				AutoRemove:  false,
+				Pull:        digraph.PullPolicyMissing,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -566,14 +566,14 @@ func TestParseMapConfig(t *testing.T) {
 				"image":    "alpine",
 				"platform": nil,
 			},
-			expected: &Client{
-				image:           "alpine",
-				platform:        "",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:       "alpine",
+				Platform:    "",
+				Pull:        digraph.PullPolicyMissing,
+				Container:   &container.Config{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -582,14 +582,14 @@ func TestParseMapConfig(t *testing.T) {
 				"image":         "alpine",
 				"containerName": nil,
 			},
-			expected: &Client{
-				image:           "alpine",
-				containerID:     "",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:         "alpine",
+				ContainerName: "",
+				Pull:          digraph.PullPolicyMissing,
+				Container:     &container.Config{},
+				Host:          &container.HostConfig{},
+				Network:       &network.NetworkingConfig{},
+				ExecOptions:   &container.ExecOptions{},
 			},
 		},
 		{
@@ -598,21 +598,21 @@ func TestParseMapConfig(t *testing.T) {
 				"image":         nil,
 				"containerName": "test",
 			},
-			expected: &Client{
-				image:           "",
-				containerID:     "test",
-				pull:            digraph.PullPolicyMissing,
-				containerConfig: &container.Config{},
-				hostConfig:      &container.HostConfig{},
-				networkConfig:   &network.NetworkingConfig{},
-				execOptions:     &container.ExecOptions{},
+			expected: &Config{
+				Image:         "",
+				ContainerName: "test",
+				Pull:          digraph.PullPolicyMissing,
+				Container:     &container.Config{},
+				Host:          &container.HostConfig{},
+				Network:       &network.NetworkingConfig{},
+				ExecOptions:   &container.ExecOptions{},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := NewFromMapConfig(tt.input)
+			result, err := LoadConfigFromMap(tt.input, nil)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -621,34 +621,34 @@ func TestParseMapConfig(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected.image, result.image)
-			assert.Equal(t, tt.expected.containerID, result.containerID)
-			assert.Equal(t, tt.expected.platform, result.platform)
-			assert.Equal(t, tt.expected.pull, result.pull)
-			assert.Equal(t, tt.expected.autoRemove, result.autoRemove)
+			assert.Equal(t, tt.expected.Image, result.Image)
+			assert.Equal(t, tt.expected.ContainerName, result.ContainerName)
+			assert.Equal(t, tt.expected.Platform, result.Platform)
+			assert.Equal(t, tt.expected.Pull, result.Pull)
+			assert.Equal(t, tt.expected.AutoRemove, result.AutoRemove)
 
 			// Compare container config
-			assert.Equal(t, tt.expected.containerConfig.Env, result.containerConfig.Env)
-			assert.Equal(t, tt.expected.containerConfig.WorkingDir, result.containerConfig.WorkingDir)
-			assert.Equal(t, tt.expected.containerConfig.User, result.containerConfig.User)
+			assert.Equal(t, tt.expected.Container.Env, result.Container.Env)
+			assert.Equal(t, tt.expected.Container.WorkingDir, result.Container.WorkingDir)
+			assert.Equal(t, tt.expected.Container.User, result.Container.User)
 
 			// Compare host config
-			assert.Equal(t, tt.expected.hostConfig.AutoRemove, result.hostConfig.AutoRemove)
-			assert.Equal(t, tt.expected.hostConfig.Privileged, result.hostConfig.Privileged)
+			assert.Equal(t, tt.expected.Host.AutoRemove, result.Host.AutoRemove)
+			assert.Equal(t, tt.expected.Host.Privileged, result.Host.Privileged)
 
 			// Compare exec options
-			assert.Equal(t, tt.expected.execOptions.User, result.execOptions.User)
-			assert.Equal(t, tt.expected.execOptions.WorkingDir, result.execOptions.WorkingDir)
-			assert.Equal(t, tt.expected.execOptions.Env, result.execOptions.Env)
+			assert.Equal(t, tt.expected.ExecOptions.User, result.ExecOptions.User)
+			assert.Equal(t, tt.expected.ExecOptions.WorkingDir, result.ExecOptions.WorkingDir)
+			assert.Equal(t, tt.expected.ExecOptions.Env, result.ExecOptions.Env)
 		})
 	}
 }
 
-func TestParseContainer(t *testing.T) {
+func TestLoadConfig(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       digraph.Container
-		expected    *Client
+		expected    *Config
 		expectError bool
 		errorMsg    string
 	}{
@@ -657,16 +657,16 @@ func TestParseContainer(t *testing.T) {
 			input: digraph.Container{
 				Image: "alpine:latest",
 			},
-			expected: &Client{
-				image:      "alpine:latest",
-				pull:       digraph.PullPolicyAlways, // Zero value of PullPolicy
-				autoRemove: true,                     // Default when KeepContainer is false
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "alpine:latest",
+				Pull:       digraph.PullPolicyAlways, // Zero value of PullPolicy
+				AutoRemove: true,                     // Default when KeepContainer is false
+				Container: &container.Config{
 					Image: "alpine:latest",
 				},
-				hostConfig:    &container.HostConfig{},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -691,12 +691,12 @@ func TestParseContainer(t *testing.T) {
 				Network:       "mynetwork",
 				KeepContainer: true,
 			},
-			expected: &Client{
-				image:      "ubuntu:20.04",
-				platform:   "linux/arm64",
-				pull:       digraph.PullPolicyAlways,
-				autoRemove: false, // KeepContainer is true
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "ubuntu:20.04",
+				Platform:   "linux/arm64",
+				Pull:       digraph.PullPolicyAlways,
+				AutoRemove: false, // KeepContainer is true
+				Container: &container.Config{
 					Image:      "ubuntu:20.04",
 					Env:        []string{"FOO=bar", "BAZ=qux"},
 					User:       "1000:1000",
@@ -706,7 +706,7 @@ func TestParseContainer(t *testing.T) {
 						"9090/tcp": {},
 					},
 				},
-				hostConfig: &container.HostConfig{
+				Host: &container.HostConfig{
 					Binds: []string{"/host/data:/data:ro"},
 					Mounts: []mount.Mount{
 						{
@@ -726,12 +726,12 @@ func TestParseContainer(t *testing.T) {
 					},
 					NetworkMode: "mynetwork",
 				},
-				networkConfig: &network.NetworkingConfig{
+				Network: &network.NetworkingConfig{
 					EndpointsConfig: map[string]*network.EndpointSettings{
 						"mynetwork": {},
 					},
 				},
-				execOptions: &container.ExecOptions{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -740,17 +740,17 @@ func TestParseContainer(t *testing.T) {
 				Image:   "nginx",
 				Network: "host",
 			},
-			expected: &Client{
-				image:      "nginx",
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "nginx",
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "nginx",
 				},
-				hostConfig: &container.HostConfig{
+				Host: &container.HostConfig{
 					NetworkMode: "host",
 				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -759,17 +759,17 @@ func TestParseContainer(t *testing.T) {
 				Image:   "nginx",
 				Network: "container:myapp",
 			},
-			expected: &Client{
-				image:      "nginx",
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "nginx",
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "nginx",
 				},
-				hostConfig: &container.HostConfig{
+				Host: &container.HostConfig{
 					NetworkMode: "container:myapp",
 				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -778,17 +778,17 @@ func TestParseContainer(t *testing.T) {
 				Image:   "alpine",
 				Volumes: []string{"/host/path:/container/path"},
 			},
-			expected: &Client{
-				image:      "alpine",
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "alpine",
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "alpine",
 				},
-				hostConfig: &container.HostConfig{
+				Host: &container.HostConfig{
 					Binds: []string{"/host/path:/container/path:rw"},
 				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -797,21 +797,21 @@ func TestParseContainer(t *testing.T) {
 				Image:   "alpine",
 				Volumes: []string{"./data:/data:ro"},
 			},
-			expected: func() *Client {
+			expected: func() *Config {
 				// Relative paths are resolved to absolute paths
 				cwd, _ := os.Getwd()
 				resolvedPath := filepath.Join(cwd, "data")
-				return &Client{
-					image:      "alpine",
-					autoRemove: true,
-					containerConfig: &container.Config{
+				return &Config{
+					Image:      "alpine",
+					AutoRemove: true,
+					Container: &container.Config{
 						Image: "alpine",
 					},
-					hostConfig: &container.HostConfig{
+					Host: &container.HostConfig{
 						Binds: []string{resolvedPath + ":/data:ro"},
 					},
-					networkConfig: &network.NetworkingConfig{},
-					execOptions:   &container.ExecOptions{},
+					Network:     &network.NetworkingConfig{},
+					ExecOptions: &container.ExecOptions{},
 				}
 			}(),
 		},
@@ -821,21 +821,21 @@ func TestParseContainer(t *testing.T) {
 				Image:   "alpine",
 				Volumes: []string{"~/data:/data:rw"},
 			},
-			expected: func() *Client {
+			expected: func() *Config {
 				// Home directory paths are resolved to absolute paths
 				homeDir, _ := os.UserHomeDir()
 				resolvedPath := filepath.Join(homeDir, "data")
-				return &Client{
-					image:      "alpine",
-					autoRemove: true,
-					containerConfig: &container.Config{
+				return &Config{
+					Image:      "alpine",
+					AutoRemove: true,
+					Container: &container.Config{
 						Image: "alpine",
 					},
-					hostConfig: &container.HostConfig{
+					Host: &container.HostConfig{
 						Binds: []string{resolvedPath + ":/data:rw"},
 					},
-					networkConfig: &network.NetworkingConfig{},
-					execOptions:   &container.ExecOptions{},
+					Network:     &network.NetworkingConfig{},
+					ExecOptions: &container.ExecOptions{},
 				}
 			}(),
 		},
@@ -845,16 +845,16 @@ func TestParseContainer(t *testing.T) {
 				Image: "nginx",
 				Ports: []string{"127.0.0.1:8080:80/tcp"},
 			},
-			expected: &Client{
-				image:      "nginx",
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "nginx",
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "nginx",
 					ExposedPorts: nat.PortSet{
 						"80/tcp": {},
 					},
 				},
-				hostConfig: &container.HostConfig{
+				Host: &container.HostConfig{
 					PortBindings: nat.PortMap{
 						"80/tcp": []nat.PortBinding{
 							{
@@ -864,8 +864,8 @@ func TestParseContainer(t *testing.T) {
 						},
 					},
 				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -874,16 +874,16 @@ func TestParseContainer(t *testing.T) {
 				Image: "dns-server",
 				Ports: []string{"53:53/udp"},
 			},
-			expected: &Client{
-				image:      "dns-server",
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "dns-server",
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "dns-server",
 					ExposedPorts: nat.PortSet{
 						"53/udp": {},
 					},
 				},
-				hostConfig: &container.HostConfig{
+				Host: &container.HostConfig{
 					PortBindings: nat.PortMap{
 						"53/udp": []nat.PortBinding{
 							{
@@ -893,8 +893,8 @@ func TestParseContainer(t *testing.T) {
 						},
 					},
 				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -957,18 +957,18 @@ func TestParseContainer(t *testing.T) {
 				Image: "sctp-server",
 				Ports: []string{"132/sctp"},
 			},
-			expected: &Client{
-				image:      "sctp-server",
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "sctp-server",
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "sctp-server",
 					ExposedPorts: nat.PortSet{
 						"132/sctp": {},
 					},
 				},
-				hostConfig:    &container.HostConfig{},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -977,16 +977,16 @@ func TestParseContainer(t *testing.T) {
 				Image: "nginx",
 				Ports: []string{" 8080:80 "},
 			},
-			expected: &Client{
-				image:      "nginx",
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "nginx",
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "nginx",
 					ExposedPorts: nat.PortSet{
 						"80/tcp": {},
 					},
 				},
-				hostConfig: &container.HostConfig{
+				Host: &container.HostConfig{
 					PortBindings: nat.PortMap{
 						"80/tcp": []nat.PortBinding{
 							{
@@ -996,8 +996,8 @@ func TestParseContainer(t *testing.T) {
 						},
 					},
 				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -1006,17 +1006,17 @@ func TestParseContainer(t *testing.T) {
 				Image:   "nginx",
 				Network: "",
 			},
-			expected: &Client{
-				image:      "nginx",
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "nginx",
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "nginx",
 				},
-				hostConfig: &container.HostConfig{
+				Host: &container.HostConfig{
 					NetworkMode: "", // Empty string for default
 				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -1025,17 +1025,17 @@ func TestParseContainer(t *testing.T) {
 				Image:   "nginx",
 				Network: "bridge",
 			},
-			expected: &Client{
-				image:      "nginx",
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "nginx",
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "nginx",
 				},
-				hostConfig: &container.HostConfig{
+				Host: &container.HostConfig{
 					NetworkMode: "bridge",
 				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -1044,17 +1044,17 @@ func TestParseContainer(t *testing.T) {
 				Image:   "nginx",
 				Network: "none",
 			},
-			expected: &Client{
-				image:      "nginx",
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "nginx",
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "nginx",
 				},
-				hostConfig: &container.HostConfig{
+				Host: &container.HostConfig{
 					NetworkMode: "none",
 				},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -1063,15 +1063,15 @@ func TestParseContainer(t *testing.T) {
 				Image:         "alpine",
 				KeepContainer: false,
 			},
-			expected: &Client{
-				image:      "alpine",
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "alpine",
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "alpine",
 				},
-				hostConfig:    &container.HostConfig{},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -1080,15 +1080,15 @@ func TestParseContainer(t *testing.T) {
 				Image:         "alpine",
 				KeepContainer: true,
 			},
-			expected: &Client{
-				image:      "alpine",
-				autoRemove: false,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "alpine",
+				AutoRemove: false,
+				Container: &container.Config{
 					Image: "alpine",
 				},
-				hostConfig:    &container.HostConfig{},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -1097,16 +1097,16 @@ func TestParseContainer(t *testing.T) {
 				Image:      "alpine",
 				PullPolicy: digraph.PullPolicyNever,
 			},
-			expected: &Client{
-				image:      "alpine",
-				pull:       digraph.PullPolicyNever,
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "alpine",
+				Pull:       digraph.PullPolicyNever,
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "alpine",
 				},
-				hostConfig:    &container.HostConfig{},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 		{
@@ -1115,23 +1115,23 @@ func TestParseContainer(t *testing.T) {
 				Image:    "alpine",
 				Platform: "linux/386",
 			},
-			expected: &Client{
-				image:      "alpine",
-				platform:   "linux/386",
-				autoRemove: true,
-				containerConfig: &container.Config{
+			expected: &Config{
+				Image:      "alpine",
+				Platform:   "linux/386",
+				AutoRemove: true,
+				Container: &container.Config{
 					Image: "alpine",
 				},
-				hostConfig:    &container.HostConfig{},
-				networkConfig: &network.NetworkingConfig{},
-				execOptions:   &container.ExecOptions{},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := NewFromContainerConfig("", tt.input)
+			result, err := LoadConfig("", tt.input, nil)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -1140,35 +1140,35 @@ func TestParseContainer(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected.image, result.image)
-			assert.Equal(t, tt.expected.platform, result.platform)
-			assert.Equal(t, tt.expected.pull, result.pull)
-			assert.Equal(t, tt.expected.autoRemove, result.autoRemove)
+			assert.Equal(t, tt.expected.Image, result.Image)
+			assert.Equal(t, tt.expected.Platform, result.Platform)
+			assert.Equal(t, tt.expected.Pull, result.Pull)
+			assert.Equal(t, tt.expected.AutoRemove, result.AutoRemove)
 
 			// Compare container config
-			assert.Equal(t, tt.expected.containerConfig.Image, result.containerConfig.Image)
-			assert.Equal(t, tt.expected.containerConfig.Env, result.containerConfig.Env)
-			assert.Equal(t, tt.expected.containerConfig.User, result.containerConfig.User)
-			assert.Equal(t, tt.expected.containerConfig.WorkingDir, result.containerConfig.WorkingDir)
+			assert.Equal(t, tt.expected.Container.Image, result.Container.Image)
+			assert.Equal(t, tt.expected.Container.Env, result.Container.Env)
+			assert.Equal(t, tt.expected.Container.User, result.Container.User)
+			assert.Equal(t, tt.expected.Container.WorkingDir, result.Container.WorkingDir)
 
 			// Compare exposed ports
-			if tt.expected.containerConfig.ExposedPorts != nil {
-				assert.Equal(t, tt.expected.containerConfig.ExposedPorts, result.containerConfig.ExposedPorts)
+			if tt.expected.Container.ExposedPorts != nil {
+				assert.Equal(t, tt.expected.Container.ExposedPorts, result.Container.ExposedPorts)
 			}
 
 			// Compare host config
-			assert.Equal(t, tt.expected.hostConfig.Binds, result.hostConfig.Binds)
-			if tt.expected.hostConfig.Mounts != nil {
-				assert.Equal(t, tt.expected.hostConfig.Mounts, result.hostConfig.Mounts)
+			assert.Equal(t, tt.expected.Host.Binds, result.Host.Binds)
+			if tt.expected.Host.Mounts != nil {
+				assert.Equal(t, tt.expected.Host.Mounts, result.Host.Mounts)
 			}
-			if tt.expected.hostConfig.PortBindings != nil {
-				assert.Equal(t, tt.expected.hostConfig.PortBindings, result.hostConfig.PortBindings)
+			if tt.expected.Host.PortBindings != nil {
+				assert.Equal(t, tt.expected.Host.PortBindings, result.Host.PortBindings)
 			}
-			assert.Equal(t, tt.expected.hostConfig.NetworkMode, result.hostConfig.NetworkMode)
+			assert.Equal(t, tt.expected.Host.NetworkMode, result.Host.NetworkMode)
 
 			// Compare network config
-			if tt.expected.networkConfig.EndpointsConfig != nil {
-				assert.Equal(t, tt.expected.networkConfig.EndpointsConfig, result.networkConfig.EndpointsConfig)
+			if tt.expected.Network.EndpointsConfig != nil {
+				assert.Equal(t, tt.expected.Network.EndpointsConfig, result.Network.EndpointsConfig)
 			}
 		})
 	}

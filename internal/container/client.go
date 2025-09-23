@@ -19,10 +19,8 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/go-viper/mapstructure/v2"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -39,74 +37,69 @@ var (
 	ErrInvalidOptionsWithContainerName  = errors.New("'container', 'host', 'network', 'pull', 'platform', or 'autoRemove' not supported with 'containerName'")
 )
 
+// errorExitCode is the exit code to return when an error occurs and we
+// cannot get a more specific code
+const errorExitCode = 1
+
 type Client struct {
-	image       string
-	platform    string
-	platformO   specs.Platform
-	containerID string
-	pull        digraph.PullPolicy
-	autoRemove  bool
-	// containerConfig is the configuration for new container creation
-	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#Config
-	containerConfig *container.Config
-	// hostConfig is configuration for the container host
-	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig
-	hostConfig *container.HostConfig
-	// networkConfig is configuration for the container network
-	// See https://pkg.go.dev/github.com/docker/docker@v27.5.1+incompatible/api/types/network#NetworkingConfig
-	networkConfig *network.NetworkingConfig
-	// execOptions is configuration for exec in existing container
-	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#ExecOptions
-	execOptions  *container.ExecOptions
-	mu           sync.Mutex
-	cli          *client.Client
+	cfg *Config
+
+	platform     specs.Platform // resolved platform
+	containerID  string         // ID of the running container (if any)
+	newContainer bool           // whether we created the container (vs using existing)
+
+	mu  sync.Mutex
+	cli *client.Client
+
 	keepAliveTmp string
+
 	// authManager handles registry authentication
 	authManager *RegistryAuthManager
 
 	cancelMu sync.Mutex
 	cancel   func()
-
-	// startup mode for DAG-level container: "keepalive" (default) | "entrypoint" | "command"
-	startup string
-	// readiness gate: "running" (default) | "healthy"
-	waitFor string
-	// command for startup when startup == "command"
-	startCmd []string
-	// optional regex to wait for in logs before proceeding
-	logPattern string
 }
 
 // ExecOptions specifies options to execute commands in the container.
 type ExecOptions struct {
-	WorkingDir string // Working directory
+	// WorkingDir overrides the working directory for the exec command.
+	WorkingDir string
 }
 
-// Init initialize the client
-func (c *Client) Init(ctx context.Context) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+// InitializeClient creates a new container client
+func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
+	dockerCli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		return err
+		return nil, err
 	}
-	c.cli = cli
 
-	platform, err := c.getPlatform(ctx, cli)
+	platform, err := getPlatform(ctx, dockerCli, cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	c.platformO = platform
 
-	return nil
+	// Check if the container is running when containerName is specified
+	var ctID string
+	if cfg.ContainerName != "" {
+		info, _ := dockerCli.ContainerInspect(ctx, cfg.ContainerName)
+		if info.ID == "" || !info.State.Running {
+			// Container not found or not running
+			// TODO: Create container if not found and if image is specified
+			return nil, fmt.Errorf("container %q is not running", cfg.ContainerName)
+		}
+		ctID = info.ID
+	}
+
+	return &Client{cfg: cfg, containerID: ctID, cli: dockerCli, platform: platform}, nil
 }
 
-// Destroy destroys the client
+// Close closes the container client and cleans up resources
 func (c *Client) Close(ctx context.Context) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.containerID != "" && c.autoRemove {
+	// If we have a running container and autoRemove is set, remove it
+	if c.containerID != "" && c.cfg.AutoRemove {
 		if err := c.cli.ContainerRemove(ctx, c.containerID, container.RemoveOptions{Force: true}); err != nil {
 			logger.Error(ctx, "docker executor: remove container", "err", err)
 		}
@@ -138,13 +131,13 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 
 	// Choose startup mode and command
 	var cmd []string
-	mode := c.startup
+	mode := c.cfg.Startup
 	if mode == "" {
 		mode = "keepalive"
 	}
 	switch mode {
 	case "keepalive":
-		if len(c.containerConfig.Cmd) == 0 {
+		if len(c.cfg.Container.Cmd) == 0 {
 			// Detect if we're running in docker-in-docker environment
 			isDockerInDocker := c.isDockerInDocker()
 
@@ -153,7 +146,7 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 				cmd = []string{"sh", "-c", "while true; do sleep 86400; done"}
 			} else {
 				// Standard environment, use the keepalive binary
-				hostPath, err := GetKeepaliveFile(c.platformO)
+				hostPath, err := GetKeepaliveFile(c.platform)
 				if err != nil {
 					// Fallback to sleep if keepalive binary fails
 					logger.Warn(ctx, "Failed to get keepalive binary, using sleep fallback", "err", err)
@@ -163,7 +156,7 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 					// Setup the volume bind for the keepalive binary
 					targetPath := "/__dagu_runner/keepalive"
 					bind := hostPath + ":" + targetPath + ":ro"
-					c.hostConfig.Binds = append(c.hostConfig.Binds, bind)
+					c.cfg.Host.Binds = append(c.cfg.Host.Binds, bind)
 					cmd = []string{targetPath}
 				}
 			}
@@ -172,32 +165,36 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 		// Respect image ENTRYPOINT/CMD: do not set cmd; run as-is
 		cmd = nil
 	case "command":
-		if len(c.startCmd) == 0 {
+		if len(c.cfg.StartCmd) == 0 {
 			return fmt.Errorf("startup 'command' requires non-empty command array")
 		}
-		cmd = append([]string{}, c.startCmd...)
+		cmd = append([]string{}, c.cfg.StartCmd...)
 	default:
 		return fmt.Errorf("invalid startup mode: %s", mode)
 	}
 
 	// Set init true to prevent zombie subprocess issues
 	init := true
-	c.hostConfig.Init = &init
+	c.cfg.Host.Init = &init
 
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancelMu.Lock()
 	c.cancel = cancel
 	c.cancelMu.Unlock()
 
-	id, err := c.startNewContainer(ctx, c.cli, cmd)
+	if c.containerID == "" {
+		// If container name was not specified, generate a random one
+		c.containerID = fmt.Sprintf("dagu-%s", stringutil.RandomString(12))
+	}
+	ctID := c.containerID
+
+	_, err := c.startNewContainer(ctx, c.cli, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to start a new container: %w", err)
 	}
 
-	c.containerID = id
-
 	// Readiness wait
-	waitMode := c.waitFor
+	waitMode := c.cfg.WaitFor
 	if waitMode == "" {
 		waitMode = "running"
 	}
@@ -207,22 +204,22 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 
 	switch waitMode {
 	case "running":
-		if err := c.waitRunning(readyCtx, c.cli, id); err != nil {
+		if err := c.waitRunning(readyCtx, c.cli, ctID); err != nil {
 			return err
 		}
 	case "healthy":
 		// If no healthcheck defined, warn and fallback to running
-		hasHealth, err := c.hasHealthcheck(readyCtx, c.cli, id)
+		hasHealth, err := c.hasHealthcheck(readyCtx, c.cli, ctID)
 		if err != nil {
 			return err
 		}
 		if !hasHealth {
 			logger.Warn(ctx, "Selected waitFor=healthy but image has no healthcheck; falling back to running")
-			if err := c.waitRunning(readyCtx, c.cli, id); err != nil {
+			if err := c.waitRunning(readyCtx, c.cli, ctID); err != nil {
 				return err
 			}
 		} else {
-			if err := c.waitHealthy(readyCtx, c.cli, id); err != nil {
+			if err := c.waitHealthy(readyCtx, c.cli, ctID); err != nil {
 				return err
 			}
 		}
@@ -231,8 +228,8 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 	}
 
 	// Optional log pattern wait after base readiness
-	if strings.TrimSpace(c.logPattern) != "" {
-		if err := c.waitLogPattern(readyCtx, c.cli, id, c.logPattern); err != nil {
+	if strings.TrimSpace(c.cfg.LogPattern) != "" {
+		if err := c.waitLogPattern(readyCtx, c.cli, ctID, c.cfg.LogPattern); err != nil {
 			return err
 		}
 	}
@@ -276,7 +273,7 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 	id, err := c.startNewContainer(ctx, c.cli, cmd)
 	if err != nil {
 		c.mu.Unlock()
-		return 1, fmt.Errorf("failed to start a new container: %w", err)
+		return errorExitCode, fmt.Errorf("failed to start a new container: %w", err)
 	}
 
 	c.containerID = id
@@ -284,7 +281,7 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 
 	var once sync.Once
 	defer func() {
-		if !c.autoRemove {
+		if !c.cfg.AutoRemove {
 			return
 		}
 
@@ -303,45 +300,46 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 }
 
 func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd []string) (string, error) {
-	pull, err := c.shouldPullImage(ctx, cli, &c.platformO)
+	pull, err := c.shouldPullImage(ctx, cli, &c.platform)
 	if err != nil {
 		return "", err
 	}
 
-	logger.Info(ctx, "Creating a new container", "platform", c.platform, "image", c.image)
+	logger.Info(ctx, "Creating a new container", "platform", c.platform, "image", c.cfg.Container.Image, "pullPolicy", c.cfg.Pull.String(), "shouldPull", pull)
 
 	if pull {
-		logger.Infof(ctx, "Pulling the image %q", c.image)
+		logger.Infof(ctx, "Pulling the image %q", c.cfg.Image)
 
 		// Get pull options with authentication if configured
 		var pullOpts image.PullOptions
 		if c.authManager != nil {
 			var err error
-			pullOpts, err = c.authManager.GetPullOptions(c.image, platforms.Format(c.platformO))
+			pullOpts, err = c.authManager.GetPullOptions(c.cfg.Image, platforms.Format(c.platform))
 			if err != nil {
 				return "", fmt.Errorf("failed to get pull options: %w", err)
 			}
 		} else {
-			pullOpts = image.PullOptions{Platform: platforms.Format(c.platformO)}
+			pullOpts = image.PullOptions{Platform: platforms.Format(c.platform)}
 		}
 
-		reader, err := cli.ImagePull(ctx, c.image, pullOpts)
+		reader, err := cli.ImagePull(ctx, c.cfg.Image, pullOpts)
 		if err != nil {
 			return "", err
 		}
-		logger.Infof(ctx, "Successfully pulled the image %q", c.image)
+		logger.Infof(ctx, "Successfully pulled the image %q", c.cfg.Image)
 		// Output pull-image log to stderr instead of stdout
 		_, _ = io.Copy(io.Discard, reader)
 	}
 
-	containerConfig := *c.containerConfig
+	ctCfg := *c.cfg.Container // Copy to avoid mutating original
+	ctCfg.Image = c.cfg.Image
+
 	if len(cmd) > 0 {
-		containerConfig.Cmd = cmd
+		ctCfg.Cmd = cmd
 	}
-	containerConfig.Image = c.image
 
 	resp, err := cli.ContainerCreate(
-		ctx, &containerConfig, c.hostConfig, c.networkConfig, &c.platformO, c.containerID,
+		ctx, &ctCfg, c.cfg.Host, c.cfg.Network, &c.platform, c.containerID,
 	)
 	if err != nil {
 		return "", err
@@ -372,15 +370,15 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 
 	// Create exec configuration
 	execOpts := container.ExecOptions{
-		User:         c.execOptions.User,
-		Privileged:   c.execOptions.Privileged,
-		Tty:          c.execOptions.Tty,
+		User:         c.cfg.ExecOptions.User,
+		Privileged:   c.cfg.ExecOptions.Privileged,
+		Tty:          c.cfg.ExecOptions.Tty,
 		AttachStdin:  false,
 		AttachStdout: true,
 		AttachStderr: true,
 		Cmd:          cmd,
-		Env:          c.execOptions.Env,
-		WorkingDir:   c.execOptions.WorkingDir,
+		Env:          c.cfg.ExecOptions.Env,
+		WorkingDir:   c.cfg.ExecOptions.WorkingDir,
 	}
 
 	// Override the working dir if specified
@@ -533,15 +531,14 @@ func (c *Client) isDockerInDocker() bool {
 	return false
 }
 
-// getPlatform returns the platform of the container
-func (c *Client) getPlatform(ctx context.Context, cli *client.Client) (specs.Platform, error) {
+func getPlatform(ctx context.Context, cli *client.Client, cfg *Config) (specs.Platform, error) {
 	// Extract platform from the current input and fallback to the current docker host platform.
 	var platform specs.Platform
-	if c.platform != "" {
+	if cfg.Platform != "" {
 		var err error
-		platform, err = platforms.Parse(c.platform)
+		platform, err = platforms.Parse(cfg.Platform)
 		if err != nil {
-			return platform, fmt.Errorf("failed to parse platform %s: %w", c.platform, err)
+			return platform, fmt.Errorf("failed to parse platform %s: %w", cfg.Platform, err)
 		}
 	} else {
 		info, err := cli.Info(ctx)
@@ -556,21 +553,21 @@ func (c *Client) getPlatform(ctx context.Context, cli *client.Client) (specs.Pla
 }
 
 func (c *Client) shouldPullImage(ctx context.Context, cli *client.Client, platform *specs.Platform) (bool, error) {
-	if c.pull == digraph.PullPolicyAlways {
+	if c.cfg.Pull == digraph.PullPolicyAlways {
 		return true, nil
 	}
-	if c.pull == digraph.PullPolicyNever {
+	if c.cfg.Pull == digraph.PullPolicyNever {
 		return false, nil
 	}
 
 	// Loop through all locally available images that have the same reference with
 	// the input image to check if we have the correct platform.
 	filters := filters.NewArgs()
-	filters.Add("reference", c.image)
+	filters.Add("reference", c.cfg.Image)
 
 	images, err := cli.ImageList(ctx, image.ListOptions{Filters: filters})
 	if err != nil {
-		return false, fmt.Errorf("failed to list local images %s: %w", c.image, err)
+		return false, fmt.Errorf("failed to list local images %s: %w", c.cfg.Image, err)
 	}
 
 	for _, summary := range images {
@@ -718,230 +715,4 @@ func (c *Client) waitLogPattern(ctx context.Context, cli *client.Client, id stri
 		return fmt.Errorf("error reading logs: %w", err)
 	}
 	return fmt.Errorf("log stream ended before pattern matched: %q", pattern)
-}
-
-// NewFromContainerConfig parses digraph.Container into Container struct
-func NewFromContainerConfig(workDir string, ct digraph.Container) (*Client, error) {
-	return NewFromContainerConfigWithAuth(workDir, ct, nil)
-}
-
-// NewFromContainerConfigWithAuth parses digraph.Container into Container struct with registry auth
-func NewFromContainerConfigWithAuth(workDir string, ct digraph.Container, registryAuths map[string]*digraph.AuthConfig) (*Client, error) {
-	// Validate required fields
-	if ct.Image == "" {
-		return nil, ErrImageRequired
-	}
-
-	// Initialize Docker configuration structs
-	containerConfig := &container.Config{
-		Image:      ct.Image,
-		Env:        ct.Env,
-		User:       ct.User,
-		WorkingDir: ct.GetWorkingDir(),
-	}
-
-	hostConfig := &container.HostConfig{}
-	networkConfig := &network.NetworkingConfig{}
-	execOptions := &container.ExecOptions{}
-
-	// Parse volumes
-	if len(ct.Volumes) > 0 {
-		binds, mounts, err := parseVolumes(workDir, ct.Volumes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse volumes: %w", err)
-		}
-		if len(binds) > 0 {
-			hostConfig.Binds = binds
-		}
-		if len(mounts) > 0 {
-			hostConfig.Mounts = mounts
-		}
-	}
-
-	// Parse ports
-	if len(ct.Ports) > 0 {
-		exposedPorts, portBindings, err := parsePorts(ct.Ports)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse ports: %w", err)
-		}
-		containerConfig.ExposedPorts = exposedPorts
-		hostConfig.PortBindings = portBindings
-	}
-
-	// Parse network mode
-	if ct.Network != "" {
-		networkMode := parseNetworkMode(ct.Network)
-		hostConfig.NetworkMode = networkMode
-
-		// If it's a custom network, add it to the endpoints config
-		if !isStandardNetworkMode(ct.Network) {
-			networkConfig.EndpointsConfig = map[string]*network.EndpointSettings{
-				ct.Network: {},
-			}
-		}
-	}
-
-	// autoRemove is the inverse of KeepContainer
-	autoRemove := !ct.KeepContainer
-
-	// Apply restart policy if specified
-	if ct.RestartPolicy != "" {
-		rp, err := parseRestartPolicy(ct.RestartPolicy)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse restartPolicy: %w", err)
-		}
-		hostConfig.RestartPolicy = rp
-	}
-
-	client := &Client{
-		image:           ct.Image,
-		platform:        ct.Platform,
-		pull:            ct.PullPolicy,
-		autoRemove:      autoRemove,
-		containerConfig: containerConfig,
-		hostConfig:      hostConfig,
-		networkConfig:   networkConfig,
-		execOptions:     execOptions,
-	}
-
-	// Startup and readiness configuration (defaults)
-	client.startup = strings.ToLower(strings.TrimSpace(string(ct.Startup)))
-	if client.startup == "" {
-		client.startup = "keepalive"
-	}
-	client.waitFor = strings.ToLower(strings.TrimSpace(string(ct.WaitFor)))
-	if client.waitFor == "" {
-		client.waitFor = "running"
-	}
-	client.startCmd = append([]string{}, ct.Command...)
-	client.logPattern = ct.LogPattern
-
-	// Set up registry authentication if provided
-	if len(registryAuths) > 0 {
-		client.authManager = NewRegistryAuthManager(registryAuths)
-	}
-
-	return client, nil
-}
-
-// NewFromMapConfig parses executorConfig into Container struct
-func NewFromMapConfig(data map[string]any) (*Client, error) {
-	return NewFromMapConfigWithAuth(data, nil)
-}
-
-// NewFromMapConfigWithAuth parses executorConfig into Container struct with registry auth
-func NewFromMapConfigWithAuth(data map[string]any, registryAuths map[string]*digraph.AuthConfig) (*Client, error) {
-	ret := struct {
-		Container     container.Config         `mapstructure:"container"`
-		Host          container.HostConfig     `mapstructure:"host"`
-		Network       network.NetworkingConfig `mapstructure:"network"`
-		Exec          container.ExecOptions    `mapstructure:"exec"`
-		AutoRemove    any                      `mapstructure:"autoRemove"`
-		Pull          any                      `mapstructure:"pull"`
-		Platform      string                   `mapstructure:"platform"`
-		ContainerName string                   `mapstructure:"containerName"`
-		Image         string                   `mapstructure:"image"`
-	}{}
-
-	md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:           &ret,
-		WeaklyTypedInput: true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create decoder: %w", err)
-	}
-	if err := md.Decode(data); err != nil {
-		return nil, fmt.Errorf("failed to decode config: %w", err)
-	}
-
-	var autoRemove bool
-	if ret.Host.AutoRemove {
-		ret.Host.AutoRemove = false // Prevent removal by sdk
-		autoRemove = true
-	}
-
-	pull := digraph.PullPolicyMissing
-	if ret.Pull != nil {
-		parsed, err := digraph.ParsePullPolicy(ret.Pull)
-		if err != nil {
-			return nil, err
-		}
-		pull = parsed
-	}
-
-	if ret.ContainerName == "" && ret.Image == "" {
-		return nil, ErrImageOrContainerShouldNotBeEmpty
-	}
-
-	// Extract original presence of keys to drive validation (avoid zero-value ambiguity)
-	hasKey := func(k string) bool {
-		_, ok := data[k]
-		return ok
-	}
-
-	nonEmptyMap := func(v any) bool {
-		if v == nil {
-			return false
-		}
-		if m, ok := v.(map[string]any); ok {
-			return len(m) > 0
-		}
-		return true // present and not a map or nil
-	}
-
-	// Determine mode-affecting flags based on input
-	hasImage := strings.TrimSpace(ret.Image) != ""
-	hasContainerName := strings.TrimSpace(ret.ContainerName) != ""
-	hasExec := hasKey("exec") && nonEmptyMap(data["exec"])
-	hasContainerCfg := hasKey("container") && nonEmptyMap(data["container"])
-	hasHostCfg := hasKey("host") && nonEmptyMap(data["host"])
-	hasNetworkCfg := hasKey("network") && nonEmptyMap(data["network"])
-	hasPull := hasKey("pull")
-	hasPlatform := hasKey("platform")
-	hasAutoRemove := hasKey("autoRemove")
-
-	// Validation rules:
-	// - image and containerName are mutually exclusive for step-level Docker executor
-	if hasImage && hasContainerName {
-		return nil, ErrConflictingImageAndContainerName
-	}
-	// - exec options are only valid with containerName (exec-in-existing mode)
-	if hasImage && hasExec && !hasContainerName {
-		return nil, ErrExecOnlyWithContainerName
-	}
-	// - containerName (exec mode) cannot specify new-container options
-	if hasContainerName && (hasContainerCfg || hasHostCfg || hasNetworkCfg || hasPull || hasPlatform || hasAutoRemove) {
-		return nil, ErrInvalidOptionsWithContainerName
-	}
-
-	if ret.AutoRemove != nil {
-		v, err := stringutil.ParseBool(ret.AutoRemove)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate autoRemove value: %w", err)
-		}
-		autoRemove = v
-	}
-
-	image := strings.TrimSpace(ret.Image)
-	platform := strings.TrimSpace(ret.Platform)
-	containerID := strings.TrimSpace(ret.ContainerName)
-
-	client := &Client{
-		image:           image,
-		platform:        platform,
-		containerID:     containerID,
-		pull:            pull,
-		containerConfig: &ret.Container,
-		hostConfig:      &ret.Host,
-		networkConfig:   &ret.Network,
-		execOptions:     &ret.Exec,
-		autoRemove:      autoRemove,
-	}
-
-	// Set up registry authentication if provided
-	if len(registryAuths) > 0 {
-		client.authManager = NewRegistryAuthManager(registryAuths)
-	}
-
-	return client, nil
 }
