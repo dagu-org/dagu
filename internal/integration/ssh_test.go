@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -20,14 +21,16 @@ func TestSSHIntegration(t *testing.T) {
 
 	th := test.Setup(t)
 
+	port := findPort(t)
+
 	// Parent DAG runs a long-lived container that starts sshd on port 2222
 	// and exposes it to the host; child DAG connects via SSH and runs `hostname`.
-	dag := th.DAG(t, `
+	dag := th.DAG(t, fmt.Sprintf(`
 container:
   image: alpine:3
   # Expose container port 2222 to host port 2222
   ports:
-    - "2222:2222"
+    - "%s:2222"
   # Run a long-lived sshd process and log to stderr (-e) so LogPattern can match
   startup: command
   command: ["sh", "-c", "apk add --no-cache openssh >/dev/null 2>&1 && ssh-keygen -A >/dev/null 2>&1 && echo 'root:root' | chpasswd && /usr/sbin/sshd -D -e -p 2222 -o PermitRootLogin=yes -o PasswordAuthentication=yes -o UsePAM=no"]
@@ -67,7 +70,7 @@ ssh:
 steps:
   - command: echo dagu-ssh-ok
     output: RESULT
-`)
+`, port))
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, status.Success)
