@@ -426,27 +426,48 @@ func createLongRunningContainer(t *testing.T, th test.Helper, dockerClient *clie
 func removeContainer(t *testing.T, th test.Helper, dockerClient *client.Client, containerID string) {
 	t.Helper()
 
-	_ = dockerClient.ContainerStop(th.Context, containerID, container.StopOptions{})
-	// Wait a moment for the container to stop
-	timer := time.NewTimer(5 * time.Second)
-WAIT:
-	for {
-		inspect, err := dockerClient.ContainerInspect(th.Context, containerID)
-		if err != nil {
-			break
-		}
-		if !inspect.State.Running {
-			break
-		}
+	const (
+		stopTimeout  = 5 * time.Second
+		pollInterval = 100 * time.Millisecond
+	)
 
+	// Stop the container gracefully
+	if err := dockerClient.ContainerStop(th.Context, containerID, container.StopOptions{}); err != nil {
+		t.Logf("failed to stop container %s: %v", containerID, err)
+	}
+
+	// Wait for container to stop with timeout
+	if !waitForContainerStop(t, th, dockerClient, containerID, stopTimeout, pollInterval) {
+		t.Logf("timeout waiting for container %s to stop, forcing removal", containerID)
+	}
+
+	// Remove the container
+	if err := dockerClient.ContainerRemove(th.Context, containerID, container.RemoveOptions{Force: true}); err != nil {
+		t.Logf("failed to remove container %s: %v", containerID, err)
+	}
+}
+
+func waitForContainerStop(t *testing.T, th test.Helper, dockerClient *client.Client, containerID string, timeout, pollInterval time.Duration) bool {
+	t.Helper()
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	timeoutChan := time.After(timeout)
+
+	for {
 		select {
-		case <-timer.C:
-			t.Logf("timeout waiting for container %s to stop", containerID)
-			break WAIT
-		default:
-			time.Sleep(100 * time.Millisecond)
+		case <-timeoutChan:
+			return false
+		case <-ticker.C:
+			inspect, err := dockerClient.ContainerInspect(th.Context, containerID)
+			if err != nil {
+				// Container might have been removed or doesn't exist
+				return true
+			}
+			if !inspect.State.Running {
+				return true
+			}
 		}
 	}
-	timer.Stop()
-	_ = dockerClient.ContainerRemove(th.Context, containerID, container.RemoveOptions{Force: true})
 }
