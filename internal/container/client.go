@@ -44,9 +44,8 @@ const errorExitCode = 1
 type Client struct {
 	cfg *Config
 
-	platform     specs.Platform // resolved platform
-	containerID  string         // ID of the running container (if any)
-	newContainer bool           // whether we created the container (vs using existing)
+	platform    specs.Platform // resolved platform
+	containerID string         // ID of the running container (if any)
 
 	mu  sync.Mutex
 	cli *client.Client
