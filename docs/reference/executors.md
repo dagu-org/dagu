@@ -233,6 +233,14 @@ steps:
     command: echo "Debug mode"
 ```
 
+::: info
+Validation: Set at least `config.image` or `config.containerName`. If both are omitted, the step fails validation. Supplying only `containerName` requires the container to already be running. When both are set, Dagu first tries to exec into the named container; if it is missing or stopped, Dagu creates it using the provided image (applying any `container`/`host`/`network` settings) before running the command.
+:::
+
+::: warning
+When a DAG‑level `container:` is configured, Docker‑executor steps run inside that shared container via `docker exec`. In this case, the step’s Docker `config` (including `image`, `container/host/network`, and `exec`) is ignored; only the step’s `command` and `args` are used.
+:::
+
 ### Complete Docker Example
 
 ```yaml

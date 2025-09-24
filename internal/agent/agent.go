@@ -328,26 +328,27 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new container if the DAG has a container configuration.
 	if a.dag.Container != nil {
-		containerClient, err := container.NewFromContainerConfigWithAuth(a.dag.WorkingDir, *a.dag.Container, a.dag.RegistryAuths)
+		ctCfg, err := container.LoadConfig(a.dag.WorkingDir, *a.dag.Container, a.dag.RegistryAuths)
 		if err != nil {
-			initErr = fmt.Errorf("failed to create container client: %w", err)
+			initErr = fmt.Errorf("failed to load container config: %w", err)
 			return initErr
 		}
-		if err := containerClient.Init(ctx); err != nil {
+		ctCli, err := container.InitializeClient(ctx, ctCfg)
+		if err != nil {
 			initErr = fmt.Errorf("failed to initialize container client: %w", err)
 			return initErr
 		}
-		if err := containerClient.CreateContainerKeepAlive(ctx); err != nil {
+		if err := ctCli.CreateContainerKeepAlive(ctx); err != nil {
 			initErr = fmt.Errorf("failed to create keepalive container: %w", err)
 			return initErr
 		}
 
 		// Set the container client in the context for the execution.
-		ctx = executor.WithContainerClient(ctx, containerClient)
+		ctx = executor.WithContainerClient(ctx, ctCli)
 
 		defer func() {
-			containerClient.StopContainerKeepAlive(ctx)
-			containerClient.Close(ctx)
+			ctCli.StopContainerKeepAlive(ctx)
+			ctCli.Close(ctx)
 		}()
 	}
 

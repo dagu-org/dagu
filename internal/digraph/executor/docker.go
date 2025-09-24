@@ -77,6 +77,7 @@ type docker struct {
 	stderr    io.Writer
 	context   context.Context
 	cancel    func()
+	cfg       *container.Config
 	container *container.Client
 	mu        sync.Mutex
 	exitCode  int
@@ -130,9 +131,16 @@ func (e *docker) Run(ctx context.Context) error {
 		return err
 	}
 
-	if err := e.container.Init(ctx); err != nil {
+	if e.cfg == nil {
+		return ErrExecutorConfigRequired
+	}
+
+	cli, err := container.InitializeClient(ctx, e.cfg)
+	if err != nil {
 		return fmt.Errorf("failed to setup container: %w", err)
 	}
+
+	e.container = cli
 	defer e.container.Close(ctx)
 
 	// Build command only when explicitly provided; otherwise use image default CMD/ENTRYPOINT.
@@ -141,11 +149,7 @@ func (e *docker) Run(ctx context.Context) error {
 		cmd = append([]string{e.step.Command}, e.step.Args...)
 	}
 
-	exitCode, err := e.container.Run(
-		ctx,
-		cmd,
-		e.stdout, e.stderr,
-	)
+	exitCode, err := e.container.Run(ctx, cmd, e.stdout, e.stderr)
 
 	e.mu.Lock()
 	e.exitCode = exitCode
@@ -166,23 +170,26 @@ func newDocker(
 ) (Executor, error) {
 	execCfg := step.ExecutorConfig
 
-	var ct *container.Client
-
+	var cfg *container.Config
 	if len(execCfg.Config) > 0 {
-		var err error
 		// Get registry auth from context if available
 		registryAuths := getRegistryAuth(ctx)
-		ct, err = container.NewFromMapConfigWithAuth(execCfg.Config, registryAuths)
+		c, err := container.LoadConfigFromMap(execCfg.Config, registryAuths)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse executor config: %w", err)
+			return nil, fmt.Errorf("failed to load container config: %w", err)
 		}
+		// Set ShouldStart to true for Step-level containers
+		// This ensures the container is automatically created and started
+		// if it does not exist or is stopped.
+		c.ShouldStart = true
+		cfg = c
 	}
 
 	return &docker{
-		container: ct,
-		step:      step,
-		stdout:    os.Stdout,
-		stderr:    os.Stderr,
+		cfg:    cfg,
+		step:   step,
+		stdout: os.Stdout,
+		stderr: os.Stderr,
 	}, nil
 }
 

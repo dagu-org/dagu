@@ -420,7 +420,7 @@
                 "config": {
                   "type": "object",
                   "additionalProperties": true,
-                  "description": "Executor-specific configuration options"
+                  "description": "Executor-specific configuration options. For the Docker executor, set `image`, `containerName`, or both; with only `containerName` the container must already be running, and with both set Dagu creates the container from the `image` if it is missing or stopped."
                 }
               },
               "required": ["type"]
