@@ -42,9 +42,9 @@ steps:
   - executor:
       type: docker
       config:
-        # Provide one of the following (see precedence note below):
+        # Provide at least one of the following (see fallback note below):
         image: alpine:latest         # Create a new container from this image
-        # containerName: my-running-container  # Exec into an existing container
+        # containerName: my-running-container  # Exec into (and optionally create) this container
 
         # Image pull behavior (string or boolean)
         pull: missing                # always | missing | never (true->always, false->never)
@@ -68,10 +68,11 @@ steps:
 ```
 
 Notes:
-- You must set either `image` or `containerName`. If both are omitted, the step fails validation.
-- Precedence: if `containerName` is set, the executor runs `docker exec` in that container. In this mode, `image`, `container`, `host`, and `network` are not used.
+- Set `image`, `containerName`, or both. If both are omitted, the step fails validation.
+- With only `containerName`, the target container must already be running; Dagu will exec into it using the `exec` options.
+- With both `image` and `containerName`, Dagu first attempts to exec into the named container. If it is missing or stopped, Dagu creates it using the supplied image (applying `container`/`host`/`network` settings) before running the command.
 - When creating a new container (`image` set) and `command` is omitted, Docker uses the image’s default `ENTRYPOINT`/`CMD`.
-- When executing in an existing container (`containerName` set), the container must be running; otherwise the step fails with “container is not running”. The `exec` block controls user/workingDir/env.
+- Low-level Docker options (`container`, `host`, `network`) only apply when Dagu starts the container; they are ignored if an existing running container is reused.
 - `host.autoRemove` from raw Docker config is ignored — use top‑level `config.autoRemove` instead.
 - `pull` accepts booleans for backward compatibility: `true` = `always`, `false` = `never`.
 
@@ -85,7 +86,7 @@ If the DAG has a top‑level `container:` configured, any step using the Docker 
 ## Validation and Errors
 
 - Required fields:
-  - Step‑level: `config.image` or `config.containerName` must be provided (one is required). If `containerName` is provided, the target container must already be running.
+  - Step‑level: Provide `config.image`, `config.containerName`, or both. Without either the step fails. Only `containerName` requires the container to already be running; with both set, Dagu will start the container from `image` if needed.
   - DAG‑level: `container.image` is required.
 - Volume format (DAG‑level `container.volumes`): `source:target[:ro|rw]`
   - `source` may be absolute, relative to DAG workingDir (`.` or `./...`), or `~`-expanded; otherwise it is treated as a named volume.

@@ -238,7 +238,7 @@ steps:
 ```
 
 ::: info
-Validation: Provide either `config.image` (create new container) or `config.containerName` (exec into existing). If both are omitted, the step fails. If both are set, `containerName` takes precedence and the step attempts to exec in that container; `image` and other Docker configs are ignored.
+Validation: Set at least `config.image` or `config.containerName`. If both are omitted, the step fails validation. Supplying only `containerName` requires the container to already be running. When both are set, Dagu first tries to exec into the named container; if it is missing or stopped, Dagu creates it using the provided image (applying any `container`/`host`/`network` settings) before running the command.
 :::
 
 ::: warning
