@@ -37,9 +37,30 @@ var (
 	ErrInvalidOptionsWithContainerName = errors.New("'container', 'host', 'network', 'pull', 'platform', or 'autoRemove' not supported with 'containerName'")
 )
 
-// errorExitCode is the exit code to return when an error occurs and we
-// cannot get a more specific code
-const errorExitCode = 1
+// Constants for container operations
+const (
+	// errorExitCode is the exit code to return when an error occurs and we
+	// cannot get a more specific code
+	errorExitCode = 1
+
+	// Default timeout values
+	defaultReadinessTimeout = 120 * time.Second
+	defaultPollInterval     = 500 * time.Millisecond
+
+	// Container runtime detection files
+	dockerEnvFile    = "/.dockerenv"
+	podmanEnvFile    = "/run/.containerenv"
+	proc1CgroupFile  = "/proc/1/cgroup"
+	dockerSocketFile = "/var/run/docker.sock"
+
+	// Keepalive settings
+	keepAliveSleepCmd   = "while true; do sleep 86400; done"
+	keepAliveTargetPath = "/__dagu_runner/keepalive"
+
+	// Log scanning buffer sizes
+	logScanInitialBuf = 64 * 1024
+	logScanMaxBuf     = 1024 * 1024
+)
 
 type Client struct {
 	cfg *Config
@@ -147,22 +168,9 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 
 			if isDockerInDocker {
 				logger.Info(ctx, "Detected docker-in-docker environment, using sleep for keepalive")
-				cmd = []string{"sh", "-c", "while true; do sleep 86400; done"}
+				cmd = []string{"sh", "-c", keepAliveSleepCmd}
 			} else {
-				// Standard environment, use the keepalive binary
-				hostPath, err := GetKeepaliveFile(c.platform)
-				if err != nil {
-					// Fallback to sleep if keepalive binary fails
-					logger.Warn(ctx, "Failed to get keepalive binary, using sleep fallback", "err", err)
-					cmd = []string{"sh", "-c", "while true; do sleep 86400; done"}
-				} else {
-					c.keepAliveTmp = hostPath
-					// Setup the volume bind for the keepalive binary
-					targetPath := "/__dagu_runner/keepalive"
-					bind := hostPath + ":" + targetPath + ":ro"
-					c.cfg.Host.Binds = append(c.cfg.Host.Binds, bind)
-					cmd = []string{targetPath}
-				}
+				cmd = c.setupKeepaliveCommand(ctx)
 			}
 		}
 	case "entrypoint":
@@ -202,7 +210,7 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 		waitMode = "running"
 	}
 	// Default timeout for readiness
-	readyCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	readyCtx, cancel := context.WithTimeout(ctx, defaultReadinessTimeout)
 	defer cancel()
 
 	switch waitMode {
@@ -238,6 +246,23 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// setupKeepaliveCommand configures the keepalive command for non-docker-in-docker environments
+func (c *Client) setupKeepaliveCommand(ctx context.Context) []string {
+	// Standard environment, use the keepalive binary
+	hostPath, err := GetKeepaliveFile(c.platform)
+	if err != nil {
+		// Fallback to sleep if keepalive binary fails
+		logger.Warn(ctx, "Failed to get keepalive binary, using sleep fallback", "err", err)
+		return []string{"sh", "-c", keepAliveSleepCmd}
+	}
+
+	c.keepAliveTmp = hostPath
+	// Setup the volume bind for the keepalive binary
+	bind := hostPath + ":" + keepAliveTargetPath + ":ro"
+	c.cfg.Host.Binds = append(c.cfg.Host.Binds, bind)
+	return []string{keepAliveTargetPath}
 }
 
 // StopContainerKeepAlive stops the container running keep alive command
@@ -416,16 +441,11 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 		}
 	}()
 
-	time.Sleep(500 * time.Millisecond) // Give some time for the exec to start
-
-	client, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return 1, fmt.Errorf("failed to create docker client: %w", err)
-	}
+	time.Sleep(defaultPollInterval) // Give some time for the exec to start
 
 	// Wait for exec to complete
 	for {
-		inspectResp, err := client.ContainerExecInspect(ctx, execCreateResp.ID)
+		inspectResp, err := cli.ContainerExecInspect(ctx, execCreateResp.ID)
 		if err != nil {
 			return 1, fmt.Errorf("failed to inspect exec: %w", err)
 		}
@@ -496,49 +516,58 @@ func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containe
 func (c *Client) isDockerInDocker() bool {
 	// Check multiple indicators of running in a container
 
-	// 1. Check for /.dockerenv file (Docker specific)
-	if _, err := os.Stat("/.dockerenv"); err == nil {
+	// 1. Check for Docker environment file
+	if c.fileExists(dockerEnvFile) {
 		return true
 	}
 
-	// 2. Check for /run/.containerenv file (Podman specific)
-	if _, err := os.Stat("/run/.containerenv"); err == nil {
+	// 2. Check for Podman environment file
+	if c.fileExists(podmanEnvFile) {
 		return true
 	}
 
-	// 3. Check if we're in a container by looking at cgroup
-	if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
-		// Look for docker, containerd, or other container runtimes in cgroup
-		content := string(data)
-		if strings.Contains(content, "docker") ||
-			strings.Contains(content, "containerd") ||
-			strings.Contains(content, "kubepods") ||
-			strings.Contains(content, "lxc") {
-			return true
-		}
+	// 3. Check if we're in a container by examining cgroup
+	if c.isInContainerByCgroup() {
+		return true
 	}
 
-	// 4. Check for Kubernetes environment variables
+	// 4. Check for Kubernetes environment
 	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
 		return true
 	}
 
-	// 5. Check if Docker socket is mounted (common in docker-in-docker setups)
-	if _, err := os.Stat("/var/run/docker.sock"); err == nil {
-		// Additional check: if docker.sock exists AND we have /.dockerenv or container indicators
-		// This helps distinguish between a host with Docker installed vs docker-in-docker
-		if _, err := os.Stat("/proc/1/cgroup"); err == nil {
-			if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
-				content := string(data)
-				// If cgroup shows we're in a container and docker.sock is mounted, it's docker-in-docker
-				if content != "0::/" && content != "" {
-					return true
-				}
-			}
-		}
+	// 5. Check if Docker socket is mounted (docker-in-docker scenario)
+	if c.fileExists(dockerSocketFile) && c.isInContainerByCgroup() {
+		return true
 	}
 
 	return false
+}
+
+// fileExists checks if a file exists
+func (c *Client) fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// isInContainerByCgroup checks if we're running in a container by examining cgroup
+func (c *Client) isInContainerByCgroup() bool {
+	data, err := os.ReadFile(proc1CgroupFile)
+	if err != nil {
+		return false
+	}
+
+	content := string(data)
+	// Look for container runtime indicators in cgroup
+	containerIndicators := []string{"docker", "containerd", "kubepods", "lxc"}
+	for _, indicator := range containerIndicators {
+		if strings.Contains(content, indicator) {
+			return true
+		}
+	}
+
+	// Additional check for non-root cgroup (indicates containerization)
+	return content != "0::/" && content != ""
 }
 
 func getPlatform(ctx context.Context, cli *client.Client, cfg *Config) (specs.Platform, error) {
@@ -616,7 +645,7 @@ func parseRestartPolicy(s string) (container.RestartPolicy, error) {
 
 // waitRunning waits until the container is in running state or context times out.
 func (c *Client) waitRunning(ctx context.Context, cli *client.Client, id string) error {
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(defaultPollInterval)
 	defer ticker.Stop()
 	var last string
 	for {
@@ -654,7 +683,7 @@ func (c *Client) hasHealthcheck(ctx context.Context, cli *client.Client, id stri
 
 // waitHealthy waits until the container health status is healthy.
 func (c *Client) waitHealthy(ctx context.Context, cli *client.Client, id string) error {
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(defaultPollInterval)
 	defer ticker.Stop()
 	var last string
 	for {
@@ -706,9 +735,9 @@ func (c *Client) waitLogPattern(ctx context.Context, cli *client.Client, id stri
 	}()
 
 	scanner := bufio.NewScanner(pr)
-	// allow long lines
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024)
+	// Allow long lines for log parsing
+	buf := make([]byte, 0, logScanInitialBuf)
+	scanner.Buffer(buf, logScanMaxBuf)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if re.MatchString(line) {
