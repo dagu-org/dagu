@@ -46,6 +46,8 @@ type Config struct {
 	StartCmd []string
 	// LogPattern optional regex to wait for in logs before proceeding (if empty, no wait)
 	LogPattern string
+	// ShouldStart indicates whether the container should be started (for DAG-level containers)
+	ShouldStart bool
 }
 
 // LoadConfig parses executorConfig into Container struct with registry auth
@@ -112,25 +114,11 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*digraph.Au
 	hasImage := strings.TrimSpace(ret.Image) != ""
 	hasContainerName := strings.TrimSpace(ret.ContainerName) != ""
 	hasExec := hasKey("exec") && nonEmptyMap(data["exec"])
-	hasContainerCfg := hasKey("container") && nonEmptyMap(data["container"])
-	hasHostCfg := hasKey("host") && nonEmptyMap(data["host"])
-	hasNetworkCfg := hasKey("network") && nonEmptyMap(data["network"])
-	hasPull := hasKey("pull")
-	hasPlatform := hasKey("platform")
-	hasAutoRemove := hasKey("autoRemove")
 
 	// Validation rules:
-	// - image and containerName are mutually exclusive for step-level Docker executor
-	if hasImage && hasContainerName {
-		return nil, ErrConflictingImageAndContainerName
-	}
 	// - exec options are only valid with containerName (exec-in-existing mode)
 	if hasImage && hasExec && !hasContainerName {
 		return nil, ErrExecOnlyWithContainerName
-	}
-	// - containerName (exec mode) cannot specify new-container options
-	if hasContainerName && (hasContainerCfg || hasHostCfg || hasNetworkCfg || hasPull || hasPlatform || hasAutoRemove) {
-		return nil, ErrInvalidOptionsWithContainerName
 	}
 
 	if ret.AutoRemove != nil {

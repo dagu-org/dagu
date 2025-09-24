@@ -22,9 +22,8 @@ func TestDockerExecutor(t *testing.T) {
 		expectedOutputs map[string]any
 	}{
 		{
-			name: "basic",
+			name: "Basic",
 			dag: `
-name: test-basic
 env:
   - FOO: BAR
   - ABC=XYZ
@@ -40,6 +39,24 @@ steps:
 `,
 			expectedOutputs: map[string]any{
 				"DOCKER_EXEC_OUT1": "123 abc BAR XYZ",
+			},
+		},
+		{
+			name: "AutoStart",
+			dag: `
+steps:
+  - name: s1
+    executor:
+      type: docker
+      config:
+        image: alpine:3
+				autoRemove: true
+        containerName: dagu-autostart
+    command: echo "container started"
+    output: DOCKER_EXEC_OUT1
+`,
+			expectedOutputs: map[string]any{
+				"DOCKER_EXEC_OUT1": "container started",
 			},
 		},
 	}

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -32,9 +33,8 @@ var (
 	ErrInvalidPortFormat                = errors.New("invalid port format")
 	ErrContainerIsNotRunning            = errors.New("container is not running")
 	// Validation errors for docker executor map config
-	ErrConflictingImageAndContainerName = errors.New("cannot set both 'image' and 'containerName' in docker executor config")
-	ErrExecOnlyWithContainerName        = errors.New("'exec' options require 'containerName' (exec-in-existing mode)")
-	ErrInvalidOptionsWithContainerName  = errors.New("'container', 'host', 'network', 'pull', 'platform', or 'autoRemove' not supported with 'containerName'")
+	ErrExecOnlyWithContainerName       = errors.New("'exec' options require 'containerName' (exec-in-existing mode)")
+	ErrInvalidOptionsWithContainerName = errors.New("'container', 'host', 'network', 'pull', 'platform', or 'autoRemove' not supported with 'containerName'")
 )
 
 // errorExitCode is the exit code to return when an error occurs and we
@@ -79,14 +79,17 @@ func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 
 	// Check if the container is running when containerName is specified
 	var ctID string
-	if cfg.ContainerName != "" {
-		info, _ := dockerCli.ContainerInspect(ctx, cfg.ContainerName)
-		if info.ID == "" || !info.State.Running {
-			// Container not found or not running
-			// TODO: Create container if not found and if image is specified
-			return nil, fmt.Errorf("container %q is not running", cfg.ContainerName)
+	var name = strings.TrimSpace(cfg.ContainerName)
+	if name != "" {
+		info, err := dockerCli.ContainerInspect(ctx, name)
+		isContainerRunning, err := isContainerRunning(info, err)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if container %q is running: %w", name, err)
 		}
 		ctID = info.ID
+		if cfg.Image == "" && !isContainerRunning {
+			return nil, fmt.Errorf("container %q is not running", name)
+		}
 	}
 
 	return &Client{cfg: cfg, containerID: ctID, cli: dockerCli, platform: platform}, nil
@@ -185,9 +188,8 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 		// If container name was not specified, generate a random one
 		c.containerID = fmt.Sprintf("dagu-%s", stringutil.RandomString(12))
 	}
-	ctID := c.containerID
 
-	_, err := c.startNewContainer(ctx, c.cli, cmd)
+	ctID, err := c.startNewContainer(ctx, c.cfg.ContainerName, c.cli, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to start a new container: %w", err)
 	}
@@ -263,20 +265,29 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 
 // Run executes the command in the container and returns exit code
 func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer) (int, error) {
-	c.mu.Lock()
-	if c.containerID != "" {
-		c.mu.Unlock()
-		return c.execInContainer(ctx, c.cli, cmd, stdout, stderr, ExecOptions{})
+	ctID := c.containerID
+
+	// check if container with the same name already exists
+	if ctID != "" {
+		// Check if the container is running
+		info, err := c.cli.ContainerInspect(ctx, ctID)
+		if err != nil && !errdefs.IsNotFound(err) {
+			return errorExitCode, fmt.Errorf("failed to inspect container %s: %w", ctID, err)
+		}
+		// Container exists and is running; exec in it
+		if err == nil && info.State != nil && info.State.Running {
+			return c.execInContainer(ctx, c.cli, cmd, stdout, stderr, ExecOptions{})
+		}
+		// If shouldStart is false, return error
+		if !c.cfg.ShouldStart {
+			return errorExitCode, fmt.Errorf("container %s already exists and is not running", ctID)
+		}
 	}
 
-	id, err := c.startNewContainer(ctx, c.cli, cmd)
+	ctID, err := c.startNewContainer(ctx, c.containerID, c.cli, cmd)
 	if err != nil {
-		c.mu.Unlock()
 		return errorExitCode, fmt.Errorf("failed to start a new container: %w", err)
 	}
-
-	c.containerID = id
-	c.mu.Unlock()
 
 	var once sync.Once
 	defer func() {
@@ -285,20 +296,16 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 		}
 
 		once.Do(func() {
-			c.mu.Lock()
-			id := c.containerID
-			c.mu.Unlock()
-
-			if err := c.cli.ContainerRemove(ctx, id, container.RemoveOptions{Force: true}); err != nil {
+			if err := c.cli.ContainerRemove(ctx, c.containerID, container.RemoveOptions{Force: true}); err != nil {
 				logger.Error(ctx, "docker executor: remove container", "err", err)
 			}
 		})
 	}()
 
-	return c.attachAndWait(ctx, c.cli, id, stdout, stderr)
+	return c.attachAndWait(ctx, c.cli, ctID, stdout, stderr)
 }
 
-func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd []string) (string, error) {
+func (c *Client) startNewContainer(ctx context.Context, name string, cli *client.Client, cmd []string) (string, error) {
 	pull, err := c.shouldPullImage(ctx, cli, &c.platform)
 	if err != nil {
 		return "", err
@@ -338,7 +345,7 @@ func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd 
 	}
 
 	resp, err := cli.ContainerCreate(
-		ctx, &ctCfg, c.cfg.Host, c.cfg.Network, &c.platform, c.containerID,
+		ctx, &ctCfg, c.cfg.Host, c.cfg.Network, &c.platform, name,
 	)
 	if err != nil {
 		return "", err
@@ -347,6 +354,8 @@ func (c *Client) startNewContainer(ctx context.Context, cli *client.Client, cmd 
 	for _, warning := range resp.Warnings {
 		logger.Warn(ctx, warning)
 	}
+
+	c.containerID = resp.ID
 
 	return resp.ID, cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
 }
@@ -714,4 +723,14 @@ func (c *Client) waitLogPattern(ctx context.Context, cli *client.Client, id stri
 		return fmt.Errorf("error reading logs: %w", err)
 	}
 	return fmt.Errorf("log stream ended before pattern matched: %q", pattern)
+}
+
+func isContainerRunning(info container.InspectResponse, err error) (bool, error) {
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return (info.State != nil && info.State.Running), nil
 }

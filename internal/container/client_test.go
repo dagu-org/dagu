@@ -424,15 +424,6 @@ func TestLoadConfigFromMap(t *testing.T) {
 			errorMsg:    "containerName or image must be specified",
 		},
 		{
-			name: "error when both image and containerName provided",
-			input: map[string]any{
-				"image":         "alpine",
-				"containerName": "test",
-			},
-			expectError: true,
-			errorMsg:    "cannot set both 'image' and 'containerName'",
-		},
-		{
 			name: "error when exec provided with image only",
 			input: map[string]any{
 				"image": "alpine",
@@ -442,15 +433,6 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expectError: true,
 			errorMsg:    "exec' options require 'containerName",
-		},
-		{
-			name: "error when containerName with unsupported options",
-			input: map[string]any{
-				"containerName": "test",
-				"autoRemove":    true,
-			},
-			expectError: true,
-			errorMsg:    "not supported with 'containerName'",
 		},
 		{
 			name: "platform as non-string type",

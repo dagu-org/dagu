@@ -196,6 +196,10 @@ func newDocker(
 		if err != nil {
 			return nil, fmt.Errorf("failed to load container config: %w", err)
 		}
+		// Set ShouldStart to true for Step-level containers
+		// This ensures the container is automatically created and started
+		// if it does not exist or is stopped.
+		c.ShouldStart = true
 		cfg = c
 	}
 
