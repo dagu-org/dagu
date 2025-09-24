@@ -6,24 +6,33 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/test"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/test"
 )
+
+const (
+	testImage       = "alpine:3"
+	nginxTestImage  = "nginx:alpine"
+	containerPrefix = "dagu-test"
+)
+
+type dockerExecutorTest struct {
+	name            string
+	dagConfig       string
+	expectedOutputs map[string]any
+}
 
 func TestDockerExecutor(t *testing.T) {
 	t.Parallel()
 
-	testCases := []struct {
-		name            string
-		dag             string
-		expectedOutputs map[string]any
-	}{
+	tests := []dockerExecutorTest{
 		{
-			name: "Basic",
-			dag: `
+			name: "BasicExecution",
+			dagConfig: `
 env:
   - FOO: BAR
   - ABC=XYZ
@@ -41,8 +50,8 @@ steps:
 			},
 		},
 		{
-			name: "AutoStart",
-			dag: `
+			name: "AutoStartContainer",
+			dagConfig: `
 steps:
   - executor:
       type: docker
@@ -59,33 +68,36 @@ steps:
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			th := test.Setup(t)
-			dag := th.DAG(t, tc.dag)
+			dag := th.DAG(t, tt.dagConfig)
 			dag.Agent().RunSuccess(t)
 			dag.AssertLatestStatus(t, status.Success)
-			dag.AssertOutputs(t, tc.expectedOutputs)
+			dag.AssertOutputs(t, tt.expectedOutputs)
 		})
 	}
 }
 
-func TestContainer(t *testing.T) {
+type containerTest struct {
+	name            string
+	dagConfigFunc   func(tempDir string) string
+	expectedOutputs map[string]any
+	setupFunc       func(t *testing.T, tempDir string)
+}
+
+func TestDAGLevelContainer(t *testing.T) {
 	t.Parallel()
 
-	testCases := []struct {
-		name            string
-		dagFunc         func(tempDir string) string
-		expectedOutputs map[string]any
-	}{
+	tests := []containerTest{
 		{
 			name: "VolumeBindMounts",
-			dagFunc: func(tempDir string) string {
+			dagConfigFunc: func(tempDir string) string {
 				return fmt.Sprintf(`
 container:
-  image: alpine:3
+  image: %s
   volumes:
     - %s:/data:rw
 steps:
@@ -95,7 +107,7 @@ steps:
   - command: sh -c "echo 'Hello from step 3' >> /data/test.txt"
   - command: cat /data/test.txt
     output: BIND_MOUNT_OUT2
-`, tempDir)
+`, testImage, tempDir)
 			},
 			expectedOutputs: map[string]any{
 				"BIND_MOUNT_OUT1": "Hello from step 1",
@@ -103,64 +115,64 @@ steps:
 			},
 		},
 		{
-			name: "Basic",
-			dagFunc: func(_ string) string {
-				return `
+			name: "BasicExecution",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
 env:
   - FOO: BAR
 container:
-  image: alpine:3
+  image: %s
 steps:
   - command: echo 123 abc $FOO
     output: CONTAINER_BASIC_OUT1
-`
+`, testImage)
 			},
 			expectedOutputs: map[string]any{
 				"CONTAINER_BASIC_OUT1": "123 abc BAR",
 			},
 		},
 		{
-			name: "CmdWithArgs",
-			dagFunc: func(_ string) string {
-				return `
+			name: "CommandWithArguments",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
 container:
-  image: alpine:3
+  image: %s
 steps:
   - command: echo hello world
     output: CMD_WITH_ARGS_OUT1
-`
+`, testImage)
 			},
 			expectedOutputs: map[string]any{
 				"CMD_WITH_ARGS_OUT1": "hello world",
 			},
 		},
 		{
-			name: "WorkingDir",
-			dagFunc: func(_ string) string {
-				return `
+			name: "WorkingDirectory",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
 container:
-  image: alpine:3
+  image: %s
   workingDir: /tmp
 steps:
-  - command: "pwd"
+  - command: pwd
     output: WORK_DIR_OUT1
-`
+`, testImage)
 			},
 			expectedOutputs: map[string]any{
 				"WORK_DIR_OUT1": "/tmp",
 			},
 		},
 		{
-			name: "WithUser",
-			dagFunc: func(_ string) string {
-				return `
+			name: "UserSpecification",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
 container:
-  image: alpine:3
+  image: %s
   user: "nobody"
 steps:
-  - command: "whoami"
+  - command: whoami
     output: WITH_USER_OUT1
-`
+`, testImage)
 			},
 			expectedOutputs: map[string]any{
 				"WITH_USER_OUT1": "nobody",
@@ -168,43 +180,43 @@ steps:
 		},
 		{
 			name: "NamedVolume",
-			dagFunc: func(_ string) string {
-				return `
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
 container:
-  image: alpine:3
+  image: %s
   volumes:
     - test-volume:/data
 steps:
   - command: sh -c "echo 'Data in named volume' > /data/volume.txt"
-  - command: "cat /data/volume.txt"
+  - command: cat /data/volume.txt
     output: NAMED_VOL_OUT1
-  - command: "ls -la /data/"
+  - command: ls -la /data/
     output: NAMED_VOL_OUT2
-`
+`, testImage)
 			},
 			expectedOutputs: map[string]any{
 				"NAMED_VOL_OUT1": "Data in named volume",
 			},
 		},
 		{
-			name: "RelativeBindMountsAndWorkingDir",
-			dagFunc: func(tempDir string) string {
-				// Create a subdirectory to use as working directory
+			name: "RelativeBindMountsWithWorkingDirectory",
+			setupFunc: func(t *testing.T, tempDir string) {
 				subDir := fmt.Sprintf("%s/work", tempDir)
-				if err := os.MkdirAll(subDir, 0755); err != nil {
-					t.Fatalf("Failed to create subdirectory: %v", err)
+				if err := os.MkdirAll(subDir, 0o755); err != nil {
+					t.Fatalf("failed to create subdirectory %s: %v", subDir, err)
 				}
 
-				// Create a test file in the working directory
 				testFile := fmt.Sprintf("%s/initial.txt", subDir)
-				if err := os.WriteFile(testFile, []byte("Initial content"), 0644); err != nil {
-					t.Fatalf("Failed to create test file: %v", err)
+				if err := os.WriteFile(testFile, []byte("Initial content"), 0o644); err != nil {
+					t.Fatalf("failed to create test file %s: %v", testFile, err)
 				}
-
+			},
+			dagConfigFunc: func(tempDir string) string {
+				subDir := fmt.Sprintf("%s/work", tempDir)
 				return fmt.Sprintf(`
 workingDir: %s
 container:
-  image: alpine:3
+  image: %s
   volumes:
     - ./:/workspace:rw
 steps:
@@ -215,7 +227,7 @@ steps:
     output: WORK_DIR_VOL_OUT2
   - command: ls -la /workspace/
     output: WORK_DIR_VOL_OUT3
-`, subDir)
+`, subDir, testImage)
 			},
 			expectedOutputs: map[string]any{
 				"WORK_DIR_VOL_OUT1": "Initial content",
@@ -224,24 +236,23 @@ steps:
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Create a unique temporary directory for this test
-			tempDir, err := os.MkdirTemp("", fmt.Sprintf("dagu-test-%s-*", tc.name))
-			if err != nil {
-				t.Fatalf("Failed to create temp dir: %v", err)
+			tempDir, err := os.MkdirTemp("", fmt.Sprintf("%s-%s-*", containerPrefix, tt.name))
+			require.NoError(t, err, "failed to create temporary directory")
+			t.Cleanup(func() { _ = os.RemoveAll(tempDir) })
+
+			if tt.setupFunc != nil {
+				tt.setupFunc(t, tempDir)
 			}
-			defer func() {
-				_ = os.RemoveAll(tempDir)
-			}()
 
 			th := test.Setup(t)
-			dag := th.DAG(t, tc.dagFunc(tempDir))
+			dag := th.DAG(t, tt.dagConfigFunc(tempDir))
 			dag.Agent().RunSuccess(t)
 			dag.AssertLatestStatus(t, status.Success)
-			dag.AssertOutputs(t, tc.expectedOutputs)
+			dag.AssertOutputs(t, tt.expectedOutputs)
 		})
 	}
 }
@@ -251,26 +262,28 @@ func TestContainerPullPolicy(t *testing.T) {
 
 	th := test.Setup(t)
 
-	// Test that pull policy "never" works with a pre-existing image
-	dag := th.DAG(t, `
+	pullPolicyTestDAG := fmt.Sprintf(`
 container:
-  image: alpine:3
+  image: %s
   pullPolicy: never
 steps:
-  - command: "echo 'pull policy test'"
+  - command: echo 'pull policy test'
     output: OUT1
-`)
+`, testImage)
 
-	// First, ensure the image exists by running with default pull policy
-	ensureImageDag := th.DAG(t, `
+	ensureImageDAG := fmt.Sprintf(`
 container:
-  image: alpine:3
+  image: %s
 steps:
   - "true"
-`)
+`, testImage)
+
+	// First, ensure the image exists by running with default pull policy
+	ensureImageDag := th.DAG(t, ensureImageDAG)
 	ensureImageDag.Agent().RunSuccess(t)
 
-	// Now run with "never" pull policy
+	// Now test that pull policy "never" works with the pre-existing image
+	dag := th.DAG(t, pullPolicyTestDAG)
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, status.Success)
 	dag.AssertOutputs(t, map[string]any{
@@ -285,16 +298,17 @@ func TestContainerStartup_Entrypoint_WithHealthyFallback(t *testing.T) {
 
 	// Use nginx which stays up by default; most tags have no healthcheck,
 	// so waitFor: healthy should fall back to running.
-	dag := th.DAG(t, `
+	dagConfig := fmt.Sprintf(`
 container:
-  image: nginx:alpine
+  image: %s
   startup: entrypoint
   waitFor: healthy
 steps:
   - command: echo entrypoint-ok
     output: ENTRYPOINT_OK
-`)
+`, nginxTestImage)
 
+	dag := th.DAG(t, dagConfig)
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, status.Success)
 	dag.AssertOutputs(t, map[string]any{
@@ -307,16 +321,17 @@ func TestContainerStartup_Command_LongRunning(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dag := th.DAG(t, `
+	dagConfig := fmt.Sprintf(`
 container:
-  image: alpine:3
+  image: %s
   startup: command
   command: ["sh", "-c", "while true; do sleep 3600; done"]
 steps:
   - command: echo command-ok
     output: COMMAND_OK
-`)
+`, testImage)
 
+	dag := th.DAG(t, dagConfig)
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, status.Success)
 	dag.AssertOutputs(t, map[string]any{
@@ -324,50 +339,19 @@ steps:
 	})
 }
 
-// TestDockerExecutor_ExecInExistingContainer verifies that a step-level Docker executor
-// can execute a command in an already-running container by specifying `containerName`
-// without an `image`. This reproduces the reported regression where containerName
-// was ignored and caused an error: "containerName or image must be specified".
 func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		t.Fatalf("failed to create docker client: %v", err)
-	}
-	t.Cleanup(func() { _ = cli.Close() })
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	require.NoError(t, err, "failed to create docker client")
+	defer dockerClient.Close()
 
-	// Create a long-running container we can exec into
-	cname := fmt.Sprintf("dagu-integ-existing-%d", time.Now().UnixNano())
-	created, err := cli.ContainerCreate(
-		th.Context,
-		&container.Config{
-			Image: "alpine:3",
-			Cmd:   []string{"sh", "-c", "while true; do sleep 3600; done"},
-		},
-		&container.HostConfig{AutoRemove: true},
-		nil,
-		nil,
-		cname,
-	)
-	if err != nil {
-		t.Fatalf("failed to create container: %v", err)
-	}
+	containerName := fmt.Sprintf("dagu-existing-%d", time.Now().UnixNano())
+	containerID := createLongRunningContainer(t, th, dockerClient, containerName)
+	defer removeContainer(t, th, dockerClient, containerID)
 
-	if err := cli.ContainerStart(th.Context, created.ID, container.StartOptions{}); err != nil {
-		t.Fatalf("failed to start container: %v", err)
-	}
-
-	// Ensure cleanup
-	t.Cleanup(func() {
-		// Stop (ignore error if already stopped) and remove the container
-		_ = cli.ContainerStop(th.Context, created.ID, container.StopOptions{})
-		_ = cli.ContainerRemove(th.Context, created.ID, container.RemoveOptions{Force: true})
-	})
-
-	// Run a DAG step that execs into the existing container via containerName
-	dag := th.DAG(t, fmt.Sprintf(`
+	dagConfig := fmt.Sprintf(`
 steps:
   - executor:
       type: docker
@@ -377,8 +361,9 @@ steps:
           workingDir: /
     command: echo hello-existing
     output: EXEC_EXISTING_OUT
-`, cname))
+`, containerName)
 
+	dag := th.DAG(t, dagConfig)
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, status.Success)
 	dag.AssertOutputs(t, map[string]any{
@@ -391,21 +376,77 @@ func TestDockerExecutor_ErrorIncludesRecentStderr(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dag := th.DAG(t, `
+	dagConfig := fmt.Sprintf(`
 steps:
   - executor:
       type: docker
       config:
-        image: alpine:3
+        image: %s
         autoRemove: true
     command: sh -c 'echo first 1>&2; echo second 1>&2; exit 7'
-`)
+`, testImage)
 
+	dag := th.DAG(t, dagConfig)
 	agent := dag.Agent()
 
 	err := agent.Run(agent.Context)
 	require.Error(t, err)
+
 	// Should contain recent stderr from docker executor
 	require.Contains(t, err.Error(), "first")
 	require.Contains(t, err.Error(), "second")
+}
+
+// Helper functions
+func createLongRunningContainer(t *testing.T, th test.Helper, dockerClient *client.Client, containerName string) string {
+	t.Helper()
+
+	created, err := dockerClient.ContainerCreate(
+		th.Context,
+		&container.Config{
+			Image: testImage,
+			Cmd:   []string{"sh", "-c", "while true; do sleep 3600; done"},
+		},
+		&container.HostConfig{AutoRemove: true},
+		nil,
+		nil,
+		containerName,
+	)
+	if err != nil {
+		t.Fatalf("failed to create container: %v", err)
+	}
+
+	if err := dockerClient.ContainerStart(th.Context, created.ID, container.StartOptions{}); err != nil {
+		t.Fatalf("failed to start container: %v", err)
+	}
+
+	return created.ID
+}
+
+func removeContainer(t *testing.T, th test.Helper, dockerClient *client.Client, containerID string) {
+	t.Helper()
+
+	_ = dockerClient.ContainerStop(th.Context, containerID, container.StopOptions{})
+	// Wait a moment for the container to stop
+	timer := time.NewTimer(5 * time.Second)
+WAIT:
+	for {
+		inspect, err := dockerClient.ContainerInspect(th.Context, containerID)
+		if err != nil {
+			break
+		}
+		if !inspect.State.Running {
+			break
+		}
+
+		select {
+		case <-timer.C:
+			t.Logf("timeout waiting for container %s to stop", containerID)
+			break WAIT
+		default:
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	timer.Stop()
+	_ = dockerClient.ContainerRemove(th.Context, containerID, container.RemoveOptions{Force: true})
 }
