@@ -81,12 +81,14 @@ func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 	var ctID string
 	var name = strings.TrimSpace(cfg.ContainerName)
 	if name != "" {
-		info, err := dockerCli.ContainerInspect(ctx, name)
-		isContainerRunning, err := isContainerRunning(info, err)
+		info, inspectErr := dockerCli.ContainerInspect(ctx, name)
+		isContainerRunning, err := isContainerRunning(info, inspectErr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if container %q is running: %w", name, err)
 		}
-		ctID = info.ID
+		if info.ContainerJSONBase != nil {
+			ctID = info.ID
+		}
 		if cfg.Image == "" && !isContainerRunning {
 			return nil, fmt.Errorf("container %q is not running", name)
 		}

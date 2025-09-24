@@ -28,8 +28,7 @@ env:
   - FOO: BAR
   - ABC=XYZ
 steps:
-  - name: s1
-    executor:
+  - executor:
       type: docker
       config:
         image: alpine:3
@@ -45,8 +44,7 @@ steps:
 			name: "AutoStart",
 			dag: `
 steps:
-  - name: s1
-    executor:
+  - executor:
       type: docker
       config:
         image: alpine:3
@@ -83,24 +81,19 @@ func TestContainer(t *testing.T) {
 		expectedOutputs map[string]any
 	}{
 		{
-			name: "volume_bind_mount_persistence",
+			name: "VolumeBindMounts",
 			dagFunc: func(tempDir string) string {
 				return fmt.Sprintf(`
-name: test-bind-mount
 container:
   image: alpine:3
   volumes:
     - %s:/data:rw
 steps:
-  - name: write_data
-    command: sh -c "echo 'Hello from step 1' > /data/test.txt"
-  - name: read_data
-    command: cat /data/test.txt
+  - command: sh -c "echo 'Hello from step 1' > /data/test.txt"
+  - command: cat /data/test.txt
     output: BIND_MOUNT_OUT1
-  - name: append_data
-    command: sh -c "echo 'Hello from step 3' >> /data/test.txt"
-  - name: read_all
-    command: cat /data/test.txt
+  - command: sh -c "echo 'Hello from step 3' >> /data/test.txt"
+  - command: cat /data/test.txt
     output: BIND_MOUNT_OUT2
 `, tempDir)
 			},
@@ -110,7 +103,7 @@ steps:
 			},
 		},
 		{
-			name: "basic",
+			name: "Basic",
 			dagFunc: func(_ string) string {
 				return `
 env:
@@ -118,8 +111,7 @@ env:
 container:
   image: alpine:3
 steps:
-  - name: s1
-    command: echo 123 abc $FOO
+  - command: echo 123 abc $FOO
     output: CONTAINER_BASIC_OUT1
 `
 			},
@@ -128,14 +120,13 @@ steps:
 			},
 		},
 		{
-			name: "command_with_args",
+			name: "CmdWithArgs",
 			dagFunc: func(_ string) string {
 				return `
 container:
   image: alpine:3
 steps:
-  - name: s1
-    command: echo hello world
+  - command: echo hello world
     output: CMD_WITH_ARGS_OUT1
 `
 			},
@@ -144,16 +135,14 @@ steps:
 			},
 		},
 		{
-			name: "working_directory",
+			name: "WorkingDir",
 			dagFunc: func(_ string) string {
 				return `
-name: test-woring-dir
 container:
   image: alpine:3
   workingDir: /tmp
 steps:
-  - name: s1
-    command: "pwd"
+  - command: "pwd"
     output: WORK_DIR_OUT1
 `
 			},
@@ -162,15 +151,14 @@ steps:
 			},
 		},
 		{
-			name: "container_with_user",
+			name: "WithUser",
 			dagFunc: func(_ string) string {
 				return `
 container:
   image: alpine:3
   user: "nobody"
 steps:
-  - name: s1
-    command: "whoami"
+  - command: "whoami"
     output: WITH_USER_OUT1
 `
 			},
@@ -179,7 +167,7 @@ steps:
 			},
 		},
 		{
-			name: "volume_named_persistence",
+			name: "NamedVolume",
 			dagFunc: func(_ string) string {
 				return `
 container:
@@ -187,13 +175,10 @@ container:
   volumes:
     - test-volume:/data
 steps:
-  - name: create_file
-    command: sh -c "echo 'Data in named volume' > /data/volume.txt"
-  - name: verify_file
-    command: "cat /data/volume.txt"
+  - command: sh -c "echo 'Data in named volume' > /data/volume.txt"
+  - command: "cat /data/volume.txt"
     output: NAMED_VOL_OUT1
-  - name: list_files
-    command: "ls -la /data/"
+  - command: "ls -la /data/"
     output: NAMED_VOL_OUT2
 `
 			},
@@ -202,7 +187,7 @@ steps:
 			},
 		},
 		{
-			name: "relative_volume_with_working_dir",
+			name: "RelativeBindMountsAndWorkingDir",
 			dagFunc: func(tempDir string) string {
 				// Create a subdirectory to use as working directory
 				subDir := fmt.Sprintf("%s/work", tempDir)
@@ -223,16 +208,12 @@ container:
   volumes:
     - ./:/workspace:rw
 steps:
-  - name: read_initial
-    command: cat /workspace/initial.txt
+  - command: cat /workspace/initial.txt
     output: WORK_DIR_VOL_OUT1
-  - name: write_new
-    command: sh -c "echo 'New content' > /workspace/new.txt"
-  - name: verify_new
-    command: cat /workspace/new.txt
+  - command: sh -c "echo 'New content' > /workspace/new.txt"
+  - command: cat /workspace/new.txt
     output: WORK_DIR_VOL_OUT2
-  - name: list_workspace
-    command: ls -la /workspace/
+  - command: ls -la /workspace/
     output: WORK_DIR_VOL_OUT3
 `, subDir)
 			},
@@ -276,8 +257,7 @@ container:
   image: alpine:3
   pullPolicy: never
 steps:
-  - name: s1
-    command: "echo 'pull policy test'"
+  - command: "echo 'pull policy test'"
     output: OUT1
 `)
 
@@ -286,8 +266,7 @@ steps:
 container:
   image: alpine:3
 steps:
-  - name: s1
-    command: "true"
+  - "true"
 `)
 	ensureImageDag.Agent().RunSuccess(t)
 
@@ -312,8 +291,7 @@ container:
   startup: entrypoint
   waitFor: healthy
 steps:
-  - name: s1
-    command: echo entrypoint-ok
+  - command: echo entrypoint-ok
     output: ENTRYPOINT_OK
 `)
 
@@ -335,8 +313,7 @@ container:
   startup: command
   command: ["sh", "-c", "while true; do sleep 3600; done"]
 steps:
-  - name: s1
-    command: echo command-ok
+  - command: echo command-ok
     output: COMMAND_OK
 `)
 
@@ -392,8 +369,7 @@ func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
 	// Run a DAG step that execs into the existing container via containerName
 	dag := th.DAG(t, fmt.Sprintf(`
 steps:
-  - name: exec-existing
-    executor:
+  - executor:
       type: docker
       config:
         containerName: %s
@@ -417,8 +393,7 @@ func TestDockerExecutor_ErrorIncludesRecentStderr(t *testing.T) {
 
 	dag := th.DAG(t, `
 steps:
-  - name: fail
-    executor:
+  - executor:
       type: docker
       config:
         image: alpine:3
