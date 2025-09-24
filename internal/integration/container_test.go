@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -420,6 +421,11 @@ func createLongRunningContainer(t *testing.T, th test.Helper, dockerClient *clie
 		t.Fatalf("failed to start container: %v", err)
 	}
 
+	// Wait for container to be running
+	if err := waitForContainerRunning(th.Context, dockerClient, created.ID); err != nil {
+		t.Fatalf("failed to wait for container to be running: %v", err)
+	}
+
 	return created.ID
 }
 
@@ -444,6 +450,33 @@ func removeContainer(t *testing.T, th test.Helper, dockerClient *client.Client, 
 	// Remove the container
 	if err := dockerClient.ContainerRemove(th.Context, containerID, container.RemoveOptions{Force: true}); err != nil {
 		t.Logf("failed to remove container %s: %v", containerID, err)
+	}
+}
+
+func waitForContainerRunning(ctx context.Context, dockerClient *client.Client, containerID string) error {
+	const (
+		timeout      = 10 * time.Second
+		pollInterval = 100 * time.Millisecond
+	)
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	timeoutChan := time.After(timeout)
+
+	for {
+		select {
+		case <-timeoutChan:
+			return fmt.Errorf("timeout waiting for container %s to be running", containerID)
+		case <-ticker.C:
+			inspect, err := dockerClient.ContainerInspect(ctx, containerID)
+			if err != nil {
+				return fmt.Errorf("failed to inspect container %s: %w", containerID, err)
+			}
+			if inspect.State.Running {
+				return nil
+			}
+		}
 	}
 }
 
