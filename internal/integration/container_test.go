@@ -345,7 +345,7 @@ func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
 	th := test.Setup(t)
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	require.NoError(t, err, "failed to create docker client")
-	defer dockerClient.Close()
+	defer func() { _ = dockerClient.Close() }()
 
 	containerName := fmt.Sprintf("dagu-existing-%d", time.Now().UnixNano())
 	containerID := createLongRunningContainer(t, th, dockerClient, containerName)
