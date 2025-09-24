@@ -50,7 +50,7 @@ steps:
       type: docker
       config:
         image: alpine:3
-				autoRemove: true
+        autoRemove: true
         containerName: dagu-autostart
     command: echo "container started"
     output: DOCKER_EXEC_OUT1
@@ -113,7 +113,6 @@ steps:
 			name: "basic",
 			dagFunc: func(_ string) string {
 				return `
-name: test-basic
 env:
   - FOO: BAR
 container:
@@ -132,7 +131,6 @@ steps:
 			name: "command_with_args",
 			dagFunc: func(_ string) string {
 				return `
-name: test-command-with-args
 container:
   image: alpine:3
 steps:
@@ -149,7 +147,7 @@ steps:
 			name: "working_directory",
 			dagFunc: func(_ string) string {
 				return `
-name: test-working-dir
+name: test-woring-dir
 container:
   image: alpine:3
   workingDir: /tmp
@@ -167,7 +165,6 @@ steps:
 			name: "container_with_user",
 			dagFunc: func(_ string) string {
 				return `
-name: test-user
 container:
   image: alpine:3
   user: "nobody"
@@ -185,7 +182,6 @@ steps:
 			name: "volume_named_persistence",
 			dagFunc: func(_ string) string {
 				return `
-name: test-named-volume
 container:
   image: alpine:3
   volumes:
@@ -221,7 +217,6 @@ steps:
 				}
 
 				return fmt.Sprintf(`
-name: test-relative-volume
 workingDir: %s
 container:
   image: alpine:3
@@ -312,7 +307,6 @@ func TestContainerStartup_Entrypoint_WithHealthyFallback(t *testing.T) {
 	// Use nginx which stays up by default; most tags have no healthcheck,
 	// so waitFor: healthy should fall back to running.
 	dag := th.DAG(t, `
-name: container-startup-entrypoint
 container:
   image: nginx:alpine
   startup: entrypoint
@@ -336,7 +330,6 @@ func TestContainerStartup_Command_LongRunning(t *testing.T) {
 	th := test.Setup(t)
 
 	dag := th.DAG(t, `
-name: container-startup-command
 container:
   image: alpine:3
   startup: command
@@ -398,7 +391,6 @@ func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
 
 	// Run a DAG step that execs into the existing container via containerName
 	dag := th.DAG(t, fmt.Sprintf(`
-name: exec-in-existing-container
 steps:
   - name: exec-existing
     executor:
