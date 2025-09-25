@@ -57,7 +57,7 @@ func TestNewResult(t *testing.T) {
 		want      PaginatedResult[testItem]
 	}{
 		{
-			name:      "First page",
+			name:      "FirstPage",
 			items:     []testItem{{1}, {2}, {3}},
 			total:     10,
 			paginator: NewPaginator(1, 3),
@@ -74,7 +74,7 @@ func TestNewResult(t *testing.T) {
 			},
 		},
 		{
-			name:      "Last page",
+			name:      "LastPage",
 			items:     []testItem{{9}, {10}},
 			total:     10,
 			paginator: NewPaginator(4, 3),
@@ -91,7 +91,7 @@ func TestNewResult(t *testing.T) {
 			},
 		},
 		{
-			name:      "Empty result",
+			name:      "EmptyResult",
 			items:     []testItem{},
 			total:     0,
 			paginator: NewPaginator(1, 10),
@@ -163,7 +163,7 @@ func TestResult_PageRange(t *testing.T) {
 		wantSkipLast  bool
 	}{
 		{
-			name:          "Middle of large range",
+			name:          "MiddleOfLargeRange",
 			result:        PaginatedResult[int]{CurrentPage: 50, TotalPages: 100},
 			size:          5,
 			wantRange:     []int{48, 49, 50, 51, 52},
@@ -171,7 +171,7 @@ func TestResult_PageRange(t *testing.T) {
 			wantSkipLast:  true,
 		},
 		{
-			name:          "Near start of range",
+			name:          "NearStartOfRange",
 			result:        PaginatedResult[int]{CurrentPage: 2, TotalPages: 100},
 			size:          5,
 			wantRange:     []int{1, 2, 3, 4, 5},
@@ -179,7 +179,7 @@ func TestResult_PageRange(t *testing.T) {
 			wantSkipLast:  true,
 		},
 		{
-			name:          "Near end of range",
+			name:          "NearEndOfRange",
 			result:        PaginatedResult[int]{CurrentPage: 99, TotalPages: 100},
 			size:          5,
 			wantRange:     []int{96, 97, 98, 99, 100},
@@ -187,7 +187,7 @@ func TestResult_PageRange(t *testing.T) {
 			wantSkipLast:  false,
 		},
 		{
-			name:          "Range larger than total pages",
+			name:          "RangeLargerThanTotalPages",
 			result:        PaginatedResult[int]{CurrentPage: 2, TotalPages: 3},
 			size:          5,
 			wantRange:     []int{1, 2, 3},

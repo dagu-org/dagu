@@ -246,17 +246,17 @@ func TestErrFromText(t *testing.T) {
 		expected error
 	}{
 		{
-			name:     "empty string",
+			name:     "EmptyString",
 			input:    "",
 			expected: nil,
 		},
 		{
-			name:     "error message",
+			name:     "ErrorMessage",
 			input:    "command failed with exit code 1",
 			expected: errors.New("node processing error: command failed with exit code 1"),
 		},
 		{
-			name:     "whitespace only",
+			name:     "WhitespaceOnly",
 			input:    "   ",
 			expected: errors.New("node processing error:    "),
 		},
@@ -285,17 +285,17 @@ func TestErrText(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "nil error",
+			name:     "NilError",
 			input:    nil,
 			expected: "",
 		},
 		{
-			name:     "simple error",
+			name:     "SimpleError",
 			input:    errors.New("test error"),
 			expected: "test error",
 		},
 		{
-			name:     "wrapped error",
+			name:     "WrappedError",
 			input:    errors.New("wrapped: original error"),
 			expected: "wrapped: original error",
 		},

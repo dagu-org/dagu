@@ -10,7 +10,7 @@ import (
 )
 
 func TestCreateFile(t *testing.T) {
-	t.Run("file creation and permissions", func(t *testing.T) {
+	t.Run("FileCreationAndPermissions", func(t *testing.T) {
 		dir := t.TempDir()
 		filePath := filepath.Join(dir, "test.log")
 
@@ -28,7 +28,7 @@ func TestCreateFile(t *testing.T) {
 		assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
 	})
 
-	t.Run("invalid path", func(t *testing.T) {
+	t.Run("InvalidPath", func(t *testing.T) {
 		_, err := OpenOrCreateFile("/nonexistent/directory/test.log")
 		assert.Error(t, err)
 	})
@@ -62,61 +62,61 @@ func TestResolvePath(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name:        "empty path",
+			name:        "EmptyPath",
 			path:        "",
 			expected:    "",
 			expectError: false,
 		},
 		{
-			name:        "tilde expansion",
+			name:        "TildeExpansion",
 			path:        "~/documents",
 			expected:    filepath.Clean(filepath.Join(testHome, "documents")),
 			expectError: false,
 		},
 		{
-			name:        "tilde only",
+			name:        "TildeOnly",
 			path:        "~",
 			expected:    filepath.Clean(testHome),
 			expectError: false,
 		},
 		{
-			name:        "environment variable expansion",
+			name:        "EnvironmentVariableExpansion",
 			path:        "$TEMP_DIR/logs",
 			expected:    filepath.Clean(filepath.Join(testTempDir, "logs")),
 			expectError: false,
 		},
 		{
-			name:        "multiple environment variables",
+			name:        "MultipleEnvironmentVariables",
 			path:        "$HOME/projects/$TEMP_DIR",
 			expected:    filepath.Clean(filepath.Join(testHome, "projects", testTempDir)),
 			expectError: false,
 		},
 		{
-			name:        "path cleaning with dots",
+			name:        "PathCleaningWithDots",
 			path:        "/usr/local/../bin/./app",
 			expected:    "/usr/bin/app",
 			expectError: false,
 		},
 		{
-			name:        "path cleaning with redundant slashes",
+			name:        "PathCleaningWithRedundantSlashes",
 			path:        "/usr//local/bin",
 			expected:    "/usr/local/bin",
 			expectError: false,
 		},
 		{
-			name:        "combined tilde and environment variable",
+			name:        "CombinedTildeAndEnvironmentVariable",
 			path:        "~/projects/$TEMP_DIR",
 			expected:    filepath.Clean(filepath.Join(testHome, "projects", testTempDir)),
 			expectError: false,
 		},
 		{
-			name:        "absolute path",
+			name:        "AbsolutePath",
 			path:        "/usr/local/bin",
 			expected:    "/usr/local/bin",
 			expectError: false,
 		},
 		{
-			name:        "relative path",
+			name:        "RelativePath",
 			path:        "projects/dagu",
 			expected:    filepath.Join(cwd, "projects/dagu"),
 			expectError: false,
@@ -155,7 +155,7 @@ func TestResolvePath(t *testing.T) {
 
 func TestMustResolvePath(t *testing.T) {
 	// Test normal case
-	t.Run("normal case", func(t *testing.T) {
+	t.Run("NormalCase", func(t *testing.T) {
 		// Get current working directory
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -173,7 +173,7 @@ func TestMustResolvePath(t *testing.T) {
 
 	// Test panic case - can't easily test without mocking os functions
 	// but we can at least verify it calls ResolvePath
-	t.Run("calls ResolvePath", func(t *testing.T) {
+	t.Run("CallsResolvePath", func(t *testing.T) {
 		path := "test.txt"
 		resolved, err := ResolvePath(path)
 		if err != nil {

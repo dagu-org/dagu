@@ -175,7 +175,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "sub-id", dagRunStatus.DAGRunID)
 	})
-	t.Run("ChildDAGRun_Retry", func(t *testing.T) {
+	t.Run("ChildDAGRunRetry", func(t *testing.T) {
 		th := setupTestStore(t)
 
 		// Create a timestamp for the parent record
@@ -466,7 +466,7 @@ func TestListStatuses(t *testing.T) {
 }
 
 func TestLatestStatusTimezone(t *testing.T) {
-	t.Run("LatestStatusToday_TimezoneIssue", func(t *testing.T) {
+	t.Run("LatestStatusTodayTimezoneIssue", func(t *testing.T) {
 		// Simulate Europe/Paris timezone (UTC+2 in summer, UTC+1 in winter)
 		parisLoc, err := time.LoadLocation("Europe/Paris")
 		require.NoError(t, err)
@@ -529,7 +529,7 @@ func TestLatestStatusTimezone(t *testing.T) {
 		assert.Equal(t, "midnight-run", dagRunStatus.DAGRunID)
 	})
 
-	t.Run("LatestStatusToday_VerifyFix", func(t *testing.T) {
+	t.Run("LatestStatusTodayVerifyFix", func(t *testing.T) {
 		// This test verifies that when we create runs at different times,
 		// the "today" calculation uses the configured timezone correctly
 

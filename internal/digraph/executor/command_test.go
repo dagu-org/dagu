@@ -22,7 +22,7 @@ func TestShellCommandBuilder_Build(t *testing.T) {
 		shouldSkipOnMac bool
 	}{
 		{
-			name: "basic shell command",
+			name: "BasicShellCommand",
 			builder: shellCommandBuilder{
 				ShellCommand:     "/bin/sh",
 				ShellCommandArgs: "echo hello",
@@ -30,7 +30,7 @@ func TestShellCommandBuilder_Build(t *testing.T) {
 			expectedInArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name: "bash command",
+			name: "BashCommand",
 			builder: shellCommandBuilder{
 				ShellCommand:     "/bin/bash",
 				ShellCommandArgs: "echo hello",
@@ -38,7 +38,7 @@ func TestShellCommandBuilder_Build(t *testing.T) {
 			expectedInArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name: "command with script",
+			name: "CommandWithScript",
 			builder: shellCommandBuilder{
 				Command:      "python",
 				Script:       "script.py",
@@ -48,7 +48,7 @@ func TestShellCommandBuilder_Build(t *testing.T) {
 			expectedInArgs: []string{"-u", "script.py"},
 		},
 		{
-			name: "powershell command",
+			name: "PowershellCommand",
 			builder: shellCommandBuilder{
 				ShellCommand:     "powershell",
 				ShellCommandArgs: "Write-Host hello",
@@ -57,7 +57,7 @@ func TestShellCommandBuilder_Build(t *testing.T) {
 			shouldSkipOnMac: true,
 		},
 		{
-			name: "cmd.exe command",
+			name: "CmdExeCommand",
 			builder: shellCommandBuilder{
 				ShellCommand:     "cmd.exe",
 				ShellCommandArgs: "echo hello",
@@ -96,7 +96,7 @@ func TestBuildPowerShellCommand(t *testing.T) {
 		expected []string
 	}{
 		{
-			name: "basic powershell command",
+			name: "BasicPowershellCommand",
 			cmd:  "powershell",
 			args: []string{},
 			builder: shellCommandBuilder{
@@ -105,7 +105,7 @@ func TestBuildPowerShellCommand(t *testing.T) {
 			expected: []string{"powershell", "-Command", "Get-Date"},
 		},
 		{
-			name: "powershell with existing -Command",
+			name: "PowershellWithExistingCommand",
 			cmd:  "powershell",
 			args: []string{"-Command"},
 			builder: shellCommandBuilder{
@@ -114,7 +114,7 @@ func TestBuildPowerShellCommand(t *testing.T) {
 			expected: []string{"powershell", "-Command", "Get-Date"},
 		},
 		{
-			name: "powershell with script",
+			name: "PowershellWithScript",
 			cmd:  "powershell",
 			args: []string{},
 			builder: shellCommandBuilder{
@@ -148,7 +148,7 @@ func TestBuildCmdCommand(t *testing.T) {
 		expected []string
 	}{
 		{
-			name: "basic cmd command",
+			name: "BasicCmdCommand",
 			cmd:  "cmd",
 			args: []string{},
 			builder: shellCommandBuilder{
@@ -157,7 +157,7 @@ func TestBuildCmdCommand(t *testing.T) {
 			expected: []string{"cmd", "/c", "dir"},
 		},
 		{
-			name: "cmd with existing /c",
+			name: "CmdWithExisting/C",
 			cmd:  "cmd",
 			args: []string{"/c"},
 			builder: shellCommandBuilder{
@@ -166,7 +166,7 @@ func TestBuildCmdCommand(t *testing.T) {
 			expected: []string{"cmd", "/c", "dir"},
 		},
 		{
-			name: "cmd with script",
+			name: "CmdWithScript",
 			cmd:  "cmd",
 			args: []string{},
 			builder: shellCommandBuilder{
@@ -239,7 +239,7 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 		checkPath  string
 	}{
 		{
-			name: "simple command",
+			name: "SimpleCommand",
 			config: commandConfig{
 				Ctx:     ctx,
 				Command: "echo",
@@ -248,7 +248,7 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 			checkPath: "echo",
 		},
 		{
-			name: "shell command",
+			name: "ShellCommand",
 			config: commandConfig{
 				Ctx:              ctx,
 				ShellCommand:     "/bin/sh",
@@ -257,7 +257,7 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 			checkPath: "/bin/sh",
 		},
 		{
-			name: "script file",
+			name: "ScriptFile",
 			config: commandConfig{
 				Ctx:          ctx,
 				ShellCommand: "/bin/sh",
@@ -305,7 +305,7 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 		shouldError  bool
 	}{
 		{
-			name: "successful command",
+			name: "SuccessfulCommand",
 			step: digraph.Step{
 				Name:    "test",
 				Command: "true",
@@ -314,7 +314,7 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 			shouldError:  false,
 		},
 		{
-			name: "failing command",
+			name: "FailingCommand",
 			step: digraph.Step{
 				Name:    "test",
 				Command: "false",
@@ -323,7 +323,7 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 			shouldError:  true,
 		},
 		{
-			name: "exit with specific code",
+			name: "ExitWithSpecificCode",
 			step: digraph.Step{
 				Name:    "test",
 				Command: "/bin/sh",

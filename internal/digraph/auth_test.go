@@ -7,7 +7,7 @@ import (
 )
 
 func TestAuthConfig(t *testing.T) {
-	t.Run("AuthConfig fields", func(t *testing.T) {
+	t.Run("AuthConfigFields", func(t *testing.T) {
 		auth := &AuthConfig{
 			Username: "test-user",
 			Password: "test-pass",
@@ -21,7 +21,7 @@ func TestAuthConfig(t *testing.T) {
 }
 
 func TestDAGRegistryAuths(t *testing.T) {
-	t.Run("DAG with registry auths", func(t *testing.T) {
+	t.Run("DAGWithRegistryAuths", func(t *testing.T) {
 		dag := &DAG{
 			Name: "test-dag",
 			RegistryAuths: map[string]*AuthConfig{

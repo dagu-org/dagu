@@ -20,8 +20,7 @@ func TestBuild(t *testing.T) {
 		data := []byte(`
 skipIfSuccessful: true
 steps:
-  - name: "1"
-    command: "true"
+  - "true"
 `)
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -97,11 +96,10 @@ env:
 			"Z=A B C",
 		)
 	})
-	t.Run("mailOn", func(t *testing.T) {
+	t.Run("MailOn", func(t *testing.T) {
 		data := []byte(`
 steps:
-  - name: "1"
-    command: "true"
+  - "true"
 
 mailOn:
   failure: true
@@ -117,8 +115,7 @@ mailOn:
 		data := []byte(`
 tags: daily,monthly
 steps:
-  - command: echo 1
-    name: step1
+  - echo 1
 `)
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -132,8 +129,7 @@ tags:
   - daily
   - monthly
 steps:
-  - command: echo 1
-    name: step1
+  - echo 1
 `)
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -145,8 +141,7 @@ steps:
 		data := []byte(`
 logDir: /tmp/logs
 steps:
-  - name: "1"
-    command: "true"
+  - "true"
 `)
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -203,8 +198,7 @@ smtp:
   username: "user@example.com"
   password: "password"
 steps:
-  - name: test
-    command: echo test
+  -     echo test
 `)
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -270,8 +264,7 @@ histRetentionDays: 365
 		data := []byte(`
 maxCleanUpTimeSec: 10
 steps:
-  - name: "1"
-    command: "true"
+  - "true"
 `)
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -280,21 +273,13 @@ steps:
 	})
 	t.Run("ChainTypeBasic", func(t *testing.T) {
 		data := []byte(`
-name: chain-basic-test
 type: chain
 
 steps:
-  - name: step1
-    command: echo "First"
-  
-  - name: step2  
-    command: echo "Second"
-  
-  - name: step3
-    command: echo "Third"
-  
-  - name: step4
-    command: echo "Fourth"
+  - echo "First"
+  - echo "Second"
+  - echo "Third"
+  - echo "Fourth"
 `)
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -304,13 +289,12 @@ steps:
 		// Check that implicit dependencies were added
 		assert.Len(t, th.Steps, 4)
 		assert.Empty(t, th.Steps[0].Depends) // First step has no dependencies
-		assert.Equal(t, []string{"step1"}, th.Steps[1].Depends)
-		assert.Equal(t, []string{"step2"}, th.Steps[2].Depends)
-		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends)
+		assert.Equal(t, []string{"cmd_1"}, th.Steps[1].Depends)
+		assert.Equal(t, []string{"cmd_2"}, th.Steps[2].Depends)
+		assert.Equal(t, []string{"cmd_3"}, th.Steps[3].Depends)
 	})
 	t.Run("ChainTypeWithExplicitDepends", func(t *testing.T) {
 		data := []byte(`
-name: chain-explicit-depends-test
 type: chain
 
 steps:
@@ -349,7 +333,6 @@ steps:
 	t.Run("InvalidType", func(t *testing.T) {
 		// Test will fail with an error containing "invalid type"
 		data := []byte(`
-name: invalid-type-test
 type: invalid-type
 
 steps:
@@ -363,8 +346,7 @@ steps:
 	t.Run("DefaultTypeIsChain", func(t *testing.T) {
 		data := []byte(`
 steps:
-  - command: echo 1
-    name: step1
+  - echo 1
 `)
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -373,7 +355,6 @@ steps:
 	})
 	t.Run("ChainTypeWithNoDependencies", func(t *testing.T) {
 		data := []byte(`
-name: chain-no-deps-test
 type: chain
 
 steps:
@@ -414,7 +395,7 @@ preconditions:
 		assert.Len(t, th.Preconditions, 1)
 		assert.Equal(t, &digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
-	t.Run("maxActiveRuns", func(t *testing.T) {
+	t.Run("MaxActiveRuns", func(t *testing.T) {
 		data := []byte(`
 maxActiveRuns: 5
 `)
@@ -447,15 +428,13 @@ runConfig:
 	t.Run("MaxOutputSize", func(t *testing.T) {
 		// Test custom maxOutputSize
 		data := []byte(`
-name: test-max-output-size
 description: Test DAG with custom maxOutputSize
 
 # Custom maxOutputSize of 512KB
 maxOutputSize: 524288
 
 steps:
-  - name: step1
-    command: echo "test output"
+  - echo "test output"
 `)
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -465,8 +444,7 @@ steps:
 		// Test default maxOutputSize when not specified
 		data2 := []byte(`
 steps:
-  - name: "1"
-    command: "true"
+  - "true"
 `)
 		dag2, err := digraph.LoadYAML(context.Background(), data2)
 		require.NoError(t, err)
@@ -548,8 +526,7 @@ env:
   - FOO: "123"
 
 steps:
-  - name: "1"
-    command: "true"
+  - "true"
 `,
 			expected: map[string]string{
 				"FOO": "123",
@@ -562,8 +539,7 @@ env:
   - VAR: "` + "`echo 123`" + `"
 
 steps:
-  - name: "1"
-    command: "true"
+  - "true"
 `,
 			expected: map[string]string{
 				"VAR": "123",
@@ -579,8 +555,7 @@ env:
   - FOO: "${BEE}:${BAZ}:${BOO}:FOO"
 
 steps:
-  - name: "1"
-    command: "true"
+  - "true"
 `,
 			expected: map[string]string{
 				"FOO": "BEE:BAZ:BOO:FOO",
@@ -623,8 +598,7 @@ schedule:
   restart: "0 12 * * *"
 
 steps:
-  - name: "1"
-    command: "true"
+  - "true"
 `,
 			start:   []string{"0 1 * * *"},
 			stop:    []string{"0 2 * * *"},
@@ -638,8 +612,7 @@ schedule:
   - "0 18 * * *"
 
 steps:
-  - name: "1"
-    command: "true"
+  - "true"
 `,
 			start: []string{
 				"0 1 * * *",
@@ -661,8 +634,7 @@ schedule:
     - "0 22 * * *"
 
 steps:
-  - name: "1"
-    command: "true"
+  - "true"
 `,
 			start: []string{
 				"0 1 * * *",
@@ -829,8 +801,7 @@ steps:
 
 		data := []byte(`
 steps:
-  - name: "1"
-    command: "echo 1"
+  - command: "echo 1"
     continueOn:
       skipped: true
       failure: true
@@ -847,8 +818,7 @@ steps:
 
 		data := []byte(`
 steps:
-  - name: "2"
-    command: "echo 2"
+  - command: "echo 2"
     retryPolicy:
       limit: 3
       intervalSec: 10
@@ -912,7 +882,6 @@ steps:
 
 		// Test backoff value <= 1.0
 		data := []byte(`
-name: test-invalid-backoff
 steps:
   - name: "test"
     command: "echo test"
@@ -932,8 +901,7 @@ steps:
 		// Test basic boolean repeat (backward compatibility)
 		data := []byte(`
 steps:
-  - name: "2"
-    command: "echo 2"
+  - command: "echo 2"
     repeatPolicy:
       repeat: true
       intervalSec: 60
@@ -1281,7 +1249,6 @@ steps:
 
 		// Test invalid repeat value
 		data := []byte(`
-name: test-invalid-repeat
 steps:
   - name: "invalid-repeat"
     command: "echo test"
@@ -1296,7 +1263,6 @@ steps:
 
 		// Test explicit while mode without condition or exitCode
 		data = []byte(`
-name: test-while-no-condition
 steps:
   - name: "while-no-condition"
     command: "echo test"
@@ -1311,7 +1277,6 @@ steps:
 
 		// Test explicit until mode without condition or exitCode
 		data = []byte(`
-name: test-until-no-condition
 steps:
   - name: "until-no-condition"
     command: "echo test"
@@ -1326,7 +1291,6 @@ steps:
 
 		// Test invalid repeat type (not string or bool)
 		data = []byte(`
-name: test-invalid-type
 steps:
   - name: "invalid-type"
     command: "echo test"
@@ -1345,7 +1309,6 @@ steps:
 
 		// Test repeat policy invalid backoff
 		data := []byte(`
-name: test-invalid-backoff
 steps:
   - name: "test"
     command: "echo test"
@@ -1362,7 +1325,6 @@ steps:
 
 		// Test with backoff = 0.5
 		data = []byte(`
-name: test-invalid-backoff-2
 steps:
   - name: "test"
     command: "echo test"
@@ -1434,7 +1396,6 @@ steps:
 		// Test that negative values are preserved (they mean queueing is disabled)
 		// Create a simple DAG YAML with negative maxActiveRuns
 		data := []byte(`
-name: test-negative-max-active-runs
 maxActiveRuns: -1
 steps:
   - name: step1
@@ -1493,7 +1454,7 @@ steps:
 steps:
   - name: setup
     command: echo "setup"
-  - 
+  -
     - echo "parallel 1"
     - name: test
       command: npm test
@@ -1679,9 +1640,9 @@ func TestOptionalStepNames(t *testing.T) {
 
 		data := []byte(`
 steps:
-  - command: echo "hello"
-  - command: npm test
-  - command: go build
+  - echo "hello"
+  - npm test
+  - go build
 `)
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -1698,7 +1659,7 @@ steps:
 
 		data := []byte(`
 steps:
-  - command: setup.sh
+  - setup.sh
   - name: build
     command: make all
   - command: test.sh
@@ -1719,10 +1680,10 @@ steps:
 
 		data := []byte(`
 steps:
-  - command: echo "first"
+  - echo "first"
   - name: cmd_2
     command: echo "explicit"
-  - command: echo "third"
+  - echo "third"
 `)
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -1739,7 +1700,7 @@ steps:
 
 		data := []byte(`
 steps:
-  - command: git pull
+  - git pull
   - command: npm install
     depends: cmd_1
   - command: npm test
@@ -1786,7 +1747,7 @@ steps:
 		// Test different step types get appropriate names
 		data := []byte(`
 steps:
-  - command: echo "command"
+  - echo "command"
   - script: |
       echo "script content"
   - executor:
@@ -1822,25 +1783,21 @@ steps:
 		// Ensure existing DAGs with explicit names still work
 		data := []byte(`
 steps:
-  - name: setup
-    command: echo "setup"
-  - name: test
-    command: echo "test"
-    depends: setup
-  - name: deploy
-    command: echo "deploy"
-    depends: test
+  - echo "setup"
+  - echo "test"
+  - echo "deploy"
 `)
 		dag, err := digraph.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
 		require.Len(t, th.Steps, 3)
-		assert.Equal(t, "setup", th.Steps[0].Name)
-		assert.Equal(t, "test", th.Steps[1].Name)
-		assert.Equal(t, "deploy", th.Steps[2].Name)
-		assert.Equal(t, []string{"setup"}, th.Steps[1].Depends)
-		assert.Equal(t, []string{"test"}, th.Steps[2].Depends)
+		assert.Equal(t, "cmd_1", th.Steps[0].Name)
+		assert.Equal(t, "cmd_2", th.Steps[1].Name)
+		assert.Equal(t, "cmd_3", th.Steps[2].Name)
+		// In chain mode, sequential dependencies are implicit
+		assert.Equal(t, []string{"cmd_1"}, th.Steps[1].Depends)
+		assert.Equal(t, []string{"cmd_2"}, th.Steps[2].Depends)
 	})
 }
 
@@ -1851,7 +1808,6 @@ func TestStepIDValidation(t *testing.T) {
 		t.Parallel()
 
 		data := []byte(`
-name: test-valid-id
 steps:
   - name: step1
     id: valid_id
@@ -1867,7 +1823,6 @@ steps:
 		t.Parallel()
 
 		data := []byte(`
-name: test-invalid-id
 steps:
   - name: step1
     id: 123invalid
@@ -1882,7 +1837,6 @@ steps:
 		t.Parallel()
 
 		data := []byte(`
-name: test-duplicate-ids
 steps:
   - name: step1
     id: myid
@@ -1900,7 +1854,6 @@ steps:
 		t.Parallel()
 
 		data := []byte(`
-name: test-id-name-conflict
 steps:
   - name: step1
     id: step2
@@ -1917,7 +1870,6 @@ steps:
 		t.Parallel()
 
 		data := []byte(`
-name: test-name-id-conflict
 steps:
   - name: step1
     id: myid
@@ -1932,7 +1884,6 @@ steps:
 
 	t.Run("ReservedWordID", func(t *testing.T) {
 		data := []byte(`
-name: test-reserved-word
 steps:
   - name: step1
     id: env
@@ -1951,7 +1902,6 @@ func TestStepIDInDependencies(t *testing.T) {
 		t.Parallel()
 
 		data := []byte(`
-name: test-depend-by-id
 steps:
   - name: step1
     id: first
@@ -1971,7 +1921,6 @@ steps:
 		t.Parallel()
 
 		data := []byte(`
-name: test-depend-by-name
 steps:
   - name: step1
     id: first
@@ -1990,7 +1939,6 @@ steps:
 		t.Parallel()
 
 		data := []byte(`
-name: test-multiple-deps
 steps:
   - name: step1
     id: first
@@ -2012,7 +1960,6 @@ steps:
 
 	t.Run("MixOfIDAndNameDependencies", func(t *testing.T) {
 		data := []byte(`
-name: test-mixed-deps
 steps:
   - name: step1
     id: first
@@ -2037,7 +1984,6 @@ func TestChainTypeWithStepIDs(t *testing.T) {
 
 	data := []byte(`
 type: chain
-name: chain-with-ids
 steps:
   - name: step1
     id: s1
@@ -2072,9 +2018,8 @@ func TestResolveStepDependencies(t *testing.T) {
 		expected map[string][]string // step name -> expected depends
 	}{
 		{
-			name: "single ID dependency",
+			name: "SingleIDDependency",
 			yaml: `
-name: test
 steps:
   - name: step-one
     id: s1
@@ -2088,9 +2033,8 @@ steps:
 			},
 		},
 		{
-			name: "multiple ID dependencies",
+			name: "MultipleIDDependencies",
 			yaml: `
-name: test
 steps:
   - name: step-one
     id: s1
@@ -2109,9 +2053,8 @@ steps:
 			},
 		},
 		{
-			name: "mixed ID and name dependencies",
+			name: "MixedIDAndNameDependencies",
 			yaml: `
-name: test
 steps:
   - name: step-one
     id: s1
@@ -2129,9 +2072,8 @@ steps:
 			},
 		},
 		{
-			name: "no ID dependencies",
+			name: "NoIDDependencies",
 			yaml: `
-name: test
 steps:
   - name: step-one
     command: echo "1"
@@ -2144,9 +2086,8 @@ steps:
 			},
 		},
 		{
-			name: "ID same as name",
+			name: "IDSameAsName",
 			yaml: `
-name: test
 steps:
   - name: step-one
     id: step-one
@@ -2187,9 +2128,8 @@ func TestResolveStepDependencies_Errors(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name: "dependency on non-existent ID",
+			name: "DependencyOnNonExistentID",
 			yaml: `
-name: test
 steps:
   - name: step-one
     command: echo "1"
@@ -2222,7 +2162,6 @@ func TestBuildOTel(t *testing.T) {
 
 	t.Run("BasicOTelConfig", func(t *testing.T) {
 		yaml := `
-name: test
 otel:
   enabled: true
   endpoint: localhost:4317
@@ -2240,7 +2179,6 @@ steps:
 
 	t.Run("FullOTelConfig", func(t *testing.T) {
 		yaml := `
-name: test
 otel:
   enabled: true
   endpoint: otel-collector:4317
@@ -2270,7 +2208,6 @@ steps:
 
 	t.Run("DisabledOTel", func(t *testing.T) {
 		yaml := `
-name: test
 steps:
   - name: step1
     command: echo "test"
@@ -2285,7 +2222,6 @@ steps:
 func TestContainer(t *testing.T) {
 	t.Run("BasicContainer", func(t *testing.T) {
 		yaml := `
-name: test
 container:
   image: python:3.11-slim
   pullPolicy: always
@@ -2303,7 +2239,6 @@ steps:
 
 	t.Run("ContainerWithAllFields", func(t *testing.T) {
 		yaml := `
-name: test
 container:
   image: node:18-alpine
   pullPolicy: missing
@@ -2345,7 +2280,6 @@ steps:
 
 	t.Run("ContainerEnvAsMap", func(t *testing.T) {
 		yaml := `
-name: test
 container:
   image: alpine
   env:
@@ -2379,7 +2313,6 @@ steps:
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				yaml := `
-name: test
 container:
   image: alpine
   pullPolicy: ` + tc.pullPolicy + `
@@ -2399,7 +2332,6 @@ steps:
 	t.Run("ContainerPullPolicyBoolean", func(t *testing.T) {
 		// Test with boolean true
 		yaml := `
-name: test
 container:
   image: alpine
   pullPolicy: true
@@ -2416,7 +2348,6 @@ steps:
 
 	t.Run("ContainerWithoutPullPolicy", func(t *testing.T) {
 		yaml := `
-name: test
 container:
   image: alpine
 steps:
@@ -2432,7 +2363,6 @@ steps:
 
 	t.Run("NoContainer", func(t *testing.T) {
 		yaml := `
-name: test
 steps:
   - name: step1
     command: echo test
@@ -2445,7 +2375,6 @@ steps:
 
 	t.Run("InvalidPullPolicy", func(t *testing.T) {
 		yaml := `
-name: test
 container:
   image: alpine
   pullPolicy: invalid_policy
@@ -2461,7 +2390,6 @@ steps:
 
 	t.Run("ContainerWithoutImage", func(t *testing.T) {
 		yaml := `
-name: test
 container:
   pullPolicy: always
   env:
@@ -2480,7 +2408,6 @@ steps:
 func TestContainerExecutorIntegration(t *testing.T) {
 	t.Run("StepInheritsContainerExecutor", func(t *testing.T) {
 		yaml := `
-name: test
 container:
   image: python:3.11-slim
 steps:
@@ -2498,7 +2425,6 @@ steps:
 
 	t.Run("ExplicitExecutorOverridesContainer", func(t *testing.T) {
 		yaml := `
-name: test
 container:
   image: python:3.11-slim
 steps:
@@ -2517,7 +2443,6 @@ steps:
 
 	t.Run("NoContainerNoExecutor", func(t *testing.T) {
 		yaml := `
-name: test
 steps:
   - name: step1
     command: echo test
@@ -2533,7 +2458,6 @@ steps:
 
 	t.Run("StepWithDockerExecutorConfig", func(t *testing.T) {
 		yaml := `
-name: test
 container:
   image: node:18-alpine
 steps:
@@ -2556,7 +2480,6 @@ steps:
 
 	t.Run("MultipleStepsWithContainer", func(t *testing.T) {
 		yaml := `
-name: test
 container:
   image: alpine:latest
 steps:
@@ -2583,7 +2506,6 @@ steps:
 func TestSSHConfiguration(t *testing.T) {
 	t.Run("BasicSSHConfig", func(t *testing.T) {
 		yaml := `
-name: test
 ssh:
   user: testuser
   host: example.com
@@ -2605,7 +2527,6 @@ steps:
 
 	t.Run("SSHConfigWithStrictHostKey", func(t *testing.T) {
 		yaml := `
-name: test
 ssh:
   user: testuser
   host: example.com
@@ -2628,7 +2549,6 @@ steps:
 
 	t.Run("SSHConfigDefaultValues", func(t *testing.T) {
 		yaml := `
-name: test
 ssh:
   user: testuser
   host: example.com
@@ -2649,7 +2569,6 @@ steps:
 func TestSSHInheritance(t *testing.T) {
 	t.Run("StepInheritsSSHFromDAG", func(t *testing.T) {
 		yaml := `
-name: test
 ssh:
   user: testuser
   host: example.com
@@ -2673,7 +2592,6 @@ steps:
 
 	t.Run("StepOverridesSSHConfig", func(t *testing.T) {
 		yaml := `
-name: test
 ssh:
   user: defaultuser
   host: default.com
@@ -2709,7 +2627,6 @@ steps:
 func TestStepLevelEnv(t *testing.T) {
 	t.Run("BasicStepEnv", func(t *testing.T) {
 		yaml := `
-name: test
 steps:
   - name: step1
     command: echo $STEP_VAR
@@ -2725,7 +2642,6 @@ steps:
 
 	t.Run("StepEnvOverridesDAGEnv", func(t *testing.T) {
 		yaml := `
-name: test
 env:
   - SHARED_VAR: dag_value
   - DAG_ONLY: dag_only_value
@@ -2750,7 +2666,6 @@ steps:
 
 	t.Run("StepEnvAsMap", func(t *testing.T) {
 		yaml := `
-name: test
 steps:
   - name: step1
     command: echo test
@@ -2768,7 +2683,6 @@ steps:
 
 	t.Run("StepEnvWithSubstitution", func(t *testing.T) {
 		yaml := `
-name: test
 env:
   - BASE_PATH: /tmp
 steps:
@@ -2788,7 +2702,6 @@ steps:
 
 	t.Run("MultipleStepsWithDifferentEnvs", func(t *testing.T) {
 		yaml := `
-name: test
 steps:
   - name: step1
     command: echo $ENV_VAR
@@ -2813,7 +2726,6 @@ steps:
 
 	t.Run("StepEnvComplexValues", func(t *testing.T) {
 		yaml := `
-name: test
 steps:
   - name: step1
     command: echo test
@@ -2840,9 +2752,8 @@ steps:
 }
 
 func TestBuildRegistryAuths(t *testing.T) {
-	t.Run("Parse registryAuths from YAML", func(t *testing.T) {
+	t.Run("ParseRegistryAuthsFromYAML", func(t *testing.T) {
 		yaml := `
-name: test-dag
 registryAuths:
   docker.io:
     username: docker-user
@@ -2857,8 +2768,7 @@ container:
   image: docker.io/myapp:latest
 
 steps:
-  - name: test
-    command: echo hello
+  - echo hello
 `
 		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
@@ -2888,12 +2798,10 @@ steps:
 		assert.Empty(t, gcrAuth.Password) // Should be empty when auth is provided
 	})
 
-	t.Run("Empty registryAuths", func(t *testing.T) {
+	t.Run("EmptyRegistryAuths", func(t *testing.T) {
 		yaml := `
-name: test-dag
 steps:
-  - name: test
-    command: echo hello
+  - echo hello
 `
 		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
@@ -2903,21 +2811,19 @@ steps:
 		assert.Nil(t, dag.RegistryAuths)
 	})
 
-	t.Run("registryAuths with environment variables", func(t *testing.T) {
+	t.Run("RegistryAuthsWithEnvironmentVariables", func(t *testing.T) {
 		// Set environment variables for testing
 		t.Setenv("DOCKER_USER", "env-docker-user")
 		t.Setenv("DOCKER_PASS", "env-docker-pass")
 
 		yaml := `
-name: test-dag
 registryAuths:
   docker.io:
     username: ${DOCKER_USER}
     password: ${DOCKER_PASS}
 
 steps:
-  - name: test
-    command: echo hello
+  - echo hello
 `
 		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
@@ -2930,18 +2836,16 @@ steps:
 		assert.Equal(t, "env-docker-pass", dockerAuth.Password)
 	})
 
-	t.Run("registryAuths as JSON string", func(t *testing.T) {
+	t.Run("RegistryAuthsAsJSONString", func(t *testing.T) {
 		// Simulate DOCKER_AUTH_CONFIG style JSON string
 		jsonAuth := `{"docker.io": {"username": "json-user", "password": "json-pass"}}`
 		t.Setenv("DOCKER_AUTH_JSON", jsonAuth)
 
 		yaml := `
-name: test-dag
 registryAuths: ${DOCKER_AUTH_JSON}
 
 steps:
-  - name: test
-    command: echo hello
+  - echo hello
 `
 		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
@@ -2954,16 +2858,14 @@ steps:
 		assert.Equal(t, jsonAuth, jsonEntry.Auth)
 	})
 
-	t.Run("registryAuths with string values per registry", func(t *testing.T) {
+	t.Run("RegistryAuthsWithStringValuesPerRegistry", func(t *testing.T) {
 		yaml := `
-name: test-dag
 registryAuths:
   docker.io: '{"username": "user1", "password": "pass1"}'
   ghcr.io: '{"username": "user2", "password": "pass2"}'
 
 steps:
-  - name: test
-    command: echo hello
+  - echo hello
 `
 		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
@@ -2984,13 +2886,11 @@ steps:
 }
 
 func TestBuildWorkingDir(t *testing.T) {
-	t.Run("explicit workingDir", func(t *testing.T) {
+	t.Run("ExplicitWorkingDir", func(t *testing.T) {
 		yaml := `
-name: test-dag
 workingDir: /tmp
 steps:
-  - name: test
-    command: echo hello
+  - echo hello
 `
 		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
@@ -2998,14 +2898,12 @@ steps:
 		assert.Equal(t, "/tmp", dag.WorkingDir)
 	})
 
-	t.Run("workingDir with env var expansion", func(t *testing.T) {
+	t.Run("WorkingDirWithEnvVarExpansion", func(t *testing.T) {
 		t.Setenv("TEST_DIR", "/tmp/dir")
 		yaml := `
-name: test-dag
 workingDir: ${TEST_DIR}/subdir
 steps:
-  - name: test
-    command: echo hello
+  - echo hello
 `
 		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
@@ -3013,12 +2911,10 @@ steps:
 		assert.Equal(t, "/tmp/dir/subdir", dag.WorkingDir)
 	})
 
-	t.Run("default workingDir when no file", func(t *testing.T) {
+	t.Run("DefaultWorkingDirWhenNoFile", func(t *testing.T) {
 		yaml := `
-name: test-dag
 steps:
-  - name: test
-    command: echo hello
+  - echo hello
 `
 		dag, err := digraph.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
@@ -3032,7 +2928,7 @@ steps:
 }
 
 func TestDAGLoadEnv(t *testing.T) {
-	t.Run("LoadEnv with dotenv and env vars", func(t *testing.T) {
+	t.Run("LoadEnvWithDotenvAndEnvVars", func(t *testing.T) {
 		// Create a temp directory with a .env file
 		tempDir := t.TempDir()
 		envFile := filepath.Join(tempDir, ".env")
@@ -3041,15 +2937,13 @@ func TestDAGLoadEnv(t *testing.T) {
 		require.NoError(t, err)
 
 		yaml := fmt.Sprintf(`
-name: test-dag
 workingDir: %s
 dotenv: .env
 env:
   - LOAD_ENV_ENV_VAR: from_dag
   - LOAD_ENV_ANOTHER_VAR: another_value
 steps:
-  - name: test
-    command: echo hello
+  - echo hello
 `, tempDir)
 
 		dag, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(yaml), digraph.BuildOpts{NoEval: true})
@@ -3070,15 +2964,13 @@ steps:
 		os.Unsetenv("LOAD_ENV_ANOTHER_VAR")
 	})
 
-	t.Run("LoadEnv with missing dotenv file", func(t *testing.T) {
+	t.Run("LoadEnvWithMissingDotenvFile", func(t *testing.T) {
 		yaml := `
-name: test-dag
 dotenv: nonexistent.env
 env:
   - TEST_VAR_LOAD_ENV: test_value
 steps:
-  - name: test
-    command: echo hello
+  - echo hello
 `
 		dag, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(yaml), digraph.BuildOpts{NoEval: true})
 		require.NoError(t, err)

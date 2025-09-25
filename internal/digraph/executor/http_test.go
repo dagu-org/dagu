@@ -14,7 +14,7 @@ import (
 )
 
 func TestHTTPExecutor_SkipTLSVerify(t *testing.T) {
-	t.Run("HTTPS request with self-signed certificate", func(t *testing.T) {
+	t.Run("HTTPSRequestWithSelfSignedCertificate", func(t *testing.T) {
 		// Create a test server with a self-signed certificate
 		server := httptest.NewTLSServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, _ *nethttp.Request) {
 			w.WriteHeader(nethttp.StatusOK)
@@ -50,7 +50,7 @@ func TestHTTPExecutor_SkipTLSVerify(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("HTTPS request without skipTLSVerify", func(t *testing.T) {
+	t.Run("HTTPSRequestWithoutSkipTLSVerify", func(t *testing.T) {
 		// Create a test server with a self-signed certificate
 		server := httptest.NewTLSServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, _ *nethttp.Request) {
 			w.WriteHeader(nethttp.StatusOK)
@@ -87,7 +87,7 @@ func TestHTTPExecutor_SkipTLSVerify(t *testing.T) {
 		assert.Contains(t, err.Error(), "certificate")
 	})
 
-	t.Run("Config parsing with skipTLSVerify", func(t *testing.T) {
+	t.Run("ConfigParsingWithSkipTLSVerify", func(t *testing.T) {
 		step := digraph.Step{
 			Command: "GET",
 			Args:    []string{"https://example.com"},
@@ -110,7 +110,7 @@ func TestHTTPExecutor_SkipTLSVerify(t *testing.T) {
 }
 
 func TestHTTPExecutor_StandardFeatures(t *testing.T) {
-	t.Run("GET request with headers and query params", func(t *testing.T) {
+	t.Run("GETRequestWithHeadersAndQueryParams", func(t *testing.T) {
 		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
 			assert.Equal(t, "GET", r.Method)
 			assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
@@ -155,7 +155,7 @@ func TestHTTPExecutor_StandardFeatures(t *testing.T) {
 
 // TestHTTPExecutor_CrossPlatform tests behavior across different platforms
 func TestHTTPExecutor_CrossPlatform(t *testing.T) {
-	t.Run("Behavior consistency across platforms", func(t *testing.T) {
+	t.Run("BehaviorConsistencyAcrossPlatforms", func(t *testing.T) {
 		// Test data that should behave the same on all platforms
 		testCases := []struct {
 			name   string
@@ -163,12 +163,12 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 			config map[string]any
 		}{
 			{
-				name:   "Simple GET",
+				name:   "SimpleGET",
 				method: "GET",
 				config: map[string]any{"silent": true},
 			},
 			{
-				name:   "POST with JSON",
+				name:   "POSTWithJSON",
 				method: "POST",
 				config: map[string]any{
 					"headers": map[string]string{"Content-Type": "application/json"},
@@ -177,7 +177,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 				},
 			},
 			{
-				name:   "GET with custom headers",
+				name:   "GETWithCustomHeaders",
 				method: "GET",
 				config: map[string]any{
 					"headers": map[string]string{
@@ -242,7 +242,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 		}
 	})
 
-	t.Run("JSON response formatting consistency", func(t *testing.T) {
+	t.Run("JSONResponseFormattingConsistency", func(t *testing.T) {
 		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, _ *nethttp.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-Test-Header", "cross-platform")
@@ -296,7 +296,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 		t.Logf("Platform: %s, JSON response verified", runtime.GOOS)
 	})
 
-	t.Run("Error handling consistency", func(t *testing.T) {
+	t.Run("ErrorHandlingConsistency", func(t *testing.T) {
 		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, _ *nethttp.Request) {
 			w.WriteHeader(nethttp.StatusInternalServerError)
 			_, _ = w.Write([]byte("Server error for cross-platform test"))

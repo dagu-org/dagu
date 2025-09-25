@@ -11,7 +11,7 @@ import (
 func TestScheduler_QueueMethods(t *testing.T) {
 	t.Parallel()
 
-	t.Run("getQueueConfigByName_GlobalConfigExists", func(t *testing.T) {
+	t.Run("GetQueueConfigByNameGlobalConfigExists", func(t *testing.T) {
 		cfg := &config.Config{
 			Queues: config.Queues{
 				Enabled: true,
@@ -33,7 +33,7 @@ func TestScheduler_QueueMethods(t *testing.T) {
 		assert.Equal(t, 2, queueCfg.MaxConcurrency)
 	})
 
-	t.Run("getQueueConfigByName_FallbackToDAGMaxActiveRuns", func(t *testing.T) {
+	t.Run("GetQueueConfigByNameFallbackToDAGMaxActiveRuns", func(t *testing.T) {
 		cfg := &config.Config{
 			Queues: config.Queues{
 				Enabled: true,
@@ -52,7 +52,7 @@ func TestScheduler_QueueMethods(t *testing.T) {
 		assert.Equal(t, 7, queueCfg.MaxConcurrency)
 	})
 
-	t.Run("getQueueConfigByName_DefaultToOne", func(t *testing.T) {
+	t.Run("GetQueueConfigByNameDefaultToOne", func(t *testing.T) {
 		cfg := &config.Config{
 			Queues: config.Queues{
 				Enabled: true,
@@ -71,7 +71,7 @@ func TestScheduler_QueueMethods(t *testing.T) {
 		assert.Equal(t, 1, queueCfg.MaxConcurrency)
 	})
 
-	t.Run("getQueueConfigByName_GlobalConfigPriority", func(t *testing.T) {
+	t.Run("GetQueueConfigByNameGlobalConfigPriority", func(t *testing.T) {
 		cfg := &config.Config{
 			Queues: config.Queues{
 				Enabled: true,
@@ -92,7 +92,7 @@ func TestScheduler_QueueMethods(t *testing.T) {
 		assert.Equal(t, 3, queueCfg.MaxConcurrency) // Global config takes priority
 	})
 
-	t.Run("getQueueConfigByName_MinimumOne", func(t *testing.T) {
+	t.Run("GetQueueConfigByNameMinimumOne", func(t *testing.T) {
 		cfg := &config.Config{
 			Queues: config.Queues{
 				Enabled: true,

@@ -102,10 +102,10 @@ container:
   volumes:
     - %s:/data:rw
 steps:
-  - command: sh -c "echo 'Hello from step 1' > /data/test.txt"
+  - sh -c "echo 'Hello from step 1' > /data/test.txt"
   - command: cat /data/test.txt
     output: BIND_MOUNT_OUT1
-  - command: sh -c "echo 'Hello from step 3' >> /data/test.txt"
+  - sh -c "echo 'Hello from step 3' >> /data/test.txt"
   - command: cat /data/test.txt
     output: BIND_MOUNT_OUT2
 `, testImage, tempDir)
@@ -188,7 +188,7 @@ container:
   volumes:
     - test-volume:/data
 steps:
-  - command: sh -c "echo 'Data in named volume' > /data/volume.txt"
+  - sh -c "echo 'Data in named volume' > /data/volume.txt"
   - command: cat /data/volume.txt
     output: NAMED_VOL_OUT1
   - command: ls -la /data/
@@ -223,7 +223,7 @@ container:
 steps:
   - command: cat /workspace/initial.txt
     output: WORK_DIR_VOL_OUT1
-  - command: sh -c "echo 'New content' > /workspace/new.txt"
+  - sh -c "echo 'New content' > /workspace/new.txt"
   - command: cat /workspace/new.txt
     output: WORK_DIR_VOL_OUT2
   - command: ls -la /workspace/

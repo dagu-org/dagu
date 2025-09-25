@@ -35,8 +35,7 @@ name: child-echo
 params:
   - ITEM: "default"
 steps:
-  - name: echo-item
-    command: echo "Processing $1"
+  - command: echo "Processing $1"
     output: PROCESSED_ITEM
 `)
 
@@ -86,8 +85,7 @@ params:
   - REGION: "us-east-1"
   - VERSION: "1.0.0"
 steps:
-  - name: process-region
-    command: echo "Deploying version $VERSION to region $REGION"
+  - command: echo "Deploying version $VERSION to region $REGION"
     output: DEPLOYMENT_RESULT
 `)
 
@@ -136,8 +134,7 @@ name: child-echo
 params:
   - ITEM: "default"
 steps:
-  - name: echo-item
-    command: echo "Processing $1"
+  - command: echo "Processing $1"
     output: PROCESSED_ITEM
 `)
 
@@ -180,8 +177,7 @@ name: child-echo
 params:
   - ITEM: "default"
 steps:
-  - name: echo-item
-    command: echo "Processing $1"
+  - command: echo "Processing $1"
     output: PROCESSED_ITEM
 `)
 
@@ -228,13 +224,11 @@ name: child-with-output
 params:
   - TASK: "default"
 steps:
-  - name: process-task
-    command: |
+  - command: |
       echo "Processing task: $1"
       echo "TASK_RESULT_$1"
     output: TASK_OUTPUT
-  - name: finalize
-    command: echo "Task $1 completed with output ${TASK_OUTPUT}"
+  - echo "Task $1 completed with output ${TASK_OUTPUT}"
 `)
 
 	// Run the DAG
@@ -284,8 +278,7 @@ name: child-with-output
 params:
   - ITEM: ""
 steps:
-  - name: process
-    command: |
+  - command: |
       echo "Processing item: $1"
       echo "TASK_RESULT_$1"
     output: TASK_OUTPUT
@@ -355,8 +348,7 @@ name: child-echo
 params:
   - ITEM: ""
 steps:
-  - name: echo
-    command: echo "$1"
+  - command: echo "$1"
     output: ECHO_OUTPUT
 `)
 
@@ -409,8 +401,7 @@ name: child-conditional-fail
 params:
   - INPUT: "default"
 steps:
-  - name: process
-    command: |
+  - command: |
       if [ "$1" = "fail" ]; then
         echo "Failing as requested"
         exit 1
@@ -468,8 +459,7 @@ name: child-with-output
 params:
   - ITEM: ""
 steps:
-  - name: process
-    command: |
+  - command: |
       echo "Processing item: $1"
       echo "TASK_RESULT_$1"
     output: TASK_OUTPUT
@@ -534,8 +524,7 @@ func TestParallelExecution_MinimalRetry(t *testing.T) {
 ---
 name: child-fail
 steps:
-  - name: fail
-    command: exit 1
+  - exit 1
 `)
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
@@ -587,8 +576,7 @@ func TestParallelExecution_RetryAndContinueOn(t *testing.T) {
 ---
 name: child-fail-both
 steps:
-  - name: fail
-    command: exit 1
+  - exit 1
 `)
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
@@ -654,8 +642,7 @@ func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
 ---
 name: child-output-fail
 steps:
-  - name: process
-    command: |
+  - command: |
       INPUT="$1"
       echo "Output for ${INPUT}"
       if [ "${INPUT}" = "fail" ]; then
@@ -726,8 +713,7 @@ func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
 ---
 name: child-retry-simple
 steps:
-  - name: retry-step
-    command: |
+  - command: |
       COUNTER_FILE="/tmp/test_retry_counter.txt"
       if [ ! -f "$COUNTER_FILE" ]; then
         echo "1" > "$COUNTER_FILE"
@@ -785,7 +771,6 @@ func TestParallelExecution_ExceedsMaxLimit(t *testing.T) {
 	itemsStr := strings.Join(items, "\n")
 
 	dagContent := fmt.Sprintf(`
-name: test-parallel-exceed-limit
 steps:
   - name: too-many-items
     run: child-echo
@@ -797,8 +782,7 @@ name: child-echo
 params:
   - ITEM: ""
 steps:
-  - name: echo
-    command: echo "$1"
+  - command: echo "$1"
     output: ECHO_OUTPUT
 `, itemsStr)
 
@@ -826,7 +810,6 @@ func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
 	itemsStr := strings.Join(items, "\n")
 
 	dagContent := fmt.Sprintf(`
-name: test-parallel-max-limit
 steps:
   - name: max-items
     run: child-echo
@@ -839,8 +822,7 @@ name: child-echo
 params:
   - ITEM: ""
 steps:
-  - name: echo
-    command: echo "$1"
+  - command: echo "$1"
     output: ECHO_OUTPUT
 `, itemsStr)
 
@@ -891,7 +873,7 @@ func TestParallelExecution_ObjectItemProperties(t *testing.T) {
         {"region": "ap-south-1", "bucket": "data-ap"}
       ]'
     output: CONFIGS
-  
+
   - name: sync data
     run: sync-data
     parallel:
@@ -909,8 +891,7 @@ params:
   - REGION: ""
   - BUCKET: ""
 steps:
-  - name: sync
-    script: |
+  - script: |
       echo "Syncing data from region: $REGION"
       echo "Using bucket: $BUCKET"
       echo "Sync completed for $BUCKET in $REGION"
@@ -995,8 +976,7 @@ func TestParallelExecution_DynamicFileDiscovery(t *testing.T) {
 params:
   - ITEM: ""
 steps:
-  - name: process
-    script: |
+  - script: |
       FILE="$ITEM"
       echo "Processing file: ${FILE}"
       # Simulate file processing
@@ -1017,7 +997,7 @@ steps:
   - name: get files
     command: find %s -name "*.csv" -type f
     output: FILES
-  
+
   - name: process files
     run: process-file
     parallel: ${FILES}
@@ -1135,8 +1115,7 @@ params:
   - PORT: ""
   - REPLICAS: ""
 steps:
-  - name: validate
-    script: |
+  - script: |
       echo "Validating deployment parameters..."
       if [ -z "$SERVICE_NAME" ] || [ -z "$PORT" ] || [ -z "$REPLICAS" ]; then
         echo "ERROR: Missing required parameters"
@@ -1146,23 +1125,21 @@ steps:
       echo "Port: $PORT"
       echo "Replicas: $REPLICAS"
     output: VALIDATE_RESULT
-  - name: deploy
-    script: |
+  - script: |
       echo "Deploying $SERVICE_NAME..."
       echo "  - Binding to port $PORT"
       echo "  - Scaling to $REPLICAS replicas"
-      
+
       # Simulate deployment
       sleep 1
-      
+
       # Simulate occasional failures for testing continueOnError
       if [ "$SERVICE_NAME" = "api-service" ]; then
         echo "ERROR: Failed to deploy $SERVICE_NAME - port $PORT already in use"
         exit 1
       fi
-      
+
       echo "Successfully deployed $SERVICE_NAME"
-    depends: validate
     output: DEPLOY_RESULT
 `
 	// Load the DAG using helper

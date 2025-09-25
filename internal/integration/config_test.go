@@ -18,9 +18,9 @@ func TestDAGExecution(t *testing.T) {
 		t.Parallel()
 
 		dag := th.DAG(t, `steps:
-  - command: "echo 1"
+  - command: echo 1
     output: NO_NAME_STEP_OUT
-  - command: "echo ${NO_NAME_STEP_OUT}=1"
+  - command: echo ${NO_NAME_STEP_OUT}=1
     output: NO_NAME_STEP_OUT2
 `)
 		agent := dag.Agent()
@@ -37,10 +37,10 @@ func TestDAGExecution(t *testing.T) {
 
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: "echo 1"
+    command: echo 1
   - name: "2"
     depends: "1"
-    command: "echo 2"
+    command: echo 2
 `)
 		agent := dag.Agent()
 
@@ -55,8 +55,7 @@ func TestDAGExecution(t *testing.T) {
 		dag := th.DAG(t, `params:
   - NAME: "foo"
 steps:
-  - name: step1
-    command: echo hello $NAME | xargs echo
+  - command: echo hello $NAME | xargs echo
     output: OUT1
 `)
 		agent := dag.Agent()
@@ -81,8 +80,7 @@ steps:
   - `+dotenv1Path+`
   - `+dotenv2Path+`
 steps:
-  - name: step1
-    command: echo "${ENV1} ${ENV2}"
+  - command: echo "${ENV1} ${ENV2}"
     output: OUT1 #123 456
 `)
 		agent := dag.Agent()
@@ -99,8 +97,7 @@ steps:
 		t.Parallel()
 
 		dag := th.DAG(t, `steps:
-  - name: fail
-    command: bash
+  - command: bash
     script: |
       echo first 1>&2
       echo second 1>&2
@@ -174,8 +171,7 @@ steps:
 		dag := th.DAG(t, `params: "foo bar"
 
 steps:
-  - name: step1
-    output: OUT1
+  - output: OUT1
     command: echo '$1' is $1, '$2' is $2
 `)
 		agent := dag.Agent()
@@ -197,8 +193,7 @@ steps:
 		dag := th.DAG(t, `params: "foo bar"
 
 steps:
-  - name: step1
-    output: OUT1
+  - output: OUT1
     script: |
       echo '$1' is $1, '$2' is ${2}
 `)
@@ -221,8 +216,7 @@ steps:
 		dag := th.DAG(t, `params:
   - NAME: "foo"
 steps:
-  - name: step1
-    script: |
+  - script: |
       echo 1 2 3
     output: OUT1
 `)
@@ -348,22 +342,17 @@ steps:
 		t.Parallel()
 
 		dag := th.DAG(t, `steps:
-  - name: step1
-    command: echo $DAG_RUN_LOG_FILE
+  - command: echo $DAG_RUN_LOG_FILE
     output: OUT1
-  - name: step2
-    command: echo $DAG_RUN_STEP_STDOUT_FILE
+  - command: echo $DAG_RUN_STEP_STDOUT_FILE
     output: OUT2
-  - name: step3
-    command: echo $DAG_RUN_STEP_NAME
+  - command: echo $DAG_RUN_STEP_NAME
     output: OUT3
-  - name: step4
-    command: sh
+  - command: sh
     output: OUT4
     script: |
       echo $DAG_NAME
-  - name: step5
-    command: bash
+  - command: bash
     output: OUT5
     script: |
       echo $DAG_RUN_ID
@@ -386,8 +375,7 @@ steps:
 		t.Parallel()
 
 		dag := th.DAG(t, `steps:
-  - name: extract_value
-    executor: jq
+  - executor: jq
     command: .user.name # Get user name from JSON
     output: NAME
     script: |
@@ -436,8 +424,7 @@ steps:
 		t.Parallel()
 
 		dag := th.DAG(t, `steps:
-  - name: step1
-    command: perl
+  - command: perl
     script: |
       use strict;
       use warnings;
@@ -461,13 +448,11 @@ steps:
   - WORKDIR: $HOME
   - TILDE: ~/
 steps:
-  - name: step1
-    dir: $TILDE
+  - dir: $TILDE
     command: echo $PWD
     output: OUT1
 
-  - name: step2
-    dir: $WORKDIR
+  - dir: $WORKDIR
     command: echo $PWD
     output: OUT2
 `)
@@ -482,7 +467,7 @@ steps:
 		})
 	})
 
-	t.Run("Issue-810", func(t *testing.T) {
+	t.Run("Issue810", func(t *testing.T) {
 		t.Parallel()
 
 		dag := th.DAG(t, `params: bar
@@ -533,8 +518,7 @@ steps:
 		t.Parallel()
 
 		dag := th.DAG(t, `steps:
-  - name: step1
-    description: test step
+  - description: test step
     command: |
       echo 'hello world' && ls -al /
     shell: bash -o errexit -o xtrace -o pipefail -c
@@ -552,7 +536,7 @@ steps:
 		})
 	})
 
-	t.Run("Issue1203_ScriptWithCarriageReturn", func(t *testing.T) {
+	t.Run("Issue1203ScriptWithCarriageReturn", func(t *testing.T) {
 		t.Parallel()
 
 		// Issue #1203: Scripts with trailing \r cause file path errors
@@ -561,8 +545,7 @@ steps:
 
 		// Create a DAG with script containing \r - this should fail
 		dag := th.DAG(t, "steps:\n"+
-			"  - name: script_with_cr\n"+
-			"    command: bash\n"+
+			"  - command: bash\n"+
 			"    script: \"test -f "+tmpFile+"\\r\"\n")
 
 		agent := dag.Agent()
@@ -619,7 +602,7 @@ params:
   PARAM: VALUE
 steps:
   - name: grand_child
-    command: "echo value is ${PARAM}"
+    command: echo value is ${PARAM}
     output: OUTPUT
 `))
 
@@ -630,7 +613,7 @@ steps:
     params: "PARAM=123"
     output: CHILD_OUTPUT
   - name: output
-    command: "echo ${CHILD_OUTPUT.outputs.OUTPUT}"
+    command: echo ${CHILD_OUTPUT.outputs.OUTPUT}
     output: OUT1
     depends:
       - child
@@ -644,7 +627,7 @@ steps:
     params: "PARAM=${PARAM}"
     output: GRAND_CHILD_OUTPUT
   - name: output
-    command: "echo ${GRAND_CHILD_OUTPUT.outputs.OUTPUT}"
+    command: echo ${GRAND_CHILD_OUTPUT.outputs.OUTPUT}
     depends:
       - child
     output: OUTPUT
@@ -797,20 +780,17 @@ env:
   - MY_VAR2: "dag_value2"
 
 steps:
-  - name: step1
-    env:
+  - env:
       MY_VAR: "step1_value"
     command: echo $MY_VAR
     output: OUT1
 
-  - name: step2
-    env:
+  - env:
       MY_VAR: $MY_VAR2
     command: echo $MY_VAR
     output: OUT2
 
-  - name: step3
-    env:
+  - env:
       MY_VAR: "`+"`echo dynamic value`"+`"
     command: echo $MY_VAR
     output: OUT3
@@ -845,10 +825,8 @@ func TestStepWorkingDir(t *testing.T) {
 
 	// Test that step workingDir works
 	dag := th.DAG(t, `
-name: test-step-working-dir
 steps:
-  - name: step-with-dir
-    workingDir: `+stepWorkDir+`
+  - workingDir: `+stepWorkDir+`
     command: pwd
     output: STEP_DIR
 `)

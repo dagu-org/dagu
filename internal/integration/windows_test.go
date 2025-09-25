@@ -23,7 +23,7 @@ func TestWindowsShellDetection(t *testing.T) {
 		t.Skip("Skipping Windows-specific tests on non-Windows platform")
 	}
 
-	t.Run("environment variables", func(t *testing.T) {
+	t.Run("EnvironmentVariables", func(t *testing.T) {
 		// Essential environment variables that should exist on Windows
 		envVars := []string{"COMSPEC", "WINDIR", "SYSTEMROOT", "PATH"}
 		for _, env := range envVars {
@@ -32,7 +32,7 @@ func TestWindowsShellDetection(t *testing.T) {
 		}
 	})
 
-	t.Run("shell availability", func(t *testing.T) {
+	t.Run("ShellAvailability", func(t *testing.T) {
 		// Test common shells/commands available on Windows
 		commands := []struct {
 			name     string
@@ -62,7 +62,7 @@ func TestWindowsShellDetection(t *testing.T) {
 		assert.True(t, foundAtLeastOne, "At least one shell command should be available")
 	})
 
-	t.Run("shell command resolution", func(t *testing.T) {
+	t.Run("ShellCommandResolution", func(t *testing.T) {
 		// Test cmdutil.GetShellCommand behavior on Windows
 		testCases := []struct {
 			input    string
@@ -87,7 +87,7 @@ func TestWindowsCommandExecution(t *testing.T) {
 		t.Skip("Skipping Windows-specific tests on non-Windows platform")
 	}
 
-	t.Run("basic cmd commands", func(t *testing.T) {
+	t.Run("BasicCmdCommands", func(t *testing.T) {
 		tests := []struct {
 			name    string
 			shell   string
@@ -96,19 +96,19 @@ func TestWindowsCommandExecution(t *testing.T) {
 			wantErr bool
 		}{
 			{
-				name:    "echo via cmd",
+				name:    "EchoViaCmd",
 				shell:   "cmd",
 				command: "echo hello",
 				wantErr: false,
 			},
 			{
-				name:    "dir command",
+				name:    "DirCommand",
 				shell:   "cmd",
 				command: "dir",
 				wantErr: false,
 			},
 			{
-				name:    "set variable",
+				name:    "SetVariable",
 				shell:   "cmd",
 				command: "set TEST_VAR=hello && echo %TEST_VAR%",
 				wantErr: false,
@@ -135,7 +135,7 @@ func TestWindowsCommandExecution(t *testing.T) {
 		}
 	})
 
-	t.Run("powershell commands", func(t *testing.T) {
+	t.Run("PowershellCommands", func(t *testing.T) {
 		// Skip if PowerShell not available
 		if _, err := exec.LookPath("powershell"); err != nil {
 			t.Skip("PowerShell not available")
@@ -147,17 +147,17 @@ func TestWindowsCommandExecution(t *testing.T) {
 			wantErr bool
 		}{
 			{
-				name:    "echo via powershell",
+				name:    "EchoViaPowershell",
 				command: "Write-Output 'hello'",
 				wantErr: false,
 			},
 			{
-				name:    "get location",
+				name:    "GetLocation",
 				command: "Get-Location",
 				wantErr: false,
 			},
 			{
-				name:    "set and get variable",
+				name:    "SetAndGetVariable",
 				command: "$env:TEST_VAR='hello'; Write-Output $env:TEST_VAR",
 				wantErr: false,
 			},
@@ -185,7 +185,7 @@ func TestWindowsSocketHandling(t *testing.T) {
 		t.Skip("Skipping Windows-specific tests on non-Windows platform")
 	}
 
-	t.Run("socket path generation", func(t *testing.T) {
+	t.Run("SocketPathGeneration", func(t *testing.T) {
 		// Test Windows-specific socket path handling
 		socketPath := digraph.SockAddr("windows-test", "test-run")
 		assert.NotEmpty(t, socketPath, "Socket path should not be empty")
@@ -207,7 +207,7 @@ func TestWindowsCommandQuoting(t *testing.T) {
 		t.Skip("Skipping Windows-specific tests on non-Windows platform")
 	}
 
-	t.Run("quoted arguments", func(t *testing.T) {
+	t.Run("QuotedArguments", func(t *testing.T) {
 		// Skip if cmd not available
 		if _, err := exec.LookPath("cmd"); err != nil {
 			t.Skip("cmd not available")
@@ -219,17 +219,17 @@ func TestWindowsCommandQuoting(t *testing.T) {
 			expected string
 		}{
 			{
-				name:     "simple quote",
+				name:     "SimpleQuote",
 				command:  `echo "hello world"`,
 				expected: "hello world",
 			},
 			{
-				name:     "single quotes",
+				name:     "SingleQuotes",
 				command:  `echo 'hello world'`,
 				expected: "'hello world'", // cmd treats single quotes literally
 			},
 			{
-				name:     "nested quotes",
+				name:     "NestedQuotes",
 				command:  `echo "She said 'hello'"`,
 				expected: "She said 'hello'",
 			},
@@ -254,14 +254,14 @@ func TestWindowsCommandConstruction(t *testing.T) {
 		t.Skip("Skipping Windows-specific tests on non-Windows platform")
 	}
 
-	t.Run("shell command detection", func(t *testing.T) {
+	t.Run("ShellCommandDetection", func(t *testing.T) {
 		// Test auto-detection of shell
 		shell := cmdutil.GetShellCommand("")
 		assert.NotEmpty(t, shell, "Auto-detected shell should not be empty")
 		t.Logf("Auto-detected shell: %s", shell)
 	})
 
-	t.Run("command argument construction", func(t *testing.T) {
+	t.Run("CommandArgumentConstruction", func(t *testing.T) {
 		tests := []struct {
 			name         string
 			shell        string
@@ -269,25 +269,25 @@ func TestWindowsCommandConstruction(t *testing.T) {
 			expectedFlag string
 		}{
 			{
-				name:         "powershell with -Command",
+				name:         "PowershellWithCommand",
 				shell:        "powershell",
 				command:      "Write-Output 'test'",
 				expectedFlag: "-Command",
 			},
 			{
-				name:         "powershell.exe with -Command",
+				name:         "PowershellExeWithCommand",
 				shell:        "powershell.exe",
 				command:      "Get-Location",
 				expectedFlag: "-Command",
 			},
 			{
-				name:         "cmd with /c",
+				name:         "CmdWith/C",
 				shell:        "cmd",
 				command:      "echo hello",
 				expectedFlag: "/c",
 			},
 			{
-				name:         "cmd.exe with /c",
+				name:         "CmdExeWith/C",
 				shell:        "cmd.exe",
 				command:      "dir",
 				expectedFlag: "/c",
@@ -317,7 +317,7 @@ func TestWindowsCommandConstruction(t *testing.T) {
 		}
 	})
 
-	t.Run("command execution with proper flags", func(t *testing.T) {
+	t.Run("CommandExecutionWithProperFlags", func(t *testing.T) {
 		tests := []struct {
 			name    string
 			shell   string
@@ -325,13 +325,13 @@ func TestWindowsCommandConstruction(t *testing.T) {
 			command string
 		}{
 			{
-				name:    "powershell command",
+				name:    "PowershellCommand",
 				shell:   "powershell",
 				flag:    "-Command",
 				command: "Write-Output 'PowerShell test'",
 			},
 			{
-				name:    "cmd command",
+				name:    "CmdCommand",
 				shell:   "cmd",
 				flag:    "/c",
 				command: "echo CMD test",
@@ -357,7 +357,7 @@ func TestWindowsCommandConstruction(t *testing.T) {
 		}
 	})
 
-	t.Run("edge cases", func(t *testing.T) {
+	t.Run("EdgeCases", func(t *testing.T) {
 		// Test edge cases for command construction
 		tests := []struct {
 			name    string
@@ -366,19 +366,19 @@ func TestWindowsCommandConstruction(t *testing.T) {
 			wantErr bool
 		}{
 			{
-				name:    "empty command",
+				name:    "EmptyCommand",
 				shell:   "cmd",
 				command: "",
 				wantErr: false, // Empty command should not error during construction
 			},
 			{
-				name:    "command with quotes",
+				name:    "CommandWithQuotes",
 				shell:   "cmd",
 				command: `echo "quoted string"`,
 				wantErr: false,
 			},
 			{
-				name:    "command with special characters",
+				name:    "CommandWithSpecialCharacters",
 				shell:   "cmd",
 				command: "echo hello & echo world",
 				wantErr: false,
@@ -412,7 +412,7 @@ func TestWindowsEnvironmentVariables(t *testing.T) {
 		t.Skip("Skipping Windows-specific tests on non-Windows platform")
 	}
 
-	t.Run("windows environment variables", func(t *testing.T) {
+	t.Run("WindowsEnvironmentVariables", func(t *testing.T) {
 		// Test that essential Windows environment variables are available
 		essentialVars := []string{"USERNAME", "COMPUTERNAME", "USERPROFILE", "TEMP", "WINDIR"}
 
@@ -423,7 +423,7 @@ func TestWindowsEnvironmentVariables(t *testing.T) {
 		}
 	})
 
-	t.Run("cmd vs powershell environment syntax", func(t *testing.T) {
+	t.Run("CmdVsPowershellEnvironmentSyntax", func(t *testing.T) {
 		// Test that we can distinguish between CMD and PowerShell environment variable syntax
 		cmdSyntax := "%USERNAME%"
 		psSyntax := "$env:USERNAME"

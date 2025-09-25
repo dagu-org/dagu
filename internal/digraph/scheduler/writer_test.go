@@ -19,31 +19,31 @@ func TestFlushableMultiWriter_Write(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "write to single writer",
+			name:    "WriteToSingleWriter",
 			writers: []io.Writer{&bytes.Buffer{}},
 			input:   []byte("hello world"),
 			wantErr: false,
 		},
 		{
-			name:    "write to multiple writers",
+			name:    "WriteToMultipleWriters",
 			writers: []io.Writer{&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{}},
 			input:   []byte("test data"),
 			wantErr: false,
 		},
 		{
-			name:    "empty write",
+			name:    "EmptyWrite",
 			writers: []io.Writer{&bytes.Buffer{}},
 			input:   []byte{},
 			wantErr: false,
 		},
 		{
-			name:    "write with error",
+			name:    "WriteWithError",
 			writers: []io.Writer{&errorWriter{err: errors.New("write failed")}},
 			input:   []byte("data"),
 			wantErr: true,
 		},
 		{
-			name:    "write with short write",
+			name:    "WriteWithShortWrite",
 			writers: []io.Writer{&shortWriter{}},
 			input:   []byte("data"),
 			wantErr: true,
@@ -79,7 +79,7 @@ func TestFlushableMultiWriter_Flush(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "flush buffered writer",
+			name: "FlushBufferedWriter",
 			setup: func() (*flushableMultiWriter, func()) {
 				var buf bytes.Buffer
 				bw := bufio.NewWriter(&buf)
@@ -97,7 +97,7 @@ func TestFlushableMultiWriter_Flush(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "flush multiple writers",
+			name: "FlushMultipleWriters",
 			setup: func() (*flushableMultiWriter, func()) {
 				var buf1, buf2, buf3 bytes.Buffer
 				bw1 := bufio.NewWriter(&buf1)
@@ -119,7 +119,7 @@ func TestFlushableMultiWriter_Flush(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "flush with flushable interface",
+			name: "FlushWithFlushableInterface",
 			setup: func() (*flushableMultiWriter, func()) {
 				f := &flushableWriter{flushed: false}
 				fw := newFlushableMultiWriter(f)
@@ -130,7 +130,7 @@ func TestFlushableMultiWriter_Flush(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "flush with syncable interface",
+			name: "FlushWithSyncableInterface",
 			setup: func() (*flushableMultiWriter, func()) {
 				s := &syncableWriter{synced: false}
 				fw := newFlushableMultiWriter(s)
@@ -141,7 +141,7 @@ func TestFlushableMultiWriter_Flush(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "flush with error",
+			name: "FlushWithError",
 			setup: func() (*flushableMultiWriter, func()) {
 				f := &flushableWriter{err: errors.New("flush failed")}
 				fw := newFlushableMultiWriter(f)
@@ -150,7 +150,7 @@ func TestFlushableMultiWriter_Flush(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "flush with no flushable writers",
+			name: "FlushWithNoFlushableWriters",
 			setup: func() (*flushableMultiWriter, func()) {
 				fw := newFlushableMultiWriter(&bytes.Buffer{})
 				return fw, func() {}
@@ -158,7 +158,7 @@ func TestFlushableMultiWriter_Flush(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "flush with mixed writer types",
+			name: "FlushWithMixedWriterTypes",
 			setup: func() (*flushableMultiWriter, func()) {
 				var buf bytes.Buffer
 				bw := bufio.NewWriter(&buf)
@@ -197,7 +197,7 @@ func TestFlushableMultiWriter_Flush(t *testing.T) {
 
 func TestFlushableMultiWriter_Integration(t *testing.T) {
 	// Test the full flow with pipes similar to how it's used in node.go
-	t.Run("pipe with buffered writer", func(t *testing.T) {
+	t.Run("PipeWithBufferedWriter", func(t *testing.T) {
 		pr, pw := io.Pipe()
 		defer func() { _ = pr.Close() }()
 		defer func() { _ = pw.Close() }()

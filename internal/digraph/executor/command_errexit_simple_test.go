@@ -38,7 +38,7 @@ func TestCommandExecutor_ErrexitSimple(t *testing.T) {
 		return WithEnv(ctx, NewEnv(ctx, step))
 	}
 
-	t.Run("DefaultShell_WithErrexitFlag", func(t *testing.T) {
+	t.Run("DefaultShellWithErrexitFlag", func(t *testing.T) {
 		// Simulate how the scheduler would set up a step
 		step := digraph.Step{
 			Name:         "test",
@@ -65,7 +65,7 @@ func TestCommandExecutor_ErrexitSimple(t *testing.T) {
 			"Second command should not run after failure with errexit")
 	})
 
-	t.Run("UserSpecifiedShell_NoErrexitFlag", func(t *testing.T) {
+	t.Run("UserSpecifiedShellNoErrexitFlag", func(t *testing.T) {
 		step := digraph.Step{
 			Name:         "test",
 			Shell:        "bash",
@@ -92,7 +92,7 @@ func TestCommandExecutor_ErrexitSimple(t *testing.T) {
 			"Second command should run when user specifies shell without errexit")
 	})
 
-	t.Run("UserSpecifiedShell_WithExplicitErrexitFlag", func(t *testing.T) {
+	t.Run("UserSpecifiedShellWithExplicitErrexitFlag", func(t *testing.T) {
 		step := digraph.Step{
 			Name:         "test",
 			Shell:        "bash -e",

@@ -202,7 +202,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 		expectMarkSuccess  bool
 	}{
 		{
-			name:       "success status",
+			name:       "SuccessStatus",
 			nodeStatus: status.NodeSuccess,
 			continueOnSettings: digraph.ContinueOn{
 				MarkSuccess: true,
@@ -210,7 +210,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 			expectMarkSuccess: true, // shouldContinue returns true for success status, so shouldMarkSuccess follows MarkSuccess setting
 		},
 		{
-			name:       "error with continue on failure and mark success",
+			name:       "ErrorWithContinueOnFailureAndMarkSuccess",
 			nodeStatus: status.NodeError,
 			continueOnSettings: digraph.ContinueOn{
 				Failure:     true,
@@ -219,7 +219,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 			expectMarkSuccess: true,
 		},
 		{
-			name:       "error with continue on failure but no mark success",
+			name:       "ErrorWithContinueOnFailureButNoMarkSuccess",
 			nodeStatus: status.NodeError,
 			continueOnSettings: digraph.ContinueOn{
 				Failure:     true,
@@ -228,7 +228,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 			expectMarkSuccess: false,
 		},
 		{
-			name:       "skipped with continue on skipped and mark success",
+			name:       "SkippedWithContinueOnSkippedAndMarkSuccess",
 			nodeStatus: status.NodeSkipped,
 			continueOnSettings: digraph.ContinueOn{
 				Skipped:     true,
@@ -280,47 +280,47 @@ Line 5: Process completed
 		setup    func()
 	}{
 		{
-			name:     "exact match",
+			name:     "ExactMatch",
 			patterns: []string{"Error occurred"},
 			expected: true,
 		},
 		{
-			name:     "partial match",
+			name:     "PartialMatch",
 			patterns: []string{"Success"},
 			expected: true,
 		},
 		{
-			name:     "regex match",
+			name:     "RegexMatch",
 			patterns: []string{"re:Error.*"},
 			expected: true,
 		},
 		{
-			name:     "regex with brackets",
+			name:     "RegexWithBrackets",
 			patterns: []string{`re:\[WARNING\].*`},
 			expected: true,
 		},
 		{
-			name:     "multiple patterns - any match",
+			name:     "MultiplePatternsAnyMatch",
 			patterns: []string{"NotFound", "Success"},
 			expected: true,
 		},
 		{
-			name:     "no match",
+			name:     "NoMatch",
 			patterns: []string{"NotInLog"},
 			expected: false,
 		},
 		{
-			name:     "empty patterns",
+			name:     "EmptyPatterns",
 			patterns: []string{},
 			expected: false,
 		},
 		{
-			name:     "invalid regex",
+			name:     "InvalidRegex",
 			patterns: []string{"re:["},
 			expected: false,
 		},
 		{
-			name:     "non-existent log file",
+			name:     "NonExistentLogFile",
 			patterns: []string{"anything"},
 			expected: false,
 			setup: func() {
@@ -372,7 +372,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name:     "non-parallel execution",
+			name:     "NonParallelExecution",
 			parallel: nil,
 			childDAG: &digraph.ChildDAG{
 				Name:   "child-dag",
@@ -381,7 +381,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 			expectCount: 1,
 		},
 		{
-			name: "parallel with variable - JSON array",
+			name: "ParallelWithVariableJSONArray",
 			parallel: &digraph.ParallelConfig{
 				Variable: "${LIST_VAR}",
 			},
@@ -396,7 +396,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 			expectCount: 3,
 		},
 		{
-			name: "parallel with variable - space separated",
+			name: "ParallelWithVariableSpaceSeparated",
 			parallel: &digraph.ParallelConfig{
 				Variable: "${SPACE_VAR}",
 			},
@@ -411,7 +411,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 			expectCount: 3,
 		},
 		{
-			name: "parallel with static items",
+			name: "ParallelWithStaticItems",
 			parallel: &digraph.ParallelConfig{
 				Items: []digraph.ParallelItem{
 					{Value: "item1"},
@@ -424,7 +424,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 			expectCount: 2,
 		},
 		{
-			name: "parallel with params items",
+			name: "ParallelWithParamsItems",
 			parallel: &digraph.ParallelConfig{
 				Items: []digraph.ParallelItem{
 					{Params: map[string]string{"key1": "value1"}},
@@ -437,7 +437,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 			expectCount: 2,
 		},
 		{
-			name: "parallel with no items",
+			name: "ParallelWithNoItems",
 			parallel: &digraph.ParallelConfig{
 				Variable: "${NONEXISTENT}",
 			},
@@ -448,7 +448,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 			errorContains: "requires at least one item",
 		},
 		{
-			name: "parallel with too many items",
+			name: "ParallelWithTooManyItems",
 			parallel: &digraph.ParallelConfig{
 				Items: func() []digraph.ParallelItem {
 					items := make([]digraph.ParallelItem, 1001)
@@ -465,7 +465,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 			errorContains: "exceeds maximum limit",
 		},
 		{
-			name: "parallel with ITEM variable in params",
+			name: "ParallelWithITEMVariableInParams",
 			parallel: &digraph.ParallelConfig{
 				Variable: "${SPACE_VAR}",
 			},
@@ -521,62 +521,62 @@ func TestNodeItemToParam(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "string",
+			name:     "String",
 			item:     "test-string",
 			expected: "test-string",
 		},
 		{
-			name:     "int",
+			name:     "Int",
 			item:     42,
 			expected: "42",
 		},
 		{
-			name:     "int64",
+			name:     "Int64",
 			item:     int64(9223372036854775807),
 			expected: "9223372036854775807",
 		},
 		{
-			name:     "float32",
+			name:     "Float32",
 			item:     float32(3.14),
 			expected: "3.14",
 		},
 		{
-			name:     "float64",
+			name:     "Float64",
 			item:     3.14159,
 			expected: "3.14159",
 		},
 		{
-			name:     "bool true",
+			name:     "BoolTrue",
 			item:     true,
 			expected: "true",
 		},
 		{
-			name:     "bool false",
+			name:     "BoolFalse",
 			item:     false,
 			expected: "false",
 		},
 		{
-			name:     "nil",
+			name:     "Nil",
 			item:     nil,
 			expected: "null",
 		},
 		{
-			name:     "json.RawMessage",
+			name:     "JsonRawMessage",
 			item:     json.RawMessage(`{"key":"value"}`),
 			expected: `{"key":"value"}`,
 		},
 		{
-			name:     "map",
+			name:     "Map",
 			item:     map[string]string{"key": "value"},
 			expected: `{"key":"value"}`,
 		},
 		{
-			name:     "slice",
+			name:     "Slice",
 			item:     []string{"a", "b", "c"},
 			expected: `["a","b","c"]`,
 		},
 		{
-			name:     "struct",
+			name:     "Struct",
 			item:     struct{ Name string }{Name: "test"},
 			expected: `{"Name":"test"}`,
 		},
@@ -609,7 +609,7 @@ func TestRetryPolicyShouldRetry(t *testing.T) {
 		shouldRetry bool
 	}{
 		{
-			name: "retry on any non-zero when no exit codes specified",
+			name: "RetryOnAnyNonZeroWhenNoExitCodesSpecified",
 			policy: scheduler.RetryPolicy{
 				Limit:    3,
 				Interval: time.Second,
@@ -618,7 +618,7 @@ func TestRetryPolicyShouldRetry(t *testing.T) {
 			shouldRetry: true,
 		},
 		{
-			name: "no retry on zero when no exit codes specified",
+			name: "NoRetryOnZeroWhenNoExitCodesSpecified",
 			policy: scheduler.RetryPolicy{
 				Limit:    3,
 				Interval: time.Second,
@@ -627,7 +627,7 @@ func TestRetryPolicyShouldRetry(t *testing.T) {
 			shouldRetry: false,
 		},
 		{
-			name: "retry only on specific exit codes",
+			name: "RetryOnlyOnSpecificExitCodes",
 			policy: scheduler.RetryPolicy{
 				Limit:     3,
 				Interval:  time.Second,
@@ -637,7 +637,7 @@ func TestRetryPolicyShouldRetry(t *testing.T) {
 			shouldRetry: true,
 		},
 		{
-			name: "no retry on non-specified exit code",
+			name: "NoRetryOnNonSpecifiedExitCode",
 			policy: scheduler.RetryPolicy{
 				Limit:     3,
 				Interval:  time.Second,
@@ -647,7 +647,7 @@ func TestRetryPolicyShouldRetry(t *testing.T) {
 			shouldRetry: false,
 		},
 		{
-			name: "no retry on zero even when in exit codes",
+			name: "NoRetryOnZeroEvenWhenInExitCodes",
 			policy: scheduler.RetryPolicy{
 				Limit:     3,
 				Interval:  time.Second,
@@ -780,21 +780,21 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 		expectSuccess bool
 	}{
 		{
-			name:          "small output within limit",
+			name:          "SmallOutputWithinLimit",
 			command:       "echo",
 			args:          []string{"Hello, World!"},
 			maxOutputSize: 1000,
 			expectSuccess: true,
 		},
 		{
-			name:          "very large output size limit",
+			name:          "VeryLargeOutputSizeLimit",
 			command:       "echo",
 			args:          []string{"test"},
 			maxOutputSize: 1024 * 1024, // 1MB
 			expectSuccess: true,
 		},
 		{
-			name:          "zero output size means unlimited",
+			name:          "ZeroOutputSizeMeansUnlimited",
 			command:       "echo",
 			args:          []string{"unlimited test"},
 			maxOutputSize: 0,
@@ -855,7 +855,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 	}
 
 	// Additional test to verify configuration is respected
-	t.Run("DAG MaxOutputSize configuration", func(t *testing.T) {
+	t.Run("DAGMaxOutputSizeConfiguration", func(t *testing.T) {
 		// Test that different MaxOutputSize values are properly configured
 		sizes := []int{0, 100, 1024, 1024 * 1024}
 
@@ -903,7 +903,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		expectContinue     bool
 	}{
 		{
-			name:       "continue on failure",
+			name:       "ContinueOnFailure",
 			nodeStatus: status.NodeError,
 			exitCode:   1,
 			continueOnSettings: digraph.ContinueOn{
@@ -912,7 +912,7 @@ func TestNodeShouldContinue(t *testing.T) {
 			expectContinue: true,
 		},
 		{
-			name:       "continue on specific exit code",
+			name:       "ContinueOnSpecificExitCode",
 			nodeStatus: status.NodeError,
 			exitCode:   42,
 			continueOnSettings: digraph.ContinueOn{
@@ -921,7 +921,7 @@ func TestNodeShouldContinue(t *testing.T) {
 			expectContinue: true,
 		},
 		{
-			name:       "don't continue on non-matching exit code",
+			name:       "DonTContinueOnNonMatchingExitCode",
 			nodeStatus: status.NodeError,
 			exitCode:   44,
 			continueOnSettings: digraph.ContinueOn{
@@ -930,7 +930,7 @@ func TestNodeShouldContinue(t *testing.T) {
 			expectContinue: false,
 		},
 		{
-			name:       "continue on skipped",
+			name:       "ContinueOnSkipped",
 			nodeStatus: status.NodeSkipped,
 			continueOnSettings: digraph.ContinueOn{
 				Skipped: true,
@@ -938,13 +938,13 @@ func TestNodeShouldContinue(t *testing.T) {
 			expectContinue: true,
 		},
 		{
-			name:               "success always continues",
+			name:               "SuccessAlwaysContinues",
 			nodeStatus:         status.NodeSuccess,
 			continueOnSettings: digraph.ContinueOn{},
 			expectContinue:     true,
 		},
 		{
-			name:       "cancel never continues",
+			name:       "CancelNeverContinues",
 			nodeStatus: status.NodeCancel,
 			continueOnSettings: digraph.ContinueOn{
 				Failure: true,
@@ -953,7 +953,7 @@ func TestNodeShouldContinue(t *testing.T) {
 			expectContinue: false,
 		},
 		{
-			name:       "continue on output match",
+			name:       "ContinueOnOutputMatch",
 			nodeStatus: status.NodeError,
 			continueOnSettings: digraph.ContinueOn{
 				Output: []string{"WARNING"},
@@ -972,7 +972,7 @@ func TestNodeShouldContinue(t *testing.T) {
 			expectContinue: true,
 		},
 		{
-			name:       "continue on regex output match",
+			name:       "ContinueOnRegexOutputMatch",
 			nodeStatus: status.NodeError,
 			continueOnSettings: digraph.ContinueOn{
 				Output: []string{"re:.*timeout.*"},
@@ -992,7 +992,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 
 		{
-			name:       "don't continue on skipped when continueOn.skipped is false, even with exit code 0 in exitCode",
+			name:       "DonTContinueOnSkippedWhenContinueOnSkippedIsFalseEvenWithExitCode0InExitCode",
 			nodeStatus: status.NodeSkipped,
 			exitCode:   0,
 			continueOnSettings: digraph.ContinueOn{

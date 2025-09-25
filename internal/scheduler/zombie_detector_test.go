@@ -36,7 +36,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 
 	ctx := context.Background()
 
-	t.Run("no running DAGs", func(t *testing.T) {
+	t.Run("NoRunningDAGs", func(t *testing.T) {
 		t.Parallel()
 
 		dagRunStore := &mockDAGRunStore{}
@@ -52,7 +52,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		procStore.AssertExpectations(t)
 	})
 
-	t.Run("running DAG is alive", func(t *testing.T) {
+	t.Run("RunningDAGIsAlive", func(t *testing.T) {
 		t.Parallel()
 
 		dagRunStore := &mockDAGRunStore{}
@@ -95,7 +95,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		attempt.AssertExpectations(t)
 	})
 
-	t.Run("running DAG is zombie", func(t *testing.T) {
+	t.Run("RunningDAGIsZombie", func(t *testing.T) {
 		t.Parallel()
 
 		dagRunStore := &mockDAGRunStore{}
@@ -140,7 +140,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		attempt.AssertExpectations(t)
 	})
 
-	t.Run("error listing statuses", func(t *testing.T) {
+	t.Run("ErrorListingStatuses", func(t *testing.T) {
 		t.Parallel()
 
 		dagRunStore := &mockDAGRunStore{}
@@ -194,7 +194,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 
 	ctx := context.Background()
 
-	t.Run("error finding attempt", func(t *testing.T) {
+	t.Run("ErrorFindingAttempt", func(t *testing.T) {
 		t.Parallel()
 
 		dagRunStore := &mockDAGRunStore{}
@@ -217,7 +217,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		dagRunStore.AssertExpectations(t)
 	})
 
-	t.Run("error reading DAG", func(t *testing.T) {
+	t.Run("ErrorReadingDAG", func(t *testing.T) {
 		t.Parallel()
 
 		dagRunStore := &mockDAGRunStore{}
@@ -243,7 +243,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		attempt.AssertExpectations(t)
 	})
 
-	t.Run("error checking if alive", func(t *testing.T) {
+	t.Run("ErrorCheckingIfAlive", func(t *testing.T) {
 		t.Parallel()
 
 		dagRunStore := &mockDAGRunStore{}
@@ -278,7 +278,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		attempt.AssertExpectations(t)
 	})
 
-	t.Run("error updating status", func(t *testing.T) {
+	t.Run("ErrorUpdatingStatus", func(t *testing.T) {
 		t.Parallel()
 
 		dagRunStore := &mockDAGRunStore{}

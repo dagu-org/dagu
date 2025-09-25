@@ -19,47 +19,47 @@ func TestExtractRegistry(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "Docker Hub short name",
+			name:     "DockerHubShortName",
 			image:    "alpine:latest",
 			expected: "docker.io",
 		},
 		{
-			name:     "Docker Hub with user",
+			name:     "DockerHubWithUser",
 			image:    "myuser/myimage:v1.0",
 			expected: "docker.io",
 		},
 		{
-			name:     "Explicit Docker Hub",
+			name:     "ExplicitDockerHub",
 			image:    "docker.io/library/alpine:latest",
 			expected: "docker.io",
 		},
 		{
-			name:     "GitHub Container Registry",
+			name:     "GitHubContainerRegistry",
 			image:    "ghcr.io/owner/repo:latest",
 			expected: "ghcr.io",
 		},
 		{
-			name:     "Google Container Registry",
+			name:     "GoogleContainerRegistry",
 			image:    "gcr.io/project/image:v1",
 			expected: "gcr.io",
 		},
 		{
-			name:     "AWS ECR",
+			name:     "AWSECR",
 			image:    "123456789012.dkr.ecr.us-east-1.amazonaws.com/myimage:latest",
 			expected: "123456789012.dkr.ecr.us-east-1.amazonaws.com",
 		},
 		{
-			name:     "Private registry with port",
+			name:     "PrivateRegistryWithPort",
 			image:    "myregistry.com:5000/myimage:latest",
 			expected: "myregistry.com:5000",
 		},
 		{
-			name:     "Localhost registry",
+			name:     "LocalhostRegistry",
 			image:    "localhost:5000/myimage",
 			expected: "localhost:5000",
 		},
 		{
-			name:     "Image with digest",
+			name:     "ImageWithDigest",
 			image:    "myregistry.com/myimage@sha256:abc123",
 			expected: "myregistry.com",
 		},
@@ -82,7 +82,7 @@ func TestConvertToDockerAuth(t *testing.T) {
 		expectError   bool
 	}{
 		{
-			name: "Username and password",
+			name: "UsernameAndPassword",
 			auth: &digraph.AuthConfig{
 				Username: "user",
 				Password: "pass",
@@ -95,7 +95,7 @@ func TestConvertToDockerAuth(t *testing.T) {
 			},
 		},
 		{
-			name: "Pre-encoded auth",
+			name: "PreEncodedAuth",
 			auth: &digraph.AuthConfig{
 				Auth: base64.StdEncoding.EncodeToString([]byte("user:pass")),
 			},
@@ -106,7 +106,7 @@ func TestConvertToDockerAuth(t *testing.T) {
 			},
 		},
 		{
-			name: "JSON string auth",
+			name: "JSONStringAuth",
 			auth: &digraph.AuthConfig{
 				Auth: `{"username":"user","password":"pass"}`,
 			},
@@ -118,7 +118,7 @@ func TestConvertToDockerAuth(t *testing.T) {
 			},
 		},
 		{
-			name:          "Nil auth",
+			name:          "NilAuth",
 			auth:          nil,
 			serverAddress: "docker.io",
 			expected:      nil,
@@ -161,7 +161,7 @@ func TestGetAuthFromDockerConfig(t *testing.T) {
 		checkAuth func(*testing.T, *registry.AuthConfig)
 	}{
 		{
-			name:      "Docker Hub image",
+			name:      "DockerHubImage",
 			imageName: "alpine:latest",
 			hasAuth:   true,
 			checkAuth: func(t *testing.T, auth *registry.AuthConfig) {
@@ -170,7 +170,7 @@ func TestGetAuthFromDockerConfig(t *testing.T) {
 			},
 		},
 		{
-			name:      "GitHub Container Registry",
+			name:      "GitHubContainerRegistry",
 			imageName: "ghcr.io/owner/repo:latest",
 			hasAuth:   true,
 			checkAuth: func(t *testing.T, auth *registry.AuthConfig) {
@@ -180,7 +180,7 @@ func TestGetAuthFromDockerConfig(t *testing.T) {
 			},
 		},
 		{
-			name:      "Private registry with port",
+			name:      "PrivateRegistryWithPort",
 			imageName: "myregistry.com:5000/myimage:latest",
 			hasAuth:   true,
 			checkAuth: func(t *testing.T, auth *registry.AuthConfig) {
@@ -189,7 +189,7 @@ func TestGetAuthFromDockerConfig(t *testing.T) {
 			},
 		},
 		{
-			name:      "Unknown registry",
+			name:      "UnknownRegistry",
 			imageName: "unknown.registry.com/image:latest",
 			hasAuth:   false,
 		},
@@ -212,7 +212,7 @@ func TestGetAuthFromDockerConfig(t *testing.T) {
 
 func TestRegistryAuthManager_GetAuthHeader(t *testing.T) {
 	// Test with DAG-level auth
-	t.Run("DAG-level auth", func(t *testing.T) {
+	t.Run("DAGLevelAuth", func(t *testing.T) {
 		manager := NewRegistryAuthManager(map[string]*digraph.AuthConfig{
 			"docker.io": {
 				Username: "user",
@@ -233,7 +233,7 @@ func TestRegistryAuthManager_GetAuthHeader(t *testing.T) {
 	})
 
 	// Test with DOCKER_AUTH_CONFIG env var
-	t.Run("DOCKER_AUTH_CONFIG fallback", func(t *testing.T) {
+	t.Run("DOCKERAUTHCONFIGFallback", func(t *testing.T) {
 		oldEnv := os.Getenv("DOCKER_AUTH_CONFIG")
 		defer func() {
 			_ = os.Setenv("DOCKER_AUTH_CONFIG", oldEnv)
@@ -257,7 +257,7 @@ func TestRegistryAuthManager_GetAuthHeader(t *testing.T) {
 	})
 
 	// Test with _json special entry
-	t.Run("JSON config in DAG", func(t *testing.T) {
+	t.Run("JSONConfigInDAG", func(t *testing.T) {
 		dockerConfig := `{"auths":{"ghcr.io":{"auth":"dGVzdDp0ZXN0"}}}`
 
 		manager := NewRegistryAuthManager(map[string]*digraph.AuthConfig{
@@ -278,7 +278,7 @@ func TestRegistryAuthManager_GetAuthHeader(t *testing.T) {
 	})
 
 	// Test with no auth configured
-	t.Run("No auth", func(t *testing.T) {
+	t.Run("NoAuth", func(t *testing.T) {
 		oldEnv := os.Getenv("DOCKER_AUTH_CONFIG")
 		defer func() {
 			_ = os.Setenv("DOCKER_AUTH_CONFIG", oldEnv)

@@ -20,7 +20,7 @@ func TestZombieDetectionConfig(t *testing.T) {
 		expectWarning    bool
 	}{
 		{
-			name: "default value when not specified",
+			name: "DefaultValueWhenNotSpecified",
 			configYAML: `
 host: "0.0.0.0"
 port: 8080
@@ -29,7 +29,7 @@ port: 8080
 			expectWarning:    false,
 		},
 		{
-			name: "custom interval",
+			name: "CustomInterval",
 			configYAML: `
 host: "0.0.0.0"
 port: 8080
@@ -40,7 +40,7 @@ scheduler:
 			expectWarning:    false,
 		},
 		{
-			name: "disabled with zero",
+			name: "DisabledWithZero",
 			configYAML: `
 host: "0.0.0.0"
 port: 8080
@@ -51,7 +51,7 @@ scheduler:
 			expectWarning:    false,
 		},
 		{
-			name: "invalid duration format",
+			name: "InvalidDurationFormat",
 			configYAML: `
 host: "0.0.0.0"
 port: 8080

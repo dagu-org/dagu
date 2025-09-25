@@ -14,7 +14,7 @@ import (
 )
 
 func TestTraceContextCarrier(t *testing.T) {
-	t.Run("Get and Set", func(t *testing.T) {
+	t.Run("GetAndSet", func(t *testing.T) {
 		carrier := NewTraceContextCarrier()
 
 		// Test Set and Get
@@ -108,7 +108,7 @@ func TestInjectTraceContext(t *testing.T) {
 func TestExtractTraceContext(t *testing.T) {
 	InitializePropagators()
 
-	t.Run("With trace context in environment", func(t *testing.T) {
+	t.Run("WithTraceContextInEnvironment", func(t *testing.T) {
 		// Set environment variables
 		require.NoError(t, os.Setenv("TRACEPARENT", "00-1234567890abcdef1234567890abcdef-1234567890abcdef-01"))
 		require.NoError(t, os.Setenv("TRACESTATE", "vendor=value"))
@@ -129,7 +129,7 @@ func TestExtractTraceContext(t *testing.T) {
 		assert.Equal(t, "vendor=value", spanCtx.TraceState().String())
 	})
 
-	t.Run("Without trace context in environment", func(t *testing.T) {
+	t.Run("WithoutTraceContextInEnvironment", func(t *testing.T) {
 		// Ensure no trace context in environment
 		_ = os.Unsetenv("TRACEPARENT")
 		_ = os.Unsetenv("TRACESTATE")

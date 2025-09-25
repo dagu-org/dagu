@@ -17,7 +17,7 @@ import (
 )
 
 func TestDAGItem(t *testing.T) {
-	t.Run("DAGItem implements list.Item interface", func(t *testing.T) {
+	t.Run("DAGItemImplementsListItemInterface", func(t *testing.T) {
 		item := DAGItem{
 			Name:   "test-dag",
 			Path:   "/path/to/test.yaml",
@@ -31,7 +31,7 @@ func TestDAGItem(t *testing.T) {
 		assert.Equal(t, "test-dag", item.FilterValue())
 	})
 
-	t.Run("DAGItem with empty description but params", func(t *testing.T) {
+	t.Run("DAGItemWithEmptyDescriptionButParams", func(t *testing.T) {
 		item := DAGItem{
 			Name:   "test-dag",
 			Path:   "/path/to/test.yaml",
@@ -43,7 +43,7 @@ func TestDAGItem(t *testing.T) {
 		assert.Equal(t, "params: KEY=value", item.Description())
 	})
 
-	t.Run("DAGItem with description but no params", func(t *testing.T) {
+	t.Run("DAGItemWithDescriptionButNoParams", func(t *testing.T) {
 		item := DAGItem{
 			Name:   "test-dag",
 			Path:   "/path/to/test.yaml",
@@ -57,7 +57,7 @@ func TestDAGItem(t *testing.T) {
 }
 
 func TestPromptForParams(t *testing.T) {
-	t.Run("Returns empty string when DAG has no parameters", func(t *testing.T) {
+	t.Run("ReturnsEmptyStringWhenDAGHasNoParameters", func(t *testing.T) {
 		dag := &digraph.DAG{
 			DefaultParams: "",
 			Params:        []string{},
@@ -68,7 +68,7 @@ func TestPromptForParams(t *testing.T) {
 		assert.Empty(t, params)
 	})
 
-	t.Run("DAG with default parameters", func(_ *testing.T) {
+	t.Run("DAGWithDefaultParameters", func(_ *testing.T) {
 		dag := &digraph.DAG{
 			DefaultParams: "KEY1=value1 KEY2=value2",
 			Params:        []string{},
@@ -81,7 +81,7 @@ func TestPromptForParams(t *testing.T) {
 }
 
 func TestModel(t *testing.T) {
-	t.Run("Model initialization", func(t *testing.T) {
+	t.Run("ModelInitialization", func(t *testing.T) {
 		ti := textinput.New()
 		m := Model{
 			paramInput: ti,
@@ -90,7 +90,7 @@ func TestModel(t *testing.T) {
 		assert.NotNil(t, cmd) // Now returns textinput.Blink
 	})
 
-	t.Run("Model view when done", func(t *testing.T) {
+	t.Run("ModelViewWhenDone", func(t *testing.T) {
 		m := Model{
 			state: StateDone,
 		}
@@ -99,7 +99,7 @@ func TestModel(t *testing.T) {
 		assert.Equal(t, "", view)
 	})
 
-	t.Run("Model view in selecting state", func(t *testing.T) {
+	t.Run("ModelViewInSelectingState", func(t *testing.T) {
 		items := []list.Item{
 			DAGItem{Name: "test", Desc: "Test DAG"},
 		}
@@ -115,7 +115,7 @@ func TestModel(t *testing.T) {
 		assert.Contains(t, view, "Test DAG") // Should show the description
 	})
 
-	t.Run("Model handles escape key in DAG selection", func(t *testing.T) {
+	t.Run("ModelHandlesEscapeKeyInDAGSelection", func(t *testing.T) {
 		items := []list.Item{
 			DAGItem{Name: "test", Desc: "Test DAG"},
 		}
@@ -135,7 +135,7 @@ func TestModel(t *testing.T) {
 		assert.NotNil(t, cmd)
 	})
 
-	t.Run("Model handles ctrl+c", func(t *testing.T) {
+	t.Run("ModelHandlesCtrlC", func(t *testing.T) {
 		m := Model{
 			state: StateSelectingDAG,
 		}
@@ -149,7 +149,7 @@ func TestModel(t *testing.T) {
 		assert.NotNil(t, cmd)
 	})
 
-	t.Run("Model handles window size", func(t *testing.T) {
+	t.Run("ModelHandlesWindowSize", func(t *testing.T) {
 		// Create a model with an initialized list
 		items := []list.Item{
 			DAGItem{Name: "test", Desc: "Test DAG"},
@@ -246,7 +246,7 @@ func (m *mockDAGStore) IsSuspended(ctx context.Context, fileName string) bool {
 }
 
 func TestPickDAG(t *testing.T) {
-	t.Run("Returns error when DAG store fails", func(t *testing.T) {
+	t.Run("ReturnsErrorWhenDAGStoreFails", func(t *testing.T) {
 		mockStore := new(mockDAGStore)
 		ctx := context.Background()
 
@@ -262,7 +262,7 @@ func TestPickDAG(t *testing.T) {
 		mockStore.AssertExpectations(t)
 	})
 
-	t.Run("Returns error when no DAGs found", func(t *testing.T) {
+	t.Run("ReturnsErrorWhenNoDAGsFound", func(t *testing.T) {
 		mockStore := new(mockDAGStore)
 		ctx := context.Background()
 
@@ -280,7 +280,7 @@ func TestPickDAG(t *testing.T) {
 		mockStore.AssertExpectations(t)
 	})
 
-	t.Run("Creates proper DAGItems from DAGs", func(t *testing.T) {
+	t.Run("CreatesProperDAGItemsFromDAGs", func(t *testing.T) {
 		// This tests the internal logic of converting DAGs to list items
 		dags := []*digraph.DAG{
 			{
@@ -326,7 +326,7 @@ func TestPickDAG(t *testing.T) {
 }
 
 func TestPromptForParamsReturnsInput(t *testing.T) {
-	t.Run("Returns user input as-is", func(t *testing.T) {
+	t.Run("ReturnsUserInputAsIs", func(t *testing.T) {
 		// This test verifies that PromptForParams returns the input without modification
 		// In a real test, we would mock stdin, but for now we just verify the concept
 

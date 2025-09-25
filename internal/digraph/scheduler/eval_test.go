@@ -26,27 +26,27 @@ func TestEvalString(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "simple variable",
+			name:     "SimpleVariable",
 			input:    "${TEST_VAR}",
 			expected: "hello",
 		},
 		{
-			name:     "another variable",
+			name:     "AnotherVariable",
 			input:    "${ANOTHER_VAR}",
 			expected: "world",
 		},
 		{
-			name:     "combined variables",
+			name:     "CombinedVariables",
 			input:    "${TEST_VAR} ${ANOTHER_VAR}",
 			expected: "hello world",
 		},
 		{
-			name:     "no variables",
+			name:     "NoVariables",
 			input:    "no variables here",
 			expected: "no variables here",
 		},
 		{
-			name:     "non-existent variable",
+			name:     "NonExistentVariable",
 			input:    "${NON_EXISTENT}",
 			expected: "",
 		},
@@ -79,49 +79,49 @@ func TestEvalBool(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "true boolean",
+			name:     "TrueBoolean",
 			input:    true,
 			expected: true,
 			wantErr:  false,
 		},
 		{
-			name:     "false boolean",
+			name:     "FalseBoolean",
 			input:    false,
 			expected: false,
 			wantErr:  false,
 		},
 		{
-			name:     "true string",
+			name:     "TrueString",
 			input:    "${TRUE_VAR}",
 			expected: true,
 			wantErr:  false,
 		},
 		{
-			name:     "false string",
+			name:     "FalseString",
 			input:    "${FALSE_VAR}",
 			expected: false,
 			wantErr:  false,
 		},
 		{
-			name:     "1 string",
+			name:     "1String",
 			input:    "${ONE_VAR}",
 			expected: true,
 			wantErr:  false,
 		},
 		{
-			name:     "0 string",
+			name:     "0String",
 			input:    "${ZERO_VAR}",
 			expected: false,
 			wantErr:  false,
 		},
 		{
-			name:     "invalid string",
+			name:     "InvalidString",
 			input:    "${INVALID_VAR}",
 			expected: false,
 			wantErr:  true,
 		},
 		{
-			name:     "unsupported type",
+			name:     "UnsupportedType",
 			input:    123,
 			expected: false,
 			wantErr:  true,
@@ -263,19 +263,19 @@ func TestGenerateChildDAGRunID(t *testing.T) {
 		expectLen int // Expected length of the hash
 	}{
 		{
-			name:      "non-repeated run",
+			name:      "NonRepeatedRun",
 			params:    "param1=value1",
 			repeated:  false,
 			expectLen: 11, // Base58 encoded SHA256 should be consistent length
 		},
 		{
-			name:      "repeated run",
+			name:      "RepeatedRun",
 			params:    "param1=value1",
 			repeated:  true,
 			expectLen: 11, // Base58 encoded SHA256 should be consistent length
 		},
 		{
-			name:      "empty params",
+			name:      "EmptyParams",
 			params:    "",
 			repeated:  false,
 			expectLen: 11,
@@ -319,7 +319,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 		expected any
 	}{
 		{
-			name: "deeply nested maps",
+			name: "DeeplyNestedMaps",
 			input: map[string]any{
 				"level1": map[string]any{
 					"level2": map[string]any{
@@ -336,7 +336,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 			},
 		},
 		{
-			name: "array of maps",
+			name: "ArrayOfMaps",
 			input: map[string]any{
 				"items": []any{
 					map[string]any{"name": "${VAR1}"},
@@ -351,7 +351,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 			},
 		},
 		{
-			name: "slice of strings with variables",
+			name: "SliceOfStringsWithVariables",
 			input: map[string]any{
 				"commands": []string{
 					"echo ${VAR1}",
@@ -368,7 +368,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 			},
 		},
 		{
-			name: "nested slices",
+			name: "NestedSlices",
 			input: map[string]any{
 				"matrix": [][]string{
 					{"${VAR1}", "${VAR2}"},
@@ -383,7 +383,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 			},
 		},
 		{
-			name: "slice of interfaces",
+			name: "SliceOfInterfaces",
 			input: map[string]any{
 				"mixed": []any{
 					"${VAR1}",
@@ -402,7 +402,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 			},
 		},
 		{
-			name: "empty slice",
+			name: "EmptySlice",
 			input: map[string]any{
 				"empty": []string{},
 			},
@@ -411,7 +411,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 			},
 		},
 		{
-			name: "mixed types in map",
+			name: "MixedTypesInMap",
 			input: map[string]any{
 				"string": "${VAR1}",
 				"number": 123,
@@ -428,7 +428,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 			},
 		},
 		{
-			name: "map with nil values",
+			name: "MapWithNilValues",
 			input: map[string]any{
 				"key1": nil,
 				"key2": "${VAR1}",
@@ -439,7 +439,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 			},
 		},
 		{
-			name: "map with pointer values",
+			name: "MapWithPointerValues",
 			input: map[string]any{
 				"ptr": &TestStruct{
 					Name: "${VAR1}",
@@ -480,37 +480,37 @@ func TestEvalStringEdgeCases(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "empty variable",
+			name:     "EmptyVariable",
 			input:    "${EMPTY}",
 			expected: "",
 			wantErr:  false,
 		},
 		{
-			name:     "variable with spaces",
+			name:     "VariableWithSpaces",
 			input:    "${SPACES}",
 			expected: "  ",
 			wantErr:  false,
 		},
 		{
-			name:     "variable with special characters",
+			name:     "VariableWithSpecialCharacters",
 			input:    "${SPECIAL}",
 			expected: "special!@#",
 			wantErr:  false,
 		},
 		{
-			name:     "nested variable references",
+			name:     "NestedVariableReferences",
 			input:    "${${EMPTY}}",
 			expected: "}",
 			wantErr:  false,
 		},
 		{
-			name:     "malformed variable",
+			name:     "MalformedVariable",
 			input:    "${",
 			expected: "",
 			wantErr:  false,
 		},
 		{
-			name:     "empty string",
+			name:     "EmptyString",
 			input:    "",
 			expected: "",
 			wantErr:  false,
@@ -546,37 +546,37 @@ func TestEvalObjectWithDirectStringEvaluation(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "direct string evaluation",
+			name:     "DirectStringEvaluation",
 			input:    "${STRING_VAR}",
 			expected: "evaluated_string",
 			wantErr:  false,
 		},
 		{
-			name:     "string with multiple variables",
+			name:     "StringWithMultipleVariables",
 			input:    "${PATH_VAR}/config-${STRING_VAR}.json",
 			expected: "/path/to/file/config-evaluated_string.json",
 			wantErr:  false,
 		},
 		{
-			name:     "plain string without variables",
+			name:     "PlainStringWithoutVariables",
 			input:    "no variables here",
 			expected: "no variables here",
 			wantErr:  false,
 		},
 		{
-			name:     "empty string",
+			name:     "EmptyString",
 			input:    "",
 			expected: "",
 			wantErr:  false,
 		},
 		{
-			name:     "string within map",
+			name:     "StringWithinMap",
 			input:    map[string]any{"key": "${STRING_VAR}"},
 			expected: map[string]any{"key": "evaluated_string"},
 			wantErr:  false,
 		},
 		{
-			name: "string within nested structure",
+			name: "StringWithinNestedStructure",
 			input: map[string]any{
 				"config": map[string]any{
 					"path": "${PATH_VAR}",
@@ -635,61 +635,61 @@ func TestEvalBoolEdgeCases(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "nil value",
+			name:     "NilValue",
 			input:    nil,
 			expected: false,
 			wantErr:  true,
 		},
 		{
-			name:     "string yes",
+			name:     "StringYes",
 			input:    "${YES}",
 			expected: false,
 			wantErr:  true,
 		},
 		{
-			name:     "string no",
+			name:     "StringNo",
 			input:    "${NO}",
 			expected: false,
 			wantErr:  true,
 		},
 		{
-			name:     "string on",
+			name:     "StringOn",
 			input:    "${ON}",
 			expected: false,
 			wantErr:  true,
 		},
 		{
-			name:     "string off",
+			name:     "StringOff",
 			input:    "${OFF}",
 			expected: false,
 			wantErr:  true,
 		},
 		{
-			name:     "string t",
+			name:     "StringT",
 			input:    "${T}",
 			expected: true,
 			wantErr:  false,
 		},
 		{
-			name:     "string f",
+			name:     "StringF",
 			input:    "${F}",
 			expected: false,
 			wantErr:  false,
 		},
 		{
-			name:     "struct type",
+			name:     "StructType",
 			input:    TestStruct{},
 			expected: false,
 			wantErr:  true,
 		},
 		{
-			name:     "slice type",
+			name:     "SliceType",
 			input:    []string{"true"},
 			expected: false,
 			wantErr:  true,
 		},
 		{
-			name:     "map type",
+			name:     "MapType",
 			input:    map[string]string{"key": "true"},
 			expected: false,
 			wantErr:  true,

@@ -25,7 +25,7 @@ func TestRootCommand(t *testing.T) {
 		cleanup        func()
 	}{
 		{
-			name:        "help command",
+			name:        "HelpCommand",
 			args:        []string{"dagu", "--help"},
 			expectError: false,
 			expectContains: []string{
@@ -34,7 +34,7 @@ func TestRootCommand(t *testing.T) {
 			},
 		},
 		{
-			name:        "invalid command",
+			name:        "InvalidCommand",
 			args:        []string{"dagu", "invalid-command"},
 			expectError: true,
 			expectContains: []string{
@@ -42,7 +42,7 @@ func TestRootCommand(t *testing.T) {
 			},
 		},
 		{
-			name:        "no arguments",
+			name:        "NoArguments",
 			args:        []string{"dagu"},
 			expectError: false,
 			expectContains: []string{
@@ -118,12 +118,12 @@ func TestMainFunction(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name:        "successful command",
+			name:        "SuccessfulCommand",
 			args:        []string{"version"},
 			expectError: false,
 		},
 		{
-			name:        "failed command",
+			name:        "FailedCommand",
 			args:        []string{"invalid-command-that-does-not-exist"},
 			expectError: true,
 		},

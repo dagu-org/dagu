@@ -12,12 +12,12 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	t.Run("valid directory", func(t *testing.T) {
+	t.Run("ValidDirectory", func(t *testing.T) {
 		lock := New("/tmp/test", nil)
 		require.NotNil(t, lock)
 	})
 
-	t.Run("default options", func(t *testing.T) {
+	t.Run("DefaultOptions", func(t *testing.T) {
 		lock := New("/tmp/test", nil)
 
 		dl := lock.(*dirLock)
@@ -25,7 +25,7 @@ func TestNew(t *testing.T) {
 		require.Equal(t, 50*time.Millisecond, dl.opts.RetryInterval)
 	})
 
-	t.Run("custom options", func(t *testing.T) {
+	t.Run("CustomOptions", func(t *testing.T) {
 		opts := &LockOptions{
 			StaleThreshold: 10 * time.Second,
 			RetryInterval:  100 * time.Millisecond,
@@ -41,7 +41,7 @@ func TestNew(t *testing.T) {
 func TestTryLock(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	t.Run("acquire lock successfully", func(t *testing.T) {
+	t.Run("AcquireLockSuccessfully", func(t *testing.T) {
 		lock := New(tmpDir, nil)
 
 		err := lock.TryLock()
@@ -54,7 +54,7 @@ func TestTryLock(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("lock conflict", func(t *testing.T) {
+	t.Run("LockConflict", func(t *testing.T) {
 		lock1 := New(tmpDir, nil)
 		lock2 := New(tmpDir, nil)
 
@@ -72,7 +72,7 @@ func TestTryLock(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("reacquire after unlock", func(t *testing.T) {
+	t.Run("ReacquireAfterUnlock", func(t *testing.T) {
 		lock := New(tmpDir, nil)
 
 		// Acquire
@@ -96,7 +96,7 @@ func TestTryLock(t *testing.T) {
 func TestLock(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	t.Run("acquire immediately", func(t *testing.T) {
+	t.Run("AcquireImmediately", func(t *testing.T) {
 		lock := New(tmpDir, nil)
 
 		ctx := context.Background()
@@ -109,7 +109,7 @@ func TestLock(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("wait for lock", func(t *testing.T) {
+	t.Run("WaitForLock", func(t *testing.T) {
 		lock1 := New(tmpDir, &LockOptions{
 			RetryInterval: 10 * time.Millisecond,
 		})
@@ -148,7 +148,7 @@ func TestLock(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("context cancellation", func(t *testing.T) {
+	t.Run("ContextCancellation", func(t *testing.T) {
 		lock1 := New(tmpDir, nil)
 		lock2 := New(tmpDir, nil)
 
@@ -174,7 +174,7 @@ func TestLock(t *testing.T) {
 func TestUnlock(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	t.Run("unlock held lock", func(t *testing.T) {
+	t.Run("UnlockHeldLock", func(t *testing.T) {
 		lock := New(tmpDir, nil)
 
 		err := lock.TryLock()
@@ -186,14 +186,14 @@ func TestUnlock(t *testing.T) {
 		require.False(t, lock.IsLocked())
 	})
 
-	t.Run("unlock not held", func(t *testing.T) {
+	t.Run("UnlockNotHeld", func(t *testing.T) {
 		lock := New(tmpDir, nil)
 
 		err := lock.Unlock()
 		require.NoError(t, err)
 	})
 
-	t.Run("double unlock", func(t *testing.T) {
+	t.Run("DoubleUnlock", func(t *testing.T) {
 		lock := New(tmpDir, nil)
 
 		err := lock.TryLock()
@@ -210,12 +210,12 @@ func TestUnlock(t *testing.T) {
 func TestIsLocked(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	t.Run("no lock", func(t *testing.T) {
+	t.Run("NoLock", func(t *testing.T) {
 		lock := New(tmpDir, nil)
 		require.False(t, lock.IsLocked())
 	})
 
-	t.Run("with lock", func(t *testing.T) {
+	t.Run("WithLock", func(t *testing.T) {
 		lock1 := New(tmpDir, nil)
 		lock2 := New(tmpDir, nil)
 
@@ -236,7 +236,7 @@ func TestIsLocked(t *testing.T) {
 func TestStaleDetection(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	t.Run("clean stale lock", func(t *testing.T) {
+	t.Run("CleanStaleLock", func(t *testing.T) {
 		// Create a stale lock manually
 		lockPath := filepath.Join(tmpDir, ".dagu_lock")
 		err := os.Mkdir(lockPath, 0700)
@@ -267,7 +267,7 @@ func TestStaleDetection(t *testing.T) {
 func TestForceUnlock(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	t.Run("force unlock existing lock", func(t *testing.T) {
+	t.Run("ForceUnlockExistingLock", func(t *testing.T) {
 		lock := New(tmpDir, nil)
 
 		err := lock.TryLock()
@@ -279,7 +279,7 @@ func TestForceUnlock(t *testing.T) {
 		require.False(t, lock.IsLocked())
 	})
 
-	t.Run("force unlock empty directory", func(t *testing.T) {
+	t.Run("ForceUnlockEmptyDirectory", func(t *testing.T) {
 		err := ForceUnlock(tmpDir)
 		require.NoError(t, err)
 	})
@@ -288,7 +288,7 @@ func TestForceUnlock(t *testing.T) {
 func TestConcurrency(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	t.Run("multiple goroutines competing", func(t *testing.T) {
+	t.Run("MultipleGoroutinesCompeting", func(t *testing.T) {
 		const numGoroutines = 10
 		const numIterations = 5
 
@@ -330,7 +330,7 @@ func TestConcurrency(t *testing.T) {
 func TestHeartbeat(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	t.Run("heartbeat updates lock timestamp", func(t *testing.T) {
+	t.Run("HeartbeatUpdatesLockTimestamp", func(t *testing.T) {
 		lock := New(tmpDir, nil)
 
 		// Acquire lock
@@ -366,14 +366,14 @@ func TestHeartbeat(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("heartbeat without lock fails", func(t *testing.T) {
+	t.Run("HeartbeatWithoutLockFails", func(t *testing.T) {
 		lock := New(tmpDir, nil)
 
 		err := lock.Heartbeat(context.Background())
 		require.ErrorIs(t, err, ErrNotLocked)
 	})
 
-	t.Run("concurrent heartbeat and check", func(t *testing.T) {
+	t.Run("ConcurrentHeartbeatAndCheck", func(t *testing.T) {
 		// Use a different temp dir to avoid conflicts
 		isolatedDir := t.TempDir()
 		lock := New(isolatedDir, nil)
@@ -417,7 +417,7 @@ func TestHeartbeat(t *testing.T) {
 }
 
 func TestEdgeCases(t *testing.T) {
-	t.Run("non-existent directory", func(t *testing.T) {
+	t.Run("NonExistentDirectory", func(t *testing.T) {
 		nonExistentDir := filepath.Join(t.TempDir(), "non-existent")
 		lock := New(nonExistentDir, nil)
 
@@ -433,7 +433,7 @@ func TestEdgeCases(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("info returns correct data", func(t *testing.T) {
+	t.Run("InfoReturnsCorrectData", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		lock := New(tmpDir, nil)
 

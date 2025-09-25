@@ -21,7 +21,7 @@ func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 	// Ensure we're actually running on Windows
 	require.Equal(t, "windows", runtime.GOOS, "This test should only run on Windows")
 
-	t.Run("Basic GET request on Windows", func(t *testing.T) {
+	t.Run("BasicGETRequestOnWindows", func(t *testing.T) {
 		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
 			assert.Equal(t, "GET", r.Method)
 			w.WriteHeader(nethttp.StatusOK)
@@ -54,7 +54,7 @@ func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 		assert.Equal(t, "Hello from Windows test server", out.String())
 	})
 
-	t.Run("POST request with JSON body on Windows", func(t *testing.T) {
+	t.Run("POSTRequestWithJSONBodyOnWindows", func(t *testing.T) {
 		var receivedBody map[string]interface{}
 		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
 			assert.Equal(t, "POST", r.Method)
@@ -120,7 +120,7 @@ func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 		assert.NotNil(t, response.Body)
 	})
 
-	t.Run("Headers and query parameters on Windows", func(t *testing.T) {
+	t.Run("HeadersAndQueryParametersOnWindows", func(t *testing.T) {
 		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
 			// Verify custom headers
 			assert.Equal(t, "Bearer windows-token", r.Header.Get("Authorization"))
@@ -168,7 +168,7 @@ func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 		assert.Equal(t, "Headers and params received", out.String())
 	})
 
-	t.Run("Timeout handling on Windows", func(t *testing.T) {
+	t.Run("TimeoutHandlingOnWindows", func(t *testing.T) {
 		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
 			// Simulate slow response (longer than timeout)
 			time.Sleep(3 * time.Second)
@@ -208,7 +208,7 @@ func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 		assert.Less(t, duration, 2*time.Second)
 	})
 
-	t.Run("Error status codes on Windows", func(t *testing.T) {
+	t.Run("ErrorStatusCodesOnWindows", func(t *testing.T) {
 		testCases := []struct {
 			statusCode  int
 			expectError bool
@@ -266,7 +266,7 @@ func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 		}
 	})
 
-	t.Run("HTTPS with self-signed certificate on Windows", func(t *testing.T) {
+	t.Run("HTTPSWithSelfSignedCertificateOnWindows", func(t *testing.T) {
 		server := httptest.NewTLSServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
 			w.WriteHeader(nethttp.StatusOK)
 			_, _ = w.Write([]byte("HTTPS on Windows works"))
@@ -300,7 +300,7 @@ func TestHTTPExecutor_WindowsSpecific(t *testing.T) {
 		assert.Equal(t, "HTTPS on Windows works", out.String())
 	})
 
-	t.Run("Process cancellation on Windows", func(t *testing.T) {
+	t.Run("ProcessCancellationOnWindows", func(t *testing.T) {
 		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
 			// Simulate long-running request
 			time.Sleep(5 * time.Second)

@@ -18,7 +18,7 @@ func TestRetryCommand(t *testing.T) {
 		dagFile := th.DAG(t, `params: "p1"
 steps:
   - name: "1"
-    command: "echo param is $1"
+    command: echo param is $1
 `)
 
 		// Run a DAG.
@@ -51,7 +51,7 @@ steps:
 		dagFile := th.DAG(t, `params: "p1"
 steps:
   - name: "1"
-    command: "echo param is $1"
+    command: echo param is $1
 `)
 
 		// Run a DAG.

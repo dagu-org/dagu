@@ -475,7 +475,6 @@ steps:
     params: "SOURCE=customers TABLE=users"
   - name: transform
     run: transform-module
-    depends: extract
 
 ---
 name: extract-module

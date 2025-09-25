@@ -80,7 +80,7 @@ func TestMigrateHistoryCommand(t *testing.T) {
 		DAGRunStore: dagRunStore,
 	}
 
-	t.Run("successful migration", func(t *testing.T) {
+	t.Run("SuccessfulMigration", func(t *testing.T) {
 		err := runMigration(ctx)
 		require.NoError(t, err)
 

@@ -18,19 +18,19 @@ func TestGetShellCommandWithGlobal(t *testing.T) {
 		expected           string
 	}{
 		{
-			name:               "configured shell takes precedence",
+			name:               "ConfiguredShellTakesPrecedence",
 			configuredShell:    "/bin/zsh",
 			globalDefaultShell: "/bin/bash",
 			expected:           "/bin/zsh",
 		},
 		{
-			name:               "global default shell used when no configured shell",
+			name:               "GlobalDefaultShellUsedWhenNoConfiguredShell",
 			configuredShell:    "",
 			globalDefaultShell: "/bin/bash",
 			expected:           "/bin/bash",
 		},
 		{
-			name:               "fallback to GetShellCommand when both empty",
+			name:               "FallbackToGetShellCommandWhenBothEmpty",
 			configuredShell:    "",
 			globalDefaultShell: "",
 			expected:           GetShellCommand(""), // Should return system shell

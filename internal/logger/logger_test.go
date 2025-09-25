@@ -15,7 +15,7 @@ func TestLogger_SourceLocation(t *testing.T) {
 		shouldNotHave []string
 	}{
 		{
-			name: "Info method shows correct source",
+			name: "InfoMethodShowsCorrectSource",
 			logFunc: func(l Logger) {
 				l.Info("test message")
 			},
@@ -23,7 +23,7 @@ func TestLogger_SourceLocation(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "slog-multi"},
 		},
 		{
-			name: "Debug method shows correct source",
+			name: "DebugMethodShowsCorrectSource",
 			logFunc: func(l Logger) {
 				l.Debug("debug message")
 			},
@@ -31,7 +31,7 @@ func TestLogger_SourceLocation(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "slog-multi"},
 		},
 		{
-			name: "Error method shows correct source",
+			name: "ErrorMethodShowsCorrectSource",
 			logFunc: func(l Logger) {
 				l.Error("error message")
 			},
@@ -39,7 +39,7 @@ func TestLogger_SourceLocation(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "slog-multi"},
 		},
 		{
-			name: "Warn method shows correct source",
+			name: "WarnMethodShowsCorrectSource",
 			logFunc: func(l Logger) {
 				l.Warn("warn message")
 			},
@@ -47,7 +47,7 @@ func TestLogger_SourceLocation(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "slog-multi"},
 		},
 		{
-			name: "Infof method shows correct source",
+			name: "InfofMethodShowsCorrectSource",
 			logFunc: func(l Logger) {
 				l.Infof("formatted %s", "message")
 			},
@@ -55,7 +55,7 @@ func TestLogger_SourceLocation(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "slog-multi"},
 		},
 		{
-			name: "Debugf method shows correct source",
+			name: "DebugfMethodShowsCorrectSource",
 			logFunc: func(l Logger) {
 				l.Debugf("debug %d", 42)
 			},
@@ -63,7 +63,7 @@ func TestLogger_SourceLocation(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "slog-multi"},
 		},
 		{
-			name: "Errorf method shows correct source",
+			name: "ErrorfMethodShowsCorrectSource",
 			logFunc: func(l Logger) {
 				l.Errorf("error %v", "test")
 			},
@@ -71,7 +71,7 @@ func TestLogger_SourceLocation(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "slog-multi"},
 		},
 		{
-			name: "Warnf method shows correct source",
+			name: "WarnfMethodShowsCorrectSource",
 			logFunc: func(l Logger) {
 				l.Warnf("warning %s", "test")
 			},
@@ -117,7 +117,7 @@ func TestLogger_SourceLocationWithContext(t *testing.T) {
 		shouldNotHave []string
 	}{
 		{
-			name: "Context Info shows correct source",
+			name: "ContextInfoShowsCorrectSource",
 			logFunc: func(ctx context.Context) {
 				Info(ctx, "context info message")
 			},
@@ -125,7 +125,7 @@ func TestLogger_SourceLocationWithContext(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "internal/logger/context.go", "slog-multi"},
 		},
 		{
-			name: "Context Debug shows correct source",
+			name: "ContextDebugShowsCorrectSource",
 			logFunc: func(ctx context.Context) {
 				Debug(ctx, "context debug message")
 			},
@@ -133,7 +133,7 @@ func TestLogger_SourceLocationWithContext(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "internal/logger/context.go", "slog-multi"},
 		},
 		{
-			name: "Context Error shows correct source",
+			name: "ContextErrorShowsCorrectSource",
 			logFunc: func(ctx context.Context) {
 				Error(ctx, "context error message")
 			},
@@ -141,7 +141,7 @@ func TestLogger_SourceLocationWithContext(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "internal/logger/context.go", "slog-multi"},
 		},
 		{
-			name: "Context Warn shows correct source",
+			name: "ContextWarnShowsCorrectSource",
 			logFunc: func(ctx context.Context) {
 				Warn(ctx, "context warn message")
 			},
@@ -149,7 +149,7 @@ func TestLogger_SourceLocationWithContext(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "internal/logger/context.go", "slog-multi"},
 		},
 		{
-			name: "Context Infof shows correct source",
+			name: "ContextInfofShowsCorrectSource",
 			logFunc: func(ctx context.Context) {
 				Infof(ctx, "formatted %s", "context")
 			},
@@ -157,7 +157,7 @@ func TestLogger_SourceLocationWithContext(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "internal/logger/context.go", "slog-multi"},
 		},
 		{
-			name: "Context Debugf shows correct source",
+			name: "ContextDebugfShowsCorrectSource",
 			logFunc: func(ctx context.Context) {
 				Debugf(ctx, "debug %d", 123)
 			},
@@ -165,7 +165,7 @@ func TestLogger_SourceLocationWithContext(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "internal/logger/context.go", "slog-multi"},
 		},
 		{
-			name: "Context Errorf shows correct source",
+			name: "ContextErrorfShowsCorrectSource",
 			logFunc: func(ctx context.Context) {
 				Errorf(ctx, "error %v", "context")
 			},
@@ -173,7 +173,7 @@ func TestLogger_SourceLocationWithContext(t *testing.T) {
 			shouldNotHave: []string{"internal/logger/logger.go", "internal/logger/context.go", "slog-multi"},
 		},
 		{
-			name: "Context Warnf shows correct source",
+			name: "ContextWarnfShowsCorrectSource",
 			logFunc: func(ctx context.Context) {
 				Warnf(ctx, "warning %s", "context")
 			},
