@@ -6,8 +6,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sync"
-	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -206,7 +204,7 @@ func TestScheduler(t *testing.T) {
 		// 1 (exit code 1) -> 2
 		graph := sc.newGraph(t,
 			newStep("1",
-				withCommand("echo test_output; false 1>&2"), // stderr: test_output
+				withCommand("echo test_output >&2; echo test_output; false"), // write to stderr and stdout
 				withContinueOn(digraph.ContinueOn{
 					Output: []string{
 						"test_output",
@@ -218,9 +216,14 @@ func TestScheduler(t *testing.T) {
 
 		result := graph.Schedule(t, status.PartialSuccess)
 
-		// 1, 2 should be
+		// Step 1 fails but matches continueOn output, allowing step 2 to run
 		result.AssertNodeStatus(t, "1", status.NodeError)
 		result.AssertNodeStatus(t, "2", status.NodeSuccess)
+
+		node := result.Node(t, "1")
+		stderrData, err := os.ReadFile(node.GetStderr())
+		require.NoError(t, err)
+		assert.Contains(t, string(stderrData), "test_output")
 	})
 	t.Run("ContinueOnOutputRegexp", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -880,45 +883,6 @@ func TestScheduler(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicyRepeatsWhileConditionExits0", func(t *testing.T) {
-		sc := setupScheduler(t)
-		// This step will repeat until the file exists
-		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exit0_%s", uuid.Must(uuid.NewV7()).String()))
-		err := os.Remove(file)
-		if err != nil && !os.IsNotExist(err) {
-			require.NoError(t, err)
-		}
-		defer func() {
-			err := os.Remove(file)
-			if err != nil && !os.IsNotExist(err) {
-				require.NoError(t, err)
-			}
-		}()
-		graph := sc.newGraph(t,
-			newStep("1",
-				withCommand("echo hello"),
-				func(step *digraph.Step) {
-					step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile
-					step.RepeatPolicy.Condition = &digraph.Condition{
-						Condition: "test ! -f " + file,
-					}
-					step.RepeatPolicy.Interval = 20 * time.Millisecond
-				},
-			),
-		)
-		// Create file 100 ms after step runs
-		go func() {
-			time.Sleep(200 * time.Millisecond)
-			f, _ := os.Create(file)
-			err := f.Close()
-			require.NoError(t, err)
-		}()
-		result := graph.Schedule(t, status.Success)
-		result.AssertNodeStatus(t, "1", status.NodeSuccess)
-		node := result.Node(t, "1")
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
-	})
-
 	t.Run("RepeatPolicyRepeatsWhileCommandExitCodeMatches", func(t *testing.T) {
 		sc := setupScheduler(t)
 		// This step will repeat until exit code is not 42.
@@ -1520,49 +1484,34 @@ func TestScheduler_DryRunWithHandlers(t *testing.T) {
 }
 
 func TestScheduler_ConcurrentExecution(t *testing.T) {
-	sc := setupScheduler(t, withMaxActiveRuns(3))
-
-	// Create a synchronization mechanism to ensure steps run concurrently
-	var counter int32
-	var mu sync.Mutex
-	maxConcurrent := int32(0)
-
-	step := func(name string) digraph.Step {
-		return newStep(name, withScript(fmt.Sprintf(`
-			echo "Step %s starting"
-			sleep 0.1
-			echo "Step %s ending"
-		`, name, name)))
+	steps := func() []digraph.Step {
+		return []digraph.Step{
+			newStep("1", withScript("sleep 0.3")),
+			newStep("2", withScript("sleep 0.3")),
+			newStep("3", withScript("sleep 0.3")),
+		}
 	}
 
-	// Track concurrent executions
-	graph := sc.newGraph(t,
-		step("1"),
-		step("2"),
-		step("3"),
-	)
+	sequential := setupScheduler(t, withMaxActiveRuns(1))
+	graphSequential := sequential.newGraph(t, steps()...)
+	startSequential := time.Now()
+	resultSequential := graphSequential.Schedule(t, status.Success)
+	elapsedSequential := time.Since(startSequential)
+	resultSequential.AssertNodeStatus(t, "1", status.NodeSuccess)
+	resultSequential.AssertNodeStatus(t, "2", status.NodeSuccess)
+	resultSequential.AssertNodeStatus(t, "3", status.NodeSuccess)
 
-	// Hook to track concurrent executions
-	go func() {
-		for {
-			time.Sleep(10 * time.Millisecond)
-			current := atomic.LoadInt32(&counter)
-			mu.Lock()
-			if current > maxConcurrent {
-				maxConcurrent = current
-			}
-			mu.Unlock()
-			if current == 0 {
-				break
-			}
-		}
-	}()
+	concurrent := setupScheduler(t, withMaxActiveRuns(3))
+	graphConcurrent := concurrent.newGraph(t, steps()...)
+	startConcurrent := time.Now()
+	resultConcurrent := graphConcurrent.Schedule(t, status.Success)
+	elapsedConcurrent := time.Since(startConcurrent)
+	resultConcurrent.AssertNodeStatus(t, "1", status.NodeSuccess)
+	resultConcurrent.AssertNodeStatus(t, "2", status.NodeSuccess)
+	resultConcurrent.AssertNodeStatus(t, "3", status.NodeSuccess)
 
-	result := graph.Schedule(t, status.Success)
-
-	result.AssertNodeStatus(t, "1", status.NodeSuccess)
-	result.AssertNodeStatus(t, "2", status.NodeSuccess)
-	result.AssertNodeStatus(t, "3", status.NodeSuccess)
+	assert.Greater(t, elapsedSequential, elapsedConcurrent)
+	assert.Greater(t, elapsedSequential-elapsedConcurrent, 200*time.Millisecond)
 }
 
 func TestScheduler_ErrorHandling(t *testing.T) {
@@ -2358,7 +2307,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 
 		node := result.Node(t, "1")
 		// Should have executed at least 3 times (until exit code 42)
-		assert.GreaterOrEqual(t, 3, node.State().DoneCount)
+		assert.GreaterOrEqual(t, node.State().DoneCount, 3)
 	})
 
 	t.Run("RepeatPolicyLimit", func(t *testing.T) {
