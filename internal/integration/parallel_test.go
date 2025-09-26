@@ -11,7 +11,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -21,14 +20,13 @@ func TestParallelExecution_SimpleItems(t *testing.T) {
 
 	// Create multi-document YAML with both parent and child DAGs
 	dag := th.DAG(t, `steps:
-  - name: process-items
-    run: child-echo
+  - run: child-echo
     parallel:
       items:
         - "item1"
         - "item2"
         - "item3"
-      maxConcurrent: 2
+      maxConcurrent: 3
 
 ---
 name: child-echo
@@ -54,7 +52,6 @@ steps:
 
 	// Check process-items node
 	processNode := dagRunStatus.Nodes[0]
-	require.Equal(t, "process-items", processNode.Step.Name)
 	require.Equal(t, status.NodeSuccess, processNode.Status)
 
 	// Verify child DAG runs were created
@@ -67,8 +64,7 @@ func TestParallelExecution_ObjectItems(t *testing.T) {
 
 	// Create multi-document YAML with both parent and child DAGs
 	dag := th.DAG(t, `steps:
-  - name: process-regions
-    run: child-process
+  - run: child-process
     parallel:
       items:
         - REGION: us-east-1
@@ -104,7 +100,6 @@ steps:
 
 	// Check process-regions node
 	processNode := dagRunStatus.Nodes[0]
-	require.Equal(t, "process-regions", processNode.Step.Name)
 	require.Equal(t, status.NodeSuccess, processNode.Status)
 
 	// Verify child DAG runs were created with JSON parameters
@@ -125,8 +120,7 @@ func TestParallelExecution_VariableReference(t *testing.T) {
 	dag := th.DAG(t, `params:
   - ITEMS: '["alpha", "beta", "gamma", "delta"]'
 steps:
-  - name: process-from-var
-    run: child-echo
+  - run: child-echo
     parallel: ${ITEMS}
 
 ---
@@ -153,7 +147,6 @@ steps:
 
 	// Check process-from-var node
 	processNode := dagRunStatus.Nodes[0]
-	require.Equal(t, "process-from-var", processNode.Step.Name)
 	require.Equal(t, status.NodeSuccess, processNode.Status)
 
 	// Verify four child DAG runs from JSON array
@@ -168,8 +161,7 @@ func TestParallelExecution_SpaceSeparated(t *testing.T) {
 	dag := th.DAG(t, `env:
   - SERVERS: "server1 server2 server3"
 steps:
-  - name: process-servers
-    run: child-echo
+  - run: child-echo
     parallel: ${SERVERS}
 
 ---
@@ -196,7 +188,6 @@ steps:
 
 	// Check process-servers node
 	processNode := dagRunStatus.Nodes[0]
-	require.Equal(t, "process-servers", processNode.Step.Name)
 	require.Equal(t, status.NodeSuccess, processNode.Status)
 
 	// Verify three child DAG runs from space-separated values
@@ -211,12 +202,10 @@ func TestParallelExecution_DirectVariable(t *testing.T) {
 	dag := th.DAG(t, `env:
   - ITEMS: '["task1", "task2", "task3"]'
 steps:
-  - name: parallel-tasks
-    run: child-with-output
+  - run: child-with-output
     parallel: $ITEMS
   - name: aggregate-results
     command: echo "Completed parallel tasks"
-    depends: parallel-tasks
     output: FINAL_RESULT
 
 ---
@@ -246,7 +235,6 @@ steps:
 
 	// Check parallel-tasks node
 	parallelNode := dagRunStatus.Nodes[0]
-	require.Equal(t, "parallel-tasks", parallelNode.Step.Name)
 	require.Equal(t, status.NodeSuccess, parallelNode.Status)
 
 	// Verify child DAG runs were created
@@ -259,19 +247,16 @@ func TestParallelExecution_WithOutput(t *testing.T) {
 
 	// Create a DAG that uses parallel execution output
 	dag := th.DAG(t, `steps:
-  - name: parallel-with-output
-    run: child-with-output
+  - run: child-with-output
     parallel:
       items:
         - "A"
         - "B"
         - "C"
     output: PARALLEL_RESULTS
-  - name: use-output
-    command: |
+  - command: |
       echo "Parallel execution results:"
       echo "${PARALLEL_RESULTS}"
-    depends: parallel-with-output
     output: FINAL_OUTPUT
 ---
 name: child-with-output
@@ -298,7 +283,6 @@ steps:
 
 	// Check parallel-with-output node
 	parallelNode := dagRunStatus.Nodes[0]
-	require.Equal(t, "parallel-with-output", parallelNode.Step.Name)
 	require.Equal(t, status.NodeSuccess, parallelNode.Status)
 	require.Len(t, parallelNode.Children, 3) // 3 child runs
 
@@ -324,7 +308,6 @@ steps:
 
 	// Check use-output node
 	useOutputNode := dagRunStatus.Nodes[1]
-	require.Equal(t, "use-output", useOutputNode.Step.Name)
 	require.Equal(t, status.NodeSuccess, useOutputNode.Status)
 }
 
@@ -334,8 +317,7 @@ func TestParallelExecution_DeterministicIDs(t *testing.T) {
 
 	// Create a temporary test DAG that uses parallel execution with duplicate items
 	dag := th.DAG(t, `steps:
-  - name: process
-    run: child-echo
+  - run: child-echo
     parallel:
       items:
         - "test1"
@@ -387,8 +369,7 @@ func TestParallelExecution_PartialFailure(t *testing.T) {
 
 	// Create parent and child DAGs
 	dag := th.DAG(t, `steps:
-  - name: parallel-mixed
-    run: child-conditional-fail
+  - run: child-conditional-fail
     parallel:
       items:
         - "ok1"
@@ -422,7 +403,6 @@ steps:
 	// Check that the parallel step failed
 	require.Len(t, dagRunStatus.Nodes, 1)
 	parallelNode := dagRunStatus.Nodes[0]
-	require.Equal(t, "parallel-mixed", parallelNode.Step.Name)
 	require.Equal(t, status.NodeError, parallelNode.Status)
 
 	// Verify that child DAG runs were created (4 due to deduplication of "fail")
@@ -435,24 +415,19 @@ func TestParallelExecution_OutputsArray(t *testing.T) {
 
 	// Create parent and child DAGs
 	dag := th.DAG(t, `steps:
-  - name: parallel-tasks
-    run: child-with-output
+  - run: child-with-output
     parallel:
       items: ["task1", "task2", "task3"]
     output: RESULTS
-  - name: use-first-output
-    command: |
+  - command: |
       # Access first output directly from outputs array
       echo "First output: ${RESULTS.outputs[0].TASK_OUTPUT}"
-    depends: parallel-tasks
     output: FIRST_OUTPUT
-  - name: use-all-outputs
-    command: |
+  - command: |
       # Show we can access any output by index
       echo "Output 0: ${RESULTS.outputs[0].TASK_OUTPUT}"
       echo "Output 1: ${RESULTS.outputs[1].TASK_OUTPUT}"
       echo "Output 2: ${RESULTS.outputs[2].TASK_OUTPUT}"
-    depends: parallel-tasks
     output: ALL_OUTPUTS
 ---
 name: child-with-output
@@ -478,7 +453,6 @@ steps:
 
 	// Check that subsequent steps could access the outputs array
 	firstOutputNode := dagRunStatus.Nodes[1]
-	require.Equal(t, "use-first-output", firstOutputNode.Step.Name)
 	require.Equal(t, status.NodeSuccess, firstOutputNode.Status)
 
 	// Verify the first output was accessible
@@ -493,7 +467,6 @@ steps:
 
 	// Check all outputs were accessible
 	allOutputsNode := dagRunStatus.Nodes[2]
-	require.Equal(t, "use-all-outputs", allOutputsNode.Step.Name)
 	require.Equal(t, status.NodeSuccess, allOutputsNode.Status)
 
 	if value, ok := allOutputsNode.OutputVariables.Load("ALL_OUTPUTS"); ok {
@@ -512,8 +485,7 @@ func TestParallelExecution_MinimalRetry(t *testing.T) {
 
 	// Create parent and child DAGs
 	dag := th.DAG(t, `steps:
-  - name: parallel-execution
-    run: child-fail
+  - run: child-fail
     parallel:
       items:
         - "item1"
@@ -534,15 +506,8 @@ steps:
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
 
-	// Find the parallel node
-	var parallelNode *models.Node
-	for _, node := range dagRunStatus.Nodes {
-		if node.Step.Name == "parallel-execution" {
-			parallelNode = node
-			break
-		}
-	}
-	require.NotNil(t, parallelNode)
+	require.Len(t, dagRunStatus.Nodes, 1)
+	parallelNode := dagRunStatus.Nodes[0]
 
 	t.Logf("Node status: %v (expected %v)", parallelNode.Status, status.NodeError)
 	t.Logf("Retry count: %v", parallelNode.RetryCount)
@@ -559,8 +524,7 @@ func TestParallelExecution_RetryAndContinueOn(t *testing.T) {
 
 	// Create parent and child DAGs
 	dag := th.DAG(t, `steps:
-  - name: parallel-execution
-    run: child-fail-both
+  - run: child-fail-both
     parallel:
       items:
         - "item1"
@@ -570,9 +534,7 @@ func TestParallelExecution_RetryAndContinueOn(t *testing.T) {
     continueOn:
       failure: true
     output: RESULTS
-  - name: next-step
-    command: echo "This should run"
-    depends: parallel-execution
+  - echo "This should run"
 ---
 name: child-fail-both
 steps:
@@ -587,19 +549,9 @@ steps:
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
 
-	// Find nodes
-	var parallelNode *models.Node
-	var nextNode *models.Node
-	for _, node := range dagRunStatus.Nodes {
-		if node.Step.Name == "parallel-execution" {
-			parallelNode = node
-		}
-		if node.Step.Name == "next-step" {
-			nextNode = node
-		}
-	}
-	require.NotNil(t, parallelNode)
-	require.NotNil(t, nextNode)
+	require.Len(t, dagRunStatus.Nodes, 2)
+	parallelNode := dagRunStatus.Nodes[0]
+	nextNode := dagRunStatus.Nodes[1]
 
 	t.Logf("Parallel node status: %v (expected %v)", parallelNode.Status, status.NodeError)
 	t.Logf("Retry count: %v", parallelNode.RetryCount)
@@ -611,17 +563,11 @@ steps:
 	require.Equal(t, status.NodeSuccess, nextNode.Status)
 
 	// Check if output was captured despite the error
-	if parallelNode.OutputVariables != nil {
-		if value, ok := parallelNode.OutputVariables.Load("RESULTS"); ok {
-			results := value.(string)
-			t.Logf("Captured output: %s", results)
-			require.Contains(t, results, "RESULTS=")
-		} else {
-			t.Log("No output captured - this might be the bug we're fixing")
-		}
-	} else {
-		t.Log("OutputVariables is nil - this might be the bug we're fixing")
-	}
+	require.NotNil(t, parallelNode.OutputVariables)
+	value, ok := parallelNode.OutputVariables.Load("RESULTS")
+	require.True(t, ok, "RESULTS output should be present")
+	results := value.(string)
+	require.Contains(t, results, "RESULTS=")
 }
 
 // TestParallelExecution_OutputCaptureWithFailures verifies output behavior when some child DAGs fail
@@ -630,8 +576,7 @@ func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
 
 	// Create parent and child DAGs
 	dag := th.DAG(t, `steps:
-  - name: parallel-test
-    run: child-output-fail
+  - run: child-output-fail
     parallel:
       items:
         - "success"
@@ -663,7 +608,6 @@ steps:
 
 	// Check parallel node
 	parallelNode := st.Nodes[0]
-	require.Equal(t, "parallel-test", parallelNode.Step.Name)
 	require.Equal(t, status.NodeError, parallelNode.Status)
 
 	// Verify output was captured for successful executions only
@@ -704,8 +648,7 @@ func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
 
 	// Create parent and child DAGs
 	dag := th.DAG(t, `steps:
-  - name: parallel-retry
-    run: child-retry-simple
+  - run: child-retry-simple
     parallel:
       items:
         - "item1"
@@ -740,7 +683,6 @@ steps:
 
 	// Check parallel node
 	parallelNode := dagRunStatus.Nodes[0]
-	require.Equal(t, "parallel-retry", parallelNode.Step.Name)
 	require.Equal(t, status.NodeSuccess, parallelNode.Status)
 
 	// Verify output was captured from retry
@@ -772,8 +714,7 @@ func TestParallelExecution_ExceedsMaxLimit(t *testing.T) {
 
 	dagContent := fmt.Sprintf(`
 steps:
-  - name: too-many-items
-    run: child-echo
+  - run: child-echo
     parallel:
       items:
 %s
@@ -811,8 +752,7 @@ func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
 
 	dagContent := fmt.Sprintf(`
 steps:
-  - name: max-items
-    run: child-echo
+  - run: child-echo
     parallel:
       items:
 %s
@@ -865,8 +805,7 @@ func TestParallelExecution_ObjectItemProperties(t *testing.T) {
 
 	// Create multi-document YAML with both parent and child DAGs
 	yamlContent := `steps:
-  - name: get configs
-    command: |
+  - command: |
       echo '[
         {"region": "us-east-1", "bucket": "data-us"},
         {"region": "eu-west-1", "bucket": "data-eu"},
@@ -874,15 +813,13 @@ func TestParallelExecution_ObjectItemProperties(t *testing.T) {
       ]'
     output: CONFIGS
 
-  - name: sync data
-    run: sync-data
+  - run: sync-data
     parallel:
       items: ${CONFIGS}
       maxConcurrent: 2
     params:
       - REGION: ${ITEM.region}
       - BUCKET: ${ITEM.bucket}
-    depends: get configs
     output: RESULTS
 
 ---
@@ -972,7 +909,7 @@ func TestParallelExecution_DynamicFileDiscovery(t *testing.T) {
 	}
 
 	// Create a child DAG that processes a file
-	childDagContent := `name: process-file
+	childDagContent := `
 params:
   - ITEM: ""
 steps:
@@ -992,7 +929,7 @@ steps:
 	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "process-file", []byte(childDagContent))
 
 	// Create the parent DAG that discovers and processes files
-	parentDagContent := fmt.Sprintf(`name: test-file-discovery
+	parentDagContent := fmt.Sprintf(`
 steps:
   - name: get files
     command: find %s -name "*.csv" -type f
@@ -1086,8 +1023,7 @@ func TestParallelExecution_StaticObjectItems(t *testing.T) {
 
 	// Create multi-document YAML with both parent and child DAGs
 	yamlContent := `steps:
-  - name: deploy services
-    run: deploy-service
+  - run: deploy-service
     parallel:
       maxConcurrent: 3
       items:
@@ -1159,7 +1095,6 @@ steps:
 
 	// Check deploy services node
 	deployNode := dagRunStatus.Nodes[0]
-	require.Equal(t, "deploy services", deployNode.Step.Name)
 	require.Equal(t, status.NodeError, deployNode.Status) // Error because one child failed
 
 	// Verify child DAG runs were created
