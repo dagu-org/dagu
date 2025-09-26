@@ -7,12 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/platforms"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const (
@@ -402,6 +405,24 @@ steps:
 func createLongRunningContainer(t *testing.T, th test.Helper, dockerClient *client.Client, containerName string) string {
 	t.Helper()
 
+	info, err := dockerClient.Info(th.Context)
+	if err != nil {
+		t.Fatalf("failed to get docker info: %v", err)
+	}
+
+	var platform specs.Platform
+	platform.Architecture = info.Architecture
+	platform.OS = info.OSType
+
+	var pullOpts image.PullOptions
+	pullOpts = image.PullOptions{Platform: platforms.Format(platform)}
+
+	// Pull the image to ensure it exists
+	if _, err = dockerClient.ImagePull(th.Context, testImage, pullOpts); err != nil {
+		t.Fatalf("failed to pull image %s: %v", testImage, err)
+	}
+
+	// Create and start the container
 	created, err := dockerClient.ContainerCreate(
 		th.Context,
 		&container.Config{
