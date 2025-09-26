@@ -414,8 +414,7 @@ func createLongRunningContainer(t *testing.T, th test.Helper, dockerClient *clie
 	platform.Architecture = info.Architecture
 	platform.OS = info.OSType
 
-	var pullOpts image.PullOptions
-	pullOpts = image.PullOptions{Platform: platforms.Format(platform)}
+	pullOpts := image.PullOptions{Platform: platforms.Format(platform)}
 
 	// Pull the image to ensure it exists
 	if _, err = dockerClient.ImagePull(th.Context, testImage, pullOpts); err != nil {
