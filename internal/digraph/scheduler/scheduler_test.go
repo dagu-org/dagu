@@ -2361,40 +2361,21 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		assert.GreaterOrEqual(t, 3, node.State().DoneCount)
 	})
 
-	t.Run("RepeatPolicyLimitOverridesAllConditions", func(t *testing.T) {
+	t.Run("RepeatPolicyLimit", func(t *testing.T) {
 		sc := setupScheduler(t)
-
-		// This step will repeat until the file exists, but is limited to 3 repeats
-		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_limit_%s", uuid.Must(uuid.NewV7()).String()))
-		err := os.Remove(file)
-		if err != nil && !os.IsNotExist(err) {
-			require.NoError(t, err)
-		}
-		defer func() {
-			err := os.Remove(file)
-			if err != nil && !os.IsNotExist(err) {
-				require.NoError(t, err)
-			}
-		}()
 		graph := sc.newGraph(t,
 			newStep("1",
-				withCommand("cat "+file+" || echo notfound"),
+				withCommand("echo limit"),
 				func(step *digraph.Step) {
 					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 					step.RepeatPolicy.Condition = &digraph.Condition{
-						Condition: fmt.Sprintf("test -f %s", file),
+						Condition: "false", // Will never be true
 					}
 					step.RepeatPolicy.Limit = 3
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
-
-		go func() {
-			time.Sleep(time.Millisecond * 50)
-			f, _ := os.Create(file)
-			_ = f.Close()
-		}()
 
 		result := graph.Schedule(t, status.Success)
 		result.AssertNodeStatus(t, "1", status.NodeSuccess)
