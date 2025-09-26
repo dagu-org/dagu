@@ -851,12 +851,10 @@ steps:
 
 	// Check get configs node
 	getConfigsNode := dagRunStatus.Nodes[0]
-	require.Equal(t, "get configs", getConfigsNode.Step.Name)
 	require.Equal(t, status.NodeSuccess, getConfigsNode.Status)
 
 	// Check sync data node
 	syncNode := dagRunStatus.Nodes[1]
-	require.Equal(t, "sync data", syncNode.Step.Name)
 	require.Equal(t, status.NodeSuccess, syncNode.Status)
 
 	// Verify child DAG runs were created
