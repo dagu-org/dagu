@@ -19,31 +19,31 @@ func TestNode_LargeOutput(t *testing.T) {
 		expectHang bool
 	}{
 		{
-			name:       "small output",
+			name:       "SmallOutput",
 			outputSize: 1024, // 1KB
 			script:     `python3 -c "print('x' * 1024)"`,
 			expectHang: false,
 		},
 		{
-			name:       "medium output",
+			name:       "MediumOutput",
 			outputSize: 32 * 1024, // 32KB
 			script:     `python3 -c "print('x' * (32 * 1024))"`,
 			expectHang: false,
 		},
 		{
-			name:       "large output just below 64KB",
+			name:       "LargeOutputJustBelow64KB",
 			outputSize: 63 * 1024, // 63KB
 			script:     `python3 -c "print('x' * (63 * 1024))"`,
 			expectHang: false,
 		},
 		{
-			name:       "large output at 64KB",
+			name:       "LargeOutputAt64KB",
 			outputSize: 64 * 1024, // 64KB
 			script:     `python3 -c "print('x' * (64 * 1024))"`,
 			expectHang: false, // Fixed - no longer hangs
 		},
 		{
-			name:       "large output above 64KB",
+			name:       "LargeOutputAbove64KB",
 			outputSize: 128 * 1024, // 128KB
 			script:     `python3 -c "print('x' * (128 * 1024))"`,
 			expectHang: false, // Fixed - no longer hangs

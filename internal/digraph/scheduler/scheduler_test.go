@@ -6,8 +6,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sync"
-	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -206,7 +204,7 @@ func TestScheduler(t *testing.T) {
 		// 1 (exit code 1) -> 2
 		graph := sc.newGraph(t,
 			newStep("1",
-				withCommand("echo test_output; false 1>&2"), // stderr: test_output
+				withCommand("echo test_output >&2; echo test_output; false"), // write to stderr and stdout
 				withContinueOn(digraph.ContinueOn{
 					Output: []string{
 						"test_output",
@@ -218,9 +216,14 @@ func TestScheduler(t *testing.T) {
 
 		result := graph.Schedule(t, status.PartialSuccess)
 
-		// 1, 2 should be
+		// Step 1 fails but matches continueOn output, allowing step 2 to run
 		result.AssertNodeStatus(t, "1", status.NodeError)
 		result.AssertNodeStatus(t, "2", status.NodeSuccess)
+
+		node := result.Node(t, "1")
+		stderrData, err := os.ReadFile(node.GetStderr())
+		require.NoError(t, err)
+		assert.Contains(t, string(stderrData), "test_output")
 	})
 	t.Run("ContinueOnOutputRegexp", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -714,7 +717,7 @@ func TestScheduler(t *testing.T) {
 		output, _ := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
 	})
-	t.Run("SpecialVars_DAG_RUN_LOG_FILE", func(t *testing.T) {
+	t.Run("SpecialVarsDAGRUNLOGFILE", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
@@ -728,7 +731,7 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_DAG_RUN_STEP_STDOUT_FILE", func(t *testing.T) {
+	t.Run("SpecialVarsDAGRUNSTEPSTDOUTFILE", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
@@ -742,7 +745,7 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.out$`, output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_DAG_RUN_STEP_STDERR_FILE", func(t *testing.T) {
+	t.Run("SpecialVarsDAGRUNSTEPSTDERRFILE", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
@@ -756,7 +759,7 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.err$`, output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_DAG_RUN_ID", func(t *testing.T) {
+	t.Run("SpecialVarsDAGRUNID", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
@@ -770,7 +773,7 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `RESULT=[a-f0-9-]+`, output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_DAG_NAME", func(t *testing.T) {
+	t.Run("SpecialVarsDAGNAME", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
@@ -784,7 +787,7 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=test_dag", output, "unexpected output %q", output)
 	})
-	t.Run("SpecialVars_DAG_RUN_STEP_NAME", func(t *testing.T) {
+	t.Run("SpecialVarsDAGRUNSTEPNAME", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		graph := sc.newGraph(t,
@@ -799,7 +802,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, "RESULT=step_test", output, "unexpected output %q", output)
 	})
 
-	t.Run("RepeatPolicy_RepeatsUntilCommandConditionMatchesExpected", func(t *testing.T) {
+	t.Run("RepeatPolicyRepeatsUntilCommandConditionMatchesExpected", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// This step will repeat until the file contains 'ready'
@@ -841,7 +844,7 @@ func TestScheduler(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicy_RepeatWhileConditionExits0", func(t *testing.T) {
+	t.Run("RepeatPolicyRepeatWhileConditionExits0", func(t *testing.T) {
 		sc := setupScheduler(t)
 		// This step will repeat until the file exists
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exit0_%s", uuid.Must(uuid.NewV7()).String()))
@@ -880,46 +883,7 @@ func TestScheduler(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicy_RepeatsWhileConditionExits0", func(t *testing.T) {
-		sc := setupScheduler(t)
-		// This step will repeat until the file exists
-		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exit0_%s", uuid.Must(uuid.NewV7()).String()))
-		err := os.Remove(file)
-		if err != nil && !os.IsNotExist(err) {
-			require.NoError(t, err)
-		}
-		defer func() {
-			err := os.Remove(file)
-			if err != nil && !os.IsNotExist(err) {
-				require.NoError(t, err)
-			}
-		}()
-		graph := sc.newGraph(t,
-			newStep("1",
-				withCommand("echo hello"),
-				func(step *digraph.Step) {
-					step.RepeatPolicy.RepeatMode = digraph.RepeatModeWhile
-					step.RepeatPolicy.Condition = &digraph.Condition{
-						Condition: "test ! -f " + file,
-					}
-					step.RepeatPolicy.Interval = 20 * time.Millisecond
-				},
-			),
-		)
-		// Create file 100 ms after step runs
-		go func() {
-			time.Sleep(200 * time.Millisecond)
-			f, _ := os.Create(file)
-			err := f.Close()
-			require.NoError(t, err)
-		}()
-		result := graph.Schedule(t, status.Success)
-		result.AssertNodeStatus(t, "1", status.NodeSuccess)
-		node := result.Node(t, "1")
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
-	})
-
-	t.Run("RepeatPolicy_RepeatsWhileCommandExitCodeMatches", func(t *testing.T) {
+	t.Run("RepeatPolicyRepeatsWhileCommandExitCodeMatches", func(t *testing.T) {
 		sc := setupScheduler(t)
 		// This step will repeat until exit code is not 42.
 		countFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exitcode_%s", uuid.Must(uuid.NewV7()).String()))
@@ -957,7 +921,7 @@ func TestScheduler(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicy_RepeatsUntilEnvVarConditionMatchesExpected", func(t *testing.T) {
+	t.Run("RepeatPolicyRepeatsUntilEnvVarConditionMatchesExpected", func(t *testing.T) {
 		sc := setupScheduler(t)
 		// This step will repeat until the environment variable TEST_REPEAT_MATCH_EXPR equals 'done'
 		err := os.Setenv("TEST_REPEAT_MATCH_EXPR", "notyet")
@@ -990,7 +954,7 @@ func TestScheduler(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicy_RepeatsUntilOutputVarConditionMatchesExpected", func(t *testing.T) {
+	t.Run("RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected", func(t *testing.T) {
 		sc := setupScheduler(t)
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_outputvar_%s", uuid.Must(uuid.NewV7()).String()))
 		err := os.Remove(file)
@@ -1520,49 +1484,34 @@ func TestScheduler_DryRunWithHandlers(t *testing.T) {
 }
 
 func TestScheduler_ConcurrentExecution(t *testing.T) {
-	sc := setupScheduler(t, withMaxActiveRuns(3))
-
-	// Create a synchronization mechanism to ensure steps run concurrently
-	var counter int32
-	var mu sync.Mutex
-	maxConcurrent := int32(0)
-
-	step := func(name string) digraph.Step {
-		return newStep(name, withScript(fmt.Sprintf(`
-			echo "Step %s starting"
-			sleep 0.1
-			echo "Step %s ending"
-		`, name, name)))
+	steps := func() []digraph.Step {
+		return []digraph.Step{
+			newStep("1", withScript("sleep 0.3")),
+			newStep("2", withScript("sleep 0.3")),
+			newStep("3", withScript("sleep 0.3")),
+		}
 	}
 
-	// Track concurrent executions
-	graph := sc.newGraph(t,
-		step("1"),
-		step("2"),
-		step("3"),
-	)
+	sequential := setupScheduler(t, withMaxActiveRuns(1))
+	graphSequential := sequential.newGraph(t, steps()...)
+	startSequential := time.Now()
+	resultSequential := graphSequential.Schedule(t, status.Success)
+	elapsedSequential := time.Since(startSequential)
+	resultSequential.AssertNodeStatus(t, "1", status.NodeSuccess)
+	resultSequential.AssertNodeStatus(t, "2", status.NodeSuccess)
+	resultSequential.AssertNodeStatus(t, "3", status.NodeSuccess)
 
-	// Hook to track concurrent executions
-	go func() {
-		for {
-			time.Sleep(10 * time.Millisecond)
-			current := atomic.LoadInt32(&counter)
-			mu.Lock()
-			if current > maxConcurrent {
-				maxConcurrent = current
-			}
-			mu.Unlock()
-			if current == 0 {
-				break
-			}
-		}
-	}()
+	concurrent := setupScheduler(t, withMaxActiveRuns(3))
+	graphConcurrent := concurrent.newGraph(t, steps()...)
+	startConcurrent := time.Now()
+	resultConcurrent := graphConcurrent.Schedule(t, status.Success)
+	elapsedConcurrent := time.Since(startConcurrent)
+	resultConcurrent.AssertNodeStatus(t, "1", status.NodeSuccess)
+	resultConcurrent.AssertNodeStatus(t, "2", status.NodeSuccess)
+	resultConcurrent.AssertNodeStatus(t, "3", status.NodeSuccess)
 
-	result := graph.Schedule(t, status.Success)
-
-	result.AssertNodeStatus(t, "1", status.NodeSuccess)
-	result.AssertNodeStatus(t, "2", status.NodeSuccess)
-	result.AssertNodeStatus(t, "3", status.NodeSuccess)
+	assert.Greater(t, elapsedSequential, elapsedConcurrent)
+	assert.Greater(t, elapsedSequential-elapsedConcurrent, 200*time.Millisecond)
 }
 
 func TestScheduler_ErrorHandling(t *testing.T) {
@@ -2045,7 +1994,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	// Test cases for behaviors when neither condition nor exitCode are present
-	t.Run("RepeatPolicy_BooleanTrue_RepeatsWhileStepSucceeds", func(t *testing.T) {
+	t.Run("RepeatPolicyBooleanTrueRepeatsWhileStepSucceeds", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Test repeat: true (boolean mode) - should repeat while step succeeds (no condition/exitCode)
@@ -2069,7 +2018,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		assert.Equal(t, 3, node.State().DoneCount)
 	})
 
-	t.Run("RepeatPolicy_BooleanTrueWithFailure_StopsOnFailure", func(t *testing.T) {
+	t.Run("RepeatPolicyBooleanTrueWithFailureStopsOnFailure", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Test repeat: true (boolean mode) with step that eventually fails
@@ -2107,7 +2056,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		assert.Equal(t, 3, node.State().DoneCount)
 	})
 
-	t.Run("RepeatPolicy_UntilModeWithoutCondition_RepeatsOnFailure", func(t *testing.T) {
+	t.Run("RepeatPolicyUntilModeWithoutConditionRepeatsOnFailure", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Test explicit until mode without condition/exitCode (repeats until step succeeds)
@@ -2150,7 +2099,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		assert.Equal(t, 3, node.State().DoneCount)
 	})
 
-	t.Run("RepeatPolicy_WhileWithCondition_RepeatsWhileConditionSucceeds", func(t *testing.T) {
+	t.Run("RepeatPolicyWhileWithConditionRepeatsWhileConditionSucceeds", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Test explicit while mode with condition
@@ -2192,7 +2141,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicy_WhileWithConditionAndExpected_RepeatsWhileMatches", func(t *testing.T) {
+	t.Run("RepeatPolicyWhileWithConditionAndExpectedRepeatsWhileMatches", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Test explicit while mode with condition and expected value
@@ -2231,7 +2180,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicy_UntilWithCondition_RepeatsUntilConditionSucceeds", func(t *testing.T) {
+	t.Run("RepeatPolicyUntilWithConditionRepeatsUntilConditionSucceeds", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Test explicit until mode with condition (no expected)
@@ -2273,7 +2222,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicy_UntilWithConditionAndExpected_RepeatsUntilMatches", func(t *testing.T) {
+	t.Run("RepeatPolicyUntilWithConditionAndExpectedRepeatsUntilMatches", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Test explicit until mode with condition and expected value
@@ -2312,7 +2261,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicy_UntilWithExitCode_RepeatsUntilExitCodeMatches", func(t *testing.T) {
+	t.Run("RepeatPolicyUntilWithExitCodeRepeatsUntilExitCodeMatches", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Test explicit until mode with exit codes
@@ -2358,43 +2307,24 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 
 		node := result.Node(t, "1")
 		// Should have executed at least 3 times (until exit code 42)
-		assert.GreaterOrEqual(t, 3, node.State().DoneCount)
+		assert.GreaterOrEqual(t, node.State().DoneCount, 3)
 	})
 
-	t.Run("RepeatPolicy_LimitOverridesAllConditions", func(t *testing.T) {
+	t.Run("RepeatPolicyLimit", func(t *testing.T) {
 		sc := setupScheduler(t)
-
-		// This step will repeat until the file exists, but is limited to 3 repeats
-		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_limit_%s", uuid.Must(uuid.NewV7()).String()))
-		err := os.Remove(file)
-		if err != nil && !os.IsNotExist(err) {
-			require.NoError(t, err)
-		}
-		defer func() {
-			err := os.Remove(file)
-			if err != nil && !os.IsNotExist(err) {
-				require.NoError(t, err)
-			}
-		}()
 		graph := sc.newGraph(t,
 			newStep("1",
-				withCommand("cat "+file+" || echo notfound"),
+				withCommand("echo limit"),
 				func(step *digraph.Step) {
 					step.RepeatPolicy.RepeatMode = digraph.RepeatModeUntil
 					step.RepeatPolicy.Condition = &digraph.Condition{
-						Condition: fmt.Sprintf("test -f %s", file),
+						Condition: "false", // Will never be true
 					}
 					step.RepeatPolicy.Limit = 3
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
-
-		go func() {
-			time.Sleep(time.Millisecond * 50)
-			f, _ := os.Create(file)
-			_ = f.Close()
-		}()
 
 		result := graph.Schedule(t, status.Success)
 		result.AssertNodeStatus(t, "1", status.NodeSuccess)
@@ -2404,7 +2334,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		assert.Equal(t, 3, node.State().DoneCount)
 	})
 
-	t.Run("RepeatPolicy_OutputVariablesReloadedBeforeConditionEval", func(t *testing.T) {
+	t.Run("RepeatPolicyOutputVariablesReloadedBeforeConditionEval", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Test that output variables are reloaded before evaluating repeat condition

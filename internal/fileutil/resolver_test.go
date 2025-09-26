@@ -43,43 +43,43 @@ func TestFileResolver(t *testing.T) {
 		expectedError bool
 	}{
 		{
-			name:         "Find file in first relative path",
+			name:         "FindFileInFirstRelativePath",
 			relativeTos:  []string{dir1, dir2},
 			file:         "file1.txt",
 			expectedPath: filepath.Join(dir1, "file1.txt"),
 		},
 		{
-			name:         "Find file in second relative path",
+			name:         "FindFileInSecondRelativePath",
 			relativeTos:  []string{dir1, dir2},
 			file:         "file2.txt",
 			expectedPath: filepath.Join(dir2, "file2.txt"),
 		},
 		{
-			name:         "Find shared file (should use first match)",
+			name:         "FindSharedFileShouldUseFirstMatch",
 			relativeTos:  []string{dir1, dir2},
 			file:         "shared.txt",
 			expectedPath: filepath.Join(dir1, "shared.txt"),
 		},
 		{
-			name:         "Absolute path exists",
+			name:         "AbsolutePathExists",
 			relativeTos:  []string{dir1, dir2},
 			file:         filepath.Join(tempDir, "absolute.txt"),
 			expectedPath: filepath.Join(tempDir, "absolute.txt"),
 		},
 		{
-			name:          "Absolute path does not exist",
+			name:          "AbsolutePathDoesNotExist",
 			relativeTos:   []string{dir1, dir2},
 			file:          filepath.Join(tempDir, "nonexistent.txt"),
 			expectedError: true,
 		},
 		{
-			name:          "File not found in any location",
+			name:          "FileNotFoundInAnyLocation",
 			relativeTos:   []string{dir1, dir2},
 			file:          "nonexistent.txt",
 			expectedError: true,
 		},
 		{
-			name:          "Empty relative paths",
+			name:          "EmptyRelativePaths",
 			relativeTos:   []string{},
 			file:          "file1.txt",
 			expectedError: true,
@@ -125,14 +125,14 @@ func TestFileNotFoundError(t *testing.T) {
 		expectedMsg string
 	}{
 		{
-			name: "Error with no searched paths",
+			name: "ErrorWithNoSearchedPaths",
 			err: &FileNotFoundError{
 				Path: "test.txt",
 			},
 			expectedMsg: "file not found: test.txt",
 		},
 		{
-			name: "Error with searched paths",
+			name: "ErrorWithSearchedPaths",
 			err: &FileNotFoundError{
 				Path:          "test.txt",
 				SearchedPaths: []string{"/path1", "/path2"},

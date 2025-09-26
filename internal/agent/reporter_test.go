@@ -112,7 +112,7 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 	html := renderHTMLWithDAGInfo(status)
 
 	// Verify HTML structure and content
-	t.Run("DAG info section", func(t *testing.T) {
+	t.Run("DAGInfoSection", func(t *testing.T) {
 		// Check DAG info section exists
 		require.Contains(t, html, "DAG Execution Details")
 		require.Contains(t, html, "dag-info")
@@ -140,7 +140,7 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 		require.Contains(t, html, "FINISHED")             // Status text
 	})
 
-	t.Run("Table content", func(t *testing.T) {
+	t.Run("TableContent", func(t *testing.T) {
 		// Check that step table is still included
 		require.Contains(t, html, "<table>")
 		require.Contains(t, html, "setup-database")
@@ -148,7 +148,7 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 		require.Contains(t, html, "Migration failed")
 	})
 
-	t.Run("Empty parameters", func(t *testing.T) {
+	t.Run("EmptyParameters", func(t *testing.T) {
 		// Test with empty parameters
 		statusNoParams := status
 		statusNoParams.Params = ""
@@ -158,7 +158,7 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 		require.Contains(t, htmlNoParams, "(none)")
 	})
 
-	t.Run("HTML escaping in DAG info", func(t *testing.T) {
+	t.Run("HTMLEscapingInDAGInfo", func(t *testing.T) {
 		// Test HTML escaping in DAG info
 		statusWithSpecialChars := status
 		statusWithSpecialChars.Name = "test<script>alert('xss')</script>"
@@ -324,7 +324,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 	html := renderHTML(nodes)
 
 	// Verify HTML structure and content
-	t.Run("HTML structure", func(t *testing.T) {
+	t.Run("HTMLStructure", func(t *testing.T) {
 		// Check basic HTML structure
 		require.Contains(t, html, "<!DOCTYPE html>")
 		require.Contains(t, html, "<html>")
@@ -339,7 +339,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		require.Contains(t, html, "</table>")
 	})
 
-	t.Run("Table headers", func(t *testing.T) {
+	t.Run("TableHeaders", func(t *testing.T) {
 		// Check all required headers are present
 		headers := []string{"#", "Step", "Started At", "Finished At", "Status", "Command", "Error"}
 		for _, header := range headers {
@@ -347,7 +347,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		}
 	})
 
-	t.Run("Table content", func(t *testing.T) {
+	t.Run("TableContent", func(t *testing.T) {
 		// Check that all step names are present
 		require.Contains(t, html, "setup-database")
 		require.Contains(t, html, "run-migrations")
@@ -370,7 +370,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		require.Contains(t, html, "Migration failed: Table 'users' already exists")
 	})
 
-	t.Run("HTML escaping", func(t *testing.T) {
+	t.Run("HTMLEscaping", func(t *testing.T) {
 		// Verify dangerous HTML characters are properly escaped
 		require.NotContains(t, html, "<script>alert('xss')</script>")          // Raw script tag should not exist
 		require.Contains(t, html, "&lt;script&gt;alert('xss')&lt;/script&gt;") // Should be escaped (actual format)
@@ -382,13 +382,13 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		require.Contains(t, html, "\"special chars\"") // Quotes in actual output
 	})
 
-	t.Run("Row count", func(t *testing.T) {
+	t.Run("RowCount", func(t *testing.T) {
 		// Count the number of table rows (excluding header)
 		rowCount := strings.Count(html, "<tr>") - 1 // Subtract 1 for header row
 		require.Equal(t, len(nodes), rowCount, "Should have one row per node")
 	})
 
-	t.Run("CSS styling", func(t *testing.T) {
+	t.Run("CSSStyling", func(t *testing.T) {
 		// Check that modern CSS is present for proper email rendering
 		require.Contains(t, html, "border-collapse: separate")
 		require.Contains(t, html, "border-spacing: 0")
@@ -398,7 +398,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		require.Contains(t, html, "font-family: -apple-system")
 	})
 
-	t.Run("Gmail compatibility", func(t *testing.T) {
+	t.Run("GmailCompatibility", func(t *testing.T) {
 		// Ensure Gmail-compatible structure
 		require.Contains(t, html, `<style type="text/css">`)
 		require.Contains(t, html, "class=")

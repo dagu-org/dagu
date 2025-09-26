@@ -48,7 +48,7 @@ func TestReadLogLines(t *testing.T) {
 		expectError   bool
 	}{
 		{
-			name:          "Read entire file",
+			name:          "ReadEntireFile",
 			filePath:      testLogPath,
 			options:       LogReadOptions{},
 			expectedLines: testContent,
@@ -58,7 +58,7 @@ func TestReadLogLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read with head option",
+			name:          "ReadWithHeadOption",
 			filePath:      testLogPath,
 			options:       LogReadOptions{Head: 3},
 			expectedLines: testContent[:3],
@@ -68,7 +68,7 @@ func TestReadLogLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read with tail option",
+			name:          "ReadWithTailOption",
 			filePath:      testLogPath,
 			options:       LogReadOptions{Tail: 3},
 			expectedLines: testContent[7:],
@@ -78,7 +78,7 @@ func TestReadLogLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read with offset and limit",
+			name:          "ReadWithOffsetAndLimit",
 			filePath:      testLogPath,
 			options:       LogReadOptions{Offset: 4, Limit: 3},
 			expectedLines: testContent[3:6],
@@ -88,7 +88,7 @@ func TestReadLogLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read with offset beyond file size",
+			name:          "ReadWithOffsetBeyondFileSize",
 			filePath:      testLogPath,
 			options:       LogReadOptions{Offset: 20},
 			expectedLines: []string{},
@@ -98,7 +98,7 @@ func TestReadLogLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read with head larger than file",
+			name:          "ReadWithHeadLargerThanFile",
 			filePath:      testLogPath,
 			options:       LogReadOptions{Head: 20},
 			expectedLines: testContent,
@@ -108,7 +108,7 @@ func TestReadLogLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read with tail larger than file",
+			name:          "ReadWithTailLargerThanFile",
 			filePath:      testLogPath,
 			options:       LogReadOptions{Tail: 20},
 			expectedLines: testContent,
@@ -118,7 +118,7 @@ func TestReadLogLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read empty file",
+			name:          "ReadEmptyFile",
 			filePath:      emptyLogPath,
 			options:       LogReadOptions{},
 			expectedLines: []string{},
@@ -128,7 +128,7 @@ func TestReadLogLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read non-existent file",
+			name:          "ReadNonExistentFile",
 			filePath:      filepath.Join(tempDir, "nonexistent.log"),
 			options:       LogReadOptions{},
 			expectedLines: nil,
@@ -210,7 +210,7 @@ func TestReadLogContent(t *testing.T) {
 		expectError      bool
 	}{
 		{
-			name:             "Read entire file",
+			name:             "ReadEntireFile",
 			filePath:         testLogPath,
 			options:          LogReadOptions{},
 			expectedString:   strings.Join(testContent, "\n"),
@@ -221,7 +221,7 @@ func TestReadLogContent(t *testing.T) {
 			expectError:      false,
 		},
 		{
-			name:             "Read with head option",
+			name:             "ReadWithHeadOption",
 			filePath:         testLogPath,
 			options:          LogReadOptions{Head: 2},
 			expectedString:   strings.Join(testContent[:2], "\n"),
@@ -232,7 +232,7 @@ func TestReadLogContent(t *testing.T) {
 			expectError:      false,
 		},
 		{
-			name:             "Read with tail option",
+			name:             "ReadWithTailOption",
 			filePath:         testLogPath,
 			options:          LogReadOptions{Tail: 2},
 			expectedString:   strings.Join(testContent[3:], "\n"),
@@ -243,7 +243,7 @@ func TestReadLogContent(t *testing.T) {
 			expectError:      false,
 		},
 		{
-			name:             "Read non-existent file",
+			name:             "ReadNonExistentFile",
 			filePath:         filepath.Join(tempDir, "nonexistent.log"),
 			options:          LogReadOptions{},
 			expectedString:   "",
@@ -304,22 +304,22 @@ func TestCountLinesExact(t *testing.T) {
 		lineCount int
 	}{
 		{
-			name:      "Empty file",
+			name:      "EmptyFile",
 			content:   "",
 			lineCount: 0,
 		},
 		{
-			name:      "Single line",
+			name:      "SingleLine",
 			content:   "Line 1",
 			lineCount: 1,
 		},
 		{
-			name:      "Multiple lines",
+			name:      "MultipleLines",
 			content:   "Line 1\nLine 2\nLine 3",
 			lineCount: 3,
 		},
 		{
-			name:      "Lines with empty lines",
+			name:      "LinesWithEmptyLines",
 			content:   "Line 1\n\nLine 3",
 			lineCount: 3,
 		},
@@ -348,7 +348,7 @@ func TestCountLinesExact(t *testing.T) {
 	}
 
 	// Test non-existent file
-	t.Run("Non-existent file", func(t *testing.T) {
+	t.Run("NonExistentFile", func(t *testing.T) {
 		_, err := countLinesExact(filepath.Join(tempDir, "nonexistent.log"))
 		if err == nil {
 			t.Errorf("countLines() expected error for non-existent file, got nil")
@@ -385,7 +385,7 @@ func TestReadFirstLines(t *testing.T) {
 		expectError   bool
 	}{
 		{
-			name:          "Read first 3 lines",
+			name:          "ReadFirst3Lines",
 			filePath:      testLogPath,
 			n:             3,
 			totalLines:    5,
@@ -395,7 +395,7 @@ func TestReadFirstLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read more lines than file has",
+			name:          "ReadMoreLinesThanFileHas",
 			filePath:      testLogPath,
 			n:             10,
 			totalLines:    5,
@@ -405,7 +405,7 @@ func TestReadFirstLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read 0 lines",
+			name:          "Read0Lines",
 			filePath:      testLogPath,
 			n:             0,
 			totalLines:    5,
@@ -415,7 +415,7 @@ func TestReadFirstLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Non-existent file",
+			name:          "NonExistentFile",
 			filePath:      filepath.Join(tempDir, "nonexistent.log"),
 			n:             3,
 			totalLines:    0,
@@ -496,7 +496,7 @@ func TestReadLastLines(t *testing.T) {
 		expectError   bool
 	}{
 		{
-			name:          "Read last 3 lines",
+			name:          "ReadLast3Lines",
 			filePath:      testLogPath,
 			n:             3,
 			totalLines:    5,
@@ -506,7 +506,7 @@ func TestReadLastLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read more lines than file has",
+			name:          "ReadMoreLinesThanFileHas",
 			filePath:      testLogPath,
 			n:             10,
 			totalLines:    5,
@@ -516,7 +516,7 @@ func TestReadLastLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read 0 lines",
+			name:          "Read0Lines",
 			filePath:      testLogPath,
 			n:             0,
 			totalLines:    5,
@@ -526,7 +526,7 @@ func TestReadLastLines(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Non-existent file",
+			name:          "NonExistentFile",
 			filePath:      filepath.Join(tempDir, "nonexistent.log"),
 			n:             3,
 			totalLines:    0,
@@ -608,7 +608,7 @@ func TestReadLinesRange(t *testing.T) {
 		expectError   bool
 	}{
 		{
-			name:          "Read lines 2-4",
+			name:          "ReadLines24",
 			filePath:      testLogPath,
 			offset:        2,
 			limit:         3,
@@ -619,7 +619,7 @@ func TestReadLinesRange(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Read beyond file end",
+			name:          "ReadBeyondFileEnd",
 			filePath:      testLogPath,
 			offset:        4,
 			limit:         10,
@@ -630,7 +630,7 @@ func TestReadLinesRange(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Offset beyond file size",
+			name:          "OffsetBeyondFileSize",
 			filePath:      testLogPath,
 			offset:        10,
 			limit:         5,
@@ -641,7 +641,7 @@ func TestReadLinesRange(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Negative offset",
+			name:          "NegativeOffset",
 			filePath:      testLogPath,
 			offset:        -1,
 			limit:         3,
@@ -652,7 +652,7 @@ func TestReadLinesRange(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Zero limit",
+			name:          "ZeroLimit",
 			filePath:      testLogPath,
 			offset:        2,
 			limit:         0,
@@ -663,7 +663,7 @@ func TestReadLinesRange(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:          "Non-existent file",
+			name:          "NonExistentFile",
 			filePath:      filepath.Join(tempDir, "nonexistent.log"),
 			offset:        1,
 			limit:         5,
@@ -729,21 +729,21 @@ func TestEstimateLineCount(t *testing.T) {
 		fileSize         int // in KB
 	}{
 		{
-			name:             "Small file (exact count)",
+			name:             "SmallFileExactCount",
 			content:          strings.Repeat("Line content\n", 100),
 			expectedCount:    100,
 			expectedEstimate: false,
 			fileSize:         1, // 1KB
 		},
 		{
-			name:             "Medium file (estimated count)",
+			name:             "MediumFileEstimatedCount",
 			content:          strings.Repeat("Medium line content for testing estimation\n", 5000),
 			expectedCount:    5000,
 			expectedEstimate: true,
 			fileSize:         200, // 200KB
 		},
 		{
-			name:             "File with varying line lengths",
+			name:             "FileWithVaryingLineLengths",
 			content:          generateVaryingLineLengths(5000),
 			expectedCount:    5000,
 			expectedEstimate: true,

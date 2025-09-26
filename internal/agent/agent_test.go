@@ -22,8 +22,7 @@ func TestAgent_Run(t *testing.T) {
 	t.Run("RunDAG", func(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "sleep 1"
+  - "sleep 1"
 `)
 		dagAgent := dag.Agent()
 
@@ -38,8 +37,7 @@ func TestAgent_Run(t *testing.T) {
 	t.Run("DeleteOldHistory", func(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "sleep 1"
+  - "sleep 1"
 `)
 		dagAgent := dag.Agent()
 
@@ -60,8 +58,7 @@ func TestAgent_Run(t *testing.T) {
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "sleep 1"
+  - "sleep 1"
 `)
 		dagAgent := dag.Agent(test.WithDAGRunID("test-dag-run"))
 		done := make(chan struct{})
@@ -83,12 +80,8 @@ func TestAgent_Run(t *testing.T) {
 	t.Run("PreConditionNotMet", func(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "true"
-  - name: "2"
-    command: "true"
-    depends:
-      - "1"
+  - "true"
+  - "true"
 `)
 
 		// Set a precondition that always fails
@@ -108,8 +101,7 @@ func TestAgent_Run(t *testing.T) {
 	t.Run("FinishWithError", func(t *testing.T) {
 		th := test.Setup(t)
 		errDAG := th.DAG(t, `steps:
-  - name: "1"
-    command: "false"
+  - "false"
 `)
 		dagAgent := errDAG.Agent()
 		dagAgent.RunError(t)
@@ -121,10 +113,8 @@ func TestAgent_Run(t *testing.T) {
 		th := test.Setup(t)
 		timeoutDAG := th.DAG(t, `timeoutSec: 2
 steps:
-  - name: "1"
-    command: "sleep 1"
-  - name: "2"
-    command: "sleep 2"
+  - "sleep 1"
+  - "sleep 2"
 `)
 		dagAgent := timeoutDAG.Agent()
 		dagAgent.RunError(t)
@@ -135,8 +125,7 @@ steps:
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "sleep 3"
+  - "sleep 3"
 `)
 		dagAgent := dag.Agent()
 		done := make(chan struct{})
@@ -163,12 +152,8 @@ steps:
   Exit:
     command: "true"
 steps:
-  - name: "1"
-    command: "true"
-  - name: "2"
-    command: "true"
-    depends:
-      - "1"
+  - "true"
+  - "true"
 `)
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
@@ -190,8 +175,7 @@ func TestAgent_DryRun(t *testing.T) {
 		th := test.Setup(t)
 
 		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "true"
+  - "true"
 `)
 		dagAgent := dag.Agent(test.WithAgentOptions(agent.Options{Dry: true}))
 
@@ -387,14 +371,13 @@ func TestAgent_Retry(t *testing.T) {
 func TestAgent_HandleHTTP(t *testing.T) {
 	t.Parallel()
 
-	t.Run("HTTP_Valid", func(t *testing.T) {
+	t.Run("HTTPValid", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
 		// Start a long-running DAG
 		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "sleep 10"
+  - "sleep 10"
 `)
 		dagAgent := dag.Agent()
 		ctx := th.Context
@@ -425,14 +408,13 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		dag.AssertLatestStatus(t, status.Cancel)
 	})
-	t.Run("HTTP_InvalidRequest", func(t *testing.T) {
+	t.Run("HTTPInvalidRequest", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
 		// Start a long-running DAG
 		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "sleep 10"
+  - "sleep 10"
 `)
 		dagAgent := dag.Agent()
 
@@ -456,14 +438,13 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		dagAgent.Abort()
 		dag.AssertLatestStatus(t, status.Cancel)
 	})
-	t.Run("HTTP_HandleCancel", func(t *testing.T) {
+	t.Run("HTTPHandleCancel", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
 		// Start a long-running DAG
 		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "sleep 10"
+  - "sleep 10"
 `)
 		dagAgent := dag.Agent()
 

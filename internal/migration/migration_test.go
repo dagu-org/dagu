@@ -104,27 +104,27 @@ func TestExtractDAGName(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "directory with hash",
+			name:     "DirectoryWithHash",
 			dirName:  "my-dag-a1b2c3d4",
 			expected: "my-dag",
 		},
 		{
-			name:     "directory with longer hash",
+			name:     "DirectoryWithLongerHash",
 			dirName:  "test-workflow-deadbeef1234",
 			expected: "test-workflow",
 		},
 		{
-			name:     "directory without hash",
+			name:     "DirectoryWithoutHash",
 			dirName:  "simple-dag",
 			expected: "simple-dag",
 		},
 		{
-			name:     "directory with multiple hyphens",
+			name:     "DirectoryWithMultipleHyphens",
 			dirName:  "my-complex-dag-name-abc123",
 			expected: "my-complex-dag-name",
 		},
 		{
-			name:     "directory with non-hex suffix",
+			name:     "DirectoryWithNonHexSuffix",
 			dirName:  "dag-with-suffix-xyz",
 			expected: "dag-with-suffix-xyz",
 		},
@@ -186,7 +186,7 @@ func TestReadLegacyStatusFile(t *testing.T) {
 func TestNeedsMigration(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("no history directory", func(t *testing.T) {
+	t.Run("NoHistoryDirectory", func(t *testing.T) {
 		tempDir := t.TempDir()
 		m := &HistoryMigrator{dataDir: tempDir}
 
@@ -195,7 +195,7 @@ func TestNeedsMigration(t *testing.T) {
 		assert.False(t, needsMigration)
 	})
 
-	t.Run("history directory with dat files", func(t *testing.T) {
+	t.Run("HistoryDirectoryWithDatFiles", func(t *testing.T) {
 		tempDir := t.TempDir()
 
 		// Create legacy structure
@@ -211,7 +211,7 @@ func TestNeedsMigration(t *testing.T) {
 		assert.True(t, needsMigration)
 	})
 
-	t.Run("history directory without dat files", func(t *testing.T) {
+	t.Run("HistoryDirectoryWithoutDatFiles", func(t *testing.T) {
 		tempDir := t.TempDir()
 
 		// Create directory without .dat files
@@ -289,32 +289,32 @@ func TestParseTime(t *testing.T) {
 		shouldErr bool
 	}{
 		{
-			name:      "RFC3339 format",
+			name:      "RFC3339Format",
 			timeStr:   "2024-01-01T10:00:00Z",
 			shouldErr: false,
 		},
 		{
-			name:      "RFC3339 with timezone",
+			name:      "RFC3339WithTimezone",
 			timeStr:   "2024-01-01T10:00:00+09:00",
 			shouldErr: false,
 		},
 		{
-			name:      "space separated format",
+			name:      "SpaceSeparatedFormat",
 			timeStr:   "2024-01-01 10:00:00",
 			shouldErr: false,
 		},
 		{
-			name:      "empty string",
+			name:      "EmptyString",
 			timeStr:   "",
 			shouldErr: true,
 		},
 		{
-			name:      "dash only",
+			name:      "DashOnly",
 			timeStr:   "-",
 			shouldErr: true,
 		},
 		{
-			name:      "invalid format",
+			name:      "InvalidFormat",
 			timeStr:   "not a date",
 			shouldErr: true,
 		},
@@ -414,19 +414,19 @@ func TestLoadDAGForMigration(t *testing.T) {
 	require.NoError(t, os.WriteFile(dag1Path, []byte("test"), 0600))
 	require.NoError(t, os.WriteFile(dag2Path, []byte("test"), 0600))
 
-	t.Run("find by status name", func(t *testing.T) {
+	t.Run("FindByStatusName", func(t *testing.T) {
 		result, err := m.loadDAGForMigration(ctx, "test-dag", "other-name")
 		require.NoError(t, err)
 		assert.Equal(t, "test-dag", result.Name)
 	})
 
-	t.Run("find by directory name", func(t *testing.T) {
+	t.Run("FindByDirectoryName", func(t *testing.T) {
 		result, err := m.loadDAGForMigration(ctx, "not-found", "test-dag-v2")
 		require.NoError(t, err)
 		assert.Equal(t, "test-dag-v2", result.Name)
 	})
 
-	t.Run("not found - create minimal", func(t *testing.T) {
+	t.Run("NotFoundCreateMinimal", func(t *testing.T) {
 		result, err := m.loadDAGForMigration(ctx, "not-found", "also-not-found")
 		require.NoError(t, err)
 		assert.Equal(t, "not-found", result.Name)

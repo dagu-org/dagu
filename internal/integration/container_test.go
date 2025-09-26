@@ -7,12 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/platforms"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const (
@@ -102,10 +105,10 @@ container:
   volumes:
     - %s:/data:rw
 steps:
-  - command: sh -c "echo 'Hello from step 1' > /data/test.txt"
+  - sh -c "echo 'Hello from step 1' > /data/test.txt"
   - command: cat /data/test.txt
     output: BIND_MOUNT_OUT1
-  - command: sh -c "echo 'Hello from step 3' >> /data/test.txt"
+  - sh -c "echo 'Hello from step 3' >> /data/test.txt"
   - command: cat /data/test.txt
     output: BIND_MOUNT_OUT2
 `, testImage, tempDir)
@@ -188,7 +191,7 @@ container:
   volumes:
     - test-volume:/data
 steps:
-  - command: sh -c "echo 'Data in named volume' > /data/volume.txt"
+  - sh -c "echo 'Data in named volume' > /data/volume.txt"
   - command: cat /data/volume.txt
     output: NAMED_VOL_OUT1
   - command: ls -la /data/
@@ -223,7 +226,7 @@ container:
 steps:
   - command: cat /workspace/initial.txt
     output: WORK_DIR_VOL_OUT1
-  - command: sh -c "echo 'New content' > /workspace/new.txt"
+  - sh -c "echo 'New content' > /workspace/new.txt"
   - command: cat /workspace/new.txt
     output: WORK_DIR_VOL_OUT2
   - command: ls -la /workspace/
@@ -402,6 +405,23 @@ steps:
 func createLongRunningContainer(t *testing.T, th test.Helper, dockerClient *client.Client, containerName string) string {
 	t.Helper()
 
+	info, err := dockerClient.Info(th.Context)
+	if err != nil {
+		t.Fatalf("failed to get docker info: %v", err)
+	}
+
+	var platform specs.Platform
+	platform.Architecture = info.Architecture
+	platform.OS = info.OSType
+
+	pullOpts := image.PullOptions{Platform: platforms.Format(platform)}
+
+	// Pull the image to ensure it exists
+	if _, err = dockerClient.ImagePull(th.Context, testImage, pullOpts); err != nil {
+		t.Fatalf("failed to pull image %s: %v", testImage, err)
+	}
+
+	// Create and start the container
 	created, err := dockerClient.ContainerCreate(
 		th.Context,
 		&container.Config{

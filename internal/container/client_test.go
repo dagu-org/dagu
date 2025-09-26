@@ -27,7 +27,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name: "minimal config with image",
+			name: "MinimalConfigWithImage",
 			input: map[string]any{
 				"image": "alpine:latest",
 			},
@@ -41,7 +41,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "minimal config with containerName",
+			name: "MinimalConfigWithContainerName",
 			input: map[string]any{
 				"containerName": "my-container",
 			},
@@ -55,7 +55,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "error when neither image nor containerName provided",
+			name: "ErrorWhenNeitherImageNorContainerNameProvided",
 			input: map[string]any{
 				"platform": "linux/amd64",
 			},
@@ -63,7 +63,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			errorMsg:    "containerName or image must be specified",
 		},
 		{
-			name: "full config for new container (no containerName)",
+			name: "FullConfigForNewContainerNoContainerName",
 			input: map[string]any{
 				"image":      "ubuntu:20.04",
 				"platform":   "linux/arm64",
@@ -103,7 +103,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "exec mode with containerName and exec options",
+			name: "ExecModeWithContainerNameAndExecOptions",
 			input: map[string]any{
 				"containerName": "test-container",
 				"exec": map[string]any{
@@ -126,7 +126,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "autoRemove from hostConfig",
+			name: "AutoRemoveFromHostConfig",
 			input: map[string]any{
 				"image": "alpine",
 				"host": map[string]any{
@@ -146,7 +146,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "autoRemove explicit true overrides hostConfig false",
+			name: "AutoRemoveExplicitTrueOverridesHostConfigFalse",
 			input: map[string]any{
 				"image":      "alpine",
 				"autoRemove": true,
@@ -167,7 +167,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "autoRemove string value true",
+			name: "AutoRemoveStringValueTrue",
 			input: map[string]any{
 				"image":      "alpine",
 				"autoRemove": "true",
@@ -183,7 +183,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "autoRemove string value false",
+			name: "AutoRemoveStringValueFalse",
 			input: map[string]any{
 				"image":      "alpine",
 				"autoRemove": "false",
@@ -199,7 +199,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "autoRemove string value 1",
+			name: "AutoRemoveStringValue1",
 			input: map[string]any{
 				"image":      "alpine",
 				"autoRemove": "1",
@@ -215,7 +215,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "autoRemove string value 0",
+			name: "AutoRemoveStringValue0",
 			input: map[string]any{
 				"image":      "alpine",
 				"autoRemove": "0",
@@ -231,7 +231,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "autoRemove invalid value",
+			name: "AutoRemoveInvalidValue",
 			input: map[string]any{
 				"image":      "alpine",
 				"autoRemove": "invalid",
@@ -240,7 +240,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			errorMsg:    "failed to evaluate autoRemove value",
 		},
 		{
-			name: "autoRemove unsupported type",
+			name: "AutoRemoveUnsupportedType",
 			input: map[string]any{
 				"image":      "alpine",
 				"autoRemove": 123,
@@ -249,7 +249,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			errorMsg:    "failed to evaluate autoRemove value",
 		},
 		{
-			name: "pull policy never",
+			name: "PullPolicyNever",
 			input: map[string]any{
 				"image": "alpine",
 				"pull":  "never",
@@ -264,7 +264,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "pull policy missing",
+			name: "PullPolicyMissing",
 			input: map[string]any{
 				"image": "alpine",
 				"pull":  "missing",
@@ -279,7 +279,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "pull policy as boolean true",
+			name: "PullPolicyAsBooleanTrue",
 			input: map[string]any{
 				"image": "alpine",
 				"pull":  true,
@@ -294,7 +294,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "pull policy as boolean false",
+			name: "PullPolicyAsBooleanFalse",
 			input: map[string]any{
 				"image": "alpine",
 				"pull":  false,
@@ -309,7 +309,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "pull policy as string true",
+			name: "PullPolicyAsStringTrue",
 			input: map[string]any{
 				"image": "alpine",
 				"pull":  "true",
@@ -324,7 +324,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid pull policy",
+			name: "InvalidPullPolicy",
 			input: map[string]any{
 				"image": "alpine",
 				"pull":  "invalid",
@@ -333,7 +333,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			errorMsg:    "failed to parse pull policy as boolean",
 		},
 		{
-			name: "pull policy unsupported type",
+			name: "PullPolicyUnsupportedType",
 			input: map[string]any{
 				"image": "alpine",
 				"pull":  123,
@@ -342,7 +342,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			errorMsg:    "invalid pull policy type",
 		},
 		{
-			name: "container config with weakly typed input",
+			name: "ContainerConfigWithWeaklyTypedInput",
 			input: map[string]any{
 				"image": "alpine",
 				"container": map[string]any{
@@ -361,7 +361,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid container config decoder",
+			name: "InvalidContainerConfigDecoder",
 			input: map[string]any{
 				"image":     "alpine",
 				"container": "invalid", // Not a map
@@ -370,7 +370,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			errorMsg:    "failed to decode config",
 		},
 		{
-			name: "invalid host config decoder",
+			name: "InvalidHostConfigDecoder",
 			input: map[string]any{
 				"image": "alpine",
 				"host":  "invalid", // Not a map
@@ -379,7 +379,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			errorMsg:    "failed to decode config",
 		},
 		{
-			name: "invalid network config decoder",
+			name: "InvalidNetworkConfigDecoder",
 			input: map[string]any{
 				"image":   "alpine",
 				"network": "invalid", // Not a map
@@ -388,7 +388,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			errorMsg:    "failed to decode config",
 		},
 		{
-			name: "invalid exec config decoder",
+			name: "InvalidExecConfigDecoder",
 			input: map[string]any{
 				"image": "alpine",
 				"exec":  "invalid", // Not a map
@@ -397,7 +397,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			errorMsg:    "failed to decode config",
 		},
 		{
-			name: "empty config sections",
+			name: "EmptyConfigSections",
 			input: map[string]any{
 				"image":     "alpine",
 				"container": map[string]any{},
@@ -415,7 +415,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "both image and containerName empty strings",
+			name: "BothImageAndContainerNameEmptyStrings",
 			input: map[string]any{
 				"image":         "",
 				"containerName": "",
@@ -424,7 +424,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			errorMsg:    "containerName or image must be specified",
 		},
 		{
-			name: "error when exec provided with image only",
+			name: "ErrorWhenExecProvidedWithImageOnly",
 			input: map[string]any{
 				"image": "alpine",
 				"exec": map[string]any{
@@ -435,7 +435,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			errorMsg:    "exec' options require 'containerName",
 		},
 		{
-			name: "platform as non-string type",
+			name: "PlatformAsNonStringType",
 			input: map[string]any{
 				"image":    "alpine",
 				"platform": 123, // Not a string
@@ -451,7 +451,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "containerName as non-string type (exec mode)",
+			name: "ContainerNameAsNonStringTypeExecMode",
 			input: map[string]any{
 				"containerName": 123, // Not a string
 			},
@@ -465,7 +465,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "image as non-string type",
+			name: "ImageAsNonStringType",
 			input: map[string]any{
 				"image": 123, // Not a string
 			},
@@ -479,7 +479,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "nil sections are handled",
+			name: "NilSectionsAreHandled",
 			input: map[string]any{
 				"image":     "alpine",
 				"container": nil,
@@ -497,7 +497,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "pull policy nil",
+			name: "PullPolicyNil",
 			input: map[string]any{
 				"image": "alpine",
 				"pull":  nil,
@@ -512,7 +512,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "pull policy empty string",
+			name: "PullPolicyEmptyString",
 			input: map[string]any{
 				"image": "alpine",
 				"pull":  "",
@@ -527,7 +527,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "autoRemove nil value",
+			name: "AutoRemoveNilValue",
 			input: map[string]any{
 				"image":      "alpine",
 				"autoRemove": nil,
@@ -543,7 +543,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "platform nil value",
+			name: "PlatformNilValue",
 			input: map[string]any{
 				"image":    "alpine",
 				"platform": nil,
@@ -559,7 +559,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "containerName nil value",
+			name: "ContainerNameNilValue",
 			input: map[string]any{
 				"image":         "alpine",
 				"containerName": nil,
@@ -575,7 +575,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "image nil value",
+			name: "ImageNilValue",
 			input: map[string]any{
 				"image":         nil,
 				"containerName": "test",
@@ -635,7 +635,7 @@ func TestLoadConfig(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name: "minimal container with image only",
+			name: "MinimalContainerWithImageOnly",
 			input: digraph.Container{
 				Image: "alpine:latest",
 			},
@@ -652,7 +652,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "error when image is empty",
+			name: "ErrorWhenImageIsEmpty",
 			input: digraph.Container{
 				Platform: "linux/amd64",
 			},
@@ -660,7 +660,7 @@ func TestLoadConfig(t *testing.T) {
 			errorMsg:    "image is required",
 		},
 		{
-			name: "full container configuration",
+			name: "FullContainerConfiguration",
 			input: digraph.Container{
 				Image:         "ubuntu:20.04",
 				PullPolicy:    digraph.PullPolicyAlways,
@@ -717,7 +717,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "standard network modes",
+			name: "StandardNetworkModes",
 			input: digraph.Container{
 				Image:   "nginx",
 				Network: "host",
@@ -736,7 +736,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "container network reference",
+			name: "ContainerNetworkReference",
 			input: digraph.Container{
 				Image:   "nginx",
 				Network: "container:myapp",
@@ -755,7 +755,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "bind mount with default rw mode",
+			name: "BindMountWithDefaultRwMode",
 			input: digraph.Container{
 				Image:   "alpine",
 				Volumes: []string{"/host/path:/container/path"},
@@ -774,7 +774,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "relative bind mount",
+			name: "RelativeBindMount",
 			input: digraph.Container{
 				Image:   "alpine",
 				Volumes: []string{"./data:/data:ro"},
@@ -798,7 +798,7 @@ func TestLoadConfig(t *testing.T) {
 			}(),
 		},
 		{
-			name: "home directory bind mount",
+			name: "HomeDirectoryBindMount",
 			input: digraph.Container{
 				Image:   "alpine",
 				Volumes: []string{"~/data:/data:rw"},
@@ -822,7 +822,7 @@ func TestLoadConfig(t *testing.T) {
 			}(),
 		},
 		{
-			name: "port with IP address",
+			name: "PortWithIPAddress",
 			input: digraph.Container{
 				Image: "nginx",
 				Ports: []string{"127.0.0.1:8080:80/tcp"},
@@ -851,7 +851,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "udp port",
+			name: "UdpPort",
 			input: digraph.Container{
 				Image: "dns-server",
 				Ports: []string{"53:53/udp"},
@@ -880,7 +880,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid volume format - too few parts",
+			name: "InvalidVolumeFormatTooFewParts",
 			input: digraph.Container{
 				Image:   "alpine",
 				Volumes: []string{"/data"},
@@ -889,7 +889,7 @@ func TestLoadConfig(t *testing.T) {
 			errorMsg:    "invalid volume format: /data",
 		},
 		{
-			name: "invalid volume format - too many parts",
+			name: "InvalidVolumeFormatTooManyParts",
 			input: digraph.Container{
 				Image:   "alpine",
 				Volumes: []string{"/host:/container:ro:extra"},
@@ -898,7 +898,7 @@ func TestLoadConfig(t *testing.T) {
 			errorMsg:    "invalid volume format: /host:/container:ro:extra",
 		},
 		{
-			name: "invalid volume mode",
+			name: "InvalidVolumeMode",
 			input: digraph.Container{
 				Image:   "alpine",
 				Volumes: []string{"/data:/data:invalid"},
@@ -907,7 +907,7 @@ func TestLoadConfig(t *testing.T) {
 			errorMsg:    "invalid volume format: invalid mode invalid in /data:/data:invalid",
 		},
 		{
-			name: "invalid port format - too many parts",
+			name: "InvalidPortFormatTooManyParts",
 			input: digraph.Container{
 				Image: "nginx",
 				Ports: []string{"1.2.3.4:8080:80:extra"},
@@ -916,7 +916,7 @@ func TestLoadConfig(t *testing.T) {
 			errorMsg:    "invalid port format: 1.2.3.4:8080:80:extra",
 		},
 		{
-			name: "invalid port protocol delimiter",
+			name: "InvalidPortProtocolDelimiter",
 			input: digraph.Container{
 				Image: "nginx",
 				Ports: []string{"80/tcp/extra"},
@@ -925,7 +925,7 @@ func TestLoadConfig(t *testing.T) {
 			errorMsg:    "invalid port format: invalid protocol in 80/tcp/extra",
 		},
 		{
-			name: "invalid port protocol",
+			name: "InvalidPortProtocol",
 			input: digraph.Container{
 				Image: "nginx",
 				Ports: []string{"80/invalid"},
@@ -934,7 +934,7 @@ func TestLoadConfig(t *testing.T) {
 			errorMsg:    "invalid port format: invalid protocol invalid in 80/invalid",
 		},
 		{
-			name: "sctp port protocol",
+			name: "SctpPortProtocol",
 			input: digraph.Container{
 				Image: "sctp-server",
 				Ports: []string{"132/sctp"},
@@ -954,7 +954,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "whitespace in port specification",
+			name: "WhitespaceInPortSpecification",
 			input: digraph.Container{
 				Image: "nginx",
 				Ports: []string{" 8080:80 "},
@@ -983,7 +983,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "empty network uses default",
+			name: "EmptyNetworkUsesDefault",
 			input: digraph.Container{
 				Image:   "nginx",
 				Network: "",
@@ -1002,7 +1002,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "bridge network mode",
+			name: "BridgeNetworkMode",
 			input: digraph.Container{
 				Image:   "nginx",
 				Network: "bridge",
@@ -1021,7 +1021,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "none network mode",
+			name: "NoneNetworkMode",
 			input: digraph.Container{
 				Image:   "nginx",
 				Network: "none",
@@ -1040,7 +1040,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "keep container false sets autoRemove true",
+			name: "KeepContainerFalseSetsAutoRemoveTrue",
 			input: digraph.Container{
 				Image:         "alpine",
 				KeepContainer: false,
@@ -1057,7 +1057,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "keep container true sets autoRemove false",
+			name: "KeepContainerTrueSetsAutoRemoveFalse",
 			input: digraph.Container{
 				Image:         "alpine",
 				KeepContainer: true,
@@ -1074,7 +1074,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "pull policy propagation",
+			name: "PullPolicyPropagation",
 			input: digraph.Container{
 				Image:      "alpine",
 				PullPolicy: digraph.PullPolicyNever,
@@ -1092,7 +1092,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "platform propagation",
+			name: "PlatformPropagation",
 			input: digraph.Container{
 				Image:    "alpine",
 				Platform: "linux/386",

@@ -22,7 +22,7 @@ func TestDAGExecutorRealBehavior(t *testing.T) {
 	// The connections are cleaned up when the test ends, but goleak may still
 	// report leaked goroutines from gRPC's internal connection management.
 
-	t.Run("HandleJob vs ExecuteDAG Behavior", func(t *testing.T) {
+	t.Run("HandleJobVsExecuteDAGBehavior", func(t *testing.T) {
 		// Setup test environment
 		tmpDir := t.TempDir()
 		queueDir := filepath.Join(tmpDir, "queue")
@@ -51,7 +51,7 @@ steps:
 		})
 
 		// Test 1: HandleJob with distributed execution and START operation
-		t.Run("HandleJob_Distributed_START", func(t *testing.T) {
+		t.Run("HandleJobDistributedSTART", func(t *testing.T) {
 			// Load DAG and set worker selector for distributed execution
 			dag, err := digraph.Load(context.Background(), testFile)
 			require.NoError(t, err)
@@ -74,7 +74,7 @@ steps:
 		})
 
 		// Test 2: ExecuteDAG with distributed execution
-		t.Run("ExecuteDAG_Distributed", func(t *testing.T) {
+		t.Run("ExecuteDAGDistributed", func(t *testing.T) {
 			// Create DAG executor
 			dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, dagRunMgr)
 
@@ -102,7 +102,7 @@ steps:
 		})
 
 		// Test 3: HandleJob with local execution
-		t.Run("HandleJob_Local", func(t *testing.T) {
+		t.Run("HandleJobLocal", func(t *testing.T) {
 			// Create DAG executor without coordinator (local only)
 			dagExecutor := scheduler.NewDAGExecutor(nil, dagRunMgr)
 
@@ -131,7 +131,7 @@ steps:
 		})
 
 		// Test 4: HandleJob with RETRY operation
-		t.Run("HandleJob_RETRY", func(t *testing.T) {
+		t.Run("HandleJobRETRY", func(t *testing.T) {
 			// Create DAG executor
 			dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, dagRunMgr)
 

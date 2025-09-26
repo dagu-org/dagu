@@ -15,14 +15,14 @@ func TestConfigSet(t *testing.T) {
 		assert.Empty(t, configSet.configs)
 	})
 
-	t.Run("Get_NonExistentConfig", func(t *testing.T) {
+	t.Run("GetNonExistentConfig", func(t *testing.T) {
 		configSet := NewConfigSet()
 		config := configSet.Get("non-existent")
 		// Should return zero value of Config
 		assert.Equal(t, 0, config.ConcurrencyLimit)
 	})
 
-	t.Run("Set_And_Get", func(t *testing.T) {
+	t.Run("SetAndGet", func(t *testing.T) {
 		configSet := NewConfigSet()
 		dagName := "test-dag"
 		expectedConfig := Config{
@@ -39,7 +39,7 @@ func TestConfigSet(t *testing.T) {
 		assert.Equal(t, 1, DefaultConfig.ConcurrencyLimit)
 	})
 
-	t.Run("Concurrent_Access", func(t *testing.T) {
+	t.Run("ConcurrentAccess", func(t *testing.T) {
 		configSet := NewConfigSet()
 		dagName := "concurrent-dag"
 
@@ -70,7 +70,7 @@ func TestConfigSet(t *testing.T) {
 		_ = configSet.Get(dagName)
 	})
 
-	t.Run("Multiple_DAGs", func(t *testing.T) {
+	t.Run("MultipleDAGs", func(t *testing.T) {
 		configSet := NewConfigSet()
 
 		dag1 := "dag-1"

@@ -11,7 +11,7 @@ import (
 )
 
 func TestNewTracer(t *testing.T) {
-	t.Run("Disabled OTel", func(t *testing.T) {
+	t.Run("DisabledOTel", func(t *testing.T) {
 		dag := &digraph.DAG{
 			Name: "test-dag",
 			OTel: nil, // OTel not configured
@@ -24,7 +24,7 @@ func TestNewTracer(t *testing.T) {
 		assert.Nil(t, tracer.provider)
 	})
 
-	t.Run("OTel disabled explicitly", func(t *testing.T) {
+	t.Run("OTelDisabledExplicitly", func(t *testing.T) {
 		dag := &digraph.DAG{
 			Name: "test-dag",
 			OTel: &digraph.OTelConfig{
@@ -40,7 +40,7 @@ func TestNewTracer(t *testing.T) {
 		assert.Nil(t, tracer.provider)
 	})
 
-	t.Run("Missing endpoint", func(t *testing.T) {
+	t.Run("MissingEndpoint", func(t *testing.T) {
 		dag := &digraph.DAG{
 			Name: "test-dag",
 			OTel: &digraph.OTelConfig{
@@ -55,7 +55,7 @@ func TestNewTracer(t *testing.T) {
 		assert.Nil(t, tracer)
 	})
 
-	t.Run("gRPC endpoint detection", func(t *testing.T) {
+	t.Run("GRPCEndpointDetection", func(t *testing.T) {
 		dag := &digraph.DAG{
 			Name: "test-dag",
 			OTel: &digraph.OTelConfig{
@@ -76,7 +76,7 @@ func TestNewTracer(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("HTTP endpoint detection", func(t *testing.T) {
+	t.Run("HTTPEndpointDetection", func(t *testing.T) {
 		dag := &digraph.DAG{
 			Name: "test-dag",
 			OTel: &digraph.OTelConfig{
@@ -97,7 +97,7 @@ func TestNewTracer(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("With headers and timeout", func(t *testing.T) {
+	t.Run("WithHeadersAndTimeout", func(t *testing.T) {
 		dag := &digraph.DAG{
 			Name: "test-dag",
 			OTel: &digraph.OTelConfig{
@@ -121,7 +121,7 @@ func TestNewTracer(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("With resource attributes", func(t *testing.T) {
+	t.Run("WithResourceAttributes", func(t *testing.T) {
 		dag := &digraph.DAG{
 			Name: "test-dag",
 			OTel: &digraph.OTelConfig{
@@ -150,7 +150,7 @@ func TestNewTracer(t *testing.T) {
 }
 
 func TestTracerStart(t *testing.T) {
-	t.Run("With enabled tracer", func(t *testing.T) {
+	t.Run("WithEnabledTracer", func(t *testing.T) {
 		dag := &digraph.DAG{
 			Name: "test-dag",
 			OTel: &digraph.OTelConfig{
@@ -174,7 +174,7 @@ func TestTracerStart(t *testing.T) {
 		span.End()
 	})
 
-	t.Run("With disabled tracer", func(t *testing.T) {
+	t.Run("WithDisabledTracer", func(t *testing.T) {
 		dag := &digraph.DAG{
 			Name: "test-dag",
 			OTel: nil,

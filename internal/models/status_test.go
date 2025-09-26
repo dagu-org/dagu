@@ -279,17 +279,17 @@ func TestPID_String(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "positive PID",
+			name:     "PositivePID",
 			pid:      models.PID(12345),
 			expected: "12345",
 		},
 		{
-			name:     "zero PID",
+			name:     "ZeroPID",
 			pid:      models.PID(0),
 			expected: "",
 		},
 		{
-			name:     "negative PID",
+			name:     "NegativePID",
 			pid:      models.PID(-1),
 			expected: "",
 		},

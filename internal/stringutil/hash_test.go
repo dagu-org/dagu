@@ -15,23 +15,23 @@ func TestBase58EncodeSHA256(t *testing.T) {
 		expected string // We'll validate format rather than exact value
 	}{
 		{
-			name:  "simple string",
+			name:  "SimpleString",
 			input: "hello",
 		},
 		{
-			name:  "empty string",
+			name:  "EmptyString",
 			input: "",
 		},
 		{
-			name:  "child DAG ID format",
+			name:  "ChildDAGIDFormat",
 			input: "12345:process-data:{\"REGION\":\"us-east-1\",\"VERSION\":\"1.0.0\"}",
 		},
 		{
-			name:  "unicode characters",
+			name:  "UnicodeCharacters",
 			input: "Hello 世界 🌍",
 		},
 		{
-			name:  "long input",
+			name:  "LongInput",
 			input: "parent-dag-run-id-12345:parallel-step-name:{\"param1\":\"value1\",\"param2\":\"value2\",\"param3\":\"value3\"}",
 		},
 	}
@@ -62,27 +62,27 @@ func TestBase58Encode(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "empty bytes",
+			name:     "EmptyBytes",
 			input:    []byte{},
 			expected: "",
 		},
 		{
-			name:     "single zero byte",
+			name:     "SingleZeroByte",
 			input:    []byte{0},
 			expected: "1",
 		},
 		{
-			name:     "multiple zero bytes",
+			name:     "MultipleZeroBytes",
 			input:    []byte{0, 0, 0},
 			expected: "111",
 		},
 		{
-			name:     "simple bytes",
+			name:     "SimpleBytes",
 			input:    []byte{1, 2, 3},
 			expected: "Ldp",
 		},
 		{
-			name:     "SHA256 hash",
+			name:     "SHA256Hash",
 			input:    func() []byte { h := sha256.Sum256([]byte("test")); return h[:] }(),
 			expected: "Bjj4AWTNrjQVHqgWbP2XaxXz4DYH1WZMyERHxsad7b2w",
 		},
@@ -106,21 +106,21 @@ func TestBase58EncodeSHA256_ChildDAGScenarios(t *testing.T) {
 		expectedLength int // Expected length range
 	}{
 		{
-			name:           "simple child DAG",
+			name:           "SimpleChildDAG",
 			parentRunID:    "parent-12345",
 			stepName:       "process",
 			params:         `{"env":"prod"}`,
 			expectedLength: 40, // Base58 encoded SHA256 is typically 43-44 chars
 		},
 		{
-			name:           "child DAG with complex params",
+			name:           "ChildDAGWithComplexParams",
 			parentRunID:    "workflow-abc-123",
 			stepName:       "etl-pipeline",
 			params:         `{"AWS_REGION":"us-east-1","BATCH_SIZE":"1000","MODE":"parallel"}`,
 			expectedLength: 40,
 		},
 		{
-			name:           "nested child DAG scenario",
+			name:           "NestedChildDAGScenario",
 			parentRunID:    "root-workflow:child-workflow:grandchild-12345",
 			stepName:       "data-processor",
 			params:         `{"input":"/data/raw","output":"/data/processed"}`,

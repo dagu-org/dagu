@@ -18,7 +18,7 @@ func TestLogDir(t *testing.T) {
 		validate func(t *testing.T, path string)
 	}{
 		{
-			name: "using LogDir",
+			name: "UsingLogDir",
 			config: cmd.LogConfig{
 				BaseDir: t.TempDir(),
 				Name:    "test_dag",
@@ -29,7 +29,7 @@ func TestLogDir(t *testing.T) {
 			},
 		},
 		{
-			name: "using DAGLogDir",
+			name: "UsingDAGLogDir",
 			config: cmd.LogConfig{
 				DAGLogDir: filepath.Join(t.TempDir(), "custom"),
 				Name:      "test_dag",
@@ -41,7 +41,7 @@ func TestLogDir(t *testing.T) {
 			},
 		},
 		{
-			name: "with special characters in DAGName",
+			name: "WithSpecialCharactersInDAGName",
 			config: cmd.LogConfig{
 				BaseDir: t.TempDir(),
 				Name:    "test/dag*special",
@@ -67,7 +67,7 @@ func TestLogDir(t *testing.T) {
 }
 
 func TestLogFileName(t *testing.T) {
-	t.Run("filename format", func(t *testing.T) {
+	t.Run("FilenameFormat", func(t *testing.T) {
 		cfg := cmd.LogConfig{
 			Name:     "test dag",
 			DAGRunID: "12345678901234", // Longer than 8 chars to test truncation
@@ -93,7 +93,7 @@ func TestLogConfigValidation(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "valid settings",
+			name: "ValidSettings",
 			config: cmd.LogConfig{
 				BaseDir: "/tmp",
 				Name:    "test",
@@ -101,14 +101,14 @@ func TestLogConfigValidation(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "empty DAGName",
+			name: "EmptyDAGName",
 			config: cmd.LogConfig{
 				BaseDir: "/tmp",
 			},
 			wantErr: true,
 		},
 		{
-			name: "no directories",
+			name: "NoDirectories",
 			config: cmd.LogConfig{
 				Name: "test",
 			},

@@ -17,8 +17,7 @@ func TestRepeatPolicy_WithLimit(t *testing.T) {
 
 	// Load DAG with repeat limit
 	dag := th.DAG(t, `steps:
-  - name: repeat-step
-    command: echo "Executing step"
+  - command: echo "Executing step"
     repeatPolicy:
       repeat: true
       limit: 3
@@ -44,7 +43,6 @@ func TestRepeatPolicy_WithLimit(t *testing.T) {
 	// Verify the step completed successfully
 	require.Len(t, dagRunStatus.Nodes, 1)
 	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
-	assert.Equal(t, "repeat-step", dagRunStatus.Nodes[0].Step.Name)
 
 	// Verify it executed exactly 3 times (as per limit)
 	assert.Equal(t, 3, dagRunStatus.Nodes[0].DoneCount, "Step should have executed exactly 3 times")
@@ -55,8 +53,7 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 
 	// Load DAG with repeat limit and condition
 	dag := th.DAG(t, `steps:
-  - name: increment-counter
-    script: |
+  - script: |
       COUNTER_FILE="/tmp/dagu_repeat_counter_test2"
       COUNT=0
       if [ -f "$COUNTER_FILE" ]; then
@@ -109,8 +106,7 @@ func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 
 	// Load DAG that repeats with a limit
 	dag := th.DAG(t, `steps:
-  - name: check-flag
-    command: echo "Checking for flag file"
+  - command: echo "Checking for flag file"
     repeatPolicy:
       repeat: true
       limit: 3
@@ -144,8 +140,7 @@ func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
 
 	// Load DAG with boolean repeat mode (should repeat while step succeeds, like unconditional while)
 	dag := th.DAG(t, `steps:
-  - name: repeat-step
-    command: echo "Unconditional while loop using boolean mode"
+  - command: echo "Unconditional while loop using boolean mode"
     repeatPolicy:
       repeat: true
       limit: 3
@@ -171,7 +166,6 @@ func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
 	// Verify the step completed successfully
 	require.Len(t, dagRunStatus.Nodes, 1)
 	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
-	assert.Equal(t, "repeat-step", dagRunStatus.Nodes[0].Step.Name)
 
 	// Verify it executed exactly 3 times (as per limit)
 	assert.Equal(t, 3, dagRunStatus.Nodes[0].DoneCount, "Step should have executed exactly 3 times")
@@ -182,8 +176,7 @@ func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
 
 	// Load DAG with until mode and exitCode (should repeat until step returns exit code 0)
 	dag := th.DAG(t, `steps:
-  - name: repeat-step
-    script: |
+  - script: |
       COUNT_FILE="/tmp/dagu_repeat_until_unconditional_test"
       COUNT=0
       if [ -f "$COUNT_FILE" ]; then
@@ -237,8 +230,7 @@ func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
 
 	// Load DAG with repeat: true (should work as "while" mode)
 	dag := th.DAG(t, `steps:
-  - name: repeat-step
-    command: echo "Boolean true compatibility test"
+  - command: echo "Boolean true compatibility test"
     repeatPolicy:
       repeat: true
       limit: 4
@@ -264,7 +256,6 @@ func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
 	// Verify the step completed successfully
 	require.Len(t, dagRunStatus.Nodes, 1)
 	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
-	assert.Equal(t, "repeat-step", dagRunStatus.Nodes[0].Step.Name)
 
 	// Verify it executed exactly 4 times (as per limit, confirming repeat: true works)
 	assert.Equal(t, 4, dagRunStatus.Nodes[0].DoneCount, "Step should have executed exactly 4 times")
@@ -280,8 +271,7 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
 	th := test.Setup(t)
 
 	dag := th.DAG(t, `steps:
-  - name: repeat-on-fail
-    command: |
+  - command: |
       #!/bin/bash
       COUNTER_FILE="/tmp/dagu-test-counter-repeat-on-exitcode"
       if [ ! -f "$COUNTER_FILE" ]; then

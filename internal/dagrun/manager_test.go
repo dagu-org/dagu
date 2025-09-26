@@ -26,7 +26,7 @@ func TestManager(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: "sleep 1"
+    command: sleep 1
 `)
 		ctx := th.Context
 
@@ -145,7 +145,7 @@ steps:
 	t.Run("InvalidUpdateStatusWithInvalidDAGRunID", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: "sleep 1"
+    command: sleep 1
 `)
 		ctx := th.Context
 		cli := th.DAGRunMgr
@@ -183,7 +183,7 @@ func TestClient_RunDAG(t *testing.T) {
 	t.Run("Stop", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: "sleep 10"
+    command: sleep 10
 `)
 		ctx := th.Context
 
@@ -200,7 +200,7 @@ func TestClient_RunDAG(t *testing.T) {
 	t.Run("Restart", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: "sleep 1"
+    command: sleep 1
 `)
 		ctx := th.Context
 
@@ -299,9 +299,9 @@ func TestHandleTask(t *testing.T) {
 	t.Run("HandleTaskRetry", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: "echo step1"
+    command: echo step1
   - name: "2"
-    command: "echo step2"
+    command: echo step2
 `)
 		ctx := th.Context
 		cli := th.DAGRunMgr
@@ -340,9 +340,9 @@ func TestHandleTask(t *testing.T) {
 	t.Run("HandleTaskRetryWithStep", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: "echo step1"
+    command: echo step1
   - name: "2"
-    command: "echo step2"
+    command: echo step2
 `)
 		ctx := th.Context
 		cli := th.DAGRunMgr
@@ -382,7 +382,7 @@ func TestHandleTask(t *testing.T) {
 	t.Run("HandleTaskStart", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "process"
-    command: "echo processing $1"
+    command: echo processing $1
 `)
 		ctx := th.Context
 		cli := th.DAGRunMgr

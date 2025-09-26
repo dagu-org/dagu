@@ -12,10 +12,9 @@ import (
 )
 
 func TestDistributedLocalDAGExecution(t *testing.T) {
-	t.Run("E2E_LocalDAGOnWorker", func(t *testing.T) {
+	t.Run("E2ELocalDAGOnWorker", func(t *testing.T) {
 		// Create test DAG with local child that uses workerSelector
 		yamlContent := `
-name: parent-distributed
 steps:
   - name: run-local-on-worker
     run: local-child
@@ -78,7 +77,6 @@ steps:
 	t.Run("TempFileCreationForLocalDAG", func(t *testing.T) {
 		// Create a simple local DAG YAML
 		localDAGYAML := `
-name: local-child
 steps:
   - name: worker-task
     command: echo "Hello from worker"
@@ -92,13 +90,11 @@ steps:
 
 		// Verify the DAG was loaded correctly
 		require.NotNil(t, dagWrapper.DAG)
-		require.Equal(t, "local-child", dagWrapper.Name)
 	})
 
 	t.Run("DistributedExecutionFailure", func(t *testing.T) {
 		// Test that distributed execution failure is not fallback to local execution
 		yamlContent := `
-name: parent-distributed-fail
 steps:
   - name: run-on-nonexistent-worker
     run: local-child

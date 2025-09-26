@@ -106,7 +106,7 @@ func TestJobReady(t *testing.T) {
 		wantErr        error
 	}{
 		{
-			name:           "skip_if_successful_true_with_recent_success",
+			name:           "SkipIfSuccessfulTrueWithRecentSuccess",
 			schedule:       "0 * * * *", // Every hour
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC), // 1 min after prev schedule
@@ -115,7 +115,7 @@ func TestJobReady(t *testing.T) {
 			wantErr:        scheduler.ErrJobSuccess,
 		},
 		{
-			name:           "skip_if_successful_false_with_recent_success",
+			name:           "SkipIfSuccessfulFalseWithRecentSuccess",
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC),
@@ -124,7 +124,7 @@ func TestJobReady(t *testing.T) {
 			wantErr:        nil,
 		},
 		{
-			name:           "already_running",
+			name:           "AlreadyRunning",
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -133,7 +133,7 @@ func TestJobReady(t *testing.T) {
 			wantErr:        scheduler.ErrJobRunning,
 		},
 		{
-			name:           "last_execution_after_next_schedule",
+			name:           "LastExecutionAfterNextSchedule",
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),
@@ -142,7 +142,7 @@ func TestJobReady(t *testing.T) {
 			wantErr:        scheduler.ErrJobFinished,
 		},
 		{
-			name:           "failed_previous_run",
+			name:           "FailedPreviousRun",
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC),
@@ -186,19 +186,19 @@ func TestPrevExecTime(t *testing.T) {
 		want     time.Time
 	}{
 		{
-			name:     "hourly_schedule",
+			name:     "HourlySchedule",
 			schedule: "0 * * * *",
 			now:      time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),
 			want:     time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 		},
 		{
-			name:     "every_five_minutes",
+			name:     "EveryFiveMinutes",
 			schedule: "*/5 * * * *",
 			now:      time.Date(2020, 1, 1, 1, 5, 0, 0, time.UTC),
 			want:     time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 		},
 		{
-			name:     "daily_schedule",
+			name:     "DailySchedule",
 			schedule: "0 0 * * *",
 			now:      time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC),
 			want:     time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -221,7 +221,7 @@ func TestPrevExecTime(t *testing.T) {
 func TestScheduler_QueueDisabled(t *testing.T) {
 	t.Parallel()
 
-	t.Run("QueueDisabled_SkipsQueueProcessing", func(t *testing.T) {
+	t.Run("QueueDisabledSkipsQueueProcessing", func(t *testing.T) {
 		th := test.SetupScheduler(t)
 		// Disable queues
 		th.Config.Queues.Enabled = false

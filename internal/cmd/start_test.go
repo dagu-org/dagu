@@ -66,11 +66,10 @@ steps:
 }
 
 func TestCmdStart_InteractiveMode(t *testing.T) {
-	t.Run("Works with explicit DAG path", func(t *testing.T) {
+	t.Run("WorksWithExplicitDAGPath", func(t *testing.T) {
 		// Create a test DAG
 		th := test.SetupCommand(t)
 		dagContent := `
-name: test-dag
 steps:
   - name: step1
     command: echo test
@@ -85,13 +84,13 @@ steps:
 		_ = cmd.Execute()
 	})
 
-	t.Run("Terminal detection function available", func(t *testing.T) {
+	t.Run("TerminalDetectionFunctionAvailable", func(t *testing.T) {
 		// Verify that term.IsTerminal is available and doesn't panic
 		isTTY := term.IsTerminal(int(os.Stdin.Fd()))
 		require.False(t, isTTY, "Tests should not run in a TTY")
 	})
 
-	t.Run("Interactive mode info message", func(t *testing.T) {
+	t.Run("InteractiveModeInfoMessage", func(t *testing.T) {
 		// Verify the info message is appropriate
 		expectedMsg := "No DAG specified, opening interactive selector..."
 		require.Contains(t, expectedMsg, "interactive selector")
@@ -99,10 +98,9 @@ steps:
 }
 
 func TestCmdStart_BackwardCompatibility(t *testing.T) {
-	t.Run("Should accept parameters after --", func(t *testing.T) {
+	t.Run("ShouldAcceptParametersAfter", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		dagContent := `
-name: test-params
 params: KEY1=default1 KEY2=default2
 steps:
   - name: step1
@@ -118,10 +116,9 @@ steps:
 		_ = cmd.Execute()
 	})
 
-	t.Run("Should accept --params flag", func(t *testing.T) {
+	t.Run("ShouldAcceptParamsFlag", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		dagContent := `
-name: test-params-flag
 params: KEY=default
 steps:
   - name: step1

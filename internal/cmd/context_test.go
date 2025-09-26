@@ -15,42 +15,42 @@ func TestContext_StringParam(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			name:      "String param without quotes",
+			name:      "StringParamWithoutQuotes",
 			flagName:  "test-param",
 			flagValue: "hello",
 			expected:  "hello",
 			expectErr: false,
 		},
 		{
-			name:      "String param with double quotes",
+			name:      "StringParamWithDoubleQuotes",
 			flagName:  "test-param",
 			flagValue: `"world"`,
 			expected:  "world",
 			expectErr: false,
 		},
 		{
-			name:      "Empty string param",
+			name:      "EmptyStringParam",
 			flagName:  "test-param",
 			flagValue: `""`,
 			expected:  "",
 			expectErr: false,
 		},
 		{
-			name:      "String param with escaped double quotes",
+			name:      "StringParamWithEscapedDoubleQuotes",
 			flagName:  "test-param",
 			flagValue: `"{\"key\":\"value with \\\"quotes\\\"\"}"`, // This is the string literal `{"key":"value with \"quotes\""}`
 			expected:  `{"key":"value with \"quotes\""}`,
 			expectErr: false,
 		},
 		{
-			name:      "JSON string param",
+			name:      "JSONStringParam",
 			flagName:  "test-param",
 			flagValue: `"{ \"name\": \"test\", \"value\": 123 }"`, // This is the string literal `{ "name": "test", "value": 123 }`
 			expected:  `{ "name": "test", "value": 123 }`,
 			expectErr: false,
 		},
 		{
-			name:      "Flag not found",
+			name:      "FlagNotFound",
 			flagName:  "non-existent-param",
 			flagValue: "", // Value doesn't matter if flag not found
 			expected:  "",

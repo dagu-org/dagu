@@ -18,25 +18,25 @@ func TestShouldEnableProgress(t *testing.T) {
 		expectedResult bool
 	}{
 		{
-			name:           "Progress enabled when not quiet and env not set",
+			name:           "ProgressEnabledWhenNotQuietAndEnvNotSet",
 			quiet:          false,
 			envDisable:     "",
 			expectedResult: true, // Would be true if terminal check passes
 		},
 		{
-			name:           "Progress disabled when quiet",
+			name:           "ProgressDisabledWhenQuiet",
 			quiet:          true,
 			envDisable:     "",
 			expectedResult: false,
 		},
 		{
-			name:           "Progress disabled when env variable set",
+			name:           "ProgressDisabledWhenEnvVariableSet",
 			quiet:          false,
 			envDisable:     "1",
 			expectedResult: false,
 		},
 		{
-			name:           "Progress disabled when both quiet and env set",
+			name:           "ProgressDisabledWhenBothQuietAndEnvSet",
 			quiet:          true,
 			envDisable:     "1",
 			expectedResult: false,
@@ -80,22 +80,22 @@ func TestConfigureLoggerForProgress(t *testing.T) {
 		logFormat string
 	}{
 		{
-			name:      "Basic configuration",
+			name:      "BasicConfiguration",
 			debug:     false,
 			logFormat: "",
 		},
 		{
-			name:      "Debug enabled",
+			name:      "DebugEnabled",
 			debug:     true,
 			logFormat: "",
 		},
 		{
-			name:      "With log format",
+			name:      "WithLogFormat",
 			debug:     false,
 			logFormat: "json",
 		},
 		{
-			name:      "Debug and log format",
+			name:      "DebugAndLogFormat",
 			debug:     true,
 			logFormat: "json",
 		},

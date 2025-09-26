@@ -503,7 +503,7 @@ func TestCollector_SchedulerStatus(t *testing.T) {
 	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*models.DAGRunStatus{}, nil)
 	queueStore.On("All", mock.Anything).Return([]models.QueuedItemData{}, nil)
 
-	t.Run("Active scheduler", func(t *testing.T) {
+	t.Run("ActiveScheduler", func(t *testing.T) {
 		serviceRegistry := &mockServiceRegistry{}
 		serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return(
 			[]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}},
@@ -529,7 +529,7 @@ func TestCollector_SchedulerStatus(t *testing.T) {
 		assert.True(t, schedulerRunningFound, "scheduler_running metric not found")
 	})
 
-	t.Run("Inactive scheduler", func(t *testing.T) {
+	t.Run("InactiveScheduler", func(t *testing.T) {
 		serviceRegistry := &mockServiceRegistry{}
 		serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return(
 			[]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusInactive}},
@@ -555,7 +555,7 @@ func TestCollector_SchedulerStatus(t *testing.T) {
 		assert.True(t, schedulerRunningFound, "scheduler_running metric not found")
 	})
 
-	t.Run("No scheduler instances", func(t *testing.T) {
+	t.Run("NoSchedulerInstances", func(t *testing.T) {
 		serviceRegistry := &mockServiceRegistry{}
 		serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return(
 			[]models.HostInfo{},

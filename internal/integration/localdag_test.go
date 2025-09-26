@@ -19,10 +19,7 @@ steps:
     params: "NAME=World"
     output: CHILD_RESULT
 
-  - name: use-output
-    command: echo "Child said ${CHILD_RESULT.outputs.GREETING}"
-    depends: 
-      - run-local-child
+  - echo "Child said ${CHILD_RESULT.outputs.GREETING}"
 
 ---
 
@@ -30,15 +27,10 @@ name: local-child
 params:
   - NAME
 steps:
-  - name: greet
-    command: echo "Hello, ${NAME}!"
+  - command: echo "Hello, ${NAME}!"
     output: GREETING
-  
-  - name: confirm
-    command: echo "Greeting was ${GREETING}"
-    output: CONFIRMATION
-    depends: 
-      - greet
+
+  - echo "Greeting was ${GREETING}"
 `
 		// Setup test helper
 		th := test.Setup(t)
@@ -89,18 +81,9 @@ params:
   - TASK_ID
   - TASK_NAME
 steps:
-  - name: start
-    command: echo "Starting task ${TASK_ID} - ${TASK_NAME}"
-  
-  - name: process
-    command: echo "Processing ${TASK_NAME} with ID ${TASK_ID}"
-    depends:
-      - start
-  
-  - name: complete
-    command: echo "Completed ${TASK_NAME}"
-    depends:
-      - process
+  - echo "Starting task ${TASK_ID} - ${TASK_NAME}"
+  - echo "Processing ${TASK_NAME} with ID ${TASK_ID}"
+  - echo "Completed ${TASK_NAME}"
 `
 		// Setup test helper
 		th := test.Setup(t)
@@ -141,15 +124,12 @@ name: middle-dag
 params:
   - ROOT_PARAM
 steps:
-  - name: process-root-param
-    command: echo "Received ${ROOT_PARAM}"
+  - command: echo "Received ${ROOT_PARAM}"
     output: MIDDLE_OUTPUT
-  
+
   - name: run-leaf-dag
     run: leaf-dag
     params: "MIDDLE_PARAM=${MIDDLE_OUTPUT} LEAF_PARAM=FromMiddle"
-    depends:
-      - process-root-param
 
 ---
 
@@ -158,8 +138,7 @@ params:
   - MIDDLE_PARAM
   - LEAF_PARAM
 steps:
-  - name: final-task
-    command: |
+  - command: |
       echo "Middle: ${MIDDLE_PARAM}, Leaf: ${LEAF_PARAM}"
 `
 		th := test.Setup(t)
@@ -197,16 +176,12 @@ steps:
 
   - name: run-prod-dag
     run: production-dag
-    depends:
-      - check-env
     preconditions:
       - condition: "${ENV_TYPE}"
         expected: "production"
 
   - name: run-dev-dag
     run: development-dag
-    depends:
-      - check-env
     preconditions:
       - condition: "${ENV_TYPE}"
         expected: "development"
@@ -215,25 +190,15 @@ steps:
 
 name: production-dag
 steps:
-  - name: prod-deploy
-    command: echo "Deploying to production"
-  
-  - name: prod-verify
-    command: echo "Verifying production deployment"
-    depends:
-      - prod-deploy
+  - echo "Deploying to production"
+  - echo "Verifying production deployment"
 
 ---
 
 name: development-dag
 steps:
-  - name: dev-build
-    command: echo "Building for development"
-  
-  - name: dev-test
-    command: echo "Running development tests"
-    depends:
-      - dev-build
+  - echo "Building for development"
+  - echo "Running development tests"
 `
 		th := test.Setup(t)
 
@@ -275,15 +240,12 @@ steps:
   - name: process-data
     run: processor-dag
     params: "INPUT_DATA=${GEN_OUTPUT.outputs.DATA}"
-    depends:
-      - generate-data
 
 ---
 
 name: generator-dag
 steps:
-  - name: create-data
-    command: echo "test-value-42"
+  - command: echo "test-value-42"
     output: DATA
 
 ---
@@ -292,15 +254,11 @@ name: processor-dag
 params:
   - INPUT_DATA
 steps:
-  - name: parse-data
-    command: echo "Processing ${INPUT_DATA}"
+  - command: echo "Processing ${INPUT_DATA}"
     output: RESULT
-  
-  - name: validate-data
-    command: |
+
+  - command: |
       echo "Validated: ${RESULT}"
-    depends:
-      - parse-data
 `
 		th := test.Setup(t)
 
@@ -336,10 +294,9 @@ steps:
 
 ---
 
-name: existing-dag
+name: some-other-dag
 steps:
-  - name: task
-    command: echo "test"
+  - echo "test"
 `
 		th := test.Setup(t)
 
@@ -375,15 +332,11 @@ steps:
   - name: task1
     run: task-dag
     params: "TASK_NAME=Task1 SETUP=${SETUP_STATUS}"
-    depends:
-      - setup
     output: TASK1_RESULT
 
   - name: task2
     run: task-dag
     params: "TASK_NAME=Task2 SETUP=${SETUP_STATUS}"
-    depends:
-      - setup
     output: TASK2_RESULT
 
   - name: combine
@@ -400,8 +353,7 @@ params:
   - TASK_NAME
   - SETUP
 steps:
-  - name: process
-    command: echo "${TASK_NAME} processing with ${SETUP}"
+  - command: echo "${TASK_NAME} processing with ${SETUP}"
     output: RESULT
 `
 		th := test.Setup(t)
@@ -456,13 +408,11 @@ params:
   - TASK_ID
   - TASK_NAME
 steps:
-  - name: s1
-    command: exit 1
+  - command: exit 1
     continueOn:
       failure: true
-  
-  - name: s2
-    command: exit 0
+
+  - exit 0
 `
 		// Setup test helper
 		th := test.Setup(t)
@@ -491,13 +441,11 @@ params:
   - TASK_ID
   - TASK_NAME
 steps:
-  - name: s1
-    command: exit 1
+  - command: exit 1
     continueOn:
       failure: true
-  
-  - name: s2
-    command: exit 0
+
+  - exit 0
 `
 		// Setup test helper
 		th := test.Setup(t)

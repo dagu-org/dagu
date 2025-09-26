@@ -26,31 +26,31 @@ func TestSubstituteCommands(t *testing.T) {
 		skipOnOS   []string
 	}{
 		{
-			name:    "no command substitution needed",
+			name:    "NoCommandSubstitutionNeeded",
 			input:   "hello world",
 			want:    "hello world",
 			wantErr: false,
 		},
 		{
-			name:    "simple echo command",
+			name:    "SimpleEchoCommand",
 			input:   "prefix `echo hello` suffix",
 			want:    "prefix hello suffix",
 			wantErr: false,
 		},
 		{
-			name:    "multiple commands",
+			name:    "MultipleCommands",
 			input:   "`echo foo` and `echo bar`",
 			want:    "foo and bar",
 			wantErr: false,
 		},
 		{
-			name:    "nested quotes",
+			name:    "NestedQuotes",
 			input:   "`echo \"hello world\"`",
 			want:    "hello world",
 			wantErr: false,
 		},
 		{
-			name:    "command with environment variable",
+			name:    "CommandWithEnvironmentVariable",
 			input:   "`echo $TEST_VAR`",
 			want:    "test_value",
 			wantErr: false,
@@ -60,35 +60,35 @@ func TestSubstituteCommands(t *testing.T) {
 			cleanupEnv: []string{"TEST_VAR"},
 		},
 		{
-			name:    "command with spaces",
+			name:    "CommandWithSpaces",
 			input:   "`echo 'hello   world'`",
 			want:    "hello   world",
 			wantErr: false,
 		},
 		{
-			name:    "invalid command",
+			name:    "InvalidCommand",
 			input:   "`nonexistentcommand123`",
 			wantErr: true,
 		},
 		{
-			name:    "empty backticks",
+			name:    "EmptyBackticks",
 			input:   "``",
 			want:    "``",
 			wantErr: false,
 		},
 		{
-			name:    "command that returns error",
+			name:    "CommandThatReturnsError",
 			input:   "`exit 1`",
 			wantErr: true,
 		},
 		{
-			name:    "command with pipeline",
+			name:    "CommandWithPipeline",
 			input:   "`echo hello | tr 'a-z' 'A-Z'`",
 			want:    "HELLO",
 			wantErr: false,
 		},
 		{
-			name:    "multiple lines in output",
+			name:    "MultipleLinesInOutput",
 			input:   "`printf 'line1\\nline2'`",
 			want:    "line1\nline2",
 			wantErr: false,
@@ -146,31 +146,31 @@ func TestSubstituteCommandsEdgeCases(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "empty input",
+			name:    "EmptyInput",
 			input:   "",
 			want:    "",
 			wantErr: false,
 		},
 		{
-			name:    "only spaces",
+			name:    "OnlySpaces",
 			input:   "     ",
 			want:    "     ",
 			wantErr: false,
 		},
 		{
-			name:    "unmatched backticks",
+			name:    "UnmatchedBackticks",
 			input:   "hello `world",
 			want:    "hello `world",
 			wantErr: false,
 		},
 		{
-			name:    "escaped backticks",
+			name:    "EscapedBackticks",
 			input:   "hello \\`world\\`",
 			want:    "hello \\`world\\`",
 			wantErr: false,
 		},
 		{
-			name:    "multiple backticks without command",
+			name:    "MultipleBackticksWithoutCommand",
 			input:   "``````",
 			want:    "``````",
 			wantErr: false,
@@ -199,73 +199,73 @@ func TestSubstituteCommands_Extended(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "simple command substitution",
+			name:    "SimpleCommandSubstitution",
 			input:   "`echo hello`",
 			want:    "hello",
 			wantErr: false,
 		},
 		{
-			name:    "command in middle of string",
+			name:    "CommandInMiddleOfString",
 			input:   "prefix `echo test` suffix",
 			want:    "prefix test suffix",
 			wantErr: false,
 		},
 		{
-			name:    "multiple commands",
+			name:    "MultipleCommands",
 			input:   "`echo one` and `echo two`",
 			want:    "one and two",
 			wantErr: false,
 		},
 		{
-			name:    "nested backticks not supported",
+			name:    "NestedBackticksNotSupported",
 			input:   "`echo `echo nested``",
 			want:    "echo nested``",
 			wantErr: false,
 		},
 		{
-			name:    "command with args",
+			name:    "CommandWithArgs",
 			input:   "`echo hello world`",
 			want:    "hello world",
 			wantErr: false,
 		},
 		{
-			name:    "empty command",
+			name:    "EmptyCommand",
 			input:   "``",
 			want:    "``",
 			wantErr: false,
 		},
 		{
-			name:    "command failure",
+			name:    "CommandFailure",
 			input:   "`false`",
 			want:    "",
 			wantErr: true, // Command returns error on non-zero exit code
 		},
 		{
-			name:    "invalid command",
+			name:    "InvalidCommand",
 			input:   "`command_that_does_not_exist`",
 			want:    "",
 			wantErr: true,
 		},
 		{
-			name:    "no command substitution",
+			name:    "NoCommandSubstitution",
 			input:   "plain text without backticks",
 			want:    "plain text without backticks",
 			wantErr: false,
 		},
 		{
-			name:    "escaped backticks",
+			name:    "EscapedBackticks",
 			input:   "text with \\`escaped\\` backticks",
 			want:    "text with \\`escaped\\` backticks",
 			wantErr: false,
 		},
 		{
-			name:    "command with newline output",
+			name:    "CommandWithNewlineOutput",
 			input:   "`printf 'line1\nline2'`",
 			want:    "line1\nline2",
 			wantErr: false,
 		},
 		{
-			name:    "command with trailing newline removed",
+			name:    "CommandWithTrailingNewlineRemoved",
 			input:   "`echo -n hello`",
 			want:    "hello",
 			wantErr: false,
@@ -293,7 +293,7 @@ func TestExpandReferences_ComplexJSON(t *testing.T) {
 		want    string
 	}{
 		{
-			name:  "array access",
+			name:  "ArrayAccess",
 			input: "${DATA.items.[1].name}",
 			dataMap: map[string]string{
 				"DATA": `{"items": [{"name": "first"}, {"name": "second"}, {"name": "third"}]}`,
@@ -301,7 +301,7 @@ func TestExpandReferences_ComplexJSON(t *testing.T) {
 			want: "second",
 		},
 		{
-			name:  "boolean value",
+			name:  "BooleanValue",
 			input: "${CONFIG.enabled}",
 			dataMap: map[string]string{
 				"CONFIG": `{"enabled": true}`,
@@ -309,7 +309,7 @@ func TestExpandReferences_ComplexJSON(t *testing.T) {
 			want: "true",
 		},
 		{
-			name:  "number value",
+			name:  "NumberValue",
 			input: "${CONFIG.port}",
 			dataMap: map[string]string{
 				"CONFIG": `{"port": 8080}`,
@@ -317,7 +317,7 @@ func TestExpandReferences_ComplexJSON(t *testing.T) {
 			want: "8080",
 		},
 		{
-			name:  "null value",
+			name:  "NullValue",
 			input: "${CONFIG.optional}",
 			dataMap: map[string]string{
 				"CONFIG": `{"optional": null}`,
@@ -325,7 +325,7 @@ func TestExpandReferences_ComplexJSON(t *testing.T) {
 			want: "<nil>",
 		},
 		{
-			name:  "deeply nested",
+			name:  "DeeplyNested",
 			input: "${DATA.level1.level2.level3.value}",
 			dataMap: map[string]string{
 				"DATA": `{"level1": {"level2": {"level3": {"value": "deep"}}}}`,
@@ -333,7 +333,7 @@ func TestExpandReferences_ComplexJSON(t *testing.T) {
 			want: "deep",
 		},
 		{
-			name:  "array of objects",
+			name:  "ArrayOfObjects",
 			input: "${USERS.[0].email}",
 			dataMap: map[string]string{
 				"USERS": `[{"name": "Alice", "email": "alice@example.com"}, {"name": "Bob", "email": "bob@example.com"}]`,
@@ -341,7 +341,7 @@ func TestExpandReferences_ComplexJSON(t *testing.T) {
 			want: "alice@example.com",
 		},
 		{
-			name:  "special characters in JSON",
+			name:  "SpecialCharactersInJSON",
 			input: "${DATA.message}",
 			dataMap: map[string]string{
 				"DATA": `{"message": "Hello \"World\" with 'quotes'"}`,
@@ -434,7 +434,7 @@ func TestEvalOptions_Combinations(t *testing.T) {
 		want  string
 	}{
 		{
-			name:  "all features disabled",
+			name:  "AllFeaturesDisabled",
 			input: "$TEST_ENV `echo hello` ${VAR}",
 			opts: []EvalOption{
 				WithoutExpandEnv(),
@@ -443,7 +443,7 @@ func TestEvalOptions_Combinations(t *testing.T) {
 			want: "$TEST_ENV `echo hello` ${VAR}",
 		},
 		{
-			name:  "only variables enabled",
+			name:  "OnlyVariablesEnabled",
 			input: "$TEST_ENV `echo hello` ${VAR}",
 			opts: []EvalOption{
 				OnlyReplaceVars(),
@@ -452,7 +452,7 @@ func TestEvalOptions_Combinations(t *testing.T) {
 			want: "$TEST_ENV `echo hello` value",
 		},
 		{
-			name:  "multiple variable sets with step map",
+			name:  "MultipleVariableSetsWithStepMap",
 			input: "${VAR1} ${VAR2} ${step1.exit_code}",
 			opts: []EvalOption{
 				WithVariables(map[string]string{"VAR1": "first"}),

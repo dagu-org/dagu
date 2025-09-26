@@ -12,47 +12,47 @@ func TestSafeName(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "already safe string",
+			name:     "AlreadySafeString",
 			input:    "simple_file-name123",
 			expected: "simple_file-name123",
 		},
 		{
-			name:     "string with spaces",
+			name:     "StringWithSpaces",
 			input:    "file name with spaces",
 			expected: "file_name_with_spaces",
 		},
 		{
-			name:     "string with special characters",
+			name:     "StringWithSpecialCharacters",
 			input:    "file!@#$%^&*()name.txt",
 			expected: "file__________name_txt",
 		},
 		{
-			name:     "string with Windows reserved filename",
+			name:     "StringWithWindowsReservedFilename",
 			input:    "CON.txt",
 			expected: "CON_txt",
 		},
 		{
-			name:     "string with path-like characters",
+			name:     "StringWithPathLikeCharacters",
 			input:    "path/to\\file:name",
 			expected: "path_to_file_name",
 		},
 		{
-			name:     "empty string",
+			name:     "EmptyString",
 			input:    "",
 			expected: "",
 		},
 		{
-			name:     "very long string",
+			name:     "VeryLongString",
 			input:    strings.Repeat("a", 200),
 			expected: strings.Repeat("a", MaxSafeNameLength),
 		},
 		{
-			name:     "string with mixed characters",
+			name:     "StringWithMixedCharacters",
 			input:    "File Name 123!@#.txt",
 			expected: "File_Name_123____txt",
 		},
 		{
-			name:     "string with leading and trailing spaces",
+			name:     "StringWithLeadingAndTrailingSpaces",
 			input:    " filename ",
 			expected: "_filename_",
 		},

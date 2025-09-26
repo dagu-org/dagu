@@ -17,8 +17,7 @@ func TestValidateCommand(t *testing.T) {
 	t.Run("ValidSpec", func(t *testing.T) {
 		dag := th.DAG(t, `
 steps:
-  - name: "s1"
-    command: "echo ok"
+  - echo ok
 `)
 
 		// Run in subprocess to capture stdout/stderr and exit code
@@ -36,14 +35,13 @@ steps:
 		}
 	})
 
-	t.Run("InvalidDependency_Exit1", func(t *testing.T) {
+	t.Run("InvalidDependencyExit1", func(t *testing.T) {
 		// This DAG has a step depending on a non-existent step
 		dagFile := th.CreateDAGFile(t, "invalid.yaml", `
 steps:
-  - name: "a"
-    command: "echo A"
+  - echo A
   - name: "b"
-    command: "echo B"
+    command: echo B
     depends: ["missing_step"]
 `)
 

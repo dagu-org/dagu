@@ -19,27 +19,27 @@ func TestIsHTMLContent(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "HTML document with DOCTYPE",
+			name:     "HTMLDocumentWithDOCTYPE",
 			content:  "<!DOCTYPE html><html><body><h1>Test</h1></body></html>",
 			expected: true,
 		},
 		{
-			name:     "HTML document without DOCTYPE",
+			name:     "HTMLDocumentWithoutDOCTYPE",
 			content:  "<html><body><h1>Test</h1></body></html>",
 			expected: false,
 		},
 		{
-			name:     "Plain text with newlines",
+			name:     "PlainTextWithNewlines",
 			content:  "This is plain text\nwith some\nline breaks",
 			expected: false,
 		},
 		{
-			name:     "Plain text single line",
+			name:     "PlainTextSingleLine",
 			content:  "This is just plain text",
 			expected: false,
 		},
 		{
-			name:     "HTML with whitespace",
+			name:     "HTMLWithWhitespace",
 			content:  "  \n  <!DOCTYPE html>\n<html>\n<body>Test</body></html>  ",
 			expected: true,
 		},
@@ -60,37 +60,37 @@ func TestNewlineToBrTag(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "Unix newlines",
+			name:     "UnixNewlines",
 			input:    "Line 1\nLine 2\nLine 3",
 			expected: "Line 1<br />Line 2<br />Line 3",
 		},
 		{
-			name:     "Windows newlines",
+			name:     "WindowsNewlines",
 			input:    "Line 1\r\nLine 2\r\nLine 3",
 			expected: "Line 1<br />Line 2<br />Line 3",
 		},
 		{
-			name:     "Mac newlines",
+			name:     "MacNewlines",
 			input:    "Line 1\rLine 2\rLine 3",
 			expected: "Line 1<br />Line 2<br />Line 3",
 		},
 		{
-			name:     "Mixed newlines",
+			name:     "MixedNewlines",
 			input:    "Line 1\nLine 2\r\nLine 3\rLine 4",
 			expected: "Line 1<br />Line 2<br />Line 3<br />Line 4",
 		},
 		{
-			name:     "Escaped newlines",
+			name:     "EscapedNewlines",
 			input:    "Line 1\\nLine 2\\r\\nLine 3",
 			expected: "Line 1<br />Line 2<br />Line 3",
 		},
 		{
-			name:     "No newlines",
+			name:     "NoNewlines",
 			input:    "Single line text",
 			expected: "Single line text",
 		},
 		{
-			name:     "Empty string",
+			name:     "EmptyString",
 			input:    "",
 			expected: "",
 		},
@@ -114,7 +114,7 @@ func TestMailerContentTypeDetection(t *testing.T) {
 		description            string
 	}{
 		{
-			name: "Plain text email with newlines",
+			name: "PlainTextEmailWithNewlines",
 			emailBody: `Hello,
 
 This is a plain text email.
@@ -126,7 +126,7 @@ Dagu Team`,
 			description:            "Plain text should have newlines converted to <br /> tags",
 		},
 		{
-			name: "HTML email with table",
+			name: "HTMLEmailWithTable",
 			emailBody: `<!DOCTYPE html>
 <html>
 <head>
@@ -151,7 +151,7 @@ Dagu Team`,
 			description:            "HTML content should not have newlines converted to <br /> tags",
 		},
 		{
-			name: "Error message with angle brackets",
+			name: "ErrorMessageWithAngleBrackets",
 			emailBody: `Error occurred during execution:
 
 File not found: <missing.txt>
@@ -311,7 +311,7 @@ func TestMailerTimeout(t *testing.T) {
 	// Set a shorter timeout for testing
 	mailTimeout = 2 * time.Second
 
-	t.Run("sendWithNoAuth timeout on connection", func(t *testing.T) {
+	t.Run("SendWithNoAuthTimeoutOnConnection", func(t *testing.T) {
 		// Create a listener that accepts connections but never responds
 		listener, err := net.Listen("tcp", "127.0.0.1:0")
 		require.NoError(t, err)
@@ -350,7 +350,7 @@ func TestMailerTimeout(t *testing.T) {
 		assert.Contains(t, err.Error(), "timeout")
 	})
 
-	t.Run("sendWithNoAuth timeout during SMTP session", func(t *testing.T) {
+	t.Run("SendWithNoAuthTimeoutDuringSMTPSession", func(t *testing.T) {
 		// Create a mock server that delays responses
 		server, err := newMockSMTPServer(0, 0, 3*time.Second)
 		require.NoError(t, err)
@@ -382,7 +382,7 @@ func TestMailerTimeout(t *testing.T) {
 			strings.Contains(err.Error(), "deadline exceeded"))
 	})
 
-	t.Run("sendWithNoAuth successful within timeout", func(t *testing.T) {
+	t.Run("SendWithNoAuthSuccessfulWithinTimeout", func(t *testing.T) {
 		// Create a mock server that responds quickly
 		server, err := newMockSMTPServer(0, 0, 0)
 		require.NoError(t, err)
@@ -417,7 +417,7 @@ func TestMailerTimeout(t *testing.T) {
 		}
 	})
 
-	t.Run("sendWithAuth timeout", func(t *testing.T) {
+	t.Run("SendWithAuthTimeout", func(t *testing.T) {
 		// Set an even shorter timeout for this test
 		mailTimeout = 100 * time.Millisecond
 
@@ -453,7 +453,7 @@ func TestMailerTimeout(t *testing.T) {
 		assert.Less(t, elapsed, 500*time.Millisecond)
 	})
 
-	t.Run("Send method routes correctly", func(t *testing.T) {
+	t.Run("SendMethodRoutesCorrectly", func(t *testing.T) {
 		// Test that Send method correctly routes to sendWithAuth when credentials are provided
 		mailer := New(Config{
 			Host:     "invalid.host",

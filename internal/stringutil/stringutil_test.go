@@ -36,7 +36,7 @@ func Test_ParseTime(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, time.Date(2022, 2, 1, 2, 2, 2, 0, time.UTC), parsed)
 	})
-	t.Run("Valid_Legacy", func(t *testing.T) {
+	t.Run("ValidLegacy", func(t *testing.T) {
 		parsed, err := stringutil.ParseTime("2022-02-01 02:02:02")
 		require.NoError(t, err)
 		require.Equal(t, time.Date(2022, 2, 1, 2, 2, 2, 0, time.Now().Location()), parsed)
@@ -77,99 +77,99 @@ func TestIsJSONArray(t *testing.T) {
 	}{
 		// Valid JSON arrays
 		{
-			name:     "empty array",
+			name:     "EmptyArray",
 			input:    "[]",
 			expected: true,
 		},
 		{
-			name:     "array with strings",
+			name:     "ArrayWithStrings",
 			input:    `["item1", "item2", "item3"]`,
 			expected: true,
 		},
 		{
-			name:     "array with numbers",
+			name:     "ArrayWithNumbers",
 			input:    "[1, 2, 3, 4, 5]",
 			expected: true,
 		},
 		{
-			name:     "array with objects",
+			name:     "ArrayWithObjects",
 			input:    `[{"key": "value"}, {"key2": "value2"}]`,
 			expected: true,
 		},
 		{
-			name:     "array with mixed types",
+			name:     "ArrayWithMixedTypes",
 			input:    `["string", 123, true, null, {"key": "value"}]`,
 			expected: true,
 		},
 		{
-			name:     "array with whitespace",
+			name:     "ArrayWithWhitespace",
 			input:    "  [ 1 , 2 , 3 ]  ",
 			expected: true,
 		},
 		{
-			name:     "nested arrays",
+			name:     "NestedArrays",
 			input:    `[["a", "b"], ["c", "d"]]`,
 			expected: true,
 		},
 
 		// Invalid cases
 		{
-			name:     "empty string",
+			name:     "EmptyString",
 			input:    "",
 			expected: false,
 		},
 		{
-			name:     "single bracket",
+			name:     "SingleBracket",
 			input:    "[",
 			expected: false,
 		},
 		{
-			name:     "space separated items",
+			name:     "SpaceSeparatedItems",
 			input:    "item1 item2 item3",
 			expected: false,
 		},
 		{
-			name:     "shell command with brackets",
+			name:     "ShellCommandWithBrackets",
 			input:    "ls [abc]*.txt",
 			expected: false,
 		},
 		{
-			name:     "invalid JSON array - missing comma",
+			name:     "InvalidJSONArrayMissingComma",
 			input:    `["item1" "item2"]`,
 			expected: false,
 		},
 		{
-			name:     "invalid JSON array - trailing comma",
+			name:     "InvalidJSONArrayTrailingComma",
 			input:    `["item1", "item2",]`,
 			expected: false,
 		},
 		{
-			name:     "JSON object not array",
+			name:     "JSONObjectNotArray",
 			input:    `{"key": "value"}`,
 			expected: false,
 		},
 		{
-			name:     "string that starts with bracket",
+			name:     "StringThatStartsWithBracket",
 			input:    `[hello world`,
 			expected: false,
 		},
 		{
-			name:     "string that ends with bracket",
+			name:     "StringThatEndsWithBracket",
 			input:    `hello world]`,
 			expected: false,
 		},
 		{
-			name:     "malformed JSON",
+			name:     "MalformedJSON",
 			input:    `[{"key": "value"`,
 			expected: false,
 		},
 		{
-			name:     "array with unquoted strings",
+			name:     "ArrayWithUnquotedStrings",
 			input:    `[item1, item2, item3]`,
 			expected: false,
 		},
 		{
-			name:     "text with brackets but not JSON",
+			name:     "TextWithBracketsButNotJSON",
 			input:    "[this is not json]",
 			expected: false,
 		},
@@ -263,132 +263,132 @@ func TestIsMultiLine(t *testing.T) {
 	}{
 		// Single line cases
 		{
-			name:     "empty string",
+			name:     "EmptyString",
 			input:    "",
 			expected: false,
 		},
 		{
-			name:     "single line text",
+			name:     "SingleLineText",
 			input:    "hello world",
 			expected: false,
 		},
 		{
-			name:     "single word",
+			name:     "SingleWord",
 			input:    "hello",
 			expected: false,
 		},
 		{
-			name:     "single line with spaces",
+			name:     "SingleLineWithSpaces",
 			input:    "   hello world   ",
 			expected: false,
 		},
 		{
-			name:     "single line with special characters",
+			name:     "SingleLineWithSpecialCharacters",
 			input:    "hello@world.com",
 			expected: false,
 		},
 
 		// Multi-line cases with Unix line endings (\n)
 		{
-			name:     "two lines with unix ending",
+			name:     "TwoLinesWithUnixEnding",
 			input:    "line1\nline2",
 			expected: true,
 		},
 		{
-			name:     "multiple lines with unix endings",
+			name:     "MultipleLinesWithUnixEndings",
 			input:    "line1\nline2\nline3",
 			expected: true,
 		},
 		{
-			name:     "line ending at start",
+			name:     "LineEndingAtStart",
 			input:    "\nhello",
 			expected: true,
 		},
 		{
-			name:     "line ending at end",
+			name:     "LineEndingAtEnd",
 			input:    "hello\n",
 			expected: true,
 		},
 		{
-			name:     "only newline character",
+			name:     "OnlyNewlineCharacter",
 			input:    "\n",
 			expected: true,
 		},
 
 		// Multi-line cases with Windows line endings (\r\n)
 		{
-			name:     "two lines with windows ending",
+			name:     "TwoLinesWithWindowsEnding",
 			input:    "line1\r\nline2",
 			expected: true,
 		},
 		{
-			name:     "multiple lines with windows endings",
+			name:     "MultipleLinesWithWindowsEndings",
 			input:    "line1\r\nline2\r\nline3",
 			expected: true,
 		},
 		{
-			name:     "windows line ending at start",
+			name:     "WindowsLineEndingAtStart",
 			input:    "\r\nhello",
 			expected: true,
 		},
 		{
-			name:     "windows line ending at end",
+			name:     "WindowsLineEndingAtEnd",
 			input:    "hello\r\n",
 			expected: true,
 		},
 
 		// Multi-line cases with old Mac line endings (\r)
 		{
-			name:     "two lines with mac ending",
+			name:     "TwoLinesWithMacEnding",
 			input:    "line1\rline2",
 			expected: true,
 		},
 		{
-			name:     "multiple lines with mac endings",
+			name:     "MultipleLinesWithMacEndings",
 			input:    "line1\rline2\rline3",
 			expected: true,
 		},
 		{
-			name:     "mac line ending at start",
+			name:     "MacLineEndingAtStart",
 			input:    "\rhello",
 			expected: true,
 		},
 		{
-			name:     "mac line ending at end",
+			name:     "MacLineEndingAtEnd",
 			input:    "hello\r",
 			expected: true,
 		},
 		{
-			name:     "only carriage return character",
+			name:     "OnlyCarriageReturnCharacter",
 			input:    "\r",
 			expected: true,
 		},
 
 		// Mixed line endings
 		{
-			name:     "mixed line endings",
+			name:     "MixedLineEndings",
 			input:    "line1\nline2\r\nline3\rline4",
 			expected: true,
 		},
 		{
-			name:     "consecutive newlines",
+			name:     "ConsecutiveNewlines",
 			input:    "line1\n\nline3",
 			expected: true,
 		},
 		{
-			name:     "consecutive carriage returns",
+			name:     "ConsecutiveCarriageReturns",
 			input:    "line1\r\rline3",
 			expected: true,
 		},
 
 		// Edge cases
 		{
-			name:     "only whitespace with newline",
+			name:     "OnlyWhitespaceWithNewline",
 			input:    "   \n   ",
 			expected: true,
 		},
 		{
-			name:     "tabs and newlines",
+			name:     "TabsAndNewlines",
 			input:    "hello\tworld\nfoo",
 			expected: true,
 		},
@@ -410,104 +410,104 @@ func TestDetectSeparatorType(t *testing.T) {
 	}{
 		// JSON tests
 		{
-			name:     "json array",
+			name:     "JsonArray",
 			input:    `["item1", "item2", "item3"]`,
 			expected: stringutil.SeparatorTypeJSON,
 		},
 		{
-			name:     "json array with mixed types",
+			name:     "JsonArrayWithMixedTypes",
 			input:    `["string", 123, true, null]`,
 			expected: stringutil.SeparatorTypeJSON,
 		},
 
 		// Newline tests
 		{
-			name:     "unix newlines",
+			name:     "UnixNewlines",
 			input:    "line1\nline2\nline3",
 			expected: stringutil.SeparatorTypeNewline,
 		},
 		{
-			name:     "windows newlines",
+			name:     "WindowsNewlines",
 			input:    "line1\r\nline2\r\nline3",
 			expected: stringutil.SeparatorTypeNewline,
 		},
 		{
-			name:     "mixed newlines",
+			name:     "MixedNewlines",
 			input:    "line1\nline2\r\nline3\rline4",
 			expected: stringutil.SeparatorTypeNewline,
 		},
 
 		// Delimiter tests
 		{
-			name:     "comma separated",
+			name:     "CommaSeparated",
 			input:    "item1,item2,item3",
 			expected: stringutil.SeparatorTypeComma,
 		},
 		{
-			name:     "semicolon separated",
+			name:     "SemicolonSeparated",
 			input:    "item1;item2;item3",
 			expected: stringutil.SeparatorTypeSemicolon,
 		},
 		{
-			name:     "pipe separated",
+			name:     "PipeSeparated",
 			input:    "item1|item2|item3",
 			expected: stringutil.SeparatorTypePipe,
 		},
 		{
-			name:     "tab separated",
+			name:     "TabSeparated",
 			input:    "item1\titem2\titem3",
 			expected: stringutil.SeparatorTypeTab,
 		},
 
 		// Quoted strings tests
 		{
-			name:     "quoted strings with spaces",
+			name:     "QuotedStringsWithSpaces",
 			input:    `"item one" "item two" "item three"`,
 			expected: stringutil.SeparatorTypeQuoted,
 		},
 		{
-			name:     "mixed quoted and unquoted",
+			name:     "MixedQuotedAndUnquoted",
 			input:    `"quoted item" unquoted`,
 			expected: stringutil.SeparatorTypeQuoted,
 		},
 
 		// Space separated tests
 		{
-			name:     "simple space separated",
+			name:     "SimpleSpaceSeparated",
 			input:    "item1 item2 item3",
 			expected: stringutil.SeparatorTypeSpace,
 		},
 		{
-			name:     "multiple spaces",
+			name:     "MultipleSpaces",
 			input:    "item1   item2     item3",
 			expected: stringutil.SeparatorTypeSpace,
 		},
 
 		// Edge cases
 		{
-			name:     "empty string",
+			name:     "EmptyString",
 			input:    "",
 			expected: stringutil.SeparatorTypeSpace,
 		},
 		{
-			name:     "single item",
+			name:     "SingleItem",
 			input:    "single",
 			expected: stringutil.SeparatorTypeSpace,
 		},
 		{
-			name:     "whitespace only",
+			name:     "WhitespaceOnly",
 			input:    "   \t\n   ",
 			expected: stringutil.SeparatorTypeSpace,
 		},
 
 		// Priority tests (comma should win over other separators)
 		{
-			name:     "comma wins over semicolon",
+			name:     "CommaWinsOverSemicolon",
 			input:    "a,b,c;d",
 			expected: stringutil.SeparatorTypeComma,
 		},
 		{
-			name:     "pipe wins over comma when more frequent",
+			name:     "PipeWinsOverCommaWhenMoreFrequent",
 			input:    "a|b|c|d,e",
 			expected: stringutil.SeparatorTypePipe,
 		},
@@ -530,25 +530,25 @@ func TestParseSeparatedValues(t *testing.T) {
 	}{
 		// JSON array tests
 		{
-			name:     "json array strings",
+			name:     "JsonArrayStrings",
 			input:    `["item1", "item2", "item3"]`,
 			expected: []string{"item1", "item2", "item3"},
 			wantErr:  false,
 		},
 		{
-			name:     "json array with numbers",
+			name:     "JsonArrayWithNumbers",
 			input:    `["string", 123, true, false, null]`,
 			expected: []string{"string", "123", "true", "false", "null"},
 			wantErr:  false,
 		},
 		{
-			name:     "json array with objects",
+			name:     "JsonArrayWithObjects",
 			input:    `[{"key": "value"}, "string", 42]`,
 			expected: []string{`{"key":"value"}`, "string", "42"},
 			wantErr:  false,
 		},
 		{
-			name:     "invalid json array detected as quoted",
+			name:     "InvalidJsonArrayDetectedAsQuoted",
 			input:    `["unclosed array"`,
 			expected: []string{`[`, `unclosed array`},
 			wantErr:  false,
@@ -556,25 +556,25 @@ func TestParseSeparatedValues(t *testing.T) {
 
 		// Newline-separated tests
 		{
-			name:     "unix newlines",
+			name:     "UnixNewlines",
 			input:    "line1\nline2\nline3",
 			expected: []string{"line1", "line2", "line3"},
 			wantErr:  false,
 		},
 		{
-			name:     "windows newlines",
+			name:     "WindowsNewlines",
 			input:    "line1\r\nline2\r\nline3",
 			expected: []string{"line1", "line2", "line3"},
 			wantErr:  false,
 		},
 		{
-			name:     "mixed newlines with empty lines",
+			name:     "MixedNewlinesWithEmptyLines",
 			input:    "line1\n\nline3\r\n\r\nline5",
 			expected: []string{"line1", "line3", "line5"},
 			wantErr:  false,
 		},
 		{
-			name:     "newlines with whitespace",
+			name:     "NewlinesWithWhitespace",
 			input:    "  line1  \n\t\tline2\t\t\n   line3   ",
 			expected: []string{"line1", "line2", "line3"},
 			wantErr:  false,
@@ -582,19 +582,19 @@ func TestParseSeparatedValues(t *testing.T) {
 
 		// Comma-separated tests
 		{
-			name:     "simple comma separated",
+			name:     "SimpleCommaSeparated",
 			input:    "item1,item2,item3",
 			expected: []string{"item1", "item2", "item3"},
 			wantErr:  false,
 		},
 		{
-			name:     "comma separated with spaces",
+			name:     "CommaSeparatedWithSpaces",
 			input:    "item1 , item2 , item3",
 			expected: []string{"item1", "item2", "item3"},
 			wantErr:  false,
 		},
 		{
-			name:     "comma separated with empty values",
+			name:     "CommaSeparatedWithEmptyValues",
 			input:    "item1,,item3",
 			expected: []string{"item1", "item3"},
 			wantErr:  false,
@@ -602,19 +602,19 @@ func TestParseSeparatedValues(t *testing.T) {
 
 		// Other delimiter tests
 		{
-			name:     "semicolon separated",
+			name:     "SemicolonSeparated",
 			input:    "item1;item2;item3",
 			expected: []string{"item1", "item2", "item3"},
 			wantErr:  false,
 		},
 		{
-			name:     "pipe separated",
+			name:     "PipeSeparated",
 			input:    "item1|item2|item3",
 			expected: []string{"item1", "item2", "item3"},
 			wantErr:  false,
 		},
 		{
-			name:     "tab separated",
+			name:     "TabSeparated",
 			input:    "item1\titem2\titem3",
 			expected: []string{"item1", "item2", "item3"},
 			wantErr:  false,
@@ -622,25 +622,25 @@ func TestParseSeparatedValues(t *testing.T) {
 
 		// Quoted strings tests
 		{
-			name:     "quoted strings with spaces",
+			name:     "QuotedStringsWithSpaces",
 			input:    `"item one" "item two" "item three"`,
 			expected: []string{"item one", "item two", "item three"},
 			wantErr:  false,
 		},
 		{
-			name:     "mixed quoted and unquoted",
+			name:     "MixedQuotedAndUnquoted",
 			input:    `"quoted item" unquoted "another quoted"`,
 			expected: []string{"quoted item", "unquoted", "another quoted"},
 			wantErr:  false,
 		},
 		{
-			name:     "quoted strings with escaped quotes (complex parsing)",
+			name:     "QuotedStringsWithEscapedQuotesComplexParsing",
 			input:    `"item with \"quotes\"" "normal item"`,
 			expected: []string{`item with \`, `quotes\`, ``, `normal item`},
 			wantErr:  false,
 		},
 		{
-			name:     "unclosed quote falls back to space",
+			name:     "UnclosedQuoteFallsBackToSpace",
 			input:    `"unclosed quote item`,
 			expected: []string{`"unclosed`, `quote`, `item`},
 			wantErr:  false,
@@ -648,13 +648,13 @@ func TestParseSeparatedValues(t *testing.T) {
 
 		// Space-separated tests
 		{
-			name:     "simple space separated",
+			name:     "SimpleSpaceSeparated",
 			input:    "item1 item2 item3",
 			expected: []string{"item1", "item2", "item3"},
 			wantErr:  false,
 		},
 		{
-			name:     "multiple spaces",
+			name:     "MultipleSpaces",
 			input:    "item1   item2     item3",
 			expected: []string{"item1", "item2", "item3"},
 			wantErr:  false,
@@ -662,19 +662,19 @@ func TestParseSeparatedValues(t *testing.T) {
 
 		// File path tests (real-world examples)
 		{
-			name:     "file paths with spaces (newline separated)",
+			name:     "FilePathsWithSpacesNewlineSeparated",
 			input:    "/path/to/my file.txt\n/another/path with spaces.csv\n/simple/path.json",
 			expected: []string{"/path/to/my file.txt", "/another/path with spaces.csv", "/simple/path.json"},
 			wantErr:  false,
 		},
 		{
-			name:     "file paths with spaces (quoted)",
+			name:     "FilePathsWithSpacesQuoted",
 			input:    `"/path/to/my file.txt" "/another/path with spaces.csv" "/simple/path.json"`,
 			expected: []string{"/path/to/my file.txt", "/another/path with spaces.csv", "/simple/path.json"},
 			wantErr:  false,
 		},
 		{
-			name:     "comma separated file paths",
+			name:     "CommaSeparatedFilePaths",
 			input:    "file1.txt,file2.csv,file3.json",
 			expected: []string{"file1.txt", "file2.csv", "file3.json"},
 			wantErr:  false,
@@ -682,25 +682,25 @@ func TestParseSeparatedValues(t *testing.T) {
 
 		// Edge cases
 		{
-			name:     "empty string",
+			name:     "EmptyString",
 			input:    "",
 			expected: nil,
 			wantErr:  false,
 		},
 		{
-			name:     "whitespace only",
+			name:     "WhitespaceOnly",
 			input:    "   \t\n   ",
 			expected: nil,
 			wantErr:  false,
 		},
 		{
-			name:     "single item",
+			name:     "SingleItem",
 			input:    "single",
 			expected: []string{"single"},
 			wantErr:  false,
 		},
 		{
-			name:     "single quoted item",
+			name:     "SingleQuotedItem",
 			input:    `"single item"`,
 			expected: []string{"single item"},
 			wantErr:  false,
@@ -708,13 +708,13 @@ func TestParseSeparatedValues(t *testing.T) {
 
 		// Real-world command output examples
 		{
-			name:     "find command output",
+			name:     "FindCommandOutput",
 			input:    "/usr/bin/find\n/usr/bin/grep\n/usr/bin/awk",
 			expected: []string{"/usr/bin/find", "/usr/bin/grep", "/usr/bin/awk"},
 			wantErr:  false,
 		},
 		{
-			name:     "ls command output with spaces",
+			name:     "LsCommandOutputWithSpaces",
 			input:    "My Document.pdf\nAnother File.txt\nno-spaces-file.json",
 			expected: []string{"My Document.pdf", "Another File.txt", "no-spaces-file.json"},
 			wantErr:  false,
@@ -742,17 +742,17 @@ func TestParseSeparatedValues_BackwardCompatibility(t *testing.T) {
 		expected []string
 	}{
 		{
-			name:     "space separated servers (existing behavior)",
+			name:     "SpaceSeparatedServersExistingBehavior",
 			input:    "server1 server2 server3",
 			expected: []string{"server1", "server2", "server3"},
 		},
 		{
-			name:     "multiple whitespace with tabs",
+			name:     "MultipleWhitespaceWithTabs",
 			input:    "item1\t\titem2\t\titem3",
 			expected: []string{"item1", "item2", "item3"},
 		},
 		{
-			name:     "json array compatibility",
+			name:     "JsonArrayCompatibility",
 			input:    `["alpha", "beta", "gamma", "delta"]`,
 			expected: []string{"alpha", "beta", "gamma", "delta"},
 		},

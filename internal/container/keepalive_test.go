@@ -21,7 +21,7 @@ func TestGetKeepaliveFile(t *testing.T) {
 		fileCheck   func(t *testing.T, path string)
 	}{
 		{
-			name: "linux amd64",
+			name: "LinuxAmd64",
 			platform: specs.Platform{
 				OS:           "linux",
 				Architecture: "amd64",
@@ -32,7 +32,7 @@ func TestGetKeepaliveFile(t *testing.T) {
 			},
 		},
 		{
-			name: "linux x86_64 (mapped to amd64)",
+			name: "LinuxX8664MappedToAmd64",
 			platform: specs.Platform{
 				OS:           "linux",
 				Architecture: "x86_64",
@@ -42,7 +42,7 @@ func TestGetKeepaliveFile(t *testing.T) {
 			},
 		},
 		{
-			name: "darwin arm64",
+			name: "DarwinArm64",
 			platform: specs.Platform{
 				OS:           "darwin",
 				Architecture: "arm64",
@@ -52,7 +52,7 @@ func TestGetKeepaliveFile(t *testing.T) {
 			},
 		},
 		{
-			name: "windows amd64",
+			name: "WindowsAmd64",
 			platform: specs.Platform{
 				OS:           "windows",
 				Architecture: "amd64",
@@ -62,7 +62,7 @@ func TestGetKeepaliveFile(t *testing.T) {
 			},
 		},
 		{
-			name: "linux arm with v7 variant",
+			name: "LinuxArmWithV7Variant",
 			platform: specs.Platform{
 				OS:           "linux",
 				Architecture: "arm",
@@ -73,7 +73,7 @@ func TestGetKeepaliveFile(t *testing.T) {
 			},
 		},
 		{
-			name: "linux arm with v6 variant",
+			name: "LinuxArmWithV6Variant",
 			platform: specs.Platform{
 				OS:           "linux",
 				Architecture: "arm",
@@ -84,7 +84,7 @@ func TestGetKeepaliveFile(t *testing.T) {
 			},
 		},
 		{
-			name: "linux arm without variant (defaults to v7)",
+			name: "LinuxArmWithoutVariantDefaultsToV7",
 			platform: specs.Platform{
 				OS:           "linux",
 				Architecture: "arm",
@@ -94,7 +94,7 @@ func TestGetKeepaliveFile(t *testing.T) {
 			},
 		},
 		{
-			name: "linux ppc64le",
+			name: "LinuxPpc64le",
 			platform: specs.Platform{
 				OS:           "linux",
 				Architecture: "ppc64le",
@@ -104,7 +104,7 @@ func TestGetKeepaliveFile(t *testing.T) {
 			},
 		},
 		{
-			name: "unsupported OS",
+			name: "UnsupportedOS",
 			platform: specs.Platform{
 				OS:           "freebsd",
 				Architecture: "amd64",
@@ -113,7 +113,7 @@ func TestGetKeepaliveFile(t *testing.T) {
 			errContains: "unsupported OS: freebsd",
 		},
 		{
-			name: "unsupported architecture",
+			name: "UnsupportedArchitecture",
 			platform: specs.Platform{
 				OS:           "linux",
 				Architecture: "mips",

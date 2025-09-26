@@ -20,7 +20,7 @@ func TestZombieDetectionEnvVarPrecedence(t *testing.T) {
 		expectedInterval time.Duration
 	}{
 		{
-			name: "env var overrides default",
+			name: "EnvVarOverridesDefault",
 			configYAML: `
 host: "0.0.0.0"
 port: 8080
@@ -29,7 +29,7 @@ port: 8080
 			expectedInterval: 90 * time.Second,
 		},
 		{
-			name: "env var overrides config file",
+			name: "EnvVarOverridesConfigFile",
 			configYAML: `
 host: "0.0.0.0"
 port: 8080
@@ -40,7 +40,7 @@ scheduler:
 			expectedInterval: 120 * time.Second,
 		},
 		{
-			name: "env var set to disable",
+			name: "EnvVarSetToDisable",
 			configYAML: `
 host: "0.0.0.0"
 port: 8080

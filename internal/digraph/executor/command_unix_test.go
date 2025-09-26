@@ -22,7 +22,7 @@ func TestKillProcessGroup(t *testing.T) {
 		shouldError bool
 	}{
 		{
-			name: "kill running process",
+			name: "KillRunningProcess",
 			setupCmd: func() *exec.Cmd {
 				cmd := exec.Command("sleep", "10")
 				cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -37,7 +37,7 @@ func TestKillProcessGroup(t *testing.T) {
 			shouldError: false,
 		},
 		{
-			name: "kill nil process",
+			name: "KillNilProcess",
 			setupCmd: func() *exec.Cmd {
 				return nil
 			},
@@ -45,7 +45,7 @@ func TestKillProcessGroup(t *testing.T) {
 			shouldError: false, // Should handle nil gracefully
 		},
 		{
-			name: "kill process without process field",
+			name: "KillProcessWithoutProcessField",
 			setupCmd: func() *exec.Cmd {
 				return &exec.Cmd{}
 			},

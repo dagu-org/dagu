@@ -18,20 +18,16 @@ func TestStepIDPropertyAccess(t *testing.T) {
 		expectedOutput map[string]any
 	}{
 		{
-			name: "Basic stdout/stderr file access",
+			name: "BasicStdout/StderrFileAccess",
 			yaml: `
-name: test-step-id-files
 steps:
-  - name: generate-data
-    id: gen
+  - id: gen
     command: |
       echo "Test output data"
       echo "Error message" >&2
     output: GEN_OUTPUT
 
-  - name: process-files
-    id: proc
-    depends:
+  - depends:
       - gen
     command: |
       echo "stdout_file=${gen.stdout}"
@@ -49,22 +45,18 @@ steps:
 			},
 		},
 		{
-			name: "Exit code access",
+			name: "ExitCodeAccess",
 			yaml: `
-name: test-step-id-exitcode
 steps:
-  - name: success-step
-    id: success
+  - id: success
     command: exit 0
 
-  - name: failure-step
-    id: failure
+  - id: failure
     command: exit 42
     continueOn:
       failure: true
 
-  - name: check-codes
-    depends:
+  - depends:
       - success
       - failure
     command: |
@@ -78,17 +70,14 @@ steps:
 			},
 		},
 		{
-			name: "Unknown step ID remains unchanged",
+			name: "UnknownStepIDRemainsUnchanged",
 			yaml: `
-name: test-step-id-unknown
 steps:
-  - name: first
-    id: first_step
+  - id: first_step
     command: echo "Hello"
     output: FIRST_OUT
 
-  - name: second
-    depends:
+  - depends:
       - first_step
     command: |
       echo "known=${first_step.stdout}"
@@ -108,17 +97,14 @@ steps:
 			},
 		},
 		{
-			name: "Regular variable takes precedence over step ID",
+			name: "RegularVariableTakesPrecedenceOverStepID",
 			yaml: `
-name: test-step-id-precedence
 steps:
-  - name: create-var
-    id: check
+  - id: check
     command: echo '{"status":"from-step"}'
     output: check
 
-  - name: verify-precedence
-    depends:
+  - depends:
       - check
     command: |
       echo "variable=${check.status}"
@@ -172,20 +158,16 @@ func TestStepIDComplexScenarios(t *testing.T) {
 		th := test.Setup(t)
 
 		yaml := `
-name: test-multiple-outputs
 steps:
-  - name: first-generator
-    id: gen1
+  - id: gen1
     command: echo "data from gen1"
     output: DATA
 
-  - name: second-generator
-    id: gen2
+  - id: gen2
     command: echo "data from gen2"
     output: DATA
 
-  - name: consumer
-    depends:
+  - depends:
       - gen1
       - gen2
     command: |
@@ -217,31 +199,20 @@ steps:
 		th := test.Setup(t)
 
 		yaml := `
-name: test-chained-refs
 steps:
-  - name: step1
-    id: s1
+  - id: s1
     command: echo "10"
     output: NUM
 
-  - name: step2
-    id: s2
-    depends:
-      - s1
+  - id: s2
     command: echo "15"
     output: NUM2
 
-  - name: step3
-    id: s3
-    depends:
-      - s2
+  - id: s3
     command: echo "20"
     output: NUM3
 
-  - name: final
-    depends:
-      - s3
-    command: |
+  - command: |
       echo "s1=10"
       echo "s2=15"
       echo "s3=20"
@@ -266,20 +237,17 @@ steps:
 		th := test.Setup(t)
 
 		yaml := `
-name: test-script-refs
 steps:
-  - name: setup
-    id: setup_step
+  - id: setup_step
     command: echo '{"env":"test","timeout":30}'
     output: CONFIG
 
-  - name: run-script
-    depends:
+  - depends:
       - setup_step
     script: |
       #!/bin/bash
       set -e
-      
+
       # Access file paths
       echo "Setup logs available at: ${setup_step.stdout}"
     output: SCRIPT_OUTPUT
@@ -308,15 +276,12 @@ func TestStepIDErrorCases(t *testing.T) {
 		th := test.Setup(t)
 
 		yaml := `
-name: test-invalid-json-path
 steps:
-  - name: generate
-    id: gen
+  - id: gen
     command: echo "not json"
     output: DATA
 
-  - name: access
-    depends:
+  - depends:
       - gen
     command: |
       echo "data=not json"

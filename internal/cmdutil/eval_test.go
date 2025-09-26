@@ -43,7 +43,7 @@ func TestEvalStringFields(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "basic substitution",
+			name: "BasicSubstitution",
 			input: TestStruct{
 				SimpleField:  "hello",
 				EnvField:     "$TEST_VAR",
@@ -73,7 +73,7 @@ func TestEvalStringFields(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "invalid command",
+			name: "InvalidCommand",
 			input: TestStruct{
 				CommandField: "`invalid_command_that_does_not_exist`",
 			},
@@ -192,43 +192,43 @@ func TestReplaceVars(t *testing.T) {
 		want     string
 	}{
 		{
-			name:     "basic substitution",
+			name:     "BasicSubstitution",
 			template: "${FOO}",
 			vars:     map[string]string{"FOO": "BAR"},
 			want:     "BAR",
 		},
 		{
-			name:     "short syntax",
+			name:     "ShortSyntax",
 			template: "$FOO",
 			vars:     map[string]string{"FOO": "BAR"},
 			want:     "BAR",
 		},
 		{
-			name:     "no substitution",
+			name:     "NoSubstitution",
 			template: "$FOO_",
 			vars:     map[string]string{"FOO": "BAR"},
 			want:     "$FOO_",
 		},
 		{
-			name:     "in middle of string",
+			name:     "InMiddleOfString",
 			template: "prefix $FOO suffix",
 			vars:     map[string]string{"FOO": "BAR"},
 			want:     "prefix BAR suffix",
 		},
 		{
-			name:     "in middle of string and no substitution",
+			name:     "InMiddleOfStringAndNoSubstitution",
 			template: "prefix $FOO1 suffix",
 			vars:     map[string]string{"FOO": "BAR"},
 			want:     "prefix $FOO1 suffix",
 		},
 		{
-			name:     "missing var",
+			name:     "MissingVar",
 			template: "${MISSING}",
 			vars:     map[string]string{"FOO": "BAR"},
 			want:     "${MISSING}",
 		},
 		{
-			name:     "multiple vars",
+			name:     "MultipleVars",
 			template: "$FOO ${BAR} $BAZ",
 			vars: map[string]string{
 				"FOO": "1",
@@ -238,7 +238,7 @@ func TestReplaceVars(t *testing.T) {
 			want: "1 2 3",
 		},
 		{
-			name:     "nested vars not supported",
+			name:     "NestedVarsNotSupported",
 			template: "${FOO${BAR}}",
 			vars:     map[string]string{"FOO": "1", "BAR": "2"},
 			want:     "${FOO${BAR}}",
@@ -264,7 +264,7 @@ func TestExpandReferences(t *testing.T) {
 		want    string
 	}{
 		{
-			name:  "Basic replacement with curly braces",
+			name:  "BasicReplacementWithCurlyBraces",
 			input: "Hello: ${FOO.bar}",
 			dataMap: map[string]string{
 				"FOO": `{"bar": "World"}`,
@@ -272,7 +272,7 @@ func TestExpandReferences(t *testing.T) {
 			want: "Hello: World",
 		},
 		{
-			name:  "Basic replacement with single dollar sign",
+			name:  "BasicReplacementWithSingleDollarSign",
 			input: "Output => $FOO.value",
 			dataMap: map[string]string{
 				"FOO": `{"value": "SingleDollarWorks"}`,
@@ -280,7 +280,7 @@ func TestExpandReferences(t *testing.T) {
 			want: "Output => SingleDollarWorks",
 		},
 		{
-			name:  "Missing key in dataMap",
+			name:  "MissingKeyInDataMap",
 			input: "Hello: ${BAR.xyz}",
 			dataMap: map[string]string{
 				// no "BAR" key
@@ -290,7 +290,7 @@ func TestExpandReferences(t *testing.T) {
 			want: "Hello: ${BAR.xyz}",
 		},
 		{
-			name:  "Invalid JSON in dataMap",
+			name:  "InvalidJSONInDataMap",
 			input: "Test => ${FOO.bar}",
 			dataMap: map[string]string{
 				"FOO": `{"bar":`, // invalid JSON
@@ -298,7 +298,7 @@ func TestExpandReferences(t *testing.T) {
 			want: "Test => ${FOO.bar}",
 		},
 		{
-			name:  "Nested sub-path extraction",
+			name:  "NestedSubPathExtraction",
 			input: "Deep => ${FOO.level1.level2}",
 			dataMap: map[string]string{
 				"FOO": `{"level1": {"level2":"DeepValue"}}`,
@@ -306,7 +306,7 @@ func TestExpandReferences(t *testing.T) {
 			want: "Deep => DeepValue",
 		},
 		{
-			name:  "Non-existent sub-path in valid JSON",
+			name:  "NonExistentSubPathInValidJSON",
 			input: "Data => ${FOO.bar.baz}",
 			dataMap: map[string]string{
 				"FOO": `{"bar":"NotAnObject"}`,
@@ -315,7 +315,7 @@ func TestExpandReferences(t *testing.T) {
 			want: "Data => ${FOO.bar.baz}",
 		},
 		{
-			name:  "Multiple placeholders, including single-dollar form",
+			name:  "MultiplePlaceholdersIncludingSingleDollarForm",
 			input: "Multi: ${FOO.one}, $FOO.two , and ${FOO.three}",
 			dataMap: map[string]string{
 				"FOO": `{
@@ -327,7 +327,7 @@ func TestExpandReferences(t *testing.T) {
 			want: "Multi: 1, 2 , and 3",
 		},
 		{
-			name:    "lookup from environment",
+			name:    "LookupFromEnvironment",
 			input:   "${TEST_JSON_VAR.bar}",
 			dataMap: map[string]string{},
 			want:    "World",
@@ -358,49 +358,49 @@ func TestBuildCommandEscapedString(t *testing.T) {
 		want    string
 	}{
 		{
-			name:    "command with no args",
+			name:    "CommandWithNoArgs",
 			command: "echo",
 			args:    []string{},
 			want:    "echo",
 		},
 		{
-			name:    "command with simple args",
+			name:    "CommandWithSimpleArgs",
 			command: "echo",
 			args:    []string{"hello", "world"},
 			want:    "echo hello world",
 		},
 		{
-			name:    "args with spaces need quoting",
+			name:    "ArgsWithSpacesNeedQuoting",
 			command: "echo",
 			args:    []string{"hello world", "foo bar"},
 			want:    `echo "hello world" "foo bar"`,
 		},
 		{
-			name:    "already quoted with double quotes",
+			name:    "AlreadyQuotedWithDoubleQuotes",
 			command: "echo",
 			args:    []string{`"hello world"`, "test"},
 			want:    `echo "hello world" test`,
 		},
 		{
-			name:    "already quoted with single quotes",
+			name:    "AlreadyQuotedWithSingleQuotes",
 			command: "echo",
 			args:    []string{`'hello world'`, "test"},
 			want:    `echo 'hello world' test`,
 		},
 		{
-			name:    "key-value pair already quoted",
+			name:    "KeyValuePairAlreadyQuoted",
 			command: "docker",
 			args:    []string{"run", "-e", `VAR="value with spaces"`},
 			want:    `docker run -e VAR="value with spaces"`,
 		},
 		{
-			name:    "arg with double quotes inside",
+			name:    "ArgWithDoubleQuotesInside",
 			command: "echo",
 			args:    []string{`hello "world" test`},
 			want:    `echo "hello \"world\" test"`,
 		},
 		{
-			name:    "mixed args",
+			name:    "MixedArgs",
 			command: "command",
 			args:    []string{"simple", "with space", `"already quoted"`, `key="value"`, "test=value"},
 			want:    `command simple "with space" "already quoted" key="value" test=value`,
@@ -432,72 +432,72 @@ func TestEvalString(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "empty string",
+			name:    "EmptyString",
 			input:   "",
 			want:    "",
 			wantErr: false,
 		},
 		{
-			name:    "env var expansion",
+			name:    "EnvVarExpansion",
 			input:   "$TEST_ENV",
 			want:    "test_value",
 			wantErr: false,
 		},
 		{
-			name:    "command substitution",
+			name:    "CommandSubstitution",
 			input:   "`echo hello`",
 			want:    "hello",
 			wantErr: false,
 		},
 		{
-			name:    "combined env and command",
+			name:    "CombinedEnvAndCommand",
 			input:   "$TEST_ENV and `echo world`",
 			want:    "test_value and world",
 			wantErr: false,
 		},
 		{
-			name:    "with variables",
+			name:    "WithVariables",
 			input:   "${FOO} and ${BAR}",
 			opts:    []EvalOption{WithVariables(map[string]string{"FOO": "foo", "BAR": "bar"})},
 			want:    "foo and bar",
 			wantErr: false,
 		},
 		{
-			name:    "without env expansion",
+			name:    "WithoutEnvExpansion",
 			input:   "$TEST_ENV",
 			opts:    []EvalOption{WithoutExpandEnv()},
 			want:    "$TEST_ENV",
 			wantErr: false,
 		},
 		{
-			name:    "without substitution",
+			name:    "WithoutSubstitution",
 			input:   "`echo hello`",
 			opts:    []EvalOption{WithoutSubstitute()},
 			want:    "`echo hello`",
 			wantErr: false,
 		},
 		{
-			name:    "only replace vars",
+			name:    "OnlyReplaceVars",
 			input:   "$TEST_ENV and `echo hello` and ${FOO}",
 			opts:    []EvalOption{OnlyReplaceVars(), WithVariables(map[string]string{"FOO": "foo"})},
 			want:    "$TEST_ENV and `echo hello` and foo",
 			wantErr: false,
 		},
 		{
-			name:    "invalid command substitution",
+			name:    "InvalidCommandSubstitution",
 			input:   "`invalid_command_that_does_not_exist`",
 			want:    "",
 			wantErr: true,
 		},
 		{
-			name:    "JSON reference",
+			name:    "JSONReference",
 			input:   "${TEST_JSON.key}",
 			opts:    []EvalOption{WithVariables(map[string]string{"TEST_JSON": os.Getenv("TEST_JSON")})},
 			want:    "value",
 			wantErr: false,
 		},
 		{
-			name:  "multiple variable sets",
+			name:  "MultipleVariableSets",
 			input: "${FOO} ${BAR}",
 			opts: []EvalOption{
 				WithVariables(map[string]string{"FOO": "first"}),
@@ -507,70 +507,70 @@ func TestEvalString(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "quoted JSON variable escaping",
+			name:    "QuotedJSONVariableEscaping",
 			input:   `params: aJson="${ITEM}"`,
 			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `{"file": "file1.txt", "config": "prod"}`})},
 			want:    `params: aJson=` + strconv.Quote(`{"file": "file1.txt", "config": "prod"}`),
 			wantErr: false,
 		},
 		{
-			name:    "quoted file path with spaces",
+			name:    "QuotedFilePathWithSpaces",
 			input:   `path: "FILE=\"${ITEM}\""`,
 			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": "/path/to/my file.txt"})},
 			want:    `path: "FILE=\"/path/to/my file.txt\""`,
 			wantErr: false,
 		},
 		{
-			name:    "quoted string with internal quotes",
+			name:    "QuotedStringWithInternalQuotes",
 			input:   `value: "VAR=\"${ITEM}\""`,
 			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `say "hello"`})},
 			want:    `value: "VAR=\"say "hello"\""`,
 			wantErr: false,
 		},
 		{
-			name:    "mixed quoted and unquoted variables",
+			name:    "MixedQuotedAndUnquotedVariables",
 			input:   `unquoted ${ITEM} and quoted "value=\"${ITEM}\""`,
 			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `{"test": "value"}`})},
 			want:    `unquoted {"test": "value"} and quoted "value=\"{"test": "value"}\""`,
 			wantErr: false,
 		},
 		{
-			name:    "quoted empty string",
+			name:    "QuotedEmptyString",
 			input:   `empty: "VAL=\"${EMPTY}\""`,
 			opts:    []EvalOption{WithVariables(map[string]string{"EMPTY": ""})},
 			want:    `empty: "VAL=\"\""`,
 			wantErr: false,
 		},
 		{
-			name:    "quoted JSON path reference",
+			name:    "QuotedJSONPathReference",
 			input:   `config: "file=\"${CONFIG.file}\""`,
 			opts:    []EvalOption{WithVariables(map[string]string{"CONFIG": `{"file": "/path/to/config.json", "env": "prod"}`})},
 			want:    `config: "file=\"/path/to/config.json\""`,
 			wantErr: false,
 		},
 		{
-			name:    "quoted JSON path with spaces",
+			name:    "QuotedJSONPathWithSpaces",
 			input:   `path: "value=\"${DATA.path}\""`,
 			opts:    []EvalOption{WithVariables(map[string]string{"DATA": `{"path": "/my dir/file name.txt"}`})},
 			want:    `path: "value=\"/my dir/file name.txt\""`,
 			wantErr: false,
 		},
 		{
-			name:    "quoted nested JSON path",
+			name:    "QuotedNestedJSONPath",
 			input:   `nested: "result=\"${OBJ.nested.deep}\""`,
 			opts:    []EvalOption{WithVariables(map[string]string{"OBJ": `{"nested": {"deep": "found it"}}`})},
 			want:    `nested: "result=\"found it\""`,
 			wantErr: false,
 		},
 		{
-			name:    "quoted JSON path with quotes in value",
+			name:    "QuotedJSONPathWithQuotesInValue",
 			input:   `msg: "text=\"${MSG.content}\""`,
 			opts:    []EvalOption{WithVariables(map[string]string{"MSG": `{"content": "He said \"hello\""}`})},
 			want:    `msg: "text=\"He said "hello"\""`,
 			wantErr: false,
 		},
 		{
-			name:  "mixed quoted JSON path and simple variable",
+			name:  "MixedQuotedJSONPathAndSimpleVariable",
 			input: `params: "${SIMPLE}" and config="file=\"${CONFIG.file}\""`,
 			opts: []EvalOption{WithVariables(map[string]string{
 				"SIMPLE": "value",
@@ -580,7 +580,7 @@ func TestEvalString(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "quoted non-existent JSON path",
+			name:    "QuotedNonExistentJSONPath",
 			input:   `missing: "val=\"${CONFIG.missing}\""`,
 			opts:    []EvalOption{WithVariables(map[string]string{"CONFIG": `{"file": "app.conf"}`})},
 			want:    `missing: "val=\"<nil>\""`,
@@ -617,38 +617,38 @@ func TestEvalIntString(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "simple integer",
+			name:    "SimpleInteger",
 			input:   "123",
 			want:    123,
 			wantErr: false,
 		},
 		{
-			name:    "env var integer",
+			name:    "EnvVarInteger",
 			input:   "$TEST_INT",
 			want:    42,
 			wantErr: false,
 		},
 		{
-			name:    "command substitution integer",
+			name:    "CommandSubstitutionInteger",
 			input:   "`echo 100`",
 			want:    100,
 			wantErr: false,
 		},
 		{
-			name:    "with variables",
+			name:    "WithVariables",
 			input:   "${NUM}",
 			opts:    []EvalOption{WithVariables(map[string]string{"NUM": "999"})},
 			want:    999,
 			wantErr: false,
 		},
 		{
-			name:    "invalid integer",
+			name:    "InvalidInteger",
 			input:   "not_a_number",
 			want:    0,
 			wantErr: true,
 		},
 		{
-			name:    "invalid command",
+			name:    "InvalidCommand",
 			input:   "`invalid_command`",
 			want:    0,
 			wantErr: true,
@@ -684,7 +684,7 @@ func TestEvalStringFields_Map(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "simple map with string values",
+			name: "SimpleMapWithStringValues",
 			input: map[string]any{
 				"key1": "$MAP_ENV",
 				"key2": "`echo hello`",
@@ -698,7 +698,7 @@ func TestEvalStringFields_Map(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "nested map",
+			name: "NestedMap",
 			input: map[string]any{
 				"outer": map[string]any{
 					"inner": "$MAP_ENV",
@@ -712,7 +712,7 @@ func TestEvalStringFields_Map(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "map with non-string values",
+			name: "MapWithNonStringValues",
 			input: map[string]any{
 				"string": "$MAP_ENV",
 				"int":    42,
@@ -728,7 +728,7 @@ func TestEvalStringFields_Map(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "map with struct value",
+			name: "MapWithStructValue",
 			input: map[string]any{
 				"struct": struct {
 					Field string
@@ -746,7 +746,7 @@ func TestEvalStringFields_Map(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "with variables option",
+			name: "WithVariablesOption",
 			input: map[string]any{
 				"key": "${VAR}",
 			},
@@ -757,7 +757,7 @@ func TestEvalStringFields_Map(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "map with pointer values",
+			name: "MapWithPointerValues",
 			input: map[string]any{
 				"ptr": ptrString("$MAP_ENV"),
 			},
@@ -791,7 +791,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 		want    string
 	}{
 		{
-			name:    "step stdout reference",
+			name:    "StepStdoutReference",
 			input:   "The output is at ${step1.stdout}",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -802,7 +802,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			want: "The output is at /tmp/step1.out",
 		},
 		{
-			name:    "step stderr reference",
+			name:    "StepStderrReference",
 			input:   "Errors at ${step1.stderr}",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -813,7 +813,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			want: "Errors at /tmp/step1.err",
 		},
 		{
-			name:    "step exit code reference",
+			name:    "StepExitCodeReference",
 			input:   "Exit code: ${step1.exit_code}",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -824,7 +824,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			want: "Exit code: 0",
 		},
 		{
-			name:    "missing step reference",
+			name:    "MissingStepReference",
 			input:   "Missing: ${missing_step.stdout}",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -835,7 +835,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			want: "Missing: ${missing_step.stdout}",
 		},
 		{
-			name:    "empty step property",
+			name:    "EmptyStepProperty",
 			input:   "Empty: ${step1.stdout}",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -846,14 +846,14 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			want: "Empty: ${step1.stdout}",
 		},
 		{
-			name:    "nil stepMap",
+			name:    "NilStepMap",
 			input:   "No steps: ${step1.stdout}",
 			dataMap: map[string]string{},
 			stepMap: nil,
 			want:    "No steps: ${step1.stdout}",
 		},
 		{
-			name:  "regular variable takes precedence",
+			name:  "RegularVariableTakesPrecedence",
 			input: "Value: ${step1.field}",
 			dataMap: map[string]string{
 				"step1": `{"field": "from_var"}`,
@@ -866,7 +866,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			want: "Value: from_var",
 		},
 		{
-			name:    "dollar sign without braces",
+			name:    "DollarSignWithoutBraces",
 			input:   "Path: $step1.stdout",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -877,7 +877,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			want: "Path: /tmp/out",
 		},
 		{
-			name:    "multiple step references",
+			name:    "MultipleStepReferences",
 			input:   "Out: ${step1.stdout}, Err: ${step1.stderr}, Code: ${step1.exit_code}",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -909,7 +909,7 @@ func TestEvalString_WithStepMap(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:  "step reference with no variables",
+			name:  "StepReferenceWithNoVariables",
 			input: "Output: ${step1.stdout}",
 			opts: []EvalOption{
 				WithStepMap(map[string]StepInfo{
@@ -922,7 +922,7 @@ func TestEvalString_WithStepMap(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:  "step reference with variables",
+			name:  "StepReferenceWithVariables",
 			input: "Var: ${VAR}, Step: ${step1.exit_code}",
 			opts: []EvalOption{
 				WithVariables(map[string]string{"VAR": "value"}),
@@ -960,7 +960,7 @@ func TestEvalIntString_WithStepMap(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:  "step exit code as integer",
+			name:  "StepExitCodeAsInteger",
 			input: "${step1.exit_code}",
 			opts: []EvalOption{
 				WithStepMap(map[string]StepInfo{
@@ -1047,31 +1047,31 @@ func TestReplaceVars_EdgeCases(t *testing.T) {
 		want     string
 	}{
 		{
-			name:     "single quotes preserved",
+			name:     "SingleQuotesPreserved",
 			template: "'$FOO'",
 			vars:     map[string]string{"FOO": "bar"},
 			want:     "'$FOO'",
 		},
 		{
-			name:     "single quotes preserved with braces",
+			name:     "SingleQuotesPreservedWithBraces",
 			template: "'${FOO}'",
 			vars:     map[string]string{"FOO": "bar"},
 			want:     "'${FOO}'",
 		},
 		{
-			name:     "empty variable name",
+			name:     "EmptyVariableName",
 			template: "${}",
 			vars:     map[string]string{"": "value"},
 			want:     "${}",
 		},
 		{
-			name:     "underscore in var name",
+			name:     "UnderscoreInVarName",
 			template: "${FOO_BAR}",
 			vars:     map[string]string{"FOO_BAR": "value"},
 			want:     "value",
 		},
 		{
-			name:     "number in var name",
+			name:     "NumberInVarName",
 			template: "${FOO123}",
 			vars:     map[string]string{"FOO123": "value"},
 			want:     "value",
@@ -1095,7 +1095,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 		want    string
 	}{
 		{
-			name:    "Basic step ID stdout reference",
+			name:    "BasicStepIDStdoutReference",
 			input:   "Log file is at ${download.stdout}",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -1108,7 +1108,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			want: "Log file is at /tmp/logs/download.out",
 		},
 		{
-			name:    "Step ID stderr reference",
+			name:    "StepIDStderrReference",
 			input:   "Check errors at ${build.stderr}",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -1121,7 +1121,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			want: "Check errors at /tmp/logs/build.err",
 		},
 		{
-			name:    "Step ID exit code reference",
+			name:    "StepIDExitCodeReference",
 			input:   "Build exited with code ${build.exit_code}",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -1134,7 +1134,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			want: "Build exited with code 1",
 		},
 		{
-			name:    "Multiple step references",
+			name:    "MultipleStepReferences",
 			input:   "Download log: ${download.stdout}, Build errors: ${build.stderr}",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -1148,7 +1148,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			want: "Download log: /tmp/logs/download.out, Build errors: /tmp/logs/build.err",
 		},
 		{
-			name:    "Unknown step ID leaves as-is",
+			name:    "UnknownStepIDLeavesAsIs",
 			input:   "Unknown step: ${unknown.stdout}",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -1159,7 +1159,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			want: "Unknown step: ${unknown.stdout}",
 		},
 		{
-			name:    "Unknown property leaves as-is",
+			name:    "UnknownPropertyLeavesAsIs",
 			input:   "Unknown prop: ${download.unknown}",
 			dataMap: map[string]string{},
 			stepMap: map[string]StepInfo{
@@ -1170,7 +1170,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			want: "Unknown prop: ${download.unknown}",
 		},
 		{
-			name:  "Regular variable takes precedence over step ID",
+			name:  "RegularVariableTakesPrecedenceOverStepID",
 			input: "Value: ${download.stdout}",
 			dataMap: map[string]string{
 				"download": `{"stdout": "from-variable"}`,
@@ -1215,17 +1215,17 @@ func TestEvalStringWithSteps(t *testing.T) {
 		want  string
 	}{
 		{
-			name:  "stdout reference",
+			name:  "StdoutReference",
 			input: "cat ${download.stdout}",
 			want:  "cat /var/log/download.stdout",
 		},
 		{
-			name:  "stderr reference",
+			name:  "StderrReference",
 			input: "tail -20 ${process.stderr}",
 			want:  "tail -20 /var/log/process.stderr",
 		},
 		{
-			name:  "exit code reference",
+			name:  "ExitCodeReference",
 			input: "if [ ${process.exit_code} -ne 0 ]; then echo failed; fi",
 			want:  "if [ 1 -ne 0 ]; then echo failed; fi",
 		},
@@ -1268,7 +1268,7 @@ func TestEvalStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 		expected TestStruct
 	}{
 		{
-			name: "three variable sets with step references",
+			name: "ThreeVariableSetsWithStepReferences",
 			input: TestStruct{
 				Field1: "${A}",
 				Field2: "${B}",
@@ -1288,7 +1288,7 @@ func TestEvalStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 			},
 		},
 		{
-			name: "step references only on last variable set",
+			name: "StepReferencesOnlyOnLastVariableSet",
 			input: TestStruct{
 				Field1: "${VAR1}",
 				Field2: "${VAR2}",
@@ -1345,7 +1345,7 @@ func TestEvalString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 		expected string
 	}{
 		{
-			name:  "step references processed with last variable set",
+			name:  "StepReferencesProcessedWithLastVariableSet",
 			input: "${X} and ${Y} with log at ${deploy.stdout}",
 			varSets: []map[string]string{
 				{"X": "1", "Y": "2"},

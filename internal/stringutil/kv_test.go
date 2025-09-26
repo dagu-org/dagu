@@ -23,63 +23,63 @@ func TestKeyValue(t *testing.T) {
 		wantBool  bool
 	}{
 		{
-			name:      "normal key-value",
+			name:      "NormalKeyValue",
 			input:     stringutil.KeyValue("foo=bar"),
 			wantKey:   "foo",
 			wantValue: "bar",
 			wantBool:  false,
 		},
 		{
-			name:      "empty value",
+			name:      "EmptyValue",
 			input:     stringutil.KeyValue("foo="),
 			wantKey:   "foo",
 			wantValue: "",
 			wantBool:  false,
 		},
 		{
-			name:      "empty key",
+			name:      "EmptyKey",
 			input:     stringutil.KeyValue("=bar"),
 			wantKey:   "",
 			wantValue: "bar",
 			wantBool:  false,
 		},
 		{
-			name:      "no equals sign",
+			name:      "NoEqualsSign",
 			input:     stringutil.KeyValue("foobar"),
 			wantKey:   "foobar",
 			wantValue: "",
 			wantBool:  false,
 		},
 		{
-			name:      "empty string",
+			name:      "EmptyString",
 			input:     stringutil.KeyValue(""),
 			wantKey:   "",
 			wantValue: "",
 			wantBool:  false,
 		},
 		{
-			name:      "bool true",
+			name:      "BoolTrue",
 			input:     stringutil.KeyValue("flag=true"),
 			wantKey:   "flag",
 			wantValue: "true",
 			wantBool:  true,
 		},
 		{
-			name:      "bool false",
+			name:      "BoolFalse",
 			input:     stringutil.KeyValue("flag=false"),
 			wantKey:   "flag",
 			wantValue: "false",
 			wantBool:  false,
 		},
 		{
-			name:      "bool invalid",
+			name:      "BoolInvalid",
 			input:     stringutil.KeyValue("flag=notbool"),
 			wantKey:   "flag",
 			wantValue: "notbool",
 			wantBool:  false,
 		},
 		{
-			name:      "multiple equals signs",
+			name:      "MultipleEqualsSigns",
 			input:     stringutil.KeyValue("foo=bar=baz"),
 			wantKey:   "foo",
 			wantValue: "bar=baz",
@@ -113,25 +113,25 @@ func TestKeyValueJSON(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "normal key-value",
+			name:    "NormalKeyValue",
 			input:   stringutil.KeyValue("foo=bar"),
 			want:    `"foo=bar"`,
 			wantErr: false,
 		},
 		{
-			name:    "empty value",
+			name:    "EmptyValue",
 			input:   stringutil.KeyValue("foo="),
 			want:    `"foo="`,
 			wantErr: false,
 		},
 		{
-			name:    "empty key",
+			name:    "EmptyKey",
 			input:   stringutil.KeyValue("=bar"),
 			want:    `"=bar"`,
 			wantErr: false,
 		},
 		{
-			name:    "empty string",
+			name:    "EmptyString",
 			input:   stringutil.KeyValue(""),
 			want:    `""`,
 			wantErr: false,
@@ -164,7 +164,7 @@ func TestKeyValueJSON(t *testing.T) {
 	}
 
 	// Test UnmarshalJSON with invalid JSON
-	t.Run("invalid json", func(t *testing.T) {
+	t.Run("InvalidJson", func(t *testing.T) {
 		var kv stringutil.KeyValue
 		err := json.Unmarshal([]byte(`{invalid`), &kv)
 		if err == nil {

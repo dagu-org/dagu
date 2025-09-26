@@ -19,37 +19,37 @@ func TestBuildShellCommand(t *testing.T) {
 		expectedArgs []string
 	}{
 		{
-			name:         "bash shell",
+			name:         "BashShell",
 			shell:        "/bin/bash",
 			cmdStr:       "echo hello",
 			expectedArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name:         "sh shell",
+			name:         "ShShell",
 			shell:        "/bin/sh",
 			cmdStr:       "echo hello",
 			expectedArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name:         "zsh shell",
+			name:         "ZshShell",
 			shell:        "/bin/zsh",
 			cmdStr:       "echo hello",
 			expectedArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name:         "empty shell fallback",
+			name:         "EmptyShellFallback",
 			shell:        "",
 			cmdStr:       "echo hello",
 			expectedArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name:         "powershell detection (even on unix)",
+			name:         "PowershellDetectionEvenOnUnix",
 			shell:        "/usr/local/bin/powershell",
 			cmdStr:       "echo hello",
 			expectedArgs: []string{"-Command", "echo hello"},
 		},
 		{
-			name:         "pwsh detection",
+			name:         "PwshDetection",
 			shell:        "/usr/local/bin/pwsh",
 			cmdStr:       "echo hello",
 			expectedArgs: []string{"-Command", "echo hello"},
@@ -93,17 +93,17 @@ func TestBuildShellCommand_ComplexCommands(t *testing.T) {
 		cmdStr string
 	}{
 		{
-			name:   "command with pipes",
+			name:   "CommandWithPipes",
 			shell:  "/bin/bash",
 			cmdStr: "echo hello | tr a-z A-Z",
 		},
 		{
-			name:   "command with quotes",
+			name:   "CommandWithQuotes",
 			shell:  "/bin/bash",
 			cmdStr: `echo "hello world"`,
 		},
 		{
-			name:   "command with variables",
+			name:   "CommandWithVariables",
 			shell:  "/bin/bash",
 			cmdStr: "VAR=test; echo $VAR",
 		},

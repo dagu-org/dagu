@@ -20,7 +20,7 @@ func TestStatusCommand(t *testing.T) {
 
 		dagFile := th.DAG(t, `steps:
   - name: "1"
-    command: "sleep 10"
+    command: sleep 10
 `)
 
 		done := make(chan struct{})
@@ -100,7 +100,7 @@ func TestStatusCommand(t *testing.T) {
 
 		dagFile := th.DAG(t, `steps:
   - name: "error"
-    command: "exit 1"
+    command: exit 1
 `)
 
 		// Create a DAG context
@@ -341,7 +341,7 @@ steps:
 
 		dagFile := th.DAG(t, `steps:
   - name: "1"
-    command: "sleep 10"
+    command: sleep 10
 `)
 
 		done := make(chan struct{})
@@ -471,7 +471,7 @@ steps:
 
 		dagFile := th.DAG(t, `steps:
   - name: "1"
-    command: "sleep 10"
+    command: sleep 10
 `)
 
 		done := make(chan struct{})

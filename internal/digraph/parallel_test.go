@@ -23,9 +23,8 @@ func TestBuildParallel(t *testing.T) {
 		wantErrMsg    string
 	}{
 		{
-			name: "direct variable reference",
+			name: "DirectVariableReference",
 			yaml: `
-name: test
 steps:
   - name: process
     run: workflows/processor
@@ -36,9 +35,8 @@ steps:
 			wantMaxConc:  10, // default
 		},
 		{
-			name: "static array",
+			name: "StaticArray",
 			yaml: `
-name: test
 steps:
   - name: process
     run: workflows/processor
@@ -52,9 +50,8 @@ steps:
 			wantFirstItem: "item1",
 		},
 		{
-			name: "static array with objects",
+			name: "StaticArrayWithObjects",
 			yaml: `
-name: test
 steps:
   - name: process
     run: workflows/processor
@@ -67,9 +64,8 @@ steps:
 			wantMaxConc: 10, // default
 		},
 		{
-			name: "static array with maxConcurrent",
+			name: "StaticArrayWithMaxConcurrent",
 			yaml: `
-name: test
 steps:
   - name: process
     run: workflows/processor
@@ -84,9 +80,8 @@ steps:
 			wantMaxConc: 2,
 		},
 		{
-			name: "object form with items and maxConcurrent",
+			name: "ObjectFormWithItemsAndMaxConcurrent",
 			yaml: `
-name: test
 steps:
   - name: process
     run: workflows/processor
@@ -99,9 +94,8 @@ steps:
 			wantMaxConc:  5,
 		},
 		{
-			name: "object form with static array and maxConcurrent",
+			name: "ObjectFormWithStaticArrayAndMaxConcurrent",
 			yaml: `
-name: test
 steps:
   - name: process
     run: workflows/processor
@@ -116,9 +110,8 @@ steps:
 			wantFirstItem: "item1",
 		},
 		{
-			name: "error: parallel without run field",
+			name: "ErrorParallelWithoutRunField",
 			yaml: `
-name: test
 steps:
   - name: process
     command: echo test
@@ -128,9 +121,8 @@ steps:
 			wantErrMsg: "parallel execution is only supported for child-DAGs",
 		},
 		{
-			name: "error: parallel without command or run",
+			name: "ErrorParallelWithoutCommandOrRun",
 			yaml: `
-name: test
 steps:
   - name: process
     parallel: ${ITEMS}
@@ -138,9 +130,8 @@ steps:
 			wantErr: true,
 		},
 		{
-			name: "error: invalid maxConcurrent",
+			name: "ErrorInvalidMaxConcurrent",
 			yaml: `
-name: test
 steps:
   - name: process
     run: workflows/processor
@@ -152,9 +143,8 @@ steps:
 			wantErrMsg: "maxConcurrent must be greater than 0",
 		},
 		{
-			name: "error: empty items",
+			name: "ErrorEmptyItems",
 			yaml: `
-name: test
 steps:
   - name: process
     run: workflows/processor
@@ -216,7 +206,6 @@ steps:
 
 func TestParallelWithChildDAG(t *testing.T) {
 	yaml := `
-name: test
 steps:
   - name: process-regions
     run: workflows/deploy
@@ -259,9 +248,8 @@ func TestParallelIntegration(t *testing.T) {
 		yaml string
 	}{
 		{
-			name: "parallel with env variable substitution",
+			name: "ParallelWithEnvVariableSubstitution",
 			yaml: `
-name: test
 env:
   - REGIONS: '["us-east-1", "eu-west-1"]'
 steps:
@@ -271,9 +259,8 @@ steps:
 `,
 		},
 		{
-			name: "parallel with output from previous step",
+			name: "ParallelWithOutputFromPreviousStep",
 			yaml: `
-name: test  
 steps:
   - name: get-items
     command: echo '["item1", "item2", "item3"]'

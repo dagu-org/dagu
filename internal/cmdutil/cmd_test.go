@@ -51,67 +51,67 @@ func TestSplitCommand(t *testing.T) {
 		errorType error
 	}{
 		{
-			name:     "simple command no args",
+			name:     "SimpleCommandNoArgs",
 			input:    "echo",
 			wantCmd:  "echo",
 			wantArgs: []string{},
 		},
 		{
-			name:     "command with single arg",
+			name:     "CommandWithSingleArg",
 			input:    "echo hello",
 			wantCmd:  "echo",
 			wantArgs: []string{"hello"},
 		},
 		{
-			name:     "command with backtick",
+			name:     "CommandWithBacktick",
 			input:    "echo `echo hello`",
 			wantCmd:  "echo",
 			wantArgs: []string{"`echo hello`"},
 		},
 		{
-			name:     "command with multiple args",
+			name:     "CommandWithMultipleArgs",
 			input:    "echo hello world",
 			wantCmd:  "echo",
 			wantArgs: []string{"hello", "world"},
 		},
 		{
-			name:     "command with quoted args",
+			name:     "CommandWithQuotedArgs",
 			input:    `echo "hello world"`,
 			wantCmd:  "echo",
 			wantArgs: []string{"hello world"},
 		},
 		{
-			name:     "command with pipe",
+			name:     "CommandWithPipe",
 			input:    "echo foo | grep foo",
 			wantCmd:  "echo",
 			wantArgs: []string{"foo", "|", "grep", "foo"},
 		},
 		{
-			name:     "complex pipe command",
+			name:     "ComplexPipeCommand",
 			input:    "echo foo | grep foo | wc -l",
 			wantCmd:  "echo",
 			wantArgs: []string{"foo", "|", "grep", "foo", "|", "wc", "-l"},
 		},
 		{
-			name:     "command with quoted pipe",
+			name:     "CommandWithQuotedPipe",
 			input:    `echo "hello|world"`,
 			wantCmd:  "echo",
 			wantArgs: []string{"hello|world"},
 		},
 		{
-			name:      "empty command",
+			name:      "EmptyCommand",
 			input:     "",
 			wantErr:   true,
 			errorType: ErrCommandIsEmpty,
 		},
 		{
-			name:     "command with escaped quotes",
+			name:     "CommandWithEscapedQuotes",
 			input:    `echo "\"hello world\""`,
 			wantCmd:  "echo",
 			wantArgs: []string{`"hello world"`},
 		},
 		{
-			name:     "command with JSON",
+			name:     "CommandWithJSON",
 			input:    `echo "{\n\t\"key\": \"value\"\n}"`,
 			wantCmd:  "echo",
 			wantArgs: []string{"{\n\t\"key\": \"value\"\n}"},
@@ -192,37 +192,37 @@ func TestBuildEscapedCommandString(t *testing.T) {
 
 	tests := []testCase{
 		{
-			name: "piping",
+			name: "Piping",
 			cmd:  "echo",
 			args: []string{"hello", "|", "wc", "-c"},
 			want: "echo hello | wc -c",
 		},
 		{
-			name: "redirection",
+			name: "Redirection",
 			cmd:  "echo",
 			args: []string{"'test content'", ">", "testfile.txt", "&&", "cat", "testfile.txt"},
 			want: `echo 'test content' > testfile.txt && cat testfile.txt`,
 		},
 		{
-			name: `key="value" argument`,
+			name: "KeyValueArgument",
 			cmd:  "echo",
 			args: []string{`key="value"`},
 			want: `echo key="value"`,
 		},
 		{
-			name: "JSON argument",
+			name: "JSONArgument",
 			cmd:  "echo",
 			args: []string{`{"foo":"bar","hello":"world"}`},
 			want: `echo {"foo":"bar","hello":"world"}`,
 		},
 		{
-			name: "key=value argument",
+			name: "KeyValueArgument",
 			cmd:  "echo",
 			args: []string{`key="some value"`},
 			want: `echo key="some value"`,
 		},
 		{
-			name: "double quotes",
+			name: "DoubleQuotes",
 			cmd:  "echo",
 			args: []string{`a "b" c`},
 			want: `echo "a \"b\" c"`,
@@ -248,92 +248,92 @@ func TestParsePipedCommand(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:  "simple command no args",
+			name:  "SimpleCommandNoArgs",
 			input: "echo",
 			want:  [][]string{{"echo"}},
 		},
 		{
-			name:  "simple command with args",
+			name:  "SimpleCommandWithArgs",
 			input: "echo foo bar",
 			want:  [][]string{{"echo", "foo", "bar"}},
 		},
 		{
-			name:  "command with quoted args",
+			name:  "CommandWithQuotedArgs",
 			input: `echo "hello world"`,
 			want:  [][]string{{"echo", `hello world`}},
 		},
 		{
-			name:  "command with pipe",
+			name:  "CommandWithPipe",
 			input: "echo foo | grep foo",
 			want:  [][]string{{"echo", "foo"}, {"grep", "foo"}},
 		},
 		{
-			name:  "multiple pipes",
+			name:  "MultiplePipes",
 			input: "echo foo | grep foo | wc -l",
 			want:  [][]string{{"echo", "foo"}, {"grep", "foo"}, {"wc", "-l"}},
 		},
 		{
-			name:  "pipe in quotes",
+			name:  "PipeInQuotes",
 			input: `echo "hello|world"`,
 			want:  [][]string{{"echo", `hello|world`}},
 		},
 		{
-			name:  "command with single quoted args",
+			name:  "CommandWithSingleQuotedArgs",
 			input: `sh -c 'echo this is stderr >&2'`,
 			want:  [][]string{{"sh", "-c", `echo this is stderr >&2`}},
 		},
 		{
-			name:  "pipe in single quotes",
+			name:  "PipeInSingleQuotes",
 			input: `echo 'hello|world'`,
 			want:  [][]string{{"echo", `hello|world`}},
 		},
 		{
-			name:  "mixed single and double quotes",
+			name:  "MixedSingleAndDoubleQuotes",
 			input: `echo "hello" 'world'`,
 			want:  [][]string{{"echo", `hello`, `world`}},
 		},
 		{
-			name:  "single quotes with spaces",
+			name:  "SingleQuotesWithSpaces",
 			input: `echo 'hello world'`,
 			want:  [][]string{{"echo", `hello world`}},
 		},
 		{
-			name:  "multiple spaces between commands",
+			name:  "MultipleSpacesBetweenCommands",
 			input: "echo foo    |    grep foo",
 			want:  [][]string{{"echo", "foo"}, {"grep", "foo"}},
 		},
 		{
-			name:  "command with backticks",
+			name:  "CommandWithBackticks",
 			input: "echo `date`",
 			want:  [][]string{{"echo", "`date`"}},
 		},
 		{
-			name:  "pipe in backticks",
+			name:  "PipeInBackticks",
 			input: "echo `echo foo | grep foo`",
 			want:  [][]string{{"echo", "`echo foo | grep foo`"}},
 		},
 		{
-			name:  "escaped quotes",
+			name:  "EscapedQuotes",
 			input: `echo "Hello \"World\""`,
 			want:  [][]string{{"echo", `Hello "World"`}},
 		},
 		{
-			name:  "escaped pipe",
+			name:  "EscapedPipe",
 			input: `echo foo\|bar`,
 			want:  [][]string{{"echo", `foo\|bar`}},
 		},
 		{
-			name:  "empty command",
+			name:  "EmptyCommand",
 			input: "",
 			want:  [][]string{},
 		},
 		{
-			name:  "mixed quotes and backticks",
+			name:  "MixedQuotesAndBackticks",
 			input: "echo \"hello\" world `date`",
 			want:  [][]string{{"echo", `hello`, "world", "`date`"}},
 		},
 		{
-			name:  "complex pipeline",
+			name:  "ComplexPipeline",
 			input: `find . -name "*.go" | xargs grep "fmt" | sort | uniq -c`,
 			want: [][]string{
 				{"find", ".", "-name", `*.go`},
@@ -343,7 +343,7 @@ func TestParsePipedCommand(t *testing.T) {
 			},
 		},
 		{
-			name:  "command with environment variables",
+			name:  "CommandWithEnvironmentVariables",
 			input: `echo $HOME | grep home`,
 			want:  [][]string{{"echo", "$HOME"}, {"grep", "home"}},
 		},
@@ -374,17 +374,17 @@ func TestParsePipedCommandErrors(t *testing.T) {
 		wantPipe [][]string // what we expect even in case of errors
 	}{
 		{
-			name:     "unterminated quote",
+			name:     "UnterminatedQuote",
 			input:    `echo "hello`,
 			wantPipe: [][]string{{"echo", `"hello`}},
 		},
 		{
-			name:     "unterminated backtick",
+			name:     "UnterminatedBacktick",
 			input:    "echo `date",
 			wantPipe: [][]string{{"echo", "`date"}},
 		},
 		{
-			name:     "mixed unterminated quotes",
+			name:     "MixedUnterminatedQuotes",
 			input:    "echo \"hello `date`\"",
 			wantPipe: [][]string{{"echo", "hello `date`"}},
 		},
@@ -414,77 +414,77 @@ func TestParsePipedCommandShellOperators(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:  "OR operator - false || true",
+			name:  "OROperatorFalseTrue",
 			input: "false || true",
 			want:  [][]string{{"false", "||", "true"}}, // Currently incorrect behavior
 		},
 		{
-			name:  "AND operator - true && echo success",
+			name:  "ANDOperatorTrueEchoSuccess",
 			input: "true && echo success",
 			want:  [][]string{{"true", "&&", "echo", "success"}}, // Should be single command
 		},
 		{
-			name:  "Mixed operators - false || true && echo done",
+			name:  "MixedOperatorsFalseTrueEchoDone",
 			input: "false || true && echo done",
 			want:  [][]string{{"false", "||", "true", "&&", "echo", "done"}}, // Should be single command
 		},
 		{
-			name:  "OR with spaces - false  ||  true",
+			name:  "ORWithSpacesFalseTrue",
 			input: "false  ||  true",
 			want:  [][]string{{"false", "||", "true"}}, // Should handle extra spaces
 		},
 		{
-			name:  "Single pipe vs double pipe - echo a | grep a || echo failed",
+			name:  "SinglePipeVsDoublePipeEchoAGrepAEchoFailed",
 			input: "echo a | grep a || echo failed",
 			want:  [][]string{{"echo", "a"}, {"grep", "a", "||", "echo", "failed"}}, // First | is pipe, || is OR
 		},
 		{
-			name:  "Complex shell command",
+			name:  "ComplexShellCommand",
 			input: "test -f file.txt && cat file.txt || echo 'file not found'",
 			want:  [][]string{{"test", "-f", "file.txt", "&&", "cat", "file.txt", "||", "echo", "file not found"}},
 		},
 		{
-			name:  "Parentheses grouping",
+			name:  "ParenthesesGrouping",
 			input: "(false || true) && echo success",
 			want:  [][]string{{"(false", "||", "true)", "&&", "echo", "success"}},
 		},
 		{
-			name:  "OR in quotes should not be parsed",
+			name:  "ORInQuotesShouldNotBeParsed",
 			input: `echo "false || true"`,
 			want:  [][]string{{"echo", "false || true"}}, // Quoted || should remain intact
 		},
 		{
-			name:  "AND in quotes should not be parsed",
+			name:  "ANDInQuotesShouldNotBeParsed",
 			input: `echo "true && false"`,
 			want:  [][]string{{"echo", "true && false"}}, // Quoted && should remain intact
 		},
 		{
-			name:  "Mixed pipe and OR",
+			name:  "MixedPipeAndOR",
 			input: "ps aux | grep process || echo 'not found'",
 			want:  [][]string{{"ps", "aux"}, {"grep", "process", "||", "echo", "not found"}},
 		},
 		{
-			name:  "Triple pipe edge case",
+			name:  "TriplePipeEdgeCase",
 			input: "echo a ||| echo b",
 			want:  [][]string{{"echo", "a", "||"}, {"echo", "b"}}, // ||| = | + ||
 		},
 		{
-			name:  "Semicolon operator",
+			name:  "SemicolonOperator",
 			input: "echo first; echo second",
 			want:  [][]string{{"echo", "first;", "echo", "second"}}, // Semicolon not handled specially
 		},
 		{
-			name:  "Background operator",
+			name:  "BackgroundOperator",
 			input: "sleep 10 &",
 			want:  [][]string{{"sleep", "10", "&"}}, // & not handled specially
 		},
 		{
-			name:  "Subshell with operators",
+			name:  "SubshellWithOperators",
 			input: "$(false || true) && echo ok",
 			want:  [][]string{{"$(false", "||", "true)", "&&", "echo", "ok"}},
 		},
 		{
-			name:  "Issue #1065 - clamscan with grep and OR fallback",
+			name:  "Issue1065ClamscanWithGrepAndORFallback",
 			input: `clamscan -r / 2>&1 | grep -A 20 "SCAN SUMMARY" || true`,
 			want:  [][]string{{"clamscan", "-r", "/", "2>&1"}, {"grep", "-A", "20", "SCAN SUMMARY", "||", "true"}},
 		},
@@ -514,31 +514,31 @@ func TestSplitCommandShellOperators(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "OR operator - false || true",
+			name:     "OROperatorFalseTrue",
 			input:    "false || true",
 			wantCmd:  "false",
 			wantArgs: []string{"||", "true"}, // Correct behavior: || stays as single token
 		},
 		{
-			name:     "AND operator - true && echo success",
+			name:     "ANDOperatorTrueEchoSuccess",
 			input:    "true && echo success",
 			wantCmd:  "true",
 			wantArgs: []string{"&&", "echo", "success"},
 		},
 		{
-			name:     "Mixed pipe and OR",
+			name:     "MixedPipeAndOR",
 			input:    "echo hello | grep hello || echo not found",
 			wantCmd:  "echo",
 			wantArgs: []string{"hello", "|", "grep", "hello", "||", "echo", "not", "found"}, // Fixed: || stays as single token
 		},
 		{
-			name:     "Complex conditional",
+			name:     "ComplexConditional",
 			input:    "test -f file && cat file || touch file",
 			wantCmd:  "test",
 			wantArgs: []string{"-f", "file", "&&", "cat", "file", "||", "touch", "file"}, // Fixed: || stays as single token
 		},
 		{
-			name:     "Issue #1065 - clamscan command with pipe and OR",
+			name:     "Issue1065ClamscanCommandWithPipeAndOR",
 			input:    `clamscan -r / 2>&1 | grep -A 20 "SCAN SUMMARY" || true`,
 			wantCmd:  "clamscan",
 			wantArgs: []string{"-r", "/", "2>&1", "|", "grep", "-A", "20", "SCAN SUMMARY", "||", "true"},

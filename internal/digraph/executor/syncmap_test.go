@@ -14,13 +14,13 @@ func TestSyncMap_MarshalJSON(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "Empty map",
+			name:    "EmptyMap",
 			input:   map[string]any{},
 			want:    "{}",
 			wantErr: false,
 		},
 		{
-			name: "Map with string values",
+			name: "MapWithStringValues",
 			input: map[string]any{
 				"key1": "value1",
 				"key2": "value2",
@@ -29,7 +29,7 @@ func TestSyncMap_MarshalJSON(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Map with mixed value types",
+			name: "MapWithMixedValueTypes",
 			input: map[string]any{
 				"string": "value",
 				"number": 42,
@@ -69,13 +69,13 @@ func TestSyncMap_UnmarshalJSON(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "Empty JSON object",
+			name:    "EmptyJSONObject",
 			input:   "{}",
 			want:    map[string]any{},
 			wantErr: false,
 		},
 		{
-			name:  "JSON object with string values",
+			name:  "JSONObjectWithStringValues",
 			input: `{"key1":"value1","key2":"value2"}`,
 			want: map[string]any{
 				"key1": "value1",
@@ -84,7 +84,7 @@ func TestSyncMap_UnmarshalJSON(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:  "JSON object with mixed value types",
+			name:  "JSONObjectWithMixedValueTypes",
 			input: `{"string":"value","number":42,"bool":true,"null":null}`,
 			want: map[string]any{
 				"string": "value",
@@ -95,7 +95,7 @@ func TestSyncMap_UnmarshalJSON(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "Invalid JSON",
+			name:    "InvalidJSON",
 			input:   `{"key":"value"`,
 			want:    nil,
 			wantErr: true,

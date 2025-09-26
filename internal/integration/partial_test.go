@@ -18,7 +18,7 @@ func TestPartialSuccess(t *testing.T) {
 		expectedOutput map[string]any
 	}{
 		{
-			name: "Basic partial success",
+			name: "BasicPartialSuccess",
 			yaml: `
 steps:
   - name: fail-step
@@ -32,7 +32,7 @@ steps:
 			expectedStatus: status.PartialSuccess,
 		},
 		{
-			name: "Success by marking step as successful",
+			name: "SuccessByMarkingStepAsSuccessful",
 			yaml: `
 steps:
   - name: fail-step
@@ -47,7 +47,7 @@ steps:
 			expectedStatus: status.Success,
 		},
 		{
-			name: "Single step with continueOn failure",
+			name: "SingleStepWithContinueOnFailure",
 			yaml: `
 steps:
   - name: fail-step
@@ -58,7 +58,7 @@ steps:
 			expectedStatus: status.Error,
 		},
 		{
-			name: "Single step with continueOn marking as success",
+			name: "SingleStepWithContinueOnMarkingAsSuccess",
 			yaml: `
 steps:
   - name: fail-step
