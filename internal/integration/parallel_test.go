@@ -76,7 +76,7 @@ steps:
 			expectedNodes:     1,
 			parallelNodeIndex: 0,
 			expectedChildren:  3,
-			verify: func(t *testing.T, status *models.DAGRunStatus, node *models.Node) {
+			verify: func(t *testing.T, _ *models.DAGRunStatus, node *models.Node) {
 				for _, child := range node.Children {
 					require.Contains(t, child.Params, `"REGION"`)
 					require.Contains(t, child.Params, `"VERSION"`)
@@ -131,7 +131,7 @@ steps:
 			expectedNodes:     2,
 			parallelNodeIndex: 0,
 			expectedChildren:  3,
-			verify: func(t *testing.T, dagStatus *models.DAGRunStatus, node *models.Node) {
+			verify: func(t *testing.T, dagStatus *models.DAGRunStatus, _ *models.Node) {
 				require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 				aggregate := dagStatus.Nodes[1]
 				require.Equal(t, status.NodeSuccess, aggregate.Status)
