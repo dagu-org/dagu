@@ -16,7 +16,6 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -124,11 +123,10 @@ func (c *Client) Close(ctx context.Context) {
 	defer c.mu.Unlock()
 
 	// If we have a running container and autoRemove is set, remove it
-	if c.containerID != "" && c.cfg.AutoRemove {
+	if c.cfg.AutoRemove {
 		if err := c.cli.ContainerRemove(ctx, c.containerID, container.RemoveOptions{Force: true}); err != nil {
 			logger.Error(ctx, "docker executor: remove container", "err", err)
 		}
-		c.containerID = ""
 	}
 
 	_ = c.cli.Close()
@@ -194,15 +192,11 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 	c.cancel = cancel
 	c.cancelMu.Unlock()
 
-	if c.containerID == "" {
-		// If container name was not specified, generate a random one
-		c.containerID = fmt.Sprintf("dagu-%s", stringutil.RandomString(12))
-	}
-
 	ctID, err := c.startNewContainer(ctx, c.cfg.ContainerName, c.cli, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to start a new container: %w", err)
 	}
+	c.containerID = ctID
 
 	// Readiness wait
 	waitMode := c.cfg.WaitFor
@@ -270,24 +264,25 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 	c.cancelMu.Lock()
 	defer c.cancelMu.Unlock()
 
-	if c.cancel == nil {
+	if c.cancel != nil {
 		return
 	}
+
 	c.cancel()
 	c.cancel = nil
 
-	if c.containerID == "" {
-		return
+	if c.containerID != "" {
+		// Stop the container
+		if err := c.cli.ContainerStop(ctx, c.containerID, container.StopOptions{}); err != nil {
+			logger.Error(ctx, "docker executor: stop container", "err", err)
+		}
 	}
-
-	if err := c.cli.ContainerStop(ctx, c.containerID, container.StopOptions{}); err != nil {
-		logger.Error(ctx, "docker executor: stop container", "err", err)
+	if c.keepAliveTmp != "" {
+		// Remove the temporary keep alive file if it exists
+		if err := os.Remove(c.keepAliveTmp); err != nil && !os.IsNotExist(err) {
+			logger.Error(ctx, "docker executor: remove keep alive file", "err", err)
+		}
 	}
-	// Remove the temporary keep alive file if it exists
-	if err := os.Remove(c.keepAliveTmp); err != nil && !os.IsNotExist(err) {
-		logger.Error(ctx, "docker executor: remove keep alive file", "err", err)
-	}
-	c.keepAliveTmp = ""
 }
 
 // Run executes the command in the container and returns exit code
@@ -311,7 +306,7 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 		}
 	}
 
-	ctID, err := c.startNewContainer(ctx, c.containerID, c.cli, cmd)
+	ctID, err := c.startNewContainer(ctx, c.cfg.ContainerName, c.cli, cmd)
 	if err != nil {
 		return errorExitCode, fmt.Errorf("failed to start a new container: %w", err)
 	}
