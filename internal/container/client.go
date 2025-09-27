@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -67,6 +68,7 @@ type Client struct {
 
 	platform    specs.Platform // resolved platform
 	containerID string         // ID of the running container (if any)
+	started     atomic.Bool
 
 	mu  sync.Mutex
 	cli *client.Client
@@ -124,8 +126,8 @@ func (c *Client) Close(ctx context.Context) {
 	defer c.mu.Unlock()
 
 	// If we have a running container and autoRemove is set, remove it
-	if c.cfg.AutoRemove {
-		if err := c.cli.ContainerRemove(ctx, c.containerID, container.RemoveOptions{Force: true}); err != nil {
+	if c.cfg.AutoRemove && c.started.Load() && c.containerID != "" {
+		if err := c.cli.ContainerRemove(context.Background(), c.containerID, container.RemoveOptions{Force: true}); err != nil {
 			logger.Error(ctx, "docker executor: remove container", "err", err)
 		}
 	}
@@ -427,7 +429,13 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 
 	c.containerID = resp.ID
 
-	return resp.ID, cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
+	err = cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
+
+	if err == nil {
+		c.started.Store(true)
+	}
+
+	return resp.ID, err
 }
 
 func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {
