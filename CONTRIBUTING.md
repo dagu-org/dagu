@@ -15,7 +15,7 @@ Dagu is an open-source workflow engine designed to simplify workflow orchestrati
 ## 🛠️ Setup Instructions
 
 ### Prerequisites
-- [Go 1.24+](https://go.dev/doc/install)
+- [Go 1.25+](https://go.dev/doc/install)
 - [Node.js](https://nodejs.org/en/download/)
 - [pnpm](https://pnpm.io/installation)
 
