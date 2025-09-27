@@ -298,7 +298,7 @@ This configuration is used for communication between coordinator services and ot
 ### Building from Source
 
 #### Prerequisites
-- [Go 1.24+](https://go.dev/doc/install)
+- [Go 1.25+](https://go.dev/doc/install)
 - [Node.js](https://nodejs.org/en/download/)
 - [pnpm](https://pnpm.io/installation)
 
