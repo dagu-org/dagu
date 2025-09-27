@@ -148,7 +148,7 @@ steps:
 ### Cleanup Timeout
 
 ```yaml
-maxCleanUpTimeSec: 300  # 5 minutes for cleanup
+maxCleanUpTimeSec: 300  # 5 minutes for cleanup (default: 5)
 
 handlerOn:
   exit:

@@ -22,7 +22,7 @@ import (
 // Constants for configuration defaults
 const (
 	defaultDAGRunRetentionDays = 30
-	defaultMaxCleanUpTime      = 60 * time.Second
+	defaultMaxCleanUpTime      = 5 * time.Second
 )
 
 // Execution type constants
