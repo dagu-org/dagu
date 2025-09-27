@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -324,7 +325,51 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 		})
 	}()
 
-	return c.attachAndWait(ctx, c.cli, ctID, stdout, stderr)
+	exitCode, err := c.attachAndWait(ctx, c.cli, ctID, stdout, stderr)
+
+	// Wait for container to be stopped before returning
+	for {
+		info, err := c.cli.ContainerInspect(context.Background(), ctID)
+		if err != nil {
+			return exitCode, err
+		}
+		if info.State != nil && !info.State.Running {
+			break
+		}
+
+		time.Sleep(defaultPollInterval)
+	}
+
+	return exitCode, err
+}
+
+// Stop stops the running container
+func (c *Client) Stop(sig os.Signal) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.containerID == "" {
+		return nil
+	}
+
+	// Check if the container is already stopped
+	if info, err := c.cli.ContainerInspect(context.Background(), c.containerID); err == nil {
+		if errdefs.IsNotFound(err) {
+			return nil
+		}
+		if info.State != nil && !info.State.Running {
+			return nil
+		}
+	}
+
+	var sigName string
+	if sysSig, ok := sig.(syscall.Signal); ok {
+		sigName = sysSig.String()
+	}
+
+	return c.cli.ContainerStop(context.Background(), c.containerID, container.StopOptions{
+		Signal: sigName,
+	})
 }
 
 func (c *Client) startNewContainer(ctx context.Context, name string, cli *client.Client, cmd []string) (string, error) {

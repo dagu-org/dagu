@@ -91,11 +91,15 @@ func (e *docker) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
-func (e *docker) Kill(_ os.Signal) error {
+func (e *docker) Kill(sig os.Signal) error {
 	if e.cancel != nil {
 		e.cancel()
+		e.cancel = nil
 	}
-	return nil
+	if e.container == nil {
+		return nil
+	}
+	return e.container.Stop(sig)
 }
 
 func (e *docker) Run(ctx context.Context) error {
