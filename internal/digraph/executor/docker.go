@@ -7,9 +7,12 @@ import (
 	"io"
 	"os"
 	"sync"
+	"syscall"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/container"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
 // Docker executor runs a command in a Docker container.
@@ -99,6 +102,22 @@ func (e *docker) Kill(sig os.Signal) error {
 	if e.container == nil {
 		return nil
 	}
+
+	if sig == syscall.SIGKILL {
+		return e.container.Stop(sig)
+	}
+	if sig == syscall.SIGTERM && e.step.SignalOnStop != "" {
+		sig = syscall.Signal(digraph.GetSignalNum(e.step.SignalOnStop))
+	}
+
+	// Wait for max clean up time before forcefully killing the container
+	go func() {
+		env := GetEnv(e.context)
+		<-time.After(env.DAG.MaxCleanUpTime)
+		logger.Warn(e.context, "forcefully stopping container after max clean up time", "container", e.step.Name)
+		_ = e.container.Stop(syscall.SIGKILL)
+	}()
+
 	return e.container.Stop(sig)
 }
 

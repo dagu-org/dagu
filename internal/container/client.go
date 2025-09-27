@@ -307,6 +307,9 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 		}
 	}
 
+	// If container is not running, start a new one
+	// The container should be stopped and removed after run with autoRemove
+	// set to true.
 	ctID, err := c.startNewContainer(ctx, c.cfg.ContainerName, c.cli, cmd)
 	if err != nil {
 		return errorExitCode, fmt.Errorf("failed to start a new container: %w", err)
@@ -319,7 +322,7 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 		}
 
 		once.Do(func() {
-			if err := c.cli.ContainerRemove(ctx, c.containerID, container.RemoveOptions{Force: true}); err != nil {
+			if err := c.cli.ContainerRemove(context.Background(), c.containerID, container.RemoveOptions{Force: true}); err != nil {
 				logger.Error(ctx, "docker executor: remove container", "err", err)
 			}
 		})
@@ -364,7 +367,7 @@ func (c *Client) Stop(sig os.Signal) error {
 
 	var sigName string
 	if sysSig, ok := sig.(syscall.Signal); ok {
-		sigName = sysSig.String()
+		sigName = GetSignalName(sysSig)
 	}
 
 	return c.cli.ContainerStop(context.Background(), c.containerID, container.StopOptions{
