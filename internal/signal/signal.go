@@ -1,6 +1,7 @@
 package signal
 
 import (
+	"os"
 	"syscall"
 )
 
@@ -20,18 +21,27 @@ func GetSignalName(sig syscall.Signal) string {
 	return ""
 }
 
+// IsTerminationSignalOS checks if the given os.Signal is a termination signal
+func IsTerminationSignalOS(sis os.Signal) bool {
+	sig, ok := sis.(syscall.Signal)
+	if !ok {
+		return false
+	}
+	return isTerminationSignalInternal(sig)
+}
+
 // IsTerminationSignal checks if the given signal is a termination signal
 func IsTerminationSignal(sig syscall.Signal) bool {
 	return isTerminationSignalInternal(sig)
+}
+
+// GetSignalNum returns the signal number for the given signal name
+func GetSignalNum(sig string) int {
+	return getSignalNum(sig)
 }
 
 type signalInfo struct {
 	name          string
 	isTermination bool
 	number        syscall.Signal
-}
-
-// GetSignalNum returns the signal number for the given signal name
-func GetSignalNum(sig string) int {
-	return getSignalNum(sig)
 }
