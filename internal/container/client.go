@@ -267,7 +267,7 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 	c.cancelMu.Lock()
 	defer c.cancelMu.Unlock()
 
-	if c.cancel != nil {
+	if c.cancel == nil {
 		return
 	}
 
@@ -286,6 +286,7 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 			logger.Error(ctx, "docker executor: remove keep alive file", "err", err)
 		}
 	}
+	c.keepAliveTmp = ""
 }
 
 // Run executes the command in the container and returns exit code
@@ -336,7 +337,10 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 	for {
 		info, err := c.cli.ContainerInspect(context.Background(), ctID)
 		if err != nil {
-			return exitCode, err
+			if errdefs.IsNotFound(err) {
+				break
+			}
+			return exitCode, fmt.Errorf("failed to inspect container %s: %w", ctID, err)
 		}
 		if info.State != nil && !info.State.Running {
 			break
@@ -357,14 +361,15 @@ func (c *Client) Stop(sig os.Signal) error {
 		return nil
 	}
 
-	// Check if the container is already stopped
-	if info, err := c.cli.ContainerInspect(context.Background(), c.containerID); err == nil {
+	info, err := c.cli.ContainerInspect(context.Background(), c.containerID)
+	if err != nil {
 		if errdefs.IsNotFound(err) {
 			return nil
 		}
-		if info.State != nil && !info.State.Running {
-			return nil
-		}
+		return fmt.Errorf("failed to inspect container %s: %w", c.containerID, err)
+	}
+	if info.State != nil && !info.State.Running {
+		return nil
 	}
 
 	var sigName string
@@ -372,9 +377,14 @@ func (c *Client) Stop(sig os.Signal) error {
 		sigName = GetSignalName(sysSig)
 	}
 
-	return c.cli.ContainerStop(context.Background(), c.containerID, container.StopOptions{
-		Signal: sigName,
-	})
+	if err := c.cli.ContainerStop(context.Background(), c.containerID, container.StopOptions{Signal: sigName}); err != nil {
+		if errdefs.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	return nil
 }
 
 func (c *Client) startNewContainer(ctx context.Context, name string, cli *client.Client, cmd []string) (string, error) {

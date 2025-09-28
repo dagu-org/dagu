@@ -5,5 +5,5 @@ package container
 import "syscall"
 
 func signalName(syscall.Signal) string {
-	return "SIGKILL"
+	return ""
 }
