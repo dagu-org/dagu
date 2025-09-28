@@ -3,16 +3,20 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/containerd/platforms"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const (
@@ -376,6 +380,31 @@ steps:
 func createLongRunningContainer(t *testing.T, th test.Helper, dockerClient *client.Client, containerName string) string {
 	t.Helper()
 
+	info, err := dockerClient.Info(th.Context)
+	if err != nil {
+		t.Fatalf("failed to get docker info: %v", err)
+	}
+
+	var platform specs.Platform
+	platform.Architecture = info.Architecture
+	platform.OS = info.OSType
+
+	pullOpts := image.PullOptions{Platform: platforms.Format(platform)}
+
+	// Pull the image to ensure it exists; consume the stream so the daemon registers it
+	reader, err := dockerClient.ImagePull(th.Context, testImage, pullOpts)
+	if err != nil {
+		t.Fatalf("failed to pull image %s: %v", testImage, err)
+	}
+	if _, err := io.Copy(io.Discard, reader); err != nil {
+		_ = reader.Close()
+		t.Fatalf("failed to read pull response for %s: %v", testImage, err)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatalf("failed to close pull response for %s: %v", testImage, err)
+	}
+
+	// Create and start the container
 	created, err := dockerClient.ContainerCreate(
 		th.Context,
 		&container.Config{

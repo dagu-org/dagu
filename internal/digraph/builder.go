@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/signal"
 	"github.com/go-viper/mapstructure/v2"
 )
 
@@ -1570,7 +1571,7 @@ func buildStepPrecondition(ctx StepBuildContext, def stepDef, step *Step) error 
 func buildSignalOnStop(_ StepBuildContext, def stepDef, step *Step) error {
 	if def.SignalOnStop != nil {
 		sigDef := *def.SignalOnStop
-		sig := getSignalNum(sigDef)
+		sig := signal.GetSignalNum(sigDef, 0)
 		if sig == 0 {
 			return fmt.Errorf("%w: %s", ErrInvalidSignal, sigDef)
 		}

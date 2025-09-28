@@ -94,7 +94,7 @@ schedule:
 | `maxActiveSteps` | integer | Max parallel steps | `1` |
 | `timeoutSec` | integer | Workflow timeout in seconds | `0` (no timeout) |
 | `delaySec` | integer | Initial delay before start (seconds) | `0` |
-| `maxCleanUpTimeSec` | integer | Max cleanup time (seconds) | `300` |
+| `maxCleanUpTimeSec` | integer | Max cleanup time (seconds) | `5` |
 | `preconditions` | array | Workflow-level preconditions | - |
 | `runConfig` | object | User interaction controls when starting DAG | - |
 

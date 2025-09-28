@@ -10,13 +10,15 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/signal"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -67,6 +69,7 @@ type Client struct {
 
 	platform    specs.Platform // resolved platform
 	containerID string         // ID of the running container (if any)
+	started     atomic.Bool
 
 	mu  sync.Mutex
 	cli *client.Client
@@ -124,11 +127,10 @@ func (c *Client) Close(ctx context.Context) {
 	defer c.mu.Unlock()
 
 	// If we have a running container and autoRemove is set, remove it
-	if c.containerID != "" && c.cfg.AutoRemove {
-		if err := c.cli.ContainerRemove(ctx, c.containerID, container.RemoveOptions{Force: true}); err != nil {
+	if c.cfg.AutoRemove && c.started.Load() && c.containerID != "" {
+		if err := c.cli.ContainerRemove(context.Background(), c.containerID, container.RemoveOptions{Force: true}); err != nil {
 			logger.Error(ctx, "docker executor: remove container", "err", err)
 		}
-		c.containerID = ""
 	}
 
 	_ = c.cli.Close()
@@ -194,15 +196,11 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 	c.cancel = cancel
 	c.cancelMu.Unlock()
 
-	if c.containerID == "" {
-		// If container name was not specified, generate a random one
-		c.containerID = fmt.Sprintf("dagu-%s", stringutil.RandomString(12))
-	}
-
 	ctID, err := c.startNewContainer(ctx, c.cfg.ContainerName, c.cli, cmd)
 	if err != nil {
 		return fmt.Errorf("failed to start a new container: %w", err)
 	}
+	c.containerID = ctID
 
 	// Readiness wait
 	waitMode := c.cfg.WaitFor
@@ -273,19 +271,71 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 	if c.cancel == nil {
 		return
 	}
+
 	c.cancel()
 	c.cancel = nil
 
-	if c.containerID == "" {
-		return
+	if c.containerID != "" {
+		// Stop the container
+		if err := c.cli.ContainerStop(ctx, c.containerID, container.StopOptions{}); err != nil {
+			logger.Error(ctx, "docker executor: stop container", "err", err)
+		}
 	}
 
-	if err := c.cli.ContainerStop(ctx, c.containerID, container.StopOptions{}); err != nil {
-		logger.Error(ctx, "docker executor: stop container", "err", err)
+	if c.containerID != "" {
+		// Forcefully stop after timeout
+		defaultStopTimeout := 5 * time.Second
+		var containerStopped atomic.Bool
+		forceKillTimer := time.AfterFunc(defaultStopTimeout, func() {
+			if containerStopped.Load() {
+				return
+			}
+			if err := c.cli.ContainerKill(context.Background(), c.containerID, "SIGKILL"); err != nil {
+				if errdefs.IsNotFound(err) {
+					return
+				}
+				logger.Error(ctx, "docker executor: force stop container", "err", err)
+			}
+		})
+
+		// Wait for container to be fully stopped
+		maxWait := 30 * time.Second
+		waitTimer := time.NewTimer(maxWait)
+		defer waitTimer.Stop()
+
+	WAIT_LOOP:
+		for {
+			info, err := c.cli.ContainerInspect(context.Background(), c.containerID)
+			if err != nil {
+				if errdefs.IsNotFound(err) {
+					containerStopped.Store(true)
+					break
+				}
+				logger.Error(ctx, "docker executor: inspect container", "err", err)
+			} else if info.State != nil && !info.State.Running {
+				containerStopped.Store(true)
+				break
+			}
+
+			select {
+			case <-waitTimer.C:
+				logger.Warn(ctx, "docker executor: timeout waiting for container to stop")
+				break WAIT_LOOP
+			default:
+				time.Sleep(defaultPollInterval)
+			}
+		}
+
+		if containerStopped.Load() {
+			_ = forceKillTimer.Stop()
+		}
 	}
-	// Remove the temporary keep alive file if it exists
-	if err := os.Remove(c.keepAliveTmp); err != nil && !os.IsNotExist(err) {
-		logger.Error(ctx, "docker executor: remove keep alive file", "err", err)
+
+	if c.keepAliveTmp != "" {
+		// Remove the temporary keep alive file if it exists
+		if err := os.Remove(c.keepAliveTmp); err != nil && !os.IsNotExist(err) {
+			logger.Error(ctx, "docker executor: remove keep alive file", "err", err)
+		}
 	}
 	c.keepAliveTmp = ""
 }
@@ -311,7 +361,10 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 		}
 	}
 
-	ctID, err := c.startNewContainer(ctx, c.containerID, c.cli, cmd)
+	// If container is not running, start a new one
+	// The container should be stopped and removed after run with autoRemove
+	// set to true.
+	ctID, err := c.startNewContainer(ctx, c.cfg.ContainerName, c.cli, cmd)
 	if err != nil {
 		return errorExitCode, fmt.Errorf("failed to start a new container: %w", err)
 	}
@@ -323,13 +376,66 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 		}
 
 		once.Do(func() {
-			if err := c.cli.ContainerRemove(ctx, c.containerID, container.RemoveOptions{Force: true}); err != nil {
+			if err := c.cli.ContainerRemove(context.Background(), c.containerID, container.RemoveOptions{Force: true}); err != nil {
 				logger.Error(ctx, "docker executor: remove container", "err", err)
 			}
 		})
 	}()
 
-	return c.attachAndWait(ctx, c.cli, ctID, stdout, stderr)
+	exitCode, err := c.attachAndWait(ctx, c.cli, ctID, stdout, stderr)
+
+	// Wait for container to be stopped before returning
+	for {
+		info, err := c.cli.ContainerInspect(context.Background(), ctID)
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				break
+			}
+			return exitCode, fmt.Errorf("failed to inspect container %s: %w", ctID, err)
+		}
+		if info.State != nil && !info.State.Running {
+			break
+		}
+
+		time.Sleep(defaultPollInterval)
+	}
+
+	return exitCode, err
+}
+
+// Stop stops the running container
+func (c *Client) Stop(sig os.Signal) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.containerID == "" {
+		return nil
+	}
+
+	info, err := c.cli.ContainerInspect(context.Background(), c.containerID)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to inspect container %s: %w", c.containerID, err)
+	}
+	if info.State != nil && !info.State.Running {
+		return nil
+	}
+
+	var sigName string
+	if sysSig, ok := sig.(syscall.Signal); ok {
+		sigName = signal.GetSignalName(sysSig)
+	}
+
+	if err := c.cli.ContainerStop(context.Background(), c.containerID, container.StopOptions{Signal: sigName}); err != nil {
+		if errdefs.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	return nil
 }
 
 func (c *Client) startNewContainer(ctx context.Context, name string, cli *client.Client, cmd []string) (string, error) {
@@ -384,7 +490,13 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 
 	c.containerID = resp.ID
 
-	return resp.ID, cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
+	err = cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
+
+	if err == nil {
+		c.started.Store(true)
+	}
+
+	return resp.ID, err
 }
 
 func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {
@@ -435,10 +547,15 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 	defer resp.Close()
 
 	// Copy output
+	var wg sync.WaitGroup
+	wg.Add(1)
+	defer wg.Wait()
+
 	go func() {
 		if _, err := stdcopy.StdCopy(stdout, stderr, resp.Reader); err != nil {
 			logger.Error(ctx, "docker executor: stdcopy", "err", err)
 		}
+		wg.Done()
 	}()
 
 	time.Sleep(defaultPollInterval) // Give some time for the exec to start
@@ -460,8 +577,9 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 		select {
 		case <-ctx.Done():
 			return 1, ctx.Err()
+
 		default:
-			// Continue waiting
+			time.Sleep(defaultPollInterval)
 		}
 	}
 }
