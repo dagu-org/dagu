@@ -14,9 +14,84 @@ params:
 # Positional parameters (accessed as $1, $2, ...)
 params: first second third
 
+# JSON Schema validation
+params:
+  schema: "./schemas/params.json"  # Local file or remote URL
+  values:
+    ENVIRONMENT: dev
+    PORT: 8080
+    DEBUG: false
+
 steps:
   - echo $1 --env=${ENVIRONMENT} --port=${PORT}
 ```
+
+## JSON Schema Validation
+
+Validate parameters against a JSON Schema to ensure type safety and enforce constraints:
+
+```yaml
+params:
+  schema: "https://example.com/schemas/dag-params.json"
+  values:
+    batch_size: 25
+    environment: "staging"
+```
+
+The schema can be:
+- **Local file**: `"./schemas/params.json"` or `"/absolute/path/to/schema.json"`
+- **Remote URL**: `"https://example.com/schemas/params.json"`
+
+### Schema-Only Mode
+
+Define validation without default values:
+
+```yaml
+params:
+  schema: "./schemas/params.json"
+  # No values - all parameters must be provided at runtime
+```
+
+### Reserved Keywords
+
+⚠️ **Important**: The following keywords are reserved and cannot be used as parameter names:
+- `schema` - References the JSON Schema file
+
+Using these as parameter names could possibly cause parsing errors.
+
+### Example JSON Schema
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "batch_size": {
+      "type": "integer",
+      "default": 10,
+      "minimum": 1,
+      "maximum": 100
+    },
+    "environment": {
+      "type": "string",
+      "default": "dev",
+      "enum": ["dev", "staging", "prod"]
+    },
+    "debug": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": ["batch_size", "environment"]
+}
+```
+
+### Validation Behavior
+
+- **Runtime Validation**: Parameters are validated when the DAG is loaded, before execution
+- **CLI Override Validation**: Command-line parameters are also validated against the schema
+- **Error Messages**: Clear error messages indicate which parameters failed validation and why
+- **Backward Compatibility**: Existing parameter formats continue to work unchanged
 
 ## Passing Parameters
 

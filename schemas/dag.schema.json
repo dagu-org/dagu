@@ -305,9 +305,26 @@
           "type": "object",
           "additionalProperties": true,
           "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema": {
+              "type": "string",
+              "description": "Path to JSON Schema file (local file or remote URL) for parameter validation"
+            },
+            "values": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Default parameter values to be validated against the schema"
+            }
+          },
+          "required": ["schema"],
+          "additionalProperties": false,
+          "description": "JSON Schema validation mode: validates parameters against a schema. 'schema' field is required, 'values' field is optional."
         }
       ],
-      "description": "Default parameters that can be overridden when triggering the DAG. Can be positional (accessed as $1, $2) or named (accessed as ${KEY})."
+      "description": "Default parameters that can be overridden when triggering the DAG. Supports positional parameters (accessed as $1, $2), named parameters (accessed as ${KEY}), or JSON Schema validation mode with reserved keywords 'schema' and 'values'."
     },
     "container": {
       "$ref": "#/definitions/container",

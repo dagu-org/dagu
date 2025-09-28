@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -95,6 +97,133 @@ env:
 			"Y=foo",
 			"Z=A B C",
 		)
+	})
+	t.Run("ParamsWithLocalSchemaReference", func(t *testing.T) {
+		schemaContent := `{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "batch_size": {
+      "type": "integer",
+      "default": 10,
+      "minimum": 1
+    },
+    "environment": {
+      "type": "string",
+      "default": "dev",
+      "enum": ["dev", "staging", "prod"]
+    }
+  }
+}`
+
+		// Create temp schema file
+		tmpFile, err := os.CreateTemp("", "test-schema-*.json")
+		require.NoError(t, err)
+		defer os.Remove(tmpFile.Name())
+
+		_, err = tmpFile.WriteString(schemaContent)
+		require.NoError(t, err)
+		tmpFile.Close()
+
+		data := []byte(fmt.Sprintf(`
+params:
+  schema: "%s"
+  values:
+    batch_size: 25
+    environment: "staging"
+`, tmpFile.Name()))
+
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+
+		// Test that parameters are parsed correctly (order may vary)
+		require.Len(t, th.Params, 2)
+		require.Contains(t, th.Params, "batch_size=25")
+		require.Contains(t, th.Params, "environment=staging")
+	})
+	t.Run("ParamsWithRemoteSchemaReference", func(t *testing.T) {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/schemas/dag-params.json", func(w http.ResponseWriter, r *http.Request) {
+			schemaContent := `{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "batch_size": {
+      "type": "integer",
+      "default": 10,
+      "minimum": 1
+    },
+    "environment": {
+      "type": "string",
+      "default": "dev",
+      "enum": ["dev", "staging", "prod"]
+    }
+  }
+}`
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(schemaContent))
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		data := []byte(fmt.Sprintf(`
+params:
+  schema: "%s/schemas/dag-params.json"
+  values:
+    batch_size: 50
+    environment: "prod"
+`, server.URL))
+
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+
+		// Test that parameters are parsed correctly (order may vary)
+		require.Len(t, th.Params, 2)
+		require.Contains(t, th.Params, "batch_size=50")
+		require.Contains(t, th.Params, "environment=prod")
+	})
+	t.Run("ParamsWithSchemaAndOverrideValidation", func(t *testing.T) {
+		schemaContent := `{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "batch_size": {
+      "type": "integer",
+      "default": 10,
+      "minimum": 1,
+      "maximum": 50
+    },
+    "environment": {
+      "type": "string",
+      "default": "dev",
+      "enum": ["dev", "staging", "prod"]
+    }
+  }
+}`
+
+		// Create temp schema file
+		tmpFile, err := os.CreateTemp("", "test-schema-validation-*.json")
+		require.NoError(t, err)
+		defer os.Remove(tmpFile.Name())
+
+		_, err = tmpFile.WriteString(schemaContent)
+		require.NoError(t, err)
+		tmpFile.Close()
+
+		data := []byte(fmt.Sprintf(`
+params:
+  schema: "%s"
+`, tmpFile.Name()))
+
+		// Inject CLI parameters that override the schema values and should fail validation
+		cliParams := "batch_size=100 environment=prod"
+		_, err = digraph.LoadYAML(context.Background(), data, digraph.WithParams(cliParams))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "parameter validation failed")
+		require.Contains(t, err.Error(), "maximum: 100/1 is greater than 50")
 	})
 	t.Run("MailOn", func(t *testing.T) {
 		data := []byte(`

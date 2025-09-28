@@ -69,6 +69,7 @@ require (
 	github.com/golangci/asciicheck v0.5.0 // indirect
 	github.com/golangci/nilerr v0.0.0-20250918000102-015671e622fe // indirect
 	github.com/golangci/swaggoswag v0.0.0-20250504205917-77f2aca3143e // indirect
+	github.com/google/jsonschema-go v0.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/hashicorp/go-plugin v1.6.3 // indirect
@@ -84,6 +85,9 @@ require (
 	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/samber/slog-common v0.19.0 // indirect
 	github.com/speakeasy-api/jsonpath v0.6.0 // indirect
+	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
+	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
+	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/yoheimuta/go-protoparser/v4 v4.14.2 // indirect
 	go.augendre.info/arangolint v0.2.0 // indirect
 	go.augendre.info/fatcontext v0.8.1 // indirect
