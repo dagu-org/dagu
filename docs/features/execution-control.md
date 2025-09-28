@@ -147,8 +147,10 @@ steps:
 
 ### Cleanup Timeout
 
+By default DAGs wait 5 seconds for cleanup before forcefully terminating steps. Increase `maxCleanUpTimeSec` if your handlers need longer.
+
 ```yaml
-maxCleanUpTimeSec: 300  # 5 minutes for cleanup
+maxCleanUpTimeSec: 300  # allow 5 minutes for cleanup (default timeout: 5s)
 
 handlerOn:
   exit:
