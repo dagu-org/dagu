@@ -39,22 +39,6 @@ var signalMap = map[syscall.Signal]signalInfo{
 	syscall.SIGXFSZ:   {"SIGXFSZ", true, syscall.SIGXFSZ},     // A - File size limit exceeded
 }
 
-func getSignalNum(sig string) int {
-	for s, info := range signalMap {
-		if info.name == sig {
-			return int(s)
-		}
-	}
-	return int(syscall.SIGTERM)
-}
-
-func signalName(sig syscall.Signal) string {
-	if sigInfo, ok := signalMap[sig]; ok {
-		return sigInfo.name
-	}
-	return ""
-}
-
 func isTerminationSignalInternal(sig syscall.Signal) bool {
 	if sigInfo, ok := signalMap[sig]; ok {
 		return sigInfo.isTermination

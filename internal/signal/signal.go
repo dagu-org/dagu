@@ -5,11 +5,11 @@ import (
 	"syscall"
 )
 
-var nameToSignal = map[string]syscall.Signal{}
+var nameToSignalInfo = map[string]syscall.Signal{}
 
 func init() {
 	for sig, info := range signalMap {
-		nameToSignal[info.name] = sig
+		nameToSignalInfo[info.name] = sig
 	}
 }
 
@@ -36,8 +36,21 @@ func IsTerminationSignal(sig syscall.Signal) bool {
 }
 
 // GetSignalNum returns the signal number for the given signal name
-func GetSignalNum(sig string) int {
-	return getSignalNum(sig)
+func GetSignalNum(sig string, fallback ...syscall.Signal) int {
+	if s, ok := nameToSignalInfo[sig]; ok {
+		return int(s)
+	}
+	if len(fallback) > 0 {
+		return int(fallback[0])
+	}
+	return int(syscall.SIGTERM)
+}
+
+func signalName(sig syscall.Signal) string {
+	if info, ok := signalMap[sig]; ok {
+		return info.name
+	}
+	return ""
 }
 
 type signalInfo struct {
