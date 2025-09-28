@@ -18,6 +18,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/signal"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -374,7 +375,7 @@ func (c *Client) Stop(sig os.Signal) error {
 
 	var sigName string
 	if sysSig, ok := sig.(syscall.Signal); ok {
-		sigName = GetSignalName(sysSig)
+		sigName = signal.GetSignalName(sysSig)
 	}
 
 	if err := c.cli.ContainerStop(context.Background(), c.containerID, container.StopOptions{Signal: sigName}); err != nil {

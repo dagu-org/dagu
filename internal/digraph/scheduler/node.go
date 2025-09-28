@@ -24,6 +24,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/signal"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
@@ -518,7 +519,7 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	if s == status.NodeRunning && n.cmd != nil {
 		sigsig := sig
 		if allowOverride && n.SignalOnStop() != "" {
-			sigsig = syscall.Signal(digraph.GetSignalNum(n.SignalOnStop()))
+			sigsig = syscall.Signal(signal.GetSignalNum(n.SignalOnStop()))
 		}
 		logger.Info(ctx, "Sending signal", "signal", sigsig, "step", n.Name())
 		if err := n.cmd.Kill(sigsig); err != nil {
