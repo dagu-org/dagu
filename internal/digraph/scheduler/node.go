@@ -526,7 +526,8 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 			logger.Error(ctx, "Failed to send signal", "err", err, "step", n.Name())
 		}
 	}
-	if s == status.NodeRunning {
+
+	if signal.IsTerminationSignalOS(sig) && s == status.NodeRunning {
 		n.SetStatus(status.NodeCancel)
 	}
 }

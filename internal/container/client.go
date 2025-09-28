@@ -281,6 +281,56 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 			logger.Error(ctx, "docker executor: stop container", "err", err)
 		}
 	}
+
+	if c.containerID != "" {
+		// Forcefully stop after timeout
+		defaultStopTimeout := 5 * time.Second
+		var containerStopped atomic.Bool
+		forceKillTimer := time.AfterFunc(defaultStopTimeout, func() {
+			if containerStopped.Load() {
+				return
+			}
+			if err := c.cli.ContainerKill(context.Background(), c.containerID, "SIGKILL"); err != nil {
+				if errdefs.IsNotFound(err) {
+					return
+				}
+				logger.Error(ctx, "docker executor: force stop container", "err", err)
+			}
+		})
+
+		// Wait for container to be fully stopped
+		maxWait := 30 * time.Second
+		waitTimer := time.NewTimer(maxWait)
+		defer waitTimer.Stop()
+
+	WAIT_LOOP:
+		for {
+			info, err := c.cli.ContainerInspect(context.Background(), c.containerID)
+			if err != nil {
+				if errdefs.IsNotFound(err) {
+					containerStopped.Store(true)
+					break
+				}
+				logger.Error(ctx, "docker executor: inspect container", "err", err)
+			} else if info.State != nil && !info.State.Running {
+				containerStopped.Store(true)
+				break
+			}
+
+			select {
+			case <-waitTimer.C:
+				logger.Warn(ctx, "docker executor: timeout waiting for container to stop")
+				break WAIT_LOOP
+			default:
+				time.Sleep(defaultPollInterval)
+			}
+		}
+
+		if containerStopped.Load() {
+			_ = forceKillTimer.Stop()
+		}
+	}
+
 	if c.keepAliveTmp != "" {
 		// Remove the temporary keep alive file if it exists
 		if err := os.Remove(c.keepAliveTmp); err != nil && !os.IsNotExist(err) {
@@ -497,10 +547,15 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 	defer resp.Close()
 
 	// Copy output
+	var wg sync.WaitGroup
+	wg.Add(1)
+	defer wg.Wait()
+
 	go func() {
 		if _, err := stdcopy.StdCopy(stdout, stderr, resp.Reader); err != nil {
 			logger.Error(ctx, "docker executor: stdcopy", "err", err)
 		}
+		wg.Done()
 	}()
 
 	time.Sleep(defaultPollInterval) // Give some time for the exec to start
@@ -522,8 +577,9 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 		select {
 		case <-ctx.Done():
 			return 1, ctx.Err()
+
 		default:
-			// Continue waiting
+			time.Sleep(defaultPollInterval)
 		}
 	}
 }
