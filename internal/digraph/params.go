@@ -65,10 +65,11 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 	// Validate the parameters against the provided schema, if it exists
 	schemaRef := extractSchemaReference(spec.Params)
 	if schemaRef != "" {
-		err := validateParams(paramPairs, schemaRef)
+		updatedPairs, err := validateParams(paramPairs, schemaRef)
 		if err != nil {
 			return err
 		}
+		paramPairs = updatedPairs
 	}
 
 	for _, paramPair := range paramPairs {
@@ -80,10 +81,10 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
-func validateParams(paramPairs []paramPair, schemaRef string) error {
+func validateParams(paramPairs []paramPair, schemaRef string) ([]paramPair, error) {
 	schema, err := getSchemaFromRef(schemaRef)
 	if err != nil {
-		return fmt.Errorf("failed to get JSON schema: %w", err)
+		return nil, fmt.Errorf("failed to get JSON schema: %w", err)
 	}
 
 	// Convert paramPairs to a map for validation
@@ -98,11 +99,33 @@ func validateParams(paramPairs []paramPair, schemaRef string) error {
 		paramMap[pair.Name] = value
 	}
 
-	if err := schema.Validate(paramMap); err != nil {
-		return fmt.Errorf("parameter validation failed: %w", err)
+	// Apply schema defaults to the parameter map
+	if err := schema.ApplyDefaults(&paramMap); err != nil {
+		return nil, fmt.Errorf("failed to apply schema defaults: %w", err)
 	}
 
-	return nil
+	if err := schema.Validate(paramMap); err != nil {
+		return nil, fmt.Errorf("parameter validation failed: %w", err)
+	}
+
+	// Convert the updated paramMap back to paramPair format
+	updatedPairs := make([]paramPair, 0, len(paramMap))
+	for name, value := range paramMap {
+		var valueStr string
+		if str, ok := value.(string); ok {
+			valueStr = str
+		} else {
+			// Convert non-string values to JSON string
+			if jsonBytes, err := json.Marshal(value); err == nil {
+				valueStr = string(jsonBytes)
+			} else {
+				valueStr = fmt.Sprintf("%v", value)
+			}
+		}
+		updatedPairs = append(updatedPairs, paramPair{Name: name, Value: valueStr})
+	}
+
+	return updatedPairs, nil
 }
 
 // Schema Ref can be a local file (relative or absolute paths), or a remote URL
@@ -126,7 +149,11 @@ func getSchemaFromRef(schemaRef string) (*jsonschema.Resolved, error) {
 		return nil, fmt.Errorf("failed to parse schema JSON: %w", err)
 	}
 
-	resolvedSchema, err := schema.Resolve(nil)
+	resolveOptions := &jsonschema.ResolveOptions{
+		ValidateDefaults: true,
+	}
+
+	resolvedSchema, err := schema.Resolve(resolveOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve schema: %w", err)
 	}

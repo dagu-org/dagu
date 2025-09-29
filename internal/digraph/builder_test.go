@@ -225,6 +225,121 @@ params:
 		require.Contains(t, err.Error(), "parameter validation failed")
 		require.Contains(t, err.Error(), "maximum: 100/1 is greater than 50")
 	})
+	t.Run("ParamsWithSchemaDefaultsApplied", func(t *testing.T) {
+		schemaContent := `{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "batch_size": {
+      "type": "integer",
+      "default": 25,
+      "minimum": 1,
+      "maximum": 100
+    },
+    "environment": {
+      "type": "string",
+      "default": "development",
+      "enum": ["development", "staging", "production"]
+    },
+    "debug": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}`
+
+		// Create temp schema file
+		tmpFile, err := os.CreateTemp("", "test-schema-defaults-*.json")
+		require.NoError(t, err)
+		defer os.Remove(tmpFile.Name())
+
+		_, err = tmpFile.WriteString(schemaContent)
+		require.NoError(t, err)
+		tmpFile.Close()
+
+		// Test case 1: Only provide some parameters, let defaults fill the rest
+		data := []byte(fmt.Sprintf(`
+params:
+  schema: "%s"
+  values:
+    batch_size: 75
+    # environment and debug should get defaults
+`, tmpFile.Name()))
+
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+
+		// Should have all 3 parameters: provided batch_size + defaults for environment and debug
+		require.Len(t, th.Params, 3)
+
+		// Check that provided value remains unchanged
+		require.Contains(t, th.Params, "batch_size=75")
+
+		// Check that defaults were applied
+		require.Contains(t, th.Params, "environment=development")
+		require.Contains(t, th.Params, "debug=true")
+	})
+	t.Run("ParamsWithSchemaDefaultsPreserveExistingValues", func(t *testing.T) {
+		schemaContent := `{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "batch_size": {
+      "type": "integer",
+      "default": 25,
+      "minimum": 1,
+      "maximum": 100
+    },
+    "environment": {
+      "type": "string",
+      "default": "development",
+      "enum": ["development", "staging", "production"]
+    },
+    "debug": {
+      "type": "boolean",
+      "default": true
+    },
+    "timeout": {
+      "type": "integer",
+      "default": 300
+    }
+  }
+}`
+
+		// Create temp schema file
+		tmpFile, err := os.CreateTemp("", "test-schema-preserve-*.json")
+		require.NoError(t, err)
+		defer os.Remove(tmpFile.Name())
+
+		_, err = tmpFile.WriteString(schemaContent)
+		require.NoError(t, err)
+		tmpFile.Close()
+
+		// Provide all parameters explicitly - defaults should NOT override them
+		data := []byte(fmt.Sprintf(`
+params:
+  schema: "%s"
+  values:
+    batch_size: 50
+    environment: "production"
+    debug: false
+    timeout: 600
+`, tmpFile.Name()))
+
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+
+		// Should have all 4 parameters with their explicitly provided values
+		require.Len(t, th.Params, 4)
+
+		// Check that all explicitly provided values remain unchanged (defaults should not override)
+		require.Contains(t, th.Params, "batch_size=50")
+		require.Contains(t, th.Params, "environment=production")
+		require.Contains(t, th.Params, "debug=false")
+		require.Contains(t, th.Params, "timeout=600")
+	})
 	t.Run("MailOn", func(t *testing.T) {
 		data := []byte(`
 steps:
