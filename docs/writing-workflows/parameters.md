@@ -17,7 +17,7 @@ params: first second third
 # JSON Schema validation
 params:
   schema: "./schemas/params.json"  # Local file or remote URL
-  values:
+  values:  # These defaults take precedence over schema defaults
     ENVIRONMENT: dev
     PORT: 8080
     DEBUG: false
@@ -86,12 +86,14 @@ Using these as parameter names could possibly cause parsing errors.
 }
 ```
 
-### Validation Behavior
+### Schema Validation
 
 - **Runtime Validation**: Parameters are validated when the DAG is loaded, before execution
 - **CLI Override Validation**: Command-line parameters are also validated against the schema
 - **Error Messages**: Clear error messages indicate which parameters failed validation and why
 - **Backward Compatibility**: Existing parameter formats continue to work unchanged
+
+**Parameter Precedence**: CLI parameters > YAML values > schema defaults. Schema defaults only fill missing parameters and never override explicit values.
 
 ## Passing Parameters
 

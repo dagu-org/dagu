@@ -8,12 +8,12 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/google/jsonschema-go/jsonschema"
 )
 
@@ -197,21 +197,14 @@ func loadSchemaFromURL(schemaURL string) (data []byte, err error) {
 
 // loadSchemaFromFile loads a JSON schema from a file path.
 func loadSchemaFromFile(filePath string) ([]byte, error) {
-	// Validate file path to prevent directory traversal attacks
-	filePath = filepath.Clean(filePath)
-
-	// Handle relative paths
-	if !filepath.IsAbs(filePath) {
-		// Use current working directory as base
-		wd, err := os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get working directory: %w", err)
-		}
-		filePath = filepath.Join(wd, filePath)
+	// Resolve the path (handles relative paths, env vars, tilde expansion)
+	resolvedPath, err := fileutil.ResolvePath(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve schema file path: %w", err)
 	}
 
-	// #nosec G304 - File path is validated above to prevent directory traversal
-	return os.ReadFile(filePath)
+	// #nosec G304 - File path is validated by ResolvePath
+	return os.ReadFile(resolvedPath)
 }
 
 func overrideParams(paramPairs *[]paramPair, override []paramPair) {
