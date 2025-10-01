@@ -51,6 +51,7 @@ function DAGSpec({ fileName }: Props) {
 
   // Reference to the main container div
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const lastFetchedSpecRef = React.useRef<string | undefined>(undefined);
 
   /**
    * Handle flowchart direction change and save preference to cookie
@@ -100,10 +101,21 @@ function DAGSpec({ fileName }: Props) {
 
   // Update current value when data changes
   useEffect(() => {
-    if (data) {
-      setCurrentValue(data.spec);
+    if (typeof data?.spec === 'undefined') {
+      return;
     }
-  }, [data]);
+
+    const fetchedSpec = data.spec;
+
+    if (lastFetchedSpecRef.current === fetchedSpec) {
+      // Ensure the editor initializes with the fetched value on first load.
+      setCurrentValue((prev) => (typeof prev === 'undefined' ? fetchedSpec : prev));
+      return;
+    }
+
+    lastFetchedSpecRef.current = fetchedSpec;
+    setCurrentValue(fetchedSpec);
+  }, [data?.spec]);
 
   // Save scroll position before saving
   const saveScrollPosition = React.useCallback(() => {
