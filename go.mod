@@ -12,7 +12,7 @@ require (
 	github.com/coreos/go-oidc v2.3.0+incompatible
 	github.com/docker/docker v28.3.2+incompatible
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/getkin/kin-openapi v0.132.0
+	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-chi/chi/v5 v5.2.2
 	github.com/go-chi/cors v1.2.2
 	github.com/go-chi/httplog/v2 v2.1.1
@@ -84,6 +84,7 @@ require (
 	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/samber/slog-common v0.19.0 // indirect
 	github.com/speakeasy-api/jsonpath v0.6.0 // indirect
+	github.com/woodsbury/decimal128 v1.3.0 // indirect
 	github.com/yoheimuta/go-protoparser/v4 v4.14.2 // indirect
 	go.augendre.info/arangolint v0.2.0 // indirect
 	go.augendre.info/fatcontext v0.8.1 // indirect
@@ -321,6 +322,6 @@ require (
 	github.com/samber/lo v1.51.0
 	golang.org/x/crypto v0.42.0
 	golang.org/x/net v0.44.0 // indirect
-	golang.org/x/sys v0.36.0
+	golang.org/x/sys v0.36.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
