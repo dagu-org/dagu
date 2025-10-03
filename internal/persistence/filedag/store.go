@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -287,17 +288,55 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 		allDags = append(allDags, dag)
 	}
 
-	// Sort DAGs by name (the only supported sort field)
-	sort.Slice(allDags, func(i, j int) bool {
-		// Default to ascending order
-		ascending := opts.Order != "desc"
+	switch opts.Sort {
+	case "name":
+		// Sort DAGs by name
+		sort.Slice(allDags, func(i, j int) bool {
+			// Default to ascending order
+			ascending := opts.Order != "desc"
 
-		// Always sort by name (case-insensitive)
-		if ascending {
-			return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
-		}
-		return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
-	})
+			// Always sort by name (case-insensitive)
+			if ascending {
+				return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
+			}
+			return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
+		})
+
+	case "nextRun":
+		now := time.Now()
+		// Sort DAGs by next run time
+		sort.Slice(allDags, func(i, j int) bool {
+			// Default to ascending order
+			ascending := opts.Order != "desc"
+
+			// Always sort by next run time
+			var t1, t2 int64
+			nextRun1 := allDags[i].NextRun(now)
+			nextRun2 := allDags[j].NextRun(now)
+			if nextRun1.IsZero() && nextRun2.IsZero() {
+				// If both are zero, sort by name (case-insensitive)
+				if ascending {
+					return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
+				}
+				return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
+			}
+			// Treat zero time as greater than any other time
+			if nextRun1.IsZero() {
+				return false
+			}
+			if nextRun2.IsZero() {
+				return true
+			}
+
+			// Both are non-zero, compare normally
+			t1 = nextRun1.Unix()
+			t2 = nextRun2.Unix()
+			if ascending {
+				return t1 < t2
+			}
+			return t1 > t2
+		})
+	}
 
 	totalCount := len(allDags)
 

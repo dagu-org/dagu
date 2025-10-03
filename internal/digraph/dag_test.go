@@ -614,3 +614,23 @@ func TestTaskOption_Functions(t *testing.T) {
 		assert.Equal(t, "step-name", task.Step)
 	})
 }
+
+func TestNextRun(t *testing.T) {
+	t.Parallel()
+
+	dag := &digraph.DAG{
+		Schedule: []digraph.Schedule{
+			{Expression: "0 1 * * *"}, // Daily at 1 AM
+		},
+	}
+	parsedCron, err := cron.ParseStandard(dag.Schedule[0].Expression)
+	require.NoError(t, err)
+	dag.Schedule[0].Parsed = parsedCron
+
+	now := time.Date(2023, 10, 1, 1, 0, 0, 0, time.UTC)
+	nextRun := dag.NextRun(now)
+
+	// Next run should be the next day at 1 AM
+	expectedNext := time.Date(2023, 10, 2, 1, 0, 0, 0, time.UTC)
+	require.Equal(t, expectedNext, nextRun)
+}

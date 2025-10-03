@@ -262,6 +262,23 @@ func (d *DAG) LoadEnv(ctx context.Context) {
 	}
 }
 
+// NextRun returns the next scheduled run time based on the DAG's schedules.
+func (d *DAG) NextRun(now time.Time) time.Time {
+	if len(d.Schedule) == 0 {
+		return time.Time{}
+	}
+	var next time.Time
+	for _, sched := range d.Schedule {
+		if sched.Parsed != nil {
+			t := sched.Parsed.Next(now)
+			if next.IsZero() || t.Before(next) {
+				next = t
+			}
+		}
+	}
+	return next
+}
+
 // loadDotEnv loads dotenv file
 func (d *DAG) loadDotEnv(ctx context.Context, relativeTos []string) {
 	resolver := fileutil.NewFileResolver(relativeTos)
