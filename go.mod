@@ -21,6 +21,7 @@ require (
 	github.com/goccy/go-yaml v1.18.0
 	github.com/golangci/golangci-lint/v2 v2.5.0
 	github.com/google/addlicense v1.1.1
+	github.com/google/jsonschema-go v0.3.0
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/gojq v0.12.17
 	github.com/jedib0t/go-pretty/v6 v6.6.8

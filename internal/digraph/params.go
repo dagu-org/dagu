@@ -1,7 +1,11 @@
 package digraph
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"regexp"
@@ -9,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
+	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/google/jsonschema-go/jsonschema"
 )
 
 // buildParams builds the parameters for the DAG.
@@ -56,6 +62,16 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 		overrideEnvirons(&envs, overrideEnvs)
 	}
 
+	// Validate the parameters against the provided schema, if it exists
+	schemaRef := extractSchemaReference(spec.Params)
+	if schemaRef != "" {
+		updatedPairs, err := validateParams(paramPairs, schemaRef)
+		if err != nil {
+			return err
+		}
+		paramPairs = updatedPairs
+	}
+
 	for _, paramPair := range paramPairs {
 		dag.Params = append(dag.Params, paramPair.String())
 	}
@@ -65,8 +81,134 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
+func validateParams(paramPairs []paramPair, schemaRef string) ([]paramPair, error) {
+	schema, err := getSchemaFromRef(schemaRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get JSON schema: %w", err)
+	}
+
+	// Convert paramPairs to a map for validation
+	paramMap := make(map[string]any)
+	for _, pair := range paramPairs {
+		// Try to parse as JSON first, fall back to string
+		var value any
+		if err := json.Unmarshal([]byte(pair.Value), &value); err != nil {
+			// If JSON parsing fails, use as string
+			value = pair.Value
+		}
+		paramMap[pair.Name] = value
+	}
+
+	// Apply schema defaults to the parameter map
+	if err := schema.ApplyDefaults(&paramMap); err != nil {
+		return nil, fmt.Errorf("failed to apply schema defaults: %w", err)
+	}
+
+	if err := schema.Validate(paramMap); err != nil {
+		return nil, fmt.Errorf("parameter validation failed: %w", err)
+	}
+
+	// Convert the updated paramMap back to paramPair format
+	updatedPairs := make([]paramPair, 0, len(paramMap))
+	for name, value := range paramMap {
+		var valueStr string
+		if str, ok := value.(string); ok {
+			valueStr = str
+		} else {
+			// Convert non-string values to JSON string
+			if jsonBytes, err := json.Marshal(value); err == nil {
+				valueStr = string(jsonBytes)
+			} else {
+				valueStr = fmt.Sprintf("%v", value)
+			}
+		}
+		updatedPairs = append(updatedPairs, paramPair{Name: name, Value: valueStr})
+	}
+
+	return updatedPairs, nil
+}
+
+// Schema Ref can be a local file (relative or absolute paths), or a remote URL
+func getSchemaFromRef(schemaRef string) (*jsonschema.Resolved, error) {
+	var schemaData []byte
+	var err error
+
+	// Check if it's a URL or file path
+	if strings.HasPrefix(schemaRef, "http://") || strings.HasPrefix(schemaRef, "https://") {
+		schemaData, err = loadSchemaFromURL(schemaRef)
+	} else {
+		schemaData, err = loadSchemaFromFile(schemaRef)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to load schema from %s: %w", schemaRef, err)
+	}
+
+	var schema jsonschema.Schema
+	if err := json.Unmarshal(schemaData, &schema); err != nil {
+		return nil, fmt.Errorf("failed to parse schema JSON: %w", err)
+	}
+
+	resolveOptions := &jsonschema.ResolveOptions{
+		ValidateDefaults: true,
+	}
+
+	resolvedSchema, err := schema.Resolve(resolveOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve schema: %w", err)
+	}
+
+	return resolvedSchema, nil
+}
+
+// loadSchemaFromURL loads a JSON schema from a URL.
+func loadSchemaFromURL(schemaURL string) (data []byte, err error) {
+	// Validate URL to prevent potential security issues (and satisfy linter :P)
+	parsedURL, err := url.Parse(schemaURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL: %w", err)
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported URL scheme: %s", parsedURL.Scheme)
+	}
+
+	req, err := http.NewRequest("GET", schemaURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	data, err = io.ReadAll(resp.Body)
+	return data, err
+}
+
+// loadSchemaFromFile loads a JSON schema from a file path.
+func loadSchemaFromFile(filePath string) ([]byte, error) {
+	// Resolve the path (handles relative paths, env vars, tilde expansion)
+	resolvedPath, err := fileutil.ResolvePath(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve schema file path: %w", err)
+	}
+
+	// #nosec G304 - File path is validated by ResolvePath
+	return os.ReadFile(resolvedPath)
+}
+
 func overrideParams(paramPairs *[]paramPair, override []paramPair) {
-	// Override the default parameters with the command line parameters
+	// Override the default parameters with the command line parameters (and satisfy linter :P)
 	pairsIndex := make(map[string]int)
 	for i, paramPair := range *paramPairs {
 		if paramPair.Name != "" {
@@ -160,9 +302,23 @@ func parseParamValue(ctx BuildContext, input any) ([]paramPair, error) {
 	case []string:
 		return parseListParams(ctx, v)
 
+	// At this point, the schema input can be two cases:
+	// 1. a map with a "schema" key and a "values" key
+	// e.g. { "schema": "./schema.json", "values": { "batch_size": 10, "environment": "dev" } }
+	// 2. a map with no "schema" key
+	// e.g. { "batch_size": 10, "environment": "dev" }
 	case map[string]any:
-		return parseMapParams(ctx, []any{v})
+		schemaRef := extractSchemaReference(v)
+		if schemaRef == "" {
+			return parseMapParams(ctx, []any{v})
+		}
 
+		values, ok := v["values"]
+		if !ok {
+			return []paramPair{}, nil // Schema-only mode, no values to validate
+		}
+
+		return parseMapParams(ctx, []any{values})
 	default:
 		return nil, wrapError("params", v, fmt.Errorf("%w: %T", ErrInvalidParamValue, v))
 
@@ -297,4 +453,25 @@ func (p paramPair) Escaped() string {
 		return fmt.Sprintf("%s=%q", p.Name, p.Value)
 	}
 	return fmt.Sprintf("%q", p.Value)
+}
+
+// extractSchemaReference extracts the schema reference from a params map.
+// Returns the schema reference as a string if present and valid, empty string otherwise.
+func extractSchemaReference(params any) string {
+	paramsMap, ok := params.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	schemaRef, hasSchema := paramsMap["schema"]
+	if !hasSchema {
+		return ""
+	}
+
+	schemaRefStr, ok := schemaRef.(string)
+	if !ok {
+		return ""
+	}
+
+	return schemaRefStr
 }
