@@ -111,7 +111,10 @@ paths:
             type: "string"
             enum: ["name", "nextRun"]
             default: "name"
-          description: "Field to sort by"
+          description: |
+            Field to sort by:
+            - `name`: Sort alphabetically by DAG name (case-insensitive)
+            - `nextRun`: Sort by next scheduled run time. DAGs with earlier next run times appear first in ascending order. DAGs without schedules appear last.
         - name: "order"
           in: "query"
           required: false

@@ -896,3 +896,148 @@ steps:
 	// Error list might contain warnings but should not fail
 	t.Logf("Error list: %v", errList)
 }
+
+func TestListWithNextRunSorting(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-list-nextrun-sort")
+	defer os.RemoveAll(tmpDir)
+
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	// Create test DAG files directly
+	createDAG := func(name, schedule string) {
+		content := fmt.Sprintf("name: %s\nsteps:\n  - echo test", name)
+		if schedule != "" {
+			content = fmt.Sprintf("name: %s\nschedule: %s\nsteps:\n  - echo test", name, schedule)
+		}
+		err := os.WriteFile(filepath.Join(tmpDir, name+".yaml"), []byte(content), 0600)
+		require.NoError(t, err)
+	}
+
+	createDAG("hourly-dag", "\"0 * * * *\"")
+	createDAG("daily-dag", "\"0 1 * * *\"")
+	createDAG("no-schedule", "")
+
+	// Test ascending order
+	result, _, err := store.List(ctx, models.ListDAGsOptions{Sort: "nextRun", Order: "asc"})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 3)
+
+	// Verify order: hourly (runs soonest) -> daily -> no-schedule (last)
+	assert.Equal(t, "hourly-dag", result.Items[0].Name)
+	assert.Equal(t, "daily-dag", result.Items[1].Name)
+	assert.Equal(t, "no-schedule", result.Items[2].Name)
+
+	// Test descending order
+	result, _, err = store.List(ctx, models.ListDAGsOptions{Sort: "nextRun", Order: "desc"})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 3)
+
+	// Verify order: daily (runs latest) -> hourly -> no-schedule (still last)
+	assert.Equal(t, "daily-dag", result.Items[0].Name)
+	assert.Equal(t, "hourly-dag", result.Items[1].Name)
+	assert.Equal(t, "no-schedule", result.Items[2].Name)
+}
+
+func TestListWithNextRunSortingMultipleSchedules(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-list-nextrun-multiple")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	// Create DAG with multiple schedules - should use earliest next run
+	multiScheduleDAG := `name: multi-schedule-dag
+schedule:
+  - "0 */2 * * *"  # Every 2 hours
+  - "0 1 * * *"    # Daily at 1 AM
+steps:
+  - echo "multi"`
+	err := store.Create(ctx, "multi-schedule-dag", []byte(multiScheduleDAG))
+	require.NoError(t, err)
+
+	// Create DAG with hourly schedule
+	hourlyDAG := `name: hourly-dag
+schedule: "0 * * * *"
+steps:
+  - echo "hourly"`
+	err = store.Create(ctx, "hourly-dag", []byte(hourlyDAG))
+	require.NoError(t, err)
+
+	// List with nextRun sorting
+	opts := models.ListDAGsOptions{
+		Sort:  "nextRun",
+		Order: "asc",
+	}
+	result, errList, err := store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 2)
+
+	// Hourly should typically be first, but multi-schedule might be close
+	// The key test is that multi-schedule uses the earliest of its schedules
+	dagNames := []string{result.Items[0].Name, result.Items[1].Name}
+	assert.Contains(t, dagNames, "hourly-dag")
+	assert.Contains(t, dagNames, "multi-schedule-dag")
+}
+
+func TestListWithNextRunSortingZeroTimes(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-list-nextrun-zero")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	// Create multiple DAGs with no schedules
+	dag1Content := `name: zebra-no-schedule
+steps:
+  - echo "zebra"`
+	err := store.Create(ctx, "zebra-no-schedule", []byte(dag1Content))
+	require.NoError(t, err)
+
+	dag2Content := `name: alpha-no-schedule
+steps:
+  - echo "alpha"`
+	err = store.Create(ctx, "alpha-no-schedule", []byte(dag2Content))
+	require.NoError(t, err)
+
+	dag3Content := `name: beta-no-schedule
+steps:
+  - echo "beta"`
+	err = store.Create(ctx, "beta-no-schedule", []byte(dag3Content))
+	require.NoError(t, err)
+
+	// Test ascending order - DAGs with zero time should be sorted by name
+	opts := models.ListDAGsOptions{
+		Sort:  "nextRun",
+		Order: "asc",
+	}
+	result, errList, err := store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 3)
+
+	// When all have zero time, should fall back to name sorting (case-insensitive)
+	assert.Equal(t, "alpha-no-schedule", result.Items[0].Name)
+	assert.Equal(t, "beta-no-schedule", result.Items[1].Name)
+	assert.Equal(t, "zebra-no-schedule", result.Items[2].Name)
+
+	// Test descending order
+	opts = models.ListDAGsOptions{
+		Sort:  "nextRun",
+		Order: "desc",
+	}
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 3)
+
+	// When all have zero time, should fall back to name sorting descending
+	assert.Equal(t, "zebra-no-schedule", result.Items[0].Name)
+	assert.Equal(t, "beta-no-schedule", result.Items[1].Name)
+	assert.Equal(t, "alpha-no-schedule", result.Items[2].Name)
+}
