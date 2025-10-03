@@ -88,7 +88,7 @@ func TestDAG(t *testing.T) {
 		var ascResp api.ListDAGs200JSONResponse
 		resp.Unmarshal(t, &ascResp)
 
-		var hourlyIdx, dailyIdx, noScheduleIdx int = -1, -1, -1
+		var hourlyIdx, dailyIdx, noScheduleIdx = -1, -1, -1
 		for i, dag := range ascResp.Dags {
 			switch dag.Dag.Name {
 			case "hourly_dag":

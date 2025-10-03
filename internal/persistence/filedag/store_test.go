@@ -899,7 +899,9 @@ steps:
 
 func TestListWithNextRunSorting(t *testing.T) {
 	tmpDir := fileutil.MustTempDir("test-list-nextrun-sort")
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(tmpDir)
+	})
 
 	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
