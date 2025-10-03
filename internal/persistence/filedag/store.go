@@ -289,19 +289,6 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 	}
 
 	switch opts.Sort {
-	case "name":
-		// Sort DAGs by name
-		sort.Slice(allDags, func(i, j int) bool {
-			// Default to ascending order
-			ascending := opts.Order != "desc"
-
-			// Always sort by name (case-insensitive)
-			if ascending {
-				return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
-			}
-			return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
-		})
-
 	case "nextRun":
 		now := time.Now()
 		// Pre-calculate next run times to avoid recalculating on each comparison
@@ -338,6 +325,18 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 				return nextRun1.Before(nextRun2)
 			}
 			return nextRun2.Before(nextRun1)
+		})
+	default:
+		// Default to sorting by name (includes "name" and empty sort field)
+		sort.Slice(allDags, func(i, j int) bool {
+			// Default to ascending order
+			ascending := opts.Order != "desc"
+
+			// Always sort by name (case-insensitive)
+			if ascending {
+				return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
+			}
+			return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
 		})
 	}
 
