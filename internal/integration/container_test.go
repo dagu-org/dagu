@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -416,9 +417,17 @@ func createLongRunningContainer(t *testing.T, th test.Helper, dockerClient *clie
 
 	pullOpts := image.PullOptions{Platform: platforms.Format(platform)}
 
-	// Pull the image to ensure it exists
-	if _, err = dockerClient.ImagePull(th.Context, testImage, pullOpts); err != nil {
+	// Pull the image to ensure it exists; consume the stream so the daemon registers it
+	reader, err := dockerClient.ImagePull(th.Context, testImage, pullOpts)
+	if err != nil {
 		t.Fatalf("failed to pull image %s: %v", testImage, err)
+	}
+	if _, err := io.Copy(io.Discard, reader); err != nil {
+		_ = reader.Close()
+		t.Fatalf("failed to read pull response for %s: %v", testImage, err)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatalf("failed to close pull response for %s: %v", testImage, err)
 	}
 
 	// Create and start the container

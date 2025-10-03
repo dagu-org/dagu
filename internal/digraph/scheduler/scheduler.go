@@ -19,6 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/signal"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -428,7 +429,8 @@ func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
 func (sc *Scheduler) Signal(
 	ctx context.Context, graph *ExecutionGraph, sig os.Signal, done chan bool, allowOverride bool,
 ) {
-	if !sc.isCanceled() {
+	isTermination := signal.IsTerminationSignalOS(sig)
+	if !sc.isCanceled() && isTermination {
 		sc.setCanceled()
 	}
 
@@ -442,14 +444,13 @@ func (sc *Scheduler) Signal(
 		node.Signal(ctx, sig, allowOverride)
 	}
 
-	if done != nil {
+	if done != nil && isTermination {
 		defer func() {
+			for graph.IsRunning() {
+				time.Sleep(sc.pause)
+			}
 			done <- true
 		}()
-
-		for graph.IsRunning() {
-			time.Sleep(sc.pause)
-		}
 	}
 }
 

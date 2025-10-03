@@ -28,6 +28,7 @@ import (
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/otel"
+	"github.com/dagu-org/dagu/internal/signal"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/sshutil"
 	"github.com/dagu-org/dagu/internal/stringutil"
@@ -795,6 +796,12 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 		"signal", sig.String(),
 		"allowOverride", allowOverride,
 		"maxCleanupTime", a.dag.MaxCleanUpTime/time.Second)
+
+	if !signal.IsTerminationSignalOS(sig) {
+		// For non-termination signals, just send the signal once and return.
+		a.scheduler.Signal(ctx, a.graph, sig, nil, allowOverride)
+		return
+	}
 
 	signalCtx, cancel := context.WithTimeout(ctx, a.dag.MaxCleanUpTime)
 	defer cancel()
