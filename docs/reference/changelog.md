@@ -7,12 +7,14 @@
 - API: Added `POST /api/v2/dags/validate` to validate DAG YAML. Returns `{ valid: boolean, errors: string[], dag?: DAGDetails }`.
 - API: `POST /api/v2/dags` now accepts optional `spec` to initialize a DAG. The spec is validated before creation and returns 400 on invalid input.
 - API: Added `POST /api/v2/dag-runs` to create and start a DAG-run directly from an inline YAML `spec` without persisting a DAG file. Supports optional `name`, `params`, `dagRunId`, and `singleton`.
+- API: Added `nextRun` sort option to `GET /api/v2/dags` to sort DAGs by their next scheduled run time. DAGs with earlier next runs appear first in ascending order, and DAGs without schedules appear last.
 
 ### Breaking/Behavioral Changes
 - DAG name validation is centralized and enforced consistently: names must be `<= 40` chars and match `[A-Za-z0-9_.-]+`. Endpoints that accept `name` now return `400 bad_request` for invalid names.
 
 ### Improvements
 - Validation error messages are deduplicated at the source to avoid repeated prefixes like `field 'steps': field 'steps': ...`.
+- DAG list sorting performance improved by caching next run time calculations.
 
 ### Documentation
 - Updated API Overview with inline run example (`POST /api/v2/dag-runs`).
