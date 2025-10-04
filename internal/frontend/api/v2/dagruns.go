@@ -365,12 +365,33 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 
 // GetDAGRunDetails implements api.StrictServerInterface.
 func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetailsRequestObject) (api.GetDAGRunDetailsResponseObject, error) {
-	ref := digraph.NewDAGRunRef(request.Name, request.DagRunId)
+	dagName := request.Name
+	dagRunId := request.DagRunId
+
+	if dagRunId == "latest" {
+		// Get the DAG to retrieve the latest status
+		attempt, err := a.dagRunStore.LatestAttempt(ctx, dagName)
+		if err != nil {
+			return &api.GetDAGRunDetails404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("no dag-runs found for DAG %s", dagName),
+			}, nil
+		}
+		status, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error getting latest status: %w", err)
+		}
+		return &api.GetDAGRunDetails200JSONResponse{
+			DagRunDetails: toDAGRunDetails(*status),
+		}, nil
+	}
+
+	ref := digraph.NewDAGRunRef(dagName, dagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return &api.GetDAGRunDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
 		}, nil
 	}
 	return &api.GetDAGRunDetails200JSONResponse{

@@ -781,7 +781,11 @@ Retrieves all DAG runs with optional filtering.
 
 **Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}`
 
-Fetches detailed status of a specific DAG run.
+Fetches detailed status of a specific DAG run. You can use the special value "latest" as the dagRunId to retrieve the most recent DAG run for the specified DAG.
+
+**Examples**:
+- `GET /api/v2/dag-runs/data-pipeline/20240211_120000` - Get a specific run
+- `GET /api/v2/dag-runs/data-pipeline/latest` - Get the latest run
 
 **Path Parameters**:
 | Parameter | Type | Description |
