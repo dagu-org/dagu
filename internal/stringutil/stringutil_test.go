@@ -69,120 +69,6 @@ func TestRemoveQuotes(t *testing.T) {
 	})
 }
 
-func TestIsJSONArray(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected bool
-	}{
-		// Valid JSON arrays
-		{
-			name:     "EmptyArray",
-			input:    "[]",
-			expected: true,
-		},
-		{
-			name:     "ArrayWithStrings",
-			input:    `["item1", "item2", "item3"]`,
-			expected: true,
-		},
-		{
-			name:     "ArrayWithNumbers",
-			input:    "[1, 2, 3, 4, 5]",
-			expected: true,
-		},
-		{
-			name:     "ArrayWithObjects",
-			input:    `[{"key": "value"}, {"key2": "value2"}]`,
-			expected: true,
-		},
-		{
-			name:     "ArrayWithMixedTypes",
-			input:    `["string", 123, true, null, {"key": "value"}]`,
-			expected: true,
-		},
-		{
-			name:     "ArrayWithWhitespace",
-			input:    "  [ 1 , 2 , 3 ]  ",
-			expected: true,
-		},
-		{
-			name:     "NestedArrays",
-			input:    `[["a", "b"], ["c", "d"]]`,
-			expected: true,
-		},
-
-		// Invalid cases
-		{
-			name:     "EmptyString",
-			input:    "",
-			expected: false,
-		},
-		{
-			name:     "SingleBracket",
-			input:    "[",
-			expected: false,
-		},
-		{
-			name:     "SpaceSeparatedItems",
-			input:    "item1 item2 item3",
-			expected: false,
-		},
-		{
-			name:     "ShellCommandWithBrackets",
-			input:    "ls [abc]*.txt",
-			expected: false,
-		},
-		{
-			name:     "InvalidJSONArrayMissingComma",
-			input:    `["item1" "item2"]`,
-			expected: false,
-		},
-		{
-			name:     "InvalidJSONArrayTrailingComma",
-			input:    `["item1", "item2",]`,
-			expected: false,
-		},
-		{
-			name:     "JSONObjectNotArray",
-			input:    `{"key": "value"}`,
-			expected: false,
-		},
-		{
-			name:     "StringThatStartsWithBracket",
-			input:    `[hello world`,
-			expected: false,
-		},
-		{
-			name:     "StringThatEndsWithBracket",
-			input:    `hello world]`,
-			expected: false,
-		},
-		{
-			name:     "MalformedJSON",
-			input:    `[{"key": "value"`,
-			expected: false,
-		},
-		{
-			name:     "ArrayWithUnquotedStrings",
-			input:    `[item1, item2, item3]`,
-			expected: false,
-		},
-		{
-			name:     "TextWithBracketsButNotJSON",
-			input:    "[this is not json]",
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := stringutil.IsJSONArray(tt.input)
-			require.Equal(t, tt.expected, result, "IsJSONArray(%q) = %v, want %v", tt.input, result, tt.expected)
-		})
-	}
-}
-
 func TestKebabToCamel(t *testing.T) {
 	t.Run("SimpleKebabCase", func(t *testing.T) {
 		result := stringutil.KebabToCamel("hello-world")
@@ -703,6 +589,26 @@ func TestParseSeparatedValues(t *testing.T) {
 			name:     "SingleQuotedItem",
 			input:    `"single item"`,
 			expected: []string{"single item"},
+			wantErr:  false,
+		},
+
+		// Issue #1274: Single JSON object tests
+		{
+			name:     "SingleJSONObject",
+			input:    `{"file": "params.txt", "config": "env"}`,
+			expected: []string{`{"file": "params.txt", "config": "env"}`},
+			wantErr:  false,
+		},
+		{
+			name:     "SingleJSONObjectCompact",
+			input:    `{"key":"value"}`,
+			expected: []string{`{"key":"value"}`},
+			wantErr:  false,
+		},
+		{
+			name:     "MultipleJSONObjectsNewlineSeparated",
+			input:    "{\"file\": \"file1.txt\", \"config\": \"prod\"}\n{\"file\": \"file2.txt\", \"config\": \"test\"}\n{\"file\": \"file3.txt\", \"config\": \"dev\"}",
+			expected: []string{`{"file": "file1.txt", "config": "prod"}`, `{"file": "file2.txt", "config": "test"}`, `{"file": "file3.txt", "config": "dev"}`},
 			wantErr:  false,
 		},
 
