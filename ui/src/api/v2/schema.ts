@@ -1276,7 +1276,10 @@ export interface operations {
                 name?: string;
                 /** @description Filter DAGs by tag */
                 tag?: string;
-                /** @description Field to sort by */
+                /** @description Field to sort by:
+                 *     - `name`: Sort alphabetically by DAG name (case-insensitive)
+                 *     - `nextRun`: Sort by next scheduled run time. DAGs with earlier next run times appear first in ascending order. DAGs without schedules appear last.
+                 *      */
                 sort?: PathsDagsGetParametersQuerySort;
                 /** @description Sort order (ascending or descending) */
                 order?: PathsDagsGetParametersQueryOrder;
@@ -2731,7 +2734,8 @@ export interface operations {
     };
 }
 export enum PathsDagsGetParametersQuerySort {
-    name = "name"
+    name = "name",
+    nextRun = "nextRun"
 }
 export enum PathsDagsGetParametersQueryOrder {
     asc = "asc",

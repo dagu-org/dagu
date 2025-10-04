@@ -896,3 +896,47 @@ steps:
 	// Error list might contain warnings but should not fail
 	t.Logf("Error list: %v", errList)
 }
+
+func TestListWithNextRunSorting(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-list-nextrun-sort")
+	t.Cleanup(func() {
+		_ = os.RemoveAll(tmpDir)
+	})
+
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	// Create test DAG files directly
+	createDAG := func(name, schedule string) {
+		content := fmt.Sprintf("name: %s\nsteps:\n  - echo test", name)
+		if schedule != "" {
+			content = fmt.Sprintf("name: %s\nschedule: %s\nsteps:\n  - echo test", name, schedule)
+		}
+		err := os.WriteFile(filepath.Join(tmpDir, name+".yaml"), []byte(content), 0600)
+		require.NoError(t, err)
+	}
+
+	createDAG("hourly-dag", "\"0 * * * *\"")
+	createDAG("daily-dag", "\"0 1 * * *\"")
+	createDAG("no-schedule", "")
+
+	// Test ascending order
+	result, _, err := store.List(ctx, models.ListDAGsOptions{Sort: "nextRun", Order: "asc"})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 3)
+
+	// Verify order: hourly (runs soonest) -> daily -> no-schedule (last)
+	assert.Equal(t, "hourly-dag", result.Items[0].Name)
+	assert.Equal(t, "daily-dag", result.Items[1].Name)
+	assert.Equal(t, "no-schedule", result.Items[2].Name)
+
+	// Test descending order
+	result, _, err = store.List(ctx, models.ListDAGsOptions{Sort: "nextRun", Order: "desc"})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 3)
+
+	// Verify order: daily (runs latest) -> hourly -> no-schedule (still last)
+	assert.Equal(t, "daily-dag", result.Items[0].Name)
+	assert.Equal(t, "hourly-dag", result.Items[1].Name)
+	assert.Equal(t, "no-schedule", result.Items[2].Name)
+}

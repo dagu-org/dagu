@@ -594,7 +594,7 @@ const defaultColumns = [
 // Mapping between column IDs and backend sort fields
 const columnToSortField: Record<string, string> = {
   Name: 'name',
-  // Only name sorting is supported by the backend
+  ScheduleAndNextRun: 'nextRun',
 };
 
 // Client-side sortable columns
