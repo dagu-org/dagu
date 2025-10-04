@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -287,17 +288,57 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 		allDags = append(allDags, dag)
 	}
 
-	// Sort DAGs by name (the only supported sort field)
-	sort.Slice(allDags, func(i, j int) bool {
-		// Default to ascending order
-		ascending := opts.Order != "desc"
-
-		// Always sort by name (case-insensitive)
-		if ascending {
-			return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
+	switch opts.Sort {
+	case "nextRun":
+		now := time.Now()
+		// Pre-calculate next run times to avoid recalculating on each comparison
+		nextRunTimes := make(map[*digraph.DAG]time.Time, len(allDags))
+		for _, dag := range allDags {
+			nextRunTimes[dag] = dag.NextRun(now)
 		}
-		return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
-	})
+
+		// Sort DAGs by next run time using cached values
+		sort.Slice(allDags, func(i, j int) bool {
+			// Default to ascending order
+			ascending := opts.Order != "desc"
+
+			nextRun1 := nextRunTimes[allDags[i]]
+			nextRun2 := nextRunTimes[allDags[j]]
+
+			if nextRun1.IsZero() && nextRun2.IsZero() {
+				// If both are zero, sort by name (case-insensitive)
+				if ascending {
+					return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
+				}
+				return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
+			}
+			// Treat zero time as greater than any other time (push to end)
+			if nextRun1.IsZero() {
+				return false
+			}
+			if nextRun2.IsZero() {
+				return true
+			}
+
+			// Both are non-zero, compare normally
+			if ascending {
+				return nextRun1.Before(nextRun2)
+			}
+			return nextRun2.Before(nextRun1)
+		})
+	default:
+		// Default to sorting by name (includes "name" and empty sort field)
+		sort.Slice(allDags, func(i, j int) bool {
+			// Default to ascending order
+			ascending := opts.Order != "desc"
+
+			// Always sort by name (case-insensitive)
+			if ascending {
+				return strings.ToLower(allDags[i].Name) < strings.ToLower(allDags[j].Name)
+			}
+			return strings.ToLower(allDags[i].Name) > strings.ToLower(allDags[j].Name)
+		})
+	}
 
 	totalCount := len(allDags)
 
