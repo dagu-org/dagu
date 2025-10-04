@@ -1224,3 +1224,47 @@ steps:
 		t.Fatal("DEPLOYMENT_RESULTS output not found")
 	}
 }
+
+// TestIssue1274_ParallelJSONSingleItem tests that parallel execution
+// correctly handles a single JSON item from output (should dispatch 1 job)
+func TestIssue1274_ParallelJSONSingleItem(t *testing.T) {
+	const dagContent = `steps:
+  - command: |
+      echo '{"file": "params.txt", "config": "env"}'
+    output: jsonList
+
+  - run: issue-1274-worker
+    parallel:
+      items: ${jsonList}
+      maxConcurrent: 1
+    params:
+      aJson: ${ITEM}
+    continueOn:
+      skipped: true
+
+---
+name: issue-1274-worker
+params:
+  aJson: ""
+steps:
+  - name: Process JSON item
+    command: echo "Processing file=${aJson.file} config=${aJson.config}"
+`
+
+	th := test.Setup(t)
+	dag := th.DAG(t, dagContent)
+	agent := dag.Agent()
+	err := agent.Run(agent.Context)
+	require.NoError(t, err)
+	dag.AssertLatestStatus(t, status.Success)
+
+	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+	require.NoError(t, statusErr)
+
+	require.Len(t, dagStatus.Nodes, 2)
+
+	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
+	parallelNode := dagStatus.Nodes[1]
+	require.Equal(t, status.NodeSuccess, parallelNode.Status)
+	require.Len(t, parallelNode.Children, 1, "should dispatch exactly 1 worker instance for 1 JSON item")
+}
