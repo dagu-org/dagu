@@ -780,7 +780,7 @@ paths:
   /dag-runs/{name}/{dagRunId}:
     get:
       summary: "Retrieve detailed status of a DAG-run"
-      description: "Fetches detailed status information about a specific DAG-run"
+      description: "Fetches detailed status information about a specific DAG-run. Use 'latest' as the dagRunId to retrieve the most recent DAG-run for the specified DAG name."
       operationId: "getDAGRunDetails"
       tags:
         - "dag-runs"
@@ -1555,7 +1555,7 @@ components:
 
     DAGRunId:
       type: string
-      description: "Unique identifier for the DAG-run"
+      description: "Unique identifier for the DAG-run. The special value 'latest' can be used to reference the most recent DAG-run."
       example: "latest"
       pattern: "^[a-zA-Z0-9_-]+$"
 
