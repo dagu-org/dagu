@@ -4,21 +4,14 @@ Install Dagu on your system.
 
 ## Quick Install
 
-### npm
-
-```bash
-npm install -g dagu
-```
-
-This installs Dagu globally with automatic platform detection.
-
 ### Script Install
 
 ```bash
+# Install to ~/.local/bin (default, no sudo required)
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
 ```
 
-This detects your OS/architecture and installs to `/usr/local/bin`.
+This detects your OS/architecture and installs to `~/.local/bin` by default.
 
 ### Docker
 
@@ -38,8 +31,10 @@ Visit http://localhost:8080
 ### npm
 
 ```bash
-npm install -g dagu
+npm install -g --ignore-scripts=false dagu 
 ```
+
+This installs Dagu globally with automatic platform detection.
 
 ### Homebrew
 
@@ -53,16 +48,24 @@ Download from [GitHub Releases](https://github.com/dagu-org/dagu/releases).
 
 ## Installation Options
 
-### Custom Directory
+### Custom Directory & Version
 
 ```bash
 # Install to custom location
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | \
-  bash -s -- --prefix ~/bin
+  bash -s -- --install-dir ~/bin
 
-# Specific version
+# Install to system-wide location (requires sudo)
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | \
+  bash -s -- --install-dir /usr/local/bin
+
+# Install specific version
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | \
   bash -s -- --version v1.17.0
+
+# Combine options
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | \
+  bash -s -- --version v1.17.0 --install-dir ~/bin
 ```
 
 ### Docker Compose
