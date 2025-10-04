@@ -78,12 +78,6 @@ steps:
 
 ### 1. Install dagu
 
-**npm**:
-```bash
-# Install via npm
-npm install -g dagu
-```
-
 **Homebrew**:
 
 ```bash
@@ -111,6 +105,12 @@ docker run --rm \
 ```
 
 Note: see [documentation](https://docs.dagu.cloud/getting-started/installation) for other methods.
+
+**npm**:
+```bash
+# Install via npm
+npm install -g --ignore-scripts=false dagu
+```
 
 ### 2. Create your first workflow
 
