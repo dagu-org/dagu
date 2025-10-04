@@ -41,7 +41,7 @@ docker pull ghcr.io/dagu-org/dagu:latest
 ```
 
 ```bash [Homebrew]
-brew install dagu-org/brew/dagu
+brew update && brew install dagu
 ```
 
 ```bash [npm]

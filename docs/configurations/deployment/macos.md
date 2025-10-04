@@ -4,10 +4,10 @@
 
 ```bash
 # Install Dagu
-brew install dagu-org/brew/dagu
+brew update && brew install dagu
 
 # Update Dagu
-brew upgrade dagu-org/brew/dagu
+brew update && brew upgrade dagu
 ```
 
 
