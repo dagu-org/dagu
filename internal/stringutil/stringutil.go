@@ -68,23 +68,6 @@ func RemoveQuotes(s string) string {
 	return s
 }
 
-// IsJSONArray checks if the given string is a valid JSON array.
-// This is useful for determining if parallel input should be parsed as JSON or space-separated.
-func IsJSONArray(s string) bool {
-	s = strings.TrimSpace(s)
-	if len(s) < 2 {
-		return false
-	}
-
-	// Quick check for brackets
-	if s[0] != '[' || s[len(s)-1] != ']' {
-		return false
-	}
-
-	// Use json.Valid for accurate validation
-	return json.Valid([]byte(s))
-}
-
 // KebabToCamel converts a kebab-case string to camelCase.
 func KebabToCamel(s string) string {
 	parts := strings.Split(s, "-")
@@ -159,8 +142,10 @@ func DetectSeparatorType(s string) SeparatorType {
 		return SeparatorTypeSpace
 	}
 
-	// Check for JSON first
-	if IsJSONArray(s) {
+	isValidJSON := IsJSON(s)
+
+	// Check for JSON first (both arrays and objects)
+	if isValidJSON && (strings.HasPrefix(s, "[") || strings.HasPrefix(s, "{")) {
 		return SeparatorTypeJSON
 	}
 
@@ -219,30 +204,37 @@ func ParseSeparatedValues(s string) ([]string, error) {
 
 	switch separatorType {
 	case SeparatorTypeJSON:
-		// Handle JSON array
-		var items []any
-		if err := json.Unmarshal([]byte(s), &items); err != nil {
-			return nil, fmt.Errorf("failed to parse JSON array: %w", err)
-		}
+		// Array or object
+		if strings.HasPrefix(s, "[") {
+			var items []any
+			err := json.Unmarshal([]byte(s), &items)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse JSON array: %w", err)
+			}
 
-		var result []string
-		for _, item := range items {
-			switch v := item.(type) {
-			case string:
-				result = append(result, v)
-			case nil:
-				result = append(result, "null")
-			default:
-				// Convert other types to string representation
-				jsonBytes, err := json.Marshal(v)
-				if err != nil {
-					result = append(result, fmt.Sprintf("%v", v))
-				} else {
-					result = append(result, string(jsonBytes))
+			// Successfully parsed as array
+			var result []string
+			for _, item := range items {
+				switch v := item.(type) {
+				case string:
+					result = append(result, v)
+				case nil:
+					result = append(result, "null")
+				default:
+					// Convert other types to string representation
+					jsonBytes, err := json.Marshal(v)
+					if err != nil {
+						result = append(result, fmt.Sprintf("%v", v))
+					} else {
+						result = append(result, string(jsonBytes))
+					}
 				}
 			}
+			return result, nil
 		}
-		return result, nil
+
+		// Single JSON object - return as is
+		return []string{s}, nil
 
 	case SeparatorTypeNewline:
 		return parseNewlineSeparated(s), nil
@@ -263,10 +255,19 @@ func ParseSeparatedValues(s string) ([]string, error) {
 		return parseQuotedStrings(s), nil
 
 	case SeparatorTypeSpace:
+		// Check if the entire string is a valid JSON object before space-splitting
+		// This handles the case where a single JSON object (not array) is output
+		// e.g., {"file": "params.txt", "config": "env"}
+		if IsJSON(s) {
+			return []string{s}, nil
+		}
 		return parseSpaceSeparated(s), nil
 
 	default:
-		// Fallback to space separation
+		// Fallback to space separation, but check for JSON object first
+		if IsJSON(s) {
+			return []string{s}, nil
+		}
 		return parseSpaceSeparated(s), nil
 	}
 }
