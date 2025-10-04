@@ -39,7 +39,7 @@ This installs Dagu globally with automatic platform detection.
 ### Homebrew
 
 ```bash
-brew install dagu-org/brew/dagu
+brew update && brew install dagu
 ```
 
 ### Manual Download

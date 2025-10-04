@@ -106,10 +106,10 @@ Note: see [documentation](https://docs.dagu.cloud/getting-started/installation) 
 **Homebrew**:
 
 ```bash
-brew install dagu-org/brew/dagu
+brew update && brew install dagu
 
 # Upgrade to latest version
-brew upgrade dagu-org/brew/dagu
+brew update && brew upgrade dagu
 ```
 
 **npm**:
