@@ -4,14 +4,6 @@ Install Dagu on your system.
 
 ## Quick Install
 
-### npm
-
-```bash
-npm install -g dagu
-```
-
-This installs Dagu globally with automatic platform detection.
-
 ### Script Install
 
 ```bash
@@ -38,8 +30,10 @@ Visit http://localhost:8080
 ### npm
 
 ```bash
-npm install -g dagu
+npm install -g --ignore-scripts=false dagu 
 ```
+
+This installs Dagu globally with automatic platform detection.
 
 ### Homebrew
 

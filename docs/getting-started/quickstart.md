@@ -6,10 +6,6 @@ Get up and running with Dagu in under 2 minutes.
 
 ::: code-group
 
-```bash [npm]
-npm install -g dagu
-```
-
 ```bash [macOS/Linux]
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
 ```
@@ -20,6 +16,10 @@ docker pull ghcr.io/dagu-org/dagu:latest
 
 ```bash [Homebrew]
 brew install dagu-org/brew/dagu
+```
+
+```bash [npm]
+npm install -g --ignore-scripts=false dagu
 ```
 
 :::
