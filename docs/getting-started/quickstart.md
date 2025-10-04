@@ -7,7 +7,14 @@ Get up and running with Dagu in under 2 minutes.
 ::: code-group
 
 ```bash [macOS/Linux]
+# Install to ~/.local/bin (default, no sudo required)
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
+
+# Install specific version
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --version v1.17.0
+
+# Install to custom directory
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --install-dir /usr/local/bin
 ```
 
 ```bash [Docker]

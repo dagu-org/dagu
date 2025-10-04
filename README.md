@@ -78,20 +78,17 @@ steps:
 
 ### 1. Install dagu
 
-**Homebrew**:
-
-```bash
-brew install dagu-org/brew/dagu
-
-# Upgrade to latest version
-brew upgrade dagu-org/brew/dagu
-```
-
 **macOS/Linux**:
 
 ```bash
-# Install via script
+# Install to ~/.local/bin (default, no sudo required)
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
+
+# Install specific version
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --version v1.17.0
+
+# Install to custom directory
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --install-dir /usr/local/bin
 ```
 
 **Docker**:
@@ -105,6 +102,15 @@ docker run --rm \
 ```
 
 Note: see [documentation](https://docs.dagu.cloud/getting-started/installation) for other methods.
+
+**Homebrew**:
+
+```bash
+brew install dagu-org/brew/dagu
+
+# Upgrade to latest version
+brew upgrade dagu-org/brew/dagu
+```
 
 **npm**:
 ```bash
