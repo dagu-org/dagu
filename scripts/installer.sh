@@ -34,7 +34,8 @@ command -v tar >/dev/null 2>&1 || { echo "tar is not installed. Aborting." >&2; 
 
 # Determine version
 if [ -z "$VERSION" ]; then
-  VERSION="$(curl -sfL -o /dev/null -w '%{url_effective}' "$RELEASES_URL/latest" | rev | cut -d'/' -f1 | rev)"
+  # Use GitHub API for faster version detection
+  VERSION="$(curl -sfL "https://api.github.com/repos/dagu-org/dagu/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)".*/\1/')"
 fi
 
 if [ -z "$VERSION" ]; then
