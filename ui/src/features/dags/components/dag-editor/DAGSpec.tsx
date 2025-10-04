@@ -4,10 +4,16 @@
  * @module features/dags/components/dag-editor
  */
 import BorderedBox from '@/ui/BorderedBox';
-import { AlertTriangle, Save } from 'lucide-react';
+import { AlertTriangle, Info, Save } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
-import { components } from '../../../../api/v2/schema';
+import type { components } from '../../../../api/v2/schema';
+import { DAGDetailsType } from '../../../../api/v2/schema';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '../../../../components/ui/alert';
 import { Button } from '../../../../components/ui/button';
 import { useSimpleToast } from '../../../../components/ui/simple-toast';
 import { Tab, Tabs } from '../../../../components/ui/tabs';
@@ -109,7 +115,9 @@ function DAGSpec({ fileName }: Props) {
 
     if (lastFetchedSpecRef.current === fetchedSpec) {
       // Ensure the editor initializes with the fetched value on first load.
-      setCurrentValue((prev) => (typeof prev === 'undefined' ? fetchedSpec : prev));
+      setCurrentValue((prev) =>
+        typeof prev === 'undefined' ? fetchedSpec : prev
+      );
       return;
     }
 
@@ -147,116 +155,176 @@ function DAGSpec({ fileName }: Props) {
   // Check if we have local DAGs
   const hasLocalDags = dagDetails?.localDags && dagDetails.localDags.length > 0;
 
+  // Helper function to check if DAG is in chain mode with explicit dependencies
+  const hasChainModeWithDependencies = (
+    dag: components['schemas']['DAGDetails']
+  ) => {
+    // Check if any step has explicit depends field
+    const hasExplicitDeps = dag.steps?.some(
+      (step) => step.depends && step.depends.length > 0
+    );
+
+    if (!hasExplicitDeps) {
+      return false;
+    }
+
+    // Check if the DAG type is chain (default) or not specified (defaults to chain)
+    return !dag.type || dag.type === DAGDetailsType.chain;
+  };
+
   // Helper function to render DAG content (Graph, Attributes, Steps, Errors)
   const renderDAGContent = (
     dag: components['schemas']['DAGDetails'],
     errors?: string[]
-  ) => (
-    <div className="space-y-6">
-      {errors?.length ? (
+  ) => {
+    const showChainWarning = hasChainModeWithDependencies(dag);
+
+    return (
+      <div className="space-y-6">
+        {errors?.length ? (
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+            <div className="border-b border-slate-100 dark:border-slate-800 bg-red-50 dark:bg-red-900/10 px-6 py-4">
+              <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Configuration Errors
+              </h2>
+            </div>
+            <div className="p-6">
+              <div className="space-y-3">
+                {errors.map((e, i) => (
+                  <div
+                    key={i}
+                    className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-red-600 dark:text-red-400 font-mono text-sm break-words"
+                  >
+                    {e}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {showChainWarning && (
+          <Alert className="bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800">
+            <Info className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <AlertTitle className="text-amber-900 dark:text-amber-100">
+              Chain Mode with Explicit Dependencies
+            </AlertTitle>
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
+              <p className="mb-2">
+                This DAG is configured in <strong>chain mode</strong>, which
+                automatically links steps in sequence. However, explicit
+                dependencies (
+                <code className="bg-amber-100 dark:bg-amber-900/30 px-1 py-0.5 rounded text-sm">
+                  depends
+                </code>
+                ) are also defined.
+              </p>
+              <p>
+                The explicit dependencies may be redundant or could conflict
+                with the automatic chaining behavior. Consider either:
+              </p>
+              <ul className="list-disc list-inside mt-1 ml-2 space-y-1">
+                <li>
+                  Removing explicit dependencies if you want sequential
+                  execution
+                </li>
+                <li>
+                  Changing to{' '}
+                  <code className="bg-amber-100 dark:bg-amber-900/30 px-1 py-0.5 rounded text-sm">
+                    type: graph
+                  </code>{' '}
+                  if you need custom dependency control
+                </li>
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-          <div className="border-b border-slate-100 dark:border-slate-800 bg-red-50 dark:bg-red-900/10 px-6 py-4">
-            <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Configuration Errors
+          <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Graph
+            </h2>
+            {!errors?.length && (
+              <FlowchartSwitch
+                value={cookie['flowchart']}
+                onChange={onChangeFlowchart}
+              />
+            )}
+          </div>
+          <div className="p-6">
+            {errors?.length || !dag.steps || dag.steps.length === 0 ? (
+              <div className="py-8 px-4 text-center">
+                <AlertTriangle className="h-12 w-12 text-yellow-500 dark:text-yellow-400 mx-auto mb-4" />
+                <p className="text-slate-600 dark:text-slate-400 mb-2">
+                  Cannot render graph due to configuration errors
+                </p>
+                <p className="text-sm text-slate-500 dark:text-slate-500">
+                  Please fix the errors above and save the configuration to view
+                  the graph
+                </p>
+              </div>
+            ) : (
+              <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
+                <Graph
+                  steps={dag.steps}
+                  type="config"
+                  flowchart={flowchart}
+                  showIcons={false}
+                />
+              </BorderedBox>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+          <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Attributes
             </h2>
           </div>
           <div className="p-6">
-            <div className="space-y-3">
-              {errors.map((e, i) => (
-                <div
-                  key={i}
-                  className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-red-600 dark:text-red-400 font-mono text-sm break-words"
-                >
-                  {e}
-                </div>
-              ))}
+            <DAGAttributes dag={dag} />
+          </div>
+        </div>
+
+        {dag.steps ? (
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+            <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                <span>Steps</span>
+                <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                  {dag.steps.length} step
+                  {dag.steps.length !== 1 ? 's' : ''}
+                </span>
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <DAGStepTable steps={dag.steps} />
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-        <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Graph
-          </h2>
-          {!errors?.length && (
-            <FlowchartSwitch
-              value={cookie['flowchart']}
-              onChange={onChangeFlowchart}
-            />
-          )}
-        </div>
-        <div className="p-6">
-          {errors?.length || !dag.steps || dag.steps.length === 0 ? (
-            <div className="py-8 px-4 text-center">
-              <AlertTriangle className="h-12 w-12 text-yellow-500 dark:text-yellow-400 mx-auto mb-4" />
-              <p className="text-slate-600 dark:text-slate-400 mb-2">
-                Cannot render graph due to configuration errors
-              </p>
-              <p className="text-sm text-slate-500 dark:text-slate-500">
-                Please fix the errors above and save the configuration to view the graph
-              </p>
+        {getHandlers(dag)?.length ? (
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+            <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                <span>Lifecycle Hooks</span>
+                <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                  {getHandlers(dag).length} hook
+                  {getHandlers(dag).length !== 1 ? 's' : ''}
+                </span>
+              </h2>
             </div>
-          ) : (
-            <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
-              <Graph
-                steps={dag.steps}
-                type="config"
-                flowchart={flowchart}
-                showIcons={false}
-              />
-            </BorderedBox>
-          )}
-        </div>
+            <div className="overflow-x-auto">
+              <DAGStepTable steps={getHandlers(dag)} />
+            </div>
+          </div>
+        ) : null}
       </div>
-
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-        <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Attributes
-          </h2>
-        </div>
-        <div className="p-6">
-          <DAGAttributes dag={dag} />
-        </div>
-      </div>
-
-      {dag.steps ? (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-          <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-              <span>Steps</span>
-              <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                {dag.steps.length} step
-                {dag.steps.length !== 1 ? 's' : ''}
-              </span>
-            </h2>
-          </div>
-          <div className="overflow-x-auto">
-            <DAGStepTable steps={dag.steps} />
-          </div>
-        </div>
-      ) : null}
-
-      {getHandlers(dag)?.length ? (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-          <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-              <span>Lifecycle Hooks</span>
-              <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                {getHandlers(dag).length} hook{getHandlers(dag).length !== 1 ? 's' : ''}
-              </span>
-            </h2>
-          </div>
-          <div className="overflow-x-auto">
-            <DAGStepTable steps={getHandlers(dag)} />
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
+    );
+  };
 
   return (
     <DAGContext.Consumer>
@@ -275,44 +343,56 @@ function DAGSpec({ fileName }: Props) {
                       >
                         {data?.dag?.name} (Parent)
                       </Tab>
-                      {dagDetails?.localDags?.map((localDag: components['schemas']['LocalDag']) => (
-                        <Tab
-                          key={localDag.name}
-                          isActive={activeTab === localDag.name}
-                          onClick={() => setActiveTab(localDag.name)}
-                          className="cursor-pointer whitespace-nowrap"
-                        >
-                          {localDag.name}
-                        </Tab>
-                      ))}
+                      {dagDetails?.localDags?.map(
+                        (localDag: components['schemas']['LocalDag']) => (
+                          <Tab
+                            key={localDag.name}
+                            isActive={activeTab === localDag.name}
+                            onClick={() => setActiveTab(localDag.name)}
+                            className="cursor-pointer whitespace-nowrap"
+                          >
+                            {localDag.name}
+                          </Tab>
+                        )
+                      )}
                     </Tabs>
                   </div>
-                  
-                  {activeTab === 'parent' && data?.dag && renderDAGContent(data.dag, data?.errors)}
-                  
-                  {dagDetails?.localDags?.map((localDag: components['schemas']['LocalDag']) => (
-                    activeTab === localDag.name && (
-                      <div key={localDag.name}>
-                        {localDag.dag ? (
-                          renderDAGContent(localDag.dag, localDag.errors)
-                        ) : (
-                          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
-                            <div className="text-red-600 dark:text-red-400">
-                              <AlertTriangle className="h-5 w-5 inline mr-2" />
-                              Failed to load local DAG: {localDag.name}
-                            </div>
-                            {localDag.errors?.length ? (
-                              <div className="mt-4 space-y-2">
-                                {localDag.errors.map((e: string, i: number) => (
-                                  <div key={i} className="text-sm font-mono">{e}</div>
-                                ))}
+
+                  {activeTab === 'parent' &&
+                    data?.dag &&
+                    renderDAGContent(data.dag, data?.errors)}
+
+                  {dagDetails?.localDags?.map(
+                    (localDag: components['schemas']['LocalDag']) =>
+                      activeTab === localDag.name && (
+                        <div key={localDag.name}>
+                          {localDag.dag ? (
+                            renderDAGContent(localDag.dag, localDag.errors)
+                          ) : (
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+                              <div className="text-red-600 dark:text-red-400">
+                                <AlertTriangle className="h-5 w-5 inline mr-2" />
+                                Failed to load local DAG: {localDag.name}
                               </div>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  ))}
+                              {localDag.errors?.length ? (
+                                <div className="mt-4 space-y-2">
+                                  {localDag.errors.map(
+                                    (e: string, i: number) => (
+                                      <div
+                                        key={i}
+                                        className="text-sm font-mono"
+                                      >
+                                        {e}
+                                      </div>
+                                    )
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
+                      )
+                  )}
                 </div>
               ) : (
                 data?.dag && renderDAGContent(data.dag, data?.errors)

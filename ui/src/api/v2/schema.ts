@@ -891,6 +891,12 @@ export interface components {
             defaultParams?: string;
             /** @description List of tags for categorizing and filtering DAGs */
             tags?: string[];
+            /**
+             * @description Execution type for steps. 'chain' (default) executes steps sequentially in the order they are defined, with each step automatically depending on the previous one. 'graph' uses dependency-based execution where steps run based on their 'depends' field. 'agent' is reserved for future agent-based execution.
+             * @default chain
+             * @enum {string}
+             */
+            type: DAGDetailsType;
             runConfig?: components["schemas"]["RunConfig"];
         };
         /** @description Configuration for controlling user interactions when starting DAG runs */
@@ -2972,6 +2978,11 @@ export enum WorkerHealthStatus {
     healthy = "healthy",
     warning = "warning",
     unhealthy = "unhealthy"
+}
+export enum DAGDetailsType {
+    graph = "graph",
+    chain = "chain",
+    agent = "agent"
 }
 export enum RepeatMode {
     While = "while",
