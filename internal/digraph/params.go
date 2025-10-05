@@ -24,7 +24,7 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 		envs       []string
 	)
 
-	if err := parseParams(ctx, spec.Params, &paramPairs, &envs); err != nil {
+	if err := parseParams(ctx, spec.Params, &paramPairs, &envs, dag); err != nil {
 		return err
 	}
 
@@ -41,7 +41,7 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 			overridePairs []paramPair
 			overrideEnvs  []string
 		)
-		if err := parseParams(ctx, ctx.opts.Parameters, &overridePairs, &overrideEnvs); err != nil {
+		if err := parseParams(ctx, ctx.opts.Parameters, &overridePairs, &overrideEnvs, dag); err != nil {
 			return err
 		}
 		// Override the default parameters with the command line parameters
@@ -54,7 +54,7 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 			overridePairs []paramPair
 			overrideEnvs  []string
 		)
-		if err := parseParams(ctx, ctx.opts.ParametersList, &overridePairs, &overrideEnvs); err != nil {
+		if err := parseParams(ctx, ctx.opts.ParametersList, &overridePairs, &overrideEnvs, dag); err != nil {
 			return err
 		}
 		// Override the default parameters with the command line parameters
@@ -249,7 +249,7 @@ func overrideEnvirons(envs *[]string, override []string) {
 }
 
 // parseParams parses and processes the parameters for the DAG.
-func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]string) error {
+func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]string, dag *DAG) error {
 	var paramPairs []paramPair
 
 	paramPairs, err := parseParamValue(ctx, value)
@@ -257,26 +257,42 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 		return wrapError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 	}
 
+	// Accumulated vars for sequential param expansion (e.g., Y=${P1})
+	accumulatedVars := make(map[string]string)
+
 	for index, paramPair := range paramPairs {
 		if !ctx.opts.NoEval {
-			paramPair.Value = os.ExpandEnv(paramPair.Value)
+			// Use os.Expand with accumulated vars to support ${P1} references
+			// Also check buildEnv from env vars (e.g., P2=${A001} where A001 is in env)
+			paramPair.Value = os.Expand(paramPair.Value, func(key string) string {
+				// Check accumulated params first
+				if val, ok := accumulatedVars[key]; ok {
+					return val
+				}
+				// Then check env vars from dag.buildEnv (populated by buildEnvs)
+				// This allows params to reference env vars (e.g., P2=${A001} where A001 is in env)
+				if dag != nil && dag.buildEnv != nil {
+					if val, ok := dag.buildEnv[key]; ok {
+						return val
+					}
+				}
+				// Fall back to real env
+				return os.Getenv(key)
+			})
 		}
 
 		*params = append(*params, paramPair)
 
 		paramString := paramPair.String()
 
-		// Set the parameter as an environment variable for the command
-		// $1, $2, $3, ...
-		if err := os.Setenv(strconv.Itoa(index+1), paramString); err != nil {
-			return wrapError("params", paramString, fmt.Errorf("failed to set environment variable: %w", err))
-		}
+		// Store in accumulated vars for next param expansion
+		// Positional params: $1, $2, $3, ...
+		accumulatedVars[strconv.Itoa(index+1)] = paramString
 
 		if !ctx.opts.NoEval && paramPair.Name != "" {
 			*envs = append(*envs, paramString)
-			if err := os.Setenv(paramPair.Name, paramPair.Value); err != nil {
-				return wrapError("params", paramString, fmt.Errorf("failed to set environment variable: %w", err))
-			}
+			// Store named param for next param expansion
+			accumulatedVars[paramPair.Name] = paramPair.Value
 		}
 
 		if paramPair.Name == "" {

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -3197,15 +3198,18 @@ steps:
 		// Call LoadEnv
 		dag.LoadEnv(context.Background())
 
-		// Verify environment variables were set
-		assert.Equal(t, "from_file", os.Getenv("LOAD_ENV_DOTENV_VAR"))
-		assert.Equal(t, "from_dag", os.Getenv("LOAD_ENV_ENV_VAR"))
-		assert.Equal(t, "another_value", os.Getenv("LOAD_ENV_ANOTHER_VAR"))
-
-		// Clean up
-		os.Unsetenv("LOAD_ENV_DOTENV_VAR")
-		os.Unsetenv("LOAD_ENV_ENV_VAR")
-		os.Unsetenv("LOAD_ENV_ANOTHER_VAR")
+		// Verify environment variables are in dag.Env (not process env)
+		// Child processes will receive them via cmd.Env = AllEnvs()
+		envMap := make(map[string]string)
+		for _, env := range dag.Env {
+			parts := strings.SplitN(env, "=", 2)
+			if len(parts) == 2 {
+				envMap[parts[0]] = parts[1]
+			}
+		}
+		assert.Equal(t, "from_file", envMap["LOAD_ENV_DOTENV_VAR"])
+		assert.Equal(t, "from_dag", envMap["LOAD_ENV_ENV_VAR"])
+		assert.Equal(t, "another_value", envMap["LOAD_ENV_ANOTHER_VAR"])
 	})
 
 	t.Run("LoadEnvWithMissingDotenvFile", func(t *testing.T) {
@@ -3223,10 +3227,14 @@ steps:
 		// LoadEnv should not fail even if dotenv file doesn't exist
 		dag.LoadEnv(context.Background())
 
-		// Environment variables from env should still be set
-		assert.Equal(t, "test_value", os.Getenv("TEST_VAR_LOAD_ENV"))
-
-		// Clean up
-		os.Unsetenv("TEST_VAR_LOAD_ENV")
+		// Environment variables from env should still be in dag.Env
+		envMap := make(map[string]string)
+		for _, env := range dag.Env {
+			parts := strings.SplitN(env, "=", 2)
+			if len(parts) == 2 {
+				envMap[parts[0]] = parts[1]
+			}
+		}
+		assert.Equal(t, "test_value", envMap["TEST_VAR_LOAD_ENV"])
 	})
 }

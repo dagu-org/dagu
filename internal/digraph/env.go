@@ -35,11 +35,9 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOptio
 }
 
 func (e Env) ApplyEnvs(ctx context.Context) {
-	for k, v := range e.Envs {
-		if err := os.Setenv(k, v); err != nil {
-			logger.Error(ctx, "failed to set environment variable %q: %v", k, err)
-		}
-	}
+	// No-op: Environment variables are already stored in e.Envs map
+	// Child processes receive them via cmd.Env = AllEnvs()
+	// which includes e.Envs at executor/env.go:133
 }
 
 // Dispatcher defines the interface for coordinator operations
