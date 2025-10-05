@@ -258,7 +258,6 @@ func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
 		Schedule:          ptrOf(schedules),
 		Steps:             ptrOf(steps),
 		Tags:              ptrOf(dag.Tags),
-		Type:              ptrOf(api.DAGDetailsType(dag.Type)),
 		RunConfig:         runConfig,
 	}
 

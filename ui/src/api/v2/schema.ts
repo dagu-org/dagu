@@ -377,7 +377,7 @@ export interface paths {
         };
         /**
          * Retrieve detailed status of a DAG-run
-         * @description Fetches detailed status information about a specific DAG-run. Use 'latest' as the dagRunId to retrieve the most recent DAG-run for the specified DAG name.
+         * @description Fetches detailed status information about a specific DAG-run
          */
         get: operations["getDAGRunDetails"];
         put?: never;
@@ -719,7 +719,7 @@ export interface components {
             prevPage: number;
         };
         /**
-         * @description Unique identifier for the DAG-run. The special value 'latest' can be used to reference the most recent DAG-run.
+         * @description Unique identifier for the DAG-run
          * @example latest
          */
         DAGRunId: string;
@@ -891,12 +891,6 @@ export interface components {
             defaultParams?: string;
             /** @description List of tags for categorizing and filtering DAGs */
             tags?: string[];
-            /**
-             * @description Execution type for steps. 'chain' (default) executes steps sequentially in the order they are defined, with each step automatically depending on the previous one. 'graph' uses dependency-based execution where steps run based on their 'depends' field. 'agent' is reserved for future agent-based execution.
-             * @default chain
-             * @enum {string}
-             */
-            type: DAGDetailsType;
             runConfig?: components["schemas"]["RunConfig"];
         };
         /** @description Configuration for controlling user interactions when starting DAG runs */
@@ -2978,11 +2972,6 @@ export enum WorkerHealthStatus {
     healthy = "healthy",
     warning = "warning",
     unhealthy = "unhealthy"
-}
-export enum DAGDetailsType {
-    graph = "graph",
-    chain = "chain",
-    agent = "agent"
 }
 export enum RepeatMode {
     While = "while",
