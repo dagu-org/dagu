@@ -34,12 +34,6 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOptio
 	return cmdutil.EvalString(ctx, s, opts...)
 }
 
-func (e Env) ApplyEnvs(ctx context.Context) {
-	// No-op: Environment variables are already stored in e.Envs map
-	// Child processes receive them via cmd.Env = AllEnvs()
-	// which includes e.Envs at executor/env.go:133
-}
-
 // Dispatcher defines the interface for coordinator operations
 type Dispatcher interface {
 	// Dispatch sends a task to the coordinator

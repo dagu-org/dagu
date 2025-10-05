@@ -129,7 +129,7 @@ type DAG struct {
 
 	// buildEnv is a temporary map used during DAG building to pass env vars to params
 	// This is not serialized and is cleared after build completes
-	buildEnv map[string]string `json:"-"`
+	buildEnv map[string]string
 }
 
 // CreateTask creates a coordinator task from this DAG for distributed execution.
