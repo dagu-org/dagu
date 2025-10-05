@@ -377,7 +377,7 @@ export interface paths {
         };
         /**
          * Retrieve detailed status of a DAG-run
-         * @description Fetches detailed status information about a specific DAG-run
+         * @description Fetches detailed status information about a specific DAG-run. Use 'latest' as the dagRunId to retrieve the most recent DAG-run for the specified DAG name.
          */
         get: operations["getDAGRunDetails"];
         put?: never;
@@ -719,7 +719,7 @@ export interface components {
             prevPage: number;
         };
         /**
-         * @description Unique identifier for the DAG-run
+         * @description Unique identifier for the DAG-run. The special value 'latest' can be used to reference the most recent DAG-run.
          * @example latest
          */
         DAGRunId: string;
