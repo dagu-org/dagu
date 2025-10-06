@@ -1102,6 +1102,8 @@ func buildStep(ctx StepBuildContext, def stepDef) (*core.Step, error) {
 		Stderr:         strings.TrimSpace(def.Stderr),
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
+		Uses:           strings.TrimSpace(def.Uses),
+		With:           def.With,
 	}
 
 	for _, entry := range stepBuilderRegistry {
