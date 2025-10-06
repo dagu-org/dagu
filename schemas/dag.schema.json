@@ -852,6 +852,17 @@
             }
           ],
           "description": "Environment variables specific to this step. These override DAG-level environment variables with the same name. Can use shell expansions, references to other environment variables, or command substitutions."
+        },
+        "uses": {
+          "type": "string",
+          "description": "GitHub Action to run (e.g., 'actions/checkout@v4'). When specified, this step will execute a GitHub Action locally using nektos/act. The action will run in a Docker container with the working directory mounted for file persistence. Requires Docker to be installed and running."
+        },
+        "with": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Input parameters for the GitHub Action specified in 'uses'. These are passed as inputs to the action. For example, when using actions/checkout@v4, you can specify 'repository', 'ref', 'token', etc. Refer to the specific action's documentation for available inputs."
         }
       }
     },
