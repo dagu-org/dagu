@@ -66,6 +66,15 @@ var (
 )
 
 func NewExecutor(ctx context.Context, step digraph.Step) (Executor, error) {
+	// If the step has a "uses" field, automatically use the github-action executor
+	if step.Uses != "" {
+		f, ok := executors["github-action"]
+		if ok {
+			return f(ctx, step)
+		}
+		return nil, fmt.Errorf("github-action executor not registered")
+	}
+
 	f, ok := executors[step.ExecutorConfig.Type]
 	if ok {
 		return f(ctx, step)
