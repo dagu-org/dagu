@@ -1518,6 +1518,17 @@ func validateStep(_ StepBuildContext, def stepDef, step *Step) error {
 	}
 
 	// TODO: Validate executor config for each executor type.
+	if step.ExecutorConfig.Type != "" {
+		if validator, exists := executorValidatorRegistry[step.ExecutorConfig.Type]; exists {
+			if err := validator.ValidateStep(step); err != nil {
+				return wrapError(
+					fmt.Sprintf("executor.%s", step.ExecutorConfig.Type),
+					step.ExecutorConfig.Type,
+					err,
+				)
+			}
+		}
+	}
 
 	if step.Command == "" {
 		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildDAG == nil {
