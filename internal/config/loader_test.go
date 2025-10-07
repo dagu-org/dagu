@@ -1,4 +1,4 @@
-package config_test
+package config
 
 import (
 	"os"
@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -115,14 +114,14 @@ func TestLoad_Env(t *testing.T) {
 		os.Setenv(key, val)
 	}
 
-	cfg, err := config.Load(config.WithConfigFile(configFile))
+	cfg, err := Load(WithConfigFile(configFile))
 	require.NoError(t, err)
 
 	berlinLoc, _ := time.LoadLocation("Europe/Berlin")
 	_, berlinOffset := time.Now().In(berlinLoc).Zone()
 
-	expected := &config.Config{
-		Global: config.Global{
+	expected := &Config{
+		Global: Global{
 			Debug:         true,
 			LogFormat:     "json",
 			TZ:            "Europe/Berlin",
@@ -130,34 +129,34 @@ func TestLoad_Env(t *testing.T) {
 			Location:      berlinLoc,
 			DefaultShell:  "/bin/zsh",
 			SkipExamples:  false,
-			Peer:          config.Peer{Insecure: true}, // Default is true
-			BaseEnv:       cfg.Global.BaseEnv,          // Dynamic, copy from actual
+			Peer:          Peer{Insecure: true}, // Default is true
+			BaseEnv:       cfg.Global.BaseEnv,   // Dynamic, copy from actual
 		},
-		Server: config.Server{
+		Server: Server{
 			Host:        "test.example.com",
 			Port:        9876,
 			BasePath:    "/test/base",
 			APIBasePath: "/test/api",
 			Headless:    true,
-			Auth: config.Auth{
-				Basic: config.AuthBasic{Username: "testuser", Password: "testpass"},
-				Token: config.AuthToken{Value: "test-token-123"},
-				OIDC: config.AuthOIDC{
+			Auth: Auth{
+				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
+				Token: AuthToken{Value: "test-token-123"},
+				OIDC: AuthOIDC{
 					ClientId:     "test-client-id",
 					ClientSecret: "test-secret",
 					Issuer:       "https://auth.example.com",
 					Scopes:       []string{"openid", "profile", "email"},
 				},
 			},
-			TLS: &config.TLSConfig{
+			TLS: &TLSConfig{
 				CertFile: "/test/cert.pem",
 				KeyFile:  "/test/key.pem",
 			},
-			Permissions:       map[config.Permission]bool{config.PermissionWriteDAGs: true, config.PermissionRunDAGs: true},
+			Permissions:       map[Permission]bool{PermissionWriteDAGs: true, PermissionRunDAGs: true},
 			LatestStatusToday: true,
 			StrictValidation:  false,
 		},
-		Paths: config.PathsConfig{
+		Paths: PathsConfig{
 			DAGsDir:            "/test/dags",
 			Executable:         "/test/bin/dagu",
 			LogDir:             "/test/logs",
@@ -170,22 +169,22 @@ func TestLoad_Env(t *testing.T) {
 			QueueDir:           "/test/queue",
 			ServiceRegistryDir: "/test/service-registry",
 		},
-		UI: config.UI{
+		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
 			NavbarColor:           "#123456",
 			NavbarTitle:           "Test Dagu",
 			MaxDashboardPageLimit: 250,
-			DAGs: config.DAGsConfig{
+			DAGs: DAGsConfig{
 				SortField: "status",
 				SortOrder: "desc",
 			},
 		},
-		Queues: config.Queues{Enabled: false},
-		Worker: config.Worker{
+		Queues: Queues{Enabled: false},
+		Worker: Worker{
 			ID:            "test-worker-123",
 			MaxActiveRuns: 200,
 		},
-		Scheduler: config.Scheduler{
+		Scheduler: Scheduler{
 			Port:                    9999,
 			LockStaleThreshold:      30 * time.Second,
 			LockRetryInterval:       5 * time.Second,
@@ -291,8 +290,8 @@ scheduler:
 
 	utcLoc, _ := time.LoadLocation("UTC")
 
-	expected := &config.Config{
-		Global: config.Global{
+	expected := &Config{
+		Global: Global{
 			Debug:         true,
 			LogFormat:     "json",
 			TZ:            "UTC",
@@ -300,7 +299,7 @@ scheduler:
 			Location:      utcLoc,
 			DefaultShell:  "/bin/bash",
 			SkipExamples:  true,
-			Peer: config.Peer{
+			Peer: Peer{
 				CertFile:      "/path/to/peer-cert.pem",
 				KeyFile:       "/path/to/peer-key.pem",
 				ClientCaFile:  "/path/to/peer-ca.pem",
@@ -309,17 +308,17 @@ scheduler:
 			},
 			BaseEnv: cfg.Global.BaseEnv, // Dynamic, copy from actual
 		},
-		Server: config.Server{
+		Server: Server{
 			Host:              "0.0.0.0",
 			Port:              9090,
 			BasePath:          "/dagu",
 			APIBasePath:       "/api/v1",
 			Headless:          true,
 			LatestStatusToday: true,
-			Auth: config.Auth{
-				Basic: config.AuthBasic{Username: "admin", Password: "secret"},
-				Token: config.AuthToken{Value: "api-token"},
-				OIDC: config.AuthOIDC{
+			Auth: Auth{
+				Basic: AuthBasic{Username: "admin", Password: "secret"},
+				Token: AuthToken{Value: "api-token"},
+				OIDC: AuthOIDC{
 					ClientId:     "test-client-id",
 					ClientSecret: "test-client-secret",
 					ClientUrl:    "http://localhost:8081",
@@ -328,12 +327,12 @@ scheduler:
 					Whitelist:    []string{"user@example.com"},
 				},
 			},
-			TLS: &config.TLSConfig{
+			TLS: &TLSConfig{
 				CertFile: "/path/to/cert.pem",
 				KeyFile:  "/path/to/key.pem",
 				CAFile:   "/path/to/ca.pem",
 			},
-			RemoteNodes: []config.RemoteNode{
+			RemoteNodes: []RemoteNode{
 				{
 					Name:              "node1",
 					APIBaseURL:        "http://node1.example.com/api",
@@ -349,12 +348,12 @@ scheduler:
 					AuthToken:   "node-token-123",
 				},
 			},
-			Permissions: map[config.Permission]bool{
-				config.PermissionWriteDAGs: false,
-				config.PermissionRunDAGs:   false,
+			Permissions: map[Permission]bool{
+				PermissionWriteDAGs: false,
+				PermissionRunDAGs:   false,
 			},
 		},
-		Paths: config.PathsConfig{
+		Paths: PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
 			LogDir:             "/var/dagu/logs",
 			DataDir:            "/var/dagu/data",
@@ -367,28 +366,28 @@ scheduler:
 			QueueDir:           "/var/dagu/data/queue",
 			ServiceRegistryDir: "/var/dagu/data/service-registry",
 		},
-		UI: config.UI{
+		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
 			NavbarColor:           "#ff5733",
 			NavbarTitle:           "Test Dagu",
 			MaxDashboardPageLimit: 50,
-			DAGs: config.DAGsConfig{
+			DAGs: DAGsConfig{
 				SortField: "name",
 				SortOrder: "asc",
 			},
 		},
-		Queues: config.Queues{
+		Queues: Queues{
 			Enabled: true,
-			Config: []config.QueueConfig{
+			Config: []QueueConfig{
 				{Name: "critical", MaxActiveRuns: 5},
 				{Name: "normal", MaxActiveRuns: 10},
 			},
 		},
-		Coordinator: config.Coordinator{
+		Coordinator: Coordinator{
 			Host: "coordinator.example.com",
 			Port: 8081,
 		},
-		Worker: config.Worker{
+		Worker: Worker{
 			ID:            "worker-1",
 			MaxActiveRuns: 50,
 			Labels: map[string]string{
@@ -396,7 +395,7 @@ scheduler:
 				"region": "us-west-2",
 			},
 		},
-		Scheduler: config.Scheduler{
+		Scheduler: Scheduler{
 			Port:                    7890,
 			LockStaleThreshold:      50 * time.Second,
 			LockRetryInterval:       10 * time.Second,
@@ -466,7 +465,7 @@ func TestLoad_EdgeCases_Errors(t *testing.T) {
 		err := os.WriteFile(configFile, []byte(`tz: "Invalid/Timezone"`), 0600)
 		require.NoError(t, err)
 
-		_, err = config.Load(config.WithConfigFile(configFile))
+		_, err = Load(WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to load timezone")
 	})
@@ -482,7 +481,7 @@ tls:
 `), 0600)
 		require.NoError(t, err)
 
-		_, err = config.Load(config.WithConfigFile(configFile))
+		_, err = Load(WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "TLS configuration incomplete")
 	})
@@ -495,14 +494,14 @@ tls:
 		// Test negative port
 		err := os.WriteFile(configFile, []byte(`port: -1`), 0600)
 		require.NoError(t, err)
-		_, err = config.Load(config.WithConfigFile(configFile))
+		_, err = Load(WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid port number")
 
 		// Test port > 65535
 		err = os.WriteFile(configFile, []byte(`port: 99999`), 0600)
 		require.NoError(t, err)
-		_, err = config.Load(config.WithConfigFile(configFile))
+		_, err = Load(WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid port number")
 	})
@@ -517,7 +516,7 @@ ui:
 `), 0600)
 		require.NoError(t, err)
 
-		_, err = config.Load(config.WithConfigFile(configFile))
+		_, err = Load(WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid max dashboard page limit")
 	})
@@ -561,30 +560,30 @@ func TestLoad_LegacyEnv(t *testing.T) {
 }
 
 func TestLoad_LoadLegacyFields(t *testing.T) {
-	loader := &config.ConfigLoader{}
+	loader := &ConfigLoader{}
 
 	t.Run("AllFieldsSet", func(t *testing.T) {
-		def := config.Definition{
-			BasicAuthUsername:      "user",
-			BasicAuthPassword:      "pass",
-			APIBaseURL:             "/api/v1",
-			IsAuthToken:            true,
-			AuthToken:              "token123",
-			DAGs:                   "/legacy/dags",
-			DAGsDir:                "/new/dags", // Takes precedence over DAGs
-			Executable:             "/bin/dagu",
-			LogDir:                 "/logs",
-			DataDir:                "/data",
-			SuspendFlagsDir:        "/suspend",
-			AdminLogsDir:           "/adminlogs",
-			BaseConfig:             "/base.yaml",
-			LogEncodingCharset:     "iso-8859-1",
-			NavbarColor:            "#123456",
-			NavbarTitle:            "Title",
-			MaxDashboardPageLimit:  100,
+		def := Definition{
+			BasicAuthUsername:     "user",
+			BasicAuthPassword:     "pass",
+			APIBaseURL:            "/api/v1",
+			IsAuthToken:           true,
+			AuthToken:             "token123",
+			DAGs:                  "/legacy/dags",
+			DAGsDir:               "/new/dags", // Takes precedence over DAGs
+			Executable:            "/bin/dagu",
+			LogDir:                "/logs",
+			DataDir:               "/data",
+			SuspendFlagsDir:       "/suspend",
+			AdminLogsDir:          "/adminlogs",
+			BaseConfig:            "/base.yaml",
+			LogEncodingCharset:    "iso-8859-1",
+			NavbarColor:           "#123456",
+			NavbarTitle:           "Title",
+			MaxDashboardPageLimit: 100,
 		}
 
-		cfg := config.Config{}
+		cfg := Config{}
 		loader.LoadLegacyFields(&cfg, def)
 
 		// Auth
@@ -611,26 +610,26 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 
 	t.Run("DAGsPrecedence", func(t *testing.T) {
 		// Test that DAGsDir takes precedence over DAGs
-		def := config.Definition{
+		def := Definition{
 			DAGs:    "/legacy/dags",
 			DAGsDir: "/new/dags",
 		}
-		cfg := config.Config{}
+		cfg := Config{}
 		loader.LoadLegacyFields(&cfg, def)
 		assert.Equal(t, "/new/dags", cfg.Paths.DAGsDir)
 
 		// Test that DAGs is used when DAGsDir is not set
-		def2 := config.Definition{
+		def2 := Definition{
 			DAGs: "/legacy/dags",
 		}
-		cfg2 := config.Config{}
+		cfg2 := Config{}
 		loader.LoadLegacyFields(&cfg2, def2)
 		assert.Equal(t, "/legacy/dags", cfg2.Paths.DAGsDir)
 	})
 }
 
 // loadWithEnv loads config with environment variables set
-func loadWithEnv(t *testing.T, yaml string, env map[string]string) *config.Config {
+func loadWithEnv(t *testing.T, yaml string, env map[string]string) *Config {
 	t.Helper()
 	viper.Reset()
 
@@ -651,7 +650,7 @@ func loadWithEnv(t *testing.T, yaml string, env map[string]string) *config.Confi
 }
 
 // loadFromYAML loads config from YAML string
-func loadFromYAML(t *testing.T, yaml string) *config.Config {
+func loadFromYAML(t *testing.T, yaml string) *Config {
 	t.Helper()
 	viper.Reset()
 
@@ -660,7 +659,7 @@ func loadFromYAML(t *testing.T, yaml string) *config.Config {
 	err := os.WriteFile(configFile, []byte(yaml), 0600)
 	require.NoError(t, err)
 
-	cfg, err := config.Load(config.WithConfigFile(configFile))
+	cfg, err := Load(WithConfigFile(configFile))
 	require.NoError(t, err)
 	return cfg
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestServer_cleanBasePath(t *testing.T) {
+func TestCleanBasePath(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -52,7 +52,7 @@ func TestServer_cleanBasePath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := &Server{BasePath: tt.input}
-			srv.cleanBasePath()
+			cleanServerBasePath(srv)
 			assert.Equal(t, tt.expected, srv.BasePath)
 		})
 	}

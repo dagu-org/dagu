@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -213,7 +214,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 
 	// Normalize the BasePath value for proper URL construction.
-	cfg.Server.cleanBasePath()
+	cleanServerBasePath(&cfg.Server)
 
 	// Set file system paths from the definition.
 	if def.Paths != nil {
@@ -753,4 +754,25 @@ func parseLabels(labelsStr string) map[string]string {
 	}
 
 	return labels
+}
+
+func cleanServerBasePath(cfg *Server) {
+	if cfg.BasePath == "" {
+		return
+	}
+
+	// Clean the provided BasePath.
+	cleanPath := path.Clean(cfg.BasePath)
+
+	// Ensure the path is absolute.
+	if !path.IsAbs(cleanPath) {
+		cleanPath = path.Join("/", cleanPath)
+	}
+
+	// If the cleaned path is the root, reset it to an empty string.
+	if cleanPath == "/" {
+		cfg.BasePath = ""
+	} else {
+		cfg.BasePath = cleanPath
+	}
 }

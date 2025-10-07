@@ -1,7 +1,6 @@
 package config
 
 import (
-	"path"
 	"time"
 )
 
@@ -115,27 +114,6 @@ const (
 	PermissionWriteDAGs Permission = "write_dags"
 	PermissionRunDAGs   Permission = "run_dags"
 )
-
-func (cfg *Server) cleanBasePath() {
-	if cfg.BasePath == "" {
-		return
-	}
-
-	// Clean the provided BasePath.
-	cleanPath := path.Clean(cfg.BasePath)
-
-	// Ensure the path is absolute.
-	if !path.IsAbs(cleanPath) {
-		cleanPath = path.Join("/", cleanPath)
-	}
-
-	// If the cleaned path is the root, reset it to an empty string.
-	if cleanPath == "/" {
-		cfg.BasePath = ""
-	} else {
-		cfg.BasePath = cleanPath
-	}
-}
 
 // Auth represents the authentication configuration
 type Auth struct {
