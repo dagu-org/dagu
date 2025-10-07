@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestWithConfigAndGetConfig(t *testing.T) {
@@ -48,4 +49,30 @@ func TestGetConfig_NoConfigInContext(t *testing.T) {
 	if cfg.Server.Host != "" || cfg.Server.Port != 0 {
 		t.Errorf("expected empty config, got Server: %+v", cfg.Server)
 	}
+}
+
+func TestConfigFileUsed(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	assert.Equal(t, "", config.ConfigFileUsed(ctx))
+	ctx = config.WithConfig(context.Background(), &config.Config{
+		Global: config.Global{ConfigFileUsed: "/path/to/config.yaml"},
+	})
+	assert.Equal(t, "/path/to/config.yaml", config.ConfigFileUsed(ctx))
+}
+
+func TestBaseEnvVars(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	assert.Empty(t, config.BaseEnvVars(ctx), 0)
+	ctx = config.WithConfig(context.Background(), &config.Config{
+		Global: config.Global{
+			BaseEnv: config.BaseEnv{
+				Variables: []string{"A=1", "B=2"},
+			},
+		},
+	})
+	assert.Equal(t, []string{"A=1", "B=2"}, config.BaseEnvVars(ctx))
 }

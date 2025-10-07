@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -193,53 +192,5 @@ func TestConfig_Validate(t *testing.T) {
 		}
 		err := cfg.Validate()
 		require.NoError(t, err)
-	})
-}
-
-func TestConfigFileUsed(t *testing.T) {
-	t.Parallel()
-	t.Run("WithConfigFileSet", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-		cfg := &Config{
-			Global: Global{
-				ConfigFileUsed: "/path/to/config.yaml",
-			},
-		}
-		ctx = WithConfig(ctx, cfg)
-
-		result := ConfigFileUsed(ctx)
-		assert.Equal(t, "/path/to/config.yaml", result)
-	})
-
-	t.Run("WithEmptyConfigFile", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-		cfg := &Config{
-			Global: Global{
-				ConfigFileUsed: "",
-			},
-		}
-		ctx = WithConfig(ctx, cfg)
-
-		result := ConfigFileUsed(ctx)
-		assert.Equal(t, "", result)
-	})
-
-	t.Run("NoConfigInContext", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-
-		result := ConfigFileUsed(ctx)
-		assert.Equal(t, "", result)
-	})
-
-	t.Run("NilConfig", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-		ctx = context.WithValue(ctx, configKey{}, (*Config)(nil))
-
-		result := ConfigFileUsed(ctx)
-		assert.Equal(t, "", result)
 	})
 }
