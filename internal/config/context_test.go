@@ -8,6 +8,7 @@ import (
 )
 
 func TestWithConfigAndGetConfig(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	cfg := &config.Config{
 		Server: config.Server{
@@ -34,6 +35,7 @@ func TestWithConfigAndGetConfig(t *testing.T) {
 }
 
 func TestGetConfig_NoConfigInContext(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	// Get config from context without setting it

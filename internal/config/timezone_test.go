@@ -8,7 +8,9 @@ import (
 )
 
 func TestSetTimezone(t *testing.T) {
+	t.Parallel()
 	t.Run("ValidTimezone", func(t *testing.T) {
+		t.Parallel()
 		g := &Global{TZ: "America/New_York"}
 		err := setTimezone(g)
 		require.NoError(t, err)
@@ -21,6 +23,7 @@ func TestSetTimezone(t *testing.T) {
 	})
 
 	t.Run("UTCTimezone", func(t *testing.T) {
+		t.Parallel()
 		g := &Global{TZ: "UTC"}
 		err := setTimezone(g)
 		require.NoError(t, err)
@@ -31,6 +34,7 @@ func TestSetTimezone(t *testing.T) {
 	})
 
 	t.Run("AsiaTokyoTimezone", func(t *testing.T) {
+		t.Parallel()
 		g := &Global{TZ: "Asia/Tokyo"}
 		err := setTimezone(g)
 		require.NoError(t, err)
@@ -41,6 +45,7 @@ func TestSetTimezone(t *testing.T) {
 	})
 
 	t.Run("InvalidTimezone", func(t *testing.T) {
+		t.Parallel()
 		g := &Global{TZ: "Invalid/Timezone"}
 		err := setTimezone(g)
 		require.Error(t, err)
@@ -48,6 +53,7 @@ func TestSetTimezone(t *testing.T) {
 	})
 
 	t.Run("EmptyTimezoneUsesLocal", func(t *testing.T) {
+		t.Parallel()
 		g := &Global{TZ: ""}
 		err := setTimezone(g)
 		require.NoError(t, err)

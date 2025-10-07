@@ -9,7 +9,9 @@ import (
 )
 
 func TestConfig_Validate(t *testing.T) {
+	t.Parallel()
 	t.Run("ValidConfig", func(t *testing.T) {
+		t.Parallel()
 		cfg := &Config{
 			Server: Server{
 				Port: 8080,
@@ -23,6 +25,7 @@ func TestConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("InvalidPort_Negative", func(t *testing.T) {
+		t.Parallel()
 		cfg := &Config{
 			Server: Server{
 				Port: -1,
@@ -37,6 +40,7 @@ func TestConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("InvalidPort_TooLarge", func(t *testing.T) {
+		t.Parallel()
 		cfg := &Config{
 			Server: Server{
 				Port: 99999,
@@ -51,6 +55,7 @@ func TestConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("InvalidPort_MaxValue", func(t *testing.T) {
+		t.Parallel()
 		cfg := &Config{
 			Server: Server{
 				Port: 65536,
@@ -65,6 +70,7 @@ func TestConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("ValidPort_MinValue", func(t *testing.T) {
+		t.Parallel()
 		cfg := &Config{
 			Server: Server{
 				Port: 0,
@@ -78,6 +84,7 @@ func TestConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("ValidPort_MaxValue", func(t *testing.T) {
+		t.Parallel()
 		cfg := &Config{
 			Server: Server{
 				Port: 65535,
@@ -91,6 +98,7 @@ func TestConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("IncompleteTLS_MissingCert", func(t *testing.T) {
+		t.Parallel()
 		cfg := &Config{
 			Server: Server{
 				Port: 8080,
@@ -108,6 +116,7 @@ func TestConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("IncompleteTLS_MissingKey", func(t *testing.T) {
+		t.Parallel()
 		cfg := &Config{
 			Server: Server{
 				Port: 8080,
@@ -125,6 +134,7 @@ func TestConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("CompleteTLS", func(t *testing.T) {
+		t.Parallel()
 		cfg := &Config{
 			Server: Server{
 				Port: 8080,
@@ -142,6 +152,7 @@ func TestConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("InvalidMaxDashboardPageLimit_Zero", func(t *testing.T) {
+		t.Parallel()
 		cfg := &Config{
 			Server: Server{
 				Port: 8080,
@@ -156,6 +167,7 @@ func TestConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("InvalidMaxDashboardPageLimit_Negative", func(t *testing.T) {
+		t.Parallel()
 		cfg := &Config{
 			Server: Server{
 				Port: 8080,
@@ -170,6 +182,7 @@ func TestConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("ValidMaxDashboardPageLimit_MinValue", func(t *testing.T) {
+		t.Parallel()
 		cfg := &Config{
 			Server: Server{
 				Port: 8080,
@@ -184,7 +197,9 @@ func TestConfig_Validate(t *testing.T) {
 }
 
 func TestConfigFileUsed(t *testing.T) {
+	t.Parallel()
 	t.Run("WithConfigFileSet", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 		cfg := &Config{
 			Global: Global{
@@ -198,6 +213,7 @@ func TestConfigFileUsed(t *testing.T) {
 	})
 
 	t.Run("WithEmptyConfigFile", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 		cfg := &Config{
 			Global: Global{
@@ -211,6 +227,7 @@ func TestConfigFileUsed(t *testing.T) {
 	})
 
 	t.Run("NoConfigInContext", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 
 		result := ConfigFileUsed(ctx)
@@ -218,6 +235,7 @@ func TestConfigFileUsed(t *testing.T) {
 	})
 
 	t.Run("NilConfig", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 		ctx = context.WithValue(ctx, configKey{}, (*Config)(nil))
 

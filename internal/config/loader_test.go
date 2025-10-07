@@ -560,9 +560,11 @@ func TestLoad_LegacyEnv(t *testing.T) {
 }
 
 func TestLoad_LoadLegacyFields(t *testing.T) {
+	t.Parallel()
 	loader := &ConfigLoader{}
 
 	t.Run("AllFieldsSet", func(t *testing.T) {
+		t.Parallel()
 		def := Definition{
 			BasicAuthUsername:     "user",
 			BasicAuthPassword:     "pass",
@@ -609,6 +611,7 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 	})
 
 	t.Run("DAGsPrecedence", func(t *testing.T) {
+		t.Parallel()
 		// Test that DAGsDir takes precedence over DAGs
 		def := Definition{
 			DAGs:    "/legacy/dags",

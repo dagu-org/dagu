@@ -15,6 +15,7 @@ import (
 func TestResolver(t *testing.T) {
 	t.Parallel()
 	t.Run("AppHomeDirectory", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := fileutil.MustTempDir("test")
 		defer os.RemoveAll(tmpDir)
 
@@ -32,6 +33,7 @@ func TestResolver(t *testing.T) {
 		}, paths)
 	})
 	t.Run("LegacyHomeDirectory", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := fileutil.MustTempDir("test")
 		defer os.RemoveAll(tmpDir)
 
@@ -53,6 +55,7 @@ func TestResolver(t *testing.T) {
 		}, paths)
 	})
 	t.Run("XDGCONFIGHOME", func(t *testing.T) {
+		t.Parallel()
 		paths := config.ResolvePaths("UNSET_APP_HOME", ".test", config.XDGConfig{
 			DataHome:   "/home/user/.local/share",
 			ConfigHome: "/home/user/.config",
