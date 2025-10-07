@@ -55,8 +55,8 @@ type Global struct {
 	// If not provided, platform-specific defaults are used (PowerShell on Windows, $SHELL on Unix).
 	DefaultShell string
 
-	// ConfigPath is the path to the configuration file used to load settings.
-	ConfigPath string
+	// ConfigFileUsed is the path to the configuration file used to load settings.
+	ConfigFileUsed string
 
 	// SkipExamples disables the automatic creation of example DAGs when the DAGs directory is empty.
 	SkipExamples bool

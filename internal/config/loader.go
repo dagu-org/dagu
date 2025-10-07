@@ -9,16 +9,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/adrg/xdg"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/spf13/viper"
 )
-
-// UsedConfigFile is a global variable that stores the path to the configuration file
-var UsedConfigFile = atomic.Value{}
 
 // loadLock synchronizes access to the Load function to ensure that only one configuration load occurs at a time.
 var loadLock sync.Mutex
@@ -89,11 +85,6 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		}
 	}
 
-	// Store the path of the used configuration file for later reference.
-	if configFile := viper.ConfigFileUsed(); configFile != "" {
-		UsedConfigFile.Store(configFile)
-	}
-
 	// For backward compatibility, try merging in the "admin.yaml" config.
 	viper.SetConfigName("admin")
 	if err := viper.MergeInConfig(); err != nil {
@@ -114,7 +105,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to build config: %w", err)
 	}
 
-	cfg.Global.ConfigPath = viper.ConfigFileUsed()
+	cfg.Global.ConfigFileUsed = viper.ConfigFileUsed()
 
 	// Attach any warnings collected during the resolution process.
 	cfg.Warnings = l.warnings

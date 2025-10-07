@@ -92,8 +92,10 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	executablePath := path.Join(root, ".local", "bin", "dagu")
 	_ = os.Setenv("DAGU_EXECUTABLE", executablePath)
 
+	ctx := createDefaultContext()
 	cfg, err := config.Load()
 	require.NoError(t, err)
+	ctx = config.WithConfig(ctx, cfg)
 
 	cfg.Paths.Executable = executablePath
 	cfg.Paths.LogDir = filepath.Join(tmpDir, "logs")
@@ -121,7 +123,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable)
 
 	helper := Helper{
-		Context:         createDefaultContext(),
+		Context:         ctx,
 		Config:          cfg,
 		DAGRunMgr:       drm,
 		DAGStore:        dagStore,

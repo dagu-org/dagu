@@ -111,11 +111,8 @@ func (e *ChildDAGExecutor) buildCommand(
 		"--no-queue",
 		e.DAG.Location,
 	}
-
-	if configFile := config.UsedConfigFile.Load(); configFile != nil {
-		if configFile, ok := configFile.(string); ok {
-			args = append(args, "--config", configFile)
-		}
+	if configFile := config.ConfigFileUsed(ctx); configFile != "" {
+		args = append(args, "--config", configFile)
 	}
 
 	if runParams.Params != "" {

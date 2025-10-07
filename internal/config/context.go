@@ -21,3 +21,11 @@ func GetConfig(ctx context.Context) *Config {
 	warnings := []string{warningNoConfigInContext}
 	return &Config{Warnings: warnings}
 }
+
+// ConfigFileUsed retrieves the path to the configuration file used
+func ConfigFileUsed(ctx context.Context) string {
+	if cfg := GetConfig(ctx); cfg != nil {
+		return cfg.Global.ConfigFileUsed
+	}
+	return ""
+}
