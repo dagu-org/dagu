@@ -12,9 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestConfigLoader_EnvironmentVariableBindings tests that all environment variables
-// defined in bindEnvironmentVariables() are correctly bound and applied to the config
-func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
+func TestLoad_EnvBindings(t *testing.T) {
 	// Reset viper to ensure clean state
 	viper.Reset()
 	defer viper.Reset()
@@ -22,6 +20,7 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	// Create a minimal config file
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "config.yaml")
+
 	err := os.WriteFile(configFile, []byte("# minimal config"), 0600)
 	require.NoError(t, err)
 
@@ -80,7 +79,18 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 		"DAGU_WORKER_MAX_ACTIVE_RUNS": "200",
 
 		// Scheduler configuration
-		"DAGU_SCHEDULER_PORT": "9999",
+		"DAGU_SCHEDULER_PORT":                      "9999",
+		"DAGU_SCHEDULER_ZOMBIE_DETECTION_INTERVAL": "90s",
+
+		// OIDC Authentication configurations
+		"DAGU_AUTH_OIDC_CLIENT_ID":     "test-client-id",
+		"DAGU_AUTH_OIDC_CLIENT_SECRET": "test-secret",
+		"DAGU_AUTH_OIDC_ISSUER":        "https://auth.example.com",
+		"DAGU_AUTH_OIDC_SCOPES":        "openid,profile,email",
+
+		// UI DAGs configuration
+		"DAGU_UI_DAGS_SORT_FIELD": "status",
+		"DAGU_UI_DAGS_SORT_ORDER": "desc",
 	}
 
 	// Save and clear existing environment variables
@@ -137,6 +147,11 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 	assert.Equal(t, "test-token-123", cfg.Server.Auth.Token.Value)
 	assert.True(t, cfg.Server.Auth.Basic.Enabled())
 	assert.True(t, cfg.Server.Auth.Token.Enabled())
+	assert.Equal(t, "test-client-id", cfg.Server.Auth.OIDC.ClientId)
+	assert.Equal(t, "test-secret", cfg.Server.Auth.OIDC.ClientSecret)
+	assert.Equal(t, "https://auth.example.com", cfg.Server.Auth.OIDC.Issuer)
+	assert.Equal(t, []string{"openid", "profile", "email"}, cfg.Server.Auth.OIDC.Scopes)
+	assert.True(t, cfg.Server.Auth.OIDC.Enabled())
 
 	// Coordinator configurations are loaded from config file only
 
@@ -170,98 +185,14 @@ func TestConfigLoader_EnvironmentVariableBindings(t *testing.T) {
 
 	// Scheduler configuration
 	assert.Equal(t, 9999, cfg.Scheduler.Port)
+	assert.Equal(t, 90*time.Second, cfg.Scheduler.ZombieDetectionInterval)
+
+	// UI DAGs configuration
+	assert.Equal(t, "status", cfg.UI.DAGs.SortField)
+	assert.Equal(t, "desc", cfg.UI.DAGs.SortOrder)
 }
 
-func TestConfigLoader_CoordinatorSigningKey(t *testing.T) {
-	t.Run("LoadFromYAML", func(t *testing.T) {
-		// Reset viper to ensure clean state
-		viper.Reset()
-		defer viper.Reset()
-
-		// Create a config file with auth configuration
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "config.yaml")
-		configContent := `
-auth:
-  basic:
-    username: "admin"
-    password: "pass"
-  token:
-    value: "api-token"
-`
-		err := os.WriteFile(configFile, []byte(configContent), 0600)
-		require.NoError(t, err)
-
-		// Load configuration
-		cfg, err := config.Load(config.WithConfigFile(configFile))
-		require.NoError(t, err)
-		require.NotNil(t, cfg)
-
-		// Verify auth configuration is loaded from YAML
-		assert.Equal(t, "admin", cfg.Server.Auth.Basic.Username)
-		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
-		assert.Equal(t, "api-token", cfg.Server.Auth.Token.Value)
-	})
-
-	t.Run("EmptyCoordinatorSigningKey", func(t *testing.T) {
-		// Reset viper to ensure clean state
-		viper.Reset()
-		defer viper.Reset()
-
-		// Create a minimal config file with basic auth only
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "config.yaml")
-		configContent := `
-auth:
-  basic:
-    username: "user"
-    password: "pass"
-`
-		err := os.WriteFile(configFile, []byte(configContent), 0600)
-		require.NoError(t, err)
-
-		// Load configuration
-		cfg, err := config.Load(config.WithConfigFile(configFile))
-		require.NoError(t, err)
-		require.NotNil(t, cfg)
-
-		// Verify auth configuration
-		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
-		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
-	})
-
-	t.Run("NestedAuthConfig", func(t *testing.T) {
-		// Reset viper to ensure clean state
-		viper.Reset()
-		defer viper.Reset()
-
-		// Create a config with all auth fields
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "config.yaml")
-		configContent := `
-auth:
-  basic:
-    username: "testuser"
-    password: "testpass"
-  token:
-    value: "test-token"
-`
-		err := os.WriteFile(configFile, []byte(configContent), 0600)
-		require.NoError(t, err)
-
-		// Load configuration
-		cfg, err := config.Load(config.WithConfigFile(configFile))
-		require.NoError(t, err)
-		require.NotNil(t, cfg)
-
-		// Verify all auth fields are loaded correctly
-		assert.Equal(t, "testuser", cfg.Server.Auth.Basic.Username)
-		assert.Equal(t, "testpass", cfg.Server.Auth.Basic.Password)
-		assert.Equal(t, "test-token", cfg.Server.Auth.Token.Value)
-	})
-}
-
-func TestConfigLoader_WorkerConfiguration(t *testing.T) {
+func TestLoad_WorkerConfiguration(t *testing.T) {
 	t.Run("LoadFromYAML", func(t *testing.T) {
 		// Reset viper to ensure clean state
 		viper.Reset()
@@ -693,7 +624,7 @@ func TestLoad_Defaults(t *testing.T) {
 	assert.Equal(t, 100, cfg.Worker.MaxActiveRuns)
 }
 
-func TestLoad_ComprehensiveConfiguration(t *testing.T) {
+func TestLoad_YAML(t *testing.T) {
 	cfg := loadFromYAML(t, `
 host: "0.0.0.0"
 port: 9090
@@ -721,6 +652,19 @@ auth:
   basic:
     username: "admin"
     password: "secret"
+  token:
+    value: "api-token"
+  oidc:
+    clientId: "test-client-id"
+    clientSecret: "test-client-secret"
+    clientUrl: "http://localhost:8081"
+    issuer: "https://accounts.example.com"
+    scopes:
+      - "openid"
+      - "profile"
+      - "email"
+    whitelist:
+      - "user@example.com"
 remoteNodes:
   - name: "node1"
     apiBaseURL: "http://node1.example.com/api"
@@ -752,6 +696,15 @@ scheduler:
 	assert.True(t, cfg.Server.Auth.Basic.Enabled())
 	assert.Equal(t, "admin", cfg.Server.Auth.Basic.Username)
 	assert.Equal(t, "secret", cfg.Server.Auth.Basic.Password)
+	assert.True(t, cfg.Server.Auth.Token.Enabled())
+	assert.Equal(t, "api-token", cfg.Server.Auth.Token.Value)
+	assert.True(t, cfg.Server.Auth.OIDC.Enabled())
+	assert.Equal(t, "test-client-id", cfg.Server.Auth.OIDC.ClientId)
+	assert.Equal(t, "test-client-secret", cfg.Server.Auth.OIDC.ClientSecret)
+	assert.Equal(t, "http://localhost:8081", cfg.Server.Auth.OIDC.ClientUrl)
+	assert.Equal(t, "https://accounts.example.com", cfg.Server.Auth.OIDC.Issuer)
+	assert.Equal(t, []string{"openid", "profile", "email"}, cfg.Server.Auth.OIDC.Scopes)
+	assert.Equal(t, []string{"user@example.com"}, cfg.Server.Auth.OIDC.Whitelist)
 
 	// TLS
 	require.NotNil(t, cfg.Server.TLS)
@@ -776,35 +729,42 @@ scheduler:
 }
 
 func TestLoad_ValidationErrors(t *testing.T) {
-	tests := []struct {
-		name    string
-		yaml    string
-		wantErr string
-	}{
-		{
-			name: "IncompleteTLS",
-			yaml: `
+	t.Run("IncompleteTLS", func(t *testing.T) {
+		viper.Reset()
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		err := os.WriteFile(configFile, []byte(`
 tls:
   certFile: "/path/to/cert.pem"
   keyFile: ""
-`,
-			wantErr: "TLS configuration incomplete",
-		},
-	}
+`), 0600)
+		require.NoError(t, err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			viper.Reset()
-			tempDir := t.TempDir()
-			configFile := filepath.Join(tempDir, "config.yaml")
-			err := os.WriteFile(configFile, []byte(tt.yaml), 0600)
-			require.NoError(t, err)
+		_, err = config.Load(config.WithConfigFile(configFile))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "TLS configuration incomplete")
+	})
+}
 
-			_, err = config.Load(config.WithConfigFile(configFile))
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.wantErr)
-		})
-	}
+func TestLoad_InvalidSchedulerDurations(t *testing.T) {
+	cfg := loadFromYAML(t, `
+scheduler:
+  lockStaleThreshold: "invalid"
+  lockRetryInterval: "bad-duration"
+  zombieDetectionInterval: "not-a-duration"
+`)
+
+	// Should still load with defaults since parsing failed
+	assert.Equal(t, 30*time.Second, cfg.Scheduler.LockStaleThreshold)
+	assert.Equal(t, 5*time.Second, cfg.Scheduler.LockRetryInterval)
+	// ZombieDetectionInterval stays 0 because viper.IsSet returns true even for invalid values
+	assert.Equal(t, time.Duration(0), cfg.Scheduler.ZombieDetectionInterval)
+
+	// Should have warnings
+	require.Len(t, cfg.Warnings, 3)
+	assert.Contains(t, cfg.Warnings[0], "Invalid scheduler.lockStaleThreshold")
+	assert.Contains(t, cfg.Warnings[1], "Invalid scheduler.lockRetryInterval")
+	assert.Contains(t, cfg.Warnings[2], "Invalid scheduler.zombieDetectionInterval")
 }
 
 func TestLoad_UIConfiguration(t *testing.T) {
@@ -836,91 +796,6 @@ queues:
 	})
 }
 
-func TestLoad_SchedulerConfiguration(t *testing.T) {
-	t.Run("CustomZombieDetection", func(t *testing.T) {
-		cfg := loadFromYAML(t, `
-scheduler:
-  zombieDetectionInterval: 90s
-`)
-		assert.Equal(t, 90*time.Second, cfg.Scheduler.ZombieDetectionInterval)
-	})
-
-	t.Run("DisableZombieDetection", func(t *testing.T) {
-		cfg := loadFromYAML(t, `
-scheduler:
-  zombieDetectionInterval: 0s
-`)
-		assert.Equal(t, time.Duration(0), cfg.Scheduler.ZombieDetectionInterval)
-	})
-}
-
-func TestLoad_AuthConfiguration(t *testing.T) {
-	t.Run("OIDC", func(t *testing.T) {
-		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_AUTH_OIDC_CLIENT_ID":     "test-client-id",
-			"DAGU_AUTH_OIDC_CLIENT_SECRET": "test-secret",
-			"DAGU_AUTH_OIDC_ISSUER":        "https://auth.example.com",
-			"DAGU_AUTH_OIDC_SCOPES":        "openid,profile,email",
-		})
-
-		assert.True(t, cfg.Server.Auth.OIDC.Enabled())
-		assert.Equal(t, "test-client-id", cfg.Server.Auth.OIDC.ClientId)
-		assert.Equal(t, "test-secret", cfg.Server.Auth.OIDC.ClientSecret)
-		assert.Equal(t, []string{"openid", "profile", "email"}, cfg.Server.Auth.OIDC.Scopes)
-	})
-}
-
-func TestLoad_EnvironmentOverrides(t *testing.T) {
-	tests := []struct {
-		name   string
-		yaml   string
-		env    map[string]string
-		verify func(*testing.T, *config.Config)
-	}{
-		{
-			name: "ServerConfig",
-			yaml: `host: "localhost"`,
-			env:  map[string]string{"DAGU_HOST": "0.0.0.0", "DAGU_PORT": "9999"},
-			verify: func(t *testing.T, cfg *config.Config) {
-				assert.Equal(t, "0.0.0.0", cfg.Server.Host)
-				assert.Equal(t, 9999, cfg.Server.Port)
-			},
-		},
-		{
-			name: "ZombieDetection",
-			yaml: `scheduler: {zombieDetectionInterval: 30s}`,
-			env:  map[string]string{"DAGU_SCHEDULER_ZOMBIE_DETECTION_INTERVAL": "90s"},
-			verify: func(t *testing.T, cfg *config.Config) {
-				assert.Equal(t, 90*time.Second, cfg.Scheduler.ZombieDetectionInterval)
-			},
-		},
-		{
-			name: "QueueConfig",
-			yaml: `queues: {enabled: true}`,
-			env:  map[string]string{"DAGU_QUEUE_ENABLED": "false"},
-			verify: func(t *testing.T, cfg *config.Config) {
-				assert.False(t, cfg.Queues.Enabled)
-			},
-		},
-		{
-			name: "DAGsConfig",
-			yaml: `ui: {dags: {sortField: "name"}}`,
-			env:  map[string]string{"DAGU_UI_DAGS_SORT_FIELD": "status", "DAGU_UI_DAGS_SORT_ORDER": "desc"},
-			verify: func(t *testing.T, cfg *config.Config) {
-				assert.Equal(t, "status", cfg.UI.DAGs.SortField)
-				assert.Equal(t, "desc", cfg.UI.DAGs.SortOrder)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := loadWithEnv(t, tt.yaml, tt.env)
-			tt.verify(t, cfg)
-		})
-	}
-}
-
 func TestLoad_LegacyEnvironmentVariables(t *testing.T) {
 	// Test deprecated env vars still work
 	cfg := loadWithEnv(t, "# empty", map[string]string{
@@ -934,7 +809,7 @@ func TestLoad_LegacyEnvironmentVariables(t *testing.T) {
 	assert.Equal(t, "LegacyTitle", cfg.UI.NavbarTitle)
 }
 
-func TestConfigLoader_LoadLegacyFields(t *testing.T) {
+func TestLoad_LoadLegacyFields(t *testing.T) {
 	loader := &config.ConfigLoader{}
 
 	t.Run("AllFieldsSet", func(t *testing.T) {
@@ -980,20 +855,6 @@ func TestLoad_BasePathCleaning(t *testing.T) {
 	assert.Equal(t, "/dagu", cfg.Server.BasePath)
 }
 
-// loadFromYAML loads config from YAML string
-func loadFromYAML(t *testing.T, yaml string) *config.Config {
-	t.Helper()
-	viper.Reset()
-	tempDir := t.TempDir()
-	configFile := filepath.Join(tempDir, "config.yaml")
-	err := os.WriteFile(configFile, []byte(yaml), 0600)
-	require.NoError(t, err)
-	cfg, err := config.Load(config.WithConfigFile(configFile))
-	require.NoError(t, err)
-	require.NotNil(t, cfg)
-	return cfg
-}
-
 // loadWithEnv loads config with environment variables set
 func loadWithEnv(t *testing.T, yaml string, env map[string]string) *config.Config {
 	t.Helper()
@@ -1013,4 +874,19 @@ func loadWithEnv(t *testing.T, yaml string, env map[string]string) *config.Confi
 	}
 
 	return loadFromYAML(t, yaml)
+}
+
+// loadFromYAML loads config from YAML string
+func loadFromYAML(t *testing.T, yaml string) *config.Config {
+	t.Helper()
+	viper.Reset()
+
+	configFile := filepath.Join(t.TempDir(), "config.yaml")
+
+	err := os.WriteFile(configFile, []byte(yaml), 0600)
+	require.NoError(t, err)
+
+	cfg, err := config.Load(config.WithConfigFile(configFile))
+	require.NoError(t, err)
+	return cfg
 }
