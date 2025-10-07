@@ -127,7 +127,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		TZ:           def.TZ,
 		DefaultShell: def.DefaultShell,
 		SkipExamples: viper.GetBool("skipExamples"),
-		BaseEnv:      loadBaseEnv(),
+		BaseEnv:      LoadBaseEnv(),
 	}
 
 	// Set Peer configuration if provided

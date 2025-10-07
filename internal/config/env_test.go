@@ -1,10 +1,11 @@
-package config
+package config_test
 
 import (
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +27,7 @@ func TestLoadBaseEnv(t *testing.T) {
 		})
 	}
 
-	baseEnv := loadBaseEnv()
+	baseEnv := config.LoadBaseEnv()
 	envSlice := baseEnv.AsSlice()
 	envMap := parseEnvSlice(envSlice)
 
@@ -39,14 +40,14 @@ func TestLoadBaseEnv(t *testing.T) {
 func TestBaseEnv_AsSlice(t *testing.T) {
 	t.Parallel()
 
-	baseEnv := BaseEnv{variables: []string{"A=1", "B=2"}}
+	baseEnv := config.BaseEnv{Variables: []string{"A=1", "B=2"}}
 	slice := baseEnv.AsSlice()
 
 	require.Equal(t, []string{"A=1", "B=2"}, slice)
 
 	// Verify defensive copy
 	slice[0] = "MODIFIED=X"
-	require.Equal(t, []string{"A=1", "B=2"}, baseEnv.variables)
+	require.Equal(t, []string{"A=1", "B=2"}, baseEnv.Variables)
 }
 
 func parseEnvSlice(envSlice []string) map[string]string {

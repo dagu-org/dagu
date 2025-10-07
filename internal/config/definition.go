@@ -4,7 +4,7 @@ package config
 // Each field maps to a configuration key defined in external sources (like YAML files)
 type Definition struct {
 	// Peer contains configuration for peer connections over gRPC.
-	Peer peerDef `mapstructure:"peer"`
+	Peer PeerDef `mapstructure:"peer"`
 
 	// Host defines the hostname or IP address on which the application will run.
 	Host string `mapstructure:"host"`
@@ -19,7 +19,7 @@ type Definition struct {
 	PermissionRunDAGs *bool `mapstructure:"permissionRunDAGs"`
 
 	// Permissions defines the permissions allowed in the UI and API.
-	Permissions permissionsDef `mapstructure:"permissions"`
+	Permissions PermissionsDef `mapstructure:"permissions"`
 
 	// Debug toggles debug mode; when true, the application may output extra logs and error details.
 	Debug bool `mapstructure:"debug"`
@@ -44,10 +44,10 @@ type Definition struct {
 	Headless *bool `mapstructure:"headless"`
 
 	// Auth contains authentication settings (such as credentials or tokens) needed to secure the application.
-	Auth *authDef `mapstructure:"auth"`
+	Auth *AuthDef `mapstructure:"auth"`
 
 	// Paths holds various filesystem path configurations used throughout the application.
-	Paths *pathsConfigDef `mapstructure:"paths"`
+	Paths *PathsDef `mapstructure:"paths"`
 
 	// LogFormat defines the output format for log messages (e.g., JSON, plain text).
 	// Available options: "json", "text"
@@ -60,27 +60,27 @@ type Definition struct {
 	TZ string `mapstructure:"tz"`
 
 	// UI contains settings specific to the application's user interface.
-	UI *uiDef `mapstructure:"ui"`
+	UI *UIDef `mapstructure:"ui"`
 
 	// RemoteNodes holds a list of configurations for connecting to remote nodes.
 	// This enables the management of DAGs on external servers.
-	RemoteNodes []remoteNodeDef `mapstructure:"remoteNodes"`
+	RemoteNodes []RemoteNodeDef `mapstructure:"remoteNodes"`
 
 	// TLS contains configuration details for enabling TLS/SSL encryption,
 	// such as certificate and key file paths.
-	TLS *tlsConfigDef `mapstructure:"tls"`
+	TLS *TLSDef `mapstructure:"tls"`
 
 	// Queues contains global queue configuration settings.
-	Queues *queuesDef `mapstructure:"queues"`
+	Queues *QueueConfigDef `mapstructure:"queues"`
 
 	// Coordinator contains configuration for the coordinator server.
-	Coordinator *coordinatorDef `mapstructure:"coordinator"`
+	Coordinator *CoordinatorDef `mapstructure:"coordinator"`
 
 	// Worker contains configuration for the worker.
-	Worker *workerDef `mapstructure:"worker"`
+	Worker *WorkerDef `mapstructure:"worker"`
 
 	// Scheduler contains configuration for the scheduler.
-	Scheduler *schedulerDef `mapstructure:"scheduler"`
+	Scheduler *SchedulerDef `mapstructure:"scheduler"`
 
 	// DAGs is a field that was previously used to configure the directory for DAG files.
 	DAGs string `mapstructure:"dags"`
@@ -134,8 +134,8 @@ type Definition struct {
 	MaxDashboardPageLimit int `mapstructure:"maxDashboardPageLimit"`
 }
 
-// peerDef holds the certificate and TLS configuration for peer connections over gRPC.
-type peerDef struct {
+// PeerDef holds the certificate and TLS configuration for peer connections over gRPC.
+type PeerDef struct {
 	// CertFile is the path to the server's TLS certificate file.
 	CertFile string `mapstructure:"certFile"`
 
@@ -152,25 +152,25 @@ type peerDef struct {
 	Insecure bool `mapstructure:"insecure"`
 }
 
-// authDef holds the authentication configuration for the application.
-type authDef struct {
-	Basic *authBasicDef `mapstructure:"basic"`
-	Token *authTokenDef `mapstructure:"token"`
-	OIDC  *authOIDCDef  `mapstructure:"oidc"`
+// AuthDef holds the authentication configuration for the application.
+type AuthDef struct {
+	Basic *AuthBasicDef `mapstructure:"basic"`
+	Token *AuthTokenDef `mapstructure:"token"`
+	OIDC  *AuthOIDCDef  `mapstructure:"oidc"`
 }
 
-// authBasicDef represents the basic authentication configuration
-type authBasicDef struct {
+// AuthBasicDef represents the basic authentication configuration
+type AuthBasicDef struct {
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 }
 
-// authTokenDef represents the authentication token configuration
-type authTokenDef struct {
+// AuthTokenDef represents the authentication token configuration
+type AuthTokenDef struct {
 	Value string `mapstructure:"value"`
 }
 
-type authOIDCDef struct {
+type AuthOIDCDef struct {
 	ClientId     string   `mapstructure:"clientId"`
 	ClientSecret string   `mapstructure:"clientSecret"`
 	ClientUrl    string   `mapstructure:"clientUrl"`
@@ -179,8 +179,8 @@ type authOIDCDef struct {
 	Whitelist    []string `mapstructure:"whitelist"`
 }
 
-// PathsConfigDef represents the file system paths configuration.
-type pathsConfigDef struct {
+// PathsDef represents the file system paths configuration.
+type PathsDef struct {
 	DAGsDir            string `mapstructure:"dagsDir"`
 	Executable         string `mapstructure:"executable"`
 	LogDir             string `mapstructure:"logDir"`
@@ -194,30 +194,30 @@ type pathsConfigDef struct {
 	ServiceRegistryDir string `mapstructure:"serviceRegistryDir"`
 }
 
-// uiDef holds the user interface configuration settings.
-type uiDef struct {
-	LogEncodingCharset    string   `mapstructure:"logEncodingCharset"`
-	NavbarColor           string   `mapstructure:"navbarColor"`
-	NavbarTitle           string   `mapstructure:"navbarTitle"`
-	MaxDashboardPageLimit int      `mapstructure:"maxDashboardPageLimit"`
-	DAGs                  *dagsDef `mapstructure:"dags"`
+// UIDef holds the user interface configuration settings.
+type UIDef struct {
+	LogEncodingCharset    string      `mapstructure:"logEncodingCharset"`
+	NavbarColor           string      `mapstructure:"navbarColor"`
+	NavbarTitle           string      `mapstructure:"navbarTitle"`
+	MaxDashboardPageLimit int         `mapstructure:"maxDashboardPageLimit"`
+	DAGs                  *DAGListDef `mapstructure:"dags"`
 }
 
-// dagsDef holds the DAGs page configuration settings.
-type dagsDef struct {
+// DAGListDef holds the DAGs page configuration settings.
+type DAGListDef struct {
 	SortField string `mapstructure:"sortField"`
 	SortOrder string `mapstructure:"sortOrder"`
 }
 
-// permissionsDef holds the permissions configuration for the application.
+// PermissionsDef holds the permissions configuration for the application.
 // It defines what actions are allowed in the UI, such as writing DAGs.
-type permissionsDef struct {
+type PermissionsDef struct {
 	WriteDAGs *bool `mapstructure:"writeDAGs"`
 	RunDAGs   *bool `mapstructure:"runDAGs"`
 }
 
-// remoteNodeDef represents a configuration for connecting to a remote node.
-type remoteNodeDef struct {
+// RemoteNodeDef represents a configuration for connecting to a remote node.
+type RemoteNodeDef struct {
 	Name              string `mapstructure:"name"`
 	APIBaseURL        string `mapstructure:"apiBaseURL"`
 	IsBasicAuth       bool   `mapstructure:"isBasicAuth"`
@@ -228,29 +228,29 @@ type remoteNodeDef struct {
 	SkipTLSVerify     bool   `mapstructure:"skipTLSVerify"`
 }
 
-// tlsConfigDef represents TLS configuration
-type tlsConfigDef struct {
+// TLSDef represents TLS configuration
+type TLSDef struct {
 	CertFile string `mapstructure:"certFile"`
 	KeyFile  string `mapstructure:"keyFile"`
 	CAFile   string `mapstructure:"caFile"`
 }
 
-// queuesDef represents the global queue configuration
-type queuesDef struct {
-	Enabled bool             `mapstructure:"enabled"`
-	Config  []queueConfigDef `mapstructure:"config"`
+// QueueConfigDef represents the global queue configuration
+type QueueConfigDef struct {
+	Enabled bool       `mapstructure:"enabled"`
+	Config  []QueueDef `mapstructure:"config"`
 }
 
-// queueConfigDef represents individual queue configuration
-type queueConfigDef struct {
+// QueueDef represents individual queue configuration
+type QueueDef struct {
 	Name string `mapstructure:"name"`
 	// Deprecated: use maxConcurrency
 	MaxActiveRuns  *int `mapstructure:"maxActiveRuns"`
 	MaxConcurrency int  `mapstructure:"maxConcurrency"`
 }
 
-// coordinatorDef holds the configuration for the coordinator service.
-type coordinatorDef struct {
+// CoordinatorDef holds the configuration for the coordinator service.
+type CoordinatorDef struct {
 	// Host is the hostname or IP address for the coordinator service.
 	Host string `mapstructure:"host"`
 
@@ -258,8 +258,8 @@ type coordinatorDef struct {
 	Port int `mapstructure:"port"`
 }
 
-// workerDef holds the configuration for the worker.
-type workerDef struct {
+// WorkerDef holds the configuration for the worker.
+type WorkerDef struct {
 	// ID is the unique identifier for the worker instance.
 	ID string `mapstructure:"id"`
 
@@ -271,8 +271,8 @@ type workerDef struct {
 	Labels interface{} `mapstructure:"labels"`
 }
 
-// schedulerDef holds the configuration for the scheduler.
-type schedulerDef struct {
+// SchedulerDef holds the configuration for the scheduler.
+type SchedulerDef struct {
 	// Port is the port number for the health check server.
 	Port int `mapstructure:"port"`
 

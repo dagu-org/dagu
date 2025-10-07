@@ -1,24 +1,26 @@
-package config
+package config_test
 
 import (
 	"context"
 	"testing"
+
+	"github.com/dagu-org/dagu/internal/config"
 )
 
 func TestWithConfigAndGetConfig(t *testing.T) {
 	ctx := context.Background()
-	cfg := &Config{
-		Server: Server{
+	cfg := &config.Config{
+		Server: config.Server{
 			Host: "localhost",
 			Port: 8080,
 		},
 	}
 
 	// Store config in context
-	ctx = WithConfig(ctx, cfg)
+	ctx = config.WithConfig(ctx, cfg)
 
 	// Retrieve config from context
-	retrieved := GetConfig(ctx)
+	retrieved := config.GetConfig(ctx)
 
 	if retrieved != cfg {
 		t.Errorf("expected config to be %v, got %v", cfg, retrieved)
@@ -35,7 +37,7 @@ func TestGetConfig_NoConfigInContext(t *testing.T) {
 	ctx := context.Background()
 
 	// Get config from context without setting it
-	cfg := GetConfig(ctx)
+	cfg := config.GetConfig(ctx)
 
 	if cfg == nil {
 		t.Error("expected non-nil config, got nil")
