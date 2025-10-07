@@ -65,6 +65,9 @@ type Global struct {
 
 	// Peer contains configuration for peer connections over gRPC.
 	Peer Peer
+
+	// BaseEnv holds base environment variables to be used for child processes.
+	BaseEnv BaseEnv
 }
 
 func (cfg *Global) setTimezone() error {

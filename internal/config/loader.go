@@ -81,7 +81,6 @@ func (l *ConfigLoader) Load() (*Config, error) {
 			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
 	}
-	configPath := viper.ConfigFileUsed()
 
 	// Store the path of the used configuration file for later reference.
 	if configFile := viper.ConfigFileUsed(); configFile != "" {
@@ -108,11 +107,10 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to build config: %w", err)
 	}
 
+	cfg.Global.ConfigPath = viper.ConfigFileUsed()
+
 	// Attach any warnings collected during the resolution process.
 	cfg.Warnings = l.warnings
-
-	// Set the config path in the global configuration for reference.
-	cfg.Global.ConfigPath = configPath
 
 	return cfg, nil
 }
@@ -129,6 +127,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		TZ:           def.TZ,
 		DefaultShell: def.DefaultShell,
 		SkipExamples: viper.GetBool("skipExamples"),
+		BaseEnv:      loadBaseEnv(),
 	}
 
 	// Set Peer configuration if provided

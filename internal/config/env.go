@@ -12,20 +12,20 @@ type BaseEnv struct {
 	variables []string
 }
 
-// DefaultWhitelist defines which env vars to pass to child processes.
-var DefaultWhitelist = map[string]bool{
+// defaultWhitelist defines which env vars to pass to child processes.
+var defaultWhitelist = map[string]bool{
 	"PATH": true,
 	"HOME": true,
 	"LANG": true,
 	"TZ":   true,
 }
 
-// DefaultPrefixes defines prefixes of env vars allowed to propagate.
-var DefaultPrefixes = []string{strings.ToUpper(build.AppName) + "_"}
+// defaultPrefixes defines prefixes of env vars allowed to propagate.
+var defaultPrefixes = []string{strings.ToUpper(build.AppName) + "_"}
 
-// LoadBaseEnv loads and filters current environment variables.
-func LoadBaseEnv() BaseEnv {
-	return BaseEnv{variables: filterEnv(os.Environ(), DefaultWhitelist, DefaultPrefixes)}
+// loadBaseEnv loads and filters current environment variables.
+func loadBaseEnv() BaseEnv {
+	return BaseEnv{variables: filterEnv(os.Environ(), defaultWhitelist, defaultPrefixes)}
 }
 
 // AsSlice returns a defensive copy of the filtered environment.

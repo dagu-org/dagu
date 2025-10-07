@@ -26,7 +26,7 @@ func TestLoadBaseEnv(t *testing.T) {
 		})
 	}
 
-	baseEnv := LoadBaseEnv()
+	baseEnv := loadBaseEnv()
 	envSlice := baseEnv.AsSlice()
 	envMap := parseEnvSlice(envSlice)
 
