@@ -61,6 +61,9 @@ type Agent struct {
 	// registry is the service registry to find the coordinator service.
 	registry models.ServiceRegistry
 
+	// peerConfig is the configuration for the peer connections.
+	peerConfig config.Peer
+
 	// dagRunMgr is the runstore dagRunMgr to communicate with the history.
 	dagRunMgr dagrun.Manager
 
@@ -150,6 +153,7 @@ func New(
 	drs models.DAGRunStore,
 	reg models.ServiceRegistry,
 	root digraph.DAGRunRef,
+	peerConfig config.Peer,
 	opts Options,
 ) *Agent {
 	a := &Agent{
@@ -166,6 +170,7 @@ func New(
 		dagRunStore:  drs,
 		registry:     reg,
 		stepRetry:    opts.StepRetry,
+		peerConfig:   peerConfig,
 	}
 
 	// Initialize progress display if enabled
@@ -736,23 +741,16 @@ func (a *Agent) createCoordinatorClient(ctx context.Context) digraph.Dispatcher 
 		return nil
 	}
 
-	// Load configuration
-	cfg, err := config.Load()
-	if err != nil {
-		logger.Error(ctx, "Failed to load configuration for coordinator client", "err", err)
-		return nil
-	}
-
 	// Create and configure factory
 	coordinatorCliCfg := coordinator.DefaultConfig()
 	coordinatorCliCfg.MaxRetries = 10
 
 	// Configure the coordinator client based on the global configuration
-	coordinatorCliCfg.CAFile = cfg.Global.Peer.ClientCaFile
-	coordinatorCliCfg.CertFile = cfg.Global.Peer.CertFile
-	coordinatorCliCfg.KeyFile = cfg.Global.Peer.KeyFile
-	coordinatorCliCfg.SkipTLSVerify = cfg.Global.Peer.SkipTLSVerify
-	coordinatorCliCfg.Insecure = cfg.Global.Peer.Insecure
+	coordinatorCliCfg.CAFile = a.peerConfig.ClientCaFile
+	coordinatorCliCfg.CertFile = a.peerConfig.CertFile
+	coordinatorCliCfg.KeyFile = a.peerConfig.KeyFile
+	coordinatorCliCfg.SkipTLSVerify = a.peerConfig.SkipTLSVerify
+	coordinatorCliCfg.Insecure = a.peerConfig.Insecure
 
 	return coordinator.New(a.registry, coordinatorCliCfg)
 }

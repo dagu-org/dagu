@@ -396,6 +396,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.DAGRunStore,
 		d.ServiceRegistry,
 		root,
+		d.Config.Global.Peer,
 		helper.opts,
 	)
 
