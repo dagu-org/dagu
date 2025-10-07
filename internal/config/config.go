@@ -129,19 +129,9 @@ type AuthBasic struct {
 	Password string
 }
 
-// Enabled returns true if both username and password are set
-func (a AuthBasic) Enabled() bool {
-	return a.Username != "" && a.Password != ""
-}
-
 // AuthToken represents the authentication token configuration
 type AuthToken struct {
 	Value string
-}
-
-// Enabled returns true if the token value is set
-func (a AuthToken) Enabled() bool {
-	return a.Value != ""
 }
 
 type AuthOIDC struct {
@@ -151,11 +141,6 @@ type AuthOIDC struct {
 	Issuer       string   //the URL identifier for the authorization service. for example: "https://accounts.google.com" - try adding "/.well-known/openid-configuration" to the path to make sure it's correct
 	Scopes       []string //OAuth scopes. If you're unsure go with: []string{oidc.ScopeOpenID, "profile", "email"}
 	Whitelist    []string //OAuth User whitelist ref userinfo.email https://github.com/coreos/go-oidc/blob/v2/oidc.go#L199
-}
-
-// Enabled returns true if all required OIDC fields are set
-func (a AuthOIDC) Enabled() bool {
-	return a.ClientId != "" && a.ClientSecret != "" && a.Issuer != ""
 }
 
 // Paths represents the file system paths configuration
