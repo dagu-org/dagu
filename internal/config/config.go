@@ -77,22 +77,22 @@ func (cfg *Global) setTimezone() error {
 			return fmt.Errorf("failed to load timezone: %w", err)
 		}
 		cfg.Location = loc
+		_, cfg.TzOffsetInSec = time.Now().In(loc).Zone()
 
-		t := time.Now().In(loc)
-		_, offset := t.Zone()
-		cfg.TzOffsetInSec = offset
-
-		_ = os.Setenv("TZ", cfg.TZ)
-	} else {
-		_, offset := time.Now().Zone()
-		if offset == 0 {
-			cfg.TZ = "UTC"
-			cfg.TzOffsetInSec = 0
-		} else {
-			cfg.TZ = fmt.Sprintf("UTC%+d", offset/3600)
-			cfg.TzOffsetInSec = offset
+		if err := os.Setenv("TZ", cfg.TZ); err != nil {
+			return fmt.Errorf("failed to set TZ environment variable: %w", err)
 		}
-		cfg.Location = time.Local
+		return nil
+	}
+
+	// Use local timezone when TZ is not specified
+	cfg.Location = time.Local
+	_, cfg.TzOffsetInSec = time.Now().Zone()
+
+	if cfg.TzOffsetInSec == 0 {
+		cfg.TZ = "UTC"
+	} else {
+		cfg.TZ = fmt.Sprintf("UTC%+d", cfg.TzOffsetInSec/3600)
 	}
 
 	return nil
