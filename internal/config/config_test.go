@@ -740,3 +740,41 @@ ui:
 	assert.Equal(t, "status", cfg.UI.DAGs.SortField)
 	assert.Equal(t, "desc", cfg.UI.DAGs.SortOrder)
 }
+
+func TestLoadConfig_SchedulerZombieDetection(t *testing.T) {
+	t.Run("DisabledWithZero", func(t *testing.T) {
+		viper.Reset()
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+scheduler:
+  zombieDetectionInterval: 0s
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		assert.Equal(t, time.Duration(0), cfg.Scheduler.ZombieDetectionInterval)
+	})
+
+	t.Run("EnvironmentOverride", func(t *testing.T) {
+		viper.Reset()
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		configContent := `
+scheduler:
+  zombieDetectionInterval: 30s
+`
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err)
+
+		original := os.Getenv("DAGU_SCHEDULER_ZOMBIE_DETECTION_INTERVAL")
+		defer os.Setenv("DAGU_SCHEDULER_ZOMBIE_DETECTION_INTERVAL", original)
+		os.Setenv("DAGU_SCHEDULER_ZOMBIE_DETECTION_INTERVAL", "90s")
+
+		cfg, err := config.Load(config.WithConfigFile(configFile))
+		require.NoError(t, err)
+		assert.Equal(t, 90*time.Second, cfg.Scheduler.ZombieDetectionInterval)
+	})
+}
