@@ -409,6 +409,41 @@ tls:
 		assert.Contains(t, err.Error(), "TLS configuration incomplete")
 	})
 
+	t.Run("InvalidPort", func(t *testing.T) {
+		viper.Reset()
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+
+		// Test negative port
+		err := os.WriteFile(configFile, []byte(`port: -1`), 0600)
+		require.NoError(t, err)
+		_, err = config.Load(config.WithConfigFile(configFile))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid port number")
+
+		// Test port > 65535
+		err = os.WriteFile(configFile, []byte(`port: 99999`), 0600)
+		require.NoError(t, err)
+		_, err = config.Load(config.WithConfigFile(configFile))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid port number")
+	})
+
+	t.Run("InvalidMaxDashboardPageLimit", func(t *testing.T) {
+		viper.Reset()
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		err := os.WriteFile(configFile, []byte(`
+ui:
+  maxDashboardPageLimit: 0
+`), 0600)
+		require.NoError(t, err)
+
+		_, err = config.Load(config.WithConfigFile(configFile))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid max dashboard page limit")
+	})
+
 	t.Run("InvalidSchedulerDurations", func(t *testing.T) {
 		cfg := loadFromYAML(t, `
 scheduler:
