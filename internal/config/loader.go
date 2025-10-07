@@ -71,9 +71,16 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	defer l.lock.Unlock()
 
 	// Initialize viper with proper defaults, environment binding and warnings.
-	if err := l.setupViper(); err != nil {
-		return nil, fmt.Errorf("viper setup failed: %w", err)
+	homeDir, err := getHomeDir()
+	if err != nil {
+		return nil, err
 	}
+	xdgConfig := XDGConfig{
+		DataHome:   xdg.DataHome,
+		ConfigHome: filepath.Join(homeDir, ".config"),
+	}
+	warnings := setupViper(xdgConfig, homeDir, l.configFile)
+	l.warnings = append(l.warnings, warnings...)
 
 	// Attempt to read the main config file. If not found, we proceed without error.
 	if err := viper.ReadInConfig(); err != nil {
@@ -214,7 +221,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 
 	// Normalize the BasePath value for proper URL construction.
-	cleanServerBasePath(&cfg.Server)
+	cfg.Server.BasePath = cleanServerBasePath(cfg.Server.BasePath)
 
 	// Set file system paths from the definition.
 	if def.Paths != nil {
@@ -278,7 +285,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 			switch v := def.Worker.Labels.(type) {
 			case string:
 				if v != "" {
-					cfg.Worker.Labels = parseLabels(v)
+					cfg.Worker.Labels = parseWorkerLabels(v)
 				}
 			case map[string]interface{}:
 				cfg.Worker.Labels = make(map[string]string)
@@ -368,12 +375,16 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 
 	// Ensure the executable path is set.
-	if err := l.setExecutable(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to set executable: %w", err)
+	if cfg.Paths.Executable == "" {
+		executable, err := os.Executable()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get executable path: %w", err)
+		}
+		cfg.Paths.Executable = executable
 	}
 
 	// Validate the final configuration.
-	if err := l.validateConfig(&cfg); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
@@ -434,212 +445,6 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
 	}
 }
 
-// setupViper initializes viper by determining the home directory and XDG configuration,
-// configuring viper with defaults, binding environment variables, and collecting any warnings.
-func (l *ConfigLoader) setupViper() error {
-	homeDir, err := l.getHomeDir()
-	if err != nil {
-		return err
-	}
-	xdgConfig := l.getXDGConfig(homeDir)
-	paths := ResolvePaths("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
-
-	// Collect any warnings from path resolution.
-	l.warnings = append(l.warnings, paths.Warnings...)
-
-	l.configureViper(paths)
-	l.bindEnvironmentVariables()
-	l.setDefaultValues(paths)
-
-	return nil
-}
-
-// getHomeDir returns the current user's home directory.
-func (l *ConfigLoader) getHomeDir() (string, error) {
-	dir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("could not determine home directory: %w", err)
-	}
-	return dir, nil
-}
-
-// getXDGConfig creates an XDGConfig using the provided home directory.
-func (l *ConfigLoader) getXDGConfig(homeDir string) XDGConfig {
-	return XDGConfig{
-		DataHome:   xdg.DataHome,
-		ConfigHome: filepath.Join(homeDir, ".config"),
-	}
-}
-
-// configureViper sets up viper's configuration file location, type, and environment variable handling.
-func (l *ConfigLoader) configureViper(paths Paths) {
-	l.setupViperConfigPath(paths.ConfigDir)
-	viper.SetEnvPrefix(strings.ToUpper(AppSlug))
-	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	viper.AutomaticEnv()
-}
-
-func (l *ConfigLoader) setupViperConfigPath(configDir string) {
-	if l.configFile == "" {
-		viper.AddConfigPath(configDir)
-		viper.SetConfigName("config")
-	} else {
-		viper.SetConfigFile(l.configFile)
-	}
-	viper.SetConfigType("yaml")
-}
-
-// setDefaultValues establishes the default configuration values for various keys.
-func (l *ConfigLoader) setDefaultValues(paths Paths) {
-	// File paths
-	viper.SetDefault("workDir", "")         // Defaults to DAG location if empty.
-	viper.SetDefault("skipExamples", false) // Defaults to creating examples
-	viper.SetDefault("paths.dagsDir", paths.DAGsDir)
-	viper.SetDefault("paths.suspendFlagsDir", paths.SuspendFlagsDir)
-	viper.SetDefault("paths.dataDir", paths.DataDir)
-	viper.SetDefault("paths.logDir", paths.LogsDir)
-	viper.SetDefault("paths.adminLogsDir", paths.AdminLogsDir)
-	viper.SetDefault("paths.baseConfig", paths.BaseConfigFile)
-
-	// Server settings
-	viper.SetDefault("host", "127.0.0.1")
-	viper.SetDefault("port", 8080)
-	viper.SetDefault("debug", false)
-	viper.SetDefault("basePath", "")
-	viper.SetDefault("apiBasePath", "/api/v2")
-	viper.SetDefault("latestStatusToday", false)
-
-	// Coordinator settings
-	viper.SetDefault("coordinatorHost", "127.0.0.1")
-	viper.SetDefault("coordinatorPort", 50055)
-
-	// Worker settings - nested structure
-	viper.SetDefault("worker.maxActiveRuns", 100)
-
-	// UI settings
-	viper.SetDefault("ui.navbarTitle", AppName)
-	viper.SetDefault("ui.maxDashboardPageLimit", 100)
-	viper.SetDefault("ui.logEncodingCharset", "utf-8")
-	viper.SetDefault("ui.dags.sortField", "name")
-	viper.SetDefault("ui.dags.sortOrder", "asc")
-
-	// Logging settings
-	viper.SetDefault("logFormat", "text")
-
-	// Queue settings
-	viper.SetDefault("queues.enabled", true)
-
-	// Scheduler settings
-	viper.SetDefault("scheduler.lockStaleThreshold", "30s")
-	viper.SetDefault("scheduler.lockRetryInterval", "5s")
-
-	// Peer settings
-	viper.SetDefault("peer.insecure", true) // Default to insecure (h2c)
-}
-
-// bindEnvironmentVariables binds various configuration keys to environment variables.
-func (l *ConfigLoader) bindEnvironmentVariables() {
-	// Server configurations
-	l.bindEnv("logFormat", "LOG_FORMAT")
-	l.bindEnv("basePath", "BASE_PATH")
-	l.bindEnv("apiBaseURL", "API_BASE_URL")
-	l.bindEnv("tz", "TZ")
-	l.bindEnv("host", "HOST")
-	l.bindEnv("port", "PORT")
-	l.bindEnv("debug", "DEBUG")
-	l.bindEnv("headless", "HEADLESS")
-
-	// Global configurations
-	l.bindEnv("workDir", "WORK_DIR")
-	l.bindEnv("defaultShell", "DEFAULT_SHELL")
-	l.bindEnv("skipExamples", "SKIP_EXAMPLES")
-
-	// Scheduler configurations
-	l.bindEnv("scheduler.lockStaleThreshold", "SCHEDULER_LOCK_STALE_THRESHOLD")
-	l.bindEnv("scheduler.lockRetryInterval", "SCHEDULER_LOCK_RETRY_INTERVAL")
-	l.bindEnv("scheduler.zombieDetectionInterval", "SCHEDULER_ZOMBIE_DETECTION_INTERVAL")
-
-	// UI configurations
-	l.bindEnv("ui.maxDashboardPageLimit", "UI_MAX_DASHBOARD_PAGE_LIMIT")
-	l.bindEnv("ui.logEncodingCharset", "UI_LOG_ENCODING_CHARSET")
-	l.bindEnv("ui.navbarColor", "UI_NAVBAR_COLOR")
-	l.bindEnv("ui.navbarTitle", "UI_NAVBAR_TITLE")
-	l.bindEnv("ui.dags.sortField", "UI_DAGS_SORT_FIELD")
-	l.bindEnv("ui.dags.sortOrder", "UI_DAGS_SORT_ORDER")
-
-	// UI configurations (legacy keys)
-	l.bindEnv("ui.maxDashboardPageLimit", "MAX_DASHBOARD_PAGE_LIMIT")
-	l.bindEnv("ui.logEncodingCharset", "LOG_ENCODING_CHARSET")
-	l.bindEnv("ui.navbarColor", "NAVBAR_COLOR")
-	l.bindEnv("ui.navbarTitle", "NAVBAR_TITLE")
-
-	// Authentication configurations
-	l.bindEnv("auth.basic.username", "AUTH_BASIC_USERNAME")
-	l.bindEnv("auth.basic.password", "AUTH_BASIC_PASSWORD")
-	l.bindEnv("auth.token.value", "AUTH_TOKEN")
-
-	// Authentication configurations (OIDC)
-	l.bindEnv("auth.oidc.clientId", "AUTH_OIDC_CLIENT_ID")
-	l.bindEnv("auth.oidc.clientSecret", "AUTH_OIDC_CLIENT_SECRET")
-	l.bindEnv("auth.oidc.clientUrl", "AUTH_OIDC_CLIENT_URL")
-	l.bindEnv("auth.oidc.issuer", "AUTH_OIDC_ISSUER")
-	l.bindEnv("auth.oidc.scopes", "AUTH_OIDC_SCOPES")
-	l.bindEnv("auth.oidc.whitelist", "AUTH_OIDC_WHITELIST")
-
-	// Authentication configurations (legacy keys)
-	l.bindEnv("auth.basic.username", "BASICAUTH_USERNAME")
-	l.bindEnv("auth.basic.password", "BASICAUTH_PASSWORD")
-	l.bindEnv("auth.token.value", "AUTHTOKEN")
-
-	// TLS configurations
-	l.bindEnv("tls.certFile", "CERT_FILE")
-	l.bindEnv("tls.keyFile", "KEY_FILE")
-
-	// File paths
-	l.bindEnv("paths.dagsDir", "DAGS")
-	l.bindEnv("paths.dagsDir", "DAGS_DIR")
-	l.bindEnv("paths.executable", "EXECUTABLE")
-	l.bindEnv("paths.logDir", "LOG_DIR")
-	l.bindEnv("paths.dataDir", "DATA_DIR")
-	l.bindEnv("paths.suspendFlagsDir", "SUSPEND_FLAGS_DIR")
-	l.bindEnv("paths.adminLogsDir", "ADMIN_LOG_DIR")
-	l.bindEnv("paths.baseConfig", "BASE_CONFIG")
-	l.bindEnv("paths.dagRunsDir", "DAG_RUNS_DIR")
-	l.bindEnv("paths.procDir", "PROC_DIR")
-	l.bindEnv("paths.queueDir", "QUEUE_DIR")
-	l.bindEnv("paths.serviceRegistryDir", "SERVICE_REGISTRY_DIR")
-
-	// UI customization
-	l.bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")
-
-	// Queue configuration
-	l.bindEnv("queues.enabled", "QUEUE_ENABLED")
-
-	// Coordinator service configuration (flat structure)
-	l.bindEnv("coordinator.host", "COORDINATOR_HOST")
-	l.bindEnv("coordinator.port", "COORDINATOR_PORT")
-
-	// Worker configuration (nested structure)
-	l.bindEnv("worker.id", "WORKER_ID")
-	l.bindEnv("worker.maxActiveRuns", "WORKER_MAX_ACTIVE_RUNS")
-	l.bindEnv("worker.labels", "WORKER_LABELS")
-	// Scheduler configuration
-	l.bindEnv("scheduler.port", "SCHEDULER_PORT")
-
-	// Peer configuration
-	l.bindEnv("peer.certFile", "PEER_CERT_FILE")
-	l.bindEnv("peer.keyFile", "PEER_KEY_FILE")
-	l.bindEnv("peer.clientCaFile", "PEER_CLIENT_CA_FILE")
-	l.bindEnv("peer.skipTlsVerify", "PEER_SKIP_TLS_VERIFY")
-	l.bindEnv("peer.insecure", "PEER_INSECURE")
-}
-
-// bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.
-func (l *ConfigLoader) bindEnv(key, env string) {
-	prefix := strings.ToUpper(AppSlug) + "_"
-	_ = viper.BindEnv(key, prefix+env)
-}
-
 // LoadLegacyEnv maps legacy environment variables to their new counterparts in the configuration.
 // If a legacy env var is set, a warning is logged and the corresponding setter function is called.
 func (l *ConfigLoader) LoadLegacyEnv(cfg *Config) {
@@ -690,22 +495,181 @@ func (l *ConfigLoader) LoadLegacyEnv(cfg *Config) {
 	}
 }
 
-// setExecutable ensures that the executable path is set in the configuration.
-// If not provided, it retrieves the current executable's path.
-func (l *ConfigLoader) setExecutable(cfg *Config) error {
-	if cfg.Paths.Executable == "" {
-		executable, err := os.Executable()
-		if err != nil {
-			return fmt.Errorf("failed to get executable path: %w", err)
-		}
-		cfg.Paths.Executable = executable
+func setupViper(xdgConfig XDGConfig, homeDir, configFile string) (warnings []string) {
+	paths := ResolvePaths("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
+
+	configureViper(paths.ConfigDir, configFile)
+	bindEnvironmentVariables()
+	setViperDefaultValues(paths)
+
+	return paths.Warnings
+}
+
+func setViperDefaultValues(paths Paths) {
+	// File paths
+	viper.SetDefault("workDir", "")         // Defaults to DAG location if empty.
+	viper.SetDefault("skipExamples", false) // Defaults to creating examples
+	viper.SetDefault("paths.dagsDir", paths.DAGsDir)
+	viper.SetDefault("paths.suspendFlagsDir", paths.SuspendFlagsDir)
+	viper.SetDefault("paths.dataDir", paths.DataDir)
+	viper.SetDefault("paths.logDir", paths.LogsDir)
+	viper.SetDefault("paths.adminLogsDir", paths.AdminLogsDir)
+	viper.SetDefault("paths.baseConfig", paths.BaseConfigFile)
+
+	// Server settings
+	viper.SetDefault("host", "127.0.0.1")
+	viper.SetDefault("port", 8080)
+	viper.SetDefault("debug", false)
+	viper.SetDefault("basePath", "")
+	viper.SetDefault("apiBasePath", "/api/v2")
+	viper.SetDefault("latestStatusToday", false)
+
+	// Coordinator settings
+	viper.SetDefault("coordinatorHost", "127.0.0.1")
+	viper.SetDefault("coordinatorPort", 50055)
+
+	// Worker settings - nested structure
+	viper.SetDefault("worker.maxActiveRuns", 100)
+
+	// UI settings
+	viper.SetDefault("ui.navbarTitle", AppName)
+	viper.SetDefault("ui.maxDashboardPageLimit", 100)
+	viper.SetDefault("ui.logEncodingCharset", "utf-8")
+	viper.SetDefault("ui.dags.sortField", "name")
+	viper.SetDefault("ui.dags.sortOrder", "asc")
+
+	// Logging settings
+	viper.SetDefault("logFormat", "text")
+
+	// Queue settings
+	viper.SetDefault("queues.enabled", true)
+
+	// Scheduler settings
+	viper.SetDefault("scheduler.lockStaleThreshold", "30s")
+	viper.SetDefault("scheduler.lockRetryInterval", "5s")
+
+	// Peer settings
+	viper.SetDefault("peer.insecure", true) // Default to insecure (h2c)
+}
+
+// bindEnvironmentVariables binds various configuration keys to environment variables.
+func bindEnvironmentVariables() {
+	// Server configurations
+	bindEnv("logFormat", "LOG_FORMAT")
+	bindEnv("basePath", "BASE_PATH")
+	bindEnv("apiBaseURL", "API_BASE_URL")
+	bindEnv("tz", "TZ")
+	bindEnv("host", "HOST")
+	bindEnv("port", "PORT")
+	bindEnv("debug", "DEBUG")
+	bindEnv("headless", "HEADLESS")
+
+	// Global configurations
+	bindEnv("workDir", "WORK_DIR")
+	bindEnv("defaultShell", "DEFAULT_SHELL")
+	bindEnv("skipExamples", "SKIP_EXAMPLES")
+
+	// Scheduler configurations
+	bindEnv("scheduler.lockStaleThreshold", "SCHEDULER_LOCK_STALE_THRESHOLD")
+	bindEnv("scheduler.lockRetryInterval", "SCHEDULER_LOCK_RETRY_INTERVAL")
+	bindEnv("scheduler.zombieDetectionInterval", "SCHEDULER_ZOMBIE_DETECTION_INTERVAL")
+
+	// UI configurations
+	bindEnv("ui.maxDashboardPageLimit", "UI_MAX_DASHBOARD_PAGE_LIMIT")
+	bindEnv("ui.logEncodingCharset", "UI_LOG_ENCODING_CHARSET")
+	bindEnv("ui.navbarColor", "UI_NAVBAR_COLOR")
+	bindEnv("ui.navbarTitle", "UI_NAVBAR_TITLE")
+	bindEnv("ui.dags.sortField", "UI_DAGS_SORT_FIELD")
+	bindEnv("ui.dags.sortOrder", "UI_DAGS_SORT_ORDER")
+
+	// UI configurations (legacy keys)
+	bindEnv("ui.maxDashboardPageLimit", "MAX_DASHBOARD_PAGE_LIMIT")
+	bindEnv("ui.logEncodingCharset", "LOG_ENCODING_CHARSET")
+	bindEnv("ui.navbarColor", "NAVBAR_COLOR")
+	bindEnv("ui.navbarTitle", "NAVBAR_TITLE")
+
+	// Authentication configurations
+	bindEnv("auth.basic.username", "AUTH_BASIC_USERNAME")
+	bindEnv("auth.basic.password", "AUTH_BASIC_PASSWORD")
+	bindEnv("auth.token.value", "AUTH_TOKEN")
+
+	// Authentication configurations (OIDC)
+	bindEnv("auth.oidc.clientId", "AUTH_OIDC_CLIENT_ID")
+	bindEnv("auth.oidc.clientSecret", "AUTH_OIDC_CLIENT_SECRET")
+	bindEnv("auth.oidc.clientUrl", "AUTH_OIDC_CLIENT_URL")
+	bindEnv("auth.oidc.issuer", "AUTH_OIDC_ISSUER")
+	bindEnv("auth.oidc.scopes", "AUTH_OIDC_SCOPES")
+	bindEnv("auth.oidc.whitelist", "AUTH_OIDC_WHITELIST")
+
+	// Authentication configurations (legacy keys)
+	bindEnv("auth.basic.username", "BASICAUTH_USERNAME")
+	bindEnv("auth.basic.password", "BASICAUTH_PASSWORD")
+	bindEnv("auth.token.value", "AUTHTOKEN")
+
+	// TLS configurations
+	bindEnv("tls.certFile", "CERT_FILE")
+	bindEnv("tls.keyFile", "KEY_FILE")
+
+	// File paths
+	bindEnv("paths.dagsDir", "DAGS")
+	bindEnv("paths.dagsDir", "DAGS_DIR")
+	bindEnv("paths.executable", "EXECUTABLE")
+	bindEnv("paths.logDir", "LOG_DIR")
+	bindEnv("paths.dataDir", "DATA_DIR")
+	bindEnv("paths.suspendFlagsDir", "SUSPEND_FLAGS_DIR")
+	bindEnv("paths.adminLogsDir", "ADMIN_LOG_DIR")
+	bindEnv("paths.baseConfig", "BASE_CONFIG")
+	bindEnv("paths.dagRunsDir", "DAG_RUNS_DIR")
+	bindEnv("paths.procDir", "PROC_DIR")
+	bindEnv("paths.queueDir", "QUEUE_DIR")
+	bindEnv("paths.serviceRegistryDir", "SERVICE_REGISTRY_DIR")
+
+	// UI customization
+	bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")
+
+	// Queue configuration
+	bindEnv("queues.enabled", "QUEUE_ENABLED")
+
+	// Coordinator service configuration (flat structure)
+	bindEnv("coordinator.host", "COORDINATOR_HOST")
+	bindEnv("coordinator.port", "COORDINATOR_PORT")
+
+	// Worker configuration (nested structure)
+	bindEnv("worker.id", "WORKER_ID")
+	bindEnv("worker.maxActiveRuns", "WORKER_MAX_ACTIVE_RUNS")
+	bindEnv("worker.labels", "WORKER_LABELS")
+	// Scheduler configuration
+	bindEnv("scheduler.port", "SCHEDULER_PORT")
+
+	// Peer configuration
+	bindEnv("peer.certFile", "PEER_CERT_FILE")
+	bindEnv("peer.keyFile", "PEER_KEY_FILE")
+	bindEnv("peer.clientCaFile", "PEER_CLIENT_CA_FILE")
+	bindEnv("peer.skipTlsVerify", "PEER_SKIP_TLS_VERIFY")
+	bindEnv("peer.insecure", "PEER_INSECURE")
+}
+
+func bindEnv(key, env string) {
+	prefix := strings.ToUpper(AppSlug) + "_"
+	_ = viper.BindEnv(key, prefix+env)
+}
+
+func configureViper(configDir, configFile string) {
+	if configFile == "" {
+		viper.AddConfigPath(configDir)
+		viper.SetConfigName("config")
+	} else {
+		viper.SetConfigFile(configFile)
 	}
-	return nil
+	viper.SetConfigType("yaml")
+	viper.SetEnvPrefix(strings.ToUpper(AppSlug))
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viper.AutomaticEnv()
 }
 
 // validateConfig performs basic validation on the configuration to ensure required fields are set
 // and that numerical values fall within acceptable ranges.
-func (l *ConfigLoader) validateConfig(cfg *Config) error {
+func validateConfig(cfg *Config) error {
 	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
 		return fmt.Errorf("invalid port number: %d", cfg.Server.Port)
 	}
@@ -716,11 +680,6 @@ func (l *ConfigLoader) validateConfig(cfg *Config) error {
 		}
 	}
 
-	// Redundant check for port validity (can be removed if not needed twice).
-	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
-		return fmt.Errorf("invalid port number: %d", cfg.Server.Port)
-	}
-
 	if cfg.UI.MaxDashboardPageLimit < 1 {
 		return fmt.Errorf("invalid max dashboard page limit: %d", cfg.UI.MaxDashboardPageLimit)
 	}
@@ -728,9 +687,7 @@ func (l *ConfigLoader) validateConfig(cfg *Config) error {
 	return nil
 }
 
-// parseLabels parses a comma-separated string of key=value pairs into a map.
-// Example: "gpu=true,memory=64G" -> map[string]string{"gpu": "true", "memory": "64G"}
-func parseLabels(labelsStr string) map[string]string {
+func parseWorkerLabels(labelsStr string) map[string]string {
 	labels := make(map[string]string)
 	if labelsStr == "" {
 		return labels
@@ -756,23 +713,30 @@ func parseLabels(labelsStr string) map[string]string {
 	return labels
 }
 
-func cleanServerBasePath(cfg *Server) {
-	if cfg.BasePath == "" {
-		return
+func cleanServerBasePath(s string) string {
+	if s == "" {
+		return ""
 	}
 
 	// Clean the provided BasePath.
-	cleanPath := path.Clean(cfg.BasePath)
+	cleanPath := path.Clean(s)
 
 	// Ensure the path is absolute.
 	if !path.IsAbs(cleanPath) {
 		cleanPath = path.Join("/", cleanPath)
 	}
 
-	// If the cleaned path is the root, reset it to an empty string.
 	if cleanPath == "/" {
-		cfg.BasePath = ""
-	} else {
-		cfg.BasePath = cleanPath
+		// If the cleaned path is the root, reset it to an empty string.
+		return ""
 	}
+	return cleanPath
+}
+
+func getHomeDir() (string, error) {
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("could not determine home directory: %w", err)
+	}
+	return dir, nil
 }

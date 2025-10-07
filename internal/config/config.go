@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -128,9 +129,19 @@ type AuthBasic struct {
 	Password string
 }
 
+// Enabled returns true if both username and password are set
+func (a AuthBasic) Enabled() bool {
+	return a.Username != "" && a.Password != ""
+}
+
 // AuthToken represents the authentication token configuration
 type AuthToken struct {
 	Value string
+}
+
+// Enabled returns true if the token value is set
+func (a AuthToken) Enabled() bool {
+	return a.Value != ""
 }
 
 type AuthOIDC struct {
@@ -140,6 +151,11 @@ type AuthOIDC struct {
 	Issuer       string   //the URL identifier for the authorization service. for example: "https://accounts.google.com" - try adding "/.well-known/openid-configuration" to the path to make sure it's correct
 	Scopes       []string //OAuth scopes. If you're unsure go with: []string{oidc.ScopeOpenID, "profile", "email"}
 	Whitelist    []string //OAuth User whitelist ref userinfo.email https://github.com/coreos/go-oidc/blob/v2/oidc.go#L199
+}
+
+// Enabled returns true if all required OIDC fields are set
+func (a AuthOIDC) Enabled() bool {
+	return a.ClientId != "" && a.ClientSecret != "" && a.Issuer != ""
 }
 
 // Paths represents the file system paths configuration
@@ -250,4 +266,24 @@ type Peer struct {
 
 	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
 	Insecure bool
+}
+
+// Validate performs basic validation on the configuration to ensure required fields are set
+// and that numerical values fall within acceptable ranges.
+func (c *Config) Validate() error {
+	if c.Server.Port < 0 || c.Server.Port > 65535 {
+		return fmt.Errorf("invalid port number: %d", c.Server.Port)
+	}
+
+	if c.Server.TLS != nil {
+		if c.Server.TLS.CertFile == "" || c.Server.TLS.KeyFile == "" {
+			return fmt.Errorf("TLS configuration incomplete: both cert and key files are required")
+		}
+	}
+
+	if c.UI.MaxDashboardPageLimit < 1 {
+		return fmt.Errorf("invalid max dashboard page limit: %d", c.UI.MaxDashboardPageLimit)
+	}
+
+	return nil
 }
