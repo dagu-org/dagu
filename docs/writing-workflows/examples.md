@@ -754,7 +754,7 @@ stateDiagram-v2
     class NotifySuccess,CleanupFail,AlwaysCleanup handler
 ```
 
-<a href="/writing-workflows/error-handling#handlers" class="learn-more">Learn more →</a>
+<a href="/writing-workflows/lifecycle-handlers" class="learn-more">Learn more →</a>
 
 </div>
 

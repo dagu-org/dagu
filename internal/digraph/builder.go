@@ -1517,7 +1517,18 @@ func validateStep(_ StepBuildContext, def stepDef, step *Step) error {
 		return wrapError("name", step.Name, ErrStepNameTooLong)
 	}
 
-	// TODO: Validate executor config for each executor type.
+	// Executor-specific validation using type assertion
+	if step.ExecutorConfig.Type == "ssh" && step.Script != "" {
+		return wrapError(
+			"script",
+			step.Script,
+			fmt.Errorf(
+				"script field is not supported with SSH executor. "+
+					"Use 'command' field instead. "+
+					"See: https://github.com/dagu-org/dagu/issues/1306",
+			),
+		)
+	}
 
 	if step.Command == "" {
 		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildDAG == nil {
