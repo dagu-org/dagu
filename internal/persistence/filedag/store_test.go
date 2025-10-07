@@ -917,8 +917,8 @@ func TestListWithNextRunSorting(t *testing.T) {
 	}
 
 	// Create DAGs with different schedules
-	createDAG("hourly-dag", "\"0 * * * *\"")   // Runs at the top of every hour
-	createDAG("daily-dag", "\"0 1 * * *\"")    // Runs at 01:00 every day
+	createDAG("hourly-dag", "\"0 * * * *\"") // Runs at the top of every hour
+	createDAG("daily-dag", "\"0 1 * * *\"")  // Runs at 01:00 every day
 	createDAG("no-schedule", "")
 
 	// Use a fixed time for deterministic testing: 2024-01-15 01:30:00
