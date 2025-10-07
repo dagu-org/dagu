@@ -209,6 +209,10 @@ apiBasePath: "/api/v1"
 tz: "UTC"
 logFormat: "json"
 headless: true
+latestStatusToday: true
+strictValidation: true
+defaultShell: "/bin/bash"
+skipExamples: true
 paths:
   dagsDir: "/var/dagu/dags"
   logDir: "/var/dagu/logs"
@@ -219,7 +223,12 @@ paths:
   executable: "/usr/local/bin/dagu"
 ui:
   navbarTitle: "Test Dagu"
+  navbarColor: "#ff5733"
+  logEncodingCharset: "iso-8859-1"
   maxDashboardPageLimit: 50
+  dags:
+    sortField: "name"
+    sortOrder: "asc"
 auth:
   basic:
     username: "admin"
@@ -240,9 +249,41 @@ auth:
 remoteNodes:
   - name: "node1"
     apiBaseURL: "http://node1.example.com/api"
+    isBasicAuth: true
+    basicAuthUsername: "nodeuser"
+    basicAuthPassword: "nodepass"
+    skipTLSVerify: true
+  - name: "node2"
+    apiBaseURL: "http://node2.example.com/api"
+    isAuthToken: true
+    authToken: "node-token-123"
 tls:
   certFile: "/path/to/cert.pem"
   keyFile: "/path/to/key.pem"
+  caFile: "/path/to/ca.pem"
+peer:
+  certFile: "/path/to/peer-cert.pem"
+  keyFile: "/path/to/peer-key.pem"
+  clientCaFile: "/path/to/peer-ca.pem"
+  skipTLSVerify: false
+  insecure: false
+queues:
+  enabled: true
+  config:
+    - name: "critical"
+      maxActiveRuns: 5
+    - name: "normal"
+      maxActiveRuns: 10
+coordinator:
+  id: "coordinator-1"
+  host: "coordinator.example.com"
+  port: 8081
+worker:
+  id: "worker-1"
+  maxActiveRuns: 50
+  labels:
+    env: "production"
+    region: "us-west-2"
 scheduler:
   port: 7890
   lockStaleThreshold: 50s
@@ -259,16 +300,25 @@ scheduler:
 			TZ:            "UTC",
 			TzOffsetInSec: 0,
 			Location:      utcLoc,
-			SkipExamples:  false,
-			Peer:          config.Peer{Insecure: true}, // Default is true
-			BaseEnv:       cfg.Global.BaseEnv,          // Dynamic, copy from actual
+			DefaultShell:  "/bin/bash",
+			SkipExamples:  true,
+			Peer: config.Peer{
+				CertFile:      "/path/to/peer-cert.pem",
+				KeyFile:       "/path/to/peer-key.pem",
+				ClientCaFile:  "/path/to/peer-ca.pem",
+				SkipTLSVerify: false,
+				Insecure:      false,
+			},
+			BaseEnv: cfg.Global.BaseEnv, // Dynamic, copy from actual
 		},
 		Server: config.Server{
-			Host:        "0.0.0.0",
-			Port:        9090,
-			BasePath:    "/dagu",
-			APIBasePath: "/api/v1",
-			Headless:    true,
+			Host:              "0.0.0.0",
+			Port:              9090,
+			BasePath:          "/dagu",
+			APIBasePath:       "/api/v1",
+			Headless:          true,
+			LatestStatusToday: true,
+			StrictValidation:  true,
 			Auth: config.Auth{
 				Basic: config.AuthBasic{Username: "admin", Password: "secret"},
 				Token: config.AuthToken{Value: "api-token"},
@@ -284,16 +334,28 @@ scheduler:
 			TLS: &config.TLSConfig{
 				CertFile: "/path/to/cert.pem",
 				KeyFile:  "/path/to/key.pem",
+				CAFile:   "/path/to/ca.pem",
 			},
 			RemoteNodes: []config.RemoteNode{
-				{Name: "node1", APIBaseURL: "http://node1.example.com/api"},
+				{
+					Name:              "node1",
+					APIBaseURL:        "http://node1.example.com/api",
+					IsBasicAuth:       true,
+					BasicAuthUsername: "nodeuser",
+					BasicAuthPassword: "nodepass",
+					SkipTLSVerify:     true,
+				},
+				{
+					Name:        "node2",
+					APIBaseURL:  "http://node2.example.com/api",
+					IsAuthToken: true,
+					AuthToken:   "node-token-123",
+				},
 			},
 			Permissions: map[config.Permission]bool{
 				config.PermissionWriteDAGs: false,
 				config.PermissionRunDAGs:   false,
 			},
-			LatestStatusToday: false,
-			StrictValidation:  false,
 		},
 		Paths: config.PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
@@ -309,14 +371,34 @@ scheduler:
 			ServiceRegistryDir: "/var/dagu/data/service-registry",
 		},
 		UI: config.UI{
-			LogEncodingCharset:    "utf-8",
+			LogEncodingCharset:    "iso-8859-1",
+			NavbarColor:           "#ff5733",
 			NavbarTitle:           "Test Dagu",
 			MaxDashboardPageLimit: 50,
-			DAGs:                  cfg.UI.DAGs, // Copy actual to avoid test pollution
+			DAGs: config.DAGsConfig{
+				SortField: "name",
+				SortOrder: "asc",
+			},
 		},
-		Queues: config.Queues{Enabled: cfg.Queues.Enabled}, // Copy actual to avoid test pollution
+		Queues: config.Queues{
+			Enabled: true,
+			Config: []config.QueueConfig{
+				{Name: "critical", MaxActiveRuns: 5},
+				{Name: "normal", MaxActiveRuns: 10},
+			},
+		},
+		Coordinator: config.Coordinator{
+			ID:   "coordinator-1",
+			Host: "coordinator.example.com",
+			Port: 8081,
+		},
 		Worker: config.Worker{
-			MaxActiveRuns: 100,
+			ID:            "worker-1",
+			MaxActiveRuns: 50,
+			Labels: map[string]string{
+				"env":    "production",
+				"region": "us-west-2",
+			},
 		},
 		Scheduler: config.Scheduler{
 			Port:                    7890,
