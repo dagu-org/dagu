@@ -452,19 +452,67 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 
 	t.Run("AllFieldsSet", func(t *testing.T) {
 		def := config.Definition{
-			BasicAuthUsername: "user",
-			BasicAuthPassword: "pass",
-			DAGsDir:           "/dags",
-			NavbarTitle:       "Title",
+			BasicAuthUsername:      "user",
+			BasicAuthPassword:      "pass",
+			APIBaseURL:             "/api/v1",
+			IsAuthToken:            true,
+			AuthToken:              "token123",
+			DAGs:                   "/legacy/dags",
+			DAGsDir:                "/new/dags", // Takes precedence over DAGs
+			Executable:             "/bin/dagu",
+			LogDir:                 "/logs",
+			DataDir:                "/data",
+			SuspendFlagsDir:        "/suspend",
+			AdminLogsDir:           "/adminlogs",
+			BaseConfig:             "/base.yaml",
+			LogEncodingCharset:     "iso-8859-1",
+			NavbarColor:            "#123456",
+			NavbarTitle:            "Title",
+			MaxDashboardPageLimit:  100,
 		}
 
 		cfg := config.Config{}
 		loader.LoadLegacyFields(&cfg, def)
 
+		// Auth
 		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
-		assert.Equal(t, "/dags", cfg.Paths.DAGsDir)
+		assert.Equal(t, "token123", cfg.Server.Auth.Token.Value)
+		assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
+
+		// Paths - DAGsDir should take precedence over DAGs
+		assert.Equal(t, "/new/dags", cfg.Paths.DAGsDir)
+		assert.Equal(t, "/bin/dagu", cfg.Paths.Executable)
+		assert.Equal(t, "/logs", cfg.Paths.LogDir)
+		assert.Equal(t, "/data", cfg.Paths.DataDir)
+		assert.Equal(t, "/suspend", cfg.Paths.SuspendFlagsDir)
+		assert.Equal(t, "/adminlogs", cfg.Paths.AdminLogsDir)
+		assert.Equal(t, "/base.yaml", cfg.Paths.BaseConfig)
+
+		// UI
+		assert.Equal(t, "iso-8859-1", cfg.UI.LogEncodingCharset)
+		assert.Equal(t, "#123456", cfg.UI.NavbarColor)
 		assert.Equal(t, "Title", cfg.UI.NavbarTitle)
+		assert.Equal(t, 100, cfg.UI.MaxDashboardPageLimit)
+	})
+
+	t.Run("DAGsPrecedence", func(t *testing.T) {
+		// Test that DAGsDir takes precedence over DAGs
+		def := config.Definition{
+			DAGs:    "/legacy/dags",
+			DAGsDir: "/new/dags",
+		}
+		cfg := config.Config{}
+		loader.LoadLegacyFields(&cfg, def)
+		assert.Equal(t, "/new/dags", cfg.Paths.DAGsDir)
+
+		// Test that DAGs is used when DAGsDir is not set
+		def2 := config.Definition{
+			DAGs: "/legacy/dags",
+		}
+		cfg2 := config.Config{}
+		loader.LoadLegacyFields(&cfg2, def2)
+		assert.Equal(t, "/legacy/dags", cfg2.Paths.DAGsDir)
 	})
 }
 
