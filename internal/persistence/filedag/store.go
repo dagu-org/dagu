@@ -291,6 +291,9 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 	switch opts.Sort {
 	case "nextRun":
 		now := time.Now()
+		if opts.Time != nil {
+			now = *opts.Time
+		}
 		// Pre-calculate next run times to avoid recalculating on each comparison
 		nextRunTimes := make(map[*digraph.DAG]time.Time, len(allDags))
 		for _, dag := range allDags {
