@@ -22,14 +22,18 @@ func setTimezone(cfg *Global) error {
 	}
 
 	// Use local timezone when TZ is not specified
-	cfg.Location = time.Local
-	_, cfg.TzOffsetInSec = time.Now().Zone()
+	var tz string
+	_, tzOffsetInSec := time.Now().Zone()
 
-	if cfg.TzOffsetInSec == 0 {
-		cfg.TZ = "UTC"
+	if tzOffsetInSec != 0 {
+		tz = fmt.Sprintf("UTC%+d", tzOffsetInSec/3600)
 	} else {
-		cfg.TZ = fmt.Sprintf("UTC%+d", cfg.TzOffsetInSec/3600)
+		tz = "UTC"
 	}
+
+	cfg.Location = time.Local
+	cfg.TZ = tz
+	cfg.TzOffsetInSec = tzOffsetInSec
 
 	return nil
 }
