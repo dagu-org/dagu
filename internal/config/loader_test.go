@@ -115,81 +115,85 @@ func TestLoad_EnvBindings(t *testing.T) {
 		os.Setenv(key, val)
 	}
 
-	// Load configuration
 	cfg, err := config.Load(config.WithConfigFile(configFile))
 	require.NoError(t, err)
-	require.NotNil(t, cfg)
 
-	// Verify all environment variables were correctly bound and applied
+	berlinLoc, _ := time.LoadLocation("Europe/Berlin")
+	_, berlinOffset := time.Now().In(berlinLoc).Zone()
 
-	// Server configurations
-	assert.Equal(t, "json", cfg.Global.LogFormat)
-	assert.Equal(t, "/test/base", cfg.Server.BasePath)
-	assert.Equal(t, "/test/api", cfg.Server.APIBasePath)
-	assert.Equal(t, "Europe/Berlin", cfg.Global.TZ)
-	assert.Equal(t, "test.example.com", cfg.Server.Host)
-	assert.Equal(t, 9876, cfg.Server.Port)
-	assert.True(t, cfg.Global.Debug)
-	assert.True(t, cfg.Server.Headless)
+	expected := &config.Config{
+		Global: config.Global{
+			Debug:         true,
+			LogFormat:     "json",
+			TZ:            "Europe/Berlin",
+			TzOffsetInSec: berlinOffset,
+			Location:      berlinLoc,
+			DefaultShell:  "/bin/zsh",
+			SkipExamples:  false,
+			Peer:          config.Peer{Insecure: true}, // Default is true
+			BaseEnv:       cfg.Global.BaseEnv,          // Dynamic, copy from actual
+		},
+		Server: config.Server{
+			Host:        "test.example.com",
+			Port:        9876,
+			BasePath:    "/test/base",
+			APIBasePath: "/test/api",
+			Headless:    true,
+			Auth: config.Auth{
+				Basic: config.AuthBasic{Username: "testuser", Password: "testpass"},
+				Token: config.AuthToken{Value: "test-token-123"},
+				OIDC: config.AuthOIDC{
+					ClientId:     "test-client-id",
+					ClientSecret: "test-secret",
+					Issuer:       "https://auth.example.com",
+					Scopes:       []string{"openid", "profile", "email"},
+				},
+			},
+			TLS: &config.TLSConfig{
+				CertFile: "/test/cert.pem",
+				KeyFile:  "/test/key.pem",
+			},
+			Permissions:       map[config.Permission]bool{config.PermissionWriteDAGs: true, config.PermissionRunDAGs: true},
+			LatestStatusToday: true,
+			StrictValidation:  false,
+		},
+		Paths: config.PathsConfig{
+			DAGsDir:            "/test/dags",
+			Executable:         "/test/bin/dagu",
+			LogDir:             "/test/logs",
+			DataDir:            "/test/data",
+			SuspendFlagsDir:    "/test/suspend",
+			AdminLogsDir:       "/test/admin",
+			BaseConfig:         "/test/base.yaml",
+			DAGRunsDir:         "/test/runs",
+			ProcDir:            "/test/proc",
+			QueueDir:           "/test/queue",
+			ServiceRegistryDir: "/test/service-registry",
+		},
+		UI: config.UI{
+			LogEncodingCharset:    "iso-8859-1",
+			NavbarColor:           "#123456",
+			NavbarTitle:           "Test Dagu",
+			MaxDashboardPageLimit: 250,
+			DAGs: config.DAGsConfig{
+				SortField: "status",
+				SortOrder: "desc",
+			},
+		},
+		Queues: config.Queues{Enabled: false},
+		Worker: config.Worker{
+			ID:            "test-worker-123",
+			MaxActiveRuns: 200,
+		},
+		Scheduler: config.Scheduler{
+			Port:                    9999,
+			LockStaleThreshold:      30 * time.Second,
+			LockRetryInterval:       5 * time.Second,
+			ZombieDetectionInterval: 90 * time.Second,
+		},
+	}
 
-	// Global configurations
-	assert.Equal(t, "/bin/zsh", cfg.Global.DefaultShell)
-
-	// UI configurations
-	assert.Equal(t, 250, cfg.UI.MaxDashboardPageLimit)
-	assert.Equal(t, "iso-8859-1", cfg.UI.LogEncodingCharset)
-	assert.Equal(t, "#123456", cfg.UI.NavbarColor)
-	assert.Equal(t, "Test Dagu", cfg.UI.NavbarTitle)
-
-	// Authentication configurations
-	assert.Equal(t, "testuser", cfg.Server.Auth.Basic.Username)
-	assert.Equal(t, "testpass", cfg.Server.Auth.Basic.Password)
-	assert.Equal(t, "test-token-123", cfg.Server.Auth.Token.Value)
-	assert.True(t, cfg.Server.Auth.Basic.Enabled())
-	assert.True(t, cfg.Server.Auth.Token.Enabled())
-	assert.Equal(t, "test-client-id", cfg.Server.Auth.OIDC.ClientId)
-	assert.Equal(t, "test-secret", cfg.Server.Auth.OIDC.ClientSecret)
-	assert.Equal(t, "https://auth.example.com", cfg.Server.Auth.OIDC.Issuer)
-	assert.Equal(t, []string{"openid", "profile", "email"}, cfg.Server.Auth.OIDC.Scopes)
-	assert.True(t, cfg.Server.Auth.OIDC.Enabled())
-
-	// Coordinator configurations are loaded from config file only
-
-	// TLS configurations
-	require.NotNil(t, cfg.Server.TLS)
-	assert.Equal(t, "/test/cert.pem", cfg.Server.TLS.CertFile)
-	assert.Equal(t, "/test/key.pem", cfg.Server.TLS.KeyFile)
-
-	// File paths
-	assert.Equal(t, "/test/dags", cfg.Paths.DAGsDir)
-	assert.Equal(t, "/test/bin/dagu", cfg.Paths.Executable)
-	assert.Equal(t, "/test/logs", cfg.Paths.LogDir)
-	assert.Equal(t, "/test/data", cfg.Paths.DataDir)
-	assert.Equal(t, "/test/suspend", cfg.Paths.SuspendFlagsDir)
-	assert.Equal(t, "/test/admin", cfg.Paths.AdminLogsDir)
-	assert.Equal(t, "/test/base.yaml", cfg.Paths.BaseConfig)
-	assert.Equal(t, "/test/runs", cfg.Paths.DAGRunsDir)
-	assert.Equal(t, "/test/proc", cfg.Paths.ProcDir)
-	assert.Equal(t, "/test/queue", cfg.Paths.QueueDir)
-	assert.Equal(t, "/test/service-registry", cfg.Paths.ServiceRegistryDir)
-
-	// UI customization
-	assert.True(t, cfg.Server.LatestStatusToday)
-
-	// Queue configuration
-	assert.False(t, cfg.Queues.Enabled)
-
-	// Worker configuration
-	assert.Equal(t, "test-worker-123", cfg.Worker.ID)
-	assert.Equal(t, 200, cfg.Worker.MaxActiveRuns)
-
-	// Scheduler configuration
-	assert.Equal(t, 9999, cfg.Scheduler.Port)
-	assert.Equal(t, 90*time.Second, cfg.Scheduler.ZombieDetectionInterval)
-
-	// UI DAGs configuration
-	assert.Equal(t, "status", cfg.UI.DAGs.SortField)
-	assert.Equal(t, "desc", cfg.UI.DAGs.SortOrder)
+	assert.Equal(t, expected, cfg)
 }
 
 func TestLoad_WorkerConfiguration(t *testing.T) {
@@ -678,54 +682,83 @@ scheduler:
   zombieDetectionInterval: 60s
 `)
 
-	// Global
-	assert.True(t, cfg.Global.Debug)
-	assert.Equal(t, "json", cfg.Global.LogFormat)
-	assert.Equal(t, "UTC", cfg.Global.TZ)
+	utcLoc, _ := time.LoadLocation("UTC")
 
-	// Server
-	assert.Equal(t, "0.0.0.0", cfg.Server.Host)
-	assert.Equal(t, 9090, cfg.Server.Port)
-	assert.Equal(t, "/dagu", cfg.Server.BasePath)
-	assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
-	assert.True(t, cfg.Server.Headless)
-	assert.False(t, cfg.Server.Permissions[config.PermissionWriteDAGs])
-	assert.False(t, cfg.Server.Permissions[config.PermissionRunDAGs])
+	expected := &config.Config{
+		Global: config.Global{
+			Debug:         true,
+			LogFormat:     "json",
+			TZ:            "UTC",
+			TzOffsetInSec: 0,
+			Location:      utcLoc,
+			SkipExamples:  false,
+			Peer:          config.Peer{Insecure: true}, // Default is true
+			BaseEnv:       cfg.Global.BaseEnv,          // Dynamic, copy from actual
+		},
+		Server: config.Server{
+			Host:        "0.0.0.0",
+			Port:        9090,
+			BasePath:    "/dagu",
+			APIBasePath: "/api/v1",
+			Headless:    true,
+			Auth: config.Auth{
+				Basic: config.AuthBasic{Username: "admin", Password: "secret"},
+				Token: config.AuthToken{Value: "api-token"},
+				OIDC: config.AuthOIDC{
+					ClientId:     "test-client-id",
+					ClientSecret: "test-client-secret",
+					ClientUrl:    "http://localhost:8081",
+					Issuer:       "https://accounts.example.com",
+					Scopes:       []string{"openid", "profile", "email"},
+					Whitelist:    []string{"user@example.com"},
+				},
+			},
+			TLS: &config.TLSConfig{
+				CertFile: "/path/to/cert.pem",
+				KeyFile:  "/path/to/key.pem",
+			},
+			RemoteNodes: []config.RemoteNode{
+				{Name: "node1", APIBaseURL: "http://node1.example.com/api"},
+			},
+			Permissions: map[config.Permission]bool{
+				config.PermissionWriteDAGs: false,
+				config.PermissionRunDAGs:   false,
+			},
+			LatestStatusToday: false,
+			StrictValidation:  false,
+		},
+		Paths: config.PathsConfig{
+			DAGsDir:            "/var/dagu/dags",
+			LogDir:             "/var/dagu/logs",
+			DataDir:            "/var/dagu/data",
+			SuspendFlagsDir:    "/var/dagu/suspend",
+			AdminLogsDir:       "/var/dagu/adminlogs",
+			BaseConfig:         "/var/dagu/base.yaml",
+			Executable:         "/usr/local/bin/dagu",
+			DAGRunsDir:         "/var/dagu/data/dag-runs",
+			ProcDir:            "/var/dagu/data/proc",
+			QueueDir:           "/var/dagu/data/queue",
+			ServiceRegistryDir: "/var/dagu/data/service-registry",
+		},
+		UI: config.UI{
+			LogEncodingCharset:    "utf-8",
+			NavbarTitle:           "Test Dagu",
+			MaxDashboardPageLimit: 50,
+			DAGs:                  cfg.UI.DAGs, // Copy actual to avoid test pollution
+		},
+		Queues: config.Queues{Enabled: cfg.Queues.Enabled}, // Copy actual to avoid test pollution
+		Worker: config.Worker{
+			MaxActiveRuns: 100,
+		},
+		Scheduler: config.Scheduler{
+			Port:                    7890,
+			LockStaleThreshold:      50 * time.Second,
+			LockRetryInterval:       10 * time.Second,
+			ZombieDetectionInterval: 60 * time.Second,
+		},
+	}
 
-	// Auth
-	assert.True(t, cfg.Server.Auth.Basic.Enabled())
-	assert.Equal(t, "admin", cfg.Server.Auth.Basic.Username)
-	assert.Equal(t, "secret", cfg.Server.Auth.Basic.Password)
-	assert.True(t, cfg.Server.Auth.Token.Enabled())
-	assert.Equal(t, "api-token", cfg.Server.Auth.Token.Value)
-	assert.True(t, cfg.Server.Auth.OIDC.Enabled())
-	assert.Equal(t, "test-client-id", cfg.Server.Auth.OIDC.ClientId)
-	assert.Equal(t, "test-client-secret", cfg.Server.Auth.OIDC.ClientSecret)
-	assert.Equal(t, "http://localhost:8081", cfg.Server.Auth.OIDC.ClientUrl)
-	assert.Equal(t, "https://accounts.example.com", cfg.Server.Auth.OIDC.Issuer)
-	assert.Equal(t, []string{"openid", "profile", "email"}, cfg.Server.Auth.OIDC.Scopes)
-	assert.Equal(t, []string{"user@example.com"}, cfg.Server.Auth.OIDC.Whitelist)
-
-	// TLS
-	require.NotNil(t, cfg.Server.TLS)
-	assert.Equal(t, "/path/to/cert.pem", cfg.Server.TLS.CertFile)
-	assert.Equal(t, "/path/to/key.pem", cfg.Server.TLS.KeyFile)
-
-	// Remote nodes
-	require.Len(t, cfg.Server.RemoteNodes, 1)
-	assert.Equal(t, "node1", cfg.Server.RemoteNodes[0].Name)
-	assert.Equal(t, "http://node1.example.com/api", cfg.Server.RemoteNodes[0].APIBaseURL)
-
-	// Paths
-	assert.Equal(t, "/var/dagu/dags", cfg.Paths.DAGsDir)
-	assert.Equal(t, "/var/dagu/logs", cfg.Paths.LogDir)
-	assert.Equal(t, "/var/dagu/data", cfg.Paths.DataDir)
-
-	// Scheduler
-	assert.Equal(t, 7890, cfg.Scheduler.Port)
-	assert.Equal(t, 50*time.Second, cfg.Scheduler.LockStaleThreshold)
-	assert.Equal(t, 10*time.Second, cfg.Scheduler.LockRetryInterval)
-	assert.Equal(t, 60*time.Second, cfg.Scheduler.ZombieDetectionInterval)
+	assert.Equal(t, expected, cfg)
 }
 
 func TestLoad_ValidationErrors(t *testing.T) {
