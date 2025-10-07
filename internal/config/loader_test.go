@@ -196,6 +196,139 @@ func TestLoad_EnvBindings(t *testing.T) {
 	assert.Equal(t, expected, cfg)
 }
 
+func TestLoad_YAML(t *testing.T) {
+	cfg := loadFromYAML(t, `
+host: "0.0.0.0"
+port: 9090
+permissions:
+  writeDAGs: false
+  runDAGs: false
+debug: true
+basePath: "/dagu"
+apiBasePath: "/api/v1"
+tz: "UTC"
+logFormat: "json"
+headless: true
+paths:
+  dagsDir: "/var/dagu/dags"
+  logDir: "/var/dagu/logs"
+  dataDir: "/var/dagu/data"
+  suspendFlagsDir: "/var/dagu/suspend"
+  adminLogsDir: "/var/dagu/adminlogs"
+  baseConfig: "/var/dagu/base.yaml"
+  executable: "/usr/local/bin/dagu"
+ui:
+  navbarTitle: "Test Dagu"
+  maxDashboardPageLimit: 50
+auth:
+  basic:
+    username: "admin"
+    password: "secret"
+  token:
+    value: "api-token"
+  oidc:
+    clientId: "test-client-id"
+    clientSecret: "test-client-secret"
+    clientUrl: "http://localhost:8081"
+    issuer: "https://accounts.example.com"
+    scopes:
+      - "openid"
+      - "profile"
+      - "email"
+    whitelist:
+      - "user@example.com"
+remoteNodes:
+  - name: "node1"
+    apiBaseURL: "http://node1.example.com/api"
+tls:
+  certFile: "/path/to/cert.pem"
+  keyFile: "/path/to/key.pem"
+scheduler:
+  port: 7890
+  lockStaleThreshold: 50s
+  lockRetryInterval: 10s
+  zombieDetectionInterval: 60s
+`)
+
+	utcLoc, _ := time.LoadLocation("UTC")
+
+	expected := &config.Config{
+		Global: config.Global{
+			Debug:         true,
+			LogFormat:     "json",
+			TZ:            "UTC",
+			TzOffsetInSec: 0,
+			Location:      utcLoc,
+			SkipExamples:  false,
+			Peer:          config.Peer{Insecure: true}, // Default is true
+			BaseEnv:       cfg.Global.BaseEnv,          // Dynamic, copy from actual
+		},
+		Server: config.Server{
+			Host:        "0.0.0.0",
+			Port:        9090,
+			BasePath:    "/dagu",
+			APIBasePath: "/api/v1",
+			Headless:    true,
+			Auth: config.Auth{
+				Basic: config.AuthBasic{Username: "admin", Password: "secret"},
+				Token: config.AuthToken{Value: "api-token"},
+				OIDC: config.AuthOIDC{
+					ClientId:     "test-client-id",
+					ClientSecret: "test-client-secret",
+					ClientUrl:    "http://localhost:8081",
+					Issuer:       "https://accounts.example.com",
+					Scopes:       []string{"openid", "profile", "email"},
+					Whitelist:    []string{"user@example.com"},
+				},
+			},
+			TLS: &config.TLSConfig{
+				CertFile: "/path/to/cert.pem",
+				KeyFile:  "/path/to/key.pem",
+			},
+			RemoteNodes: []config.RemoteNode{
+				{Name: "node1", APIBaseURL: "http://node1.example.com/api"},
+			},
+			Permissions: map[config.Permission]bool{
+				config.PermissionWriteDAGs: false,
+				config.PermissionRunDAGs:   false,
+			},
+			LatestStatusToday: false,
+			StrictValidation:  false,
+		},
+		Paths: config.PathsConfig{
+			DAGsDir:            "/var/dagu/dags",
+			LogDir:             "/var/dagu/logs",
+			DataDir:            "/var/dagu/data",
+			SuspendFlagsDir:    "/var/dagu/suspend",
+			AdminLogsDir:       "/var/dagu/adminlogs",
+			BaseConfig:         "/var/dagu/base.yaml",
+			Executable:         "/usr/local/bin/dagu",
+			DAGRunsDir:         "/var/dagu/data/dag-runs",
+			ProcDir:            "/var/dagu/data/proc",
+			QueueDir:           "/var/dagu/data/queue",
+			ServiceRegistryDir: "/var/dagu/data/service-registry",
+		},
+		UI: config.UI{
+			LogEncodingCharset:    "utf-8",
+			NavbarTitle:           "Test Dagu",
+			MaxDashboardPageLimit: 50,
+			DAGs:                  cfg.UI.DAGs, // Copy actual to avoid test pollution
+		},
+		Queues: config.Queues{Enabled: cfg.Queues.Enabled}, // Copy actual to avoid test pollution
+		Worker: config.Worker{
+			MaxActiveRuns: 100,
+		},
+		Scheduler: config.Scheduler{
+			Port:                    7890,
+			LockStaleThreshold:      50 * time.Second,
+			LockRetryInterval:       10 * time.Second,
+			ZombieDetectionInterval: 60 * time.Second,
+		},
+	}
+
+	assert.Equal(t, expected, cfg)
+}
+
 func TestLoad_WorkerConfiguration(t *testing.T) {
 	t.Run("LoadFromYAML", func(t *testing.T) {
 		// Reset viper to ensure clean state
@@ -626,139 +759,6 @@ func TestLoad_Defaults(t *testing.T) {
 
 	// Worker defaults
 	assert.Equal(t, 100, cfg.Worker.MaxActiveRuns)
-}
-
-func TestLoad_YAML(t *testing.T) {
-	cfg := loadFromYAML(t, `
-host: "0.0.0.0"
-port: 9090
-permissions:
-  writeDAGs: false
-  runDAGs: false
-debug: true
-basePath: "/dagu"
-apiBasePath: "/api/v1"
-tz: "UTC"
-logFormat: "json"
-headless: true
-paths:
-  dagsDir: "/var/dagu/dags"
-  logDir: "/var/dagu/logs"
-  dataDir: "/var/dagu/data"
-  suspendFlagsDir: "/var/dagu/suspend"
-  adminLogsDir: "/var/dagu/adminlogs"
-  baseConfig: "/var/dagu/base.yaml"
-  executable: "/usr/local/bin/dagu"
-ui:
-  navbarTitle: "Test Dagu"
-  maxDashboardPageLimit: 50
-auth:
-  basic:
-    username: "admin"
-    password: "secret"
-  token:
-    value: "api-token"
-  oidc:
-    clientId: "test-client-id"
-    clientSecret: "test-client-secret"
-    clientUrl: "http://localhost:8081"
-    issuer: "https://accounts.example.com"
-    scopes:
-      - "openid"
-      - "profile"
-      - "email"
-    whitelist:
-      - "user@example.com"
-remoteNodes:
-  - name: "node1"
-    apiBaseURL: "http://node1.example.com/api"
-tls:
-  certFile: "/path/to/cert.pem"
-  keyFile: "/path/to/key.pem"
-scheduler:
-  port: 7890
-  lockStaleThreshold: 50s
-  lockRetryInterval: 10s
-  zombieDetectionInterval: 60s
-`)
-
-	utcLoc, _ := time.LoadLocation("UTC")
-
-	expected := &config.Config{
-		Global: config.Global{
-			Debug:         true,
-			LogFormat:     "json",
-			TZ:            "UTC",
-			TzOffsetInSec: 0,
-			Location:      utcLoc,
-			SkipExamples:  false,
-			Peer:          config.Peer{Insecure: true}, // Default is true
-			BaseEnv:       cfg.Global.BaseEnv,          // Dynamic, copy from actual
-		},
-		Server: config.Server{
-			Host:        "0.0.0.0",
-			Port:        9090,
-			BasePath:    "/dagu",
-			APIBasePath: "/api/v1",
-			Headless:    true,
-			Auth: config.Auth{
-				Basic: config.AuthBasic{Username: "admin", Password: "secret"},
-				Token: config.AuthToken{Value: "api-token"},
-				OIDC: config.AuthOIDC{
-					ClientId:     "test-client-id",
-					ClientSecret: "test-client-secret",
-					ClientUrl:    "http://localhost:8081",
-					Issuer:       "https://accounts.example.com",
-					Scopes:       []string{"openid", "profile", "email"},
-					Whitelist:    []string{"user@example.com"},
-				},
-			},
-			TLS: &config.TLSConfig{
-				CertFile: "/path/to/cert.pem",
-				KeyFile:  "/path/to/key.pem",
-			},
-			RemoteNodes: []config.RemoteNode{
-				{Name: "node1", APIBaseURL: "http://node1.example.com/api"},
-			},
-			Permissions: map[config.Permission]bool{
-				config.PermissionWriteDAGs: false,
-				config.PermissionRunDAGs:   false,
-			},
-			LatestStatusToday: false,
-			StrictValidation:  false,
-		},
-		Paths: config.PathsConfig{
-			DAGsDir:            "/var/dagu/dags",
-			LogDir:             "/var/dagu/logs",
-			DataDir:            "/var/dagu/data",
-			SuspendFlagsDir:    "/var/dagu/suspend",
-			AdminLogsDir:       "/var/dagu/adminlogs",
-			BaseConfig:         "/var/dagu/base.yaml",
-			Executable:         "/usr/local/bin/dagu",
-			DAGRunsDir:         "/var/dagu/data/dag-runs",
-			ProcDir:            "/var/dagu/data/proc",
-			QueueDir:           "/var/dagu/data/queue",
-			ServiceRegistryDir: "/var/dagu/data/service-registry",
-		},
-		UI: config.UI{
-			LogEncodingCharset:    "utf-8",
-			NavbarTitle:           "Test Dagu",
-			MaxDashboardPageLimit: 50,
-			DAGs:                  cfg.UI.DAGs, // Copy actual to avoid test pollution
-		},
-		Queues: config.Queues{Enabled: cfg.Queues.Enabled}, // Copy actual to avoid test pollution
-		Worker: config.Worker{
-			MaxActiveRuns: 100,
-		},
-		Scheduler: config.Scheduler{
-			Port:                    7890,
-			LockStaleThreshold:      50 * time.Second,
-			LockRetryInterval:       10 * time.Second,
-			ZombieDetectionInterval: 60 * time.Second,
-		},
-	}
-
-	assert.Equal(t, expected, cfg)
 }
 
 func TestLoad_ValidationErrors(t *testing.T) {
