@@ -14,6 +14,7 @@ import (
 )
 
 var _ Executor = (*sshExec)(nil)
+var _ StepValidator = (*sshExec)(nil) // Ensure sshExec implements StepValidator
 
 type sshClientCtxKey = struct{}
 
@@ -99,6 +100,19 @@ func (e *sshExec) Run(_ context.Context) error {
 		append([]string{e.step.Command}, e.step.Args...), " ",
 	)
 	return session.Run(command)
+}
+
+// ValidateStep implements StepValidator interface for SSH executor.
+// SSH executor does not support the script field, only command field.
+func (e *sshExec) ValidateStep(step *digraph.Step) error {
+	if step.Script != "" {
+		return fmt.Errorf(
+			"script field is not supported with SSH executor. " +
+				"Use 'command' field instead. " +
+				"See: https://github.com/dagu-org/dagu/issues/1306",
+		)
+	}
+	return nil
 }
 
 func init() {
