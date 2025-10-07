@@ -11,9 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/build"
-	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -170,7 +169,7 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 	cc := c.NewCoordinatorClient()
 
 	collector := metrics.NewCollector(
-		build.Version,
+		config.Version,
 		dr,
 		c.DAGRunStore,
 		c.QueueStore,

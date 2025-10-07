@@ -3,13 +3,13 @@ package main
 import (
 	"os"
 
-	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   build.Slug,
+	Use:   config.AppSlug,
 	Short: "Dagu is a compact, portable workflow engine",
 	Long: `Dagu is a compact, portable workflow engine.
 
@@ -43,7 +43,7 @@ func init() {
 	rootCmd.AddCommand(cmd.CmdStartAll())
 	rootCmd.AddCommand(cmd.CmdMigrate())
 
-	build.Version = version
+	config.Version = version
 }
 
 var version = "0.0.0"

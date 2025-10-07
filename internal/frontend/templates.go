@@ -10,7 +10,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/logger"
 )
@@ -71,7 +70,7 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 			return v
 		},
 		"version": func() string {
-			return build.Version
+			return config.Version
 		},
 		"navbarColor": func() string {
 			return cfg.NavbarColor

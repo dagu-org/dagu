@@ -3,8 +3,6 @@ package config
 import (
 	"os"
 	"strings"
-
-	"github.com/dagu-org/dagu/internal/build"
 )
 
 // BaseEnv represents a filtered set of environment variables to pass to child processes.
@@ -21,7 +19,7 @@ var defaultWhitelist = map[string]bool{
 }
 
 // defaultPrefixes defines prefixes of env vars allowed to propagate.
-var defaultPrefixes = []string{strings.ToUpper(build.AppName) + "_"}
+var defaultPrefixes = []string{strings.ToUpper(AppName) + "_"}
 
 // LoadBaseEnv loads and filters current environment variables.
 func LoadBaseEnv() BaseEnv {

@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/dagu-org/dagu/internal/build"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -14,7 +14,7 @@ func CmdVersion() *cobra.Command {
 This command shows the version information that can be useful for troubleshooting,
 reporting issues, or verifying that you're running the expected version of Dagu.`,
 		Run: func(_ *cobra.Command, _ []string) {
-			println(build.Version)
+			println(config.Version)
 		},
 	}
 }

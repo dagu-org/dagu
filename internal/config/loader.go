@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/adrg/xdg"
-	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/spf13/viper"
 )
@@ -474,7 +473,7 @@ func (l *ConfigLoader) getXDGConfig(homeDir string) XDGConfig {
 // configureViper sets up viper's configuration file location, type, and environment variable handling.
 func (l *ConfigLoader) configureViper(paths Paths) {
 	l.setupViperConfigPath(paths.ConfigDir)
-	viper.SetEnvPrefix(strings.ToUpper(build.Slug))
+	viper.SetEnvPrefix(strings.ToUpper(AppSlug))
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 }
@@ -517,7 +516,7 @@ func (l *ConfigLoader) setDefaultValues(paths Paths) {
 	viper.SetDefault("worker.maxActiveRuns", 100)
 
 	// UI settings
-	viper.SetDefault("ui.navbarTitle", build.AppName)
+	viper.SetDefault("ui.navbarTitle", AppName)
 	viper.SetDefault("ui.maxDashboardPageLimit", 100)
 	viper.SetDefault("ui.logEncodingCharset", "utf-8")
 	viper.SetDefault("ui.dags.sortField", "name")
@@ -636,7 +635,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 
 // bindEnv constructs the full environment variable name using the app prefix and binds it to the given key.
 func (l *ConfigLoader) bindEnv(key, env string) {
-	prefix := strings.ToUpper(build.Slug) + "_"
+	prefix := strings.ToUpper(AppSlug) + "_"
 	_ = viper.BindEnv(key, prefix+env)
 }
 

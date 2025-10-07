@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/build"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/frontend/metrics"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
@@ -14,7 +14,7 @@ import (
 func (a *API) GetHealth(_ context.Context, _ api.GetHealthRequestObject) (api.GetHealthResponseObject, error) {
 	return &api.GetHealth200JSONResponse{
 		Status:    api.HealthResponseStatusHealthy,
-		Version:   build.Version,
+		Version:   config.Version,
 		Uptime:    int(metrics.GetUptime()),
 		Timestamp: stringutil.FormatTime(time.Now()),
 	}, nil

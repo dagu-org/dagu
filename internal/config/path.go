@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/fileutil"
 )
 
@@ -52,7 +51,7 @@ func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) Paths {
 		return setLegacyPaths(legacyPath)
 	// Fallback to default XDG-based paths.
 	default:
-		configDir := filepath.Join(xdg.ConfigHome, build.Slug)
+		configDir := filepath.Join(xdg.ConfigHome, AppSlug)
 		return setXDGPaths(xdg, configDir)
 	}
 }
@@ -63,12 +62,12 @@ func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) Paths {
 func setXDGPaths(xdg XDGConfig, configDir string) Paths {
 	return Paths{
 		ConfigDir:       configDir,
-		DataDir:         filepath.Join(xdg.DataHome, build.Slug, "data"),
-		LogsDir:         filepath.Join(xdg.DataHome, build.Slug, "logs"),
-		BaseConfigFile:  filepath.Join(xdg.ConfigHome, build.Slug, "base.yaml"),
-		AdminLogsDir:    filepath.Join(xdg.DataHome, build.Slug, "logs", "admin"),
-		SuspendFlagsDir: filepath.Join(xdg.DataHome, build.Slug, "suspend"),
-		DAGsDir:         filepath.Join(xdg.ConfigHome, build.Slug, "dags"),
+		DataDir:         filepath.Join(xdg.DataHome, AppSlug, "data"),
+		LogsDir:         filepath.Join(xdg.DataHome, AppSlug, "logs"),
+		BaseConfigFile:  filepath.Join(xdg.ConfigHome, AppSlug, "base.yaml"),
+		AdminLogsDir:    filepath.Join(xdg.DataHome, AppSlug, "logs", "admin"),
+		SuspendFlagsDir: filepath.Join(xdg.DataHome, AppSlug, "suspend"),
+		DAGsDir:         filepath.Join(xdg.ConfigHome, AppSlug, "dags"),
 	}
 }
 
