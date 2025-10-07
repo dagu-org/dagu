@@ -177,7 +177,10 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) {
 	// Serve UI pages
 	indexHandler := srv.useTemplate(ctx, "index.gohtml", "index")
 	r.Route("/", func(r chi.Router) {
-		if srv.config.Server.Auth.OIDC.Enabled() {
+		authConfig := srv.config.Server.Auth
+		oidcEnabled := authConfig.OIDC.ClientId != "" &&
+			authConfig.OIDC.ClientSecret != "" && authConfig.OIDC.Issuer != ""
+		if oidcEnabled {
 			authOptions := auth.Options{}
 			oidcProvider, oidcVerify, oidcConfig := auth.InitVerifierAndConfig(srv.config.Server.Auth.OIDC)
 			authOptions.OIDCAuthEnabled = true

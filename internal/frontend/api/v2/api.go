@@ -124,10 +124,13 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 				authConfig.Basic.Username: authConfig.Basic.Password,
 			},
 		}
-		if a.config.Server.Auth.OIDC.Enabled() {
-			oidcProvider, oidcVerify, oidcConfig := auth.InitVerifierAndConfig(a.config.Server.Auth.OIDC)
+		oidcEnabled := authConfig.OIDC.ClientId != "" &&
+			authConfig.OIDC.ClientSecret != "" && authConfig.OIDC.Issuer != ""
+		// Enable OIDC authentication if all required fields are set
+		if oidcEnabled {
+			oidcProvider, oidcVerify, oidcConfig := auth.InitVerifierAndConfig(authConfig.OIDC)
 			authOptions.OIDCAuthEnabled = true
-			authOptions.OIDCWhitelist = a.config.Server.Auth.OIDC.Whitelist
+			authOptions.OIDCWhitelist = authConfig.OIDC.Whitelist
 			authOptions.OIDCProvider, authOptions.OIDCVerify, authOptions.OIDCConfig = oidcProvider, oidcVerify, oidcConfig
 		}
 		r.Use(auth.Middleware(authOptions))
