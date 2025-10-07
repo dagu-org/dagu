@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/spf13/viper"
@@ -667,4 +668,349 @@ peer:
 		assert.Equal(t, "", cfg.Global.Peer.ClientCaFile)
 		assert.True(t, cfg.Global.Peer.SkipTLSVerify)
 	})
+}
+
+func TestLoad_Defaults(t *testing.T) {
+	cfg := loadFromYAML(t, "# empty config")
+
+	// Verify defaults
+	assert.Equal(t, "127.0.0.1", cfg.Server.Host)
+	assert.Equal(t, 8080, cfg.Server.Port)
+	assert.False(t, cfg.Global.Debug)
+	assert.Equal(t, "text", cfg.Global.LogFormat)
+	assert.Equal(t, 100, cfg.UI.MaxDashboardPageLimit)
+	assert.Equal(t, "utf-8", cfg.UI.LogEncodingCharset)
+	assert.True(t, cfg.Server.Permissions[config.PermissionWriteDAGs])
+	assert.True(t, cfg.Server.Permissions[config.PermissionRunDAGs])
+
+	// Scheduler defaults
+	assert.Equal(t, 8090, cfg.Scheduler.Port)
+	assert.Equal(t, 30*time.Second, cfg.Scheduler.LockStaleThreshold)
+	assert.Equal(t, 5*time.Second, cfg.Scheduler.LockRetryInterval)
+	assert.Equal(t, 45*time.Second, cfg.Scheduler.ZombieDetectionInterval)
+
+	// Worker defaults
+	assert.Equal(t, 100, cfg.Worker.MaxActiveRuns)
+}
+
+func TestLoad_ComprehensiveConfiguration(t *testing.T) {
+	cfg := loadFromYAML(t, `
+host: "0.0.0.0"
+port: 9090
+permissions:
+  writeDAGs: false
+  runDAGs: false
+debug: true
+basePath: "/dagu"
+apiBasePath: "/api/v1"
+tz: "UTC"
+logFormat: "json"
+headless: true
+paths:
+  dagsDir: "/var/dagu/dags"
+  logDir: "/var/dagu/logs"
+  dataDir: "/var/dagu/data"
+  suspendFlagsDir: "/var/dagu/suspend"
+  adminLogsDir: "/var/dagu/adminlogs"
+  baseConfig: "/var/dagu/base.yaml"
+  executable: "/usr/local/bin/dagu"
+ui:
+  navbarTitle: "Test Dagu"
+  maxDashboardPageLimit: 50
+auth:
+  basic:
+    username: "admin"
+    password: "secret"
+remoteNodes:
+  - name: "node1"
+    apiBaseURL: "http://node1.example.com/api"
+tls:
+  certFile: "/path/to/cert.pem"
+  keyFile: "/path/to/key.pem"
+scheduler:
+  port: 7890
+  lockStaleThreshold: 50s
+  lockRetryInterval: 10s
+  zombieDetectionInterval: 60s
+`)
+
+	// Global
+	assert.True(t, cfg.Global.Debug)
+	assert.Equal(t, "json", cfg.Global.LogFormat)
+	assert.Equal(t, "UTC", cfg.Global.TZ)
+
+	// Server
+	assert.Equal(t, "0.0.0.0", cfg.Server.Host)
+	assert.Equal(t, 9090, cfg.Server.Port)
+	assert.Equal(t, "/dagu", cfg.Server.BasePath)
+	assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
+	assert.True(t, cfg.Server.Headless)
+	assert.False(t, cfg.Server.Permissions[config.PermissionWriteDAGs])
+	assert.False(t, cfg.Server.Permissions[config.PermissionRunDAGs])
+
+	// Auth
+	assert.True(t, cfg.Server.Auth.Basic.Enabled())
+	assert.Equal(t, "admin", cfg.Server.Auth.Basic.Username)
+	assert.Equal(t, "secret", cfg.Server.Auth.Basic.Password)
+
+	// TLS
+	require.NotNil(t, cfg.Server.TLS)
+	assert.Equal(t, "/path/to/cert.pem", cfg.Server.TLS.CertFile)
+	assert.Equal(t, "/path/to/key.pem", cfg.Server.TLS.KeyFile)
+
+	// Remote nodes
+	require.Len(t, cfg.Server.RemoteNodes, 1)
+	assert.Equal(t, "node1", cfg.Server.RemoteNodes[0].Name)
+	assert.Equal(t, "http://node1.example.com/api", cfg.Server.RemoteNodes[0].APIBaseURL)
+
+	// Paths
+	assert.Equal(t, "/var/dagu/dags", cfg.Paths.DAGsDir)
+	assert.Equal(t, "/var/dagu/logs", cfg.Paths.LogDir)
+	assert.Equal(t, "/var/dagu/data", cfg.Paths.DataDir)
+
+	// Scheduler
+	assert.Equal(t, 7890, cfg.Scheduler.Port)
+	assert.Equal(t, 50*time.Second, cfg.Scheduler.LockStaleThreshold)
+	assert.Equal(t, 10*time.Second, cfg.Scheduler.LockRetryInterval)
+	assert.Equal(t, 60*time.Second, cfg.Scheduler.ZombieDetectionInterval)
+}
+
+func TestLoad_ValidationErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		yaml    string
+		wantErr string
+	}{
+		{
+			name: "IncompleteTLS",
+			yaml: `
+tls:
+  certFile: "/path/to/cert.pem"
+  keyFile: ""
+`,
+			wantErr: "TLS configuration incomplete",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			tempDir := t.TempDir()
+			configFile := filepath.Join(tempDir, "config.yaml")
+			err := os.WriteFile(configFile, []byte(tt.yaml), 0600)
+			require.NoError(t, err)
+
+			_, err = config.Load(config.WithConfigFile(configFile))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestLoad_UIConfiguration(t *testing.T) {
+	t.Run("DAGsConfig", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+ui:
+  dags:
+    sortField: "lastRun"
+    sortOrder: "desc"
+`)
+		assert.Equal(t, "lastRun", cfg.UI.DAGs.SortField)
+		assert.Equal(t, "desc", cfg.UI.DAGs.SortOrder)
+	})
+
+	t.Run("Queues", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+queues:
+  enabled: true
+  config:
+    - name: "default"
+      maxConcurrency: 5
+    - name: "highPriority"
+      maxConcurrency: 2
+`)
+		assert.True(t, cfg.Queues.Enabled)
+		require.Len(t, cfg.Queues.Config, 2)
+		assert.Equal(t, "default", cfg.Queues.Config[0].Name)
+		assert.Equal(t, 5, cfg.Queues.Config[0].MaxActiveRuns)
+	})
+}
+
+func TestLoad_SchedulerConfiguration(t *testing.T) {
+	t.Run("CustomZombieDetection", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+scheduler:
+  zombieDetectionInterval: 90s
+`)
+		assert.Equal(t, 90*time.Second, cfg.Scheduler.ZombieDetectionInterval)
+	})
+
+	t.Run("DisableZombieDetection", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+scheduler:
+  zombieDetectionInterval: 0s
+`)
+		assert.Equal(t, time.Duration(0), cfg.Scheduler.ZombieDetectionInterval)
+	})
+}
+
+func TestLoad_AuthConfiguration(t *testing.T) {
+	t.Run("OIDC", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_AUTH_OIDC_CLIENT_ID":     "test-client-id",
+			"DAGU_AUTH_OIDC_CLIENT_SECRET": "test-secret",
+			"DAGU_AUTH_OIDC_ISSUER":        "https://auth.example.com",
+			"DAGU_AUTH_OIDC_SCOPES":        "openid,profile,email",
+		})
+
+		assert.True(t, cfg.Server.Auth.OIDC.Enabled())
+		assert.Equal(t, "test-client-id", cfg.Server.Auth.OIDC.ClientId)
+		assert.Equal(t, "test-secret", cfg.Server.Auth.OIDC.ClientSecret)
+		assert.Equal(t, []string{"openid", "profile", "email"}, cfg.Server.Auth.OIDC.Scopes)
+	})
+}
+
+func TestLoad_EnvironmentOverrides(t *testing.T) {
+	tests := []struct {
+		name   string
+		yaml   string
+		env    map[string]string
+		verify func(*testing.T, *config.Config)
+	}{
+		{
+			name: "ServerConfig",
+			yaml: `host: "localhost"`,
+			env:  map[string]string{"DAGU_HOST": "0.0.0.0", "DAGU_PORT": "9999"},
+			verify: func(t *testing.T, cfg *config.Config) {
+				assert.Equal(t, "0.0.0.0", cfg.Server.Host)
+				assert.Equal(t, 9999, cfg.Server.Port)
+			},
+		},
+		{
+			name: "ZombieDetection",
+			yaml: `scheduler: {zombieDetectionInterval: 30s}`,
+			env:  map[string]string{"DAGU_SCHEDULER_ZOMBIE_DETECTION_INTERVAL": "90s"},
+			verify: func(t *testing.T, cfg *config.Config) {
+				assert.Equal(t, 90*time.Second, cfg.Scheduler.ZombieDetectionInterval)
+			},
+		},
+		{
+			name: "QueueConfig",
+			yaml: `queues: {enabled: true}`,
+			env:  map[string]string{"DAGU_QUEUE_ENABLED": "false"},
+			verify: func(t *testing.T, cfg *config.Config) {
+				assert.False(t, cfg.Queues.Enabled)
+			},
+		},
+		{
+			name: "DAGsConfig",
+			yaml: `ui: {dags: {sortField: "name"}}`,
+			env:  map[string]string{"DAGU_UI_DAGS_SORT_FIELD": "status", "DAGU_UI_DAGS_SORT_ORDER": "desc"},
+			verify: func(t *testing.T, cfg *config.Config) {
+				assert.Equal(t, "status", cfg.UI.DAGs.SortField)
+				assert.Equal(t, "desc", cfg.UI.DAGs.SortOrder)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := loadWithEnv(t, tt.yaml, tt.env)
+			tt.verify(t, cfg)
+		})
+	}
+}
+
+func TestLoad_LegacyEnvironmentVariables(t *testing.T) {
+	// Test deprecated env vars still work
+	cfg := loadWithEnv(t, "# empty", map[string]string{
+		"DAGU__ADMIN_PORT":         "1234",
+		"DAGU__ADMIN_HOST":         "0.0.0.0",
+		"DAGU__ADMIN_NAVBAR_TITLE": "LegacyTitle",
+	})
+
+	assert.Equal(t, 1234, cfg.Server.Port)
+	assert.Equal(t, "0.0.0.0", cfg.Server.Host)
+	assert.Equal(t, "LegacyTitle", cfg.UI.NavbarTitle)
+}
+
+func TestConfigLoader_LoadLegacyFields(t *testing.T) {
+	loader := &config.ConfigLoader{}
+
+	t.Run("AllFieldsSet", func(t *testing.T) {
+		def := config.Definition{
+			BasicAuthUsername: "user",
+			BasicAuthPassword: "pass",
+			DAGsDir:           "/dags",
+			NavbarTitle:       "Title",
+		}
+
+		cfg := config.Config{}
+		loader.LoadLegacyFields(&cfg, def)
+
+		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
+		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
+		assert.Equal(t, "/dags", cfg.Paths.DAGsDir)
+		assert.Equal(t, "Title", cfg.UI.NavbarTitle)
+	})
+}
+
+func TestLoad_Timezone(t *testing.T) {
+	t.Run("ValidTimezone", func(t *testing.T) {
+		cfg := loadFromYAML(t, `tz: "America/New_York"`)
+		assert.Equal(t, "America/New_York", cfg.Global.TZ)
+		assert.NotNil(t, cfg.Global.Location)
+	})
+
+	t.Run("InvalidTimezone", func(t *testing.T) {
+		viper.Reset()
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		err := os.WriteFile(configFile, []byte(`tz: "Invalid/Timezone"`), 0600)
+		require.NoError(t, err)
+
+		_, err = config.Load(config.WithConfigFile(configFile))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to load timezone")
+	})
+}
+
+func TestLoad_BasePathCleaning(t *testing.T) {
+	cfg := loadFromYAML(t, `basePath: "////dagu//"`)
+	assert.Equal(t, "/dagu", cfg.Server.BasePath)
+}
+
+// loadFromYAML loads config from YAML string
+func loadFromYAML(t *testing.T, yaml string) *config.Config {
+	t.Helper()
+	viper.Reset()
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	err := os.WriteFile(configFile, []byte(yaml), 0600)
+	require.NoError(t, err)
+	cfg, err := config.Load(config.WithConfigFile(configFile))
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	return cfg
+}
+
+// loadWithEnv loads config with environment variables set
+func loadWithEnv(t *testing.T, yaml string, env map[string]string) *config.Config {
+	t.Helper()
+	viper.Reset()
+
+	// Set environment variables
+	for k, v := range env {
+		original := os.Getenv(k)
+		os.Setenv(k, v)
+		t.Cleanup(func() {
+			if original == "" {
+				os.Unsetenv(k)
+			} else {
+				os.Setenv(k, original)
+			}
+		})
+	}
+
+	return loadFromYAML(t, yaml)
 }
