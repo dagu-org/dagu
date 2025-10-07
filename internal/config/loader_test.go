@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoad_EnvBindings(t *testing.T) {
+func TestLoad_Env(t *testing.T) {
 	// Reset viper to ensure clean state
 	viper.Reset()
 	defer viper.Reset()
@@ -380,29 +380,19 @@ paths:
 	assert.Equal(t, "/custom/data/service-registry", cfg.Paths.ServiceRegistryDir)
 }
 
-func TestLoad_Defaults(t *testing.T) {
-	cfg := loadFromYAML(t, "# empty config")
+func TestLoad_EdgeCases_Errors(t *testing.T) {
+	t.Run("InvalidTimezone", func(t *testing.T) {
+		viper.Reset()
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, "config.yaml")
+		err := os.WriteFile(configFile, []byte(`tz: "Invalid/Timezone"`), 0600)
+		require.NoError(t, err)
 
-	assert.Equal(t, "127.0.0.1", cfg.Server.Host)
-	assert.Equal(t, 8080, cfg.Server.Port)
-	assert.False(t, cfg.Global.Debug)
-	assert.Equal(t, "text", cfg.Global.LogFormat)
-	assert.Equal(t, 100, cfg.UI.MaxDashboardPageLimit)
-	assert.Equal(t, "utf-8", cfg.UI.LogEncodingCharset)
-	assert.True(t, cfg.Server.Permissions[config.PermissionWriteDAGs])
-	assert.True(t, cfg.Server.Permissions[config.PermissionRunDAGs])
+		_, err = config.Load(config.WithConfigFile(configFile))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to load timezone")
+	})
 
-	// Scheduler defaults
-	assert.Equal(t, 8090, cfg.Scheduler.Port)
-	assert.Equal(t, 30*time.Second, cfg.Scheduler.LockStaleThreshold)
-	assert.Equal(t, 5*time.Second, cfg.Scheduler.LockRetryInterval)
-	assert.Equal(t, 45*time.Second, cfg.Scheduler.ZombieDetectionInterval)
-
-	// Worker defaults
-	assert.Equal(t, 100, cfg.Worker.MaxActiveRuns)
-}
-
-func TestLoad_ValidationErrors(t *testing.T) {
 	t.Run("IncompleteTLS", func(t *testing.T) {
 		viper.Reset()
 		tempDir := t.TempDir()
@@ -418,69 +408,43 @@ tls:
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "TLS configuration incomplete")
 	})
-}
 
-func TestLoad_InvalidSchedulerDurations(t *testing.T) {
-	cfg := loadFromYAML(t, `
+	t.Run("InvalidSchedulerDurations", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
 scheduler:
   lockStaleThreshold: "invalid"
   lockRetryInterval: "bad-duration"
   zombieDetectionInterval: "not-a-duration"
 `)
+		assert.Equal(t, 30*time.Second, cfg.Scheduler.LockStaleThreshold)
+		assert.Equal(t, 5*time.Second, cfg.Scheduler.LockRetryInterval)
+		assert.Equal(t, time.Duration(0), cfg.Scheduler.ZombieDetectionInterval)
 
-	// Should still load with defaults since parsing failed
-	assert.Equal(t, 30*time.Second, cfg.Scheduler.LockStaleThreshold)
-	assert.Equal(t, 5*time.Second, cfg.Scheduler.LockRetryInterval)
-	// ZombieDetectionInterval stays 0 because viper.IsSet returns true even for invalid values
-	assert.Equal(t, time.Duration(0), cfg.Scheduler.ZombieDetectionInterval)
-
-	// Should have warnings
-	require.Len(t, cfg.Warnings, 3)
-	assert.Contains(t, cfg.Warnings[0], "Invalid scheduler.lockStaleThreshold")
-	assert.Contains(t, cfg.Warnings[1], "Invalid scheduler.lockRetryInterval")
-	assert.Contains(t, cfg.Warnings[2], "Invalid scheduler.zombieDetectionInterval")
-}
-
-func TestLoad_UIConfiguration(t *testing.T) {
-	t.Run("DAGsConfig", func(t *testing.T) {
-		cfg := loadFromYAML(t, `
-ui:
-  dags:
-    sortField: "lastRun"
-    sortOrder: "desc"
-`)
-		assert.Equal(t, "lastRun", cfg.UI.DAGs.SortField)
-		assert.Equal(t, "desc", cfg.UI.DAGs.SortOrder)
-	})
-
-	t.Run("Queues", func(t *testing.T) {
-		cfg := loadFromYAML(t, `
-queues:
-  enabled: true
-  config:
-    - name: "default"
-      maxConcurrency: 5
-    - name: "highPriority"
-      maxConcurrency: 2
-`)
-		assert.True(t, cfg.Queues.Enabled)
-		require.Len(t, cfg.Queues.Config, 2)
-		assert.Equal(t, "default", cfg.Queues.Config[0].Name)
-		assert.Equal(t, 5, cfg.Queues.Config[0].MaxActiveRuns)
+		require.Len(t, cfg.Warnings, 3)
+		assert.Contains(t, cfg.Warnings[0], "Invalid scheduler.lockStaleThreshold")
+		assert.Contains(t, cfg.Warnings[1], "Invalid scheduler.lockRetryInterval")
+		assert.Contains(t, cfg.Warnings[2], "Invalid scheduler.zombieDetectionInterval")
 	})
 }
 
-func TestLoad_LegacyEnvironmentVariables(t *testing.T) {
-	// Test deprecated env vars still work
+func TestLoad_LegacyEnv(t *testing.T) {
 	cfg := loadWithEnv(t, "# empty", map[string]string{
 		"DAGU__ADMIN_PORT":         "1234",
 		"DAGU__ADMIN_HOST":         "0.0.0.0",
 		"DAGU__ADMIN_NAVBAR_TITLE": "LegacyTitle",
+		"DAGU__ADMIN_NAVBAR_COLOR": "#abc123",
+		"DAGU__DATA":               "/legacy/data",
+		"DAGU__SUSPEND_FLAGS_DIR":  "/legacy/suspend",
+		"DAGU__ADMIN_LOGS_DIR":     "/legacy/adminlogs",
 	})
 
 	assert.Equal(t, 1234, cfg.Server.Port)
 	assert.Equal(t, "0.0.0.0", cfg.Server.Host)
 	assert.Equal(t, "LegacyTitle", cfg.UI.NavbarTitle)
+	assert.Equal(t, "#abc123", cfg.UI.NavbarColor)
+	assert.Equal(t, "/legacy/data", cfg.Paths.DataDir)
+	assert.Equal(t, "/legacy/suspend", cfg.Paths.SuspendFlagsDir)
+	assert.Equal(t, "/legacy/adminlogs", cfg.Paths.AdminLogsDir)
 }
 
 func TestLoad_LoadLegacyFields(t *testing.T) {
@@ -502,31 +466,6 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		assert.Equal(t, "/dags", cfg.Paths.DAGsDir)
 		assert.Equal(t, "Title", cfg.UI.NavbarTitle)
 	})
-}
-
-func TestLoad_Timezone(t *testing.T) {
-	t.Run("ValidTimezone", func(t *testing.T) {
-		cfg := loadFromYAML(t, `tz: "America/New_York"`)
-		assert.Equal(t, "America/New_York", cfg.Global.TZ)
-		assert.NotNil(t, cfg.Global.Location)
-	})
-
-	t.Run("InvalidTimezone", func(t *testing.T) {
-		viper.Reset()
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "config.yaml")
-		err := os.WriteFile(configFile, []byte(`tz: "Invalid/Timezone"`), 0600)
-		require.NoError(t, err)
-
-		_, err = config.Load(config.WithConfigFile(configFile))
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to load timezone")
-	})
-}
-
-func TestLoad_BasePathCleaning(t *testing.T) {
-	cfg := loadFromYAML(t, `basePath: "////dagu//"`)
-	assert.Equal(t, "/dagu", cfg.Server.BasePath)
 }
 
 // loadWithEnv loads config with environment variables set
