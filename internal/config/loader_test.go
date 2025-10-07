@@ -210,7 +210,6 @@ tz: "UTC"
 logFormat: "json"
 headless: true
 latestStatusToday: true
-strictValidation: true
 defaultShell: "/bin/bash"
 skipExamples: true
 paths:
@@ -275,7 +274,6 @@ queues:
     - name: "normal"
       maxActiveRuns: 10
 coordinator:
-  id: "coordinator-1"
   host: "coordinator.example.com"
   port: 8081
 worker:
@@ -318,7 +316,6 @@ scheduler:
 			APIBasePath:       "/api/v1",
 			Headless:          true,
 			LatestStatusToday: true,
-			StrictValidation:  true,
 			Auth: config.Auth{
 				Basic: config.AuthBasic{Username: "admin", Password: "secret"},
 				Token: config.AuthToken{Value: "api-token"},
@@ -388,7 +385,6 @@ scheduler:
 			},
 		},
 		Coordinator: config.Coordinator{
-			ID:   "coordinator-1",
 			Host: "coordinator.example.com",
 			Port: 8081,
 		},
