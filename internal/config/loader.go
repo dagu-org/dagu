@@ -141,7 +141,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 
 	// Initialize the timezone (loads the time.Location and sets the TZ environment variable).
-	if err := cfg.Global.setTimezone(); err != nil {
+	if err := setTimezone(&cfg.Global); err != nil {
 		return nil, fmt.Errorf("failed to set timezone: %w", err)
 	}
 

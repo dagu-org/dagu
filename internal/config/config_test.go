@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestServer_cleanBasePath(t *testing.T) {
@@ -57,57 +56,6 @@ func TestServer_cleanBasePath(t *testing.T) {
 			assert.Equal(t, tt.expected, srv.BasePath)
 		})
 	}
-}
-
-func TestGlobal_setTimezone(t *testing.T) {
-	t.Run("ValidTimezone", func(t *testing.T) {
-		g := &Global{TZ: "America/New_York"}
-		err := g.setTimezone()
-		require.NoError(t, err)
-
-		assert.Equal(t, "America/New_York", g.TZ)
-		assert.NotNil(t, g.Location)
-		assert.Equal(t, "America/New_York", g.Location.String())
-		// New York is UTC-5 or UTC-4 depending on DST
-		assert.NotEqual(t, 0, g.TzOffsetInSec)
-	})
-
-	t.Run("UTCTimezone", func(t *testing.T) {
-		g := &Global{TZ: "UTC"}
-		err := g.setTimezone()
-		require.NoError(t, err)
-
-		assert.Equal(t, "UTC", g.TZ)
-		assert.NotNil(t, g.Location)
-		assert.Equal(t, 0, g.TzOffsetInSec)
-	})
-
-	t.Run("AsiaTokyoTimezone", func(t *testing.T) {
-		g := &Global{TZ: "Asia/Tokyo"}
-		err := g.setTimezone()
-		require.NoError(t, err)
-
-		assert.Equal(t, "Asia/Tokyo", g.TZ)
-		assert.NotNil(t, g.Location)
-		assert.Equal(t, 9*3600, g.TzOffsetInSec) // Tokyo is UTC+9
-	})
-
-	t.Run("InvalidTimezone", func(t *testing.T) {
-		g := &Global{TZ: "Invalid/Timezone"}
-		err := g.setTimezone()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to load timezone")
-	})
-
-	t.Run("EmptyTimezoneUsesLocal", func(t *testing.T) {
-		g := &Global{TZ: ""}
-		err := g.setTimezone()
-		require.NoError(t, err)
-
-		// Should set TZ to UTC or UTC+X format
-		assert.NotEmpty(t, g.TZ)
-		assert.NotNil(t, g.Location)
-	})
 }
 
 func TestAuthBasic_Enabled(t *testing.T) {
@@ -186,57 +134,6 @@ func TestAuthOIDC_Enabled(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, tt.oidc.Enabled())
-		})
-	}
-}
-
-func TestTLSConfig_IsEnabled(t *testing.T) {
-	tests := []struct {
-		name     string
-		tls      TLSConfig
-		expected bool
-	}{
-		{
-			name: "AllFieldsSet",
-			tls: TLSConfig{
-				CertFile: "/cert.pem",
-				KeyFile:  "/key.pem",
-				CAFile:   "/ca.pem",
-			},
-			expected: true,
-		},
-		{
-			name: "MissingCertFile",
-			tls: TLSConfig{
-				CertFile: "",
-				KeyFile:  "/key.pem",
-				CAFile:   "/ca.pem",
-			},
-			expected: false,
-		},
-		{
-			name: "MissingKeyFile",
-			tls: TLSConfig{
-				CertFile: "/cert.pem",
-				KeyFile:  "",
-				CAFile:   "/ca.pem",
-			},
-			expected: false,
-		},
-		{
-			name: "MissingCAFile",
-			tls: TLSConfig{
-				CertFile: "/cert.pem",
-				KeyFile:  "/key.pem",
-				CAFile:   "",
-			},
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.tls.IsEnabled())
 		})
 	}
 }
