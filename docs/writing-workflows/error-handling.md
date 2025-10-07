@@ -128,6 +128,8 @@ See the [Continue On Reference](/reference/continue-on) for complete documentati
 
 ## Lifecycle Handlers
 
+Lifecycle handlers fire after the main steps complete and let you add notifications or cleanup logic based on the final DAG status. See the [Lifecycle Handlers guide](/writing-workflows/lifecycle-handlers) for execution order, context access, and additional patterns. Quick examples:
+
 ```yaml
 handlerOn:
   success:
@@ -150,8 +152,6 @@ handlerOn:
         subject: "Failed: ${DAG_NAME}"
         message: "Check logs: ${DAG_RUN_LOG_FILE}"
 ```
-
-Execution order: step → status handlers → exit handler
 
 ## Email Notifications
 

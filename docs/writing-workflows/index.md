@@ -66,7 +66,8 @@ Configuration precedence: System defaults → Base config → DAG config
 3. **[Control Flow](/writing-workflows/control-flow)** - Parallel execution, conditions, loops
 4. **[Data & Variables](/writing-workflows/data-variables)** - Parameters, outputs, data passing
 5. **[Error Handling](/writing-workflows/error-handling)** - Retries, failures, notifications
-6. **[Patterns](/writing-workflows/control-flow#patterns)** - Composition, optimization, best practices
+6. **[Lifecycle Handlers](/writing-workflows/lifecycle-handlers)** - Cleanup, notifications, post-run tasks
+7. **[Patterns](/writing-workflows/control-flow#patterns)** - Composition, optimization, best practices
 
 ## Complete Example
 
