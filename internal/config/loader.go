@@ -442,14 +442,14 @@ func (l *ConfigLoader) setupViper() error {
 		return err
 	}
 	xdgConfig := l.getXDGConfig(homeDir)
-	resolver := NewResolver("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
+	paths := ResolvePaths("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
 
 	// Collect any warnings from path resolution.
-	l.warnings = append(l.warnings, resolver.Warnings...)
+	l.warnings = append(l.warnings, paths.Warnings...)
 
-	l.configureViper(resolver)
+	l.configureViper(paths)
 	l.bindEnvironmentVariables()
-	l.setDefaultValues(resolver)
+	l.setDefaultValues(paths)
 
 	return nil
 }
@@ -472,8 +472,8 @@ func (l *ConfigLoader) getXDGConfig(homeDir string) XDGConfig {
 }
 
 // configureViper sets up viper's configuration file location, type, and environment variable handling.
-func (l *ConfigLoader) configureViper(resolver PathResolver) {
-	l.setupViperConfigPath(resolver.ConfigDir)
+func (l *ConfigLoader) configureViper(paths Paths) {
+	l.setupViperConfigPath(paths.ConfigDir)
 	viper.SetEnvPrefix(strings.ToUpper(build.Slug))
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
@@ -490,16 +490,16 @@ func (l *ConfigLoader) setupViperConfigPath(configDir string) {
 }
 
 // setDefaultValues establishes the default configuration values for various keys.
-func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
+func (l *ConfigLoader) setDefaultValues(paths Paths) {
 	// File paths
 	viper.SetDefault("workDir", "")         // Defaults to DAG location if empty.
 	viper.SetDefault("skipExamples", false) // Defaults to creating examples
-	viper.SetDefault("paths.dagsDir", resolver.DAGsDir)
-	viper.SetDefault("paths.suspendFlagsDir", resolver.SuspendFlagsDir)
-	viper.SetDefault("paths.dataDir", resolver.DataDir)
-	viper.SetDefault("paths.logDir", resolver.LogsDir)
-	viper.SetDefault("paths.adminLogsDir", resolver.AdminLogsDir)
-	viper.SetDefault("paths.baseConfig", resolver.BaseConfigFile)
+	viper.SetDefault("paths.dagsDir", paths.DAGsDir)
+	viper.SetDefault("paths.suspendFlagsDir", paths.SuspendFlagsDir)
+	viper.SetDefault("paths.dataDir", paths.DataDir)
+	viper.SetDefault("paths.logDir", paths.LogsDir)
+	viper.SetDefault("paths.adminLogsDir", paths.AdminLogsDir)
+	viper.SetDefault("paths.baseConfig", paths.BaseConfigFile)
 
 	// Server settings
 	viper.SetDefault("host", "127.0.0.1")
