@@ -24,7 +24,7 @@ func New(drs models.DAGRunStore, ps models.ProcStore, cfg *config.Config) Manage
 	return Manager{
 		dagRunStore: drs,
 		procStore:   ps,
-		cmdBuilder:  NewCmdBuilder(cfg),
+		cmdBuilder:  NewSubCmdBuilder(cfg),
 	}
 }
 

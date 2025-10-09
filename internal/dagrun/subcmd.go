@@ -105,8 +105,8 @@ type SubCmdBuilder struct {
 	baseEnv    config.BaseEnv
 }
 
-// NewCmdBuilder creates a new CmdBuilder instance.
-func NewCmdBuilder(cfg *config.Config) *SubCmdBuilder {
+// NewSubCmdBuilder creates a new CmdBuilder instance.
+func NewSubCmdBuilder(cfg *config.Config) *SubCmdBuilder {
 	return &SubCmdBuilder{
 		executable: cfg.Paths.Executable,
 		configFile: cfg.Global.ConfigFileUsed,
