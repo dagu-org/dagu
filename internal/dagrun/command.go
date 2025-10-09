@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"strconv"
 
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -102,12 +101,12 @@ type CmdBuilder struct {
 	configFile string
 }
 
-func NewCmdBuilder(ctx context.Context) *CmdBuilder {
-	return &CmdBuilder{configFile: config.ConfigFileUsed(ctx)}
+func NewCmdBuilder(configFile string) *CmdBuilder {
+	return &CmdBuilder{configFile: configFile}
 }
 
 // Start creates a start command spec.
-func (b *CmdBuilder) Start(ctx context.Context, dag *digraph.DAG, opts StartOptions) CmdSpec {
+func (b *CmdBuilder) Start(dag *digraph.DAG, opts StartOptions) CmdSpec {
 	args := []string{"start"}
 
 	if opts.Params != "" {
@@ -130,12 +129,12 @@ func (b *CmdBuilder) Start(ctx context.Context, dag *digraph.DAG, opts StartOpti
 	return CmdSpec{
 		Args:       args,
 		WorkingDir: dag.WorkingDir,
-		Env:        config.GetBaseEnv(ctx).AsSlice(),
+		Env:        os.Environ(),
 	}
 }
 
 // Enqueue creates an enqueue command spec.
-func (b *CmdBuilder) Enqueue(ctx context.Context, dag *digraph.DAG, opts EnqueueOptions) CmdSpec {
+func (b *CmdBuilder) Enqueue(dag *digraph.DAG, opts EnqueueOptions) CmdSpec {
 	args := []string{"enqueue"}
 
 	if opts.Params != "" {
@@ -158,14 +157,14 @@ func (b *CmdBuilder) Enqueue(ctx context.Context, dag *digraph.DAG, opts Enqueue
 	return CmdSpec{
 		Args:       args,
 		WorkingDir: dag.WorkingDir,
-		Env:        config.GetBaseEnv(ctx).AsSlice(),
+		Env:        os.Environ(),
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 	}
 }
 
 // Dequeue creates a dequeue command spec.
-func (b *CmdBuilder) Dequeue(ctx context.Context, dag *digraph.DAG, dagRun digraph.DAGRunRef) CmdSpec {
+func (b *CmdBuilder) Dequeue(dag *digraph.DAG, dagRun digraph.DAGRunRef) CmdSpec {
 	args := []string{"dequeue", fmt.Sprintf("--dag-run=%s", dagRun.String())}
 
 	if b.configFile != "" {
@@ -175,14 +174,14 @@ func (b *CmdBuilder) Dequeue(ctx context.Context, dag *digraph.DAG, dagRun digra
 	return CmdSpec{
 		Args:       args,
 		WorkingDir: dag.WorkingDir,
-		Env:        config.GetBaseEnv(ctx).AsSlice(),
+		Env:        os.Environ(),
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 	}
 }
 
 // Restart creates a restart command spec.
-func (b *CmdBuilder) Restart(ctx context.Context, dag *digraph.DAG, opts RestartOptions) CmdSpec {
+func (b *CmdBuilder) Restart(dag *digraph.DAG, opts RestartOptions) CmdSpec {
 	args := []string{"restart"}
 
 	if opts.Quiet {
@@ -196,12 +195,12 @@ func (b *CmdBuilder) Restart(ctx context.Context, dag *digraph.DAG, opts Restart
 	return CmdSpec{
 		Args:       args,
 		WorkingDir: dag.WorkingDir,
-		Env:        config.GetBaseEnv(ctx).AsSlice(),
+		Env:        os.Environ(),
 	}
 }
 
 // Retry creates a retry command spec.
-func (b *CmdBuilder) Retry(ctx context.Context, dag *digraph.DAG, dagRunID string, stepName string, disableMaxActiveRuns bool) CmdSpec {
+func (b *CmdBuilder) Retry(dag *digraph.DAG, dagRunID string, stepName string, disableMaxActiveRuns bool) CmdSpec {
 	args := []string{"retry", fmt.Sprintf("--run-id=%s", dagRunID)}
 
 	if stepName != "" {
@@ -218,12 +217,12 @@ func (b *CmdBuilder) Retry(ctx context.Context, dag *digraph.DAG, dagRunID strin
 	return CmdSpec{
 		Args:       args,
 		WorkingDir: dag.WorkingDir,
-		Env:        config.GetBaseEnv(ctx).AsSlice(),
+		Env:        os.Environ(),
 	}
 }
 
 // TaskStart creates a start command spec for coordinator tasks.
-func (b *CmdBuilder) TaskStart(ctx context.Context, task *coordinatorv1.Task) CmdSpec {
+func (b *CmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 	args := []string{"start"}
 
 	// Add hierarchy flags for child DAGs
@@ -247,12 +246,12 @@ func (b *CmdBuilder) TaskStart(ctx context.Context, task *coordinatorv1.Task) Cm
 
 	return CmdSpec{
 		Args: args,
-		Env:  config.GetBaseEnv(ctx).AsSlice(),
+		Env:  os.Environ(),
 	}
 }
 
 // TaskRetry creates a retry command spec for coordinator tasks.
-func (b *CmdBuilder) TaskRetry(ctx context.Context, task *coordinatorv1.Task) CmdSpec {
+func (b *CmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId)}
 
 	if task.Step != "" {
@@ -265,6 +264,6 @@ func (b *CmdBuilder) TaskRetry(ctx context.Context, task *coordinatorv1.Task) Cm
 
 	return CmdSpec{
 		Args: args,
-		Env:  config.GetBaseEnv(ctx).AsSlice(),
+		Env:  os.Environ(),
 	}
 }

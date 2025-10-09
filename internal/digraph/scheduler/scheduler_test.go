@@ -328,12 +328,14 @@ func TestScheduler(t *testing.T) {
 	})
 	t.Run("RetryWithScript", func(t *testing.T) {
 		sc := setupScheduler(t)
+		tmpDir := t.TempDir()
+		testFile := path.Join(tmpDir, "testfile.txt")
 
-		const testEnv = "TEST_RETRY_WITH_SCRIPT"
 		graph := sc.newGraph(t,
 			newStep("1",
 				withScript(`
-					if [ "$TEST_RETRY_WITH_SCRIPT" -eq 1 ]; then
+					if [ ! -f "`+testFile+`" ]; then
+						touch `+testFile+`
 						exit 1
 					fi
 					exit 0
@@ -341,15 +343,6 @@ func TestScheduler(t *testing.T) {
 				withRetryPolicy(1, time.Millisecond*50),
 			),
 		)
-
-		_ = os.Setenv(testEnv, "1")
-		go func() {
-			time.Sleep(time.Millisecond * 50)
-			_ = os.Setenv(testEnv, "0")
-			t.Cleanup(func() {
-				_ = os.Unsetenv(testEnv)
-			})
-		}()
 
 		result := graph.Schedule(t, status.Success)
 

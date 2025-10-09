@@ -90,7 +90,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	cfg, err := config.Load(configLoaderOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
+		return nil, err
 	}
 	ctx = config.WithConfig(ctx, cfg)
 
@@ -128,7 +128,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	ps := fileproc.New(cfg.Paths.ProcDir)
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
-	drm := dagrun.New(drs, ps, cfg.Paths.Executable)
+	drm := dagrun.New(drs, ps, cfg.Paths.Executable, cfg.Global.ConfigFileUsed)
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
@@ -144,15 +144,6 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		QueueStore:      qs,
 		ServiceRegistry: sm,
 	}, nil
-}
-
-// HistoryManager initializes a HistoryManager using the provided options. If not supplied,
-func (c *Context) HistoryManager(drs models.DAGRunStore) dagrun.Manager {
-	return dagrun.New(
-		drs,
-		c.ProcStore,
-		c.Config.Paths.Executable,
-	)
 }
 
 // NewServer creates and returns a new web UI NewServer.

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -165,6 +166,7 @@ func TestBuildCommand(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
+	baseEnv := config.NewBaseEnv(nil)
 	env := Env{
 		Env: digraph.Env{
 			DAG:        &digraph.DAG{Name: "parent"},
@@ -172,6 +174,7 @@ func TestBuildCommand(t *testing.T) {
 			RootDAGRun: digraph.NewDAGRunRef("parent", "root-123"),
 			DAGRunID:   "parent-456",
 			Envs:       map[string]string{"TEST_ENV": "value"},
+			BaseEnv:    &baseEnv,
 		},
 		Variables: &SyncMap{},
 		Step:      digraph.Step{},

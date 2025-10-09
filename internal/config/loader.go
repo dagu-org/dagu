@@ -28,7 +28,7 @@ func Load(opts ...ConfigLoaderOption) (*Config, error) {
 	loader := NewConfigLoader(opts...)
 	cfg, err := loader.Load()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
+		return nil, err
 	}
 	return cfg, nil
 }
@@ -36,9 +36,10 @@ func Load(opts ...ConfigLoaderOption) (*Config, error) {
 // ConfigLoader is responsible for reading and merging configuration from various sources.
 // The internal mutex ensures thread-safety when loading the configuration.
 type ConfigLoader struct {
-	lock       sync.Mutex
-	configFile string   // Optional explicit path to the configuration file.
-	warnings   []string // Collected warnings during configuration resolution.
+	lock              sync.Mutex
+	configFile        string   // Optional explicit path to the configuration file.
+	warnings          []string // Collected warnings during configuration resolution.
+	additionalBaseEnv []string // Additional environment variables to append to the base environment.
 }
 
 // ConfigLoaderOption defines a functional option for configuring a ConfigLoader.
@@ -48,6 +49,13 @@ type ConfigLoaderOption func(*ConfigLoader)
 func WithConfigFile(configFile string) ConfigLoaderOption {
 	return func(l *ConfigLoader) {
 		l.configFile = configFile
+	}
+}
+
+// WithAdditionalBaseEnv returns a ConfigLoaderOption that appends additional environment variables
+func WithAdditionalBaseEnv(env []string) ConfigLoaderOption {
+	return func(l *ConfigLoader) {
+		l.additionalBaseEnv = env
 	}
 }
 
@@ -118,6 +126,9 @@ func (l *ConfigLoader) Load() (*Config, error) {
 func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	var cfg Config
 
+	baseEnv := LoadBaseEnv()
+	baseEnv.variables = append(baseEnv.variables, l.additionalBaseEnv...)
+
 	// Set global configuration values.
 	cfg.Global = Global{
 		Debug:        def.Debug,
@@ -125,7 +136,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		TZ:           def.TZ,
 		DefaultShell: def.DefaultShell,
 		SkipExamples: viper.GetBool("skipExamples"),
-		BaseEnv:      LoadBaseEnv(),
+		BaseEnv:      baseEnv,
 	}
 
 	// Set Peer configuration if provided

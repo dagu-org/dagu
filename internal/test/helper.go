@@ -95,6 +95,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	ctx := createDefaultContext()
 	cfg, err := config.Load()
 	require.NoError(t, err)
+
 	ctx = config.WithConfig(ctx, cfg)
 
 	cfg.Paths.Executable = executablePath
@@ -120,7 +121,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
-	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable)
+	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable, cfg.Global.ConfigFileUsed)
 
 	helper := Helper{
 		Context:         ctx,

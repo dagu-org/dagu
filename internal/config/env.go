@@ -10,6 +10,7 @@ type BaseEnv struct {
 	variables []string
 }
 
+// NewBaseEnv creates a new BaseEnv with the provided variables.
 func NewBaseEnv(vars []string) BaseEnv {
 	return BaseEnv{variables: vars}
 }

@@ -64,7 +64,7 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 	qs := filequeue.New(helper.Config.Paths.QueueDir)
 
 	// Create DAG run manager
-	drm := dagrun.New(drs, ps, helper.Config.Paths.Executable)
+	drm := dagrun.New(drs, ps, helper.Config.Paths.Executable, helper.Config.Global.ConfigFileUsed)
 
 	// Create entry reader
 	coordinatorCli := coordinator.New(helper.ServiceRegistry, coordinator.DefaultConfig())

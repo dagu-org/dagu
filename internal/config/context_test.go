@@ -71,5 +71,5 @@ func TestBaseEnvVars(t *testing.T) {
 	ctx = config.WithConfig(context.Background(), &config.Config{
 		Global: config.Global{BaseEnv: baseEnv},
 	})
-	assert.Equal(t, []string{"A=1", "B=2"}, config.GetBaseEnv(ctx))
+	assert.Equal(t, []string{"A=1", "B=2"}, config.GetBaseEnv(ctx).AsSlice())
 }
