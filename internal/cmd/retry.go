@@ -140,6 +140,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 		ctx.DAGRunStore,
 		ctx.ServiceRegistry,
 		rootRun,
+		ctx.Config.Global.Peer,
 		agent.Options{
 			RetryTarget:     status,
 			ParentDAGRun:    status.Parent,

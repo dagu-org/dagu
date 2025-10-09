@@ -2,8 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"path"
 	"time"
 )
 
@@ -57,42 +55,17 @@ type Global struct {
 	// If not provided, platform-specific defaults are used (PowerShell on Windows, $SHELL on Unix).
 	DefaultShell string
 
-	// ConfigPath is the path to the configuration file used to load settings.
-	ConfigPath string
+	// ConfigFileUsed is the path to the configuration file used to load settings.
+	ConfigFileUsed string
 
 	// SkipExamples disables the automatic creation of example DAGs when the DAGs directory is empty.
 	SkipExamples bool
 
 	// Peer contains configuration for peer connections over gRPC.
 	Peer Peer
-}
 
-func (cfg *Global) setTimezone() error {
-	if cfg.TZ != "" {
-		loc, err := time.LoadLocation(cfg.TZ)
-		if err != nil {
-			return fmt.Errorf("failed to load timezone: %w", err)
-		}
-		cfg.Location = loc
-
-		t := time.Now().In(loc)
-		_, offset := t.Zone()
-		cfg.TzOffsetInSec = offset
-
-		_ = os.Setenv("TZ", cfg.TZ)
-	} else {
-		_, offset := time.Now().Zone()
-		if offset == 0 {
-			cfg.TZ = "UTC"
-			cfg.TzOffsetInSec = 0
-		} else {
-			cfg.TZ = fmt.Sprintf("UTC%+d", offset/3600)
-			cfg.TzOffsetInSec = offset
-		}
-		cfg.Location = time.Local
-	}
-
-	return nil
+	// BaseEnv holds base environment variables to be used for child processes.
+	BaseEnv BaseEnv
 }
 
 // Server contains the API server configuration
@@ -143,27 +116,6 @@ const (
 	PermissionRunDAGs   Permission = "run_dags"
 )
 
-func (cfg *Server) cleanBasePath() {
-	if cfg.BasePath == "" {
-		return
-	}
-
-	// Clean the provided BasePath.
-	cleanPath := path.Clean(cfg.BasePath)
-
-	// Ensure the path is absolute.
-	if !path.IsAbs(cleanPath) {
-		cleanPath = path.Join("/", cleanPath)
-	}
-
-	// If the cleaned path is the root, reset it to an empty string.
-	if cleanPath == "/" {
-		cfg.BasePath = ""
-	} else {
-		cfg.BasePath = cleanPath
-	}
-}
-
 // Auth represents the authentication configuration
 type Auth struct {
 	Basic AuthBasic
@@ -177,19 +129,9 @@ type AuthBasic struct {
 	Password string
 }
 
-// Enabled checks if basic authentication is enabled
-func (cfg *AuthBasic) Enabled() bool {
-	return cfg.Username != "" && cfg.Password != ""
-}
-
 // AuthToken represents the authentication token configuration
 type AuthToken struct {
 	Value string
-}
-
-// Enabled checks if the authentication token is enabled
-func (cfg *AuthToken) Enabled() bool {
-	return cfg.Value != ""
 }
 
 type AuthOIDC struct {
@@ -199,10 +141,6 @@ type AuthOIDC struct {
 	Issuer       string   //the URL identifier for the authorization service. for example: "https://accounts.google.com" - try adding "/.well-known/openid-configuration" to the path to make sure it's correct
 	Scopes       []string //OAuth scopes. If you're unsure go with: []string{oidc.ScopeOpenID, "profile", "email"}
 	Whitelist    []string //OAuth User whitelist ref userinfo.email https://github.com/coreos/go-oidc/blob/v2/oidc.go#L199
-}
-
-func (cfg *AuthOIDC) Enabled() bool {
-	return cfg.ClientId != "" && cfg.ClientSecret != "" && cfg.Issuer != ""
 }
 
 // Paths represents the file system paths configuration
@@ -250,11 +188,6 @@ type TLSConfig struct {
 	CertFile string
 	KeyFile  string
 	CAFile   string
-}
-
-// IsEnabled checks if TLS is enabled by verifying that all necessary files are provided
-func (cfg *TLSConfig) IsEnabled() bool {
-	return cfg.CertFile != "" && cfg.KeyFile != "" && cfg.CAFile != ""
 }
 
 // Queues represents the global queue configuration
@@ -318,4 +251,24 @@ type Peer struct {
 
 	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
 	Insecure bool
+}
+
+// Validate performs basic validation on the configuration to ensure required fields are set
+// and that numerical values fall within acceptable ranges.
+func (c *Config) Validate() error {
+	if c.Server.Port < 0 || c.Server.Port > 65535 {
+		return fmt.Errorf("invalid port number: %d", c.Server.Port)
+	}
+
+	if c.Server.TLS != nil {
+		if c.Server.TLS.CertFile == "" || c.Server.TLS.KeyFile == "" {
+			return fmt.Errorf("TLS configuration incomplete: both cert and key files are required")
+		}
+	}
+
+	if c.UI.MaxDashboardPageLimit < 1 {
+		return fmt.Errorf("invalid max dashboard page limit: %d", c.UI.MaxDashboardPageLimit)
+	}
+
+	return nil
 }

@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
@@ -152,8 +152,8 @@ func TestMainFunction(t *testing.T) {
 func TestInit(t *testing.T) {
 	// Test that init() sets up the version correctly
 	// Note: init() is automatically called by Go
-	// Since the test version is set to "0.0.0", that's what should be in build.Version
-	assert.NotEmpty(t, build.Version)
+	// Since the test version is set to "0.0.0", that's what should be in config.Version
+	assert.NotEmpty(t, config.Version)
 }
 
 func TestRootCommandStructure(t *testing.T) {
@@ -188,7 +188,7 @@ func TestRootCommandStructure(t *testing.T) {
 }
 
 func TestRootCommandMetadata(t *testing.T) {
-	assert.Equal(t, build.Slug, rootCmd.Use)
+	assert.Equal(t, config.AppSlug, rootCmd.Use)
 	assert.Equal(t, "Dagu is a compact, portable workflow engine", rootCmd.Short)
 	assert.Contains(t, rootCmd.Long, "declarative model for orchestrating command execution")
 	assert.Contains(t, rootCmd.Long, "shell scripts, Python commands, containerized")
@@ -221,7 +221,7 @@ func TestCommandHelp(t *testing.T) {
 // Helper to reset root command state
 func resetRootCommand() {
 	rootCmd = &cobra.Command{
-		Use:   build.Slug,
+		Use:   config.AppSlug,
 		Short: "Dagu is a compact, portable workflow engine",
 		Long: `Dagu is a compact, portable workflow engine.
 

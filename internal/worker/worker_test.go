@@ -1,10 +1,3 @@
-// Package worker_test provides integration tests for the worker component.
-//
-// Test Design:
-// - These tests use a MockTaskExecutor to control task execution behavior
-// - This allows for deterministic testing without relying on real execution timing
-// - Tests verify polling, task dispatch, connection handling, and error scenarios
-// - The tests will continue to work when actual task execution is implemented
 package worker_test
 
 import (
@@ -15,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/backoff"
-	"github.com/dagu-org/dagu/internal/dagrun"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/dagu-org/dagu/internal/worker"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -77,7 +70,7 @@ func TestWorkerStart(t *testing.T) {
 
 		// Track polling activity
 		var pollCount atomic.Int32
-		w.SetTaskExecutor(&mockTaskExecutor{
+		w.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				pollCount.Add(1)
 				time.Sleep(50 * time.Millisecond)
@@ -149,7 +142,7 @@ func TestWorkerTaskExecution(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(1)
 
-		w.SetTaskExecutor(&mockTaskExecutor{
+		w.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, task *coordinatorv1.Task) error {
 				executedTask = task
 				wg.Done()
@@ -215,7 +208,7 @@ func TestWorkerTaskExecution(t *testing.T) {
 		w := createTestWorker(t, "test-worker", 1, coord)
 
 		var executionAttempted atomic.Bool
-		w.SetTaskExecutor(&mockTaskExecutor{
+		w.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				executionAttempted.Store(true)
 				return assert.AnError
@@ -269,7 +262,7 @@ func TestWorkerWithLabels(t *testing.T) {
 		// Create worker WITHOUT matching labels
 		w1 := createTestWorker(t, "worker-1", 1, coord)
 		var w1Executed atomic.Bool
-		w1.SetTaskExecutor(&mockTaskExecutor{
+		w1.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				w1Executed.Store(true)
 				return nil
@@ -281,11 +274,11 @@ func TestWorkerWithLabels(t *testing.T) {
 			"worker-2",
 			1,
 			coord.GetCoordinatorClient(t),
-			th.DAGRunMgr,
 			map[string]string{"type": "special", "region": "us-east", "extra": "value"},
+			th.Config,
 		)
 		var w2Executed atomic.Bool
-		w2.SetTaskExecutor(&mockTaskExecutor{
+		w2.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				w2Executed.Store(true)
 				return nil
@@ -370,13 +363,12 @@ func TestWorkerHeartbeat(t *testing.T) {
 
 func TestWorkerStopWithoutStart(t *testing.T) {
 	t.Run("StopUnstartedWorker", func(t *testing.T) {
-		mockMgr := dagrun.New(nil, nil, "dagu")
 		labels := make(map[string]string)
 
 		// Create a mock coordinator client that doesn't connect
 		mockCoordinatorCli := newMockCoordinatorCli()
-		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, mockMgr, labels)
-		w.SetTaskExecutor(&mockTaskExecutor{ExecutionTime: 0})
+		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
+		w.SetHandler(&mockHandler{ExecutionTime: 0})
 
 		// Stop should work without error even if not started
 		err := w.Stop(context.Background())
@@ -397,7 +389,7 @@ func TestRunningTaskTracking(t *testing.T) {
 		activeTasks := make(map[string]bool)
 		taskStarted := make(chan string, 5)
 
-		w.SetTaskExecutor(&mockTaskExecutor{
+		w.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, task *coordinatorv1.Task) error {
 				activeTasksMu.Lock()
 				activeTasks[task.DagRunId] = true
@@ -480,9 +472,6 @@ func TestRunningTaskTracking(t *testing.T) {
 
 func TestWorkerConnectionFailure(t *testing.T) {
 	t.Run("HandleConnectionFailure", func(t *testing.T) {
-		mockMgr := dagrun.New(nil, nil, "dagu")
-		labels := make(map[string]string)
-
 		// Create worker with a mock coordinator client that always fails
 		var pollCount atomic.Int32
 		connectionError := status.Error(codes.Unavailable, "connection failed")
@@ -494,8 +483,9 @@ func TestWorkerConnectionFailure(t *testing.T) {
 			return nil, connectionError
 		}
 
-		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, mockMgr, labels)
-		w.SetTaskExecutor(&mockTaskExecutor{})
+		labels := make(map[string]string)
+		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
+		w.SetHandler(&mockHandler{})
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -522,12 +512,12 @@ func TestWorkerConnectionFailure(t *testing.T) {
 	})
 }
 
-type mockTaskExecutor struct {
+type mockHandler struct {
 	ExecuteFunc   func(context.Context, *coordinatorv1.Task) error
 	ExecutionTime time.Duration
 }
 
-func (m *mockTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Task) error {
+func (m *mockHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
 	if m.ExecuteFunc != nil {
 		return m.ExecuteFunc(ctx, task)
 	}
@@ -547,11 +537,10 @@ func (m *mockTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Task
 
 // createTestWorker creates a worker with a mock dagrun.Manager and coordinator client for testing
 func createTestWorker(t *testing.T, workerID string, maxActiveRuns int, coord *test.Coordinator) *worker.Worker {
-	mockMgr := dagrun.New(nil, nil, "dagu")
-	labels := make(map[string]string)
 
 	// Create coordinator client for the coordinator
 	coordinatorClient := coord.GetCoordinatorClient(t)
 
-	return worker.NewWorker(workerID, maxActiveRuns, coordinatorClient, mockMgr, labels)
+	labels := make(map[string]string)
+	return worker.NewWorker(workerID, maxActiveRuns, coordinatorClient, labels, &config.Config{})
 }

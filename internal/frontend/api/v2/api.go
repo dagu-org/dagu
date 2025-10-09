@@ -38,6 +38,7 @@ type API struct {
 	metricsRegistry    *prometheus.Registry
 	coordinatorCli     coordinator.Client
 	serviceRegistry    models.ServiceRegistry
+	subCmdBuilder      *dagrun.SubCmdBuilder
 }
 
 func New(
@@ -64,6 +65,7 @@ func New(
 		dagRunMgr:          drm,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,
+		subCmdBuilder:      dagrun.NewSubCmdBuilder(cfg),
 		apiBasePath:        cfg.Server.APIBasePath,
 		config:             cfg,
 		coordinatorCli:     cc,
@@ -114,19 +116,23 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 	}
 
 	r.Group(func(r chi.Router) {
+		authConfig := a.config.Server.Auth
 		authOptions := auth.Options{
 			Realm:            "restricted",
-			APITokenEnabled:  a.config.Server.Auth.Token.Enabled(),
-			APIToken:         a.config.Server.Auth.Token.Value,
-			BasicAuthEnabled: a.config.Server.Auth.Basic.Enabled(),
+			APITokenEnabled:  authConfig.Token.Value != "",
+			APIToken:         authConfig.Token.Value,
+			BasicAuthEnabled: authConfig.Basic.Username != "" && authConfig.Basic.Password != "",
 			Creds: map[string]string{
-				a.config.Server.Auth.Basic.Username: a.config.Server.Auth.Basic.Password,
+				authConfig.Basic.Username: authConfig.Basic.Password,
 			},
 		}
-		if a.config.Server.Auth.OIDC.Enabled() {
-			oidcProvider, oidcVerify, oidcConfig := auth.InitVerifierAndConfig(a.config.Server.Auth.OIDC)
+		oidcEnabled := authConfig.OIDC.ClientId != "" &&
+			authConfig.OIDC.ClientSecret != "" && authConfig.OIDC.Issuer != ""
+		// Enable OIDC authentication if all required fields are set
+		if oidcEnabled {
+			oidcProvider, oidcVerify, oidcConfig := auth.InitVerifierAndConfig(authConfig.OIDC)
 			authOptions.OIDCAuthEnabled = true
-			authOptions.OIDCWhitelist = a.config.Server.Auth.OIDC.Whitelist
+			authOptions.OIDCWhitelist = authConfig.OIDC.Whitelist
 			authOptions.OIDCProvider, authOptions.OIDCVerify, authOptions.OIDCConfig = oidcProvider, oidcVerify, oidcConfig
 		}
 		r.Use(auth.Middleware(authOptions))

@@ -155,6 +155,7 @@ func executeDAG(ctx *Context, cli dagrun.Manager, dag *digraph.DAG) error {
 		ctx.DAGRunStore,
 		ctx.ServiceRegistry,
 		digraph.NewDAGRunRef(dag.Name, dagRunID),
+		ctx.Config.Global.Peer,
 		agent.Options{Dry: false})
 
 	listenSignals(ctx, agentInstance)

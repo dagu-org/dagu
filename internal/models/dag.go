@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 )
@@ -47,10 +48,11 @@ type DAGStore interface {
 // ListDAGsOptions contains parameters for paginated DAG listing
 type ListDAGsOptions struct {
 	Paginator *Paginator
-	Name      string // Optional name filter
-	Tag       string // Optional tag filter
-	Sort      string // Optional sort field (name, updated_at, created_at)
-	Order     string // Optional sort order (asc, desc)
+	Name      string     // Optional name filter
+	Tag       string     // Optional tag filter
+	Sort      string     // Optional sort field (name, updated_at, created_at)
+	Order     string     // Optional sort order (asc, desc)
+	Time      *time.Time // Optional time for next run calculations (defaults to time.Now())
 }
 
 // ListDAGsResult contains the result of a paginated DAG listing operation

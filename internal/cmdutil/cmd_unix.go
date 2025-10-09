@@ -1,7 +1,7 @@
 //go:build !windows
 // +build !windows
 
-package executor
+package cmdutil
 
 import (
 	"os"
@@ -22,16 +22,16 @@ func setupCommand(cmd *exec.Cmd) {
 	}
 }
 
-// killProcessGroup kills the process group on Unix systems
-func killProcessGroup(cmd *exec.Cmd, sig os.Signal) error {
+// KillProcessGroup kills the process group on Unix systems
+func KillProcessGroup(cmd *exec.Cmd, sig os.Signal) error {
 	if cmd != nil && cmd.Process != nil {
 		return syscall.Kill(-cmd.Process.Pid, sig.(syscall.Signal))
 	}
 	return nil
 }
 
-// killMultipleProcessGroups kills multiple process groups on Unix systems
-func killMultipleProcessGroups(cmds map[string]*exec.Cmd, sig os.Signal) error {
+// KillMultipleProcessGroups kills multiple process groups on Unix systems
+func KillMultipleProcessGroups(cmds map[string]*exec.Cmd, sig os.Signal) error {
 	var lastErr error
 	for _, cmd := range cmds {
 		if cmd != nil && cmd.Process != nil {

@@ -591,8 +591,14 @@ func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
 		return err
 	}
 
+	// Store env vars in DAG temporarily for params to reference (e.g., P2=${A001})
+	// This is cleared after params are built
+	if dag.buildEnv == nil {
+		dag.buildEnv = make(map[string]string)
+	}
 	for k, v := range vars {
 		dag.Env = append(dag.Env, fmt.Sprintf("%s=%s", k, v))
+		dag.buildEnv[k] = v
 	}
 
 	return nil

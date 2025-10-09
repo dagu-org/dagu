@@ -380,6 +380,7 @@ func executeDAGRun(ctx *Context, d *digraph.DAG, parent digraph.DAGRunRef, dagRu
 		ctx.DAGRunStore,
 		ctx.ServiceRegistry,
 		root,
+		ctx.Config.Global.Peer,
 		agent.Options{
 			ParentDAGRun:    parent,
 			ProgressDisplay: shouldEnableProgress(ctx),

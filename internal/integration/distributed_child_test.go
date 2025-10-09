@@ -40,8 +40,8 @@ steps:
 			"test-worker-1",
 			10, // maxActiveRuns
 			coordinatorClient,
-			coord.DAGRunMgr,
 			map[string]string{"type": "test-worker"},
+			coord.Config,
 		)
 
 		ctx, cancel := context.WithCancel(coord.Context)

@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/frontend"
@@ -57,7 +56,7 @@ func (srv *Server) runServer(t *testing.T) {
 	cc := coordinator.New(srv.ServiceRegistry, coordinator.DefaultConfig())
 
 	collector := metrics.NewCollector(
-		build.Version,
+		config.Version,
 		srv.DAGStore,
 		srv.DAGRunStore,
 		srv.QueueStore,

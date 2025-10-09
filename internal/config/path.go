@@ -4,17 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/fileutil"
 )
-
-// PathResolver consolidates both custom paths and XDG configuration values.
-// The resulting paths will be determined based on environment variables,
-// legacy configuration, or default XDG-based paths.
-type PathResolver struct {
-	Paths
-	XDGConfig
-}
 
 // Paths holds various file system path settings used by the application.
 type Paths struct {
@@ -42,57 +33,54 @@ type XDGConfig struct {
 	ConfigHome string
 }
 
-// NewResolver instantiates a PathResolver based on the provided application home environment variable,
+// ResolvePaths determines application paths based on the provided application home environment variable,
 // a legacy path, and an XDGConfig. It chooses the configuration directory based on these inputs.
-func NewResolver(appHomeEnv, legacyPath string, xdg XDGConfig) PathResolver {
-	resolver := PathResolver{XDGConfig: xdg}
-	// Determine the proper configuration directory.
-	resolver.resolve(appHomeEnv, legacyPath)
-	return resolver
-}
-
-// resolve determines the configuration directory using the following logic:
+//
+// Resolution logic:
 // 1. If the environment variable (appHomeEnv) is set, use its value and assume legacy directory structure.
 // 2. Else, if the legacyPath exists on disk, use it and emit a warning to update configuration paths.
 // 3. Otherwise, fall back to XDG-compliant defaults.
-// Note: filepath.Join ensures compatibility with Windows by using OS-specific separators.
-func (r *PathResolver) resolve(appHomeEnv, legacyPath string) {
+func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) Paths {
 	switch {
 	// Use the directory from the environment variable if available.
 	case os.Getenv(appHomeEnv) != "":
-		r.Paths.ConfigDir = os.Getenv(appHomeEnv)
-		// Legacy paths are derived from the provided configuration directory.
-		r.setLegacyPaths()
+		configDir := os.Getenv(appHomeEnv)
+		return setLegacyPaths(configDir)
 	// If the legacy path exists, warn and use it.
 	case fileutil.FileExists(legacyPath):
-		r.Paths.ConfigDir = legacyPath
-		r.setLegacyPaths()
+		return setLegacyPaths(legacyPath)
 	// Fallback to default XDG-based paths.
 	default:
-		r.Paths.ConfigDir = filepath.Join(r.ConfigHome, build.Slug)
-		r.setXDGPaths()
+		configDir := filepath.Join(xdg.ConfigHome, AppSlug)
+		return setXDGPaths(xdg, configDir)
 	}
 }
 
 // setXDGPaths sets the paths based on XDG environment variables.
 // This approach uses the standard XDG directories (DataHome and ConfigHome)
 // to organize application data, logs, and configuration files.
-func (r *PathResolver) setXDGPaths() {
-	r.DataDir = filepath.Join(r.DataHome, build.Slug, "data")
-	r.LogsDir = filepath.Join(r.DataHome, build.Slug, "logs")
-	r.BaseConfigFile = filepath.Join(r.ConfigHome, build.Slug, "base.yaml")
-	r.AdminLogsDir = filepath.Join(r.DataHome, build.Slug, "logs", "admin")
-	r.SuspendFlagsDir = filepath.Join(r.DataHome, build.Slug, "suspend")
-	r.DAGsDir = filepath.Join(r.ConfigHome, build.Slug, "dags")
+func setXDGPaths(xdg XDGConfig, configDir string) Paths {
+	return Paths{
+		ConfigDir:       configDir,
+		DataDir:         filepath.Join(xdg.DataHome, AppSlug, "data"),
+		LogsDir:         filepath.Join(xdg.DataHome, AppSlug, "logs"),
+		BaseConfigFile:  filepath.Join(xdg.ConfigHome, AppSlug, "base.yaml"),
+		AdminLogsDir:    filepath.Join(xdg.DataHome, AppSlug, "logs", "admin"),
+		SuspendFlagsDir: filepath.Join(xdg.DataHome, AppSlug, "suspend"),
+		DAGsDir:         filepath.Join(xdg.ConfigHome, AppSlug, "dags"),
+	}
 }
 
 // setLegacyPaths sets the application paths using the legacy directory structure,
 // where all subdirectories are placed within the configuration directory.
-func (r *PathResolver) setLegacyPaths() {
-	r.DataDir = filepath.Join(r.ConfigDir, "data")
-	r.LogsDir = filepath.Join(r.ConfigDir, "logs")
-	r.BaseConfigFile = filepath.Join(r.ConfigDir, "base.yaml")
-	r.AdminLogsDir = filepath.Join(r.ConfigDir, "logs", "admin")
-	r.SuspendFlagsDir = filepath.Join(r.ConfigDir, "suspend")
-	r.DAGsDir = filepath.Join(r.ConfigDir, "dags")
+func setLegacyPaths(configDir string) Paths {
+	return Paths{
+		ConfigDir:       configDir,
+		DataDir:         filepath.Join(configDir, "data"),
+		LogsDir:         filepath.Join(configDir, "logs"),
+		BaseConfigFile:  filepath.Join(configDir, "base.yaml"),
+		AdminLogsDir:    filepath.Join(configDir, "logs", "admin"),
+		SuspendFlagsDir: filepath.Join(configDir, "suspend"),
+		DAGsDir:         filepath.Join(configDir, "dags"),
+	}
 }

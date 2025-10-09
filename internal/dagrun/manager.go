@@ -3,44 +3,25 @@ package dagrun
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"runtime/debug"
-	"slices"
-	"strconv"
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/sock"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
 )
 
 // New creates a new Manager instance.
 // The Manager is used to interact with the DAG.
-func New(
-	drs models.DAGRunStore,
-	ps models.ProcStore,
-	executable string,
-) Manager {
-	var configFile string
-	if cfg := config.UsedConfigFile.Load(); cfg != nil {
-		if cfgStr, ok := cfg.(string); ok {
-			configFile = cfgStr
-		}
-	}
-
+func New(drs models.DAGRunStore, ps models.ProcStore, cfg *config.Config) Manager {
 	return Manager{
-		dagRunStore: drs,
-		procStore:   ps,
-		executable:  executable,
-		configFile:  configFile,
+		dagRunStore:   drs,
+		procStore:     ps,
+		subCmdBuilder: NewSubCmdBuilder(cfg),
 	}
 }
 
@@ -48,18 +29,9 @@ func New(
 // restarting, and retrieving status information. It communicates with the DAG
 // through a socket interface and manages dag-run data.
 type Manager struct {
-	dagRunStore models.DAGRunStore // Store interface for persisting run data
-	procStore   models.ProcStore   // Store interface for process management
-
-	executable string // Path to the executable used to run DAGs
-	configFile string // Path to the config file (if any)
-}
-
-// LoadYAML loads a DAG from YAML specification bytes without evaluating it.
-// It appends the WithoutEval option to any provided options.
-func (m *Manager) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
-	opts = append(slices.Clone(opts), digraph.WithoutEval())
-	return digraph.LoadYAML(ctx, spec, opts...)
+	dagRunStore   models.DAGRunStore // Store interface for persisting run data
+	procStore     models.ProcStore   // Store interface for process management
+	subCmdBuilder *SubCmdBuilder     // Command builder for constructing command specs
 }
 
 // Stop stops a running DAG by sending a stop request to its socket.
@@ -174,173 +146,6 @@ func (m *Manager) GenDAGRunID(_ context.Context) (string, error) {
 		return "", fmt.Errorf("failed to generate dag-run ID: %w", err)
 	}
 	return id.String(), nil
-}
-
-// StartDAGRunAsync starts a dag-run by executing the configured executable with the start command.
-// It sets up the command to run in its own process group and configures standard output/error.
-func (m *Manager) StartDAGRunAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions) error {
-	args := []string{"start"}
-	if opts.Params != "" {
-		args = append(args, "-p")
-		args = append(args, strconv.Quote(opts.Params))
-	}
-	if opts.Quiet {
-		args = append(args, "-q")
-	}
-	if opts.NoQueue {
-		args = append(args, "--no-queue")
-	}
-	if opts.DAGRunID != "" {
-		args = append(args, fmt.Sprintf("--run-id=%s", opts.DAGRunID))
-	}
-	if m.configFile != "" {
-		args = append(args, "--config")
-		args = append(args, m.configFile)
-	}
-	args = append(args, dag.Location)
-	// nolint:gosec
-	cmd := exec.Command(m.executable, args...)
-	executor.SetupCommand(cmd)
-	cmd.Dir = dag.WorkingDir
-	cmd.Env = os.Environ()
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start dag-run: %w", err)
-	}
-	go execWithRecovery(ctx, func() {
-		_ = cmd.Wait() // Wait for the command to finish in a goroutine to avoid blocking
-	})
-	return nil
-}
-
-// EnqueueDAGRun enqueues a dag-run by executing the configured executable with the enqueue command.
-func (m *Manager) EnqueueDAGRun(_ context.Context, dag *digraph.DAG, opts EnqueueOptions) error {
-	args := []string{"enqueue"}
-	if opts.Params != "" {
-		args = append(args, "-p")
-		args = append(args, strconv.Quote(opts.Params))
-	}
-	if opts.Quiet {
-		args = append(args, "-q")
-	}
-	if opts.DAGRunID != "" {
-		args = append(args, fmt.Sprintf("--run-id=%s", opts.DAGRunID))
-	}
-	if m.configFile != "" {
-		args = append(args, "--config")
-		args = append(args, m.configFile)
-	}
-	if opts.Queue != "" {
-		args = append(args, "--queue")
-		args = append(args, opts.Queue)
-	}
-	args = append(args, dag.Location)
-	// nolint:gosec
-	cmd := exec.Command(m.executable, args...)
-	executor.SetupCommand(cmd)
-	cmd.Dir = dag.WorkingDir
-	cmd.Env = os.Environ()
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start enqueue command: %w", err)
-	}
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("failed to enqueue dag-run: %w", err)
-	}
-	return nil
-}
-
-func (m *Manager) DequeueDAGRun(_ context.Context, dag *digraph.DAG, dagRun digraph.DAGRunRef) error {
-	args := []string{"dequeue", fmt.Sprintf("--dag-run=%s", dagRun.String())}
-	if m.configFile != "" {
-		args = append(args, "--config")
-		args = append(args, m.configFile)
-	}
-
-	// nolint:gosec
-	cmd := exec.Command(m.executable, args...)
-	executor.SetupCommand(cmd)
-	cmd.Dir = dag.WorkingDir
-	cmd.Env = os.Environ()
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start dequeue command: %w", err)
-	}
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("failed to dequeue dag-run: %w", err)
-	}
-	return nil
-}
-
-// RestartDAG restarts a DAG by executing the configured executable with the restart command.
-// It sets up the command to run in its own process group.
-func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error {
-	args := []string{"restart"}
-	if opts.Quiet {
-		args = append(args, "-q")
-	}
-	if m.configFile != "" {
-		args = append(args, "--config")
-		args = append(args, m.configFile)
-	}
-	args = append(args, dag.Location)
-	// nolint:gosec
-	cmd := exec.Command(m.executable, args...)
-	executor.SetupCommand(cmd)
-	cmd.Dir = dag.WorkingDir
-	cmd.Env = os.Environ()
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start restart command: %w", err)
-	}
-	go execWithRecovery(ctx, func() {
-		_ = cmd.Wait() // Wait for the command to finish in a goroutine to avoid blocking
-	})
-	return nil
-}
-
-// RetryDAGRun retries a dag-run by executing the configured executable with the retry command.
-func (m *Manager) RetryDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string, disableMaxActiveRuns bool) error {
-	args := []string{"retry"}
-	args = append(args, fmt.Sprintf("--run-id=%s", dagRunID))
-	if disableMaxActiveRuns {
-		args = append(args, "--disable-max-active-runs")
-	}
-	return m.runRetryCommand(ctx, args, dag)
-}
-
-// RetryDAGStep retries a dag-run from a specific step by executing the configured executable with the retry command and --step flag.
-func (m *Manager) RetryDAGStep(ctx context.Context, dag *digraph.DAG, dagRunID string, stepName string) error {
-	args := []string{"retry"}
-	args = append(args, fmt.Sprintf("--run-id=%s", dagRunID))
-	args = append(args, fmt.Sprintf("--step=%s", stepName))
-	return m.runRetryCommand(ctx, args, dag)
-}
-
-// runRetryCommand builds the full command and starts the process for retrying a dag-run or step.
-func (m *Manager) runRetryCommand(ctx context.Context, args []string, dag *digraph.DAG) error {
-	if m.configFile != "" {
-		args = append(args, "--config")
-		args = append(args, m.configFile)
-	}
-	args = append(args, dag.Name)
-	// nolint:gosec
-	cmd := exec.Command(m.executable, args...)
-	executor.SetupCommand(cmd)
-	cmd.Dir = dag.WorkingDir
-	cmd.Env = os.Environ()
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start retry command: %w", err)
-	}
-	go execWithRecovery(ctx, func() {
-		_ = cmd.Wait() // Wait for the command to finish in a goroutine to avoid blocking
-	})
-	return nil
 }
 
 // IsRunning checks if a dag-run is currently running by querying its status.
@@ -568,132 +373,35 @@ func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef
 	return nil
 }
 
-// StartOptions contains options for initiating a dag-run.
-type StartOptions struct {
-	Params   string // Parameters to pass to the DAG
-	Quiet    bool   // Whether to run in quiet mode
-	DAGRunID string // ID for the dag-run
-	NoQueue  bool   // Do not allow queueing
-}
-
-// EnqueueOptions contains options for enqueuing a dag-run.
-type EnqueueOptions struct {
-	Params   string // Parameters to pass to the DAG
-	Quiet    bool   // Whether to run in quiet mode
-	DAGRunID string // ID for the dag-run
-	Queue    string // Queue name to enqueue to
-}
-
-// RestartOptions contains options for restarting a dag-run.
-type RestartOptions struct {
-	Quiet bool // Whether to run in quiet mode
-}
-
-// HandleTask executes a DAG run synchronously based on the task information.
-// It handles both START (new runs) and RETRY (resume existing runs) operations.
-func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) error {
-	var args []string
-	var tempFile string
-
-	// If definition is provided, create a temporary DAG file
-	if task.Definition != "" {
-		logger.Info(ctx, "Creating temporary DAG file from definition",
-			"dagName", task.Target,
-			"definitionSize", len(task.Definition))
-
-		tf, err := m.createTempDAGFile(task.Target, []byte(task.Definition))
-		if err != nil {
-			return fmt.Errorf("failed to create temp DAG file: %w", err)
-		}
-		tempFile = tf
-		defer func() {
-			// Clean up the temporary file
-			if err := os.Remove(tempFile); err != nil && !os.IsNotExist(err) {
-				logger.Errorf(ctx, "Failed to remove temp DAG file: %v", err)
-			}
-		}()
-		// Update the target to use the temp file
-		originalTarget := task.Target
-		task.Target = tempFile
-
-		logger.Info(ctx, "Created temporary DAG file",
-			"tempFile", tempFile,
-			"originalTarget", originalTarget)
-	}
-
-	switch task.Operation {
-	case coordinatorv1.Operation_OPERATION_START:
-		args = m.buildStartCommand(task)
-	case coordinatorv1.Operation_OPERATION_RETRY:
-		args = m.buildRetryCommand(task)
-	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
-		return fmt.Errorf("operation not specified")
-	default:
-		return fmt.Errorf("unknown operation: %v", task.Operation)
-	}
-
-	// Execute synchronously
-	// nolint:gosec
-	cmd := exec.CommandContext(ctx, m.executable, args...)
-	executor.SetupCommand(cmd)
-	cmd.Dir = "" // Working directory will be set in the process
-	cmd.Env = os.Environ()
-
-	// Execute and capture output
-	output, err := cmd.CombinedOutput()
+// checkAndUpdateStaleRunningStatus checks if a running DAG has a live process
+// and updates its status to error if the process is not alive.
+func (m *Manager) checkAndUpdateStaleRunningStatus(
+	ctx context.Context,
+	att models.DAGRunAttempt,
+	st *models.DAGRunStatus,
+) error {
+	dag, err := att.ReadDAG(ctx)
 	if err != nil {
-		return fmt.Errorf("%v failed: %w\noutput: %s", task.Operation, err, output)
+		return fmt.Errorf("failed to read DAG for stale status check: %w", err)
 	}
+	dagRun := digraph.DAGRunRef{
+		Name: dag.Name,
+		ID:   st.DAGRunID,
+	}
+	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), dagRun)
+	if err != nil {
+		// Log but don't fail - we can't determine if it's alive
+		logger.Error(ctx, "Failed to check if DAG run is alive", "err", err)
+		return nil
+	}
+	if alive {
+		// Process is still alive, nothing to do
+		return nil
+	}
+	// Process is not alive, update status to error
+	st.Status = status.Error
 
 	return nil
-}
-
-// buildStartCommand builds the command arguments for starting a new DAG run.
-func (m *Manager) buildStartCommand(task *coordinatorv1.Task) []string {
-	args := []string{"start"}
-
-	// Add hierarchy flags for child DAGs
-	if task.RootDagRunId != "" {
-		args = append(args, fmt.Sprintf("--root=%s:%s", task.RootDagRunName, task.RootDagRunId))
-	}
-	if task.ParentDagRunId != "" {
-		args = append(args, fmt.Sprintf("--parent=%s:%s", task.ParentDagRunName, task.ParentDagRunId))
-	}
-
-	args = append(args,
-		fmt.Sprintf("--run-id=%s", task.DagRunId),
-		"--no-queue", // Always bypass queue for worker execution
-	)
-
-	m.addConfigFlag(&args)
-	args = append(args, task.Target)
-
-	if task.Params != "" {
-		args = append(args, "--", task.Params)
-	}
-
-	return args
-}
-
-// buildRetryCommand builds the command arguments for retrying an existing DAG run.
-func (m *Manager) buildRetryCommand(task *coordinatorv1.Task) []string {
-	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId)}
-
-	if task.Step != "" {
-		args = append(args, fmt.Sprintf("--step=%s", task.Step))
-	}
-
-	m.addConfigFlag(&args)
-	args = append(args, task.Target) // DAG name
-
-	return args
-}
-
-// addConfigFlag adds the config file flag if one is set.
-func (m *Manager) addConfigFlag(args *[]string) {
-	if m.configFile != "" {
-		*args = append(*args, "--config", m.configFile)
-	}
 }
 
 // execWithRecovery executes a function with panic recovery and detailed error reporting
@@ -725,62 +433,4 @@ func execWithRecovery(ctx context.Context, fn func()) {
 
 	// Execute the function
 	fn()
-}
-
-// createTempDAGFile creates a temporary file with the DAG definition content.
-func (m *Manager) createTempDAGFile(dagName string, yamlData []byte) (string, error) {
-	// Create a temporary directory if it doesn't exist
-	tempDir := filepath.Join(os.TempDir(), "dagu", "worker-dags")
-	if err := os.MkdirAll(tempDir, 0750); err != nil {
-		return "", fmt.Errorf("failed to create temp directory: %w", err)
-	}
-
-	// Create a temporary file with a meaningful name
-	pattern := fmt.Sprintf("%s-*.yaml", dagName)
-	tempFile, err := os.CreateTemp(tempDir, pattern)
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
-	}
-	defer func() {
-		_ = tempFile.Close()
-	}()
-
-	// Write the YAML data
-	if _, err := tempFile.Write(yamlData); err != nil {
-		_ = os.Remove(tempFile.Name())
-		return "", fmt.Errorf("failed to write YAML data: %w", err)
-	}
-
-	return tempFile.Name(), nil
-}
-
-// checkAndUpdateStaleRunningStatus checks if a running DAG has a live process
-// and updates its status to error if the process is not alive.
-func (m *Manager) checkAndUpdateStaleRunningStatus(
-	ctx context.Context,
-	att models.DAGRunAttempt,
-	st *models.DAGRunStatus,
-) error {
-	dag, err := att.ReadDAG(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to read DAG for stale status check: %w", err)
-	}
-	dagRun := digraph.DAGRunRef{
-		Name: dag.Name,
-		ID:   st.DAGRunID,
-	}
-	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), dagRun)
-	if err != nil {
-		// Log but don't fail - we can't determine if it's alive
-		logger.Error(ctx, "Failed to check if DAG run is alive", "err", err)
-		return nil
-	}
-	if alive {
-		// Process is still alive, nothing to do
-		return nil
-	}
-	// Process is not alive, update status to error
-	st.Status = status.Error
-
-	return nil
 }

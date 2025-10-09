@@ -1,25 +1,17 @@
 # Changelog
 
-## Unreleased
+## v1.23.0 (UNRELEASED)
 
-### New Features
+### Added
 - CLI: Added `dagu validate` command to validate DAG specifications without executing them. Prints human‑readable errors and exits with code 1 on failure.
 - API: Added `POST /api/v2/dags/validate` to validate DAG YAML. Returns `{ valid: boolean, errors: string[], dag?: DAGDetails }`.
 - API: `POST /api/v2/dags` now accepts optional `spec` to initialize a DAG. The spec is validated before creation and returns 400 on invalid input.
 - API: Added `POST /api/v2/dag-runs` to create and start a DAG-run directly from an inline YAML `spec` without persisting a DAG file. Supports optional `name`, `params`, `dagRunId`, and `singleton`.
 - API: Added `nextRun` sort option to `GET /api/v2/dags` to sort DAGs by their next scheduled run time. DAGs with earlier next runs appear first in ascending order, and DAGs without schedules appear last.
+- Security: Implemented security filtering for system environment variables passed to step processes and child DAGs. System variables remain available for expansion (`${VAR}`) during DAG configuration parsing, but only whitelisted variables (`PATH`, `HOME`, `LANG`, `TZ`, `SHELL`) and variables with allowed prefixes (`DAGU_*`, `LC_*`, `DAG_*`) are passed to the step execution environment. This prevents accidental exposure of sensitive credentials to subprocess environments. Other variables must be explicitly defined in the workflow's `env` section to be available in step processes.
 
-### Breaking/Behavioral Changes
+### Fixed
 - DAG name validation is centralized and enforced consistently: names must be `<= 40` chars and match `[A-Za-z0-9_.-]+`. Endpoints that accept `name` now return `400 bad_request` for invalid names.
-
-### Improvements
-- Validation error messages are deduplicated at the source to avoid repeated prefixes like `field 'steps': field 'steps': ...`.
-- DAG list sorting performance improved by caching next run time calculations.
-
-### Documentation
-- Updated API Overview with inline run example (`POST /api/v2/dag-runs`).
-- Added Quickstart note on starting a simple inline DAG via REST API.
-
 
 ## v1.22.0 (2025-08-24)
 

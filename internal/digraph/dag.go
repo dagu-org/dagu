@@ -126,6 +126,10 @@ type DAG struct {
 	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
 	// SSH contains the default SSH configuration for the DAG.
 	SSH *SSHConfig `json:"ssh,omitempty"`
+
+	// buildEnv is a temporary map used during DAG building to pass env vars to params
+	// This is not serialized and is cleared after build completes
+	buildEnv map[string]string
 }
 
 // CreateTask creates a coordinator task from this DAG for distributed execution.
@@ -253,13 +257,8 @@ func (d *DAG) LoadEnv(ctx context.Context) {
 	// Load dotenv
 	d.loadDotEnv(ctx, []string{d.WorkingDir})
 
-	// Load env
-	for _, env := range d.Env {
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) == 2 {
-			_ = os.Setenv(parts[0], parts[1])
-		}
-	}
+	// Note: d.Env is already used by AllEnvs() to pass vars to child processes
+	// No need to set process environment - child processes get vars via cmd.Env
 }
 
 // NextRun returns the next scheduled run time based on the DAG's schedules.
@@ -300,9 +299,15 @@ func (d *DAG) loadDotEnv(ctx context.Context, relativeTos []string) {
 		if !fileutil.FileExists(resolvedPath) {
 			continue
 		}
-		if err := godotenv.Load(resolvedPath); err != nil {
+		// Use godotenv.Read instead of godotenv.Load to avoid os.Setenv
+		vars, err := godotenv.Read(resolvedPath)
+		if err != nil {
 			logger.Warn(ctx, "Failed to load .env", "file", resolvedPath, "err", err)
 			continue
+		}
+		// Add dotenv vars to DAG.Env so they're included in AllEnvs()
+		for k, v := range vars {
+			d.Env = append(d.Env, fmt.Sprintf("%s=%s", k, v))
 		}
 
 		// Load the first found one

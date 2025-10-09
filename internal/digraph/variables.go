@@ -58,15 +58,17 @@ func loadVariables(ctx BuildContext, strVariables any) (
 		if !ctx.opts.NoEval {
 			// Evaluate the value of the environment variable.
 			// This also executes command substitution.
+			// Pass accumulated vars so ${VAR} can reference previously defined vars
 			var err error
 
-			value, err = cmdutil.EvalString(ctx.ctx, value)
+			value, err = cmdutil.EvalString(ctx.ctx, value, cmdutil.WithVariables(vars))
 			if err != nil {
 				return nil, wrapError("env", pair.val, fmt.Errorf("%w: %s", ErrInvalidEnvValue, pair.val))
 			}
 
+			// Set the environment variable.
 			if err := os.Setenv(pair.key, value); err != nil {
-				return nil, wrapError("env", pair.key, err)
+				return nil, wrapError("env", pair.key, fmt.Errorf("%w: %s", err, pair.key))
 			}
 		}
 

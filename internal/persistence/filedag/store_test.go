@@ -916,12 +916,23 @@ func TestListWithNextRunSorting(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	createDAG("hourly-dag", "\"0 * * * *\"")
-	createDAG("daily-dag", "\"0 1 * * *\"")
+	// Create DAGs with different schedules
+	createDAG("hourly-dag", "\"0 * * * *\"") // Runs at the top of every hour
+	createDAG("daily-dag", "\"0 1 * * *\"")  // Runs at 01:00 every day
 	createDAG("no-schedule", "")
 
+	// Use a fixed time for deterministic testing: 2024-01-15 01:30:00
+	// At this time:
+	// - hourly-dag next run: 2024-01-15 02:00:00 (30 minutes away)
+	// - daily-dag next run: 2024-01-16 01:00:00 (23.5 hours away)
+	fixedTime := time.Date(2024, 1, 15, 1, 30, 0, 0, time.UTC)
+
 	// Test ascending order
-	result, _, err := store.List(ctx, models.ListDAGsOptions{Sort: "nextRun", Order: "asc"})
+	result, _, err := store.List(ctx, models.ListDAGsOptions{
+		Sort:  "nextRun",
+		Order: "asc",
+		Time:  &fixedTime,
+	})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 3)
 
@@ -931,11 +942,16 @@ func TestListWithNextRunSorting(t *testing.T) {
 	assert.Equal(t, "no-schedule", result.Items[2].Name)
 
 	// Test descending order
-	result, _, err = store.List(ctx, models.ListDAGsOptions{Sort: "nextRun", Order: "desc"})
+	result, _, err = store.List(ctx, models.ListDAGsOptions{
+		Sort:  "nextRun",
+		Order: "desc",
+		Time:  &fixedTime,
+	})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 3)
 
 	// Verify order: daily (runs latest) -> hourly -> no-schedule (still last)
+	// Note: no-schedule always comes last because IsZero() time is treated as greater
 	assert.Equal(t, "daily-dag", result.Items[0].Name)
 	assert.Equal(t, "hourly-dag", result.Items[1].Name)
 	assert.Equal(t, "no-schedule", result.Items[2].Name)
