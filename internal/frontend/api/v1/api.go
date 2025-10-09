@@ -29,6 +29,7 @@ type API struct {
 	apiBasePath        string
 	logEncodingCharset string
 	config             *config.Config
+	cmdBuilder         *dagrun.SubCmdBuilder
 }
 
 func New(
@@ -50,6 +51,7 @@ func New(
 		remoteNodes:        remoteNodes,
 		apiBasePath:        cfg.Server.APIBasePath,
 		config:             cfg,
+		cmdBuilder:         dagrun.NewSubCmdBuilder(cfg),
 	}
 }
 

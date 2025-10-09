@@ -621,12 +621,14 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 }
 
 func (a *API) startDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunID string, singleton bool) error {
-	if err := a.dagRunMgr.StartDAGRunAsync(ctx, dag, dagrun.StartOptions{
+	spec := a.cmdBuilder.Start(dag, dagrun.StartOptions{
 		Params:   params,
 		DAGRunID: dagRunID,
 		Quiet:    true,
 		NoQueue:  singleton || dag.MaxActiveRuns == 1,
-	}); err != nil {
+	})
+
+	if err := dagrun.Start(ctx, spec); err != nil {
 		return fmt.Errorf("error starting DAG: %w", err)
 	}
 
@@ -743,8 +745,8 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRu
 		opts.Queue = dag.Queue
 	}
 
-	// Enqueue the DAG-run
-	if err := a.dagRunMgr.EnqueueDAGRun(ctx, dag, opts); err != nil {
+	spec := a.cmdBuilder.Enqueue(dag, opts)
+	if err := dagrun.Run(ctx, spec); err != nil {
 		return fmt.Errorf("error enqueuing DAG: %w", err)
 	}
 

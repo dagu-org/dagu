@@ -23,24 +23,29 @@ type CmdSpec struct {
 	Stderr     *os.File
 }
 
-// CmdRunner executes commands synchronously or asynchronously.
-type CmdRunner interface {
-	// Run executes the command and waits for it to complete.
-	Run(ctx context.Context, spec CmdSpec) error
-	// Start executes the command without waiting for it to complete.
-	Start(ctx context.Context, spec CmdSpec) error
+// StartOptions contains options for initiating a dag-run.
+type StartOptions struct {
+	Params   string // Parameters to pass to the DAG
+	Quiet    bool   // Whether to run in quiet mode
+	DAGRunID string // ID for the dag-run
+	NoQueue  bool   // Do not allow queueing
 }
 
-var _ CmdRunner = (*cmdRunner)(nil) // Ensure cmdRunner implements CmdRunner
-
-// cmdRunner implements CommandRunner using os/exec.
-type cmdRunner struct{}
-
-func newCmdRunner() CmdRunner {
-	return &cmdRunner{}
+// EnqueueOptions contains options for enqueuing a dag-run.
+type EnqueueOptions struct {
+	Params   string // Parameters to pass to the DAG
+	Quiet    bool   // Whether to run in quiet mode
+	DAGRunID string // ID for the dag-run
+	Queue    string // Queue name to enqueue to
 }
 
-func (r *cmdRunner) Run(ctx context.Context, spec CmdSpec) error {
+// RestartOptions contains options for restarting a dag-run.
+type RestartOptions struct {
+	Quiet bool // Whether to run in quiet mode
+}
+
+// Run executes the command and waits for it to complete.
+func Run(ctx context.Context, spec CmdSpec) error {
 	// nolint:gosec
 	cmd := exec.CommandContext(ctx, spec.Executable, spec.Args...)
 	cmdutil.SetupCommand(cmd)
@@ -69,7 +74,8 @@ func (r *cmdRunner) Run(ctx context.Context, spec CmdSpec) error {
 	return nil
 }
 
-func (r *cmdRunner) Start(ctx context.Context, spec CmdSpec) error {
+// Start executes the command without waiting for it to complete.
+func Start(ctx context.Context, spec CmdSpec) error {
 	// nolint:gosec
 	cmd := exec.Command(spec.Executable, spec.Args...)
 	cmdutil.SetupCommand(cmd)

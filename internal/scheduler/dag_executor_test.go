@@ -7,10 +7,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/coordinator"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
-	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -40,12 +37,9 @@ steps:
 `
 		testDAG := th.DAG(t, yamlContent)
 		testFile := testDAG.Location
-		runStore := filedagrun.New(filepath.Join(tmpDir, "data"))
-		procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
-		dagRunMgr := dagrun.New(runStore, procStore, th.Config)
 		coordinatorCli := coordinator.New(th.ServiceRegistry, coordinator.DefaultConfig())
 
-		dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, dagRunMgr)
+		dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, th.SubCmdBuilder)
 		t.Cleanup(func() {
 			dagExecutor.Close(th.Context)
 		})
@@ -76,7 +70,7 @@ steps:
 		// Test 2: ExecuteDAG with distributed execution
 		t.Run("ExecuteDAGDistributed", func(t *testing.T) {
 			// Create DAG executor
-			dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, dagRunMgr)
+			dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, th.SubCmdBuilder)
 
 			// Load DAG and set worker selector
 			dag, err := digraph.Load(context.Background(), testFile)
@@ -104,7 +98,7 @@ steps:
 		// Test 3: HandleJob with local execution
 		t.Run("HandleJobLocal", func(t *testing.T) {
 			// Create DAG executor without coordinator (local only)
-			dagExecutor := scheduler.NewDAGExecutor(nil, dagRunMgr)
+			dagExecutor := scheduler.NewDAGExecutor(nil, th.SubCmdBuilder)
 
 			// Load DAG without worker selector (local execution)
 			dag, err := digraph.Load(context.Background(), testFile)
@@ -133,7 +127,7 @@ steps:
 		// Test 4: HandleJob with RETRY operation
 		t.Run("HandleJobRETRY", func(t *testing.T) {
 			// Create DAG executor
-			dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, dagRunMgr)
+			dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, th.SubCmdBuilder)
 
 			// Load DAG and set worker selector
 			dag, err := digraph.Load(context.Background(), testFile)

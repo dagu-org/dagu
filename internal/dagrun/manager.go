@@ -151,43 +151,6 @@ func (m *Manager) GenDAGRunID(_ context.Context) (string, error) {
 	return id.String(), nil
 }
 
-// StartDAGRunAsync starts a dag-run by executing the configured executable with the start command.
-// It sets up the command to run in its own process group and configures standard output/error.
-func (m *Manager) StartDAGRunAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions) error {
-	spec := m.cmdBuilder.Start(dag, opts)
-	return newCmdRunner().Start(ctx, spec)
-}
-
-// EnqueueDAGRun enqueues a dag-run by executing the configured executable with the enqueue command.
-func (m *Manager) EnqueueDAGRun(ctx context.Context, dag *digraph.DAG, opts EnqueueOptions) error {
-	spec := m.cmdBuilder.Enqueue(dag, opts)
-	return newCmdRunner().Run(ctx, spec)
-}
-
-func (m *Manager) DequeueDAGRun(ctx context.Context, dag *digraph.DAG, dagRun digraph.DAGRunRef) error {
-	spec := m.cmdBuilder.Dequeue(dag, dagRun)
-	return newCmdRunner().Run(ctx, spec)
-}
-
-// RestartDAG restarts a DAG by executing the configured executable with the restart command.
-// It sets up the command to run in its own process group.
-func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error {
-	spec := m.cmdBuilder.Restart(dag, opts)
-	return newCmdRunner().Start(ctx, spec)
-}
-
-// RetryDAGRun retries a dag-run by executing the configured executable with the retry command.
-func (m *Manager) RetryDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string, disableMaxActiveRuns bool) error {
-	spec := m.cmdBuilder.Retry(dag, dagRunID, "", disableMaxActiveRuns)
-	return newCmdRunner().Start(ctx, spec)
-}
-
-// RetryDAGStep retries a dag-run from a specific step by executing the configured executable with the retry command and --step flag.
-func (m *Manager) RetryDAGStep(ctx context.Context, dag *digraph.DAG, dagRunID string, stepName string) error {
-	spec := m.cmdBuilder.Retry(dag, dagRunID, stepName, false)
-	return newCmdRunner().Start(ctx, spec)
-}
-
 // IsRunning checks if a dag-run is currently running by querying its status.
 // Returns true if the status can be retrieved without error, indicating the DAG is running.
 func (m *Manager) IsRunning(ctx context.Context, dag *digraph.DAG, dagRunID string) bool {
@@ -413,27 +376,6 @@ func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef
 	return nil
 }
 
-// StartOptions contains options for initiating a dag-run.
-type StartOptions struct {
-	Params   string // Parameters to pass to the DAG
-	Quiet    bool   // Whether to run in quiet mode
-	DAGRunID string // ID for the dag-run
-	NoQueue  bool   // Do not allow queueing
-}
-
-// EnqueueOptions contains options for enqueuing a dag-run.
-type EnqueueOptions struct {
-	Params   string // Parameters to pass to the DAG
-	Quiet    bool   // Whether to run in quiet mode
-	DAGRunID string // ID for the dag-run
-	Queue    string // Queue name to enqueue to
-}
-
-// RestartOptions contains options for restarting a dag-run.
-type RestartOptions struct {
-	Quiet bool // Whether to run in quiet mode
-}
-
 // HandleTask executes a DAG run synchronously based on the task information.
 // It handles both START (new runs) and RETRY (resume existing runs) operations.
 func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) error {
@@ -479,8 +421,7 @@ func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) erro
 		return fmt.Errorf("unknown operation: %v", task.Operation)
 	}
 
-	// Execute synchronously
-	return newCmdRunner().Run(ctx, spec)
+	return Run(ctx, spec) // Synchronous execution
 }
 
 // execWithRecovery executes a function with panic recovery and detailed error reporting

@@ -112,7 +112,6 @@ func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Schedule
 func (er *entryReaderImpl) createJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job {
 	return &DAGRunJob{
 		DAG:         dag,
-		Executable:  er.executable,
 		Next:        next,
 		Schedule:    schedule,
 		Client:      er.dagRunMgr,

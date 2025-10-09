@@ -84,7 +84,7 @@ func New(
 		})
 
 	// Create DAG executor
-	dagExecutor := NewDAGExecutor(coordinatorCli, drm)
+	dagExecutor := NewDAGExecutor(coordinatorCli, dagrun.NewSubCmdBuilder(cfg))
 
 	// Create health server
 	healthServer := NewHealthServer(cfg.Scheduler.Port)

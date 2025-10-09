@@ -132,6 +132,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		ProcStore:       procStore,
 		QueueStore:      queueStore,
 		ServiceRegistry: serviceMonitor,
+		SubCmdBuilder:   dagrun.NewSubCmdBuilder(cfg),
 
 		tmpDir: tmpDir,
 	}
@@ -180,6 +181,7 @@ type Helper struct {
 	ProcStore       models.ProcStore
 	QueueStore      models.QueueStore
 	ServiceRegistry models.ServiceRegistry
+	SubCmdBuilder   *dagrun.SubCmdBuilder
 
 	tmpDir string
 }

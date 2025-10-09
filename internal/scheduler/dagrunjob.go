@@ -29,16 +29,10 @@ var _ Job = (*DAGRunJob)(nil)
 // DAGRunJob represents a job that runs a DAG.
 type DAGRunJob struct {
 	DAG         *digraph.DAG
-	Executable  string
 	Next        time.Time
 	Schedule    cron.Schedule
 	Client      dagrun.Manager
 	DAGExecutor *DAGExecutor
-}
-
-// GetDAG returns the DAG associated with this job.
-func (j *DAGRunJob) GetDAG(_ context.Context) *digraph.DAG {
-	return j.DAG
 }
 
 // Start attempts to run the job if it is not already running and is ready.
@@ -129,9 +123,9 @@ func (j *DAGRunJob) Stop(ctx context.Context) error {
 	return j.Client.Stop(ctx, j.DAG, "")
 }
 
-// Restart restarts the job unconditionally (quiet mode).
+// Restart restarts the job unconditionally.
 func (j *DAGRunJob) Restart(ctx context.Context) error {
-	return j.Client.RestartDAG(ctx, j.DAG, dagrun.RestartOptions{Quiet: true})
+	return j.DAGExecutor.Restart(ctx, j.DAG)
 }
 
 // String returns a string representation of the job, which is the DAG's name.

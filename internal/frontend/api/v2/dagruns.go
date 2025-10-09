@@ -11,6 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -589,13 +590,15 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	}
 
 	if request.Body.StepName != nil && *request.Body.StepName != "" {
-		if err := a.dagRunMgr.RetryDAGStep(ctx, dag, request.Body.DagRunId, *request.Body.StepName); err != nil {
+		spec := a.cmdBuilder.Retry(dag, request.Body.DagRunId, *request.Body.StepName, true)
+		if err := dagrun.Start(ctx, spec); err != nil {
 			return nil, fmt.Errorf("error retrying DAG step: %w", err)
 		}
 		return api.RetryDAGRun200Response{}, nil
 	}
 
-	if err := a.dagRunMgr.RetryDAGRun(ctx, dag, request.Body.DagRunId, false); err != nil {
+	spec := a.cmdBuilder.Retry(dag, request.Body.DagRunId, "", false)
+	if err := dagrun.Start(ctx, spec); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 
@@ -678,7 +681,8 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 		}
 	}
 
-	if err := a.dagRunMgr.DequeueDAGRun(ctx, dag, dagRun); err != nil {
+	spec := a.cmdBuilder.Dequeue(dag, dagRun)
+	if err := dagrun.Run(ctx, spec); err != nil {
 		return nil, fmt.Errorf("error dequeueing dag-run: %w", err)
 	}
 

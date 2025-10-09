@@ -116,7 +116,8 @@ steps:
 ---
 `)
 
-		err := th.DAGRunMgr.StartDAGRunAsync(th.Context, dag.DAG, dagrun.StartOptions{})
+		spec := th.SubCmdBuilder.Start(dag.DAG, dagrun.StartOptions{})
+		err := dagrun.Start(th.Context, spec)
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, status.Success)
@@ -160,132 +161,6 @@ steps:
 	})
 }
 
-func TestClient_RunDAG(t *testing.T) {
-	th := test.Setup(t)
-
-	t.Run("RunDAG", func(t *testing.T) {
-		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "true"
-`)
-
-		err := th.DAGRunMgr.StartDAGRunAsync(th.Context, dag.DAG, dagrun.StartOptions{
-			Quiet: true,
-		})
-		require.NoError(t, err)
-
-		dag.AssertLatestStatus(t, status.Success)
-
-		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
-		require.NoError(t, err)
-		require.Equal(t, status.Success.String(), dagRunStatus.Status.String())
-	})
-	t.Run("Stop", func(t *testing.T) {
-		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: sleep 10
-`)
-		ctx := th.Context
-
-		err := th.DAGRunMgr.StartDAGRunAsync(ctx, dag.DAG, dagrun.StartOptions{})
-		require.NoError(t, err)
-
-		dag.AssertLatestStatus(t, status.Running)
-
-		err = th.DAGRunMgr.Stop(ctx, dag.DAG, "")
-		require.NoError(t, err)
-
-		dag.AssertLatestStatus(t, status.Cancel)
-	})
-	t.Run("Restart", func(t *testing.T) {
-		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: sleep 1
-`)
-		ctx := th.Context
-
-		err := th.DAGRunMgr.StartDAGRunAsync(th.Context, dag.DAG, dagrun.StartOptions{})
-		require.NoError(t, err)
-
-		dag.AssertLatestStatus(t, status.Running)
-
-		err = th.DAGRunMgr.RestartDAG(ctx, dag.DAG, dagrun.RestartOptions{})
-		require.NoError(t, err)
-
-		dag.AssertLatestStatus(t, status.Success)
-	})
-	t.Run("Retry", func(t *testing.T) {
-		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "true"
-`)
-		ctx := th.Context
-		cli := th.DAGRunMgr
-
-		err := cli.StartDAGRunAsync(ctx, dag.DAG, dagrun.StartOptions{Params: "x y z"})
-		require.NoError(t, err)
-
-		// Wait for the DAG to finish
-		dag.AssertLatestStatus(t, status.Success)
-
-		// Retry the DAG with the same params.
-		dagRunStatus, err := cli.GetLatestStatus(ctx, dag.DAG)
-		require.NoError(t, err)
-
-		prevDAGRunID := dagRunStatus.DAGRunID
-		prevParams := dagRunStatus.Params
-
-		time.Sleep(1 * time.Second)
-
-		err = cli.RetryDAGRun(ctx, dag.DAG, prevDAGRunID, true)
-		require.NoError(t, err)
-
-		// Wait for the DAG to finish
-		dag.AssertLatestStatus(t, status.Success)
-
-		dagRunStatus, err = cli.GetLatestStatus(ctx, dag.DAG)
-		require.NoError(t, err)
-
-		// Check if the params are the same as the previous run.
-		require.Equal(t, prevDAGRunID, dagRunStatus.DAGRunID)
-		require.Equal(t, prevParams, dagRunStatus.Params)
-	})
-	t.Run("RetryStep", func(t *testing.T) {
-		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "true"
-`)
-		ctx := th.Context
-		cli := th.DAGRunMgr
-
-		err := cli.StartDAGRunAsync(ctx, dag.DAG, dagrun.StartOptions{})
-		require.NoError(t, err)
-
-		// Wait for the DAG to finish
-		dag.AssertLatestStatus(t, status.Success)
-
-		dagRunStatus, err := cli.GetLatestStatus(ctx, dag.DAG)
-		require.NoError(t, err)
-		dagRunID := dagRunStatus.DAGRunID
-		prevParams := dagRunStatus.Params
-
-		time.Sleep(1 * time.Second)
-
-		err = cli.RetryDAGStep(ctx, dag.DAG, dagRunID, "2")
-		require.NoError(t, err)
-
-		// Wait for the DAG to finish again
-		dag.AssertLatestStatus(t, status.Success)
-
-		dagRunStatus, err = cli.GetLatestStatus(ctx, dag.DAG)
-		require.NoError(t, err)
-
-		// Check if the params are the same as the previous run.
-		require.Equal(t, dagRunID, dagRunStatus.DAGRunID)
-		require.Equal(t, prevParams, dagRunStatus.Params)
-	})
-}
-
 func testNewStatus(dag *digraph.DAG, dagRunID string, dagStatus status.Status, nodeStatus status.NodeStatus) models.DAGRunStatus {
 	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
 	tm := time.Now()
@@ -307,7 +182,8 @@ func TestHandleTask(t *testing.T) {
 		cli := th.DAGRunMgr
 
 		// First, start a DAG run
-		err := cli.StartDAGRunAsync(ctx, dag.DAG, dagrun.StartOptions{})
+		spec := th.SubCmdBuilder.Start(dag.DAG, dagrun.StartOptions{})
+		err := dagrun.Start(th.Context, spec)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -348,7 +224,8 @@ func TestHandleTask(t *testing.T) {
 		cli := th.DAGRunMgr
 
 		// First, start a DAG run
-		err := cli.StartDAGRunAsync(ctx, dag.DAG, dagrun.StartOptions{})
+		spec := th.SubCmdBuilder.Start(dag.DAG, dagrun.StartOptions{})
+		err := dagrun.Start(th.Context, spec)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish

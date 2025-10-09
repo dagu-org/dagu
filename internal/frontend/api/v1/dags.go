@@ -540,9 +540,12 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "DAG is already running",
 			}
 		}
-		if err := a.dagRunManager.StartDAGRunAsync(ctx, dag, dagrun.StartOptions{
+
+		spec := a.cmdBuilder.Start(dag, dagrun.StartOptions{
 			Params: valueOf(request.Body.Params),
-		}); err != nil {
+		})
+
+		if err := dagrun.Start(ctx, spec); err != nil {
 			return nil, fmt.Errorf("error starting DAG: %w", err)
 		}
 		return api.PostDAGAction200JSONResponse{}, nil
@@ -595,12 +598,15 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			}
 		}
 		if request.Body.Step != nil && *request.Body.Step != "" {
-			if err := a.dagRunManager.RetryDAGStep(ctx, dag, *request.Body.RequestId, *request.Body.Step); err != nil {
+			spec := a.cmdBuilder.Retry(dag, *request.Body.RequestId, *request.Body.Step, true)
+			if err := dagrun.Start(ctx, spec); err != nil {
 				return nil, fmt.Errorf("error retrying DAG step: %w", err)
 			}
 			return api.PostDAGAction200JSONResponse{}, nil
 		}
-		if err := a.dagRunManager.RetryDAGRun(ctx, dag, *request.Body.RequestId, false); err != nil {
+
+		spec := a.cmdBuilder.Retry(dag, *request.Body.RequestId, "", false)
+		if err := dagrun.Start(ctx, spec); err != nil {
 			return nil, fmt.Errorf("error retrying DAG: %w", err)
 		}
 		return api.PostDAGAction200JSONResponse{}, nil
