@@ -24,8 +24,10 @@ type CommandSpec struct {
 
 // CommandRunner executes commands synchronously or asynchronously.
 type CommandRunner interface {
-	Execute(ctx context.Context, spec CommandSpec) error
-	ExecuteAsync(ctx context.Context, spec CommandSpec) error
+	// Run executes the command and waits for it to complete.
+	Run(ctx context.Context, spec CommandSpec) error
+	// Start executes the command without waiting for it to complete.
+	Start(ctx context.Context, spec CommandSpec) error
 }
 
 // defaultCommandRunner implements CommandRunner using os/exec.
@@ -37,7 +39,7 @@ func newCommandRunner(executable string) CommandRunner {
 	return &defaultCommandRunner{executable: executable}
 }
 
-func (r *defaultCommandRunner) Execute(ctx context.Context, spec CommandSpec) error {
+func (r *defaultCommandRunner) Run(ctx context.Context, spec CommandSpec) error {
 	// nolint:gosec
 	cmd := exec.CommandContext(ctx, r.executable, spec.Args...)
 	executor.SetupCommand(cmd)
@@ -66,7 +68,7 @@ func (r *defaultCommandRunner) Execute(ctx context.Context, spec CommandSpec) er
 	return nil
 }
 
-func (r *defaultCommandRunner) ExecuteAsync(ctx context.Context, spec CommandSpec) error {
+func (r *defaultCommandRunner) Start(ctx context.Context, spec CommandSpec) error {
 	// nolint:gosec
 	cmd := exec.Command(r.executable, spec.Args...)
 	executor.SetupCommand(cmd)

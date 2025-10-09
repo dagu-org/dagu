@@ -165,20 +165,20 @@ func (m *Manager) GenDAGRunID(_ context.Context) (string, error) {
 func (m *Manager) StartDAGRunAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions) error {
 	builder := NewCmdBuilder(ctx)
 	spec := builder.Start(ctx, dag, opts)
-	return m.runner.ExecuteAsync(ctx, spec)
+	return m.runner.Start(ctx, spec)
 }
 
 // EnqueueDAGRun enqueues a dag-run by executing the configured executable with the enqueue command.
 func (m *Manager) EnqueueDAGRun(ctx context.Context, dag *digraph.DAG, opts EnqueueOptions) error {
 	builder := NewCmdBuilder(ctx)
 	spec := builder.Enqueue(ctx, dag, opts)
-	return m.runner.Execute(ctx, spec)
+	return m.runner.Run(ctx, spec)
 }
 
 func (m *Manager) DequeueDAGRun(ctx context.Context, dag *digraph.DAG, dagRun digraph.DAGRunRef) error {
 	builder := NewCmdBuilder(ctx)
 	spec := builder.Dequeue(ctx, dag, dagRun)
-	return m.runner.Execute(ctx, spec)
+	return m.runner.Run(ctx, spec)
 }
 
 // RestartDAG restarts a DAG by executing the configured executable with the restart command.
@@ -186,21 +186,21 @@ func (m *Manager) DequeueDAGRun(ctx context.Context, dag *digraph.DAG, dagRun di
 func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error {
 	builder := NewCmdBuilder(ctx)
 	spec := builder.Restart(ctx, dag, opts)
-	return m.runner.ExecuteAsync(ctx, spec)
+	return m.runner.Start(ctx, spec)
 }
 
 // RetryDAGRun retries a dag-run by executing the configured executable with the retry command.
 func (m *Manager) RetryDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string, disableMaxActiveRuns bool) error {
 	builder := NewCmdBuilder(ctx)
 	spec := builder.Retry(ctx, dag, dagRunID, "", disableMaxActiveRuns)
-	return m.runner.ExecuteAsync(ctx, spec)
+	return m.runner.Start(ctx, spec)
 }
 
 // RetryDAGStep retries a dag-run from a specific step by executing the configured executable with the retry command and --step flag.
 func (m *Manager) RetryDAGStep(ctx context.Context, dag *digraph.DAG, dagRunID string, stepName string) error {
 	builder := NewCmdBuilder(ctx)
 	spec := builder.Retry(ctx, dag, dagRunID, stepName, false)
-	return m.runner.ExecuteAsync(ctx, spec)
+	return m.runner.Start(ctx, spec)
 }
 
 // IsRunning checks if a dag-run is currently running by querying its status.
@@ -496,7 +496,7 @@ func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) erro
 	}
 
 	// Execute synchronously
-	return m.runner.Execute(ctx, spec)
+	return m.runner.Run(ctx, spec)
 }
 
 // execWithRecovery executes a function with panic recovery and detailed error reporting
