@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/backoff"
 	"github.com/dagu-org/dagu/internal/coordinator"
+	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
@@ -15,13 +16,14 @@ import (
 type Poller struct {
 	workerID       string
 	coordinatorCli coordinator.Client
-	taskExecutor   TaskExecutor
+	subCmdBuilder  *dagrun.SubCmdBuilder
+	taskExecutor   TaskHandler
 	index          int
 	labels         map[string]string
 }
 
 // NewPoller creates a new poller instance
-func NewPoller(workerID string, coordinatorCli coordinator.Client, taskExecutor TaskExecutor, index int, labels map[string]string) *Poller {
+func NewPoller(workerID string, coordinatorCli coordinator.Client, taskExecutor TaskHandler, index int, labels map[string]string) *Poller {
 	return &Poller{
 		workerID:       workerID,
 		coordinatorCli: coordinatorCli,
@@ -68,7 +70,7 @@ func (p *Poller) Run(ctx context.Context) {
 					"dag_run_id", task.DagRunId)
 
 				// Execute the task using the TaskExecutor
-				err := p.taskExecutor.Execute(ctx, task)
+				err := p.taskExecutor.Handle(ctx, task)
 				if err != nil {
 					if ctx.Err() != nil {
 						// Context cancelled, exit gracefully

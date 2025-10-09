@@ -3,8 +3,6 @@ package dagrun
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"runtime/debug"
 
 	"github.com/dagu-org/dagu/internal/config"
@@ -14,7 +12,6 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/sock"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
 )
 
@@ -22,9 +19,9 @@ import (
 // The Manager is used to interact with the DAG.
 func New(drs models.DAGRunStore, ps models.ProcStore, cfg *config.Config) Manager {
 	return Manager{
-		dagRunStore: drs,
-		procStore:   ps,
-		cmdBuilder:  NewSubCmdBuilder(cfg),
+		dagRunStore:   drs,
+		procStore:     ps,
+		subCmdBuilder: NewSubCmdBuilder(cfg),
 	}
 }
 
@@ -32,9 +29,9 @@ func New(drs models.DAGRunStore, ps models.ProcStore, cfg *config.Config) Manage
 // restarting, and retrieving status information. It communicates with the DAG
 // through a socket interface and manages dag-run data.
 type Manager struct {
-	dagRunStore models.DAGRunStore // Store interface for persisting run data
-	procStore   models.ProcStore   // Store interface for process management
-	cmdBuilder  *SubCmdBuilder     // Command builder for constructing command specs
+	dagRunStore   models.DAGRunStore // Store interface for persisting run data
+	procStore     models.ProcStore   // Store interface for process management
+	subCmdBuilder *SubCmdBuilder     // Command builder for constructing command specs
 }
 
 // Stop stops a running DAG by sending a stop request to its socket.
@@ -376,54 +373,6 @@ func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef
 	return nil
 }
 
-// HandleTask executes a DAG run synchronously based on the task information.
-// It handles both START (new runs) and RETRY (resume existing runs) operations.
-func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) error {
-	var tempFile string
-
-	// If definition is provided, create a temporary DAG file
-	if task.Definition != "" {
-		logger.Info(ctx, "Creating temporary DAG file from definition",
-			"dagName", task.Target,
-			"definitionSize", len(task.Definition))
-
-		tf, err := m.createTempDAGFile(task.Target, []byte(task.Definition))
-		if err != nil {
-			return fmt.Errorf("failed to create temp DAG file: %w", err)
-		}
-		tempFile = tf
-		defer func() {
-			// Clean up the temporary file
-			if err := os.Remove(tempFile); err != nil && !os.IsNotExist(err) {
-				logger.Errorf(ctx, "Failed to remove temp DAG file: %v", err)
-			}
-		}()
-		// Update the target to use the temp file
-		originalTarget := task.Target
-		task.Target = tempFile
-
-		logger.Info(ctx, "Created temporary DAG file",
-			"tempFile", tempFile,
-			"originalTarget", originalTarget)
-	}
-
-	// Build command spec based on operation
-	var spec CmdSpec
-
-	switch task.Operation {
-	case coordinatorv1.Operation_OPERATION_START:
-		spec = m.cmdBuilder.TaskStart(task)
-	case coordinatorv1.Operation_OPERATION_RETRY:
-		spec = m.cmdBuilder.TaskRetry(task)
-	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
-		return fmt.Errorf("operation not specified")
-	default:
-		return fmt.Errorf("unknown operation: %v", task.Operation)
-	}
-
-	return Run(ctx, spec) // Synchronous execution
-}
-
 // execWithRecovery executes a function with panic recovery and detailed error reporting
 // It captures stack traces and provides structured error information for debugging
 func execWithRecovery(ctx context.Context, fn func()) {
@@ -453,33 +402,6 @@ func execWithRecovery(ctx context.Context, fn func()) {
 
 	// Execute the function
 	fn()
-}
-
-// createTempDAGFile creates a temporary file with the DAG definition content.
-func (m *Manager) createTempDAGFile(dagName string, yamlData []byte) (string, error) {
-	// Create a temporary directory if it doesn't exist
-	tempDir := filepath.Join(os.TempDir(), "dagu", "worker-dags")
-	if err := os.MkdirAll(tempDir, 0750); err != nil {
-		return "", fmt.Errorf("failed to create temp directory: %w", err)
-	}
-
-	// Create a temporary file with a meaningful name
-	pattern := fmt.Sprintf("%s-*.yaml", dagName)
-	tempFile, err := os.CreateTemp(tempDir, pattern)
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
-	}
-	defer func() {
-		_ = tempFile.Close()
-	}()
-
-	// Write the YAML data
-	if _, err := tempFile.Write(yamlData); err != nil {
-		_ = os.Remove(tempFile.Name())
-		return "", fmt.Errorf("failed to write YAML data: %w", err)
-	}
-
-	return tempFile.Name(), nil
 }
 
 // checkAndUpdateStaleRunningStatus checks if a running DAG has a live process

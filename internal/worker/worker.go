@@ -8,41 +8,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
-// TaskExecutor defines the interface for executing tasks
-type TaskExecutor interface {
-	Execute(ctx context.Context, task *coordinatorv1.Task) error
-}
-
-// dagRunTaskExecutor is the implementation that uses dagrun.Manager to execute tasks
-type dagRunTaskExecutor struct {
-	manager dagrun.Manager
-}
-
-// Execute runs the task using the dagrun.Manager
-func (e *dagRunTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Task) error {
-	logger.Info(ctx, "Executing task",
-		"operation", task.Operation.String(),
-		"target", task.Target,
-		"dag_run_id", task.DagRunId,
-		"root_dag_run_id", task.RootDagRunId,
-		"parent_dag_run_id", task.ParentDagRunId)
-
-	// Use the HandleTask method which handles all operations
-	return e.manager.HandleTask(ctx, task)
-}
-
 // Worker represents a worker instance that polls for tasks from the coordinator.
 type Worker struct {
 	id             string
 	maxActiveRuns  int
 	coordinatorCli coordinator.Client
-	taskExecutor   TaskExecutor
+	taskExecutor   TaskHandler
 	labels         map[string]string
 
 	// For tracking poller states and heartbeats
@@ -51,12 +29,12 @@ type Worker struct {
 }
 
 // SetTaskExecutor sets a custom task executor for testing or custom execution logic
-func (w *Worker) SetTaskExecutor(executor TaskExecutor) {
+func (w *Worker) SetTaskExecutor(executor TaskHandler) {
 	w.taskExecutor = executor
 }
 
 // NewWorker creates a new worker instance.
-func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator.Client, dagRunMgr dagrun.Manager, labels map[string]string) *Worker {
+func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator.Client, labels map[string]string, cfg *config.Config) *Worker {
 	// Generate default worker ID if not provided
 	if workerID == "" {
 		hostname, err := os.Hostname()
@@ -70,7 +48,7 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 		id:             workerID,
 		maxActiveRuns:  maxActiveRuns,
 		coordinatorCli: coordinatorClient,
-		taskExecutor:   &dagRunTaskExecutor{manager: dagRunMgr},
+		taskExecutor:   &taskHandler{subCmdBuilder: dagrun.NewSubCmdBuilder(cfg)},
 		labels:         labels,
 		runningTasks:   make(map[string]*coordinatorv1.RunningTask),
 	}
@@ -130,11 +108,11 @@ func (w *Worker) Stop(ctx context.Context) error {
 type trackingTaskExecutor struct {
 	worker        *Worker
 	pollerIndex   int
-	innerExecutor TaskExecutor
+	innerExecutor TaskHandler
 }
 
-// Execute tracks task state and delegates to the inner executor
-func (t *trackingTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.Task) error {
+// Handle tracks task state and delegates to the inner executor
+func (t *trackingTaskExecutor) Handle(ctx context.Context, task *coordinatorv1.Task) error {
 	pollerID := fmt.Sprintf("poller-%d", t.pollerIndex)
 
 	// Mark task as running
@@ -151,7 +129,7 @@ func (t *trackingTaskExecutor) Execute(ctx context.Context, task *coordinatorv1.
 	t.worker.pollersMu.Unlock()
 
 	// Execute the task
-	err := t.innerExecutor.Execute(ctx, task)
+	err := t.innerExecutor.Handle(ctx, task)
 
 	// Remove from running tasks
 	t.worker.pollersMu.Lock()

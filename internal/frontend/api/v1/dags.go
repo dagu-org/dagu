@@ -541,7 +541,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			}
 		}
 
-		spec := a.cmdBuilder.Start(dag, dagrun.StartOptions{
+		spec := a.subCmdBuilder.Start(dag, dagrun.StartOptions{
 			Params: valueOf(request.Body.Params),
 		})
 
@@ -598,14 +598,14 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			}
 		}
 		if request.Body.Step != nil && *request.Body.Step != "" {
-			spec := a.cmdBuilder.Retry(dag, *request.Body.RequestId, *request.Body.Step, true)
+			spec := a.subCmdBuilder.Retry(dag, *request.Body.RequestId, *request.Body.Step, true)
 			if err := dagrun.Start(ctx, spec); err != nil {
 				return nil, fmt.Errorf("error retrying DAG step: %w", err)
 			}
 			return api.PostDAGAction200JSONResponse{}, nil
 		}
 
-		spec := a.cmdBuilder.Retry(dag, *request.Body.RequestId, "", false)
+		spec := a.subCmdBuilder.Retry(dag, *request.Body.RequestId, "", false)
 		if err := dagrun.Start(ctx, spec); err != nil {
 			return nil, fmt.Errorf("error retrying DAG: %w", err)
 		}

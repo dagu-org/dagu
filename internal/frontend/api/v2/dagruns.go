@@ -590,14 +590,14 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	}
 
 	if request.Body.StepName != nil && *request.Body.StepName != "" {
-		spec := a.cmdBuilder.Retry(dag, request.Body.DagRunId, *request.Body.StepName, true)
+		spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, *request.Body.StepName, true)
 		if err := dagrun.Start(ctx, spec); err != nil {
 			return nil, fmt.Errorf("error retrying DAG step: %w", err)
 		}
 		return api.RetryDAGRun200Response{}, nil
 	}
 
-	spec := a.cmdBuilder.Retry(dag, request.Body.DagRunId, "", false)
+	spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, "", false)
 	if err := dagrun.Start(ctx, spec); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
@@ -681,7 +681,7 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 		}
 	}
 
-	spec := a.cmdBuilder.Dequeue(dag, dagRun)
+	spec := a.subCmdBuilder.Dequeue(dag, dagRun)
 	if err := dagrun.Run(ctx, spec); err != nil {
 		return nil, fmt.Errorf("error dequeueing dag-run: %w", err)
 	}

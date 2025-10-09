@@ -38,7 +38,7 @@ type API struct {
 	metricsRegistry    *prometheus.Registry
 	coordinatorCli     coordinator.Client
 	serviceRegistry    models.ServiceRegistry
-	cmdBuilder         *dagrun.SubCmdBuilder
+	subCmdBuilder      *dagrun.SubCmdBuilder
 }
 
 func New(
@@ -65,7 +65,7 @@ func New(
 		dagRunMgr:          drm,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,
-		cmdBuilder:         dagrun.NewSubCmdBuilder(cfg),
+		subCmdBuilder:      dagrun.NewSubCmdBuilder(cfg),
 		apiBasePath:        cfg.Server.APIBasePath,
 		config:             cfg,
 		coordinatorCli:     cc,

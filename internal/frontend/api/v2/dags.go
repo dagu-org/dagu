@@ -621,7 +621,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 }
 
 func (a *API) startDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunID string, singleton bool) error {
-	spec := a.cmdBuilder.Start(dag, dagrun.StartOptions{
+	spec := a.subCmdBuilder.Start(dag, dagrun.StartOptions{
 		Params:   params,
 		DAGRunID: dagRunID,
 		Quiet:    true,
@@ -745,7 +745,7 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRu
 		opts.Queue = dag.Queue
 	}
 
-	spec := a.cmdBuilder.Enqueue(dag, opts)
+	spec := a.subCmdBuilder.Enqueue(dag, opts)
 	if err := dagrun.Run(ctx, spec); err != nil {
 		return fmt.Errorf("error enqueuing DAG: %w", err)
 	}
