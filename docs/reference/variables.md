@@ -26,6 +26,27 @@ steps:
 
 ## Environment Variables
 
+### System Environment Variable Filtering
+
+For security, Dagu filters which system environment variables are passed to step processes and child DAGs.
+
+**How It Works:**
+
+System environment variables are available for expansion (`${VAR}`) when the DAG configuration is parsed, but only filtered variables are passed to the actual step execution environment.
+
+**Filtered Variables:**
+
+Only these system environment variables are automatically passed to step processes and child DAGs:
+
+- **Whitelisted:** `PATH`, `HOME`, `LANG`, `TZ`, `SHELL`
+- **Allowed Prefixes:** `DAGU_*`, `LC_*`, `DAG_*`
+
+The `DAG_*` prefix includes the special environment variables that Dagu automatically sets (see below).
+
+**What This Means:**
+
+You can use `${AWS_SECRET_ACCESS_KEY}` in your DAG YAML for variable expansion, but the `AWS_SECRET_ACCESS_KEY` variable itself won't be available in the environment when your step commands run unless you explicitly define it in the `env` section.
+
 ### Defining Environment Variables
 
 Set environment variables available to all steps:
@@ -35,8 +56,10 @@ env:
   - LOG_LEVEL: debug
   - DATA_DIR: /tmp/data
   - API_URL: https://api.example.com
-  - API_KEY: ${SECRET_API_KEY}  # From system environment
+  - API_KEY: ${SECRET_API_KEY}  # Explicitly reference system environment
 ```
+
+**Important:** To use sensitive system environment variables in your workflows, you must explicitly reference them in your `env` section as shown above. They will not be automatically available.
 
 ### Variable Expansion
 

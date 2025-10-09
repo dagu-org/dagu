@@ -261,12 +261,23 @@ steps:
 
 ## Environment Variables
 
+### System Environment Security
+
+Dagu filters environment variables passed to step processes for security:
+- System variables work in DAG YAML for expansion: `${VAR}`
+- Only filtered variables are passed to step execution environment
+- **Whitelisted:** `PATH`, `HOME`, `LANG`, `TZ`, `SHELL`
+- **Allowed Prefixes:** `DAGU_*`, `LC_*`, `DAG_*`
+
+To make other variables available in step processes, define them in `env`.
+
 ### Global Environment
 
 ```yaml
 env:
   - API_KEY: secret123
   - ENV: production
+  - AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}  # Explicit reference required
 
 steps:
   - name: use-env

@@ -25,7 +25,11 @@ var defaultWhitelist = map[string]bool{
 }
 
 // defaultPrefixes defines prefixes of env vars allowed to propagate.
-var defaultPrefixes = []string{strings.ToUpper(AppName) + "_", "LC_"}
+var defaultPrefixes = []string{
+	strings.ToUpper(AppName) + "_", // e.g., "DAGU_"
+	"DAG_",                         // Special DAG-related variables
+	"LC_",                          // Locale-related variables
+}
 
 // LoadBaseEnv loads and filters current environment variables.
 func LoadBaseEnv() BaseEnv {

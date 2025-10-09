@@ -4,6 +4,41 @@ Dagu provides multiple ways to handle data and variables in your DAGs, from simp
 
 ## Environment Variables
 
+### System Environment Variable Security
+
+For security, Dagu limits which system environment variables are passed to step processes and child DAGs.
+
+**How It Works:**
+
+System environment variables are available for expansion (`${VAR}`) during DAG configuration parsing, but only filtered variables are passed to the step execution environment.
+
+**Filtered Variables:**
+
+Only these are automatically passed to step processes:
+- **Whitelisted:** `PATH`, `HOME`, `LANG`, `TZ`, `SHELL`
+- **Allowed Prefixes:** `DAGU_*`, `LC_*`, `DAG_*`
+
+The `DAG_*` prefix includes special variables automatically set by Dagu for each step execution.
+
+**To Use Sensitive Variables:**
+
+You can reference system variables like `${AWS_SECRET_ACCESS_KEY}` in your YAML for substitution, but to make them available in the step process environment, define them in the `env` section:
+
+```yaml
+env:
+  - AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}      # Available in step environment
+  - AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  - DATABASE_URL: ${DATABASE_URL}
+```
+
+Or use `.env` files (recommended):
+
+```yaml
+dotenv: .env.secrets
+```
+
+This prevents accidental exposure of sensitive variables to step processes.
+
 ### DAG-Level Environment Variables
 
 Define variables accessible throughout the DAG:
@@ -11,7 +46,7 @@ Define variables accessible throughout the DAG:
 ```yaml
 env:
   - SOME_DIR: ${HOME}/batch
-  - SOME_FILE: ${SOME_DIR}/some_file 
+  - SOME_FILE: ${SOME_DIR}/some_file
 steps:
   - workingDir: ${SOME_DIR}
     command: python main.py ${SOME_FILE}
