@@ -34,7 +34,7 @@ func New(drs models.DAGRunStore, ps models.ProcStore, cfg *config.Config) Manage
 type Manager struct {
 	dagRunStore models.DAGRunStore // Store interface for persisting run data
 	procStore   models.ProcStore   // Store interface for process management
-	cmdBuilder  *CmdBuilder        // Command builder for constructing command specs
+	cmdBuilder  *SubCmdBuilder     // Command builder for constructing command specs
 }
 
 // Stop stops a running DAG by sending a stop request to its socket.

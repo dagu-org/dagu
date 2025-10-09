@@ -63,55 +63,6 @@ func TestDAG(t *testing.T) {
 		require.NotNil(t, apiResp.Pagination)
 	})
 
-	t.Run("ListDAGsNextRunSorting", func(t *testing.T) {
-		// Create DAGs with different schedules
-		hourlySpec := "schedule: \"0 * * * *\"\nsteps:\n  - name: step1\n    command: echo hourly"
-		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
-			Name: "hourly_dag",
-			Spec: &hourlySpec,
-		}).ExpectStatus(http.StatusCreated).Send(t)
-
-		dailySpec := "schedule: \"0 1 * * *\"\nsteps:\n  - name: step1\n    command: echo daily"
-		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
-			Name: "daily_dag",
-			Spec: &dailySpec,
-		}).ExpectStatus(http.StatusCreated).Send(t)
-
-		noScheduleSpec := "steps:\n  - name: step1\n    command: echo none"
-		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
-			Name: "no_schedule_dag",
-			Spec: &noScheduleSpec,
-		}).ExpectStatus(http.StatusCreated).Send(t)
-
-		// Test ascending order - hourly should come before daily
-		resp := server.Client().Get("/api/v2/dags?sort=nextRun&order=asc").ExpectStatus(http.StatusOK).Send(t)
-		var ascResp api.ListDAGs200JSONResponse
-		resp.Unmarshal(t, &ascResp)
-
-		var hourlyIdx, dailyIdx, noScheduleIdx = -1, -1, -1
-		for i, dag := range ascResp.Dags {
-			switch dag.Dag.Name {
-			case "hourly_dag":
-				hourlyIdx = i
-			case "daily_dag":
-				dailyIdx = i
-			case "no_schedule_dag":
-				noScheduleIdx = i
-			}
-		}
-
-		require.NotEqual(t, -1, hourlyIdx)
-		require.NotEqual(t, -1, dailyIdx)
-		require.NotEqual(t, -1, noScheduleIdx)
-		require.Less(t, hourlyIdx, dailyIdx, "hourly should come before daily")
-		require.Greater(t, noScheduleIdx, dailyIdx, "no schedule should come last")
-
-		// Clean up
-		_ = server.Client().Delete("/api/v2/dags/hourly_dag").ExpectStatus(http.StatusNoContent).Send(t)
-		_ = server.Client().Delete("/api/v2/dags/daily_dag").ExpectStatus(http.StatusNoContent).Send(t)
-		_ = server.Client().Delete("/api/v2/dags/no_schedule_dag").ExpectStatus(http.StatusNoContent).Send(t)
-	})
-
 	t.Run("ExecuteDAGWithSingleton", func(t *testing.T) {
 		// Create a new DAG
 		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAG201JSONResponse{

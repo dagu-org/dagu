@@ -98,16 +98,16 @@ func (r *cmdRunner) Start(ctx context.Context, spec CmdSpec) error {
 	return nil
 }
 
-// CmdBuilder centralizes CLI command argument construction.
-type CmdBuilder struct {
+// SubCmdBuilder centralizes CLI command argument construction.
+type SubCmdBuilder struct {
 	executable string
 	configFile string
 	baseEnv    config.BaseEnv
 }
 
 // NewCmdBuilder creates a new CmdBuilder instance.
-func NewCmdBuilder(cfg *config.Config) *CmdBuilder {
-	return &CmdBuilder{
+func NewCmdBuilder(cfg *config.Config) *SubCmdBuilder {
+	return &SubCmdBuilder{
 		executable: cfg.Paths.Executable,
 		configFile: cfg.Global.ConfigFileUsed,
 		baseEnv:    cfg.Global.BaseEnv,
@@ -115,7 +115,7 @@ func NewCmdBuilder(cfg *config.Config) *CmdBuilder {
 }
 
 // Start creates a start command spec.
-func (b *CmdBuilder) Start(dag *digraph.DAG, opts StartOptions) CmdSpec {
+func (b *SubCmdBuilder) Start(dag *digraph.DAG, opts StartOptions) CmdSpec {
 	args := []string{"start"}
 
 	if opts.Params != "" {
@@ -144,7 +144,7 @@ func (b *CmdBuilder) Start(dag *digraph.DAG, opts StartOptions) CmdSpec {
 }
 
 // Enqueue creates an enqueue command spec.
-func (b *CmdBuilder) Enqueue(dag *digraph.DAG, opts EnqueueOptions) CmdSpec {
+func (b *SubCmdBuilder) Enqueue(dag *digraph.DAG, opts EnqueueOptions) CmdSpec {
 	args := []string{"enqueue"}
 
 	if opts.Params != "" {
@@ -175,7 +175,7 @@ func (b *CmdBuilder) Enqueue(dag *digraph.DAG, opts EnqueueOptions) CmdSpec {
 }
 
 // Dequeue creates a dequeue command spec.
-func (b *CmdBuilder) Dequeue(dag *digraph.DAG, dagRun digraph.DAGRunRef) CmdSpec {
+func (b *SubCmdBuilder) Dequeue(dag *digraph.DAG, dagRun digraph.DAGRunRef) CmdSpec {
 	args := []string{"dequeue", fmt.Sprintf("--dag-run=%s", dagRun.String())}
 
 	if b.configFile != "" {
@@ -193,7 +193,7 @@ func (b *CmdBuilder) Dequeue(dag *digraph.DAG, dagRun digraph.DAGRunRef) CmdSpec
 }
 
 // Restart creates a restart command spec.
-func (b *CmdBuilder) Restart(dag *digraph.DAG, opts RestartOptions) CmdSpec {
+func (b *SubCmdBuilder) Restart(dag *digraph.DAG, opts RestartOptions) CmdSpec {
 	args := []string{"restart"}
 
 	if opts.Quiet {
@@ -213,7 +213,7 @@ func (b *CmdBuilder) Restart(dag *digraph.DAG, opts RestartOptions) CmdSpec {
 }
 
 // Retry creates a retry command spec.
-func (b *CmdBuilder) Retry(dag *digraph.DAG, dagRunID string, stepName string, disableMaxActiveRuns bool) CmdSpec {
+func (b *SubCmdBuilder) Retry(dag *digraph.DAG, dagRunID string, stepName string, disableMaxActiveRuns bool) CmdSpec {
 	args := []string{"retry", fmt.Sprintf("--run-id=%s", dagRunID)}
 
 	if stepName != "" {
@@ -236,7 +236,7 @@ func (b *CmdBuilder) Retry(dag *digraph.DAG, dagRunID string, stepName string, d
 }
 
 // TaskStart creates a start command spec for coordinator tasks.
-func (b *CmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
+func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 	args := []string{"start"}
 
 	// Add hierarchy flags for child DAGs
@@ -266,7 +266,7 @@ func (b *CmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 }
 
 // TaskRetry creates a retry command spec for coordinator tasks.
-func (b *CmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
+func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId)}
 
 	if task.Step != "" {
