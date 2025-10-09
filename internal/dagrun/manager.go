@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
-	"slices"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/status"
@@ -37,13 +36,6 @@ type Manager struct {
 	procStore   models.ProcStore   // Store interface for process management
 	executable  string             // Path to the executable used to run DAGs
 	runner      CmdRunner          // Command execution abstraction
-}
-
-// LoadYAML loads a DAG from YAML specification bytes without evaluating it.
-// It appends the WithoutEval option to any provided options.
-func (m *Manager) LoadYAML(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
-	opts = append(slices.Clone(opts), digraph.WithoutEval())
-	return digraph.LoadYAML(ctx, spec, opts...)
 }
 
 // Stop stops a running DAG by sending a stop request to its socket.

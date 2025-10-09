@@ -35,12 +35,12 @@ func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRe
 		}
 	}
 
-	dag, err := a.dagRunMgr.LoadYAML(
-		ctx,
+	// Load the DAG spec
+	dag, err := digraph.LoadYAML(ctx,
 		[]byte(request.Body.Spec),
-		digraph.WithoutEval(),
 		digraph.WithName(name),
 		digraph.WithAllowBuildErrors(),
+		digraph.WithoutEval(),
 	)
 
 	var errs []string
@@ -77,7 +77,13 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 	var spec []byte
 	if request.Body.Spec != nil && strings.TrimSpace(*request.Body.Spec) != "" {
 		// Validate provided spec before creating
-		if _, err := a.dagRunMgr.LoadYAML(ctx, []byte(*request.Body.Spec), digraph.WithName(request.Body.Name)); err != nil {
+		_, err := digraph.LoadYAML(ctx,
+			[]byte(*request.Body.Spec),
+			digraph.WithName(request.Body.Name),
+			digraph.WithoutEval(),
+		)
+
+		if err != nil {
 			var verrs digraph.ErrorList
 			if errors.As(err, &verrs) {
 				// Return 400 with summary of errors
@@ -142,9 +148,12 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 	}
 
 	// Validate the spec - use WithAllowBuildErrors to return DAG even with errors
-	dag, err := a.dagRunMgr.LoadYAML(ctx, []byte(spec),
+	dag, err := digraph.LoadYAML(ctx,
+		[]byte(spec),
 		digraph.WithName(request.FileName),
-		digraph.WithAllowBuildErrors())
+		digraph.WithAllowBuildErrors(),
+		digraph.WithoutEval(),
+	)
 	var errs []string
 
 	var loadErrs digraph.ErrorList
