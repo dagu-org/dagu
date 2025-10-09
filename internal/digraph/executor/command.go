@@ -95,7 +95,7 @@ func (e *commandExecutor) Kill(sig os.Signal) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	return killProcessGroup(e.cmd, sig)
+	return cmdutil.KillProcessGroup(e.cmd, sig)
 }
 
 type commandConfig struct {
@@ -156,7 +156,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	cmd.Dir = cfg.Dir
 	cmd.Stdout = cfg.Stdout
 	cmd.Stderr = cfg.Stderr
-	setupCommand(cmd)
+	cmdutil.SetupCommand(cmd)
 
 	return cmd, nil
 }

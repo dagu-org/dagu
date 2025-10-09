@@ -1,7 +1,7 @@
 //go:build !windows
 // +build !windows
 
-package executor
+package cmdutil
 
 import (
 	"os"
@@ -58,7 +58,7 @@ func TestKillProcessGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := tt.setupCmd()
 
-			err := killProcessGroup(cmd, tt.signal)
+			err := KillProcessGroup(cmd, tt.signal)
 
 			if tt.shouldError {
 				assert.Error(t, err)
@@ -94,7 +94,7 @@ func TestKillMultipleProcessGroups(t *testing.T) {
 	cmds["nil"] = nil
 
 	// Kill all processes
-	err := killMultipleProcessGroups(cmds, syscall.SIGTERM)
+	err := KillMultipleProcessGroups(cmds, syscall.SIGTERM)
 	// Error might occur if process already exited, which is OK
 	_ = err
 

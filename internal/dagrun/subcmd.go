@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"strconv"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -43,7 +43,7 @@ func newCmdRunner() CmdRunner {
 func (r *cmdRunner) Run(ctx context.Context, spec CmdSpec) error {
 	// nolint:gosec
 	cmd := exec.CommandContext(ctx, spec.Executable, spec.Args...)
-	executor.SetupCommand(cmd)
+	cmdutil.SetupCommand(cmd)
 	cmd.Dir = spec.WorkingDir
 	cmd.Env = spec.Env
 
@@ -72,7 +72,7 @@ func (r *cmdRunner) Run(ctx context.Context, spec CmdSpec) error {
 func (r *cmdRunner) Start(ctx context.Context, spec CmdSpec) error {
 	// nolint:gosec
 	cmd := exec.Command(spec.Executable, spec.Args...)
-	executor.SetupCommand(cmd)
+	cmdutil.SetupCommand(cmd)
 	cmd.Dir = spec.WorkingDir
 	cmd.Env = spec.Env
 
