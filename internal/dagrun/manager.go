@@ -373,37 +373,6 @@ func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun digraph.DAGRunRef
 	return nil
 }
 
-// execWithRecovery executes a function with panic recovery and detailed error reporting
-// It captures stack traces and provides structured error information for debugging
-func execWithRecovery(ctx context.Context, fn func()) {
-	defer func() {
-		if panicObj := recover(); panicObj != nil {
-			stack := debug.Stack()
-
-			// Convert panic object to error
-			var err error
-			switch v := panicObj.(type) {
-			case error:
-				err = v
-			case string:
-				err = fmt.Errorf("panic: %s", v)
-			default:
-				err = fmt.Errorf("panic: %v", v)
-			}
-
-			// Log with structured information
-			logger.Error(ctx, "Recovered from panic",
-				"err", err.Error(),
-				"errType", fmt.Sprintf("%T", panicObj),
-				"stackTrace", stack,
-				"fullStack", string(stack))
-		}
-	}()
-
-	// Execute the function
-	fn()
-}
-
 // checkAndUpdateStaleRunningStatus checks if a running DAG has a live process
 // and updates its status to error if the process is not alive.
 func (m *Manager) checkAndUpdateStaleRunningStatus(
@@ -433,4 +402,35 @@ func (m *Manager) checkAndUpdateStaleRunningStatus(
 	st.Status = status.Error
 
 	return nil
+}
+
+// execWithRecovery executes a function with panic recovery and detailed error reporting
+// It captures stack traces and provides structured error information for debugging
+func execWithRecovery(ctx context.Context, fn func()) {
+	defer func() {
+		if panicObj := recover(); panicObj != nil {
+			stack := debug.Stack()
+
+			// Convert panic object to error
+			var err error
+			switch v := panicObj.(type) {
+			case error:
+				err = v
+			case string:
+				err = fmt.Errorf("panic: %s", v)
+			default:
+				err = fmt.Errorf("panic: %v", v)
+			}
+
+			// Log with structured information
+			logger.Error(ctx, "Recovered from panic",
+				"err", err.Error(),
+				"errType", fmt.Sprintf("%T", panicObj),
+				"stackTrace", stack,
+				"fullStack", string(stack))
+		}
+	}()
+
+	// Execute the function
+	fn()
 }

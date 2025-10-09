@@ -13,97 +13,6 @@ import (
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
-// CmdSpec describes a command to be executed with all its configuration.
-type CmdSpec struct {
-	Executable string
-	Args       []string
-	WorkingDir string
-	Env        []string
-	Stdout     *os.File
-	Stderr     *os.File
-}
-
-// StartOptions contains options for initiating a dag-run.
-type StartOptions struct {
-	Params   string // Parameters to pass to the DAG
-	Quiet    bool   // Whether to run in quiet mode
-	DAGRunID string // ID for the dag-run
-	NoQueue  bool   // Do not allow queueing
-}
-
-// EnqueueOptions contains options for enqueuing a dag-run.
-type EnqueueOptions struct {
-	Params   string // Parameters to pass to the DAG
-	Quiet    bool   // Whether to run in quiet mode
-	DAGRunID string // ID for the dag-run
-	Queue    string // Queue name to enqueue to
-}
-
-// RestartOptions contains options for restarting a dag-run.
-type RestartOptions struct {
-	Quiet bool // Whether to run in quiet mode
-}
-
-// Run executes the command and waits for it to complete.
-func Run(ctx context.Context, spec CmdSpec) error {
-	// nolint:gosec
-	cmd := exec.CommandContext(ctx, spec.Executable, spec.Args...)
-	cmdutil.SetupCommand(cmd)
-	cmd.Dir = spec.WorkingDir
-	cmd.Env = spec.Env
-
-	// If custom streams are provided, use them and call Run()
-	if spec.Stdout != nil || spec.Stderr != nil {
-		if spec.Stdout != nil {
-			cmd.Stdout = spec.Stdout
-		}
-		if spec.Stderr != nil {
-			cmd.Stderr = spec.Stderr
-		}
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("command failed: %w", err)
-		}
-		return nil
-	}
-
-	// Otherwise capture output with CombinedOutput()
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("command failed: %w\noutput: %s", err, output)
-	}
-	return nil
-}
-
-// Start executes the command without waiting for it to complete.
-func Start(ctx context.Context, spec CmdSpec) error {
-	// nolint:gosec
-	cmd := exec.Command(spec.Executable, spec.Args...)
-	cmdutil.SetupCommand(cmd)
-	cmd.Dir = spec.WorkingDir
-	cmd.Env = spec.Env
-
-	if spec.Stdout != nil {
-		cmd.Stdout = spec.Stdout
-	} else {
-		cmd.Stdout = os.Stdout
-	}
-	if spec.Stderr != nil {
-		cmd.Stderr = spec.Stderr
-	} else {
-		cmd.Stderr = os.Stderr
-	}
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start command: %w", err)
-	}
-
-	go execWithRecovery(ctx, func() {
-		_ = cmd.Wait()
-	})
-
-	return nil
-}
-
 // SubCmdBuilder centralizes CLI command argument construction.
 type SubCmdBuilder struct {
 	executable string
@@ -288,4 +197,95 @@ func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 		Args:       args,
 		Env:        os.Environ(),
 	}
+}
+
+// CmdSpec describes a command to be executed with all its configuration.
+type CmdSpec struct {
+	Executable string
+	Args       []string
+	WorkingDir string
+	Env        []string
+	Stdout     *os.File
+	Stderr     *os.File
+}
+
+// StartOptions contains options for initiating a dag-run.
+type StartOptions struct {
+	Params   string // Parameters to pass to the DAG
+	Quiet    bool   // Whether to run in quiet mode
+	DAGRunID string // ID for the dag-run
+	NoQueue  bool   // Do not allow queueing
+}
+
+// EnqueueOptions contains options for enqueuing a dag-run.
+type EnqueueOptions struct {
+	Params   string // Parameters to pass to the DAG
+	Quiet    bool   // Whether to run in quiet mode
+	DAGRunID string // ID for the dag-run
+	Queue    string // Queue name to enqueue to
+}
+
+// RestartOptions contains options for restarting a dag-run.
+type RestartOptions struct {
+	Quiet bool // Whether to run in quiet mode
+}
+
+// Run executes the command and waits for it to complete.
+func Run(ctx context.Context, spec CmdSpec) error {
+	// nolint:gosec
+	cmd := exec.CommandContext(ctx, spec.Executable, spec.Args...)
+	cmdutil.SetupCommand(cmd)
+	cmd.Dir = spec.WorkingDir
+	cmd.Env = spec.Env
+
+	// If custom streams are provided, use them and call Run()
+	if spec.Stdout != nil || spec.Stderr != nil {
+		if spec.Stdout != nil {
+			cmd.Stdout = spec.Stdout
+		}
+		if spec.Stderr != nil {
+			cmd.Stderr = spec.Stderr
+		}
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("command failed: %w", err)
+		}
+		return nil
+	}
+
+	// Otherwise capture output with CombinedOutput()
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("command failed: %w\noutput: %s", err, output)
+	}
+	return nil
+}
+
+// Start executes the command without waiting for it to complete.
+func Start(ctx context.Context, spec CmdSpec) error {
+	// nolint:gosec
+	cmd := exec.Command(spec.Executable, spec.Args...)
+	cmdutil.SetupCommand(cmd)
+	cmd.Dir = spec.WorkingDir
+	cmd.Env = spec.Env
+
+	if spec.Stdout != nil {
+		cmd.Stdout = spec.Stdout
+	} else {
+		cmd.Stdout = os.Stdout
+	}
+	if spec.Stderr != nil {
+		cmd.Stderr = spec.Stderr
+	} else {
+		cmd.Stderr = os.Stderr
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start command: %w", err)
+	}
+
+	go execWithRecovery(ctx, func() {
+		_ = cmd.Wait()
+	})
+
+	return nil
 }
