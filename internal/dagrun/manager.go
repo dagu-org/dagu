@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -19,13 +20,11 @@ import (
 
 // New creates a new Manager instance.
 // The Manager is used to interact with the DAG.
-func New(drs models.DAGRunStore, ps models.ProcStore, executable, configFile string) Manager {
+func New(drs models.DAGRunStore, ps models.ProcStore, cfg *config.Config) Manager {
 	return Manager{
 		dagRunStore: drs,
 		procStore:   ps,
-		executable:  executable,
-		runner:      newCommandRunner(executable),
-		configFile:  configFile,
+		cmdBuilder:  NewCmdBuilder(cfg),
 	}
 }
 
@@ -35,9 +34,7 @@ func New(drs models.DAGRunStore, ps models.ProcStore, executable, configFile str
 type Manager struct {
 	dagRunStore models.DAGRunStore // Store interface for persisting run data
 	procStore   models.ProcStore   // Store interface for process management
-	executable  string             // Path to the executable used to run DAGs
-	configFile  string             // Path to the configuration file
-	runner      CmdRunner          // Command execution abstraction
+	cmdBuilder  *CmdBuilder        // Command builder for constructing command specs
 }
 
 // Stop stops a running DAG by sending a stop request to its socket.
@@ -157,44 +154,38 @@ func (m *Manager) GenDAGRunID(_ context.Context) (string, error) {
 // StartDAGRunAsync starts a dag-run by executing the configured executable with the start command.
 // It sets up the command to run in its own process group and configures standard output/error.
 func (m *Manager) StartDAGRunAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions) error {
-	builder := NewCmdBuilder(m.configFile)
-	spec := builder.Start(dag, opts)
-	return m.runner.Start(ctx, spec)
+	spec := m.cmdBuilder.Start(dag, opts)
+	return newCmdRunner().Start(ctx, spec)
 }
 
 // EnqueueDAGRun enqueues a dag-run by executing the configured executable with the enqueue command.
 func (m *Manager) EnqueueDAGRun(ctx context.Context, dag *digraph.DAG, opts EnqueueOptions) error {
-	builder := NewCmdBuilder(m.configFile)
-	spec := builder.Enqueue(dag, opts)
-	return m.runner.Run(ctx, spec)
+	spec := m.cmdBuilder.Enqueue(dag, opts)
+	return newCmdRunner().Run(ctx, spec)
 }
 
 func (m *Manager) DequeueDAGRun(ctx context.Context, dag *digraph.DAG, dagRun digraph.DAGRunRef) error {
-	builder := NewCmdBuilder(m.configFile)
-	spec := builder.Dequeue(dag, dagRun)
-	return m.runner.Run(ctx, spec)
+	spec := m.cmdBuilder.Dequeue(dag, dagRun)
+	return newCmdRunner().Run(ctx, spec)
 }
 
 // RestartDAG restarts a DAG by executing the configured executable with the restart command.
 // It sets up the command to run in its own process group.
 func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error {
-	builder := NewCmdBuilder(m.configFile)
-	spec := builder.Restart(dag, opts)
-	return m.runner.Start(ctx, spec)
+	spec := m.cmdBuilder.Restart(dag, opts)
+	return newCmdRunner().Start(ctx, spec)
 }
 
 // RetryDAGRun retries a dag-run by executing the configured executable with the retry command.
 func (m *Manager) RetryDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string, disableMaxActiveRuns bool) error {
-	builder := NewCmdBuilder(m.configFile)
-	spec := builder.Retry(dag, dagRunID, "", disableMaxActiveRuns)
-	return m.runner.Start(ctx, spec)
+	spec := m.cmdBuilder.Retry(dag, dagRunID, "", disableMaxActiveRuns)
+	return newCmdRunner().Start(ctx, spec)
 }
 
 // RetryDAGStep retries a dag-run from a specific step by executing the configured executable with the retry command and --step flag.
 func (m *Manager) RetryDAGStep(ctx context.Context, dag *digraph.DAG, dagRunID string, stepName string) error {
-	builder := NewCmdBuilder(m.configFile)
-	spec := builder.Retry(dag, dagRunID, stepName, false)
-	return m.runner.Start(ctx, spec)
+	spec := m.cmdBuilder.Retry(dag, dagRunID, stepName, false)
+	return newCmdRunner().Start(ctx, spec)
 }
 
 // IsRunning checks if a dag-run is currently running by querying its status.
@@ -475,14 +466,13 @@ func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) erro
 	}
 
 	// Build command spec based on operation
-	builder := NewCmdBuilder(m.configFile)
 	var spec CmdSpec
 
 	switch task.Operation {
 	case coordinatorv1.Operation_OPERATION_START:
-		spec = builder.TaskStart(task)
+		spec = m.cmdBuilder.TaskStart(task)
 	case coordinatorv1.Operation_OPERATION_RETRY:
-		spec = builder.TaskRetry(task)
+		spec = m.cmdBuilder.TaskRetry(task)
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
 		return fmt.Errorf("operation not specified")
 	default:
@@ -490,7 +480,7 @@ func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) erro
 	}
 
 	// Execute synchronously
-	return m.runner.Run(ctx, spec)
+	return newCmdRunner().Run(ctx, spec)
 }
 
 // execWithRecovery executes a function with panic recovery and detailed error reporting

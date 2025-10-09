@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -14,6 +15,7 @@ import (
 
 // CmdSpec describes a command to be executed with all its configuration.
 type CmdSpec struct {
+	Executable string
 	Args       []string
 	WorkingDir string
 	Env        []string
@@ -29,18 +31,18 @@ type CmdRunner interface {
 	Start(ctx context.Context, spec CmdSpec) error
 }
 
-// defaultCommandRunner implements CommandRunner using os/exec.
-type defaultCommandRunner struct {
-	executable string
+var _ CmdRunner = (*cmdRunner)(nil) // Ensure cmdRunner implements CmdRunner
+
+// cmdRunner implements CommandRunner using os/exec.
+type cmdRunner struct{}
+
+func newCmdRunner() CmdRunner {
+	return &cmdRunner{}
 }
 
-func newCommandRunner(executable string) CmdRunner {
-	return &defaultCommandRunner{executable: executable}
-}
-
-func (r *defaultCommandRunner) Run(ctx context.Context, spec CmdSpec) error {
+func (r *cmdRunner) Run(ctx context.Context, spec CmdSpec) error {
 	// nolint:gosec
-	cmd := exec.CommandContext(ctx, r.executable, spec.Args...)
+	cmd := exec.CommandContext(ctx, spec.Executable, spec.Args...)
 	executor.SetupCommand(cmd)
 	cmd.Dir = spec.WorkingDir
 	cmd.Env = spec.Env
@@ -67,9 +69,9 @@ func (r *defaultCommandRunner) Run(ctx context.Context, spec CmdSpec) error {
 	return nil
 }
 
-func (r *defaultCommandRunner) Start(ctx context.Context, spec CmdSpec) error {
+func (r *cmdRunner) Start(ctx context.Context, spec CmdSpec) error {
 	// nolint:gosec
-	cmd := exec.Command(r.executable, spec.Args...)
+	cmd := exec.Command(spec.Executable, spec.Args...)
 	executor.SetupCommand(cmd)
 	cmd.Dir = spec.WorkingDir
 	cmd.Env = spec.Env
@@ -98,11 +100,18 @@ func (r *defaultCommandRunner) Start(ctx context.Context, spec CmdSpec) error {
 
 // CmdBuilder centralizes CLI command argument construction.
 type CmdBuilder struct {
+	executable string
 	configFile string
+	baseEnv    config.BaseEnv
 }
 
-func NewCmdBuilder(configFile string) *CmdBuilder {
-	return &CmdBuilder{configFile: configFile}
+// NewCmdBuilder creates a new CmdBuilder instance.
+func NewCmdBuilder(cfg *config.Config) *CmdBuilder {
+	return &CmdBuilder{
+		executable: cfg.Paths.Executable,
+		configFile: cfg.Global.ConfigFileUsed,
+		baseEnv:    cfg.Global.BaseEnv,
+	}
 }
 
 // Start creates a start command spec.
@@ -127,6 +136,7 @@ func (b *CmdBuilder) Start(dag *digraph.DAG, opts StartOptions) CmdSpec {
 	args = append(args, dag.Location)
 
 	return CmdSpec{
+		Executable: b.executable,
 		Args:       args,
 		WorkingDir: dag.WorkingDir,
 		Env:        os.Environ(),
@@ -155,6 +165,7 @@ func (b *CmdBuilder) Enqueue(dag *digraph.DAG, opts EnqueueOptions) CmdSpec {
 	args = append(args, dag.Location)
 
 	return CmdSpec{
+		Executable: b.executable,
 		Args:       args,
 		WorkingDir: dag.WorkingDir,
 		Env:        os.Environ(),
@@ -172,6 +183,7 @@ func (b *CmdBuilder) Dequeue(dag *digraph.DAG, dagRun digraph.DAGRunRef) CmdSpec
 	}
 
 	return CmdSpec{
+		Executable: b.executable,
 		Args:       args,
 		WorkingDir: dag.WorkingDir,
 		Env:        os.Environ(),
@@ -193,6 +205,7 @@ func (b *CmdBuilder) Restart(dag *digraph.DAG, opts RestartOptions) CmdSpec {
 	args = append(args, dag.Location)
 
 	return CmdSpec{
+		Executable: b.executable,
 		Args:       args,
 		WorkingDir: dag.WorkingDir,
 		Env:        os.Environ(),
@@ -215,6 +228,7 @@ func (b *CmdBuilder) Retry(dag *digraph.DAG, dagRunID string, stepName string, d
 	args = append(args, dag.Name)
 
 	return CmdSpec{
+		Executable: b.executable,
 		Args:       args,
 		WorkingDir: dag.WorkingDir,
 		Env:        os.Environ(),
@@ -245,8 +259,9 @@ func (b *CmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 	}
 
 	return CmdSpec{
-		Args: args,
-		Env:  os.Environ(),
+		Executable: b.executable,
+		Args:       args,
+		Env:        os.Environ(),
 	}
 }
 
@@ -263,7 +278,8 @@ func (b *CmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 	args = append(args, task.Target)
 
 	return CmdSpec{
-		Args: args,
-		Env:  os.Environ(),
+		Executable: b.executable,
+		Args:       args,
+		Env:        os.Environ(),
 	}
 }
