@@ -30,10 +30,10 @@ func ConfigFileUsed(ctx context.Context) string {
 	return ""
 }
 
-// BaseEnvVars returns a map of base environment variables derived from the configuration.
-func BaseEnvVars(ctx context.Context) []string {
+// GetBaseEnv returns a map of base environment variables derived from the configuration.
+func GetBaseEnv(ctx context.Context) *BaseEnv {
 	if cfg := GetConfig(ctx); cfg != nil {
-		return cfg.Global.BaseEnv.AsSlice()
+		return &cfg.Global.BaseEnv
 	}
 	return nil
 }

@@ -66,13 +66,10 @@ func TestBaseEnvVars(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	assert.Empty(t, config.BaseEnvVars(ctx), 0)
+	assert.Empty(t, config.GetBaseEnv(ctx), 0)
+	baseEnv := config.NewBaseEnv([]string{"A=1", "B=2"})
 	ctx = config.WithConfig(context.Background(), &config.Config{
-		Global: config.Global{
-			BaseEnv: config.BaseEnv{
-				Variables: []string{"A=1", "B=2"},
-			},
-		},
+		Global: config.Global{BaseEnv: baseEnv},
 	})
-	assert.Equal(t, []string{"A=1", "B=2"}, config.BaseEnvVars(ctx))
+	assert.Equal(t, []string{"A=1", "B=2"}, config.GetBaseEnv(ctx))
 }

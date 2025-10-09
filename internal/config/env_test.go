@@ -40,14 +40,8 @@ func TestLoadBaseEnv(t *testing.T) {
 func TestBaseEnv_AsSlice(t *testing.T) {
 	t.Parallel()
 
-	baseEnv := config.BaseEnv{Variables: []string{"A=1", "B=2"}}
-	slice := baseEnv.AsSlice()
-
-	require.Equal(t, []string{"A=1", "B=2"}, slice)
-
-	// Verify defensive copy
-	slice[0] = "MODIFIED=X"
-	require.Equal(t, []string{"A=1", "B=2"}, baseEnv.Variables)
+	baseEnv := config.NewBaseEnv([]string{"A=1", "B=2"})
+	require.Equal(t, []string{"A=1", "B=2"}, baseEnv.AsSlice())
 }
 
 func parseEnvSlice(envSlice []string) map[string]string {

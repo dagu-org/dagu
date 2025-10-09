@@ -7,7 +7,11 @@ import (
 
 // BaseEnv represents a filtered set of environment variables to pass to child processes.
 type BaseEnv struct {
-	Variables []string
+	variables []string
+}
+
+func NewBaseEnv(vars []string) BaseEnv {
+	return BaseEnv{variables: vars}
 }
 
 // defaultWhitelist defines which env vars to pass to child processes.
@@ -23,12 +27,12 @@ var defaultPrefixes = []string{strings.ToUpper(AppName) + "_"}
 
 // LoadBaseEnv loads and filters current environment variables.
 func LoadBaseEnv() BaseEnv {
-	return BaseEnv{Variables: filterEnv(os.Environ(), defaultWhitelist, defaultPrefixes)}
+	return BaseEnv{variables: filterEnv(os.Environ(), defaultWhitelist, defaultPrefixes)}
 }
 
 // AsSlice returns a defensive copy of the filtered environment.
 func (b BaseEnv) AsSlice() []string {
-	return append([]string{}, b.Variables...)
+	return append([]string{}, b.variables...)
 }
 
 // filterEnv filters the provided environment variables.

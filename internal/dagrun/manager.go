@@ -193,7 +193,7 @@ func (m *Manager) StartDAGRunAsync(ctx context.Context, dag *digraph.DAG, opts S
 	cmd := exec.Command(m.executable, args...)
 	executor.SetupCommand(cmd)
 	cmd.Dir = dag.WorkingDir
-	cmd.Env = os.Environ()
+	cmd.Env = config.GetBaseEnv(ctx).AsSlice()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -232,7 +232,7 @@ func (m *Manager) EnqueueDAGRun(ctx context.Context, dag *digraph.DAG, opts Enqu
 	cmd := exec.Command(m.executable, args...)
 	executor.SetupCommand(cmd)
 	cmd.Dir = dag.WorkingDir
-	cmd.Env = os.Environ()
+	cmd.Env = config.GetBaseEnv(ctx).AsSlice()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -256,7 +256,7 @@ func (m *Manager) DequeueDAGRun(ctx context.Context, dag *digraph.DAG, dagRun di
 	cmd := exec.Command(m.executable, args...)
 	executor.SetupCommand(cmd)
 	cmd.Dir = dag.WorkingDir
-	cmd.Env = os.Environ()
+	cmd.Env = config.GetBaseEnv(ctx).AsSlice()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -285,7 +285,7 @@ func (m *Manager) RestartDAG(ctx context.Context, dag *digraph.DAG, opts Restart
 	cmd := exec.Command(m.executable, args...)
 	executor.SetupCommand(cmd)
 	cmd.Dir = dag.WorkingDir
-	cmd.Env = os.Environ()
+	cmd.Env = config.GetBaseEnv(ctx).AsSlice()
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start restart command: %w", err)
 	}
@@ -324,7 +324,7 @@ func (m *Manager) runRetryCommand(ctx context.Context, args []string, dag *digra
 	cmd := exec.Command(m.executable, args...)
 	executor.SetupCommand(cmd)
 	cmd.Dir = dag.WorkingDir
-	cmd.Env = os.Environ()
+	cmd.Env = config.GetBaseEnv(ctx).AsSlice()
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start retry command: %w", err)
 	}
@@ -628,7 +628,7 @@ func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) erro
 	cmd := exec.CommandContext(ctx, m.executable, args...)
 	executor.SetupCommand(cmd)
 	cmd.Dir = "" // Working directory will be set in the process
-	cmd.Env = os.Environ()
+	cmd.Env = config.GetBaseEnv(ctx).AsSlice()
 
 	// Execute and capture output
 	output, err := cmd.CombinedOutput()
