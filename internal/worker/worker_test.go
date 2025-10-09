@@ -70,7 +70,7 @@ func TestWorkerStart(t *testing.T) {
 
 		// Track polling activity
 		var pollCount atomic.Int32
-		w.SetTaskExecutor(&mockTaskExecutor{
+		w.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				pollCount.Add(1)
 				time.Sleep(50 * time.Millisecond)
@@ -142,7 +142,7 @@ func TestWorkerTaskExecution(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(1)
 
-		w.SetTaskExecutor(&mockTaskExecutor{
+		w.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, task *coordinatorv1.Task) error {
 				executedTask = task
 				wg.Done()
@@ -208,7 +208,7 @@ func TestWorkerTaskExecution(t *testing.T) {
 		w := createTestWorker(t, "test-worker", 1, coord)
 
 		var executionAttempted atomic.Bool
-		w.SetTaskExecutor(&mockTaskExecutor{
+		w.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				executionAttempted.Store(true)
 				return assert.AnError
@@ -262,7 +262,7 @@ func TestWorkerWithLabels(t *testing.T) {
 		// Create worker WITHOUT matching labels
 		w1 := createTestWorker(t, "worker-1", 1, coord)
 		var w1Executed atomic.Bool
-		w1.SetTaskExecutor(&mockTaskExecutor{
+		w1.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				w1Executed.Store(true)
 				return nil
@@ -278,7 +278,7 @@ func TestWorkerWithLabels(t *testing.T) {
 			th.Config,
 		)
 		var w2Executed atomic.Bool
-		w2.SetTaskExecutor(&mockTaskExecutor{
+		w2.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				w2Executed.Store(true)
 				return nil
@@ -368,7 +368,7 @@ func TestWorkerStopWithoutStart(t *testing.T) {
 		// Create a mock coordinator client that doesn't connect
 		mockCoordinatorCli := newMockCoordinatorCli()
 		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
-		w.SetTaskExecutor(&mockTaskExecutor{ExecutionTime: 0})
+		w.SetHandler(&mockHandler{ExecutionTime: 0})
 
 		// Stop should work without error even if not started
 		err := w.Stop(context.Background())
@@ -389,7 +389,7 @@ func TestRunningTaskTracking(t *testing.T) {
 		activeTasks := make(map[string]bool)
 		taskStarted := make(chan string, 5)
 
-		w.SetTaskExecutor(&mockTaskExecutor{
+		w.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, task *coordinatorv1.Task) error {
 				activeTasksMu.Lock()
 				activeTasks[task.DagRunId] = true
@@ -485,7 +485,7 @@ func TestWorkerConnectionFailure(t *testing.T) {
 
 		labels := make(map[string]string)
 		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
-		w.SetTaskExecutor(&mockTaskExecutor{})
+		w.SetHandler(&mockHandler{})
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -512,12 +512,12 @@ func TestWorkerConnectionFailure(t *testing.T) {
 	})
 }
 
-type mockTaskExecutor struct {
+type mockHandler struct {
 	ExecuteFunc   func(context.Context, *coordinatorv1.Task) error
 	ExecutionTime time.Duration
 }
 
-func (m *mockTaskExecutor) Handle(ctx context.Context, task *coordinatorv1.Task) error {
+func (m *mockHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
 	if m.ExecuteFunc != nil {
 		return m.ExecuteFunc(ctx, task)
 	}

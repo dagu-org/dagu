@@ -19,8 +19,8 @@ type TaskHandler interface {
 
 var _ TaskHandler = (*taskHandler)(nil)
 
-// NewTaskExecutor creates a new TaskExecutor
-func NewTaskExecutor(cfg *config.Config) TaskHandler {
+// NewTaskHandler creates a new TaskHandler
+func NewTaskHandler(cfg *config.Config) TaskHandler {
 	return &taskHandler{
 		subCmdBuilder: dagrun.NewSubCmdBuilder(cfg),
 	}

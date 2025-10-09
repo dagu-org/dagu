@@ -20,7 +20,7 @@ type Worker struct {
 	id             string
 	maxActiveRuns  int
 	coordinatorCli coordinator.Client
-	taskExecutor   TaskHandler
+	handler        TaskHandler
 	labels         map[string]string
 
 	// For tracking poller states and heartbeats
@@ -28,9 +28,9 @@ type Worker struct {
 	runningTasks map[string]*coordinatorv1.RunningTask // pollerID -> running task
 }
 
-// SetTaskExecutor sets a custom task executor for testing or custom execution logic
-func (w *Worker) SetTaskExecutor(executor TaskHandler) {
-	w.taskExecutor = executor
+// SetHandler sets a custom task executor for testing or custom execution logic
+func (w *Worker) SetHandler(executor TaskHandler) {
+	w.handler = executor
 }
 
 // NewWorker creates a new worker instance.
@@ -48,7 +48,7 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 		id:             workerID,
 		maxActiveRuns:  maxActiveRuns,
 		coordinatorCli: coordinatorClient,
-		taskExecutor:   &taskHandler{subCmdBuilder: dagrun.NewSubCmdBuilder(cfg)},
+		handler:        &taskHandler{subCmdBuilder: dagrun.NewSubCmdBuilder(cfg)},
 		labels:         labels,
 		runningTasks:   make(map[string]*coordinatorv1.RunningTask),
 	}
@@ -68,13 +68,13 @@ func (w *Worker) Start(ctx context.Context) error {
 		wg.Add(1)
 		go func(pollerIndex int) {
 			defer wg.Done()
-			// Create a wrapper task executor that tracks task state
-			wrappedExecutor := &trackingTaskExecutor{
-				worker:        w,
-				pollerIndex:   pollerIndex,
-				innerExecutor: w.taskExecutor,
+			// Create a wrapper task handler that tracks task state
+			wrappedHandler := &trackingHandler{
+				worker:      w,
+				pollerIndex: pollerIndex,
+				handler:     w.handler,
 			}
-			poller := NewPoller(w.id, w.coordinatorCli, wrappedExecutor, pollerIndex, w.labels)
+			poller := NewPoller(w.id, w.coordinatorCli, wrappedHandler, pollerIndex, w.labels)
 			poller.Run(ctx)
 		}(i)
 	}
@@ -104,15 +104,15 @@ func (w *Worker) Stop(ctx context.Context) error {
 	return nil
 }
 
-// trackingTaskExecutor wraps a TaskExecutor to track running task state
-type trackingTaskExecutor struct {
-	worker        *Worker
-	pollerIndex   int
-	innerExecutor TaskHandler
+// trackingHandler wraps a TaskHandler to track running task state
+type trackingHandler struct {
+	worker      *Worker
+	pollerIndex int
+	handler     TaskHandler
 }
 
 // Handle tracks task state and delegates to the inner executor
-func (t *trackingTaskExecutor) Handle(ctx context.Context, task *coordinatorv1.Task) error {
+func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
 	pollerID := fmt.Sprintf("poller-%d", t.pollerIndex)
 
 	// Mark task as running
@@ -129,7 +129,7 @@ func (t *trackingTaskExecutor) Handle(ctx context.Context, task *coordinatorv1.T
 	t.worker.pollersMu.Unlock()
 
 	// Execute the task
-	err := t.innerExecutor.Handle(ctx, task)
+	err := t.handler.Handle(ctx, task)
 
 	// Remove from running tasks
 	t.worker.pollersMu.Lock()

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/dagrun"
-	dagStatus "github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/dagu-org/dagu/internal/worker"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -32,7 +32,7 @@ func TestTaskHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
-		dag.AssertLatestStatus(t, dagStatus.Success)
+		dag.AssertLatestStatus(t, status.Success)
 
 		// Get the st to get the dag-run ID
 		st, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
@@ -51,12 +51,12 @@ func TestTaskHandler(t *testing.T) {
 		defer cancel()
 
 		// Execute the task
-		handler := worker.NewTaskExecutor(th.Config)
+		handler := worker.NewTaskHandler(th.Config)
 		err = handler.Handle(taskCtx, task)
 		require.NoError(t, err)
 
 		// Verify the DAG ran again successfully
-		dag.AssertLatestStatus(t, dagStatus.Success)
+		dag.AssertLatestStatus(t, status.Success)
 	})
 
 	t.Run("HandleTaskRetryWithStep", func(t *testing.T) {
@@ -75,7 +75,7 @@ func TestTaskHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
-		dag.AssertLatestStatus(t, dagStatus.Success)
+		dag.AssertLatestStatus(t, status.Success)
 
 		// Get the st to get the dag-run ID
 		st, err := cli.GetLatestStatus(ctx, dag.DAG)
@@ -95,12 +95,12 @@ func TestTaskHandler(t *testing.T) {
 		defer cancel()
 
 		// Execute the task
-		handler := worker.NewTaskExecutor(th.Config)
+		handler := worker.NewTaskHandler(th.Config)
 		err = handler.Handle(taskCtx, task)
 		require.NoError(t, err)
 
 		// Verify the DAG ran again successfully
-		dag.AssertLatestStatus(t, dagStatus.Success)
+		dag.AssertLatestStatus(t, status.Success)
 	})
 
 	t.Run("HandleTaskStart", func(t *testing.T) {
@@ -127,12 +127,12 @@ func TestTaskHandler(t *testing.T) {
 		defer cancel()
 
 		// Execute the task
-		handler := worker.NewTaskExecutor(th.Config)
+		handler := worker.NewTaskHandler(th.Config)
 		err := handler.Handle(taskCtx, task)
 		require.NoError(t, err)
 
 		// Verify the DAG ran successfully
-		dag.AssertLatestStatus(t, dagStatus.Success)
+		dag.AssertLatestStatus(t, status.Success)
 
 		// Verify the params were passed
 		status, err := cli.GetLatestStatus(ctx, dag.DAG)
@@ -152,7 +152,7 @@ func TestTaskHandler(t *testing.T) {
 		}
 
 		// Execute the task
-		handler := worker.NewTaskExecutor(th.Config)
+		handler := worker.NewTaskHandler(th.Config)
 		err := handler.Handle(ctx, task)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "operation not specified")
