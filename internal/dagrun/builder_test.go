@@ -444,11 +444,11 @@ func TestTaskStart(t *testing.T) {
 	t.Run("TaskStartWithHierarchy", func(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
-			DagRunId:        "child-run-id",
-			Target:          "/path/to/child.yaml",
-			RootDagRunId:    "root-id",
-			RootDagRunName:  "root-dag",
-			ParentDagRunId:  "parent-id",
+			DagRunId:         "child-run-id",
+			Target:           "/path/to/child.yaml",
+			RootDagRunId:     "root-id",
+			RootDagRunName:   "root-dag",
+			ParentDagRunId:   "parent-id",
 			ParentDagRunName: "parent-dag",
 		}
 		spec := builder.TaskStart(task)

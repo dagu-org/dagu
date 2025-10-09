@@ -1,14 +1,18 @@
-package worker_test
+package worker
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
-	"github.com/dagu-org/dagu/internal/worker"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -51,7 +55,7 @@ func TestTaskHandler(t *testing.T) {
 		defer cancel()
 
 		// Execute the task
-		handler := worker.NewTaskHandler(th.Config)
+		handler := NewTaskHandler(th.Config)
 		err = handler.Handle(taskCtx, task)
 		require.NoError(t, err)
 
@@ -95,7 +99,7 @@ func TestTaskHandler(t *testing.T) {
 		defer cancel()
 
 		// Execute the task
-		handler := worker.NewTaskHandler(th.Config)
+		handler := NewTaskHandler(th.Config)
 		err = handler.Handle(taskCtx, task)
 		require.NoError(t, err)
 
@@ -127,7 +131,7 @@ func TestTaskHandler(t *testing.T) {
 		defer cancel()
 
 		// Execute the task
-		handler := worker.NewTaskHandler(th.Config)
+		handler := NewTaskHandler(th.Config)
 		err := handler.Handle(taskCtx, task)
 		require.NoError(t, err)
 
@@ -152,9 +156,78 @@ func TestTaskHandler(t *testing.T) {
 		}
 
 		// Execute the task
-		handler := worker.NewTaskHandler(th.Config)
+		handler := NewTaskHandler(th.Config)
 		err := handler.Handle(ctx, task)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "operation not specified")
 	})
+}
+
+func TestCreateTempDAGFile(t *testing.T) {
+	path, err := createTempDAGFile("simple", []byte("steps:\n  - name: example\n"))
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = os.Remove(path) })
+
+	require.FileExists(t, path)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, "steps:\n  - name: example\n", string(data))
+
+	expectedDir := filepath.Join(os.TempDir(), "dagu", "worker-dags") + string(os.PathSeparator)
+	require.True(t, strings.HasPrefix(path, expectedDir), "expected %q to start with %q", path, expectedDir)
+}
+
+func TestTaskHandlerStartWithDefinition(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell required for fake executable script")
+	}
+
+	tmpDir := t.TempDir()
+	argsPath := filepath.Join(tmpDir, "args.txt")
+	fakeExec := filepath.Join(tmpDir, "fake-dagu.sh")
+
+	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsPath + "\n"
+	err := os.WriteFile(fakeExec, []byte(script), 0o700)
+	require.NoError(t, err)
+
+	cfg := &config.Config{
+		Paths: config.PathsConfig{
+			Executable: fakeExec,
+		},
+		Global: config.Global{
+			BaseEnv: config.NewBaseEnv(nil),
+		},
+	}
+
+	handler := NewTaskHandler(cfg)
+
+	originalTarget := "workflow.yaml"
+	task := &coordinatorv1.Task{
+		Operation:  coordinatorv1.Operation_OPERATION_START,
+		DagRunId:   "run-123",
+		Target:     originalTarget,
+		Definition: "steps:\n  - name: example\n",
+		Params:     "foo=bar",
+	}
+
+	err = handler.Handle(context.Background(), task)
+	require.NoError(t, err)
+
+	require.NotEqual(t, originalTarget, task.Target)
+
+	argsData, err := os.ReadFile(argsPath)
+	require.NoError(t, err)
+
+	argsLines := strings.Split(strings.TrimSpace(string(argsData)), "\n")
+	require.Contains(t, argsLines, "start")
+	require.Contains(t, argsLines, "--run-id=run-123")
+	require.Contains(t, argsLines, "--no-queue")
+	require.Contains(t, argsLines, task.Target)
+	require.Contains(t, argsLines, "--")
+	require.Contains(t, argsLines, "foo=bar")
+
+	_, statErr := os.Stat(task.Target)
+	require.True(t, os.IsNotExist(statErr), "temporary DAG file should be removed after execution")
 }
