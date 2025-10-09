@@ -2,6 +2,7 @@ package digraph
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
@@ -65,7 +66,10 @@ func loadVariables(ctx BuildContext, strVariables any) (
 				return nil, wrapError("env", pair.val, fmt.Errorf("%w: %s", ErrInvalidEnvValue, pair.val))
 			}
 
-			// No os.Setenv needed - accumulated vars passed to EvalString above
+			// Set the environment variable.
+			if err := os.Setenv(pair.key, value); err != nil {
+				return nil, wrapError("env", pair.key, fmt.Errorf("%w: %s", err, pair.key))
+			}
 		}
 
 		vars[pair.key] = value
