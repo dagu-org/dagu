@@ -36,7 +36,7 @@ type Manager struct {
 	dagRunStore models.DAGRunStore // Store interface for persisting run data
 	procStore   models.ProcStore   // Store interface for process management
 	executable  string             // Path to the executable used to run DAGs
-	runner      CommandRunner      // Command execution abstraction
+	runner      CmdRunner          // Command execution abstraction
 }
 
 // LoadYAML loads a DAG from YAML specification bytes without evaluating it.
@@ -482,7 +482,7 @@ func (m *Manager) HandleTask(ctx context.Context, task *coordinatorv1.Task) erro
 
 	// Build command spec based on operation
 	builder := NewCmdBuilder(ctx)
-	var spec CommandSpec
+	var spec CmdSpec
 
 	switch task.Operation {
 	case coordinatorv1.Operation_OPERATION_START:
