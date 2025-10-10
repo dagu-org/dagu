@@ -121,4 +121,4 @@ When requesting features, please describe:
 
 ## License
 
-By contributing to go-deposit, you agree that your contributions will be licensed under the [GNU General Public License v3.0](LICENSE.md).
+By contributing to go-deposit, you agree that your contributions will be licensed under the **GNU General Public License v3.0**.
