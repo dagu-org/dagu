@@ -1103,6 +1103,8 @@ steps:
 
 ### Reproducible Env with Nix Shell
 
+> **Note:** Requires nix-shell to be installed separately. Not included in Dagu binary or container.
+
 ```yaml
 steps:
   - shell: nix-shell

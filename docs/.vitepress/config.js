@@ -8,6 +8,7 @@ const fullSidebar = [
     text: "Overview",
     items: [
       { text: "What is Dagu?", link: "/overview/" },
+      { text: "Contributing", link: "/overview/contributing" },
       { text: "Architecture", link: "/overview/architecture" },
       { text: "CLI", link: "/overview/cli" },
       { text: "Web UI", link: "/overview/web-ui" },

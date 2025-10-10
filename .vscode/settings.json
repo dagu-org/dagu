@@ -1,36 +1,19 @@
 {
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,
-  "editor.insertSpaces": true,
-  "[go]": {
-    "editor.insertSpaces": true,
-    "editor.formatOnSave": true,
-    "editor.defaultFormatter": "golang.go"
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
   },
-  "[markdown]": {
-    "editor.formatOnSave": false
-  },
-  "editor.rulers": [80],
-  "editor.renderWhitespace": "all",
   "go.lintTool": "golangci-lint",
   "go.lintFlags": ["--fast"],
+  "go.lintOnSave": "workspace",
   "go.formatTool": "gofmt",
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[go]": {
+    "editor.defaultFormatter": "golang.go"
+  },
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
   "files.associations": {
     "*.gohtml": "html"
-  },
-  "prettier.tabWidth": 2,
-  "editor.tabSize": 2,
-  "cSpell.words": [
-    "dagu",
-    "yota",
-    "hamada",
-    "debugf",
-    "infof",
-    "warnf",
-    "errorf",
-    "fatalf",
-    "mapstructure",
-    "BASICAUTH",
-    "AUTHTOKEN"
-  ]
+  }
 }
