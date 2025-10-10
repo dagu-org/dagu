@@ -548,12 +548,12 @@ func (n *Node) Cancel(ctx context.Context) {
 func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	env := executor.GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 	env = env.WithEnv(
 		digraph.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
 		digraph.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)
-	return executor.WithEnv(ctx, env)
+	return digraph.WithEnv(ctx, env)
 }
 
 func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error {
@@ -1128,7 +1128,7 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 func (oc *OutputCoordinator) setupFile(ctx context.Context, filePath string, _ NodeData) (*os.File, error) {
 	absFilePath := filePath
 	if !filepath.IsAbs(absFilePath) {
-		dir := executor.GetEnv(ctx).WorkingDir
+		dir := digraph.GetEnv(ctx).WorkingDir
 		absFilePath = filepath.Join(dir, absFilePath)
 		absFilePath = filepath.Clean(absFilePath)
 	}

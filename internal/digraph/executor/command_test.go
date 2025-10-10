@@ -215,9 +215,9 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 	// Setup the context with DAG environment
 	ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "", nil, nil)
 
-	env := NewEnv(ctx, digraph.Step{})
+	env := digraph.NewEnv(ctx, digraph.Step{})
 	env.WorkingDir = t.TempDir()
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	tests := []struct {
 		name       string
@@ -281,9 +281,9 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 	// Setup the context with DAG environment
 	ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "", nil, nil)
 
-	env := NewEnv(ctx, digraph.Step{})
+	env := digraph.NewEnv(ctx, digraph.Step{})
 	env.WorkingDir = t.TempDir()
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	tests := []struct {
 		name         string

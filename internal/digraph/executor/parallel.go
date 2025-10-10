@@ -50,7 +50,7 @@ func newParallelExecutor(
 		return nil, err
 	}
 
-	dir := GetEnv(ctx).WorkingDir
+	dir := digraph.GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
 	}

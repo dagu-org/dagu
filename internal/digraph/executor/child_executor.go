@@ -37,14 +37,14 @@ type ChildDAGExecutor struct {
 	mu              sync.Mutex
 	cmds            map[string]*exec.Cmd // runID -> cmd for local processes
 	distributedRuns map[string]bool      // runID -> true for distributed runs
-	env             Env                  // for DB access when cancelling distributed runs
+	env             digraph.Env          // for DB access when cancelling distributed runs
 }
 
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
 // It handles the logic for finding the DAG - either from the database
 // or from local DAGs defined in the parent.
 func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecutor, error) {
-	env := GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 
 	// First, check if it's a local DAG in the parent
 	if env.DAG != nil && env.DAG.LocalDAGs != nil {
@@ -65,7 +65,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 				coordinatorCli:  env.CoordinatorCli,
 				cmds:            make(map[string]*exec.Cmd),
 				distributedRuns: make(map[string]bool),
-				env:             GetEnv(ctx),
+				env:             digraph.GetEnv(ctx),
 			}, nil
 		}
 	}
@@ -81,7 +81,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 		coordinatorCli:  env.CoordinatorCli,
 		cmds:            make(map[string]*exec.Cmd),
 		distributedRuns: make(map[string]bool),
-		env:             GetEnv(ctx),
+		env:             digraph.GetEnv(ctx),
 	}, nil
 }
 
@@ -100,7 +100,7 @@ func (e *ChildDAGExecutor) buildCommand(
 		return nil, fmt.Errorf("dag-run ID is not set")
 	}
 
-	env := GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 	if env.RootDAGRun.Zero() {
 		return nil, fmt.Errorf("root dag-run ID is not set")
 	}
@@ -161,7 +161,7 @@ func (e *ChildDAGExecutor) BuildCoordinatorTask(
 	ctx context.Context,
 	runParams RunParams,
 ) (*coordinatorv1.Task, error) {
-	env := GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 
 	if runParams.RunID == "" {
 		return nil, fmt.Errorf("dag-run ID is not set")
@@ -273,7 +273,7 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 	}
 
 	// Get the result regardless of error
-	env := GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 	result, resultErr := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
 	if resultErr != nil {
 		return nil, fmt.Errorf("failed to find result for the child dag-run %q: %w", runParams.RunID, resultErr)
@@ -331,7 +331,7 @@ func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams 
 
 // waitForCompletionWithResult is similar to waitForCompletion but returns the result
 func (e *ChildDAGExecutor) waitForCompletionWithResult(ctx context.Context, dagRunID string) (*digraph.RunStatus, error) {
-	env := GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 
 	// Poll for completion
 	pollInterval := 1 * time.Second

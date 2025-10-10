@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,10 +14,10 @@ func TestEvalString(t *testing.T) {
 
 	// Create a test context with environment variables
 	ctx := context.Background()
-	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
+	env := digraph.NewEnv(ctx, digraph.Step{Name: "test-step"})
 	env.Variables.Store("TEST_VAR", "TEST_VAR=hello")
 	env.Envs["ANOTHER_VAR"] = "world"
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	tests := []struct {
 		name     string
@@ -64,13 +63,13 @@ func TestEvalString(t *testing.T) {
 func TestEvalBool(t *testing.T) {
 	// Create a test context with environment variables
 	ctx := context.Background()
-	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
+	env := digraph.NewEnv(ctx, digraph.Step{Name: "test-step"})
 	env.Variables.Store("TRUE_VAR", "TRUE_VAR=true")
 	env.Variables.Store("FALSE_VAR", "FALSE_VAR=false")
 	env.Variables.Store("ONE_VAR", "ONE_VAR=1")
 	env.Variables.Store("ZERO_VAR", "ZERO_VAR=0")
 	env.Variables.Store("INVALID_VAR", "INVALID_VAR=not-a-bool")
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	tests := []struct {
 		name     string
@@ -156,11 +155,11 @@ type NestedStruct struct {
 func TestEvalObject(t *testing.T) {
 	// Create a test context with environment variables
 	ctx := context.Background()
-	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
+	env := digraph.NewEnv(ctx, digraph.Step{Name: "test-step"})
 	env.Variables.Store("NAME_VAR", "NAME_VAR=John")
 	env.Variables.Store("DESC_VAR", "DESC_VAR=Developer")
 	env.Variables.Store("NESTED_VAR", "NESTED_VAR=NestedValue")
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	// Create a test struct
 	testObj := TestStruct{
@@ -198,11 +197,11 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 
 	// Create a test context with environment variables
 	ctx := context.Background()
-	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
+	env := digraph.NewEnv(ctx, digraph.Step{Name: "test-step"})
 	env.Variables.Store("EXECUTOR_TYPE", "EXECUTOR_TYPE=docker")
 	env.Variables.Store("HOST_VAR", "HOST_VAR=localhost")
 	env.Variables.Store("PORT_VAR", "PORT_VAR=8080")
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	// Create an ExecutorConfig with variables
 	config := digraph.ExecutorConfig{
@@ -251,10 +250,10 @@ func TestGenerateChildDAGRunID(t *testing.T) {
 
 	// Create a test context with environment variables
 	ctx := context.Background()
-	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
+	env := digraph.NewEnv(ctx, digraph.Step{Name: "test-step"})
 	env.DAGRunID = "parent-run-123"
 	env.Step.Name = "child-step"
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	tests := []struct {
 		name      string
@@ -307,11 +306,11 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 
 	// Create a test context with environment variables
 	ctx := context.Background()
-	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
+	env := digraph.NewEnv(ctx, digraph.Step{Name: "test-step"})
 	env.Variables.Store("VAR1", "VAR1=value1")
 	env.Variables.Store("VAR2", "VAR2=value2")
 	env.Variables.Store("NUM", "NUM=42")
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	tests := []struct {
 		name     string
@@ -467,11 +466,11 @@ func TestEvalStringEdgeCases(t *testing.T) {
 
 	// Create a test context with environment variables
 	ctx := digraph.SetupDAGContext(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
-	env := executor.GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 	env.Variables.Store("EMPTY", "EMPTY=")
 	env.Variables.Store("SPACES", "SPACES=  ")
 	env.Variables.Store("SPECIAL", "SPECIAL=special!@#")
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	tests := []struct {
 		name     string
@@ -533,11 +532,11 @@ func TestEvalStringEdgeCases(t *testing.T) {
 func TestEvalObjectWithDirectStringEvaluation(t *testing.T) {
 	// Create a test context with environment variables
 	ctx := context.Background()
-	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
+	env := digraph.NewEnv(ctx, digraph.Step{Name: "test-step"})
 	env.Variables.Store("STRING_VAR", "STRING_VAR=evaluated_string")
 	env.Variables.Store("PATH_VAR", "PATH_VAR=/path/to/file")
 	env.Variables.Store("COMBINED", "COMBINED=prefix")
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	tests := []struct {
 		name     string
@@ -618,7 +617,7 @@ func TestEvalBoolEdgeCases(t *testing.T) {
 	// Create a test context with environment variables
 	ctx := digraph.SetupDAGContext(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
-	env := executor.GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 	env.Variables.Store("YES", "YES=yes")
 	env.Variables.Store("NO", "NO=no")
 	env.Variables.Store("ON", "ON=on")
@@ -626,7 +625,7 @@ func TestEvalBoolEdgeCases(t *testing.T) {
 	env.Variables.Store("T", "T=t")
 	env.Variables.Store("F", "F=f")
 
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	tests := []struct {
 		name     string

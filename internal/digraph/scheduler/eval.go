@@ -7,25 +7,25 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 // EvalString evaluates the given string with the variables within the execution context.
 func EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
-	return executor.GetEnv(ctx).EvalString(ctx, s, opts...)
+	return digraph.GetEnv(ctx).EvalString(ctx, s, opts...)
 }
 
 // EvalBool evaluates the given value with the variables within the execution context
 // and parses it as a boolean.
 func EvalBool(ctx context.Context, value any) (bool, error) {
-	return executor.GetEnv(ctx).EvalBool(ctx, value)
+	return digraph.GetEnv(ctx).EvalBool(ctx, value)
 }
 
 // EvalObject recursively evaluates the string fields of the given object
 // with the variables within the execution context.
 func EvalObject[T any](ctx context.Context, obj T) (T, error) {
-	vars := executor.GetEnv(ctx).VariablesMap()
+	vars := digraph.GetEnv(ctx).VariablesMap()
 	return cmdutil.EvalObject(ctx, obj, vars)
 }
 
@@ -39,10 +39,10 @@ func GenerateChildDAGRunID(ctx context.Context, params string, repeated bool) st
 			randomBytes = []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
 		}
 		return stringutil.Base58EncodeSHA256(
-			fmt.Sprintf("%s:%s:%s:%x", executor.GetEnv(ctx).DAGRunID, executor.GetEnv(ctx).Step.Name, params, randomBytes),
+			fmt.Sprintf("%s:%s:%s:%x", digraph.GetEnv(ctx).DAGRunID, digraph.GetEnv(ctx).Step.Name, params, randomBytes),
 		)
 	}
-	env := executor.GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 	return stringutil.Base58EncodeSHA256(
 		fmt.Sprintf("%s:%s:%s", env.DAGRunID, env.Step.Name, params),
 	)

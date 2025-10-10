@@ -43,7 +43,7 @@ func newDAGExecutor(ctx context.Context, step digraph.Step) (digraph.Executor, e
 		return nil, err
 	}
 
-	dir := GetEnv(ctx).WorkingDir
+	dir := digraph.GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
 	}

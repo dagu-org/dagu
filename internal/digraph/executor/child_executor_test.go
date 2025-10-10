@@ -33,7 +33,7 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
-	env := Env{
+	env := digraph.Env{
 		DAGContext: digraph.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
@@ -45,7 +45,7 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	// Test creating executor for local DAG
 	executor, err := NewChildDAGExecutor(ctx, "local-child")
@@ -83,7 +83,7 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
-	env := Env{
+	env := digraph.Env{
 		DAGContext: digraph.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
@@ -95,7 +95,7 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	// Mock the database call
 	expectedDAG := &digraph.DAG{
@@ -134,7 +134,7 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
-	env := Env{
+	env := digraph.Env{
 		DAGContext: digraph.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
@@ -146,7 +146,7 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	// Mock the database call to return not found
 	mockDB.On("GetDAG", ctx, "non-existent").Return(nil, assert.AnError)
@@ -167,7 +167,7 @@ func TestBuildCommand(t *testing.T) {
 	// Set up the environment
 	mockDB := new(mockDatabase)
 	baseEnv := config.NewBaseEnv(nil)
-	env := Env{
+	env := digraph.Env{
 		DAGContext: digraph.DAGContext{
 			DAG:        &digraph.DAG{Name: "parent"},
 			DB:         mockDB,
@@ -180,7 +180,7 @@ func TestBuildCommand(t *testing.T) {
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	// Create executor
 	executor := &ChildDAGExecutor{
@@ -221,7 +221,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
-	env := Env{
+	env := digraph.Env{
 		DAGContext: digraph.DAGContext{
 			DAG:        &digraph.DAG{Name: "parent"},
 			DB:         mockDB,
@@ -233,7 +233,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	executor := &ChildDAGExecutor{
 		DAG: &digraph.DAG{Name: "test-child"},
@@ -255,7 +255,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 
 	// Set up the environment without RootDAGRun
 	mockDB := new(mockDatabase)
-	env := Env{
+	env := digraph.Env{
 		DAGContext: digraph.DAGContext{
 			DAG: &digraph.DAG{Name: "parent"},
 			DB:  mockDB,
@@ -267,7 +267,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	executor := &ChildDAGExecutor{
 		DAG: &digraph.DAG{Name: "test-child"},

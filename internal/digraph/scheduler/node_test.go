@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
@@ -389,9 +388,9 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 				Name: "child-dag",
 			},
 			setupEnv: func(ctx context.Context) context.Context {
-				env := executor.GetEnv(ctx)
+				env := digraph.GetEnv(ctx)
 				env.Variables.Store("LIST_VAR", `LIST_VAR=["item1", "item2", "item3"]`)
-				return executor.WithEnv(ctx, env)
+				return digraph.WithEnv(ctx, env)
 			},
 			expectCount: 3,
 		},
@@ -404,9 +403,9 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 				Name: "child-dag",
 			},
 			setupEnv: func(ctx context.Context) context.Context {
-				env := executor.GetEnv(ctx)
+				env := digraph.GetEnv(ctx)
 				env.Variables.Store("SPACE_VAR", "SPACE_VAR=one two three")
-				return executor.WithEnv(ctx, env)
+				return digraph.WithEnv(ctx, env)
 			},
 			expectCount: 3,
 		},
@@ -474,9 +473,9 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 				Params: "item=${ITEM}",
 			},
 			setupEnv: func(ctx context.Context) context.Context {
-				env := executor.GetEnv(ctx)
+				env := digraph.GetEnv(ctx)
 				env.Variables.Store("SPACE_VAR", "SPACE_VAR=one two three")
-				return executor.WithEnv(ctx, env)
+				return digraph.WithEnv(ctx, env)
 			},
 			expectCount: 3,
 		},
@@ -749,8 +748,8 @@ func TestNodeCancel(t *testing.T) {
 
 func TestNodeSetupContextBeforeExec(t *testing.T) {
 	ctx := context.Background()
-	env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
-	ctx = executor.WithEnv(ctx, env)
+	env := digraph.NewEnv(ctx, digraph.Step{Name: "test-step"})
+	ctx = digraph.WithEnv(ctx, env)
 
 	step := digraph.Step{Name: "test-step"}
 	node := scheduler.NewNode(step, scheduler.NodeState{
@@ -762,7 +761,7 @@ func TestNodeSetupContextBeforeExec(t *testing.T) {
 	newCtx := node.SetupContextBeforeExec(ctx)
 
 	// Verify environment variables were set
-	newEnv := executor.GetEnv(newCtx)
+	newEnv := digraph.GetEnv(newCtx)
 	assert.Equal(t, "/tmp/stdout.log", newEnv.Envs[digraph.EnvKeyDAGRunStepStdoutFile])
 	assert.Equal(t, "/tmp/stderr.log", newEnv.Envs[digraph.EnvKeyDAGRunStepStderrFile])
 }
@@ -845,7 +844,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 			}
 
 			// Verify that MaxOutputSize is respected in the DAG configuration
-			env := executor.GetEnv(ctx)
+			env := digraph.GetEnv(ctx)
 			assert.Equal(t, tt.maxOutputSize, env.DAG.MaxOutputSize)
 
 			// Cleanup
@@ -867,7 +866,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 				}
 
 				ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
-				env := executor.GetEnv(ctx)
+				env := digraph.GetEnv(ctx)
 
 				// Verify the MaxOutputSize is properly set in the environment
 				assert.Equal(t, size, env.DAG.MaxOutputSize)
@@ -1164,9 +1163,9 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		ctx := context.Background()
 		dag := &digraph.DAG{}
 		ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
-		env := executor.GetEnv(ctx)
+		env := digraph.GetEnv(ctx)
 		env.WorkingDir = workDir
-		ctx = executor.WithEnv(ctx, env)
+		ctx = digraph.WithEnv(ctx, env)
 
 		// Setup and execute node
 		err = node.Setup(ctx, tempDir, "test-run")
@@ -1204,9 +1203,9 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		ctx := context.Background()
 		dag := &digraph.DAG{}
 		ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
-		env := executor.GetEnv(ctx)
+		env := digraph.GetEnv(ctx)
 		env.WorkingDir = workDir
-		ctx = executor.WithEnv(ctx, env)
+		ctx = digraph.WithEnv(ctx, env)
 
 		// Setup and execute node
 		err = node.Setup(ctx, tempDir, "test-run")
@@ -1249,9 +1248,9 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		ctx := context.Background()
 		dag := &digraph.DAG{}
 		ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
-		env := executor.GetEnv(ctx)
+		env := digraph.GetEnv(ctx)
 		env.WorkingDir = workDir
-		ctx = executor.WithEnv(ctx, env)
+		ctx = digraph.WithEnv(ctx, env)
 
 		// Setup and execute node
 		err = node.Setup(ctx, tempDir, "test-run")
@@ -1295,9 +1294,9 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		ctx := context.Background()
 		dag := &digraph.DAG{}
 		ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
-		env := executor.GetEnv(ctx)
+		env := digraph.GetEnv(ctx)
 		env.WorkingDir = workDir
-		ctx = executor.WithEnv(ctx, env)
+		ctx = digraph.WithEnv(ctx, env)
 
 		// Setup and execute node
 		err = node.Setup(ctx, tempDir, "test-run")

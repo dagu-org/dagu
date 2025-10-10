@@ -1,4 +1,4 @@
-package executor_test
+package digraph_test
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,12 +17,12 @@ func TestEnv_VariablesMap(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		setupEnv func(env executor.Env) executor.Env
+		setupEnv func(env digraph.Env) digraph.Env
 		expected map[string]string
 	}{
 		{
 			name: "CombinesVariablesAndEnvs",
-			setupEnv: func(env executor.Env) executor.Env {
+			setupEnv: func(env digraph.Env) digraph.Env {
 				env.Variables.Store("VAR1", "VAR1=value1")
 				env.Variables.Store("VAR2", "VAR2=value2")
 				env.Envs["ENV1"] = "env1"
@@ -40,7 +39,7 @@ func TestEnv_VariablesMap(t *testing.T) {
 		},
 		{
 			name: "EnvsOverrideVariables",
-			setupEnv: func(env executor.Env) executor.Env {
+			setupEnv: func(env digraph.Env) digraph.Env {
 				env.Variables.Store("SAME_KEY", "SAME_KEY=from_variables")
 				env.Envs["SAME_KEY"] = "from_envs"
 				return env
@@ -52,7 +51,7 @@ func TestEnv_VariablesMap(t *testing.T) {
 		},
 		{
 			name: "EmptyVariablesAndEnvs",
-			setupEnv: func(env executor.Env) executor.Env {
+			setupEnv: func(env digraph.Env) digraph.Env {
 				return env
 			},
 			expected: map[string]string{
@@ -61,7 +60,7 @@ func TestEnv_VariablesMap(t *testing.T) {
 		},
 		{
 			name: "OnlyVariables",
-			setupEnv: func(env executor.Env) executor.Env {
+			setupEnv: func(env digraph.Env) digraph.Env {
 				env.Variables.Store("VAR1", "VAR1=value1")
 				env.Variables.Store("VAR2", "VAR2=value2")
 				return env
@@ -74,7 +73,7 @@ func TestEnv_VariablesMap(t *testing.T) {
 		},
 		{
 			name: "OnlyEnvs",
-			setupEnv: func(env executor.Env) executor.Env {
+			setupEnv: func(env digraph.Env) digraph.Env {
 				env.Envs["ENV1"] = "env1"
 				env.Envs["ENV2"] = "env2"
 				return env
@@ -100,7 +99,7 @@ func TestEnv_VariablesMap(t *testing.T) {
 			require.NoError(t, os.Chdir(tempDir))
 
 			ctx := context.Background()
-			env := executor.NewEnv(ctx, digraph.Step{Name: "test-step"})
+			env := digraph.NewEnv(ctx, digraph.Step{Name: "test-step"})
 			env = tt.setupEnv(env)
 
 			result := env.VariablesMap()
@@ -130,7 +129,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 		name      string
 		step      digraph.Step
 		setupFunc func()
-		checkFunc func(t *testing.T, env executor.Env)
+		checkFunc func(t *testing.T, env digraph.Env)
 	}{
 		{
 			name: "StepWithAbsoluteDirectory",
@@ -139,7 +138,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 				Dir:  tempDir,
 			},
 			setupFunc: func() {},
-			checkFunc: func(t *testing.T, env executor.Env) {
+			checkFunc: func(t *testing.T, env digraph.Env) {
 				// Resolve symlinks for comparison (macOS /var vs /private/var)
 				expectedDir, _ := filepath.EvalSymlinks(tempDir)
 				actualDir, _ := filepath.EvalSymlinks(env.WorkingDir)
@@ -159,7 +158,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 				require.NoError(t, os.Chdir(tempDir))
 				require.NoError(t, os.Mkdir("subdir", 0755))
 			},
-			checkFunc: func(t *testing.T, env executor.Env) {
+			checkFunc: func(t *testing.T, env digraph.Env) {
 				expectedDir := filepath.Join(tempDir, "subdir")
 				// Resolve symlinks for comparison
 				expectedResolved, _ := filepath.EvalSymlinks(expectedDir)
@@ -180,7 +179,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 				testDir := filepath.Join(homeDir, "testdir")
 				require.NoError(t, os.MkdirAll(testDir, 0755))
 			},
-			checkFunc: func(t *testing.T, env executor.Env) {
+			checkFunc: func(t *testing.T, env digraph.Env) {
 				homeDir, _ := os.UserHomeDir()
 				expectedDir := filepath.Join(homeDir, "testdir")
 				// Resolve symlinks for comparison
@@ -198,7 +197,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 			setupFunc: func() {
 				require.NoError(t, os.Chdir(tempDir))
 			},
-			checkFunc: func(t *testing.T, env executor.Env) {
+			checkFunc: func(t *testing.T, env digraph.Env) {
 				// Resolve symlinks for comparison (macOS /var vs /private/var)
 				expectedDir, _ := filepath.EvalSymlinks(tempDir)
 				actualDir, _ := filepath.EvalSymlinks(env.WorkingDir)
@@ -215,7 +214,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 			setupFunc: func() {
 				require.NoError(t, os.Chdir(tempDir))
 			},
-			checkFunc: func(t *testing.T, env executor.Env) {
+			checkFunc: func(t *testing.T, env digraph.Env) {
 				// Non-existent directory gets resolved to absolute path
 				// On Windows, this will include drive letter
 				if runtime.GOOS == "windows" {
@@ -243,7 +242,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 				testDir := filepath.Join(homeDir, "testdir")
 				require.NoError(t, os.MkdirAll(testDir, 0755))
 			},
-			checkFunc: func(t *testing.T, env executor.Env) {
+			checkFunc: func(t *testing.T, env digraph.Env) {
 				homeDir, _ := os.UserHomeDir()
 				expectedDir := filepath.Join(homeDir, "testdir")
 				// Resolve symlinks for comparison
@@ -262,7 +261,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 			tt.setupFunc()
 
 			ctx := context.Background()
-			env := executor.NewEnv(ctx, tt.step)
+			env := digraph.NewEnv(ctx, tt.step)
 
 			// Check that DAG_RUN_STEP_NAME is always set
 			assert.Equal(t, tt.step.Name, env.Envs[digraph.EnvKeyDAGRunStepName])
@@ -283,7 +282,7 @@ func TestNewEnv_BasicFields(t *testing.T) {
 		Args:    []string{"arg1", "arg2"},
 	}
 
-	env := executor.NewEnv(ctx, step)
+	env := digraph.NewEnv(ctx, step)
 
 	// Check basic fields
 	assert.Equal(t, step, env.Step)
@@ -304,13 +303,13 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		setup    func(ctx context.Context) (context.Context, executor.Env)
+		setup    func(ctx context.Context) (context.Context, digraph.Env)
 		input    string
 		expected string
 	}{
 		{
 			name: "StepEnvOverridesOutputVariablesAndDAGEnv",
-			setup: func(ctx context.Context) (context.Context, executor.Env) {
+			setup: func(ctx context.Context) (context.Context, digraph.Env) {
 				// Create DAG with env variable
 				dag := &digraph.DAG{
 					Env: []string{"FOO=from_dag"},
@@ -318,7 +317,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 				// Create executor env
-				env := executor.NewEnv(ctx, digraph.Step{Name: "test"})
+				env := digraph.NewEnv(ctx, digraph.Step{Name: "test"})
 
 				// Set output variable
 				env.Variables.Store("FOO", "FOO=from_output")
@@ -333,7 +332,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 		},
 		{
 			name: "OutputVariablesOverrideDAGEnv",
-			setup: func(ctx context.Context) (context.Context, executor.Env) {
+			setup: func(ctx context.Context) (context.Context, digraph.Env) {
 				// Create DAG with env variable
 				dag := &digraph.DAG{
 					Env: []string{"BAR=from_dag"},
@@ -341,7 +340,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 				// Create executor env
-				env := executor.NewEnv(ctx, digraph.Step{Name: "test"})
+				env := digraph.NewEnv(ctx, digraph.Step{Name: "test"})
 
 				// Set output variable (higher precedence than DAG)
 				env.Variables.Store("BAR", "BAR=from_output")
@@ -353,7 +352,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 		},
 		{
 			name: "DAGEnvUsedWhenNoOverrideExists",
-			setup: func(ctx context.Context) (context.Context, executor.Env) {
+			setup: func(ctx context.Context) (context.Context, digraph.Env) {
 				// Create DAG with env variable
 				dag := &digraph.DAG{
 					Env: []string{"BAZ=from_dag"},
@@ -361,7 +360,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 				// Create executor env
-				env := executor.NewEnv(ctx, digraph.Step{Name: "test"})
+				env := digraph.NewEnv(ctx, digraph.Step{Name: "test"})
 
 				return ctx, env
 			},
@@ -370,7 +369,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 		},
 		{
 			name: "MultipleVariablesWithDifferentPrecedence",
-			setup: func(ctx context.Context) (context.Context, executor.Env) {
+			setup: func(ctx context.Context) (context.Context, digraph.Env) {
 				// Create DAG with multiple env variables
 				dag := &digraph.DAG{
 					Env: []string{"VAR1=dag1", "VAR2=dag2", "VAR3=dag3"},
@@ -378,7 +377,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 				// Create executor env
-				env := executor.NewEnv(ctx, digraph.Step{Name: "test"})
+				env := digraph.NewEnv(ctx, digraph.Step{Name: "test"})
 
 				// Set output variables
 				env.Variables.Store("VAR1", "VAR1=output1")

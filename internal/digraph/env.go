@@ -1,4 +1,4 @@
-package executor
+package digraph
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
@@ -28,7 +27,7 @@ func WithEnv(ctx context.Context, e Env) context.Context {
 func GetEnv(ctx context.Context) Env {
 	v, ok := ctx.Value(envCtxKey{}).(Env)
 	if !ok {
-		return NewEnv(ctx, digraph.Step{})
+		return NewEnv(ctx, Step{})
 	}
 	return v
 }
@@ -40,16 +39,16 @@ type Env struct {
 	// Embedded execution metadata from parent DAG run containing DAGRunID,
 	// RootDAGRun reference, DAG configuration, database interface,
 	// DAG-level environment variables, and coordinator dispatcher
-	digraph.DAGContext
+	DAGContext
 
 	// Thread-safe map storing output variables from previously executed steps
 	// in the format "key=value". These variables are populated when a step
 	// completes and has an Output field defined, making the step's stdout
 	// available to subsequent steps via variable substitution
-	Variables *digraph.SyncMap
+	Variables *SyncMap
 
 	// The current step being executed within this environment context
-	Step digraph.Step
+	Step Step
 
 	// Additional environment variables specific to this step execution,
 	// including DAG_RUN_STEP_NAME and PWD. These take precedence over
@@ -77,8 +76,8 @@ func (e Env) VariablesMap() map[string]string {
 }
 
 // NewEnv creates a new execution context with the given step.
-func NewEnv(ctx context.Context, step digraph.Step) Env {
-	parentEnv := digraph.GetDAGContextFromContext(ctx)
+func NewEnv(ctx context.Context, step Step) Env {
+	parentEnv := GetDAGContextFromContext(ctx)
 	parentDAG := parentEnv.DAG
 
 	var workingDir string
@@ -121,7 +120,7 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 	}
 
 	envs := map[string]string{
-		digraph.EnvKeyDAGRunStepName: step.Name,
+		EnvKeyDAGRunStepName: step.Name,
 	}
 
 	if workingDir != "" {
@@ -129,8 +128,8 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 	}
 
 	return Env{
-		DAGContext: digraph.GetDAGContextFromContext(ctx),
-		Variables:  &digraph.SyncMap{},
+		DAGContext: GetDAGContextFromContext(ctx),
+		Variables:  &SyncMap{},
 		Step:       step,
 		Envs:       envs,
 		StepMap:    make(map[string]cmdutil.StepInfo),
@@ -139,8 +138,8 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 }
 
 // DAGRunRef returns the DAGRunRef for the current execution context.
-func (e Env) DAGRunRef() digraph.DAGRunRef {
-	return digraph.NewDAGRunRef(e.DAG.Name, e.DAGRunID)
+func (e Env) DAGRunRef() DAGRunRef {
+	return NewDAGRunRef(e.DAG.Name, e.DAGRunID)
 }
 
 // AllEnvs returns all environment variables that needs to be passed to the command.
@@ -157,20 +156,20 @@ func (e Env) AllEnvs() []string {
 }
 
 // LoadOutputVariables loads the output variables from the given DAG into the
-func (e Env) LoadOutputVariables(vars *digraph.SyncMap) {
+func (e Env) LoadOutputVariables(vars *SyncMap) {
 	e.loadOutputVariables(vars, false)
 }
 
 // ForceLoadOutputVariables forces loading of output variables into the execution context.
 // This is the same as LoadOutputVariables, but it does not check if the key already exists.
-func (e Env) ForceLoadOutputVariables(vars *digraph.SyncMap) {
+func (e Env) ForceLoadOutputVariables(vars *SyncMap) {
 	e.loadOutputVariables(vars, true)
 }
 
 // loadOutputVariables loads the output variables from the given SyncMap into the execution context.
 // If force is true, it will overwrite existing variables in the execution context.
 // If force is false, it will only load variables that are not already present in the execution context.
-func (e Env) loadOutputVariables(vars *digraph.SyncMap, force bool) {
+func (e Env) loadOutputVariables(vars *SyncMap, force bool) {
 	vars.Range(func(key, value any) bool {
 		if !force {
 			if _, ok := e.Variables.Load(key); ok {
@@ -196,7 +195,7 @@ func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 
 // EvalString evaluates the given string with the variables within the execution context.
 func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
-	dagEnv := digraph.GetDAGContextFromContext(ctx)
+	dagEnv := GetDAGContextFromContext(ctx)
 
 	// Collect environment variables for evaluating the string.
 	// Variables are processed sequentially, and once a variable is replaced,

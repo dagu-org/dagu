@@ -36,7 +36,7 @@ func TestCommandExecutor_ErrexitSimple(t *testing.T) {
 		)
 
 		// Set up the executor environment
-		return WithEnv(ctx, NewEnv(ctx, step))
+		return digraph.WithEnv(ctx, digraph.NewEnv(ctx, step))
 	}
 
 	t.Run("DefaultShellWithErrexitFlag", func(t *testing.T) {

@@ -152,7 +152,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 
 	}
 
-	cmd.Env = append(cmd.Env, AllEnvs(ctx)...)
+	cmd.Env = append(cmd.Env, digraph.AllEnvs(ctx)...)
 	cmd.Dir = cfg.Dir
 	cmd.Stdout = cfg.Stdout
 	cmd.Stderr = cfg.Stderr
@@ -334,7 +334,7 @@ func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig
 
 	return &commandConfig{
 		Ctx:                ctx,
-		Dir:                GetEnv(ctx).WorkingDir,
+		Dir:                digraph.GetEnv(ctx).WorkingDir,
 		Command:            step.Command,
 		Args:               step.Args,
 		Script:             step.Script,

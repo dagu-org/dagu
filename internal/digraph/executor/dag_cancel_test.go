@@ -16,14 +16,14 @@ func TestDAGExecutor_Kill_Distributed(t *testing.T) {
 	mockDB := new(mockDatabase)
 
 	// Create a context with environment
-	env := Env{
+	env := digraph.Env{
 		DAGContext: digraph.DAGContext{
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
 		},
 	}
-	_ = WithEnv(context.Background(), env)
+	_ = digraph.WithEnv(context.Background(), env)
 
 	// Create a child DAG with worker selector for distributed execution
 	childDAG := &digraph.DAG{
@@ -64,14 +64,14 @@ func TestDAGExecutor_Kill_NotDistributed(t *testing.T) {
 	mockDB := new(mockDatabase)
 
 	// Create a context with environment
-	env := Env{
+	env := digraph.Env{
 		DAGContext: digraph.DAGContext{
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
 		},
 	}
-	_ = WithEnv(context.Background(), env)
+	_ = digraph.WithEnv(context.Background(), env)
 
 	// Create a child DAG without worker selector (local execution)
 	childDAG := &digraph.DAG{

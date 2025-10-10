@@ -113,7 +113,7 @@ func (e *docker) Kill(sig os.Signal) error {
 
 	// Wait for max clean up time before forcefully killing the container
 	go func() {
-		env := GetEnv(e.context)
+		env := digraph.GetEnv(e.context)
 		<-time.After(env.DAG.MaxCleanUpTime)
 		logger.Warn(e.context, "forcefully stopping container after max clean up time", "container", e.step.Name)
 		_ = e.container.Stop(syscall.SIGKILL)

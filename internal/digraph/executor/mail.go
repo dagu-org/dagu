@@ -35,7 +35,7 @@ func newMail(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
 		return nil, fmt.Errorf("failed to decode mail config: %w", err)
 	}
 
-	env := NewEnv(ctx, step)
+	env := digraph.NewEnv(ctx, step)
 
 	exec := &mail{cfg: &cfg}
 	mailerConfig, err := env.MailerConfig(ctx)

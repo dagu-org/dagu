@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
@@ -202,7 +201,7 @@ func (d *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) e
 	d.inner.State.Stderr = logFile + ".err"
 	d.inner.State.StartedAt = startedAt
 
-	env := executor.GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 
 	// Evaluate the stdout field
 	stdout, err := env.EvalString(ctx, d.inner.Step.Stdout)
