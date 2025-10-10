@@ -120,6 +120,8 @@ scheduler:
 
 All options support `DAGU_` prefix.
 
+**Note:** For security, Dagu filters which system environment variables are passed to step processes and child DAGs. System variables are available for expansion (`${VAR}`) in DAG configuration, but only whitelisted variables (`PATH`, `HOME`, `LANG`, `TZ`, `SHELL`) and variables with allowed prefixes (`DAGU_*`, `LC_*`, `DAG_*`) are passed to the step execution environment. See [Operations - Security](/configurations/operations#security) for details.
+
 ### Server
 - `DAGU_HOST` - Server host (default: `127.0.0.1`)
 - `DAGU_PORT` - Server port (default: `8080`)

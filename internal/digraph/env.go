@@ -2,10 +2,10 @@ package digraph
 
 import (
 	"context"
-	"os"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -16,12 +16,13 @@ type Env struct {
 	RootDAGRun     DAGRunRef
 	DAG            *DAG
 	DB             Database
+	BaseEnv        *config.BaseEnv
 	Envs           map[string]string
 	CoordinatorCli Dispatcher
 }
 
 func (e Env) AllEnvs() []string {
-	envs := os.Environ()
+	envs := e.BaseEnv.AsSlice()
 	envs = append(envs, e.DAG.Env...)
 	for k, v := range e.Envs {
 		envs = append(envs, k+"="+v)
@@ -32,14 +33,6 @@ func (e Env) AllEnvs() []string {
 func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
 	opts = append(opts, cmdutil.WithVariables(e.Envs))
 	return cmdutil.EvalString(ctx, s, opts...)
-}
-
-func (e Env) ApplyEnvs(ctx context.Context) {
-	for k, v := range e.Envs {
-		if err := os.Setenv(k, v); err != nil {
-			logger.Error(ctx, "failed to set environment variable %q: %v", k, err)
-		}
-	}
 }
 
 // Dispatcher defines the interface for coordinator operations
@@ -81,6 +74,7 @@ func SetupEnv(ctx context.Context, dag *DAG, db Database, rootDAGRun DAGRunRef, 
 		DB:             db,
 		Envs:           envs,
 		DAGRunID:       dagRunID,
+		BaseEnv:        config.GetBaseEnv(ctx),
 		CoordinatorCli: coordinatorCli,
 	})
 }

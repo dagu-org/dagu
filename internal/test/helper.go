@@ -92,8 +92,11 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	executablePath := path.Join(root, ".local", "bin", "dagu")
 	_ = os.Setenv("DAGU_EXECUTABLE", executablePath)
 
+	ctx := createDefaultContext()
 	cfg, err := config.Load()
 	require.NoError(t, err)
+
+	ctx = config.WithConfig(ctx, cfg)
 
 	cfg.Paths.Executable = executablePath
 	cfg.Paths.LogDir = filepath.Join(tmpDir, "logs")
@@ -118,10 +121,10 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
-	drm := dagrun.New(runStore, procStore, cfg.Paths.Executable)
+	drm := dagrun.New(runStore, procStore, cfg)
 
 	helper := Helper{
-		Context:         createDefaultContext(),
+		Context:         ctx,
 		Config:          cfg,
 		DAGRunMgr:       drm,
 		DAGStore:        dagStore,
@@ -129,6 +132,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		ProcStore:       procStore,
 		QueueStore:      queueStore,
 		ServiceRegistry: serviceMonitor,
+		SubCmdBuilder:   dagrun.NewSubCmdBuilder(cfg),
 
 		tmpDir: tmpDir,
 	}
@@ -177,6 +181,7 @@ type Helper struct {
 	ProcStore       models.ProcStore
 	QueueStore      models.QueueStore
 	ServiceRegistry models.ServiceRegistry
+	SubCmdBuilder   *dagrun.SubCmdBuilder
 
 	tmpDir string
 }
@@ -396,6 +401,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.DAGRunStore,
 		d.ServiceRegistry,
 		root,
+		d.Config.Global.Peer,
 		helper.opts,
 	)
 

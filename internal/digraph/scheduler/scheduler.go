@@ -584,10 +584,6 @@ func (sc *Scheduler) runEventHandler(ctx context.Context, graph *ExecutionGraph,
 }
 
 func (sc *Scheduler) setup(ctx context.Context) (err error) {
-	// Apply environment variables specified for the DAG.
-	env := digraph.GetEnv(ctx)
-	env.ApplyEnvs(ctx)
-
 	if !sc.dry {
 		if err = os.MkdirAll(sc.logDir, 0750); err != nil {
 			err = fmt.Errorf("failed to create log directory: %w", err)

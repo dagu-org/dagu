@@ -9,10 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
-	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/dagu-org/dagu/internal/worker"
 	"github.com/stretchr/testify/require"
@@ -55,8 +52,8 @@ steps:
 				fmt.Sprintf("test-worker-%d", i+1),
 				10, // maxActiveRuns
 				coordinatorClient,
-				coord.DAGRunMgr,
 				map[string]string{"type": "test-worker"},
+				coord.Config,
 			)
 			workers[i] = workerInst
 
@@ -163,8 +160,8 @@ steps:
 				fmt.Sprintf("test-worker-%d", i+1),
 				10,
 				coordinatorClient,
-				coord.DAGRunMgr,
 				map[string]string{"type": "test-worker"},
+				coord.Config,
 			)
 
 			ctx, cancel := context.WithCancel(coord.Context)
@@ -294,10 +291,6 @@ steps:
 		err = os.MkdirAll(procDir, 0755)
 		require.NoError(t, err)
 
-		runStore := filedagrun.New(dataDir)
-		procStore := fileproc.New(procDir)
-		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable)
-
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
@@ -308,8 +301,8 @@ steps:
 				fmt.Sprintf("test-worker-%d", i+1),
 				10, // maxActiveRuns
 				coordinatorClient,
-				dagRunMgr,
 				map[string]string{"type": "test-worker"},
+				coord.Config,
 			)
 			workers[i] = workerInst
 
@@ -434,10 +427,6 @@ steps:
 		err = os.MkdirAll(procDir, 0755)
 		require.NoError(t, err)
 
-		runStore := filedagrun.New(dataDir)
-		procStore := fileproc.New(procDir)
-		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable)
-
 		// Create worker for distributed execution
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
@@ -446,8 +435,8 @@ steps:
 			"test-worker-1",
 			10,
 			coordinatorClient,
-			dagRunMgr,
 			map[string]string{"type": "test-worker"},
+			coord.Config,
 		)
 
 		ctx, cancel := context.WithCancel(coord.Context)
@@ -555,10 +544,6 @@ steps:
 		err = os.MkdirAll(procDir, 0755)
 		require.NoError(t, err)
 
-		runStore := filedagrun.New(dataDir)
-		procStore := fileproc.New(procDir)
-		dagRunMgr := dagrun.New(runStore, procStore, coord.Config.Paths.Executable)
-
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
@@ -569,8 +554,8 @@ steps:
 				fmt.Sprintf("test-worker-%d", i+1),
 				5, // maxActiveRuns per worker
 				coordinatorClient,
-				dagRunMgr,
 				map[string]string{"type": "test-worker"},
+				coord.Config,
 			)
 			workers[i] = workerInst
 

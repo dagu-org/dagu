@@ -45,17 +45,17 @@ import (
 // - ExecuteDAG(): Executes/dispatches already-persisted jobs (no persistence)
 type DAGExecutor struct {
 	coordinatorCli digraph.Dispatcher
-	dagRunManager  dagrun.Manager
+	subCmdBuilder  *dagrun.SubCmdBuilder
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
 func NewDAGExecutor(
 	coordinatorCli digraph.Dispatcher,
-	dagRunManager dagrun.Manager,
+	subCmdBuilder *dagrun.SubCmdBuilder,
 ) *DAGExecutor {
 	return &DAGExecutor{
 		coordinatorCli: coordinatorCli,
-		dagRunManager:  dagRunManager,
+		subCmdBuilder:  subCmdBuilder,
 	}
 }
 
@@ -84,9 +84,10 @@ func (e *DAGExecutor) HandleJob(
 			"runId", runID,
 			"workerSelector", dag.WorkerSelector)
 
-		if err := e.dagRunManager.EnqueueDAGRun(ctx, dag, dagrun.EnqueueOptions{
+		spec := e.subCmdBuilder.Enqueue(dag, dagrun.EnqueueOptions{
 			DAGRunID: runID,
-		}); err != nil {
+		})
+		if err := dagrun.Run(ctx, spec); err != nil {
 			return fmt.Errorf("failed to enqueue DAG run: %w", err)
 		}
 		return nil
@@ -124,16 +125,22 @@ func (e *DAGExecutor) ExecuteDAG(
 	// Local execution
 	switch operation {
 	case coordinatorv1.Operation_OPERATION_START:
-		return e.dagRunManager.StartDAGRunAsync(ctx, dag, dagrun.StartOptions{
-			Quiet:    true,
+		spec := e.subCmdBuilder.Start(dag, dagrun.StartOptions{
 			DAGRunID: runID,
+			Quiet:    true,
 		})
+		return dagrun.Start(ctx, spec)
+
 	case coordinatorv1.Operation_OPERATION_RETRY:
-		return e.dagRunManager.RetryDAGRun(ctx, dag, runID, true)
+		spec := e.subCmdBuilder.Retry(dag, runID, "", true)
+		return dagrun.Run(ctx, spec)
+
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
 		return errors.New("operation not specified")
+
 	default:
 		return fmt.Errorf("unsupported operation: %v", operation)
+
 	}
 }
 
@@ -167,6 +174,14 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 		"operation", task.Operation.String())
 
 	return nil
+}
+
+// Restart restarts a DAG unconditionally.
+func (e *DAGExecutor) Restart(ctx context.Context, dag *digraph.DAG) error {
+	spec := e.subCmdBuilder.Restart(dag, dagrun.RestartOptions{
+		Quiet: true,
+	})
+	return dagrun.Start(ctx, spec)
 }
 
 // Close closes any resources held by the DAGExecutor, including the coordinator client

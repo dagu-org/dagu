@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
@@ -91,8 +90,9 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	cfg, err := config.Load(configLoaderOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
+		return nil, err
 	}
+	ctx = config.WithConfig(ctx, cfg)
 
 	// Create a logger context based on config and quiet mode
 	var opts []logger.Option
@@ -128,7 +128,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	ps := fileproc.New(cfg.Paths.ProcDir)
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
-	drm := dagrun.New(drs, ps, cfg.Paths.Executable)
+	drm := dagrun.New(drs, ps, cfg)
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
@@ -146,15 +146,6 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}, nil
 }
 
-// HistoryManager initializes a HistoryManager using the provided options. If not supplied,
-func (c *Context) HistoryManager(drs models.DAGRunStore) dagrun.Manager {
-	return dagrun.New(
-		drs,
-		c.ProcStore,
-		c.Config.Paths.Executable,
-	)
-}
-
 // NewServer creates and returns a new web UI NewServer.
 // It initializes in-memory caches for DAGs and runstore, and uses them in the client.
 func (c *Context) NewServer() (*frontend.Server, error) {
@@ -170,7 +161,7 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 	cc := c.NewCoordinatorClient()
 
 	collector := metrics.NewCollector(
-		build.Version,
+		config.Version,
 		dr,
 		c.DAGRunStore,
 		c.QueueStore,
@@ -210,7 +201,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	}
 
 	coordinatorCli := c.NewCoordinatorClient()
-	de := scheduler.NewDAGExecutor(coordinatorCli, c.DAGRunMgr)
+	de := scheduler.NewDAGExecutor(coordinatorCli, dagrun.NewSubCmdBuilder(c.Config))
 	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable)
 	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli)
 }

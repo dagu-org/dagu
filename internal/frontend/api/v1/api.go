@@ -29,6 +29,7 @@ type API struct {
 	apiBasePath        string
 	logEncodingCharset string
 	config             *config.Config
+	subCmdBuilder      *dagrun.SubCmdBuilder
 }
 
 func New(
@@ -50,6 +51,7 @@ func New(
 		remoteNodes:        remoteNodes,
 		apiBasePath:        cfg.Server.APIBasePath,
 		config:             cfg,
+		subCmdBuilder:      dagrun.NewSubCmdBuilder(cfg),
 	}
 }
 
@@ -85,13 +87,14 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 	}
 
 	r.Group(func(r chi.Router) {
+		authConfig := a.config.Server.Auth
 		authOptions := auth.Options{
 			Realm:            "restricted",
-			APITokenEnabled:  a.config.Server.Auth.Token.Enabled(),
-			APIToken:         a.config.Server.Auth.Token.Value,
-			BasicAuthEnabled: a.config.Server.Auth.Basic.Enabled(),
+			APITokenEnabled:  authConfig.Token.Value != "",
+			APIToken:         authConfig.Token.Value,
+			BasicAuthEnabled: authConfig.Basic.Username != "" && authConfig.Basic.Password != "",
 			Creds: map[string]string{
-				a.config.Server.Auth.Basic.Username: a.config.Server.Auth.Basic.Password,
+				authConfig.Basic.Username: authConfig.Basic.Password,
 			},
 		}
 		r.Use(auth.Middleware(authOptions))

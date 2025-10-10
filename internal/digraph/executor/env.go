@@ -85,11 +85,26 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 
 	switch {
 	case step.Dir != "":
-		dir, err := fileutil.ResolvePath(step.Dir)
+		// Expand environment variables in step.Dir using DAG env vars
+		// Since we no longer use os.Setenv, we need to manually expand using dag.Env
+		expandedDir := os.Expand(step.Dir, func(key string) string {
+			// Check DAG-level env vars
+			if parentDAG != nil {
+				for _, env := range parentDAG.Env {
+					if len(env) > len(key)+1 && env[:len(key)] == key && env[len(key)] == '=' {
+						return env[len(key)+1:]
+					}
+				}
+			}
+			// Fall back to process environment
+			return os.Getenv(key)
+		})
+
+		dir, err := fileutil.ResolvePath(expandedDir)
 		if err == nil {
 			workingDir = dir
 		} else {
-			logger.Warn(ctx, "Failed to resolve working directory for step", "step", step.Name, "dir", dir, "err", err)
+			logger.Warn(ctx, "Failed to resolve working directory for step", "step", step.Name, "dir", expandedDir, "err", err)
 			workingDir = parentEnv.DAG.WorkingDir
 		}
 

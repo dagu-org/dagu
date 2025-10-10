@@ -140,16 +140,22 @@ func createResource(_ context.Context, dag *digraph.DAG) (*resource.Resource, er
 
 	// Add custom resource attributes from config
 	if dag.OTel != nil && dag.OTel.Resource != nil {
-		// Set DAG_NAME environment variable for expansion
-		if dag.Name != "" {
-			_ = os.Setenv("DAG_NAME", dag.Name)
+		// DAG variables for expansion (e.g., ${DAG_NAME})
+		dagVars := map[string]string{
+			"DAG_NAME": dag.Name,
 		}
 
 		for key, val := range dag.OTel.Resource {
 			switch v := val.(type) {
 			case string:
-				// Expand environment variables in string values
-				expanded := os.ExpandEnv(v)
+				// Expand environment variables using os.Expand with DAG vars
+				// Check DAG vars first, then fall back to real environment
+				expanded := os.Expand(v, func(name string) string {
+					if val, ok := dagVars[name]; ok {
+						return val
+					}
+					return os.Getenv(name)
+				})
 				attrs = append(attrs, attribute.String(key, expanded))
 			case int:
 				attrs = append(attrs, attribute.Int(key, v))

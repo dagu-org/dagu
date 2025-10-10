@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -111,11 +112,8 @@ func (e *ChildDAGExecutor) buildCommand(
 		"--no-queue",
 		e.DAG.Location,
 	}
-
-	if configFile := config.UsedConfigFile.Load(); configFile != nil {
-		if configFile, ok := configFile.(string); ok {
-			args = append(args, "--config", configFile)
-		}
+	if configFile := config.ConfigFileUsed(ctx); configFile != "" {
+		args = append(args, "--config", configFile)
 	}
 
 	if runParams.Params != "" {
@@ -140,7 +138,7 @@ func (e *ChildDAGExecutor) buildCommand(
 		)
 	}
 
-	setupCommand(cmd)
+	cmdutil.SetupCommand(cmd)
 
 	logger.Info(ctx, "Prepared child DAG command",
 		"dagRunId", runParams.RunID,
@@ -413,7 +411,7 @@ func (e *ChildDAGExecutor) Kill(sig os.Signal) error {
 				"pid", cmd.Process.Pid,
 				"signal", sig,
 			)
-			if err := killProcessGroup(cmd, sig); err != nil {
+			if err := cmdutil.KillProcessGroup(cmd, sig); err != nil {
 				logger.Error(ctx, "Failed to kill process",
 					"runId", runID,
 					"err", err,

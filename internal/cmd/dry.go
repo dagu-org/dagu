@@ -89,6 +89,7 @@ func runDry(ctx *Context, args []string) error {
 		ctx.DAGRunStore,
 		ctx.ServiceRegistry,
 		root,
+		ctx.Config.Global.Peer,
 		agent.Options{Dry: true},
 	)
 

@@ -22,10 +22,10 @@ import (
 func TestPollerStateTracking(t *testing.T) {
 	t.Run("InitialStateIsConnected", func(t *testing.T) {
 		mockCoordinatorCli := newMockCoordinatorCli()
-		mockExecutor := &mockTaskExecutor{}
+		mockHandler := &mockHandler{}
 		labels := make(map[string]string)
 
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Check initial state
 		isConnected, consecutiveFails, lastError := poller.GetState()
@@ -47,9 +47,9 @@ func TestPollerStateTracking(t *testing.T) {
 			}
 		}
 
-		mockExecutor := &mockTaskExecutor{}
+		mockHandler := &mockHandler{}
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// State should reflect coordinator client metrics
 		isConnected, consecutiveFails, lastError := poller.GetState()
@@ -82,7 +82,7 @@ func TestPollerTaskDispatch(t *testing.T) {
 		}
 
 		var executedTask *coordinatorv1.Task
-		mockExecutor := &mockTaskExecutor{
+		mockHandler := &mockHandler{
 			ExecuteFunc: func(_ context.Context, task *coordinatorv1.Task) error {
 				executedTask = task
 				cancel() // Stop poller after executing task
@@ -91,7 +91,7 @@ func TestPollerTaskDispatch(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Run poller
 		poller.Run(ctx)
@@ -129,7 +129,7 @@ func TestPollerTaskDispatch(t *testing.T) {
 			}
 		}
 
-		mockExecutor := &mockTaskExecutor{
+		mockHandler := &mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				atomic.AddInt32(&executionCount, 1)
 				return nil
@@ -137,7 +137,7 @@ func TestPollerTaskDispatch(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Run poller in background
 		go poller.Run(ctx)
@@ -174,7 +174,7 @@ func TestPollerErrorHandling(t *testing.T) {
 
 		executorError := fmt.Errorf("execution failed")
 		var executionAttempted atomic.Bool
-		mockExecutor := &mockTaskExecutor{
+		mockHandler := &mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				executionAttempted.Store(true)
 				return executorError
@@ -182,7 +182,7 @@ func TestPollerErrorHandling(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Run poller in background
 		go poller.Run(ctx)
@@ -216,7 +216,7 @@ func TestPollerErrorHandling(t *testing.T) {
 		}
 
 		var taskExecuted atomic.Bool
-		mockExecutor := &mockTaskExecutor{
+		mockHandler := &mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				taskExecuted.Store(true)
 				cancel() // Stop after execution
@@ -225,7 +225,7 @@ func TestPollerErrorHandling(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Run poller (will retry on errors)
 		poller.Run(ctx)
@@ -249,9 +249,9 @@ func TestPollerContextCancellation(t *testing.T) {
 			return nil, ctx.Err()
 		}
 
-		mockExecutor := &mockTaskExecutor{}
+		mockHandler := &mockHandler{}
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Run poller in background
 		var wg sync.WaitGroup
@@ -279,7 +279,7 @@ func TestPollerContextCancellation(t *testing.T) {
 		}
 
 		var executionStarted atomic.Bool
-		mockExecutor := &mockTaskExecutor{
+		mockHandler := &mockHandler{
 			ExecuteFunc: func(ctx context.Context, _ *coordinatorv1.Task) error {
 				executionStarted.Store(true)
 				// Simulate long-running task
@@ -293,7 +293,7 @@ func TestPollerContextCancellation(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, labels)
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Run poller in background
 		var wg sync.WaitGroup
@@ -331,8 +331,8 @@ func TestPollerWithLabels(t *testing.T) {
 			return nil, nil
 		}
 
-		mockExecutor := &mockTaskExecutor{}
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockExecutor, 0, expectedLabels)
+		mockHandler := &mockHandler{}
+		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, expectedLabels)
 
 		// Run poller
 		poller.Run(ctx)

@@ -304,8 +304,76 @@ handlerOn:
           }
 ```
 
+## Security
+
+### Environment Variable Filtering
+
+Dagu implements environment variable filtering to prevent accidental exposure of sensitive data to step processes and child DAGs.
+
+**How It Works:**
+
+System environment variables are available for variable expansion (`${VAR}`) when parsing the DAG configuration, but only filtered variables are passed to the actual step execution environment and child DAG processes.
+
+**Filtered Variables (passed to step processes):**
+
+Only these system environment variables are automatically passed to step processes and child DAGs:
+
+- **Whitelisted:** `PATH`, `HOME`, `LANG`, `TZ`, `SHELL`
+- **Allowed Prefixes:** `DAGU_*`, `LC_*`, `DAG_*`
+
+**Note:** Dagu automatically sets special variables with the `DAG_*` prefix for every step execution:
+- `DAG_NAME`, `DAG_RUN_ID`, `DAG_RUN_STEP_NAME`
+- `DAG_RUN_LOG_FILE`, `DAG_RUN_STEP_STDOUT_FILE`, `DAG_RUN_STEP_STDERR_FILE`
+
+You can still use `${SYSTEM_VAR}` in your DAG YAML for variable expansion during configuration parsing, but the variable itself won't be in the step process environment unless it's whitelisted or explicitly defined in the `env` section.
+
+**Using Sensitive Variables:**
+
+The recommended approach is to use `.env` files to provide sensitive credentials to workflows:
+
+```yaml
+# workflow.yaml
+dotenv: .env.secrets  # Load from .env file (not tracked in git)
+
+steps:
+  - name: deploy
+    command: aws s3 sync ./build s3://my-bucket
+```
+
+```bash
+# .env.secrets (add to .gitignore)
+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+DATABASE_PASSWORD=secure-password
+```
+
+Alternatively, if you need to pass through system environment variables, you must explicitly reference them:
+
+```yaml
+# workflow.yaml
+env:
+  - AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}      # Explicit reference
+  - AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+steps:
+  - name: deploy
+    command: aws s3 sync ./build s3://my-bucket
+```
+
+### Process Isolation
+
+```bash
+# systemd security features
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/dagu/data /opt/dagu/logs
+```
+
 ## See Also
 
 - [Server Configuration](/configurations/server) - Configure server settings
 - [Deployment](/configurations/deployment) - Installation and deployment guides
 - [Reference](/configurations/reference) - Complete configuration reference
+- [Variables Reference](/reference/variables) - Environment variable usage
