@@ -77,13 +77,6 @@ var (
 // It is used to collect multiple errors in building a DAG.
 type ErrorList []error
 
-// Add adds an error to the list.
-func (e *ErrorList) Add(err error) {
-	if err != nil {
-		*e = append(*e, err)
-	}
-}
-
 // ToStringList returns the list of errors as a slice of strings.
 func (e *ErrorList) ToStringList() []string {
 	errStrings := make([]string, len(*e))
