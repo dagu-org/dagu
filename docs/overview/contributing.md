@@ -1,6 +1,8 @@
-# Contributing to Dagu
-
-Thank you for considering to help improve go-deposit! We welcome contributions from anyone on the internet.
+---
+title: Contributing
+description: How to contribute to Dagu in a few clear steps.
+outline: [2, 3]
+---
 
 ## Quick Start
 
@@ -87,11 +89,11 @@ Navigate to [http://localhost:8081](http://localhost:8081) to view hot-reloading
 
 Before submitting:
 
-- [ ] Tests pass (`make test`)
-- [ ] Linter passes (`make lint`)
-- [ ] New code includes tests
-- [ ] Documentation updated if applicable
-- [ ] Commit messages following the [Go Commit Message Guidelines](https://go.dev/wiki/CommitMessage)
+- Tests pass (`make test`)
+- Linter passes (`make lint`)
+- New code includes tests
+- Documentation updated if applicable
+- Commit messages following the [Go Commit Message Guidelines](https://go.dev/wiki/CommitMessage)
 
 ### Review Process
 
