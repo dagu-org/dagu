@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
@@ -28,7 +27,7 @@ func TestDBClient_GetChildDAGRunStatus(t *testing.T) {
 		childRunID := "child-run-123"
 
 		// Setup outputs
-		outputs := &executor.SyncMap{}
+		outputs := &digraph.SyncMap{}
 		outputs.Store("key1", "result=success")
 		outputs.Store("key2", "count=42")
 		mockAttempt.outputs = outputs
@@ -311,7 +310,7 @@ func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName st
 type mockDAGRunAttempt struct {
 	mock.Mock
 	status  *models.DAGRunStatus
-	outputs *executor.SyncMap
+	outputs *digraph.SyncMap
 }
 
 func (m *mockDAGRunAttempt) ID() string {
@@ -359,9 +358,9 @@ func (m *mockDAGRunAttempt) CancelRequested(ctx context.Context) (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *mockDAGRunAttempt) GetOutputs() *executor.SyncMap {
+func (m *mockDAGRunAttempt) GetOutputs() *digraph.SyncMap {
 	if m.outputs == nil {
-		m.outputs = &executor.SyncMap{}
+		m.outputs = &digraph.SyncMap{}
 	}
 	return m.outputs
 }

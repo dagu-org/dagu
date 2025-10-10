@@ -41,7 +41,7 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
-		Variables: &SyncMap{},
+		Variables: &digraph.SyncMap{},
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
@@ -91,7 +91,7 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
-		Variables: &SyncMap{},
+		Variables: &digraph.SyncMap{},
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
@@ -142,7 +142,7 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
-		Variables: &SyncMap{},
+		Variables: &digraph.SyncMap{},
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
@@ -176,7 +176,7 @@ func TestBuildCommand(t *testing.T) {
 			Envs:       map[string]string{"TEST_ENV": "value"},
 			BaseEnv:    &baseEnv,
 		},
-		Variables: &SyncMap{},
+		Variables: &digraph.SyncMap{},
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
@@ -229,7 +229,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
-		Variables: &SyncMap{},
+		Variables: &digraph.SyncMap{},
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
@@ -263,7 +263,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 			DAGRunID: "parent-456",
 			Envs:     make(map[string]string),
 		},
-		Variables: &SyncMap{},
+		Variables: &digraph.SyncMap{},
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}

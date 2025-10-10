@@ -368,7 +368,7 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 	}
 
 	// Add step-level environment variables
-	envVars := &executor.SyncMap{}
+	envVars := &digraph.SyncMap{}
 	for _, v := range node.Step().Env {
 		parts := strings.SplitN(v, "=", 2)
 		if len(parts) != 2 {
