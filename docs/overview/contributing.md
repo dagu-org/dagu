@@ -4,7 +4,7 @@ description: How to contribute to Dagu in a few clear steps.
 outline: [2, 3]
 ---
 
-Thank you for considering to help improve go-deposit! We welcome contributions from anyone on the internet.
+Thank you for considering to help improve Dagu! We welcome contributions from anyone on the internet.
 
 ## Quick Start
 
@@ -125,4 +125,4 @@ When requesting features, please describe:
 
 ## License
 
-By contributing to go-deposit, you agree that your contributions will be licensed under the **GNU General Public License v3.0**.
+By contributing to Dagu, you agree that your contributions will be licensed under the **GNU General Public License v3.0**.
