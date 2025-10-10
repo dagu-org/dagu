@@ -12,5 +12,8 @@
     "editor.defaultFormatter": "golang.go"
   },
   "files.eol": "\n",
-  "files.insertFinalNewline": true
+  "files.insertFinalNewline": true,
+  "files.associations": {
+    "*.gohtml": "html"
+  }
 }
