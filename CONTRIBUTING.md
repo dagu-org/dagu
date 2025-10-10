@@ -2,6 +2,25 @@
 
 Thank you for considering to help improve go-deposit! We welcome contributions from anyone on the internet.
 
+## Getting Started
+
+- Fork the repository and clone it locally
+- Look for any issue that interests you
+- Make your changes and test them
+- Ask questions if anything is unclear
+
+## How to Contribute
+
+We welcome contributions of all kinds, including:
+
+- Help other users by answering questions and providing support
+- Suggest new features or improvements
+- Improve documentation and examples, or provide use cases
+- Refactor code for better readability and maintainability
+- Fix bugs or add missing tests
+- Add new features based on issue discussions
+- Review and provide feedback on PRs
+
 ## Development
 
 Prerequisites:
@@ -44,7 +63,7 @@ pnpm install
 pnpm dev
 ```
 
-Open your browser and navigate to [http://localhost:8081](http://localhost:8081). It should automatically reload when you make changes.
+Navigate to [http://localhost:8081](http://localhost:8081) to view hot-reloading frontend.
 
 ### Code Standards
 - Write unit tests for any new functionality
@@ -59,7 +78,12 @@ Before submitting:
 - [ ] Linter passes (`make lint`)
 - [ ] New code includes tests
 - [ ] Documentation updated if applicable
-- [ ] Clear, descriptive commit messages following the [Go Commit Message Guidelines](https://go.dev/wiki/CommitMessage)
+- [ ] Commit messages following the [Go Commit Message Guidelines](https://go.dev/wiki/CommitMessage)
+
+### Review Process
+
+- All PRs are reviewed by maintainers, primarily [Yota Hamada](https://github.com/yottahmd).
+- Community members are encouraged to review and provide feedback.
 
 ## Issues
 
@@ -81,6 +105,11 @@ When requesting features, please describe:
 - Explain why it would be valuable
 - Consider backward compatibility
 - Provide examples if possible
+
+## Getting Help
+
+- Open an [GitHub issue](https://github.com/dagu-org/dagu/issues) if you need help or have questions.
+- Join our [Discord community](https://discord.gg/your-invite-link) to chat other users and contributors.
 
 ## License
 
