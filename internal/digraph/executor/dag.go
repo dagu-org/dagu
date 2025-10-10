@@ -33,9 +33,7 @@ var (
 	ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 )
 
-func newDAGExecutor(
-	ctx context.Context, step digraph.Step,
-) (Executor, error) {
+func newDAGExecutor(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
 	if step.ChildDAG == nil {
 		return nil, fmt.Errorf("child DAG configuration is missing")
 	}
@@ -138,6 +136,6 @@ func (e *dagExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	Register(digraph.ExecutorTypeDAGLegacy, newDAGExecutor)
-	Register(digraph.ExecutorTypeDAG, newDAGExecutor)
+	digraph.RegisterExecutor(digraph.ExecutorTypeDAGLegacy, newDAGExecutor)
+	digraph.RegisterExecutor(digraph.ExecutorTypeDAG, newDAGExecutor)
 }

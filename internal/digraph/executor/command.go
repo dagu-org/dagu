@@ -15,7 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 )
 
-var _ Executor = (*commandExecutor)(nil)
+var _ digraph.Executor = (*commandExecutor)(nil)
 var _ ExitCoder = (*commandExecutor)(nil)
 
 type commandExecutor struct {
@@ -162,9 +162,9 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 }
 
 func init() {
-	Register("", newCommand)
-	Register("shell", newCommand)
-	Register("command", newCommand)
+	digraph.RegisterExecutor("", newCommand)
+	digraph.RegisterExecutor("shell", newCommand)
+	digraph.RegisterExecutor("command", newCommand)
 }
 
 func exitCodeFromError(err error) int {
@@ -295,7 +295,7 @@ func (b *shellCommandBuilder) buildCmdCommand(ctx context.Context, cmd string, a
 	return exec.CommandContext(ctx, cmd, args...), nil
 }
 
-func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
+func newCommand(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
 	cfg, err := createCommandConfig(ctx, step)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)

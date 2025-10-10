@@ -43,7 +43,7 @@ steps:
 ```
 */
 
-var _ Executor = (*docker)(nil)
+var _ digraph.Executor = (*docker)(nil)
 var _ ExitCoder = (*docker)(nil)
 
 type containerClientCtxKey = struct{}
@@ -207,9 +207,7 @@ func (e *docker) ExitCode() int {
 	return e.exitCode
 }
 
-func newDocker(
-	ctx context.Context, step digraph.Step,
-) (Executor, error) {
+func newDocker(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
 	execCfg := step.ExecutorConfig
 
 	var cfg *container.Config
@@ -240,5 +238,5 @@ var (
 )
 
 func init() {
-	Register("docker", newDocker)
+	digraph.RegisterExecutor("docker", newDocker)
 }

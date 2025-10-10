@@ -12,7 +12,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 )
 
-var _ Executor = (*mail)(nil)
+var _ digraph.Executor = (*mail)(nil)
 
 type mail struct {
 	stdout io.Writer
@@ -29,7 +29,7 @@ type mailConfig struct {
 	Attachments []string `mapstructure:"attachments"`
 }
 
-func newMail(ctx context.Context, step digraph.Step) (Executor, error) {
+func newMail(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
 	var cfg mailConfig
 	if err := decodeMailConfig(step.ExecutorConfig.Config, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to decode mail config: %w", err)
@@ -120,5 +120,5 @@ func decodeMailConfig(dat map[string]any, cfg *mailConfig) error {
 }
 
 func init() {
-	Register("mail", newMail)
+	digraph.RegisterExecutor("mail", newMail)
 }

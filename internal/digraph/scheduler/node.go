@@ -116,7 +116,7 @@ type Node struct {
 
 	id           int
 	mu           sync.RWMutex
-	cmd          executor.Executor
+	cmd          digraph.Executor
 	cancelFunc   func()
 	done         atomic.Bool
 	retryPolicy  RetryPolicy
@@ -299,7 +299,7 @@ func (n *Node) clearVariable(key string) {
 	n.ClearVariable(key)
 }
 
-func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
+func (n *Node) setupExecutor(ctx context.Context) (digraph.Executor, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -355,7 +355,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	}
 
 	// Create the executor
-	cmd, err := executor.NewExecutor(ctx, n.Step())
+	cmd, err := digraph.NewExecutor(ctx, n.Step())
 	if err != nil {
 		return nil, err
 	}
@@ -950,7 +950,7 @@ func (oc *OutputCoordinator) setup(ctx context.Context, data NodeData) error {
 	return oc.setupStderrRedirect(ctx, data)
 }
 
-func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.Executor, data NodeData) error {
+func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd digraph.Executor, data NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 

@@ -37,7 +37,7 @@ type parallelExecutor struct {
 
 func newParallelExecutor(
 	ctx context.Context, step digraph.Step,
-) (Executor, error) {
+) (digraph.Executor, error) {
 	// The parallel executor doesn't use the params from the step directly
 	// as they are passed through SetParamsList
 
@@ -303,5 +303,5 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	Register(digraph.ExecutorTypeParallel, newParallelExecutor)
+	digraph.RegisterExecutor(digraph.ExecutorTypeParallel, newParallelExecutor)
 }

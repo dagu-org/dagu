@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/sshutil"
 )
 
-var _ Executor = (*sshExec)(nil)
+var _ digraph.Executor = (*sshExec)(nil)
 var _ StepValidator = (*sshExec)(nil) // Ensure sshExec implements StepValidator
 
 type sshClientCtxKey = struct{}
@@ -40,7 +40,7 @@ type sshExec struct {
 	session *ssh.Session
 }
 
-func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
+func newSSHExec(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
 	var client *sshutil.Client
 
 	// Prefer step-level SSH configuration if present
@@ -116,5 +116,5 @@ func (e *sshExec) ValidateStep(step *digraph.Step) error {
 }
 
 func init() {
-	Register("ssh", newSSHExec)
+	digraph.RegisterExecutor("ssh", newSSHExec)
 }

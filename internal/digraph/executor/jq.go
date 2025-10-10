@@ -13,7 +13,7 @@ import (
 	"github.com/itchyny/gojq"
 )
 
-var _ Executor = (*jq)(nil)
+var _ digraph.Executor = (*jq)(nil)
 
 type jq struct {
 	stdout io.Writer
@@ -27,7 +27,7 @@ type jqConfig struct {
 	Raw bool `mapstructure:"raw"`
 }
 
-func newJQ(_ context.Context, step digraph.Step) (Executor, error) {
+func newJQ(_ context.Context, step digraph.Step) (digraph.Executor, error) {
 	var jqCfg jqConfig
 	if step.ExecutorConfig.Config != nil {
 		if err := decodeJqConfig(
@@ -113,5 +113,5 @@ func decodeJqConfig(dat map[string]any, cfg *jqConfig) error {
 }
 
 func init() {
-	Register("jq", newJQ)
+	digraph.RegisterExecutor("jq", newJQ)
 }
