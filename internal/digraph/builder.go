@@ -1236,6 +1236,8 @@ func buildStep(ctx StepBuildContext, def stepDef) (*Step, error) {
 		Stderr:         strings.TrimSpace(def.Stderr),
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
+		Uses:           strings.TrimSpace(def.Uses),
+		With:           def.With,
 	}
 
 	for _, entry := range stepBuilderRegistry {
@@ -1537,7 +1539,7 @@ func validateStep(_ StepBuildContext, def stepDef, step *Step) error {
 	}
 
 	if step.Command == "" {
-		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildDAG == nil {
+		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildDAG == nil && step.Uses == "" {
 			return ErrStepCommandIsRequired
 		}
 	}
