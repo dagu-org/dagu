@@ -17,7 +17,7 @@ func TestDAGExecutor_Kill_Distributed(t *testing.T) {
 
 	// Create a context with environment
 	env := Env{
-		Env: digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
@@ -65,7 +65,7 @@ func TestDAGExecutor_Kill_NotDistributed(t *testing.T) {
 
 	// Create a context with environment
 	env := Env{
-		Env: digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",

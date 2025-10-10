@@ -12,7 +12,7 @@ import (
 
 func TestDebugVariables(t *testing.T) {
 	// Create a test context with environment variables
-	ctx := digraph.SetupEnvForTest(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+	ctx := digraph.SetupDAGContext(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 	env := executor.GetEnv(ctx)
 
 	// Store variable with spaces

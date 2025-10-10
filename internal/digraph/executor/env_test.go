@@ -315,7 +315,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				dag := &digraph.DAG{
 					Env: []string{"FOO=from_dag"},
 				}
-				ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+				ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 				// Create executor env
 				env := executor.NewEnv(ctx, digraph.Step{Name: "test"})
@@ -338,7 +338,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				dag := &digraph.DAG{
 					Env: []string{"BAR=from_dag"},
 				}
-				ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+				ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 				// Create executor env
 				env := executor.NewEnv(ctx, digraph.Step{Name: "test"})
@@ -358,7 +358,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				dag := &digraph.DAG{
 					Env: []string{"BAZ=from_dag"},
 				}
-				ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+				ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 				// Create executor env
 				env := executor.NewEnv(ctx, digraph.Step{Name: "test"})
@@ -375,7 +375,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				dag := &digraph.DAG{
 					Env: []string{"VAR1=dag1", "VAR2=dag2", "VAR3=dag3"},
 				}
-				ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+				ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 				// Create executor env
 				env := executor.NewEnv(ctx, digraph.Step{Name: "test"})

@@ -466,7 +466,7 @@ func TestEvalStringEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	// Create a test context with environment variables
-	ctx := digraph.SetupEnvForTest(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+	ctx := digraph.SetupDAGContext(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 	env := executor.GetEnv(ctx)
 	env.Variables.Store("EMPTY", "EMPTY=")
 	env.Variables.Store("SPACES", "SPACES=  ")
@@ -616,7 +616,7 @@ func TestEvalBoolEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	// Create a test context with environment variables
-	ctx := digraph.SetupEnvForTest(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+	ctx := digraph.SetupDAGContext(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 	env := executor.GetEnv(ctx)
 	env.Variables.Store("YES", "YES=yes")

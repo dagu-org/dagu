@@ -40,7 +40,7 @@ type Env struct {
 	// Embedded execution metadata from parent DAG run containing DAGRunID,
 	// RootDAGRun reference, DAG configuration, database interface,
 	// DAG-level environment variables, and coordinator dispatcher
-	digraph.Env
+	digraph.DAGContext
 
 	// Thread-safe map storing output variables from previously executed steps
 	// in the format "key=value". These variables are populated when a step
@@ -78,7 +78,7 @@ func (e Env) VariablesMap() map[string]string {
 
 // NewEnv creates a new execution context with the given step.
 func NewEnv(ctx context.Context, step digraph.Step) Env {
-	parentEnv := digraph.GetEnv(ctx)
+	parentEnv := digraph.GetDAGContextFromContext(ctx)
 	parentDAG := parentEnv.DAG
 
 	var workingDir string
@@ -129,7 +129,7 @@ func NewEnv(ctx context.Context, step digraph.Step) Env {
 	}
 
 	return Env{
-		Env:        digraph.GetEnv(ctx),
+		DAGContext: digraph.GetDAGContextFromContext(ctx),
 		Variables:  &digraph.SyncMap{},
 		Step:       step,
 		Envs:       envs,
@@ -145,7 +145,7 @@ func (e Env) DAGRunRef() digraph.DAGRunRef {
 
 // AllEnvs returns all environment variables that needs to be passed to the command.
 func (e Env) AllEnvs() []string {
-	envs := e.Env.AllEnvs()
+	envs := e.DAGContext.AllEnvs()
 	for k, v := range e.Envs {
 		envs = append(envs, k+"="+v)
 	}
@@ -196,7 +196,7 @@ func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 
 // EvalString evaluates the given string with the variables within the execution context.
 func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
-	dagEnv := digraph.GetEnv(ctx)
+	dagEnv := digraph.GetDAGContextFromContext(ctx)
 
 	// Collect environment variables for evaluating the string.
 	// Variables are processed sequentially, and once a variable is replaced,

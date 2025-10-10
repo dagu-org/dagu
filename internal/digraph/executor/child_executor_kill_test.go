@@ -17,7 +17,7 @@ func TestChildDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 
 	// Create a context with environment
 	env := Env{
-		Env: digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
@@ -65,7 +65,7 @@ func TestChildDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 
 	// Create a context with environment
 	env := Env{
-		Env: digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
@@ -109,7 +109,7 @@ func TestChildDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 
 	// Create a context with environment
 	env := Env{
-		Env: digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
@@ -148,7 +148,7 @@ func TestChildDAGExecutor_Kill_Empty(t *testing.T) {
 
 	// Create a context with environment
 	env := Env{
-		Env: digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",

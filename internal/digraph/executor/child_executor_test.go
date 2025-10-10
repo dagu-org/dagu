@@ -34,7 +34,7 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 	// Set up the environment
 	mockDB := new(mockDatabase)
 	env := Env{
-		Env: digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("parent", "root-123"),
@@ -84,7 +84,7 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 	// Set up the environment
 	mockDB := new(mockDatabase)
 	env := Env{
-		Env: digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("parent", "root-123"),
@@ -135,7 +135,7 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 	// Set up the environment
 	mockDB := new(mockDatabase)
 	env := Env{
-		Env: digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("parent", "root-123"),
@@ -168,7 +168,7 @@ func TestBuildCommand(t *testing.T) {
 	mockDB := new(mockDatabase)
 	baseEnv := config.NewBaseEnv(nil)
 	env := Env{
-		Env: digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DAG:        &digraph.DAG{Name: "parent"},
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("parent", "root-123"),
@@ -222,7 +222,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 	// Set up the environment
 	mockDB := new(mockDatabase)
 	env := Env{
-		Env: digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DAG:        &digraph.DAG{Name: "parent"},
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("parent", "root-123"),
@@ -256,7 +256,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 	// Set up the environment without RootDAGRun
 	mockDB := new(mockDatabase)
 	env := Env{
-		Env: digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DAG: &digraph.DAG{Name: "parent"},
 			DB:  mockDB,
 			// RootDAGRun is zero value

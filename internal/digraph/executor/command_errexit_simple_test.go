@@ -24,7 +24,7 @@ func TestCommandExecutor_ErrexitSimple(t *testing.T) {
 		}
 
 		// Set up the digraph environment
-		ctx := digraph.SetupEnvForTest(
+		ctx := digraph.SetupDAGContext(
 			context.Background(),
 			dag,
 			nil, // database
@@ -32,6 +32,7 @@ func TestCommandExecutor_ErrexitSimple(t *testing.T) {
 			"test-run-id",
 			"/tmp/test.log",
 			[]string{},
+			nil,
 		)
 
 		// Set up the executor environment

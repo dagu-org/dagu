@@ -632,7 +632,7 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 
 	// Get maxOutputSize from DAG configuration
 	var maxOutputSize = 1024 * 1024 // Default 1MB
-	if env := digraph.GetEnv(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+	if env := digraph.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
 		maxOutputSize = env.DAG.MaxOutputSize
 	}
 
@@ -976,7 +976,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd digraph.Ex
 
 		// Get max output size from DAG configuration, default to 1MB
 		oc.maxOutputSize = 1024 * 1024 // 1MB default
-		if env := digraph.GetEnv(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+		if env := digraph.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
 			oc.maxOutputSize = int64(env.DAG.MaxOutputSize)
 		}
 

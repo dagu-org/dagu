@@ -111,7 +111,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	sc.metrics.totalNodes = len(graph.nodes)
 
 	// If one of the conditions does not met, cancel the execution.
-	env := digraph.GetEnv(ctx)
+	env := digraph.GetDAGContextFromContext(ctx)
 	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", "err", err)
 		sc.Cancel(ctx, graph)
