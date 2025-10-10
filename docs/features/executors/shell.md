@@ -37,6 +37,8 @@ steps:
 
 Use nix-shell for reproducible environments with specific packages:
 
+> **Note:** nix-shell must be installed on your system separately. The Dagu binary and container image do not include nix-shell. Install Nix from [nixos.org](https://nixos.org/download.html) to use this feature.
+
 ```yaml
 steps:
   - shell: nix-shell
