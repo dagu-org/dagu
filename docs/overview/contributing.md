@@ -4,6 +4,8 @@ description: How to contribute to Dagu in a few clear steps.
 outline: [2, 3]
 ---
 
+Thank you for considering to help improve go-deposit! We welcome contributions from anyone on the internet.
+
 ## Quick Start
 
 - Browse [`good first issue`](https://github.com/dagu-org/dagu/labels/good%20first%20issue) or [`help wanted`](https://github.com/dagu-org/dagu/labels/help%20wanted) labels and comment to claim.
