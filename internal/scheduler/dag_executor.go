@@ -7,6 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
+	taskpkg "github.com/dagu-org/dagu/internal/digraph/task"
 	"github.com/dagu-org/dagu/internal/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -114,10 +115,12 @@ func (e *DAGExecutor) ExecuteDAG(
 ) error {
 	if e.shouldUseDistributedExecution(dag) {
 		// Distributed execution: dispatch to coordinator
-		task := dag.CreateTask(
+		task := taskpkg.CreateTask(
+			dag.Name,
+			string(dag.YamlData),
 			operation,
 			runID,
-			digraph.WithWorkerSelector(dag.WorkerSelector),
+			taskpkg.WithWorkerSelector(dag.WorkerSelector),
 		)
 		return e.dispatchToCoordinator(ctx, task)
 	}

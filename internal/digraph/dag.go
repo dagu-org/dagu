@@ -14,7 +14,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"
 )
@@ -130,44 +129,6 @@ type DAG struct {
 	// buildEnv is a temporary map used during DAG building to pass env vars to params
 	// This is not serialized and is cleared after build completes
 	buildEnv map[string]string
-}
-
-// CreateTask creates a coordinator task from this DAG for distributed execution.
-// It constructs a task with the given operation and run ID, setting the DAG's name
-// as both the root DAG and target, and includes the DAG's YAML definition.
-//
-// Parameters:
-//   - op: The operation type (START or RETRY)
-//   - runID: The unique identifier for this DAG run
-//   - opts: Optional task modifiers (e.g., WithTaskParams, WithWorkerSelector)
-//
-// Example:
-//
-//	task := dag.CreateTask(
-//	    coordinatorv1.Operation_OPERATION_START,
-//	    "run-123",
-//	    digraph.WithTaskParams("env=prod"),
-//	    digraph.WithWorkerSelector(map[string]string{"gpu": "true"}),
-//	)
-func (d *DAG) CreateTask(
-	op coordinatorv1.Operation,
-	runID string,
-	opts ...TaskOption,
-) *coordinatorv1.Task {
-	task := &coordinatorv1.Task{
-		RootDagRunName: d.Name,
-		RootDagRunId:   runID,
-		Operation:      op,
-		DagRunId:       runID,
-		Target:         d.Name,
-		Definition:     string(d.YamlData),
-	}
-
-	for _, opt := range opts {
-		opt(task)
-	}
-
-	return task
 }
 
 // HasTag checks if the DAG has the given tag.
@@ -359,52 +320,6 @@ func (d *DAG) ParamsMap() map[string]string {
 		}
 	}
 	return params
-}
-
-// TaskOption is a function that modifies a coordinatorv1.Task.
-type TaskOption func(*coordinatorv1.Task)
-
-// WithRootDagRun sets the root DAG run name and ID in the task.
-func WithRootDagRun(ref DAGRunRef) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		if ref.Name == "" || ref.ID == "" {
-			return // No root DAG run reference provided
-		}
-		task.RootDagRunName = ref.Name
-		task.RootDagRunId = ref.ID
-	}
-}
-
-// WithParentDagRun sets the parent DAG run name and ID in the task.
-func WithParentDagRun(ref DAGRunRef) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		if ref.Name == "" || ref.ID == "" {
-			return // No parent DAG run reference provided
-		}
-		task.ParentDagRunName = ref.Name
-		task.ParentDagRunId = ref.ID
-	}
-}
-
-// WithTaskParams sets the parameters for the task.
-func WithTaskParams(params string) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		task.Params = params
-	}
-}
-
-// WithWorkerSelector sets the worker selector labels for the task.
-func WithWorkerSelector(selector map[string]string) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		task.WorkerSelector = selector
-	}
-}
-
-// WithStep sets the step name for retry operations.
-func WithStep(step string) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		task.Step = step
-	}
 }
 
 // ProcGroup returns the name of the process group for this DAG.
