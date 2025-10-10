@@ -16,6 +16,10 @@ import (
 	"github.com/dagu-org/dagu/internal/signal"
 )
 
+var (
+	ErrExecutorConfigRequired = errors.New("executor config is required")
+)
+
 // Docker executor runs a command in a Docker container.
 /* Example DAG:
 ```yaml
@@ -232,10 +236,6 @@ func newDocker(ctx context.Context, step digraph.Step) (digraph.Executor, error)
 		stderr: os.Stderr,
 	}, nil
 }
-
-var (
-	ErrExecutorConfigRequired = errors.New("executor config is required")
-)
 
 func init() {
 	digraph.RegisterExecutor("docker", newDocker)
