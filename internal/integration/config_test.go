@@ -424,6 +424,27 @@ steps:
 		})
 	})
 
+	t.Run("Shebang", func(t *testing.T) {
+		t.Parallel()
+
+		dag := th.DAG(t, `steps:
+  - script: |
+      #!env perl
+      use strict;
+      use warnings;
+      print("Hello World\n");
+    output: OUT1
+`)
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, status.Success)
+		dag.AssertOutputs(t, map[string]any{
+			"OUT1": "Hello World",
+		})
+	})
+
 	t.Run("Workdir", func(t *testing.T) {
 		t.Parallel()
 

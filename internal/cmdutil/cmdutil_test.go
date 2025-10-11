@@ -504,6 +504,64 @@ func TestParsePipedCommandShellOperators(t *testing.T) {
 	}
 }
 
+// TestDetectShebang tests shebang detection in scripts
+func TestDetectShebang(t *testing.T) {
+	tests := []struct {
+		name     string
+		script   string
+		wantCmd  string
+		wantArgs []string
+		wantErr  bool
+	}{
+		{
+			name:     "WithShebang",
+			script:   "#!/bin/bash\necho hello",
+			wantCmd:  "/bin/bash",
+			wantArgs: []string{},
+		},
+		{
+			name:     "WithShebangAndArgs",
+			script:   "#!/usr/bin/env python3\nprint('hello')",
+			wantCmd:  "/usr/bin/env",
+			wantArgs: []string{"python3"},
+		},
+		{
+			name:     "WithoutShebang",
+			script:   "echo hello",
+			wantCmd:  "",
+			wantArgs: nil,
+		},
+		{
+			name:     "EmptyScript",
+			script:   "",
+			wantCmd:  "",
+			wantArgs: nil,
+		},
+		{
+			name:     "OnlyShebang",
+			script:   "#!",
+			wantCmd:  "",
+			wantArgs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotCmd, gotArgs, err := DetectShebang(tt.script)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DetectShebang() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotCmd != tt.wantCmd {
+				t.Errorf("DetectShebang() gotCmd = %v, want %v", gotCmd, tt.wantCmd)
+			}
+			if !reflect.DeepEqual(gotArgs, tt.wantArgs) {
+				t.Errorf("DetectShebang() gotArgs = %v, want %v", gotArgs, tt.wantArgs)
+			}
+		})
+	}
+}
+
 // TestSplitCommandShellOperators tests SplitCommand behavior with shell operators
 func TestSplitCommandShellOperators(t *testing.T) {
 	tests := []struct {

@@ -132,8 +132,18 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 		cmd = c
 
 	case cfg.ShellCommand != "" && scriptFile != "":
-		// If script is provided ignore the shell command args
+		// Check if the script has shebang and user did not specify a shell
+		shebang, shebangArgs, err := cfg.detectShebang()
+		if err != nil {
+			return nil, fmt.Errorf("failed to detect shebang: %w", err)
+		}
+		if shebang != "" {
+			// Use the shebang interpreter to run the script
+			cmd = exec.CommandContext(cfg.Ctx, shebang, append(shebangArgs, scriptFile)...) // nolint: gosec
+			break
+		}
 
+		// If script is provided ignore the shell command args
 		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, scriptFile) // nolint: gosec
 
 	case cfg.ShellCommand != "" && cfg.ShellCommandArgs != "":
@@ -149,8 +159,13 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 		cmd = c
 
 	default:
-		cmd = createDirectCommand(cfg.Ctx, cfg.Command, cfg.Args, scriptFile)
-
+		command := cfg.Command
+		if command == "" {
+			// If no command is specified, use the default shell.
+			// Usually this should not happen.
+			command = cmdutil.GetShellCommand("")
+		}
+		cmd = createDirectCommand(cfg.Ctx, command, cfg.Args, scriptFile)
 	}
 
 	cmd.Env = append(cmd.Env, digraph.AllEnvs(ctx)...)
@@ -160,6 +175,13 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	cmdutil.SetupCommand(cmd)
 
 	return cmd, nil
+}
+
+func (cfg *commandConfig) detectShebang() (string, []string, error) {
+	if cfg.UserSpecifiedShell {
+		return "", nil, nil
+	}
+	return cmdutil.DetectShebang(cfg.Script)
 }
 
 func exitCodeFromError(err error) int {
@@ -300,6 +322,7 @@ func NewCommand(ctx context.Context, step digraph.Step) (digraph.Executor, error
 	return &commandExecutor{config: cfg}, nil
 }
 
+// NewCommandConfig creates a new commandConfig from the given step.
 func NewCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig, error) {
 	var shellCommand string
 	shellCmdArgs := step.ShellCmdArgs
@@ -413,20 +436,6 @@ func validateCommandStep(step digraph.Step) error {
 		return digraph.ErrStepCommandIsRequired
 	}
 
-	return nil
-}
-
-func validateCommandShell(step digraph.Step) error {
-	if step.Shell == "" {
-		return nil
-	}
-	shell, _, err := cmdutil.SplitCommand(step.Shell)
-	if err != nil {
-		return fmt.Errorf("invalid shell command: %w", err)
-	}
-	if _, err := exec.LookPath(shell); err != nil {
-		return fmt.Errorf("shell command not found: %s", shell)
-	}
 	return nil
 }
 
