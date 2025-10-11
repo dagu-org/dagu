@@ -324,7 +324,7 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			executor, err := newCommand(ctx, tt.step)
+			executor, err := NewCommand(ctx, tt.step)
 			require.NoError(t, err)
 
 			err = executor.Run(ctx)

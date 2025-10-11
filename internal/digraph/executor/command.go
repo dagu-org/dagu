@@ -290,8 +290,9 @@ func (b *shellCommandBuilder) buildCmdCommand(ctx context.Context, cmd string, a
 	return exec.CommandContext(ctx, cmd, args...), nil
 }
 
-func newCommand(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
-	cfg, err := createCommandConfig(ctx, step)
+// NewCommand creates a new command executor.
+func NewCommand(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
+	cfg, err := NewCommandConfig(ctx, step)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)
 	}
@@ -299,7 +300,7 @@ func newCommand(ctx context.Context, step digraph.Step) (digraph.Executor, error
 	return &commandExecutor{config: cfg}, nil
 }
 
-func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig, error) {
+func NewCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig, error) {
 	var shellCommand string
 	shellCmdArgs := step.ShellCmdArgs
 	userSpecifiedShell := step.Shell != ""
@@ -411,11 +412,26 @@ func validateCommandStep(step digraph.Step) error {
 	default:
 		return digraph.ErrStepCommandIsRequired
 	}
+
+	return nil
+}
+
+func validateCommandShell(step digraph.Step) error {
+	if step.Shell == "" {
+		return nil
+	}
+	shell, _, err := cmdutil.SplitCommand(step.Shell)
+	if err != nil {
+		return fmt.Errorf("invalid shell command: %w", err)
+	}
+	if _, err := exec.LookPath(shell); err != nil {
+		return fmt.Errorf("shell command not found: %s", shell)
+	}
 	return nil
 }
 
 func init() {
-	digraph.RegisterExecutor("", newCommand, validateCommandStep)
-	digraph.RegisterExecutor("shell", newCommand, validateCommandStep)
-	digraph.RegisterExecutor("command", newCommand, validateCommandStep)
+	digraph.RegisterExecutor("", NewCommand, validateCommandStep)
+	digraph.RegisterExecutor("shell", NewCommand, validateCommandStep)
+	digraph.RegisterExecutor("command", NewCommand, validateCommandStep)
 }

@@ -8,26 +8,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSSHExecutor(t *testing.T) {
+func TestNewSSHExecutor(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Basic", func(t *testing.T) {
-		step := digraph.Step{
-			Name: "ssh-exec",
-			ExecutorConfig: digraph.ExecutorConfig{
-				Type: "ssh",
-				Config: map[string]any{
-					"User":     "testuser",
-					"IP":       "testip",
-					"Port":     25,
-					"Password": "testpassword",
-				},
+	step := digraph.Step{
+		Name: "ssh-exec",
+		ExecutorConfig: digraph.ExecutorConfig{
+			Type: "ssh",
+			Config: map[string]any{
+				"User":     "testuser",
+				"IP":       "testip",
+				"Port":     25,
+				"Password": "testpassword",
 			},
-		}
-		ctx := context.Background()
-		_, err := newSSHExec(ctx, step)
-		require.NoError(t, err)
-	})
+		},
+	}
+	ctx := context.Background()
+	_, err := NewSSHExecutor(ctx, step)
+	require.NoError(t, err)
 }
 
 func TestValidateSSHStep(t *testing.T) {
