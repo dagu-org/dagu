@@ -17,12 +17,6 @@ type NodeStatusDeterminer interface {
 	DetermineNodeStatus(ctx context.Context) (status.NodeStatus, error)
 }
 
-// StepValidator is an interface for executors that validate step configurations.
-// Executors can optionally implement this interface to enforce executor-specific constraints.
-type StepValidator interface {
-	ValidateStep(step *digraph.Step) error
-}
-
 // DAGExecutor is an interface for child DAG executors.
 type DAGExecutor interface {
 	digraph.Executor

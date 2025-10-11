@@ -10,12 +10,10 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/sshutil"
 )
 
 var _ digraph.Executor = (*sshExec)(nil)
-var _ scheduler.StepValidator = (*sshExec)(nil) // Ensure sshExec implements StepValidator
 
 type sshClientCtxKey = struct{}
 
