@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -334,7 +335,7 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 			}
 
 			// Check exit code
-			if exitCoder, ok := executor.(ExitCoder); ok {
+			if exitCoder, ok := executor.(scheduler.ExitCoder); ok {
 				assert.Equal(t, tt.expectedCode, exitCoder.ExitCode())
 			}
 		})

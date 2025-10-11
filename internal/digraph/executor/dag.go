@@ -9,13 +9,14 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-var _ DAGExecutor = (*dagExecutor)(nil)
-var _ NodeStatusDeterminer = (*dagExecutor)(nil)
+var _ scheduler.DAGExecutor = (*dagExecutor)(nil)
+var _ scheduler.NodeStatusDeterminer = (*dagExecutor)(nil)
 
 type dagExecutor struct {
 	child     *ChildDAGExecutor
@@ -23,7 +24,7 @@ type dagExecutor struct {
 	workDir   string
 	stdout    io.Writer
 	stderr    io.Writer
-	runParams RunParams
+	runParams scheduler.RunParams
 	step      digraph.Step
 	result    *digraph.RunStatus
 }
@@ -108,7 +109,7 @@ func (e *dagExecutor) DetermineNodeStatus(_ context.Context) (status.NodeStatus,
 	}
 }
 
-func (e *dagExecutor) SetParams(params RunParams) {
+func (e *dagExecutor) SetParams(params scheduler.RunParams) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	e.runParams = params

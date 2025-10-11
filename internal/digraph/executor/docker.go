@@ -12,6 +12,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/container"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/signal"
 )
@@ -48,7 +49,7 @@ steps:
 */
 
 var _ digraph.Executor = (*docker)(nil)
-var _ ExitCoder = (*docker)(nil)
+var _ scheduler.ExitCoder = (*docker)(nil)
 
 type containerClientCtxKey = struct{}
 type registryAuthCtxKey = struct{}

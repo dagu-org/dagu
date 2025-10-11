@@ -9,6 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -192,7 +193,7 @@ func TestBuildCommand(t *testing.T) {
 	}
 
 	// Build command
-	runParams := RunParams{
+	runParams := scheduler.RunParams{
 		RunID:  "child-789",
 		Params: "param1=value1 param2=value2",
 	}
@@ -241,7 +242,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 	}
 
 	// Build command without RunID
-	runParams := RunParams{
+	runParams := scheduler.RunParams{
 		RunID: "", // Empty RunID
 	}
 
@@ -274,7 +275,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 		DAG: &digraph.DAG{Name: "test-child"},
 	}
 
-	runParams := RunParams{
+	runParams := scheduler.RunParams{
 		RunID: "child-789",
 	}
 

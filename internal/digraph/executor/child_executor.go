@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	taskpkg "github.com/dagu-org/dagu/internal/digraph/task"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/otel"
@@ -88,7 +89,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 // buildCommand builds the command to execute the child DAG.
 func (e *ChildDAGExecutor) buildCommand(
 	ctx context.Context,
-	runParams RunParams,
+	runParams scheduler.RunParams,
 	workDir string,
 ) (*exec.Cmd, error) {
 	executable, err := executablePath()
@@ -159,7 +160,7 @@ func (e *ChildDAGExecutor) ShouldUseDistributedExecution() bool {
 // BuildCoordinatorTask creates a coordinator task for distributed execution
 func (e *ChildDAGExecutor) BuildCoordinatorTask(
 	ctx context.Context,
-	runParams RunParams,
+	runParams scheduler.RunParams,
 ) (*coordinatorv1.Task, error) {
 	env := digraph.GetEnv(ctx)
 
@@ -221,7 +222,7 @@ func (e *ChildDAGExecutor) Cleanup(ctx context.Context) error {
 
 // ExecuteWithResult executes the child DAG and returns the result.
 // This is useful for parallel execution where results need to be collected.
-func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunParams, workDir string) (*digraph.RunStatus, error) {
+func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams scheduler.RunParams, workDir string) (*digraph.RunStatus, error) {
 	// Check if we should use distributed execution
 	if e.ShouldUseDistributedExecution() {
 		// Track distributed execution
@@ -293,7 +294,7 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 }
 
 // executeDistributedWithResult runs the child DAG via coordinator and returns the result
-func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, runParams RunParams) (*digraph.RunStatus, error) {
+func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, runParams scheduler.RunParams) (*digraph.RunStatus, error) {
 	// Dispatch to coordinator
 	if err := e.dispatchToCoordinator(ctx, runParams); err != nil {
 		return nil, fmt.Errorf("distributed execution failed: %w", err)
@@ -304,7 +305,7 @@ func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, run
 }
 
 // dispatchToCoordinator builds and dispatches a task to the coordinator
-func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams RunParams) error {
+func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams scheduler.RunParams) error {
 	// Build the coordinator task
 	task, err := e.BuildCoordinatorTask(ctx, runParams)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +50,7 @@ func TestSSHExecutor(t *testing.T) {
 		require.NoError(t, err)
 
 		// Type assert to StepValidator
-		validator, ok := exec.(StepValidator)
+		validator, ok := exec.(scheduler.StepValidator)
 		require.True(t, ok, "SSH executor should implement StepValidator")
 
 		// Should fail with script field
@@ -78,7 +79,7 @@ func TestSSHExecutor(t *testing.T) {
 		require.NoError(t, err)
 
 		// Type assert to StepValidator
-		validator, ok := exec.(StepValidator)
+		validator, ok := exec.(scheduler.StepValidator)
 		require.True(t, ok, "SSH executor should implement StepValidator")
 
 		// Should pass with command field

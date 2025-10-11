@@ -13,10 +13,11 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 )
 
 var _ digraph.Executor = (*commandExecutor)(nil)
-var _ ExitCoder = (*commandExecutor)(nil)
+var _ scheduler.ExitCoder = (*commandExecutor)(nil)
 
 type commandExecutor struct {
 	mu         sync.Mutex

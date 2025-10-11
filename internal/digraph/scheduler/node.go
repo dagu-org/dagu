@@ -20,7 +20,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -248,7 +247,7 @@ func (n *Node) Execute(ctx context.Context) error {
 
 		// Set the exit code if the command implements ExitCoder
 		var exitErr *exec.ExitError
-		if cmd, ok := cmd.(executor.ExitCoder); ok {
+		if cmd, ok := cmd.(ExitCoder); ok {
 			exitCode = cmd.ExitCode()
 		} else if n.Error() != nil && errors.As(n.Error(), &exitErr) {
 			exitCode = exitErr.ExitCode()
@@ -281,7 +280,7 @@ func (n *Node) Execute(ctx context.Context) error {
 		n.setVariable(output, value)
 	}
 
-	if status, ok := cmd.(executor.NodeStatusDeterminer); ok {
+	if status, ok := cmd.(NodeStatusDeterminer); ok {
 		// Determine the node status based on the executor's implementation
 		nodeStatus, err := status.DetermineNodeStatus(ctx)
 		// Only set the status if it is a success
@@ -376,24 +375,24 @@ func (n *Node) setupExecutor(ctx context.Context) (digraph.Executor, error) {
 		// Setup the executor with child DAG run information
 		if n.Step().Parallel == nil {
 			// Single child DAG execution
-			exec, ok := cmd.(executor.DAGExecutor)
+			exec, ok := cmd.(DAGExecutor)
 			if !ok {
 				return nil, fmt.Errorf("executor %T does not support child DAG execution", cmd)
 			}
-			exec.SetParams(executor.RunParams{
+			exec.SetParams(RunParams{
 				RunID:  childRuns[0].DAGRunID,
 				Params: childRuns[0].Params,
 			})
 		} else {
 			// Parallel child DAG execution
-			exec, ok := cmd.(executor.ParallelExecutor)
+			exec, ok := cmd.(ParallelExecutor)
 			if !ok {
 				return nil, fmt.Errorf("executor %T does not support parallel execution", cmd)
 			}
 			// Convert ChildDAGRun to executor.RunParams
-			var runParamsList []executor.RunParams
+			var runParamsList []RunParams
 			for _, childRun := range childRuns {
-				runParamsList = append(runParamsList, executor.RunParams{
+				runParamsList = append(runParamsList, RunParams{
 					RunID:  childRun.DAGRunID,
 					Params: childRun.Params,
 				})
