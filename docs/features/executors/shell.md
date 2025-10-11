@@ -104,6 +104,8 @@ steps:
     command: npm install
 ```
 
+Multi-line command strings are treated as inline scripts. They run without splitting into `command` and `args`, so you can include shell control flow, environment setup, or even a shebang (`#! /usr/bin/env bash`) as the first line. When no `shell` is specified, Dagu honors the shebang interpreter just like it does for the `script` field.
+
 ## Environment Variables
 
 ```yaml
