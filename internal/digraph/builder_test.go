@@ -940,6 +940,28 @@ steps:
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
 		assert.Equal(t, "step1", th.Steps[0].Name)
 	})
+	t.Run("CommandAsScript", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: |
+      echo hello
+      echo world
+    name: script
+`)
+		dag, err := digraph.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		require.Len(t, th.Steps, 1)
+		step := th.Steps[0]
+		assert.Equal(t, "script", step.Name)
+		assert.Equal(t, "echo hello\necho world", step.Script)
+		assert.Empty(t, step.Command)
+		assert.Empty(t, step.CmdWithArgs)
+		assert.Empty(t, step.CmdArgsSys)
+		assert.Nil(t, step.Args)
+	})
 	t.Run("ValidCommandInArray", func(t *testing.T) {
 		t.Parallel()
 
