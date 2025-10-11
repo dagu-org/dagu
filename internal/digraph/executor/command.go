@@ -399,24 +399,17 @@ func createDirectCommand(ctx context.Context, cmd string, args []string, scriptF
 }
 
 func validateCommandStep(step digraph.Step) error {
-	if step.Command == "" && step.Script == "" && step.ChildDAG == nil {
+	switch {
+	case step.Command != "" && step.Script != "":
+		// Both command and script provided - valid
+	case step.Command != "" && step.Script == "":
+		// Command only - valid
+	case step.Command == "" && step.Script != "":
+		// Script only - valid
+	case step.ChildDAG != nil:
+		// Child DAG - valid
+	default:
 		return digraph.ErrStepCommandIsRequired
-	}
-	var specified int
-	if step.Command != "" {
-		specified++
-	}
-	if step.Script != "" {
-		specified++
-	}
-	if step.ShellCmdArgs != "" {
-		specified++
-	}
-	if step.ChildDAG != nil {
-		specified++
-	}
-	if specified > 1 {
-		return fmt.Errorf("only one of command, script, shell command args, or child DAG can be specified")
 	}
 	return nil
 }
