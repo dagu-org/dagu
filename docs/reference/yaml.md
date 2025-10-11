@@ -350,7 +350,7 @@ Each step in the `steps` array can have these fields:
 |-------|------|-------------|---------|
 | `name` | string | Step name (optional - auto-generated if not provided) | Auto-generated |
 | `command` | string | Command to execute | - |
-| `script` | string | Inline script (alternative to command) | - |
+| `script` | string | Inline script (alternative to command). Honors shebang when no shell is set. | - |
 | `run` | string | Run another DAG | - |
 | `depends` | string/array | Step dependencies | - |
 

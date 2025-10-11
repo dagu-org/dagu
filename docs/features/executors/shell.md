@@ -20,6 +20,8 @@ steps:
       python process.py  # Run a Python script
 ```
 
+When `shell` is omitted, Dagu executes the script with the interpreter defined by its shebang (`#!`) if one is provided.
+
 ## Shell Selection
 
 ```yaml

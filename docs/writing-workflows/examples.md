@@ -1011,6 +1011,7 @@ steps:
 ```yaml
 steps:
   - script: |
+      #!/bin/bash
       cd /tmp
       echo "hello world" > hello
       cat hello
@@ -1018,6 +1019,24 @@ steps:
 ```
 
 Run shell script with default shell.
+
+<a href="/writing-workflows/basics#scripts" class="learn-more">Learn more →</a>
+
+</div>
+
+<div class="example-card">
+
+### Shebang Script
+
+```yaml
+steps:
+  - script: |
+      #!/usr/bin/env python3
+      import platform
+      print(platform.python_version())
+```
+
+Runs with the interpreter declared in the shebang.
 
 <a href="/writing-workflows/basics#scripts" class="learn-more">Learn more →</a>
 
