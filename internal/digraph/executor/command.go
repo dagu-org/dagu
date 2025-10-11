@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -133,7 +134,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 
 	case cfg.ShellCommand != "" && scriptFile != "":
 		// Check if the script has shebang and user did not specify a shell
-		shebang, shebangArgs, err := cfg.detectShebang()
+		shebang, shebangArgs, err := cfg.detectShebang(scriptFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to detect shebang: %w", err)
 		}
@@ -181,11 +182,44 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	return cmd, nil
 }
 
-func (cfg *commandConfig) detectShebang() (string, []string, error) {
+func (cfg *commandConfig) detectShebang(scriptFile string) (string, []string, error) {
 	if cfg.UserSpecifiedShell {
 		return "", nil, nil
 	}
-	return cmdutil.DetectShebang(cfg.Script)
+	// read the first line of the script file
+	firstLine, err := readFirstLine(scriptFile)
+	if err != nil {
+		return "", nil, err
+	}
+	return cmdutil.DetectShebang(firstLine)
+}
+
+func readFirstLine(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	scanner := bufio.NewScanner(file)
+	// Set a reasonable limit to prevent memory issues with extremely long lines
+	// Shebangs are typically < 256 bytes, but allow up to 4KB to be safe
+	const maxLineSize = 4 * 1024
+	buf := make([]byte, maxLineSize)
+	scanner.Buffer(buf, maxLineSize)
+
+	if scanner.Scan() {
+		return scanner.Text(), nil
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Empty file
+	return "", nil
 }
 
 func exitCodeFromError(err error) int {

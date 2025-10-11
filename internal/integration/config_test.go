@@ -24,10 +24,7 @@ func TestDAGExecution(t *testing.T) {
     output: NO_NAME_STEP_OUT2
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"NO_NAME_STEP_OUT2": "1=1",
 		})
@@ -43,10 +40,7 @@ func TestDAGExecution(t *testing.T) {
     command: echo 2
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 	})
 
 	t.Run("Pipe", func(t *testing.T) {
@@ -59,10 +53,7 @@ steps:
     output: OUT1
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "hello foo",
 		})
@@ -84,10 +75,7 @@ steps:
     output: OUT1 #123 456
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "123 456",
 		})
@@ -104,7 +92,6 @@ steps:
       exit 7
 `)
 		agent := dag.Agent()
-
 		err := agent.Run(agent.Context)
 		require.Error(t, err)
 		// Should contain the last stderr line
@@ -128,10 +115,7 @@ steps:
     output: OUT2
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "Dagu",
 			"OUT2": "Hello, Dagu",
@@ -152,10 +136,7 @@ steps:
     output: OUT2
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "Dagu",
 			"OUT2": "Hello, Dagu",
@@ -172,10 +153,7 @@ steps:
     command: echo '$1' is $1, '$2' is $2
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": []test.Contains{
 				"$1 is foo",
@@ -195,10 +173,7 @@ steps:
       echo '$1' is $1, '$2' is ${2}
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": []test.Contains{
 				"$1 is foo",
@@ -218,10 +193,7 @@ steps:
     output: OUT1
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "1 2 3",
 		})
@@ -240,10 +212,7 @@ steps:
         expected: "re:^abc.*def$"
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "abc run def",
 			"OUT2": "match",
@@ -262,10 +231,7 @@ steps:
     output: OUT1
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "Starting server at localhost:8080",
 		})
@@ -289,10 +255,7 @@ steps:
   - command: rm ${DATA_DIR}_${PROCESS_DATE}
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "foo",
 		})
@@ -311,10 +274,7 @@ steps:
       echo E1 is $E1, E2 is $E2
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": []test.Contains{
 				"E1 is foo",
@@ -343,10 +303,7 @@ steps:
       echo $DAG_RUN_ID
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": test.NotEmpty{},
 			"OUT2": test.NotEmpty{},
@@ -372,10 +329,7 @@ steps:
       }
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"NAME": `"John"`,
 		})
@@ -394,10 +348,7 @@ steps:
     output: OUT1
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "Starting server at localhost:8080",
 		})
@@ -415,10 +366,7 @@ steps:
     output: OUT1
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "Hello World",
 		})
@@ -436,13 +384,24 @@ steps:
     output: OUT1
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "Hello World",
 		})
+	})
+
+	t.Run("ShebangInCommand", func(t *testing.T) {
+		t.Parallel()
+
+		dag := th.DAG(t, `steps:
+  - |
+      #!env perl
+      use strict;
+      use warnings;
+      print("Hello World\n");
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
 	})
 
 	t.Run("Workdir", func(t *testing.T) {
@@ -461,10 +420,7 @@ steps:
     output: OUT2
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": os.ExpandEnv("$HOME"),
 			"OUT2": os.ExpandEnv("$HOME"),
@@ -506,10 +462,7 @@ steps:
         expected: bar
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": "start",
 			"OUT2": "foo",
@@ -528,10 +481,7 @@ steps:
     output: OUT1
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, status.Success)
 		dag.AssertOutputs(t, map[string]any{
 			"OUT1": []test.Contains{
 				"hello world",
@@ -584,10 +534,7 @@ steps:
 `
 	dag := th.DAG(t, dagContent)
 	agent := dag.Agent()
-
 	agent.RunSuccess(t)
-
-	dag.AssertLatestStatus(t, status.Success)
 	dag.AssertOutputs(t, map[string]any{
 		"OUT2": "foo",
 	})
@@ -625,10 +572,7 @@ steps:
 `
 	dag := th.DAG(t, dagContent)
 	agent := dag.Agent()
-
 	agent.RunSuccess(t)
-
-	dag.AssertLatestStatus(t, status.Success)
 	dag.AssertOutputs(t, map[string]any{
 		"OUT1": "value is 123",
 	})
@@ -657,15 +601,7 @@ steps:
     output: OUT_SKIP2
 `)
 	agent := dag.Agent()
-
-	// Run the DAG and expect it to complete successfully.
 	agent.RunSuccess(t)
-
-	// Assert that the final status is successful.
-	dag.AssertLatestStatus(t, status.Success)
-
-	// Verify outputs:
-	// OUT_RUN should be "executed" and OUT_SKIP should be empty (indicating the step was skipped).
 	dag.AssertOutputs(t, map[string]any{
 		"OUT_RUN":   "executed",
 		"OUT_SKIP":  "",
@@ -704,14 +640,7 @@ func TestComplexDependencies(t *testing.T) {
     output: FINAL
 `)
 	agent := dag.Agent()
-
-	// Run the DAG and expect it to complete successfully.
 	agent.RunSuccess(t)
-
-	// Assert that the final status is successful.
-	dag.AssertLatestStatus(t, status.Success)
-
-	// Verify the outputs from each step.
 	dag.AssertOutputs(t, map[string]any{
 		"START":   "start",
 		"BRANCH1": "branch1",
@@ -786,8 +715,6 @@ steps:
 
 	agent := dag.Agent()
 	agent.RunSuccess(t)
-
-	dag.AssertLatestStatus(t, status.Success)
 	dag.AssertOutputs(t, map[string]any{
 		"STEP_DIR": stepWorkDir,
 	})

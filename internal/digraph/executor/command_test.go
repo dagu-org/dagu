@@ -341,3 +341,37 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 		})
 	}
 }
+
+func TestReadFirstLine(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected string
+	}{
+		{"ShebangLine", "#!/bin/bash\necho hello", "#!/bin/bash"},
+		{"SingleLine", "single line", "single line"},
+		{"EmptyFile", "", ""},
+		{"MultipleLines", "first\nsecond\nthird", "first"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpFile, err := os.CreateTemp("", "test-*.sh")
+			require.NoError(t, err)
+			defer os.Remove(tmpFile.Name())
+
+			_, err = tmpFile.WriteString(tt.content)
+			require.NoError(t, err)
+			tmpFile.Close()
+
+			result, err := readFirstLine(tmpFile.Name())
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+
+	t.Run("NonExistentFile", func(t *testing.T) {
+		_, err := readFirstLine("/non/existent/file")
+		assert.Error(t, err)
+	})
+}

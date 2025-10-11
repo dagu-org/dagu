@@ -45,6 +45,13 @@ func buildCommand(_ StepBuildContext, def stepDef, step *Step) error {
 		if val == "" {
 			return wrapError("command", val, ErrStepCommandIsEmpty)
 		}
+
+		// If the value is multi-line, treat it as a script
+		if strings.Contains(val, "\n") {
+			step.Script = val
+			return nil
+		}
+
 		// We need to split the command into command and args.
 		step.CmdWithArgs = val
 		cmd, args, err := cmdutil.SplitCommand(val)
