@@ -142,9 +142,13 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 			cmd = exec.CommandContext(cfg.Ctx, shebang, append(shebangArgs, scriptFile)...) // nolint: gosec
 			break
 		}
-
-		// If script is provided ignore the shell command args
-		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, scriptFile) // nolint: gosec
+		// If no shebang, use the specified shell command
+		command, args, err := cmdutil.SplitCommand(cfg.ShellCommand)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse shell command: %w", err)
+		}
+		args = append(args, scriptFile)
+		cmd = exec.CommandContext(cfg.Ctx, command, args...) // nolint: gosec
 
 	case cfg.ShellCommand != "" && cfg.ShellCommandArgs != "":
 		builder := &shellCommandBuilder{

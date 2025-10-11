@@ -460,9 +460,6 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		step.Command = cmd
 		step.Args = args
 
-	case step.Command == "":
-		// Do nothing
-
 	case step.Command != "" && len(step.Args) == 0:
 		// Shouldn't reach here except for testing.
 
