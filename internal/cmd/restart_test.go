@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -53,7 +53,7 @@ steps:
 		dag.AssertCurrentStatus(t, status.None)
 
 		// Check parameter was the same as the first execution
-		loaded, err := digraph.Load(th.Context, dag.Location, digraph.WithBaseConfig(th.Config.Paths.BaseConfig))
+		loaded, err := builder.Load(th.Context, dag.Location, builder.WithBaseConfig(th.Config.Paths.BaseConfig))
 		require.NoError(t, err)
 
 		time.Sleep(time.Millisecond * 300) // Wait for the history to be updated.

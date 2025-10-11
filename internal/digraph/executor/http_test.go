@@ -339,3 +339,16 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 		t.Logf("Platform: %s, Error handling verified", runtime.GOOS)
 	})
 }
+
+type testWriter struct {
+	data []byte
+}
+
+func (tw *testWriter) Write(p []byte) (n int, err error) {
+	tw.data = append(tw.data, p...)
+	return len(p), nil
+}
+
+func (tw *testWriter) String() string {
+	return string(tw.data)
+}

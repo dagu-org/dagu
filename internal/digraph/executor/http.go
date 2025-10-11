@@ -16,7 +16,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 )
 
-var _ Executor = (*http)(nil)
+var _ digraph.Executor = (*http)(nil)
 
 type http struct {
 	stdout    io.Writer
@@ -45,7 +45,7 @@ type httpJSONResult struct {
 	Body       any                 `json:"body"`
 }
 
-func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
+func newHTTP(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
 	var reqCfg httpConfig
 	if len(step.Script) > 0 {
 		if err := decodeHTTPConfigFromString(ctx, step.Script, &reqCfg); err != nil {
@@ -198,5 +198,5 @@ func decodeHTTPConfigFromString(_ context.Context, source string, target *httpCo
 }
 
 func init() {
-	Register("http", newHTTP)
+	digraph.RegisterExecutor("http", newHTTP, nil)
 }

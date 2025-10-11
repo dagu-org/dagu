@@ -73,9 +73,9 @@ func TestMail(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				ctx := context.Background()
-				ctx = digraph.SetupEnvForTest(ctx, &digraph.DAG{
+				ctx = digraph.SetupDAGContext(ctx, &digraph.DAG{
 					SMTP: &digraph.SMTPConfig{},
-				}, nil, digraph.DAGRunRef{}, "", "", nil)
+				}, nil, digraph.DAGRunRef{}, "", "", nil, nil)
 
 				exec, err := newMail(ctx, tt.step)
 
@@ -148,9 +148,9 @@ func TestMail(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				ctx = digraph.SetupEnvForTest(ctx, &digraph.DAG{
+				ctx = digraph.SetupDAGContext(ctx, &digraph.DAG{
 					SMTP: &digraph.SMTPConfig{},
-				}, nil, digraph.DAGRunRef{}, "", "", nil)
+				}, nil, digraph.DAGRunRef{}, "", "", nil, nil)
 
 				exec, err := newMail(ctx, step)
 				assert.NoError(t, err)

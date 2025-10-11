@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/stringutil"
@@ -25,7 +24,7 @@ type Node struct {
 	Error            string            `json:"error,omitempty"`
 	Children         []ChildDAGRun     `json:"children,omitempty"`
 	ChildrenRepeated []ChildDAGRun     `json:"childrenRepeated,omitempty"` // repeated child DAG runs
-	OutputVariables  *executor.SyncMap `json:"outputVariables,omitempty"`
+	OutputVariables  *digraph.SyncMap  `json:"outputVariables,omitempty"`
 }
 
 // ChildDAGRun represents a child DAG run associated with a node

@@ -12,8 +12,13 @@ import (
 
 	"github.com/dagu-org/dagu/internal/container"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/signal"
+)
+
+var (
+	ErrExecutorConfigRequired = errors.New("executor config is required")
 )
 
 // Docker executor runs a command in a Docker container.
@@ -43,8 +48,8 @@ steps:
 ```
 */
 
-var _ Executor = (*docker)(nil)
-var _ ExitCoder = (*docker)(nil)
+var _ digraph.Executor = (*docker)(nil)
+var _ scheduler.ExitCoder = (*docker)(nil)
 
 type containerClientCtxKey = struct{}
 type registryAuthCtxKey = struct{}
@@ -113,7 +118,7 @@ func (e *docker) Kill(sig os.Signal) error {
 
 	// Wait for max clean up time before forcefully killing the container
 	go func() {
-		env := GetEnv(e.context)
+		env := digraph.GetEnv(e.context)
 		<-time.After(env.DAG.MaxCleanUpTime)
 		logger.Warn(e.context, "forcefully stopping container after max clean up time", "container", e.step.Name)
 		_ = e.container.Stop(syscall.SIGKILL)
@@ -207,9 +212,7 @@ func (e *docker) ExitCode() int {
 	return e.exitCode
 }
 
-func newDocker(
-	ctx context.Context, step digraph.Step,
-) (Executor, error) {
+func newDocker(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
 	execCfg := step.ExecutorConfig
 
 	var cfg *container.Config
@@ -235,10 +238,6 @@ func newDocker(
 	}, nil
 }
 
-var (
-	ErrExecutorConfigRequired = errors.New("executor config is required")
-)
-
 func init() {
-	Register("docker", newDocker)
+	digraph.RegisterExecutor("docker", newDocker, nil)
 }

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/coordinator"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -47,7 +47,7 @@ steps:
 		// Test 1: HandleJob with distributed execution and START operation
 		t.Run("HandleJobDistributedSTART", func(t *testing.T) {
 			// Load DAG and set worker selector for distributed execution
-			dag, err := digraph.Load(context.Background(), testFile)
+			dag, err := builder.Load(context.Background(), testFile)
 			require.NoError(t, err)
 			dag.WorkerSelector = map[string]string{"type": "test-worker"}
 
@@ -73,7 +73,7 @@ steps:
 			dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, th.SubCmdBuilder)
 
 			// Load DAG and set worker selector
-			dag, err := digraph.Load(context.Background(), testFile)
+			dag, err := builder.Load(context.Background(), testFile)
 			require.NoError(t, err)
 			dag.WorkerSelector = map[string]string{"type": "test-worker"}
 
@@ -101,7 +101,7 @@ steps:
 			dagExecutor := scheduler.NewDAGExecutor(nil, th.SubCmdBuilder)
 
 			// Load DAG without worker selector (local execution)
-			dag, err := digraph.Load(context.Background(), testFile)
+			dag, err := builder.Load(context.Background(), testFile)
 			require.NoError(t, err)
 
 			// Call HandleJob with START operation
@@ -130,7 +130,7 @@ steps:
 			dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, th.SubCmdBuilder)
 
 			// Load DAG and set worker selector
-			dag, err := digraph.Load(context.Background(), testFile)
+			dag, err := builder.Load(context.Background(), testFile)
 			require.NoError(t, err)
 			dag.WorkerSelector = map[string]string{"type": "test-worker"}
 

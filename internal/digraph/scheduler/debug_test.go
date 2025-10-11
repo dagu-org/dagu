@@ -6,20 +6,19 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 )
 
 func TestDebugVariables(t *testing.T) {
 	// Create a test context with environment variables
-	ctx := digraph.SetupEnvForTest(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
-	env := executor.GetEnv(ctx)
+	ctx := digraph.SetupDAGContext(context.Background(), &digraph.DAG{}, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
+	env := digraph.GetEnv(ctx)
 
 	// Store variable with spaces
 	env.Variables.Store("SPACES", "SPACES=  ")
 
 	// IMPORTANT: Update the context with the modified env
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	// Print out what Variables() returns
 	vars := env.Variables.Variables()
@@ -43,14 +42,14 @@ func TestDebugVariables(t *testing.T) {
 	fmt.Printf("\nEnvs map: %#v\n", env.Envs)
 
 	// Let's check what GetEnv returns
-	envFromCtx := executor.GetEnv(ctx)
+	envFromCtx := digraph.GetEnv(ctx)
 	fmt.Printf("\nEnv from context Variables: %#v\n", envFromCtx.Variables.Variables())
 
 	// Test with special characters too
 	env.Variables.Store("SPECIAL", "SPECIAL=$pecial!@#")
 
 	// Update context again after adding new variable
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	vars2 := env.Variables.Variables()
 	fmt.Printf("\nVariables map with special: %#v\n", vars2)
@@ -67,7 +66,7 @@ func TestDebugVariables(t *testing.T) {
 	env.Variables.Store("DOLLAR", "DOLLAR=$")
 	env.Variables.Store("DOLLAR_P", "DOLLAR_P=$p")
 	env.Variables.Store("ESCAPED", "ESCAPED=\\$pecial")
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	r3, _ := scheduler.EvalString(ctx, "${DOLLAR}")
 	r4, _ := scheduler.EvalString(ctx, "${DOLLAR_P}")
@@ -80,7 +79,7 @@ func TestDebugVariables(t *testing.T) {
 	// Test without environment expansion
 	fmt.Printf("\n--- Testing without env expansion ---\n")
 	env.Variables.Store("TEST_DOLLAR", "TEST_DOLLAR=$HOME/test")
-	ctx = executor.WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	// This should expand $HOME
 	r6, _ := scheduler.EvalString(ctx, "${TEST_DOLLAR}")

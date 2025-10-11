@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 )
@@ -36,11 +37,11 @@ func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRe
 	}
 
 	// Load the DAG spec
-	dag, err := digraph.LoadYAML(ctx,
+	dag, err := builder.LoadYAML(ctx,
 		[]byte(request.Body.Spec),
-		digraph.WithName(name),
-		digraph.WithAllowBuildErrors(),
-		digraph.WithoutEval(),
+		builder.WithName(name),
+		builder.WithAllowBuildErrors(),
+		builder.WithoutEval(),
 	)
 
 	var errs []string
@@ -77,10 +78,10 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 	var spec []byte
 	if request.Body.Spec != nil && strings.TrimSpace(*request.Body.Spec) != "" {
 		// Validate provided spec before creating
-		_, err := digraph.LoadYAML(ctx,
+		_, err := builder.LoadYAML(ctx,
 			[]byte(*request.Body.Spec),
-			digraph.WithName(request.Body.Name),
-			digraph.WithoutEval(),
+			builder.WithName(request.Body.Name),
+			builder.WithoutEval(),
 		)
 
 		if err != nil {
@@ -148,11 +149,11 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 	}
 
 	// Validate the spec - use WithAllowBuildErrors to return DAG even with errors
-	dag, err := digraph.LoadYAML(ctx,
+	dag, err := builder.LoadYAML(ctx,
 		[]byte(spec),
-		digraph.WithName(request.FileName),
-		digraph.WithAllowBuildErrors(),
-		digraph.WithoutEval(),
+		builder.WithName(request.FileName),
+		builder.WithAllowBuildErrors(),
+		builder.WithoutEval(),
 	)
 	var errs []string
 
@@ -288,7 +289,7 @@ func (a *API) GetDAGDAGRunHistory(ctx context.Context, request api.GetDAGDAGRunH
 
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
 	fileName := request.FileName
-	dag, err := a.dagStore.GetDetails(ctx, fileName, digraph.WithAllowBuildErrors())
+	dag, err := a.dagStore.GetDetails(ctx, fileName, builder.WithAllowBuildErrors())
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -504,7 +505,7 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 	dag, err := a.dagStore.GetMetadata(ctx, dagFileName)
 	if err != nil {
 		// For DAGs with errors, try to load with AllowBuildErrors
-		dag, err = a.dagStore.GetDetails(ctx, dagFileName, digraph.WithAllowBuildErrors())
+		dag, err = a.dagStore.GetDetails(ctx, dagFileName, builder.WithAllowBuildErrors())
 		if err != nil {
 			return nil, &Error{
 				HTTPStatus: http.StatusNotFound,
@@ -680,7 +681,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		return nil, err
 	}
 
-	dag, err := a.dagStore.GetDetails(ctx, request.FileName, digraph.WithoutEval())
+	dag, err := a.dagStore.GetDetails(ctx, request.FileName, builder.WithoutEval())
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,

@@ -1,7 +1,9 @@
 package cmdutil
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
@@ -313,4 +315,32 @@ func ParsePipedCommand(cmdString string) ([][]string, error) {
 	}
 
 	return pipeline, nil
+}
+
+// DetectShebang checks if the given script starts with a shebang (#!) line.
+func DetectShebang(script string) (string, []string, error) {
+	reader := strings.NewReader(script)
+	// Read the first two bytes to check for shebang
+	buf := make([]byte, 2)
+	n, err := reader.Read(buf)
+	if err != nil && err != io.EOF {
+		return "", nil, fmt.Errorf("failed to read script for shebang: %w", err)
+	}
+	if n < 2 || buf[0] != '#' || buf[1] != '!' {
+		// No shebang
+		return "", nil, nil
+	}
+
+	// Read the first line
+	scanner := bufio.NewScanner(reader)
+	if !scanner.Scan() {
+		if err := scanner.Err(); err != nil {
+			return "", nil, fmt.Errorf("failed to read shebang line: %w", err)
+		}
+		return "", nil, nil
+	}
+	line := scanner.Text()
+
+	// Split the shebang line into command and args
+	return SplitCommand(strings.TrimSpace(line))
 }

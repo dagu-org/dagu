@@ -1,4 +1,4 @@
-package digraph
+package builder
 
 import (
 	"context"
@@ -6,23 +6,73 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	digraph "github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/signal"
 	"github.com/go-viper/mapstructure/v2"
 )
+
+type DAG = digraph.DAG
+type Step = digraph.Step
+type Condition = digraph.Condition
+type Container = digraph.Container
+type ContainerStartup = digraph.ContainerStartup
+type ContainerWaitFor = digraph.ContainerWaitFor
+type MailConfig = digraph.MailConfig
+type SMTPConfig = digraph.SMTPConfig
+type RunConfig = digraph.RunConfig
+type SSHConfig = digraph.SSHConfig
+type ParallelConfig = digraph.ParallelConfig
+type ParallelItem = digraph.ParallelItem
+type ContinueOn = digraph.ContinueOn
+type RepeatPolicy = digraph.RepeatPolicy
+type RetryPolicy = digraph.RetryPolicy
+type OTelConfig = digraph.OTelConfig
+type Schedule = digraph.Schedule
+type MailOn = digraph.MailOn
+type HandlerOn = digraph.HandlerOn
+type ErrorList = digraph.ErrorList
+type AuthConfig = digraph.AuthConfig
+type RepeatMode = digraph.RepeatMode
+type ChildDAG = digraph.ChildDAG
+type LoadError = digraph.LoadError
+type ExecutorConfig = digraph.ExecutorConfig
+type DeterministicMap = digraph.DeterministicMap
+
+const (
+	ExecutorTypeDAGLegacy = digraph.ExecutorTypeDAGLegacy
+	ExecutorTypeDAG       = digraph.ExecutorTypeDAG
+	ExecutorTypeParallel  = digraph.ExecutorTypeParallel
+	DefaultMaxConcurrent  = digraph.DefaultMaxConcurrent
+	TypeGraph             = digraph.TypeGraph
+	TypeChain             = digraph.TypeChain
+	TypeAgent             = digraph.TypeAgent
+	RepeatModeWhile       = digraph.RepeatModeWhile
+	RepeatModeUntil       = digraph.RepeatModeUntil
+	HandlerOnSuccess      = digraph.HandlerOnSuccess
+	HandlerOnFailure      = digraph.HandlerOnFailure
+	HandlerOnCancel       = digraph.HandlerOnCancel
+	HandlerOnExit         = digraph.HandlerOnExit
+)
+
+var ValidateDAGName = digraph.ValidateDAGName
 
 // BuilderFn is a function that builds a part of the DAG.
 type BuilderFn func(ctx BuildContext, spec *definition, dag *DAG) error
 
 // BuildContext is the context for building a DAG.
 type BuildContext struct {
-	ctx  context.Context
-	file string
-	opts BuildOpts
+	ctx   context.Context
+	file  string
+	opts  BuildOpts
+	index int
+
+	// buildEnv is a temporary map used during DAG building to pass env vars to params
+	// This is not serialized and is cleared after build completes
+	buildEnv map[string]string
 }
 
 // StepBuildContext is the context for building a step.
@@ -90,7 +140,6 @@ var builderRegistry = []builderEntry{
 	{name: "preconditions", fn: buildPrecondition},
 	{name: "otel", fn: buildOTel},
 	{name: "steps", fn: buildSteps},
-	{name: "validateSteps", fn: validateSteps},
 }
 
 type builderEntry struct {
@@ -127,7 +176,6 @@ type StepBuilderFn func(ctx StepBuildContext, def stepDef, step *Step) error
 func build(ctx BuildContext, spec *definition) (*DAG, error) {
 	dag := &DAG{
 		Location:       ctx.file,
-		Name:           strings.TrimSpace(spec.Name),
 		Group:          strings.TrimSpace(spec.Group),
 		Description:    strings.TrimSpace(spec.Description),
 		Type:           strings.TrimSpace(spec.Type),
@@ -149,11 +197,15 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 			// Avoid duplicating field prefixes like "field 'steps': field 'steps': ..."
 			var le *LoadError
 			if errors.As(err, &le) && le.Field == builder.name {
-				errs.Add(err)
+				errs = append(errs, err)
 			} else {
-				errs.Add(wrapError(builder.name, nil, err))
+				errs = append(errs, digraph.WrapError(builder.name, nil, err))
 			}
 		}
+	}
+
+	if err := digraph.ValidateSteps(dag); err != nil {
+		errs = append(errs, err)
 	}
 
 	if len(errs) > 0 {
@@ -235,7 +287,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 		for _, s := range schedule {
 			s, ok := s.(string)
 			if !ok {
-				return wrapError("schedule", s, ErrScheduleMustBeStringOrArray)
+				return digraph.WrapError("schedule", s, digraph.ErrScheduleMustBeStringOrArray)
 			}
 			starts = append(starts, s)
 		}
@@ -253,7 +305,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 
 	default:
 		// If schedule is of an invalid type, return an error.
-		return wrapError("schedule", spec.Schedule, ErrInvalidScheduleType)
+		return digraph.WrapError("schedule", spec.Schedule, ErrInvalidScheduleType)
 
 	}
 
@@ -278,17 +330,17 @@ func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
 
 	// Validate required fields
 	if spec.Container.Image == "" {
-		return wrapError("container.image", spec.Container.Image, fmt.Errorf("image is required when container is specified"))
+		return digraph.WrapError("container.image", spec.Container.Image, fmt.Errorf("image is required when container is specified"))
 	}
 
-	pullPolicy, err := ParsePullPolicy(spec.Container.PullPolicy)
+	pullPolicy, err := digraph.ParsePullPolicy(spec.Container.PullPolicy)
 	if err != nil {
-		return wrapError("container.pullPolicy", spec.Container.PullPolicy, err)
+		return digraph.WrapError("container.pullPolicy", spec.Container.PullPolicy, err)
 	}
 
 	vars, err := loadVariables(ctx, spec.Container.Env)
 	if err != nil {
-		return wrapError("container.env", spec.Container.Env, err)
+		return digraph.WrapError("container.env", spec.Container.Env, err)
 	}
 
 	var envs []string
@@ -470,7 +522,7 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *DAG) error {
 		}
 
 	default:
-		return wrapError("registryAuths", spec.RegistryAuths, fmt.Errorf("invalid type: %T", spec.RegistryAuths))
+		return digraph.WrapError("registryAuths", spec.RegistryAuths, fmt.Errorf("invalid type: %T", spec.RegistryAuths))
 	}
 
 	return nil
@@ -490,15 +542,15 @@ func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 			case string:
 				dag.Dotenv = append(dag.Dotenv, e)
 			default:
-				return wrapError("dotenv", e, ErrDotEnvMustBeStringOrArray)
+				return digraph.WrapError("dotenv", e, ErrDotEnvMustBeStringOrArray)
 			}
 		}
 	default:
-		return wrapError("dotenv", v, ErrDotEnvMustBeStringOrArray)
+		return digraph.WrapError("dotenv", v, ErrDotEnvMustBeStringOrArray)
 	}
 
 	if !ctx.opts.NoEval {
-		dag.loadDotEnv(ctx.ctx, []string{dag.WorkingDir})
+		dag.LoadDotEnv(ctx.ctx)
 	}
 
 	return nil
@@ -518,21 +570,29 @@ func buildMailOn(_ BuildContext, spec *definition, dag *DAG) error {
 // buildName set the name if name is specified by the option but if Name is defined
 // it does not override
 func buildName(ctx BuildContext, spec *definition, dag *DAG) error {
-	if spec.Name != "" {
-		return nil
-	}
-
-	dag.Name = ctx.opts.Name
-
-	// Validate the name
+	dag.Name = findName(ctx, spec)
 	if dag.Name == "" {
 		return nil
 	}
 	if err := ValidateDAGName(dag.Name); err != nil {
-		return wrapError("name", dag.Name, err)
+		return digraph.WrapError("name", dag.Name, err)
 	}
-
 	return nil
+}
+
+func findName(ctx BuildContext, spec *definition) string {
+	if ctx.opts.Name != "" {
+		return strings.TrimSpace(ctx.opts.Name)
+	}
+	if spec.Name != "" {
+		return strings.TrimSpace(spec.Name)
+	}
+	if ctx.file != "" && ctx.index == 0 {
+		// Use the filename if the DAG is from a file and it's the first document
+		filename := filepath.Base(ctx.file)
+		return strings.TrimSuffix(filename, filepath.Ext(filename))
+	}
+	return ""
 }
 
 func buildWorkingDir(ctx BuildContext, spec *definition, dag *DAG) error {
@@ -576,9 +636,9 @@ func buildType(_ BuildContext, spec *definition, dag *DAG) error {
 		// Valid types
 		return nil
 	case TypeAgent:
-		return wrapError("type", dag.Type, fmt.Errorf("agent type is not yet implemented"))
+		return digraph.WrapError("type", dag.Type, fmt.Errorf("agent type is not yet implemented"))
 	default:
-		return wrapError("type", dag.Type, fmt.Errorf("invalid type: %s (must be one of: graph, chain, agent)", dag.Type))
+		return digraph.WrapError("type", dag.Type, fmt.Errorf("invalid type: %s (must be one of: graph, chain, agent)", dag.Type))
 	}
 }
 
@@ -593,12 +653,12 @@ func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
 
 	// Store env vars in DAG temporarily for params to reference (e.g., P2=${A001})
 	// This is cleared after params are built
-	if dag.buildEnv == nil {
-		dag.buildEnv = make(map[string]string)
+	if ctx.buildEnv == nil {
+		ctx.buildEnv = make(map[string]string)
 	}
 	for k, v := range vars {
 		dag.Env = append(dag.Env, fmt.Sprintf("%s=%s", k, v))
-		dag.buildEnv[k] = v
+		ctx.buildEnv[k] = v
 	}
 
 	return nil
@@ -679,32 +739,32 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]*Condition, error)
 			case "condition":
 				val, ok := vv.(string)
 				if !ok {
-					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
+					return nil, digraph.WrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
 				ret.Condition = val
 
 			case "expected":
 				val, ok := vv.(string)
 				if !ok {
-					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
+					return nil, digraph.WrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
 				ret.Expected = val
 
 			case "command":
 				val, ok := vv.(string)
 				if !ok {
-					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
+					return nil, digraph.WrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
 				ret.Condition = val
 
 			default:
-				return nil, wrapError("preconditions", key, fmt.Errorf("%w: %s", ErrPreconditionHasInvalidKey, key))
+				return nil, digraph.WrapError("preconditions", key, fmt.Errorf("%w: %s", ErrPreconditionHasInvalidKey, key))
 
 			}
 		}
 
 		if err := ret.Validate(); err != nil {
-			return nil, wrapError("preconditions", v, err)
+			return nil, digraph.WrapError("preconditions", v, err)
 		}
 
 		return []*Condition{&ret}, nil
@@ -721,7 +781,7 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]*Condition, error)
 		return ret, nil
 
 	default:
-		return nil, wrapError("preconditions", v, ErrPreconditionMustBeArrayOrString)
+		return nil, digraph.WrapError("preconditions", v, ErrPreconditionMustBeArrayOrString)
 
 	}
 }
@@ -915,7 +975,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 						tempSteps = append(tempSteps, step)
 
 					default:
-						return wrapError("steps", raw, ErrInvalidStepData)
+						return digraph.WrapError("steps", raw, ErrInvalidStepData)
 					}
 				}
 
@@ -923,7 +983,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 				prevSteps = tempSteps
 
 			default:
-				return wrapError("steps", raw, ErrInvalidStepData)
+				return digraph.WrapError("steps", raw, ErrInvalidStepData)
 			}
 		}
 
@@ -941,7 +1001,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 			Result:      &stepDefs,
 		})
 		if err := md.Decode(v); err != nil {
-			return wrapError("steps", v, err)
+			return digraph.WrapError("steps", v, err)
 		}
 		for name, stepDef := range stepDefs {
 			stepDef.Name = name
@@ -956,7 +1016,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		return nil
 
 	default:
-		return wrapError("steps", v, ErrStepsMustBeArrayOrMap)
+		return digraph.WrapError("steps", v, ErrStepsMustBeArrayOrMap)
 
 	}
 }
@@ -986,7 +1046,7 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 		Result:      &stepDef,
 	})
 	if err := md.Decode(raw); err != nil {
-		return nil, wrapError("steps", raw, err)
+		return nil, digraph.WrapError("steps", raw, err)
 	}
 	step, err := buildStep(ctx, stepDef)
 	if err != nil {
@@ -995,140 +1055,7 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 	if step.Name == "" {
 		step.Name = generateTypedStepName(names, step, idx)
 	}
-	if err := validateStep(ctx, stepDef, step); err != nil {
-		return nil, err
-	}
 	return step, nil
-}
-
-// stepIDPattern defines the valid format for step IDs
-var stepIDPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
-
-// isValidStepID checks if the given ID matches the required pattern
-func isValidStepID(id string) bool {
-	return stepIDPattern.MatchString(id)
-}
-
-// isReservedWord checks if the given ID is a reserved word
-func isReservedWord(id string) bool {
-	reservedWords := map[string]bool{
-		"env":     true,
-		"params":  true,
-		"args":    true,
-		"stdout":  true,
-		"stderr":  true,
-		"output":  true,
-		"outputs": true,
-	}
-	return reservedWords[strings.ToLower(id)]
-}
-
-// validateSteps validates the steps in the DAG.
-func validateSteps(ctx BuildContext, spec *definition, dag *DAG) error {
-	// First pass: collect all names and IDs
-	stepNames := make(map[string]struct{})
-	stepIDs := make(map[string]struct{})
-
-	for _, step := range dag.Steps {
-		// Names should always exist at this point (explicit or auto-generated)
-		if step.Name == "" {
-			// This should not happen if generation works correctly
-			return wrapError("steps", step, fmt.Errorf("internal error: step name not generated"))
-		}
-
-		if _, exists := stepNames[step.Name]; exists {
-			return wrapError("steps", step.Name, ErrStepNameDuplicate)
-		}
-		stepNames[step.Name] = struct{}{}
-
-		// Collect IDs if present
-		if step.ID != "" {
-			// Check ID format
-			if !isValidStepID(step.ID) {
-				return wrapError("steps", step.ID, fmt.Errorf("invalid step ID format: must match pattern ^[a-zA-Z][a-zA-Z0-9_-]*$"))
-			}
-
-			// Check for duplicate IDs
-			if _, exists := stepIDs[step.ID]; exists {
-				return wrapError("steps", step.ID, fmt.Errorf("duplicate step ID: %s", step.ID))
-			}
-			stepIDs[step.ID] = struct{}{}
-
-			// Check for reserved words
-			if isReservedWord(step.ID) {
-				return wrapError("steps", step.ID, fmt.Errorf("step ID '%s' is a reserved word", step.ID))
-			}
-		}
-	}
-
-	// Second pass: check for conflicts between names and IDs
-	for _, step := range dag.Steps {
-		if step.ID != "" {
-			// Check that ID doesn't conflict with any step name
-			if _, exists := stepNames[step.ID]; exists && step.ID != step.Name {
-				return wrapError("steps", step.ID, fmt.Errorf("step ID '%s' conflicts with another step's name", step.ID))
-			}
-		}
-
-		// Check that name doesn't conflict with any ID (unless it's the same step)
-		if _, exists := stepIDs[step.Name]; exists {
-			// Find if this is the same step
-			sameStep := false
-			for _, s := range dag.Steps {
-				if s.Name == step.Name && s.ID == step.Name {
-					sameStep = true
-					break
-				}
-			}
-			if !sameStep {
-				return wrapError("steps", step.Name, fmt.Errorf("step name '%s' conflicts with another step's ID", step.Name))
-			}
-		}
-	}
-
-	// Third pass: resolve step IDs to names in depends fields
-	if err := resolveStepDependencies(dag); err != nil {
-		return err
-	}
-
-	// Fourth pass: validate dependencies exist
-	for _, step := range dag.Steps {
-		for _, dep := range step.Depends {
-			if _, exists := stepNames[dep]; !exists {
-				return wrapError("depends", dep, fmt.Errorf("step %s depends on non-existent step %s", step.Name, dep))
-			}
-		}
-	}
-
-	return nil
-}
-
-// resolveStepDependencies resolves step IDs to step names in the depends field
-func resolveStepDependencies(dag *DAG) error {
-	// Build a map from ID to step name for quick lookup
-	idToName := make(map[string]string)
-	for i := range dag.Steps {
-		step := &dag.Steps[i]
-		if step.ID != "" {
-			idToName[step.ID] = step.Name
-		}
-	}
-
-	// Resolve dependencies for each step
-	for i := range dag.Steps {
-		step := &dag.Steps[i]
-		for j, dep := range step.Depends {
-			// Check if this dependency is an ID that needs to be resolved
-			if name, exists := idToName[dep]; exists {
-				// Replace the ID with the actual step name
-				step.Depends[j] = name
-			}
-			// If not found in idToName, it's either already a name or will be caught
-			// as an error during dependency validation
-		}
-	}
-
-	return nil
 }
 
 // buildSMTPConfig builds the SMTP configuration for the DAG.
@@ -1257,13 +1184,13 @@ func buildContinueOn(_ StepBuildContext, def stepDef, step *Step) error {
 
 	exitCodes, err := parseIntOrArray(def.ContinueOn.ExitCode)
 	if err != nil {
-		return wrapError("continueOn.exitCode", def.ContinueOn.ExitCode, ErrContinueOnExitCodeMustBeIntOrArray)
+		return digraph.WrapError("continueOn.exitCode", def.ContinueOn.ExitCode, ErrContinueOnExitCodeMustBeIntOrArray)
 	}
 	step.ContinueOn.ExitCode = exitCodes
 
 	output, err := parseStringOrArray(def.ContinueOn.Output)
 	if err != nil {
-		return wrapError("continueOn.stdout", def.ContinueOn.Output, ErrContinueOnOutputMustBeStringOrArray)
+		return digraph.WrapError("continueOn.stdout", def.ContinueOn.Output, ErrContinueOnOutputMustBeStringOrArray)
 	}
 	step.ContinueOn.Output = output
 
@@ -1284,7 +1211,7 @@ func buildRetryPolicy(_ StepBuildContext, def stepDef, step *Step) error {
 		case string:
 			step.RetryPolicy.LimitStr = v
 		default:
-			return wrapError("retryPolicy.Limit", v, fmt.Errorf("invalid type: %T", v))
+			return digraph.WrapError("retryPolicy.Limit", v, fmt.Errorf("invalid type: %T", v))
 		}
 
 		switch v := def.RetryPolicy.IntervalSec.(type) {
@@ -1297,7 +1224,7 @@ func buildRetryPolicy(_ StepBuildContext, def stepDef, step *Step) error {
 		case string:
 			step.RetryPolicy.IntervalSecStr = v
 		default:
-			return wrapError("retryPolicy.IntervalSec", v, fmt.Errorf("invalid type: %T", v))
+			return digraph.WrapError("retryPolicy.IntervalSec", v, fmt.Errorf("invalid type: %T", v))
 		}
 
 		if def.RetryPolicy.ExitCode != nil {
@@ -1318,12 +1245,12 @@ func buildRetryPolicy(_ StepBuildContext, def stepDef, step *Step) error {
 			case float64:
 				step.RetryPolicy.Backoff = v
 			default:
-				return wrapError("retryPolicy.Backoff", v, fmt.Errorf("invalid type: %T", v))
+				return digraph.WrapError("retryPolicy.Backoff", v, fmt.Errorf("invalid type: %T", v))
 			}
 
 			// Validate backoff value
 			if step.RetryPolicy.Backoff > 0 && step.RetryPolicy.Backoff <= 1.0 {
-				return wrapError("retryPolicy.Backoff", step.RetryPolicy.Backoff,
+				return digraph.WrapError("retryPolicy.Backoff", step.RetryPolicy.Backoff,
 					fmt.Errorf("backoff must be greater than 1.0 for exponential growth"))
 			}
 		}
@@ -1514,55 +1441,6 @@ func buildStepEnvs(ctx StepBuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-func validateStep(_ StepBuildContext, def stepDef, step *Step) error {
-	if step.Name == "" {
-		return wrapError("name", step.Name, ErrStepNameRequired)
-	}
-
-	if len(step.Name) > maxStepNameLen {
-		return wrapError("name", step.Name, ErrStepNameTooLong)
-	}
-
-	// Executor-specific validation using type assertion
-	if step.ExecutorConfig.Type == "ssh" && step.Script != "" {
-		return wrapError(
-			"script",
-			step.Script,
-			fmt.Errorf(
-				"script field is not supported with SSH executor. "+
-					"Use 'command' field instead. "+
-					"See: https://github.com/dagu-org/dagu/issues/1306",
-			),
-		)
-	}
-
-	if step.Command == "" {
-		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildDAG == nil {
-			return ErrStepCommandIsRequired
-		}
-	}
-
-	// Validate parallel configuration
-	if step.Parallel != nil {
-		// Parallel steps must have a run field (child-DAG only for MVP)
-		if step.ChildDAG == nil {
-			return wrapError("parallel", step.Parallel, fmt.Errorf("parallel execution is only supported for child-DAGs (must have 'run' field)"))
-		}
-
-		// MaxConcurrent must be positive
-		if step.Parallel.MaxConcurrent <= 0 {
-			return wrapError("parallel.maxConcurrent", step.Parallel.MaxConcurrent, fmt.Errorf("maxConcurrent must be greater than 0"))
-		}
-
-		// Must have either items or variable reference
-		if len(step.Parallel.Items) == 0 && step.Parallel.Variable == "" {
-			return wrapError("parallel", step.Parallel, fmt.Errorf("parallel must have either items array or variable reference"))
-		}
-	}
-
-	return nil
-}
-
 // maxStepNameLen is the maximum length of a step name.
 const maxStepNameLen = 40
 
@@ -1610,7 +1488,7 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
 		ctxCopy.opts.NoEval = true // Disable evaluation for params parsing
 		paramPairs, err := parseParamValue(ctxCopy.BuildContext, def.Params)
 		if err != nil {
-			return wrapError("params", def.Params, err)
+			return digraph.WrapError("params", def.Params, err)
 		}
 
 		// Convert to string format "key=value key=value ..."
@@ -1640,7 +1518,7 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
 func buildDepends(_ StepBuildContext, def stepDef, step *Step) error {
 	deps, err := parseStringOrArray(def.Depends)
 	if err != nil {
-		return wrapError("depends", def.Depends, ErrDependsMustBeStringOrArray)
+		return digraph.WrapError("depends", def.Depends, ErrDependsMustBeStringOrArray)
 	}
 	step.Depends = deps
 
@@ -1707,7 +1585,7 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 				// Executor type is a string.
 				typ, ok := v.(string)
 				if !ok {
-					return wrapError("executor.type", v, ErrExecutorTypeMustBeString)
+					return digraph.WrapError("executor.type", v, ErrExecutorTypeMustBeString)
 				}
 				step.ExecutorConfig.Type = strings.TrimSpace(typ)
 
@@ -1717,7 +1595,7 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 				// It is up to the executor to parse the values.
 				executorConfig, ok := v.(map[string]any)
 				if !ok {
-					return wrapError("executor.config", v, ErrExecutorConfigValueMustBeMap)
+					return digraph.WrapError("executor.config", v, ErrExecutorConfigValueMustBeMap)
 				}
 				for configKey, v := range executorConfig {
 					step.ExecutorConfig.Config[configKey] = v
@@ -1725,14 +1603,14 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 
 			default:
 				// Unknown key in the executor config.
-				return wrapError("executor.config", key, fmt.Errorf("%w: %s", ErrExecutorHasInvalidKey, key))
+				return digraph.WrapError("executor.config", key, fmt.Errorf("%w: %s", ErrExecutorHasInvalidKey, key))
 
 			}
 		}
 
 	default:
 		// Unknown key for executor field.
-		return wrapError("executor", val, ErrExecutorConfigMustBeStringOrMap)
+		return digraph.WrapError("executor", val, ErrExecutorConfigMustBeStringOrMap)
 
 	}
 
@@ -1860,7 +1738,7 @@ func buildParallel(ctx StepBuildContext, def stepDef, step *Step) error {
 		// Static array: parallel: [item1, item2] or parallel: [{SOURCE: s3://...}, ...]
 		items, err := parseParallelItems(v)
 		if err != nil {
-			return wrapError("parallel", v, err)
+			return digraph.WrapError("parallel", v, err)
 		}
 		step.Parallel.Items = items
 
@@ -1877,11 +1755,11 @@ func buildParallel(ctx StepBuildContext, def stepDef, step *Step) error {
 					// Direct array in object form
 					items, err := parseParallelItems(itemsVal)
 					if err != nil {
-						return wrapError("parallel.items", itemsVal, err)
+						return digraph.WrapError("parallel.items", itemsVal, err)
 					}
 					step.Parallel.Items = items
 				default:
-					return wrapError("parallel.items", val, fmt.Errorf("parallel.items must be string or array, got %T", val))
+					return digraph.WrapError("parallel.items", val, fmt.Errorf("parallel.items must be string or array, got %T", val))
 				}
 
 			case "maxConcurrent":
@@ -1895,7 +1773,7 @@ func buildParallel(ctx StepBuildContext, def stepDef, step *Step) error {
 				case float64:
 					step.Parallel.MaxConcurrent = int(mc)
 				default:
-					return wrapError("parallel.maxConcurrent", val, fmt.Errorf("parallel.maxConcurrent must be int, got %T", val))
+					return digraph.WrapError("parallel.maxConcurrent", val, fmt.Errorf("parallel.maxConcurrent must be int, got %T", val))
 				}
 
 			default:
@@ -1904,7 +1782,7 @@ func buildParallel(ctx StepBuildContext, def stepDef, step *Step) error {
 		}
 
 	default:
-		return wrapError("parallel", v, fmt.Errorf("parallel must be string, array, or object, got %T", v))
+		return digraph.WrapError("parallel", v, fmt.Errorf("parallel must be string, array, or object, got %T", v))
 	}
 
 	return nil
@@ -2051,7 +1929,7 @@ func buildOTel(_ BuildContext, spec *definition, dag *DAG) error {
 		if timeout, ok := v["timeout"].(string); ok {
 			duration, err := time.ParseDuration(timeout)
 			if err != nil {
-				return wrapError("otel.timeout", timeout, err)
+				return digraph.WrapError("otel.timeout", timeout, err)
 			}
 			config.Timeout = duration
 		}
@@ -2065,6 +1943,6 @@ func buildOTel(_ BuildContext, spec *definition, dag *DAG) error {
 		return nil
 
 	default:
-		return wrapError("otel", v, fmt.Errorf("otel must be a map"))
+		return digraph.WrapError("otel", v, fmt.Errorf("otel must be a map"))
 	}
 }

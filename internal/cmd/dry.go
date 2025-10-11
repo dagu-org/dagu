@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/spf13/cobra"
 )
@@ -35,24 +36,24 @@ Example:
 var dryFlags = []commandLineFlag{paramsFlag}
 
 func runDry(ctx *Context, args []string) error {
-	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(ctx.Config.Paths.BaseConfig),
-		digraph.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+	loadOpts := []builder.LoadOption{
+		builder.WithBaseConfig(ctx.Config.Paths.BaseConfig),
+		builder.WithDAGsDir(ctx.Config.Paths.DAGsDir),
 	}
 
 	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
-		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
+		loadOpts = append(loadOpts, builder.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
 		params, err := ctx.Command.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
-		loadOpts = append(loadOpts, digraph.WithParams(stringutil.RemoveQuotes(params)))
+		loadOpts = append(loadOpts, builder.WithParams(stringutil.RemoveQuotes(params)))
 	}
 
-	dag, err := digraph.Load(ctx, args[0], loadOpts...)
+	dag, err := builder.Load(ctx, args[0], loadOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}

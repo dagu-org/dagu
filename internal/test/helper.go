@@ -19,6 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -212,12 +213,12 @@ func (h Helper) DAG(t *testing.T, yamlContent string) DAG {
 	require.NoError(t, err, "failed to create DAGs directory %q", h.Config.Paths.DAGsDir)
 
 	// Generate a unique filename for the test DAG
-	filename := fmt.Sprintf("test-%s.yaml", uuid.New().String())
+	filename := fmt.Sprintf("%s.yaml", uuid.New().String())
 	testFile := filepath.Join(h.Config.Paths.DAGsDir, filename)
 	err = os.WriteFile(testFile, []byte(yamlContent), 0600)
 	require.NoError(t, err, "failed to write test DAG")
 
-	dag, err := digraph.Load(h.Context, testFile)
+	dag, err := builder.Load(h.Context, testFile)
 	require.NoError(t, err, "failed to load test DAG")
 
 	return DAG{
@@ -251,7 +252,7 @@ func (h Helper) DAGExpectError(t *testing.T, name string, expectedErr string) {
 	t.Helper()
 
 	filePath := TestdataPath(t, name)
-	_, err := digraph.Load(h.Context, filePath)
+	_, err := builder.Load(h.Context, filePath)
 	require.Error(t, err, "expected error loading test DAG %q", name)
 	require.Contains(t, err.Error(), expectedErr, "expected error %q, got %q", expectedErr, err.Error())
 }

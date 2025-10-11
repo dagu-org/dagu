@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
@@ -61,7 +60,7 @@ type NodeState struct {
 	ChildrenRepeated []ChildDAGRun
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
-	OutputVariables *executor.SyncMap
+	OutputVariables *digraph.SyncMap
 }
 
 // Parallel represents the evaluated parallel execution configuration for a node.
@@ -202,7 +201,7 @@ func (d *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) e
 	d.inner.State.Stderr = logFile + ".err"
 	d.inner.State.StartedAt = startedAt
 
-	env := executor.GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 
 	// Evaluate the stdout field
 	stdout, err := env.EvalString(ctx, d.inner.Step.Stdout)
@@ -343,7 +342,7 @@ func (d *Data) setBoolVariable(key string, value bool) {
 
 	if d.inner.State.OutputVariables == nil {
 		d.mu.Lock()
-		d.inner.State.OutputVariables = &executor.SyncMap{}
+		d.inner.State.OutputVariables = &digraph.SyncMap{}
 		d.mu.Unlock()
 	}
 	d.inner.State.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
@@ -352,7 +351,7 @@ func (d *Data) setBoolVariable(key string, value bool) {
 func (d *Data) setVariable(key, value string) {
 	if d.inner.State.OutputVariables == nil {
 		d.mu.Lock()
-		d.inner.State.OutputVariables = &executor.SyncMap{}
+		d.inner.State.OutputVariables = &digraph.SyncMap{}
 		d.mu.Unlock()
 	}
 	d.inner.State.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())

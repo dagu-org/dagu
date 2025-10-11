@@ -14,7 +14,6 @@ Before submitting this PR, please ensure:
 - [ ] Linter passes (`make lint`)
 - [ ] New code includes tests
 - [ ] Documentation updated if applicable
-- [ ] No sensitive data (mnemonics, private keys, passwords) in commits
 
 ## Additional Notes
 

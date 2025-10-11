@@ -276,7 +276,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize coordinator client factory for distributed execution
 	coordinatorCli := a.createCoordinatorClient(ctx)
 
-	ctx = digraph.SetupEnv(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli)
+	ctx = digraph.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli)
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}
@@ -773,7 +773,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
-	dagCtx := digraph.SetupEnv(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil)
+	dagCtx := digraph.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
 	a.lastErr = lastErr
 

@@ -1,4 +1,4 @@
-package digraph
+package builder
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
+	digraph "github.com/dagu-org/dagu/internal/digraph"
 )
 
 // loadVariables loads the environment variables from the map.
@@ -21,7 +22,7 @@ func loadVariables(ctx BuildContext, strVariables any) (
 	case map[string]any:
 		// Case 1. env is a map.
 		if err := parseKeyValue(a, &pairs); err != nil {
-			return nil, wrapError("env", a, err)
+			return nil, digraph.WrapError("env", a, err)
 		}
 
 	case []any:
@@ -30,21 +31,21 @@ func loadVariables(ctx BuildContext, strVariables any) (
 			switch vv := v.(type) {
 			case map[string]any:
 				if err := parseKeyValue(vv, &pairs); err != nil {
-					return nil, wrapError("env", v, err)
+					return nil, digraph.WrapError("env", v, err)
 				}
 			case string:
 				// parse key=value string
 				parts := strings.SplitN(vv, "=", 2)
 				if len(parts) != 2 {
-					return nil, wrapError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
+					return nil, digraph.WrapError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
 				}
 				pairs = append(pairs, pair{key: parts[0], val: parts[1]})
 			default:
-				return nil, wrapError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
+				return nil, digraph.WrapError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
 			}
 			if aa, ok := v.(map[string]any); ok {
 				if err := parseKeyValue(aa, &pairs); err != nil {
-					return nil, wrapError("env", v, err)
+					return nil, digraph.WrapError("env", v, err)
 				}
 			}
 		}
@@ -63,17 +64,18 @@ func loadVariables(ctx BuildContext, strVariables any) (
 
 			value, err = cmdutil.EvalString(ctx.ctx, value, cmdutil.WithVariables(vars))
 			if err != nil {
-				return nil, wrapError("env", pair.val, fmt.Errorf("%w: %s", ErrInvalidEnvValue, pair.val))
+				return nil, digraph.WrapError("env", pair.val, fmt.Errorf("%w: %s", ErrInvalidEnvValue, pair.val))
 			}
 
 			// Set the environment variable.
 			if err := os.Setenv(pair.key, value); err != nil {
-				return nil, wrapError("env", pair.key, fmt.Errorf("%w: %s", err, pair.key))
+				return nil, digraph.WrapError("env", pair.key, fmt.Errorf("%w: %s", err, pair.key))
 			}
 		}
 
 		vars[pair.key] = value
 	}
+
 	return vars, nil
 }
 

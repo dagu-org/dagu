@@ -24,8 +24,8 @@ func (e *LoadError) Unwrap() error {
 	return e.Err
 }
 
-// wrapError wraps an error with field context
-func wrapError(field string, value any, err error) error {
+// WrapError wraps an error with field context so other packages can build LoadError instances.
+func WrapError(field string, value any, err error) error {
 	return &LoadError{
 		Field: field,
 		Value: value,
@@ -76,13 +76,6 @@ var (
 // ErrorList is just a list of errors.
 // It is used to collect multiple errors in building a DAG.
 type ErrorList []error
-
-// Add adds an error to the list.
-func (e *ErrorList) Add(err error) {
-	if err != nil {
-		*e = append(*e, err)
-	}
-}
 
 // ToStringList returns the list of errors as a slice of strings.
 func (e *ErrorList) ToStringList() []string {

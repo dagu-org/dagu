@@ -14,15 +14,8 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"
-)
-
-// Constants for configuration defaults
-const (
-	defaultDAGRunRetentionDays = 30
-	defaultMaxCleanUpTime      = 5 * time.Second
 )
 
 // Execution type constants
@@ -126,48 +119,6 @@ type DAG struct {
 	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
 	// SSH contains the default SSH configuration for the DAG.
 	SSH *SSHConfig `json:"ssh,omitempty"`
-
-	// buildEnv is a temporary map used during DAG building to pass env vars to params
-	// This is not serialized and is cleared after build completes
-	buildEnv map[string]string
-}
-
-// CreateTask creates a coordinator task from this DAG for distributed execution.
-// It constructs a task with the given operation and run ID, setting the DAG's name
-// as both the root DAG and target, and includes the DAG's YAML definition.
-//
-// Parameters:
-//   - op: The operation type (START or RETRY)
-//   - runID: The unique identifier for this DAG run
-//   - opts: Optional task modifiers (e.g., WithTaskParams, WithWorkerSelector)
-//
-// Example:
-//
-//	task := dag.CreateTask(
-//	    coordinatorv1.Operation_OPERATION_START,
-//	    "run-123",
-//	    digraph.WithTaskParams("env=prod"),
-//	    digraph.WithWorkerSelector(map[string]string{"gpu": "true"}),
-//	)
-func (d *DAG) CreateTask(
-	op coordinatorv1.Operation,
-	runID string,
-	opts ...TaskOption,
-) *coordinatorv1.Task {
-	task := &coordinatorv1.Task{
-		RootDagRunName: d.Name,
-		RootDagRunId:   runID,
-		Operation:      op,
-		DagRunId:       runID,
-		Target:         d.Name,
-		Definition:     string(d.YamlData),
-	}
-
-	for _, opt := range opts {
-		opt(task)
-	}
-
-	return task
 }
 
 // HasTag checks if the DAG has the given tag.
@@ -202,7 +153,8 @@ func (d *DAG) GetName() string {
 	if name != "" {
 		return name
 	}
-	return defaultName(d.Location)
+	filename := filepath.Base(d.Location)
+	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
 
 // String implements the Stringer interface.
@@ -242,7 +194,7 @@ func (d *DAG) Validate() error {
 		for _, dep := range step.Depends {
 			if !stepMap[dep] {
 				var errList error = ErrorList{
-					wrapError("depends", dep, fmt.Errorf("step %s depends on non-existent step", step.Name)),
+					WrapError("depends", dep, fmt.Errorf("step %s depends on non-existent step", step.Name)),
 				}
 				return errList
 			}
@@ -250,15 +202,6 @@ func (d *DAG) Validate() error {
 	}
 
 	return nil
-}
-
-// LoadEnv loads required environment variable
-func (d *DAG) LoadEnv(ctx context.Context) {
-	// Load dotenv
-	d.loadDotEnv(ctx, []string{d.WorkingDir})
-
-	// Note: d.Env is already used by AllEnvs() to pass vars to child processes
-	// No need to set process environment - child processes get vars via cmd.Env
 }
 
 // NextRun returns the next scheduled run time based on the DAG's schedules.
@@ -279,7 +222,16 @@ func (d *DAG) NextRun(now time.Time) time.Time {
 }
 
 // loadDotEnv loads dotenv file
-func (d *DAG) loadDotEnv(ctx context.Context, relativeTos []string) {
+func (d *DAG) LoadDotEnv(ctx context.Context) {
+	if len(d.Dotenv) == 0 {
+		return
+	}
+
+	relativeTos := []string{d.WorkingDir}
+	if d.Location != "" {
+		relativeTos = append(relativeTos, filepath.Dir(d.Location))
+	}
+
 	resolver := fileutil.NewFileResolver(relativeTos)
 	candidates := append([]string{".env"}, d.Dotenv...)
 
@@ -317,11 +269,6 @@ func (d *DAG) loadDotEnv(ctx context.Context, relativeTos []string) {
 
 // initializeDefaults sets the default values for the DAG.
 func (d *DAG) initializeDefaults() {
-	// Set the name if not set.
-	if d.Name == "" {
-		d.Name = defaultName(d.Location)
-	}
-
 	// Set default type to chain if not specified.
 	if d.Type == "" {
 		d.Type = TypeChain
@@ -329,12 +276,12 @@ func (d *DAG) initializeDefaults() {
 
 	// Set default history retention days to 30 if not specified.
 	if d.HistRetentionDays == 0 {
-		d.HistRetentionDays = defaultDAGRunRetentionDays
+		d.HistRetentionDays = 30
 	}
 
 	// Set default max cleanup time to 60 seconds if not specified.
 	if d.MaxCleanUpTime == 0 {
-		d.MaxCleanUpTime = defaultMaxCleanUpTime
+		d.MaxCleanUpTime = 5 * time.Second
 	}
 
 	// Set default max active runs to 1 only when not specified (0).
@@ -349,6 +296,11 @@ func (d *DAG) initializeDefaults() {
 	}
 }
 
+// InitializeDefaults exposes initializeDefaults for packages that prepare DAGs before execution.
+func InitializeDefaults(d *DAG) {
+	d.initializeDefaults()
+}
+
 // ParamsMap returns the parameters as a map.
 func (d *DAG) ParamsMap() map[string]string {
 	params := make(map[string]string)
@@ -359,52 +311,6 @@ func (d *DAG) ParamsMap() map[string]string {
 		}
 	}
 	return params
-}
-
-// TaskOption is a function that modifies a coordinatorv1.Task.
-type TaskOption func(*coordinatorv1.Task)
-
-// WithRootDagRun sets the root DAG run name and ID in the task.
-func WithRootDagRun(ref DAGRunRef) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		if ref.Name == "" || ref.ID == "" {
-			return // No root DAG run reference provided
-		}
-		task.RootDagRunName = ref.Name
-		task.RootDagRunId = ref.ID
-	}
-}
-
-// WithParentDagRun sets the parent DAG run name and ID in the task.
-func WithParentDagRun(ref DAGRunRef) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		if ref.Name == "" || ref.ID == "" {
-			return // No parent DAG run reference provided
-		}
-		task.ParentDagRunName = ref.Name
-		task.ParentDagRunId = ref.ID
-	}
-}
-
-// WithTaskParams sets the parameters for the task.
-func WithTaskParams(params string) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		task.Params = params
-	}
-}
-
-// WithWorkerSelector sets the worker selector labels for the task.
-func WithWorkerSelector(selector map[string]string) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		task.WorkerSelector = selector
-	}
-}
-
-// WithStep sets the step name for retry operations.
-func WithStep(step string) TaskOption {
-	return func(task *coordinatorv1.Task) {
-		task.Step = step
-	}
 }
 
 // ProcGroup returns the name of the process group for this DAG.
@@ -434,6 +340,19 @@ func (d *DAG) FileName() string {
 		return ""
 	}
 	return fileutil.TrimYAMLFileExtension(filepath.Base(d.Location))
+}
+
+// AuthConfig represents Docker registry authentication configuration.
+// This is a simplified structure for user convenience that will be
+// converted to Docker's registry.AuthConfig format when needed.
+type AuthConfig struct {
+	// Username for registry authentication
+	Username string `json:"username,omitempty"`
+	// Password for registry authentication
+	Password string `json:"password,omitempty"`
+	// Auth can be used instead of username/password for pre-encoded credentials
+	// This should be base64(username:password)
+	Auth string `json:"auth,omitempty"`
 }
 
 // RunConfig contains configuration for controlling user interactions during DAG runs.
@@ -561,18 +480,6 @@ const (
 
 func (h HandlerType) String() string {
 	return string(h)
-}
-
-// ParseHandlerType converts a string to a HandlerType.
-func ParseHandlerType(s string) HandlerType {
-	return handlerMapping[s]
-}
-
-var handlerMapping = map[string]HandlerType{
-	"onSuccess": HandlerOnSuccess,
-	"onFailure": HandlerOnFailure,
-	"onCancel":  HandlerOnCancel,
-	"onExit":    HandlerOnExit,
 }
 
 // SockAddr returns the unix socket address for the DAG.

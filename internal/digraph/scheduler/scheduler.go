@@ -16,7 +16,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/signal"
@@ -111,7 +110,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	sc.metrics.totalNodes = len(graph.nodes)
 
 	// If one of the conditions does not met, cancel the execution.
-	env := digraph.GetEnv(ctx)
+	env := digraph.GetDAGContextFromContext(ctx)
 	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", "err", err)
 		sc.Cancel(ctx, graph)
@@ -324,7 +323,7 @@ func (sc *Scheduler) teardownNode(ctx context.Context, node *Node) error {
 }
 
 func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	env := executor.NewEnv(ctx, node.Step())
+	env := digraph.NewEnv(ctx, node.Step())
 
 	// Populate step information for all nodes with IDs
 	for _, n := range graph.nodes {
@@ -368,7 +367,7 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 	}
 
 	// Add step-level environment variables
-	envVars := &executor.SyncMap{}
+	envVars := &digraph.SyncMap{}
 	for _, v := range node.Step().Env {
 		parts := strings.SplitN(v, "=", 2)
 		if len(parts) != 2 {
@@ -385,11 +384,11 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 
 	env.ForceLoadOutputVariables(envVars)
 
-	return executor.WithEnv(ctx, env)
+	return digraph.WithEnv(ctx, env)
 }
 
 func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	env := executor.NewEnv(ctx, node.Step())
+	env := digraph.NewEnv(ctx, node.Step())
 
 	// Populate step information for all nodes with IDs
 	for _, n := range graph.nodes {
@@ -412,7 +411,7 @@ func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, graph *Execut
 		env.LoadOutputVariables(node.inner.State.OutputVariables)
 	}
 
-	return executor.WithEnv(ctx, env)
+	return digraph.WithEnv(ctx, env)
 }
 
 func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
@@ -886,9 +885,9 @@ func (sc *Scheduler) shouldRepeatNode(ctx context.Context, node *Node, execErr e
 		if rp.Condition != nil {
 			// Ensure node's own output variables are reloaded before evaluating the condition.
 			if node.inner.State.OutputVariables != nil {
-				env := executor.GetEnv(ctx)
+				env := digraph.GetEnv(ctx)
 				env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
-				ctx = executor.WithEnv(ctx, env)
+				ctx = digraph.WithEnv(ctx, env)
 			}
 			shell := cmdutil.GetShellCommand(node.Step().Shell)
 			err := EvalCondition(ctx, shell, rp.Condition)
@@ -906,9 +905,9 @@ func (sc *Scheduler) shouldRepeatNode(ctx context.Context, node *Node, execErr e
 		if rp.Condition != nil {
 			// Ensure node's own output variables are reloaded before evaluating the condition.
 			if node.inner.State.OutputVariables != nil {
-				env := executor.GetEnv(ctx)
+				env := digraph.GetEnv(ctx)
 				env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
-				ctx = executor.WithEnv(ctx, env)
+				ctx = digraph.WithEnv(ctx, env)
 			}
 			shell := cmdutil.GetShellCommand(node.Step().Shell)
 			err := EvalCondition(ctx, shell, rp.Condition)

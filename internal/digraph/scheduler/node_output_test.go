@@ -63,7 +63,7 @@ func TestNode_LargeOutput(t *testing.T) {
 			ctx := context.Background()
 			// Set up environment context with proper DAG
 			dag := &digraph.DAG{Name: "test"}
-			ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil)
+			ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 			// Setup node with a temporary directory
 			tmpDir := t.TempDir()
@@ -131,7 +131,7 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 	ctx := context.Background()
 	// Set up environment context with proper DAG
 	dag := &digraph.DAG{Name: "test"}
-	ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "deadlock-test", "test.log", nil)
+	ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "deadlock-test", "test.log", nil, nil)
 
 	tmpDir := t.TempDir()
 	err := node.Setup(ctx, tmpDir, "deadlock-test")
@@ -180,7 +180,7 @@ func TestNode_OutputExceedsLimit(t *testing.T) {
 	ctx := context.Background()
 	// Set up environment context with proper DAG
 	dag := &digraph.DAG{Name: "test"}
-	ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "exceed-limit-test", "test.log", nil)
+	ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "exceed-limit-test", "test.log", nil, nil)
 
 	tmpDir := t.TempDir()
 	err := node.Setup(ctx, tmpDir, "exceed-limit-test")
@@ -216,7 +216,7 @@ func TestNode_CustomOutputLimit(t *testing.T) {
 		Name:          "test",
 		MaxOutputSize: 50 * 1024, // 50KB limit
 	}
-	ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "custom-limit-test", "test.log", nil)
+	ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "custom-limit-test", "test.log", nil, nil)
 
 	tmpDir := t.TempDir()
 	err := node.Setup(ctx, tmpDir, "custom-limit-test")
@@ -252,7 +252,7 @@ func TestNode_ConcurrentOutputCapture(t *testing.T) {
 	ctx := context.Background()
 	// Set up environment context with proper DAG
 	dag := &digraph.DAG{Name: "test"}
-	ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "concurrent-test", "test.log", nil)
+	ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "concurrent-test", "test.log", nil, nil)
 
 	tmpDir := t.TempDir()
 	err := node.Setup(ctx, tmpDir, "concurrent-test")

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/grep"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -111,24 +112,24 @@ func (store *Storage) GetMetadata(ctx context.Context, name string) (*digraph.DA
 		return nil, fmt.Errorf("failed to locate DAG %s in search paths (%v): %w", name, store.searchPaths, err)
 	}
 	if store.fileCache == nil {
-		return digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
+		return builder.Load(ctx, filePath, builder.OnlyMetadata(), builder.WithoutEval())
 	}
 	return store.fileCache.LoadLatest(filePath, func() (*digraph.DAG, error) {
-		return digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
+		return builder.Load(ctx, filePath, builder.OnlyMetadata(), builder.WithoutEval())
 	})
 }
 
 // GetDetails retrieves the details of a DAG by its name.
-func (store *Storage) GetDetails(ctx context.Context, name string, opts ...digraph.LoadOption) (*digraph.DAG, error) {
+func (store *Storage) GetDetails(ctx context.Context, name string, opts ...builder.LoadOption) (*digraph.DAG, error) {
 	filePath, err := store.locateDAG(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate DAG %s: %w", name, err)
 	}
-	var loadOpts []digraph.LoadOption
+	var loadOpts []builder.LoadOption
 	loadOpts = append(loadOpts, opts...)
-	loadOpts = append(loadOpts, digraph.WithoutEval())
+	loadOpts = append(loadOpts, builder.WithoutEval())
 
-	dat, err := digraph.Load(ctx, filePath, loadOpts...)
+	dat, err := builder.Load(ctx, filePath, loadOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load DAG %s: %w", name, err)
 	}
@@ -151,19 +152,19 @@ func (store *Storage) GetSpec(_ context.Context, name string) (string, error) {
 // FileMode used for newly created DAG files
 const defaultPerm os.FileMode = 0600
 
-func (store *Storage) LoadSpec(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
+func (store *Storage) LoadSpec(ctx context.Context, spec []byte, opts ...builder.LoadOption) (*digraph.DAG, error) {
 	// Validate the spec before saving it.
-	opts = append(slices.Clone(opts), digraph.WithoutEval())
-	return digraph.LoadYAML(ctx, spec, opts...)
+	opts = append(slices.Clone(opts), builder.WithoutEval())
+	return builder.LoadYAML(ctx, spec, opts...)
 }
 
 // UpdateSpec updates the specification of a DAG by its name.
 func (store *Storage) UpdateSpec(ctx context.Context, name string, spec []byte) error {
 	// Validate the spec before saving it.
-	dag, err := digraph.LoadYAML(ctx,
+	dag, err := builder.LoadYAML(ctx,
 		spec,
-		digraph.WithoutEval(),
-		digraph.WithName(name),
+		builder.WithoutEval(),
+		builder.WithName(name),
 	)
 	if err != nil {
 		return err
@@ -270,7 +271,7 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 		// Read the file and parse the DAG.
 		// Use WithAllowBuildErrors to include DAGs with errors in the list
 		filePath := filepath.Join(store.baseDir, entry.Name())
-		dag, err := digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval(), digraph.WithAllowBuildErrors())
+		dag, err := builder.Load(ctx, filePath, builder.OnlyMetadata(), builder.WithoutEval(), builder.WithAllowBuildErrors())
 		if err != nil {
 			// If it completely fails to load, skip it
 			errList = append(errList, fmt.Sprintf("reading %s failed: %s", dagName, err))
@@ -400,7 +401,7 @@ func (store *Storage) Grep(ctx context.Context, pattern string) (
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", entry.Name(), err))
 				continue
 			}
-			dag, err := digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
+			dag, err := builder.Load(ctx, filePath, builder.OnlyMetadata(), builder.WithoutEval())
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", entry.Name(), err))
 				continue

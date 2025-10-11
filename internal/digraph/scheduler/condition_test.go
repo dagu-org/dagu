@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/stretchr/testify/require"
 )
@@ -113,7 +112,7 @@ func TestCondition_Eval(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			ctx = executor.WithEnv(ctx, executor.NewEnv(ctx, digraph.Step{}))
+			ctx = digraph.WithEnv(ctx, digraph.NewEnv(ctx, digraph.Step{}))
 			err := scheduler.EvalConditions(ctx, "sh", tt.condition)
 			if tt.wantErr {
 				require.Error(t, err, "expected error but got nil")

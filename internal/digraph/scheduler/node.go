@@ -20,7 +20,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -116,7 +115,7 @@ type Node struct {
 
 	id           int
 	mu           sync.RWMutex
-	cmd          executor.Executor
+	cmd          digraph.Executor
 	cancelFunc   func()
 	done         atomic.Bool
 	retryPolicy  RetryPolicy
@@ -248,7 +247,7 @@ func (n *Node) Execute(ctx context.Context) error {
 
 		// Set the exit code if the command implements ExitCoder
 		var exitErr *exec.ExitError
-		if cmd, ok := cmd.(executor.ExitCoder); ok {
+		if cmd, ok := cmd.(ExitCoder); ok {
 			exitCode = cmd.ExitCode()
 		} else if n.Error() != nil && errors.As(n.Error(), &exitErr) {
 			exitCode = exitErr.ExitCode()
@@ -281,7 +280,7 @@ func (n *Node) Execute(ctx context.Context) error {
 		n.setVariable(output, value)
 	}
 
-	if status, ok := cmd.(executor.NodeStatusDeterminer); ok {
+	if status, ok := cmd.(NodeStatusDeterminer); ok {
 		// Determine the node status based on the executor's implementation
 		nodeStatus, err := status.DetermineNodeStatus(ctx)
 		// Only set the status if it is a success
@@ -299,7 +298,7 @@ func (n *Node) clearVariable(key string) {
 	n.ClearVariable(key)
 }
 
-func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
+func (n *Node) setupExecutor(ctx context.Context) (digraph.Executor, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -355,7 +354,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	}
 
 	// Create the executor
-	cmd, err := executor.NewExecutor(ctx, n.Step())
+	cmd, err := digraph.NewExecutor(ctx, n.Step())
 	if err != nil {
 		return nil, err
 	}
@@ -376,24 +375,24 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		// Setup the executor with child DAG run information
 		if n.Step().Parallel == nil {
 			// Single child DAG execution
-			exec, ok := cmd.(executor.DAGExecutor)
+			exec, ok := cmd.(DAGExecutor)
 			if !ok {
 				return nil, fmt.Errorf("executor %T does not support child DAG execution", cmd)
 			}
-			exec.SetParams(executor.RunParams{
+			exec.SetParams(RunParams{
 				RunID:  childRuns[0].DAGRunID,
 				Params: childRuns[0].Params,
 			})
 		} else {
 			// Parallel child DAG execution
-			exec, ok := cmd.(executor.ParallelExecutor)
+			exec, ok := cmd.(ParallelExecutor)
 			if !ok {
 				return nil, fmt.Errorf("executor %T does not support parallel execution", cmd)
 			}
 			// Convert ChildDAGRun to executor.RunParams
-			var runParamsList []executor.RunParams
+			var runParamsList []RunParams
 			for _, childRun := range childRuns {
-				runParamsList = append(runParamsList, executor.RunParams{
+				runParamsList = append(runParamsList, RunParams{
 					RunID:  childRun.DAGRunID,
 					Params: childRun.Params,
 				})
@@ -460,12 +459,6 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 
 		step.Command = cmd
 		step.Args = args
-
-	case step.Command == "":
-		// If the command is empty, use the default shell as the command if a script is provided.
-		if step.ExecutorConfig.IsCommand() && step.Script != "" {
-			step.Command = shellCommand
-		}
 
 	case step.Command != "" && len(step.Args) == 0:
 		// Shouldn't reach here except for testing.
@@ -548,12 +541,12 @@ func (n *Node) Cancel(ctx context.Context) {
 func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	env := executor.GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 	env = env.WithEnv(
 		digraph.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
 		digraph.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)
-	return executor.WithEnv(ctx, env)
+	return digraph.WithEnv(ctx, env)
 }
 
 func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error {
@@ -632,7 +625,7 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 
 	// Get maxOutputSize from DAG configuration
 	var maxOutputSize = 1024 * 1024 // Default 1MB
-	if env := digraph.GetEnv(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+	if env := digraph.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
 		maxOutputSize = env.DAG.MaxOutputSize
 	}
 
@@ -950,7 +943,7 @@ func (oc *OutputCoordinator) setup(ctx context.Context, data NodeData) error {
 	return oc.setupStderrRedirect(ctx, data)
 }
 
-func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.Executor, data NodeData) error {
+func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd digraph.Executor, data NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
@@ -976,7 +969,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 
 		// Get max output size from DAG configuration, default to 1MB
 		oc.maxOutputSize = 1024 * 1024 // 1MB default
-		if env := digraph.GetEnv(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+		if env := digraph.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
 			oc.maxOutputSize = int64(env.DAG.MaxOutputSize)
 		}
 
@@ -1128,7 +1121,7 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 func (oc *OutputCoordinator) setupFile(ctx context.Context, filePath string, _ NodeData) (*os.File, error) {
 	absFilePath := filePath
 	if !filepath.IsAbs(absFilePath) {
-		dir := executor.GetEnv(ctx).WorkingDir
+		dir := digraph.GetEnv(ctx).WorkingDir
 		absFilePath = filepath.Join(dir, absFilePath)
 		absFilePath = filepath.Clean(absFilePath)
 	}

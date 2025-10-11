@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -194,7 +195,7 @@ func (m *mockDAGStore) GetMetadata(ctx context.Context, fileName string) (*digra
 	return args.Get(0).(*digraph.DAG), args.Error(1)
 }
 
-func (m *mockDAGStore) GetDetails(ctx context.Context, fileName string, opts ...digraph.LoadOption) (*digraph.DAG, error) {
+func (m *mockDAGStore) GetDetails(ctx context.Context, fileName string, opts ...builder.LoadOption) (*digraph.DAG, error) {
 	args := m.Called(ctx, fileName, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -222,7 +223,7 @@ func (m *mockDAGStore) UpdateSpec(ctx context.Context, fileName string, spec []b
 	return args.Error(0)
 }
 
-func (m *mockDAGStore) LoadSpec(ctx context.Context, spec []byte, opts ...digraph.LoadOption) (*digraph.DAG, error) {
+func (m *mockDAGStore) LoadSpec(ctx context.Context, spec []byte, opts ...builder.LoadOption) (*digraph.DAG, error) {
 	args := m.Called(ctx, spec, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

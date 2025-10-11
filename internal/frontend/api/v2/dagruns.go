@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/models"
@@ -66,9 +67,9 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 		nameHint = *request.Body.Name
 	} else {
 		// Validate the DAG spec has a name
-		dag, err := digraph.LoadYAML(
+		dag, err := builder.LoadYAML(
 			ctx, []byte(request.Body.Spec),
-			digraph.WithoutEval(),
+			builder.WithoutEval(),
 		)
 		if err != nil {
 			return nil, &Error{
@@ -99,11 +100,11 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	}
 
 	// Load the DAG from the temp file to validate and prepare execution
-	var loadOpts []digraph.LoadOption
+	var loadOpts []builder.LoadOption
 	if request.Body.Name != nil && *request.Body.Name != "" {
-		loadOpts = append(loadOpts, digraph.WithName(*request.Body.Name))
+		loadOpts = append(loadOpts, builder.WithName(*request.Body.Name))
 	}
-	dag, err := digraph.Load(ctx, tfPath, loadOpts...)
+	dag, err := builder.Load(ctx, tfPath, loadOpts...)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,

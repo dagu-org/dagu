@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
@@ -62,7 +63,7 @@ func runStop(ctx *Context, args []string) error {
 		}
 		dag = d
 	} else {
-		d, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(ctx.Config.Paths.BaseConfig))
+		d, err := builder.Load(ctx, args[0], builder.WithBaseConfig(ctx.Config.Paths.BaseConfig))
 		if err != nil {
 			return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 		}

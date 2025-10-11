@@ -10,13 +10,14 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-var _ ParallelExecutor = (*parallelExecutor)(nil)
-var _ NodeStatusDeterminer = (*parallelExecutor)(nil)
+var _ scheduler.ParallelExecutor = (*parallelExecutor)(nil)
+var _ scheduler.NodeStatusDeterminer = (*parallelExecutor)(nil)
 
 type parallelExecutor struct {
 	child         *ChildDAGExecutor
@@ -24,7 +25,7 @@ type parallelExecutor struct {
 	workDir       string
 	stdout        io.Writer
 	stderr        io.Writer
-	runParamsList []RunParams
+	runParamsList []scheduler.RunParams
 	maxConcurrent int
 
 	// Runtime state
@@ -37,7 +38,7 @@ type parallelExecutor struct {
 
 func newParallelExecutor(
 	ctx context.Context, step digraph.Step,
-) (Executor, error) {
+) (digraph.Executor, error) {
 	// The parallel executor doesn't use the params from the step directly
 	// as they are passed through SetParamsList
 
@@ -50,7 +51,7 @@ func newParallelExecutor(
 		return nil, err
 	}
 
-	dir := GetEnv(ctx).WorkingDir
+	dir := digraph.GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
 	}
@@ -101,7 +102,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Launch all child DAG executions
 	for _, params := range e.runParamsList {
 		e.wg.Add(1)
-		go func(runParams RunParams) {
+		go func(runParams scheduler.RunParams) {
 			defer e.wg.Done()
 
 			// Acquire semaphore
@@ -167,7 +168,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	return nil
 }
 
-func (e *parallelExecutor) SetParamsList(paramsList []RunParams) {
+func (e *parallelExecutor) SetParamsList(paramsList []scheduler.RunParams) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	e.runParamsList = paramsList
@@ -210,7 +211,7 @@ func (e *parallelExecutor) DetermineNodeStatus(_ context.Context) (status.NodeSt
 }
 
 // executeChild executes a single child DAG with the given parameters
-func (e *parallelExecutor) executeChild(ctx context.Context, runParams RunParams) error {
+func (e *parallelExecutor) executeChild(ctx context.Context, runParams scheduler.RunParams) error {
 	// Use the new ExecuteWithResult API
 	result, err := e.child.ExecuteWithResult(ctx, runParams, e.workDir)
 
@@ -303,5 +304,5 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	Register(digraph.ExecutorTypeParallel, newParallelExecutor)
+	digraph.RegisterExecutor(digraph.ExecutorTypeParallel, newParallelExecutor, nil)
 }

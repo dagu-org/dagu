@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
@@ -22,7 +23,7 @@ type mockDAGStore struct {
 	dags map[string]*digraph.DAG
 }
 
-func (m *mockDAGStore) GetDetails(_ context.Context, path string, _ ...digraph.LoadOption) (*digraph.DAG, error) {
+func (m *mockDAGStore) GetDetails(_ context.Context, path string, _ ...builder.LoadOption) (*digraph.DAG, error) {
 	if dag, ok := m.dags[path]; ok {
 		return dag, nil
 	}
@@ -89,7 +90,7 @@ func (m *mockDAGStore) UpdateSpec(_ context.Context, _ string, _ []byte) error {
 	return nil
 }
 
-func (m *mockDAGStore) LoadSpec(_ context.Context, _ []byte, _ ...digraph.LoadOption) (*digraph.DAG, error) {
+func (m *mockDAGStore) LoadSpec(_ context.Context, _ []byte, _ ...builder.LoadOption) (*digraph.DAG, error) {
 	return nil, nil
 }
 

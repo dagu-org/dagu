@@ -3,11 +3,13 @@ package executor
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -33,19 +35,19 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
-	env := Env{
-		Env: digraph.Env{
+	env := digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("parent", "root-123"),
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
-		Variables: &SyncMap{},
+		Variables: &digraph.SyncMap{},
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	// Test creating executor for local DAG
 	executor, err := NewChildDAGExecutor(ctx, "local-child")
@@ -83,19 +85,19 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
-	env := Env{
-		Env: digraph.Env{
+	env := digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("parent", "root-123"),
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
-		Variables: &SyncMap{},
+		Variables: &digraph.SyncMap{},
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	// Mock the database call
 	expectedDAG := &digraph.DAG{
@@ -134,19 +136,19 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
-	env := Env{
-		Env: digraph.Env{
+	env := digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("parent", "root-123"),
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
-		Variables: &SyncMap{},
+		Variables: &digraph.SyncMap{},
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	// Mock the database call to return not found
 	mockDB.On("GetDAG", ctx, "non-existent").Return(nil, assert.AnError)
@@ -167,8 +169,8 @@ func TestBuildCommand(t *testing.T) {
 	// Set up the environment
 	mockDB := new(mockDatabase)
 	baseEnv := config.NewBaseEnv(nil)
-	env := Env{
-		Env: digraph.Env{
+	env := digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DAG:        &digraph.DAG{Name: "parent"},
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("parent", "root-123"),
@@ -176,11 +178,11 @@ func TestBuildCommand(t *testing.T) {
 			Envs:       map[string]string{"TEST_ENV": "value"},
 			BaseEnv:    &baseEnv,
 		},
-		Variables: &SyncMap{},
+		Variables: &digraph.SyncMap{},
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	// Create executor
 	executor := &ChildDAGExecutor{
@@ -191,7 +193,7 @@ func TestBuildCommand(t *testing.T) {
 	}
 
 	// Build command
-	runParams := RunParams{
+	runParams := scheduler.RunParams{
 		RunID:  "child-789",
 		Params: "param1=value1 param2=value2",
 	}
@@ -221,26 +223,26 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
-	env := Env{
-		Env: digraph.Env{
+	env := digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DAG:        &digraph.DAG{Name: "parent"},
 			DB:         mockDB,
 			RootDAGRun: digraph.NewDAGRunRef("parent", "root-123"),
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
-		Variables: &SyncMap{},
+		Variables: &digraph.SyncMap{},
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	executor := &ChildDAGExecutor{
 		DAG: &digraph.DAG{Name: "test-child"},
 	}
 
 	// Build command without RunID
-	runParams := RunParams{
+	runParams := scheduler.RunParams{
 		RunID: "", // Empty RunID
 	}
 
@@ -255,25 +257,25 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 
 	// Set up the environment without RootDAGRun
 	mockDB := new(mockDatabase)
-	env := Env{
-		Env: digraph.Env{
+	env := digraph.Env{
+		DAGContext: digraph.DAGContext{
 			DAG: &digraph.DAG{Name: "parent"},
 			DB:  mockDB,
 			// RootDAGRun is zero value
 			DAGRunID: "parent-456",
 			Envs:     make(map[string]string),
 		},
-		Variables: &SyncMap{},
+		Variables: &digraph.SyncMap{},
 		Step:      digraph.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	executor := &ChildDAGExecutor{
 		DAG: &digraph.DAG{Name: "test-child"},
 	}
 
-	runParams := RunParams{
+	runParams := scheduler.RunParams{
 		RunID: "child-789",
 	}
 
@@ -360,6 +362,174 @@ func TestExecutablePath(t *testing.T) {
 	path, err = executablePath()
 	assert.NoError(t, err)
 	assert.NotEmpty(t, path)
+}
+
+func TestChildDAGExecutor_Kill_MixedProcesses(t *testing.T) {
+	// Create a mock database
+	mockDB := new(mockDatabase)
+
+	// Create a context with environment
+	env := digraph.Env{
+		DAGContext: digraph.DAGContext{
+			DB:         mockDB,
+			RootDAGRun: digraph.NewDAGRunRef("root-dag", "root-run-id"),
+			DAGRunID:   "parent-run-id",
+		},
+	}
+	_ = digraph.WithEnv(context.Background(), env)
+
+	// Create a child DAG
+	childDAG := &digraph.DAG{
+		Name: "child-dag",
+	}
+
+	// Create child executor with both local and distributed processes
+	executor := &ChildDAGExecutor{
+		DAG: childDAG,
+		env: env,
+		cmds: map[string]*exec.Cmd{
+			"local-run-1": &exec.Cmd{Process: &os.Process{Pid: 1234}},
+			"local-run-2": &exec.Cmd{Process: &os.Process{Pid: 5678}},
+		},
+		distributedRuns: map[string]bool{
+			"distributed-run-1": true,
+			"distributed-run-2": true,
+		},
+	}
+
+	// Set up expectations for RequestChildCancel
+	mockDB.On("RequestChildCancel", mock.Anything, "distributed-run-1", env.RootDAGRun).Return(nil)
+	mockDB.On("RequestChildCancel", mock.Anything, "distributed-run-2", env.RootDAGRun).Return(nil)
+
+	// Call Kill
+	err := executor.Kill(os.Interrupt)
+
+	// Verify no error (killProcessGroup will fail for fake PIDs but that's expected)
+	// We're mainly testing that both distributed and local processes are handled
+	assert.Error(t, err) // Expected error from trying to kill fake processes
+
+	// Verify RequestChildCancel was called for both distributed runs
+	mockDB.AssertExpectations(t)
+}
+
+func TestChildDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
+	// Create a mock database
+	mockDB := new(mockDatabase)
+
+	// Create a context with environment
+	env := digraph.Env{
+		DAGContext: digraph.DAGContext{
+			DB:         mockDB,
+			RootDAGRun: digraph.NewDAGRunRef("root-dag", "root-run-id"),
+			DAGRunID:   "parent-run-id",
+		},
+	}
+	_ = digraph.WithEnv(context.Background(), env)
+
+	// Create a child DAG
+	childDAG := &digraph.DAG{
+		Name: "child-dag",
+	}
+
+	// Create child executor with only distributed processes
+	executor := &ChildDAGExecutor{
+		DAG:  childDAG,
+		env:  env,
+		cmds: make(map[string]*exec.Cmd),
+		distributedRuns: map[string]bool{
+			"distributed-run-1": true,
+			"distributed-run-2": true,
+		},
+	}
+
+	// Set up expectations for RequestChildCancel
+	mockDB.On("RequestChildCancel", mock.Anything, "distributed-run-1", env.RootDAGRun).Return(nil)
+	mockDB.On("RequestChildCancel", mock.Anything, "distributed-run-2", env.RootDAGRun).Return(nil)
+
+	// Call Kill
+	err := executor.Kill(os.Interrupt)
+
+	// Verify no error
+	assert.NoError(t, err)
+
+	// Verify RequestChildCancel was called for both distributed runs
+	mockDB.AssertExpectations(t)
+}
+
+func TestChildDAGExecutor_Kill_OnlyLocal(t *testing.T) {
+	// Create a mock database
+	mockDB := new(mockDatabase)
+
+	// Create a context with environment
+	env := digraph.Env{
+		DAGContext: digraph.DAGContext{
+			DB:         mockDB,
+			RootDAGRun: digraph.NewDAGRunRef("root-dag", "root-run-id"),
+			DAGRunID:   "parent-run-id",
+		},
+	}
+	_ = digraph.WithEnv(context.Background(), env)
+
+	// Create a child DAG
+	childDAG := &digraph.DAG{
+		Name: "child-dag",
+	}
+
+	// Create child executor with only local processes
+	executor := &ChildDAGExecutor{
+		DAG: childDAG,
+		env: env,
+		cmds: map[string]*exec.Cmd{
+			"local-run-1": &exec.Cmd{Process: &os.Process{Pid: 1234}},
+		},
+		distributedRuns: make(map[string]bool),
+	}
+
+	// Call Kill
+	err := executor.Kill(os.Interrupt)
+
+	// Verify error (from trying to kill fake process)
+	assert.Error(t, err)
+
+	// Verify RequestChildCancel was NOT called
+	mockDB.AssertNotCalled(t, "RequestChildCancel")
+}
+
+func TestChildDAGExecutor_Kill_Empty(t *testing.T) {
+	// Create a mock database
+	mockDB := new(mockDatabase)
+
+	// Create a context with environment
+	env := digraph.Env{
+		DAGContext: digraph.DAGContext{
+			DB:         mockDB,
+			RootDAGRun: digraph.NewDAGRunRef("root-dag", "root-run-id"),
+			DAGRunID:   "parent-run-id",
+		},
+	}
+	_ = digraph.WithEnv(context.Background(), env)
+
+	// Create a child DAG
+	childDAG := &digraph.DAG{
+		Name: "child-dag",
+	}
+
+	// Create child executor with no processes
+	executor := &ChildDAGExecutor{
+		DAG:             childDAG,
+		env:             env,
+		cmds:            make(map[string]*exec.Cmd),
+		distributedRuns: make(map[string]bool),
+	}
+
+	// Call Kill
+	err := executor.Kill(os.Interrupt)
+
+	// Verify no error
+	assert.NoError(t, err)
+
+	// Verify RequestChildCancel was NOT called
+	mockDB.AssertNotCalled(t, "RequestChildCancel")
 }
 
 var _ digraph.Database = (*mockDatabase)(nil)
