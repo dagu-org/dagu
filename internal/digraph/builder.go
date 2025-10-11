@@ -23,6 +23,10 @@ type BuildContext struct {
 	ctx  context.Context
 	file string
 	opts BuildOpts
+
+	// buildEnv is a temporary map used during DAG building to pass env vars to params
+	// This is not serialized and is cleared after build completes
+	buildEnv map[string]string
 }
 
 // StepBuildContext is the context for building a step.
@@ -596,12 +600,12 @@ func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
 
 	// Store env vars in DAG temporarily for params to reference (e.g., P2=${A001})
 	// This is cleared after params are built
-	if dag.buildEnv == nil {
-		dag.buildEnv = make(map[string]string)
+	if ctx.buildEnv == nil {
+		ctx.buildEnv = make(map[string]string)
 	}
 	for k, v := range vars {
 		dag.Env = append(dag.Env, fmt.Sprintf("%s=%s", k, v))
-		dag.buildEnv[k] = v
+		ctx.buildEnv[k] = v
 	}
 
 	return nil

@@ -18,12 +18,6 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-// Constants for configuration defaults
-const (
-	defaultDAGRunRetentionDays = 30
-	defaultMaxCleanUpTime      = 5 * time.Second
-)
-
 // Execution type constants
 const (
 	// TypeGraph is the default execution type using dependency-based execution
@@ -125,10 +119,6 @@ type DAG struct {
 	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
 	// SSH contains the default SSH configuration for the DAG.
 	SSH *SSHConfig `json:"ssh,omitempty"`
-
-	// buildEnv is a temporary map used during DAG building to pass env vars to params
-	// This is not serialized and is cleared after build completes
-	buildEnv map[string]string
 }
 
 // HasTag checks if the DAG has the given tag.
@@ -290,12 +280,12 @@ func (d *DAG) initializeDefaults() {
 
 	// Set default history retention days to 30 if not specified.
 	if d.HistRetentionDays == 0 {
-		d.HistRetentionDays = defaultDAGRunRetentionDays
+		d.HistRetentionDays = 30
 	}
 
 	// Set default max cleanup time to 60 seconds if not specified.
 	if d.MaxCleanUpTime == 0 {
-		d.MaxCleanUpTime = defaultMaxCleanUpTime
+		d.MaxCleanUpTime = 5 * time.Second
 	}
 
 	// Set default max active runs to 1 only when not specified (0).
@@ -489,18 +479,6 @@ const (
 
 func (h HandlerType) String() string {
 	return string(h)
-}
-
-// ParseHandlerType converts a string to a HandlerType.
-func ParseHandlerType(s string) HandlerType {
-	return handlerMapping[s]
-}
-
-var handlerMapping = map[string]HandlerType{
-	"onSuccess": HandlerOnSuccess,
-	"onFailure": HandlerOnFailure,
-	"onCancel":  HandlerOnCancel,
-	"onExit":    HandlerOnExit,
 }
 
 // SockAddr returns the unix socket address for the DAG.

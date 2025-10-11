@@ -271,8 +271,8 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 				}
 				// Then check env vars from dag.buildEnv (populated by buildEnvs)
 				// This allows params to reference env vars (e.g., P2=${A001} where A001 is in env)
-				if dag != nil && dag.buildEnv != nil {
-					if val, ok := dag.buildEnv[key]; ok {
+				if dag != nil && ctx.buildEnv != nil {
+					if val, ok := ctx.buildEnv[key]; ok {
 						return val
 					}
 				}
