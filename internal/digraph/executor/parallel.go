@@ -304,5 +304,5 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	digraph.RegisterExecutor(digraph.ExecutorTypeParallel, newParallelExecutor)
+	digraph.RegisterExecutor(digraph.ExecutorTypeParallel, newParallelExecutor, nil)
 }

@@ -198,5 +198,5 @@ func decodeHTTPConfigFromString(_ context.Context, source string, target *httpCo
 }
 
 func init() {
-	digraph.RegisterExecutor("http", newHTTP)
+	digraph.RegisterExecutor("http", newHTTP, nil)
 }

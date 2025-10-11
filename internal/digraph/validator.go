@@ -2,10 +2,8 @@ package digraph
 
 import "fmt"
 
-// StepValidator is an interface for executors that validate step configurations.
-type StepValidator interface {
-	Validate(step *Step) error
-}
+// StepValidator is a function type for validating step configurations.
+type StepValidator func(step Step) error
 
 func validateSteps(dag *DAG) error {
 	// First pass: collect all names and IDs
@@ -103,26 +101,6 @@ func validateStep(step Step) error {
 		return wrapError("name", step.Name, ErrStepNameTooLong)
 	}
 
-	// Executor-specific validation using type assertion
-	if step.ExecutorConfig.Type == "ssh" && step.Script != "" {
-		return wrapError(
-			"script",
-			step.Script,
-			fmt.Errorf(
-				"script field is not supported with SSH executor. "+
-					"Use 'command' field instead. "+
-					"See: https://github.com/dagu-org/dagu/issues/1306",
-			),
-		)
-	}
-
-	if step.Command == "" {
-		if step.ExecutorConfig.Type == "" && step.Script == "" && step.ChildDAG == nil {
-			return ErrStepCommandIsRequired
-		}
-	}
-
-	// Validate parallel configuration
 	if step.Parallel != nil {
 		// Parallel steps must have a run field (child-DAG only for MVP)
 		if step.ChildDAG == nil {
@@ -140,5 +118,18 @@ func validateStep(step Step) error {
 		}
 	}
 
+	// Validate executor-specific configuration if validator exists
+	return validateStepWithValidator(step)
+}
+
+func validateStepWithValidator(step Step) error {
+	validator, exists := executorValidators[step.ExecutorConfig.Type]
+	if !exists || validator == nil {
+		// No validator registered for this executor type
+		return nil
+	}
+	if err := validator(step); err != nil {
+		return wrapError("executorConfig", step.ExecutorConfig, err)
+	}
 	return nil
 }

@@ -28,8 +28,14 @@ func NewExecutor(ctx context.Context, step Step) (Executor, error) {
 }
 
 // RegisterExecutor registers a new executor type with its corresponding Creator function.
-func RegisterExecutor(executorType string, factory ExecutorFactory) {
+func RegisterExecutor(executorType string, factory ExecutorFactory, validator StepValidator) {
 	executorRegistry[executorType] = factory
+	if validator != nil {
+		executorValidators[executorType] = validator
+	}
 }
 
-var executorRegistry = make(map[string]ExecutorFactory)
+var (
+	executorRegistry   = make(map[string]ExecutorFactory)
+	executorValidators = make(map[string]StepValidator)
+)

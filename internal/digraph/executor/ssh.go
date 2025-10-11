@@ -116,6 +116,17 @@ func (e *sshExec) ValidateStep(step *digraph.Step) error {
 	return nil
 }
 
+func validateSSHStep(step digraph.Step) error {
+	if step.Script != "" {
+		return fmt.Errorf(
+			"script field is not supported with SSH executor. " +
+				"Use 'command' field instead. " +
+				"See: https://github.com/dagu-org/dagu/issues/1306",
+		)
+	}
+	return nil
+}
+
 func init() {
-	digraph.RegisterExecutor("ssh", newSSHExec)
+	digraph.RegisterExecutor("ssh", newSSHExec, validateSSHStep)
 }

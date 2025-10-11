@@ -162,12 +162,6 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	return cmd, nil
 }
 
-func init() {
-	digraph.RegisterExecutor("", newCommand)
-	digraph.RegisterExecutor("shell", newCommand)
-	digraph.RegisterExecutor("command", newCommand)
-}
-
 func exitCodeFromError(err error) int {
 	if err == nil {
 		return 0
@@ -402,4 +396,33 @@ func createDirectCommand(ctx context.Context, cmd string, args []string, scriptF
 
 	// nolint: gosec
 	return exec.CommandContext(ctx, cmd, arguments...)
+}
+
+func validateCommandStep(step digraph.Step) error {
+	if step.Command == "" && step.Script == "" && step.ChildDAG == nil {
+		return digraph.ErrStepCommandIsRequired
+	}
+	var specified int
+	if step.Command != "" {
+		specified++
+	}
+	if step.Script != "" {
+		specified++
+	}
+	if step.ShellCmdArgs != "" {
+		specified++
+	}
+	if step.ChildDAG != nil {
+		specified++
+	}
+	if specified > 1 {
+		return fmt.Errorf("only one of command, script, shell command args, or child DAG can be specified")
+	}
+	return nil
+}
+
+func init() {
+	digraph.RegisterExecutor("", newCommand, validateCommandStep)
+	digraph.RegisterExecutor("shell", newCommand, validateCommandStep)
+	digraph.RegisterExecutor("command", newCommand, validateCommandStep)
 }

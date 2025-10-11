@@ -120,5 +120,5 @@ func decodeMailConfig(dat map[string]any, cfg *mailConfig) error {
 }
 
 func init() {
-	digraph.RegisterExecutor("mail", newMail)
+	digraph.RegisterExecutor("mail", newMail, nil)
 }

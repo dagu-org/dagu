@@ -113,5 +113,5 @@ func decodeJqConfig(dat map[string]any, cfg *jqConfig) error {
 }
 
 func init() {
-	digraph.RegisterExecutor("jq", newJQ)
+	digraph.RegisterExecutor("jq", newJQ, nil)
 }

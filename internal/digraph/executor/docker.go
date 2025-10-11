@@ -239,5 +239,5 @@ func newDocker(ctx context.Context, step digraph.Step) (digraph.Executor, error)
 }
 
 func init() {
-	digraph.RegisterExecutor("docker", newDocker)
+	digraph.RegisterExecutor("docker", newDocker, nil)
 }

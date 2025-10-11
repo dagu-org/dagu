@@ -137,6 +137,6 @@ func (e *dagExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	digraph.RegisterExecutor(digraph.ExecutorTypeDAGLegacy, newDAGExecutor)
-	digraph.RegisterExecutor(digraph.ExecutorTypeDAG, newDAGExecutor)
+	digraph.RegisterExecutor(digraph.ExecutorTypeDAGLegacy, newDAGExecutor, nil)
+	digraph.RegisterExecutor(digraph.ExecutorTypeDAG, newDAGExecutor, nil)
 }
