@@ -1,4 +1,4 @@
-package digraph
+package builder
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"dario.cat/mergo"
+	digraph "github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/go-viper/mapstructure/v2"
 
@@ -274,7 +275,7 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*DAG, error) {
 		}
 	}
 
-	mainDAG.initializeDefaults()
+	digraph.InitializeDefaults(mainDAG)
 
 	return mainDAG, nil
 }
@@ -316,6 +317,9 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 			docIndex++
 			continue
 		}
+
+		// Update the context with the current document index
+		ctx.index = docIndex
 
 		// Decode the document into definition
 		spec, err := decode(doc)

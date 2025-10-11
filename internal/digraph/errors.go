@@ -24,8 +24,8 @@ func (e *LoadError) Unwrap() error {
 	return e.Err
 }
 
-// wrapError wraps an error with field context
-func wrapError(field string, value any, err error) error {
+// WrapError wraps an error with field context so other packages can build LoadError instances.
+func WrapError(field string, value any, err error) error {
 	return &LoadError{
 		Field: field,
 		Value: value,

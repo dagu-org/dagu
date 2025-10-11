@@ -118,7 +118,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	var cmd *exec.Cmd
 	switch {
 	case cfg.Command != "" && scriptFile != "":
-		builder := &shellCommandBuilder{
+		cmdBuilder := &shellCommandBuilder{
 			Command:          cfg.Command,
 			Args:             cfg.Args,
 			ShellCommand:     cfg.ShellCommand,
@@ -126,7 +126,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 			ShellPackages:    cfg.ShellPackages,
 			Script:           scriptFile,
 		}
-		c, err := builder.Build(ctx)
+		c, err := cmdBuilder.Build(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -152,12 +152,12 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 		cmd = exec.CommandContext(cfg.Ctx, command, args...) // nolint: gosec
 
 	case cfg.ShellCommand != "" && cfg.ShellCommandArgs != "":
-		builder := &shellCommandBuilder{
+		cmdBuilder := &shellCommandBuilder{
 			ShellCommand:     cfg.ShellCommand,
 			ShellCommandArgs: cfg.ShellCommandArgs,
 			ShellPackages:    cfg.ShellPackages,
 		}
-		c, err := builder.Build(ctx)
+		c, err := cmdBuilder.Build(ctx)
 		if err != nil {
 			return nil, err
 		}

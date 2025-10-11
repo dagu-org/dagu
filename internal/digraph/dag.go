@@ -153,7 +153,8 @@ func (d *DAG) GetName() string {
 	if name != "" {
 		return name
 	}
-	return defaultName(d.Location)
+	filename := filepath.Base(d.Location)
+	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
 
 // String implements the Stringer interface.
@@ -193,7 +194,7 @@ func (d *DAG) Validate() error {
 		for _, dep := range step.Depends {
 			if !stepMap[dep] {
 				var errList error = ErrorList{
-					wrapError("depends", dep, fmt.Errorf("step %s depends on non-existent step", step.Name)),
+					WrapError("depends", dep, fmt.Errorf("step %s depends on non-existent step", step.Name)),
 				}
 				return errList
 			}
@@ -201,15 +202,6 @@ func (d *DAG) Validate() error {
 	}
 
 	return nil
-}
-
-// LoadEnv loads required environment variable
-func (d *DAG) LoadEnv(ctx context.Context) {
-	// Load dotenv
-	d.loadDotEnv(ctx, []string{d.WorkingDir})
-
-	// Note: d.Env is already used by AllEnvs() to pass vars to child processes
-	// No need to set process environment - child processes get vars via cmd.Env
 }
 
 // NextRun returns the next scheduled run time based on the DAG's schedules.
@@ -230,7 +222,16 @@ func (d *DAG) NextRun(now time.Time) time.Time {
 }
 
 // loadDotEnv loads dotenv file
-func (d *DAG) loadDotEnv(ctx context.Context, relativeTos []string) {
+func (d *DAG) LoadDotEnv(ctx context.Context) {
+	if len(d.Dotenv) == 0 {
+		return
+	}
+
+	relativeTos := []string{d.WorkingDir}
+	if d.Location != "" {
+		relativeTos = append(relativeTos, filepath.Dir(d.Location))
+	}
+
 	resolver := fileutil.NewFileResolver(relativeTos)
 	candidates := append([]string{".env"}, d.Dotenv...)
 
@@ -268,11 +269,6 @@ func (d *DAG) loadDotEnv(ctx context.Context, relativeTos []string) {
 
 // initializeDefaults sets the default values for the DAG.
 func (d *DAG) initializeDefaults() {
-	// Set the name if not set.
-	if d.Name == "" {
-		d.Name = defaultName(d.Location)
-	}
-
 	// Set default type to chain if not specified.
 	if d.Type == "" {
 		d.Type = TypeChain
@@ -298,6 +294,11 @@ func (d *DAG) initializeDefaults() {
 	if d.MaxOutputSize == 0 {
 		d.MaxOutputSize = 1024 * 1024 // 1MB
 	}
+}
+
+// InitializeDefaults exposes initializeDefaults for packages that prepare DAGs before execution.
+func InitializeDefaults(d *DAG) {
+	d.initializeDefaults()
 }
 
 // ParamsMap returns the parameters as a map.

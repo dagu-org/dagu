@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -256,8 +257,16 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			cmd, err := tt.config.newCmd(ctx, tt.scriptFile)
+			scriptFile := tt.scriptFile
+			if scriptFile != "" {
+				tempDir := t.TempDir()
+				scriptFile = filepath.Join(tempDir, "test.sh")
+				require.NoError(t, os.WriteFile(scriptFile, []byte("#!/bin/sh\necho hello\n"), 0o755))
+			}
+
+			cmd, err := tt.config.newCmd(ctx, scriptFile)
 			require.NoError(t, err)
 			require.NotNil(t, cmd)
 
