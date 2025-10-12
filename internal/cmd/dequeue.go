@@ -4,14 +4,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/spf13/cobra"
 )
 
-func CmdDequeue() *cobra.Command {
+func Dequeue() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "dequeue [flags]",
@@ -30,7 +29,7 @@ var dequeueFlags = []commandLineFlag{paramsFlag, dagRunFlagDequeue}
 func runDequeue(ctx *Context, _ []string) error {
 	// Get dag-run reference from the context
 	dagRunRef, _ := ctx.StringParam("dag-run")
-	dagRun, err := digraph.ParseDAGRunRef(dagRunRef)
+	dagRun, err := execution.ParseDAGRunRef(dagRunRef)
 	if err != nil {
 		return fmt.Errorf("failed to parse dag-run reference %s: %w", dagRunRef, err)
 	}
@@ -38,7 +37,7 @@ func runDequeue(ctx *Context, _ []string) error {
 }
 
 // dequeueDAGRun dequeues a dag-run from the queue.
-func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
+func dequeueDAGRun(ctx *Context, dagRun execution.DAGRunRef) error {
 	// Check if queues are enabled
 	if !ctx.Config.Queues.Enabled {
 		return fmt.Errorf("queues are disabled in configuration")
@@ -53,7 +52,7 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	if dagStatus.Status != status.Queued {
+	if dagStatus.Status != core.Queued {
 		// If the status is not queued, return an error
 		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, dagStatus.Status)
 	}
@@ -68,7 +67,7 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 	if err != nil {
 		return fmt.Errorf("failed to get latest status: %w", err)
 	}
-	if latestStatus.Status != status.Queued {
+	if latestStatus.Status != core.Queued {
 		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, latestStatus.Status)
 	}
 
@@ -78,7 +77,7 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 	}
 
 	// Make the status as canceled
-	dagStatus.Status = status.Cancel
+	dagStatus.Status = core.Cancel
 
 	if err := attempt.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
@@ -101,7 +100,7 @@ func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
 	// Read the latest attempt and if it's NotStarted, we can remove the DAGRun from the store
 	// as it only has the queued status and no other attempts.
 	_, err = ctx.DAGRunStore.FindAttempt(ctx, dagRun)
-	if errors.Is(err, models.ErrNoStatusData) {
+	if errors.Is(err, execution.ErrNoStatusData) {
 		if err := ctx.DAGRunStore.RemoveDAGRun(ctx, dagRun); err != nil {
 			return fmt.Errorf("failed to remove dag-run %s from store: %w", dagRun.ID, err)
 		}

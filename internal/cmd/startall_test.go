@@ -16,7 +16,7 @@ func TestStartAllCommand(t *testing.T) {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()
 		}()
-		th.RunCommand(t, cmd.CmdStartAll(), test.CmdTest{
+		th.RunCommand(t, cmd.StartAll(), test.CmdTest{
 			Args: []string{
 				"start-all",
 				fmt.Sprintf("--port=%s", findPort(t)),
@@ -32,10 +32,10 @@ func TestStartAllCommand(t *testing.T) {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()
 		}()
-		th.RunCommand(t, cmd.CmdStartAll(), test.CmdTest{
+		th.RunCommand(t, cmd.StartAll(), test.CmdTest{
 			Args: []string{
 				"start-all",
-				"--config", test.TestdataPath(t, "cmd/config_startall.yaml"),
+				"--config", test.TestdataPath(t, "cli/config_startall.yaml"),
 				fmt.Sprintf("--coordinator.port=%s", findPort(t)),
 			},
 			ExpectedOut: []string{"54322", "dagu_test", "Coordinator initialization"},

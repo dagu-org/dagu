@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,7 +17,7 @@ func TestProcHandle(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	fileName := filepath.Join(tmpDir, "test_proc")
-	proc := NewProcHandler(fileName, models.ProcMeta{})
+	proc := NewProcHandler(fileName, execution.ProcMeta{})
 
 	ctx := context.Background()
 	err := proc.startHeartbeat(ctx)
@@ -51,7 +51,7 @@ func TestProcHandle_Restart(t *testing.T) {
 	ctx := context.Background()
 
 	fileName := filepath.Join(tmpDir, "test_proc")
-	proc := NewProcHandler(fileName, models.ProcMeta{})
+	proc := NewProcHandler(fileName, execution.ProcMeta{})
 
 	err := proc.startHeartbeat(ctx)
 	require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestProcHandle_RemovesEmptyParentDir(t *testing.T) {
 	require.NoError(t, err)
 
 	fileName := filepath.Join(subDir, "test_proc")
-	proc := NewProcHandler(fileName, models.ProcMeta{})
+	proc := NewProcHandler(fileName, execution.ProcMeta{})
 
 	err = proc.startHeartbeat(ctx)
 	require.NoError(t, err)

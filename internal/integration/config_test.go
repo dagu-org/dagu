@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -509,7 +509,7 @@ steps:
 		require.NoError(t, err)
 
 		// The test should fail with the current implementation
-		dag.AssertLatestStatus(t, status.Success)
+		dag.AssertLatestStatus(t, core.Success)
 	})
 }
 
@@ -683,7 +683,7 @@ steps:
 	require.NoError(t, agent.Run(agent.Context))
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Success)
 
 	// Assert the output contains the step-level environment variable
 	dag.AssertOutputs(t, map[string]any{

@@ -42,7 +42,7 @@ steps:
 
 		for _, tc := range tests {
 			t.Run(tc.Name, func(t *testing.T) {
-				th.RunCommand(t, cmd.CmdDry(), tc)
+				th.RunCommand(t, cmd.Dry(), tc)
 			})
 		}
 	})

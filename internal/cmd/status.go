@@ -6,17 +6,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 )
 
-func CmdStatus() *cobra.Command {
+func Status() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "status [flags] <DAG name>",
@@ -69,7 +68,7 @@ func runStatus(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read status from attempt: %w", err)
 	}
 
-	if dagStatus.Status == status.Running {
+	if dagStatus.Status == core.Running {
 		realtimeStatus, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve current status: %w", err)
@@ -86,7 +85,7 @@ func runStatus(ctx *Context, args []string) error {
 }
 
 // displayDetailedStatus renders a formatted table with DAG run information
-func displayDetailedStatus(dag *digraph.DAG, dagStatus *models.DAGRunStatus) {
+func displayDetailedStatus(dag *core.DAG, dagStatus *execution.DAGRunStatus) {
 	// Create header with 80 character width
 	fmt.Println()
 	headerColor := color.New(color.FgCyan, color.Bold)
@@ -130,7 +129,7 @@ func displayDetailedStatus(dag *digraph.DAG, dagStatus *models.DAGRunStatus) {
 				t.AppendRow(table.Row{"Duration", stringutil.FormatDuration(duration)})
 			}
 			t.AppendRow(table.Row{"Finished At", dagStatus.FinishedAt})
-		} else if dagStatus.Status == status.Running && !startedAt.IsZero() {
+		} else if dagStatus.Status == core.Running && !startedAt.IsZero() {
 			elapsed := time.Since(startedAt)
 			t.AppendRow(table.Row{"Running For", stringutil.FormatDuration(elapsed)})
 		}
@@ -166,27 +165,27 @@ func displayDetailedStatus(dag *digraph.DAG, dagStatus *models.DAGRunStatus) {
 	// Additional status-specific messages
 	fmt.Println()
 	switch dagStatus.Status {
-	case status.Running:
+	case core.Running:
 		fmt.Printf("%s The DAG is currently running. Use 'dagu stop %s' to stop it.\n",
 			color.YellowString("→"), dag.Name)
-	case status.Error:
+	case core.Error:
 		fmt.Printf("%s The DAG failed. Use 'dagu retry --run-id=%s %s' to retry.\n",
 			color.RedString("✗"), dagStatus.DAGRunID, dag.Name)
-	case status.Success:
+	case core.Success:
 		fmt.Printf("%s The DAG completed successfully.\n", color.GreenString("✓"))
-	case status.PartialSuccess:
+	case core.PartialSuccess:
 		fmt.Printf("%s The DAG completed with partial success.\n", color.YellowString("⚠"))
-	case status.Cancel:
+	case core.Cancel:
 		fmt.Printf("%s The DAG was cancelled.\n", color.YellowString("⚠"))
-	case status.Queued:
+	case core.Queued:
 		fmt.Printf("%s The DAG is queued for execution.\n", color.BlueString("●"))
-	case status.None:
+	case core.None:
 		fmt.Printf("%s The DAG has not been started yet.\n", color.New(color.Faint).Sprint("○"))
 	}
 }
 
 // displayStepSummary shows a summary of all steps in the DAG run
-func displayStepSummary(nodes []*models.Node) {
+func displayStepSummary(nodes []*execution.Node) {
 	headerColor := color.New(color.FgCyan, color.Bold)
 
 	// Create a boxed header with 80 character width
@@ -200,7 +199,7 @@ func displayStepSummary(nodes []*models.Node) {
 	fmt.Println(strings.Repeat("─", 80))
 
 	// Count steps by status
-	statusCounts := make(map[status.NodeStatus]int)
+	statusCounts := make(map[core.NodeStatus]int)
 	for _, node := range nodes {
 		statusCounts[node.Status]++
 	}
@@ -226,10 +225,10 @@ func displayStepSummary(nodes []*models.Node) {
 
 	// Show first few steps and any failed steps
 	shownSteps := 0
-	failedSteps := []*models.Node{}
+	failedSteps := []*execution.Node{}
 
 	for _, node := range nodes {
-		if node.Status == status.NodeError {
+		if node.Status == core.NodeError {
 			failedSteps = append(failedSteps, node)
 		}
 
@@ -247,7 +246,7 @@ func displayStepSummary(nodes []*models.Node) {
 				if !startedAt.IsZero() && !finishedAt.IsZero() {
 					duration = stringutil.FormatDuration(finishedAt.Sub(startedAt))
 				}
-			} else if node.Status == status.NodeRunning && !startedAt.IsZero() {
+			} else if node.Status == core.NodeRunning && !startedAt.IsZero() {
 				duration = stringutil.FormatDuration(time.Since(startedAt))
 			}
 		}
@@ -425,21 +424,21 @@ func isBinaryContent(data []byte) bool {
 }
 
 // formatStatus returns a colored status string
-func formatStatus(st status.Status) string {
+func formatStatus(st core.Status) string {
 	switch st {
-	case status.Success:
+	case core.Success:
 		return color.GreenString("Success")
-	case status.Error:
+	case core.Error:
 		return color.RedString("Failed")
-	case status.PartialSuccess:
+	case core.PartialSuccess:
 		return color.YellowString("Partial Success")
-	case status.Running:
+	case core.Running:
 		return color.New(color.FgHiGreen).Sprint("Running")
-	case status.Cancel:
+	case core.Cancel:
 		return color.YellowString("Cancelled")
-	case status.Queued:
+	case core.Queued:
 		return color.BlueString("Queued")
-	case status.None:
+	case core.None:
 		return color.New(color.Faint).Sprint("Not Started")
 	default:
 		return st.String()
@@ -447,21 +446,21 @@ func formatStatus(st status.Status) string {
 }
 
 // formatNodeStatus returns a colored status string for node status
-func formatNodeStatus(s status.NodeStatus) string {
+func formatNodeStatus(s core.NodeStatus) string {
 	switch s {
-	case status.NodeSuccess:
+	case core.NodeSuccess:
 		return color.GreenString("Success")
-	case status.NodeError:
+	case core.NodeError:
 		return color.RedString("Failed")
-	case status.NodeRunning:
+	case core.NodeRunning:
 		return color.New(color.FgHiGreen).Sprint("Running")
-	case status.NodeCancel:
+	case core.NodeCancel:
 		return color.YellowString("Cancelled")
-	case status.NodeSkipped:
+	case core.NodeSkipped:
 		return color.New(color.Faint).Sprint("Skipped")
-	case status.NodePartialSuccess:
+	case core.NodePartialSuccess:
 		return color.YellowString("Partial Success")
-	case status.NodeNone:
+	case core.NodeNone:
 		return color.New(color.Faint).Sprint("Not Started")
 	default:
 		return fmt.Sprintf("%d", s)
@@ -469,7 +468,7 @@ func formatNodeStatus(s status.NodeStatus) string {
 }
 
 // formatPID formats the process ID, showing "-" if not available
-func formatPID(pid models.PID) string {
+func formatPID(pid execution.PID) string {
 	if pid > 0 {
 		return fmt.Sprintf("%d", pid)
 	}
@@ -495,10 +494,10 @@ func extractDAGName(ctx *Context, name string) (string, error) {
 	return name, nil
 }
 
-func extractAttemptID(ctx *Context, name, dagRunID string) (models.DAGRunAttempt, error) {
+func extractAttemptID(ctx *Context, name, dagRunID string) (execution.DAGRunAttempt, error) {
 	if dagRunID != "" {
 		// Retrieve the previous run's record for the specified dag-run ID.
-		dagRunRef := digraph.NewDAGRunRef(name, dagRunID)
+		dagRunRef := execution.NewDAGRunRef(name, dagRunID)
 		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find run data for dag-run ID %s: %w", dagRunID, err)

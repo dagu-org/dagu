@@ -14,10 +14,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
 // Error definitions for common issues
@@ -36,18 +36,18 @@ const DAGDefinition = "dag.json"
 // CancelRequestedFlag is a special flag used to indicate that a cancel request has been made.
 const CancelRequestedFlag = "CANCEL_REQUESTED"
 
-var _ models.DAGRunAttempt = (*Attempt)(nil)
+var _ execution.DAGRunAttempt = (*Attempt)(nil)
 
 // Attempt manages an append-only status file with read, write, and compaction capabilities.
 // It provides thread-safe operations and supports metrics collection.
 type Attempt struct {
-	id        string                                // Attempt ID, extracted from the file path
-	file      string                                // Path to the status file
-	writer    *Writer                               // Writer for appending status updates
-	mu        sync.RWMutex                          // Mutex for thread safety
-	cache     *fileutil.Cache[*models.DAGRunStatus] // Optional cache for read operations
-	isClosing atomic.Bool                           // Flag to prevent writes during Close/Compact
-	dag       *digraph.DAG                          // DAG associated with the status file
+	id        string                                   // Attempt ID, extracted from the file path
+	file      string                                   // Path to the status file
+	writer    *Writer                                  // Writer for appending status updates
+	mu        sync.RWMutex                             // Mutex for thread safety
+	cache     *fileutil.Cache[*execution.DAGRunStatus] // Optional cache for read operations
+	isClosing atomic.Bool                              // Flag to prevent writes during Close/Compact
+	dag       *core.DAG                                // DAG associated with the status file
 }
 
 // AttemptOption defines a functional option for configuring an Attempt.
@@ -55,7 +55,7 @@ type AttemptOption func(*Attempt)
 
 // WithDAG sets the DAG associated with the Attempt.
 // This allows the Attempt to store DAG metadata alongside the status data.
-func WithDAG(dag *digraph.DAG) AttemptOption {
+func WithDAG(dag *core.DAG) AttemptOption {
 	return func(att *Attempt) {
 		att.dag = dag
 	}
@@ -67,7 +67,7 @@ func (att *Attempt) ID() string {
 }
 
 // NewAttempt creates a new Run for the specified file.
-func NewAttempt(file string, cache *fileutil.Cache[*models.DAGRunStatus], opts ...AttemptOption) (*Attempt, error) {
+func NewAttempt(file string, cache *fileutil.Cache[*execution.DAGRunStatus], opts ...AttemptOption) (*Attempt, error) {
 	dirName := filepath.Base(filepath.Dir(file))
 	matches := reAttemptDir.FindStringSubmatch(dirName)
 	if len(matches) != 3 {
@@ -98,7 +98,7 @@ func (att *Attempt) ModTime() (time.Time, error) {
 }
 
 // ReadDAG implements models.DAGRunAttempt.
-func (att *Attempt) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
+func (att *Attempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -126,7 +126,7 @@ func (att *Attempt) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
 	}
 
 	// Parse the JSON data
-	var dag digraph.DAG
+	var dag core.DAG
 	if err := json.Unmarshal(data, &dag); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal DAG definition: %w", err)
 	}
@@ -183,7 +183,7 @@ func (att *Attempt) Open(ctx context.Context) error {
 
 // Write adds a new status to the file. It returns an error if the file is not open
 // or is currently being closed. The context can be used to cancel the operation.
-func (att *Attempt) Write(ctx context.Context, status models.DAGRunStatus) error {
+func (att *Attempt) Write(ctx context.Context, status execution.DAGRunStatus) error {
 	// Check if we're closing before acquiring the mutex to reduce contention
 	if att.isClosing.Load() {
 		return fmt.Errorf("cannot write while file is closing: %w", ErrStatusFileNotOpen)
@@ -352,7 +352,7 @@ func safeRename(source, target string) error {
 
 // ReadStatus reads the latest status from the file, using cache if available.
 // The context can be used to cancel the operation.
-func (att *Attempt) ReadStatus(ctx context.Context) (*models.DAGRunStatus, error) {
+func (att *Attempt) ReadStatus(ctx context.Context) (*execution.DAGRunStatus, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -363,7 +363,7 @@ func (att *Attempt) ReadStatus(ctx context.Context) (*models.DAGRunStatus, error
 
 	// Try to use cache first if available
 	if att.cache != nil {
-		status, cacheErr := att.cache.LoadLatest(att.file, func() (*models.DAGRunStatus, error) {
+		status, cacheErr := att.cache.LoadLatest(att.file, func() (*execution.DAGRunStatus, error) {
 			att.mu.RLock()
 			defer att.mu.RUnlock()
 			return att.parseLocked()
@@ -381,7 +381,7 @@ func (att *Attempt) ReadStatus(ctx context.Context) (*models.DAGRunStatus, error
 
 	if parseErr != nil {
 		if errors.Is(parseErr, io.EOF) {
-			return nil, models.ErrCorruptedStatusFile // This means no valid status was found in the file
+			return nil, execution.ErrCorruptedStatusFile // This means no valid status was found in the file
 		}
 		return nil, fmt.Errorf("failed to parse status file: %w", parseErr)
 	}
@@ -392,13 +392,13 @@ func (att *Attempt) ReadStatus(ctx context.Context) (*models.DAGRunStatus, error
 
 // parseLocked reads the status file and returns the last valid status.
 // Must be called with a lock (read or write) already held.
-func (att *Attempt) parseLocked() (*models.DAGRunStatus, error) {
+func (att *Attempt) parseLocked() (*execution.DAGRunStatus, error) {
 	return ParseStatusFile(att.file)
 }
 
 // ParseStatusFile reads the status file and returns the last valid status.
 // The bufferSize parameter controls the size of the read buffer.
-func ParseStatusFile(file string) (*models.DAGRunStatus, error) {
+func ParseStatusFile(file string) (*execution.DAGRunStatus, error) {
 	f, err := os.Open(file) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrReadFailed, err)
@@ -409,7 +409,7 @@ func ParseStatusFile(file string) (*models.DAGRunStatus, error) {
 
 	var (
 		offset int64
-		result *models.DAGRunStatus
+		result *execution.DAGRunStatus
 	)
 
 	// Read append-only file from the beginning and find the last status
@@ -426,7 +426,7 @@ func ParseStatusFile(file string) (*models.DAGRunStatus, error) {
 
 		offset = nextOffset
 		if len(line) > 0 {
-			status, err := models.StatusFromJSON(string(line))
+			status, err := execution.StatusFromJSON(string(line))
 			if err == nil {
 				result = status
 			}

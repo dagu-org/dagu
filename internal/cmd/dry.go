@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/builder"
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
 )
 
-func CmdDry() *cobra.Command {
+func Dry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "dry [flags] <DAG definition> [-- param1 param2 ...]",
@@ -36,24 +36,24 @@ Example:
 var dryFlags = []commandLineFlag{paramsFlag}
 
 func runDry(ctx *Context, args []string) error {
-	loadOpts := []builder.LoadOption{
-		builder.WithBaseConfig(ctx.Config.Paths.BaseConfig),
-		builder.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+	loadOpts := []spec.LoadOption{
+		spec.WithBaseConfig(ctx.Config.Paths.BaseConfig),
+		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
 	}
 
 	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
-		loadOpts = append(loadOpts, builder.WithParams(args[argsLenAtDash:]))
+		loadOpts = append(loadOpts, spec.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
 		params, err := ctx.Command.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
-		loadOpts = append(loadOpts, builder.WithParams(stringutil.RemoveQuotes(params)))
+		loadOpts = append(loadOpts, spec.WithParams(stringutil.RemoveQuotes(params)))
 	}
 
-	dag, err := builder.Load(ctx, args[0], loadOpts...)
+	dag, err := spec.Load(ctx, args[0], loadOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
@@ -78,7 +78,7 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	root := digraph.NewDAGRunRef(dag.Name, dagRunID)
+	root := execution.NewDAGRunRef(dag.Name, dagRunID)
 
 	agentInstance := agent.New(
 		dagRunID,

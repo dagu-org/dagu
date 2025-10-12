@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

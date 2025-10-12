@@ -8,26 +8,27 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/pprof"
+	"sync"
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmdutil"
-	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/coordinator"
-	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/frontend"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/metrics"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/common/telemetry"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/persistence/fileserviceregistry"
-	"github.com/dagu-org/dagu/internal/scheduler"
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/frontend"
+	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -42,13 +43,13 @@ type Context struct {
 	Config  *config.Config
 	Quiet   bool
 
-	DAGRunStore     models.DAGRunStore
-	DAGRunMgr       dagrun.Manager
-	ProcStore       models.ProcStore
-	QueueStore      models.QueueStore
-	ServiceRegistry models.ServiceRegistry
+	DAGRunStore     execution.DAGRunStore
+	DAGRunMgr       runtime.Manager
+	ProcStore       execution.ProcStore
+	QueueStore      execution.QueueStore
+	ServiceRegistry execution.ServiceRegistry
 
-	Proc models.ProcHandle
+	Proc execution.ProcHandle
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -121,14 +122,14 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	switch cmd.Name() {
 	case "server", "scheduler", "start-all":
 		// For long-running process, we setup file cache for better performance
-		hc := fileutil.NewCache[*models.DAGRunStatus](0, time.Hour*12)
+		hc := fileutil.NewCache[*execution.DAGRunStatus](0, time.Hour*12)
 		hc.StartEviction(ctx)
 		hrOpts = append(hrOpts, filedagrun.WithHistoryFileCache(hc))
 	}
 
 	ps := fileproc.New(cfg.Paths.ProcDir)
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
-	drm := dagrun.New(drs, ps, cfg)
+	drm := runtime.NewManager(drs, ps, cfg)
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
@@ -149,7 +150,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 // NewServer creates and returns a new web UI NewServer.
 // It initializes in-memory caches for DAGs and runstore, and uses them in the client.
 func (c *Context) NewServer() (*frontend.Server, error) {
-	dc := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
+	dc := fileutil.NewCache[*core.DAG](0, time.Hour*12)
 	dc.StartEviction(c)
 
 	dr, err := c.dagStore(dc, nil)
@@ -160,7 +161,7 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 	// Create coordinator client (may be nil if not configured)
 	cc := c.NewCoordinatorClient()
 
-	collector := metrics.NewCollector(
+	collector := telemetry.NewCollector(
 		config.Version,
 		dr,
 		c.DAGRunStore,
@@ -168,7 +169,7 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 		c.ServiceRegistry,
 	)
 
-	mr := metrics.NewRegistry(collector)
+	mr := telemetry.NewRegistry(collector)
 
 	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr), nil
 }
@@ -192,7 +193,7 @@ func (c *Context) NewCoordinatorClient() coordinator.Client {
 // NewScheduler creates a new NewScheduler instance using the default client.
 // It builds a DAG job manager to handle scheduled executions.
 func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
-	cache := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
+	cache := fileutil.NewCache[*core.DAG](0, time.Hour*12)
 	cache.StartEviction(c)
 
 	dr, err := c.dagStore(cache, nil)
@@ -201,7 +202,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	}
 
 	coordinatorCli := c.NewCoordinatorClient()
-	de := scheduler.NewDAGExecutor(coordinatorCli, dagrun.NewSubCmdBuilder(c.Config))
+	de := scheduler.NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(c.Config))
 	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable)
 	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli)
 }
@@ -221,7 +222,7 @@ func (c *Context) StringParam(name string) (string, error) {
 
 // dagStore returns a new DAGRepository instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (c *Context) dagStore(cache *fileutil.Cache[*digraph.DAG], searchPaths []string) (models.DAGStore, error) {
+func (c *Context) dagStore(cache *fileutil.Cache[*core.DAG], searchPaths []string) (execution.DAGStore, error) {
 	dir := c.Config.Paths.DAGsDir
 	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {
@@ -253,7 +254,7 @@ func (c *Context) dagStore(cache *fileutil.Cache[*digraph.DAG], searchPaths []st
 // It evaluates the log directory, validates settings, creates the log directory,
 // builds a filename using the current timestamp and dag-run ID, and then opens the file.
 func (c *Context) OpenLogFile(
-	dag *digraph.DAG,
+	dag *core.DAG,
 	dagRunID string,
 ) (*os.File, error) {
 	logPath, err := c.GenLogFileName(dag, dagRunID)
@@ -264,7 +265,7 @@ func (c *Context) OpenLogFile(
 }
 
 // GenLogFileName generates a log file name based on the DAG and dag-run ID.
-func (c *Context) GenLogFileName(dag *digraph.DAG, dagRunID string) (string, error) {
+func (c *Context) GenLogFileName(dag *core.DAG, dagRunID string) (string, error) {
 	// Read the global configuration for log directory.
 	baseLogDir, err := cmdutil.EvalString(c, c.Config.Paths.LogDir)
 	if err != nil {
@@ -296,6 +297,8 @@ func (c *Context) GenLogFileName(dag *digraph.DAG, dagRunID string) (string, err
 	return filepath.Join(d, cfg.LogFile()), nil
 }
 
+var viperLock sync.Mutex // protects viper access across commands
+
 // NewCommand creates a new command instance with the given cobra command and run function.
 func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *Context, args []string) error) *cobra.Command {
 	initFlags(cmd, flags...)
@@ -317,7 +320,10 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 			}()
 		}
 
+		viperLock.Lock()
 		ctx, err := NewContext(cmd, flags)
+		viperLock.Unlock()
+
 		if err != nil {
 			fmt.Printf("Initialization error: %v\n", err)
 			os.Exit(1)

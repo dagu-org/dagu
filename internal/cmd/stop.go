@@ -3,13 +3,14 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/builder"
-	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/spf13/cobra"
 )
 
-func CmdStop() *cobra.Command {
+func Stop() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "stop [flags] <DAG name>",
@@ -48,10 +49,10 @@ func runStop(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to extract DAG name: %w", err)
 	}
 
-	var dag *digraph.DAG
+	var dag *core.DAG
 	if dagRunID != "" {
 		// Retrieve the previous run's history record for the specified dag-run ID.
-		ref := digraph.NewDAGRunRef(name, dagRunID)
+		ref := execution.NewDAGRunRef(name, dagRunID)
 		rec, err := ctx.DAGRunStore.FindAttempt(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
@@ -63,7 +64,7 @@ func runStop(ctx *Context, args []string) error {
 		}
 		dag = d
 	} else {
-		d, err := builder.Load(ctx, args[0], builder.WithBaseConfig(ctx.Config.Paths.BaseConfig))
+		d, err := spec.Load(ctx, args[0], spec.WithBaseConfig(ctx.Config.Paths.BaseConfig))
 		if err != nil {
 			return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 		}

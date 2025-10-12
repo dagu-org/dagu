@@ -10,9 +10,9 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/builder"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -59,7 +59,7 @@ func TestDAGItem(t *testing.T) {
 
 func TestPromptForParams(t *testing.T) {
 	t.Run("ReturnsEmptyStringWhenDAGHasNoParameters", func(t *testing.T) {
-		dag := &digraph.DAG{
+		dag := &core.DAG{
 			DefaultParams: "",
 			Params:        []string{},
 		}
@@ -70,7 +70,7 @@ func TestPromptForParams(t *testing.T) {
 	})
 
 	t.Run("DAGWithDefaultParameters", func(_ *testing.T) {
-		dag := &digraph.DAG{
+		dag := &core.DAG{
 			DefaultParams: "KEY1=value1 KEY2=value2",
 			Params:        []string{},
 		}
@@ -182,30 +182,30 @@ func (m *mockDAGStore) Delete(ctx context.Context, fileName string) error {
 	return args.Error(0)
 }
 
-func (m *mockDAGStore) List(ctx context.Context, params models.ListDAGsOptions) (models.PaginatedResult[*digraph.DAG], []string, error) {
+func (m *mockDAGStore) List(ctx context.Context, params execution.ListDAGsOptions) (execution.PaginatedResult[*core.DAG], []string, error) {
 	args := m.Called(ctx, params)
-	return args.Get(0).(models.PaginatedResult[*digraph.DAG]), args.Get(1).([]string), args.Error(2)
+	return args.Get(0).(execution.PaginatedResult[*core.DAG]), args.Get(1).([]string), args.Error(2)
 }
 
-func (m *mockDAGStore) GetMetadata(ctx context.Context, fileName string) (*digraph.DAG, error) {
+func (m *mockDAGStore) GetMetadata(ctx context.Context, fileName string) (*core.DAG, error) {
 	args := m.Called(ctx, fileName)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*digraph.DAG), args.Error(1)
+	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
-func (m *mockDAGStore) GetDetails(ctx context.Context, fileName string, opts ...builder.LoadOption) (*digraph.DAG, error) {
+func (m *mockDAGStore) GetDetails(ctx context.Context, fileName string, opts ...spec.LoadOption) (*core.DAG, error) {
 	args := m.Called(ctx, fileName, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*digraph.DAG), args.Error(1)
+	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
-func (m *mockDAGStore) Grep(ctx context.Context, pattern string) ([]*models.GrepDAGsResult, []string, error) {
+func (m *mockDAGStore) Grep(ctx context.Context, pattern string) ([]*execution.GrepDAGsResult, []string, error) {
 	args := m.Called(ctx, pattern)
-	return args.Get(0).([]*models.GrepDAGsResult), args.Get(1).([]string), args.Error(2)
+	return args.Get(0).([]*execution.GrepDAGsResult), args.Get(1).([]string), args.Error(2)
 }
 
 func (m *mockDAGStore) Rename(ctx context.Context, oldID, newID string) error {
@@ -223,12 +223,12 @@ func (m *mockDAGStore) UpdateSpec(ctx context.Context, fileName string, spec []b
 	return args.Error(0)
 }
 
-func (m *mockDAGStore) LoadSpec(ctx context.Context, spec []byte, opts ...builder.LoadOption) (*digraph.DAG, error) {
+func (m *mockDAGStore) LoadSpec(ctx context.Context, spec []byte, opts ...spec.LoadOption) (*core.DAG, error) {
 	args := m.Called(ctx, spec, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*digraph.DAG), args.Error(1)
+	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
 func (m *mockDAGStore) TagList(ctx context.Context) ([]string, []string, error) {
@@ -251,8 +251,8 @@ func TestPickDAG(t *testing.T) {
 		mockStore := new(mockDAGStore)
 		ctx := context.Background()
 
-		mockStore.On("List", ctx, models.ListDAGsOptions{}).Return(
-			models.PaginatedResult[*digraph.DAG]{},
+		mockStore.On("List", ctx, execution.ListDAGsOptions{}).Return(
+			execution.PaginatedResult[*core.DAG]{},
 			[]string{},
 			errors.New("database error"),
 		)
@@ -267,9 +267,9 @@ func TestPickDAG(t *testing.T) {
 		mockStore := new(mockDAGStore)
 		ctx := context.Background()
 
-		mockStore.On("List", ctx, models.ListDAGsOptions{}).Return(
-			models.PaginatedResult[*digraph.DAG]{
-				Items: []*digraph.DAG{},
+		mockStore.On("List", ctx, execution.ListDAGsOptions{}).Return(
+			execution.PaginatedResult[*core.DAG]{
+				Items: []*core.DAG{},
 			},
 			[]string{},
 			nil,
@@ -283,7 +283,7 @@ func TestPickDAG(t *testing.T) {
 
 	t.Run("CreatesProperDAGItemsFromDAGs", func(t *testing.T) {
 		// This tests the internal logic of converting DAGs to list items
-		dags := []*digraph.DAG{
+		dags := []*core.DAG{
 			{
 				Name:        "dag1",
 				Location:    "/path/to/dag1.yaml",

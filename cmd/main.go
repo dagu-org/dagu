@@ -4,10 +4,10 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/spf13/cobra"
 
-	_ "github.com/dagu-org/dagu/internal/digraph/executor" // Register built-in executors
+	_ "github.com/dagu-org/dagu/internal/runtime/builtin" // Register built-in executors
 )
 
 var rootCmd = &cobra.Command{
@@ -28,22 +28,22 @@ func main() {
 }
 
 func init() {
-	rootCmd.AddCommand(cmd.CmdStart())
-	rootCmd.AddCommand(cmd.CmdEnqueue())
-	rootCmd.AddCommand(cmd.CmdDequeue())
-	rootCmd.AddCommand(cmd.CmdStop())
-	rootCmd.AddCommand(cmd.CmdRestart())
-	rootCmd.AddCommand(cmd.CmdDry())
-	rootCmd.AddCommand(cmd.CmdValidate())
-	rootCmd.AddCommand(cmd.CmdStatus())
-	rootCmd.AddCommand(cmd.CmdVersion())
-	rootCmd.AddCommand(cmd.CmdServer())
-	rootCmd.AddCommand(cmd.CmdScheduler())
+	rootCmd.AddCommand(cmd.Start())
+	rootCmd.AddCommand(cmd.Enqueue())
+	rootCmd.AddCommand(cmd.Dequeue())
+	rootCmd.AddCommand(cmd.Stop())
+	rootCmd.AddCommand(cmd.Restart())
+	rootCmd.AddCommand(cmd.Dry())
+	rootCmd.AddCommand(cmd.Validate())
+	rootCmd.AddCommand(cmd.Status())
+	rootCmd.AddCommand(cmd.Version())
+	rootCmd.AddCommand(cmd.Server())
+	rootCmd.AddCommand(cmd.Scheduler())
 	rootCmd.AddCommand(cmd.CmdCoordinator())
 	rootCmd.AddCommand(cmd.CmdWorker())
-	rootCmd.AddCommand(cmd.CmdRetry())
-	rootCmd.AddCommand(cmd.CmdStartAll())
-	rootCmd.AddCommand(cmd.CmdMigrate())
+	rootCmd.AddCommand(cmd.Retry())
+	rootCmd.AddCommand(cmd.StartAll())
+	rootCmd.AddCommand(cmd.Migrate())
 
 	config.Version = version
 }

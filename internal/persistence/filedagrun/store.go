@@ -12,11 +12,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
 // Error definitions for common issues
@@ -25,15 +24,15 @@ var (
 	ErrTooManyResults = errors.New("too many results found")
 )
 
-var _ models.DAGRunStore = (*Store)(nil)
+var _ execution.DAGRunStore = (*Store)(nil)
 
 // Store manages DAGs status files in local Store with high performance and reliability.
 type Store struct {
-	baseDir           string                                // Base directory for all status files
-	latestStatusToday bool                                  // Whether to only return today's status
-	cache             *fileutil.Cache[*models.DAGRunStatus] // Optional cache for read operations
-	maxWorkers        int                                   // Maximum number of parallel workers
-	location          *time.Location                        // Timezone location for date calculations
+	baseDir           string                                   // Base directory for all status files
+	latestStatusToday bool                                     // Whether to only return today's status
+	cache             *fileutil.Cache[*execution.DAGRunStatus] // Optional cache for read operations
+	maxWorkers        int                                      // Maximum number of parallel workers
+	location          *time.Location                           // Timezone location for date calculations
 }
 
 // DAGRunStoreOption defines functional options for configuring local.
@@ -41,15 +40,15 @@ type DAGRunStoreOption func(*DAGRunStoreOptions)
 
 // DAGRunStoreOptions holds configuration options for local.
 type DAGRunStoreOptions struct {
-	FileCache         *fileutil.Cache[*models.DAGRunStatus] // Optional cache for status files
-	LatestStatusToday bool                                  // Whether to only return today's status
-	MaxWorkers        int                                   // Maximum number of parallel workers
-	OperationTimeout  time.Duration                         // Timeout for operations
-	Location          *time.Location                        // Timezone location for date calculations
+	FileCache         *fileutil.Cache[*execution.DAGRunStatus] // Optional cache for status files
+	LatestStatusToday bool                                     // Whether to only return today's status
+	MaxWorkers        int                                      // Maximum number of parallel workers
+	OperationTimeout  time.Duration                            // Timeout for operations
+	Location          *time.Location                           // Timezone location for date calculations
 }
 
 // WithHistoryFileCache sets the file cache for local.
-func WithHistoryFileCache(cache *fileutil.Cache[*models.DAGRunStatus]) DAGRunStoreOption {
+func WithHistoryFileCache(cache *fileutil.Cache[*execution.DAGRunStatus]) DAGRunStoreOption {
 	return func(o *DAGRunStoreOptions) {
 		o.FileCache = cache
 	}
@@ -70,7 +69,7 @@ func WithLocation(location *time.Location) DAGRunStoreOption {
 }
 
 // New creates a new JSONDB instance with the specified options.
-func New(baseDir string, opts ...DAGRunStoreOption) models.DAGRunStore {
+func New(baseDir string, opts ...DAGRunStoreOption) execution.DAGRunStore {
 	options := &DAGRunStoreOptions{
 		LatestStatusToday: true,
 		MaxWorkers:        runtime.NumCPU(),
@@ -92,7 +91,7 @@ func New(baseDir string, opts ...DAGRunStoreOption) models.DAGRunStore {
 
 // ListStatuses retrieves status records based on the provided options.
 // It supports filtering by time range, status, and limiting the number of results.
-func (store *Store) ListStatuses(ctx context.Context, opts ...models.ListDAGRunStatusesOption) ([]*models.DAGRunStatus, error) {
+func (store *Store) ListStatuses(ctx context.Context, opts ...execution.ListDAGRunStatusesOption) ([]*execution.DAGRunStatus, error) {
 	// Apply options and set defaults
 	options, err := prepareListOptions(opts)
 	if err != nil {
@@ -116,8 +115,8 @@ func (store *Store) ListStatuses(ctx context.Context, opts ...models.ListDAGRunS
 }
 
 // prepareListOptions processes the provided options and sets default values.
-func prepareListOptions(opts []models.ListDAGRunStatusesOption) (models.ListDAGRunStatusesOptions, error) {
-	var options models.ListDAGRunStatusesOptions
+func prepareListOptions(opts []execution.ListDAGRunStatusesOption) (execution.ListDAGRunStatusesOptions, error) {
+	var options execution.ListDAGRunStatusesOptions
 
 	// Apply all options
 	for _, opt := range opts {
@@ -126,7 +125,7 @@ func prepareListOptions(opts []models.ListDAGRunStatusesOption) (models.ListDAGR
 
 	// Set default time range if not specified
 	if options.From.IsZero() && options.To.IsZero() {
-		options.From = models.NewUTC(time.Now().Truncate(24 * time.Hour))
+		options.From = execution.NewUTC(time.Now().Truncate(24 * time.Hour))
 	}
 
 	// Enforce a reasonable limit on the number of results
@@ -142,8 +141,8 @@ func prepareListOptions(opts []models.ListDAGRunStatusesOption) (models.ListDAGR
 func (store *Store) collectStatusesFromRoots(
 	parentCtx context.Context,
 	roots []DataRoot,
-	opts models.ListDAGRunStatusesOptions,
-) ([]*models.DAGRunStatus, error) {
+	opts execution.ListDAGRunStatusesOptions,
+) ([]*execution.DAGRunStatus, error) {
 
 	if len(roots) == 0 {
 		return nil, nil
@@ -155,9 +154,9 @@ func (store *Store) collectStatusesFromRoots(
 
 	var (
 		resultsMu      sync.Mutex
-		results        = make([]*models.DAGRunStatus, 0, opts.Limit)
+		results        = make([]*execution.DAGRunStatus, 0, opts.Limit)
 		remaining      atomic.Int64
-		statusesFilter = make(map[status.Status]struct{})
+		statusesFilter = make(map[core.Status]struct{})
 	)
 
 	for _, status := range opts.Statuses {
@@ -181,7 +180,7 @@ func (store *Store) collectStatusesFromRoots(
 				limit: int(remaining.Load()),
 			})
 
-			statuses := make([]*models.DAGRunStatus, 0, len(dagRuns))
+			statuses := make([]*execution.DAGRunStatus, 0, len(dagRuns))
 			for _, dagRun := range dagRuns {
 				if opts.DAGRunID != "" && !strings.Contains(dagRun.dagRunID, opts.DAGRunID) {
 					continue
@@ -189,7 +188,7 @@ func (store *Store) collectStatusesFromRoots(
 
 				run, err := dagRun.LatestAttempt(ctx, store.cache)
 				if err != nil {
-					if !errors.Is(err, models.ErrNoStatusData) {
+					if !errors.Is(err, execution.ErrNoStatusData) {
 						logger.Error(ctx, "Failed to get latest run", "err", err)
 					}
 					continue
@@ -253,7 +252,7 @@ func (store *Store) collectStatusesFromRoots(
 // CreateAttempt creates a new history record for the specified dag-run ID.
 // If opts.Root is not nil, it creates a new history record for a child dag-run.
 // If opts.Retry is true, it creates a retry record for the specified dag-run ID.
-func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timestamp time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
+func (store *Store) CreateAttempt(ctx context.Context, dag *core.DAG, timestamp time.Time, dagRunID string, opts execution.NewDAGRunAttemptOptions) (execution.DAGRunAttempt, error) {
 	if dagRunID == "" {
 		return nil, ErrDAGRunIDEmpty
 	}
@@ -263,7 +262,7 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 	}
 
 	dataRoot := NewDataRoot(store.baseDir, dag.Name)
-	ts := models.NewUTC(timestamp)
+	ts := execution.NewUTC(timestamp)
 
 	lockCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -307,14 +306,14 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 }
 
 // newChildRecord creates a new history record for a child dag-run.
-func (b *Store) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
+func (b *Store) newChildRecord(ctx context.Context, dag *core.DAG, timestamp time.Time, dagRunID string, opts execution.NewDAGRunAttemptOptions) (execution.DAGRunAttempt, error) {
 	dataRoot := NewDataRoot(b.baseDir, opts.RootDAGRun.Name)
 	root, err := dataRoot.FindByDAGRunID(ctx, opts.RootDAGRun.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root execution: %w", err)
 	}
 
-	ts := models.NewUTC(timestamp)
+	ts := execution.NewUTC(timestamp)
 
 	var run *DAGRun
 	if opts.Retry {
@@ -341,7 +340,7 @@ func (b *Store) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp 
 }
 
 // RecentAttempts returns the most recent history records for the specified DAG name.
-func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimit int) []models.DAGRunAttempt {
+func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimit int) []execution.DAGRunAttempt {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -361,7 +360,7 @@ func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimi
 	items := root.Latest(ctx, itemLimit)
 
 	// Get the latest record for each item
-	records := make([]models.DAGRunAttempt, 0, len(items))
+	records := make([]execution.DAGRunAttempt, 0, len(items))
 	for _, item := range items {
 		record, err := item.LatestAttempt(ctx, store.cache)
 		if err != nil {
@@ -376,7 +375,7 @@ func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimi
 
 // LatestAttempt returns the most recent history record for the specified DAG name.
 // If latestStatusToday is true, it only returns today's status.
-func (store *Store) LatestAttempt(ctx context.Context, dagName string) (models.DAGRunAttempt, error) {
+func (store *Store) LatestAttempt(ctx context.Context, dagName string) (execution.DAGRunAttempt, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -391,7 +390,7 @@ func (store *Store) LatestAttempt(ctx context.Context, dagName string) (models.D
 		// Use the configured timezone to calculate "today"
 		now := time.Now().In(store.location)
 		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, store.location)
-		startOfDayInUTC := models.NewUTC(startOfDay)
+		startOfDayInUTC := execution.NewUTC(startOfDay)
 
 		// Get the latest execution data after the start of the day.
 		exec, err := root.LatestAfter(ctx, startOfDayInUTC)
@@ -405,13 +404,13 @@ func (store *Store) LatestAttempt(ctx context.Context, dagName string) (models.D
 	// Get the latest execution data.
 	latest := root.Latest(ctx, 1)
 	if len(latest) == 0 {
-		return nil, models.ErrNoStatusData
+		return nil, execution.ErrNoStatusData
 	}
 	return latest[0].LatestAttempt(ctx, store.cache)
 }
 
 // FindAttempt finds a history record by dag-run ID.
-func (store *Store) FindAttempt(ctx context.Context, ref digraph.DAGRunRef) (models.DAGRunAttempt, error) {
+func (store *Store) FindAttempt(ctx context.Context, ref execution.DAGRunRef) (execution.DAGRunAttempt, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -435,7 +434,7 @@ func (store *Store) FindAttempt(ctx context.Context, ref digraph.DAGRunRef) (mod
 
 // FindChildAttempt finds a child dag-run by its ID.
 // It returns the latest record for the specified child dag-run ID.
-func (store *Store) FindChildAttempt(ctx context.Context, ref digraph.DAGRunRef, childDAGRunID string) (models.DAGRunAttempt, error) {
+func (store *Store) FindChildAttempt(ctx context.Context, ref execution.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -485,7 +484,7 @@ func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retent
 }
 
 // RemoveDAGRun implements models.DAGRunStore.
-func (store *Store) RemoveDAGRun(ctx context.Context, dagRun digraph.DAGRunRef) error {
+func (store *Store) RemoveDAGRun(ctx context.Context, dagRun execution.DAGRunRef) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():

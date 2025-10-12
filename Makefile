@@ -49,7 +49,7 @@ OAPI_CONFIG_FILE_V1=${OAPI_SPEC_DIR_V1}/config.yaml
 
 # Frontend directories
 
-FE_DIR=./internal/frontend
+FE_DIR=./internal/service/frontend
 FE_GEN_DIR=${FE_DIR}/gen
 FE_ASSETS_DIR=${FE_DIR}/assets
 FE_BUILD_DIR=./ui/dist

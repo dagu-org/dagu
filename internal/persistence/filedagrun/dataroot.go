@@ -18,10 +18,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/persistence/dirlock"
+	"github.com/dagu-org/dagu/internal/common/dirlock"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
 // DataRoot manages the directory structure for run history data.
@@ -105,7 +105,7 @@ func (dr *DataRoot) FindByDAGRunID(_ context.Context, dagRunID string) (*DAGRun,
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w: %s", models.ErrDAGRunIDNotFound, dagRunID)
+		return nil, fmt.Errorf("%w: %s", execution.ErrDAGRunIDNotFound, dagRunID)
 	}
 
 	// Sort matches by timestamp (most recent first)
@@ -127,23 +127,23 @@ func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*DAGRun {
 
 // LatestAfter returns the most recent dag-run that occurred after the specified cutoff time.
 // Returns ErrNoStatusData if no dag-run is found or if the latest run is before the cutoff.
-func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff models.TimeInUTC) (*DAGRun, error) {
+func (dr *DataRoot) LatestAfter(ctx context.Context, cutoff execution.TimeInUTC) (*DAGRun, error) {
 	runs, err := dr.listRecentDAGRuns(ctx, 1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list recent runs: %w", err)
 	}
 	if len(runs) == 0 {
-		return nil, models.ErrNoStatusData
+		return nil, execution.ErrNoStatusData
 	}
 	if runs[0].timestamp.Before(cutoff.Time) {
-		return nil, models.ErrNoStatusData
+		return nil, execution.ErrNoStatusData
 	}
 	return runs[0], nil
 }
 
 // CreateDAGRun creates a new dag-run directory with the specified timestamp and ID.
 // The directory structure follows the pattern: year/month/day/run-YYYYMMDD_HHMMSS_dagRunID
-func (dr *DataRoot) CreateDAGRun(ts models.TimeInUTC, dagRunID string) (*DAGRun, error) {
+func (dr *DataRoot) CreateDAGRun(ts execution.TimeInUTC, dagRunID string) (*DAGRun, error) {
 	dirName := DAGRunDirPrefix + formatDAGRunTimestamp(ts) + "_" + dagRunID
 	dir := filepath.Join(dr.dagRunsDir, ts.Format("2006"), ts.Format("01"), ts.Format("02"), dirName)
 
@@ -269,8 +269,8 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 // If retentionDays is positive, only files older than the specified number of days will be removed.
 // It also removes empty directories in the hierarchy.
 func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int) error {
-	keepTime := models.NewUTC(time.Now().AddDate(0, 0, -retentionDays))
-	dagRuns := dr.listDAGRunsInRange(ctx, models.TimeInUTC{}, keepTime, &listDAGRunsInRangeOpts{})
+	keepTime := execution.NewUTC(time.Now().AddDate(0, 0, -retentionDays))
+	dagRuns := dr.listDAGRunsInRange(ctx, execution.TimeInUTC{}, keepTime, &listDAGRunsInRangeOpts{})
 
 	for _, r := range dagRuns {
 		latestAttempt, err := r.LatestAttempt(ctx, nil)
@@ -332,7 +332,7 @@ type listDAGRunsInRangeOpts struct {
 	limit int
 }
 
-func (dr DataRoot) listDAGRunsInRange(ctx context.Context, start, end models.TimeInUTC, opts *listDAGRunsInRangeOpts) []*DAGRun {
+func (dr DataRoot) listDAGRunsInRange(ctx context.Context, start, end execution.TimeInUTC, opts *listDAGRunsInRangeOpts) []*DAGRun {
 	var result []*DAGRun
 	var lock sync.Mutex
 

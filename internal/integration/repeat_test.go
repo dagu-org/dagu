@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,7 +33,7 @@ func TestRepeatPolicy_WithLimit(t *testing.T) {
 	require.NoError(t, err, "DAG should complete successfully")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Success)
 
 	// Get the latest status
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -42,7 +42,7 @@ func TestRepeatPolicy_WithLimit(t *testing.T) {
 
 	// Verify the step completed successfully
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[0].Status)
 
 	// Verify it executed exactly 3 times (as per limit)
 	assert.Equal(t, 3, dagRunStatus.Nodes[0].DoneCount, "Step should have executed exactly 3 times")
@@ -86,7 +86,7 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 	require.NoError(t, err, "DAG should complete successfully")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Success)
 
 	// Get the latest status
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -95,7 +95,7 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 
 	// Verify the step completed successfully
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[0].Status)
 
 	// Verify it stopped at the limit (5) even though condition would continue
 	assert.Equal(t, 5, dagRunStatus.Nodes[0].DoneCount, "Step should have stopped at limit of 5")
@@ -122,7 +122,7 @@ func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 	require.NoError(t, err, "DAG should complete successfully")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Success)
 
 	// Get the latest status
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -131,7 +131,7 @@ func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 
 	// Verify it stopped at limit (3)
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[0].Status)
 	assert.Equal(t, 3, dagRunStatus.Nodes[0].DoneCount, "Step should have stopped at limit of 3")
 }
 
@@ -156,7 +156,7 @@ func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
 	require.NoError(t, err, "DAG should complete successfully")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Success)
 
 	// Get the latest status
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -165,7 +165,7 @@ func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
 
 	// Verify the step completed successfully
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[0].Status)
 
 	// Verify it executed exactly 3 times (as per limit)
 	assert.Equal(t, 3, dagRunStatus.Nodes[0].DoneCount, "Step should have executed exactly 3 times")
@@ -210,7 +210,7 @@ func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
 	require.NoError(t, err, "DAG should complete successfully")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Success)
 
 	// Get the latest status
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -219,7 +219,7 @@ func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
 
 	// Verify the step completed successfully
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[0].Status)
 
 	// Verify it executed exactly 3 times (until it gets exit code 0)
 	assert.Equal(t, 3, dagRunStatus.Nodes[0].DoneCount, "Step should have executed exactly 3 times until exit code 0")
@@ -246,7 +246,7 @@ func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
 	require.NoError(t, err, "DAG should complete successfully")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Success)
 
 	// Get the latest status
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -255,7 +255,7 @@ func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
 
 	// Verify the step completed successfully
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[0].Status)
 
 	// Verify it executed exactly 4 times (as per limit, confirming repeat: true works)
 	assert.Equal(t, 4, dagRunStatus.Nodes[0].DoneCount, "Step should have executed exactly 4 times")
@@ -300,7 +300,7 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
 	err := agent.Run(ctx)
 	require.NoError(t, err, "DAG should complete successfully")
 
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Success)
 
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
@@ -309,7 +309,7 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
 	require.Len(t, dagRunStatus.Nodes, 1)
 	nodeStatus := dagRunStatus.Nodes[0]
 
-	assert.Equal(t, status.NodeSuccess, nodeStatus.Status, "The final status of the node should be Success")
+	assert.Equal(t, core.NodeSuccess, nodeStatus.Status, "The final status of the node should be Success")
 	assert.True(t, nodeStatus.Repeated, "The step should be marked as repeated")
 	assert.GreaterOrEqual(t, nodeStatus.DoneCount, 3, "The step should have executed at least 3 times")
 }

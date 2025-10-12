@@ -5,19 +5,19 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/builder"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/spf13/cobra"
 )
 
-// CmdValidate creates the 'validate' CLI command that checks a DAG spec for errors.
+// Validate creates the 'validate' CLI command that checks a DAG spec for errors.
 //
 // It follows the same validation logic used by the API's UpdateDAGSpec handler:
 // - Load the YAML without evaluation
 // - Run DAG.Validate()
 //
 // The command prints validation results and any errors found.
-func CmdValidate() *cobra.Command {
+func Validate() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "validate [flags] <DAG definition>",
@@ -36,11 +36,11 @@ similar to the server-side spec validation.`,
 
 func runValidate(ctx *Context, args []string) error {
 	// Try loading the DAG without evaluation, resolving relative names against DAGsDir
-	dag, err := builder.Load(
+	dag, err := spec.Load(
 		ctx,
 		args[0],
-		builder.WithoutEval(),
-		builder.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+		spec.WithoutEval(),
+		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
 	)
 
 	if err != nil {
@@ -62,7 +62,7 @@ func runValidate(ctx *Context, args []string) error {
 func formatValidationErrors(file string, err error) string {
 	// Collect message strings
 	var msgs []string
-	var list digraph.ErrorList
+	var list core.ErrorList
 	if errors.As(err, &list) {
 		msgs = list.ToStringList()
 	} else {

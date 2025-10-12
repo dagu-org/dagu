@@ -6,16 +6,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmd/dagpicker"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/builder"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 )
 
 // Errors for start command
@@ -30,8 +30,8 @@ var (
 	ErrDAGRunIDTooLong = errors.New("dag-run ID length must be less than 64 characters")
 )
 
-// CmdStart creates and returns a cobra command for starting a dag-run
-func CmdStart() *cobra.Command {
+// Start creates and returns a cobra command for starting a dag-run
+func Start() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "start [flags] <DAG definition> [-- param1 param2 ...]",
@@ -80,7 +80,7 @@ func runStart(ctx *Context, args []string) error {
 	// Handle child dag-run if applicable
 	if isChildDAGRun {
 		// Parse parent execution reference
-		parent, err := digraph.ParseDAGRunRef(parentRef)
+		parent, err := execution.ParseDAGRunRef(parentRef)
 		if err != nil {
 			return fmt.Errorf("failed to parse parent dag-run reference: %w", err)
 		}
@@ -147,7 +147,7 @@ var (
 )
 
 // tryExecuteDAG tries to run the DAG within the max concurrent run config
-func tryExecuteDAG(ctx *Context, dag *digraph.DAG, dagRunID string, root digraph.DAGRunRef) error {
+func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef) error {
 	if err := ctx.ProcStore.TryLock(ctx, dag.ProcGroup()); err != nil {
 		logger.Debug(ctx, "failed to lock process group", "err", err)
 		return errMaxRunReached
@@ -168,7 +168,7 @@ func tryExecuteDAG(ctx *Context, dag *digraph.DAG, dagRunID string, root digraph
 	}
 
 	// Acquire process handle
-	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), digraph.NewDAGRunRef(dag.Name, dagRunID))
+	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
 	if err != nil {
 		logger.Debug(ctx, "failed to acquire process handle", "err", err)
 		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
@@ -181,7 +181,7 @@ func tryExecuteDAG(ctx *Context, dag *digraph.DAG, dagRunID string, root digraph
 	// Unlock the process group
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
-	return executeDAGRun(ctx, dag, digraph.DAGRunRef{}, dagRunID, root)
+	return executeDAGRun(ctx, dag, execution.DAGRunRef{}, dagRunID, root)
 }
 
 // getDAGRunInfo extracts and validates dag-run ID and references from command flags
@@ -219,7 +219,7 @@ func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isC
 }
 
 // loadDAGWithParams loads the DAG and its parameters from command arguments
-func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error) {
+func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
 	var dagPath string
 	var interactiveParams string
 
@@ -241,7 +241,7 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 
 		// Load DAG metadata first to pass to the picker
 		// This will be updated when user selects a DAG
-		var tempDAG *digraph.DAG
+		var tempDAG *core.DAG
 
 		// Show unified interactive UI
 		result, err := dagpicker.PickDAGInteractive(ctx, dagStore, tempDAG)
@@ -261,9 +261,9 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 	}
 
 	// Prepare load options with base configuration
-	loadOpts := []builder.LoadOption{
-		builder.WithBaseConfig(ctx.Config.Paths.BaseConfig),
-		builder.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+	loadOpts := []spec.LoadOption{
+		spec.WithBaseConfig(ctx.Config.Paths.BaseConfig),
+		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
 	}
 
 	// Load parameters from command line arguments
@@ -273,10 +273,10 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 	// Check if parameters are provided after "--"
 	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 && len(args) > 0 {
 		// Get parameters from command line arguments after "--"
-		loadOpts = append(loadOpts, builder.WithParams(args[argsLenAtDash:]))
+		loadOpts = append(loadOpts, spec.WithParams(args[argsLenAtDash:]))
 	} else if interactiveParams != "" {
 		// Use interactive parameters
-		loadOpts = append(loadOpts, builder.WithParams(stringutil.RemoveQuotes(interactiveParams)))
+		loadOpts = append(loadOpts, spec.WithParams(stringutil.RemoveQuotes(interactiveParams)))
 		params = interactiveParams
 	} else {
 		// Get parameters from flags
@@ -284,11 +284,11 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to get parameters: %w", err)
 		}
-		loadOpts = append(loadOpts, builder.WithParams(stringutil.RemoveQuotes(params)))
+		loadOpts = append(loadOpts, spec.WithParams(stringutil.RemoveQuotes(params)))
 	}
 
 	// Load the DAG from the specified file
-	dag, err := builder.Load(ctx, dagPath, loadOpts...)
+	dag, err := spec.Load(ctx, dagPath, loadOpts...)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to load DAG from %s: %w", dagPath, err)
 	}
@@ -297,22 +297,22 @@ func loadDAGWithParams(ctx *Context, args []string) (*digraph.DAG, string, error
 }
 
 // determineRootDAGRun creates or parses the root execution reference
-func determineRootDAGRun(isChildDAGRun bool, rootDAGRun string, dag *digraph.DAG, dagRunID string) (digraph.DAGRunRef, error) {
+func determineRootDAGRun(isChildDAGRun bool, rootDAGRun string, dag *core.DAG, dagRunID string) (execution.DAGRunRef, error) {
 	if isChildDAGRun {
 		// Parse the rootDAGRun execution reference for child dag-runs
-		rootDAGRun, err := digraph.ParseDAGRunRef(rootDAGRun)
+		rootDAGRun, err := execution.ParseDAGRunRef(rootDAGRun)
 		if err != nil {
-			return digraph.DAGRunRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
+			return execution.DAGRunRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
 		}
 		return rootDAGRun, nil
 	}
 
 	// Create a new root execution reference for root execution
-	return digraph.NewDAGRunRef(dag.Name, dagRunID), nil
+	return execution.NewDAGRunRef(dag.Name, dagRunID), nil
 }
 
 // handleChildDAGRun processes a child dag-run, checking for previous runs
-func handleChildDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string, params string, root digraph.DAGRunRef, parent digraph.DAGRunRef) error {
+func handleChildDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root execution.DAGRunRef, parent execution.DAGRunRef) error {
 	// Log child dag-run execution
 	logger.Info(ctx, "Executing child dag-run",
 		"dag", dag.Name,
@@ -332,7 +332,7 @@ func handleChildDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string, params s
 
 	// Look for existing execution childAttempt
 	childAttempt, err := ctx.DAGRunStore.FindChildAttempt(ctx, root, dagRunID)
-	if errors.Is(err, models.ErrDAGRunIDNotFound) {
+	if errors.Is(err, execution.ErrDAGRunIDNotFound) {
 		// If the dag-run ID is not found, proceed with new execution
 		return executeDAGRun(ctx, dag, parent, dagRunID, root)
 	}
@@ -351,7 +351,7 @@ func handleChildDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string, params s
 }
 
 // executeDAGRun handles the actual execution of a DAG
-func executeDAGRun(ctx *Context, d *digraph.DAG, parent digraph.DAGRunRef, dagRunID string, root digraph.DAGRunRef) error {
+func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRunID string, root execution.DAGRunRef) error {
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/dag-run ID between attempts.
 	logFile, err := ctx.OpenLogFile(d, dagRunID)

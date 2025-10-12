@@ -5,14 +5,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/dagu-org/dagu/internal/test"
-	"github.com/dagu-org/dagu/internal/worker"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDistributedLocalDAGExecution(t *testing.T) {
-	t.Run("E2ELocalDAGOnWorker", func(t *testing.T) {
+	t.Run("LocalDAG", func(t *testing.T) {
 		// Create test DAG with local child that uses workerSelector
 		yamlContent := `
 steps:
@@ -71,27 +72,8 @@ steps:
 		agent.RunSuccess(t)
 
 		// Verify the DAG completed successfully
-		dagWrapper.AssertLatestStatus(t, status.Success)
+		dagWrapper.AssertLatestStatus(t, core.Success)
 	})
-
-	t.Run("TempFileCreationForLocalDAG", func(t *testing.T) {
-		// Create a simple local DAG YAML
-		localDAGYAML := `
-steps:
-  - name: worker-task
-    command: echo "Hello from worker"
-    output: MESSAGE
-`
-		// Setup test environment
-		th := test.Setup(t)
-
-		// Test using the helper to create DAG
-		dagWrapper := th.DAG(t, localDAGYAML)
-
-		// Verify the DAG was loaded correctly
-		require.NotNil(t, dagWrapper.DAG)
-	})
-
 	t.Run("DistributedExecutionFailure", func(t *testing.T) {
 		// Test that distributed execution failure is not fallback to local execution
 		yamlContent := `
@@ -126,6 +108,80 @@ steps:
 
 		// Verify the DAG did not complete successfully
 		st := agent.Status(coord.Context)
-		require.NotEqual(t, status.Success, st.Status)
+		require.NotEqual(t, core.Success, st.Status)
+	})
+	t.Run("Cancellation", func(t *testing.T) {
+		yamlContent := `
+steps:
+  - name: run-local-on-worker
+    run: local-child
+    output: RESULT
+
+---
+name: local-child
+workerSelector:
+  type: test-worker
+steps:
+  - name: worker-task
+    command: sleep 1000
+    output: MESSAGE
+`
+		// Setup and start coordinator
+		coord := test.SetupCoordinator(t)
+
+		// Get dispatcher client from coordinator
+		coordinatorClient := coord.GetCoordinatorClient(t)
+
+		// Create and start worker with selector labels
+		workerInst := worker.NewWorker(
+			"test-worker-1",
+			10, // maxActiveRuns
+			coordinatorClient,
+			map[string]string{"type": "test-worker"},
+			coord.Config,
+		)
+
+		ctx, cancel := context.WithCancel(coord.Context)
+		defer cancel()
+
+		go func() {
+			if err := workerInst.Start(ctx); err != nil {
+				t.Logf("Worker stopped: %v", err)
+			}
+		}()
+		t.Cleanup(func() {
+			if err := workerInst.Stop(ctx); err != nil {
+				t.Logf("Error stopping worker: %v", err)
+			}
+		})
+
+		// Give worker time to connect
+		time.Sleep(50 * time.Millisecond)
+
+		// Load the DAG using helper
+		dagWrapper := coord.DAG(t, yamlContent)
+
+		// Run the DAG
+		runID := uuid.New().String()
+		agent := dagWrapper.Agent(test.WithDAGRunID(runID))
+
+		// Start run in background
+		var done = make(chan struct{})
+		go func() {
+			agent.RunCancel(t)
+			close(done)
+		}()
+
+		// Wait for the DAG to start running
+		dagWrapper.AssertLatestStatus(t, core.Running)
+
+		err := coord.DAGRunMgr.Stop(coord.Context, agent.DAG, runID)
+		require.NoError(t, err)
+
+		// Verify the DAG completed successfully
+		dagWrapper.AssertLatestStatus(t, core.Cancel)
+
+		// Wait for run to finish
+		<-done
 	})
 }

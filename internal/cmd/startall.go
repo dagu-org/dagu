@@ -7,11 +7,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/spf13/cobra"
 )
 
-func CmdStartAll() *cobra.Command {
+func StartAll() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "start-all [flags]",

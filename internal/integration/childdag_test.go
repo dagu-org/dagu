@@ -7,9 +7,8 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -43,7 +42,7 @@ steps:
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
 	args := []string{"start", "--run-id", dagRunID, "parent"}
-	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
+	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"dag-run finished"},
 	})
@@ -51,11 +50,11 @@ steps:
 	// Update the child_2 status to "failed" to simulate a retry
 	// First, find the child_2 dag-run ID to update its status
 	ctx := context.Background()
-	ref := digraph.NewDAGRunRef("parent", dagRunID)
+	ref := execution.NewDAGRunRef("parent", dagRunID)
 	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
-	updateStatus := func(rec models.DAGRunAttempt, dagRunStatus *models.DAGRunStatus) {
+	updateStatus := func(rec execution.DAGRunAttempt, dagRunStatus *execution.DAGRunStatus) {
 		err = rec.Open(ctx)
 		require.NoError(t, err)
 		err = rec.Write(ctx, *dagRunStatus)
@@ -69,7 +68,7 @@ steps:
 	require.NoError(t, err)
 
 	child1Node := parentStatus.Nodes[0]
-	child1Node.Status = status.NodeError
+	child1Node.Status = core.NodeError
 	updateStatus(parentAttempt, parentStatus)
 
 	// (2) Find the child_1 dag-run ID to update its status
@@ -81,7 +80,7 @@ steps:
 
 	// (3) Find the child_2 node and update its status to "failed"
 	child2Node := child1Status.Nodes[0]
-	child2Node.Status = status.NodeError
+	child2Node.Status = core.NodeError
 	updateStatus(child1Attempt, child1Status)
 
 	// (4) Find the child_2 dag-run ID to update its status
@@ -91,21 +90,21 @@ steps:
 	child2Status, err := child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, status.NodeSuccess.String(), child2Status.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), child2Status.Status.String())
 
 	// (5) Update the step in child_2 to "failed" to simulate a retry
-	child2Status.Nodes[0].Status = status.NodeError
+	child2Status.Nodes[0].Status = core.NodeError
 	updateStatus(child2Attempt, child2Status)
 
 	// (6) Check if the child_2 status is now "failed"
 	child2Status, err = child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, status.NodeError.String(), child2Status.Nodes[0].Status.String())
+	require.Equal(t, core.NodeError.String(), child2Status.Nodes[0].Status.String())
 
 	// Retry the DAG
 
 	args = []string{"retry", "--run-id", dagRunID, "parent"}
-	th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
+	th.RunCommand(t, cmd.Retry(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"dag-run finished"},
 	})
@@ -115,7 +114,7 @@ steps:
 	require.NoError(t, err)
 	child2Status, err = child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, status.NodeSuccess.String(), child2Status.Nodes[0].Status.String())
+	require.Equal(t, core.NodeSuccess.String(), child2Status.Nodes[0].Status.String())
 
 	require.Equal(t, "parent", child2Status.Root.Name, "parent")
 	require.Equal(t, dagRunID, child2Status.Root.ID)
@@ -159,35 +158,35 @@ steps:
       intervalSec: 1
 `)
 	args := []string{"start", "--run-id", dagRunID, "parent_retry"}
-	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
+	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"dag-run finished"},
 	})
 
 	// Verify parent DAG completed successfully
 	ctx := context.Background()
-	ref := digraph.NewDAGRunRef("parent_retry", dagRunID)
+	ref := execution.NewDAGRunRef("parent_retry", dagRunID)
 	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
 	parentStatus, err := parentAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, status.NodeSuccess.String(), parentStatus.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), parentStatus.Status.String())
 
 	// Find child DAG run
 	childNode := parentStatus.Nodes[0]
-	require.Equal(t, status.NodeSuccess.String(), childNode.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), childNode.Status.String())
 
 	childAttempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, childNode.Children[0].DAGRunID)
 	require.NoError(t, err)
 
 	childStatus, err := childAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, status.NodeSuccess.String(), childStatus.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), childStatus.Status.String())
 
 	// Verify the step in child DAG completed successfully after retry
 	retryStep := childStatus.Nodes[0]
-	require.Equal(t, status.NodeSuccess.String(), retryStep.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), retryStep.Status.String())
 
 	// Verify output was captured from the successful retry attempt
 	require.NotNil(t, retryStep.OutputVariables, "OutputVariables should not be nil")
@@ -218,35 +217,35 @@ steps:
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
 	args := []string{"start", "--run-id", dagRunID, "parent_basic"}
-	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
+	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"dag-run finished"},
 	})
 
 	// Verify parent DAG completed successfully
 	ctx := context.Background()
-	ref := digraph.NewDAGRunRef("parent_basic", dagRunID)
+	ref := execution.NewDAGRunRef("parent_basic", dagRunID)
 	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
 	parentStatus, err := parentAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, status.NodeSuccess.String(), parentStatus.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), parentStatus.Status.String())
 
 	// Find child DAG run
 	childNode := parentStatus.Nodes[0]
-	require.Equal(t, status.NodeSuccess.String(), childNode.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), childNode.Status.String())
 
 	childAttempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, childNode.Children[0].DAGRunID)
 	require.NoError(t, err)
 
 	childStatus, err := childAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, status.NodeSuccess.String(), childStatus.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), childStatus.Status.String())
 
 	// Verify the step in child DAG completed successfully
 	basicStep := childStatus.Nodes[0]
-	require.Equal(t, status.NodeSuccess.String(), basicStep.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), basicStep.Status.String())
 
 	// Debug: Print all output variables
 	if basicStep.OutputVariables != nil {
@@ -294,24 +293,24 @@ steps:
 `)
 
 	args := []string{"start", "--run-id", dagRunID, "basic_retry"}
-	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
+	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"dag-run finished"},
 	})
 
 	// Verify DAG completed successfully
 	ctx := context.Background()
-	ref := digraph.NewDAGRunRef("basic_retry", dagRunID)
+	ref := execution.NewDAGRunRef("basic_retry", dagRunID)
 	attempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
 	dagRunStatus, err := attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, status.NodeSuccess.String(), dagRunStatus.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), dagRunStatus.Status.String())
 
 	// Verify the step completed successfully after retry
 	retryStep := dagRunStatus.Nodes[0]
-	require.Equal(t, status.NodeSuccess.String(), retryStep.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), retryStep.Status.String())
 
 	// Debug retry output
 	require.NotNil(t, retryStep.OutputVariables, "OutputVariables should not be nil")
@@ -345,24 +344,24 @@ steps:
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
 	args := []string{"start", "--run-id", dagRunID, "no_retry"}
-	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
+	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"dag-run finished"},
 	})
 
 	// Verify DAG completed successfully
 	ctx := context.Background()
-	ref := digraph.NewDAGRunRef("no_retry", dagRunID)
+	ref := execution.NewDAGRunRef("no_retry", dagRunID)
 	attempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
 	dagRunStatus, err := attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, status.NodeSuccess.String(), dagRunStatus.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), dagRunStatus.Status.String())
 
 	// Verify the step completed successfully on first attempt
 	successStep := dagRunStatus.Nodes[0]
-	require.Equal(t, status.NodeSuccess.String(), successStep.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), successStep.Status.String())
 
 	// Debug output for first attempt success
 	require.NotNil(t, successStep.OutputVariables, "OutputVariables should not be nil")

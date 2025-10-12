@@ -9,9 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,15 +18,15 @@ import (
 func TestDAGRun(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		run := root.CreateTestDAGRun(t, "test-id-1", models.NewUTC(time.Now()))
+		run := root.CreateTestDAGRun(t, "test-id-1", execution.NewUTC(time.Now()))
 
-		ts1 := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
-		ts2 := models.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
-		ts3 := models.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
+		ts1 := execution.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
+		ts2 := execution.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
+		ts3 := execution.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
 
-		_ = run.WriteStatus(t, ts1, status.Running)
-		_ = run.WriteStatus(t, ts2, status.Success)
-		_ = run.WriteStatus(t, ts3, status.Error)
+		_ = run.WriteStatus(t, ts1, core.Running)
+		_ = run.WriteStatus(t, ts2, core.Success)
+		_ = run.WriteStatus(t, ts3, core.Error)
 
 		latestRun, err := run.LatestAttempt(run.Context, nil)
 		require.NoError(t, err)
@@ -35,7 +34,7 @@ func TestDAGRun(t *testing.T) {
 		dagRunStatus, err := latestRun.ReadStatus(run.Context)
 		require.NoError(t, err)
 
-		require.Equal(t, status.Error.String(), dagRunStatus.Status.String())
+		require.Equal(t, core.Error.String(), dagRunStatus.Status.String())
 	})
 }
 
@@ -45,11 +44,11 @@ type DAGRunTest struct {
 	TB testing.TB
 }
 
-func (dr DAGRunTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s status.Status) *Attempt {
+func (dr DAGRunTest) WriteStatus(t *testing.T, ts execution.TimeInUTC, s core.Status) *Attempt {
 	t.Helper()
 
-	dag := &digraph.DAG{Name: "test-dag"}
-	dagRunStatus := models.InitialStatus(dag)
+	dag := &core.DAG{Name: "test-dag"}
+	dagRunStatus := execution.InitialStatus(dag)
 	dagRunStatus.DAGRunID = "test-id-1"
 	dagRunStatus.Status = s
 
@@ -71,7 +70,7 @@ func (dr DAGRunTest) WriteStatus(t *testing.T, ts models.TimeInUTC, s status.Sta
 func TestListChildDAGRuns(t *testing.T) {
 	t.Run("NoChildDAGRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		run := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
+		run := root.CreateTestDAGRun(t, "test-dag-run", execution.NewUTC(time.Now()))
 
 		children, err := run.ListChildDAGRuns(run.Context)
 		require.NoError(t, err)
@@ -80,7 +79,7 @@ func TestListChildDAGRuns(t *testing.T) {
 
 	t.Run("WithChildDAGRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		run := root.CreateTestDAGRun(t, "parent-dag-run", models.NewUTC(time.Now()))
+		run := root.CreateTestDAGRun(t, "parent-dag-run", execution.NewUTC(time.Now()))
 
 		// Create child dag-run directory and some child dag-run directories
 		childDir := filepath.Join(run.baseDir, ChildDAGRunsDir)
@@ -113,28 +112,28 @@ func TestListChildDAGRuns(t *testing.T) {
 func TestListLogFiles(t *testing.T) {
 	t.Run("WithLogFiles", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		run := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
+		run := root.CreateTestDAGRun(t, "test-dag-run", execution.NewUTC(time.Now()))
 
 		// Create a run with log files
-		dag := &digraph.DAG{Name: "test-dag"}
-		dagRunStatus := models.InitialStatus(dag)
+		dag := &core.DAG{Name: "test-dag"}
+		dagRunStatus := execution.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
-		dagRunStatus.Status = status.Success
+		dagRunStatus.Status = core.Success
 		dagRunStatus.Log = "/tmp/test.log"
-		dagRunStatus.Nodes = []*models.Node{
+		dagRunStatus.Nodes = []*execution.Node{
 			{
-				Step:   digraph.Step{Name: "step1"},
+				Step:   core.Step{Name: "step1"},
 				Stdout: "/tmp/step1.out",
 				Stderr: "/tmp/step1.err",
 			},
 			{
-				Step:   digraph.Step{Name: "step2"},
+				Step:   core.Step{Name: "step2"},
 				Stdout: "/tmp/step2.out",
 				Stderr: "/tmp/step2.err",
 			},
 		}
 
-		ts := models.NewUTC(time.Now())
+		ts := execution.NewUTC(time.Now())
 		att, err := run.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
@@ -173,23 +172,23 @@ func TestRemoveLogFiles(t *testing.T) {
 		}
 
 		root := setupTestDataRoot(t)
-		run := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
+		run := root.CreateTestDAGRun(t, "test-dag-run", execution.NewUTC(time.Now()))
 
 		// Create a run with log files pointing to our test files
-		dag := &digraph.DAG{Name: "test-dag"}
-		dagRunStatus := models.InitialStatus(dag)
+		dag := &core.DAG{Name: "test-dag"}
+		dagRunStatus := execution.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
-		dagRunStatus.Status = status.Success
+		dagRunStatus.Status = core.Success
 		dagRunStatus.Log = logFiles[0]
-		dagRunStatus.Nodes = []*models.Node{
+		dagRunStatus.Nodes = []*execution.Node{
 			{
-				Step:   digraph.Step{Name: "step1"},
+				Step:   core.Step{Name: "step1"},
 				Stdout: logFiles[1],
 				Stderr: logFiles[2],
 			},
 		}
 
-		ts := models.NewUTC(time.Now())
+		ts := execution.NewUTC(time.Now())
 		att, err := run.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
@@ -232,19 +231,19 @@ func TestRemoveLogFiles(t *testing.T) {
 		}
 
 		root := setupTestDataRoot(t)
-		run := root.CreateTestDAGRun(t, "parent-dag-run", models.NewUTC(time.Now()))
+		run := root.CreateTestDAGRun(t, "parent-dag-run", execution.NewUTC(time.Now()))
 
 		// Create parent dag-run with log files
-		dag := &digraph.DAG{Name: "test-dag"}
-		dagRunStatus := models.InitialStatus(dag)
+		dag := &core.DAG{Name: "test-dag"}
+		dagRunStatus := execution.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "parent-dag-run"
 		dagRunStatus.Log = parentLogFiles[0]
-		dagRunStatus.Nodes = []*models.Node{{
-			Step:   digraph.Step{Name: "parent-step"},
+		dagRunStatus.Nodes = []*execution.Node{{
+			Step:   core.Step{Name: "parent-step"},
 			Stdout: parentLogFiles[1],
 		}}
 
-		ts := models.NewUTC(time.Now())
+		ts := execution.NewUTC(time.Now())
 		att, err := run.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
@@ -262,11 +261,11 @@ func TestRemoveLogFiles(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create child run with log files
-		childStatus := models.InitialStatus(dag)
+		childStatus := execution.InitialStatus(dag)
 		childStatus.DAGRunID = "child1"
 		childStatus.Log = childLogFiles[0]
-		childStatus.Nodes = []*models.Node{{
-			Step:   digraph.Step{Name: "child-step"},
+		childStatus.Nodes = []*execution.Node{{
+			Step:   core.Step{Name: "child-step"},
 			Stdout: childLogFiles[1],
 		}}
 
@@ -310,23 +309,23 @@ func TestDAGRunRemove(t *testing.T) {
 		}
 
 		root := setupTestDataRoot(t)
-		run := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
+		run := root.CreateTestDAGRun(t, "test-dag-run", execution.NewUTC(time.Now()))
 
 		// Create a run with log files
-		dag := &digraph.DAG{Name: "test-dag"}
-		dagRunStatus := models.InitialStatus(dag)
+		dag := &core.DAG{Name: "test-dag"}
+		dagRunStatus := execution.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
-		dagRunStatus.Status = status.Success
+		dagRunStatus.Status = core.Success
 		dagRunStatus.Log = logFiles[0]
-		dagRunStatus.Nodes = []*models.Node{
+		dagRunStatus.Nodes = []*execution.Node{
 			{
-				Step:   digraph.Step{Name: "step1"},
+				Step:   core.Step{Name: "step1"},
 				Stdout: logFiles[1],
 				Stderr: logFiles[2],
 			},
 		}
 
-		ts := models.NewUTC(time.Now())
+		ts := execution.NewUTC(time.Now())
 		att, err := run.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
@@ -380,19 +379,19 @@ func TestDAGRunRemove(t *testing.T) {
 		}
 
 		root := setupTestDataRoot(t)
-		run := root.CreateTestDAGRun(t, "parent-dag-run", models.NewUTC(time.Now()))
+		run := root.CreateTestDAGRun(t, "parent-dag-run", execution.NewUTC(time.Now()))
 
 		// Create parent dag-run with log files
-		dag := &digraph.DAG{Name: "test-dag"}
-		dagRunStatus := models.InitialStatus(dag)
+		dag := &core.DAG{Name: "test-dag"}
+		dagRunStatus := execution.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "parent-dag-run"
 		dagRunStatus.Log = parentLogFiles[0]
-		dagRunStatus.Nodes = []*models.Node{{
-			Step:   digraph.Step{Name: "parent-step"},
+		dagRunStatus.Nodes = []*execution.Node{{
+			Step:   core.Step{Name: "parent-step"},
 			Stdout: parentLogFiles[1],
 		}}
 
-		ts := models.NewUTC(time.Now())
+		ts := execution.NewUTC(time.Now())
 		att, err := run.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
@@ -419,11 +418,11 @@ func TestDAGRunRemove(t *testing.T) {
 			childDAGRun, err := NewDAGRun(childDAGRunDir)
 			require.NoError(t, err)
 
-			childStatus := models.InitialStatus(dag)
+			childStatus := execution.InitialStatus(dag)
 			childStatus.DAGRunID = child.dagRunID
 			childStatus.Log = child.logFiles[0]
-			childStatus.Nodes = []*models.Node{{
-				Step:   digraph.Step{Name: fmt.Sprintf("%s-step", child.dagRunID)},
+			childStatus.Nodes = []*execution.Node{{
+				Step:   core.Step{Name: fmt.Sprintf("%s-step", child.dagRunID)},
 				Stdout: child.logFiles[1],
 			}}
 
@@ -457,22 +456,22 @@ func TestDAGRunRemove(t *testing.T) {
 
 	t.Run("RemoveHandlesNonExistentLogFiles", func(t *testing.T) {
 		root := setupTestDataRoot(t)
-		run := root.CreateTestDAGRun(t, "test-dag-run", models.NewUTC(time.Now()))
+		run := root.CreateTestDAGRun(t, "test-dag-run", execution.NewUTC(time.Now()))
 
 		// Create a run with log files that don't exist
-		dag := &digraph.DAG{Name: "test-dag"}
-		dagRunStatus := models.InitialStatus(dag)
+		dag := &core.DAG{Name: "test-dag"}
+		dagRunStatus := execution.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
 		dagRunStatus.Log = "/non/existent/path/dag-run.log"
-		dagRunStatus.Nodes = []*models.Node{
+		dagRunStatus.Nodes = []*execution.Node{
 			{
-				Step:   digraph.Step{Name: "step1"},
+				Step:   core.Step{Name: "step1"},
 				Stdout: "/non/existent/path/step1.out",
 				Stderr: "/non/existent/path/step1.err",
 			},
 		}
 
-		ts := models.NewUTC(time.Now())
+		ts := execution.NewUTC(time.Now())
 		att, err := run.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
@@ -536,7 +535,7 @@ func TestDAGRun_listAttemptDirs(t *testing.T) {
 	// Create status files so attempts are considered valid
 	for _, dir := range []string{normalAttempt1, normalAttempt2, hiddenAttempt} {
 		statusFile := filepath.Join(dir, JSONLStatusFile)
-		status := createTestStatus(status.Success)
+		status := createTestStatus(core.Success)
 		data, err := json.Marshal(status)
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(statusFile, append(data, '\n'), 0600))

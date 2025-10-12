@@ -5,10 +5,11 @@ import (
 	"os/exec"
 	"testing"
 
+	"strings"
+
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/spf13/cobra"
-	"strings"
 )
 
 func TestValidateCommand(t *testing.T) {
@@ -79,7 +80,7 @@ func TestValidateCommand_HelperExit(t *testing.T) {
 	dagFile := os.Getenv("DAG_FILE_PATH")
 
 	root := &cobra.Command{Use: "root"}
-	root.AddCommand(cmd.CmdValidate())
+	root.AddCommand(cmd.Validate())
 	root.SetArgs([]string{"validate", dagFile})
 
 	// This will os.Exit(1) on validation failure via NewCommand wrapper

@@ -8,10 +8,10 @@ import (
 	"net"
 	"os"
 
-	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/coordinator"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -94,7 +94,7 @@ func runCoordinator(ctx *Context, _ []string) error {
 
 // newCoordinator creates a new Coordinator service instance.
 // It sets up a gRPC server and listener for distributed task coordination.
-func newCoordinator(ctx context.Context, cfg *config.Config, registry models.ServiceRegistry) (*coordinator.Service, error) {
+func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.ServiceRegistry) (*coordinator.Service, error) {
 	// Generate instance ID
 	hostname, err := os.Hostname()
 	if err != nil {
