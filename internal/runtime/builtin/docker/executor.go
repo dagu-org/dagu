@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 

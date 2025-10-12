@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/jedib0t/go-pretty/v6/table"
 )

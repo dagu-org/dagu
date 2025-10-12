@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/infra/telemetry"
+	"github.com/dagu-org/dagu/internal/services/coordinator"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/require"
 )

@@ -9,8 +9,8 @@ import (
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/mailer"
-	"github.com/dagu-org/dagu/internal/logger"
 )
 
 // AllEnvs returns all environment variables that needs to be passed to the command.

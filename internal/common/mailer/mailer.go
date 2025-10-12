@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/common/logger"
 )
 
 // Client is a mailer that sends emails.

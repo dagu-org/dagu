@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/logger"
 )
 
 // GetSchedulerStatus returns the status of all registered scheduler instances

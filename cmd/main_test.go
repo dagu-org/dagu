@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/apps/cli"
+	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -70,20 +70,20 @@ func TestRootCommand(t *testing.T) {
 			rootCmd.ResetCommands()
 
 			// Re-add commands
-			rootCmd.AddCommand(cli.Start())
-			rootCmd.AddCommand(cli.Enqueue())
-			rootCmd.AddCommand(cli.Dequeue())
-			rootCmd.AddCommand(cli.Stop())
-			rootCmd.AddCommand(cli.Restart())
-			rootCmd.AddCommand(cli.Dry())
-			rootCmd.AddCommand(cli.Validate())
-			rootCmd.AddCommand(cli.Status())
-			rootCmd.AddCommand(cli.Version())
-			rootCmd.AddCommand(cli.Server())
-			rootCmd.AddCommand(cli.Scheduler())
-			rootCmd.AddCommand(cli.Retry())
-			rootCmd.AddCommand(cli.StartAll())
-			rootCmd.AddCommand(cli.Migrate())
+			rootCmd.AddCommand(cmd.Start())
+			rootCmd.AddCommand(cmd.Enqueue())
+			rootCmd.AddCommand(cmd.Dequeue())
+			rootCmd.AddCommand(cmd.Stop())
+			rootCmd.AddCommand(cmd.Restart())
+			rootCmd.AddCommand(cmd.Dry())
+			rootCmd.AddCommand(cmd.Validate())
+			rootCmd.AddCommand(cmd.Status())
+			rootCmd.AddCommand(cmd.Version())
+			rootCmd.AddCommand(cmd.Server())
+			rootCmd.AddCommand(cmd.Scheduler())
+			rootCmd.AddCommand(cmd.Retry())
+			rootCmd.AddCommand(cmd.StartAll())
+			rootCmd.AddCommand(cmd.Migrate())
 
 			// Set args
 			rootCmd.SetArgs(tt.args[1:]) // Skip program name
@@ -232,18 +232,18 @@ operations, or remote commands.
 	}
 
 	// Re-add all commands
-	rootCmd.AddCommand(cli.Start())
-	rootCmd.AddCommand(cli.Enqueue())
-	rootCmd.AddCommand(cli.Dequeue())
-	rootCmd.AddCommand(cli.Stop())
-	rootCmd.AddCommand(cli.Restart())
-	rootCmd.AddCommand(cli.Dry())
-	rootCmd.AddCommand(cli.Validate())
-	rootCmd.AddCommand(cli.Status())
-	rootCmd.AddCommand(cli.Version())
-	rootCmd.AddCommand(cli.Server())
-	rootCmd.AddCommand(cli.Scheduler())
-	rootCmd.AddCommand(cli.Retry())
-	rootCmd.AddCommand(cli.StartAll())
-	rootCmd.AddCommand(cli.Migrate())
+	rootCmd.AddCommand(cmd.Start())
+	rootCmd.AddCommand(cmd.Enqueue())
+	rootCmd.AddCommand(cmd.Dequeue())
+	rootCmd.AddCommand(cmd.Stop())
+	rootCmd.AddCommand(cmd.Restart())
+	rootCmd.AddCommand(cmd.Dry())
+	rootCmd.AddCommand(cmd.Validate())
+	rootCmd.AddCommand(cmd.Status())
+	rootCmd.AddCommand(cmd.Version())
+	rootCmd.AddCommand(cmd.Server())
+	rootCmd.AddCommand(cmd.Scheduler())
+	rootCmd.AddCommand(cmd.Retry())
+	rootCmd.AddCommand(cmd.StartAll())
+	rootCmd.AddCommand(cmd.Migrate())
 }
