@@ -8,14 +8,14 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/status"
+	core1 "github.com/dagu-org/dagu/internal/core"
 )
 
 // InitialStatus creates an initial Status object for the given DAG
 func InitialStatus(dag *core.DAG) DAGRunStatus {
 	return DAGRunStatus{
 		Name:          dag.Name,
-		Status:        status.None,
+		Status:        core1.None,
 		PID:           PID(0),
 		Nodes:         NodesFromSteps(dag.Steps),
 		OnExit:        NewNodeOrNil(dag.HandlerOn.Exit),
@@ -38,7 +38,7 @@ type DAGRunStatus struct {
 	Name          string            `json:"name"`
 	DAGRunID      string            `json:"dagRunId"`
 	AttemptID     string            `json:"attemptId"`
-	Status        status.Status     `json:"status"`
+	Status        core1.Status      `json:"status"`
 	PID           PID               `json:"pid,omitempty"`
 	Nodes         []*Node           `json:"nodes,omitempty"`
 	OnExit        *Node             `json:"onExit,omitempty"`

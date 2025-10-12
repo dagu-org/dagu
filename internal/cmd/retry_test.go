@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/core/status"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +34,7 @@ steps:
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
-		require.Equal(t, dagRunStatus.Status, status.Success)
+		require.Equal(t, dagRunStatus.Status, core.Success)
 		require.NotNil(t, dagRunStatus.Status)
 
 		// Retry with the dag-run ID using file path.
@@ -67,7 +67,7 @@ steps:
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
-		require.Equal(t, dagRunStatus.Status, status.Success)
+		require.Equal(t, dagRunStatus.Status, core.Success)
 		require.NotNil(t, dagRunStatus.Status)
 
 		// Retry with the dag-run ID using DAG name.

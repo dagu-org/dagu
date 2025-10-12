@@ -11,8 +11,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,7 +45,7 @@ func TestAttempt_Write(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test write without open
-	testStatus := createTestStatus(status.Running)
+	testStatus := createTestStatus(core1.Running)
 	err = att.Write(context.Background(), testStatus)
 	assert.ErrorIs(t, err, ErrStatusFileNotOpen)
 
@@ -61,7 +61,7 @@ func TestAttempt_Write(t *testing.T) {
 	actual, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "test", actual.DAGRunID)
-	assert.Equal(t, status.Running, actual.Status)
+	assert.Equal(t, core1.Running, actual.Status)
 
 	// Close
 	err = att.Close(context.Background())
@@ -73,8 +73,8 @@ func TestAttempt_Read(t *testing.T) {
 	file := filepath.Join(dir, "status.dat")
 
 	// Create test file with multiple status entries
-	status1 := createTestStatus(status.Running)
-	status2 := createTestStatus(status.Success)
+	status1 := createTestStatus(core1.Running)
+	status2 := createTestStatus(core1.Success)
 
 	// Create file directory if it doesn't exist
 	err := os.MkdirAll(filepath.Dir(file), 0750)
@@ -104,12 +104,12 @@ func TestAttempt_Read(t *testing.T) {
 	// Read status - should get the last entry (test2)
 	dagRunStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, status.Success.String(), dagRunStatus.Status.String())
+	assert.Equal(t, core1.Success.String(), dagRunStatus.Status.String())
 
 	// Read using ReadStatus
 	latestStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, status.Success.String(), latestStatus.Status.String())
+	assert.Equal(t, core1.Success.String(), latestStatus.Status.String())
 }
 
 func TestAttempt_Compact(t *testing.T) {
@@ -118,11 +118,11 @@ func TestAttempt_Compact(t *testing.T) {
 
 	// Create test file with multiple status entries
 	for i := 0; i < 10; i++ {
-		testStatus := createTestStatus(status.Running)
+		testStatus := createTestStatus(core1.Running)
 
 		if i == 9 {
 			// Make some status changes to create different attempts
-			testStatus.Status = status.Success
+			testStatus.Status = core1.Success
 		}
 
 		if i == 0 {
@@ -166,7 +166,7 @@ func TestAttempt_Compact(t *testing.T) {
 	// Verify content is still correct
 	dagRunStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, status.Success, dagRunStatus.Status)
+	assert.Equal(t, core1.Success, dagRunStatus.Status)
 }
 
 func TestAttempt_Close(t *testing.T) {
@@ -181,7 +181,7 @@ func TestAttempt_Close(t *testing.T) {
 	require.NoError(t, err)
 
 	// Write some data
-	err = att.Write(context.Background(), createTestStatus(status.Running))
+	err = att.Write(context.Background(), createTestStatus(core1.Running))
 	require.NoError(t, err)
 
 	// Close
@@ -189,7 +189,7 @@ func TestAttempt_Close(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify we can't write after close
-	err = att.Write(context.Background(), createTestStatus(status.Success))
+	err = att.Write(context.Background(), createTestStatus(core1.Success))
 	assert.ErrorIs(t, err, ErrStatusFileNotOpen)
 
 	// Test double close is safe
@@ -209,7 +209,7 @@ func TestAttempt_HandleNonExistentFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Write to create the file
-	err = att.Write(context.Background(), createTestStatus(status.Success))
+	err = att.Write(context.Background(), createTestStatus(core1.Success))
 	assert.NoError(t, err)
 
 	// Verify the file was created with correct data
@@ -248,7 +248,7 @@ func TestAttempt_InvalidJSON(t *testing.T) {
 	file := filepath.Join(dir, "invalid.dat")
 
 	// Create a file with valid JSOn
-	validStatus := createTestStatus(status.Running)
+	validStatus := createTestStatus(core1.Running)
 	writeJSONToFile(t, file, validStatus)
 
 	// Append invalid JSON
@@ -263,7 +263,7 @@ func TestAttempt_InvalidJSON(t *testing.T) {
 	// Should be able to read and get the valid entry
 	dagRunStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, status.Running.String(), dagRunStatus.Status.String())
+	assert.Equal(t, core1.Running.String(), dagRunStatus.Status.String())
 }
 
 func TestAttempt_CorruptedStatusFile(t *testing.T) {
@@ -460,7 +460,7 @@ func createTestDAG() *core.DAG {
 }
 
 // createTestStatus creates a sample status for testing using StatusFactory
-func createTestStatus(st status.Status) execution.DAGRunStatus {
+func createTestStatus(st core1.Status) execution.DAGRunStatus {
 	dag := createTestDAG()
 
 	return execution.DAGRunStatus{

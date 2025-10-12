@@ -9,8 +9,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 )
 
 // Collector implements prometheus.Collector interface
@@ -175,26 +175,26 @@ func (c *Collector) collectDAGRunMetrics(ctx context.Context, ch chan<- promethe
 	currentlyRunning := float64(0)
 
 	for _, st := range statuses {
-		if st.Status == status.Running {
+		if st.Status == core.Running {
 			currentlyRunning++
 		}
 
 		// Map internal status to user-friendly names
 		var statusLabel string
 		switch st.Status {
-		case status.Success:
+		case core.Success:
 			statusLabel = "success"
-		case status.Error:
+		case core.Error:
 			statusLabel = "error"
-		case status.PartialSuccess:
+		case core.PartialSuccess:
 			statusLabel = "partial_success"
-		case status.Cancel:
+		case core.Cancel:
 			statusLabel = "cancelled"
-		case status.Running:
+		case core.Running:
 			statusLabel = "running"
-		case status.Queued:
+		case core.Queued:
 			statusLabel = "queued"
-		case status.None:
+		case core.None:
 			statusLabel = "none"
 		default:
 			continue // Skip any unknown statuses

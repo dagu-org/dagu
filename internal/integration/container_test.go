@@ -14,7 +14,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dagu-org/dagu/internal/core/status"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -80,7 +80,7 @@ steps:
 			th := test.Setup(t)
 			dag := th.DAG(t, tt.dagConfig)
 			dag.Agent().RunSuccess(t)
-			dag.AssertLatestStatus(t, status.Success)
+			dag.AssertLatestStatus(t, core.Success)
 			dag.AssertOutputs(t, tt.expectedOutputs)
 		})
 	}
@@ -256,7 +256,7 @@ steps:
 			th := test.Setup(t)
 			dag := th.DAG(t, tt.dagConfigFunc(tempDir))
 			dag.Agent().RunSuccess(t)
-			dag.AssertLatestStatus(t, status.Success)
+			dag.AssertLatestStatus(t, core.Success)
 			dag.AssertOutputs(t, tt.expectedOutputs)
 		})
 	}
@@ -290,7 +290,7 @@ steps:
 	// Now test that pull policy "never" works with the pre-existing image
 	dag := th.DAG(t, pullPolicyTestDAG)
 	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Success)
 	dag.AssertOutputs(t, map[string]any{
 		"OUT1": "pull policy test",
 	})
@@ -315,7 +315,7 @@ steps:
 
 	dag := th.DAG(t, dagConfig)
 	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Success)
 	dag.AssertOutputs(t, map[string]any{
 		"ENTRYPOINT_OK": "entrypoint-ok",
 	})
@@ -338,7 +338,7 @@ steps:
 
 	dag := th.DAG(t, dagConfig)
 	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Success)
 	dag.AssertOutputs(t, map[string]any{
 		"COMMAND_OK": "command-ok",
 	})
@@ -370,7 +370,7 @@ steps:
 
 	dag := th.DAG(t, dagConfig)
 	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Success)
 	dag.AssertOutputs(t, map[string]any{
 		"EXEC_EXISTING_OUT": "hello-existing",
 	})

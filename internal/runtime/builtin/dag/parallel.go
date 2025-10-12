@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/status"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -187,9 +187,9 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 }
 
 // DetermineNodeStatus implements NodeStatusDeterminer.
-func (e *parallelExecutor) DetermineNodeStatus(_ context.Context) (status.NodeStatus, error) {
+func (e *parallelExecutor) DetermineNodeStatus(_ context.Context) (core1.NodeStatus, error) {
 	if len(e.results) == 0 {
-		return status.NodeError, fmt.Errorf("no results available for node status determination")
+		return core1.NodeError, fmt.Errorf("no results available for node status determination")
 	}
 
 	// Check if all child DAGs succeeded or if any had partial success
@@ -197,17 +197,17 @@ func (e *parallelExecutor) DetermineNodeStatus(_ context.Context) (status.NodeSt
 	var partialSuccess bool
 	for _, result := range e.results {
 		if !result.Status.IsSuccess() {
-			return status.NodeError, fmt.Errorf("child DAG run %s failed with status: %s", result.DAGRunID, result.Status)
+			return core1.NodeError, fmt.Errorf("child DAG run %s failed with status: %s", result.DAGRunID, result.Status)
 		}
-		if result.Status == status.PartialSuccess {
+		if result.Status == core1.PartialSuccess {
 			partialSuccess = true
 		}
 	}
 
 	if partialSuccess {
-		return status.NodePartialSuccess, nil
+		return core1.NodePartialSuccess, nil
 	}
-	return status.NodeSuccess, nil
+	return core1.NodeSuccess, nil
 }
 
 // executeChild executes a single child DAG with the given parameters

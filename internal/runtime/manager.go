@@ -10,8 +10,8 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/sock"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/google/uuid"
 )
 
@@ -153,7 +153,7 @@ func (m *Manager) GenDAGRunID(_ context.Context) (string, error) {
 // Returns true if the status can be retrieved without error, indicating the DAG is running.
 func (m *Manager) IsRunning(ctx context.Context, dag *core.DAG, dagRunID string) bool {
 	st, _ := m.currentStatus(ctx, dag, dagRunID)
-	return st != nil && st.DAGRunID == dagRunID && st.Status == status.Running
+	return st != nil && st.DAGRunID == dagRunID && st.Status == core1.Running
 }
 
 // GetCurrentStatus retrieves the current status of a dag-run by its run ID.
@@ -187,7 +187,7 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun core.DAGRunRef) (*e
 	}
 
 	// If the status is running, ensure if the process is still alive
-	if dagRun.ID == st.Root.ID && st.Status == status.Running {
+	if dagRun.ID == st.Root.ID && st.Status == core1.Running {
 		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
 			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
 		}
@@ -213,7 +213,7 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *core.DAG
 	}
 
 	// If the DAG is running, query the current status
-	if st.Status == status.Running {
+	if st.Status == core1.Running {
 		currentStatus, err := m.currentStatus(ctx, dag, st.DAGRunID)
 		if err == nil {
 			return currentStatus, nil
@@ -222,7 +222,7 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *core.DAG
 
 	// If querying the current status fails, even if the status is running,
 	// check if the process is actually alive before marking as error.
-	if st.Status == status.Running {
+	if st.Status == core1.Running {
 		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
 			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
 		}
@@ -271,7 +271,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (execution
 	alive, _ := m.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
 	if alive > 0 {
 		items, _ := m.dagRunStore.ListStatuses(
-			ctx, execution.WithName(dag.Name), execution.WithStatuses([]status.Status{status.Running}),
+			ctx, execution.WithName(dag.Name), execution.WithStatuses([]core1.Status{core1.Running}),
 		)
 		if len(items) > 0 {
 			return *items[0], nil
@@ -295,7 +295,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (execution
 	}
 
 	// If the DAG is running, query the current status
-	if st.Status == status.Running {
+	if st.Status == core1.Running {
 		dag, err = attempt.ReadDAG(ctx)
 		if err != nil {
 			currentStatus, err := m.currentStatus(ctx, dag, st.DAGRunID)
@@ -400,7 +400,7 @@ func (m *Manager) checkAndUpdateStaleRunningStatus(
 		return nil
 	}
 	// Process is not alive, update status to error
-	st.Status = status.Error
+	st.Status = core1.Error
 
 	return nil
 }

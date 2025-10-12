@@ -8,7 +8,6 @@ import (
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/core/status"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -63,7 +62,7 @@ type RunStatus struct {
 	// Outputs is the outputs of the dag-run.
 	Outputs map[string]string
 	// Status is the execution status of the dag-run.
-	Status status.Status
+	Status Status
 }
 
 // MarshalJSON implements the json.Marshaler interface for RunStatus.

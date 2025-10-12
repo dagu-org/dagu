@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core/status"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -72,7 +72,7 @@ steps:
 		agent.RunSuccess(t)
 
 		// Verify the DAG completed successfully
-		dagWrapper.AssertLatestStatus(t, status.Success)
+		dagWrapper.AssertLatestStatus(t, core.Success)
 	})
 	t.Run("DistributedExecutionFailure", func(t *testing.T) {
 		// Test that distributed execution failure is not fallback to local execution
@@ -108,7 +108,7 @@ steps:
 
 		// Verify the DAG did not complete successfully
 		st := agent.Status(coord.Context)
-		require.NotEqual(t, status.Success, st.Status)
+		require.NotEqual(t, core.Success, st.Status)
 	})
 	t.Run("Cancellation", func(t *testing.T) {
 		yamlContent := `
@@ -173,13 +173,13 @@ steps:
 		}()
 
 		// Wait for the DAG to start running
-		dagWrapper.AssertLatestStatus(t, status.Running)
+		dagWrapper.AssertLatestStatus(t, core.Running)
 
 		err := coord.DAGRunMgr.Stop(coord.Context, agent.DAG, runID)
 		require.NoError(t, err)
 
 		// Verify the DAG completed successfully
-		dagWrapper.AssertLatestStatus(t, status.Cancel)
+		dagWrapper.AssertLatestStatus(t, core.Cancel)
 
 		// Wait for run to finish
 		<-done

@@ -9,8 +9,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
@@ -71,7 +71,7 @@ func runRestart(ctx *Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
-	if dagStatus.Status != status.Running {
+	if dagStatus.Status != core1.Running {
 		return fmt.Errorf("DAG %s is not running, current status: %s", name, dagStatus.Status)
 	}
 
@@ -177,7 +177,7 @@ func stopDAGIfRunning(ctx context.Context, cli runtime.Manager, dag *core.DAG, d
 		return fmt.Errorf("failed to get current status: %w", err)
 	}
 
-	if dagStatus.Status == status.Running {
+	if dagStatus.Status == core1.Running {
 		logger.Infof(ctx, "Stopping: %s", dag.Name)
 		if err := stopRunningDAG(ctx, cli, dag, dagRunID); err != nil {
 			return fmt.Errorf("failed to stop running DAG: %w", err)
@@ -194,7 +194,7 @@ func stopRunningDAG(ctx context.Context, cli runtime.Manager, dag *core.DAG, dag
 			return fmt.Errorf("failed to get current status: %w", err)
 		}
 
-		if dagStatus.Status != status.Running {
+		if dagStatus.Status != core1.Running {
 			return nil
 		}
 

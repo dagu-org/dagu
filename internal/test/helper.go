@@ -19,9 +19,9 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
@@ -262,7 +262,7 @@ type DAG struct {
 	*core.DAG
 }
 
-func (d *DAG) AssertLatestStatus(t *testing.T, expected status.Status) {
+func (d *DAG) AssertLatestStatus(t *testing.T, expected core1.Status) {
 	t.Helper()
 
 	require.Eventually(t, func() bool {
@@ -284,7 +284,7 @@ func (d *DAG) AssertDAGRunCount(t *testing.T, expected int) {
 	require.Len(t, runstore, expected)
 }
 
-func (d *DAG) AssertCurrentStatus(t *testing.T, expected status.Status) {
+func (d *DAG) AssertCurrentStatus(t *testing.T, expected core1.Status) {
 	t.Helper()
 
 	assert.Eventually(t, func() bool {
@@ -424,7 +424,7 @@ func (a *Agent) RunError(t *testing.T) {
 	assert.Error(t, err)
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, status.Error.String(), st.String())
+	require.Equal(t, core1.Error.String(), st.String())
 }
 
 func (a *Agent) RunCancel(t *testing.T) {
@@ -443,7 +443,7 @@ func (a *Agent) RunCancel(t *testing.T) {
 	assert.NoError(t, err)
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, status.Cancel.String(), st.String())
+	require.Equal(t, core1.Cancel.String(), st.String())
 }
 
 func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
@@ -453,7 +453,7 @@ func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
 	require.Error(t, err, "expected error %q, got nil", expectedErr)
 	require.Contains(t, err.Error(), expectedErr)
 	st := a.Status(a.Context)
-	require.Equal(t, status.Cancel.String(), st.Status.String())
+	require.Equal(t, core1.Cancel.String(), st.Status.String())
 }
 
 func (a *Agent) RunSuccess(t *testing.T) {
@@ -463,12 +463,12 @@ func (a *Agent) RunSuccess(t *testing.T) {
 	assert.NoError(t, err, "failed to run agent")
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, status.Success.String(), st.String(), "expected status %q, got %q", status.Success, st)
+	require.Equal(t, core1.Success.String(), st.String(), "expected status %q, got %q", core1.Success, st)
 
 	// check all nodes are in success or skipped state
 	for _, node := range a.Status(a.Context).Nodes {
 		st := node.Status
-		if st == status.NodeSkipped || st == status.NodeSuccess {
+		if st == core1.NodeSkipped || st == core1.NodeSuccess {
 			continue
 		}
 		t.Errorf("expected node %q to be in success state, got %q", node.Step.Name, st.String())

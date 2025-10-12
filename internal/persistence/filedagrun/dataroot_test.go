@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -162,7 +162,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 			status := execution.DAGRunStatus{
 				Name:     "test-dag",
 				DAGRunID: dagRunTest.dagRunID,
-				Status:   status.Success,
+				Status:   core.Success,
 			}
 			require.NoError(t, attempt.Write(root.Context, status))
 			require.NoError(t, attempt.Close(root.Context))
@@ -208,7 +208,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 			status := execution.DAGRunStatus{
 				Name:     "test-dag",
 				DAGRunID: dagRunTest.dagRunID,
-				Status:   status.Success,
+				Status:   core.Success,
 			}
 			require.NoError(t, attempt.Write(root.Context, status))
 			require.NoError(t, attempt.Close(root.Context))
@@ -254,7 +254,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 			status := execution.DAGRunStatus{
 				Name:     "test-dag",
 				DAGRunID: dagRunTest.dagRunID,
-				Status:   status.Success,
+				Status:   core.Success,
 			}
 			require.NoError(t, attempt.Write(root.Context, status))
 			require.NoError(t, attempt.Close(root.Context))

@@ -10,7 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/status"
+	core1 "github.com/dagu-org/dagu/internal/core"
 )
 
 // Data is a thread-safe wrapper around NodeData.
@@ -27,7 +27,7 @@ type NodeData struct {
 
 type NodeState struct {
 	// Status represents the state of the node.
-	Status status.NodeStatus
+	Status core1.NodeStatus
 	// Stdout is the log file path from the node.
 	Stdout string
 	// Stderr is the log file path for the error log (stderr).
@@ -228,14 +228,14 @@ func (d *Data) State() NodeState {
 	return d.inner.State
 }
 
-func (d *Data) Status() status.NodeStatus {
+func (d *Data) Status() core1.NodeStatus {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
 	return d.inner.State.Status
 }
 
-func (d *Data) SetStatus(s status.NodeStatus) {
+func (d *Data) SetStatus(s core1.NodeStatus) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -443,5 +443,5 @@ func (d *Data) MarkError(err error) {
 	defer d.mu.Unlock()
 
 	d.inner.State.Error = err
-	d.inner.State.Status = status.NodeError
+	d.inner.State.Status = core1.NodeError
 }

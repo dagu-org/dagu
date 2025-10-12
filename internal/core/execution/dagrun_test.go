@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -142,7 +142,7 @@ func (m *mockDAGRunAttempt) Hidden() bool {
 func TestListDAGRunStatusesOptions(t *testing.T) {
 	from := execution.NewUTC(time.Now().Add(-24 * time.Hour))
 	to := execution.NewUTC(time.Now())
-	statuses := []status.Status{status.Success, status.Error}
+	statuses := []core1.Status{core1.Success, core1.Error}
 
 	opts := execution.ListDAGRunStatusesOptions{}
 
@@ -209,7 +209,7 @@ func TestDAGRunStoreInterface(t *testing.T) {
 
 	// Test ListStatuses
 	statuses := []*execution.DAGRunStatus{
-		{Name: "test-dag", Status: status.Success},
+		{Name: "test-dag", Status: core1.Success},
 	}
 	store.On("ListStatuses", ctx, mock.Anything).Return(statuses, nil)
 
@@ -265,7 +265,7 @@ func TestDAGRunAttemptInterface(t *testing.T) {
 	status := execution.DAGRunStatus{
 		Name:     "test-dag",
 		DAGRunID: "run-123",
-		Status:   status.Running,
+		Status:   core1.Running,
 	}
 	attempt.On("Write", ctx, status).Return(nil)
 	err = attempt.Write(ctx, status)
@@ -403,7 +403,7 @@ func TestListDAGRunStatusesWithOptions(t *testing.T) {
 	opts := []execution.ListDAGRunStatusesOption{
 		execution.WithFrom(from),
 		execution.WithTo(to),
-		execution.WithStatuses([]status.Status{status.Success}),
+		execution.WithStatuses([]core1.Status{core1.Success}),
 		execution.WithName("test"),
 	}
 
@@ -411,7 +411,7 @@ func TestListDAGRunStatusesWithOptions(t *testing.T) {
 		{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
-			Status:   status.Success,
+			Status:   core1.Success,
 		},
 	}
 

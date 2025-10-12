@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core/status"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -43,7 +43,7 @@ steps:
 		require.NoError(t, agent.Run(agent.Context))
 
 		// Verify successful completion
-		testDAG.AssertLatestStatus(t, status.Success)
+		testDAG.AssertLatestStatus(t, core.Success)
 
 		// Get the full run status
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
@@ -53,7 +53,7 @@ steps:
 		// Note: The child DAG's output is not directly visible in the parent's stdout
 		require.Len(t, dagRunStatus.Nodes, 2)
 		require.Equal(t, "run-local-child", dagRunStatus.Nodes[0].Step.Name)
-		require.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
+		require.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[0].Status)
 
 		// Verify the second step output
 		logContent, err := os.ReadFile(dagRunStatus.Nodes[1].Stdout)
@@ -96,7 +96,7 @@ steps:
 		require.NoError(t, agent.Run(agent.Context))
 
 		// Verify successful completion
-		testDAG.AssertLatestStatus(t, status.Success)
+		testDAG.AssertLatestStatus(t, core.Success)
 
 		// Get the full run status
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
@@ -105,7 +105,7 @@ steps:
 		// For parallel execution, we should have one step that ran multiple instances
 		require.Len(t, dagRunStatus.Nodes, 1)
 		require.Equal(t, "parallel-tasks", dagRunStatus.Nodes[0].Step.Name)
-		require.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
+		require.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[0].Status)
 	})
 
 	t.Run("NestedLocalDAGs", func(t *testing.T) {
@@ -153,7 +153,7 @@ steps:
 		require.Contains(t, err.Error(), "failed")
 
 		// This should fail because middle-dag cannot see leaf-dag
-		testDAG.AssertLatestStatus(t, status.Error)
+		testDAG.AssertLatestStatus(t, core.Error)
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
@@ -161,7 +161,7 @@ steps:
 		// Root DAG should have one step that tried to run middle-dag
 		require.Len(t, dagRunStatus.Nodes, 1)
 		require.Equal(t, "run-middle-dag", dagRunStatus.Nodes[0].Step.Name)
-		require.Equal(t, status.NodeError, dagRunStatus.Nodes[0].Status)
+		require.Equal(t, core.NodeError, dagRunStatus.Nodes[0].Status)
 	})
 
 	t.Run("LocalDAGWithConditionalExecution", func(t *testing.T) {
@@ -208,7 +208,7 @@ steps:
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
 
-		testDAG.AssertLatestStatus(t, status.Success)
+		testDAG.AssertLatestStatus(t, core.Success)
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
@@ -218,15 +218,15 @@ steps:
 
 		// Check environment step
 		require.Equal(t, "check-env", dagRunStatus.Nodes[0].Step.Name)
-		require.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
+		require.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[0].Status)
 
 		// Production DAG should run
 		require.Equal(t, "run-prod-dag", dagRunStatus.Nodes[1].Step.Name)
-		require.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[1].Status)
+		require.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[1].Status)
 
 		// Development DAG should be skipped
 		require.Equal(t, "run-dev-dag", dagRunStatus.Nodes[2].Step.Name)
-		require.Equal(t, status.NodeSkipped, dagRunStatus.Nodes[2].Status)
+		require.Equal(t, core.NodeSkipped, dagRunStatus.Nodes[2].Status)
 	})
 
 	t.Run("LocalDAGWithOutputPassing", func(t *testing.T) {
@@ -268,7 +268,7 @@ steps:
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
 
-		testDAG.AssertLatestStatus(t, status.Success)
+		testDAG.AssertLatestStatus(t, core.Success)
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
@@ -278,11 +278,11 @@ steps:
 
 		// First step generates data
 		require.Equal(t, "generate-data", dagRunStatus.Nodes[0].Step.Name)
-		require.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
+		require.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[0].Status)
 
 		// Second step processes data
 		require.Equal(t, "process-data", dagRunStatus.Nodes[1].Step.Name)
-		require.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[1].Status)
+		require.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[1].Status)
 	})
 
 	t.Run("LocalDAGReferencesNonExistent", func(t *testing.T) {
@@ -310,7 +310,7 @@ steps:
 		require.Contains(t, err.Error(), "non-existent-dag")
 
 		// Check that the DAG failed
-		testDAG.AssertLatestStatus(t, status.Error)
+		testDAG.AssertLatestStatus(t, core.Error)
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
@@ -318,7 +318,7 @@ steps:
 		// Should have one step that failed
 		require.Len(t, dagRunStatus.Nodes, 1)
 		require.Equal(t, "run-missing-dag", dagRunStatus.Nodes[0].Step.Name)
-		require.Equal(t, status.NodeError, dagRunStatus.Nodes[0].Status)
+		require.Equal(t, core.NodeError, dagRunStatus.Nodes[0].Status)
 	})
 
 	t.Run("LocalDAGWithComplexDependencies", func(t *testing.T) {
@@ -364,7 +364,7 @@ steps:
 		agent := testDAG.Agent()
 		require.NoError(t, agent.Run(agent.Context))
 
-		testDAG.AssertLatestStatus(t, status.Success)
+		testDAG.AssertLatestStatus(t, core.Success)
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
@@ -374,16 +374,16 @@ steps:
 
 		// Verify each step
 		require.Equal(t, "setup", dagRunStatus.Nodes[0].Step.Name)
-		require.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[0].Status)
+		require.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[0].Status)
 
 		require.Equal(t, "task1", dagRunStatus.Nodes[1].Step.Name)
-		require.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[1].Status)
+		require.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[1].Status)
 
 		require.Equal(t, "task2", dagRunStatus.Nodes[2].Step.Name)
-		require.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[2].Status)
+		require.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[2].Status)
 
 		require.Equal(t, "combine", dagRunStatus.Nodes[3].Step.Name)
-		require.Equal(t, status.NodeSuccess, dagRunStatus.Nodes[3].Status)
+		require.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[3].Status)
 
 		// Verify the combine step output
 		logContent, err := os.ReadFile(dagRunStatus.Nodes[3].Stdout)
@@ -425,7 +425,7 @@ steps:
 		require.NoError(t, agent.Run(agent.Context))
 
 		// Verify successful completion
-		testDAG.AssertLatestStatus(t, status.PartialSuccess)
+		testDAG.AssertLatestStatus(t, core.PartialSuccess)
 	})
 
 	t.Run("PartialSuccessChildDAG", func(t *testing.T) {
@@ -458,6 +458,6 @@ steps:
 		require.NoError(t, agent.Run(agent.Context))
 
 		// Verify successful completion
-		testDAG.AssertLatestStatus(t, status.PartialSuccess)
+		testDAG.AssertLatestStatus(t, core.PartialSuccess)
 	})
 }

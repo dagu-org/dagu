@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/status"
+	core1 "github.com/dagu-org/dagu/internal/core"
 )
 
 // Executor is an interface for executing steps in a DAG.
@@ -47,7 +47,7 @@ type ExitCoder interface {
 
 // NodeStatusDeterminer is an interface for executors that can determine the status of a node.
 type NodeStatusDeterminer interface {
-	DetermineNodeStatus(ctx context.Context) (status.NodeStatus, error)
+	DetermineNodeStatus(ctx context.Context) (core1.NodeStatus, error)
 }
 
 // DAGExecutor is an interface for child DAG executors.

@@ -6,8 +6,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/spf13/cobra"
 )
 
@@ -53,7 +53,7 @@ func dequeueDAGRun(ctx *Context, dagRun core.DAGRunRef) error {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	if dagStatus.Status != status.Queued {
+	if dagStatus.Status != core1.Queued {
 		// If the status is not queued, return an error
 		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, dagStatus.Status)
 	}
@@ -68,7 +68,7 @@ func dequeueDAGRun(ctx *Context, dagRun core.DAGRunRef) error {
 	if err != nil {
 		return fmt.Errorf("failed to get latest status: %w", err)
 	}
-	if latestStatus.Status != status.Queued {
+	if latestStatus.Status != core1.Queued {
 		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, latestStatus.Status)
 	}
 
@@ -78,7 +78,7 @@ func dequeueDAGRun(ctx *Context, dagRun core.DAGRunRef) error {
 	}
 
 	// Make the status as canceled
-	dagStatus.Status = status.Cancel
+	dagStatus.Status = core1.Cancel
 
 	if err := attempt.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)

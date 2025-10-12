@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
-	"github.com/dagu-org/dagu/internal/core/status"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +49,7 @@ steps:
 			var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
 			statusResp.Unmarshal(t, &dagRunStatus)
 
-			return dagRunStatus.DagRun.Status == api.Status(status.Success)
+			return dagRunStatus.DagRun.Status == api.Status(core.Success)
 		}, 5*time.Second, 1*time.Second, "expected DAG to complete")
 
 		// Delete the created DAG

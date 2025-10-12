@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +30,7 @@ steps:
 	}()
 
 	// Wait for the DAG to be running.
-	dag.AssertCurrentStatus(t, status.Running)
+	dag.AssertCurrentStatus(t, core.Running)
 
 	// Restart the DAG.
 	done2 := make(chan struct{})

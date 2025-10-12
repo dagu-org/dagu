@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/status"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -45,10 +45,10 @@ func TestNode(t *testing.T) {
 			node.Signal(node.Context, syscall.SIGTERM, false)
 		}()
 
-		node.SetStatus(status.NodeRunning)
+		node.SetStatus(core1.NodeRunning)
 
 		node.ExecuteFail(t, "signal: terminated")
-		require.Equal(t, status.NodeCancel.String(), node.State().Status.String())
+		require.Equal(t, core1.NodeCancel.String(), node.State().Status.String())
 	})
 	t.Run("SignalOnStop", func(t *testing.T) {
 		t.Parallel()
@@ -59,10 +59,10 @@ func TestNode(t *testing.T) {
 			node.Signal(node.Context, syscall.SIGTERM, true) // allow override signal
 		}()
 
-		node.SetStatus(status.NodeRunning)
+		node.SetStatus(core1.NodeRunning)
 
 		node.ExecuteFail(t, "signal: interrupt")
-		require.Equal(t, status.NodeCancel.String(), node.State().Status.String())
+		require.Equal(t, core1.NodeCancel.String(), node.State().Status.String())
 	})
 	t.Run("LogOutput", func(t *testing.T) {
 		t.Parallel()
@@ -196,13 +196,13 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		nodeStatus         status.NodeStatus
+		nodeStatus         core1.NodeStatus
 		continueOnSettings core.ContinueOn
 		expectMarkSuccess  bool
 	}{
 		{
 			name:       "SuccessStatus",
-			nodeStatus: status.NodeSuccess,
+			nodeStatus: core1.NodeSuccess,
 			continueOnSettings: core.ContinueOn{
 				MarkSuccess: true,
 			},
@@ -210,7 +210,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 		},
 		{
 			name:       "ErrorWithContinueOnFailureAndMarkSuccess",
-			nodeStatus: status.NodeError,
+			nodeStatus: core1.NodeError,
 			continueOnSettings: core.ContinueOn{
 				Failure:     true,
 				MarkSuccess: true,
@@ -219,7 +219,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 		},
 		{
 			name:       "ErrorWithContinueOnFailureButNoMarkSuccess",
-			nodeStatus: status.NodeError,
+			nodeStatus: core1.NodeError,
 			continueOnSettings: core.ContinueOn{
 				Failure:     true,
 				MarkSuccess: false,
@@ -228,7 +228,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 		},
 		{
 			name:       "SkippedWithContinueOnSkippedAndMarkSuccess",
-			nodeStatus: status.NodeSkipped,
+			nodeStatus: core1.NodeSkipped,
 			continueOnSettings: core.ContinueOn{
 				Skipped:     true,
 				MarkSuccess: true,
@@ -737,13 +737,13 @@ func TestNodeCancel(t *testing.T) {
 	}
 
 	node := runtime.NewNode(step, runtime.NodeState{})
-	node.SetStatus(status.NodeRunning)
+	node.SetStatus(core1.NodeRunning)
 
 	// Cancel the node
 	node.Cancel(ctx)
 
 	// Check status changed to cancel
-	assert.Equal(t, status.NodeCancel, node.NodeData().State.Status)
+	assert.Equal(t, core1.NodeCancel, node.NodeData().State.Status)
 }
 
 func TestNodeSetupContextBeforeExec(t *testing.T) {
@@ -895,7 +895,7 @@ func TestNodeShouldContinue(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		nodeStatus         status.NodeStatus
+		nodeStatus         core1.NodeStatus
 		exitCode           int
 		continueOnSettings core.ContinueOn
 		setupOutput        func(t *testing.T, node *runtime.Node)
@@ -903,7 +903,7 @@ func TestNodeShouldContinue(t *testing.T) {
 	}{
 		{
 			name:       "ContinueOnFailure",
-			nodeStatus: status.NodeError,
+			nodeStatus: core1.NodeError,
 			exitCode:   1,
 			continueOnSettings: core.ContinueOn{
 				Failure: true,
@@ -912,7 +912,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "ContinueOnSpecificExitCode",
-			nodeStatus: status.NodeError,
+			nodeStatus: core1.NodeError,
 			exitCode:   42,
 			continueOnSettings: core.ContinueOn{
 				ExitCode: []int{42, 43},
@@ -921,7 +921,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "DonTContinueOnNonMatchingExitCode",
-			nodeStatus: status.NodeError,
+			nodeStatus: core1.NodeError,
 			exitCode:   44,
 			continueOnSettings: core.ContinueOn{
 				ExitCode: []int{42, 43},
@@ -930,7 +930,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "ContinueOnSkipped",
-			nodeStatus: status.NodeSkipped,
+			nodeStatus: core1.NodeSkipped,
 			continueOnSettings: core.ContinueOn{
 				Skipped: true,
 			},
@@ -938,13 +938,13 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:               "SuccessAlwaysContinues",
-			nodeStatus:         status.NodeSuccess,
+			nodeStatus:         core1.NodeSuccess,
 			continueOnSettings: core.ContinueOn{},
 			expectContinue:     true,
 		},
 		{
 			name:       "CancelNeverContinues",
-			nodeStatus: status.NodeCancel,
+			nodeStatus: core1.NodeCancel,
 			continueOnSettings: core.ContinueOn{
 				Failure: true,
 				Skipped: true,
@@ -953,7 +953,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "ContinueOnOutputMatch",
-			nodeStatus: status.NodeError,
+			nodeStatus: core1.NodeError,
 			continueOnSettings: core.ContinueOn{
 				Output: []string{"WARNING"},
 			},
@@ -972,7 +972,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "ContinueOnRegexOutputMatch",
-			nodeStatus: status.NodeError,
+			nodeStatus: core1.NodeError,
 			continueOnSettings: core.ContinueOn{
 				Output: []string{"re:.*timeout.*"},
 			},
@@ -992,7 +992,7 @@ func TestNodeShouldContinue(t *testing.T) {
 
 		{
 			name:       "DonTContinueOnSkippedWhenContinueOnSkippedIsFalseEvenWithExitCode0InExitCode",
-			nodeStatus: status.NodeSkipped,
+			nodeStatus: core1.NodeSkipped,
 			exitCode:   0,
 			continueOnSettings: core.ContinueOn{
 				Skipped:  false,

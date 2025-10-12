@@ -8,9 +8,9 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -39,7 +39,7 @@ func TestDBClient_GetChildDAGRunStatus(t *testing.T) {
 		mockAttempt.On("ReadStatus", ctx).Return(&execution.DAGRunStatus{
 			Name:     "child-dag",
 			DAGRunID: childRunID,
-			Status:   status.Success,
+			Status:   core1.Success,
 			Params:   "param1=value1",
 			Nodes: []*execution.Node{
 				{OutputVariables: outputs},
@@ -101,7 +101,7 @@ func TestDBClient_IsChildDAGRunCompleted(t *testing.T) {
 		mockAttempt.On("ReadStatus", ctx).Return(&execution.DAGRunStatus{
 			Name:     "child-dag",
 			DAGRunID: childRunID,
-			Status:   status.Success,
+			Status:   core1.Success,
 		}, nil)
 
 		dbClient := newDBClient(mockDAGRunStore, mockDAGStore)
@@ -128,7 +128,7 @@ func TestDBClient_IsChildDAGRunCompleted(t *testing.T) {
 		mockAttempt.On("ReadStatus", ctx).Return(&execution.DAGRunStatus{
 			Name:     "child-dag",
 			DAGRunID: childRunID,
-			Status:   status.Error,
+			Status:   core1.Error,
 		}, nil)
 
 		dbClient := newDBClient(mockDAGRunStore, mockDAGStore)

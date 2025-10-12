@@ -7,8 +7,8 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/spf13/cobra"
 )
@@ -122,7 +122,7 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 
 	// As a prototype, we save the status to the database to enqueue the dag-run.
 	// This could be changed to save to a queue file in the future
-	dagStatus := transform.NewStatusBuilder(dag).Create(dagRunID, status.Queued, 0, time.Time{}, opts...)
+	dagStatus := transform.NewStatusBuilder(dag).Create(dagRunID, core1.Queued, 0, time.Time{}, opts...)
 
 	if err := att.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)

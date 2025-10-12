@@ -1,6 +1,4 @@
-// Package status defines the status constants for DAG and node execution states.
-// These constants are separated to avoid import cycles between scheduler and executor packages.
-package status
+package core
 
 // Status represents the status of a DAG execution.
 type Status int

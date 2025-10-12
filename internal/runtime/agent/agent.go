@@ -24,8 +24,8 @@ import (
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/common/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/runtime"
 	runtime1 "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
@@ -305,7 +305,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Update the status to running
 	st := a.Status(ctx)
-	st.Status = status.Running
+	st.Status = core1.Running
 	if err := attempt.Write(ctx, st); err != nil {
 		logger.Error(ctx, "Status write failed", "err", err)
 	}
@@ -314,7 +314,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		if initErr != nil {
 			logger.Error(ctx, "Failed to initialize DAG execution", "err", err)
 			st := a.Status(ctx)
-			st.Status = status.Error
+			st.Status = core1.Error
 			if err := attempt.Write(ctx, st); err != nil {
 				logger.Error(ctx, "Status write failed", "err", err)
 			}
@@ -577,9 +577,9 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	defer a.lock.RUnlock()
 
 	schedulerStatus := a.scheduler.Status(ctx, a.graph)
-	if schedulerStatus == status.None && a.graph.IsStarted() {
+	if schedulerStatus == core1.None && a.graph.IsStarted() {
 		// Match the status to the execution graph.
-		schedulerStatus = status.Running
+		schedulerStatus = core1.Running
 	}
 
 	opts := []transform.StatusOption{
@@ -652,7 +652,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 		case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
 			// Return the current status of the dag-run.
 			dagStatus := a.Status(ctx)
-			dagStatus.Status = status.Running
+			dagStatus.Status = core1.Running
 			statusJSON, err := json.Marshal(dagStatus)
 			if err != nil {
 				encodeError(w, err)

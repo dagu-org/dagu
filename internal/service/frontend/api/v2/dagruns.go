@@ -13,9 +13,9 @@ import (
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/runtime"
 )
 
@@ -163,8 +163,8 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObject) (api.ListDAGRunsResponseObject, error) {
 	var opts []execution.ListDAGRunStatusesOption
 	if request.Params.Status != nil {
-		opts = append(opts, execution.WithStatuses([]status.Status{
-			status.Status(*request.Params.Status),
+		opts = append(opts, execution.WithStatuses([]core1.Status{
+			core1.Status(*request.Params.Status),
 		}))
 	}
 	if request.Params.FromDate != nil {
@@ -198,8 +198,8 @@ func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNa
 	}
 
 	if request.Params.Status != nil {
-		opts = append(opts, execution.WithStatuses([]status.Status{
-			status.Status(*request.Params.Status),
+		opts = append(opts, execution.WithStatuses([]core1.Status{
+			core1.Status(*request.Params.Status),
 		}))
 	}
 	if request.Params.FromDate != nil {
@@ -334,7 +334,7 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
 	}
-	if dagStatus.Status == status.Running {
+	if dagStatus.Status == core1.Running {
 		return &api.UpdateDAGRunStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
 			Message: fmt.Sprintf("dag-run ID %s for DAG %s is still running", request.DagRunId, request.Name),
@@ -511,7 +511,7 @@ func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.Updat
 			Message: fmt.Sprintf("child dag-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
 		}, nil
 	}
-	if dagStatus.Status == status.Running {
+	if dagStatus.Status == core1.Running {
 		return &api.UpdateChildDAGRunStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
 			Message: fmt.Sprintf("dag-run ID %s for DAG %s is still running", request.DagRunId, request.Name),
@@ -541,13 +541,13 @@ func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.Updat
 	return &api.UpdateChildDAGRunStepStatus200Response{}, nil
 }
 
-var nodeStatusMapping = map[api.NodeStatus]status.NodeStatus{
-	api.NodeStatusNotStarted: status.NodeNone,
-	api.NodeStatusRunning:    status.NodeRunning,
-	api.NodeStatusFailed:     status.NodeError,
-	api.NodeStatusCancelled:  status.NodeCancel,
-	api.NodeStatusSuccess:    status.NodeSuccess,
-	api.NodeStatusSkipped:    status.NodeSkipped,
+var nodeStatusMapping = map[api.NodeStatus]core1.NodeStatus{
+	api.NodeStatusNotStarted: core1.NodeNone,
+	api.NodeStatusRunning:    core1.NodeRunning,
+	api.NodeStatusFailed:     core1.NodeError,
+	api.NodeStatusCancelled:  core1.NodeCancel,
+	api.NodeStatusSuccess:    core1.NodeSuccess,
+	api.NodeStatusSkipped:    core1.NodeSkipped,
 }
 
 func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObject) (api.RetryDAGRunResponseObject, error) {
@@ -634,7 +634,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		}
 	}
 
-	if dagStatus.Status != status.Running {
+	if dagStatus.Status != core1.Running {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeNotRunning,
@@ -674,7 +674,7 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 		return nil, fmt.Errorf("error getting latest status: %w", err)
 	}
 
-	if latestStatus.Status != status.Queued {
+	if latestStatus.Status != core1.Queued {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,

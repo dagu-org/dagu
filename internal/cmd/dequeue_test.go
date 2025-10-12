@@ -6,7 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/status"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -59,7 +59,7 @@ func TestDequeueCommand_PreservesState(t *testing.T) {
 
 	dagStatus, err := attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, status.Success, dagStatus.Status)
+	assert.Equal(t, core1.Success, dagStatus.Status)
 
 	// Now enqueue a new run
 	th.RunCommand(t, cmd.Enqueue(), test.CmdTest{
@@ -80,5 +80,5 @@ func TestDequeueCommand_PreservesState(t *testing.T) {
 
 	latestStatus, err := latestAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, status.Success, latestStatus.Status, "Latest visible status should be Success")
+	assert.Equal(t, core1.Success, latestStatus.Status, "Latest visible status should be Success")
 }

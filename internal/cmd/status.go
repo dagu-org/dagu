@@ -8,8 +8,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
@@ -69,7 +69,7 @@ func runStatus(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read status from attempt: %w", err)
 	}
 
-	if dagStatus.Status == status.Running {
+	if dagStatus.Status == core1.Running {
 		realtimeStatus, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve current status: %w", err)
@@ -130,7 +130,7 @@ func displayDetailedStatus(dag *core.DAG, dagStatus *execution.DAGRunStatus) {
 				t.AppendRow(table.Row{"Duration", stringutil.FormatDuration(duration)})
 			}
 			t.AppendRow(table.Row{"Finished At", dagStatus.FinishedAt})
-		} else if dagStatus.Status == status.Running && !startedAt.IsZero() {
+		} else if dagStatus.Status == core1.Running && !startedAt.IsZero() {
 			elapsed := time.Since(startedAt)
 			t.AppendRow(table.Row{"Running For", stringutil.FormatDuration(elapsed)})
 		}
@@ -166,21 +166,21 @@ func displayDetailedStatus(dag *core.DAG, dagStatus *execution.DAGRunStatus) {
 	// Additional status-specific messages
 	fmt.Println()
 	switch dagStatus.Status {
-	case status.Running:
+	case core1.Running:
 		fmt.Printf("%s The DAG is currently running. Use 'dagu stop %s' to stop it.\n",
 			color.YellowString("→"), dag.Name)
-	case status.Error:
+	case core1.Error:
 		fmt.Printf("%s The DAG failed. Use 'dagu retry --run-id=%s %s' to retry.\n",
 			color.RedString("✗"), dagStatus.DAGRunID, dag.Name)
-	case status.Success:
+	case core1.Success:
 		fmt.Printf("%s The DAG completed successfully.\n", color.GreenString("✓"))
-	case status.PartialSuccess:
+	case core1.PartialSuccess:
 		fmt.Printf("%s The DAG completed with partial success.\n", color.YellowString("⚠"))
-	case status.Cancel:
+	case core1.Cancel:
 		fmt.Printf("%s The DAG was cancelled.\n", color.YellowString("⚠"))
-	case status.Queued:
+	case core1.Queued:
 		fmt.Printf("%s The DAG is queued for execution.\n", color.BlueString("●"))
-	case status.None:
+	case core1.None:
 		fmt.Printf("%s The DAG has not been started yet.\n", color.New(color.Faint).Sprint("○"))
 	}
 }
@@ -200,7 +200,7 @@ func displayStepSummary(nodes []*execution.Node) {
 	fmt.Println(strings.Repeat("─", 80))
 
 	// Count steps by status
-	statusCounts := make(map[status.NodeStatus]int)
+	statusCounts := make(map[core1.NodeStatus]int)
 	for _, node := range nodes {
 		statusCounts[node.Status]++
 	}
@@ -229,7 +229,7 @@ func displayStepSummary(nodes []*execution.Node) {
 	failedSteps := []*execution.Node{}
 
 	for _, node := range nodes {
-		if node.Status == status.NodeError {
+		if node.Status == core1.NodeError {
 			failedSteps = append(failedSteps, node)
 		}
 
@@ -247,7 +247,7 @@ func displayStepSummary(nodes []*execution.Node) {
 				if !startedAt.IsZero() && !finishedAt.IsZero() {
 					duration = stringutil.FormatDuration(finishedAt.Sub(startedAt))
 				}
-			} else if node.Status == status.NodeRunning && !startedAt.IsZero() {
+			} else if node.Status == core1.NodeRunning && !startedAt.IsZero() {
 				duration = stringutil.FormatDuration(time.Since(startedAt))
 			}
 		}
@@ -425,21 +425,21 @@ func isBinaryContent(data []byte) bool {
 }
 
 // formatStatus returns a colored status string
-func formatStatus(st status.Status) string {
+func formatStatus(st core1.Status) string {
 	switch st {
-	case status.Success:
+	case core1.Success:
 		return color.GreenString("Success")
-	case status.Error:
+	case core1.Error:
 		return color.RedString("Failed")
-	case status.PartialSuccess:
+	case core1.PartialSuccess:
 		return color.YellowString("Partial Success")
-	case status.Running:
+	case core1.Running:
 		return color.New(color.FgHiGreen).Sprint("Running")
-	case status.Cancel:
+	case core1.Cancel:
 		return color.YellowString("Cancelled")
-	case status.Queued:
+	case core1.Queued:
 		return color.BlueString("Queued")
-	case status.None:
+	case core1.None:
 		return color.New(color.Faint).Sprint("Not Started")
 	default:
 		return st.String()
@@ -447,21 +447,21 @@ func formatStatus(st status.Status) string {
 }
 
 // formatNodeStatus returns a colored status string for node status
-func formatNodeStatus(s status.NodeStatus) string {
+func formatNodeStatus(s core1.NodeStatus) string {
 	switch s {
-	case status.NodeSuccess:
+	case core1.NodeSuccess:
 		return color.GreenString("Success")
-	case status.NodeError:
+	case core1.NodeError:
 		return color.RedString("Failed")
-	case status.NodeRunning:
+	case core1.NodeRunning:
 		return color.New(color.FgHiGreen).Sprint("Running")
-	case status.NodeCancel:
+	case core1.NodeCancel:
 		return color.YellowString("Cancelled")
-	case status.NodeSkipped:
+	case core1.NodeSkipped:
 		return color.New(color.Faint).Sprint("Skipped")
-	case status.NodePartialSuccess:
+	case core1.NodePartialSuccess:
 		return color.YellowString("Partial Success")
-	case status.NodeNone:
+	case core1.NodeNone:
 		return color.New(color.Faint).Sprint("Not Started")
 	default:
 		return fmt.Sprintf("%d", s)

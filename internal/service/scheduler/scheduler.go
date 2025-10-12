@@ -17,8 +17,8 @@ import (
 	"github.com/dagu-org/dagu/internal/common/dirlock"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -372,7 +372,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan execution.QueuedIte
 				goto SEND_RESULT
 			}
 
-			if st.Status != status.Queued {
+			if st.Status != core1.Queued {
 				logger.Info(ctx, "Skipping item from queue", "data", data, "status", st.Status)
 				result = execution.QueuedItemProcessingResultDiscard
 				goto SEND_RESULT
@@ -445,7 +445,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan execution.QueuedIte
 					break WAIT_FOR_RUN
 				}
 
-				if st.Status != status.Queued {
+				if st.Status != core1.Queued {
 					logger.Info(ctx, "Looks like the DAG is already executed", "data", data, "status", st.Status.String())
 					result = execution.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN
@@ -482,11 +482,11 @@ func (s *Scheduler) markStatusFailed(ctx context.Context, attempt execution.DAGR
 			logger.Error(ctx, "Failed to close attempt", "err", err)
 		}
 	}()
-	if st.Status != status.Queued {
+	if st.Status != core1.Queued {
 		logger.Info(ctx, "Tried to mark a queued item 'cancelled' but it's different status now", "status", st.Status.String())
 		return nil
 	}
-	st.Status = status.Cancel // Mark it cancel
+	st.Status = core1.Cancel // Mark it cancel
 	if err := attempt.Write(ctx, *st); err != nil {
 		return fmt.Errorf("failed to open attempt: %w", err)
 	}

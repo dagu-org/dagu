@@ -15,8 +15,8 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 )
 
 // Error definitions for common issues
@@ -157,7 +157,7 @@ func (store *Store) collectStatusesFromRoots(
 		resultsMu      sync.Mutex
 		results        = make([]*execution.DAGRunStatus, 0, opts.Limit)
 		remaining      atomic.Int64
-		statusesFilter = make(map[status.Status]struct{})
+		statusesFilter = make(map[core1.Status]struct{})
 	)
 
 	for _, status := range opts.Statuses {

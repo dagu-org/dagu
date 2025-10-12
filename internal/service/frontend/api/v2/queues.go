@@ -6,7 +6,7 @@ import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/status"
+	core1 "github.com/dagu-org/dagu/internal/core"
 )
 
 // ListQueues implements api.StrictServerInterface.
@@ -116,7 +116,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 		}
 
 		// Only include if status is actually queued
-		if runStatus.Status == status.Queued {
+		if runStatus.Status == core1.Queued {
 			runSummary := toDAGRunSummary(*runStatus)
 			queue.queued = append(queue.queued, runSummary)
 			totalQueued++

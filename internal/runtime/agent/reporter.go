@@ -8,8 +8,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
+	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
@@ -35,10 +35,10 @@ func (r *reporter) reportStep(
 	ctx context.Context, dag *core.DAG, dagStatus execution.DAGRunStatus, node *runtime.Node,
 ) error {
 	nodeStatus := node.State().Status
-	if nodeStatus != status.NodeNone {
+	if nodeStatus != core1.NodeNone {
 		logger.Info(ctx, "Step finished", "step", node.NodeData().Step.Name, "status", nodeStatus)
 	}
-	if nodeStatus == status.NodeError && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
+	if nodeStatus == core1.NodeError && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
 		fromAddress := dag.ErrorMail.From
 		toAddresses := dag.ErrorMail.To
 		subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, dagStatus.Status)
@@ -63,7 +63,7 @@ func (r *reporter) getSummary(_ context.Context, dagStatus execution.DAGRunStatu
 
 // send is a function that sends a report mail.
 func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus execution.DAGRunStatus, err error) error {
-	if err != nil || dagStatus.Status == status.Error {
+	if err != nil || dagStatus.Status == core1.Error {
 		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
 			fromAddress := dag.ErrorMail.From
 			toAddresses := dag.ErrorMail.To
@@ -72,7 +72,7 @@ func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus execution.
 			attachments := addAttachments(dag.ErrorMail.AttachLogs, dagStatus.Nodes)
 			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
-	} else if dagStatus.Status == status.Success || dagStatus.Status == status.PartialSuccess {
+	} else if dagStatus.Status == core1.Success || dagStatus.Status == core1.PartialSuccess {
 		if dag.MailOn != nil && dag.MailOn.Success && dag.InfoMail != nil {
 			fromAddress := dag.InfoMail.From
 			toAddresses := dag.InfoMail.To
