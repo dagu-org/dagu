@@ -6,12 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cli/dagpicker"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 

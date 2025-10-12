@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
@@ -29,6 +28,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/persistence/fileserviceregistry"
+	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

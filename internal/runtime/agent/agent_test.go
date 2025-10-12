@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/dagu-org/dagu/internal/test"
 
 	"github.com/dagu-org/dagu/internal/core/status"

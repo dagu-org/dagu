@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"golang.org/x/term"
 )
 
