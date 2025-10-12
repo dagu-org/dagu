@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -166,7 +166,7 @@ steps:
 			require.NoError(t, err)
 
 			// Load the DAG
-			dag, err := builder.Load(context.Background(), tmpFile)
+			dag, err := spec.Load(context.Background(), tmpFile)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -222,7 +222,7 @@ steps:
 	require.NoError(t, err)
 
 	// Load the DAG
-	dag, err := builder.Load(context.Background(), tmpFile)
+	dag, err := spec.Load(context.Background(), tmpFile)
 	require.NoError(t, err)
 	require.NotNil(t, dag)
 	require.Len(t, dag.Steps, 1)
@@ -283,7 +283,7 @@ steps:
 			require.NoError(t, err)
 
 			// Load the DAG - just verify it parses correctly
-			dag, err := builder.Load(context.Background(), tmpFile)
+			dag, err := spec.Load(context.Background(), tmpFile)
 			require.NoError(t, err)
 			require.NotNil(t, dag)
 		})

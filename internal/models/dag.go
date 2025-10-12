@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 )
 
 // Errors for DAG file operations
@@ -27,7 +27,7 @@ type DAGStore interface {
 	// GetMetadata retrieves only the metadata of a DAG definition (faster than full load)
 	GetMetadata(ctx context.Context, fileName string) (*core.DAG, error)
 	// GetDetails retrieves the complete DAG definition including all fields
-	GetDetails(ctx context.Context, fileName string, opts ...builder.LoadOption) (*core.DAG, error)
+	GetDetails(ctx context.Context, fileName string, opts ...spec.LoadOption) (*core.DAG, error)
 	// Grep searches for a pattern in all DAG definitions and returns matching results
 	Grep(ctx context.Context, pattern string) (ret []*GrepDAGsResult, errs []string, err error)
 	// Rename changes a DAG's identifier from oldID to newID
@@ -37,7 +37,7 @@ type DAGStore interface {
 	// UpdateSpec modifies the specification of an existing DAG
 	UpdateSpec(ctx context.Context, fileName string, spec []byte) error
 	// LoadSpec loads a DAG from a YAML file and returns the DAG object
-	LoadSpec(ctx context.Context, spec []byte, opts ...builder.LoadOption) (*core.DAG, error)
+	LoadSpec(ctx context.Context, spec []byte, opts ...spec.LoadOption) (*core.DAG, error)
 	// TagList returns all unique tags across all DAGs with any errors encountered
 	TagList(ctx context.Context) ([]string, []string, error)
 	// ToggleSuspend changes the suspension state of a DAG by ID

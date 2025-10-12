@@ -1,4 +1,4 @@
-package builder_test
+package spec_test
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +21,7 @@ func TestLoad(t *testing.T) {
   - name: "1"
     command: "true"
 `)
-		dag, err := builder.Load(context.Background(), testDAG, builder.WithName("testDAG"))
+		dag, err := spec.Load(context.Background(), testDAG, spec.WithName("testDAG"))
 		require.NoError(t, err)
 		require.Equal(t, "testDAG", dag.Name)
 	})
@@ -30,7 +30,7 @@ func TestLoad(t *testing.T) {
 
 		// Use a non-existing file path
 		testDAG := "/tmp/non_existing_file_" + t.Name() + ".yaml"
-		_, err := builder.Load(context.Background(), testDAG)
+		_, err := spec.Load(context.Background(), testDAG)
 		require.Error(t, err)
 	})
 	t.Run("UnknownField", func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestLoad(t *testing.T) {
 
 		testDAG := createTempYAMLFile(t, `invalidKey: test
 `)
-		_, err := builder.Load(context.Background(), testDAG)
+		_, err := spec.Load(context.Background(), testDAG)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "has invalid keys: invalidKey")
 	})
@@ -46,7 +46,7 @@ func TestLoad(t *testing.T) {
 		t.Parallel()
 
 		testDAG := createTempYAMLFile(t, `invalidyaml`)
-		_, err := builder.Load(context.Background(), testDAG)
+		_, err := spec.Load(context.Background(), testDAG)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalidyaml")
 	})
@@ -57,7 +57,7 @@ func TestLoad(t *testing.T) {
   - name: "1"
     command: "true"
 `)
-		dag, err := builder.Load(context.Background(), testDAG, builder.OnlyMetadata())
+		dag, err := spec.Load(context.Background(), testDAG, spec.OnlyMetadata())
 		require.NoError(t, err)
 		require.Empty(t, dag.Steps)
 		// Check if the metadata is loaded correctly
@@ -70,7 +70,7 @@ func TestLoad(t *testing.T) {
   - name: "1"
     command: "true"
 `)
-		dag, err := builder.Load(context.Background(), testDAG)
+		dag, err := spec.Load(context.Background(), testDAG)
 
 		require.NoError(t, err)
 
@@ -119,7 +119,7 @@ steps:
   - name: "1"
     command: "true"
 `)
-		dag, err := builder.Load(context.Background(), testDAG, builder.WithBaseConfig(base))
+		dag, err := spec.Load(context.Background(), testDAG, spec.WithBaseConfig(base))
 		require.NoError(t, err)
 
 		// Check if the MailOn values are overwritten
@@ -151,7 +151,7 @@ infoMail:
 mailOn:
   failure: true
 `)
-		dag, err := builder.LoadBaseConfig(builder.BuildContext{}, testDAG)
+		dag, err := spec.LoadBaseConfig(spec.BuildContext{}, testDAG)
 		require.NotNil(t, dag)
 		require.NoError(t, err)
 	})
@@ -172,7 +172,7 @@ steps:
   - name: "step1"
     command: echo "step1"
 `)
-		dag, err := builder.Load(context.Background(), testDAG, builder.WithBaseConfig(baseDAG))
+		dag, err := spec.Load(context.Background(), testDAG, spec.WithBaseConfig(baseDAG))
 		require.NotNil(t, dag)
 		require.NoError(t, err)
 
@@ -196,7 +196,7 @@ func TestLoadYAML(t *testing.T) {
 	t.Run("ValidYAMLData", func(t *testing.T) {
 		t.Parallel()
 
-		ret, err := builder.LoadYAMLWithOpts(context.Background(), []byte(testDAG), builder.BuildOpts{})
+		ret, err := spec.LoadYAMLWithOpts(context.Background(), []byte(testDAG), spec.BuildOpts{})
 		require.NoError(t, err)
 
 		step := ret.Steps[0]
@@ -206,7 +206,7 @@ func TestLoadYAML(t *testing.T) {
 	t.Run("InvalidYAMLData", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := builder.LoadYAMLWithOpts(context.Background(), []byte(`invalid`), builder.BuildOpts{})
+		_, err := spec.LoadYAMLWithOpts(context.Background(), []byte(`invalid`), spec.BuildOpts{})
 		require.Error(t, err)
 	})
 }
@@ -219,7 +219,7 @@ steps:
     command: "true"
 `
 
-	ret, err := builder.LoadYAMLWithOpts(context.Background(), []byte(testDAG), builder.BuildOpts{
+	ret, err := spec.LoadYAMLWithOpts(context.Background(), []byte(testDAG), spec.BuildOpts{
 		Name: "testDAG",
 	})
 	require.NoError(t, err)
@@ -273,7 +273,7 @@ steps:
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
 		// Load the multi-DAG file
-		dag, err := builder.Load(context.Background(), tmpFile)
+		dag, err := spec.Load(context.Background(), tmpFile)
 		require.NoError(t, err)
 
 		// Verify main DAG
@@ -338,8 +338,8 @@ steps:
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
 		// Load with base config
-		dag, err := builder.Load(context.Background(), tmpFile,
-			builder.WithBaseConfig(baseFile))
+		dag, err := spec.Load(context.Background(), tmpFile,
+			spec.WithBaseConfig(baseFile))
 		require.NoError(t, err)
 
 		// Verify main DAG inherits base config
@@ -376,7 +376,7 @@ steps:
 		tmpFile := createTempYAMLFile(t, singleDAGContent)
 
 		// Load single DAG file
-		dag, err := builder.Load(context.Background(), tmpFile)
+		dag, err := spec.Load(context.Background(), tmpFile)
 		require.NoError(t, err)
 
 		// Verify it loads correctly without child DAGs
@@ -407,7 +407,7 @@ steps:
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
 		// Load should fail due to duplicate names
-		_, err := builder.Load(context.Background(), tmpFile)
+		_, err := spec.Load(context.Background(), tmpFile)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "duplicate DAG name")
 	})
@@ -428,7 +428,7 @@ steps:
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
 		// Load should fail because child DAG has no name
-		_, err := builder.Load(context.Background(), tmpFile)
+		_, err := spec.Load(context.Background(), tmpFile)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must have a name")
 	})
@@ -455,7 +455,7 @@ steps:
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
 		// The behavior with empty documents is unpredictable
-		_, err := builder.Load(context.Background(), tmpFile)
+		_, err := spec.Load(context.Background(), tmpFile)
 		if err != nil {
 			// If it errors, it should be a decode error
 			assert.Contains(t, err.Error(), "failed to decode document")
@@ -496,7 +496,7 @@ steps:
 `
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
-		dag, err := builder.Load(context.Background(), tmpFile)
+		dag, err := spec.Load(context.Background(), tmpFile)
 		require.NoError(t, err)
 
 		// Verify main DAG
@@ -531,7 +531,7 @@ steps:
   - name: gpu-task
     command: echo "Running on GPU worker"
 `)
-		dag, err := builder.Load(context.Background(), testDAG)
+		dag, err := spec.Load(context.Background(), testDAG)
 		require.NoError(t, err)
 
 		// Verify DAG loaded successfully

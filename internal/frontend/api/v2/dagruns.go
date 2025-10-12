@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/models"
@@ -67,9 +67,9 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 		nameHint = *request.Body.Name
 	} else {
 		// Validate the DAG spec has a name
-		dag, err := builder.LoadYAML(
+		dag, err := spec.LoadYAML(
 			ctx, []byte(request.Body.Spec),
-			builder.WithoutEval(),
+			spec.WithoutEval(),
 		)
 		if err != nil {
 			return nil, &Error{
@@ -100,11 +100,11 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	}
 
 	// Load the DAG from the temp file to validate and prepare execution
-	var loadOpts []builder.LoadOption
+	var loadOpts []spec.LoadOption
 	if request.Body.Name != nil && *request.Body.Name != "" {
-		loadOpts = append(loadOpts, builder.WithName(*request.Body.Name))
+		loadOpts = append(loadOpts, spec.WithName(*request.Body.Name))
 	}
-	dag, err := builder.Load(ctx, tfPath, loadOpts...)
+	dag, err := spec.Load(ctx, tfPath, loadOpts...)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,

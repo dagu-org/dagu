@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cli/dagpicker"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
@@ -261,9 +261,9 @@ func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
 	}
 
 	// Prepare load options with base configuration
-	loadOpts := []builder.LoadOption{
-		builder.WithBaseConfig(ctx.Config.Paths.BaseConfig),
-		builder.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+	loadOpts := []spec.LoadOption{
+		spec.WithBaseConfig(ctx.Config.Paths.BaseConfig),
+		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
 	}
 
 	// Load parameters from command line arguments
@@ -273,10 +273,10 @@ func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
 	// Check if parameters are provided after "--"
 	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 && len(args) > 0 {
 		// Get parameters from command line arguments after "--"
-		loadOpts = append(loadOpts, builder.WithParams(args[argsLenAtDash:]))
+		loadOpts = append(loadOpts, spec.WithParams(args[argsLenAtDash:]))
 	} else if interactiveParams != "" {
 		// Use interactive parameters
-		loadOpts = append(loadOpts, builder.WithParams(stringutil.RemoveQuotes(interactiveParams)))
+		loadOpts = append(loadOpts, spec.WithParams(stringutil.RemoveQuotes(interactiveParams)))
 		params = interactiveParams
 	} else {
 		// Get parameters from flags
@@ -284,11 +284,11 @@ func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to get parameters: %w", err)
 		}
-		loadOpts = append(loadOpts, builder.WithParams(stringutil.RemoveQuotes(params)))
+		loadOpts = append(loadOpts, spec.WithParams(stringutil.RemoveQuotes(params)))
 	}
 
 	// Load the DAG from the specified file
-	dag, err := builder.Load(ctx, dagPath, loadOpts...)
+	dag, err := spec.Load(ctx, dagPath, loadOpts...)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to load DAG from %s: %w", dagPath, err)
 	}

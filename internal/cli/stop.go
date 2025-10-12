@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
@@ -63,7 +63,7 @@ func runStop(ctx *Context, args []string) error {
 		}
 		dag = d
 	} else {
-		d, err := builder.Load(ctx, args[0], builder.WithBaseConfig(ctx.Config.Paths.BaseConfig))
+		d, err := spec.Load(ctx, args[0], spec.WithBaseConfig(ctx.Config.Paths.BaseConfig))
 		if err != nil {
 			return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 		}

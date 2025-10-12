@@ -11,7 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
@@ -133,7 +133,7 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 	var dags []string
 	for _, fi := range fis {
 		if fileutil.IsYAMLFile(fi.Name()) {
-			dag, err := builder.Load(ctx, filepath.Join(er.targetDir, fi.Name()), builder.OnlyMetadata(), builder.WithoutEval())
+			dag, err := spec.Load(ctx, filepath.Join(er.targetDir, fi.Name()), spec.OnlyMetadata(), spec.WithoutEval())
 			if err != nil {
 				logger.Error(ctx, "DAG load failed", "err", err, "name", fi.Name())
 				continue
@@ -177,7 +177,7 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 			er.lock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
 				filePath := filepath.Join(er.targetDir, filepath.Base(event.Name))
-				dag, err := builder.Load(ctx, filePath, builder.OnlyMetadata(), builder.WithoutEval())
+				dag, err := spec.Load(ctx, filePath, spec.OnlyMetadata(), spec.WithoutEval())
 				if err != nil {
 					logger.Error(ctx, "DAG load failed", "err", err, "file", event.Name)
 				} else {

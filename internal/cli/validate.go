@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/spf13/cobra"
 )
 
@@ -36,11 +36,11 @@ similar to the server-side spec validation.`,
 
 func runValidate(ctx *Context, args []string) error {
 	// Try loading the DAG without evaluation, resolving relative names against DAGsDir
-	dag, err := builder.Load(
+	dag, err := spec.Load(
 		ctx,
 		args[0],
-		builder.WithoutEval(),
-		builder.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+		spec.WithoutEval(),
+		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
 	)
 
 	if err != nil {

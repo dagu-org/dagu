@@ -1,4 +1,4 @@
-package builder_test
+package spec_test
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,7 +26,7 @@ skipIfSuccessful: true
 steps:
   - "true"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.True(t, th.SkipIfSuccessful)
@@ -35,7 +35,7 @@ steps:
 		data := []byte(`
 params: "TEST_PARAM $1"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		th.AssertParam(t, "1=TEST_PARAM", "2=TEST_PARAM")
@@ -44,7 +44,7 @@ params: "TEST_PARAM $1"
 		data := []byte(`
 params: x="a b c" y="d e f"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		th.AssertParam(t, "x=a b c", "y=d e f")
@@ -56,7 +56,7 @@ params:
   - BAR: bar
   - BAZ: "` + "`echo baz`" + `"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		th.AssertParam(t,
@@ -72,7 +72,7 @@ params:
   - BAR: bar
   - BAZ: "` + "`echo baz`" + `"
 `)
-		dag, err := builder.LoadYAMLWithOpts(context.Background(), data, builder.BuildOpts{Parameters: "FOO=X BAZ=Y"})
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{Parameters: "FOO=X BAZ=Y"})
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		th.AssertParam(t,
@@ -87,7 +87,7 @@ params: first P1=foo P2=${A001} P3=` + "`/bin/echo BAR`" + ` X=bar Y=${P1} Z="A 
 env:
   - A001: TEXT
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		th.AssertParam(t,
@@ -135,7 +135,7 @@ params:
     environment: "staging"
 `, tmpFile.Name()))
 
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
@@ -178,7 +178,7 @@ params:
     environment: "prod"
 `, server.URL))
 
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
@@ -222,7 +222,7 @@ params:
 
 		// Inject CLI parameters that override the schema values and should fail validation
 		cliParams := "batch_size=100 environment=prod"
-		_, err = builder.LoadYAML(context.Background(), data, builder.WithParams(cliParams))
+		_, err = spec.LoadYAML(context.Background(), data, spec.WithParams(cliParams))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "parameter validation failed")
 		require.Contains(t, err.Error(), "maximum: 100/1 is greater than 50")
@@ -268,7 +268,7 @@ params:
     # environment and debug should get defaults
 `, tmpFile.Name()))
 
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
@@ -329,7 +329,7 @@ params:
     timeout: 600
 `, tmpFile.Name()))
 
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
@@ -351,7 +351,7 @@ mailOn:
   failure: true
   success: true
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.True(t, th.MailOn.Failure)
@@ -363,7 +363,7 @@ tags: daily,monthly
 steps:
   - echo 1
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.True(t, th.HasTag("daily"))
@@ -377,7 +377,7 @@ tags:
 steps:
   - echo 1
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.True(t, th.HasTag("daily"))
@@ -389,7 +389,7 @@ logDir: /tmp/logs
 steps:
   - "true"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, "/tmp/logs", th.LogDir)
@@ -417,7 +417,7 @@ infoMail:
   prefix: "[INFO]"
   attachLogs: true
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, "smtp.example.com", th.SMTP.Host)
@@ -446,7 +446,7 @@ smtp:
 steps:
   -     echo test
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		require.NotNil(t, dag.SMTP)
 		assert.Equal(t, "smtp.example.com", dag.SMTP.Host)
@@ -481,7 +481,7 @@ infoMail:
   prefix: "[INFO]"
   attachLogs: false
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
@@ -501,7 +501,7 @@ infoMail:
 		data := []byte(`
 histRetentionDays: 365
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, 365, th.HistRetentionDays)
@@ -512,7 +512,7 @@ maxCleanUpTimeSec: 10
 steps:
   - "true"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, time.Duration(10*time.Second), th.MaxCleanUpTime)
@@ -527,7 +527,7 @@ steps:
   - echo "Third"
   - echo "Fourth"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, core.TypeChain, th.Type)
@@ -562,7 +562,7 @@ steps:
   - name: cleanup
     command: rm -f fileA fileB
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, core.TypeChain, th.Type)
@@ -585,7 +585,7 @@ steps:
   - name: step1
     command: echo "test"
 `)
-		_, err := builder.LoadYAML(context.Background(), data)
+		_, err := spec.LoadYAML(context.Background(), data)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid type")
 	})
@@ -594,7 +594,7 @@ steps:
 steps:
   - echo 1
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, core.TypeChain, th.Type)
@@ -617,7 +617,7 @@ steps:
   - name: step4
     command: echo "Fourth - should depend on step3"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, core.TypeChain, th.Type)
@@ -635,7 +635,7 @@ preconditions:
   - condition: "test -f file.txt"
     expected: "true"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Preconditions, 1)
@@ -645,7 +645,7 @@ preconditions:
 		data := []byte(`
 maxActiveRuns: 5
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, 5, th.MaxActiveRuns)
@@ -654,7 +654,7 @@ maxActiveRuns: 5
 		data := []byte(`
 maxActiveSteps: 3
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, 3, th.MaxActiveSteps)
@@ -665,7 +665,7 @@ runConfig:
   disableParamEdit: true
   disableRunIdEdit: true
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		require.NotNil(t, dag.RunConfig)
 		assert.True(t, dag.RunConfig.DisableParamEdit)
@@ -682,7 +682,7 @@ maxOutputSize: 524288
 steps:
   - echo "test output"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, 524288, th.MaxOutputSize) // 512KB
@@ -692,7 +692,7 @@ steps:
 steps:
   - "true"
 `)
-		dag2, err := builder.LoadYAML(context.Background(), data2)
+		dag2, err := spec.LoadYAML(context.Background(), data2)
 		require.NoError(t, err)
 		th2 := DAG{t: t, DAG: dag2}
 		assert.Equal(t, 0, th2.MaxOutputSize) // Default 1MB
@@ -710,19 +710,19 @@ steps:
 				yaml: `
 env:
   - VAR: "` + "`invalid command`" + `"`,
-				expectedErr: builder.ErrInvalidEnvValue,
+				expectedErr: spec.ErrInvalidEnvValue,
 			},
 			{
 				name: "InvalidParams",
 				yaml: `
 params: "` + "`invalid command`" + `"`,
-				expectedErr: builder.ErrInvalidParamValue,
+				expectedErr: spec.ErrInvalidParamValue,
 			},
 			{
 				name: "InvalidSchedule",
 				yaml: `
 schedule: "1"`,
-				expectedErr: builder.ErrInvalidSchedule,
+				expectedErr: spec.ErrInvalidSchedule,
 			},
 		}
 
@@ -730,7 +730,7 @@ schedule: "1"`,
 			t.Run(tc.name, func(t *testing.T) {
 				data := []byte(tc.yaml)
 				ctx := context.Background()
-				_, err := builder.LoadYAML(ctx, data)
+				_, err := spec.LoadYAML(ctx, data)
 				if errs, ok := err.(*core.ErrorList); ok && len(*errs) > 0 {
 					found := false
 					for _, e := range *errs {
@@ -806,7 +806,7 @@ steps:
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			dag, err := builder.LoadYAML(context.Background(), []byte(tc.yaml))
+			dag, err := spec.LoadYAML(context.Background(), []byte(tc.yaml))
 			require.NoError(t, err)
 			th := DAG{t: t, DAG: dag}
 			for key, val := range tc.expected {
@@ -894,7 +894,7 @@ steps:
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			dag, err := builder.LoadYAML(context.Background(), []byte(tc.yaml))
+			dag, err := spec.LoadYAML(context.Background(), []byte(tc.yaml))
 			require.NoError(t, err)
 			th := DAG{t: t, DAG: dag}
 			assert.Len(t, th.Schedule, len(tc.start))
@@ -925,7 +925,7 @@ steps:
   - command: echo 1
     name: step1
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -944,7 +944,7 @@ steps:
       echo world
     name: script
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		require.Len(t, th.Steps, 1)
@@ -964,7 +964,7 @@ steps:
   - command: [echo, 1]
     name: step1
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -985,7 +985,7 @@ steps:
       - 1
     name: step1
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1005,7 +1005,7 @@ steps:
     name: step1
     executor: http
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1025,7 +1025,7 @@ steps:
         map:
           foo: bar
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1046,7 +1046,7 @@ steps:
     run: sub_dag
     params: "param1=value1 param2=value2"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1067,7 +1067,7 @@ steps:
       skipped: true
       failure: true
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1084,7 +1084,7 @@ steps:
       limit: 3
       intervalSec: 10
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1105,7 +1105,7 @@ steps:
       backoff: 2.0
       maxIntervalSec: 30
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1128,7 +1128,7 @@ steps:
       backoff: true
       maxIntervalSec: 10
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1151,7 +1151,7 @@ steps:
       intervalSec: 1
       backoff: 0.8
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		assert.Error(t, err)
 		assert.Nil(t, dag)
 		assert.Contains(t, err.Error(), "backoff must be greater than 1.0")
@@ -1167,7 +1167,7 @@ steps:
       repeat: true
       intervalSec: 60
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1190,7 +1190,7 @@ steps:
       intervalSec: 5
       limit: 3
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1218,7 +1218,7 @@ steps:
       intervalSec: 10
       limit: 5
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1244,7 +1244,7 @@ steps:
       exitCode: [1, 2]
       intervalSec: 15
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1268,7 +1268,7 @@ steps:
       exitCode: [0]
       intervalSec: 20
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1293,7 +1293,7 @@ steps:
       expected: "hello"
       intervalSec: 25
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1318,7 +1318,7 @@ steps:
       condition: "echo hello"
       intervalSec: 30
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1344,7 +1344,7 @@ steps:
       expected: "hello"
       intervalSec: 1
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1365,7 +1365,7 @@ steps:
     name: step1
     signalOnStop: SIGINT
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1385,7 +1385,7 @@ steps:
     id: custom-id-123
     command: echo "Another step with ID"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 3)
@@ -1413,7 +1413,7 @@ steps:
       - condition: "test -f file.txt"
         expected: "true"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1432,7 +1432,7 @@ steps:
       exitCode: [42]
       intervalSec: 2
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1459,7 +1459,7 @@ steps:
       limit: 10
       exitCode: [1]
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1489,7 +1489,7 @@ steps:
       condition: "echo done"
       expected: "done"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
@@ -1517,7 +1517,7 @@ steps:
       repeat: "invalid"
       intervalSec: 10
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		assert.Error(t, err)
 		assert.Nil(t, dag)
 		assert.Contains(t, err.Error(), "invalid value for repeat: 'invalid'")
@@ -1531,7 +1531,7 @@ steps:
       repeat: "while"
       intervalSec: 10
 `)
-		dag, err = builder.LoadYAML(context.Background(), data)
+		dag, err = spec.LoadYAML(context.Background(), data)
 		assert.Error(t, err)
 		assert.Nil(t, dag)
 		assert.Contains(t, err.Error(), "repeat mode 'while' requires either 'condition' or 'exitCode' to be specified")
@@ -1545,7 +1545,7 @@ steps:
       repeat: "until"
       intervalSec: 10
 `)
-		dag, err = builder.LoadYAML(context.Background(), data)
+		dag, err = spec.LoadYAML(context.Background(), data)
 		assert.Error(t, err)
 		assert.Nil(t, dag)
 		assert.Contains(t, err.Error(), "repeat mode 'until' requires either 'condition' or 'exitCode' to be specified")
@@ -1559,7 +1559,7 @@ steps:
       repeat: 123
       intervalSec: 10
 `)
-		dag, err = builder.LoadYAML(context.Background(), data)
+		dag, err = spec.LoadYAML(context.Background(), data)
 		assert.Error(t, err)
 		assert.Nil(t, dag)
 		assert.Contains(t, err.Error(), "invalid value for repeat")
@@ -1579,7 +1579,7 @@ steps:
       backoff: 1.0
       exitCode: [1]
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		assert.Error(t, err)
 		assert.Nil(t, dag)
 		assert.Contains(t, err.Error(), "backoff must be greater than 1.0")
@@ -1595,7 +1595,7 @@ steps:
       backoff: 0.5
       exitCode: [1]
 `)
-		dag, err = builder.LoadYAML(context.Background(), data)
+		dag, err = spec.LoadYAML(context.Background(), data)
 		assert.Error(t, err)
 		assert.Nil(t, dag)
 		assert.Contains(t, err.Error(), "backoff must be greater than 1.0")
@@ -1645,7 +1645,7 @@ steps:
   - command: echo 1
     name: step1
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag} // Using a simple DAG without maxActiveRuns
 		assert.Equal(t, 1, th.MaxActiveRuns, "maxActiveRuns should default to 1 when not specified")
@@ -1662,7 +1662,7 @@ steps:
   - name: step1
     command: echo test
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		assert.Equal(t, -1, dag.MaxActiveRuns, "negative maxActiveRuns should be preserved")
 	})
@@ -1682,7 +1682,7 @@ steps:
     - echo "parallel 2"
   - echo "step 3"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		assert.Len(t, dag.Steps, 4)
 
@@ -1722,7 +1722,7 @@ steps:
   - name: cleanup
     command: echo "cleanup"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		assert.Len(t, dag.Steps, 4)
 
@@ -1762,7 +1762,7 @@ steps:
   - name: final
     command: echo "done"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		assert.Len(t, dag.Steps, 5)
 
@@ -1793,7 +1793,7 @@ steps:
     - echo "parallel 2"
     - echo "parallel 3"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		assert.Len(t, dag.Steps, 3)
 
@@ -1817,7 +1817,7 @@ steps:
     - echo "parallel 3"
     - echo "parallel 4"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		assert.Len(t, dag.Steps, 4)
 
@@ -1845,7 +1845,7 @@ steps:
   - echo "hello"
   - ls -la
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		assert.Len(t, dag.Steps, 2)
 
@@ -1874,7 +1874,7 @@ steps:
       DEBUG: "true"
   - ls -la
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		assert.Len(t, dag.Steps, 3)
 
@@ -1905,7 +1905,7 @@ steps:
   - npm test
   - go build
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
@@ -1926,7 +1926,7 @@ steps:
   - command: test.sh
     depends: build
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
@@ -1946,7 +1946,7 @@ steps:
     command: echo "explicit"
   - echo "third"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
@@ -1967,7 +1967,7 @@ steps:
   - command: npm test
     depends: cmd_2
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
@@ -1991,7 +1991,7 @@ steps:
   - command: echo "Building version ${VERSION}"
     depends: cmd_1
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
@@ -2025,7 +2025,7 @@ steps:
       config:
         host: example.com
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
@@ -2048,7 +2048,7 @@ steps:
   - echo "test"
   - echo "deploy"
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
@@ -2074,7 +2074,7 @@ steps:
     id: valid_id
     command: echo test
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
 		assert.Equal(t, "valid_id", dag.Steps[0].ID)
@@ -2089,7 +2089,7 @@ steps:
     id: 123invalid
     command: echo test
 `)
-		_, err := builder.LoadYAML(context.Background(), data)
+		_, err := spec.LoadYAML(context.Background(), data)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid step ID format")
 	})
@@ -2106,7 +2106,7 @@ steps:
     id: myid
     command: echo test2
 `)
-		_, err := builder.LoadYAML(context.Background(), data)
+		_, err := spec.LoadYAML(context.Background(), data)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "duplicate step ID")
 	})
@@ -2122,7 +2122,7 @@ steps:
   - name: step2
     command: echo test2
 `)
-		_, err := builder.LoadYAML(context.Background(), data)
+		_, err := spec.LoadYAML(context.Background(), data)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "conflicts with another step's name")
 	})
@@ -2138,7 +2138,7 @@ steps:
   - name: myid
     command: echo test2
 `)
-		_, err := builder.LoadYAML(context.Background(), data)
+		_, err := spec.LoadYAML(context.Background(), data)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "conflicts with another step's name")
 	})
@@ -2150,7 +2150,7 @@ steps:
     id: env
     command: echo test
 `)
-		_, err := builder.LoadYAML(context.Background(), data)
+		_, err := spec.LoadYAML(context.Background(), data)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "reserved word")
 	})
@@ -2171,7 +2171,7 @@ steps:
     depends: first
     command: echo test2
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 2)
 		assert.Equal(t, "first", dag.Steps[0].ID)
@@ -2190,7 +2190,7 @@ steps:
     depends: step1
     command: echo test2
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 2)
 		assert.Equal(t, []string{"step1"}, dag.Steps[1].Depends)
@@ -2213,7 +2213,7 @@ steps:
       - second
     command: echo test3
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 3)
 		assert.Equal(t, []string{"step1", "step2"}, dag.Steps[2].Depends) // IDs resolved to names
@@ -2233,7 +2233,7 @@ steps:
       - step2
     command: echo test3
 `)
-		dag, err := builder.LoadYAML(context.Background(), data)
+		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 3)
 		assert.Equal(t, []string{"step1", "step2"}, dag.Steps[2].Depends) // ID "first" resolved to name "step1"
@@ -2255,7 +2255,7 @@ steps:
   - name: step3
     command: echo third
 `)
-	dag, err := builder.LoadYAML(context.Background(), data)
+	dag, err := spec.LoadYAML(context.Background(), data)
 	require.NoError(t, err)
 	require.Len(t, dag.Steps, 3)
 
@@ -2366,7 +2366,7 @@ steps:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			dag, err := builder.LoadYAML(ctx, []byte(tt.yaml))
+			dag, err := spec.LoadYAML(ctx, []byte(tt.yaml))
 			require.NoError(t, err)
 
 			// Check that dependencies were resolved correctly
@@ -2405,7 +2405,7 @@ steps:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			_, err := builder.LoadYAML(ctx, []byte(tt.yaml))
+			_, err := spec.LoadYAML(ctx, []byte(tt.yaml))
 			if tt.expectedErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErr)
@@ -2431,7 +2431,7 @@ steps:
     command: echo "test"
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.OTel)
 		assert.True(t, dag.OTel.Enabled)
@@ -2455,7 +2455,7 @@ steps:
     command: echo "test"
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.OTel)
 		assert.True(t, dag.OTel.Enabled)
@@ -2474,7 +2474,7 @@ steps:
     command: echo "test"
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		assert.Nil(t, dag.OTel)
 	})
@@ -2491,7 +2491,7 @@ steps:
     command: python script.py
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.Container)
 		assert.Equal(t, "python:3.11-slim", dag.Container.Image)
@@ -2522,7 +2522,7 @@ steps:
     command: node app.js
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.Container)
 
@@ -2551,7 +2551,7 @@ steps:
     command: echo test
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.Container)
 		assert.Contains(t, dag.Container.Env, "FOO=bar")
@@ -2582,7 +2582,7 @@ steps:
     command: echo test
 `
 				ctx := context.Background()
-				dag, err := builder.LoadYAML(ctx, []byte(yaml))
+				dag, err := spec.LoadYAML(ctx, []byte(yaml))
 				require.NoError(t, err)
 				require.NotNil(t, dag.Container)
 				assert.Equal(t, tc.expected, dag.Container.PullPolicy)
@@ -2601,7 +2601,7 @@ steps:
     command: echo test
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.Container)
 		assert.Equal(t, core.PullPolicyAlways, dag.Container.PullPolicy)
@@ -2616,7 +2616,7 @@ steps:
     command: echo test
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.Container)
 		assert.Equal(t, core.PullPolicyMissing, dag.Container.PullPolicy)
@@ -2629,7 +2629,7 @@ steps:
     command: echo test
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		assert.Nil(t, dag.Container)
 	})
@@ -2644,7 +2644,7 @@ steps:
     command: echo test
 `
 		ctx := context.Background()
-		_, err := builder.LoadYAML(ctx, []byte(yaml))
+		_, err := spec.LoadYAML(ctx, []byte(yaml))
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse pull policy")
 	})
@@ -2660,7 +2660,7 @@ steps:
     command: echo test
 `
 		ctx := context.Background()
-		_, err := builder.LoadYAML(ctx, []byte(yaml))
+		_, err := spec.LoadYAML(ctx, []byte(yaml))
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "image is required when container is specified")
 	})
@@ -2676,7 +2676,7 @@ steps:
     command: python script.py
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
 
@@ -2694,7 +2694,7 @@ steps:
     executor: shell
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
 
@@ -2709,7 +2709,7 @@ steps:
     command: echo test
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
 
@@ -2730,7 +2730,7 @@ steps:
         image: python:3.11
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
 
@@ -2753,7 +2753,7 @@ steps:
     command: echo "step 3"
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 3)
 
@@ -2777,7 +2777,7 @@ steps:
     command: echo hello
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.SSH)
 		assert.Equal(t, "testuser", dag.SSH.User)
@@ -2798,7 +2798,7 @@ steps:
     command: echo hello
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.SSH)
 		assert.Equal(t, "testuser", dag.SSH.User)
@@ -2818,7 +2818,7 @@ steps:
     command: echo hello
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.SSH)
 		assert.Equal(t, "22", dag.SSH.Port)        // Should default to 22
@@ -2841,7 +2841,7 @@ steps:
     command: ls -la
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 2)
 
@@ -2871,7 +2871,7 @@ steps:
       type: command
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 2)
 
@@ -2895,7 +2895,7 @@ steps:
       - STEP_VAR: step_value
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
 		assert.Equal(t, []string{"STEP_VAR=step_value"}, dag.Steps[0].Env)
@@ -2914,7 +2914,7 @@ steps:
       - STEP_ONLY: step_only_value
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
 		// Check DAG-level env
@@ -2935,7 +2935,7 @@ steps:
       BAR: bar_value
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
 		assert.Contains(t, dag.Steps[0].Env, "FOO=foo_value")
@@ -2954,7 +2954,7 @@ steps:
       - COMPUTED: "` + "`echo computed_value`" + `"
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
 		assert.Contains(t, dag.Steps[0].Env, "FULL_PATH=${BASE_PATH}/data")
@@ -2977,7 +2977,7 @@ steps:
     # No env, should inherit DAG env only
 `
 		ctx := context.Background()
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 3)
 		assert.Equal(t, []string{"ENV_VAR=value1"}, dag.Steps[0].Env)
@@ -3003,7 +3003,7 @@ steps:
 		defer func() { os.Setenv("PATH", origPath) }()
 		os.Setenv("PATH", "/usr/bin")
 
-		dag, err := builder.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
 		assert.Contains(t, dag.Steps[0].Env, "PATH=/custom/bin:${PATH}")
@@ -3031,7 +3031,7 @@ container:
 steps:
   - echo hello
 `
-		dag, err := builder.LoadYAML(context.Background(), []byte(yaml))
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 
@@ -3064,7 +3064,7 @@ steps:
 steps:
   - echo hello
 `
-		dag, err := builder.LoadYAML(context.Background(), []byte(yaml))
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 
@@ -3086,7 +3086,7 @@ registryAuths:
 steps:
   - echo hello
 `
-		dag, err := builder.LoadYAML(context.Background(), []byte(yaml))
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 
@@ -3108,7 +3108,7 @@ registryAuths: ${DOCKER_AUTH_JSON}
 steps:
   - echo hello
 `
-		dag, err := builder.LoadYAML(context.Background(), []byte(yaml))
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 
@@ -3128,7 +3128,7 @@ registryAuths:
 steps:
   - echo hello
 `
-		dag, err := builder.LoadYAML(context.Background(), []byte(yaml))
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 
@@ -3153,7 +3153,7 @@ workingDir: /tmp
 steps:
   - echo hello
 `
-		dag, err := builder.LoadYAML(context.Background(), []byte(yaml))
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 		assert.Equal(t, "/tmp", dag.WorkingDir)
@@ -3166,7 +3166,7 @@ workingDir: ${TEST_DIR}/subdir
 steps:
   - echo hello
 `
-		dag, err := builder.LoadYAML(context.Background(), []byte(yaml))
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 		assert.Equal(t, "/tmp/dir/subdir", dag.WorkingDir)
@@ -3177,7 +3177,7 @@ steps:
 steps:
   - echo hello
 `
-		dag, err := builder.LoadYAML(context.Background(), []byte(yaml))
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 
@@ -3207,7 +3207,7 @@ steps:
   - echo hello
 `, tempDir)
 
-		dag, err := builder.LoadYAMLWithOpts(context.Background(), []byte(yaml), builder.BuildOpts{NoEval: true})
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(yaml), spec.BuildOpts{NoEval: true})
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 
@@ -3236,7 +3236,7 @@ env:
 steps:
   - echo hello
 `
-		dag, err := builder.LoadYAMLWithOpts(context.Background(), []byte(yaml), builder.BuildOpts{NoEval: true})
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(yaml), spec.BuildOpts{NoEval: true})
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 

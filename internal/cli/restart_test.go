@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cli"
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -50,7 +50,7 @@ steps:
 	dag.AssertCurrentStatus(t, status.None)
 
 	// Check parameter was the same as the first execution
-	loaded, err := builder.Load(th.Context, dag.Location, builder.WithBaseConfig(th.Config.Paths.BaseConfig))
+	loaded, err := spec.Load(th.Context, dag.Location, spec.WithBaseConfig(th.Config.Paths.BaseConfig))
 	require.NoError(t, err)
 
 	time.Sleep(time.Millisecond * 1000) // Wait for the history to be updated.

@@ -1,4 +1,4 @@
-package builder
+package spec
 
 // definition is a temporary struct to hold the DAG definition.
 // This struct is used to unmarshal the YAML data.

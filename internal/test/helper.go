@@ -19,7 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -218,7 +218,7 @@ func (h Helper) DAG(t *testing.T, yamlContent string) DAG {
 	err = os.WriteFile(testFile, []byte(yamlContent), 0600)
 	require.NoError(t, err, "failed to write test DAG")
 
-	dag, err := builder.Load(h.Context, testFile)
+	dag, err := spec.Load(h.Context, testFile)
 	require.NoError(t, err, "failed to load test DAG")
 
 	return DAG{
@@ -252,7 +252,7 @@ func (h Helper) DAGExpectError(t *testing.T, name string, expectedErr string) {
 	t.Helper()
 
 	filePath := TestdataPath(t, name)
-	_, err := builder.Load(h.Context, filePath)
+	_, err := spec.Load(h.Context, filePath)
 	require.Error(t, err, "expected error loading test DAG %q", name)
 	require.Contains(t, err.Error(), expectedErr, "expected error %q, got %q", expectedErr, err.Error())
 }

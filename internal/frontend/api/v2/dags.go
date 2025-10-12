@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/models"
@@ -37,11 +37,11 @@ func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRe
 	}
 
 	// Load the DAG spec
-	dag, err := builder.LoadYAML(ctx,
+	dag, err := spec.LoadYAML(ctx,
 		[]byte(request.Body.Spec),
-		builder.WithName(name),
-		builder.WithAllowBuildErrors(),
-		builder.WithoutEval(),
+		spec.WithName(name),
+		spec.WithAllowBuildErrors(),
+		spec.WithoutEval(),
 	)
 
 	var errs []string
@@ -75,13 +75,13 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 	}
 
 	// Determine spec to create with: provided spec or default template
-	var spec []byte
+	var yamlSpec []byte
 	if request.Body.Spec != nil && strings.TrimSpace(*request.Body.Spec) != "" {
 		// Validate provided spec before creating
-		_, err := builder.LoadYAML(ctx,
+		_, err := spec.LoadYAML(ctx,
 			[]byte(*request.Body.Spec),
-			builder.WithName(request.Body.Name),
-			builder.WithoutEval(),
+			spec.WithName(request.Body.Name),
+			spec.WithoutEval(),
 		)
 
 		if err != nil {
@@ -100,15 +100,15 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 				Message:    err.Error(),
 			}
 		}
-		spec = []byte(*request.Body.Spec)
+		yamlSpec = []byte(*request.Body.Spec)
 	} else {
 		// Default minimal spec
-		spec = []byte(`steps:
+		yamlSpec = []byte(`steps:
   - command: echo hello
 `)
 	}
 
-	if err := a.dagStore.Create(ctx, request.Body.Name, spec); err != nil {
+	if err := a.dagStore.Create(ctx, request.Body.Name, yamlSpec); err != nil {
 		if errors.Is(err, models.ErrDAGAlreadyExists) {
 			return nil, &Error{
 				HTTPStatus: http.StatusConflict,
@@ -143,17 +143,17 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 }
 
 func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObject) (api.GetDAGSpecResponseObject, error) {
-	spec, err := a.dagStore.GetSpec(ctx, request.FileName)
+	yamlSpec, err := a.dagStore.GetSpec(ctx, request.FileName)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate the spec - use WithAllowBuildErrors to return DAG even with errors
-	dag, err := builder.LoadYAML(ctx,
-		[]byte(spec),
-		builder.WithName(request.FileName),
-		builder.WithAllowBuildErrors(),
-		builder.WithoutEval(),
+	dag, err := spec.LoadYAML(ctx,
+		[]byte(yamlSpec),
+		spec.WithName(request.FileName),
+		spec.WithAllowBuildErrors(),
+		spec.WithoutEval(),
 	)
 	var errs []string
 
@@ -182,7 +182,7 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 
 	return &api.GetDAGSpec200JSONResponse{
 		Dag:    toDAGDetails(dag),
-		Spec:   spec,
+		Spec:   yamlSpec,
 		Errors: errs,
 	}, nil
 }
@@ -289,7 +289,7 @@ func (a *API) GetDAGDAGRunHistory(ctx context.Context, request api.GetDAGDAGRunH
 
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
 	fileName := request.FileName
-	dag, err := a.dagStore.GetDetails(ctx, fileName, builder.WithAllowBuildErrors())
+	dag, err := a.dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -505,7 +505,7 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 	dag, err := a.dagStore.GetMetadata(ctx, dagFileName)
 	if err != nil {
 		// For DAGs with errors, try to load with AllowBuildErrors
-		dag, err = a.dagStore.GetDetails(ctx, dagFileName, builder.WithAllowBuildErrors())
+		dag, err = a.dagStore.GetDetails(ctx, dagFileName, spec.WithAllowBuildErrors())
 		if err != nil {
 			return nil, &Error{
 				HTTPStatus: http.StatusNotFound,
@@ -681,7 +681,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		return nil, err
 	}
 
-	dag, err := a.dagStore.GetDetails(ctx, request.FileName, builder.WithoutEval())
+	dag, err := a.dagStore.GetDetails(ctx, request.FileName, spec.WithoutEval())
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,

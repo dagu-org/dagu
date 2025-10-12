@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
@@ -23,7 +23,7 @@ type mockDAGStore struct {
 	dags map[string]*core.DAG
 }
 
-func (m *mockDAGStore) GetDetails(_ context.Context, path string, _ ...builder.LoadOption) (*core.DAG, error) {
+func (m *mockDAGStore) GetDetails(_ context.Context, path string, _ ...spec.LoadOption) (*core.DAG, error) {
 	if dag, ok := m.dags[path]; ok {
 		return dag, nil
 	}
@@ -90,7 +90,7 @@ func (m *mockDAGStore) UpdateSpec(_ context.Context, _ string, _ []byte) error {
 	return nil
 }
 
-func (m *mockDAGStore) LoadSpec(_ context.Context, _ []byte, _ ...builder.LoadOption) (*core.DAG, error) {
+func (m *mockDAGStore) LoadSpec(_ context.Context, _ []byte, _ ...spec.LoadOption) (*core.DAG, error) {
 	return nil, nil
 }
 
