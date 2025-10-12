@@ -22,11 +22,11 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/container"
 	"github.com/dagu-org/dagu/internal/coordinator"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/executor"
+	"github.com/dagu-org/dagu/internal/core/scheduler"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/executor"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/models"
@@ -87,15 +87,15 @@ type Agent struct {
 	logFile string
 
 	// dag is the DAG to run.
-	dag *digraph.DAG
+	dag *core.DAG
 
 	// rootDAGRun indicates the root dag-run of the current dag-run.
 	// If the current dag-run is the root dag-run, it is the same as the current
 	// DAG name and dag-run ID.
-	rootDAGRun digraph.DAGRunRef
+	rootDAGRun core.DAGRunRef
 
 	// parentDAGRun is the execution reference of the parent dag-run.
-	parentDAGRun digraph.DAGRunRef
+	parentDAGRun core.DAGRunRef
 
 	// dagRunID is the ID for the current dag-run.
 	dagRunID string
@@ -134,7 +134,7 @@ type Options struct {
 	RetryTarget *models.DAGRunStatus
 	// ParentDAGRun is the dag-run reference of the parent dag-run.
 	// It is required for child dag-runs to identify the parent dag-run.
-	ParentDAGRun digraph.DAGRunRef
+	ParentDAGRun core.DAGRunRef
 	// ProgressDisplay indicates if the progress display should be shown.
 	// This is typically enabled for CLI execution in a TTY environment.
 	ProgressDisplay bool
@@ -145,14 +145,14 @@ type Options struct {
 // New creates a new Agent.
 func New(
 	dagRunID string,
-	dag *digraph.DAG,
+	dag *core.DAG,
 	logDir string,
 	logFile string,
 	drm dagrun.Manager,
 	ds models.DAGStore,
 	drs models.DAGRunStore,
 	reg models.ServiceRegistry,
-	root digraph.DAGRunRef,
+	root core.DAGRunRef,
 	peerConfig config.Peer,
 	opts Options,
 ) *Agent {
@@ -276,7 +276,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize coordinator client factory for distributed execution
 	coordinatorCli := a.createCoordinatorClient(ctx)
 
-	ctx = digraph.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli)
+	ctx = core.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli)
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}
@@ -584,10 +584,10 @@ func (a *Agent) Status(ctx context.Context) models.DAGRunStatus {
 		models.WithFinishedAt(a.graph.FinishAt()),
 		models.WithNodes(a.graph.NodeData()),
 		models.WithLogFilePath(a.logFile),
-		models.WithOnExitNode(a.scheduler.HandlerNode(digraph.HandlerOnExit)),
-		models.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
-		models.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
-		models.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
+		models.WithOnExitNode(a.scheduler.HandlerNode(core.HandlerOnExit)),
+		models.WithOnSuccessNode(a.scheduler.HandlerNode(core.HandlerOnSuccess)),
+		models.WithOnFailureNode(a.scheduler.HandlerNode(core.HandlerOnFailure)),
+		models.WithOnCancelNode(a.scheduler.HandlerNode(core.HandlerOnCancel)),
 		models.WithAttemptID(a.dagRunAttemptID),
 		models.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 		models.WithPreconditions(a.dag.Preconditions),
@@ -735,7 +735,7 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 }
 
 // createCoordinatorClient creates a coordinator client factory for distributed execution
-func (a *Agent) createCoordinatorClient(ctx context.Context) digraph.Dispatcher {
+func (a *Agent) createCoordinatorClient(ctx context.Context) core.Dispatcher {
 	if a.registry == nil {
 		logger.Debug(ctx, "Service monitor is not configured, skipping coordinator client creation")
 		return nil
@@ -773,7 +773,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
-	dagCtx := digraph.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil)
+	dagCtx := core.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
 	a.lastErr = lastErr
 

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core/status"
 )
 
 func StatusFromJSON(s string) (*Status, error) {

@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-org/dagu/internal/common/sock"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/scheduler"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/test"
 )
@@ -81,7 +81,7 @@ func TestManager(t *testing.T) {
 		_ = att.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
-		ref := digraph.NewDAGRunRef(dag.Name, dagRunID)
+		ref := core.NewDAGRunRef(dag.Name, dagRunID)
 		statusToCheck, err := cli.GetSavedStatus(ctx, ref)
 		require.NoError(t, err)
 		require.Equal(t, status.NodeSuccess, statusToCheck.Nodes[0].Status)
@@ -90,7 +90,7 @@ func TestManager(t *testing.T) {
 		newStatus := status.NodeError
 		dagRunStatus.Nodes[0].Status = newStatus
 
-		root := digraph.NewDAGRunRef(dag.Name, dagRunID)
+		root := core.NewDAGRunRef(dag.Name, dagRunID)
 		err = cli.UpdateStatus(ctx, root, dagRunStatus)
 		require.NoError(t, err)
 
@@ -125,7 +125,7 @@ steps:
 		dagRunID := dagRunStatus.DAGRunID
 		childDAGRun := dagRunStatus.Nodes[0].Children[0]
 
-		root := digraph.NewDAGRunRef(dag.Name, dagRunID)
+		root := core.NewDAGRunRef(dag.Name, dagRunID)
 		childDAGRunStatus, err := th.DAGRunMgr.FindChildDAGRunStatus(th.Context, root, childDAGRun.DAGRunID)
 		require.NoError(t, err)
 		require.Equal(t, status.Success.String(), childDAGRunStatus.Status.String())
@@ -152,13 +152,13 @@ steps:
 		status := testNewStatus(dag.DAG, "unknown-req-id", status.Error, status.NodeError)
 
 		// Check if the update fails.
-		root := digraph.NewDAGRunRef(dag.Name, "unknown-req-id")
+		root := core.NewDAGRunRef(dag.Name, "unknown-req-id")
 		err := cli.UpdateStatus(ctx, root, status)
 		require.Error(t, err)
 	})
 }
 
-func testNewStatus(dag *digraph.DAG, dagRunID string, dagStatus status.Status, nodeStatus status.NodeStatus) models.DAGRunStatus {
+func testNewStatus(dag *core.DAG, dagRunID string, dagStatus status.Status, nodeStatus status.NodeStatus) models.DAGRunStatus {
 	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
 	tm := time.Now()
 	startedAt := &tm

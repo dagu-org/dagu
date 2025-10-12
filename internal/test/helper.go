@@ -18,10 +18,10 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/builder"
-	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
@@ -259,7 +259,7 @@ func (h Helper) DAGExpectError(t *testing.T, name string, expectedErr string) {
 
 type DAG struct {
 	*Helper
-	*digraph.DAG
+	*core.DAG
 }
 
 func (d *DAG) AssertLatestStatus(t *testing.T, expected status.Status) {
@@ -390,7 +390,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 
 	logDir := d.Config.Paths.LogDir
 	logFile := filepath.Join(d.Config.Paths.LogDir, dagRunID+".log")
-	root := digraph.NewDAGRunRef(d.Name, dagRunID)
+	root := core.NewDAGRunRef(d.Name, dagRunID)
 
 	helper.Agent = agent.New(
 		dagRunID,
@@ -411,7 +411,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 
 type Agent struct {
 	*Helper
-	*digraph.DAG
+	*core.DAG
 	*agent.Agent
 	opts     agent.Options
 	dagRunID string // the dag-run ID for this agent
@@ -430,7 +430,7 @@ func (a *Agent) RunError(t *testing.T) {
 func (a *Agent) RunCancel(t *testing.T) {
 	t.Helper()
 
-	proc, err := a.ProcStore.Acquire(a.Context, a.DAG.ProcGroup(), digraph.DAGRunRef{
+	proc, err := a.ProcStore.Acquire(a.Context, a.DAG.ProcGroup(), core.DAGRunRef{
 		Name: a.DAG.Name,
 		ID:   a.dagRunID,
 	})

@@ -6,7 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
@@ -45,7 +45,7 @@ func runRetry(ctx *Context, args []string) error {
 	}
 
 	// Retrieve the previous run data for specified dag-run ID.
-	ref := digraph.NewDAGRunRef(name, dagRunID)
+	ref := core.NewDAGRunRef(name, dagRunID)
 	attempt, err := ctx.DAGRunStore.FindAttempt(ctx, ref)
 	if err != nil {
 		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
@@ -88,7 +88,7 @@ func runRetry(ctx *Context, args []string) error {
 	}
 
 	// Acquire process handle
-	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), digraph.NewDAGRunRef(dag.Name, dagRunID))
+	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), core.NewDAGRunRef(dag.Name, dagRunID))
 	if err != nil {
 		logger.Debug(ctx, "failed to acquire process handle", "err", err)
 		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
@@ -108,7 +108,7 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, rootRun digraph.DAGRunRef, stepName string) error {
+func executeRetry(ctx *Context, dag *core.DAG, status *models.DAGRunStatus, rootRun core.DAGRunRef, stepName string) error {
 	logger.Debug(ctx, "Executing dag-run retry", "dag", dag.Name, "runId", status.DAGRunID, "step", stepName)
 
 	// We use the same log file for the retry as the original run.

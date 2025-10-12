@@ -16,8 +16,8 @@ import (
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/metrics"
@@ -149,7 +149,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 // NewServer creates and returns a new web UI NewServer.
 // It initializes in-memory caches for DAGs and runstore, and uses them in the client.
 func (c *Context) NewServer() (*frontend.Server, error) {
-	dc := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
+	dc := fileutil.NewCache[*core.DAG](0, time.Hour*12)
 	dc.StartEviction(c)
 
 	dr, err := c.dagStore(dc, nil)
@@ -192,7 +192,7 @@ func (c *Context) NewCoordinatorClient() coordinator.Client {
 // NewScheduler creates a new NewScheduler instance using the default client.
 // It builds a DAG job manager to handle scheduled executions.
 func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
-	cache := fileutil.NewCache[*digraph.DAG](0, time.Hour*12)
+	cache := fileutil.NewCache[*core.DAG](0, time.Hour*12)
 	cache.StartEviction(c)
 
 	dr, err := c.dagStore(cache, nil)
@@ -221,7 +221,7 @@ func (c *Context) StringParam(name string) (string, error) {
 
 // dagStore returns a new DAGRepository instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (c *Context) dagStore(cache *fileutil.Cache[*digraph.DAG], searchPaths []string) (models.DAGStore, error) {
+func (c *Context) dagStore(cache *fileutil.Cache[*core.DAG], searchPaths []string) (models.DAGStore, error) {
 	dir := c.Config.Paths.DAGsDir
 	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {
@@ -253,7 +253,7 @@ func (c *Context) dagStore(cache *fileutil.Cache[*digraph.DAG], searchPaths []st
 // It evaluates the log directory, validates settings, creates the log directory,
 // builds a filename using the current timestamp and dag-run ID, and then opens the file.
 func (c *Context) OpenLogFile(
-	dag *digraph.DAG,
+	dag *core.DAG,
 	dagRunID string,
 ) (*os.File, error) {
 	logPath, err := c.GenLogFileName(dag, dagRunID)
@@ -264,7 +264,7 @@ func (c *Context) OpenLogFile(
 }
 
 // GenLogFileName generates a log file name based on the DAG and dag-run ID.
-func (c *Context) GenLogFileName(dag *digraph.DAG, dagRunID string) (string, error) {
+func (c *Context) GenLogFileName(dag *core.DAG, dagRunID string) (string, error) {
 	// Read the global configuration for log directory.
 	baseLogDir, err := cmdutil.EvalString(c, c.Config.Paths.LogDir)
 	if err != nil {

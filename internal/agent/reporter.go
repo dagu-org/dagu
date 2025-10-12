@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/scheduler"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -32,7 +32,7 @@ func newReporter(f SenderFn) *reporter {
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	ctx context.Context, dag *digraph.DAG, dagStatus models.DAGRunStatus, node *scheduler.Node,
+	ctx context.Context, dag *core.DAG, dagStatus models.DAGRunStatus, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != status.NodeNone {
@@ -62,7 +62,7 @@ func (r *reporter) getSummary(_ context.Context, dagStatus models.DAGRunStatus, 
 }
 
 // send is a function that sends a report mail.
-func (r *reporter) send(ctx context.Context, dag *digraph.DAG, dagStatus models.DAGRunStatus, err error) error {
+func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus models.DAGRunStatus, err error) error {
 	if err != nil || dagStatus.Status == status.Error {
 		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
 			fromAddress := dag.ErrorMail.From

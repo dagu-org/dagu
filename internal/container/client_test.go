@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
@@ -33,7 +33,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine:latest",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -47,7 +47,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				ContainerName: "my-container",
-				Pull:          digraph.PullPolicyMissing,
+				Pull:          core.PullPolicyMissing,
 				Container:     &container.Config{},
 				Host:          &container.HostConfig{},
 				Network:       &network.NetworkingConfig{},
@@ -85,7 +85,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			expected: &Config{
 				Image:      "ubuntu:20.04",
 				Platform:   "linux/arm64",
-				Pull:       digraph.PullPolicyAlways,
+				Pull:       core.PullPolicyAlways,
 				AutoRemove: true,
 				Container: &container.Config{
 					Env:        []string{"FOO=bar"},
@@ -114,7 +114,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				ContainerName: "test-container",
-				Pull:          digraph.PullPolicyMissing,
+				Pull:          core.PullPolicyMissing,
 				Container:     &container.Config{},
 				Host:          &container.HostConfig{},
 				Network:       &network.NetworkingConfig{},
@@ -135,7 +135,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:      "alpine",
-				Pull:       digraph.PullPolicyMissing,
+				Pull:       core.PullPolicyMissing,
 				AutoRemove: true,
 				Container:  &container.Config{},
 				Host: &container.HostConfig{
@@ -156,7 +156,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:      "alpine",
-				Pull:       digraph.PullPolicyMissing,
+				Pull:       core.PullPolicyMissing,
 				AutoRemove: true,
 				Container:  &container.Config{},
 				Host: &container.HostConfig{
@@ -174,7 +174,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				AutoRemove:  true,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
@@ -190,7 +190,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				AutoRemove:  false,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
@@ -206,7 +206,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				AutoRemove:  true,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
@@ -222,7 +222,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				AutoRemove:  false,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
@@ -256,7 +256,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyNever,
+				Pull:        core.PullPolicyNever,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -271,7 +271,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -286,7 +286,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyAlways,
+				Pull:        core.PullPolicyAlways,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -301,7 +301,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyNever,
+				Pull:        core.PullPolicyNever,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -316,7 +316,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyAlways,
+				Pull:        core.PullPolicyAlways,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -351,7 +351,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image: "alpine",
-				Pull:  digraph.PullPolicyMissing,
+				Pull:  core.PullPolicyMissing,
 				Container: &container.Config{
 					Env: []string{"FOO=bar"},
 				},
@@ -407,7 +407,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -443,7 +443,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			expected: &Config{
 				Image:       "alpine",
 				Platform:    "123",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -457,7 +457,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				ContainerName: "123",
-				Pull:          digraph.PullPolicyMissing,
+				Pull:          core.PullPolicyMissing,
 				Container:     &container.Config{},
 				Host:          &container.HostConfig{},
 				Network:       &network.NetworkingConfig{},
@@ -471,7 +471,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "123",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -489,7 +489,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -504,7 +504,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -519,7 +519,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			},
 			expected: &Config{
 				Image:       "alpine",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -535,7 +535,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			expected: &Config{
 				Image:       "alpine",
 				AutoRemove:  false,
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -551,7 +551,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			expected: &Config{
 				Image:       "alpine",
 				Platform:    "",
-				Pull:        digraph.PullPolicyMissing,
+				Pull:        core.PullPolicyMissing,
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
@@ -567,7 +567,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			expected: &Config{
 				Image:         "alpine",
 				ContainerName: "",
-				Pull:          digraph.PullPolicyMissing,
+				Pull:          core.PullPolicyMissing,
 				Container:     &container.Config{},
 				Host:          &container.HostConfig{},
 				Network:       &network.NetworkingConfig{},
@@ -583,7 +583,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			expected: &Config{
 				Image:         "",
 				ContainerName: "test",
-				Pull:          digraph.PullPolicyMissing,
+				Pull:          core.PullPolicyMissing,
 				Container:     &container.Config{},
 				Host:          &container.HostConfig{},
 				Network:       &network.NetworkingConfig{},
@@ -629,20 +629,20 @@ func TestLoadConfigFromMap(t *testing.T) {
 func TestLoadConfig(t *testing.T) {
 	tests := []struct {
 		name        string
-		input       digraph.Container
+		input       core.Container
 		expected    *Config
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "MinimalContainerWithImageOnly",
-			input: digraph.Container{
+			input: core.Container{
 				Image: "alpine:latest",
 			},
 			expected: &Config{
 				Image:      "alpine:latest",
-				Pull:       digraph.PullPolicyAlways, // Zero value of PullPolicy
-				AutoRemove: true,                     // Default when KeepContainer is false
+				Pull:       core.PullPolicyAlways, // Zero value of PullPolicy
+				AutoRemove: true,                  // Default when KeepContainer is false
 				Container: &container.Config{
 					Image: "alpine:latest",
 				},
@@ -653,7 +653,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "ErrorWhenImageIsEmpty",
-			input: digraph.Container{
+			input: core.Container{
 				Platform: "linux/amd64",
 			},
 			expectError: true,
@@ -661,9 +661,9 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "FullContainerConfiguration",
-			input: digraph.Container{
+			input: core.Container{
 				Image:         "ubuntu:20.04",
-				PullPolicy:    digraph.PullPolicyAlways,
+				PullPolicy:    core.PullPolicyAlways,
 				Env:           []string{"FOO=bar", "BAZ=qux"},
 				Volumes:       []string{"/host/data:/data:ro", "myvolume:/app"},
 				User:          "1000:1000",
@@ -676,7 +676,7 @@ func TestLoadConfig(t *testing.T) {
 			expected: &Config{
 				Image:      "ubuntu:20.04",
 				Platform:   "linux/arm64",
-				Pull:       digraph.PullPolicyAlways,
+				Pull:       core.PullPolicyAlways,
 				AutoRemove: false, // KeepContainer is true
 				Container: &container.Config{
 					Image:      "ubuntu:20.04",
@@ -718,7 +718,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "StandardNetworkModes",
-			input: digraph.Container{
+			input: core.Container{
 				Image:   "nginx",
 				Network: "host",
 			},
@@ -737,7 +737,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "ContainerNetworkReference",
-			input: digraph.Container{
+			input: core.Container{
 				Image:   "nginx",
 				Network: "container:myapp",
 			},
@@ -756,7 +756,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "BindMountWithDefaultRwMode",
-			input: digraph.Container{
+			input: core.Container{
 				Image:   "alpine",
 				Volumes: []string{"/host/path:/container/path"},
 			},
@@ -775,7 +775,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "RelativeBindMount",
-			input: digraph.Container{
+			input: core.Container{
 				Image:   "alpine",
 				Volumes: []string{"./data:/data:ro"},
 			},
@@ -799,7 +799,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "HomeDirectoryBindMount",
-			input: digraph.Container{
+			input: core.Container{
 				Image:   "alpine",
 				Volumes: []string{"~/data:/data:rw"},
 			},
@@ -823,7 +823,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "PortWithIPAddress",
-			input: digraph.Container{
+			input: core.Container{
 				Image: "nginx",
 				Ports: []string{"127.0.0.1:8080:80/tcp"},
 			},
@@ -852,7 +852,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "UdpPort",
-			input: digraph.Container{
+			input: core.Container{
 				Image: "dns-server",
 				Ports: []string{"53:53/udp"},
 			},
@@ -881,7 +881,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "InvalidVolumeFormatTooFewParts",
-			input: digraph.Container{
+			input: core.Container{
 				Image:   "alpine",
 				Volumes: []string{"/data"},
 			},
@@ -890,7 +890,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "InvalidVolumeFormatTooManyParts",
-			input: digraph.Container{
+			input: core.Container{
 				Image:   "alpine",
 				Volumes: []string{"/host:/container:ro:extra"},
 			},
@@ -899,7 +899,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "InvalidVolumeMode",
-			input: digraph.Container{
+			input: core.Container{
 				Image:   "alpine",
 				Volumes: []string{"/data:/data:invalid"},
 			},
@@ -908,7 +908,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "InvalidPortFormatTooManyParts",
-			input: digraph.Container{
+			input: core.Container{
 				Image: "nginx",
 				Ports: []string{"1.2.3.4:8080:80:extra"},
 			},
@@ -917,7 +917,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "InvalidPortProtocolDelimiter",
-			input: digraph.Container{
+			input: core.Container{
 				Image: "nginx",
 				Ports: []string{"80/tcp/extra"},
 			},
@@ -926,7 +926,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "InvalidPortProtocol",
-			input: digraph.Container{
+			input: core.Container{
 				Image: "nginx",
 				Ports: []string{"80/invalid"},
 			},
@@ -935,7 +935,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "SctpPortProtocol",
-			input: digraph.Container{
+			input: core.Container{
 				Image: "sctp-server",
 				Ports: []string{"132/sctp"},
 			},
@@ -955,7 +955,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "WhitespaceInPortSpecification",
-			input: digraph.Container{
+			input: core.Container{
 				Image: "nginx",
 				Ports: []string{" 8080:80 "},
 			},
@@ -984,7 +984,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "EmptyNetworkUsesDefault",
-			input: digraph.Container{
+			input: core.Container{
 				Image:   "nginx",
 				Network: "",
 			},
@@ -1003,7 +1003,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "BridgeNetworkMode",
-			input: digraph.Container{
+			input: core.Container{
 				Image:   "nginx",
 				Network: "bridge",
 			},
@@ -1022,7 +1022,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "NoneNetworkMode",
-			input: digraph.Container{
+			input: core.Container{
 				Image:   "nginx",
 				Network: "none",
 			},
@@ -1041,7 +1041,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "KeepContainerFalseSetsAutoRemoveTrue",
-			input: digraph.Container{
+			input: core.Container{
 				Image:         "alpine",
 				KeepContainer: false,
 			},
@@ -1058,7 +1058,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "KeepContainerTrueSetsAutoRemoveFalse",
-			input: digraph.Container{
+			input: core.Container{
 				Image:         "alpine",
 				KeepContainer: true,
 			},
@@ -1075,13 +1075,13 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "PullPolicyPropagation",
-			input: digraph.Container{
+			input: core.Container{
 				Image:      "alpine",
-				PullPolicy: digraph.PullPolicyNever,
+				PullPolicy: core.PullPolicyNever,
 			},
 			expected: &Config{
 				Image:      "alpine",
-				Pull:       digraph.PullPolicyNever,
+				Pull:       core.PullPolicyNever,
 				AutoRemove: true,
 				Container: &container.Config{
 					Image: "alpine",
@@ -1093,7 +1093,7 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "PlatformPropagation",
-			input: digraph.Container{
+			input: core.Container{
 				Image:    "alpine",
 				Platform: "linux/386",
 			},

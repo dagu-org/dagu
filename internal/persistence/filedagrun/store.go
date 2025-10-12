@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 )
@@ -253,7 +253,7 @@ func (store *Store) collectStatusesFromRoots(
 // CreateAttempt creates a new history record for the specified dag-run ID.
 // If opts.Root is not nil, it creates a new history record for a child dag-run.
 // If opts.Retry is true, it creates a retry record for the specified dag-run ID.
-func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timestamp time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
+func (store *Store) CreateAttempt(ctx context.Context, dag *core.DAG, timestamp time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
 	if dagRunID == "" {
 		return nil, ErrDAGRunIDEmpty
 	}
@@ -307,7 +307,7 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *digraph.DAG, timesta
 }
 
 // newChildRecord creates a new history record for a child dag-run.
-func (b *Store) newChildRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
+func (b *Store) newChildRecord(ctx context.Context, dag *core.DAG, timestamp time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
 	dataRoot := NewDataRoot(b.baseDir, opts.RootDAGRun.Name)
 	root, err := dataRoot.FindByDAGRunID(ctx, opts.RootDAGRun.ID)
 	if err != nil {
@@ -411,7 +411,7 @@ func (store *Store) LatestAttempt(ctx context.Context, dagName string) (models.D
 }
 
 // FindAttempt finds a history record by dag-run ID.
-func (store *Store) FindAttempt(ctx context.Context, ref digraph.DAGRunRef) (models.DAGRunAttempt, error) {
+func (store *Store) FindAttempt(ctx context.Context, ref core.DAGRunRef) (models.DAGRunAttempt, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -435,7 +435,7 @@ func (store *Store) FindAttempt(ctx context.Context, ref digraph.DAGRunRef) (mod
 
 // FindChildAttempt finds a child dag-run by its ID.
 // It returns the latest record for the specified child dag-run ID.
-func (store *Store) FindChildAttempt(ctx context.Context, ref digraph.DAGRunRef, childDAGRunID string) (models.DAGRunAttempt, error) {
+func (store *Store) FindChildAttempt(ctx context.Context, ref core.DAGRunRef, childDAGRunID string) (models.DAGRunAttempt, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -485,7 +485,7 @@ func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retent
 }
 
 // RemoveDAGRun implements models.DAGRunStore.
-func (store *Store) RemoveDAGRun(ctx context.Context, dagRun digraph.DAGRunRef) error {
+func (store *Store) RemoveDAGRun(ctx context.Context, dagRun core.DAGRunRef) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():

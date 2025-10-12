@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cli"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,7 +51,7 @@ func TestDequeueCommand_PreservesState(t *testing.T) {
 	})
 
 	// Wait for it to complete
-	attempt, err := th.DAGRunStore.FindAttempt(ctx, digraph.DAGRunRef{
+	attempt, err := th.DAGRunStore.FindAttempt(ctx, core.DAGRunRef{
 		Name: dag.Name,
 		ID:   "success-run",
 	})

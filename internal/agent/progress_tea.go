@@ -9,8 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
@@ -45,7 +45,7 @@ type (
 // ProgressModel represents the Bubble Tea model for progress display
 type ProgressModel struct {
 	// DAG information
-	dag      *digraph.DAG
+	dag      *core.DAG
 	status   *models.DAGRunStatus
 	dagRunID string
 	params   string
@@ -75,7 +75,7 @@ type ProgressModel struct {
 }
 
 // NewProgressModel creates a new progress model for Bubble Tea
-func NewProgressModel(dag *digraph.DAG) ProgressModel {
+func NewProgressModel(dag *core.DAG) ProgressModel {
 	s := spinner.New()
 	s.Spinner = spinner.Spinner{
 		Frames: []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"},
@@ -738,7 +738,7 @@ type ProgressTeaDisplay struct {
 }
 
 // NewProgressTeaDisplay creates a new Bubble Tea-based progress display
-func NewProgressTeaDisplay(dag *digraph.DAG) *ProgressTeaDisplay {
+func NewProgressTeaDisplay(dag *core.DAG) *ProgressTeaDisplay {
 	model := NewProgressModel(dag)
 	return &ProgressTeaDisplay{
 		model:        model,

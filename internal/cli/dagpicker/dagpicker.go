@@ -12,7 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
@@ -68,7 +68,7 @@ type Model struct {
 
 	// Parameter input
 	paramInput textinput.Model
-	dag        *digraph.DAG
+	dag        *core.DAG
 	params     string
 
 	// Confirmation
@@ -307,16 +307,16 @@ func (m Model) viewConfirmation() string {
 type pickerModel struct {
 	ctx      context.Context
 	dagStore models.DAGStore
-	dagMap   map[string]*digraph.DAG
+	dagMap   map[string]*core.DAG
 }
 
 // PickDAGInteractive shows a unified fullscreen UI for DAG selection, parameter input, and confirmation
-func PickDAGInteractive(ctx context.Context, dagStore models.DAGStore, dag *digraph.DAG) (Result, error) {
+func PickDAGInteractive(ctx context.Context, dagStore models.DAGStore, dag *core.DAG) (Result, error) {
 	// Create an internal picker model
 	pickerModel := &pickerModel{
 		ctx:      ctx,
 		dagStore: dagStore,
-		dagMap:   make(map[string]*digraph.DAG),
+		dagMap:   make(map[string]*core.DAG),
 	}
 
 	// Get list of DAGs
@@ -433,7 +433,7 @@ func PickDAG(ctx context.Context, dagStore models.DAGStore) (string, error) {
 }
 
 // PromptForParams prompts the user to enter parameters for a DAG
-func PromptForParams(dag *digraph.DAG) (string, error) {
+func PromptForParams(dag *core.DAG) (string, error) {
 	if dag.DefaultParams == "" && len(dag.Params) == 0 {
 		return "", nil
 	}

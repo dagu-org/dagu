@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
@@ -228,7 +228,7 @@ func (m *historyMigrator) migrateRun(ctx context.Context, legacyStatusFile *lega
 }
 
 // convertStatus converts legacy status to new DAGRunStatus format
-func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *digraph.DAG) *models.DAGRunStatus {
+func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DAG) *models.DAGRunStatus {
 	// Convert timestamps
 	startedAt, _ := m.parseTime(legacy.StartedAt)
 	finishedAt, _ := m.parseTime(legacy.FinishedAt)
@@ -381,7 +381,7 @@ func (m *historyMigrator) readLegacyStatusFile(filePath string) (*legacymodel.St
 
 // isAlreadyMigrated checks if a run has already been migrated
 func (m *historyMigrator) isAlreadyMigrated(ctx context.Context, dagName, requestID string) bool {
-	attempt, err := m.dagRunStore.FindAttempt(ctx, digraph.NewDAGRunRef(dagName, requestID))
+	attempt, err := m.dagRunStore.FindAttempt(ctx, core.NewDAGRunRef(dagName, requestID))
 	if err != nil || attempt == nil {
 		return false
 	}
@@ -391,7 +391,7 @@ func (m *historyMigrator) isAlreadyMigrated(ctx context.Context, dagName, reques
 }
 
 // loadDAGForMigration attempts to load the DAG definition
-func (m *historyMigrator) loadDAGForMigration(ctx context.Context, statusDagName, dirBasedDagName string) (*digraph.DAG, error) {
+func (m *historyMigrator) loadDAGForMigration(ctx context.Context, statusDagName, dirBasedDagName string) (*core.DAG, error) {
 	// Try both DAG names as candidates
 	candidates := []string{statusDagName}
 	if dirBasedDagName != "" && dirBasedDagName != statusDagName {
@@ -414,7 +414,7 @@ func (m *historyMigrator) loadDAGForMigration(ctx context.Context, statusDagName
 	}
 
 	// If we can't find the DAG, create a minimal one
-	return &digraph.DAG{
+	return &core.DAG{
 		Name: statusDagName,
 	}, nil
 }

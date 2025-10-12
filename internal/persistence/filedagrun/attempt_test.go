@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -429,10 +429,10 @@ func createTempDir(t *testing.T) string {
 }
 
 // createTestDAG creates a sample DAG for testing
-func createTestDAG() *digraph.DAG {
-	return &digraph.DAG{
+func createTestDAG() *core.DAG {
+	return &core.DAG{
 		Name: "TestDAG",
-		Steps: []digraph.Step{
+		Steps: []core.Step{
 			{
 				Name:    "step1",
 				Command: "echo 'step1'",
@@ -445,12 +445,12 @@ func createTestDAG() *digraph.DAG {
 				},
 			},
 		},
-		HandlerOn: digraph.HandlerOn{
-			Success: &digraph.Step{
+		HandlerOn: core.HandlerOn{
+			Success: &core.Step{
 				Name:    "on_success",
 				Command: "echo 'success'",
 			},
-			Failure: &digraph.Step{
+			Failure: &core.Step{
 				Name:    "on_failure",
 				Command: "echo 'failure'",
 			},

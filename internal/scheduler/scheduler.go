@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/dirlock"
@@ -70,7 +70,7 @@ func New(
 	qs models.QueueStore,
 	ps models.ProcStore,
 	reg models.ServiceRegistry,
-	coordinatorCli digraph.Dispatcher,
+	coordinatorCli core.Dispatcher,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Global.Location
 	if timeLoc == nil {
@@ -318,7 +318,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			data := item.Data()
 			logger.Info(ctx, "Received item from queue", "data", data)
 			var (
-				dag       *digraph.DAG
+				dag       *core.DAG
 				attempt   models.DAGRunAttempt
 				st        *models.DAGRunStatus
 				err       error
@@ -412,7 +412,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 		WAIT_FOR_RUN:
 			for {
 				// Check if the process is alive (has heartbeat)
-				isAlive, err := s.procStore.IsRunAlive(ctx, dag.ProcGroup(), digraph.DAGRunRef{Name: dag.Name, ID: data.ID})
+				isAlive, err := s.procStore.IsRunAlive(ctx, dag.ProcGroup(), core.DAGRunRef{Name: dag.Name, ID: data.ID})
 				if err != nil {
 					logger.Error(ctx, "Failed to check if run is alive", "err", err, "data", data)
 					// Continue checking on error, don't immediately fail
@@ -495,7 +495,7 @@ func (s *Scheduler) markStatusFailed(ctx context.Context, attempt models.DAGRunA
 
 // getQueueConfigByName gets the queue configuration by queue name.
 // It checks global queue configurations first, then falls back to DAG's maxActiveRuns.
-func (s *Scheduler) getQueueConfig(queueName string, dag *digraph.DAG) queueConfig {
+func (s *Scheduler) getQueueConfig(queueName string, dag *core.DAG) queueConfig {
 	// Check global queue configurations
 	for _, queueCfg := range s.config.Queues.Config {
 		if queueCfg.Name == queueName {

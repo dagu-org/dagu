@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
@@ -282,7 +282,7 @@ func (q *queueReaderImpl) processItems(ctx context.Context, ch chan<- models.Que
 	return items
 }
 
-func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.QueuedItem, item *queuedItem, data digraph.DAGRunRef, _ map[string]bool) {
+func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.QueuedItem, item *queuedItem, data core.DAGRunRef, _ map[string]bool) {
 	item.status = statusProcessing
 
 	select {
@@ -326,7 +326,7 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 	}
 }
 
-func (q *queueReaderImpl) removeProcessedItem(ctx context.Context, data digraph.DAGRunRef) {
+func (q *queueReaderImpl) removeProcessedItem(ctx context.Context, data core.DAGRunRef) {
 	if _, err := q.store.DequeueByDAGRunID(ctx, data.Name, data.ID); err != nil {
 		if !errors.Is(err, models.ErrQueueItemNotFound) {
 			logger.Error(ctx, "Failed to dequeue item", "err", err, "name", data.Name, "dagRunId", data.ID)

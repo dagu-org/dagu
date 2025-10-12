@@ -9,7 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -30,7 +30,7 @@ func NewSubCmdBuilder(cfg *config.Config) *SubCmdBuilder {
 }
 
 // Start creates a start command spec.
-func (b *SubCmdBuilder) Start(dag *digraph.DAG, opts StartOptions) CmdSpec {
+func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	args := []string{"start"}
 
 	if opts.Params != "" {
@@ -59,7 +59,7 @@ func (b *SubCmdBuilder) Start(dag *digraph.DAG, opts StartOptions) CmdSpec {
 }
 
 // Enqueue creates an enqueue command spec.
-func (b *SubCmdBuilder) Enqueue(dag *digraph.DAG, opts EnqueueOptions) CmdSpec {
+func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	args := []string{"enqueue"}
 
 	if opts.Params != "" {
@@ -90,7 +90,7 @@ func (b *SubCmdBuilder) Enqueue(dag *digraph.DAG, opts EnqueueOptions) CmdSpec {
 }
 
 // Dequeue creates a dequeue command spec.
-func (b *SubCmdBuilder) Dequeue(dag *digraph.DAG, dagRun digraph.DAGRunRef) CmdSpec {
+func (b *SubCmdBuilder) Dequeue(dag *core.DAG, dagRun core.DAGRunRef) CmdSpec {
 	args := []string{"dequeue", fmt.Sprintf("--dag-run=%s", dagRun.String())}
 
 	if b.configFile != "" {
@@ -108,7 +108,7 @@ func (b *SubCmdBuilder) Dequeue(dag *digraph.DAG, dagRun digraph.DAGRunRef) CmdS
 }
 
 // Restart creates a restart command spec.
-func (b *SubCmdBuilder) Restart(dag *digraph.DAG, opts RestartOptions) CmdSpec {
+func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 	args := []string{"restart"}
 
 	if opts.Quiet {
@@ -128,7 +128,7 @@ func (b *SubCmdBuilder) Restart(dag *digraph.DAG, opts RestartOptions) CmdSpec {
 }
 
 // Retry creates a retry command spec.
-func (b *SubCmdBuilder) Retry(dag *digraph.DAG, dagRunID string, stepName string, disableMaxActiveRuns bool) CmdSpec {
+func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string, disableMaxActiveRuns bool) CmdSpec {
 	args := []string{"retry", fmt.Sprintf("--run-id=%s", dagRunID)}
 
 	if stepName != "" {

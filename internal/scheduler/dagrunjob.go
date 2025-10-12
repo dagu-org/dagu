@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/core"
+	dagstatus "github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
-	dagstatus "github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -28,7 +28,7 @@ var _ Job = (*DAGRunJob)(nil)
 
 // DAGRunJob represents a job that runs a DAG.
 type DAGRunJob struct {
-	DAG         *digraph.DAG
+	DAG         *core.DAG
 	Next        time.Time
 	Schedule    cron.Schedule
 	Client      dagrun.Manager

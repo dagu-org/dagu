@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/builder"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/builder"
 	"github.com/spf13/cobra"
 )
 
@@ -62,7 +62,7 @@ func runValidate(ctx *Context, args []string) error {
 func formatValidationErrors(file string, err error) string {
 	// Collect message strings
 	var msgs []string
-	var list digraph.ErrorList
+	var list core.ErrorList
 	if errors.As(err, &list) {
 		msgs = list.ToStringList()
 	} else {

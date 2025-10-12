@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/test"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/stretchr/testify/require"
 )
 
@@ -85,7 +85,7 @@ func TestAgent_Run(t *testing.T) {
 `)
 
 		// Set a precondition that always fails
-		dag.Preconditions = []*digraph.Condition{
+		dag.Preconditions = []*core.Condition{
 			{Condition: "`echo 1`", Expected: "0"},
 		}
 

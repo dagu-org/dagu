@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/scheduler"
+	"github.com/dagu-org/dagu/internal/core/status"
 )
 
-func FromSteps(steps []digraph.Step) []*Node {
+func FromSteps(steps []core.Step) []*Node {
 	var ret []*Node
 	for _, s := range steps {
 		ret = append(ret, NewNode(s))
@@ -42,7 +42,7 @@ func FromNode(node scheduler.NodeData) *Node {
 }
 
 type Node struct {
-	Step       digraph.Step      `json:"Step"`
+	Step       core.Step         `json:"Step"`
 	Log        string            `json:"Log"`
 	StartedAt  string            `json:"StartedAt"`
 	FinishedAt string            `json:"FinishedAt"`
@@ -70,7 +70,7 @@ func (n *Node) ToNode() *scheduler.Node {
 	})
 }
 
-func NewNode(step digraph.Step) *Node {
+func NewNode(step core.Step) *Node {
 	return &Node{
 		Step:       step,
 		StartedAt:  "-",

@@ -13,9 +13,9 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/core"
+	dagstatus "github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
-	dagstatus "github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/samber/lo/mutable"
@@ -220,7 +220,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 func (a *API) readHistoryData(
 	ctx context.Context,
-	dag *digraph.DAG,
+	dag *core.DAG,
 ) api.DAGHistoryData {
 	defaultHistoryLimit := 30
 	statuses := a.dagRunManager.ListRecentStatus(ctx, dag.Name, defaultHistoryLimit)
@@ -278,11 +278,11 @@ func (a *API) readHistoryData(
 		}
 	}
 
-	for _, handlerType := range []digraph.HandlerType{
-		digraph.HandlerOnSuccess,
-		digraph.HandlerOnFailure,
-		digraph.HandlerOnCancel,
-		digraph.HandlerOnExit,
+	for _, handlerType := range []core.HandlerType{
+		core.HandlerOnSuccess,
+		core.HandlerOnFailure,
+		core.HandlerOnCancel,
+		core.HandlerOnExit,
 	} {
 		if statusList, ok := handlers[handlerType.String()]; ok {
 			var runstore []api.NodeStatus
@@ -314,7 +314,7 @@ func (a *API) readHistoryData(
 
 func (a *API) readLog(
 	ctx context.Context,
-	dag *digraph.DAG,
+	dag *core.DAG,
 	statusFile string,
 ) (*api.SchedulerLog, error) {
 	var logFile string
@@ -348,7 +348,7 @@ func (a *API) readLog(
 
 func (a *API) readStepLog(
 	ctx context.Context,
-	dag *digraph.DAG,
+	dag *core.DAG,
 	stepName string,
 	statusFile string,
 ) (*api.StepLog, error) {
@@ -507,7 +507,7 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 	action := request.Body.Action
 
 	var status models.DAGRunStatus
-	var dag *digraph.DAG
+	var dag *core.DAG
 
 	if action != api.DAGActionSave {
 		d, err := a.dagStore.GetMetadata(ctx, request.Name)
@@ -717,7 +717,7 @@ func (a *API) updateStatus(
 	ctx context.Context,
 	dagRunID string,
 	step string,
-	dag *digraph.DAG,
+	dag *core.DAG,
 	to dagstatus.NodeStatus,
 ) error {
 	status, err := a.dagRunManager.GetCurrentStatus(ctx, dag, dagRunID)
@@ -750,7 +750,7 @@ func (a *API) updateStatus(
 
 	status.Nodes[idxToUpdate].Status = to
 
-	root := digraph.NewDAGRunRef(dag.Name, dagRunID)
+	root := core.NewDAGRunRef(dag.Name, dagRunID)
 	if err := a.dagRunManager.UpdateStatus(ctx, root, *status); err != nil {
 		return fmt.Errorf("error updating status: %w", err)
 	}
@@ -798,7 +798,7 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 	}, nil
 }
 
-func toDAG(dag *digraph.DAG) api.DAG {
+func toDAG(dag *core.DAG) api.DAG {
 	var schedules []api.Schedule
 	for _, s := range dag.Schedule {
 		schedules = append(schedules, api.Schedule{Expression: s.Expression})
@@ -815,7 +815,7 @@ func toDAG(dag *digraph.DAG) api.DAG {
 	}
 }
 
-func toStep(obj digraph.Step) api.Step {
+func toStep(obj core.Step) api.Step {
 	var conditions []api.Precondition
 	for i := range obj.Preconditions {
 		conditions = append(conditions, toPrecondition(obj.Preconditions[i]))
@@ -848,7 +848,7 @@ func toStep(obj digraph.Step) api.Step {
 	return step
 }
 
-func toPrecondition(obj *digraph.Condition) api.Precondition {
+func toPrecondition(obj *core.Condition) api.Precondition {
 	return api.Precondition{
 		Condition: ptrOf(obj.Condition),
 		Expected:  ptrOf(obj.Expected),

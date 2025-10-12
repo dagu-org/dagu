@@ -4,14 +4,14 @@ import (
 	"errors"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/scheduler"
+	"github.com/dagu-org/dagu/internal/core/status"
 )
 
 // Node represents a DAG step with its execution state for persistence
 type Node struct {
-	Step             digraph.Step      `json:"step,omitzero"`
+	Step             core.Step         `json:"step,omitzero"`
 	Stdout           string            `json:"stdout"` // standard output log file path
 	Stderr           string            `json:"stderr"` // standard error log file path
 	StartedAt        string            `json:"startedAt"`
@@ -24,7 +24,7 @@ type Node struct {
 	Error            string            `json:"error,omitempty"`
 	Children         []ChildDAGRun     `json:"children,omitempty"`
 	ChildrenRepeated []ChildDAGRun     `json:"childrenRepeated,omitempty"` // repeated child DAG runs
-	OutputVariables  *digraph.SyncMap  `json:"outputVariables,omitempty"`
+	OutputVariables  *core.SyncMap     `json:"outputVariables,omitempty"`
 }
 
 // ChildDAGRun represents a child DAG run associated with a node
@@ -68,7 +68,7 @@ func (n *Node) ToNode() *scheduler.Node {
 }
 
 // NodesFromSteps converts a list of DAG steps to persistence Node objects
-func NodesFromSteps(steps []digraph.Step) []*Node {
+func NodesFromSteps(steps []core.Step) []*Node {
 	var ret []*Node
 	for _, s := range steps {
 		ret = append(ret, newNodeFromStep(s))
@@ -77,7 +77,7 @@ func NodesFromSteps(steps []digraph.Step) []*Node {
 }
 
 // newNodeFromStep creates a new Node with default status values for the given step
-func newNodeFromStep(step digraph.Step) *Node {
+func newNodeFromStep(step core.Step) *Node {
 	return &Node{
 		Step:       step,
 		StartedAt:  "-",

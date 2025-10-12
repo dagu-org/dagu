@@ -2,11 +2,11 @@ package api
 
 import (
 	"github.com/dagu-org/dagu/api/v2"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
-func toDAG(dag *digraph.DAG) api.DAG {
+func toDAG(dag *core.DAG) api.DAG {
 	var schedules []api.Schedule
 	for _, s := range dag.Schedule {
 		schedules = append(schedules, api.Schedule{Expression: s.Expression})
@@ -23,7 +23,7 @@ func toDAG(dag *digraph.DAG) api.DAG {
 	}
 }
 
-func toStep(obj digraph.Step) api.Step {
+func toStep(obj core.Step) api.Step {
 	var conditions []api.Condition
 	for i := range obj.Preconditions {
 		conditions = append(conditions, toPrecondition(obj.Preconditions[i]))
@@ -97,7 +97,7 @@ func toStep(obj digraph.Step) api.Step {
 	return step
 }
 
-func toPrecondition(obj *digraph.Condition) api.Condition {
+func toPrecondition(obj *core.Condition) api.Condition {
 	return api.Condition{
 		Condition: obj.Condition,
 		Expected:  ptrOf(obj.Expected),
@@ -185,7 +185,7 @@ func toChildDAGRuns(childDAGRuns []models.ChildDAGRun) []api.ChildDAGRun {
 	return result
 }
 
-func toLocalDAG(dag *digraph.DAG) api.LocalDag {
+func toLocalDAG(dag *core.DAG) api.LocalDag {
 	return api.LocalDag{
 		Name:   dag.Name,
 		Dag:    toDAGDetails(dag),
@@ -193,7 +193,7 @@ func toLocalDAG(dag *digraph.DAG) api.LocalDag {
 	}
 }
 
-func toDAGDetails(dag *digraph.DAG) *api.DAGDetails {
+func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 	var details *api.DAGDetails
 	if dag == nil {
 		return details

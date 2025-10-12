@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 )
@@ -90,7 +90,7 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 // checkAndCleanZombie checks if a single DAG run is a zombie and cleans it up
 func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *models.DAGRunStatus) error {
 	// Find the attempt for this status
-	dagRunRef := digraph.NewDAGRunRef(st.Name, st.DAGRunID)
+	dagRunRef := core.NewDAGRunRef(st.Name, st.DAGRunID)
 	attempt, err := z.dagRunStore.FindAttempt(ctx, dagRunRef)
 	if err != nil {
 		return fmt.Errorf("find attempt: %w", err)
@@ -103,7 +103,7 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *models.DAG
 	}
 
 	// Check if process is alive
-	alive, err := z.procStore.IsRunAlive(ctx, dag.ProcGroup(), digraph.DAGRunRef{Name: dag.Name, ID: st.DAGRunID})
+	alive, err := z.procStore.IsRunAlive(ctx, dag.ProcGroup(), core.DAGRunRef{Name: dag.Name, ID: st.DAGRunID})
 	if err != nil {
 		return fmt.Errorf("check alive: %w", err)
 	}

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,7 +19,7 @@ type mockDAGRunStore struct {
 	mock.Mock
 }
 
-func (m *mockDAGRunStore) CreateAttempt(ctx context.Context, dag *digraph.DAG, ts time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) CreateAttempt(ctx context.Context, dag *core.DAG, ts time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
 	args := m.Called(ctx, dag, ts, dagRunID, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -51,7 +51,7 @@ func (m *mockDAGRunStore) ListStatuses(ctx context.Context, opts ...models.ListD
 	return args.Get(0).([]*models.DAGRunStatus), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun digraph.DAGRunRef) (models.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef) (models.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -59,7 +59,7 @@ func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun digraph.DAGRun
 	return args.Get(0).(models.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun digraph.DAGRunRef, childDAGRunID string) (models.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun core.DAGRunRef, childDAGRunID string) (models.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun, childDAGRunID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -109,12 +109,12 @@ func (m *mockDAGRunAttempt) ReadStatus(ctx context.Context) (*models.DAGRunStatu
 	return args.Get(0).(*models.DAGRunStatus), args.Error(1)
 }
 
-func (m *mockDAGRunAttempt) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
+func (m *mockDAGRunAttempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*digraph.DAG), args.Error(1)
+	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
 func (m *mockDAGRunAttempt) RequestCancel(ctx context.Context) error {
@@ -164,7 +164,7 @@ func TestListDAGRunStatusesOptions(t *testing.T) {
 }
 
 func TestNewDAGRunAttemptOptions(t *testing.T) {
-	rootDAGRun := &digraph.DAGRunRef{
+	rootDAGRun := &core.DAGRunRef{
 		Name: "root-dag",
 		ID:   "root-run-123",
 	}
@@ -181,7 +181,7 @@ func TestNewDAGRunAttemptOptions(t *testing.T) {
 func TestDAGRunStoreInterface(t *testing.T) {
 	ctx := context.Background()
 	store := &mockDAGRunStore{}
-	dag := &digraph.DAG{Name: "test-dag"}
+	dag := &core.DAG{Name: "test-dag"}
 	ts := time.Now()
 	dagRunID := "run-123"
 
@@ -218,7 +218,7 @@ func TestDAGRunStoreInterface(t *testing.T) {
 	assert.Equal(t, statuses, statusList)
 
 	// Test FindAttempt
-	dagRun := digraph.DAGRunRef{Name: "test-dag", ID: "run-123"}
+	dagRun := core.DAGRunRef{Name: "test-dag", ID: "run-123"}
 	store.On("FindAttempt", ctx, dagRun).Return(mockAttempt, nil)
 
 	found, err := store.FindAttempt(ctx, dagRun)
@@ -283,7 +283,7 @@ func TestDAGRunAttemptInterface(t *testing.T) {
 	assert.Equal(t, &status, readStatus)
 
 	// Test ReadDAG
-	dag := &digraph.DAG{Name: "test-dag"}
+	dag := &core.DAG{Name: "test-dag"}
 	attempt.On("ReadDAG", ctx).Return(dag, nil)
 	readDAG, err := attempt.ReadDAG(ctx)
 	assert.NoError(t, err)
@@ -313,7 +313,7 @@ func TestDAGRunStoreErrors(t *testing.T) {
 	// CreateAttempt error
 	store.On("CreateAttempt", ctx, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, expectedErr)
-	_, err := store.CreateAttempt(ctx, &digraph.DAG{}, time.Now(), "run-123", models.NewDAGRunAttemptOptions{})
+	_, err := store.CreateAttempt(ctx, &core.DAG{}, time.Now(), "run-123", models.NewDAGRunAttemptOptions{})
 	assert.Equal(t, expectedErr, err)
 
 	// LatestAttempt error
@@ -327,7 +327,7 @@ func TestDAGRunStoreErrors(t *testing.T) {
 	assert.Equal(t, expectedErr, err)
 
 	// FindAttempt error
-	dagRun := digraph.DAGRunRef{Name: "test-dag", ID: "run-123"}
+	dagRun := core.DAGRunRef{Name: "test-dag", ID: "run-123"}
 	store.On("FindAttempt", ctx, dagRun).Return(nil, models.ErrNoStatusData)
 	_, err = store.FindAttempt(ctx, dagRun)
 	assert.Equal(t, models.ErrNoStatusData, err)

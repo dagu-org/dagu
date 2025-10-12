@@ -6,8 +6,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/builder"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/builder"
 	"github.com/spf13/cobra"
 )
 
@@ -78,7 +78,7 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	root := digraph.NewDAGRunRef(dag.Name, dagRunID)
+	root := core.NewDAGRunRef(dag.Name, dagRunID)
 
 	agentInstance := agent.New(
 		dagRunID,

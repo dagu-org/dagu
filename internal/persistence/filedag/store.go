@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/builder"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/builder"
 	"github.com/dagu-org/dagu/internal/grep"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
@@ -28,14 +28,14 @@ type Option func(*Options)
 
 // Options contains configuration options for the DAG repository
 type Options struct {
-	FlagsBaseDir string                        // Base directory for flag store
-	FileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
-	SearchPaths  []string                      // Additional search paths for DAG files
-	SkipExamples bool                          // Skip creating example DAGs
+	FlagsBaseDir string                     // Base directory for flag store
+	FileCache    *fileutil.Cache[*core.DAG] // Optional cache for DAG objects
+	SearchPaths  []string                   // Additional search paths for DAG files
+	SkipExamples bool                       // Skip creating example DAGs
 }
 
 // WithFileCache returns a DAGRepositoryOption that sets the file cache for DAG objects
-func WithFileCache(cache *fileutil.Cache[*digraph.DAG]) Option {
+func WithFileCache(cache *fileutil.Cache[*core.DAG]) Option {
 	return func(o *Options) {
 		o.FileCache = cache
 	}
@@ -93,11 +93,11 @@ func New(baseDir string, opts ...Option) models.DAGStore {
 
 // Storage implements the DAGRepository interface using the local filesystem
 type Storage struct {
-	baseDir      string                        // Base directory for DAG storage
-	flagsBaseDir string                        // Base directory for flag store
-	fileCache    *fileutil.Cache[*digraph.DAG] // Optional cache for DAG objects
-	searchPaths  []string                      // Additional search paths for DAG files
-	skipExamples bool                          // Skip creating example DAGs
+	baseDir      string                     // Base directory for DAG storage
+	flagsBaseDir string                     // Base directory for flag store
+	fileCache    *fileutil.Cache[*core.DAG] // Optional cache for DAG objects
+	searchPaths  []string                   // Additional search paths for DAG files
+	skipExamples bool                       // Skip creating example DAGs
 }
 
 // Initialize ensures the storage is ready and creates example DAGs if needed
@@ -106,7 +106,7 @@ func (store *Storage) Initialize() error {
 }
 
 // GetMetadata retrieves the metadata of a DAG by its name.
-func (store *Storage) GetMetadata(ctx context.Context, name string) (*digraph.DAG, error) {
+func (store *Storage) GetMetadata(ctx context.Context, name string) (*core.DAG, error) {
 	filePath, err := store.locateDAG(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate DAG %s in search paths (%v): %w", name, store.searchPaths, err)
@@ -114,13 +114,13 @@ func (store *Storage) GetMetadata(ctx context.Context, name string) (*digraph.DA
 	if store.fileCache == nil {
 		return builder.Load(ctx, filePath, builder.OnlyMetadata(), builder.WithoutEval())
 	}
-	return store.fileCache.LoadLatest(filePath, func() (*digraph.DAG, error) {
+	return store.fileCache.LoadLatest(filePath, func() (*core.DAG, error) {
 		return builder.Load(ctx, filePath, builder.OnlyMetadata(), builder.WithoutEval())
 	})
 }
 
 // GetDetails retrieves the details of a DAG by its name.
-func (store *Storage) GetDetails(ctx context.Context, name string, opts ...builder.LoadOption) (*digraph.DAG, error) {
+func (store *Storage) GetDetails(ctx context.Context, name string, opts ...builder.LoadOption) (*core.DAG, error) {
 	filePath, err := store.locateDAG(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate DAG %s: %w", name, err)
@@ -152,7 +152,7 @@ func (store *Storage) GetSpec(_ context.Context, name string) (string, error) {
 // FileMode used for newly created DAG files
 const defaultPerm os.FileMode = 0600
 
-func (store *Storage) LoadSpec(ctx context.Context, spec []byte, opts ...builder.LoadOption) (*digraph.DAG, error) {
+func (store *Storage) LoadSpec(ctx context.Context, spec []byte, opts ...builder.LoadOption) (*core.DAG, error) {
 	// Validate the spec before saving it.
 	opts = append(slices.Clone(opts), builder.WithoutEval())
 	return builder.LoadYAML(ctx, spec, opts...)
@@ -236,8 +236,8 @@ func (store *Storage) ensureDirExist() error {
 }
 
 // List lists DAGs with pagination support.
-func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (models.PaginatedResult[*digraph.DAG], []string, error) {
-	var allDags []*digraph.DAG
+func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (models.PaginatedResult[*core.DAG], []string, error) {
+	var allDags []*core.DAG
 	var errList []string
 
 	if opts.Paginator == nil {
@@ -248,7 +248,7 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 	entries, err := os.ReadDir(store.baseDir)
 	if err != nil {
 		errList = append(errList, fmt.Sprintf("failed to read directory %s: %s", store.baseDir, err))
-		return models.NewPaginatedResult([]*digraph.DAG{}, 0, *opts.Paginator), errList, err
+		return models.NewPaginatedResult([]*core.DAG{}, 0, *opts.Paginator), errList, err
 	}
 
 	// First, collect all matching DAGs
@@ -296,7 +296,7 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 			now = *opts.Time
 		}
 		// Pre-calculate next run times to avoid recalculating on each comparison
-		nextRunTimes := make(map[*digraph.DAG]time.Time, len(allDags))
+		nextRunTimes := make(map[*core.DAG]time.Time, len(allDags))
 		for _, dag := range allDags {
 			nextRunTimes[dag] = dag.NextRun(now)
 		}
@@ -347,7 +347,7 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 	totalCount := len(allDags)
 
 	// Apply pagination
-	var paginatedDags []*digraph.DAG
+	var paginatedDags []*core.DAG
 	start := opts.Paginator.Offset()
 	end := start + opts.Paginator.Limit()
 

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
-var _ digraph.Database = &dbClient{}
+var _ core.Database = &dbClient{}
 
 type dbClient struct {
 	ds  models.DAGStore
@@ -20,12 +20,12 @@ func newDBClient(drs models.DAGRunStore, ds models.DAGStore) *dbClient {
 	return &dbClient{drs: drs, ds: ds}
 }
 
-// GetDAG implements digraph.DBClient.
-func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error) {
+// GetDAG implements core.DBClient.
+func (o *dbClient) GetDAG(ctx context.Context, name string) (*core.DAG, error) {
 	return o.ds.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (*digraph.RunStatus, error) {
+func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) (*core.RunStatus, error) {
 	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
@@ -49,7 +49,7 @@ func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, ro
 		}
 	}
 
-	return &digraph.RunStatus{
+	return &core.RunStatus{
 		Status:   status.Status,
 		Outputs:  outputVariables,
 		Name:     status.Name,
@@ -58,7 +58,7 @@ func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, ro
 	}, nil
 }
 
-func (o *dbClient) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) (bool, error) {
+func (o *dbClient) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) (bool, error) {
 	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return false, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
@@ -71,7 +71,7 @@ func (o *dbClient) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, 
 	return !status.Status.IsActive(), nil
 }
 
-func (o *dbClient) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun digraph.DAGRunRef) error {
+func (o *dbClient) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) error {
 	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to find child attempt for dag-run ID %s: %w", dagRunID, err)

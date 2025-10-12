@@ -3,7 +3,7 @@ package filequeue
 import (
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,7 +13,7 @@ func TestJob(t *testing.T) {
 	// Create a new job
 	job := NewJob(ItemData{
 		FileName: "/tmp/test-file.json",
-		DAGRun: digraph.DAGRunRef{
+		DAGRun: core.DAGRunRef{
 			Name: "test-name",
 			ID:   "test-dag",
 		},

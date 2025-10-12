@@ -5,8 +5,8 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 )
 
 // ListQueues implements api.StrictServerInterface.
@@ -44,7 +44,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 
 	// Process running DAG runs
 	for groupName, dagRuns := range runningByGroup {
-		var dag *digraph.DAG
+		var dag *core.DAG
 		var queue *queueInfo
 
 		// Convert each running DAG run to DAGRunSummary
@@ -173,7 +173,7 @@ type queueInfo struct {
 }
 
 // Helper function to get or create queue in the map
-func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, config *config.Config, dag *digraph.DAG) *queueInfo {
+func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, config *config.Config, dag *core.DAG) *queueInfo {
 	queue, exists := queueMap[queueName]
 	if !exists {
 		queue = &queueInfo{

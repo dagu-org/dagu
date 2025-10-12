@@ -3,7 +3,7 @@ package models
 import (
 	"context"
 
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 )
 
 // ProcStore is an interface for managing process storage.
@@ -14,18 +14,18 @@ type ProcStore interface {
 	Unlock(ctx context.Context, groupName string)
 	// Acquire creates a new process for a given group name and DAG-run reference.
 	// It automatically starts the heartbeat for the process.
-	Acquire(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (ProcHandle, error)
+	Acquire(ctx context.Context, groupName string, dagRun core.DAGRunRef) (ProcHandle, error)
 	// CountAlive retrieves the number of processes associated with a group name.
 	CountAlive(ctx context.Context, groupName string) (int, error)
 	// CountAlive retrieves the number of processes associated with a group name.
 	CountAliveByDAGName(ctx context.Context, groupName, dagName string) (int, error)
 	// IsRunAlive checks if a specific DAG run is currently alive.
-	IsRunAlive(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (bool, error)
+	IsRunAlive(ctx context.Context, groupName string, dagRun core.DAGRunRef) (bool, error)
 	// ListAlive returns list of running DAG runs by the group name.
-	ListAlive(ctx context.Context, groupName string) ([]digraph.DAGRunRef, error)
+	ListAlive(ctx context.Context, groupName string) ([]core.DAGRunRef, error)
 	// ListAllAlive returns all running DAG runs across all groups.
 	// Returns a map where key is the group name and value is list of DAG runs.
-	ListAllAlive(ctx context.Context) (map[string][]digraph.DAGRunRef, error)
+	ListAllAlive(ctx context.Context) (map[string][]core.DAGRunRef, error)
 }
 
 // ProcHandle represents a process that is associated with a dag-run.

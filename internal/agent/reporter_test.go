@@ -9,15 +9,15 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/require"
 )
 
 func TestReporter(t *testing.T) {
 	for scenario, fn := range map[string]func(
-		t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*models.Node,
+		t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*models.Node,
 	){
 		"create error mail":   testErrorMail,
 		"no error mail":       testNoErrorMail,
@@ -27,22 +27,22 @@ func TestReporter(t *testing.T) {
 	} {
 		t.Run(scenario, func(t *testing.T) {
 
-			d := &digraph.DAG{
+			d := &core.DAG{
 				Name: "test DAG",
-				MailOn: &digraph.MailOn{
+				MailOn: &core.MailOn{
 					Failure: true,
 				},
-				ErrorMail: &digraph.MailConfig{
+				ErrorMail: &core.MailConfig{
 					Prefix: "Error: ",
 					From:   "from@mailer.com",
 					To:     []string{"to@mailer.com"},
 				},
-				InfoMail: &digraph.MailConfig{
+				InfoMail: &core.MailConfig{
 					Prefix: "Success: ",
 					From:   "from@mailer.com",
 					To:     []string{"to@mailer.com"},
 				},
-				Steps: []digraph.Step{
+				Steps: []core.Step{
 					{
 						Name:    "test-step",
 						Command: "true",
@@ -52,7 +52,7 @@ func TestReporter(t *testing.T) {
 
 			nodes := []*models.Node{
 				{
-					Step: digraph.Step{
+					Step: core.Step{
 						Name:    "test-step",
 						Command: "true",
 						Args:    []string{"param-x"},
@@ -82,7 +82,7 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 		Params:     "env=production batch_size=1000",
 		Nodes: []*models.Node{
 			{
-				Step: digraph.Step{
+				Step: core.Step{
 					Name:        "setup-database",
 					Command:     "psql",
 					Args:        []string{"-h", "localhost", "-U", "admin", "-d", "mydb", "-f", "schema.sql"},
@@ -94,7 +94,7 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 				Error:      "",
 			},
 			{
-				Step: digraph.Step{
+				Step: core.Step{
 					Name:        "run-migrations",
 					Command:     "migrate",
 					Args:        []string{"up"},
@@ -175,7 +175,7 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 	})
 }
 
-func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*models.Node) {
+func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*models.Node) {
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = false
 
@@ -189,7 +189,7 @@ func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DA
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*models.Node) {
+func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*models.Node) {
 	dag.MailOn.Failure = false
 	dag.MailOn.Success = true
 
@@ -201,7 +201,7 @@ func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.
 	require.Equal(t, 0, mock.count)
 }
 
-func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*models.Node) {
+func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*models.Node) {
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = true
 
@@ -216,14 +216,14 @@ func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.
 	require.Equal(t, 1, mock.count)
 }
 
-func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *digraph.DAG, _ []*models.Node) {
+func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *core.DAG, _ []*models.Node) {
 	status := models.NewStatusBuilder(dag).Create("run-id", status.Error, 0, time.Now())
 	summary := renderDAGSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
 	require.Contains(t, summary, dag.Name)
 }
 
-func testRenderTable(t *testing.T, _ *reporter, _ *mockSender, _ *digraph.DAG, nodes []*models.Node) {
+func testRenderTable(t *testing.T, _ *reporter, _ *mockSender, _ *core.DAG, nodes []*models.Node) {
 	summary := renderStepSummary(nodes)
 	require.Contains(t, summary, nodes[0].Step.Name)
 	require.Contains(t, summary, nodes[0].Step.Args[0])
@@ -252,7 +252,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 	// Create comprehensive test data with various scenarios
 	nodes := []*models.Node{
 		{
-			Step: digraph.Step{
+			Step: core.Step{
 				Name:    "setup-database",
 				Command: "docker",
 				Args:    []string{"run", "-d", "--name", "test-db", "postgres:13"},
@@ -263,7 +263,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 			Error:      "",
 		},
 		{
-			Step: digraph.Step{
+			Step: core.Step{
 				Name:    "run-migrations",
 				Command: "python",
 				Args:    []string{"manage.py", "migrate", "--settings=production"},
@@ -274,7 +274,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 			Error:      "Migration failed: Table 'users' already exists",
 		},
 		{
-			Step: digraph.Step{
+			Step: core.Step{
 				Name:    "deploy-app",
 				Command: "kubectl",
 				Args:    []string{"apply", "-f", "deployment.yaml"},
@@ -285,7 +285,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 			Error:      "",
 		},
 		{
-			Step: digraph.Step{
+			Step: core.Step{
 				Name:    "send-notification",
 				Command: "curl",
 				Args:    []string{"-X", "POST", "https://api.slack.com/webhook", "-d", `{"text":"Deployment complete"}`},
@@ -296,7 +296,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 			Error:      "",
 		},
 		{
-			Step: digraph.Step{
+			Step: core.Step{
 				Name:    "cleanup-temp-files",
 				Command: "bash",
 				Args:    nil, // Test nil args
@@ -307,7 +307,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 			Error:      "",
 		},
 		{
-			Step: digraph.Step{
+			Step: core.Step{
 				Name:        "special-chars-test",
 				Command:     "echo",
 				Args:        []string{"<script>alert('xss')</script>", "&", "\"quotes\""},

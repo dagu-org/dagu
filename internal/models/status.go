@@ -7,23 +7,23 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/scheduler"
+	"github.com/dagu-org/dagu/internal/core/status"
 )
 
 // StatusBuilder creates Status objects for a specific DAG
 type StatusBuilder struct {
-	dag *digraph.DAG // The DAG for which to create status objects
+	dag *core.DAG // The DAG for which to create status objects
 }
 
 // NewStatusBuilder creates a new StatusFactory for the specified DAG
-func NewStatusBuilder(dag *digraph.DAG) *StatusBuilder {
+func NewStatusBuilder(dag *core.DAG) *StatusBuilder {
 	return &StatusBuilder{dag: dag}
 }
 
 // InitialStatus creates an initial Status object for the given DAG
-func InitialStatus(dag *digraph.DAG) DAGRunStatus {
+func InitialStatus(dag *core.DAG) DAGRunStatus {
 	return DAGRunStatus{
 		Name:          dag.Name,
 		Status:        status.None,
@@ -46,7 +46,7 @@ func InitialStatus(dag *digraph.DAG) DAGRunStatus {
 type StatusOption func(*DAGRunStatus)
 
 // WithHierarchyRefs returns a StatusOption that sets the root DAG information
-func WithHierarchyRefs(root digraph.DAGRunRef, parent digraph.DAGRunRef) StatusOption {
+func WithHierarchyRefs(root core.DAGRunRef, parent core.DAGRunRef) StatusOption {
 	return func(s *DAGRunStatus) {
 		s.Root = root
 		s.Parent = parent
@@ -134,7 +134,7 @@ func WithLogFilePath(logFilePath string) StatusOption {
 }
 
 // WithPreconditions returns a StatusOption that sets the preconditions
-func WithPreconditions(conditions []*digraph.Condition) StatusOption {
+func WithPreconditions(conditions []*core.Condition) StatusOption {
 	return func(s *DAGRunStatus) {
 		s.Preconditions = conditions
 	}
@@ -174,31 +174,31 @@ func StatusFromJSON(s string) (*DAGRunStatus, error) {
 
 // DAGRunStatus represents the complete execution state of a dag-run.
 type DAGRunStatus struct {
-	Root          digraph.DAGRunRef    `json:"root,omitzero"`
-	Parent        digraph.DAGRunRef    `json:"parent,omitzero"`
-	Name          string               `json:"name"`
-	DAGRunID      string               `json:"dagRunId"`
-	AttemptID     string               `json:"attemptId"`
-	Status        status.Status        `json:"status"`
-	PID           PID                  `json:"pid,omitempty"`
-	Nodes         []*Node              `json:"nodes,omitempty"`
-	OnExit        *Node                `json:"onExit,omitempty"`
-	OnSuccess     *Node                `json:"onSuccess,omitempty"`
-	OnFailure     *Node                `json:"onFailure,omitempty"`
-	OnCancel      *Node                `json:"onCancel,omitempty"`
-	CreatedAt     int64                `json:"createdAt,omitempty"`
-	QueuedAt      string               `json:"queuedAt,omitempty"`
-	StartedAt     string               `json:"startedAt,omitempty"`
-	FinishedAt    string               `json:"finishedAt,omitempty"`
-	Log           string               `json:"log,omitempty"`
-	Params        string               `json:"params,omitempty"`
-	ParamsList    []string             `json:"paramsList,omitempty"`
-	Preconditions []*digraph.Condition `json:"preconditions,omitempty"`
+	Root          core.DAGRunRef    `json:"root,omitzero"`
+	Parent        core.DAGRunRef    `json:"parent,omitzero"`
+	Name          string            `json:"name"`
+	DAGRunID      string            `json:"dagRunId"`
+	AttemptID     string            `json:"attemptId"`
+	Status        status.Status     `json:"status"`
+	PID           PID               `json:"pid,omitempty"`
+	Nodes         []*Node           `json:"nodes,omitempty"`
+	OnExit        *Node             `json:"onExit,omitempty"`
+	OnSuccess     *Node             `json:"onSuccess,omitempty"`
+	OnFailure     *Node             `json:"onFailure,omitempty"`
+	OnCancel      *Node             `json:"onCancel,omitempty"`
+	CreatedAt     int64             `json:"createdAt,omitempty"`
+	QueuedAt      string            `json:"queuedAt,omitempty"`
+	StartedAt     string            `json:"startedAt,omitempty"`
+	FinishedAt    string            `json:"finishedAt,omitempty"`
+	Log           string            `json:"log,omitempty"`
+	Params        string            `json:"params,omitempty"`
+	ParamsList    []string          `json:"paramsList,omitempty"`
+	Preconditions []*core.Condition `json:"preconditions,omitempty"`
 }
 
 // DAGRun returns a reference to the dag-run associated with this status
-func (st *DAGRunStatus) DAGRun() digraph.DAGRunRef {
-	return digraph.NewDAGRunRef(st.Name, st.DAGRunID)
+func (st *DAGRunStatus) DAGRun() core.DAGRunRef {
+	return core.NewDAGRunRef(st.Name, st.DAGRunID)
 }
 
 // Errors returns a slice of errors for the current status
@@ -275,7 +275,7 @@ func formatTime(val time.Time) string {
 }
 
 // nodeOrNil creates a Node from a Step or returns nil if the step is nil
-func nodeOrNil(s *digraph.Step) *Node {
+func nodeOrNil(s *core.Step) *Node {
 	if s == nil {
 		return nil
 	}

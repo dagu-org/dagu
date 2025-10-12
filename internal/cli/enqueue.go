@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
@@ -86,7 +86,7 @@ func runEnqueue(ctx *Context, args []string) error {
 }
 
 // enqueueDAGRun enqueues a dag-run to the queue.
-func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
+func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 	// Check if queues are enabled
 	if !ctx.Config.Queues.Enabled {
 		return fmt.Errorf("queues are disabled in configuration")
@@ -96,7 +96,7 @@ func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
 		return fmt.Errorf("failed to generate log file name: %w", err)
 	}
 
-	dagRun := digraph.NewDAGRunRef(dag.Name, dagRunID)
+	dagRun := core.NewDAGRunRef(dag.Name, dagRunID)
 
 	// Check if the dag-run is already existing in the history store
 	if _, err = ctx.DAGRunStore.FindAttempt(ctx, dagRun); err == nil {
@@ -114,8 +114,8 @@ func enqueueDAGRun(ctx *Context, dag *digraph.DAG, dagRunID string) error {
 		models.WithPreconditions(dag.Preconditions),
 		models.WithQueuedAt(stringutil.FormatTime(time.Now())),
 		models.WithHierarchyRefs(
-			digraph.NewDAGRunRef(dag.Name, dagRunID),
-			digraph.DAGRunRef{},
+			core.NewDAGRunRef(dag.Name, dagRunID),
+			core.DAGRunRef{},
 		),
 	}
 

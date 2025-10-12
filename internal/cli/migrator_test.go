@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/builder"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
@@ -20,28 +20,28 @@ import (
 
 // mockDAGStore implements models.DAGStore for testing
 type mockDAGStore struct {
-	dags map[string]*digraph.DAG
+	dags map[string]*core.DAG
 }
 
-func (m *mockDAGStore) GetDetails(_ context.Context, path string, _ ...builder.LoadOption) (*digraph.DAG, error) {
+func (m *mockDAGStore) GetDetails(_ context.Context, path string, _ ...builder.LoadOption) (*core.DAG, error) {
 	if dag, ok := m.dags[path]; ok {
 		return dag, nil
 	}
 	return nil, os.ErrNotExist
 }
 
-func (m *mockDAGStore) List(_ context.Context, _ models.ListDAGsOptions) (models.PaginatedResult[*digraph.DAG], []string, error) {
-	var dags []*digraph.DAG
+func (m *mockDAGStore) List(_ context.Context, _ models.ListDAGsOptions) (models.PaginatedResult[*core.DAG], []string, error) {
+	var dags []*core.DAG
 	for _, dag := range m.dags {
 		dags = append(dags, dag)
 	}
-	return models.PaginatedResult[*digraph.DAG]{
+	return models.PaginatedResult[*core.DAG]{
 		Items:      dags,
 		TotalCount: len(dags),
 	}, nil, nil
 }
 
-func (m *mockDAGStore) FindByName(_ context.Context, name string) (*digraph.DAG, error) {
+func (m *mockDAGStore) FindByName(_ context.Context, name string) (*core.DAG, error) {
 	for _, dag := range m.dags {
 		if dag.Name == name {
 			return dag, nil
@@ -78,7 +78,7 @@ func (m *mockDAGStore) ToggleSuspend(_ context.Context, _ string, _ bool) error 
 	return nil
 }
 
-func (m *mockDAGStore) GetMetadata(_ context.Context, _ string) (*digraph.DAG, error) {
+func (m *mockDAGStore) GetMetadata(_ context.Context, _ string) (*core.DAG, error) {
 	return nil, nil
 }
 
@@ -90,7 +90,7 @@ func (m *mockDAGStore) UpdateSpec(_ context.Context, _ string, _ []byte) error {
 	return nil
 }
 
-func (m *mockDAGStore) LoadSpec(_ context.Context, _ []byte, _ ...builder.LoadOption) (*digraph.DAG, error) {
+func (m *mockDAGStore) LoadSpec(_ context.Context, _ []byte, _ ...builder.LoadOption) (*core.DAG, error) {
 	return nil, nil
 }
 
@@ -242,7 +242,7 @@ func TestConvertStatus(t *testing.T) {
 		ParamsList: []string{"param1", "value1"},
 		Nodes: []*legacymodel.Node{
 			{
-				Step: digraph.Step{
+				Step: core.Step{
 					Name: "step1",
 				},
 				Status:     status.NodeSuccess,
@@ -252,16 +252,16 @@ func TestConvertStatus(t *testing.T) {
 			},
 		},
 		OnSuccess: &legacymodel.Node{
-			Step: digraph.Step{
+			Step: core.Step{
 				Name: "on_success",
 			},
 			Status: status.NodeSuccess,
 		},
 	}
 
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name: "test-dag",
-		Preconditions: []*digraph.Condition{
+		Preconditions: []*core.Condition{
 			{Condition: "test condition"},
 		},
 	}
@@ -396,11 +396,11 @@ func TestLoadDAGForMigration(t *testing.T) {
 	dag1Path := filepath.Join(tempDir, "test-dag.yaml")
 	dag2Path := filepath.Join(tempDir, "test-dag-v2.yml")
 
-	dag1 := &digraph.DAG{Name: "test-dag", Location: dag1Path}
-	dag2 := &digraph.DAG{Name: "test-dag-v2", Location: dag2Path}
+	dag1 := &core.DAG{Name: "test-dag", Location: dag1Path}
+	dag2 := &core.DAG{Name: "test-dag-v2", Location: dag2Path}
 
 	mockStore := &mockDAGStore{
-		dags: map[string]*digraph.DAG{
+		dags: map[string]*core.DAG{
 			dag1Path: dag1,
 			dag2Path: dag2,
 		},
@@ -460,7 +460,7 @@ func TestFullMigration(t *testing.T) {
 		FinishedAt: time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
 		Nodes: []*legacymodel.Node{
 			{
-				Step:   digraph.Step{Name: "step1"},
+				Step:   core.Step{Name: "step1"},
 				Status: status.NodeSuccess,
 			},
 		},
@@ -473,7 +473,7 @@ func TestFullMigration(t *testing.T) {
 
 	// Create DAG file
 	dagPath := filepath.Join(dagsDir, "test-dag.yaml")
-	testDAG := &digraph.DAG{
+	testDAG := &core.DAG{
 		Name:     "test-dag",
 		Location: dagPath,
 	}
@@ -482,7 +482,7 @@ func TestFullMigration(t *testing.T) {
 	// Set up stores
 	dagRunStore := filedagrun.New(dagRunsDir)
 	dagStore := &mockDAGStore{
-		dags: map[string]*digraph.DAG{
+		dags: map[string]*core.DAG{
 			dagPath: testDAG,
 		},
 	}
@@ -504,7 +504,7 @@ func TestFullMigration(t *testing.T) {
 	assert.Equal(t, 0, result.FailedRuns)
 
 	// Verify migration
-	attempt, err := dagRunStore.FindAttempt(ctx, digraph.NewDAGRunRef("test-dag", "req123"))
+	attempt, err := dagRunStore.FindAttempt(ctx, core.NewDAGRunRef("test-dag", "req123"))
 	require.NoError(t, err)
 	require.NotNil(t, attempt)
 

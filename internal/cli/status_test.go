@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cli"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -126,7 +126,7 @@ func TestStatusCommand(t *testing.T) {
 			AttemptID:  attempt.ID(),
 			Nodes: []*models.Node{
 				{
-					Step:   digraph.Step{Name: "error"},
+					Step:   core.Step{Name: "error"},
 					Status: status.NodeError,
 					Error:  "exit status 1",
 				},
@@ -304,14 +304,14 @@ steps:
 			AttemptID:  attempt.ID(),
 			Nodes: []*models.Node{
 				{
-					Step:       digraph.Step{Name: "check"},
+					Step:       core.Step{Name: "check"},
 					Status:     status.NodeError,
 					Error:      "exit status 1",
 					StartedAt:  time.Now().Format(time.RFC3339),
 					FinishedAt: time.Now().Format(time.RFC3339),
 				},
 				{
-					Step:       digraph.Step{Name: "skipped"},
+					Step:       core.Step{Name: "skipped"},
 					Status:     status.NodeSkipped,
 					StartedAt:  "-",
 					FinishedAt: time.Now().Format(time.RFC3339),
@@ -622,7 +622,7 @@ steps:
 			AttemptID:  attempt.ID(),
 			Nodes: []*models.Node{
 				{
-					Step:   digraph.Step{Name: "binary_output"},
+					Step:   core.Step{Name: "binary_output"},
 					Status: status.NodeSuccess,
 					Stdout: "/nonexistent/binary.log", // This will trigger "(unable to read)"
 					Stderr: "",

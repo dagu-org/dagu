@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -41,7 +41,7 @@ func TestStart(t *testing.T) {
 	}
 
 	builder := dagrun.NewSubCmdBuilder(cfg)
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name:       "test-dag",
 		Location:   "/path/to/dag.yaml",
 		WorkingDir: "/path/to",
@@ -152,7 +152,7 @@ func TestEnqueue(t *testing.T) {
 	}
 
 	builder := dagrun.NewSubCmdBuilder(cfg)
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name:       "test-dag",
 		Location:   "/path/to/dag.yaml",
 		WorkingDir: "/path/to",
@@ -248,7 +248,7 @@ func TestDequeue(t *testing.T) {
 	}
 
 	builder := dagrun.NewSubCmdBuilder(cfg)
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name:       "test-dag",
 		Location:   "/path/to/dag.yaml",
 		WorkingDir: "/path/to",
@@ -256,7 +256,7 @@ func TestDequeue(t *testing.T) {
 
 	t.Run("BasicDequeue", func(t *testing.T) {
 		t.Parallel()
-		dagRun := digraph.NewDAGRunRef("test-dag", "run-123")
+		dagRun := core.NewDAGRunRef("test-dag", "run-123")
 		spec := builder.Dequeue(dag, dagRun)
 
 		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
@@ -277,7 +277,7 @@ func TestDequeue(t *testing.T) {
 			},
 		}
 		builderNoFile := dagrun.NewSubCmdBuilder(cfgNoFile)
-		dagRun := digraph.NewDAGRunRef("test-dag", "run-456")
+		dagRun := core.NewDAGRunRef("test-dag", "run-456")
 		spec := builderNoFile.Dequeue(dag, dagRun)
 
 		assert.NotContains(t, spec.Args, "--config")
@@ -297,7 +297,7 @@ func TestRestart(t *testing.T) {
 	}
 
 	builder := dagrun.NewSubCmdBuilder(cfg)
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name:       "test-dag",
 		Location:   "/path/to/dag.yaml",
 		WorkingDir: "/path/to",
@@ -353,7 +353,7 @@ func TestRetry(t *testing.T) {
 	}
 
 	builder := dagrun.NewSubCmdBuilder(cfg)
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name:       "test-dag",
 		Location:   "/path/to/dag.yaml",
 		WorkingDir: "/path/to",

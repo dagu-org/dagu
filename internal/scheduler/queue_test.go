@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,7 +24,7 @@ func TestScheduler_QueueMethods(t *testing.T) {
 
 		s := &Scheduler{config: cfg}
 
-		dag := &digraph.DAG{
+		dag := &core.DAG{
 			Name:          "test-dag",
 			MaxActiveRuns: 5, // Should be ignored since global config exists
 		}
@@ -43,7 +43,7 @@ func TestScheduler_QueueMethods(t *testing.T) {
 
 		s := &Scheduler{config: cfg}
 
-		dag := &digraph.DAG{
+		dag := &core.DAG{
 			Name:          "test-dag",
 			MaxActiveRuns: 7,
 		}
@@ -62,7 +62,7 @@ func TestScheduler_QueueMethods(t *testing.T) {
 
 		s := &Scheduler{config: cfg}
 
-		dag := &digraph.DAG{
+		dag := &core.DAG{
 			Name:          "test-dag",
 			MaxActiveRuns: 0, // No DAG max active runs
 		}
@@ -83,7 +83,7 @@ func TestScheduler_QueueMethods(t *testing.T) {
 
 		s := &Scheduler{config: cfg}
 
-		dag := &digraph.DAG{
+		dag := &core.DAG{
 			Name:          "test-dag",
 			MaxActiveRuns: 10, // Should be ignored since global config exists for testQueue
 		}
@@ -104,7 +104,7 @@ func TestScheduler_QueueMethods(t *testing.T) {
 
 		s := &Scheduler{config: cfg}
 
-		dag := &digraph.DAG{
+		dag := &core.DAG{
 			Name:          "test-dag",
 			MaxActiveRuns: 5,
 		}

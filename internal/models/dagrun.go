@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 )
 
 // Errors related to dag-run management
@@ -22,7 +22,7 @@ var (
 // implementations (e.g., file-based, in-memory, etc.) to be used interchangeably.
 type DAGRunStore interface {
 	// CreateAttempt creates a new execution record for a dag-run.
-	CreateAttempt(ctx context.Context, dag *digraph.DAG, ts time.Time, dagRunID string, opts NewDAGRunAttemptOptions) (DAGRunAttempt, error)
+	CreateAttempt(ctx context.Context, dag *core.DAG, ts time.Time, dagRunID string, opts NewDAGRunAttemptOptions) (DAGRunAttempt, error)
 	// RecentAttempts returns the most recent dag-run's attempt for the DAG name, limited by itemLimit
 	RecentAttempts(ctx context.Context, name string, itemLimit int) []DAGRunAttempt
 	// LatestAttempt returns the most recent dag-run's attempt for the DAG name.
@@ -30,9 +30,9 @@ type DAGRunStore interface {
 	// ListStatuses returns a list of statuses.
 	ListStatuses(ctx context.Context, opts ...ListDAGRunStatusesOption) ([]*DAGRunStatus, error)
 	// FindAttempt finds the latest attempt for the dag-run.
-	FindAttempt(ctx context.Context, dagRun digraph.DAGRunRef) (DAGRunAttempt, error)
+	FindAttempt(ctx context.Context, dagRun core.DAGRunRef) (DAGRunAttempt, error)
 	// FindChildAttempt finds a child dag-run record by dag-run ID.
-	FindChildAttempt(ctx context.Context, dagRun digraph.DAGRunRef, childDAGRunID string) (DAGRunAttempt, error)
+	FindChildAttempt(ctx context.Context, dagRun core.DAGRunRef, childDAGRunID string) (DAGRunAttempt, error)
 	// RemoveOldDAGRuns delete dag-run records older than retentionDays
 	// If retentionDays is negative, it won't delete any records.
 	// If retentionDays is zero, it will delete all records for the DAG name.
@@ -43,7 +43,7 @@ type DAGRunStore interface {
 	// with the new DAG name.
 	RenameDAGRuns(ctx context.Context, oldName, newName string) error
 	// RemoveDAGRun removes a dag-run record by its reference.
-	RemoveDAGRun(ctx context.Context, dagRun digraph.DAGRunRef) error
+	RemoveDAGRun(ctx context.Context, dagRun core.DAGRunRef) error
 }
 
 // ListDAGRunStatusesOptions contains options for listing runs
@@ -105,7 +105,7 @@ func WithDAGRunID(dagRunID string) ListDAGRunStatusesOption {
 // NewDAGRunAttemptOptions contains options for creating a new run record
 type NewDAGRunAttemptOptions struct {
 	// RootDAGRun is the root dag-run reference for this attempt.
-	RootDAGRun *digraph.DAGRunRef
+	RootDAGRun *core.DAGRunRef
 	// Retry indicates whether this is a retry of a previous run.
 	Retry bool
 }
@@ -123,7 +123,7 @@ type DAGRunAttempt interface {
 	// ReadStatus retrieves the current status of the attempt
 	ReadStatus(ctx context.Context) (*DAGRunStatus, error)
 	// ReadDAG reads the DAG associated with this run attempt
-	ReadDAG(ctx context.Context) (*digraph.DAG, error)
+	ReadDAG(ctx context.Context) (*core.DAG, error)
 	// RequestCancel requests cancellation of the dag-run attempt.
 	RequestCancel(ctx context.Context) error
 	// CancelRequested checks if a cancellation has been requested for this attempt.

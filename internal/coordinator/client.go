@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -26,7 +26,7 @@ import (
 // Client abstracts handling communication with the coordinator service using
 // service registry and gRPC.
 type Client interface {
-	digraph.Dispatcher
+	core.Dispatcher
 
 	// Dispatch sends a task to the coordinator
 	Dispatch(ctx context.Context, task *coordinatorv1.Task) error

@@ -3,7 +3,7 @@ package filequeue
 import (
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
@@ -30,6 +30,6 @@ func (j *Job) ID() string {
 }
 
 // Data implements models.QueuedItem.
-func (j *Job) Data() digraph.DAGRunRef {
+func (j *Job) Data() core.DAGRunRef {
 	return j.DAGRun
 }

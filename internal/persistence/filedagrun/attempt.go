@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 )
@@ -47,7 +47,7 @@ type Attempt struct {
 	mu        sync.RWMutex                          // Mutex for thread safety
 	cache     *fileutil.Cache[*models.DAGRunStatus] // Optional cache for read operations
 	isClosing atomic.Bool                           // Flag to prevent writes during Close/Compact
-	dag       *digraph.DAG                          // DAG associated with the status file
+	dag       *core.DAG                             // DAG associated with the status file
 }
 
 // AttemptOption defines a functional option for configuring an Attempt.
@@ -55,7 +55,7 @@ type AttemptOption func(*Attempt)
 
 // WithDAG sets the DAG associated with the Attempt.
 // This allows the Attempt to store DAG metadata alongside the status data.
-func WithDAG(dag *digraph.DAG) AttemptOption {
+func WithDAG(dag *core.DAG) AttemptOption {
 	return func(att *Attempt) {
 		att.dag = dag
 	}
@@ -98,7 +98,7 @@ func (att *Attempt) ModTime() (time.Time, error) {
 }
 
 // ReadDAG implements models.DAGRunAttempt.
-func (att *Attempt) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
+func (att *Attempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -126,7 +126,7 @@ func (att *Attempt) ReadDAG(ctx context.Context) (*digraph.DAG, error) {
 	}
 
 	// Parse the JSON data
-	var dag digraph.DAG
+	var dag core.DAG
 	if err := json.Unmarshal(data, &dag); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal DAG definition: %w", err)
 	}

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -86,7 +86,7 @@ func runStatus(ctx *Context, args []string) error {
 }
 
 // displayDetailedStatus renders a formatted table with DAG run information
-func displayDetailedStatus(dag *digraph.DAG, dagStatus *models.DAGRunStatus) {
+func displayDetailedStatus(dag *core.DAG, dagStatus *models.DAGRunStatus) {
 	// Create header with 80 character width
 	fmt.Println()
 	headerColor := color.New(color.FgCyan, color.Bold)
@@ -498,7 +498,7 @@ func extractDAGName(ctx *Context, name string) (string, error) {
 func extractAttemptID(ctx *Context, name, dagRunID string) (models.DAGRunAttempt, error) {
 	if dagRunID != "" {
 		// Retrieve the previous run's record for the specified dag-run ID.
-		dagRunRef := digraph.NewDAGRunRef(name, dagRunID)
+		dagRunRef := core.NewDAGRunRef(name, dagRunID)
 		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find run data for dag-run ID %s: %w", dagRunID, err)

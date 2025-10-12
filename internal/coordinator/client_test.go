@@ -10,7 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/coordinator"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/models"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
@@ -316,14 +316,14 @@ func TestClientCleanup(t *testing.T) {
 }
 
 func TestClientDispatcherInterface(t *testing.T) {
-	// Verify that clientImpl implements the digraph.Dispatcher interface
+	// Verify that clientImpl implements the core.Dispatcher interface
 	config := coordinator.DefaultConfig()
 	monitor := &mockServiceMonitor{}
 
 	client := coordinator.New(monitor, config)
 
 	// This should compile if the interface is implemented correctly
-	var _ digraph.Dispatcher = client
+	var _ core.Dispatcher = client
 
 	// Test the Dispatch method from the interface
 	task := &coordinatorv1.Task{

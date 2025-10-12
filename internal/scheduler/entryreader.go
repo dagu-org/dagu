@@ -10,14 +10,14 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/builder"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
 	"github.com/robfig/cron/v3"
 
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -46,7 +46,7 @@ var _ EntryReader = (*entryReaderImpl)(nil)
 // entryReaderImpl manages DAGs on local filesystem.
 type entryReaderImpl struct {
 	targetDir   string
-	registry    map[string]*digraph.DAG
+	registry    map[string]*core.DAG
 	lock        sync.Mutex
 	dagStore    models.DAGStore
 	dagRunMgr   dagrun.Manager
@@ -59,7 +59,7 @@ func NewEntryReader(dir string, dagCli models.DAGStore, drm dagrun.Manager, de *
 	return &entryReaderImpl{
 		targetDir:   dir,
 		lock:        sync.Mutex{},
-		registry:    map[string]*digraph.DAG{},
+		registry:    map[string]*core.DAG{},
 		dagStore:    dagCli,
 		dagRunMgr:   drm,
 		executable:  executable,
@@ -90,7 +90,7 @@ func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Schedule
 		}
 
 		schedules := []struct {
-			items []digraph.Schedule
+			items []core.Schedule
 			typ   ScheduleType
 		}{
 			{dag.Schedule, ScheduleTypeStart},
@@ -110,7 +110,7 @@ func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Schedule
 	return jobs, nil
 }
 
-func (er *entryReaderImpl) createJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job {
+func (er *entryReaderImpl) createJob(dag *core.DAG, next time.Time, schedule cron.Schedule) Job {
 	return &DAGRunJob{
 		DAG:         dag,
 		Next:        next,

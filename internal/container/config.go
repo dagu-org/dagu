@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/go-viper/mapstructure/v2"
@@ -20,7 +20,7 @@ type Config struct {
 	// ContainerName is the name or ID of an existing container to exec into.
 	ContainerName string
 	// Pull is the image pull policy for new containers.
-	Pull digraph.PullPolicy
+	Pull core.PullPolicy
 	// Container is the container configuration for new containers.
 	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#Config
 	Container *container.Config
@@ -51,7 +51,7 @@ type Config struct {
 }
 
 // LoadConfig parses executorConfig into Container struct with registry auth
-func LoadConfigFromMap(data map[string]any, registryAuths map[string]*digraph.AuthConfig) (*Config, error) {
+func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthConfig) (*Config, error) {
 	ret := struct {
 		Container     container.Config         `mapstructure:"container"`
 		Host          container.HostConfig     `mapstructure:"host"`
@@ -81,9 +81,9 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*digraph.Au
 		autoRemove = true
 	}
 
-	pull := digraph.PullPolicyMissing
+	pull := core.PullPolicyMissing
 	if ret.Pull != nil {
-		parsed, err := digraph.ParsePullPolicy(ret.Pull)
+		parsed, err := core.ParsePullPolicy(ret.Pull)
 		if err != nil {
 			return nil, err
 		}
@@ -149,8 +149,8 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*digraph.Au
 	}), nil
 }
 
-// NewFromContainerConfigWithAuth parses digraph.Container into Container struct with registry auth
-func LoadConfig(workDir string, ct digraph.Container, registryAuths map[string]*digraph.AuthConfig) (*Config, error) {
+// NewFromContainerConfigWithAuth parses core.Container into Container struct with registry auth
+func LoadConfig(workDir string, ct core.Container, registryAuths map[string]*core.AuthConfig) (*Config, error) {
 	// Validate required fields
 	if ct.Image == "" {
 		return nil, ErrImageRequired

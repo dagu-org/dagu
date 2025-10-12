@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/scheduler"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -17,21 +17,21 @@ import (
 
 func TestStatusSerialization(t *testing.T) {
 	startedAt, finishedAt := time.Now(), time.Now().Add(time.Second*1)
-	dag := &digraph.DAG{
-		HandlerOn: digraph.HandlerOn{},
-		Steps: []digraph.Step{
+	dag := &core.DAG{
+		HandlerOn: core.HandlerOn{},
+		Steps: []core.Step{
 			{
 				Name: "1", Description: "",
 				Dir: "dir", Command: "echo 1", Args: []string{},
-				Depends: []string{}, ContinueOn: digraph.ContinueOn{},
-				RetryPolicy: digraph.RetryPolicy{}, MailOnError: false,
-				RepeatPolicy: digraph.RepeatPolicy{}, Preconditions: []*digraph.Condition{},
+				Depends: []string{}, ContinueOn: core.ContinueOn{},
+				RetryPolicy: core.RetryPolicy{}, MailOnError: false,
+				RepeatPolicy: core.RepeatPolicy{}, Preconditions: []*core.Condition{},
 			},
 		},
-		MailOn:    &digraph.MailOn{},
-		ErrorMail: &digraph.MailConfig{},
-		InfoMail:  &digraph.MailConfig{},
-		SMTP:      &digraph.SMTPConfig{},
+		MailOn:    &core.MailOn{},
+		ErrorMail: &core.MailConfig{},
+		InfoMail:  &core.MailConfig{},
+		SMTP:      &core.SMTPConfig{},
 	}
 	dagRunID := uuid.Must(uuid.NewV7()).String()
 	statusToPersist := models.NewStatusBuilder(dag).Create(dagRunID, status.Success, 0, startedAt, models.WithFinishedAt(finishedAt))
@@ -48,20 +48,20 @@ func TestStatusSerialization(t *testing.T) {
 }
 
 func TestStatusBuilder(t *testing.T) {
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name: "test-dag",
-		HandlerOn: digraph.HandlerOn{
-			Exit:    &digraph.Step{Name: "exit-handler"},
-			Success: &digraph.Step{Name: "success-handler"},
-			Failure: &digraph.Step{Name: "failure-handler"},
-			Cancel:  &digraph.Step{Name: "cancel-handler"},
+		HandlerOn: core.HandlerOn{
+			Exit:    &core.Step{Name: "exit-handler"},
+			Success: &core.Step{Name: "success-handler"},
+			Failure: &core.Step{Name: "failure-handler"},
+			Cancel:  &core.Step{Name: "cancel-handler"},
 		},
-		Steps: []digraph.Step{
+		Steps: []core.Step{
 			{Name: "step1", Command: "echo hello"},
 			{Name: "step2", Command: "echo world"},
 		},
 		Params: []string{"param1", "param2"},
-		Preconditions: []*digraph.Condition{
+		Preconditions: []*core.Condition{
 			{Condition: "test -f file.txt", Expected: "true"},
 		},
 	}
@@ -91,9 +91,9 @@ func TestStatusBuilder(t *testing.T) {
 }
 
 func TestStatusBuilderWithOptions(t *testing.T) {
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name: "test-dag",
-		Steps: []digraph.Step{
+		Steps: []core.Step{
 			{Name: "step1"},
 		},
 	}
@@ -108,7 +108,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 	// Create nodes for options
 	nodes := []scheduler.NodeData{
 		{
-			Step: digraph.Step{Name: "step1"},
+			Step: core.Step{Name: "step1"},
 			State: scheduler.NodeState{
 				Status:     status.NodeSuccess,
 				StartedAt:  startedAt,
@@ -117,13 +117,13 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 		},
 	}
 
-	exitNode := scheduler.NewNode(digraph.Step{Name: "exit-step"}, scheduler.NodeState{})
-	successNode := scheduler.NewNode(digraph.Step{Name: "success-step"}, scheduler.NodeState{})
-	failureNode := scheduler.NewNode(digraph.Step{Name: "failure-step"}, scheduler.NodeState{})
-	cancelNode := scheduler.NewNode(digraph.Step{Name: "cancel-step"}, scheduler.NodeState{})
+	exitNode := scheduler.NewNode(core.Step{Name: "exit-step"}, scheduler.NodeState{})
+	successNode := scheduler.NewNode(core.Step{Name: "success-step"}, scheduler.NodeState{})
+	failureNode := scheduler.NewNode(core.Step{Name: "failure-step"}, scheduler.NodeState{})
+	cancelNode := scheduler.NewNode(core.Step{Name: "cancel-step"}, scheduler.NodeState{})
 
-	rootRef := digraph.NewDAGRunRef("root-dag", "root-run-123")
-	parentRef := digraph.NewDAGRunRef("parent-dag", "parent-run-456")
+	rootRef := core.NewDAGRunRef("root-dag", "root-run-123")
+	parentRef := core.NewDAGRunRef("parent-dag", "parent-run-456")
 
 	// Test with all options
 	result := builder.Create(
@@ -138,7 +138,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 		models.WithOnFailureNode(failureNode),
 		models.WithOnCancelNode(cancelNode),
 		models.WithLogFilePath("/tmp/log.txt"),
-		models.WithPreconditions([]*digraph.Condition{{Condition: "test", Expected: "true"}}),
+		models.WithPreconditions([]*core.Condition{{Condition: "test", Expected: "true"}}),
 		models.WithHierarchyRefs(rootRef, parentRef),
 		models.WithAttemptID("attempt-789"),
 		models.WithQueuedAt("2024-01-01 12:00:00"),
@@ -161,20 +161,20 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 }
 
 func TestInitialStatus(t *testing.T) {
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name: "initial-test",
-		HandlerOn: digraph.HandlerOn{
-			Exit:    &digraph.Step{Name: "exit"},
-			Success: &digraph.Step{Name: "success"},
-			Failure: &digraph.Step{Name: "failure"},
-			Cancel:  &digraph.Step{Name: "cancel"},
+		HandlerOn: core.HandlerOn{
+			Exit:    &core.Step{Name: "exit"},
+			Success: &core.Step{Name: "success"},
+			Failure: &core.Step{Name: "failure"},
+			Cancel:  &core.Step{Name: "cancel"},
 		},
-		Steps: []digraph.Step{
+		Steps: []core.Step{
 			{Name: "step1"},
 			{Name: "step2"},
 		},
 		Params: []string{"arg1", "arg2"},
-		Preconditions: []*digraph.Condition{
+		Preconditions: []*core.Condition{
 			{Condition: "test condition"},
 		},
 	}
@@ -221,14 +221,14 @@ func TestDAGRunStatus_DAGRun(t *testing.T) {
 func TestDAGRunStatus_Errors(t *testing.T) {
 	dagRunStatus := &models.DAGRunStatus{
 		Nodes: []*models.Node{
-			{Step: digraph.Step{Name: "step1"}, Error: "error1"},
-			{Step: digraph.Step{Name: "step2"}, Error: ""},
-			{Step: digraph.Step{Name: "step3"}, Error: "error3"},
+			{Step: core.Step{Name: "step1"}, Error: "error1"},
+			{Step: core.Step{Name: "step2"}, Error: ""},
+			{Step: core.Step{Name: "step3"}, Error: "error3"},
 		},
-		OnExit:    &models.Node{Step: digraph.Step{Name: "exit"}, Error: "exit error"},
-		OnSuccess: &models.Node{Step: digraph.Step{Name: "success"}, Error: ""},
-		OnFailure: &models.Node{Step: digraph.Step{Name: "failure"}, Error: "failure error"},
-		OnCancel:  &models.Node{Step: digraph.Step{Name: "cancel"}, Error: "cancel error"},
+		OnExit:    &models.Node{Step: core.Step{Name: "exit"}, Error: "exit error"},
+		OnSuccess: &models.Node{Step: core.Step{Name: "success"}, Error: ""},
+		OnFailure: &models.Node{Step: core.Step{Name: "failure"}, Error: "failure error"},
+		OnCancel:  &models.Node{Step: core.Step{Name: "cancel"}, Error: "cancel error"},
 	}
 
 	errors := dagRunStatus.Errors()
@@ -243,13 +243,13 @@ func TestDAGRunStatus_Errors(t *testing.T) {
 func TestDAGRunStatus_NodeByName(t *testing.T) {
 	dagRunStatus := &models.DAGRunStatus{
 		Nodes: []*models.Node{
-			{Step: digraph.Step{Name: "step1"}},
-			{Step: digraph.Step{Name: "step2"}},
+			{Step: core.Step{Name: "step1"}},
+			{Step: core.Step{Name: "step2"}},
 		},
-		OnExit:    &models.Node{Step: digraph.Step{Name: "exit"}},
-		OnSuccess: &models.Node{Step: digraph.Step{Name: "success"}},
-		OnFailure: &models.Node{Step: digraph.Step{Name: "failure"}},
-		OnCancel:  &models.Node{Step: digraph.Step{Name: "cancel"}},
+		OnExit:    &models.Node{Step: core.Step{Name: "exit"}},
+		OnSuccess: &models.Node{Step: core.Step{Name: "success"}},
+		OnFailure: &models.Node{Step: core.Step{Name: "failure"}},
+		OnCancel:  &models.Node{Step: core.Step{Name: "cancel"}},
 	}
 
 	// Test finding regular nodes
@@ -303,7 +303,7 @@ func TestPID_String(t *testing.T) {
 }
 
 func TestNodesFromSteps(t *testing.T) {
-	steps := []digraph.Step{
+	steps := []core.Step{
 		{
 			Name:        "step1",
 			Command:     "echo hello",
@@ -326,7 +326,7 @@ func TestNodesFromSteps(t *testing.T) {
 }
 
 func TestWithCreatedAtDefaultTime(t *testing.T) {
-	dag := &digraph.DAG{Name: "test"}
+	dag := &core.DAG{Name: "test"}
 	dagRunStatus := models.InitialStatus(dag)
 
 	// Test WithCreatedAt with 0 - should use current time

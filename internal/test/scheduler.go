@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/coordinator"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
@@ -23,7 +23,7 @@ type Scheduler struct {
 	Helper
 	EntryReader    scheduler.EntryReader
 	QueueStore     models.QueueStore
-	CoordinatorCli digraph.Dispatcher
+	CoordinatorCli core.Dispatcher
 }
 
 // SetupScheduler creates a test scheduler instance with all dependencies

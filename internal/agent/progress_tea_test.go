@@ -5,17 +5,17 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestProgressModel_Init(t *testing.T) {
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name: "test-dag",
-		Steps: []digraph.Step{
+		Steps: []core.Step{
 			{Name: "step1"},
 			{Name: "step2"},
 		},
@@ -37,9 +37,9 @@ func TestProgressModel_Init(t *testing.T) {
 }
 
 func TestProgressModel_UpdateNode(t *testing.T) {
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name: "test-dag",
-		Steps: []digraph.Step{
+		Steps: []core.Step{
 			{Name: "step1"},
 		},
 	}
@@ -48,7 +48,7 @@ func TestProgressModel_UpdateNode(t *testing.T) {
 
 	// Update node status
 	node := &models.Node{
-		Step:      digraph.Step{Name: "step1"},
+		Step:      core.Step{Name: "step1"},
 		Status:    status.NodeRunning,
 		StartedAt: time.Now().Format(time.RFC3339),
 	}
@@ -61,7 +61,7 @@ func TestProgressModel_UpdateNode(t *testing.T) {
 }
 
 func TestProgressModel_UpdateStatus(t *testing.T) {
-	dag := &digraph.DAG{Name: "test-dag"}
+	dag := &core.DAG{Name: "test-dag"}
 	model := NewProgressModel(dag)
 
 	dagRunStatus := &models.DAGRunStatus{
@@ -79,7 +79,7 @@ func TestProgressModel_UpdateStatus(t *testing.T) {
 }
 
 func TestProgressModel_WindowResize(t *testing.T) {
-	dag := &digraph.DAG{Name: "test-dag"}
+	dag := &core.DAG{Name: "test-dag"}
 	model := NewProgressModel(dag)
 
 	// Test window resize
@@ -91,9 +91,9 @@ func TestProgressModel_WindowResize(t *testing.T) {
 }
 
 func TestProgressModel_View(t *testing.T) {
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name: "test-dag",
-		Steps: []digraph.Step{
+		Steps: []core.Step{
 			{Name: "step1"},
 			{Name: "step2"},
 		},
@@ -113,7 +113,7 @@ func TestProgressModel_View(t *testing.T) {
 }
 
 func TestProgressModel_Finalize(t *testing.T) {
-	dag := &digraph.DAG{Name: "test-dag"}
+	dag := &core.DAG{Name: "test-dag"}
 	model := NewProgressModel(dag)
 
 	// Test finalize
@@ -125,9 +125,9 @@ func TestProgressModel_Finalize(t *testing.T) {
 }
 
 func TestProgressModel_ProgressCalculation(t *testing.T) {
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name: "test-dag",
-		Steps: []digraph.Step{
+		Steps: []core.Step{
 			{Name: "step1"},
 			{Name: "step2"},
 			{Name: "step3"},
@@ -153,7 +153,7 @@ func TestProgressModel_ProgressCalculation(t *testing.T) {
 }
 
 func TestProgressModel_StatusFormatting(t *testing.T) {
-	dag := &digraph.DAG{Name: "test-dag"}
+	dag := &core.DAG{Name: "test-dag"}
 	model := NewProgressModel(dag)
 
 	tests := []struct {
@@ -180,15 +180,15 @@ func TestProgressModel_NodeSorting(t *testing.T) {
 	now := time.Now()
 	nodes := []*nodeProgress{
 		{
-			node:      &models.Node{Step: digraph.Step{Name: "b"}},
+			node:      &models.Node{Step: core.Step{Name: "b"}},
 			startTime: now.Add(2 * time.Second),
 		},
 		{
-			node:      &models.Node{Step: digraph.Step{Name: "a"}},
+			node:      &models.Node{Step: core.Step{Name: "a"}},
 			startTime: now.Add(1 * time.Second),
 		},
 		{
-			node:      &models.Node{Step: digraph.Step{Name: "c"}},
+			node:      &models.Node{Step: core.Step{Name: "c"}},
 			startTime: now,
 		},
 	}
@@ -220,9 +220,9 @@ func TestProgressModel_TruncateString(t *testing.T) {
 }
 
 func TestProgressTeaDisplay_Integration(t *testing.T) {
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name: "test-dag",
-		Steps: []digraph.Step{
+		Steps: []core.Step{
 			{Name: "step1"},
 			{Name: "step2"},
 		},
@@ -236,7 +236,7 @@ func TestProgressTeaDisplay_Integration(t *testing.T) {
 
 	// Update a node
 	node := &models.Node{
-		Step:      digraph.Step{Name: "step1"},
+		Step:      core.Step{Name: "step1"},
 		Status:    status.NodeRunning,
 		StartedAt: time.Now().Format(time.RFC3339),
 	}
@@ -251,9 +251,9 @@ func TestProgressTeaDisplay_Integration(t *testing.T) {
 }
 
 func TestProgressModel_ChildDAGsRendering(t *testing.T) {
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name: "test-dag",
-		Steps: []digraph.Step{
+		Steps: []core.Step{
 			{Name: "parent-step"},
 		},
 	}
@@ -276,9 +276,9 @@ func TestProgressModel_ChildDAGsRendering(t *testing.T) {
 }
 
 func TestProgressModel_ErrorDisplay(t *testing.T) {
-	dag := &digraph.DAG{
+	dag := &core.DAG{
 		Name: "test-dag",
-		Steps: []digraph.Step{
+		Steps: []core.Step{
 			{Name: "failing-step"},
 		},
 	}

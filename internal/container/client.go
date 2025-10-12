@@ -17,7 +17,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/dagu-org/dagu/internal/common/signal"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -710,10 +710,10 @@ func getPlatform(ctx context.Context, cli *client.Client, cfg *Config) (specs.Pl
 }
 
 func (c *Client) shouldPullImage(ctx context.Context, cli *client.Client, platform *specs.Platform) (bool, error) {
-	if c.cfg.Pull == digraph.PullPolicyAlways {
+	if c.cfg.Pull == core.PullPolicyAlways {
 		return true, nil
 	}
-	if c.cfg.Pull == digraph.PullPolicyNever {
+	if c.cfg.Pull == core.PullPolicyNever {
 		return false, nil
 	}
 

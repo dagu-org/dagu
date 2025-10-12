@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +23,7 @@ func TestProcGroup(t *testing.T) {
 	procFiles := NewProcGroup(baseDir, name, time.Hour)
 
 	// Create a proc file
-	proc, err := procFiles.Acquire(ctx, digraph.DAGRunRef{
+	proc, err := procFiles.Acquire(ctx, core.DAGRunRef{
 		Name: "test_proc",
 		ID:   "test_id",
 	})
@@ -81,7 +81,7 @@ func TestProcGroup_IsStale(t *testing.T) {
 	pg := NewProcGroup(baseDir, name, time.Second*5)
 
 	// create a proc
-	proc, err := pg.Acquire(ctx, digraph.DAGRunRef{
+	proc, err := pg.Acquire(ctx, core.DAGRunRef{
 		Name: "test_proc",
 		ID:   "test_id",
 	})
@@ -130,7 +130,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 	pg := NewProcGroup(baseDir, name, time.Second*5)
 
 	t.Run("NoProcessFile", func(t *testing.T) {
-		dagRun := digraph.DAGRunRef{
+		dagRun := core.DAGRunRef{
 			Name: name,
 			ID:   "run-123",
 		}
@@ -142,7 +142,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 	})
 
 	t.Run("AliveProcess", func(t *testing.T) {
-		dagRun := digraph.DAGRunRef{
+		dagRun := core.DAGRunRef{
 			Name: name,
 			ID:   "run-456",
 		}
@@ -175,7 +175,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 
 	t.Run("DifferentRunID", func(t *testing.T) {
 		// Create a process for one run ID
-		dagRun1 := digraph.DAGRunRef{
+		dagRun1 := core.DAGRunRef{
 			Name: name,
 			ID:   "run-789",
 		}
@@ -190,7 +190,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		time.Sleep(time.Millisecond * 50)
 
 		// Check for a different run ID
-		dagRun2 := digraph.DAGRunRef{
+		dagRun2 := core.DAGRunRef{
 			Name: name,
 			ID:   "run-999",
 		}
@@ -212,7 +212,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		// Create a ProcGroup with very short stale time
 		shortPG := NewProcGroup(baseDir, name, time.Millisecond*100)
 
-		dagRun := digraph.DAGRunRef{
+		dagRun := core.DAGRunRef{
 			Name: name,
 			ID:   "run-stale",
 		}
@@ -260,7 +260,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		// Create a ProcGroup with very short stale time
 		shortPG := NewProcGroup(testSubDir, name, time.Millisecond*100)
 
-		dagRun := digraph.DAGRunRef{
+		dagRun := core.DAGRunRef{
 			Name: name,
 			ID:   "run-stale-dir",
 		}
@@ -307,7 +307,7 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 	})
 
 	t.Run("InvalidFilePattern", func(t *testing.T) {
-		dagRun := digraph.DAGRunRef{
+		dagRun := core.DAGRunRef{
 			Name: name,
 			ID:   "run-invalid",
 		}

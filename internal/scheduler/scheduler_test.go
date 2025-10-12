@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
@@ -160,7 +160,7 @@ func TestJobReady(t *testing.T) {
 			scheduler.SetFixedTime(tt.now)
 
 			job := &scheduler.DAGRunJob{
-				DAG: &digraph.DAG{
+				DAG: &core.DAG{
 					SkipIfSuccessful: tt.skipSuccessful,
 				},
 				Schedule: schedule,

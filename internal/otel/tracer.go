@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -31,11 +31,11 @@ const (
 type Tracer struct {
 	tracer   trace.Tracer
 	provider *sdktrace.TracerProvider
-	config   *digraph.OTelConfig
+	config   *core.OTelConfig
 }
 
 // NewTracer creates a new OpenTelemetry tracer for a DAG
-func NewTracer(ctx context.Context, dag *digraph.DAG) (*Tracer, error) {
+func NewTracer(ctx context.Context, dag *core.DAG) (*Tracer, error) {
 	if dag.OTel == nil || !dag.OTel.Enabled {
 		return &Tracer{tracer: otel.Tracer(TracerName)}, nil
 	}
@@ -70,7 +70,7 @@ func NewTracer(ctx context.Context, dag *digraph.DAG) (*Tracer, error) {
 }
 
 // createExporter creates an OTLP exporter based on the endpoint
-func createExporter(ctx context.Context, config *digraph.OTelConfig) (sdktrace.SpanExporter, error) {
+func createExporter(ctx context.Context, config *core.OTelConfig) (sdktrace.SpanExporter, error) {
 	endpoint := config.Endpoint
 	if endpoint == "" {
 		return nil, fmt.Errorf("OTel endpoint is required")
@@ -86,7 +86,7 @@ func createExporter(ctx context.Context, config *digraph.OTelConfig) (sdktrace.S
 }
 
 // createHTTPExporter creates an OTLP HTTP exporter
-func createHTTPExporter(ctx context.Context, config *digraph.OTelConfig) (sdktrace.SpanExporter, error) {
+func createHTTPExporter(ctx context.Context, config *core.OTelConfig) (sdktrace.SpanExporter, error) {
 	opts := []otlptracehttp.Option{
 		otlptracehttp.WithEndpoint(config.Endpoint),
 		otlptracehttp.WithHeaders(config.Headers),
@@ -109,7 +109,7 @@ func createHTTPExporter(ctx context.Context, config *digraph.OTelConfig) (sdktra
 }
 
 // createGRPCExporter creates an OTLP gRPC exporter
-func createGRPCExporter(ctx context.Context, config *digraph.OTelConfig) (sdktrace.SpanExporter, error) {
+func createGRPCExporter(ctx context.Context, config *core.OTelConfig) (sdktrace.SpanExporter, error) {
 	opts := []otlptracegrpc.Option{
 		otlptracegrpc.WithEndpoint(config.Endpoint),
 		otlptracegrpc.WithHeaders(config.Headers),
@@ -133,7 +133,7 @@ func createGRPCExporter(ctx context.Context, config *digraph.OTelConfig) (sdktra
 }
 
 // createResource creates the OpenTelemetry resource for the DAG
-func createResource(_ context.Context, dag *digraph.DAG) (*resource.Resource, error) {
+func createResource(_ context.Context, dag *core.DAG) (*resource.Resource, error) {
 	attrs := []attribute.KeyValue{
 		semconv.ServiceName("dagu"),
 	}

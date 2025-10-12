@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
 	"github.com/spf13/cobra"
@@ -42,7 +42,7 @@ func TestMigrateHistoryCommand(t *testing.T) {
 		FinishedAt: time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
 		Nodes: []*legacymodel.Node{
 			{
-				Step:       digraph.Step{Name: "step1"},
+				Step:       core.Step{Name: "step1"},
 				Status:     status.NodeSuccess,
 				StartedAt:  time.Now().Add(-50 * time.Minute).Format(time.RFC3339),
 				FinishedAt: time.Now().Add(-40 * time.Minute).Format(time.RFC3339),
@@ -85,7 +85,7 @@ func TestMigrateHistoryCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify migration
-		attempt, err := dagRunStore.FindAttempt(context.Background(), digraph.NewDAGRunRef("test-dag", "req123"))
+		attempt, err := dagRunStore.FindAttempt(context.Background(), core.NewDAGRunRef("test-dag", "req123"))
 		require.NoError(t, err)
 		require.NotNil(t, attempt)
 

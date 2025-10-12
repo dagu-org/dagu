@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,7 +63,7 @@ func (th StoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s
 func (th StoreTest) DAG(name string) DAGTest {
 	return DAGTest{
 		th: th,
-		DAG: &digraph.DAG{
+		DAG: &core.DAG{
 			Name:     name,
 			Location: filepath.Join(th.TmpDir, name+".yaml"),
 		},
@@ -72,7 +72,7 @@ func (th StoreTest) DAG(name string) DAGTest {
 
 type DAGTest struct {
 	th StoreTest
-	*digraph.DAG
+	*core.DAG
 }
 
 func (d DAGTest) Writer(t *testing.T, dagRunID string, startedAt time.Time) WriterTest {

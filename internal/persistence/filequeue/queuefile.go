@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 )
@@ -54,14 +54,14 @@ func NewQueueFile(baseDir, prefix string) *QueueFile {
 
 // ItemData represents the data stored in the queue file
 type ItemData struct {
-	FileName string            `json:"fileName"`
-	DAGRun   digraph.DAGRunRef `json:"dagRun"`
-	QueuedAt time.Time         `json:"queuedAt"`
+	FileName string         `json:"fileName"`
+	DAGRun   core.DAGRunRef `json:"dagRun"`
+	QueuedAt time.Time      `json:"queuedAt"`
 }
 
 // Push adds a job to the queue
 // Since it's a prototype, it just create a json file with the job ID and dag-run reference
-func (q *QueueFile) Push(_ context.Context, dagRun digraph.DAGRunRef) error {
+func (q *QueueFile) Push(_ context.Context, dagRun core.DAGRunRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -305,7 +305,7 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 	// Create the ItemData struct
 	item := ItemData{
 		FileName: fileName,
-		DAGRun: digraph.DAGRunRef{
+		DAGRun: core.DAGRunRef{
 			Name: filepath.Base(filepath.Dir(path)),
 			ID:   matches[4],
 		},

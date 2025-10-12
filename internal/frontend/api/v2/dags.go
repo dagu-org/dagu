@@ -12,10 +12,10 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/builder"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/builder"
-	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
 )
 
@@ -45,7 +45,7 @@ func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRe
 	)
 
 	var errs []string
-	var loadErrs digraph.ErrorList
+	var loadErrs core.ErrorList
 	if errors.As(err, &loadErrs) {
 		errs = loadErrs.ToStringList()
 	} else if err != nil {
@@ -85,7 +85,7 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 		)
 
 		if err != nil {
-			var verrs digraph.ErrorList
+			var verrs core.ErrorList
 			if errors.As(err, &verrs) {
 				// Return 400 with summary of errors
 				return nil, &Error{
@@ -157,7 +157,7 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 	)
 	var errs []string
 
-	var loadErrs digraph.ErrorList
+	var loadErrs core.ErrorList
 	if errors.As(err, &loadErrs) {
 		errs = loadErrs.ToStringList()
 	} else if err != nil {
@@ -167,7 +167,7 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 
 	// If dag is still nil (shouldn't happen with AllowBuildErrors), create a minimal DAG
 	if dag == nil {
-		dag = &digraph.DAG{
+		dag = &core.DAG{
 			Name: request.FileName,
 		}
 		if err != nil {
@@ -194,7 +194,7 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 
 	err := a.dagStore.UpdateSpec(ctx, request.FileName, []byte(request.Body.Spec))
 
-	var loadErrs digraph.ErrorList
+	var loadErrs core.ErrorList
 	var errs []string
 
 	if errors.As(err, &loadErrs) {
@@ -393,11 +393,11 @@ func (a *API) readHistoryData(
 		}
 	}
 
-	for _, handlerType := range []digraph.HandlerType{
-		digraph.HandlerOnSuccess,
-		digraph.HandlerOnFailure,
-		digraph.HandlerOnCancel,
-		digraph.HandlerOnExit,
+	for _, handlerType := range []core.HandlerType{
+		core.HandlerOnSuccess,
+		core.HandlerOnFailure,
+		core.HandlerOnCancel,
+		core.HandlerOnExit,
 	} {
 		if statusList, ok := handlers[handlerType.String()]; ok {
 			var history []api.NodeStatus
@@ -567,7 +567,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	}
 
 	// Check the dag-run ID is not already in use
-	_, err = a.dagRunStore.FindAttempt(ctx, digraph.DAGRunRef{
+	_, err = a.dagRunStore.FindAttempt(ctx, core.DAGRunRef{
 		Name: dag.Name,
 		ID:   dagRunId,
 	})
@@ -621,7 +621,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	}, nil
 }
 
-func (a *API) startDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunID string, singleton bool) error {
+func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID string, singleton bool) error {
 	spec := a.subCmdBuilder.Start(dag, dagrun.StartOptions{
 		Params:   params,
 		DAGRunID: dagRunID,
@@ -737,7 +737,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	}, nil
 }
 
-func (a *API) enqueueDAGRun(ctx context.Context, dag *digraph.DAG, params, dagRunID string) error {
+func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID string) error {
 	opts := dagrun.EnqueueOptions{
 		Params:   params,
 		DAGRunID: dagRunID,

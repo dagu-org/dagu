@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -91,7 +91,7 @@ func TestJSONDB(t *testing.T) {
 		th.CreateAttempt(t, ts3, "dagrun-id-3", status.Success)
 
 		// Find the record with dag-run ID "dagrun-id-2"
-		ref := digraph.NewDAGRunRef("test_DAG", "dagrun-id-2")
+		ref := core.NewDAGRunRef("test_DAG", "dagrun-id-2")
 		attempt, err := th.Store.FindAttempt(th.Context, ref)
 		require.NoError(t, err)
 
@@ -101,7 +101,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "dagrun-id-2", dagRunStatus.DAGRunID)
 
 		// Verify an error is returned if the dag-run ID does not exist
-		refNonExist := digraph.NewDAGRunRef("test_DAG", "nonexistent-id")
+		refNonExist := core.NewDAGRunRef("test_DAG", "nonexistent-id")
 		_, err = th.Store.FindAttempt(th.Context, refNonExist)
 		assert.ErrorIs(t, err, models.ErrDAGRunIDNotFound)
 	})
@@ -147,7 +147,7 @@ func TestJSONDB(t *testing.T) {
 		_ = th.CreateAttempt(t, ts, "parent-id", status.Running)
 
 		// Create a child attempt
-		rootDAGRun := digraph.NewDAGRunRef("test_DAG", "parent-id")
+		rootDAGRun := core.NewDAGRunRef("test_DAG", "parent-id")
 		childDAG := th.DAG("child")
 		childAttempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, "sub-id", models.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
@@ -167,7 +167,7 @@ func TestJSONDB(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify record is created
-		dagRunRef := digraph.NewDAGRunRef("test_DAG", "parent-id")
+		dagRunRef := core.NewDAGRunRef("test_DAG", "parent-id")
 		existingAttempt, err := th.Store.FindChildAttempt(th.Context, dagRunRef, "sub-id")
 		require.NoError(t, err)
 
@@ -188,7 +188,7 @@ func TestJSONDB(t *testing.T) {
 		const childDAGRunID = "child-dagrun-id"
 		const parentDAGRunID = "parent-id"
 
-		rootDAGRun := digraph.NewDAGRunRef("test_DAG", parentDAGRunID)
+		rootDAGRun := core.NewDAGRunRef("test_DAG", parentDAGRunID)
 		childDAG := th.DAG("child")
 		attempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, childDAGRunID, models.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
@@ -210,7 +210,7 @@ func TestJSONDB(t *testing.T) {
 
 		// Find the child dag-run record
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
-		dagRunRef := digraph.NewDAGRunRef("test_DAG", parentDAGRunID)
+		dagRunRef := core.NewDAGRunRef("test_DAG", parentDAGRunID)
 		existingAttempt, err := th.Store.FindChildAttempt(th.Context, dagRunRef, childDAGRunID)
 		require.NoError(t, err)
 		existingAttemptStatus, err := existingAttempt.ReadStatus(th.Context)

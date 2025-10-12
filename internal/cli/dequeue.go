@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
@@ -30,7 +30,7 @@ var dequeueFlags = []commandLineFlag{paramsFlag, dagRunFlagDequeue}
 func runDequeue(ctx *Context, _ []string) error {
 	// Get dag-run reference from the context
 	dagRunRef, _ := ctx.StringParam("dag-run")
-	dagRun, err := digraph.ParseDAGRunRef(dagRunRef)
+	dagRun, err := core.ParseDAGRunRef(dagRunRef)
 	if err != nil {
 		return fmt.Errorf("failed to parse dag-run reference %s: %w", dagRunRef, err)
 	}
@@ -38,7 +38,7 @@ func runDequeue(ctx *Context, _ []string) error {
 }
 
 // dequeueDAGRun dequeues a dag-run from the queue.
-func dequeueDAGRun(ctx *Context, dagRun digraph.DAGRunRef) error {
+func dequeueDAGRun(ctx *Context, dagRun core.DAGRunRef) error {
 	// Check if queues are enabled
 	if !ctx.Config.Queues.Enabled {
 		return fmt.Errorf("queues are disabled in configuration")

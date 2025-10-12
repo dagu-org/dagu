@@ -7,18 +7,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/registry"
 )
 
 // RegistryAuthManager handles authentication for container registries
 type RegistryAuthManager struct {
-	auths map[string]*digraph.AuthConfig
+	auths map[string]*core.AuthConfig
 }
 
 // NewRegistryAuthManager creates a new registry authentication manager
-func NewRegistryAuthManager(auths map[string]*digraph.AuthConfig) *RegistryAuthManager {
+func NewRegistryAuthManager(auths map[string]*core.AuthConfig) *RegistryAuthManager {
 	return &RegistryAuthManager{
 		auths: auths,
 	}
@@ -94,7 +94,7 @@ func (r *RegistryAuthManager) getAuthConfig(imageName string) (*registry.AuthCon
 }
 
 // convertToDockerAuth converts our AuthConfig to Docker's registry.AuthConfig
-func convertToDockerAuth(auth *digraph.AuthConfig, serverAddress string) (*registry.AuthConfig, error) {
+func convertToDockerAuth(auth *core.AuthConfig, serverAddress string) (*registry.AuthConfig, error) {
 	if auth == nil {
 		return nil, nil
 	}

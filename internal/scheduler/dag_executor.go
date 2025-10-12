@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/scheduler"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -45,13 +45,13 @@ import (
 // - HandleJob(): Entry point for new scheduled jobs (handles persistence)
 // - ExecuteDAG(): Executes/dispatches already-persisted jobs (no persistence)
 type DAGExecutor struct {
-	coordinatorCli digraph.Dispatcher
+	coordinatorCli core.Dispatcher
 	subCmdBuilder  *dagrun.SubCmdBuilder
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
 func NewDAGExecutor(
-	coordinatorCli digraph.Dispatcher,
+	coordinatorCli core.Dispatcher,
 	subCmdBuilder *dagrun.SubCmdBuilder,
 ) *DAGExecutor {
 	return &DAGExecutor{
@@ -74,7 +74,7 @@ func NewDAGExecutor(
 // - No jobs are lost due to temporary system failures
 func (e *DAGExecutor) HandleJob(
 	ctx context.Context,
-	dag *digraph.DAG,
+	dag *core.DAG,
 	operation coordinatorv1.Operation,
 	runID string,
 ) error {
@@ -109,7 +109,7 @@ func (e *DAGExecutor) HandleJob(
 // which means "retry the dispatch", not "retry a failed execution".
 func (e *DAGExecutor) ExecuteDAG(
 	ctx context.Context,
-	dag *digraph.DAG,
+	dag *core.DAG,
 	operation coordinatorv1.Operation,
 	runID string,
 ) error {
@@ -154,7 +154,7 @@ func (e *DAGExecutor) ExecuteDAG(
 //
 // This ensures backward compatibility - DAGs without workerSelector continue
 // to run locally even when a coordinator is configured.
-func (e *DAGExecutor) shouldUseDistributedExecution(dag *digraph.DAG) bool {
+func (e *DAGExecutor) shouldUseDistributedExecution(dag *core.DAG) bool {
 	return e.coordinatorCli != nil && dag != nil && len(dag.WorkerSelector) > 0
 }
 
@@ -180,7 +180,7 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 }
 
 // Restart restarts a DAG unconditionally.
-func (e *DAGExecutor) Restart(ctx context.Context, dag *digraph.DAG) error {
+func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG) error {
 	spec := e.subCmdBuilder.Restart(dag, dagrun.RestartOptions{
 		Quiet: true,
 	})

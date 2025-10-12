@@ -6,16 +6,16 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/scheduler"
+	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/persistence/legacy/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFromSteps(t *testing.T) {
-	steps := []digraph.Step{
+	steps := []core.Step{
 		{
 			Name:    "step1",
 			Command: "echo hello",
@@ -45,7 +45,7 @@ func TestFromNodes(t *testing.T) {
 
 	nodeDataList := []scheduler.NodeData{
 		{
-			Step: digraph.Step{
+			Step: core.Step{
 				Name:    "step1",
 				Command: "echo hello",
 			},
@@ -60,7 +60,7 @@ func TestFromNodes(t *testing.T) {
 			},
 		},
 		{
-			Step: digraph.Step{
+			Step: core.Step{
 				Name:    "step2",
 				Command: "false",
 			},
@@ -101,7 +101,7 @@ func TestFromNode(t *testing.T) {
 	later := now.Add(5 * time.Second)
 
 	nodeData := scheduler.NodeData{
-		Step: digraph.Step{
+		Step: core.Step{
 			Name:        "test-step",
 			Command:     "echo test",
 			Description: "Test step",
@@ -133,7 +133,7 @@ func TestFromNode(t *testing.T) {
 }
 
 func TestNewNode(t *testing.T) {
-	step := digraph.Step{
+	step := core.Step{
 		Name:        "new-step",
 		Command:     "ls -la",
 		Description: "List files",
@@ -161,7 +161,7 @@ func TestNodeToNode(t *testing.T) {
 	retryTime := now.Add(5 * time.Second)
 
 	modelNode := &model.Node{
-		Step: digraph.Step{
+		Step: core.Step{
 			Name:    "convert-step",
 			Command: "sleep 1",
 		},
@@ -204,7 +204,7 @@ func TestNodeToNode(t *testing.T) {
 
 func TestNodeToNodeWithEmptyTimes(t *testing.T) {
 	modelNode := &model.Node{
-		Step: digraph.Step{
+		Step: core.Step{
 			Name: "empty-times-step",
 		},
 		StartedAt:  "-",
@@ -223,7 +223,7 @@ func TestNodeToNodeWithEmptyTimes(t *testing.T) {
 
 func TestNodeToNodeWithInvalidTimeFormat(t *testing.T) {
 	modelNode := &model.Node{
-		Step: digraph.Step{
+		Step: core.Step{
 			Name: "invalid-time-step",
 		},
 		StartedAt:  "invalid-time-format",
@@ -305,7 +305,7 @@ func TestErrText(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test through the public interface
 			nodeData := scheduler.NodeData{
-				Step: digraph.Step{Name: "test"},
+				Step: core.Step{Name: "test"},
 				State: scheduler.NodeState{
 					Error: tt.input,
 				},
@@ -330,7 +330,7 @@ func TestNodeWithAllStatuses(t *testing.T) {
 	for _, status := range statuses {
 		t.Run(status.String(), func(t *testing.T) {
 			nodeData := scheduler.NodeData{
-				Step: digraph.Step{
+				Step: core.Step{
 					Name: "status-test-step",
 				},
 				State: scheduler.NodeState{
@@ -353,7 +353,7 @@ func TestFromNodesPreservesOrder(t *testing.T) {
 	var nodeDataList []scheduler.NodeData
 	for i := 0; i < 10; i++ {
 		nodeDataList = append(nodeDataList, scheduler.NodeData{
-			Step: digraph.Step{
+			Step: core.Step{
 				Name: string(rune('A' + i)),
 			},
 			State: scheduler.NodeState{

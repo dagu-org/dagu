@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/scheduler"
 )
 
@@ -26,7 +26,7 @@ func (er *mockJobManager) Start(_ context.Context, _ chan any) error {
 var _ scheduler.Job = (*mockJob)(nil)
 
 type mockJob struct {
-	DAG          *digraph.DAG
+	DAG          *core.DAG
 	Name         string
 	RunCount     atomic.Int32
 	StopCount    atomic.Int32
@@ -34,7 +34,7 @@ type mockJob struct {
 	Panic        error
 }
 
-func (j *mockJob) GetDAG(_ context.Context) *digraph.DAG {
+func (j *mockJob) GetDAG(_ context.Context) *core.DAG {
 	return j.DAG
 }
 
