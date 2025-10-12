@@ -1,10 +1,10 @@
-package scheduler_test
+package executor_test
 
 import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,13 +29,13 @@ steps:
 			"region": "us-east-1",
 		}
 
-		task := scheduler.CreateTask(
+		task := executor.CreateTask(
 			dagName,
 			yamlDefinition,
 			coordinatorv1.Operation_OPERATION_START,
 			runID,
-			scheduler.WithTaskParams(params),
-			scheduler.WithWorkerSelector(selector),
+			executor.WithTaskParams(params),
+			executor.WithWorkerSelector(selector),
 		)
 
 		assert.NotNil(t, task)
@@ -64,12 +64,12 @@ steps:
 			ID:   "root-run-123",
 		}
 
-		task := scheduler.CreateTask(
+		task := executor.CreateTask(
 			dag.Name,
 			string(dag.YamlData),
 			coordinatorv1.Operation_OPERATION_RETRY,
 			"child-run-456",
-			scheduler.WithRootDagRun(rootRef),
+			executor.WithRootDagRun(rootRef),
 		)
 
 		assert.Equal(t, "root-dag", task.RootDagRunName)
@@ -86,12 +86,12 @@ steps:
 			ID:   "parent-run-789",
 		}
 
-		task := scheduler.CreateTask(
+		task := executor.CreateTask(
 			"child-dag",
 			`name: child-dag`,
 			coordinatorv1.Operation_OPERATION_START,
 			"child-run-456",
-			scheduler.WithParentDagRun(parentRef),
+			executor.WithParentDagRun(parentRef),
 		)
 
 		assert.Equal(t, "parent-dag", task.ParentDagRunName)
@@ -112,15 +112,15 @@ steps:
 			ID:   "parent-run-456",
 		}
 
-		task := scheduler.CreateTask(
+		task := executor.CreateTask(
 			"grandchild-dag",
 			`name: grandchild-dag`,
 			coordinatorv1.Operation_OPERATION_START,
 			"grandchild-run-789",
-			scheduler.WithTaskParams("nested=true"),
-			scheduler.WithWorkerSelector(map[string]string{"env": "prod"}),
-			scheduler.WithRootDagRun(rootRef),
-			scheduler.WithParentDagRun(parentRef),
+			executor.WithTaskParams("nested=true"),
+			executor.WithWorkerSelector(map[string]string{"env": "prod"}),
+			executor.WithRootDagRun(rootRef),
+			executor.WithParentDagRun(parentRef),
 		)
 
 		assert.Equal(t, "root-dag", task.RootDagRunName)
@@ -136,7 +136,7 @@ steps:
 	t.Run("EmptyWorkerSelector", func(t *testing.T) {
 		t.Parallel()
 
-		task := scheduler.CreateTask(
+		task := executor.CreateTask(
 			"test-dag",
 			`name: test-dag`,
 			coordinatorv1.Operation_OPERATION_START,
@@ -153,13 +153,13 @@ steps:
 		emptyRootRef := core.DAGRunRef{}
 		emptyParentRef := core.DAGRunRef{Name: "", ID: ""}
 
-		task := scheduler.CreateTask(
+		task := executor.CreateTask(
 			"test-dag",
 			`name: test-dag`,
 			coordinatorv1.Operation_OPERATION_START,
 			"run-123",
-			scheduler.WithRootDagRun(emptyRootRef),
-			scheduler.WithParentDagRun(emptyParentRef),
+			executor.WithRootDagRun(emptyRootRef),
+			executor.WithParentDagRun(emptyParentRef),
 		)
 
 		// Should use DAG name and runID as root values
@@ -177,13 +177,13 @@ steps:
 		partialRootRef := core.DAGRunRef{Name: "root-dag", ID: ""}
 		partialParentRef := core.DAGRunRef{Name: "", ID: "parent-id"}
 
-		task := scheduler.CreateTask(
+		task := executor.CreateTask(
 			"test-dag",
 			`name: test-dag`,
 			coordinatorv1.Operation_OPERATION_START,
 			"run-123",
-			scheduler.WithRootDagRun(partialRootRef),
-			scheduler.WithParentDagRun(partialParentRef),
+			executor.WithRootDagRun(partialRootRef),
+			executor.WithParentDagRun(partialParentRef),
 		)
 
 		// Partial refs should not modify the task
@@ -197,13 +197,13 @@ steps:
 		t.Parallel()
 
 		// Create a custom task option
-		withStep := func(step string) scheduler.TaskOption {
+		withStep := func(step string) executor.TaskOption {
 			return func(task *coordinatorv1.Task) {
 				task.Step = step
 			}
 		}
 
-		task := scheduler.CreateTask(
+		task := executor.CreateTask(
 			"test-dag",
 			`name: test-dag`,
 			coordinatorv1.Operation_OPERATION_RETRY,
@@ -225,7 +225,7 @@ steps:
 		}
 
 		for _, op := range operations {
-			task := scheduler.CreateTask(
+			task := executor.CreateTask(
 				"test-dag",
 				`name: test-dag`,
 				op,
@@ -245,7 +245,7 @@ func TestTaskOption_Functions(t *testing.T) {
 		task := &coordinatorv1.Task{}
 		ref := core.DAGRunRef{Name: "root", ID: "123"}
 
-		scheduler.WithRootDagRun(ref)(task)
+		executor.WithRootDagRun(ref)(task)
 
 		assert.Equal(t, "root", task.RootDagRunName)
 		assert.Equal(t, "123", task.RootDagRunId)
@@ -257,7 +257,7 @@ func TestTaskOption_Functions(t *testing.T) {
 		task := &coordinatorv1.Task{}
 		ref := core.DAGRunRef{Name: "parent", ID: "456"}
 
-		scheduler.WithParentDagRun(ref)(task)
+		executor.WithParentDagRun(ref)(task)
 
 		assert.Equal(t, "parent", task.ParentDagRunName)
 		assert.Equal(t, "456", task.ParentDagRunId)
@@ -268,7 +268,7 @@ func TestTaskOption_Functions(t *testing.T) {
 
 		task := &coordinatorv1.Task{}
 
-		scheduler.WithTaskParams("key1=value1 key2=value2")(task)
+		executor.WithTaskParams("key1=value1 key2=value2")(task)
 
 		assert.Equal(t, "key1=value1 key2=value2", task.Params)
 	})
@@ -282,7 +282,7 @@ func TestTaskOption_Functions(t *testing.T) {
 			"region": "us-west-2",
 		}
 
-		scheduler.WithWorkerSelector(selector)(task)
+		executor.WithWorkerSelector(selector)(task)
 
 		assert.Equal(t, selector, task.WorkerSelector)
 	})
@@ -292,7 +292,7 @@ func TestTaskOption_Functions(t *testing.T) {
 
 		task := &coordinatorv1.Task{}
 
-		scheduler.WithStep("step-name")(task)
+		executor.WithStep("step-name")(task)
 
 		assert.Equal(t, "step-name", task.Step)
 	})

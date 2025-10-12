@@ -12,6 +12,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/go-viper/mapstructure/v2"
 )
 
@@ -840,24 +841,7 @@ func generateTypedStepName(existingNames map[string]struct{}, step *core.Step, i
 
 	// Determine prefix based on the built step's properties
 	if step.ExecutorConfig.Type != "" {
-		switch step.ExecutorConfig.Type {
-		case core.ExecutorTypeDAG, core.ExecutorTypeDAGLegacy:
-			prefix = "dag"
-		case core.ExecutorTypeParallel:
-			prefix = "parallel"
-		case "http":
-			prefix = "http"
-		case "docker":
-			prefix = "container"
-		case "ssh":
-			prefix = "ssh"
-		case "mail":
-			prefix = "mail"
-		case "jq":
-			prefix = "jq"
-		default:
-			prefix = "exec"
-		}
+		prefix = step.ExecutorConfig.Type
 	} else if step.Parallel != nil {
 		prefix = "parallel"
 	} else if step.ChildDAG != nil {
@@ -1458,9 +1442,9 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 
 	// Set executor type based on whether parallel execution is configured
 	if step.Parallel != nil {
-		step.ExecutorConfig.Type = core.ExecutorTypeParallel
+		step.ExecutorConfig.Type = executor.ExecutorTypeParallel
 	} else {
-		step.ExecutorConfig.Type = core.ExecutorTypeDAG
+		step.ExecutorConfig.Type = executor.ExecutorTypeDAG
 	}
 
 	step.Command = "run"

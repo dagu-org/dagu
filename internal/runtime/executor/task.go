@@ -1,4 +1,4 @@
-package scheduler
+package executor
 
 import (
 	"github.com/dagu-org/dagu/internal/core"

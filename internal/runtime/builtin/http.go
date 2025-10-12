@@ -12,11 +12,12 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/go-resty/resty/v2"
 	"github.com/go-viper/mapstructure/v2"
 )
 
-var _ core.Executor = (*http)(nil)
+var _ executor.Executor = (*http)(nil)
 
 type http struct {
 	stdout    io.Writer
@@ -45,7 +46,7 @@ type httpJSONResult struct {
 	Body       any                 `json:"body"`
 }
 
-func newHTTP(ctx context.Context, step core.Step) (core.Executor, error) {
+func newHTTP(ctx context.Context, step core.Step) (executor.Executor, error) {
 	var reqCfg httpConfig
 	if len(step.Script) > 0 {
 		if err := decodeHTTPConfigFromString(ctx, step.Script, &reqCfg); err != nil {
@@ -198,5 +199,5 @@ func decodeHTTPConfigFromString(_ context.Context, source string, target *httpCo
 }
 
 func init() {
-	core.RegisterExecutor("http", newHTTP, nil)
+	executor.RegisterExecutor("http", newHTTP, nil)
 }

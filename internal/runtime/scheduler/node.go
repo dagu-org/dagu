@@ -25,6 +25,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
 // outputCapture handles concurrent reading from a pipe to avoid deadlocks
@@ -115,7 +116,7 @@ type Node struct {
 
 	id           int
 	mu           sync.RWMutex
-	cmd          core.Executor
+	cmd          executor.Executor
 	cancelFunc   func()
 	done         atomic.Bool
 	retryPolicy  RetryPolicy
@@ -247,7 +248,7 @@ func (n *Node) Execute(ctx context.Context) error {
 
 		// Set the exit code if the command implements ExitCoder
 		var exitErr *exec.ExitError
-		if cmd, ok := cmd.(ExitCoder); ok {
+		if cmd, ok := cmd.(executor.ExitCoder); ok {
 			exitCode = cmd.ExitCode()
 		} else if n.Error() != nil && errors.As(n.Error(), &exitErr) {
 			exitCode = exitErr.ExitCode()
@@ -280,7 +281,7 @@ func (n *Node) Execute(ctx context.Context) error {
 		n.setVariable(output, value)
 	}
 
-	if status, ok := cmd.(NodeStatusDeterminer); ok {
+	if status, ok := cmd.(executor.NodeStatusDeterminer); ok {
 		// Determine the node status based on the executor's implementation
 		nodeStatus, err := status.DetermineNodeStatus(ctx)
 		// Only set the status if it is a success
@@ -298,7 +299,7 @@ func (n *Node) clearVariable(key string) {
 	n.ClearVariable(key)
 }
 
-func (n *Node) setupExecutor(ctx context.Context) (core.Executor, error) {
+func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -354,7 +355,7 @@ func (n *Node) setupExecutor(ctx context.Context) (core.Executor, error) {
 	}
 
 	// Create the executor
-	cmd, err := core.NewExecutor(ctx, n.Step())
+	cmd, err := executor.NewExecutor(ctx, n.Step())
 	if err != nil {
 		return nil, err
 	}
@@ -375,24 +376,24 @@ func (n *Node) setupExecutor(ctx context.Context) (core.Executor, error) {
 		// Setup the executor with child DAG run information
 		if n.Step().Parallel == nil {
 			// Single child DAG execution
-			exec, ok := cmd.(DAGExecutor)
+			exec, ok := cmd.(executor.DAGExecutor)
 			if !ok {
 				return nil, fmt.Errorf("executor %T does not support child DAG execution", cmd)
 			}
-			exec.SetParams(RunParams{
+			exec.SetParams(executor.RunParams{
 				RunID:  childRuns[0].DAGRunID,
 				Params: childRuns[0].Params,
 			})
 		} else {
 			// Parallel child DAG execution
-			exec, ok := cmd.(ParallelExecutor)
+			exec, ok := cmd.(executor.ParallelExecutor)
 			if !ok {
 				return nil, fmt.Errorf("executor %T does not support parallel execution", cmd)
 			}
 			// Convert ChildDAGRun to executor.RunParams
-			var runParamsList []RunParams
+			var runParamsList []executor.RunParams
 			for _, childRun := range childRuns {
-				runParamsList = append(runParamsList, RunParams{
+				runParamsList = append(runParamsList, executor.RunParams{
 					RunID:  childRun.DAGRunID,
 					Params: childRun.Params,
 				})
@@ -943,7 +944,7 @@ func (oc *OutputCoordinator) setup(ctx context.Context, data NodeData) error {
 	return oc.setupStderrRedirect(ctx, data)
 }
 
-func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd core.Executor, data NodeData) error {
+func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.Executor, data NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 

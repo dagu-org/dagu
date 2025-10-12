@@ -14,11 +14,10 @@ import (
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 )
 
-var _ scheduler.ParallelExecutor = (*parallelExecutor)(nil)
-var _ scheduler.NodeStatusDeterminer = (*parallelExecutor)(nil)
+var _ executor.ParallelExecutor = (*parallelExecutor)(nil)
+var _ executor.NodeStatusDeterminer = (*parallelExecutor)(nil)
 
 type parallelExecutor struct {
 	child         *executor.ChildDAGExecutor
@@ -26,7 +25,7 @@ type parallelExecutor struct {
 	workDir       string
 	stdout        io.Writer
 	stderr        io.Writer
-	runParamsList []scheduler.RunParams
+	runParamsList []executor.RunParams
 	maxConcurrent int
 
 	// Runtime state
@@ -39,7 +38,7 @@ type parallelExecutor struct {
 
 func newParallelExecutor(
 	ctx context.Context, step core.Step,
-) (core.Executor, error) {
+) (executor.Executor, error) {
 	// The parallel executor doesn't use the params from the step directly
 	// as they are passed through SetParamsList
 
@@ -103,7 +102,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Launch all child DAG executions
 	for _, params := range e.runParamsList {
 		e.wg.Add(1)
-		go func(runParams scheduler.RunParams) {
+		go func(runParams executor.RunParams) {
 			defer e.wg.Done()
 
 			// Acquire semaphore
@@ -169,7 +168,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	return nil
 }
 
-func (e *parallelExecutor) SetParamsList(paramsList []scheduler.RunParams) {
+func (e *parallelExecutor) SetParamsList(paramsList []executor.RunParams) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	e.runParamsList = paramsList
@@ -212,7 +211,7 @@ func (e *parallelExecutor) DetermineNodeStatus(_ context.Context) (status.NodeSt
 }
 
 // executeChild executes a single child DAG with the given parameters
-func (e *parallelExecutor) executeChild(ctx context.Context, runParams scheduler.RunParams) error {
+func (e *parallelExecutor) executeChild(ctx context.Context, runParams executor.RunParams) error {
 	// Use the new ExecuteWithResult API
 	result, err := e.child.ExecuteWithResult(ctx, runParams, e.workDir)
 
@@ -305,5 +304,5 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	core.RegisterExecutor(core.ExecutorTypeParallel, newParallelExecutor, nil)
+	executor.RegisterExecutor(executor.ExecutorTypeParallel, newParallelExecutor, nil)
 }

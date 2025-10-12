@@ -9,6 +9,12 @@ import (
 // StepValidator is a function type for validating step configurations.
 type StepValidator func(step Step) error
 
+var stepValidators = make(map[string]StepValidator)
+
+func RegisterStepValidator(executorType string, validator StepValidator) {
+	stepValidators[executorType] = validator
+}
+
 // ValidateSteps exposes validateSteps for packages that need to perform validation during DAG construction.
 func ValidateSteps(dag *DAG) error {
 	// First pass: collect all names and IDs
@@ -128,7 +134,7 @@ func validateStep(step Step) error {
 }
 
 func validateStepWithValidator(step Step) error {
-	validator, exists := executorValidators[step.ExecutorConfig.Type]
+	validator, exists := stepValidators[step.ExecutorConfig.Type]
 	if !exists || validator == nil {
 		// No validator registered for this executor type
 		return nil

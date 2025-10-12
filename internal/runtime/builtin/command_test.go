@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -333,10 +333,10 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			executor, err := NewCommand(ctx, tt.step)
+			exec, err := NewCommand(ctx, tt.step)
 			require.NoError(t, err)
 
-			err = executor.Run(ctx)
+			err = exec.Run(ctx)
 			if tt.shouldError {
 				assert.Error(t, err)
 			} else {
@@ -344,7 +344,7 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 			}
 
 			// Check exit code
-			if exitCoder, ok := executor.(scheduler.ExitCoder); ok {
+			if exitCoder, ok := exec.(executor.ExitCoder); ok {
 				assert.Equal(t, tt.expectedCode, exitCoder.ExitCode())
 			}
 		})

@@ -13,11 +13,10 @@ import (
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 )
 
-var _ scheduler.DAGExecutor = (*dagExecutor)(nil)
-var _ scheduler.NodeStatusDeterminer = (*dagExecutor)(nil)
+var _ executor.DAGExecutor = (*dagExecutor)(nil)
+var _ executor.NodeStatusDeterminer = (*dagExecutor)(nil)
 
 type dagExecutor struct {
 	child     *executor.ChildDAGExecutor
@@ -25,7 +24,7 @@ type dagExecutor struct {
 	workDir   string
 	stdout    io.Writer
 	stderr    io.Writer
-	runParams scheduler.RunParams
+	runParams executor.RunParams
 	step      core.Step
 	result    *core.RunStatus
 }
@@ -35,7 +34,7 @@ var (
 	ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 )
 
-func newDAGExecutor(ctx context.Context, step core.Step) (core.Executor, error) {
+func newDAGExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
 	if step.ChildDAG == nil {
 		return nil, fmt.Errorf("child DAG configuration is missing")
 	}
@@ -110,7 +109,7 @@ func (e *dagExecutor) DetermineNodeStatus(_ context.Context) (status.NodeStatus,
 	}
 }
 
-func (e *dagExecutor) SetParams(params scheduler.RunParams) {
+func (e *dagExecutor) SetParams(params executor.RunParams) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	e.runParams = params
@@ -138,6 +137,6 @@ func (e *dagExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	core.RegisterExecutor(core.ExecutorTypeDAGLegacy, newDAGExecutor, nil)
-	core.RegisterExecutor(core.ExecutorTypeDAG, newDAGExecutor, nil)
+	executor.RegisterExecutor("subworkflow", newDAGExecutor, nil)
+	executor.RegisterExecutor("dag", newDAGExecutor, nil)
 }

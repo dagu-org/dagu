@@ -15,11 +15,10 @@ import (
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 )
 
-var _ core.Executor = (*commandExecutor)(nil)
-var _ scheduler.ExitCoder = (*commandExecutor)(nil)
+var _ executor.Executor = (*commandExecutor)(nil)
+var _ executor.ExitCoder = (*commandExecutor)(nil)
 
 type commandExecutor struct {
 	mu         sync.Mutex
@@ -353,7 +352,7 @@ func (b *shellCommandBuilder) buildCmdCommand(ctx context.Context, cmd string, a
 }
 
 // NewCommand creates a new command executor.
-func NewCommand(ctx context.Context, step core.Step) (core.Executor, error) {
+func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) {
 	cfg, err := NewCommandConfig(ctx, step)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)
@@ -480,7 +479,7 @@ func validateCommandStep(step core.Step) error {
 }
 
 func init() {
-	core.RegisterExecutor("", NewCommand, validateCommandStep)
-	core.RegisterExecutor("shell", NewCommand, validateCommandStep)
-	core.RegisterExecutor("command", NewCommand, validateCommandStep)
+	executor.RegisterExecutor("", NewCommand, validateCommandStep)
+	executor.RegisterExecutor("shell", NewCommand, validateCommandStep)
+	executor.RegisterExecutor("command", NewCommand, validateCommandStep)
 }

@@ -10,10 +10,11 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/sshutil"
 )
 
-var _ core.Executor = (*sshExecutor)(nil)
+var _ executor.Executor = (*sshExecutor)(nil)
 
 type sshClientCtxKey = struct{}
 
@@ -39,7 +40,7 @@ type sshExecutor struct {
 	session *ssh.Session
 }
 
-func NewSSHExecutor(ctx context.Context, step core.Step) (core.Executor, error) {
+func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
 	var client *sshutil.Client
 
 	// Prefer step-level SSH configuration if present
@@ -126,5 +127,5 @@ func validateSSHStep(step core.Step) error {
 }
 
 func init() {
-	core.RegisterExecutor("ssh", NewSSHExecutor, validateSSHStep)
+	executor.RegisterExecutor("ssh", NewSSHExecutor, validateSSHStep)
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -115,12 +115,12 @@ func (e *DAGExecutor) ExecuteDAG(
 ) error {
 	if e.shouldUseDistributedExecution(dag) {
 		// Distributed execution: dispatch to coordinator
-		task := scheduler.CreateTask(
+		task := executor.CreateTask(
 			dag.Name,
 			string(dag.YamlData),
 			operation,
 			runID,
-			scheduler.WithWorkerSelector(dag.WorkerSelector),
+			executor.WithWorkerSelector(dag.WorkerSelector),
 		)
 		return e.dispatchToCoordinator(ctx, task)
 	}

@@ -9,11 +9,12 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/itchyny/gojq"
 )
 
-var _ core.Executor = (*jq)(nil)
+var _ executor.Executor = (*jq)(nil)
 
 type jq struct {
 	stdout io.Writer
@@ -27,7 +28,7 @@ type jqConfig struct {
 	Raw bool `mapstructure:"raw"`
 }
 
-func newJQ(_ context.Context, step core.Step) (core.Executor, error) {
+func newJQ(_ context.Context, step core.Step) (executor.Executor, error) {
 	var jqCfg jqConfig
 	if step.ExecutorConfig.Config != nil {
 		if err := decodeJqConfig(
@@ -113,5 +114,5 @@ func decodeJqConfig(dat map[string]any, cfg *jqConfig) error {
 }
 
 func init() {
-	core.RegisterExecutor("jq", newJQ, nil)
+	executor.RegisterExecutor("jq", newJQ, nil)
 }

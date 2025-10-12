@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -193,7 +192,7 @@ func TestBuildCommand(t *testing.T) {
 	}
 
 	// Build command
-	runParams := scheduler.RunParams{
+	runParams := RunParams{
 		RunID:  "child-789",
 		Params: "param1=value1 param2=value2",
 	}
@@ -242,7 +241,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 	}
 
 	// Build command without RunID
-	runParams := scheduler.RunParams{
+	runParams := RunParams{
 		RunID: "", // Empty RunID
 	}
 
@@ -275,9 +274,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 		DAG: &core.DAG{Name: "test-child"},
 	}
 
-	runParams := scheduler.RunParams{
-		RunID: "child-789",
-	}
+	runParams := RunParams{RunID: "child-789"}
 
 	cmd, err := executor.buildCommand(ctx, runParams, "/work/dir")
 	assert.Error(t, err)

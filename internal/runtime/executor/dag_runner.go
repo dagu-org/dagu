@@ -15,7 +15,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/otel"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -88,7 +87,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 // buildCommand builds the command to execute the child DAG.
 func (e *ChildDAGExecutor) buildCommand(
 	ctx context.Context,
-	runParams scheduler.RunParams,
+	runParams RunParams,
 	workDir string,
 ) (*exec.Cmd, error) {
 	executable, err := executablePath()
@@ -159,7 +158,7 @@ func (e *ChildDAGExecutor) ShouldUseDistributedExecution() bool {
 // BuildCoordinatorTask creates a coordinator task for distributed execution
 func (e *ChildDAGExecutor) BuildCoordinatorTask(
 	ctx context.Context,
-	runParams scheduler.RunParams,
+	runParams RunParams,
 ) (*coordinatorv1.Task, error) {
 	env := core.GetEnv(ctx)
 
@@ -172,18 +171,18 @@ func (e *ChildDAGExecutor) BuildCoordinatorTask(
 	}
 
 	// Build task for coordinator dispatch using DAG.CreateTask
-	task := scheduler.CreateTask(
+	task := CreateTask(
 		e.DAG.Name,
 		string(e.DAG.YamlData),
 		coordinatorv1.Operation_OPERATION_START,
 		runParams.RunID,
-		scheduler.WithRootDagRun(env.RootDAGRun),
-		scheduler.WithParentDagRun(core.DAGRunRef{
+		WithRootDagRun(env.RootDAGRun),
+		WithParentDagRun(core.DAGRunRef{
 			Name: env.DAG.Name,
 			ID:   env.DAGRunID,
 		}),
-		scheduler.WithTaskParams(runParams.Params),
-		scheduler.WithWorkerSelector(e.DAG.WorkerSelector),
+		WithTaskParams(runParams.Params),
+		WithWorkerSelector(e.DAG.WorkerSelector),
 	)
 
 	logger.Info(ctx, "Built coordinator task for child DAG",
@@ -221,7 +220,7 @@ func (e *ChildDAGExecutor) Cleanup(ctx context.Context) error {
 
 // ExecuteWithResult executes the child DAG and returns the result.
 // This is useful for parallel execution where results need to be collected.
-func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams scheduler.RunParams, workDir string) (*core.RunStatus, error) {
+func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunParams, workDir string) (*core.RunStatus, error) {
 	// Check if we should use distributed execution
 	if e.ShouldUseDistributedExecution() {
 		// Track distributed execution
@@ -293,7 +292,7 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams sche
 }
 
 // executeDistributedWithResult runs the child DAG via coordinator and returns the result
-func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, runParams scheduler.RunParams) (*core.RunStatus, error) {
+func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, runParams RunParams) (*core.RunStatus, error) {
 	// Dispatch to coordinator
 	if err := e.dispatchToCoordinator(ctx, runParams); err != nil {
 		return nil, fmt.Errorf("distributed execution failed: %w", err)
@@ -304,7 +303,7 @@ func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, run
 }
 
 // dispatchToCoordinator builds and dispatches a task to the coordinator
-func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams scheduler.RunParams) error {
+func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams RunParams) error {
 	// Build the coordinator task
 	task, err := e.BuildCoordinatorTask(ctx, runParams)
 	if err != nil {

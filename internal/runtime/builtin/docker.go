@@ -15,7 +15,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 )
 
 var (
@@ -49,8 +48,8 @@ steps:
 ```
 */
 
-var _ core.Executor = (*docker)(nil)
-var _ scheduler.ExitCoder = (*docker)(nil)
+var _ executor.Executor = (*docker)(nil)
+var _ executor.ExitCoder = (*docker)(nil)
 
 type containerClientCtxKey = struct{}
 type registryAuthCtxKey = struct{}
@@ -213,7 +212,7 @@ func (e *docker) ExitCode() int {
 	return e.exitCode
 }
 
-func newDocker(ctx context.Context, step core.Step) (core.Executor, error) {
+func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 	execCfg := step.ExecutorConfig
 
 	var cfg *container.Config
@@ -240,5 +239,5 @@ func newDocker(ctx context.Context, step core.Step) (core.Executor, error) {
 }
 
 func init() {
-	core.RegisterExecutor("docker", newDocker, nil)
+	executor.RegisterExecutor("docker", newDocker, nil)
 }
