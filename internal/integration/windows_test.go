@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/core"
 )
 
 // TestWindowsShellDetection tests shell detection and availability on Windows
@@ -186,7 +187,7 @@ func TestWindowsSocketHandling(t *testing.T) {
 
 	t.Run("SocketPathGeneration", func(t *testing.T) {
 		// Test Windows-specific socket path handling
-		socketPath := digraph.SockAddr("windows-test", "test-run")
+		socketPath := core.SockAddr("windows-test", "test-run")
 		assert.NotEmpty(t, socketPath, "Socket path should not be empty")
 
 		// On Windows, socket paths have different constraints

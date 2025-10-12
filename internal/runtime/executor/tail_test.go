@@ -10,7 +10,7 @@ import (
 func TestTailWriter_RollingBufferSimple(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	tw := newTailWriter(&buf, 100)
+	tw := NewTailWriter(&buf, 100)
 
 	input := "line1\nline2\n"
 	n, err := tw.Write([]byte(input))
@@ -27,7 +27,7 @@ func TestTailWriter_AcrossWritesAndLimit(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	limit := 10
-	tw := newTailWriter(&buf, limit)
+	tw := NewTailWriter(&buf, limit)
 
 	_, _ = tw.Write([]byte("one\nlin")) // "one\nlin"
 	assert.True(t, len(tw.Tail()) <= limit)
@@ -44,7 +44,7 @@ func TestTailWriter_AcrossWritesAndLimit(t *testing.T) {
 
 func TestTailWriter_NoNewlineStillIncluded(t *testing.T) {
 	t.Parallel()
-	tw := newTailWriter(&bytes.Buffer{}, 50)
+	tw := NewTailWriter(&bytes.Buffer{}, 50)
 
 	_, _ = tw.Write([]byte("no newline yet"))
 	// Now tail contains the partial line
@@ -57,7 +57,7 @@ func TestTailWriter_NoNewlineStillIncluded(t *testing.T) {
 func TestTailWriter_TrimToLimit(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	tw := newTailWriter(&buf, 5)
+	tw := NewTailWriter(&buf, 5)
 
 	_, _ = tw.Write([]byte("abcdef"))
 	// Only last 5 bytes should remain

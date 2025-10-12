@@ -1,4 +1,4 @@
-package executor
+package builtin
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 )
 
@@ -20,7 +21,7 @@ var _ scheduler.ParallelExecutor = (*parallelExecutor)(nil)
 var _ scheduler.NodeStatusDeterminer = (*parallelExecutor)(nil)
 
 type parallelExecutor struct {
-	child         *ChildDAGExecutor
+	child         *executor.ChildDAGExecutor
 	lock          sync.Mutex
 	workDir       string
 	stdout        io.Writer
@@ -46,7 +47,7 @@ func newParallelExecutor(
 		return nil, fmt.Errorf("child DAG configuration is missing")
 	}
 
-	child, err := NewChildDAGExecutor(ctx, step.ChildDAG.Name)
+	child, err := executor.NewChildDAGExecutor(ctx, step.ChildDAG.Name)
 	if err != nil {
 		return nil, err
 	}

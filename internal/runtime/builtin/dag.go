@@ -1,4 +1,4 @@
-package executor
+package builtin
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 )
 
@@ -19,7 +20,7 @@ var _ scheduler.DAGExecutor = (*dagExecutor)(nil)
 var _ scheduler.NodeStatusDeterminer = (*dagExecutor)(nil)
 
 type dagExecutor struct {
-	child     *ChildDAGExecutor
+	child     *executor.ChildDAGExecutor
 	lock      sync.Mutex
 	workDir   string
 	stdout    io.Writer
@@ -39,7 +40,7 @@ func newDAGExecutor(ctx context.Context, step core.Step) (core.Executor, error) 
 		return nil, fmt.Errorf("child DAG configuration is missing")
 	}
 
-	child, err := NewChildDAGExecutor(ctx, step.ChildDAG.Name)
+	child, err := executor.NewChildDAGExecutor(ctx, step.ChildDAG.Name)
 	if err != nil {
 		return nil, err
 	}

@@ -27,7 +27,7 @@ type commandExecutor struct {
 	scriptFile string
 	exitCode   int
 	// stderrTail stores a rolling tail of recent stderr lines
-	stderrTail *tailWriter
+	stderrTail *TailWriter
 }
 
 // ExitCode implements ExitCoder.
@@ -52,7 +52,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	}
 	// Wrap stderr with a tailing writer so we can include recent
 	// stderr output (rolling, up to limit) in error messages.
-	tw := newTailWriter(e.config.Stderr, 0)
+	tw := NewTailWriter(e.config.Stderr, 0)
 	e.stderrTail = tw
 	e.config.Stderr = tw
 

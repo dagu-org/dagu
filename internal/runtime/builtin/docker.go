@@ -1,4 +1,4 @@
-package executor
+package builtin
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/container"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 )
 
@@ -136,7 +137,7 @@ func (e *docker) Run(ctx context.Context) error {
 
 	// Wrap stderr with a tail writer to capture recent output for inclusion in
 	// error messages.
-	tw := newTailWriter(e.stderr, 0)
+	tw := executor.NewTailWriter(e.stderr, 0)
 	e.stderr = tw
 
 	cli := getContainerClient(ctx)
