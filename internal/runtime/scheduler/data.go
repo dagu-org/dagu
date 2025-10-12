@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/maputil"
+	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
@@ -61,7 +61,7 @@ type NodeState struct {
 	ChildrenRepeated []ChildDAGRun
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
-	OutputVariables *maputil.SyncMap
+	OutputVariables *collections.SyncMap
 }
 
 // Parallel represents the evaluated parallel execution configuration for a node.
@@ -343,7 +343,7 @@ func (d *Data) setBoolVariable(key string, value bool) {
 
 	if d.inner.State.OutputVariables == nil {
 		d.mu.Lock()
-		d.inner.State.OutputVariables = &maputil.SyncMap{}
+		d.inner.State.OutputVariables = &collections.SyncMap{}
 		d.mu.Unlock()
 	}
 	d.inner.State.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
@@ -352,7 +352,7 @@ func (d *Data) setBoolVariable(key string, value bool) {
 func (d *Data) setVariable(key, value string) {
 	if d.inner.State.OutputVariables == nil {
 		d.mu.Lock()
-		d.inner.State.OutputVariables = &maputil.SyncMap{}
+		d.inner.State.OutputVariables = &collections.SyncMap{}
 		d.mu.Unlock()
 	}
 	d.inner.State.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())

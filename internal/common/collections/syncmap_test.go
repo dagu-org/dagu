@@ -1,11 +1,11 @@
-package maputil_test
+package collections_test
 
 import (
 	"encoding/json"
 	"reflect"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/common/maputil"
+	"github.com/dagu-org/dagu/internal/common/collections"
 )
 
 func TestSyncMap_MarshalJSON(t *testing.T) {
@@ -45,7 +45,7 @@ func TestSyncMap_MarshalJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &maputil.SyncMap{}
+			m := &collections.SyncMap{}
 			for k, v := range tt.input {
 				m.Store(k, v)
 			}
@@ -106,7 +106,7 @@ func TestSyncMap_UnmarshalJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &maputil.SyncMap{}
+			m := &collections.SyncMap{}
 			err := m.UnmarshalJSON([]byte(tt.input))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SyncMap.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
@@ -129,7 +129,7 @@ func TestSyncMap_UnmarshalJSON(t *testing.T) {
 }
 
 func TestSyncMap_RoundTrip(t *testing.T) {
-	original := &maputil.SyncMap{}
+	original := &collections.SyncMap{}
 	original.Store("string", "value")
 	original.Store("number", float64(42))
 	original.Store("bool", true)
@@ -142,7 +142,7 @@ func TestSyncMap_RoundTrip(t *testing.T) {
 	}
 
 	// Unmarshal
-	roundTripped := &maputil.SyncMap{}
+	roundTripped := &collections.SyncMap{}
 	err = roundTripped.UnmarshalJSON(data)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal: %v", err)
