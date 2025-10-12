@@ -123,7 +123,7 @@ func executeRetry(ctx *Context, dag *digraph.DAG, status *models.DAGRunStatus, r
 	logger.Info(ctx, "dag-run retry initiated", "DAG", dag.Name, "dagRunId", status.DAGRunID, "logFile", logFile.Name(), "step", stepName)
 
 	// Load environment variable
-	dag.LoadEnv(ctx)
+	dag.LoadDotEnv(ctx)
 
 	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {

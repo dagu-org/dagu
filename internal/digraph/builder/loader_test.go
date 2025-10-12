@@ -1,4 +1,4 @@
-package digraph_test
+package builder_test
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +21,7 @@ func TestLoad(t *testing.T) {
   - name: "1"
     command: "true"
 `)
-		dag, err := digraph.Load(context.Background(), testDAG, digraph.WithName("testDAG"))
+		dag, err := builder.Load(context.Background(), testDAG, builder.WithName("testDAG"))
 		require.NoError(t, err)
 		require.Equal(t, "testDAG", dag.Name)
 	})
@@ -30,7 +30,7 @@ func TestLoad(t *testing.T) {
 
 		// Use a non-existing file path
 		testDAG := "/tmp/non_existing_file_" + t.Name() + ".yaml"
-		_, err := digraph.Load(context.Background(), testDAG)
+		_, err := builder.Load(context.Background(), testDAG)
 		require.Error(t, err)
 	})
 	t.Run("UnknownField", func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestLoad(t *testing.T) {
 
 		testDAG := createTempYAMLFile(t, `invalidKey: test
 `)
-		_, err := digraph.Load(context.Background(), testDAG)
+		_, err := builder.Load(context.Background(), testDAG)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "has invalid keys: invalidKey")
 	})
@@ -46,7 +46,7 @@ func TestLoad(t *testing.T) {
 		t.Parallel()
 
 		testDAG := createTempYAMLFile(t, `invalidyaml`)
-		_, err := digraph.Load(context.Background(), testDAG)
+		_, err := builder.Load(context.Background(), testDAG)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalidyaml")
 	})
@@ -57,7 +57,7 @@ func TestLoad(t *testing.T) {
   - name: "1"
     command: "true"
 `)
-		dag, err := digraph.Load(context.Background(), testDAG, digraph.OnlyMetadata())
+		dag, err := builder.Load(context.Background(), testDAG, builder.OnlyMetadata())
 		require.NoError(t, err)
 		require.Empty(t, dag.Steps)
 		// Check if the metadata is loaded correctly
@@ -70,7 +70,7 @@ func TestLoad(t *testing.T) {
   - name: "1"
     command: "true"
 `)
-		dag, err := digraph.Load(context.Background(), testDAG)
+		dag, err := builder.Load(context.Background(), testDAG)
 
 		require.NoError(t, err)
 
@@ -119,7 +119,7 @@ steps:
   - name: "1"
     command: "true"
 `)
-		dag, err := digraph.Load(context.Background(), testDAG, digraph.WithBaseConfig(base))
+		dag, err := builder.Load(context.Background(), testDAG, builder.WithBaseConfig(base))
 		require.NoError(t, err)
 
 		// Check if the MailOn values are overwritten
@@ -151,7 +151,7 @@ infoMail:
 mailOn:
   failure: true
 `)
-		dag, err := digraph.LoadBaseConfig(digraph.BuildContext{}, testDAG)
+		dag, err := builder.LoadBaseConfig(builder.BuildContext{}, testDAG)
 		require.NotNil(t, dag)
 		require.NoError(t, err)
 	})
@@ -172,7 +172,7 @@ steps:
   - name: "step1"
     command: echo "step1"
 `)
-		dag, err := digraph.Load(context.Background(), testDAG, digraph.WithBaseConfig(baseDAG))
+		dag, err := builder.Load(context.Background(), testDAG, builder.WithBaseConfig(baseDAG))
 		require.NotNil(t, dag)
 		require.NoError(t, err)
 
@@ -196,7 +196,7 @@ func TestLoadYAML(t *testing.T) {
 	t.Run("ValidYAMLData", func(t *testing.T) {
 		t.Parallel()
 
-		ret, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(testDAG), digraph.BuildOpts{})
+		ret, err := builder.LoadYAMLWithOpts(context.Background(), []byte(testDAG), builder.BuildOpts{})
 		require.NoError(t, err)
 
 		step := ret.Steps[0]
@@ -206,7 +206,7 @@ func TestLoadYAML(t *testing.T) {
 	t.Run("InvalidYAMLData", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(`invalid`), digraph.BuildOpts{})
+		_, err := builder.LoadYAMLWithOpts(context.Background(), []byte(`invalid`), builder.BuildOpts{})
 		require.Error(t, err)
 	})
 }
@@ -219,7 +219,7 @@ steps:
     command: "true"
 `
 
-	ret, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(testDAG), digraph.BuildOpts{
+	ret, err := builder.LoadYAMLWithOpts(context.Background(), []byte(testDAG), builder.BuildOpts{
 		Name: "testDAG",
 	})
 	require.NoError(t, err)
@@ -273,7 +273,7 @@ steps:
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
 		// Load the multi-DAG file
-		dag, err := digraph.Load(context.Background(), tmpFile)
+		dag, err := builder.Load(context.Background(), tmpFile)
 		require.NoError(t, err)
 
 		// Verify main DAG
@@ -338,8 +338,8 @@ steps:
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
 		// Load with base config
-		dag, err := digraph.Load(context.Background(), tmpFile,
-			digraph.WithBaseConfig(baseFile))
+		dag, err := builder.Load(context.Background(), tmpFile,
+			builder.WithBaseConfig(baseFile))
 		require.NoError(t, err)
 
 		// Verify main DAG inherits base config
@@ -376,7 +376,7 @@ steps:
 		tmpFile := createTempYAMLFile(t, singleDAGContent)
 
 		// Load single DAG file
-		dag, err := digraph.Load(context.Background(), tmpFile)
+		dag, err := builder.Load(context.Background(), tmpFile)
 		require.NoError(t, err)
 
 		// Verify it loads correctly without child DAGs
@@ -407,7 +407,7 @@ steps:
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
 		// Load should fail due to duplicate names
-		_, err := digraph.Load(context.Background(), tmpFile)
+		_, err := builder.Load(context.Background(), tmpFile)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "duplicate DAG name")
 	})
@@ -428,7 +428,7 @@ steps:
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
 		// Load should fail because child DAG has no name
-		_, err := digraph.Load(context.Background(), tmpFile)
+		_, err := builder.Load(context.Background(), tmpFile)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must have a name")
 	})
@@ -455,7 +455,7 @@ steps:
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
 		// The behavior with empty documents is unpredictable
-		_, err := digraph.Load(context.Background(), tmpFile)
+		_, err := builder.Load(context.Background(), tmpFile)
 		if err != nil {
 			// If it errors, it should be a decode error
 			assert.Contains(t, err.Error(), "failed to decode document")
@@ -496,7 +496,7 @@ steps:
 `
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
-		dag, err := digraph.Load(context.Background(), tmpFile)
+		dag, err := builder.Load(context.Background(), tmpFile)
 		require.NoError(t, err)
 
 		// Verify main DAG
@@ -531,7 +531,7 @@ steps:
   - name: gpu-task
     command: echo "Running on GPU worker"
 `)
-		dag, err := digraph.Load(context.Background(), testDAG)
+		dag, err := builder.Load(context.Background(), testDAG)
 		require.NoError(t, err)
 
 		// Verify DAG loaded successfully

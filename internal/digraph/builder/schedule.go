@@ -1,8 +1,9 @@
-package digraph
+package builder
 
 import (
 	"fmt"
 
+	digraph "github.com/dagu-org/dagu/internal/digraph"
 	"github.com/robfig/cron/v3"
 )
 
@@ -12,15 +13,15 @@ var cronParser = cron.NewParser(
 
 // buildScheduler parses the schedule values and returns a list of schedules.
 // each schedule is parsed as a cron expression.
-func buildScheduler(values []string) ([]Schedule, error) {
-	var ret []Schedule
+func buildScheduler(values []string) ([]digraph.Schedule, error) {
+	var ret []digraph.Schedule
 
 	for _, v := range values {
 		parsed, err := cronParser.Parse(v)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrInvalidSchedule, err)
 		}
-		ret = append(ret, Schedule{Expression: v, Parsed: parsed})
+		ret = append(ret, digraph.Schedule{Expression: v, Parsed: parsed})
 	}
 
 	return ret, nil
@@ -61,7 +62,7 @@ func parseScheduleMap(
 			for _, s := range v {
 				s, ok := s.(string)
 				if !ok {
-					return wrapError("schedule", s, ErrScheduleMustBeStringOrArray)
+					return digraph.WrapError("schedule", s, ErrScheduleMustBeStringOrArray)
 				}
 				values = append(values, s)
 			}
@@ -84,7 +85,7 @@ func parseScheduleMap(
 
 		for _, v := range values {
 			if _, err := cronParser.Parse(v); err != nil {
-				return wrapError("schedule", v, fmt.Errorf("%w: %s", ErrInvalidSchedule, err))
+				return digraph.WrapError("schedule", v, fmt.Errorf("%w: %s", ErrInvalidSchedule, err))
 			}
 			*targets = append(*targets, v)
 		}

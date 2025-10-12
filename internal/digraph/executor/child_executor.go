@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/otel"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -36,14 +37,14 @@ type ChildDAGExecutor struct {
 	mu              sync.Mutex
 	cmds            map[string]*exec.Cmd // runID -> cmd for local processes
 	distributedRuns map[string]bool      // runID -> true for distributed runs
-	env             Env                  // for DB access when cancelling distributed runs
+	env             digraph.Env          // for DB access when cancelling distributed runs
 }
 
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
 // It handles the logic for finding the DAG - either from the database
 // or from local DAGs defined in the parent.
 func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecutor, error) {
-	env := GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 
 	// First, check if it's a local DAG in the parent
 	if env.DAG != nil && env.DAG.LocalDAGs != nil {
@@ -64,7 +65,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 				coordinatorCli:  env.CoordinatorCli,
 				cmds:            make(map[string]*exec.Cmd),
 				distributedRuns: make(map[string]bool),
-				env:             GetEnv(ctx),
+				env:             digraph.GetEnv(ctx),
 			}, nil
 		}
 	}
@@ -80,14 +81,14 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 		coordinatorCli:  env.CoordinatorCli,
 		cmds:            make(map[string]*exec.Cmd),
 		distributedRuns: make(map[string]bool),
-		env:             GetEnv(ctx),
+		env:             digraph.GetEnv(ctx),
 	}, nil
 }
 
 // buildCommand builds the command to execute the child DAG.
 func (e *ChildDAGExecutor) buildCommand(
 	ctx context.Context,
-	runParams RunParams,
+	runParams scheduler.RunParams,
 	workDir string,
 ) (*exec.Cmd, error) {
 	executable, err := executablePath()
@@ -99,7 +100,7 @@ func (e *ChildDAGExecutor) buildCommand(
 		return nil, fmt.Errorf("dag-run ID is not set")
 	}
 
-	env := GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 	if env.RootDAGRun.Zero() {
 		return nil, fmt.Errorf("root dag-run ID is not set")
 	}
@@ -158,9 +159,9 @@ func (e *ChildDAGExecutor) ShouldUseDistributedExecution() bool {
 // BuildCoordinatorTask creates a coordinator task for distributed execution
 func (e *ChildDAGExecutor) BuildCoordinatorTask(
 	ctx context.Context,
-	runParams RunParams,
+	runParams scheduler.RunParams,
 ) (*coordinatorv1.Task, error) {
-	env := GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 
 	if runParams.RunID == "" {
 		return nil, fmt.Errorf("dag-run ID is not set")
@@ -171,16 +172,18 @@ func (e *ChildDAGExecutor) BuildCoordinatorTask(
 	}
 
 	// Build task for coordinator dispatch using DAG.CreateTask
-	task := e.DAG.CreateTask(
+	task := scheduler.CreateTask(
+		e.DAG.Name,
+		string(e.DAG.YamlData),
 		coordinatorv1.Operation_OPERATION_START,
 		runParams.RunID,
-		digraph.WithRootDagRun(env.RootDAGRun),
-		digraph.WithParentDagRun(digraph.DAGRunRef{
+		scheduler.WithRootDagRun(env.RootDAGRun),
+		scheduler.WithParentDagRun(digraph.DAGRunRef{
 			Name: env.DAG.Name,
 			ID:   env.DAGRunID,
 		}),
-		digraph.WithTaskParams(runParams.Params),
-		digraph.WithWorkerSelector(e.DAG.WorkerSelector),
+		scheduler.WithTaskParams(runParams.Params),
+		scheduler.WithWorkerSelector(e.DAG.WorkerSelector),
 	)
 
 	logger.Info(ctx, "Built coordinator task for child DAG",
@@ -218,7 +221,7 @@ func (e *ChildDAGExecutor) Cleanup(ctx context.Context) error {
 
 // ExecuteWithResult executes the child DAG and returns the result.
 // This is useful for parallel execution where results need to be collected.
-func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunParams, workDir string) (*digraph.RunStatus, error) {
+func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams scheduler.RunParams, workDir string) (*digraph.RunStatus, error) {
 	// Check if we should use distributed execution
 	if e.ShouldUseDistributedExecution() {
 		// Track distributed execution
@@ -270,7 +273,7 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 	}
 
 	// Get the result regardless of error
-	env := GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 	result, resultErr := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
 	if resultErr != nil {
 		return nil, fmt.Errorf("failed to find result for the child dag-run %q: %w", runParams.RunID, resultErr)
@@ -290,7 +293,7 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 }
 
 // executeDistributedWithResult runs the child DAG via coordinator and returns the result
-func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, runParams RunParams) (*digraph.RunStatus, error) {
+func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, runParams scheduler.RunParams) (*digraph.RunStatus, error) {
 	// Dispatch to coordinator
 	if err := e.dispatchToCoordinator(ctx, runParams); err != nil {
 		return nil, fmt.Errorf("distributed execution failed: %w", err)
@@ -301,7 +304,7 @@ func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, run
 }
 
 // dispatchToCoordinator builds and dispatches a task to the coordinator
-func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams RunParams) error {
+func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams scheduler.RunParams) error {
 	// Build the coordinator task
 	task, err := e.BuildCoordinatorTask(ctx, runParams)
 	if err != nil {
@@ -328,7 +331,7 @@ func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams 
 
 // waitForCompletionWithResult is similar to waitForCompletion but returns the result
 func (e *ChildDAGExecutor) waitForCompletionWithResult(ctx context.Context, dagRunID string) (*digraph.RunStatus, error) {
-	env := GetEnv(ctx)
+	env := digraph.GetEnv(ctx)
 
 	// Poll for completion
 	pollInterval := 1 * time.Second

@@ -1,4 +1,4 @@
-package digraph
+package builder
 
 import (
 	"encoding/json"
@@ -13,12 +13,13 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
+	digraph "github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/google/jsonschema-go/jsonschema"
 )
 
 // buildParams builds the parameters for the DAG.
-func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildParams(ctx BuildContext, spec *definition, dag *digraph.DAG) error {
 	var (
 		paramPairs []paramPair
 		envs       []string
@@ -249,12 +250,12 @@ func overrideEnvirons(envs *[]string, override []string) {
 }
 
 // parseParams parses and processes the parameters for the DAG.
-func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]string, dag *DAG) error {
+func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]string, dag *digraph.DAG) error {
 	var paramPairs []paramPair
 
 	paramPairs, err := parseParamValue(ctx, value)
 	if err != nil {
-		return wrapError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
+		return digraph.WrapError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 	}
 
 	// Accumulated vars for sequential param expansion (e.g., Y=${P1})
@@ -271,8 +272,8 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 				}
 				// Then check env vars from dag.buildEnv (populated by buildEnvs)
 				// This allows params to reference env vars (e.g., P2=${A001} where A001 is in env)
-				if dag != nil && dag.buildEnv != nil {
-					if val, ok := dag.buildEnv[key]; ok {
+				if dag != nil && ctx.buildEnv != nil {
+					if val, ok := ctx.buildEnv[key]; ok {
 						return val
 					}
 				}
@@ -336,7 +337,7 @@ func parseParamValue(ctx BuildContext, input any) ([]paramPair, error) {
 
 		return parseMapParams(ctx, []any{values})
 	default:
-		return nil, wrapError("params", v, fmt.Errorf("%w: %T", ErrInvalidParamValue, v))
+		return nil, digraph.WrapError("params", v, fmt.Errorf("%w: %T", ErrInvalidParamValue, v))
 
 	}
 }
@@ -383,7 +384,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 				if !ctx.opts.NoEval {
 					parsed, err := cmdutil.EvalString(ctx.ctx, valueStr)
 					if err != nil {
-						return nil, wrapError("params", valueStr, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
+						return nil, digraph.WrapError("params", valueStr, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 					}
 					valueStr = parsed
 				}
@@ -393,7 +394,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 			}
 
 		default:
-			return nil, wrapError("params", m, fmt.Errorf("%w: %T", ErrInvalidParamValue, m))
+			return nil, digraph.WrapError("params", m, fmt.Errorf("%w: %T", ErrInvalidParamValue, m))
 		}
 	}
 
@@ -441,7 +442,7 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 				)
 
 				if cmdErr != nil {
-					return nil, wrapError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, cmdErr))
+					return nil, digraph.WrapError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, cmdErr))
 				}
 			}
 		}

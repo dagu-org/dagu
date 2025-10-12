@@ -1,10 +1,11 @@
-package digraph
+package builder
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
+	digraph "github.com/dagu-org/dagu/internal/digraph"
 )
 
 // buildCommand parses the command field in the step definition.
@@ -30,7 +31,7 @@ import (
 //
 // ```
 // It returns an error if the command is not nil but empty.
-func buildCommand(_ StepBuildContext, def stepDef, step *Step) error {
+func buildCommand(_ StepBuildContext, def stepDef, step *digraph.Step) error {
 	command := def.Command
 
 	// Case 1: command is nil
@@ -43,13 +44,20 @@ func buildCommand(_ StepBuildContext, def stepDef, step *Step) error {
 		// Case 2: command is a string
 		val = strings.TrimSpace(val)
 		if val == "" {
-			return wrapError("command", val, ErrStepCommandIsEmpty)
+			return digraph.WrapError("command", val, ErrStepCommandIsEmpty)
 		}
+
+		// If the value is multi-line, treat it as a script
+		if strings.Contains(val, "\n") {
+			step.Script = val
+			return nil
+		}
+
 		// We need to split the command into command and args.
 		step.CmdWithArgs = val
 		cmd, args, err := cmdutil.SplitCommand(val)
 		if err != nil {
-			return wrapError("command", val, fmt.Errorf("failed to parse command: %w", err))
+			return digraph.WrapError("command", val, fmt.Errorf("failed to parse command: %w", err))
 		}
 		step.Command = strings.TrimSpace(cmd)
 		step.Args = args
@@ -90,7 +98,7 @@ func buildCommand(_ StepBuildContext, def stepDef, step *Step) error {
 
 	default:
 		// Unknown type for command field.
-		return wrapError("command", val, ErrStepCommandMustBeArrayOrString)
+		return digraph.WrapError("command", val, ErrStepCommandMustBeArrayOrString)
 
 	}
 

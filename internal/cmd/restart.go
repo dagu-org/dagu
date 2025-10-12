@@ -90,7 +90,7 @@ func runRestart(ctx *Context, args []string) error {
 func handleRestartProcess(ctx *Context, d *digraph.DAG, dagRunID string) error {
 	// Stop if running
 	if err := stopDAGIfRunning(ctx, ctx.DAGRunMgr, d, dagRunID); err != nil {
-		return fmt.Errorf("failed to stop DAG: %w", err)
+		return err
 	}
 
 	// Wait before restart if configured
@@ -199,7 +199,7 @@ func stopRunningDAG(ctx context.Context, cli dagrun.Manager, dag *digraph.DAG, d
 		}
 
 		if err := cli.Stop(ctx, dag, dagRunID); err != nil {
-			return fmt.Errorf("failed to stop DAG: %w", err)
+			return err
 		}
 
 		time.Sleep(stopPollInterval)

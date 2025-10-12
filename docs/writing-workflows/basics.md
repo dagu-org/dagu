@@ -115,6 +115,8 @@ steps:
       echo "Complete"
 ```
 
+If you omit `shell`, Dagu uses the interpreter declared in the script's shebang (`#!`) when present.
+
 ### Shell Selection
 
 ```yaml

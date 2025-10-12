@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/builder"
 	"github.com/spf13/cobra"
 )
 
@@ -35,11 +36,11 @@ similar to the server-side spec validation.`,
 
 func runValidate(ctx *Context, args []string) error {
 	// Try loading the DAG without evaluation, resolving relative names against DAGsDir
-	dag, err := digraph.Load(
+	dag, err := builder.Load(
 		ctx,
 		args[0],
-		digraph.WithoutEval(),
-		digraph.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+		builder.WithoutEval(),
+		builder.WithDAGsDir(ctx.Config.Paths.DAGsDir),
 	)
 
 	if err != nil {

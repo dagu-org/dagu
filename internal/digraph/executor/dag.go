@@ -9,13 +9,14 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-var _ DAGExecutor = (*dagExecutor)(nil)
-var _ NodeStatusDeterminer = (*dagExecutor)(nil)
+var _ scheduler.DAGExecutor = (*dagExecutor)(nil)
+var _ scheduler.NodeStatusDeterminer = (*dagExecutor)(nil)
 
 type dagExecutor struct {
 	child     *ChildDAGExecutor
@@ -23,7 +24,7 @@ type dagExecutor struct {
 	workDir   string
 	stdout    io.Writer
 	stderr    io.Writer
-	runParams RunParams
+	runParams scheduler.RunParams
 	step      digraph.Step
 	result    *digraph.RunStatus
 }
@@ -33,9 +34,7 @@ var (
 	ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 )
 
-func newDAGExecutor(
-	ctx context.Context, step digraph.Step,
-) (Executor, error) {
+func newDAGExecutor(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
 	if step.ChildDAG == nil {
 		return nil, fmt.Errorf("child DAG configuration is missing")
 	}
@@ -45,7 +44,7 @@ func newDAGExecutor(
 		return nil, err
 	}
 
-	dir := GetEnv(ctx).WorkingDir
+	dir := digraph.GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
 	}
@@ -110,7 +109,7 @@ func (e *dagExecutor) DetermineNodeStatus(_ context.Context) (status.NodeStatus,
 	}
 }
 
-func (e *dagExecutor) SetParams(params RunParams) {
+func (e *dagExecutor) SetParams(params scheduler.RunParams) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	e.runParams = params
@@ -138,6 +137,6 @@ func (e *dagExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	Register(digraph.ExecutorTypeDAGLegacy, newDAGExecutor)
-	Register(digraph.ExecutorTypeDAG, newDAGExecutor)
+	digraph.RegisterExecutor(digraph.ExecutorTypeDAGLegacy, newDAGExecutor, nil)
+	digraph.RegisterExecutor(digraph.ExecutorTypeDAG, newDAGExecutor, nil)
 }

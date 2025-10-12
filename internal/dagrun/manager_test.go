@@ -101,7 +101,6 @@ func TestManager(t *testing.T) {
 		require.Equal(t, newStatus, statusByDAGRunID.Nodes[0].Status)
 	})
 	t.Run("UpdateChildDAGRunStatus", func(t *testing.T) {
-		// Create child DAG first
 		dag := th.DAG(t, `
 steps:
   - name: "1"

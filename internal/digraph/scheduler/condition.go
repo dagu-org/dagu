@@ -65,7 +65,7 @@ func matchCondition(ctx context.Context, c *digraph.Condition) error {
 
 	// Get maxOutputSize from DAG configuration
 	var maxOutputSize = 1024 * 1024 // Default 1MB
-	if env := digraph.GetEnv(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+	if env := digraph.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
 		maxOutputSize = env.DAG.MaxOutputSize
 	}
 

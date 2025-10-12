@@ -4,10 +4,12 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -213,11 +215,11 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 		Env:  []string{},
 	}
 	// Setup the context with DAG environment
-	ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "", nil)
+	ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "", nil, nil)
 
-	env := NewEnv(ctx, digraph.Step{})
+	env := digraph.NewEnv(ctx, digraph.Step{})
 	env.WorkingDir = t.TempDir()
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	tests := []struct {
 		name       string
@@ -255,8 +257,16 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			cmd, err := tt.config.newCmd(ctx, tt.scriptFile)
+			scriptFile := tt.scriptFile
+			if scriptFile != "" {
+				tempDir := t.TempDir()
+				scriptFile = filepath.Join(tempDir, "test.sh")
+				require.NoError(t, os.WriteFile(scriptFile, []byte("#!/bin/sh\necho hello\n"), 0o755))
+			}
+
+			cmd, err := tt.config.newCmd(ctx, scriptFile)
 			require.NoError(t, err)
 			require.NotNil(t, cmd)
 
@@ -279,11 +289,11 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 		Env:  []string{},
 	}
 	// Setup the context with DAG environment
-	ctx = digraph.SetupEnvForTest(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "", nil)
+	ctx = digraph.SetupDAGContext(ctx, dag, nil, digraph.DAGRunRef{}, "test-run", "", nil, nil)
 
-	env := NewEnv(ctx, digraph.Step{})
+	env := digraph.NewEnv(ctx, digraph.Step{})
 	env.WorkingDir = t.TempDir()
-	ctx = WithEnv(ctx, env)
+	ctx = digraph.WithEnv(ctx, env)
 
 	tests := []struct {
 		name         string
@@ -323,7 +333,7 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			executor, err := newCommand(ctx, tt.step)
+			executor, err := NewCommand(ctx, tt.step)
 			require.NoError(t, err)
 
 			err = executor.Run(ctx)
@@ -334,9 +344,43 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 			}
 
 			// Check exit code
-			if exitCoder, ok := executor.(ExitCoder); ok {
+			if exitCoder, ok := executor.(scheduler.ExitCoder); ok {
 				assert.Equal(t, tt.expectedCode, exitCoder.ExitCode())
 			}
 		})
 	}
+}
+
+func TestReadFirstLine(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected string
+	}{
+		{"ShebangLine", "#!/bin/bash\necho hello", "#!/bin/bash"},
+		{"SingleLine", "single line", "single line"},
+		{"EmptyFile", "", ""},
+		{"MultipleLines", "first\nsecond\nthird", "first"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpFile, err := os.CreateTemp("", "test-*.sh")
+			require.NoError(t, err)
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
+
+			_, err = tmpFile.WriteString(tt.content)
+			require.NoError(t, err)
+			_ = tmpFile.Close()
+
+			result, err := readFirstLine(tmpFile.Name())
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+
+	t.Run("NonExistentFile", func(t *testing.T) {
+		_, err := readFirstLine("/non/existent/file")
+		assert.Error(t, err)
+	})
 }

@@ -13,8 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/sshutil"
 )
 
-var _ Executor = (*sshExec)(nil)
-var _ StepValidator = (*sshExec)(nil) // Ensure sshExec implements StepValidator
+var _ digraph.Executor = (*sshExecutor)(nil)
 
 type sshClientCtxKey = struct{}
 
@@ -32,7 +31,7 @@ func getSSHClientFromContext(ctx context.Context) *sshutil.Client {
 	return nil
 }
 
-type sshExec struct {
+type sshExecutor struct {
 	step    digraph.Step
 	client  *sshutil.Client
 	stdout  io.Writer
@@ -40,7 +39,7 @@ type sshExec struct {
 	session *ssh.Session
 }
 
-func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
+func NewSSHExecutor(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
 	var client *sshutil.Client
 
 	// Prefer step-level SSH configuration if present
@@ -59,7 +58,7 @@ func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 		return nil, fmt.Errorf("ssh configuration is not found")
 	}
 
-	return &sshExec{
+	return &sshExecutor{
 		step:   step,
 		client: client,
 		stdout: os.Stdout,
@@ -67,22 +66,22 @@ func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 	}, nil
 }
 
-func (e *sshExec) SetStdout(out io.Writer) {
+func (e *sshExecutor) SetStdout(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *sshExec) SetStderr(out io.Writer) {
+func (e *sshExecutor) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
-func (e *sshExec) Kill(_ os.Signal) error {
+func (e *sshExecutor) Kill(_ os.Signal) error {
 	if e.session != nil {
 		return e.session.Close()
 	}
 	return nil
 }
 
-func (e *sshExec) Run(_ context.Context) error {
+func (e *sshExecutor) Run(_ context.Context) error {
 	session, err := e.client.NewSession()
 	if err != nil {
 		return err
@@ -104,7 +103,18 @@ func (e *sshExec) Run(_ context.Context) error {
 
 // ValidateStep implements StepValidator interface for SSH executor.
 // SSH executor does not support the script field, only command field.
-func (e *sshExec) ValidateStep(step *digraph.Step) error {
+func (e *sshExecutor) ValidateStep(step *digraph.Step) error {
+	if step.Script != "" {
+		return fmt.Errorf(
+			"script field is not supported with SSH executor. " +
+				"Use 'command' field instead. " +
+				"See: https://github.com/dagu-org/dagu/issues/1306",
+		)
+	}
+	return nil
+}
+
+func validateSSHStep(step digraph.Step) error {
 	if step.Script != "" {
 		return fmt.Errorf(
 			"script field is not supported with SSH executor. " +
@@ -116,5 +126,5 @@ func (e *sshExec) ValidateStep(step *digraph.Step) error {
 }
 
 func init() {
-	Register("ssh", newSSHExec)
+	digraph.RegisterExecutor("ssh", NewSSHExecutor, validateSSHStep)
 }

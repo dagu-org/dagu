@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -13,10 +14,11 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 )
 
-var _ Executor = (*commandExecutor)(nil)
-var _ ExitCoder = (*commandExecutor)(nil)
+var _ digraph.Executor = (*commandExecutor)(nil)
+var _ scheduler.ExitCoder = (*commandExecutor)(nil)
 
 type commandExecutor struct {
 	mu         sync.Mutex
@@ -116,7 +118,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	var cmd *exec.Cmd
 	switch {
 	case cfg.Command != "" && scriptFile != "":
-		builder := &shellCommandBuilder{
+		cmdBuilder := &shellCommandBuilder{
 			Command:          cfg.Command,
 			Args:             cfg.Args,
 			ShellCommand:     cfg.ShellCommand,
@@ -124,35 +126,54 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 			ShellPackages:    cfg.ShellPackages,
 			Script:           scriptFile,
 		}
-		c, err := builder.Build(ctx)
+		c, err := cmdBuilder.Build(ctx)
 		if err != nil {
 			return nil, err
 		}
 		cmd = c
 
 	case cfg.ShellCommand != "" && scriptFile != "":
-		// If script is provided ignore the shell command args
-
-		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, scriptFile) // nolint: gosec
+		// Check if the script has shebang and user did not specify a shell
+		shebang, shebangArgs, err := cfg.detectShebang(scriptFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to detect shebang: %w", err)
+		}
+		if shebang != "" {
+			// Use the shebang interpreter to run the script
+			cmd = exec.CommandContext(cfg.Ctx, shebang, append(shebangArgs, scriptFile)...) // nolint: gosec
+			break
+		}
+		// If no shebang, use the specified shell command
+		command, args, err := cmdutil.SplitCommand(cfg.ShellCommand)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse shell command: %w", err)
+		}
+		args = append(args, scriptFile)
+		cmd = exec.CommandContext(cfg.Ctx, command, args...) // nolint: gosec
 
 	case cfg.ShellCommand != "" && cfg.ShellCommandArgs != "":
-		builder := &shellCommandBuilder{
+		cmdBuilder := &shellCommandBuilder{
 			ShellCommand:     cfg.ShellCommand,
 			ShellCommandArgs: cfg.ShellCommandArgs,
 			ShellPackages:    cfg.ShellPackages,
 		}
-		c, err := builder.Build(ctx)
+		c, err := cmdBuilder.Build(ctx)
 		if err != nil {
 			return nil, err
 		}
 		cmd = c
 
 	default:
-		cmd = createDirectCommand(cfg.Ctx, cfg.Command, cfg.Args, scriptFile)
-
+		command := cfg.Command
+		if command == "" {
+			// If no command is specified, use the default shell.
+			// Usually this should not happen.
+			command = cmdutil.GetShellCommand("")
+		}
+		cmd = createDirectCommand(cfg.Ctx, command, cfg.Args, scriptFile)
 	}
 
-	cmd.Env = append(cmd.Env, AllEnvs(ctx)...)
+	cmd.Env = append(cmd.Env, digraph.AllEnvs(ctx)...)
 	cmd.Dir = cfg.Dir
 	cmd.Stdout = cfg.Stdout
 	cmd.Stderr = cfg.Stderr
@@ -161,10 +182,45 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	return cmd, nil
 }
 
-func init() {
-	Register("", newCommand)
-	Register("shell", newCommand)
-	Register("command", newCommand)
+func (cfg *commandConfig) detectShebang(scriptFile string) (string, []string, error) {
+	if cfg.UserSpecifiedShell {
+		return "", nil, nil
+	}
+	// read the first line of the script file
+	firstLine, err := readFirstLine(scriptFile)
+	if err != nil {
+		return "", nil, err
+	}
+	return cmdutil.DetectShebang(firstLine)
+}
+
+func readFirstLine(filePath string) (string, error) {
+	filePath = filepath.Clean(filePath)
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	scanner := bufio.NewScanner(file)
+	// Set a reasonable limit to prevent memory issues with extremely long lines
+	// Shebangs are typically < 256 bytes, but allow up to 4KB to be safe
+	const maxLineSize = 4 * 1024
+	buf := make([]byte, maxLineSize)
+	scanner.Buffer(buf, maxLineSize)
+
+	if scanner.Scan() {
+		return scanner.Text(), nil
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Empty file
+	return "", nil
 }
 
 func exitCodeFromError(err error) int {
@@ -295,8 +351,9 @@ func (b *shellCommandBuilder) buildCmdCommand(ctx context.Context, cmd string, a
 	return exec.CommandContext(ctx, cmd, args...), nil
 }
 
-func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
-	cfg, err := createCommandConfig(ctx, step)
+// NewCommand creates a new command executor.
+func NewCommand(ctx context.Context, step digraph.Step) (digraph.Executor, error) {
+	cfg, err := NewCommandConfig(ctx, step)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)
 	}
@@ -304,7 +361,8 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 	return &commandExecutor{config: cfg}, nil
 }
 
-func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig, error) {
+// NewCommandConfig creates a new commandConfig from the given step.
+func NewCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig, error) {
 	var shellCommand string
 	shellCmdArgs := step.ShellCmdArgs
 	userSpecifiedShell := step.Shell != ""
@@ -334,7 +392,7 @@ func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig
 
 	return &commandConfig{
 		Ctx:                ctx,
-		Dir:                GetEnv(ctx).WorkingDir,
+		Dir:                digraph.GetEnv(ctx).WorkingDir,
 		Command:            step.Command,
 		Args:               step.Args,
 		Script:             step.Script,
@@ -401,4 +459,27 @@ func createDirectCommand(ctx context.Context, cmd string, args []string, scriptF
 
 	// nolint: gosec
 	return exec.CommandContext(ctx, cmd, arguments...)
+}
+
+func validateCommandStep(step digraph.Step) error {
+	switch {
+	case step.Command != "" && step.Script != "":
+		// Both command and script provided - valid
+	case step.Command != "" && step.Script == "":
+		// Command only - valid
+	case step.Command == "" && step.Script != "":
+		// Script only - valid
+	case step.ChildDAG != nil:
+		// Child DAG - valid
+	default:
+		return digraph.ErrStepCommandIsRequired
+	}
+
+	return nil
+}
+
+func init() {
+	digraph.RegisterExecutor("", NewCommand, validateCommandStep)
+	digraph.RegisterExecutor("shell", NewCommand, validateCommandStep)
+	digraph.RegisterExecutor("command", NewCommand, validateCommandStep)
 }

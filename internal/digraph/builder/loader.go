@@ -1,4 +1,4 @@
-package digraph
+package builder
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"dario.cat/mergo"
+	digraph "github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/go-viper/mapstructure/v2"
 
@@ -27,19 +28,19 @@ var (
 // LoadOptions contains options for loading a DAG.
 type LoadOptions struct {
 	name             string   // Name of the DAG.
-	baseConfig       string   // Path to the base DAG configuration file.
+	baseConfig       string   // Path to the base digraph.DAG configuration file.
 	params           string   // Parameters to override default parameters in the DAG.
 	paramsList       []string // List of parameters to override default parameters in the DAG.
 	noEval           bool     // Flag to disable evaluation of dynamic fields.
-	onlyMetadata     bool     // Flag to load only metadata without full DAG details.
-	dagsDir          string   // Directory containing the DAG files.
+	onlyMetadata     bool     // Flag to load only metadata without full digraph.DAG details.
+	dagsDir          string   // Directory containing the digraph.DAG files.
 	allowBuildErrors bool     // Flag to allow build errors.
 }
 
 // LoadOption is a function type for setting LoadOptions.
 type LoadOption func(*LoadOptions)
 
-// WithBaseConfig sets the base DAG configuration file.
+// WithBaseConfig sets the base digraph.DAG configuration file.
 func WithBaseConfig(baseDAG string) LoadOption {
 	return func(o *LoadOptions) {
 		o.baseConfig = baseDAG
@@ -81,10 +82,10 @@ func WithName(name string) LoadOption {
 	}
 }
 
-// WithDAGsDir sets the directory containing the DAG files.
-// This directory is used as the base path for resolving relative DAG file paths.
-// When a DAG is loaded by name rather than absolute path, the system will look
-// for the DAG file in this directory. If not specified, the current working
+// WithDAGsDir sets the directory containing the digraph.DAG files.
+// This directory is used as the base path for resolving relative digraph.DAG file paths.
+// When a digraph.DAG is loaded by name rather than absolute path, the system will look
+// for the digraph.DAG file in this directory. If not specified, the current working
 // directory is used as the default.
 func WithDAGsDir(dagsDir string) LoadOption {
 	return func(o *LoadOptions) {
@@ -92,10 +93,10 @@ func WithDAGsDir(dagsDir string) LoadOption {
 	}
 }
 
-// WithAllowBuildErrors allows build errors to be ignored during DAG loading.
+// WithAllowBuildErrors allows build errors to be ignored during digraph.DAG loading.
 // This is required for loading DAGs that may have errors in their definitions,
 // such as missing steps or invalid configurations. When this option is set,
-// the loader will return a DAG with the errors included in the DAG's `BuildErrors` field,
+// the loader will return a digraph.DAG with the errors included in the DAG's `BuildErrors` field,
 // and will not fail the loading process.
 func WithAllowBuildErrors() LoadOption {
 	return func(o *LoadOptions) {
@@ -103,7 +104,7 @@ func WithAllowBuildErrors() LoadOption {
 	}
 }
 
-// Load loads a Directed Acyclic Graph (DAG) from a file path or name with the given options.
+// Load loads a Directed Acyclic Graph (digraph.DAG) from a file path or name with the given options.
 //
 // The function handles different input formats:
 //
@@ -116,9 +117,9 @@ func WithAllowBuildErrors() LoadOption {
 //   - If DAGsDir is not provided, the current working directory is used
 //   - For YAML files, the extension is optional
 //
-// This approach provides a flexible way to load DAG definitions from multiple sources
+// This approach provides a flexible way to load digraph.DAG definitions from multiple sources
 // while supporting customization through the LoadOptions.
-func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*DAG, error) {
+func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*digraph.DAG, error) {
 	if nameOrPath == "" {
 		return nil, ErrNameOrPathRequired
 	}
@@ -142,8 +143,8 @@ func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*DAG, err
 	return loadDAG(buildContext, nameOrPath)
 }
 
-// LoadYAML loads the DAG from the given YAML data with the specified options.
-func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error) {
+// LoadYAML loads the digraph.DAG from the given YAML data with the specified options.
+func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*digraph.DAG, error) {
 	var options LoadOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -160,38 +161,38 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 	})
 }
 
-// LoadYAMLWithOpts loads the DAG configuration from YAML data.
-func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*DAG, error) {
+// LoadYAMLWithOpts loads the digraph.DAG configuration from YAML data.
+func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*digraph.DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
 		if opts.AllowBuildErrors {
-			// Return a minimal DAG with the error recorded
-			return &DAG{
+			// Return a minimal digraph.DAG with the error recorded
+			return &digraph.DAG{
 				Name:        opts.Name,
 				BuildErrors: []error{err},
 			}, nil
 		}
-		return nil, ErrorList{err}
+		return nil, digraph.ErrorList{err}
 	}
 
 	def, err := decode(raw)
 	if err != nil {
 		if opts.AllowBuildErrors {
-			// Return a minimal DAG with the error recorded
-			return &DAG{
+			// Return a minimal digraph.DAG with the error recorded
+			return &digraph.DAG{
 				Name:        opts.Name,
 				BuildErrors: []error{err},
 			}, nil
 		}
-		return nil, ErrorList{err}
+		return nil, digraph.ErrorList{err}
 	}
 
 	return build(BuildContext{ctx: ctx, opts: opts}, def)
 }
 
 // LoadBaseConfig loads the global configuration from the given file.
-// The global configuration can be overridden by the DAG configuration.
-func LoadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
+// The global configuration can be overridden by the digraph.DAG configuration.
+func LoadBaseConfig(ctx BuildContext, file string) (*digraph.DAG, error) {
 	// The base config is optional.
 	if !fileutil.FileExists(file) {
 		return nil, nil
@@ -206,20 +207,20 @@ func LoadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 	// Decode the raw data into a config definition.
 	def, err := decode(raw)
 	if err != nil {
-		return nil, ErrorList{err}
+		return nil, digraph.ErrorList{err}
 	}
 
 	ctx = ctx.WithOpts(BuildOpts{NoEval: ctx.opts.NoEval}).WithFile(file)
 	dag, err := build(ctx, def)
 
 	if err != nil {
-		return nil, ErrorList{err}
+		return nil, digraph.ErrorList{err}
 	}
 	return dag, nil
 }
 
-// loadDAG loads the DAG from the given file.
-func loadDAG(ctx BuildContext, nameOrPath string) (*DAG, error) {
+// loadDAG loads the digraph.DAG from the given file.
+func loadDAG(ctx BuildContext, nameOrPath string) (*digraph.DAG, error) {
 	filePath, err := resolveYamlFilePath(ctx, nameOrPath)
 	if err != nil {
 		return nil, err
@@ -244,8 +245,8 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*DAG, error) {
 	dags, err := loadDAGsFromFile(ctx, filePath, baseDef)
 	if err != nil {
 		if ctx.opts.AllowBuildErrors {
-			// Return a minimal DAG with the error recorded
-			dag := &DAG{
+			// Return a minimal digraph.DAG with the error recorded
+			dag := &digraph.DAG{
 				Name:        defaultName(filePath),
 				Location:    filePath,
 				BuildErrors: []error{err},
@@ -259,28 +260,28 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*DAG, error) {
 		return nil, fmt.Errorf("no DAGs found in file %q", filePath)
 	}
 
-	// Get the main DAG (first one)
+	// Get the main digraph.DAG (first one)
 	mainDAG := dags[0]
 
-	// If there are child DAGs, add them to the main DAG
+	// If there are child DAGs, add them to the main digraph.DAG
 	if len(dags) > 1 {
-		mainDAG.LocalDAGs = make(map[string]*DAG)
+		mainDAG.LocalDAGs = make(map[string]*digraph.DAG)
 		for i := 1; i < len(dags); i++ {
 			childDAG := dags[i]
 			if childDAG.Name == "" {
-				return nil, fmt.Errorf("child DAG at index %d must have a name", i)
+				return nil, fmt.Errorf("child digraph.DAG at index %d must have a name", i)
 			}
 			mainDAG.LocalDAGs[childDAG.Name] = childDAG
 		}
 	}
 
-	mainDAG.initializeDefaults()
+	digraph.InitializeDefaults(mainDAG)
 
 	return mainDAG, nil
 }
 
 // loadDAGsFromFile loads all DAGs from a multi-document YAML file
-func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([]*DAG, error) {
+func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([]*digraph.DAG, error) {
 	// Open the file
 	f, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
@@ -294,7 +295,7 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 		return nil, fmt.Errorf("failed to read file %q", filePath)
 	}
 
-	var dags []*DAG
+	var dags []*digraph.DAG
 	decoder := yaml.NewDecoder(bytes.NewReader(dat))
 
 	// Read all documents from the file
@@ -317,52 +318,55 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 			continue
 		}
 
+		// Update the context with the current document index
+		ctx.index = docIndex
+
 		// Decode the document into definition
 		spec, err := decode(doc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode document %d: %w", docIndex, err)
 		}
 
-		// Build a fresh base DAG from base definition if provided
-		var dest *DAG
+		// Build a fresh base digraph.DAG from base definition if provided
+		var dest *digraph.DAG
 		if baseDef != nil {
-			// Build a new base DAG for this document
+			// Build a new base digraph.DAG for this document
 			buildCtx := ctx
-			// Don't parse parameters for the base DAG
+			// Don't parse parameters for the base digraph.DAG
 			buildCtx.opts.Parameters = ""
 			buildCtx.opts.ParametersList = nil
-			// Build the base DAG
+			// Build the base digraph.DAG
 			baseDAG, err := build(buildCtx, baseDef)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build base DAG for document %d: %w", docIndex, err)
+				return nil, fmt.Errorf("failed to build base digraph.DAG for document %d: %w", docIndex, err)
 			}
 			dest = baseDAG
 		} else {
-			dest = new(DAG)
+			dest = new(digraph.DAG)
 		}
 
-		// Build the DAG from the current document
+		// Build the digraph.DAG from the current document
 		dag, err := build(ctx, spec)
 		if err != nil {
-			return nil, fmt.Errorf("failed to build DAG in document %d: %w", docIndex, err)
+			return nil, fmt.Errorf("failed to build digraph.DAG in document %d: %w", docIndex, err)
 		}
 
-		// Merge the current DAG into the base DAG
+		// Merge the current digraph.DAG into the base digraph.DAG
 		if err := merge(dest, dag); err != nil {
-			return nil, fmt.Errorf("failed to merge DAG in document %d: %w", docIndex, err)
+			return nil, fmt.Errorf("failed to merge digraph.DAG in document %d: %w", docIndex, err)
 		}
 
-		// Set the location for the DAG
+		// Set the location for the digraph.DAG
 		dest.Location = filePath
 
 		if docIndex == 0 {
-			// If this is the first document, set the entire DAG
+			// If this is the first document, set the entire digraph.DAG
 			dest.YamlData = dat
 		} else {
 			// Marshal the document back to YAML to preserve original data
 			yamlData, err := yaml.Marshal(doc)
 			if err != nil {
-				return nil, fmt.Errorf("failed to marshal DAG in document %d: %w", docIndex, err)
+				return nil, fmt.Errorf("failed to marshal digraph.DAG in document %d: %w", docIndex, err)
 			}
 			dest.YamlData = yamlData
 		}
@@ -375,7 +379,7 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 	if len(dags) > 1 {
 		names := make(map[string]bool)
 		for i, dag := range dags {
-			// Skip validation for the first DAG as it's the main DAG
+			// Skip validation for the first digraph.DAG as it's the main digraph.DAG
 			if i == 0 {
 				continue
 			}
@@ -451,7 +455,7 @@ func (*mergeTransformer) Transformer(
 	typ reflect.Type,
 ) func(dst, src reflect.Value) error {
 	// mergo does not override a value with zero value for a pointer.
-	if typ == reflect.TypeOf(MailOn{}) {
+	if typ == reflect.TypeOf(digraph.MailOn{}) {
 		// We need to explicitly override the value for a pointer with a zero
 		// value.
 		return func(dst, src reflect.Value) error {
@@ -515,8 +519,8 @@ func decode(cm map[string]any) (*definition, error) {
 	return c, err
 }
 
-// merge merges the source DAG into the destination DAG.
-func merge(dst, src *DAG) error {
+// merge merges the source digraph.DAG into the destination DAG.
+func merge(dst, src *digraph.DAG) error {
 	return mergo.Merge(dst, src, mergo.WithOverride,
 		mergo.WithTransformers(&mergeTransformer{}))
 }
