@@ -14,7 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 )
 
 var _ core.Executor = (*commandExecutor)(nil)

@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/scheduler"
 	"github.com/dagu-org/dagu/internal/core/status"
+	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

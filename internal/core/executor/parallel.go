@@ -11,9 +11,9 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/scheduler"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 )
 
 var _ scheduler.ParallelExecutor = (*parallelExecutor)(nil)
