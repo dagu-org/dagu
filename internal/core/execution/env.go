@@ -1,4 +1,4 @@
-package core
+package execution
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/mailer"
+	"github.com/dagu-org/dagu/internal/core"
 )
 
 // AllEnvs returns all environment variables that needs to be passed to the command.
@@ -28,7 +29,7 @@ func WithEnv(ctx context.Context, e Env) context.Context {
 func GetEnv(ctx context.Context) Env {
 	v, ok := ctx.Value(envCtxKey{}).(Env)
 	if !ok {
-		return NewEnv(ctx, Step{})
+		return NewEnv(ctx, core.Step{})
 	}
 	return v
 }
@@ -49,7 +50,7 @@ type Env struct {
 	Variables *collections.SyncMap
 
 	// The current step being executed within this environment context
-	Step Step
+	Step core.Step
 
 	// Additional environment variables specific to this step execution,
 	// including DAG_RUN_STEP_NAME and PWD. These take precedence over
@@ -77,7 +78,7 @@ func (e Env) VariablesMap() map[string]string {
 }
 
 // NewEnv creates a new execution context with the given step.
-func NewEnv(ctx context.Context, step Step) Env {
+func NewEnv(ctx context.Context, step core.Step) Env {
 	parentEnv := GetDAGContextFromContext(ctx)
 	parentDAG := parentEnv.DAG
 
@@ -121,7 +122,7 @@ func NewEnv(ctx context.Context, step Step) Env {
 	}
 
 	envs := map[string]string{
-		EnvKeyDAGRunStepName: step.Name,
+		core.EnvKeyDAGRunStepName: step.Name,
 	}
 
 	if workingDir != "" {
@@ -139,8 +140,8 @@ func NewEnv(ctx context.Context, step Step) Env {
 }
 
 // DAGRunRef returns the DAGRunRef for the current execution context.
-func (e Env) DAGRunRef() DAGRunRef {
-	return NewDAGRunRef(e.DAG.Name, e.DAGRunID)
+func (e Env) DAGRunRef() core.DAGRunRef {
+	return core.NewDAGRunRef(e.DAG.Name, e.DAGRunID)
 }
 
 // AllEnvs returns all environment variables that needs to be passed to the command.

@@ -14,6 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	core1 "github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -388,9 +389,9 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 				Name: "child-dag",
 			},
 			setupEnv: func(ctx context.Context) context.Context {
-				env := core.GetEnv(ctx)
+				env := execution.GetEnv(ctx)
 				env.Variables.Store("LIST_VAR", `LIST_VAR=["item1", "item2", "item3"]`)
-				return core.WithEnv(ctx, env)
+				return execution.WithEnv(ctx, env)
 			},
 			expectCount: 3,
 		},
@@ -403,9 +404,9 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 				Name: "child-dag",
 			},
 			setupEnv: func(ctx context.Context) context.Context {
-				env := core.GetEnv(ctx)
+				env := execution.GetEnv(ctx)
 				env.Variables.Store("SPACE_VAR", "SPACE_VAR=one two three")
-				return core.WithEnv(ctx, env)
+				return execution.WithEnv(ctx, env)
 			},
 			expectCount: 3,
 		},
@@ -473,9 +474,9 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 				Params: "item=${ITEM}",
 			},
 			setupEnv: func(ctx context.Context) context.Context {
-				env := core.GetEnv(ctx)
+				env := execution.GetEnv(ctx)
 				env.Variables.Store("SPACE_VAR", "SPACE_VAR=one two three")
-				return core.WithEnv(ctx, env)
+				return execution.WithEnv(ctx, env)
 			},
 			expectCount: 3,
 		},
@@ -483,7 +484,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := core.SetupDAGContext(context.Background(), &core.DAG{}, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
+			ctx := execution.SetupDAGContext(context.Background(), &core.DAG{}, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 			if tt.setupEnv != nil {
 				ctx = tt.setupEnv(ctx)
@@ -748,8 +749,8 @@ func TestNodeCancel(t *testing.T) {
 
 func TestNodeSetupContextBeforeExec(t *testing.T) {
 	ctx := context.Background()
-	env := core.NewEnv(ctx, core.Step{Name: "test-step"})
-	ctx = core.WithEnv(ctx, env)
+	env := execution.NewEnv(ctx, core.Step{Name: "test-step"})
+	ctx = execution.WithEnv(ctx, env)
 
 	step := core.Step{Name: "test-step"}
 	node := runtime.NewNode(step, runtime.NodeState{
@@ -761,7 +762,7 @@ func TestNodeSetupContextBeforeExec(t *testing.T) {
 	newCtx := node.SetupContextBeforeExec(ctx)
 
 	// Verify environment variables were set
-	newEnv := core.GetEnv(newCtx)
+	newEnv := execution.GetEnv(newCtx)
 	assert.Equal(t, "/tmp/stdout.log", newEnv.Envs[core.EnvKeyDAGRunStepStdoutFile])
 	assert.Equal(t, "/tmp/stderr.log", newEnv.Envs[core.EnvKeyDAGRunStepStderrFile])
 }
@@ -812,7 +813,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 			}
 
 			// Setup environment with DAG
-			ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
+			ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 			step := core.Step{
 				Name:    "test-output-capture",
@@ -844,7 +845,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 			}
 
 			// Verify that MaxOutputSize is respected in the DAG configuration
-			env := core.GetEnv(ctx)
+			env := execution.GetEnv(ctx)
 			assert.Equal(t, tt.maxOutputSize, env.DAG.MaxOutputSize)
 
 			// Cleanup
@@ -865,8 +866,8 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 					MaxOutputSize: size,
 				}
 
-				ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
-				env := core.GetEnv(ctx)
+				ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
+				env := execution.GetEnv(ctx)
 
 				// Verify the MaxOutputSize is properly set in the environment
 				assert.Equal(t, size, env.DAG.MaxOutputSize)
@@ -1134,7 +1135,7 @@ func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 }
 
 func (n nodeHelper) execContext(dagRunID string) context.Context {
-	return core.SetupDAGContext(n.Context, &core.DAG{}, nil, core.DAGRunRef{}, dagRunID, "logFile", nil, nil)
+	return execution.SetupDAGContext(n.Context, &core.DAG{}, nil, core.DAGRunRef{}, dagRunID, "logFile", nil, nil)
 }
 
 func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
@@ -1162,10 +1163,10 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		// Setup context with working directory
 		ctx := context.Background()
 		dag := &core.DAG{}
-		ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
-		env := core.GetEnv(ctx)
+		ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
+		env := execution.GetEnv(ctx)
 		env.WorkingDir = workDir
-		ctx = core.WithEnv(ctx, env)
+		ctx = execution.WithEnv(ctx, env)
 
 		// Setup and execute node
 		err = node.Setup(ctx, tempDir, "test-run")
@@ -1202,10 +1203,10 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		// Setup context with working directory
 		ctx := context.Background()
 		dag := &core.DAG{}
-		ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
-		env := core.GetEnv(ctx)
+		ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
+		env := execution.GetEnv(ctx)
 		env.WorkingDir = workDir
-		ctx = core.WithEnv(ctx, env)
+		ctx = execution.WithEnv(ctx, env)
 
 		// Setup and execute node
 		err = node.Setup(ctx, tempDir, "test-run")
@@ -1247,10 +1248,10 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		// Setup context with working directory
 		ctx := context.Background()
 		dag := &core.DAG{}
-		ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
-		env := core.GetEnv(ctx)
+		ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
+		env := execution.GetEnv(ctx)
 		env.WorkingDir = workDir
-		ctx = core.WithEnv(ctx, env)
+		ctx = execution.WithEnv(ctx, env)
 
 		// Setup and execute node
 		err = node.Setup(ctx, tempDir, "test-run")
@@ -1293,10 +1294,10 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		// Setup context with working directory
 		ctx := context.Background()
 		dag := &core.DAG{}
-		ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
-		env := core.GetEnv(ctx)
+		ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
+		env := execution.GetEnv(ctx)
 		env.WorkingDir = workDir
-		ctx = core.WithEnv(ctx, env)
+		ctx = execution.WithEnv(ctx, env)
 
 		// Setup and execute node
 		err = node.Setup(ctx, tempDir, "test-run")

@@ -14,6 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -173,7 +174,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 		cmd = createDirectCommand(cfg.Ctx, command, cfg.Args, scriptFile)
 	}
 
-	cmd.Env = append(cmd.Env, core.AllEnvs(ctx)...)
+	cmd.Env = append(cmd.Env, execution.AllEnvs(ctx)...)
 	cmd.Dir = cfg.Dir
 	cmd.Stdout = cfg.Stdout
 	cmd.Stderr = cfg.Stderr
@@ -392,7 +393,7 @@ func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, erro
 
 	return &commandConfig{
 		Ctx:                ctx,
-		Dir:                core.GetEnv(ctx).WorkingDir,
+		Dir:                execution.GetEnv(ctx).WorkingDir,
 		Command:            step.Command,
 		Args:               step.Args,
 		Script:             step.Script,

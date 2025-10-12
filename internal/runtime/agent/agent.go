@@ -278,7 +278,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize coordinator client factory for distributed execution
 	coordinatorCli := a.createCoordinatorClient(ctx)
 
-	ctx = core.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli)
+	ctx = execution.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli)
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}
@@ -737,7 +737,7 @@ func (a *Agent) newScheduler() *runtime.Scheduler {
 }
 
 // createCoordinatorClient creates a coordinator client factory for distributed execution
-func (a *Agent) createCoordinatorClient(ctx context.Context) core.Dispatcher {
+func (a *Agent) createCoordinatorClient(ctx context.Context) execution.Dispatcher {
 	if a.registry == nil {
 		logger.Debug(ctx, "Service monitor is not configured, skipping coordinator client creation")
 		return nil
@@ -775,7 +775,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
-	dagCtx := core.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil)
+	dagCtx := execution.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
 	a.lastErr = lastErr
 

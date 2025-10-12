@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	core1 "github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -1283,7 +1284,7 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus core1.Status) schedu
 	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, gh.Config.DAGRunID)
 	logFilePath := path.Join(gh.Config.LogDir, logFilename)
 
-	ctx := core.SetupDAGContext(gh.Context, dag, nil, core.DAGRunRef{}, gh.Config.DAGRunID, logFilePath, nil, nil)
+	ctx := execution.SetupDAGContext(gh.Context, dag, nil, core.DAGRunRef{}, gh.Config.DAGRunID, logFilePath, nil, nil)
 
 	var doneNodes []*runtime.Node
 	progressCh := make(chan *runtime.Node)
@@ -1522,7 +1523,7 @@ func TestScheduler_ErrorHandling(t *testing.T) {
 		logFilename := fmt.Sprintf("%s_%s.log", dag.Name, sc.Config.DAGRunID)
 		logFilePath := filepath.Join(sc.Config.LogDir, logFilename)
 
-		ctx := core.SetupDAGContext(graph.Context, dag, nil, core.DAGRunRef{}, sc.Config.DAGRunID, logFilePath, nil, nil)
+		ctx := execution.SetupDAGContext(graph.Context, dag, nil, core.DAGRunRef{}, sc.Config.DAGRunID, logFilePath, nil, nil)
 
 		err := sc.Scheduler.Schedule(ctx, graph.ExecutionGraph, nil)
 		require.Error(t, err)
@@ -1598,7 +1599,7 @@ func TestScheduler_DAGPreconditions(t *testing.T) {
 		logFilename := fmt.Sprintf("%s_%s.log", dag.Name, sc.Config.DAGRunID)
 		logFilePath := filepath.Join(sc.Config.LogDir, logFilename)
 
-		ctx := core.SetupDAGContext(graph.Context, dag, nil, core.DAGRunRef{}, sc.Config.DAGRunID, logFilePath, nil, nil)
+		ctx := execution.SetupDAGContext(graph.Context, dag, nil, core.DAGRunRef{}, sc.Config.DAGRunID, logFilePath, nil, nil)
 
 		err := sc.Scheduler.Schedule(ctx, graph.ExecutionGraph, nil)
 		require.NoError(t, err) // No error, but dag should be canceled

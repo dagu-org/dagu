@@ -20,6 +20,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
 	core1 "github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -111,7 +112,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	sc.metrics.totalNodes = len(graph.nodes)
 
 	// If one of the conditions does not met, cancel the execution.
-	env := core.GetDAGContextFromContext(ctx)
+	env := execution.GetDAGContextFromContext(ctx)
 	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", "err", err)
 		sc.Cancel(ctx, graph)
@@ -324,7 +325,7 @@ func (sc *Scheduler) teardownNode(ctx context.Context, node *Node) error {
 }
 
 func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	env := core.NewEnv(ctx, node.Step())
+	env := execution.NewEnv(ctx, node.Step())
 
 	// Populate step information for all nodes with IDs
 	for _, n := range graph.nodes {
@@ -385,11 +386,11 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 
 	env.ForceLoadOutputVariables(envVars)
 
-	return core.WithEnv(ctx, env)
+	return execution.WithEnv(ctx, env)
 }
 
 func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	env := core.NewEnv(ctx, node.Step())
+	env := execution.NewEnv(ctx, node.Step())
 
 	// Populate step information for all nodes with IDs
 	for _, n := range graph.nodes {
@@ -412,7 +413,7 @@ func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, graph *Execut
 		env.LoadOutputVariables(node.inner.State.OutputVariables)
 	}
 
-	return core.WithEnv(ctx, env)
+	return execution.WithEnv(ctx, env)
 }
 
 func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
@@ -886,9 +887,9 @@ func (sc *Scheduler) shouldRepeatNode(ctx context.Context, node *Node, execErr e
 		if rp.Condition != nil {
 			// Ensure node's own output variables are reloaded before evaluating the condition.
 			if node.inner.State.OutputVariables != nil {
-				env := core.GetEnv(ctx)
+				env := execution.GetEnv(ctx)
 				env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
-				ctx = core.WithEnv(ctx, env)
+				ctx = execution.WithEnv(ctx, env)
 			}
 			shell := cmdutil.GetShellCommand(node.Step().Shell)
 			err := EvalCondition(ctx, shell, rp.Condition)
@@ -906,9 +907,9 @@ func (sc *Scheduler) shouldRepeatNode(ctx context.Context, node *Node, execErr e
 		if rp.Condition != nil {
 			// Ensure node's own output variables are reloaded before evaluating the condition.
 			if node.inner.State.OutputVariables != nil {
-				env := core.GetEnv(ctx)
+				env := execution.GetEnv(ctx)
 				env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
-				ctx = core.WithEnv(ctx, env)
+				ctx = execution.WithEnv(ctx, env)
 			}
 			shell := cmdutil.GetShellCommand(node.Step().Shell)
 			err := EvalCondition(ctx, shell, rp.Condition)

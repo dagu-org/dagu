@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -35,8 +36,8 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
-	env := core.Env{
-		DAGContext: core.DAGContext{
+	env := execution.Env{
+		DAGContext: execution.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
 			RootDAGRun: core.NewDAGRunRef("parent", "root-123"),
@@ -47,7 +48,7 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 		Step:      core.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = core.WithEnv(ctx, env)
+	ctx = execution.WithEnv(ctx, env)
 
 	// Test creating executor for local DAG
 	executor, err := NewChildDAGExecutor(ctx, "local-child")
@@ -85,8 +86,8 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
-	env := core.Env{
-		DAGContext: core.DAGContext{
+	env := execution.Env{
+		DAGContext: execution.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
 			RootDAGRun: core.NewDAGRunRef("parent", "root-123"),
@@ -97,7 +98,7 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 		Step:      core.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = core.WithEnv(ctx, env)
+	ctx = execution.WithEnv(ctx, env)
 
 	// Mock the database call
 	expectedDAG := &core.DAG{
@@ -136,8 +137,8 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
-	env := core.Env{
-		DAGContext: core.DAGContext{
+	env := execution.Env{
+		DAGContext: execution.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
 			RootDAGRun: core.NewDAGRunRef("parent", "root-123"),
@@ -148,7 +149,7 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 		Step:      core.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = core.WithEnv(ctx, env)
+	ctx = execution.WithEnv(ctx, env)
 
 	// Mock the database call to return not found
 	mockDB.On("GetDAG", ctx, "non-existent").Return(nil, assert.AnError)
@@ -169,8 +170,8 @@ func TestBuildCommand(t *testing.T) {
 	// Set up the environment
 	mockDB := new(mockDatabase)
 	baseEnv := config.NewBaseEnv(nil)
-	env := core.Env{
-		DAGContext: core.DAGContext{
+	env := execution.Env{
+		DAGContext: execution.DAGContext{
 			DAG:        &core.DAG{Name: "parent"},
 			DB:         mockDB,
 			RootDAGRun: core.NewDAGRunRef("parent", "root-123"),
@@ -182,7 +183,7 @@ func TestBuildCommand(t *testing.T) {
 		Step:      core.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = core.WithEnv(ctx, env)
+	ctx = execution.WithEnv(ctx, env)
 
 	// Create executor
 	executor := &ChildDAGExecutor{
@@ -223,8 +224,8 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 
 	// Set up the environment
 	mockDB := new(mockDatabase)
-	env := core.Env{
-		DAGContext: core.DAGContext{
+	env := execution.Env{
+		DAGContext: execution.DAGContext{
 			DAG:        &core.DAG{Name: "parent"},
 			DB:         mockDB,
 			RootDAGRun: core.NewDAGRunRef("parent", "root-123"),
@@ -235,7 +236,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 		Step:      core.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = core.WithEnv(ctx, env)
+	ctx = execution.WithEnv(ctx, env)
 
 	executor := &ChildDAGExecutor{
 		DAG: &core.DAG{Name: "test-child"},
@@ -257,8 +258,8 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 
 	// Set up the environment without RootDAGRun
 	mockDB := new(mockDatabase)
-	env := core.Env{
-		DAGContext: core.DAGContext{
+	env := execution.Env{
+		DAGContext: execution.DAGContext{
 			DAG: &core.DAG{Name: "parent"},
 			DB:  mockDB,
 			// RootDAGRun is zero value
@@ -269,7 +270,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 		Step:      core.Step{},
 		Envs:      make(map[string]string),
 	}
-	ctx = core.WithEnv(ctx, env)
+	ctx = execution.WithEnv(ctx, env)
 
 	executor := &ChildDAGExecutor{
 		DAG: &core.DAG{Name: "test-child"},
@@ -367,14 +368,14 @@ func TestChildDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 	mockDB := new(mockDatabase)
 
 	// Create a context with environment
-	env := core.Env{
-		DAGContext: core.DAGContext{
+	env := execution.Env{
+		DAGContext: execution.DAGContext{
 			DB:         mockDB,
 			RootDAGRun: core.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
 		},
 	}
-	_ = core.WithEnv(context.Background(), env)
+	_ = execution.WithEnv(context.Background(), env)
 
 	// Create a child DAG
 	childDAG := &core.DAG{
@@ -415,14 +416,14 @@ func TestChildDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 	mockDB := new(mockDatabase)
 
 	// Create a context with environment
-	env := core.Env{
-		DAGContext: core.DAGContext{
+	env := execution.Env{
+		DAGContext: execution.DAGContext{
 			DB:         mockDB,
 			RootDAGRun: core.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
 		},
 	}
-	_ = core.WithEnv(context.Background(), env)
+	_ = execution.WithEnv(context.Background(), env)
 
 	// Create a child DAG
 	childDAG := &core.DAG{
@@ -459,14 +460,14 @@ func TestChildDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 	mockDB := new(mockDatabase)
 
 	// Create a context with environment
-	env := core.Env{
-		DAGContext: core.DAGContext{
+	env := execution.Env{
+		DAGContext: execution.DAGContext{
 			DB:         mockDB,
 			RootDAGRun: core.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
 		},
 	}
-	_ = core.WithEnv(context.Background(), env)
+	_ = execution.WithEnv(context.Background(), env)
 
 	// Create a child DAG
 	childDAG := &core.DAG{
@@ -498,14 +499,14 @@ func TestChildDAGExecutor_Kill_Empty(t *testing.T) {
 	mockDB := new(mockDatabase)
 
 	// Create a context with environment
-	env := core.Env{
-		DAGContext: core.DAGContext{
+	env := execution.Env{
+		DAGContext: execution.DAGContext{
 			DB:         mockDB,
 			RootDAGRun: core.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
 		},
 	}
-	_ = core.WithEnv(context.Background(), env)
+	_ = execution.WithEnv(context.Background(), env)
 
 	// Create a child DAG
 	childDAG := &core.DAG{
@@ -530,7 +531,7 @@ func TestChildDAGExecutor_Kill_Empty(t *testing.T) {
 	mockDB.AssertNotCalled(t, "RequestChildCancel")
 }
 
-var _ core.Database = (*mockDatabase)(nil)
+var _ execution.Database = (*mockDatabase)(nil)
 
 // mockDatabase is a mock implementation of core.Database
 type mockDatabase struct {
@@ -545,12 +546,12 @@ func (m *mockDatabase) GetDAG(ctx context.Context, name string) (*core.DAG, erro
 	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
-func (m *mockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) (*core.RunStatus, error) {
+func (m *mockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) (*execution.RunStatus, error) {
 	args := m.Called(ctx, dagRunID, rootDAGRun)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*core.RunStatus), args.Error(1)
+	return args.Get(0).(*execution.RunStatus), args.Error(1)
 }
 
 // IsChildDAGRunCompleted implements core.Database.

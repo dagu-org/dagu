@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -215,11 +216,11 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 		Env:  []string{},
 	}
 	// Setup the context with DAG environment
-	ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "", nil, nil)
+	ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "", nil, nil)
 
-	env := core.NewEnv(ctx, core.Step{})
+	env := execution.NewEnv(ctx, core.Step{})
 	env.WorkingDir = t.TempDir()
-	ctx = core.WithEnv(ctx, env)
+	ctx = execution.WithEnv(ctx, env)
 
 	tests := []struct {
 		name       string
@@ -289,11 +290,11 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 		Env:  []string{},
 	}
 	// Setup the context with DAG environment
-	ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "", nil, nil)
+	ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "", nil, nil)
 
-	env := core.NewEnv(ctx, core.Step{})
+	env := execution.NewEnv(ctx, core.Step{})
 	env.WorkingDir = t.TempDir()
-	ctx = core.WithEnv(ctx, env)
+	ctx = execution.WithEnv(ctx, env)
 
 	tests := []struct {
 		name         string

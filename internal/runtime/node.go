@@ -26,6 +26,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	core1 "github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -543,12 +544,12 @@ func (n *Node) Cancel(ctx context.Context) {
 func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	env := core.GetEnv(ctx)
+	env := execution.GetEnv(ctx)
 	env = env.WithEnv(
 		core.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
 		core.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)
-	return core.WithEnv(ctx, env)
+	return execution.WithEnv(ctx, env)
 }
 
 func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error {
@@ -627,7 +628,7 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 
 	// Get maxOutputSize from DAG configuration
 	var maxOutputSize = 1024 * 1024 // Default 1MB
-	if env := core.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+	if env := execution.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
 		maxOutputSize = env.DAG.MaxOutputSize
 	}
 
@@ -971,7 +972,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 
 		// Get max output size from DAG configuration, default to 1MB
 		oc.maxOutputSize = 1024 * 1024 // 1MB default
-		if env := core.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+		if env := execution.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
 			oc.maxOutputSize = int64(env.DAG.MaxOutputSize)
 		}
 
@@ -1123,7 +1124,7 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 func (oc *OutputCoordinator) setupFile(ctx context.Context, filePath string, _ NodeData) (*os.File, error) {
 	absFilePath := filePath
 	if !filepath.IsAbs(absFilePath) {
-		dir := core.GetEnv(ctx).WorkingDir
+		dir := execution.GetEnv(ctx).WorkingDir
 		absFilePath = filepath.Join(dir, absFilePath)
 		absFilePath = filepath.Clean(absFilePath)
 	}

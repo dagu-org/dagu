@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,7 +74,7 @@ func TestMail(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				ctx := context.Background()
-				ctx = core.SetupDAGContext(ctx, &core.DAG{
+				ctx = execution.SetupDAGContext(ctx, &core.DAG{
 					SMTP: &core.SMTPConfig{},
 				}, nil, core.DAGRunRef{}, "", "", nil, nil)
 
@@ -148,7 +149,7 @@ func TestMail(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				ctx = core.SetupDAGContext(ctx, &core.DAG{
+				ctx = execution.SetupDAGContext(ctx, &core.DAG{
 					SMTP: &core.SMTPConfig{},
 				}, nil, core.DAGRunRef{}, "", "", nil, nil)
 

@@ -70,7 +70,7 @@ func New(
 	qs execution.QueueStore,
 	ps execution.ProcStore,
 	reg execution.ServiceRegistry,
-	coordinatorCli core.Dispatcher,
+	coordinatorCli execution.Dispatcher,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Global.Location
 	if timeLoc == nil {

@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
-var _ core.Database = &dbClient{}
+var _ execution.Database = &dbClient{}
 
 type dbClient struct {
 	ds  execution.DAGStore
@@ -25,7 +25,7 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*core.DAG, error) {
 	return o.ds.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) (*core.RunStatus, error) {
+func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) (*execution.RunStatus, error) {
 	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
@@ -49,7 +49,7 @@ func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, ro
 		}
 	}
 
-	return &core.RunStatus{
+	return &execution.RunStatus{
 		Status:   status.Status,
 		Outputs:  outputVariables,
 		Name:     status.Name,

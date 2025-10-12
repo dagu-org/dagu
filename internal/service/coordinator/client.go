@@ -12,7 +12,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc"
@@ -26,7 +25,7 @@ import (
 // Client abstracts handling communication with the coordinator service using
 // service registry and gRPC.
 type Client interface {
-	core.Dispatcher
+	execution.Dispatcher
 
 	// Dispatch sends a task to the coordinator
 	Dispatch(ctx context.Context, task *coordinatorv1.Task) error

@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -30,20 +31,20 @@ type ChildDAGExecutor struct {
 	tempFile string
 
 	// coordinatorCli is used for distributed execution
-	coordinatorCli core.Dispatcher
+	coordinatorCli execution.Dispatcher
 
 	// Process tracking for ALL executions
 	mu              sync.Mutex
 	cmds            map[string]*exec.Cmd // runID -> cmd for local processes
 	distributedRuns map[string]bool      // runID -> true for distributed runs
-	env             core.Env             // for DB access when cancelling distributed runs
+	env             execution.Env        // for DB access when cancelling distributed runs
 }
 
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
 // It handles the logic for finding the DAG - either from the database
 // or from local DAGs defined in the parent.
 func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecutor, error) {
-	env := core.GetEnv(ctx)
+	env := execution.GetEnv(ctx)
 
 	// First, check if it's a local DAG in the parent
 	if env.DAG != nil && env.DAG.LocalDAGs != nil {
@@ -64,7 +65,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 				coordinatorCli:  env.CoordinatorCli,
 				cmds:            make(map[string]*exec.Cmd),
 				distributedRuns: make(map[string]bool),
-				env:             core.GetEnv(ctx),
+				env:             execution.GetEnv(ctx),
 			}, nil
 		}
 	}
@@ -80,7 +81,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 		coordinatorCli:  env.CoordinatorCli,
 		cmds:            make(map[string]*exec.Cmd),
 		distributedRuns: make(map[string]bool),
-		env:             core.GetEnv(ctx),
+		env:             execution.GetEnv(ctx),
 	}, nil
 }
 
@@ -99,7 +100,7 @@ func (e *ChildDAGExecutor) buildCommand(
 		return nil, fmt.Errorf("dag-run ID is not set")
 	}
 
-	env := core.GetEnv(ctx)
+	env := execution.GetEnv(ctx)
 	if env.RootDAGRun.Zero() {
 		return nil, fmt.Errorf("root dag-run ID is not set")
 	}
@@ -160,7 +161,7 @@ func (e *ChildDAGExecutor) BuildCoordinatorTask(
 	ctx context.Context,
 	runParams RunParams,
 ) (*coordinatorv1.Task, error) {
-	env := core.GetEnv(ctx)
+	env := execution.GetEnv(ctx)
 
 	if runParams.RunID == "" {
 		return nil, fmt.Errorf("dag-run ID is not set")
@@ -220,7 +221,7 @@ func (e *ChildDAGExecutor) Cleanup(ctx context.Context) error {
 
 // ExecuteWithResult executes the child DAG and returns the result.
 // This is useful for parallel execution where results need to be collected.
-func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunParams, workDir string) (*core.RunStatus, error) {
+func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunParams, workDir string) (*execution.RunStatus, error) {
 	// Check if we should use distributed execution
 	if e.ShouldUseDistributedExecution() {
 		// Track distributed execution
@@ -272,7 +273,7 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 	}
 
 	// Get the result regardless of error
-	env := core.GetEnv(ctx)
+	env := execution.GetEnv(ctx)
 	result, resultErr := env.DB.GetChildDAGRunStatus(ctx, runParams.RunID, env.RootDAGRun)
 	if resultErr != nil {
 		return nil, fmt.Errorf("failed to find result for the child dag-run %q: %w", runParams.RunID, resultErr)
@@ -292,7 +293,7 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 }
 
 // executeDistributedWithResult runs the child DAG via coordinator and returns the result
-func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, runParams RunParams) (*core.RunStatus, error) {
+func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, runParams RunParams) (*execution.RunStatus, error) {
 	// Dispatch to coordinator
 	if err := e.dispatchToCoordinator(ctx, runParams); err != nil {
 		return nil, fmt.Errorf("distributed execution failed: %w", err)
@@ -329,8 +330,8 @@ func (e *ChildDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams 
 }
 
 // waitForCompletionWithResult is similar to waitForCompletion but returns the result
-func (e *ChildDAGExecutor) waitForCompletionWithResult(ctx context.Context, dagRunID string) (*core.RunStatus, error) {
-	env := core.GetEnv(ctx)
+func (e *ChildDAGExecutor) waitForCompletionWithResult(ctx context.Context, dagRunID string) (*execution.RunStatus, error) {
+	env := execution.GetEnv(ctx)
 
 	// Poll for completion
 	pollInterval := 1 * time.Second

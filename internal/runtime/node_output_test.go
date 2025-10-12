@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,7 +64,7 @@ func TestNode_LargeOutput(t *testing.T) {
 			ctx := context.Background()
 			// Set up environment context with proper DAG
 			dag := &core.DAG{Name: "test"}
-			ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
+			ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
 
 			// Setup node with a temporary directory
 			tmpDir := t.TempDir()
@@ -131,7 +132,7 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 	ctx := context.Background()
 	// Set up environment context with proper DAG
 	dag := &core.DAG{Name: "test"}
-	ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "deadlock-test", "test.log", nil, nil)
+	ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "deadlock-test", "test.log", nil, nil)
 
 	tmpDir := t.TempDir()
 	err := node.Setup(ctx, tmpDir, "deadlock-test")
@@ -180,7 +181,7 @@ func TestNode_OutputExceedsLimit(t *testing.T) {
 	ctx := context.Background()
 	// Set up environment context with proper DAG
 	dag := &core.DAG{Name: "test"}
-	ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "exceed-limit-test", "test.log", nil, nil)
+	ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "exceed-limit-test", "test.log", nil, nil)
 
 	tmpDir := t.TempDir()
 	err := node.Setup(ctx, tmpDir, "exceed-limit-test")
@@ -216,7 +217,7 @@ func TestNode_CustomOutputLimit(t *testing.T) {
 		Name:          "test",
 		MaxOutputSize: 50 * 1024, // 50KB limit
 	}
-	ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "custom-limit-test", "test.log", nil, nil)
+	ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "custom-limit-test", "test.log", nil, nil)
 
 	tmpDir := t.TempDir()
 	err := node.Setup(ctx, tmpDir, "custom-limit-test")
@@ -252,7 +253,7 @@ func TestNode_ConcurrentOutputCapture(t *testing.T) {
 	ctx := context.Background()
 	// Set up environment context with proper DAG
 	dag := &core.DAG{Name: "test"}
-	ctx = core.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "concurrent-test", "test.log", nil, nil)
+	ctx = execution.SetupDAGContext(ctx, dag, nil, core.DAGRunRef{}, "concurrent-test", "test.log", nil, nil)
 
 	tmpDir := t.TempDir()
 	err := node.Setup(ctx, tmpDir, "concurrent-test")

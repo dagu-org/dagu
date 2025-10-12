@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -117,7 +118,7 @@ func (e *docker) Kill(sig os.Signal) error {
 
 	// Wait for max clean up time before forcefully killing the container
 	go func() {
-		env := core.GetEnv(e.context)
+		env := execution.GetEnv(e.context)
 		<-time.After(env.DAG.MaxCleanUpTime)
 		logger.Warn(e.context, "forcefully stopping container after max clean up time", "container", e.step.Name)
 		_ = e.container.Stop(syscall.SIGKILL)

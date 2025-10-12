@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
 	core1 "github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -29,11 +30,11 @@ type parallelExecutor struct {
 	maxConcurrent int
 
 	// Runtime state
-	running    map[string]*exec.Cmd       // Maps DAG run ID to running command
-	results    map[string]*core.RunStatus // Maps DAG run ID to result
-	errors     []error                    // Collects errors from failed executions
-	wg         sync.WaitGroup             // Tracks running goroutines
-	cancelFunc context.CancelFunc         // For canceling all child executions
+	running    map[string]*exec.Cmd            // Maps DAG run ID to running command
+	results    map[string]*execution.RunStatus // Maps DAG run ID to result
+	errors     []error                         // Collects errors from failed executions
+	wg         sync.WaitGroup                  // Tracks running goroutines
+	cancelFunc context.CancelFunc              // For canceling all child executions
 }
 
 func newParallelExecutor(
@@ -51,7 +52,7 @@ func newParallelExecutor(
 		return nil, err
 	}
 
-	dir := core.GetEnv(ctx).WorkingDir
+	dir := execution.GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
 	}
@@ -66,7 +67,7 @@ func newParallelExecutor(
 		workDir:       dir,
 		maxConcurrent: maxConcurrent,
 		running:       make(map[string]*exec.Cmd),
-		results:       make(map[string]*core.RunStatus),
+		results:       make(map[string]*execution.RunStatus),
 		errors:        make([]error, 0),
 	}, nil
 }
@@ -237,12 +238,12 @@ func (e *parallelExecutor) outputResults(_ context.Context) error {
 			Succeeded int `json:"succeeded"`
 			Failed    int `json:"failed"`
 		} `json:"summary"`
-		Results []core.RunStatus    `json:"results"`
-		Outputs []map[string]string `json:"outputs"`
+		Results []execution.RunStatus `json:"results"`
+		Outputs []map[string]string   `json:"outputs"`
 	}{}
 
 	output.Summary.Total = len(e.runParamsList)
-	output.Results = make([]core.RunStatus, 0, len(e.results))
+	output.Results = make([]execution.RunStatus, 0, len(e.results))
 	output.Outputs = make([]map[string]string, 0, len(e.results))
 
 	// Collect results in order of runParamsList for consistency

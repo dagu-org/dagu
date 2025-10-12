@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
 	core1 "github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -26,7 +27,7 @@ type dagExecutor struct {
 	stderr    io.Writer
 	runParams executor.RunParams
 	step      core.Step
-	result    *core.RunStatus
+	result    *execution.RunStatus
 }
 
 // Errors for DAG executor
@@ -44,7 +45,7 @@ func newDAGExecutor(ctx context.Context, step core.Step) (executor.Executor, err
 		return nil, err
 	}
 
-	dir := core.GetEnv(ctx).WorkingDir
+	dir := execution.GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
 	}

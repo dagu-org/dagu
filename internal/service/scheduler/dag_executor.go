@@ -7,6 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -45,13 +46,13 @@ import (
 // - HandleJob(): Entry point for new scheduled jobs (handles persistence)
 // - ExecuteDAG(): Executes/dispatches already-persisted jobs (no persistence)
 type DAGExecutor struct {
-	coordinatorCli core.Dispatcher
+	coordinatorCli execution.Dispatcher
 	subCmdBuilder  *runtime.SubCmdBuilder
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
 func NewDAGExecutor(
-	coordinatorCli core.Dispatcher,
+	coordinatorCli execution.Dispatcher,
 	subCmdBuilder *runtime.SubCmdBuilder,
 ) *DAGExecutor {
 	return &DAGExecutor{

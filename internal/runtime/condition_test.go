@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/require"
 )
@@ -112,7 +113,7 @@ func TestCondition_Eval(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			ctx = core.WithEnv(ctx, core.NewEnv(ctx, core.Step{}))
+			ctx = execution.WithEnv(ctx, execution.NewEnv(ctx, core.Step{}))
 			err := runtime.EvalConditions(ctx, "sh", tt.condition)
 			if tt.wantErr {
 				require.Error(t, err, "expected error but got nil")
