@@ -107,6 +107,7 @@ func (m *Manager) Stop(ctx context.Context, dag *digraph.DAG, dagRunID string) e
 func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *digraph.DAG, dagRunID string) error {
 	// Check if the process is running using proc store
 	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), digraph.NewDAGRunRef(dag.Name, dagRunID))
+
 	if err != nil {
 		return fmt.Errorf("failed to retrieve status from proc store: %w", err)
 	}

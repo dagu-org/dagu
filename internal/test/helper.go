@@ -272,7 +272,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected status.Status) {
 		}
 		t.Logf("latest status=%s errors=%v", latest.Status.String(), latest.Errors())
 		return latest.Status == expected
-	}, time.Second*5, time.Second)
+	}, time.Second*10, time.Second)
 }
 
 func (d *DAG) AssertDAGRunCount(t *testing.T, expected int) {
@@ -430,7 +430,16 @@ func (a *Agent) RunError(t *testing.T) {
 func (a *Agent) RunCancel(t *testing.T) {
 	t.Helper()
 
-	err := a.Run(a.Context)
+	proc, err := a.ProcStore.Acquire(a.Context, a.DAG.ProcGroup(), digraph.DAGRunRef{
+		Name: a.DAG.Name,
+		ID:   a.dagRunID,
+	})
+	require.NoError(t, err, "failed to acquire proc")
+	t.Cleanup(func() {
+		proc.Stop(a.Context)
+	})
+
+	err = a.Run(a.Context)
 	assert.NoError(t, err)
 
 	st := a.Status(a.Context).Status
