@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagu-org/dagu/internal/cli"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -79,7 +79,7 @@ func startServer(t *testing.T, configFile, port string) func() {
 
 	done := make(chan struct{})
 	go func() {
-		th.RunCommand(t, cmd.CmdServer(), test.CmdTest{
+		th.RunCommand(t, cli.CmdServer(), test.CmdTest{
 			Args:        []string{"server", "--config", configFile, "--port=" + port},
 			ExpectedOut: []string{"Server is starting"},
 		})

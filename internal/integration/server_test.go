@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagu-org/dagu/internal/cli"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -69,7 +69,7 @@ steps:
 			}
 			args = append(args, dagPath)
 
-			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
+			th.RunCommand(t, cli.CmdStart(), test.CmdTest{
 				Args:        args,
 				ExpectedOut: []string{"dag-run finished"},
 			})

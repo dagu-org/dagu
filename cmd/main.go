@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagu-org/dagu/internal/cli"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/spf13/cobra"
 
@@ -28,22 +28,22 @@ func main() {
 }
 
 func init() {
-	rootCmd.AddCommand(cmd.CmdStart())
-	rootCmd.AddCommand(cmd.CmdEnqueue())
-	rootCmd.AddCommand(cmd.CmdDequeue())
-	rootCmd.AddCommand(cmd.CmdStop())
-	rootCmd.AddCommand(cmd.CmdRestart())
-	rootCmd.AddCommand(cmd.CmdDry())
-	rootCmd.AddCommand(cmd.CmdValidate())
-	rootCmd.AddCommand(cmd.CmdStatus())
-	rootCmd.AddCommand(cmd.CmdVersion())
-	rootCmd.AddCommand(cmd.CmdServer())
-	rootCmd.AddCommand(cmd.CmdScheduler())
-	rootCmd.AddCommand(cmd.CmdCoordinator())
-	rootCmd.AddCommand(cmd.CmdWorker())
-	rootCmd.AddCommand(cmd.CmdRetry())
-	rootCmd.AddCommand(cmd.CmdStartAll())
-	rootCmd.AddCommand(cmd.CmdMigrate())
+	rootCmd.AddCommand(cli.CmdStart())
+	rootCmd.AddCommand(cli.CmdEnqueue())
+	rootCmd.AddCommand(cli.CmdDequeue())
+	rootCmd.AddCommand(cli.CmdStop())
+	rootCmd.AddCommand(cli.CmdRestart())
+	rootCmd.AddCommand(cli.CmdDry())
+	rootCmd.AddCommand(cli.CmdValidate())
+	rootCmd.AddCommand(cli.CmdStatus())
+	rootCmd.AddCommand(cli.CmdVersion())
+	rootCmd.AddCommand(cli.CmdServer())
+	rootCmd.AddCommand(cli.CmdScheduler())
+	rootCmd.AddCommand(cli.CmdCoordinator())
+	rootCmd.AddCommand(cli.CmdWorker())
+	rootCmd.AddCommand(cli.CmdRetry())
+	rootCmd.AddCommand(cli.CmdStartAll())
+	rootCmd.AddCommand(cli.CmdMigrate())
 
 	config.Version = version
 }
