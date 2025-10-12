@@ -223,3 +223,11 @@ type ContinueOn struct {
 	Output      []string `json:"output,omitempty"`      // Output is the list of output (stdout/stderr) to continue to the next step.
 	MarkSuccess bool     `json:"markSuccess,omitempty"` // MarkSuccess is the flag to mark the step as success when the condition is met.
 }
+
+const (
+	// ExecutorTypeDAG is the executor type for a child DAG.
+	ExecutorTypeDAG = "dag"
+
+	// ExecutorTypeParallel is the executor type for parallel steps.
+	ExecutorTypeParallel = "parallel"
+)

@@ -10,14 +10,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core/status"
 )
 
-const (
-	// ExecutorTypeDAG is the executor type for a child DAG.
-	ExecutorTypeDAG = "dag"
-
-	// ExecutorTypeParallel is the executor type for parallel execution.
-	ExecutorTypeParallel = "parallel"
-)
-
 // Executor is an interface for executing steps in a DAG.
 type Executor interface {
 	SetStdout(out io.Writer)

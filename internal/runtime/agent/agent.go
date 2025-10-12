@@ -26,8 +26,8 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
+	"github.com/dagu-org/dagu/internal/infra/telemetry"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/otel"
 	"github.com/dagu-org/dagu/internal/runtime"
 	runtime1 "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
@@ -123,7 +123,7 @@ type Agent struct {
 	stepRetry string
 
 	// tracer is the OpenTelemetry tracer for the agent.
-	tracer *otel.Tracer
+	tracer *telemetry.Tracer
 }
 
 // Options is the configuration for the Agent.
@@ -190,17 +190,17 @@ func (a *Agent) Run(ctx context.Context) error {
 	defer cancel()
 
 	// Initialize propagators for W3C trace context before anything else
-	otel.InitializePropagators()
+	telemetry.InitializePropagators()
 
 	// Extract trace context from environment variables if present
 	// This must be done BEFORE initializing the tracer so child DAGs
 	// can continue the parent's trace
 	if a.dag.OTel != nil && a.dag.OTel.Enabled {
-		ctx = otel.ExtractTraceContext(ctx)
+		ctx = telemetry.ExtractTraceContext(ctx)
 	}
 
 	// Initialize OpenTelemetry tracer
-	tracer, err := otel.NewTracer(ctx, a.dag)
+	tracer, err := telemetry.NewTracer(ctx, a.dag)
 	if err != nil {
 		logger.Warn(ctx, "Failed to initialize OpenTelemetry tracer", "err", err)
 		// Continue without tracing

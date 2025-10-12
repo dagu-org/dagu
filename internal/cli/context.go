@@ -20,8 +20,8 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/frontend"
+	"github.com/dagu-org/dagu/internal/infra/telemetry"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/metrics"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
@@ -161,7 +161,7 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 	// Create coordinator client (may be nil if not configured)
 	cc := c.NewCoordinatorClient()
 
-	collector := metrics.NewCollector(
+	collector := telemetry.NewCollector(
 		config.Version,
 		dr,
 		c.DAGRunStore,
@@ -169,7 +169,7 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 		c.ServiceRegistry,
 	)
 
-	mr := metrics.NewRegistry(collector)
+	mr := telemetry.NewRegistry(collector)
 
 	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr), nil
 }

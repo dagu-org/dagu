@@ -13,10 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/go-viper/mapstructure/v2"
-
-	_ "github.com/dagu-org/dagu/internal/runtime/builtin" // Register built-in step validators and executors
 )
 
 // BuilderFn is a function that builds a part of the DAG.
@@ -1445,9 +1442,9 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 
 	// Set executor type based on whether parallel execution is configured
 	if step.Parallel != nil {
-		step.ExecutorConfig.Type = executor.ExecutorTypeParallel
+		step.ExecutorConfig.Type = core.ExecutorTypeParallel
 	} else {
-		step.ExecutorConfig.Type = executor.ExecutorTypeDAG
+		step.ExecutorConfig.Type = core.ExecutorTypeDAG
 	}
 
 	step.Command = "run"

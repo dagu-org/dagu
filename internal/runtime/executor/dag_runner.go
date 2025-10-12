@@ -13,8 +13,8 @@ import (
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/infra/telemetry"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/otel"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -472,5 +472,5 @@ func executablePath() (string, error) {
 // extractTraceContext extracts OpenTelemetry trace context from the current context
 // and returns it as environment variables for child processes.
 func extractTraceContext(ctx context.Context) []string {
-	return otel.InjectTraceContext(ctx)
+	return telemetry.InjectTraceContext(ctx)
 }

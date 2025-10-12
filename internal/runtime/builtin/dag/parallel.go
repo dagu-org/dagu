@@ -304,5 +304,5 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	executor.RegisterExecutor(executor.ExecutorTypeParallel, newParallelExecutor, nil)
+	executor.RegisterExecutor(core.ExecutorTypeParallel, newParallelExecutor, nil)
 }
