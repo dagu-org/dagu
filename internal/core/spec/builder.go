@@ -15,6 +15,8 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/go-viper/mapstructure/v2"
+
+	_ "github.com/dagu-org/dagu/internal/runtime/builtin" // Register built-in step validators and executors
 )
 
 // BuilderFn is a function that builds a part of the DAG.

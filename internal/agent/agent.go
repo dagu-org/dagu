@@ -35,6 +35,8 @@ import (
 	"github.com/dagu-org/dagu/internal/sshutil"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	_ "github.com/dagu-org/dagu/internal/runtime/builtin"
 )
 
 // Agent is responsible for running the DAG and handling communication
