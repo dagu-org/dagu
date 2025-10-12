@@ -195,6 +195,7 @@ func (cfg *commandConfig) detectShebang(scriptFile string) (string, []string, er
 }
 
 func readFirstLine(filePath string) (string, error) {
+	filePath = filepath.Clean(filePath)
 	file, err := os.Open(filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)

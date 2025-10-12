@@ -367,11 +367,11 @@ func TestReadFirstLine(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpFile, err := os.CreateTemp("", "test-*.sh")
 			require.NoError(t, err)
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			_, err = tmpFile.WriteString(tt.content)
 			require.NoError(t, err)
-			tmpFile.Close()
+			_ = tmpFile.Close()
 
 			result, err := readFirstLine(tmpFile.Name())
 			require.NoError(t, err)
