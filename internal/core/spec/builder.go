@@ -1564,7 +1564,7 @@ func translateExecutorConfig(ctx StepBuildContext, def stepDef, step *core.Step)
 	}
 
 	// Translate container fields to executor config
-	step.ExecutorConfig.Type = "docker"
+	step.ExecutorConfig.Type = "container"
 
 	// The other fields will be retrieved from the container configuration on
 	// execution time, so we don't need to set them here.

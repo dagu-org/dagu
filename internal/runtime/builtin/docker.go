@@ -240,4 +240,5 @@ func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 
 func init() {
 	executor.RegisterExecutor("docker", newDocker, nil)
+	executor.RegisterExecutor("container", newDocker, nil)
 }
