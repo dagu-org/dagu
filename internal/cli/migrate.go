@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/migration"
 	"github.com/spf13/cobra"
 )
 
@@ -56,7 +55,7 @@ func runMigration(ctx *Context) error {
 	}
 
 	// Create migrator
-	migrator := migration.NewHistoryMigrator(
+	migrator := newHistoryMigrator(
 		ctx.DAGRunStore,
 		dagStore,
 		ctx.Config.Paths.DataDir,

@@ -1,4 +1,4 @@
-package migration
+package cli
 
 import (
 	"context"
@@ -16,22 +16,22 @@ import (
 	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
 )
 
-// HistoryMigrator handles migration from legacy history format to new format
-type HistoryMigrator struct {
+// historyMigrator handles migration from legacy history format to new format
+type historyMigrator struct {
 	dagRunStore models.DAGRunStore
 	dagStore    models.DAGStore
 	dataDir     string
 	dagsDir     string
 }
 
-// NewHistoryMigrator creates a new history migrator
-func NewHistoryMigrator(
+// newHistoryMigrator creates a new history migrator
+func newHistoryMigrator(
 	dagRunStore models.DAGRunStore,
 	dagStore models.DAGStore,
 	dataDir string,
 	dagsDir string,
-) *HistoryMigrator {
-	return &HistoryMigrator{
+) *historyMigrator {
+	return &historyMigrator{
 		dagRunStore: dagRunStore,
 		dagStore:    dagStore,
 		dataDir:     dataDir,
@@ -39,8 +39,8 @@ func NewHistoryMigrator(
 	}
 }
 
-// MigrationResult contains the result of a migration
-type MigrationResult struct {
+// migrationResult contains the result of a migration
+type migrationResult struct {
 	TotalDAGs    int
 	TotalRuns    int
 	MigratedRuns int
@@ -50,7 +50,7 @@ type MigrationResult struct {
 }
 
 // NeedsMigration checks if legacy data exists that needs migration
-func (m *HistoryMigrator) NeedsMigration(_ context.Context) (bool, error) {
+func (m *historyMigrator) NeedsMigration(_ context.Context) (bool, error) {
 	dataDir := m.dataDir
 
 	// Check if history directory exists
@@ -88,8 +88,8 @@ func (m *HistoryMigrator) NeedsMigration(_ context.Context) (bool, error) {
 }
 
 // Migrate performs the migration from legacy to new format
-func (m *HistoryMigrator) Migrate(ctx context.Context) (*MigrationResult, error) {
-	result := &MigrationResult{}
+func (m *historyMigrator) Migrate(ctx context.Context) (*migrationResult, error) {
+	result := &migrationResult{}
 
 	logger.Info(ctx, "Starting history migration from legacy format")
 
@@ -121,7 +121,7 @@ func (m *HistoryMigrator) Migrate(ctx context.Context) (*MigrationResult, error)
 }
 
 // migrateDAGHistory migrates all runs for a specific DAG
-func (m *HistoryMigrator) migrateDAGHistory(ctx context.Context, dirName, dagName string, result *MigrationResult) error {
+func (m *historyMigrator) migrateDAGHistory(ctx context.Context, dirName, dagName string, result *migrationResult) error {
 	dagHistoryDir := filepath.Join(m.dataDir, dirName)
 
 	files, err := os.ReadDir(dagHistoryDir)
@@ -180,7 +180,7 @@ func (m *HistoryMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 }
 
 // migrateRun converts and saves a single run
-func (m *HistoryMigrator) migrateRun(ctx context.Context, legacyStatusFile *legacymodel.StatusFile, dirBasedDagName string) error {
+func (m *historyMigrator) migrateRun(ctx context.Context, legacyStatusFile *legacymodel.StatusFile, dirBasedDagName string) error {
 	legacyStatus := &legacyStatusFile.Status
 
 	// Load the DAG definition - try both the status name and directory-based name
@@ -228,7 +228,7 @@ func (m *HistoryMigrator) migrateRun(ctx context.Context, legacyStatusFile *lega
 }
 
 // convertStatus converts legacy status to new DAGRunStatus format
-func (m *HistoryMigrator) convertStatus(legacy *legacymodel.Status, dag *digraph.DAG) *models.DAGRunStatus {
+func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *digraph.DAG) *models.DAGRunStatus {
 	// Convert timestamps
 	startedAt, _ := m.parseTime(legacy.StartedAt)
 	finishedAt, _ := m.parseTime(legacy.FinishedAt)
@@ -282,7 +282,7 @@ func (m *HistoryMigrator) convertStatus(legacy *legacymodel.Status, dag *digraph
 }
 
 // convertNode converts legacy node to new Node format
-func (m *HistoryMigrator) convertNode(legacy *legacymodel.Node) *models.Node {
+func (m *historyMigrator) convertNode(legacy *legacymodel.Node) *models.Node {
 	node := &models.Node{
 		Step:       legacy.Step,
 		Status:     legacy.Status,
@@ -299,7 +299,7 @@ func (m *HistoryMigrator) convertNode(legacy *legacymodel.Node) *models.Node {
 }
 
 // parseTime attempts to parse various time formats
-func (m *HistoryMigrator) parseTime(timeStr string) (time.Time, error) {
+func (m *historyMigrator) parseTime(timeStr string) (time.Time, error) {
 	if timeStr == "" || timeStr == "-" {
 		return time.Time{}, fmt.Errorf("empty time string")
 	}
@@ -330,7 +330,7 @@ func formatTime(t time.Time) string {
 }
 
 // extractDAGName extracts the DAG name from directory name
-func (m *HistoryMigrator) extractDAGName(dirName string) string {
+func (m *historyMigrator) extractDAGName(dirName string) string {
 	// Directory format: {dag-name}-{hash}
 	// Just remove the last part after hyphen if it looks like a hash
 	lastHyphen := strings.LastIndex(dirName, "-")
@@ -350,7 +350,7 @@ func (m *HistoryMigrator) extractDAGName(dirName string) string {
 }
 
 // readLegacyStatusFile reads a legacy status file directly
-func (m *HistoryMigrator) readLegacyStatusFile(filePath string) (*legacymodel.StatusFile, error) {
+func (m *historyMigrator) readLegacyStatusFile(filePath string) (*legacymodel.StatusFile, error) {
 	data, err := os.ReadFile(filePath) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
@@ -380,7 +380,7 @@ func (m *HistoryMigrator) readLegacyStatusFile(filePath string) (*legacymodel.St
 }
 
 // isAlreadyMigrated checks if a run has already been migrated
-func (m *HistoryMigrator) isAlreadyMigrated(ctx context.Context, dagName, requestID string) bool {
+func (m *historyMigrator) isAlreadyMigrated(ctx context.Context, dagName, requestID string) bool {
 	attempt, err := m.dagRunStore.FindAttempt(ctx, digraph.NewDAGRunRef(dagName, requestID))
 	if err != nil || attempt == nil {
 		return false
@@ -391,7 +391,7 @@ func (m *HistoryMigrator) isAlreadyMigrated(ctx context.Context, dagName, reques
 }
 
 // loadDAGForMigration attempts to load the DAG definition
-func (m *HistoryMigrator) loadDAGForMigration(ctx context.Context, statusDagName, dirBasedDagName string) (*digraph.DAG, error) {
+func (m *historyMigrator) loadDAGForMigration(ctx context.Context, statusDagName, dirBasedDagName string) (*digraph.DAG, error) {
 	// Try both DAG names as candidates
 	candidates := []string{statusDagName}
 	if dirBasedDagName != "" && dirBasedDagName != statusDagName {
@@ -420,7 +420,7 @@ func (m *HistoryMigrator) loadDAGForMigration(ctx context.Context, statusDagName
 }
 
 // MoveLegacyData moves individual legacy DAG directories to an archive location after successful migration
-func (m *HistoryMigrator) MoveLegacyData(ctx context.Context) error {
+func (m *historyMigrator) MoveLegacyData(ctx context.Context) error {
 	archiveDir := filepath.Join(m.dataDir, fmt.Sprintf("history_migrated_%s", time.Now().Format("20060102_150405")))
 
 	// Create archive directory

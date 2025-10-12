@@ -1,4 +1,4 @@
-package migration
+package cli
 
 import (
 	"context"
@@ -131,7 +131,7 @@ func TestExtractDAGName(t *testing.T) {
 		},
 	}
 
-	m := &HistoryMigrator{}
+	m := &historyMigrator{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := m.extractDAGName(tt.dirName)
@@ -173,7 +173,7 @@ func TestReadLegacyStatusFile(t *testing.T) {
 	require.NoError(t, f.Close())
 
 	// Test reading the file
-	m := &HistoryMigrator{}
+	m := &historyMigrator{}
 	statusFile, err := m.readLegacyStatusFile(testFile)
 	require.NoError(t, err)
 	require.NotNil(t, statusFile)
@@ -189,7 +189,7 @@ func TestNeedsMigration(t *testing.T) {
 
 	t.Run("NoHistoryDirectory", func(t *testing.T) {
 		tempDir := t.TempDir()
-		m := &HistoryMigrator{dataDir: tempDir}
+		m := &historyMigrator{dataDir: tempDir}
 
 		needsMigration, err := m.NeedsMigration(ctx)
 		assert.NoError(t, err)
@@ -206,7 +206,7 @@ func TestNeedsMigration(t *testing.T) {
 		datFile := filepath.Join(dagDir, "my-dag.20240101.100000.req123.dat")
 		require.NoError(t, os.WriteFile(datFile, []byte(`{"RequestId":"req123"}`), 0600))
 
-		m := &HistoryMigrator{dataDir: tempDir}
+		m := &historyMigrator{dataDir: tempDir}
 		needsMigration, err := m.NeedsMigration(ctx)
 		assert.NoError(t, err)
 		assert.True(t, needsMigration)
@@ -222,7 +222,7 @@ func TestNeedsMigration(t *testing.T) {
 		otherFile := filepath.Join(dagDir, "other.txt")
 		require.NoError(t, os.WriteFile(otherFile, []byte("test"), 0600))
 
-		m := &HistoryMigrator{dataDir: tempDir}
+		m := &historyMigrator{dataDir: tempDir}
 		needsMigration, err := m.NeedsMigration(ctx)
 		assert.NoError(t, err)
 		assert.False(t, needsMigration)
@@ -266,7 +266,7 @@ func TestConvertStatus(t *testing.T) {
 		},
 	}
 
-	m := &HistoryMigrator{}
+	m := &historyMigrator{}
 	result := m.convertStatus(legacy, dag)
 
 	assert.Equal(t, "test-dag", result.Name)
@@ -321,7 +321,7 @@ func TestParseTime(t *testing.T) {
 		},
 	}
 
-	m := &HistoryMigrator{}
+	m := &historyMigrator{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := m.parseTime(tt.timeStr)
@@ -354,7 +354,7 @@ func TestMoveLegacyData(t *testing.T) {
 	require.NoError(t, os.MkdirAll(otherDir, 0750))
 	require.NoError(t, os.WriteFile(filepath.Join(otherDir, "test.txt"), []byte("data"), 0600))
 
-	m := &HistoryMigrator{dataDir: tempDir}
+	m := &historyMigrator{dataDir: tempDir}
 	err := m.MoveLegacyData(ctx)
 	require.NoError(t, err)
 
@@ -406,7 +406,7 @@ func TestLoadDAGForMigration(t *testing.T) {
 		},
 	}
 
-	m := &HistoryMigrator{
+	m := &historyMigrator{
 		dagStore: mockStore,
 		dagsDir:  tempDir,
 	}
@@ -488,7 +488,7 @@ func TestFullMigration(t *testing.T) {
 	}
 
 	// Create migrator
-	migrator := NewHistoryMigrator(dagRunStore, dagStore, dataDir, dagsDir)
+	migrator := newHistoryMigrator(dagRunStore, dagStore, dataDir, dagsDir)
 
 	// Check migration is needed
 	needsMigration, err := migrator.NeedsMigration(ctx)
