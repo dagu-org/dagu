@@ -1,4 +1,4 @@
-package task
+package scheduler
 
 import (
 	"github.com/dagu-org/dagu/internal/digraph"

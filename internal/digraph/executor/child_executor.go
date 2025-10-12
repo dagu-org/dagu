@@ -14,7 +14,6 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	taskpkg "github.com/dagu-org/dagu/internal/digraph/task"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/otel"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -173,18 +172,18 @@ func (e *ChildDAGExecutor) BuildCoordinatorTask(
 	}
 
 	// Build task for coordinator dispatch using DAG.CreateTask
-	task := taskpkg.CreateTask(
+	task := scheduler.CreateTask(
 		e.DAG.Name,
 		string(e.DAG.YamlData),
 		coordinatorv1.Operation_OPERATION_START,
 		runParams.RunID,
-		taskpkg.WithRootDagRun(env.RootDAGRun),
-		taskpkg.WithParentDagRun(digraph.DAGRunRef{
+		scheduler.WithRootDagRun(env.RootDAGRun),
+		scheduler.WithParentDagRun(digraph.DAGRunRef{
 			Name: env.DAG.Name,
 			ID:   env.DAGRunID,
 		}),
-		taskpkg.WithTaskParams(runParams.Params),
-		taskpkg.WithWorkerSelector(e.DAG.WorkerSelector),
+		scheduler.WithTaskParams(runParams.Params),
+		scheduler.WithWorkerSelector(e.DAG.WorkerSelector),
 	)
 
 	logger.Info(ctx, "Built coordinator task for child DAG",
