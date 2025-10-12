@@ -31,7 +31,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
-	"github.com/dagu-org/dagu/internal/services/coordinator"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 

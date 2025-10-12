@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/services/worker"
+	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/spf13/cobra"
 )
 

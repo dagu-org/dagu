@@ -13,8 +13,8 @@ import (
 	"github.com/dagu-org/dagu/internal/infra/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/infra/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/runtime"
-	"github.com/dagu-org/dagu/internal/services/coordinator"
-	"github.com/dagu-org/dagu/internal/services/scheduler"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/stretchr/testify/require"
 )
 

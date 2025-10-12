@@ -14,7 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/services/scheduler/filenotify"
+	"github.com/dagu-org/dagu/internal/service/scheduler/filenotify"
 	"github.com/fsnotify/fsnotify"
 )
 
