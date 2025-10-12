@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core/status"
+	"github.com/dagu-org/dagu/internal/runtime/worker"
 	"github.com/dagu-org/dagu/internal/test"
-	"github.com/dagu-org/dagu/internal/worker"
 	"github.com/stretchr/testify/require"
 )
 

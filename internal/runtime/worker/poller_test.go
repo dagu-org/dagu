@@ -10,7 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/coordinator"
-	"github.com/dagu-org/dagu/internal/worker"
+	"github.com/dagu-org/dagu/internal/runtime/worker"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
