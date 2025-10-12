@@ -1,4 +1,4 @@
-package container
+package docker
 
 import (
 	"fmt"

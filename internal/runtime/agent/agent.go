@@ -21,7 +21,6 @@ import (
 	"github.com/dagu-org/dagu/internal/common/sock"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/container"
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
@@ -337,12 +336,12 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new container if the DAG has a container configuration.
 	if a.dag.Container != nil {
-		ctCfg, err := container.LoadConfig(a.dag.WorkingDir, *a.dag.Container, a.dag.RegistryAuths)
+		ctCfg, err := docker.LoadConfig(a.dag.WorkingDir, *a.dag.Container, a.dag.RegistryAuths)
 		if err != nil {
 			initErr = fmt.Errorf("failed to load container config: %w", err)
 			return initErr
 		}
-		ctCli, err := container.InitializeClient(ctx, ctCfg)
+		ctCli, err := docker.InitializeClient(ctx, ctCfg)
 		if err != nil {
 			initErr = fmt.Errorf("failed to initialize container client: %w", err)
 			return initErr

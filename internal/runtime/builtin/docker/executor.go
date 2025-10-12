@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/signal"
-	"github.com/dagu-org/dagu/internal/container"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
@@ -55,13 +54,13 @@ type containerClientCtxKey = struct{}
 type registryAuthCtxKey = struct{}
 
 // WithContainerClient creates a new context with a client for container
-func WithContainerClient(ctx context.Context, cli *container.Client) context.Context {
+func WithContainerClient(ctx context.Context, cli *Client) context.Context {
 	return context.WithValue(ctx, containerClientCtxKey{}, cli)
 }
 
 // getContainerClient retrieves the container client from the context.
-func getContainerClient(ctx context.Context) *container.Client {
-	if cli, ok := ctx.Value(containerClientCtxKey{}).(*container.Client); ok {
+func getContainerClient(ctx context.Context) *Client {
+	if cli, ok := ctx.Value(containerClientCtxKey{}).(*Client); ok {
 		return cli
 	}
 	return nil
@@ -86,8 +85,8 @@ type docker struct {
 	stderr    io.Writer
 	context   context.Context
 	cancel    func()
-	cfg       *container.Config
-	container *container.Client
+	cfg       *Config
+	container *Client
 	mu        sync.Mutex
 	exitCode  int
 }
@@ -144,7 +143,7 @@ func (e *docker) Run(ctx context.Context) error {
 		// If it exists, use the client from the context
 		// This allows sharing the same container client across multiple executors.
 		// Don't set WorkingDir - use the container's default working directory
-		execOpts := container.ExecOptions{}
+		execOpts := ExecOptions{}
 
 		// Build command only when a command is explicitly provided.
 		// If command is empty, avoid passing an empty string which overrides image CMD.
@@ -174,7 +173,7 @@ func (e *docker) Run(ctx context.Context) error {
 		return ErrExecutorConfigRequired
 	}
 
-	cli, err := container.InitializeClient(ctx, e.cfg)
+	cli, err := InitializeClient(ctx, e.cfg)
 	if err != nil {
 		if tail := tw.Tail(); tail != "" {
 			return fmt.Errorf("failed to setup container: %w\nrecent stderr (tail):\n%s", err, tail)
@@ -215,11 +214,11 @@ func (e *docker) ExitCode() int {
 func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 	execCfg := step.ExecutorConfig
 
-	var cfg *container.Config
+	var cfg *Config
 	if len(execCfg.Config) > 0 {
 		// Get registry auth from context if available
 		registryAuths := getRegistryAuth(ctx)
-		c, err := container.LoadConfigFromMap(execCfg.Config, registryAuths)
+		c, err := LoadConfigFromMap(execCfg.Config, registryAuths)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load container config: %w", err)
 		}
