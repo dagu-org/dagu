@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/core"
 	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
@@ -90,7 +89,7 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 // checkAndCleanZombie checks if a single DAG run is a zombie and cleans it up
 func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.DAGRunStatus) error {
 	// Find the attempt for this status
-	dagRunRef := core.NewDAGRunRef(st.Name, st.DAGRunID)
+	dagRunRef := execution.NewDAGRunRef(st.Name, st.DAGRunID)
 	attempt, err := z.dagRunStore.FindAttempt(ctx, dagRunRef)
 	if err != nil {
 		return fmt.Errorf("find attempt: %w", err)
@@ -103,7 +102,7 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.
 	}
 
 	// Check if process is alive
-	alive, err := z.procStore.IsRunAlive(ctx, dag.ProcGroup(), core.DAGRunRef{Name: dag.Name, ID: st.DAGRunID})
+	alive, err := z.procStore.IsRunAlive(ctx, dag.ProcGroup(), execution.DAGRunRef{Name: dag.Name, ID: st.DAGRunID})
 	if err != nil {
 		return fmt.Errorf("check alive: %w", err)
 	}

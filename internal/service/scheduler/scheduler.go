@@ -412,7 +412,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan execution.QueuedIte
 		WAIT_FOR_RUN:
 			for {
 				// Check if the process is alive (has heartbeat)
-				isAlive, err := s.procStore.IsRunAlive(ctx, dag.ProcGroup(), core.DAGRunRef{Name: dag.Name, ID: data.ID})
+				isAlive, err := s.procStore.IsRunAlive(ctx, dag.ProcGroup(), execution.DAGRunRef{Name: dag.Name, ID: data.ID})
 				if err != nil {
 					logger.Error(ctx, "Failed to check if run is alive", "err", err, "data", data)
 					// Continue checking on error, don't immediately fail

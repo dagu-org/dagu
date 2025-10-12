@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
@@ -55,13 +54,13 @@ func (s *Store) CountAliveByDAGName(ctx context.Context, groupName, dagName stri
 }
 
 // ListAlive implements models.ProcStore.
-func (s *Store) ListAlive(ctx context.Context, groupName string) ([]core.DAGRunRef, error) {
+func (s *Store) ListAlive(ctx context.Context, groupName string) ([]execution.DAGRunRef, error) {
 	procGroup := s.newProcGroup(groupName)
 	return procGroup.ListAlive(ctx)
 }
 
 // Acquire implements models.ProcStore.
-func (s *Store) Acquire(ctx context.Context, groupName string, dagRun core.DAGRunRef) (execution.ProcHandle, error) {
+func (s *Store) Acquire(ctx context.Context, groupName string, dagRun execution.DAGRunRef) (execution.ProcHandle, error) {
 	procGroup := s.newProcGroup(groupName)
 	proc, err := procGroup.Acquire(ctx, dagRun)
 	if err != nil {
@@ -74,15 +73,15 @@ func (s *Store) Acquire(ctx context.Context, groupName string, dagRun core.DAGRu
 }
 
 // IsRunAlive implements models.ProcStore.
-func (s *Store) IsRunAlive(ctx context.Context, groupName string, dagRun core.DAGRunRef) (bool, error) {
+func (s *Store) IsRunAlive(ctx context.Context, groupName string, dagRun execution.DAGRunRef) (bool, error) {
 	procGroup := s.newProcGroup(groupName)
 	return procGroup.IsRunAlive(ctx, dagRun)
 }
 
 // ListAllAlive implements models.ProcStore.
 // Returns all running DAG runs across all process groups.
-func (s *Store) ListAllAlive(ctx context.Context) (map[string][]core.DAGRunRef, error) {
-	result := make(map[string][]core.DAGRunRef)
+func (s *Store) ListAllAlive(ctx context.Context) (map[string][]execution.DAGRunRef, error) {
+	result := make(map[string][]execution.DAGRunRef)
 
 	// Create base directory if it doesn't exist
 	if _, err := os.Stat(s.baseDir); os.IsNotExist(err) {

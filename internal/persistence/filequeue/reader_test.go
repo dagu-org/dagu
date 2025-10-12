@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/test"
@@ -21,13 +20,13 @@ func TestQueueReader(t *testing.T) {
 	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add some items to the queue
-	err := store.Enqueue(ctx, "test-name", execution.QueuePriorityLow, core.DAGRunRef{
+	err := store.Enqueue(ctx, "test-name", execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag-1",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
-	err = store.Enqueue(ctx, "test-name", execution.QueuePriorityHigh, core.DAGRunRef{
+	err = store.Enqueue(ctx, "test-name", execution.QueuePriorityHigh, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag-2",
 	})
@@ -81,7 +80,7 @@ func TestQueueReaderChannelFull(t *testing.T) {
 	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add an item to the queue
-	err := store.Enqueue(ctx, "test-name", execution.QueuePriorityLow, core.DAGRunRef{
+	err := store.Enqueue(ctx, "test-name", execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag-1",
 	})
@@ -146,7 +145,7 @@ func TestQueueReaderContextCancellation(t *testing.T) {
 	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add an item to the queue
-	err := store.Enqueue(ctx, "test-name", execution.QueuePriorityLow, core.DAGRunRef{
+	err := store.Enqueue(ctx, "test-name", execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag-1",
 	})
@@ -189,7 +188,7 @@ func TestQueueReaderRetryDelay(t *testing.T) {
 
 	// Add a single item
 	queueName := "test-queue"
-	err := store.Enqueue(ctx, queueName, execution.QueuePriorityHigh, core.DAGRunRef{
+	err := store.Enqueue(ctx, queueName, execution.QueuePriorityHigh, execution.DAGRunRef{
 		Name: queueName,
 		ID:   "test-dag-1",
 	})
@@ -245,13 +244,13 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 	queue1 := "queue-1"
 	queue2 := "queue-2"
 
-	err := store.Enqueue(ctx, queue1, execution.QueuePriorityHigh, core.DAGRunRef{
+	err := store.Enqueue(ctx, queue1, execution.QueuePriorityHigh, execution.DAGRunRef{
 		Name: queue1,
 		ID:   "dag-1",
 	})
 	require.NoError(t, err)
 
-	err = store.Enqueue(ctx, queue2, execution.QueuePriorityHigh, core.DAGRunRef{
+	err = store.Enqueue(ctx, queue2, execution.QueuePriorityHigh, execution.DAGRunRef{
 		Name: queue2,
 		ID:   "dag-2",
 	})

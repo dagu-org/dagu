@@ -12,7 +12,7 @@ import (
 
 func TestDebugVariables(t *testing.T) {
 	// Create a test context with environment variables
-	ctx := execution.SetupDAGContext(context.Background(), &core.DAG{}, nil, core.DAGRunRef{}, "test-run", "test.log", nil, nil)
+	ctx := execution.SetupDAGContext(context.Background(), &core.DAG{}, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil)
 	env := execution.GetEnv(ctx)
 
 	// Store variable with spaces

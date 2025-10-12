@@ -25,7 +25,7 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*core.DAG, error) {
 	return o.ds.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) (*execution.RunStatus, error) {
+func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (*execution.RunStatus, error) {
 	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
@@ -58,7 +58,7 @@ func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, ro
 	}, nil
 }
 
-func (o *dbClient) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) (bool, error) {
+func (o *dbClient) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (bool, error) {
 	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return false, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
@@ -71,7 +71,7 @@ func (o *dbClient) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, 
 	return !status.Status.IsActive(), nil
 }
 
-func (o *dbClient) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) error {
+func (o *dbClient) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) error {
 	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to find child attempt for dag-run ID %s: %w", dagRunID, err)

@@ -106,7 +106,7 @@ func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) erro
 // stopSingleDAGRun stops a single DAG run by its ID
 func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID string) error {
 	// Check if the process is running using proc store
-	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), core.NewDAGRunRef(dag.Name, dagRunID))
+	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
 
 	if err != nil {
 		return fmt.Errorf("failed to retrieve status from proc store: %w", err)
@@ -127,7 +127,7 @@ func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID 
 	}
 
 	// Try to find the running dag-run attempt and request cancel
-	runRef := core.NewDAGRunRef(dag.Name, dagRunID)
+	runRef := execution.NewDAGRunRef(dag.Name, dagRunID)
 	run, err := m.dagRunStore.FindAttempt(ctx, runRef)
 	if err == nil {
 		if err := run.RequestCancel(ctx); err != nil {
@@ -176,7 +176,7 @@ FALLBACK:
 }
 
 // GetSavedStatus retrieves the saved status of a dag-run by its core.DAGRun reference.
-func (m *Manager) GetSavedStatus(ctx context.Context, dagRun core.DAGRunRef) (*execution.DAGRunStatus, error) {
+func (m *Manager) GetSavedStatus(ctx context.Context, dagRun execution.DAGRunRef) (*execution.DAGRunStatus, error) {
 	attempt, err := m.dagRunStore.FindAttempt(ctx, dagRun)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by run reference: %w", err)
@@ -202,7 +202,7 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun core.DAGRunRef) (*e
 func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *core.DAG, dagRunID string) (
 	*execution.DAGRunStatus, error,
 ) {
-	dagRunRef := core.NewDAGRunRef(dag.Name, dagRunID)
+	dagRunRef := execution.NewDAGRunRef(dag.Name, dagRunID)
 	attempt, err := m.dagRunStore.FindAttempt(ctx, dagRunRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by dag-run ID: %w", err)
@@ -233,7 +233,7 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *core.DAG
 
 // FindChildDAGRunStatus retrieves the status of a child dag-run by its ID.
 // It looks up the child attempt in the dag-run store and reads its status.
-func (m *Manager) FindChildDAGRunStatus(ctx context.Context, rootDAGRun core.DAGRunRef, childRunID string) (*execution.DAGRunStatus, error) {
+func (m *Manager) FindChildDAGRunStatus(ctx context.Context, rootDAGRun execution.DAGRunRef, childRunID string) (*execution.DAGRunStatus, error) {
 	attempt, err := m.dagRunStore.FindChildAttempt(ctx, rootDAGRun, childRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find child dag-run attempt: %w", err)
@@ -326,7 +326,7 @@ func (m *Manager) ListRecentStatus(ctx context.Context, name string, n int) []ex
 }
 
 // UpdateStatus updates the status of a dag-run.
-func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun core.DAGRunRef, newStatus execution.DAGRunStatus) error {
+func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun execution.DAGRunRef, newStatus execution.DAGRunStatus) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -385,7 +385,7 @@ func (m *Manager) checkAndUpdateStaleRunningStatus(
 	if err != nil {
 		return fmt.Errorf("failed to read DAG for stale status check: %w", err)
 	}
-	dagRun := core.DAGRunRef{
+	dagRun := execution.DAGRunRef{
 		Name: dag.Name,
 		ID:   st.DAGRunID,
 	}

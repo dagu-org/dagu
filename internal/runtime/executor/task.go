@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -35,7 +35,7 @@ func CreateTask(
 type TaskOption func(*coordinatorv1.Task)
 
 // WithRootDagRun sets the root DAG run name and ID in the task.
-func WithRootDagRun(ref core.DAGRunRef) TaskOption {
+func WithRootDagRun(ref execution.DAGRunRef) TaskOption {
 	return func(task *coordinatorv1.Task) {
 		if ref.Name == "" || ref.ID == "" {
 			return // No root DAG run reference provided
@@ -46,7 +46,7 @@ func WithRootDagRun(ref core.DAGRunRef) TaskOption {
 }
 
 // WithParentDagRun sets the parent DAG run name and ID in the task.
-func WithParentDagRun(ref core.DAGRunRef) TaskOption {
+func WithParentDagRun(ref execution.DAGRunRef) TaskOption {
 	return func(task *coordinatorv1.Task) {
 		if ref.Name == "" || ref.ID == "" {
 			return // No parent DAG run reference provided

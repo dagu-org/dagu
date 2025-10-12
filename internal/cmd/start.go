@@ -80,7 +80,7 @@ func runStart(ctx *Context, args []string) error {
 	// Handle child dag-run if applicable
 	if isChildDAGRun {
 		// Parse parent execution reference
-		parent, err := core.ParseDAGRunRef(parentRef)
+		parent, err := execution.ParseDAGRunRef(parentRef)
 		if err != nil {
 			return fmt.Errorf("failed to parse parent dag-run reference: %w", err)
 		}
@@ -147,7 +147,7 @@ var (
 )
 
 // tryExecuteDAG tries to run the DAG within the max concurrent run config
-func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root core.DAGRunRef) error {
+func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef) error {
 	if err := ctx.ProcStore.TryLock(ctx, dag.ProcGroup()); err != nil {
 		logger.Debug(ctx, "failed to lock process group", "err", err)
 		return errMaxRunReached
@@ -168,7 +168,7 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root core.DAGRu
 	}
 
 	// Acquire process handle
-	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), core.NewDAGRunRef(dag.Name, dagRunID))
+	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
 	if err != nil {
 		logger.Debug(ctx, "failed to acquire process handle", "err", err)
 		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
@@ -181,7 +181,7 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root core.DAGRu
 	// Unlock the process group
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
-	return executeDAGRun(ctx, dag, core.DAGRunRef{}, dagRunID, root)
+	return executeDAGRun(ctx, dag, execution.DAGRunRef{}, dagRunID, root)
 }
 
 // getDAGRunInfo extracts and validates dag-run ID and references from command flags
@@ -297,22 +297,22 @@ func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
 }
 
 // determineRootDAGRun creates or parses the root execution reference
-func determineRootDAGRun(isChildDAGRun bool, rootDAGRun string, dag *core.DAG, dagRunID string) (core.DAGRunRef, error) {
+func determineRootDAGRun(isChildDAGRun bool, rootDAGRun string, dag *core.DAG, dagRunID string) (execution.DAGRunRef, error) {
 	if isChildDAGRun {
 		// Parse the rootDAGRun execution reference for child dag-runs
-		rootDAGRun, err := core.ParseDAGRunRef(rootDAGRun)
+		rootDAGRun, err := execution.ParseDAGRunRef(rootDAGRun)
 		if err != nil {
-			return core.DAGRunRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
+			return execution.DAGRunRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
 		}
 		return rootDAGRun, nil
 	}
 
 	// Create a new root execution reference for root execution
-	return core.NewDAGRunRef(dag.Name, dagRunID), nil
+	return execution.NewDAGRunRef(dag.Name, dagRunID), nil
 }
 
 // handleChildDAGRun processes a child dag-run, checking for previous runs
-func handleChildDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root core.DAGRunRef, parent core.DAGRunRef) error {
+func handleChildDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root execution.DAGRunRef, parent execution.DAGRunRef) error {
 	// Log child dag-run execution
 	logger.Info(ctx, "Executing child dag-run",
 		"dag", dag.Name,
@@ -351,7 +351,7 @@ func handleChildDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params stri
 }
 
 // executeDAGRun handles the actual execution of a DAG
-func executeDAGRun(ctx *Context, d *core.DAG, parent core.DAGRunRef, dagRunID string, root core.DAGRunRef) error {
+func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRunID string, root execution.DAGRunRef) error {
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/dag-run ID between attempts.
 	logFile, err := ctx.OpenLogFile(d, dagRunID)

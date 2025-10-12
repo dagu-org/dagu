@@ -97,7 +97,7 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 		return fmt.Errorf("failed to generate log file name: %w", err)
 	}
 
-	dagRun := core.NewDAGRunRef(dag.Name, dagRunID)
+	dagRun := execution.NewDAGRunRef(dag.Name, dagRunID)
 
 	// Check if the dag-run is already existing in the history store
 	if _, err = ctx.DAGRunStore.FindAttempt(ctx, dagRun); err == nil {
@@ -115,8 +115,8 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 		transform.WithPreconditions(dag.Preconditions),
 		transform.WithQueuedAt(stringutil.FormatTime(time.Now())),
 		transform.WithHierarchyRefs(
-			core.NewDAGRunRef(dag.Name, dagRunID),
-			core.DAGRunRef{},
+			execution.NewDAGRunRef(dag.Name, dagRunID),
+			execution.DAGRunRef{},
 		),
 	}
 

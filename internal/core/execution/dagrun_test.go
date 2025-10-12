@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -51,7 +50,7 @@ func (m *mockDAGRunStore) ListStatuses(ctx context.Context, opts ...execution.Li
 	return args.Get(0).([]*execution.DAGRunStatus), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun execution.DAGRunRef) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -59,7 +58,7 @@ func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef
 	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun core.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun execution.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun, childDAGRunID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -142,7 +141,7 @@ func (m *mockDAGRunAttempt) Hidden() bool {
 func TestListDAGRunStatusesOptions(t *testing.T) {
 	from := execution.NewUTC(time.Now().Add(-24 * time.Hour))
 	to := execution.NewUTC(time.Now())
-	statuses := []core1.Status{core1.Success, core1.Error}
+	statuses := []core.Status{core.Success, core.Error}
 
 	opts := execution.ListDAGRunStatusesOptions{}
 
@@ -164,7 +163,7 @@ func TestListDAGRunStatusesOptions(t *testing.T) {
 }
 
 func TestNewDAGRunAttemptOptions(t *testing.T) {
-	rootDAGRun := &core.DAGRunRef{
+	rootDAGRun := &execution.DAGRunRef{
 		Name: "root-dag",
 		ID:   "root-run-123",
 	}
@@ -209,7 +208,7 @@ func TestDAGRunStoreInterface(t *testing.T) {
 
 	// Test ListStatuses
 	statuses := []*execution.DAGRunStatus{
-		{Name: "test-dag", Status: core1.Success},
+		{Name: "test-dag", Status: core.Success},
 	}
 	store.On("ListStatuses", ctx, mock.Anything).Return(statuses, nil)
 
@@ -218,7 +217,7 @@ func TestDAGRunStoreInterface(t *testing.T) {
 	assert.Equal(t, statuses, statusList)
 
 	// Test FindAttempt
-	dagRun := core.DAGRunRef{Name: "test-dag", ID: "run-123"}
+	dagRun := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
 	store.On("FindAttempt", ctx, dagRun).Return(mockAttempt, nil)
 
 	found, err := store.FindAttempt(ctx, dagRun)
@@ -265,7 +264,7 @@ func TestDAGRunAttemptInterface(t *testing.T) {
 	status := execution.DAGRunStatus{
 		Name:     "test-dag",
 		DAGRunID: "run-123",
-		Status:   core1.Running,
+		Status:   core.Running,
 	}
 	attempt.On("Write", ctx, status).Return(nil)
 	err = attempt.Write(ctx, status)
@@ -327,7 +326,7 @@ func TestDAGRunStoreErrors(t *testing.T) {
 	assert.Equal(t, expectedErr, err)
 
 	// FindAttempt error
-	dagRun := core.DAGRunRef{Name: "test-dag", ID: "run-123"}
+	dagRun := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
 	store.On("FindAttempt", ctx, dagRun).Return(nil, execution.ErrNoStatusData)
 	_, err = store.FindAttempt(ctx, dagRun)
 	assert.Equal(t, execution.ErrNoStatusData, err)
@@ -403,7 +402,7 @@ func TestListDAGRunStatusesWithOptions(t *testing.T) {
 	opts := []execution.ListDAGRunStatusesOption{
 		execution.WithFrom(from),
 		execution.WithTo(to),
-		execution.WithStatuses([]core1.Status{core1.Success}),
+		execution.WithStatuses([]core.Status{core.Success}),
 		execution.WithName("test"),
 	}
 
@@ -411,7 +410,7 @@ func TestListDAGRunStatusesWithOptions(t *testing.T) {
 		{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
-			Status:   core1.Success,
+			Status:   core.Success,
 		},
 	}
 

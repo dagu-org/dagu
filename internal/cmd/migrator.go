@@ -381,7 +381,7 @@ func (m *historyMigrator) readLegacyStatusFile(filePath string) (*legacymodel.St
 
 // isAlreadyMigrated checks if a run has already been migrated
 func (m *historyMigrator) isAlreadyMigrated(ctx context.Context, dagName, requestID string) bool {
-	attempt, err := m.dagRunStore.FindAttempt(ctx, core.NewDAGRunRef(dagName, requestID))
+	attempt, err := m.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(dagName, requestID))
 	if err != nil || attempt == nil {
 		return false
 	}

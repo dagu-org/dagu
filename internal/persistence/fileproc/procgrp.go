@@ -12,7 +12,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/dirlock"
 	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
@@ -166,7 +165,7 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 
 // GetProc retrieves a proc file for the specified dag-run reference.
 // It returns a new Proc instance with the generated file name.
-func (pg *ProcGroup) Acquire(_ context.Context, dagRun core.DAGRunRef) (*ProcHandle, error) {
+func (pg *ProcGroup) Acquire(_ context.Context, dagRun execution.DAGRunRef) (*ProcHandle, error) {
 	// Generate the proc file name
 	fileName := pg.getFileName(execution.NewUTC(time.Now()), dagRun)
 	return NewProcHandler(fileName, execution.ProcMeta{
@@ -175,7 +174,7 @@ func (pg *ProcGroup) Acquire(_ context.Context, dagRun core.DAGRunRef) (*ProcHan
 }
 
 // getFileName generates a proc file name based on the dag-run reference and the current time.
-func (pg *ProcGroup) getFileName(t execution.TimeInUTC, dagRun core.DAGRunRef) string {
+func (pg *ProcGroup) getFileName(t execution.TimeInUTC, dagRun execution.DAGRunRef) string {
 	timestamp := t.Format(dateTimeFormatUTC)
 	fileName := procFilePrefix + timestamp + "Z_" + dagRun.ID + ".proc"
 	return filepath.Join(pg.baseDir, dagRun.Name, fileName)
@@ -185,7 +184,7 @@ func (pg *ProcGroup) getFileName(t execution.TimeInUTC, dagRun core.DAGRunRef) s
 const dateTimeFormatUTC = "20060102_150405"
 
 // IsRunAlive checks if a specific DAG run has an alive process file.
-func (pg *ProcGroup) IsRunAlive(ctx context.Context, dagRun core.DAGRunRef) (bool, error) {
+func (pg *ProcGroup) IsRunAlive(ctx context.Context, dagRun execution.DAGRunRef) (bool, error) {
 	pg.mu.Lock()
 	defer pg.mu.Unlock()
 
@@ -222,13 +221,13 @@ func (pg *ProcGroup) IsRunAlive(ctx context.Context, dagRun core.DAGRunRef) (boo
 }
 
 // ListAlive returns a list of alive DAG runs by scanning process files.
-func (pg *ProcGroup) ListAlive(ctx context.Context) ([]core.DAGRunRef, error) {
+func (pg *ProcGroup) ListAlive(ctx context.Context) ([]execution.DAGRunRef, error) {
 	pg.mu.Lock()
 	defer pg.mu.Unlock()
 
 	// If directory does not exist, return empty list
 	if _, err := os.Stat(pg.baseDir); errors.Is(err, os.ErrNotExist) {
-		return []core.DAGRunRef{}, nil
+		return []execution.DAGRunRef{}, nil
 	}
 
 	// Grep for all proc files in the directory
@@ -237,7 +236,7 @@ func (pg *ProcGroup) ListAlive(ctx context.Context) ([]core.DAGRunRef, error) {
 		return nil, err
 	}
 
-	var aliveRuns []core.DAGRunRef
+	var aliveRuns []execution.DAGRunRef
 	for _, file := range files {
 		basename := filepath.Base(file)
 		if !procFileRegex.MatchString(basename) {
@@ -250,7 +249,7 @@ func (pg *ProcGroup) ListAlive(ctx context.Context) ([]core.DAGRunRef, error) {
 			runID := extractRunIDFromFileName(basename)
 			dagName := filepath.Base(filepath.Dir(file))
 			if runID != "" {
-				aliveRuns = append(aliveRuns, core.DAGRunRef{
+				aliveRuns = append(aliveRuns, execution.DAGRunRef{
 					Name: dagName,
 					ID:   runID,
 				})

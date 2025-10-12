@@ -750,7 +750,7 @@ func (a *API) updateStatus(
 
 	status.Nodes[idxToUpdate].Status = to
 
-	root := core.NewDAGRunRef(dag.Name, dagRunID)
+	root := execution.NewDAGRunRef(dag.Name, dagRunID)
 	if err := a.dagRunManager.UpdateStatus(ctx, root, *status); err != nil {
 		return fmt.Errorf("error updating status: %w", err)
 	}

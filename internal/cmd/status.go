@@ -498,7 +498,7 @@ func extractDAGName(ctx *Context, name string) (string, error) {
 func extractAttemptID(ctx *Context, name, dagRunID string) (execution.DAGRunAttempt, error) {
 	if dagRunID != "" {
 		// Retrieve the previous run's record for the specified dag-run ID.
-		dagRunRef := core.NewDAGRunRef(name, dagRunID)
+		dagRunRef := execution.NewDAGRunRef(name, dagRunID)
 		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find run data for dag-run ID %s: %w", dagRunID, err)

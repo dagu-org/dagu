@@ -411,7 +411,7 @@ func (store *Store) LatestAttempt(ctx context.Context, dagName string) (executio
 }
 
 // FindAttempt finds a history record by dag-run ID.
-func (store *Store) FindAttempt(ctx context.Context, ref core.DAGRunRef) (execution.DAGRunAttempt, error) {
+func (store *Store) FindAttempt(ctx context.Context, ref execution.DAGRunRef) (execution.DAGRunAttempt, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -435,7 +435,7 @@ func (store *Store) FindAttempt(ctx context.Context, ref core.DAGRunRef) (execut
 
 // FindChildAttempt finds a child dag-run by its ID.
 // It returns the latest record for the specified child dag-run ID.
-func (store *Store) FindChildAttempt(ctx context.Context, ref core.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
+func (store *Store) FindChildAttempt(ctx context.Context, ref execution.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -485,7 +485,7 @@ func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retent
 }
 
 // RemoveDAGRun implements models.DAGRunStore.
-func (store *Store) RemoveDAGRun(ctx context.Context, dagRun core.DAGRunRef) error {
+func (store *Store) RemoveDAGRun(ctx context.Context, dagRun execution.DAGRunRef) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():

@@ -69,7 +69,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 
 		// Mock attempt
 		attempt := &mockDAGRunAttempt{}
-		dagRunRef := core.NewDAGRunRef("test-dag", "run-123")
+		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", ctx, dagRunRef).Return(attempt, nil)
 
 		// Mock DAG
@@ -77,7 +77,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		attempt.On("ReadDAG", ctx).Return(dag, nil)
 
 		// Process is alive
-		procRef := core.DAGRunRef{
+		procRef := execution.DAGRunRef{
 			Name: dag.Name,
 			ID:   "run-123",
 		}
@@ -112,7 +112,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 
 		// Mock attempt
 		attempt := &mockDAGRunAttempt{}
-		dagRunRef := core.NewDAGRunRef("test-dag", "run-123")
+		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", ctx, dagRunRef).Return(attempt, nil)
 
 		// Mock DAG
@@ -120,7 +120,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		attempt.On("ReadDAG", ctx).Return(dag, nil)
 
 		// Process is NOT alive (zombie)
-		procRef := core.DAGRunRef{
+		procRef := execution.DAGRunRef{
 			Name: dag.Name,
 			ID:   "run-123",
 		}
@@ -207,7 +207,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 			Status:   core1.Running,
 		}
 
-		dagRunRef := core.NewDAGRunRef("test-dag", "run-123")
+		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", ctx, dagRunRef).Return((*mockDAGRunAttempt)(nil), errors.New("not found"))
 
 		err := detector.checkAndCleanZombie(ctx, status)
@@ -231,7 +231,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		}
 
 		attempt := &mockDAGRunAttempt{}
-		dagRunRef := core.NewDAGRunRef("test-dag", "run-123")
+		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", ctx, dagRunRef).Return(attempt, nil)
 		attempt.On("ReadDAG", ctx).Return((*core.DAG)(nil), errors.New("read error"))
 
@@ -257,13 +257,13 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		}
 
 		attempt := &mockDAGRunAttempt{}
-		dagRunRef := core.NewDAGRunRef("test-dag", "run-123")
+		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", ctx, dagRunRef).Return(attempt, nil)
 
 		dag := &core.DAG{Name: "test-dag"}
 		attempt.On("ReadDAG", ctx).Return(dag, nil)
 
-		procRef := core.DAGRunRef{
+		procRef := execution.DAGRunRef{
 			Name: dag.Name,
 			ID:   "run-123",
 		}
@@ -292,13 +292,13 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		}
 
 		attempt := &mockDAGRunAttempt{}
-		dagRunRef := core.NewDAGRunRef("test-dag", "run-123")
+		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", ctx, dagRunRef).Return(attempt, nil)
 
 		dag := &core.DAG{Name: "test-dag"}
 		attempt.On("ReadDAG", ctx).Return(dag, nil)
 
-		procRef := core.DAGRunRef{
+		procRef := execution.DAGRunRef{
 			Name: dag.Name,
 			ID:   "run-123",
 		}
@@ -384,7 +384,7 @@ func (m *mockDAGRunStore) ListStatuses(ctx context.Context, opts ...execution.Li
 	return args.Get(0).([]*execution.DAGRunStatus), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun execution.DAGRunRef) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -392,7 +392,7 @@ func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef
 	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun core.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun execution.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun, childDAGRunID)
 	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
@@ -407,7 +407,7 @@ func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName st
 	return args.Error(0)
 }
 
-func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun core.DAGRunRef) error {
+func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun execution.DAGRunRef) error {
 	args := m.Called(ctx, dagRun)
 	return args.Error(0)
 }
@@ -433,7 +433,7 @@ func (m *mockProcStore) TryLock(_ context.Context, _ string) error {
 func (m *mockProcStore) Unlock(_ context.Context, _ string) {
 }
 
-func (m *mockProcStore) Acquire(ctx context.Context, groupName string, dagRun core.DAGRunRef) (execution.ProcHandle, error) {
+func (m *mockProcStore) Acquire(ctx context.Context, groupName string, dagRun execution.DAGRunRef) (execution.ProcHandle, error) {
 	args := m.Called(ctx, groupName, dagRun)
 	return args.Get(0).(execution.ProcHandle), args.Error(1)
 }
@@ -443,25 +443,25 @@ func (m *mockProcStore) CountAlive(ctx context.Context, groupName string) (int, 
 	return args.Int(0), args.Error(1)
 }
 
-func (m *mockProcStore) IsRunAlive(ctx context.Context, groupName string, dagRun core.DAGRunRef) (bool, error) {
+func (m *mockProcStore) IsRunAlive(ctx context.Context, groupName string, dagRun execution.DAGRunRef) (bool, error) {
 	args := m.Called(ctx, groupName, dagRun)
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *mockProcStore) ListAlive(ctx context.Context, groupName string) ([]core.DAGRunRef, error) {
+func (m *mockProcStore) ListAlive(ctx context.Context, groupName string) ([]execution.DAGRunRef, error) {
 	args := m.Called(ctx, groupName)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]core.DAGRunRef), args.Error(1)
+	return args.Get(0).([]execution.DAGRunRef), args.Error(1)
 }
 
-func (m *mockProcStore) ListAllAlive(ctx context.Context) (map[string][]core.DAGRunRef, error) {
+func (m *mockProcStore) ListAllAlive(ctx context.Context) (map[string][]execution.DAGRunRef, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(map[string][]core.DAGRunRef), args.Error(1)
+	return args.Get(0).(map[string][]execution.DAGRunRef), args.Error(1)
 }
 
 // Mock DAGRunAttempt

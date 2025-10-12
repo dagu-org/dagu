@@ -103,7 +103,7 @@ type mockDAGRunStore struct {
 }
 
 // RemoveDAGRun implements models.DAGRunStore.
-func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ core.DAGRunRef) error {
+func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ execution.DAGRunRef) error {
 	panic("unimplemented")
 }
 
@@ -136,7 +136,7 @@ func (m *mockDAGRunStore) ListStatuses(ctx context.Context, opts ...execution.Li
 	return args.Get(0).([]*execution.DAGRunStatus), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun execution.DAGRunRef) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -144,7 +144,7 @@ func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef
 	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun core.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun execution.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun, childDAGRunID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -173,7 +173,7 @@ func (m *mockQueueStore) ListByDAGName(_ context.Context, _, _ string) ([]execut
 	return nil, nil
 }
 
-func (m *mockQueueStore) Enqueue(ctx context.Context, name string, priority execution.QueuePriority, dagRun core.DAGRunRef) error {
+func (m *mockQueueStore) Enqueue(ctx context.Context, name string, priority execution.QueuePriority, dagRun execution.DAGRunRef) error {
 	args := m.Called(ctx, name, priority, dagRun)
 	return args.Error(0)
 }

@@ -567,7 +567,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	}
 
 	// Check the dag-run ID is not already in use
-	_, err = a.dagRunStore.FindAttempt(ctx, core.DAGRunRef{
+	_, err = a.dagRunStore.FindAttempt(ctx, execution.DAGRunRef{
 		Name: dag.Name,
 		ID:   dagRunId,
 	})

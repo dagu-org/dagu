@@ -504,7 +504,7 @@ func TestFullMigration(t *testing.T) {
 	assert.Equal(t, 0, result.FailedRuns)
 
 	// Verify migration
-	attempt, err := dagRunStore.FindAttempt(ctx, core.NewDAGRunRef("test-dag", "req123"))
+	attempt, err := dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef("test-dag", "req123"))
 	require.NoError(t, err)
 	require.NotNil(t, attempt)
 

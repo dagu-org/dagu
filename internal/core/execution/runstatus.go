@@ -33,8 +33,8 @@ func InitialStatus(dag *core.DAG) DAGRunStatus {
 
 // DAGRunStatus represents the complete execution state of a dag-run.
 type DAGRunStatus struct {
-	Root          core.DAGRunRef    `json:"root,omitzero"`
-	Parent        core.DAGRunRef    `json:"parent,omitzero"`
+	Root          DAGRunRef         `json:"root,omitzero"`
+	Parent        DAGRunRef         `json:"parent,omitzero"`
 	Name          string            `json:"name"`
 	DAGRunID      string            `json:"dagRunId"`
 	AttemptID     string            `json:"attemptId"`
@@ -56,8 +56,8 @@ type DAGRunStatus struct {
 }
 
 // DAGRun returns a reference to the dag-run associated with this status
-func (st *DAGRunStatus) DAGRun() core.DAGRunRef {
-	return core.NewDAGRunRef(st.Name, st.DAGRunID)
+func (st *DAGRunStatus) DAGRun() DAGRunRef {
+	return NewDAGRunRef(st.Name, st.DAGRunID)
 }
 
 // Errors returns a slice of errors for the current status

@@ -390,7 +390,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 
 	logDir := d.Config.Paths.LogDir
 	logFile := filepath.Join(d.Config.Paths.LogDir, dagRunID+".log")
-	root := core.NewDAGRunRef(d.Name, dagRunID)
+	root := execution.NewDAGRunRef(d.Name, dagRunID)
 
 	helper.Agent = agent.New(
 		dagRunID,
@@ -430,7 +430,7 @@ func (a *Agent) RunError(t *testing.T) {
 func (a *Agent) RunCancel(t *testing.T) {
 	t.Helper()
 
-	proc, err := a.ProcStore.Acquire(a.Context, a.DAG.ProcGroup(), core.DAGRunRef{
+	proc, err := a.ProcStore.Acquire(a.Context, a.DAG.ProcGroup(), execution.DAGRunRef{
 		Name: a.DAG.Name,
 		ID:   a.dagRunID,
 	})

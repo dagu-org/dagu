@@ -114,7 +114,7 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	}
 
 	// Ensure the dag-run ID is not already used for this DAG name
-	if _, err := a.dagRunStore.FindAttempt(ctx, core.DAGRunRef{Name: dag.Name, ID: dagRunId}); !errors.Is(err, execution.ErrDAGRunIDNotFound) {
+	if _, err := a.dagRunStore.FindAttempt(ctx, execution.DAGRunRef{Name: dag.Name, ID: dagRunId}); !errors.Is(err, execution.ErrDAGRunIDNotFound) {
 		return nil, &Error{
 			HTTPStatus: http.StatusConflict,
 			Code:       api.ErrorCodeAlreadyExists,
@@ -240,7 +240,7 @@ func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestO
 	dagName := request.Name
 	dagRunId := request.DagRunId
 
-	ref := core.NewDAGRunRef(dagName, dagRunId)
+	ref := execution.NewDAGRunRef(dagName, dagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return api.GetDAGRunLog404JSONResponse{
@@ -276,7 +276,7 @@ func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLog
 	dagName := request.Name
 	dagRunId := request.DagRunId
 
-	ref := core.NewDAGRunRef(dagName, dagRunId)
+	ref := execution.NewDAGRunRef(dagName, dagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return api.GetDAGRunStepLog404JSONResponse{
@@ -326,7 +326,7 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 		return nil, err
 	}
 
-	ref := core.NewDAGRunRef(request.Name, request.DagRunId)
+	ref := execution.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return &api.UpdateDAGRunStepStatus404JSONResponse{
@@ -357,7 +357,7 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 
 	dagStatus.Nodes[idxToUpdate].Status = nodeStatusMapping[request.Body.Status]
 
-	root := core.NewDAGRunRef(request.Name, request.DagRunId)
+	root := execution.NewDAGRunRef(request.Name, request.DagRunId)
 	if err := a.dagRunMgr.UpdateStatus(ctx, root, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
@@ -388,7 +388,7 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 		}, nil
 	}
 
-	ref := core.NewDAGRunRef(dagName, dagRunId)
+	ref := execution.NewDAGRunRef(dagName, dagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return &api.GetDAGRunDetails404JSONResponse{
@@ -403,7 +403,7 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 
 // GetChildDAGRunDetails implements api.StrictServerInterface.
 func (a *API) GetChildDAGRunDetails(ctx context.Context, request api.GetChildDAGRunDetailsRequestObject) (api.GetChildDAGRunDetailsResponseObject, error) {
-	root := core.NewDAGRunRef(request.Name, request.DagRunId)
+	root := execution.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
 	if err != nil {
 		return &api.GetChildDAGRunDetails404JSONResponse{
@@ -418,7 +418,7 @@ func (a *API) GetChildDAGRunDetails(ctx context.Context, request api.GetChildDAG
 
 // GetChildDAGRunLog implements api.StrictServerInterface.
 func (a *API) GetChildDAGRunLog(ctx context.Context, request api.GetChildDAGRunLogRequestObject) (api.GetChildDAGRunLogResponseObject, error) {
-	root := core.NewDAGRunRef(request.Name, request.DagRunId)
+	root := execution.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
 	if err != nil {
 		return &api.GetChildDAGRunLog404JSONResponse{
@@ -452,7 +452,7 @@ func (a *API) GetChildDAGRunLog(ctx context.Context, request api.GetChildDAGRunL
 
 // GetChildDAGRunStepLog implements api.StrictServerInterface.
 func (a *API) GetChildDAGRunStepLog(ctx context.Context, request api.GetChildDAGRunStepLogRequestObject) (api.GetChildDAGRunStepLogResponseObject, error) {
-	root := core.NewDAGRunRef(request.Name, request.DagRunId)
+	root := execution.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
 	if err != nil {
 		return &api.GetChildDAGRunStepLog404JSONResponse{
@@ -503,7 +503,7 @@ func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.Updat
 		return nil, err
 	}
 
-	root := core.NewDAGRunRef(request.Name, request.DagRunId)
+	root := execution.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
 	if err != nil {
 		return &api.UpdateChildDAGRunStepStatus404JSONResponse{
@@ -555,7 +555,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		return nil, err
 	}
 
-	attempt, err := a.dagRunStore.FindAttempt(ctx, core.NewDAGRunRef(request.Name, request.DagRunId))
+	attempt, err := a.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(request.Name, request.DagRunId))
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -611,7 +611,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		return nil, err
 	}
 
-	attempt, err := a.dagRunStore.FindAttempt(ctx, core.NewDAGRunRef(request.Name, request.DagRunId))
+	attempt, err := a.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(request.Name, request.DagRunId))
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -654,7 +654,7 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 		return nil, err
 	}
 
-	dagRun := core.NewDAGRunRef(request.Name, request.DagRunId)
+	dagRun := execution.NewDAGRunRef(request.Name, request.DagRunId)
 	attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
 	if err != nil {
 		return nil, &Error{

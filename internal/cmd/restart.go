@@ -53,7 +53,7 @@ func runRestart(ctx *Context, args []string) error {
 	var attempt execution.DAGRunAttempt
 	if dagRunID != "" {
 		// Retrieve the previous run for the specified dag-run ID.
-		dagRunRef := core.NewDAGRunRef(name, dagRunID)
+		dagRunRef := execution.NewDAGRunRef(name, dagRunID)
 		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			return fmt.Errorf("failed to find the run for dag-run ID %s: %w", dagRunID, err)
@@ -107,7 +107,7 @@ func handleRestartProcess(ctx *Context, d *core.DAG, dagRunID string) error {
 	defer ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 
 	// Acquire process handle
-	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), core.NewDAGRunRef(d.Name, dagRunID))
+	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), execution.NewDAGRunRef(d.Name, dagRunID))
 	if err != nil {
 		logger.Debug(ctx, "failed to acquire process handle", "err", err)
 		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
@@ -154,7 +154,7 @@ func executeDAG(ctx *Context, cli runtime.Manager, dag *core.DAG) error {
 		dr,
 		ctx.DAGRunStore,
 		ctx.ServiceRegistry,
-		core.NewDAGRunRef(dag.Name, dagRunID),
+		execution.NewDAGRunRef(dag.Name, dagRunID),
 		ctx.Config.Global.Peer,
 		agent.Options{Dry: false})
 

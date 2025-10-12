@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,7 +18,7 @@ func TestStore(t *testing.T) {
 	store := New(baseDir)
 
 	// Create a dagRun reference
-	dagRun := core.DAGRunRef{
+	dagRun := execution.DAGRunRef{
 		Name: "test_dag",
 		ID:   "test_id",
 	}
@@ -62,7 +62,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 	store := New(baseDir)
 
 	t.Run("NoProcessFile", func(t *testing.T) {
-		dagRun := core.DAGRunRef{
+		dagRun := execution.DAGRunRef{
 			Name: "test-dag",
 			ID:   "run-123",
 		}
@@ -74,7 +74,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 	})
 
 	t.Run("AliveProcess", func(t *testing.T) {
-		dagRun := core.DAGRunRef{
+		dagRun := execution.DAGRunRef{
 			Name: "test-dag",
 			ID:   "run-456",
 		}
@@ -104,7 +104,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 
 	t.Run("DifferentRunID", func(t *testing.T) {
 		// Create a process for one run ID
-		dagRun1 := core.DAGRunRef{
+		dagRun1 := execution.DAGRunRef{
 			Name: "test-dag-3",
 			ID:   "run-789",
 		}
@@ -115,7 +115,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 		time.Sleep(time.Millisecond * 50)
 
 		// Check for a different run ID
-		dagRun2 := core.DAGRunRef{
+		dagRun2 := execution.DAGRunRef{
 			Name: "test-dag-3",
 			ID:   "run-999",
 		}
@@ -140,7 +140,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 			staleTime: time.Millisecond * 100,
 		}
 
-		dagRun := core.DAGRunRef{
+		dagRun := execution.DAGRunRef{
 			Name: "test-dag-stale",
 			ID:   "run-stale",
 		}
@@ -179,11 +179,11 @@ func TestStore_ListAllAlive(t *testing.T) {
 
 	t.Run("SingleGroup", func(t *testing.T) {
 		// Create processes in a single group
-		dagRun1 := core.DAGRunRef{
+		dagRun1 := execution.DAGRunRef{
 			Name: "dag1",
 			ID:   "run1",
 		}
-		dagRun2 := core.DAGRunRef{
+		dagRun2 := execution.DAGRunRef{
 			Name: "dag2",
 			ID:   "run2",
 		}
@@ -217,15 +217,15 @@ func TestStore_ListAllAlive(t *testing.T) {
 
 	t.Run("MultipleGroups", func(t *testing.T) {
 		// Create processes in multiple groups
-		dagRun1 := core.DAGRunRef{
+		dagRun1 := execution.DAGRunRef{
 			Name: "dag-a",
 			ID:   "run-a1",
 		}
-		dagRun2 := core.DAGRunRef{
+		dagRun2 := execution.DAGRunRef{
 			Name: "dag-b",
 			ID:   "run-b1",
 		}
-		dagRun3 := core.DAGRunRef{
+		dagRun3 := execution.DAGRunRef{
 			Name: "dag-c",
 			ID:   "run-c1",
 		}
@@ -260,15 +260,15 @@ func TestStore_ListAllAlive(t *testing.T) {
 
 	t.Run("MixedAliveAndStopped", func(t *testing.T) {
 		// Create some processes and stop some
-		dagRun1 := core.DAGRunRef{
+		dagRun1 := execution.DAGRunRef{
 			Name: "dag-x",
 			ID:   "run-x1",
 		}
-		dagRun2 := core.DAGRunRef{
+		dagRun2 := execution.DAGRunRef{
 			Name: "dag-y",
 			ID:   "run-y1",
 		}
-		dagRun3 := core.DAGRunRef{
+		dagRun3 := execution.DAGRunRef{
 			Name: "dag-z",
 			ID:   "run-z1",
 		}

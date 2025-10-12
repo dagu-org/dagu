@@ -5,6 +5,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +52,7 @@ func runStop(ctx *Context, args []string) error {
 	var dag *core.DAG
 	if dagRunID != "" {
 		// Retrieve the previous run's history record for the specified dag-run ID.
-		ref := core.NewDAGRunRef(name, dagRunID)
+		ref := execution.NewDAGRunRef(name, dagRunID)
 		rec, err := ctx.DAGRunStore.FindAttempt(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)

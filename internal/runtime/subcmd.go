@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -90,7 +91,7 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 }
 
 // Dequeue creates a dequeue command spec.
-func (b *SubCmdBuilder) Dequeue(dag *core.DAG, dagRun core.DAGRunRef) CmdSpec {
+func (b *SubCmdBuilder) Dequeue(dag *core.DAG, dagRun execution.DAGRunRef) CmdSpec {
 	args := []string{"dequeue", fmt.Sprintf("--dag-run=%s", dagRun.String())}
 
 	if b.configFile != "" {

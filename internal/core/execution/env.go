@@ -154,8 +154,8 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 }
 
 // DAGRunRef returns the DAGRunRef for the current execution context.
-func (e Env) DAGRunRef() core.DAGRunRef {
-	return core.NewDAGRunRef(e.DAG.Name, e.DAGRunID)
+func (e Env) DAGRunRef() DAGRunRef {
+	return NewDAGRunRef(e.DAG.Name, e.DAGRunID)
 }
 
 // AllEnvs returns all environment variables that needs to be passed to the command.

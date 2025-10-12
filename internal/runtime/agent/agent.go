@@ -94,10 +94,10 @@ type Agent struct {
 	// rootDAGRun indicates the root dag-run of the current dag-run.
 	// If the current dag-run is the root dag-run, it is the same as the current
 	// DAG name and dag-run ID.
-	rootDAGRun core.DAGRunRef
+	rootDAGRun execution.DAGRunRef
 
 	// parentDAGRun is the execution reference of the parent dag-run.
-	parentDAGRun core.DAGRunRef
+	parentDAGRun execution.DAGRunRef
 
 	// dagRunID is the ID for the current dag-run.
 	dagRunID string
@@ -136,7 +136,7 @@ type Options struct {
 	RetryTarget *execution.DAGRunStatus
 	// ParentDAGRun is the dag-run reference of the parent dag-run.
 	// It is required for child dag-runs to identify the parent dag-run.
-	ParentDAGRun core.DAGRunRef
+	ParentDAGRun execution.DAGRunRef
 	// ProgressDisplay indicates if the progress display should be shown.
 	// This is typically enabled for CLI execution in a TTY environment.
 	ProgressDisplay bool
@@ -154,7 +154,7 @@ func New(
 	ds execution.DAGStore,
 	drs execution.DAGRunStore,
 	reg execution.ServiceRegistry,
-	root core.DAGRunRef,
+	root execution.DAGRunRef,
 	peerConfig config.Peer,
 	opts Options,
 ) *Agent {

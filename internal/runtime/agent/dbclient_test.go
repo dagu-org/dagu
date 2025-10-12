@@ -25,7 +25,7 @@ func TestDBClient_GetChildDAGRunStatus(t *testing.T) {
 		mockDAGRunStore := new(mockDAGRunStore)
 		mockAttempt := new(mockDAGRunAttempt)
 
-		rootRef := core.NewDAGRunRef("parent-dag", "parent-run-123")
+		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-123")
 		childRunID := "child-run-123"
 
 		// Setup outputs
@@ -70,7 +70,7 @@ func TestDBClient_GetChildDAGRunStatus(t *testing.T) {
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
 
-		rootRef := core.NewDAGRunRef("parent-dag", "parent-run-notfound")
+		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-notfound")
 		childRunID := "non-existent-child"
 
 		mockDAGRunStore.On("FindChildAttempt", ctx, rootRef, childRunID).Return(nil, errors.New("not found"))
@@ -94,7 +94,7 @@ func TestDBClient_IsChildDAGRunCompleted(t *testing.T) {
 		mockDAGRunStore := new(mockDAGRunStore)
 		mockAttempt := new(mockDAGRunAttempt)
 
-		rootRef := core.NewDAGRunRef("parent-dag", "parent-run-completed")
+		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-completed")
 		childRunID := "child-completed-success"
 
 		mockDAGRunStore.On("FindChildAttempt", ctx, rootRef, childRunID).Return(mockAttempt, nil)
@@ -121,7 +121,7 @@ func TestDBClient_IsChildDAGRunCompleted(t *testing.T) {
 		mockDAGRunStore := new(mockDAGRunStore)
 		mockAttempt := new(mockDAGRunAttempt)
 
-		rootRef := core.NewDAGRunRef("parent-dag", "parent-run-error")
+		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-error")
 		childRunID := "child-completed-error"
 
 		mockDAGRunStore.On("FindChildAttempt", ctx, rootRef, childRunID).Return(mockAttempt, nil)
@@ -146,7 +146,7 @@ func TestDBClient_IsChildDAGRunCompleted(t *testing.T) {
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
 
-		rootRef := core.NewDAGRunRef("parent-dag", "parent-run-notfound")
+		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-notfound")
 		childRunID := "non-existent-child"
 
 		mockDAGRunStore.On("FindChildAttempt", ctx, rootRef, childRunID).Return(nil, errors.New("not found"))
@@ -249,7 +249,7 @@ type mockDAGRunStore struct {
 }
 
 // RemoveDAGRun implements models.DAGRunStore.
-func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun core.DAGRunRef) error {
+func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun execution.DAGRunRef) error {
 	panic("unimplemented")
 }
 
@@ -282,7 +282,7 @@ func (m *mockDAGRunStore) ListStatuses(ctx context.Context, opts ...execution.Li
 	return args.Get(0).([]*execution.DAGRunStatus), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun execution.DAGRunRef) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -290,7 +290,7 @@ func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef
 	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, rootDAGRun core.DAGRunRef, dagRunID string) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, rootDAGRun execution.DAGRunRef, dagRunID string) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, rootDAGRun, dagRunID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

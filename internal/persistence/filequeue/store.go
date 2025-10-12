@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
@@ -171,7 +170,7 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([
 }
 
 // Enqueue implements models.QueueStore.
-func (s *Store) Enqueue(ctx context.Context, name string, p execution.QueuePriority, dagRun core.DAGRunRef) error {
+func (s *Store) Enqueue(ctx context.Context, name string, p execution.QueuePriority, dagRun execution.DAGRunRef) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

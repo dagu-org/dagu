@@ -3,8 +3,6 @@ package execution
 import (
 	"context"
 	"errors"
-
-	"github.com/dagu-org/dagu/internal/core"
 )
 
 // Errors for the queue
@@ -17,7 +15,7 @@ var (
 // for storing and retrieving queued dag-run items.
 type QueueStore interface {
 	// Enqueue adds an item to the queue
-	Enqueue(ctx context.Context, name string, priority QueuePriority, dagRun core.DAGRunRef) error
+	Enqueue(ctx context.Context, name string, priority QueuePriority, dagRun DAGRunRef) error
 	// DequeueByName retrieves an item from the queue and removes it
 	DequeueByName(ctx context.Context, name string) (QueuedItemData, error)
 	// DequeueByDAGRunID retrieves items from the queue by dag-run ID and removes them
@@ -82,5 +80,5 @@ type QueuedItemData interface {
 	// ID returns the ID of the queued item
 	ID() string
 	// Data returns the data of the queued item
-	Data() core.DAGRunRef
+	Data() DAGRunRef
 }

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/core"
 	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/test"
@@ -51,7 +50,7 @@ steps:
 	// Update the child_2 status to "failed" to simulate a retry
 	// First, find the child_2 dag-run ID to update its status
 	ctx := context.Background()
-	ref := core.NewDAGRunRef("parent", dagRunID)
+	ref := execution.NewDAGRunRef("parent", dagRunID)
 	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
@@ -166,7 +165,7 @@ steps:
 
 	// Verify parent DAG completed successfully
 	ctx := context.Background()
-	ref := core.NewDAGRunRef("parent_retry", dagRunID)
+	ref := execution.NewDAGRunRef("parent_retry", dagRunID)
 	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
@@ -225,7 +224,7 @@ steps:
 
 	// Verify parent DAG completed successfully
 	ctx := context.Background()
-	ref := core.NewDAGRunRef("parent_basic", dagRunID)
+	ref := execution.NewDAGRunRef("parent_basic", dagRunID)
 	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
@@ -301,7 +300,7 @@ steps:
 
 	// Verify DAG completed successfully
 	ctx := context.Background()
-	ref := core.NewDAGRunRef("basic_retry", dagRunID)
+	ref := execution.NewDAGRunRef("basic_retry", dagRunID)
 	attempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
@@ -352,7 +351,7 @@ steps:
 
 	// Verify DAG completed successfully
 	ctx := context.Background()
-	ref := core.NewDAGRunRef("no_retry", dagRunID)
+	ref := execution.NewDAGRunRef("no_retry", dagRunID)
 	attempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 

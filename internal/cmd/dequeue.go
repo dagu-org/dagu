@@ -6,7 +6,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/spf13/cobra"
 )
@@ -30,7 +29,7 @@ var dequeueFlags = []commandLineFlag{paramsFlag, dagRunFlagDequeue}
 func runDequeue(ctx *Context, _ []string) error {
 	// Get dag-run reference from the context
 	dagRunRef, _ := ctx.StringParam("dag-run")
-	dagRun, err := core.ParseDAGRunRef(dagRunRef)
+	dagRun, err := execution.ParseDAGRunRef(dagRunRef)
 	if err != nil {
 		return fmt.Errorf("failed to parse dag-run reference %s: %w", dagRunRef, err)
 	}
@@ -38,7 +37,7 @@ func runDequeue(ctx *Context, _ []string) error {
 }
 
 // dequeueDAGRun dequeues a dag-run from the queue.
-func dequeueDAGRun(ctx *Context, dagRun core.DAGRunRef) error {
+func dequeueDAGRun(ctx *Context, dagRun execution.DAGRunRef) error {
 	// Check if queues are enabled
 	if !ctx.Config.Queues.Enabled {
 		return fmt.Errorf("queues are disabled in configuration")
@@ -53,7 +52,7 @@ func dequeueDAGRun(ctx *Context, dagRun core.DAGRunRef) error {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	if dagStatus.Status != core1.Queued {
+	if dagStatus.Status != core.Queued {
 		// If the status is not queued, return an error
 		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, dagStatus.Status)
 	}
@@ -68,7 +67,7 @@ func dequeueDAGRun(ctx *Context, dagRun core.DAGRunRef) error {
 	if err != nil {
 		return fmt.Errorf("failed to get latest status: %w", err)
 	}
-	if latestStatus.Status != core1.Queued {
+	if latestStatus.Status != core.Queued {
 		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, latestStatus.Status)
 	}
 
@@ -78,7 +77,7 @@ func dequeueDAGRun(ctx *Context, dagRun core.DAGRunRef) error {
 	}
 
 	// Make the status as canceled
-	dagStatus.Status = core1.Cancel
+	dagStatus.Status = core.Cancel
 
 	if err := attempt.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)

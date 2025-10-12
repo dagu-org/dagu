@@ -40,7 +40,7 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 		DAGContext: execution.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
-			RootDAGRun: core.NewDAGRunRef("parent", "root-123"),
+			RootDAGRun: execution.NewDAGRunRef("parent", "root-123"),
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
@@ -90,7 +90,7 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 		DAGContext: execution.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
-			RootDAGRun: core.NewDAGRunRef("parent", "root-123"),
+			RootDAGRun: execution.NewDAGRunRef("parent", "root-123"),
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
@@ -141,7 +141,7 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 		DAGContext: execution.DAGContext{
 			DAG:        parentDAG,
 			DB:         mockDB,
-			RootDAGRun: core.NewDAGRunRef("parent", "root-123"),
+			RootDAGRun: execution.NewDAGRunRef("parent", "root-123"),
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
@@ -174,7 +174,7 @@ func TestBuildCommand(t *testing.T) {
 		DAGContext: execution.DAGContext{
 			DAG:        &core.DAG{Name: "parent"},
 			DB:         mockDB,
-			RootDAGRun: core.NewDAGRunRef("parent", "root-123"),
+			RootDAGRun: execution.NewDAGRunRef("parent", "root-123"),
 			DAGRunID:   "parent-456",
 			Envs:       map[string]string{"TEST_ENV": "value"},
 			BaseEnv:    &baseEnv,
@@ -228,7 +228,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 		DAGContext: execution.DAGContext{
 			DAG:        &core.DAG{Name: "parent"},
 			DB:         mockDB,
-			RootDAGRun: core.NewDAGRunRef("parent", "root-123"),
+			RootDAGRun: execution.NewDAGRunRef("parent", "root-123"),
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
@@ -371,7 +371,7 @@ func TestChildDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 	env := execution.Env{
 		DAGContext: execution.DAGContext{
 			DB:         mockDB,
-			RootDAGRun: core.NewDAGRunRef("root-dag", "root-run-id"),
+			RootDAGRun: execution.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
 		},
 	}
@@ -419,7 +419,7 @@ func TestChildDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 	env := execution.Env{
 		DAGContext: execution.DAGContext{
 			DB:         mockDB,
-			RootDAGRun: core.NewDAGRunRef("root-dag", "root-run-id"),
+			RootDAGRun: execution.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
 		},
 	}
@@ -463,7 +463,7 @@ func TestChildDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 	env := execution.Env{
 		DAGContext: execution.DAGContext{
 			DB:         mockDB,
-			RootDAGRun: core.NewDAGRunRef("root-dag", "root-run-id"),
+			RootDAGRun: execution.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
 		},
 	}
@@ -502,7 +502,7 @@ func TestChildDAGExecutor_Kill_Empty(t *testing.T) {
 	env := execution.Env{
 		DAGContext: execution.DAGContext{
 			DB:         mockDB,
-			RootDAGRun: core.NewDAGRunRef("root-dag", "root-run-id"),
+			RootDAGRun: execution.NewDAGRunRef("root-dag", "root-run-id"),
 			DAGRunID:   "parent-run-id",
 		},
 	}
@@ -546,7 +546,7 @@ func (m *mockDatabase) GetDAG(ctx context.Context, name string) (*core.DAG, erro
 	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
-func (m *mockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) (*execution.RunStatus, error) {
+func (m *mockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (*execution.RunStatus, error) {
 	args := m.Called(ctx, dagRunID, rootDAGRun)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -555,13 +555,13 @@ func (m *mockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string
 }
 
 // IsChildDAGRunCompleted implements core.Database.
-func (m *mockDatabase) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) (bool, error) {
+func (m *mockDatabase) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (bool, error) {
 	args := m.Called(ctx, dagRunID, rootDAGRun)
 	return args.Bool(0), args.Error(1)
 }
 
 // RequestChildCancel implements core.Database.
-func (m *mockDatabase) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) error {
+func (m *mockDatabase) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) error {
 	args := m.Called(ctx, dagRunID, rootDAGRun)
 	return args.Error(0)
 }

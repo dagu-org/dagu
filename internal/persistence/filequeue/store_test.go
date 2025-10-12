@@ -3,7 +3,6 @@ package filequeue_test
 import (
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/test"
@@ -24,7 +23,7 @@ func TestStore(t *testing.T) {
 	require.Equal(t, 0, length, "expected store length to be 0")
 
 	// Add a job to thestore
-	err = store.Enqueue(th.Context, "test-name", execution.QueuePriorityLow, core.DAGRunRef{
+	err = store.Enqueue(th.Context, "test-name", execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag",
 	})
@@ -63,14 +62,14 @@ func TestStore_DequeueByDAGRunID(t *testing.T) {
 	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add a job to thestore
-	err := store.Enqueue(th.Context, "test-name", execution.QueuePriorityLow, core.DAGRunRef{
+	err := store.Enqueue(th.Context, "test-name", execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Add another job to thestore
-	err = store.Enqueue(th.Context, "test-name", execution.QueuePriorityLow, core.DAGRunRef{
+	err = store.Enqueue(th.Context, "test-name", execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag-2",
 	})
@@ -95,14 +94,14 @@ func TestStore_List(t *testing.T) {
 	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add a job to thestore
-	err := store.Enqueue(th.Context, "test-name", execution.QueuePriorityLow, core.DAGRunRef{
+	err := store.Enqueue(th.Context, "test-name", execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Add another job to thestore
-	err = store.Enqueue(th.Context, "test-name", execution.QueuePriorityLow, core.DAGRunRef{
+	err = store.Enqueue(th.Context, "test-name", execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag-2",
 	})
@@ -123,14 +122,14 @@ func TestStore_All(t *testing.T) {
 	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add a job to thestore
-	err := store.Enqueue(th.Context, "test-name", execution.QueuePriorityLow, core.DAGRunRef{
+	err := store.Enqueue(th.Context, "test-name", execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Add another job to thestore
-	err = store.Enqueue(th.Context, "test-name2", execution.QueuePriorityHigh, core.DAGRunRef{
+	err = store.Enqueue(th.Context, "test-name2", execution.QueuePriorityHigh, execution.DAGRunRef{
 		Name: "test-name2",
 		ID:   "test-dag-2",
 	})

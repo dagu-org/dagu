@@ -178,7 +178,7 @@ func (e *ChildDAGExecutor) BuildCoordinatorTask(
 		coordinatorv1.Operation_OPERATION_START,
 		runParams.RunID,
 		WithRootDagRun(env.RootDAGRun),
-		WithParentDagRun(core.DAGRunRef{
+		WithParentDagRun(execution.DAGRunRef{
 			Name: env.DAG.Name,
 			ID:   env.DAGRunID,
 		}),

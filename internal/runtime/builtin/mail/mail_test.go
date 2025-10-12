@@ -76,7 +76,7 @@ func TestMail(t *testing.T) {
 				ctx := context.Background()
 				ctx = execution.SetupDAGContext(ctx, &core.DAG{
 					SMTP: &core.SMTPConfig{},
-				}, nil, core.DAGRunRef{}, "", "", nil, nil)
+				}, nil, execution.DAGRunRef{}, "", "", nil, nil)
 
 				exec, err := newMail(ctx, tt.step)
 
@@ -151,7 +151,7 @@ func TestMail(t *testing.T) {
 				ctx := context.Background()
 				ctx = execution.SetupDAGContext(ctx, &core.DAG{
 					SMTP: &core.SMTPConfig{},
-				}, nil, core.DAGRunRef{}, "", "", nil, nil)
+				}, nil, execution.DAGRunRef{}, "", "", nil, nil)
 
 				exec, err := newMail(ctx, step)
 				assert.NoError(t, err)

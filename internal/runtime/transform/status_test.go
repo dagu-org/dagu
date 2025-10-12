@@ -123,8 +123,8 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 	failureNode := runtime.NewNode(core.Step{Name: "failure-step"}, runtime.NodeState{})
 	cancelNode := runtime.NewNode(core.Step{Name: "cancel-step"}, runtime.NodeState{})
 
-	rootRef := core.NewDAGRunRef("root-dag", "root-run-123")
-	parentRef := core.NewDAGRunRef("parent-dag", "parent-run-456")
+	rootRef := execution.NewDAGRunRef("root-dag", "root-run-123")
+	parentRef := execution.NewDAGRunRef("parent-dag", "parent-run-456")
 
 	// Test with all options
 	result := builder.Create(

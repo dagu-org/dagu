@@ -15,7 +15,7 @@ import (
 // DAGContext contains the execution metadata for a dag-run.
 type DAGContext struct {
 	DAGRunID       string
-	RootDAGRun     core.DAGRunRef
+	RootDAGRun     DAGRunRef
 	DAG            *core.DAG
 	DB             Database
 	BaseEnv        *config.BaseEnv
@@ -45,11 +45,11 @@ type Database interface {
 	// GetDAG retrieves a DAG by its name.
 	GetDAG(ctx context.Context, name string) (*core.DAG, error)
 	// GetChildDAGRunStatus retrieves the status of a child dag-run by its ID and the root dag-run reference.
-	GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) (*RunStatus, error)
+	GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (*RunStatus, error)
 	// IsChildDAGRunCompleted checks if a child dag-run has completed.
-	IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) (bool, error)
+	IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (bool, error)
 	// RequestChildCancel requests cancellation of a child dag-run.
-	RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun core.DAGRunRef) error
+	RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) error
 }
 
 // ChildDAGRunStatus is an interface that represents the status of a child dag-run.
@@ -93,7 +93,7 @@ type Dispatcher interface {
 }
 
 // SetupDAGContext initializes and returns a new context with DAG execution metadata.
-func SetupDAGContext(ctx context.Context, dag *core.DAG, db Database, rootDAGRun core.DAGRunRef, dagRunID, logFile string, params []string, coordinatorCli Dispatcher) context.Context {
+func SetupDAGContext(ctx context.Context, dag *core.DAG, db Database, rootDAGRun DAGRunRef, dagRunID, logFile string, params []string, coordinatorCli Dispatcher) context.Context {
 	var envs = map[string]string{
 		EnvKeyDAGRunLogFile: logFile,
 		EnvKeyDAGRunID:      dagRunID,

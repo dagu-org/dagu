@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/dirlock"
 	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
@@ -132,7 +131,7 @@ func (q *DualQueue) Len(ctx context.Context) (int, error) {
 }
 
 // Enqueue adds a dag-run to the queue with the specified priority
-func (q *DualQueue) Enqueue(ctx context.Context, priority execution.QueuePriority, dagRun core.DAGRunRef) error {
+func (q *DualQueue) Enqueue(ctx context.Context, priority execution.QueuePriority, dagRun execution.DAGRunRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 

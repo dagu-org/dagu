@@ -3,7 +3,6 @@ package filequeue
 import (
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
@@ -30,6 +29,6 @@ func (j *Job) ID() string {
 }
 
 // Data implements models.QueuedItem.
-func (j *Job) Data() core.DAGRunRef {
+func (j *Job) Data() execution.DAGRunRef {
 	return j.DAGRun
 }

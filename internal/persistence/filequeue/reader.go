@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/service/scheduler/filenotify"
 	"github.com/fsnotify/fsnotify"
@@ -282,7 +281,7 @@ func (q *queueReaderImpl) processItems(ctx context.Context, ch chan<- execution.
 	return items
 }
 
-func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- execution.QueuedItem, item *queuedItem, data core.DAGRunRef, _ map[string]bool) {
+func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- execution.QueuedItem, item *queuedItem, data execution.DAGRunRef, _ map[string]bool) {
 	item.status = statusProcessing
 
 	select {
@@ -326,7 +325,7 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- executio
 	}
 }
 
-func (q *queueReaderImpl) removeProcessedItem(ctx context.Context, data core.DAGRunRef) {
+func (q *queueReaderImpl) removeProcessedItem(ctx context.Context, data execution.DAGRunRef) {
 	if _, err := q.store.DequeueByDAGRunID(ctx, data.Name, data.ID); err != nil {
 		if !errors.Is(err, execution.ErrQueueItemNotFound) {
 			logger.Error(ctx, "Failed to dequeue item", "err", err, "name", data.Name, "dagRunId", data.ID)

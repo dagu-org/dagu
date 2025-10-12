@@ -23,7 +23,7 @@ func NewStatusBuilder(dag *core.DAG) *StatusBuilder {
 type StatusOption func(*execution.DAGRunStatus)
 
 // WithHierarchyRefs returns a StatusOption that sets the root DAG information
-func WithHierarchyRefs(root core.DAGRunRef, parent core.DAGRunRef) StatusOption {
+func WithHierarchyRefs(root execution.DAGRunRef, parent execution.DAGRunRef) StatusOption {
 	return func(s *execution.DAGRunStatus) {
 		s.Root = root
 		s.Parent = parent
