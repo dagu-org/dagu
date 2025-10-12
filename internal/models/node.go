@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 
+	"github.com/dagu-org/dagu/internal/common/maputil"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
@@ -24,7 +25,7 @@ type Node struct {
 	Error            string            `json:"error,omitempty"`
 	Children         []ChildDAGRun     `json:"children,omitempty"`
 	ChildrenRepeated []ChildDAGRun     `json:"childrenRepeated,omitempty"` // repeated child DAG runs
-	OutputVariables  *core.SyncMap     `json:"outputVariables,omitempty"`
+	OutputVariables  *maputil.SyncMap  `json:"outputVariables,omitempty"`
 }
 
 // ChildDAGRun represents a child DAG run associated with a node

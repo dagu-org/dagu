@@ -20,6 +20,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/maputil"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
@@ -723,7 +724,7 @@ func (n *Node) BuildChildDAGRuns(ctx context.Context, childDAG *core.ChildDAG) (
 				items = append(items, value)
 			} else if len(item.Params) > 0 {
 				// evaluate each value in Params
-				m := make(core.DeterministicMap)
+				m := make(maputil.DeterministicMap)
 				for key, value := range item.Params {
 					evaluatedValue, err := EvalString(ctx, value)
 					if err != nil {

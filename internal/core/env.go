@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/maputil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 )
@@ -45,7 +46,7 @@ type Env struct {
 	// in the format "key=value". These variables are populated when a step
 	// completes and has an Output field defined, making the step's stdout
 	// available to subsequent steps via variable substitution
-	Variables *SyncMap
+	Variables *maputil.SyncMap
 
 	// The current step being executed within this environment context
 	Step Step
@@ -129,7 +130,7 @@ func NewEnv(ctx context.Context, step Step) Env {
 
 	return Env{
 		DAGContext: GetDAGContextFromContext(ctx),
-		Variables:  &SyncMap{},
+		Variables:  &maputil.SyncMap{},
 		Step:       step,
 		Envs:       envs,
 		StepMap:    make(map[string]cmdutil.StepInfo),
@@ -156,20 +157,20 @@ func (e Env) AllEnvs() []string {
 }
 
 // LoadOutputVariables loads the output variables from the given DAG into the
-func (e Env) LoadOutputVariables(vars *SyncMap) {
+func (e Env) LoadOutputVariables(vars *maputil.SyncMap) {
 	e.loadOutputVariables(vars, false)
 }
 
 // ForceLoadOutputVariables forces loading of output variables into the execution context.
 // This is the same as LoadOutputVariables, but it does not check if the key already exists.
-func (e Env) ForceLoadOutputVariables(vars *SyncMap) {
+func (e Env) ForceLoadOutputVariables(vars *maputil.SyncMap) {
 	e.loadOutputVariables(vars, true)
 }
 
 // loadOutputVariables loads the output variables from the given SyncMap into the execution context.
 // If force is true, it will overwrite existing variables in the execution context.
 // If force is false, it will only load variables that are not already present in the execution context.
-func (e Env) loadOutputVariables(vars *SyncMap, force bool) {
+func (e Env) loadOutputVariables(vars *maputil.SyncMap, force bool) {
 	vars.Range(func(key, value any) bool {
 		if !force {
 			if _, ok := e.Variables.Load(key); ok {

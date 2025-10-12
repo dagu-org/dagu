@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/common/maputil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +43,7 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
-		Variables: &core.SyncMap{},
+		Variables: &maputil.SyncMap{},
 		Step:      core.Step{},
 		Envs:      make(map[string]string),
 	}
@@ -92,7 +93,7 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
-		Variables: &core.SyncMap{},
+		Variables: &maputil.SyncMap{},
 		Step:      core.Step{},
 		Envs:      make(map[string]string),
 	}
@@ -143,7 +144,7 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
-		Variables: &core.SyncMap{},
+		Variables: &maputil.SyncMap{},
 		Step:      core.Step{},
 		Envs:      make(map[string]string),
 	}
@@ -177,7 +178,7 @@ func TestBuildCommand(t *testing.T) {
 			Envs:       map[string]string{"TEST_ENV": "value"},
 			BaseEnv:    &baseEnv,
 		},
-		Variables: &core.SyncMap{},
+		Variables: &maputil.SyncMap{},
 		Step:      core.Step{},
 		Envs:      make(map[string]string),
 	}
@@ -230,7 +231,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 			DAGRunID:   "parent-456",
 			Envs:       make(map[string]string),
 		},
-		Variables: &core.SyncMap{},
+		Variables: &maputil.SyncMap{},
 		Step:      core.Step{},
 		Envs:      make(map[string]string),
 	}
@@ -264,7 +265,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 			DAGRunID: "parent-456",
 			Envs:     make(map[string]string),
 		},
-		Variables: &core.SyncMap{},
+		Variables: &maputil.SyncMap{},
 		Step:      core.Step{},
 		Envs:      make(map[string]string),
 	}

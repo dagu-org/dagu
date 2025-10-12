@@ -2758,9 +2758,9 @@ steps:
 		require.Len(t, dag.Steps, 3)
 
 		// Step 1 and 3 should inherit docker executor
-		assert.Equal(t, "docker", dag.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "container", dag.Steps[0].ExecutorConfig.Type)
 		assert.Equal(t, "shell", dag.Steps[1].ExecutorConfig.Type)
-		assert.Equal(t, "docker", dag.Steps[2].ExecutorConfig.Type)
+		assert.Equal(t, "container", dag.Steps[2].ExecutorConfig.Type)
 	})
 }
 

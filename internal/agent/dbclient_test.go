@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/maputil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
@@ -28,7 +29,7 @@ func TestDBClient_GetChildDAGRunStatus(t *testing.T) {
 		childRunID := "child-run-123"
 
 		// Setup outputs
-		outputs := &core.SyncMap{}
+		outputs := &maputil.SyncMap{}
 		outputs.Store("key1", "result=success")
 		outputs.Store("key2", "count=42")
 		mockAttempt.outputs = outputs
@@ -311,7 +312,7 @@ func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName st
 type mockDAGRunAttempt struct {
 	mock.Mock
 	status  *models.DAGRunStatus
-	outputs *core.SyncMap
+	outputs *maputil.SyncMap
 }
 
 func (m *mockDAGRunAttempt) ID() string {
@@ -359,9 +360,9 @@ func (m *mockDAGRunAttempt) CancelRequested(ctx context.Context) (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *mockDAGRunAttempt) GetOutputs() *core.SyncMap {
+func (m *mockDAGRunAttempt) GetOutputs() *maputil.SyncMap {
 	if m.outputs == nil {
-		m.outputs = &core.SyncMap{}
+		m.outputs = &maputil.SyncMap{}
 	}
 	return m.outputs
 }

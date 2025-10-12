@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/common/maputil"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
@@ -367,7 +368,7 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 	}
 
 	// Add step-level environment variables
-	envVars := &core.SyncMap{}
+	envVars := &maputil.SyncMap{}
 	for _, v := range node.Step().Env {
 		parts := strings.SplitN(v, "=", 2)
 		if len(parts) != 2 {

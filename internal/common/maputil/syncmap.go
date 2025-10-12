@@ -1,4 +1,4 @@
-package core
+package maputil
 
 import (
 	"encoding/json"

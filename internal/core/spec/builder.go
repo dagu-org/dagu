@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/maputil"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
@@ -1743,7 +1744,7 @@ func parseParallelItems(items []any) ([]core.ParallelItem, error) {
 
 		case map[string]any:
 			// Object with parameters
-			params := make(core.DeterministicMap)
+			params := make(maputil.DeterministicMap)
 			for key, val := range v {
 				var strVal string
 				switch v := val.(type) {

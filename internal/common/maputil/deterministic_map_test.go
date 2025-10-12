@@ -1,4 +1,4 @@
-package core
+package maputil_test
 
 import (
 	"encoding/json"
@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/common/maputil"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,12 +15,12 @@ import (
 func TestDeterministicMap_MarshalJSON(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    DeterministicMap
+		input    maputil.DeterministicMap
 		expected string
 	}{
 		{
 			name:     "EmptyMap",
-			input:    DeterministicMap{},
+			input:    maputil.DeterministicMap{},
 			expected: `{}`,
 		},
 		{
@@ -28,14 +30,14 @@ func TestDeterministicMap_MarshalJSON(t *testing.T) {
 		},
 		{
 			name: "SingleKey",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"key": "value",
 			},
 			expected: `{"key":"value"}`,
 		},
 		{
 			name: "MultipleKeysSorted",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"zebra":  "animal",
 				"apple":  "fruit",
 				"banana": "fruit",
@@ -45,7 +47,7 @@ func TestDeterministicMap_MarshalJSON(t *testing.T) {
 		},
 		{
 			name: "SpecialCharacters",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"key with spaces": "value with spaces",
 				"key\"quotes\"":   "value\"quotes\"",
 				"key\nnewline":    "value\nnewline",
@@ -74,13 +76,13 @@ func TestDeterministicMap_UnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected DeterministicMap
+		expected maputil.DeterministicMap
 		wantErr  bool
 	}{
 		{
 			name:     "EmptyObject",
 			input:    `{}`,
-			expected: DeterministicMap{},
+			expected: maputil.DeterministicMap{},
 		},
 		{
 			name:     "Null",
@@ -90,7 +92,7 @@ func TestDeterministicMap_UnmarshalJSON(t *testing.T) {
 		{
 			name:  "SimpleObject",
 			input: `{"key1": "value1", "key2": "value2"}`,
-			expected: DeterministicMap{
+			expected: maputil.DeterministicMap{
 				"key1": "value1",
 				"key2": "value2",
 			},
@@ -104,7 +106,7 @@ func TestDeterministicMap_UnmarshalJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var result DeterministicMap
+			var result maputil.DeterministicMap
 			err := json.Unmarshal([]byte(tt.input), &result)
 
 			if tt.wantErr {
@@ -119,19 +121,19 @@ func TestDeterministicMap_UnmarshalJSON(t *testing.T) {
 }
 
 func TestDeterministicMap_Merge(t *testing.T) {
-	base := DeterministicMap{
+	base := maputil.DeterministicMap{
 		"key1": "value1",
 		"key2": "value2",
 	}
 
-	other := DeterministicMap{
+	other := maputil.DeterministicMap{
 		"key2": "overridden",
 		"key3": "value3",
 	}
 
 	result := base.Merge(other)
 
-	expected := DeterministicMap{
+	expected := maputil.DeterministicMap{
 		"key1": "value1",
 		"key2": "overridden",
 		"key3": "value3",
@@ -143,7 +145,7 @@ func TestDeterministicMap_Merge(t *testing.T) {
 }
 
 func TestDeterministicMap_String(t *testing.T) {
-	m := DeterministicMap{
+	m := maputil.DeterministicMap{
 		"b": "2",
 		"a": "1",
 		"c": "3",
@@ -157,12 +159,12 @@ func TestDeterministicMap_String(t *testing.T) {
 func TestDeterministicMap_EdgeCases(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    DeterministicMap
+		input    maputil.DeterministicMap
 		expected string
 	}{
 		{
 			name: "UnicodeCharacters",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"你好":    "世界",
 				"مرحبا": "عالم",
 				"emoji": "🌍🚀",
@@ -172,7 +174,7 @@ func TestDeterministicMap_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "EmptyStringKeysAndValues",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"":      "empty key",
 				"empty": "",
 				"both":  "",
@@ -181,7 +183,7 @@ func TestDeterministicMap_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "NumericStringKeysSortedLexicographically",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"1":   "one",
 				"10":  "ten",
 				"2":   "two",
@@ -192,7 +194,7 @@ func TestDeterministicMap_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "AllJSONSpecialCharacters",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"tab":       "value\twith\ttab",
 				"newline":   "value\nwith\nnewline",
 				"return":    "value\rwith\rreturn",
@@ -204,14 +206,14 @@ func TestDeterministicMap_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "VeryLongValues",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"long": strings.Repeat("a", 10000),
 			},
 			expected: fmt.Sprintf(`{"long":"%s"}`, strings.Repeat("a", 10000)),
 		},
 		{
 			name: "CaseSensitiveKeys",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"Key": "uppercase",
 				"key": "lowercase",
 				"KEY": "allcaps",
@@ -221,7 +223,7 @@ func TestDeterministicMap_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "BooleanAndNullLikeStrings",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"bool_true":  "true",
 				"bool_false": "false",
 				"null_str":   "null",
@@ -231,7 +233,7 @@ func TestDeterministicMap_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "KeysWithSpecialSortingCharacters",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"a-b": "dash",
 				"a_b": "underscore",
 				"a.b": "dot",
@@ -243,7 +245,7 @@ func TestDeterministicMap_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "JsonStringValues",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"config":    `{"timeout": 30, "retries": 3}`,
 				"array":     `["item1", "item2", "item3"]`,
 				"nested":    `{"level1": {"level2": {"value": "deep"}}}`,
@@ -254,7 +256,7 @@ func TestDeterministicMap_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "ComplexJsonInJsonScenario",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"pipeline_config": `{"stages": ["build", "test", "deploy"], "parallel": true}`,
 				"env_vars":        `{"NODE_ENV": "production", "API_KEY": "secret-key-123"}`,
 				"matrix":          `[{"os": "linux", "arch": "amd64"}, {"os": "darwin", "arch": "arm64"}]`,
@@ -264,7 +266,7 @@ func TestDeterministicMap_EdgeCases(t *testing.T) {
 		},
 		{
 			name: "MalformedJsonStrings",
-			input: DeterministicMap{
+			input: maputil.DeterministicMap{
 				"invalid_json":   `{"broken": "json`,
 				"not_json":       `this is not json at all`,
 				"partial_escape": `{"key": "value with \" quote}`,
@@ -292,7 +294,7 @@ func TestDeterministicMap_ConcurrentAccess(t *testing.T) {
 
 func TestDeterministicMap_UnmarshalExistingMap(t *testing.T) {
 	// Test unmarshaling into an existing map
-	m := &DeterministicMap{
+	m := &maputil.DeterministicMap{
 		"existing": "value",
 	}
 
@@ -307,7 +309,7 @@ func TestDeterministicMap_UnmarshalExistingMap(t *testing.T) {
 
 func TestDeterministicMap_MarshalUnmarshalRoundTrip(t *testing.T) {
 	// Test that marshal->unmarshal preserves data exactly
-	original := DeterministicMap{
+	original := maputil.DeterministicMap{
 		"unicode":    "Hello 世界 🌍",
 		"empty":      "",
 		"spaces":     "  multiple  spaces  ",
@@ -323,7 +325,7 @@ func TestDeterministicMap_MarshalUnmarshalRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 
 	// Unmarshal
-	var restored DeterministicMap
+	var restored maputil.DeterministicMap
 	err = json.Unmarshal(data, &restored)
 	require.NoError(t, err)
 
@@ -338,9 +340,9 @@ func TestDeterministicMap_MarshalUnmarshalRoundTrip(t *testing.T) {
 
 func TestDeterministicMap_Integration_ParallelItem(t *testing.T) {
 	// Test how DeterministicMap works within ParallelItem
-	item := ParallelItem{
+	item := core.ParallelItem{
 		Value: "",
-		Params: DeterministicMap{
+		Params: maputil.DeterministicMap{
 			"REGION": "us-east-1",
 			"ENV":    "production",
 			"DEBUG":  "true",
@@ -356,7 +358,7 @@ func TestDeterministicMap_Integration_ParallelItem(t *testing.T) {
 	assert.Equal(t, expected, string(data))
 
 	// Unmarshal and verify
-	var restored ParallelItem
+	var restored core.ParallelItem
 	err = json.Unmarshal(data, &restored)
 	require.NoError(t, err)
 	assert.Equal(t, item.Params, restored.Params)
@@ -366,12 +368,12 @@ func TestDeterministicMap_RealWorldChildDAGParams(t *testing.T) {
 	// Test real-world scenario where child DAGs receive complex JSON parameters
 	tests := []struct {
 		name     string
-		params   DeterministicMap
+		params   maputil.DeterministicMap
 		expected string
 	}{
 		{
 			name: "DeploymentConfiguration",
-			params: DeterministicMap{
+			params: maputil.DeterministicMap{
 				"DEPLOYMENT_CONFIG": `{"service": "api-gateway", "replicas": 3, "resources": {"cpu": "500m", "memory": "1Gi"}}`,
 				"ENVIRONMENT":       "production",
 				"VERSION":           "v1.2.3",
@@ -381,7 +383,7 @@ func TestDeterministicMap_RealWorldChildDAGParams(t *testing.T) {
 		},
 		{
 			name: "DataProcessingPipeline",
-			params: DeterministicMap{
+			params: maputil.DeterministicMap{
 				"INPUT_SCHEMA":  `{"fields": [{"name": "id", "type": "string"}, {"name": "timestamp", "type": "datetime"}]}`,
 				"TRANSFORM_OPS": `[{"op": "filter", "field": "status", "value": "active"}, {"op": "aggregate", "by": "region"}]`,
 				"OUTPUT_FORMAT": "parquet",
@@ -394,7 +396,7 @@ func TestDeterministicMap_RealWorldChildDAGParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a ParallelItem with complex params
-			item := ParallelItem{
+			item := core.ParallelItem{
 				Params: tt.params,
 			}
 
