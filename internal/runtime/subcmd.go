@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
-	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )

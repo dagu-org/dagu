@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/spf13/cobra"
 )
 

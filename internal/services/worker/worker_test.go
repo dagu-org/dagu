@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
-	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/services/worker"
 	"github.com/dagu-org/dagu/internal/test"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"

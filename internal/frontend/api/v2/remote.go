@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/config"
 )
 
 // WithRemoteNode is a middleware that checks if the request has a "remoteNode" query parameter.

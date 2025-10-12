@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/stretchr/testify/require"
 )
 

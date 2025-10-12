@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	dagstatus "github.com/dagu-org/dagu/internal/core/status"

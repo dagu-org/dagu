@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/services/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"

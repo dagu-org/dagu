@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/infra/telemetry"
 	"github.com/dagu-org/dagu/internal/services/coordinator"

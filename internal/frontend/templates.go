@@ -10,8 +10,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/config"
 )
 
 //go:embed templates/* assets/*
