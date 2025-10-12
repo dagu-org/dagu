@@ -2034,7 +2034,7 @@ steps:
 		assert.Equal(t, "script_2", th.Steps[1].Name)
 		assert.Equal(t, "http_3", th.Steps[2].Name)
 		assert.Equal(t, "dag_4", th.Steps[3].Name)
-		assert.Equal(t, "container_5", th.Steps[4].Name)
+		assert.Equal(t, "docker_5", th.Steps[4].Name)
 		assert.Equal(t, "ssh_6", th.Steps[5].Name)
 	})
 
@@ -2681,7 +2681,7 @@ steps:
 		require.Len(t, dag.Steps, 1)
 
 		// Step should have docker executor type when DAG has container
-		assert.Equal(t, "docker", dag.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "container", dag.Steps[0].ExecutorConfig.Type)
 	})
 
 	t.Run("ExplicitExecutorOverridesContainer", func(t *testing.T) {
