@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/common/mailer"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/common/sock"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
@@ -26,7 +27,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/otel"
 	"github.com/dagu-org/dagu/internal/runtime"

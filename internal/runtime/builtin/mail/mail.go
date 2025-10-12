@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/common/mailer"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/go-viper/mapstructure/v2"
 )
@@ -18,7 +18,7 @@ var _ executor.Executor = (*mail)(nil)
 type mail struct {
 	stdout io.Writer
 	stderr io.Writer
-	mailer *mailer.Mailer
+	mailer *mailer.Client
 	cfg    *mailConfig
 }
 

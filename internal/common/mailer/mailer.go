@@ -16,8 +16,8 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-// Mailer is a mailer that sends emails.
-type Mailer struct {
+// Client is a mailer that sends emails.
+type Client struct {
 	host     string
 	port     string
 	username string
@@ -32,8 +32,8 @@ type Config struct {
 	Password string
 }
 
-func New(cfg Config) *Mailer {
-	return &Mailer{
+func New(cfg Config) *Client {
+	return &Client{
 		host:     cfg.Host,
 		port:     cfg.Port,
 		username: cfg.Username,
@@ -51,7 +51,7 @@ var (
 )
 
 // SendMail sends an email.
-func (m *Mailer) Send(
+func (m *Client) Send(
 	ctx context.Context,
 	from string,
 	to []string,
@@ -65,7 +65,7 @@ func (m *Mailer) Send(
 	return m.sendWithAuth(from, to, subject, body, attachments)
 }
 
-func (m *Mailer) sendWithNoAuth(
+func (m *Client) sendWithNoAuth(
 	from string,
 	to []string,
 	subject, body string,
@@ -124,7 +124,7 @@ func (m *Mailer) sendWithNoAuth(
 	return c.Quit()
 }
 
-func (m *Mailer) sendWithAuth(
+func (m *Client) sendWithAuth(
 	from string,
 	to []string,
 	subject, body string,
@@ -156,7 +156,7 @@ func (m *Mailer) sendWithAuth(
 	}
 }
 
-func (*Mailer) composeHeader(
+func (*Client) composeHeader(
 	to []string, from string, subject string,
 ) string {
 	return "To: " + strings.Join(to, ",") + "\r\n" +
@@ -170,7 +170,7 @@ func (*Mailer) composeHeader(
 		"Content-Transfer-Encoding: base64\r\n"
 }
 
-func (m *Mailer) composeMail(
+func (m *Client) composeMail(
 	to []string,
 	from, subject, body string,
 	attachments []string,
