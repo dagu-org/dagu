@@ -45,8 +45,6 @@ steps:
 	// Wait for the dag-run running again.
 	dag.AssertCurrentStatus(t, status.Running)
 
-	time.Sleep(time.Millisecond * 1000) // Wait a bit (need to investigate why this is needed).
-
 	// Stop the restarted DAG.
 	th.RunCommand(t, cmd.CmdStop(), test.CmdTest{Args: []string{"stop", dag.Location}})
 
