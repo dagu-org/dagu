@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	legacymodel "github.com/dagu-org/dagu/internal/infra/persistence/legacy/model"
+	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
 )
 
 // historyMigrator handles migration from legacy history format to new format

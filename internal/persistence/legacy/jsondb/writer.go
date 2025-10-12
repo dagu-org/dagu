@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/infra/persistence/legacy/model"
+	"github.com/dagu-org/dagu/internal/persistence/legacy/model"
 )
 
 var (

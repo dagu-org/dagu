@@ -21,8 +21,8 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/infra/persistence/legacy"
-	"github.com/dagu-org/dagu/internal/infra/persistence/legacy/model"
+	"github.com/dagu-org/dagu/internal/persistence/legacy"
+	"github.com/dagu-org/dagu/internal/persistence/legacy/model"
 )
 
 var (

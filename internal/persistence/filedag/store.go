@@ -18,7 +18,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
-	"github.com/dagu-org/dagu/internal/infra/persistence/filedag/grep"
+	"github.com/dagu-org/dagu/internal/persistence/filedag/grep"
 )
 
 var _ execution.DAGStore = (*Storage)(nil)

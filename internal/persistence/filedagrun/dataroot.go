@@ -18,10 +18,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/dirlock"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/infra/persistence/dirlock"
 )
 
 // DataRoot manages the directory structure for run history data.

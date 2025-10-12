@@ -16,7 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	dagstatus "github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/infra/persistence/filedagrun"
+	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/samber/lo/mutable"
 	"golang.org/x/text/encoding"

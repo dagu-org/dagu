@@ -7,10 +7,10 @@ import (
 	"os"
 	"sync"
 
+	"github.com/dagu-org/dagu/internal/common/dirlock"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/infra/persistence/dirlock"
 )
 
 // Errors for the queue

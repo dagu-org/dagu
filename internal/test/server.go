@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/infra/telemetry"
+	"github.com/dagu-org/dagu/internal/common/telemetry"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/go-resty/resty/v2"

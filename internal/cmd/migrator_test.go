@@ -12,8 +12,8 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/infra/persistence/filedagrun"
-	legacymodel "github.com/dagu-org/dagu/internal/infra/persistence/legacy/model"
+	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
+	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
