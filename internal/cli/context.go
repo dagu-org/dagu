@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/pprof"
+	"sync"
 	"syscall"
 	"time"
 
@@ -296,6 +297,8 @@ func (c *Context) GenLogFileName(dag *core.DAG, dagRunID string) (string, error)
 	return filepath.Join(d, cfg.LogFile()), nil
 }
 
+var viperLock sync.Mutex // protects viper access across commands
+
 // NewCommand creates a new command instance with the given cobra command and run function.
 func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *Context, args []string) error) *cobra.Command {
 	initFlags(cmd, flags...)
@@ -317,7 +320,10 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 			}()
 		}
 
+		viperLock.Lock()
 		ctx, err := NewContext(cmd, flags)
+		viperLock.Unlock()
+
 		if err != nil {
 			fmt.Printf("Initialization error: %v\n", err)
 			os.Exit(1)

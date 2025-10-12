@@ -7,7 +7,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/spf13/cobra"
 
-	_ "github.com/dagu-org/dagu/internal/runtime/executor" // Register built-in executors
+	_ "github.com/dagu-org/dagu/internal/runtime/builtin" // Register built-in executors
 )
 
 var rootCmd = &cobra.Command{

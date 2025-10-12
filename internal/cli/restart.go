@@ -72,7 +72,7 @@ func runRestart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 	if dagStatus.Status != status.Running {
-		return fmt.Errorf("DAG %s is not running", name)
+		return fmt.Errorf("DAG %s is not running, current status: %s", name, dagStatus.Status)
 	}
 
 	dag, err := attempt.ReadDAG(ctx)

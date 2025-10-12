@@ -1,4 +1,4 @@
-package executor
+package builtin
 
 import (
 	"bufio"
@@ -14,6 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 )
 
@@ -27,7 +28,7 @@ type commandExecutor struct {
 	scriptFile string
 	exitCode   int
 	// stderrTail stores a rolling tail of recent stderr lines
-	stderrTail *TailWriter
+	stderrTail *executor.TailWriter
 }
 
 // ExitCode implements ExitCoder.
@@ -52,7 +53,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	}
 	// Wrap stderr with a tailing writer so we can include recent
 	// stderr output (rolling, up to limit) in error messages.
-	tw := NewTailWriter(e.config.Stderr, 0)
+	tw := executor.NewTailWriter(e.config.Stderr, 0)
 	e.stderrTail = tw
 	e.config.Stderr = tw
 
