@@ -95,9 +95,9 @@ type Dispatcher interface {
 // SetupDAGContext initializes and returns a new context with DAG execution metadata.
 func SetupDAGContext(ctx context.Context, dag *core.DAG, db Database, rootDAGRun core.DAGRunRef, dagRunID, logFile string, params []string, coordinatorCli Dispatcher) context.Context {
 	var envs = map[string]string{
-		core.EnvKeyDAGRunLogFile: logFile,
-		core.EnvKeyDAGRunID:      dagRunID,
-		core.EnvKeyDAGName:       dag.Name,
+		EnvKeyDAGRunLogFile: logFile,
+		EnvKeyDAGRunID:      dagRunID,
+		EnvKeyDAGName:       dag.Name,
 	}
 
 	for _, param := range params {

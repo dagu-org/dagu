@@ -196,7 +196,7 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 
 	}
 
-	cacheKey := core.SystemVariablePrefix + "CONTINUE_ON." + n.Name()
+	cacheKey := execution.SystemVariablePrefix + "CONTINUE_ON." + n.Name()
 	if v, ok := n.getBoolVariable(cacheKey); ok {
 		return v
 	}
@@ -310,7 +310,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	n.cancelFunc = fn
 
 	// Clear the cache
-	n.clearVariable(core.SystemVariablePrefix + "CONTINUE_ON." + n.Name())
+	n.clearVariable(execution.SystemVariablePrefix + "CONTINUE_ON." + n.Name())
 
 	// Reset the state
 	n.ResetError()
@@ -546,8 +546,8 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	defer n.mu.RUnlock()
 	env := execution.GetEnv(ctx)
 	env = env.WithEnv(
-		core.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
-		core.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
+		execution.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
+		execution.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)
 	return execution.WithEnv(ctx, env)
 }

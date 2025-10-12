@@ -31,11 +31,11 @@ func TestEnv_VariablesMap(t *testing.T) {
 				return env
 			},
 			expected: map[string]string{
-				"VAR1":                    "value1",
-				"VAR2":                    "value2",
-				"ENV1":                    "env1",
-				"ENV2":                    "env2",
-				core.EnvKeyDAGRunStepName: "test-step",
+				"VAR1":                         "value1",
+				"VAR2":                         "value2",
+				"ENV1":                         "env1",
+				"ENV2":                         "env2",
+				execution.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
 		{
@@ -46,8 +46,8 @@ func TestEnv_VariablesMap(t *testing.T) {
 				return env
 			},
 			expected: map[string]string{
-				"SAME_KEY":                "from_envs",
-				core.EnvKeyDAGRunStepName: "test-step",
+				"SAME_KEY":                     "from_envs",
+				execution.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
 		{
@@ -56,7 +56,7 @@ func TestEnv_VariablesMap(t *testing.T) {
 				return env
 			},
 			expected: map[string]string{
-				core.EnvKeyDAGRunStepName: "test-step",
+				execution.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
 		{
@@ -67,9 +67,9 @@ func TestEnv_VariablesMap(t *testing.T) {
 				return env
 			},
 			expected: map[string]string{
-				"VAR1":                    "value1",
-				"VAR2":                    "value2",
-				core.EnvKeyDAGRunStepName: "test-step",
+				"VAR1":                         "value1",
+				"VAR2":                         "value2",
+				execution.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
 		{
@@ -80,9 +80,9 @@ func TestEnv_VariablesMap(t *testing.T) {
 				return env
 			},
 			expected: map[string]string{
-				"ENV1":                    "env1",
-				"ENV2":                    "env2",
-				core.EnvKeyDAGRunStepName: "test-step",
+				"ENV1":                         "env1",
+				"ENV2":                         "env2",
+				execution.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
 	}
@@ -265,7 +265,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 			env := execution.NewEnv(ctx, tt.step)
 
 			// Check that DAG_RUN_STEP_NAME is always set
-			assert.Equal(t, tt.step.Name, env.Envs[core.EnvKeyDAGRunStepName])
+			assert.Equal(t, tt.step.Name, env.Envs[execution.EnvKeyDAGRunStepName])
 
 			// Run test-specific checks
 			tt.checkFunc(t, env)
@@ -290,7 +290,7 @@ func TestNewEnv_BasicFields(t *testing.T) {
 	assert.NotNil(t, env.Variables)
 	assert.NotNil(t, env.Envs)
 	assert.NotNil(t, env.StepMap)
-	assert.Equal(t, "test-step", env.Envs[core.EnvKeyDAGRunStepName])
+	assert.Equal(t, "test-step", env.Envs[execution.EnvKeyDAGRunStepName])
 
 	// Check that PWD is set
 	assert.NotEmpty(t, env.Envs["PWD"])

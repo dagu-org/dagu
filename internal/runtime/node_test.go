@@ -763,8 +763,8 @@ func TestNodeSetupContextBeforeExec(t *testing.T) {
 
 	// Verify environment variables were set
 	newEnv := execution.GetEnv(newCtx)
-	assert.Equal(t, "/tmp/stdout.log", newEnv.Envs[core.EnvKeyDAGRunStepStdoutFile])
-	assert.Equal(t, "/tmp/stderr.log", newEnv.Envs[core.EnvKeyDAGRunStepStderrFile])
+	assert.Equal(t, "/tmp/stdout.log", newEnv.Envs[execution.EnvKeyDAGRunStepStdoutFile])
+	assert.Equal(t, "/tmp/stderr.log", newEnv.Envs[execution.EnvKeyDAGRunStepStderrFile])
 }
 
 func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
