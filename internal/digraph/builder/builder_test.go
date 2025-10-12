@@ -710,19 +710,19 @@ steps:
 				yaml: `
 env:
   - VAR: "` + "`invalid command`" + `"`,
-				expectedErr: digraph.ErrInvalidEnvValue,
+				expectedErr: builder.ErrInvalidEnvValue,
 			},
 			{
 				name: "InvalidParams",
 				yaml: `
 params: "` + "`invalid command`" + `"`,
-				expectedErr: digraph.ErrInvalidParamValue,
+				expectedErr: builder.ErrInvalidParamValue,
 			},
 			{
 				name: "InvalidSchedule",
 				yaml: `
 schedule: "1"`,
-				expectedErr: digraph.ErrInvalidSchedule,
+				expectedErr: builder.ErrInvalidSchedule,
 			},
 		}
 

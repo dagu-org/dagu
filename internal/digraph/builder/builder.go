@@ -10,58 +10,13 @@ import (
 	"strings"
 	"time"
 
-	digraph "github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/signal"
 	"github.com/go-viper/mapstructure/v2"
 )
 
-type DAG = digraph.DAG
-type Step = digraph.Step
-type Condition = digraph.Condition
-type Container = digraph.Container
-type ContainerStartup = digraph.ContainerStartup
-type ContainerWaitFor = digraph.ContainerWaitFor
-type MailConfig = digraph.MailConfig
-type SMTPConfig = digraph.SMTPConfig
-type RunConfig = digraph.RunConfig
-type SSHConfig = digraph.SSHConfig
-type ParallelConfig = digraph.ParallelConfig
-type ParallelItem = digraph.ParallelItem
-type ContinueOn = digraph.ContinueOn
-type RepeatPolicy = digraph.RepeatPolicy
-type RetryPolicy = digraph.RetryPolicy
-type OTelConfig = digraph.OTelConfig
-type Schedule = digraph.Schedule
-type MailOn = digraph.MailOn
-type HandlerOn = digraph.HandlerOn
-type ErrorList = digraph.ErrorList
-type AuthConfig = digraph.AuthConfig
-type RepeatMode = digraph.RepeatMode
-type ChildDAG = digraph.ChildDAG
-type LoadError = digraph.LoadError
-type ExecutorConfig = digraph.ExecutorConfig
-type DeterministicMap = digraph.DeterministicMap
-
-const (
-	ExecutorTypeDAGLegacy = digraph.ExecutorTypeDAGLegacy
-	ExecutorTypeDAG       = digraph.ExecutorTypeDAG
-	ExecutorTypeParallel  = digraph.ExecutorTypeParallel
-	DefaultMaxConcurrent  = digraph.DefaultMaxConcurrent
-	TypeGraph             = digraph.TypeGraph
-	TypeChain             = digraph.TypeChain
-	TypeAgent             = digraph.TypeAgent
-	RepeatModeWhile       = digraph.RepeatModeWhile
-	RepeatModeUntil       = digraph.RepeatModeUntil
-	HandlerOnSuccess      = digraph.HandlerOnSuccess
-	HandlerOnFailure      = digraph.HandlerOnFailure
-	HandlerOnCancel       = digraph.HandlerOnCancel
-	HandlerOnExit         = digraph.HandlerOnExit
-)
-
-var ValidateDAGName = digraph.ValidateDAGName
-
 // BuilderFn is a function that builds a part of the DAG.
-type BuilderFn func(ctx BuildContext, spec *definition, dag *DAG) error
+type BuilderFn func(ctx BuildContext, spec *definition, dag *digraph.DAG) error
 
 // BuildContext is the context for building a DAG.
 type BuildContext struct {
@@ -70,7 +25,7 @@ type BuildContext struct {
 	opts  BuildOpts
 	index int
 
-	// buildEnv is a temporary map used during DAG building to pass env vars to params
+	// buildEnv is a temporary map used during digraph.DAG building to pass env vars to params
 	// This is not serialized and is cleared after build completes
 	buildEnv map[string]string
 }
@@ -78,7 +33,7 @@ type BuildContext struct {
 // StepBuildContext is the context for building a step.
 type StepBuildContext struct {
 	BuildContext
-	dag *DAG
+	dag *digraph.DAG
 }
 
 func (c BuildContext) WithOpts(opts BuildOpts) BuildContext {
@@ -106,9 +61,9 @@ type BuildOpts struct {
 	ParametersList []string
 	// NoEval specifies whether to evaluate dynamic fields.
 	NoEval bool
-	// Name of the DAG if it's not defined in the spec
+	// Name of the digraph.DAG if it's not defined in the spec
 	Name string
-	// DAGsDir is the directory containing the DAG files.
+	// DAGsDir is the directory containing the digraph.DAG files.
 	DAGsDir string
 	// AllowBuildErrors specifies whether to allow build errors.
 	AllowBuildErrors bool
@@ -170,11 +125,11 @@ type stepBuilderEntry struct {
 }
 
 // StepBuilderFn is a function that builds a part of the step.
-type StepBuilderFn func(ctx StepBuildContext, def stepDef, step *Step) error
+type StepBuilderFn func(ctx StepBuildContext, def stepDef, step *digraph.Step) error
 
-// build builds a DAG from the specification.
-func build(ctx BuildContext, spec *definition) (*DAG, error) {
-	dag := &DAG{
+// build builds a digraph.DAG from the specification.
+func build(ctx BuildContext, spec *definition) (*digraph.DAG, error) {
+	dag := &digraph.DAG{
 		Location:       ctx.file,
 		Group:          strings.TrimSpace(spec.Group),
 		Description:    strings.TrimSpace(spec.Description),
@@ -188,14 +143,14 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		MaxOutputSize:  spec.MaxOutputSize,
 	}
 
-	var errs ErrorList
+	var errs digraph.ErrorList
 	for _, builder := range builderRegistry {
 		if !builder.metadata && ctx.opts.OnlyMetadata {
 			continue
 		}
 		if err := builder.fn(ctx, spec, dag); err != nil {
 			// Avoid duplicating field prefixes like "field 'steps': field 'steps': ..."
-			var le *LoadError
+			var le *digraph.LoadError
 			if errors.As(err, &le) && le.Field == builder.name {
 				errs = append(errs, err)
 			} else {
@@ -210,7 +165,7 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 
 	if len(errs) > 0 {
 		if ctx.opts.AllowBuildErrors {
-			// If we are allowing build errors, return the DAG with the errors.
+			// If we are allowing build errors, return the digraph.DAG with the errors.
 			dag.BuildErrors = errs
 		} else {
 			// If we are not allowing build errors, return an error.
@@ -273,7 +228,7 @@ func parseTags(value any) []string {
 // - start: string or array of strings
 // - stop: string or array of strings
 // - restart: string or array of strings
-func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
+func buildSchedule(_ BuildContext, spec *definition, dag *digraph.DAG) error {
 	var starts, stops, restarts []string
 
 	switch schedule := (spec.Schedule).(type) {
@@ -287,7 +242,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 		for _, s := range schedule {
 			s, ok := s.(string)
 			if !ok {
-				return digraph.WrapError("schedule", s, digraph.ErrScheduleMustBeStringOrArray)
+				return digraph.WrapError("schedule", s, ErrScheduleMustBeStringOrArray)
 			}
 			starts = append(starts, s)
 		}
@@ -323,7 +278,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 	return err
 }
 
-func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildContainer(ctx BuildContext, spec *definition, dag *digraph.DAG) error {
 	if spec.Container == nil {
 		return nil
 	}
@@ -348,7 +303,7 @@ func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	container := Container{
+	container := digraph.Container{
 		Image:         spec.Container.Image,
 		PullPolicy:    pullPolicy,
 		Env:           envs,
@@ -358,9 +313,9 @@ func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
 		Ports:         spec.Container.Ports,
 		Network:       spec.Container.Network,
 		KeepContainer: spec.Container.KeepContainer,
-		Startup:       ContainerStartup(strings.ToLower(strings.TrimSpace(spec.Container.Startup))),
+		Startup:       digraph.ContainerStartup(strings.ToLower(strings.TrimSpace(spec.Container.Startup))),
 		Command:       append([]string{}, spec.Container.Command...),
-		WaitFor:       ContainerWaitFor(strings.ToLower(strings.TrimSpace(spec.Container.WaitFor))),
+		WaitFor:       digraph.ContainerWaitFor(strings.ToLower(strings.TrimSpace(spec.Container.WaitFor))),
 		LogPattern:    spec.Container.LogPattern,
 		RestartPolicy: strings.TrimSpace(spec.Container.RestartPolicy),
 	}
@@ -377,7 +332,7 @@ func buildContainer(ctx BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
-func buildWorkerSelector(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildWorkerSelector(ctx BuildContext, spec *definition, dag *digraph.DAG) error {
 	if len(spec.WorkerSelector) == 0 {
 		return nil
 	}
@@ -392,12 +347,12 @@ func buildWorkerSelector(ctx BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
-func buildRegistryAuths(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildRegistryAuths(ctx BuildContext, spec *definition, dag *digraph.DAG) error {
 	if spec.RegistryAuths == nil {
 		return nil
 	}
 
-	dag.RegistryAuths = make(map[string]*AuthConfig)
+	dag.RegistryAuths = make(map[string]*digraph.AuthConfig)
 
 	switch v := spec.RegistryAuths.(type) {
 	case string:
@@ -409,14 +364,14 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *DAG) error {
 
 		// For now, store the entire JSON string as a single entry
 		// The actual parsing will be done by the registry manager
-		dag.RegistryAuths["_json"] = &AuthConfig{
+		dag.RegistryAuths["_json"] = &digraph.AuthConfig{
 			Auth: expandedJSON,
 		}
 
 	case map[string]any:
 		// Handle as a map of registry to auth config
 		for registry, authData := range v {
-			authConfig := &AuthConfig{}
+			authConfig := &digraph.AuthConfig{}
 
 			switch auth := authData.(type) {
 			case string:
@@ -461,7 +416,7 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *DAG) error {
 				continue
 			}
 
-			authConfig := &AuthConfig{}
+			authConfig := &digraph.AuthConfig{}
 
 			switch auth := authData.(type) {
 			case string:
@@ -528,7 +483,7 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
-func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildDotenv(ctx BuildContext, spec *definition, dag *digraph.DAG) error {
 	switch v := spec.Dotenv.(type) {
 	case nil:
 		dag.Dotenv = append(dag.Dotenv, ".env")
@@ -556,11 +511,11 @@ func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
-func buildMailOn(_ BuildContext, spec *definition, dag *DAG) error {
+func buildMailOn(_ BuildContext, spec *definition, dag *digraph.DAG) error {
 	if spec.MailOn == nil {
 		return nil
 	}
-	dag.MailOn = &MailOn{
+	dag.MailOn = &digraph.MailOn{
 		Failure: spec.MailOn.Failure,
 		Success: spec.MailOn.Success,
 	}
@@ -569,12 +524,12 @@ func buildMailOn(_ BuildContext, spec *definition, dag *DAG) error {
 
 // buildName set the name if name is specified by the option but if Name is defined
 // it does not override
-func buildName(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildName(ctx BuildContext, spec *definition, dag *digraph.DAG) error {
 	dag.Name = findName(ctx, spec)
 	if dag.Name == "" {
 		return nil
 	}
-	if err := ValidateDAGName(dag.Name); err != nil {
+	if err := digraph.ValidateDAGName(dag.Name); err != nil {
 		return digraph.WrapError("name", dag.Name, err)
 	}
 	return nil
@@ -588,14 +543,14 @@ func findName(ctx BuildContext, spec *definition) string {
 		return strings.TrimSpace(spec.Name)
 	}
 	if ctx.file != "" && ctx.index == 0 {
-		// Use the filename if the DAG is from a file and it's the first document
+		// Use the filename if the digraph.DAG is from a file and it's the first document
 		filename := filepath.Base(ctx.file)
 		return strings.TrimSuffix(filename, filepath.Ext(filename))
 	}
 	return ""
 }
 
-func buildWorkingDir(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildWorkingDir(ctx BuildContext, spec *definition, dag *digraph.DAG) error {
 	switch {
 	case spec.WorkingDir != "":
 		wd := spec.WorkingDir
@@ -624,18 +579,18 @@ func buildWorkingDir(ctx BuildContext, spec *definition, dag *DAG) error {
 }
 
 // buildType validates and sets the execution type for the DAG
-func buildType(_ BuildContext, spec *definition, dag *DAG) error {
+func buildType(_ BuildContext, spec *definition, dag *digraph.DAG) error {
 	// Set default if not specified
 	if dag.Type == "" {
-		dag.Type = TypeChain
+		dag.Type = digraph.TypeChain
 	}
 
 	// Validate the type
 	switch dag.Type {
-	case TypeGraph, TypeChain:
+	case digraph.TypeGraph, digraph.TypeChain:
 		// Valid types
 		return nil
-	case TypeAgent:
+	case digraph.TypeAgent:
 		return digraph.WrapError("type", dag.Type, fmt.Errorf("agent type is not yet implemented"))
 	default:
 		return digraph.WrapError("type", dag.Type, fmt.Errorf("invalid type: %s (must be one of: graph, chain, agent)", dag.Type))
@@ -645,13 +600,13 @@ func buildType(_ BuildContext, spec *definition, dag *DAG) error {
 // buildEnvs builds the environment variables for the DAG.
 // Case 1: env is an array of maps with string keys and string values.
 // Case 2: env is a map with string keys and string values.
-func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildEnvs(ctx BuildContext, spec *definition, dag *digraph.DAG) error {
 	vars, err := loadVariables(ctx, spec.Env)
 	if err != nil {
 		return err
 	}
 
-	// Store env vars in DAG temporarily for params to reference (e.g., P2=${A001})
+	// Store env vars in digraph.DAG temporarily for params to reference (e.g., P2=${A001})
 	// This is cleared after params are built
 	if ctx.buildEnv == nil {
 		ctx.buildEnv = make(map[string]string)
@@ -665,40 +620,40 @@ func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
 }
 
 // buildLogDir builds the log directory for the DAG.
-func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
+func buildLogDir(_ BuildContext, spec *definition, dag *digraph.DAG) (err error) {
 	dag.LogDir = spec.LogDir
 	return err
 }
 
 // buildHandlers builds the handlers for the DAG.
-// The handlers are executed when the DAG is stopped, succeeded, failed, or
+// The handlers are executed when the digraph.DAG is stopped, succeeded, failed, or
 // cancelled.
-func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+func buildHandlers(ctx BuildContext, spec *definition, dag *digraph.DAG) (err error) {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
 
 	if spec.HandlerOn.Exit != nil {
-		spec.HandlerOn.Exit.Name = HandlerOnExit.String()
+		spec.HandlerOn.Exit.Name = digraph.HandlerOnExit.String()
 		if dag.HandlerOn.Exit, err = buildStep(buildCtx, *spec.HandlerOn.Exit); err != nil {
 			return err
 		}
 	}
 
 	if spec.HandlerOn.Success != nil {
-		spec.HandlerOn.Success.Name = HandlerOnSuccess.String()
+		spec.HandlerOn.Success.Name = digraph.HandlerOnSuccess.String()
 		if dag.HandlerOn.Success, err = buildStep(buildCtx, *spec.HandlerOn.Success); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Failure != nil {
-		spec.HandlerOn.Failure.Name = HandlerOnFailure.String()
+		spec.HandlerOn.Failure.Name = digraph.HandlerOnFailure.String()
 		if dag.HandlerOn.Failure, err = buildStep(buildCtx, *spec.HandlerOn.Failure); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Cancel != nil {
-		spec.HandlerOn.Cancel.Name = HandlerOnCancel.String()
+		spec.HandlerOn.Cancel.Name = digraph.HandlerOnCancel.String()
 		if dag.HandlerOn.Cancel, err = buildStep(buildCtx, *spec.HandlerOn.Cancel); err != nil {
 			return
 		}
@@ -707,7 +662,7 @@ func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 	return nil
 }
 
-func buildPrecondition(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildPrecondition(ctx BuildContext, spec *definition, dag *digraph.DAG) error {
 	// Parse both `preconditions` and `precondition` fields.
 	conditions, err := parsePrecondition(ctx, spec.Preconditions)
 	if err != nil {
@@ -724,16 +679,16 @@ func buildPrecondition(ctx BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
-func parsePrecondition(ctx BuildContext, precondition any) ([]*Condition, error) {
+func parsePrecondition(ctx BuildContext, precondition any) ([]*digraph.Condition, error) {
 	switch v := precondition.(type) {
 	case nil:
 		return nil, nil
 
 	case string:
-		return []*Condition{{Condition: v}}, nil
+		return []*digraph.Condition{{Condition: v}}, nil
 
 	case map[string]any:
-		var ret Condition
+		var ret digraph.Condition
 		for key, vv := range v {
 			switch strings.ToLower(key) {
 			case "condition":
@@ -767,10 +722,10 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]*Condition, error)
 			return nil, digraph.WrapError("preconditions", v, err)
 		}
 
-		return []*Condition{&ret}, nil
+		return []*digraph.Condition{&ret}, nil
 
 	case []any:
-		var ret []*Condition
+		var ret []*digraph.Condition
 		for _, vv := range v {
 			parsed, err := parsePrecondition(ctx, vv)
 			if err != nil {
@@ -786,14 +741,14 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]*Condition, error)
 	}
 }
 
-func maxCleanUpTime(_ BuildContext, spec *definition, dag *DAG) error {
+func maxCleanUpTime(_ BuildContext, spec *definition, dag *digraph.DAG) error {
 	if spec.MaxCleanUpTimeSec != nil {
 		dag.MaxCleanUpTime = time.Second * time.Duration(*spec.MaxCleanUpTimeSec)
 	}
 	return nil
 }
 
-func buildMaxActiveRuns(_ BuildContext, spec *definition, dag *DAG) error {
+func buildMaxActiveRuns(_ BuildContext, spec *definition, dag *digraph.DAG) error {
 	if spec.MaxActiveRuns != 0 {
 		// Preserve the value if it's set (including negative values)
 		// MaxActiveRuns < 0 means queueing is disabled for this DAG
@@ -805,7 +760,7 @@ func buildMaxActiveRuns(_ BuildContext, spec *definition, dag *DAG) error {
 	return nil
 }
 
-func maxHistoryRetentionDays(_ BuildContext, spec *definition, dag *DAG) error {
+func maxHistoryRetentionDays(_ BuildContext, spec *definition, dag *digraph.DAG) error {
 	if spec.HistRetentionDays != nil {
 		dag.HistRetentionDays = *spec.HistRetentionDays
 	}
@@ -813,17 +768,17 @@ func maxHistoryRetentionDays(_ BuildContext, spec *definition, dag *DAG) error {
 }
 
 // skipIfSuccessful sets the skipIfSuccessful field for the DAG.
-func skipIfSuccessful(_ BuildContext, spec *definition, dag *DAG) error {
+func skipIfSuccessful(_ BuildContext, spec *definition, dag *digraph.DAG) error {
 	dag.SkipIfSuccessful = spec.SkipIfSuccessful
 	return nil
 }
 
 // buildRunConfig builds the run configuration for the DAG.
-func buildRunConfig(_ BuildContext, spec *definition, dag *DAG) error {
+func buildRunConfig(_ BuildContext, spec *definition, dag *digraph.DAG) error {
 	if spec.RunConfig == nil {
 		return nil
 	}
-	dag.RunConfig = &RunConfig{
+	dag.RunConfig = &digraph.RunConfig{
 		DisableParamEdit: spec.RunConfig.DisableParamEdit,
 		DisableRunIdEdit: spec.RunConfig.DisableRunIdEdit,
 	}
@@ -831,7 +786,7 @@ func buildRunConfig(_ BuildContext, spec *definition, dag *DAG) error {
 }
 
 // buildSSH builds the SSH configuration for the DAG.
-func buildSSH(_ BuildContext, spec *definition, dag *DAG) error {
+func buildSSH(_ BuildContext, spec *definition, dag *digraph.DAG) error {
 	if spec.SSH == nil {
 		return nil
 	}
@@ -866,7 +821,7 @@ func buildSSH(_ BuildContext, spec *definition, dag *DAG) error {
 		strictHostKey = *spec.SSH.StrictHostKey
 	}
 
-	dag.SSH = &SSHConfig{
+	dag.SSH = &digraph.SSHConfig{
 		User:          spec.SSH.User,
 		Host:          spec.SSH.Host,
 		Port:          port,
@@ -880,15 +835,15 @@ func buildSSH(_ BuildContext, spec *definition, dag *DAG) error {
 }
 
 // generateTypedStepName generates a type-based name for a step after it's been built
-func generateTypedStepName(existingNames map[string]struct{}, step *Step, index int) string {
+func generateTypedStepName(existingNames map[string]struct{}, step *digraph.Step, index int) string {
 	var prefix string
 
 	// Determine prefix based on the built step's properties
 	if step.ExecutorConfig.Type != "" {
 		switch step.ExecutorConfig.Type {
-		case ExecutorTypeDAG, ExecutorTypeDAGLegacy:
+		case digraph.ExecutorTypeDAG, digraph.ExecutorTypeDAGLegacy:
 			prefix = "dag"
-		case ExecutorTypeParallel:
+		case digraph.ExecutorTypeParallel:
 			prefix = "parallel"
 		case "http":
 			prefix = "http"
@@ -930,7 +885,7 @@ func generateTypedStepName(existingNames map[string]struct{}, step *Step, index 
 }
 
 // buildSteps builds the steps for the DAG.
-func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildSteps(ctx BuildContext, spec *definition, dag *digraph.DAG) error {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
 	names := make(map[string]struct{})
 
@@ -942,8 +897,8 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		// Convert string steps to map format for shorthand syntax support
 		normalized := normalizeStepData(ctx, v)
 
-		var builtSteps []*Step
-		var prevSteps []*Step
+		var builtSteps []*digraph.Step
+		var prevSteps []*digraph.Step
 		for i, raw := range normalized {
 			switch v := raw.(type) {
 			case map[string]any:
@@ -956,10 +911,10 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 				builtSteps = append(builtSteps, step)
 
 				// prepare for the next step
-				prevSteps = []*Step{step}
+				prevSteps = []*digraph.Step{step}
 
 			case []any:
-				var tempSteps []*Step
+				var tempSteps []*digraph.Step
 				var normalized = normalizeStepData(ctx, v)
 				for _, nested := range normalized {
 					switch vv := nested.(type) {
@@ -1038,8 +993,8 @@ func normalizeStepData(ctx BuildContext, data []any) []any {
 	return normalized
 }
 
-// buildStepFromRaw build Step from give raw data (map[string]any)
-func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names map[string]struct{}) (*Step, error) {
+// buildStepFromRaw build digraph.Step from give raw data (map[string]any)
+func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names map[string]struct{}) (*digraph.Step, error) {
 	var stepDef stepDef
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
@@ -1059,7 +1014,7 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 }
 
 // buildSMTPConfig builds the SMTP configuration for the DAG.
-func buildSMTPConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
+func buildSMTPConfig(_ BuildContext, spec *definition, dag *digraph.DAG) (err error) {
 	// Convert port to string if it's provided as a number
 	var portStr string
 	if spec.SMTP.Port != nil {
@@ -1081,7 +1036,7 @@ func buildSMTPConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
 		return nil
 	}
 
-	dag.SMTP = &SMTPConfig{
+	dag.SMTP = &digraph.SMTPConfig{
 		Host:     spec.SMTP.Host,
 		Port:     portStr,
 		Username: spec.SMTP.Username,
@@ -1092,21 +1047,21 @@ func buildSMTPConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
 }
 
 // buildErrMailConfig builds the error mail configuration for the DAG.
-func buildErrMailConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
+func buildErrMailConfig(_ BuildContext, spec *definition, dag *digraph.DAG) (err error) {
 	dag.ErrorMail, err = buildMailConfig(spec.ErrorMail)
 
 	return
 }
 
 // buildInfoMailConfig builds the info mail configuration for the DAG.
-func buildInfoMailConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
+func buildInfoMailConfig(_ BuildContext, spec *definition, dag *digraph.DAG) (err error) {
 	dag.InfoMail, err = buildMailConfig(spec.InfoMail)
 
 	return
 }
 
-// buildMailConfig builds a MailConfig from the definition.
-func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
+// buildMailConfig builds a digraph.MailConfig from the definition.
+func buildMailConfig(def mailConfigDef) (*digraph.MailConfig, error) {
 	// Handle case where To is not specified
 	if def.From == "" && def.To == nil {
 		return nil, nil
@@ -1142,7 +1097,7 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 		return nil, nil
 	}
 
-	return &MailConfig{
+	return &digraph.MailConfig{
 		From:       strings.TrimSpace(def.From),
 		To:         toAddresses,
 		Prefix:     strings.TrimSpace(def.Prefix),
@@ -1151,8 +1106,8 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 }
 
 // buildStep builds a step from the step definition.
-func buildStep(ctx StepBuildContext, def stepDef) (*Step, error) {
-	step := &Step{
+func buildStep(ctx StepBuildContext, def stepDef) (*digraph.Step, error) {
+	step := &digraph.Step{
 		Name:           strings.TrimSpace(def.Name),
 		ID:             strings.TrimSpace(def.ID),
 		Description:    strings.TrimSpace(def.Description),
@@ -1162,7 +1117,7 @@ func buildStep(ctx StepBuildContext, def stepDef) (*Step, error) {
 		Stdout:         strings.TrimSpace(def.Stdout),
 		Stderr:         strings.TrimSpace(def.Stderr),
 		MailOnError:    def.MailOnError,
-		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
+		ExecutorConfig: digraph.ExecutorConfig{Config: make(map[string]any)},
 	}
 
 	for _, entry := range stepBuilderRegistry {
@@ -1174,7 +1129,7 @@ func buildStep(ctx StepBuildContext, def stepDef) (*Step, error) {
 	return step, nil
 }
 
-func buildContinueOn(_ StepBuildContext, def stepDef, step *Step) error {
+func buildContinueOn(_ StepBuildContext, def stepDef, step *digraph.Step) error {
 	if def.ContinueOn == nil {
 		return nil
 	}
@@ -1198,7 +1153,7 @@ func buildContinueOn(_ StepBuildContext, def stepDef, step *Step) error {
 }
 
 // buildRetryPolicy builds the retry policy for a step.
-func buildRetryPolicy(_ StepBuildContext, def stepDef, step *Step) error {
+func buildRetryPolicy(_ StepBuildContext, def stepDef, step *digraph.Step) error {
 	if def.RetryPolicy != nil {
 		switch v := def.RetryPolicy.Limit.(type) {
 		case int:
@@ -1311,26 +1266,26 @@ func buildRetryPolicy(_ StepBuildContext, def stepDef, step *Step) error {
 // - Boolean true is equivalent to "while" mode with unconditional repetition
 //
 // Precedence: condition > exitCode > unconditional repeat
-func buildRepeatPolicy(_ StepBuildContext, def stepDef, step *Step) error {
+func buildRepeatPolicy(_ StepBuildContext, def stepDef, step *digraph.Step) error {
 	if def.RepeatPolicy == nil {
 		return nil
 	}
 	rpDef := def.RepeatPolicy
 
 	// Determine repeat mode
-	var mode RepeatMode
+	var mode digraph.RepeatMode
 	if rpDef.Repeat != nil {
 		switch v := rpDef.Repeat.(type) {
 		case bool:
 			if v {
-				mode = RepeatModeWhile
+				mode = digraph.RepeatModeWhile
 			}
 		case string:
 			switch v {
 			case "while":
-				mode = RepeatModeWhile
+				mode = digraph.RepeatModeWhile
 			case "until":
-				mode = RepeatModeUntil
+				mode = digraph.RepeatModeUntil
 			default:
 				return fmt.Errorf("invalid value for repeat: '%s'. It must be 'while', 'until', or a boolean", v)
 			}
@@ -1342,9 +1297,9 @@ func buildRepeatPolicy(_ StepBuildContext, def stepDef, step *Step) error {
 	// Backward compatibility: infer mode if not set
 	if mode == "" {
 		if rpDef.Condition != "" && rpDef.Expected != "" {
-			mode = RepeatModeUntil
+			mode = digraph.RepeatModeUntil
 		} else if rpDef.Condition != "" || len(rpDef.ExitCode) > 0 {
-			mode = RepeatModeWhile
+			mode = digraph.RepeatModeWhile
 		}
 	}
 
@@ -1371,7 +1326,7 @@ func buildRepeatPolicy(_ StepBuildContext, def stepDef, step *Step) error {
 	step.RepeatPolicy.Limit = rpDef.Limit
 
 	if rpDef.Condition != "" {
-		step.RepeatPolicy.Condition = &Condition{
+		step.RepeatPolicy.Condition = &digraph.Condition{
 			Condition: rpDef.Condition,
 			Expected:  rpDef.Expected,
 		}
@@ -1410,7 +1365,7 @@ func buildRepeatPolicy(_ StepBuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-func buildOutput(_ StepBuildContext, def stepDef, step *Step) error {
+func buildOutput(_ StepBuildContext, def stepDef, step *digraph.Step) error {
 	if def.Output == "" {
 		return nil
 	}
@@ -1424,7 +1379,7 @@ func buildOutput(_ StepBuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-func buildStepEnvs(ctx StepBuildContext, def stepDef, step *Step) error {
+func buildStepEnvs(ctx StepBuildContext, def stepDef, step *digraph.Step) error {
 	if def.Env == nil {
 		return nil
 	}
@@ -1444,7 +1399,7 @@ func buildStepEnvs(ctx StepBuildContext, def stepDef, step *Step) error {
 // maxStepNameLen is the maximum length of a step name.
 const maxStepNameLen = 40
 
-func buildStepPrecondition(ctx StepBuildContext, def stepDef, step *Step) error {
+func buildStepPrecondition(ctx StepBuildContext, def stepDef, step *digraph.Step) error {
 	// Parse both `preconditions` and `precondition` fields.
 	conditions, err := parsePrecondition(ctx.BuildContext, def.Preconditions)
 	if err != nil {
@@ -1459,7 +1414,7 @@ func buildStepPrecondition(ctx StepBuildContext, def stepDef, step *Step) error 
 	return nil
 }
 
-func buildSignalOnStop(_ StepBuildContext, def stepDef, step *Step) error {
+func buildSignalOnStop(_ StepBuildContext, def stepDef, step *digraph.Step) error {
 	if def.SignalOnStop != nil {
 		sigDef := *def.SignalOnStop
 		sig := signal.GetSignalNum(sigDef, 0)
@@ -1471,8 +1426,8 @@ func buildSignalOnStop(_ StepBuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-// buildChildDAG parses the child DAG definition and sets up the step to run a child DAG.
-func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
+// buildChildDAG parses the child digraph.DAG definition and sets up the step to run a child DAG.
+func buildChildDAG(ctx StepBuildContext, def stepDef, step *digraph.Step) error {
 	name := strings.TrimSpace(def.Run)
 
 	// if the run field is not set, return nil.
@@ -1480,7 +1435,7 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
 		return nil
 	}
 
-	// Parse params similar to how DAG params are parsed
+	// Parse params similar to how digraph.DAG params are parsed
 	var paramsStr string
 	if def.Params != nil {
 		// Parse the params to convert them to string format
@@ -1499,13 +1454,13 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
 		paramsStr = strings.Join(paramsToJoin, " ")
 	}
 
-	step.ChildDAG = &ChildDAG{Name: name, Params: paramsStr}
+	step.ChildDAG = &digraph.ChildDAG{Name: name, Params: paramsStr}
 
 	// Set executor type based on whether parallel execution is configured
 	if step.Parallel != nil {
-		step.ExecutorConfig.Type = ExecutorTypeParallel
+		step.ExecutorConfig.Type = digraph.ExecutorTypeParallel
 	} else {
-		step.ExecutorConfig.Type = ExecutorTypeDAG
+		step.ExecutorConfig.Type = digraph.ExecutorTypeDAG
 	}
 
 	step.Command = "run"
@@ -1515,7 +1470,7 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *Step) error {
 }
 
 // buildDepends parses the depends field in the step definition.
-func buildDepends(_ StepBuildContext, def stepDef, step *Step) error {
+func buildDepends(_ StepBuildContext, def stepDef, step *digraph.Step) error {
 	deps, err := parseStringOrArray(def.Depends)
 	if err != nil {
 		return digraph.WrapError("depends", def.Depends, ErrDependsMustBeStringOrArray)
@@ -1531,7 +1486,7 @@ func buildDepends(_ StepBuildContext, def stepDef, step *Step) error {
 }
 
 // buildStepWorkingDir builds working dir field
-func buildStepWorkingDir(ctx StepBuildContext, def stepDef, step *Step) error {
+func buildStepWorkingDir(ctx StepBuildContext, def stepDef, step *digraph.Step) error {
 	if def.Dir != "" {
 		step.Dir = def.Dir
 	}
@@ -1544,13 +1499,13 @@ func buildStepWorkingDir(ctx StepBuildContext, def stepDef, step *Step) error {
 // buildExecutor parses the executor field in the step definition.
 // Case 1: executor is nil
 //
-//	Case 1.1: DAG level 'container' field is set
-//	Case 1.2: DAG 'ssh' field is set
+//	Case 1.1: digraph.DAG level 'container' field is set
+//	Case 1.2: digraph.DAG 'ssh' field is set
 //	Case 1.3: No executor is set, use default executor
 //
 // Case 2: executor is a string
 // Case 3: executor is a struct
-func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
+func buildExecutor(ctx StepBuildContext, def stepDef, step *digraph.Step) error {
 	const (
 		executorKeyType   = "type"
 		executorKeyConfig = "config"
@@ -1617,8 +1572,8 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-func translateExecutorConfig(ctx StepBuildContext, def stepDef, step *Step) error {
-	// If the executor is nil, but the DAG has a container field,
+func translateExecutorConfig(ctx StepBuildContext, def stepDef, step *digraph.Step) error {
+	// If the executor is nil, but the digraph.DAG has a container field,
 	// we translate the container configuration to executor config.
 	if ctx.dag.Container == nil {
 		return nil // No container configuration to translate
@@ -1633,7 +1588,7 @@ func translateExecutorConfig(ctx StepBuildContext, def stepDef, step *Step) erro
 	return nil
 }
 
-func translateSSHConfig(ctx StepBuildContext, def stepDef, step *Step) error {
+func translateSSHConfig(ctx StepBuildContext, def stepDef, step *digraph.Step) error {
 	if ctx.dag.SSH == nil {
 		return nil // No container configuration to translate
 	}
@@ -1717,13 +1672,13 @@ func parseStringOrArray(v any) ([]string, error) {
 // - Direct array reference: parallel: ${ITEMS}
 // - Static array: parallel: [item1, item2]
 // - Object configuration: parallel: {items: [...], maxConcurrent: 5}
-func buildParallel(ctx StepBuildContext, def stepDef, step *Step) error {
+func buildParallel(ctx StepBuildContext, def stepDef, step *digraph.Step) error {
 	if def.Parallel == nil {
 		return nil
 	}
 
-	step.Parallel = &ParallelConfig{
-		MaxConcurrent: DefaultMaxConcurrent,
+	step.Parallel = &digraph.ParallelConfig{
+		MaxConcurrent: digraph.DefaultMaxConcurrent,
 	}
 
 	switch v := def.Parallel.(type) {
@@ -1788,23 +1743,23 @@ func buildParallel(ctx StepBuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
-// parseParallelItems converts an array of any type to ParallelItem slice
-func parseParallelItems(items []any) ([]ParallelItem, error) {
-	var result []ParallelItem
+// parseParallelItems converts an array of any type to digraph.ParallelItem slice
+func parseParallelItems(items []any) ([]digraph.ParallelItem, error) {
+	var result []digraph.ParallelItem
 
 	for _, item := range items {
 		switch v := item.(type) {
 		case string:
 			// Simple string item
-			result = append(result, ParallelItem{Value: v})
+			result = append(result, digraph.ParallelItem{Value: v})
 
 		case int, int64, uint64, float64:
 			// Numeric items, convert to string
-			result = append(result, ParallelItem{Value: fmt.Sprintf("%v", v)})
+			result = append(result, digraph.ParallelItem{Value: fmt.Sprintf("%v", v)})
 
 		case map[string]any:
 			// Object with parameters
-			params := make(DeterministicMap)
+			params := make(digraph.DeterministicMap)
 			for key, val := range v {
 				var strVal string
 				switch v := val.(type) {
@@ -1825,7 +1780,7 @@ func parseParallelItems(items []any) ([]ParallelItem, error) {
 				}
 				params[key] = strVal
 			}
-			result = append(result, ParallelItem{Params: params})
+			result = append(result, digraph.ParallelItem{Params: params})
 
 		default:
 			return nil, fmt.Errorf("parallel items must be strings, numbers, or objects, got %T", v)
@@ -1837,9 +1792,9 @@ func parseParallelItems(items []any) ([]ParallelItem, error) {
 
 // injectChainDependencies adds implicit dependencies for chain type execution.
 // In chain execution, each step depends on all previous steps unless explicitly configured otherwise.
-func injectChainDependencies(dag *DAG, prevSteps []*Step, step *Step) {
+func injectChainDependencies(dag *digraph.DAG, prevSteps []*digraph.Step, step *digraph.Step) {
 	// Early returns for cases where we shouldn't inject dependencies
-	if dag.Type != TypeChain || step.ExplicitlyNoDeps || len(prevSteps) == 0 {
+	if dag.Type != digraph.TypeChain || step.ExplicitlyNoDeps || len(prevSteps) == 0 {
 		return
 	}
 
@@ -1872,7 +1827,7 @@ func injectChainDependencies(dag *DAG, prevSteps []*Step, step *Step) {
 }
 
 // getStepKey returns the preferred identifier for a step (ID if available, otherwise Name)
-func getStepKey(step *Step) string {
+func getStepKey(step *digraph.Step) string {
 	if step.ID != "" {
 		return step.ID
 	}
@@ -1880,7 +1835,7 @@ func getStepKey(step *Step) string {
 }
 
 // getStepAlternateKey returns the alternate identifier for a step, or empty string if none
-func getStepAlternateKey(step *Step, primaryKey string) string {
+func getStepAlternateKey(step *digraph.Step, primaryKey string) string {
 	if step.ID != "" && primaryKey == step.ID {
 		return step.Name
 	}
@@ -1891,14 +1846,14 @@ func getStepAlternateKey(step *Step, primaryKey string) string {
 }
 
 // buildOTel builds the OpenTelemetry configuration for the DAG.
-func buildOTel(_ BuildContext, spec *definition, dag *DAG) error {
+func buildOTel(_ BuildContext, spec *definition, dag *digraph.DAG) error {
 	if spec.OTel == nil {
 		return nil
 	}
 
 	switch v := spec.OTel.(type) {
 	case map[string]any:
-		config := &OTelConfig{}
+		config := &digraph.OTelConfig{}
 
 		// Parse enabled flag
 		if enabled, ok := v["enabled"].(bool); ok {

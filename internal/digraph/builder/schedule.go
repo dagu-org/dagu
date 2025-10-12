@@ -13,15 +13,15 @@ var cronParser = cron.NewParser(
 
 // buildScheduler parses the schedule values and returns a list of schedules.
 // each schedule is parsed as a cron expression.
-func buildScheduler(values []string) ([]Schedule, error) {
-	var ret []Schedule
+func buildScheduler(values []string) ([]digraph.Schedule, error) {
+	var ret []digraph.Schedule
 
 	for _, v := range values {
 		parsed, err := cronParser.Parse(v)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrInvalidSchedule, err)
 		}
-		ret = append(ret, Schedule{Expression: v, Parsed: parsed})
+		ret = append(ret, digraph.Schedule{Expression: v, Parsed: parsed})
 	}
 
 	return ret, nil

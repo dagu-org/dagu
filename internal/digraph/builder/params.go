@@ -19,7 +19,7 @@ import (
 )
 
 // buildParams builds the parameters for the DAG.
-func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildParams(ctx BuildContext, spec *definition, dag *digraph.DAG) error {
 	var (
 		paramPairs []paramPair
 		envs       []string
@@ -250,7 +250,7 @@ func overrideEnvirons(envs *[]string, override []string) {
 }
 
 // parseParams parses and processes the parameters for the DAG.
-func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]string, dag *DAG) error {
+func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]string, dag *digraph.DAG) error {
 	var paramPairs []paramPair
 
 	paramPairs, err := parseParamValue(ctx, value)
