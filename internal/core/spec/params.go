@@ -256,7 +256,7 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 
 	paramPairs, err := parseParamValue(ctx, value)
 	if err != nil {
-		return digraph.WrapError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
+		return digraph.NewValidationError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 	}
 
 	// Accumulated vars for sequential param expansion (e.g., Y=${P1})
@@ -338,7 +338,7 @@ func parseParamValue(ctx BuildContext, input any) ([]paramPair, error) {
 
 		return parseMapParams(ctx, []any{values})
 	default:
-		return nil, digraph.WrapError("params", v, fmt.Errorf("%w: %T", ErrInvalidParamValue, v))
+		return nil, digraph.NewValidationError("params", v, fmt.Errorf("%w: %T", ErrInvalidParamValue, v))
 
 	}
 }
@@ -385,7 +385,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 				if !ctx.opts.NoEval {
 					parsed, err := cmdutil.EvalString(ctx.ctx, valueStr)
 					if err != nil {
-						return nil, digraph.WrapError("params", valueStr, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
+						return nil, digraph.NewValidationError("params", valueStr, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 					}
 					valueStr = parsed
 				}
@@ -395,7 +395,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 			}
 
 		default:
-			return nil, digraph.WrapError("params", m, fmt.Errorf("%w: %T", ErrInvalidParamValue, m))
+			return nil, digraph.NewValidationError("params", m, fmt.Errorf("%w: %T", ErrInvalidParamValue, m))
 		}
 	}
 
@@ -443,7 +443,7 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 				)
 
 				if cmdErr != nil {
-					return nil, digraph.WrapError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, cmdErr))
+					return nil, digraph.NewValidationError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, cmdErr))
 				}
 			}
 		}

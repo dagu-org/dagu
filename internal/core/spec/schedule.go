@@ -62,7 +62,7 @@ func parseScheduleMap(
 			for _, s := range v {
 				s, ok := s.(string)
 				if !ok {
-					return digraph.WrapError("schedule", s, ErrScheduleMustBeStringOrArray)
+					return digraph.NewValidationError("schedule", s, ErrScheduleMustBeStringOrArray)
 				}
 				values = append(values, s)
 			}
@@ -85,7 +85,7 @@ func parseScheduleMap(
 
 		for _, v := range values {
 			if _, err := cronParser.Parse(v); err != nil {
-				return digraph.WrapError("schedule", v, fmt.Errorf("%w: %s", ErrInvalidSchedule, err))
+				return digraph.NewValidationError("schedule", v, fmt.Errorf("%w: %s", ErrInvalidSchedule, err))
 			}
 			*targets = append(*targets, v)
 		}

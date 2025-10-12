@@ -6,33 +6,6 @@ import (
 	"strings"
 )
 
-// LoadError represents an error in a specific field of the configuration
-type LoadError struct {
-	Field string
-	Value any
-	Err   error
-}
-
-func (e *LoadError) Error() string {
-	if e.Value == nil {
-		return fmt.Sprintf("field '%s': %v", e.Field, e.Err)
-	}
-	return fmt.Sprintf("field '%s': %v (value: %+v)", e.Field, e.Err, e.Value)
-}
-
-func (e *LoadError) Unwrap() error {
-	return e.Err
-}
-
-// WrapError wraps an error with field context so other packages can build LoadError instances.
-func WrapError(field string, value any, err error) error {
-	return &LoadError{
-		Field: field,
-		Value: value,
-		Err:   err,
-	}
-}
-
 // errors on building a DAG.
 var (
 	ErrNameTooLong                         = errors.New("name must be less than 40 characters")
@@ -106,4 +79,31 @@ func (e ErrorList) Unwrap() []error {
 	// Return a copy of the underlying error slice
 	// This allows errors.Is to check against each error in the list
 	return e
+}
+
+// ValidationError represents an error in a specific field of the configuration
+type ValidationError struct {
+	Field string
+	Value any
+	Err   error
+}
+
+func (e *ValidationError) Error() string {
+	if e.Value == nil {
+		return fmt.Sprintf("field '%s': %v", e.Field, e.Err)
+	}
+	return fmt.Sprintf("field '%s': %v (value: %+v)", e.Field, e.Err, e.Value)
+}
+
+func (e *ValidationError) Unwrap() error {
+	return e.Err
+}
+
+// NewValidationError wraps an error with field context so other packages can build LoadError instances.
+func NewValidationError(field string, value any, err error) error {
+	return &ValidationError{
+		Field: field,
+		Value: value,
+		Err:   err,
+	}
 }

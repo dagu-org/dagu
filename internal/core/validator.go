@@ -25,11 +25,11 @@ func ValidateSteps(dag *DAG) error {
 		// Names should always exist at this point (explicit or auto-generated)
 		if step.Name == "" {
 			// This should not happen if generation works correctly
-			return WrapError("steps", step, fmt.Errorf("internal error: step name not generated"))
+			return NewValidationError("steps", step, fmt.Errorf("internal error: step name not generated"))
 		}
 
 		if _, exists := stepNames[step.Name]; exists {
-			return WrapError("steps", step.Name, ErrStepNameDuplicate)
+			return NewValidationError("steps", step.Name, ErrStepNameDuplicate)
 		}
 		stepNames[step.Name] = struct{}{}
 
@@ -37,18 +37,18 @@ func ValidateSteps(dag *DAG) error {
 		if step.ID != "" {
 			// Check ID format
 			if !isValidStepID(step.ID) {
-				return WrapError("steps", step.ID, fmt.Errorf("invalid step ID format: must match pattern ^[a-zA-Z][a-zA-Z0-9_-]*$"))
+				return NewValidationError("steps", step.ID, fmt.Errorf("invalid step ID format: must match pattern ^[a-zA-Z][a-zA-Z0-9_-]*$"))
 			}
 
 			// Check for duplicate IDs
 			if _, exists := stepIDs[step.ID]; exists {
-				return WrapError("steps", step.ID, fmt.Errorf("duplicate step ID: %s", step.ID))
+				return NewValidationError("steps", step.ID, fmt.Errorf("duplicate step ID: %s", step.ID))
 			}
 			stepIDs[step.ID] = struct{}{}
 
 			// Check for reserved words
 			if isReservedWord(step.ID) {
-				return WrapError("steps", step.ID, fmt.Errorf("step ID '%s' is a reserved word", step.ID))
+				return NewValidationError("steps", step.ID, fmt.Errorf("step ID '%s' is a reserved word", step.ID))
 			}
 		}
 	}
@@ -58,7 +58,7 @@ func ValidateSteps(dag *DAG) error {
 		if step.ID != "" {
 			// Check that ID doesn't conflict with any step name
 			if _, exists := stepNames[step.ID]; exists && step.ID != step.Name {
-				return WrapError("steps", step.ID, fmt.Errorf("step ID '%s' conflicts with another step's name", step.ID))
+				return NewValidationError("steps", step.ID, fmt.Errorf("step ID '%s' conflicts with another step's name", step.ID))
 			}
 		}
 
@@ -73,7 +73,7 @@ func ValidateSteps(dag *DAG) error {
 				}
 			}
 			if !sameStep {
-				return WrapError("steps", step.Name, fmt.Errorf("step name '%s' conflicts with another step's ID", step.Name))
+				return NewValidationError("steps", step.Name, fmt.Errorf("step name '%s' conflicts with another step's ID", step.Name))
 			}
 		}
 	}
@@ -87,7 +87,7 @@ func ValidateSteps(dag *DAG) error {
 	for _, step := range dag.Steps {
 		for _, dep := range step.Depends {
 			if _, exists := stepNames[dep]; !exists {
-				return WrapError("depends", dep, fmt.Errorf("step %s depends on non-existent step %s", step.Name, dep))
+				return NewValidationError("depends", dep, fmt.Errorf("step %s depends on non-existent step %s", step.Name, dep))
 			}
 		}
 	}
@@ -105,27 +105,27 @@ func ValidateSteps(dag *DAG) error {
 
 func validateStep(step Step) error {
 	if step.Name == "" {
-		return WrapError("name", step.Name, ErrStepNameRequired)
+		return NewValidationError("name", step.Name, ErrStepNameRequired)
 	}
 
 	if len(step.Name) > maxStepNameLen {
-		return WrapError("name", step.Name, ErrStepNameTooLong)
+		return NewValidationError("name", step.Name, ErrStepNameTooLong)
 	}
 
 	if step.Parallel != nil {
 		// Parallel steps must have a run field (child-DAG only for MVP)
 		if step.ChildDAG == nil {
-			return WrapError("parallel", step.Parallel, fmt.Errorf("parallel execution is only supported for child-DAGs (must have 'run' field)"))
+			return NewValidationError("parallel", step.Parallel, fmt.Errorf("parallel execution is only supported for child-DAGs (must have 'run' field)"))
 		}
 
 		// MaxConcurrent must be positive
 		if step.Parallel.MaxConcurrent <= 0 {
-			return WrapError("parallel.maxConcurrent", step.Parallel.MaxConcurrent, fmt.Errorf("maxConcurrent must be greater than 0"))
+			return NewValidationError("parallel.maxConcurrent", step.Parallel.MaxConcurrent, fmt.Errorf("maxConcurrent must be greater than 0"))
 		}
 
 		// Must have either items or variable reference
 		if len(step.Parallel.Items) == 0 && step.Parallel.Variable == "" {
-			return WrapError("parallel", step.Parallel, fmt.Errorf("parallel must have either items array or variable reference"))
+			return NewValidationError("parallel", step.Parallel, fmt.Errorf("parallel must have either items array or variable reference"))
 		}
 	}
 
@@ -140,7 +140,7 @@ func validateStepWithValidator(step Step) error {
 		return nil
 	}
 	if err := validator(step); err != nil {
-		return WrapError("executorConfig", step.ExecutorConfig, err)
+		return NewValidationError("executorConfig", step.ExecutorConfig, err)
 	}
 	return nil
 }

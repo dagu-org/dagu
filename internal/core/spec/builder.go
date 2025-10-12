@@ -151,11 +151,11 @@ func build(ctx BuildContext, spec *definition) (*core.DAG, error) {
 		}
 		if err := builder.fn(ctx, spec, dag); err != nil {
 			// Avoid duplicating field prefixes like "field 'steps': field 'steps': ..."
-			var le *core.LoadError
+			var le *core.ValidationError
 			if errors.As(err, &le) && le.Field == builder.name {
 				errs = append(errs, err)
 			} else {
-				errs = append(errs, core.WrapError(builder.name, nil, err))
+				errs = append(errs, core.NewValidationError(builder.name, nil, err))
 			}
 		}
 	}
@@ -243,7 +243,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *core.DAG) error {
 		for _, s := range schedule {
 			s, ok := s.(string)
 			if !ok {
-				return core.WrapError("schedule", s, ErrScheduleMustBeStringOrArray)
+				return core.NewValidationError("schedule", s, ErrScheduleMustBeStringOrArray)
 			}
 			starts = append(starts, s)
 		}
@@ -261,7 +261,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *core.DAG) error {
 
 	default:
 		// If schedule is of an invalid type, return an error.
-		return core.WrapError("schedule", spec.Schedule, ErrInvalidScheduleType)
+		return core.NewValidationError("schedule", spec.Schedule, ErrInvalidScheduleType)
 
 	}
 
@@ -286,17 +286,17 @@ func buildContainer(ctx BuildContext, spec *definition, dag *core.DAG) error {
 
 	// Validate required fields
 	if spec.Container.Image == "" {
-		return core.WrapError("container.image", spec.Container.Image, fmt.Errorf("image is required when container is specified"))
+		return core.NewValidationError("container.image", spec.Container.Image, fmt.Errorf("image is required when container is specified"))
 	}
 
 	pullPolicy, err := core.ParsePullPolicy(spec.Container.PullPolicy)
 	if err != nil {
-		return core.WrapError("container.pullPolicy", spec.Container.PullPolicy, err)
+		return core.NewValidationError("container.pullPolicy", spec.Container.PullPolicy, err)
 	}
 
 	vars, err := loadVariables(ctx, spec.Container.Env)
 	if err != nil {
-		return core.WrapError("container.env", spec.Container.Env, err)
+		return core.NewValidationError("container.env", spec.Container.Env, err)
 	}
 
 	var envs []string
@@ -478,7 +478,7 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *core.DAG) error
 		}
 
 	default:
-		return core.WrapError("registryAuths", spec.RegistryAuths, fmt.Errorf("invalid type: %T", spec.RegistryAuths))
+		return core.NewValidationError("registryAuths", spec.RegistryAuths, fmt.Errorf("invalid type: %T", spec.RegistryAuths))
 	}
 
 	return nil
@@ -498,11 +498,11 @@ func buildDotenv(ctx BuildContext, spec *definition, dag *core.DAG) error {
 			case string:
 				dag.Dotenv = append(dag.Dotenv, e)
 			default:
-				return core.WrapError("dotenv", e, ErrDotEnvMustBeStringOrArray)
+				return core.NewValidationError("dotenv", e, ErrDotEnvMustBeStringOrArray)
 			}
 		}
 	default:
-		return core.WrapError("dotenv", v, ErrDotEnvMustBeStringOrArray)
+		return core.NewValidationError("dotenv", v, ErrDotEnvMustBeStringOrArray)
 	}
 
 	if !ctx.opts.NoEval {
@@ -531,7 +531,7 @@ func buildName(ctx BuildContext, spec *definition, dag *core.DAG) error {
 		return nil
 	}
 	if err := core.ValidateDAGName(dag.Name); err != nil {
-		return core.WrapError("name", dag.Name, err)
+		return core.NewValidationError("name", dag.Name, err)
 	}
 	return nil
 }
@@ -592,9 +592,9 @@ func buildType(_ BuildContext, spec *definition, dag *core.DAG) error {
 		// Valid types
 		return nil
 	case core.TypeAgent:
-		return core.WrapError("type", dag.Type, fmt.Errorf("agent type is not yet implemented"))
+		return core.NewValidationError("type", dag.Type, fmt.Errorf("agent type is not yet implemented"))
 	default:
-		return core.WrapError("type", dag.Type, fmt.Errorf("invalid type: %s (must be one of: graph, chain, agent)", dag.Type))
+		return core.NewValidationError("type", dag.Type, fmt.Errorf("invalid type: %s (must be one of: graph, chain, agent)", dag.Type))
 	}
 }
 
@@ -695,32 +695,32 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]*core.Condition, e
 			case "condition":
 				val, ok := vv.(string)
 				if !ok {
-					return nil, core.WrapError("preconditions", vv, ErrPreconditionValueMustBeString)
+					return nil, core.NewValidationError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
 				ret.Condition = val
 
 			case "expected":
 				val, ok := vv.(string)
 				if !ok {
-					return nil, core.WrapError("preconditions", vv, ErrPreconditionValueMustBeString)
+					return nil, core.NewValidationError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
 				ret.Expected = val
 
 			case "command":
 				val, ok := vv.(string)
 				if !ok {
-					return nil, core.WrapError("preconditions", vv, ErrPreconditionValueMustBeString)
+					return nil, core.NewValidationError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
 				ret.Condition = val
 
 			default:
-				return nil, core.WrapError("preconditions", key, fmt.Errorf("%w: %s", ErrPreconditionHasInvalidKey, key))
+				return nil, core.NewValidationError("preconditions", key, fmt.Errorf("%w: %s", ErrPreconditionHasInvalidKey, key))
 
 			}
 		}
 
 		if err := ret.Validate(); err != nil {
-			return nil, core.WrapError("preconditions", v, err)
+			return nil, core.NewValidationError("preconditions", v, err)
 		}
 
 		return []*core.Condition{&ret}, nil
@@ -737,7 +737,7 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]*core.Condition, e
 		return ret, nil
 
 	default:
-		return nil, core.WrapError("preconditions", v, ErrPreconditionMustBeArrayOrString)
+		return nil, core.NewValidationError("preconditions", v, ErrPreconditionMustBeArrayOrString)
 
 	}
 }
@@ -914,7 +914,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *core.DAG) error {
 						tempSteps = append(tempSteps, step)
 
 					default:
-						return core.WrapError("steps", raw, ErrInvalidStepData)
+						return core.NewValidationError("steps", raw, ErrInvalidStepData)
 					}
 				}
 
@@ -922,7 +922,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *core.DAG) error {
 				prevSteps = tempSteps
 
 			default:
-				return core.WrapError("steps", raw, ErrInvalidStepData)
+				return core.NewValidationError("steps", raw, ErrInvalidStepData)
 			}
 		}
 
@@ -940,7 +940,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *core.DAG) error {
 			Result:      &stepDefs,
 		})
 		if err := md.Decode(v); err != nil {
-			return core.WrapError("steps", v, err)
+			return core.NewValidationError("steps", v, err)
 		}
 		for name, stepDef := range stepDefs {
 			stepDef.Name = name
@@ -955,7 +955,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *core.DAG) error {
 		return nil
 
 	default:
-		return core.WrapError("steps", v, ErrStepsMustBeArrayOrMap)
+		return core.NewValidationError("steps", v, ErrStepsMustBeArrayOrMap)
 
 	}
 }
@@ -985,7 +985,7 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 		Result:      &stepDef,
 	})
 	if err := md.Decode(raw); err != nil {
-		return nil, core.WrapError("steps", raw, err)
+		return nil, core.NewValidationError("steps", raw, err)
 	}
 	step, err := buildStep(ctx, stepDef)
 	if err != nil {
@@ -1123,13 +1123,13 @@ func buildContinueOn(_ StepBuildContext, def stepDef, step *core.Step) error {
 
 	exitCodes, err := parseIntOrArray(def.ContinueOn.ExitCode)
 	if err != nil {
-		return core.WrapError("continueOn.exitCode", def.ContinueOn.ExitCode, ErrContinueOnExitCodeMustBeIntOrArray)
+		return core.NewValidationError("continueOn.exitCode", def.ContinueOn.ExitCode, ErrContinueOnExitCodeMustBeIntOrArray)
 	}
 	step.ContinueOn.ExitCode = exitCodes
 
 	output, err := parseStringOrArray(def.ContinueOn.Output)
 	if err != nil {
-		return core.WrapError("continueOn.stdout", def.ContinueOn.Output, ErrContinueOnOutputMustBeStringOrArray)
+		return core.NewValidationError("continueOn.stdout", def.ContinueOn.Output, ErrContinueOnOutputMustBeStringOrArray)
 	}
 	step.ContinueOn.Output = output
 
@@ -1150,7 +1150,7 @@ func buildRetryPolicy(_ StepBuildContext, def stepDef, step *core.Step) error {
 		case string:
 			step.RetryPolicy.LimitStr = v
 		default:
-			return core.WrapError("retryPolicy.Limit", v, fmt.Errorf("invalid type: %T", v))
+			return core.NewValidationError("retryPolicy.Limit", v, fmt.Errorf("invalid type: %T", v))
 		}
 
 		switch v := def.RetryPolicy.IntervalSec.(type) {
@@ -1163,7 +1163,7 @@ func buildRetryPolicy(_ StepBuildContext, def stepDef, step *core.Step) error {
 		case string:
 			step.RetryPolicy.IntervalSecStr = v
 		default:
-			return core.WrapError("retryPolicy.IntervalSec", v, fmt.Errorf("invalid type: %T", v))
+			return core.NewValidationError("retryPolicy.IntervalSec", v, fmt.Errorf("invalid type: %T", v))
 		}
 
 		if def.RetryPolicy.ExitCode != nil {
@@ -1184,12 +1184,12 @@ func buildRetryPolicy(_ StepBuildContext, def stepDef, step *core.Step) error {
 			case float64:
 				step.RetryPolicy.Backoff = v
 			default:
-				return core.WrapError("retryPolicy.Backoff", v, fmt.Errorf("invalid type: %T", v))
+				return core.NewValidationError("retryPolicy.Backoff", v, fmt.Errorf("invalid type: %T", v))
 			}
 
 			// Validate backoff value
 			if step.RetryPolicy.Backoff > 0 && step.RetryPolicy.Backoff <= 1.0 {
-				return core.WrapError("retryPolicy.Backoff", step.RetryPolicy.Backoff,
+				return core.NewValidationError("retryPolicy.Backoff", step.RetryPolicy.Backoff,
 					fmt.Errorf("backoff must be greater than 1.0 for exponential growth"))
 			}
 		}
@@ -1427,7 +1427,7 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 		ctxCopy.opts.NoEval = true // Disable evaluation for params parsing
 		paramPairs, err := parseParamValue(ctxCopy.BuildContext, def.Params)
 		if err != nil {
-			return core.WrapError("params", def.Params, err)
+			return core.NewValidationError("params", def.Params, err)
 		}
 
 		// Convert to string format "key=value key=value ..."
@@ -1457,7 +1457,7 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 func buildDepends(_ StepBuildContext, def stepDef, step *core.Step) error {
 	deps, err := parseStringOrArray(def.Depends)
 	if err != nil {
-		return core.WrapError("depends", def.Depends, ErrDependsMustBeStringOrArray)
+		return core.NewValidationError("depends", def.Depends, ErrDependsMustBeStringOrArray)
 	}
 	step.Depends = deps
 
@@ -1524,7 +1524,7 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *core.Step) error {
 				// Executor type is a string.
 				typ, ok := v.(string)
 				if !ok {
-					return core.WrapError("executor.type", v, ErrExecutorTypeMustBeString)
+					return core.NewValidationError("executor.type", v, ErrExecutorTypeMustBeString)
 				}
 				step.ExecutorConfig.Type = strings.TrimSpace(typ)
 
@@ -1534,7 +1534,7 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *core.Step) error {
 				// It is up to the executor to parse the values.
 				executorConfig, ok := v.(map[string]any)
 				if !ok {
-					return core.WrapError("executor.config", v, ErrExecutorConfigValueMustBeMap)
+					return core.NewValidationError("executor.config", v, ErrExecutorConfigValueMustBeMap)
 				}
 				for configKey, v := range executorConfig {
 					step.ExecutorConfig.Config[configKey] = v
@@ -1542,14 +1542,14 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *core.Step) error {
 
 			default:
 				// Unknown key in the executor config.
-				return core.WrapError("executor.config", key, fmt.Errorf("%w: %s", ErrExecutorHasInvalidKey, key))
+				return core.NewValidationError("executor.config", key, fmt.Errorf("%w: %s", ErrExecutorHasInvalidKey, key))
 
 			}
 		}
 
 	default:
 		// Unknown key for executor field.
-		return core.WrapError("executor", val, ErrExecutorConfigMustBeStringOrMap)
+		return core.NewValidationError("executor", val, ErrExecutorConfigMustBeStringOrMap)
 
 	}
 
@@ -1677,7 +1677,7 @@ func buildParallel(ctx StepBuildContext, def stepDef, step *core.Step) error {
 		// Static array: parallel: [item1, item2] or parallel: [{SOURCE: s3://...}, ...]
 		items, err := parseParallelItems(v)
 		if err != nil {
-			return core.WrapError("parallel", v, err)
+			return core.NewValidationError("parallel", v, err)
 		}
 		step.Parallel.Items = items
 
@@ -1694,11 +1694,11 @@ func buildParallel(ctx StepBuildContext, def stepDef, step *core.Step) error {
 					// Direct array in object form
 					items, err := parseParallelItems(itemsVal)
 					if err != nil {
-						return core.WrapError("parallel.items", itemsVal, err)
+						return core.NewValidationError("parallel.items", itemsVal, err)
 					}
 					step.Parallel.Items = items
 				default:
-					return core.WrapError("parallel.items", val, fmt.Errorf("parallel.items must be string or array, got %T", val))
+					return core.NewValidationError("parallel.items", val, fmt.Errorf("parallel.items must be string or array, got %T", val))
 				}
 
 			case "maxConcurrent":
@@ -1712,7 +1712,7 @@ func buildParallel(ctx StepBuildContext, def stepDef, step *core.Step) error {
 				case float64:
 					step.Parallel.MaxConcurrent = int(mc)
 				default:
-					return core.WrapError("parallel.maxConcurrent", val, fmt.Errorf("parallel.maxConcurrent must be int, got %T", val))
+					return core.NewValidationError("parallel.maxConcurrent", val, fmt.Errorf("parallel.maxConcurrent must be int, got %T", val))
 				}
 
 			default:
@@ -1721,7 +1721,7 @@ func buildParallel(ctx StepBuildContext, def stepDef, step *core.Step) error {
 		}
 
 	default:
-		return core.WrapError("parallel", v, fmt.Errorf("parallel must be string, array, or object, got %T", v))
+		return core.NewValidationError("parallel", v, fmt.Errorf("parallel must be string, array, or object, got %T", v))
 	}
 
 	return nil
@@ -1868,7 +1868,7 @@ func buildOTel(_ BuildContext, spec *definition, dag *core.DAG) error {
 		if timeout, ok := v["timeout"].(string); ok {
 			duration, err := time.ParseDuration(timeout)
 			if err != nil {
-				return core.WrapError("otel.timeout", timeout, err)
+				return core.NewValidationError("otel.timeout", timeout, err)
 			}
 			config.Timeout = duration
 		}
@@ -1882,6 +1882,6 @@ func buildOTel(_ BuildContext, spec *definition, dag *core.DAG) error {
 		return nil
 
 	default:
-		return core.WrapError("otel", v, fmt.Errorf("otel must be a map"))
+		return core.NewValidationError("otel", v, fmt.Errorf("otel must be a map"))
 	}
 }
