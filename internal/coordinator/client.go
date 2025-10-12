@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/backoff"
+	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
