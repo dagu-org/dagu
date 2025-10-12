@@ -1,4 +1,4 @@
-package builtin
+package jq
 
 import (
 	"context"
