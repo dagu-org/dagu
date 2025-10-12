@@ -1,4 +1,4 @@
-package models_test
+package execution_test
 
 import (
 	"context"
@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -19,52 +19,52 @@ type mockDAGRunStore struct {
 	mock.Mock
 }
 
-func (m *mockDAGRunStore) CreateAttempt(ctx context.Context, dag *core.DAG, ts time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) CreateAttempt(ctx context.Context, dag *core.DAG, ts time.Time, dagRunID string, opts execution.NewDAGRunAttemptOptions) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dag, ts, dagRunID, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(models.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) RecentAttempts(ctx context.Context, name string, itemLimit int) []models.DAGRunAttempt {
+func (m *mockDAGRunStore) RecentAttempts(ctx context.Context, name string, itemLimit int) []execution.DAGRunAttempt {
 	args := m.Called(ctx, name, itemLimit)
 	if args.Get(0) == nil {
 		return nil
 	}
-	return args.Get(0).([]models.DAGRunAttempt)
+	return args.Get(0).([]execution.DAGRunAttempt)
 }
 
-func (m *mockDAGRunStore) LatestAttempt(ctx context.Context, name string) (models.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) LatestAttempt(ctx context.Context, name string) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(models.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) ListStatuses(ctx context.Context, opts ...models.ListDAGRunStatusesOption) ([]*models.DAGRunStatus, error) {
+func (m *mockDAGRunStore) ListStatuses(ctx context.Context, opts ...execution.ListDAGRunStatusesOption) ([]*execution.DAGRunStatus, error) {
 	args := m.Called(ctx, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*models.DAGRunStatus), args.Error(1)
+	return args.Get(0).([]*execution.DAGRunStatus), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef) (models.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(models.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun core.DAGRunRef, childDAGRunID string) (models.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun core.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun, childDAGRunID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(models.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
 func (m *mockDAGRunStore) RemoveOldDAGRuns(ctx context.Context, name string, retentionDays int) error {
@@ -91,7 +91,7 @@ func (m *mockDAGRunAttempt) Open(ctx context.Context) error {
 	return args.Error(0)
 }
 
-func (m *mockDAGRunAttempt) Write(ctx context.Context, status models.DAGRunStatus) error {
+func (m *mockDAGRunAttempt) Write(ctx context.Context, status execution.DAGRunStatus) error {
 	args := m.Called(ctx, status)
 	return args.Error(0)
 }
@@ -101,12 +101,12 @@ func (m *mockDAGRunAttempt) Close(ctx context.Context) error {
 	return args.Error(0)
 }
 
-func (m *mockDAGRunAttempt) ReadStatus(ctx context.Context) (*models.DAGRunStatus, error) {
+func (m *mockDAGRunAttempt) ReadStatus(ctx context.Context) (*execution.DAGRunStatus, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*models.DAGRunStatus), args.Error(1)
+	return args.Get(0).(*execution.DAGRunStatus), args.Error(1)
 }
 
 func (m *mockDAGRunAttempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
@@ -140,19 +140,19 @@ func (m *mockDAGRunAttempt) Hidden() bool {
 // Tests
 
 func TestListDAGRunStatusesOptions(t *testing.T) {
-	from := models.NewUTC(time.Now().Add(-24 * time.Hour))
-	to := models.NewUTC(time.Now())
+	from := execution.NewUTC(time.Now().Add(-24 * time.Hour))
+	to := execution.NewUTC(time.Now())
 	statuses := []status.Status{status.Success, status.Error}
 
-	opts := models.ListDAGRunStatusesOptions{}
+	opts := execution.ListDAGRunStatusesOptions{}
 
 	// Apply options
-	models.WithFrom(from)(&opts)
-	models.WithTo(to)(&opts)
-	models.WithStatuses(statuses)(&opts)
-	models.WithExactName("test-dag")(&opts)
-	models.WithName("partial-name")(&opts)
-	models.WithDAGRunID("run-123")(&opts)
+	execution.WithFrom(from)(&opts)
+	execution.WithTo(to)(&opts)
+	execution.WithStatuses(statuses)(&opts)
+	execution.WithExactName("test-dag")(&opts)
+	execution.WithName("partial-name")(&opts)
+	execution.WithDAGRunID("run-123")(&opts)
 
 	// Verify options were set correctly
 	assert.Equal(t, from, opts.From)
@@ -169,7 +169,7 @@ func TestNewDAGRunAttemptOptions(t *testing.T) {
 		ID:   "root-run-123",
 	}
 
-	opts := models.NewDAGRunAttemptOptions{
+	opts := execution.NewDAGRunAttemptOptions{
 		RootDAGRun: rootDAGRun,
 		Retry:      true,
 	}
@@ -189,12 +189,12 @@ func TestDAGRunStoreInterface(t *testing.T) {
 	mockAttempt := &mockDAGRunAttempt{}
 	store.On("CreateAttempt", ctx, dag, ts, dagRunID, mock.Anything).Return(mockAttempt, nil)
 
-	attempt, err := store.CreateAttempt(ctx, dag, ts, dagRunID, models.NewDAGRunAttemptOptions{})
+	attempt, err := store.CreateAttempt(ctx, dag, ts, dagRunID, execution.NewDAGRunAttemptOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, mockAttempt, attempt)
 
 	// Test RecentAttempts
-	attempts := []models.DAGRunAttempt{mockAttempt}
+	attempts := []execution.DAGRunAttempt{mockAttempt}
 	store.On("RecentAttempts", ctx, "test-dag", 10).Return(attempts)
 
 	result := store.RecentAttempts(ctx, "test-dag", 10)
@@ -208,7 +208,7 @@ func TestDAGRunStoreInterface(t *testing.T) {
 	assert.Equal(t, mockAttempt, latest)
 
 	// Test ListStatuses
-	statuses := []*models.DAGRunStatus{
+	statuses := []*execution.DAGRunStatus{
 		{Name: "test-dag", Status: status.Success},
 	}
 	store.On("ListStatuses", ctx, mock.Anything).Return(statuses, nil)
@@ -262,7 +262,7 @@ func TestDAGRunAttemptInterface(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test Write
-	status := models.DAGRunStatus{
+	status := execution.DAGRunStatus{
 		Name:     "test-dag",
 		DAGRunID: "run-123",
 		Status:   status.Running,
@@ -313,13 +313,13 @@ func TestDAGRunStoreErrors(t *testing.T) {
 	// CreateAttempt error
 	store.On("CreateAttempt", ctx, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, expectedErr)
-	_, err := store.CreateAttempt(ctx, &core.DAG{}, time.Now(), "run-123", models.NewDAGRunAttemptOptions{})
+	_, err := store.CreateAttempt(ctx, &core.DAG{}, time.Now(), "run-123", execution.NewDAGRunAttemptOptions{})
 	assert.Equal(t, expectedErr, err)
 
 	// LatestAttempt error
-	store.On("LatestAttempt", ctx, "test-dag").Return(nil, models.ErrDAGRunIDNotFound)
+	store.On("LatestAttempt", ctx, "test-dag").Return(nil, execution.ErrDAGRunIDNotFound)
 	_, err = store.LatestAttempt(ctx, "test-dag")
-	assert.Equal(t, models.ErrDAGRunIDNotFound, err)
+	assert.Equal(t, execution.ErrDAGRunIDNotFound, err)
 
 	// ListStatuses error
 	store.On("ListStatuses", ctx, mock.Anything).Return(nil, expectedErr)
@@ -328,9 +328,9 @@ func TestDAGRunStoreErrors(t *testing.T) {
 
 	// FindAttempt error
 	dagRun := core.DAGRunRef{Name: "test-dag", ID: "run-123"}
-	store.On("FindAttempt", ctx, dagRun).Return(nil, models.ErrNoStatusData)
+	store.On("FindAttempt", ctx, dagRun).Return(nil, execution.ErrNoStatusData)
 	_, err = store.FindAttempt(ctx, dagRun)
-	assert.Equal(t, models.ErrNoStatusData, err)
+	assert.Equal(t, execution.ErrNoStatusData, err)
 
 	store.AssertExpectations(t)
 }
@@ -347,15 +347,15 @@ func TestDAGRunAttemptErrors(t *testing.T) {
 	assert.Equal(t, expectedErr, err)
 
 	// Write error
-	status := models.DAGRunStatus{}
+	status := execution.DAGRunStatus{}
 	attempt.On("Write", ctx, status).Return(expectedErr)
 	err = attempt.Write(ctx, status)
 	assert.Equal(t, expectedErr, err)
 
 	// ReadStatus error
-	attempt.On("ReadStatus", ctx).Return(nil, models.ErrNoStatusData)
+	attempt.On("ReadStatus", ctx).Return(nil, execution.ErrNoStatusData)
 	_, err = attempt.ReadStatus(ctx)
-	assert.Equal(t, models.ErrNoStatusData, err)
+	assert.Equal(t, execution.ErrNoStatusData, err)
 
 	// ReadDAG error
 	attempt.On("ReadDAG", ctx).Return(nil, expectedErr)
@@ -397,17 +397,17 @@ func TestListDAGRunStatusesWithOptions(t *testing.T) {
 	store := &mockDAGRunStore{}
 
 	// Test with multiple options
-	from := models.NewUTC(time.Now().Add(-7 * 24 * time.Hour))
-	to := models.NewUTC(time.Now())
+	from := execution.NewUTC(time.Now().Add(-7 * 24 * time.Hour))
+	to := execution.NewUTC(time.Now())
 
-	opts := []models.ListDAGRunStatusesOption{
-		models.WithFrom(from),
-		models.WithTo(to),
-		models.WithStatuses([]status.Status{status.Success}),
-		models.WithName("test"),
+	opts := []execution.ListDAGRunStatusesOption{
+		execution.WithFrom(from),
+		execution.WithTo(to),
+		execution.WithStatuses([]status.Status{status.Success}),
+		execution.WithName("test"),
 	}
 
-	expectedStatuses := []*models.DAGRunStatus{
+	expectedStatuses := []*execution.DAGRunStatus{
 		{
 			Name:     "test-dag",
 			DAGRunID: "run-123",

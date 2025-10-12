@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
-var _ models.QueuedItemData = (*Job)(nil)
+var _ execution.QueuedItemData = (*Job)(nil)
 
 type Job struct {
 	id string

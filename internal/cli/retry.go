@@ -6,8 +6,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
 )
@@ -108,7 +108,7 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *core.DAG, status *models.DAGRunStatus, rootRun core.DAGRunRef, stepName string) error {
+func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, rootRun core.DAGRunRef, stepName string) error {
 	logger.Debug(ctx, "Executing dag-run retry", "dag", dag.Name, "runId", status.DAGRunID, "step", stepName)
 
 	// We use the same log file for the retry as the original run.

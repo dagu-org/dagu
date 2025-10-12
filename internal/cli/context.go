@@ -18,11 +18,11 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/metrics"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
@@ -43,13 +43,13 @@ type Context struct {
 	Config  *config.Config
 	Quiet   bool
 
-	DAGRunStore     models.DAGRunStore
+	DAGRunStore     execution.DAGRunStore
 	DAGRunMgr       dagrun.Manager
-	ProcStore       models.ProcStore
-	QueueStore      models.QueueStore
-	ServiceRegistry models.ServiceRegistry
+	ProcStore       execution.ProcStore
+	QueueStore      execution.QueueStore
+	ServiceRegistry execution.ServiceRegistry
 
-	Proc models.ProcHandle
+	Proc execution.ProcHandle
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -122,7 +122,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	switch cmd.Name() {
 	case "server", "scheduler", "start-all":
 		// For long-running process, we setup file cache for better performance
-		hc := fileutil.NewCache[*models.DAGRunStatus](0, time.Hour*12)
+		hc := fileutil.NewCache[*execution.DAGRunStatus](0, time.Hour*12)
 		hc.StartEviction(ctx)
 		hrOpts = append(hrOpts, filedagrun.WithHistoryFileCache(hc))
 	}
@@ -222,7 +222,7 @@ func (c *Context) StringParam(name string) (string, error) {
 
 // dagStore returns a new DAGRepository instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (c *Context) dagStore(cache *fileutil.Cache[*core.DAG], searchPaths []string) (models.DAGStore, error) {
+func (c *Context) dagStore(cache *fileutil.Cache[*core.DAG], searchPaths []string) (execution.DAGStore, error) {
 	dir := c.Config.Paths.DAGsDir
 	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {

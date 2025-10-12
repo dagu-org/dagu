@@ -11,8 +11,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -236,7 +236,7 @@ func TestAttempt_EmptyFile(t *testing.T) {
 
 	// Reading an empty file should return ErrCorruptedStatusFile
 	_, err = att.ReadStatus(context.Background())
-	assert.ErrorIs(t, err, models.ErrCorruptedStatusFile)
+	assert.ErrorIs(t, err, execution.ErrCorruptedStatusFile)
 
 	// Compacting an empty file should be safe
 	err = att.Compact(context.Background())
@@ -281,7 +281,7 @@ func TestAttempt_CorruptedStatusFile(t *testing.T) {
 
 		// Should return ErrCorruptedStatusFile
 		_, err = att.ReadStatus(context.Background())
-		assert.ErrorIs(t, err, models.ErrCorruptedStatusFile)
+		assert.ErrorIs(t, err, execution.ErrCorruptedStatusFile)
 	})
 
 	t.Run("OnlyWhitespace", func(t *testing.T) {
@@ -297,7 +297,7 @@ func TestAttempt_CorruptedStatusFile(t *testing.T) {
 
 		// Should return ErrCorruptedStatusFile
 		_, err = att.ReadStatus(context.Background())
-		assert.ErrorIs(t, err, models.ErrCorruptedStatusFile)
+		assert.ErrorIs(t, err, execution.ErrCorruptedStatusFile)
 	})
 
 	t.Run("NoValidJSON", func(t *testing.T) {
@@ -313,7 +313,7 @@ func TestAttempt_CorruptedStatusFile(t *testing.T) {
 
 		// Should return ErrCorruptedStatusFile
 		_, err = att.ReadStatus(context.Background())
-		assert.ErrorIs(t, err, models.ErrCorruptedStatusFile)
+		assert.ErrorIs(t, err, execution.ErrCorruptedStatusFile)
 	})
 }
 
@@ -419,7 +419,7 @@ func createTempDir(t *testing.T) string {
 	attemptID, err := genAttemptID()
 	require.NoError(t, err)
 
-	dir, err := os.MkdirTemp("", "attempt_"+formatAttemptTimestamp(models.NewUTC(time.Now()))+"_"+attemptID)
+	dir, err := os.MkdirTemp("", "attempt_"+formatAttemptTimestamp(execution.NewUTC(time.Now()))+"_"+attemptID)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.RemoveAll(dir)
@@ -460,16 +460,16 @@ func createTestDAG() *core.DAG {
 }
 
 // createTestStatus creates a sample status for testing using StatusFactory
-func createTestStatus(st status.Status) models.DAGRunStatus {
+func createTestStatus(st status.Status) execution.DAGRunStatus {
 	dag := createTestDAG()
 
-	return models.DAGRunStatus{
+	return execution.DAGRunStatus{
 		Name:      dag.Name,
 		DAGRunID:  "test",
 		Status:    st,
-		PID:       models.PID(12345),
+		PID:       execution.PID(12345),
 		StartedAt: stringutil.FormatTime(time.Now()),
-		Nodes:     models.NodesFromSteps(dag.Steps),
+		Nodes:     execution.NodesFromSteps(dag.Steps),
 	}
 }
 

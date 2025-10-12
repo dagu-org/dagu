@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 )
 
-var _ models.ProcStore = (*Store)(nil)
+var _ execution.ProcStore = (*Store)(nil)
 
 // Store is a struct that implements the ProcStore interface.
 type Store struct {
@@ -61,7 +61,7 @@ func (s *Store) ListAlive(ctx context.Context, groupName string) ([]core.DAGRunR
 }
 
 // Acquire implements models.ProcStore.
-func (s *Store) Acquire(ctx context.Context, groupName string, dagRun core.DAGRunRef) (models.ProcHandle, error) {
+func (s *Store) Acquire(ctx context.Context, groupName string, dagRun core.DAGRunRef) (execution.ProcHandle, error) {
 	procGroup := s.newProcGroup(groupName)
 	proc, err := procGroup.Acquire(ctx, dagRun)
 	if err != nil {

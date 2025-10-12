@@ -11,9 +11,9 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/sock"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 )
@@ -32,7 +32,7 @@ func TestManager(t *testing.T) {
 		socketServer, _ := sock.NewServer(
 			dag.SockAddr(dagRunID),
 			func(w http.ResponseWriter, _ *http.Request) {
-				status := models.NewStatusBuilder(dag.DAG).Create(
+				status := execution.NewStatusBuilder(dag.DAG).Create(
 					dagRunID, status.Running, 0, time.Now(),
 				)
 				w.WriteHeader(http.StatusOK)
@@ -68,7 +68,7 @@ func TestManager(t *testing.T) {
 		cli := th.DAGRunMgr
 
 		// Open the Attempt data and write a status before updating it.
-		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, models.NewDAGRunAttemptOptions{})
+		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, execution.NewDAGRunAttemptOptions{})
 		require.NoError(t, err)
 
 		err = att.Open(ctx)
@@ -158,9 +158,9 @@ steps:
 	})
 }
 
-func testNewStatus(dag *core.DAG, dagRunID string, dagStatus status.Status, nodeStatus status.NodeStatus) models.DAGRunStatus {
+func testNewStatus(dag *core.DAG, dagRunID string, dagStatus status.Status, nodeStatus status.NodeStatus) execution.DAGRunStatus {
 	nodes := []runtime.NodeData{{State: runtime.NodeState{Status: nodeStatus}}}
 	tm := time.Now()
 	startedAt := &tm
-	return models.NewStatusBuilder(dag).Create(dagRunID, dagStatus, 0, *startedAt, models.WithNodes(nodes))
+	return execution.NewStatusBuilder(dag).Create(dagRunID, dagStatus, 0, *startedAt, execution.WithNodes(nodes))
 }

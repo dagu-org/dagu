@@ -7,22 +7,22 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 )
 
 // ZombieDetector finds and cleans up zombie DAG runs
 type ZombieDetector struct {
-	dagRunStore models.DAGRunStore
-	procStore   models.ProcStore
+	dagRunStore execution.DAGRunStore
+	procStore   execution.ProcStore
 	interval    time.Duration
 }
 
 // NewZombieDetector creates a new zombie detector
 func NewZombieDetector(
-	dagRunStore models.DAGRunStore,
-	procStore models.ProcStore,
+	dagRunStore execution.DAGRunStore,
+	procStore execution.ProcStore,
 	interval time.Duration,
 ) *ZombieDetector {
 	if interval <= 0 {
@@ -71,7 +71,7 @@ func (z *ZombieDetector) Start(ctx context.Context) {
 func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 	// Query all running DAG runs
 	statuses, err := z.dagRunStore.ListStatuses(ctx,
-		models.WithStatuses([]status.Status{status.Running}))
+		execution.WithStatuses([]status.Status{status.Running}))
 	if err != nil {
 		logger.Error(ctx, "Failed to list running DAG runs", "err", err)
 		return
@@ -88,7 +88,7 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 }
 
 // checkAndCleanZombie checks if a single DAG run is a zombie and cleans it up
-func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *models.DAGRunStatus) error {
+func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.DAGRunStatus) error {
 	// Find the attempt for this status
 	dagRunRef := core.NewDAGRunRef(st.Name, st.DAGRunID)
 	attempt, err := z.dagRunStore.FindAttempt(ctx, dagRunRef)
@@ -135,7 +135,7 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *models.DAG
 
 // updateStatus updates the status of a DAG run attempt
 func (z *ZombieDetector) updateStatus(ctx context.Context,
-	attempt models.DAGRunAttempt, status models.DAGRunStatus) error {
+	attempt execution.DAGRunAttempt, status execution.DAGRunStatus) error {
 	if err := attempt.Open(ctx); err != nil {
 		return fmt.Errorf("open attempt: %w", err)
 	}

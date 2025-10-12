@@ -9,18 +9,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 )
 
 // Collector implements prometheus.Collector interface
 type Collector struct {
 	startTime       time.Time
 	version         string
-	dagStore        models.DAGStore
-	dagRunStore     models.DAGRunStore
-	queueStore      models.QueueStore
-	serviceRegistry models.ServiceRegistry
+	dagStore        execution.DAGStore
+	dagRunStore     execution.DAGRunStore
+	queueStore      execution.QueueStore
+	serviceRegistry execution.ServiceRegistry
 
 	// Metric descriptors
 	infoDesc             *prometheus.Desc
@@ -37,10 +37,10 @@ type Collector struct {
 // NewCollector creates a new metrics collector
 func NewCollector(
 	version string,
-	dagStore models.DAGStore,
-	dagRunStore models.DAGRunStore,
-	queueStore models.QueueStore,
-	serviceRegistry models.ServiceRegistry,
+	dagStore execution.DAGStore,
+	dagRunStore execution.DAGRunStore,
+	queueStore execution.QueueStore,
+	serviceRegistry execution.ServiceRegistry,
 ) *Collector {
 	return &Collector{
 		startTime:       time.Now(),
@@ -142,11 +142,11 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	// Scheduler status
 	schedulerRunning := float64(0)
 	if c.serviceRegistry != nil {
-		members, err := c.serviceRegistry.GetServiceMembers(ctx, models.ServiceNameScheduler)
+		members, err := c.serviceRegistry.GetServiceMembers(ctx, execution.ServiceNameScheduler)
 		if err == nil {
 			// Check if any scheduler instance is active
 			for _, member := range members {
-				if member.Status == models.ServiceStatusActive {
+				if member.Status == execution.ServiceStatusActive {
 					schedulerRunning = 1
 					break
 				}
@@ -240,7 +240,7 @@ func (c *Collector) collectDAGRunMetrics(ctx context.Context, ch chan<- promethe
 
 func (c *Collector) collectDAGMetrics(ctx context.Context, ch chan<- prometheus.Metric) {
 	// Get all DAGs using List with empty options to get all
-	result, _, err := c.dagStore.List(ctx, models.ListDAGsOptions{})
+	result, _, err := c.dagStore.List(ctx, execution.ListDAGsOptions{})
 	if err != nil {
 		// Log error but don't fail collection
 		return

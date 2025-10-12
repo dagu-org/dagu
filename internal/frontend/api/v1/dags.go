@@ -14,9 +14,9 @@ import (
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	dagstatus "github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/samber/lo/mutable"
 	"golang.org/x/text/encoding"
@@ -61,7 +61,7 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 
 	_, err := a.dagStore.GetMetadata(ctx, request.Name)
 	if err != nil {
-		if errors.Is(err, models.ErrDAGNotFound) {
+		if errors.Is(err, execution.ErrDAGNotFound) {
 			return nil, &Error{
 				HTTPStatus: http.StatusNotFound,
 				Code:       api.ErrorCodeNotFound,
@@ -89,7 +89,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 	dag, err := a.dagStore.GetDetails(ctx, name)
 	if err != nil {
-		if errors.Is(err, models.ErrDAGNotFound) {
+		if errors.Is(err, execution.ErrDAGNotFound) {
 			return nil, &Error{
 				HTTPStatus: http.StatusNotFound,
 				Code:       api.ErrorCodeNotFound,
@@ -352,7 +352,7 @@ func (a *API) readStepLog(
 	stepName string,
 	statusFile string,
 ) (*api.StepLog, error) {
-	var status *models.DAGRunStatus
+	var status *execution.DAGRunStatus
 
 	if statusFile != "" {
 		parsedStatus, err := filedagrun.ParseStatusFile(statusFile)
@@ -371,7 +371,7 @@ func (a *API) readStepLog(
 	}
 
 	// Find the step in the status to get the log file.
-	var node *models.Node
+	var node *execution.Node
 	for _, n := range status.Nodes {
 		if n.Step.Name == stepName {
 			node = n
@@ -437,8 +437,8 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 
 // ListDAGs implements api.StrictServerInterface.
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
-	pg := models.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.Limit))
-	result, errList, err := a.dagStore.List(ctx, models.ListDAGsOptions{
+	pg := execution.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.Limit))
+	result, errList, err := a.dagStore.List(ctx, execution.ListDAGsOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.SearchName),
 		Tag:       valueOf(request.Params.SearchTag),
@@ -449,7 +449,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 
 	// Get status for each DAG
-	dagStatuses := make([]models.DAGRunStatus, len(result.Items))
+	dagStatuses := make([]execution.DAGRunStatus, len(result.Items))
 	for _, item := range result.Items {
 		status, err := a.dagRunManager.GetLatestStatus(ctx, item)
 		if err != nil {
@@ -506,7 +506,7 @@ func (a *API) ListTags(ctx context.Context, _ api.ListTagsRequestObject) (api.Li
 func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionRequestObject) (api.PostDAGActionResponseObject, error) {
 	action := request.Body.Action
 
-	var status models.DAGRunStatus
+	var status execution.DAGRunStatus
 	var dag *core.DAG
 
 	if action != api.DAGActionSave {
@@ -855,7 +855,7 @@ func toPrecondition(obj *core.Condition) api.Precondition {
 	}
 }
 
-func toStatus(s models.DAGRunStatus) api.DAGStatusDetails {
+func toStatus(s execution.DAGRunStatus) api.DAGStatusDetails {
 	status := api.DAGStatusDetails{
 		Log:        s.Log,
 		Name:       s.Name,
@@ -884,7 +884,7 @@ func toStatus(s models.DAGRunStatus) api.DAGStatusDetails {
 	return status
 }
 
-func toNode(node *models.Node) api.Node {
+func toNode(node *execution.Node) api.Node {
 	return api.Node{
 		DoneCount:  node.DoneCount,
 		FinishedAt: node.FinishedAt,

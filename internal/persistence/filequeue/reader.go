@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
 	"github.com/fsnotify/fsnotify"
 )
 
-var _ models.QueueReader = (*queueReaderImpl)(nil)
+var _ execution.QueueReader = (*queueReaderImpl)(nil)
 
 type queueReaderImpl struct {
 	store          *Store
@@ -33,7 +33,7 @@ type queueReaderImpl struct {
 }
 
 type queuedItem struct {
-	*models.QueuedItem
+	*execution.QueuedItem
 	status int
 }
 
@@ -61,7 +61,7 @@ func newQueueReader(s *Store) *queueReaderImpl {
 }
 
 // Start implements models.QueueReader.
-func (q *queueReaderImpl) Start(ctx context.Context, ch chan<- models.QueuedItem) error {
+func (q *queueReaderImpl) Start(ctx context.Context, ch chan<- execution.QueuedItem) error {
 	if !q.running.CompareAndSwap(false, true) {
 		return fmt.Errorf("queue reader already started")
 	}
@@ -105,7 +105,7 @@ func (q *queueReaderImpl) Start(ctx context.Context, ch chan<- models.QueuedItem
 
 // startWatch starts watching the queue for new items.
 // It will dequeue items from the queue and send them to the channel
-func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.QueuedItem) {
+func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- execution.QueuedItem) {
 	defer close(q.done)
 	defer q.running.Store(false)
 
@@ -194,7 +194,7 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- models.Queue
 	}
 }
 
-func (q *queueReaderImpl) setItems(items []models.QueuedItemData) {
+func (q *queueReaderImpl) setItems(items []execution.QueuedItemData) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -208,7 +208,7 @@ func (q *queueReaderImpl) setItems(items []models.QueuedItemData) {
 	// Add new items
 	for _, item := range items {
 		q.items = append(q.items, queuedItem{
-			QueuedItem: models.NewQueuedItem(item),
+			QueuedItem: execution.NewQueuedItem(item),
 			status:     statusNone,
 		})
 	}
@@ -235,7 +235,7 @@ func (q *queueReaderImpl) reloadItems(ctx context.Context) error {
 	return nil
 }
 
-func (q *queueReaderImpl) processItems(ctx context.Context, ch chan<- models.QueuedItem, items []queuedItem) []queuedItem {
+func (q *queueReaderImpl) processItems(ctx context.Context, ch chan<- execution.QueuedItem, items []queuedItem) []queuedItem {
 	// Check if items were updated while processing
 	if q.updated.Load() {
 		q.updated.Store(false)
@@ -282,7 +282,7 @@ func (q *queueReaderImpl) processItems(ctx context.Context, ch chan<- models.Que
 	return items
 }
 
-func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.QueuedItem, item *queuedItem, data core.DAGRunRef, _ map[string]bool) {
+func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- execution.QueuedItem, item *queuedItem, data core.DAGRunRef, _ map[string]bool) {
 	item.status = statusProcessing
 
 	select {
@@ -290,19 +290,19 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 		select {
 		case res := <-item.Result:
 			switch res {
-			case models.QueuedItemProcessingResultRetry:
+			case execution.QueuedItemProcessingResultRetry:
 				// Item was not processed successfully, set retry delay for this queue
 				item.status = statusNone
 				retryAfter := time.Now().Add(queueRetryDelay)
 				q.queueRetryTime.Store(data.Name, retryAfter)
 				logger.Info(ctx, "Max active runs is reached, delaying retry", "name", data.Name, "retryAfter", retryAfter.Format(time.RFC3339))
-			case models.QueuedItemProcessingResultSuccess:
+			case execution.QueuedItemProcessingResultSuccess:
 				logger.Info(ctx, "Item processed successfully", "name", data.Name, "dagRunId", data.ID)
 				item.status = statusDone
 				q.removeProcessedItem(ctx, data)
 				// Clear retry delay for this queue since we successfully processed an item
 				q.queueRetryTime.Delete(data.Name)
-			case models.QueuedItemProcessingResultDiscard:
+			case execution.QueuedItemProcessingResultDiscard:
 				logger.Info(ctx, "Item is invalid, discarding", "name", data.Name, "dagRunId", data.ID)
 				item.status = statusDone
 				q.removeProcessedItem(ctx, data)
@@ -328,7 +328,7 @@ func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- models.Q
 
 func (q *queueReaderImpl) removeProcessedItem(ctx context.Context, data core.DAGRunRef) {
 	if _, err := q.store.DequeueByDAGRunID(ctx, data.Name, data.ID); err != nil {
-		if !errors.Is(err, models.ErrQueueItemNotFound) {
+		if !errors.Is(err, execution.ErrQueueItemNotFound) {
 			logger.Error(ctx, "Failed to dequeue item", "err", err, "name", data.Name, "dagRunId", data.ID)
 		}
 	}

@@ -16,9 +16,14 @@ func TestDAG(t *testing.T) {
 	server := test.SetupServer(t)
 
 	t.Run("CreateExecuteDelete", func(t *testing.T) {
+		spec := `
+steps:
+  - sleep 1
+`
 		// Create a new DAG
-		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAG201JSONResponse{
+		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
 			Name: "test_dag",
+			Spec: &spec,
 		}).ExpectStatus(http.StatusCreated).Send(t)
 
 		// Fetch the created DAG with the list endpoint

@@ -13,10 +13,10 @@ import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/models"
 )
 
 // ValidateDAGSpec implements api.StrictServerInterface.
@@ -109,7 +109,7 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 	}
 
 	if err := a.dagStore.Create(ctx, request.Body.Name, yamlSpec); err != nil {
-		if errors.Is(err, models.ErrDAGAlreadyExists) {
+		if errors.Is(err, execution.ErrDAGAlreadyExists) {
 			return nil, &Error{
 				HTTPStatus: http.StatusConflict,
 				Code:       api.ErrorCodeAlreadyExists,
@@ -338,7 +338,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 func (a *API) readHistoryData(
 	_ context.Context,
-	statusList []models.DAGRunStatus,
+	statusList []execution.DAGRunStatus,
 ) []api.DAGGridItem {
 	data := map[string][]status.NodeStatus{}
 
@@ -433,10 +433,10 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 
 	// Use paginator from request
-	pg := models.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
+	pg := execution.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
 
 	// Let persistence layer handle sorting and pagination
-	result, errList, err := a.dagStore.List(ctx, models.ListDAGsOptions{
+	result, errList, err := a.dagStore.List(ctx, execution.ListDAGsOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.Name),
 		Tag:       valueOf(request.Params.Tag),
@@ -571,7 +571,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		Name: dag.Name,
 		ID:   dagRunId,
 	})
-	if !errors.Is(err, models.ErrDAGRunIDNotFound) {
+	if !errors.Is(err, execution.ErrDAGRunIDNotFound) {
 		return nil, &Error{
 			HTTPStatus: http.StatusConflict,
 			Code:       api.ErrorCodeAlreadyExists,
@@ -857,8 +857,8 @@ func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequ
 
 	// Get all running DAG-runs for this DAG
 	runningStatuses, err := a.dagRunStore.ListStatuses(ctx,
-		models.WithExactName(dag.Name),
-		models.WithStatuses([]status.Status{status.Running}),
+		execution.WithExactName(dag.Name),
+		execution.WithStatuses([]status.Status{status.Running}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error listing running DAG-runs: %w", err)

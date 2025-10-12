@@ -10,14 +10,14 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/require"
 )
 
 func TestReporter(t *testing.T) {
 	for scenario, fn := range map[string]func(
-		t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*models.Node,
+		t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*execution.Node,
 	){
 		"create error mail":   testErrorMail,
 		"no error mail":       testNoErrorMail,
@@ -50,7 +50,7 @@ func TestReporter(t *testing.T) {
 				},
 			}
 
-			nodes := []*models.Node{
+			nodes := []*execution.Node{
 				{
 					Step: core.Step{
 						Name:    "test-step",
@@ -73,14 +73,14 @@ func TestReporter(t *testing.T) {
 
 func TestRenderHTMLWithDAGInfo(t *testing.T) {
 	// Create a test DAGRunStatus
-	status := models.DAGRunStatus{
+	status := execution.DAGRunStatus{
 		Name:       "test-workflow",
 		DAGRunID:   "01975986-c13d-7b6d-b75e-abf4380a03fc",
 		Status:     status.Success,
 		StartedAt:  "2025-01-15T10:30:00Z",
 		FinishedAt: "2025-01-15T10:35:00Z",
 		Params:     "env=production batch_size=1000",
-		Nodes: []*models.Node{
+		Nodes: []*execution.Node{
 			{
 				Step: core.Step{
 					Name:        "setup-database",
@@ -175,11 +175,11 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 	})
 }
 
-func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*models.Node) {
+func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*execution.Node) {
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = false
 
-	_ = rp.send(context.Background(), dag, models.DAGRunStatus{
+	_ = rp.send(context.Background(), dag, execution.DAGRunStatus{
 		Status: status.Error,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -189,11 +189,11 @@ func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, 
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*models.Node) {
+func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*execution.Node) {
 	dag.MailOn.Failure = false
 	dag.MailOn.Success = true
 
-	err := rp.send(context.Background(), dag, models.DAGRunStatus{
+	err := rp.send(context.Background(), dag, execution.DAGRunStatus{
 		Status: status.Error,
 		Nodes:  nodes,
 	}, nil)
@@ -201,11 +201,11 @@ func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG
 	require.Equal(t, 0, mock.count)
 }
 
-func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*models.Node) {
+func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*execution.Node) {
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = true
 
-	err := rp.send(context.Background(), dag, models.DAGRunStatus{
+	err := rp.send(context.Background(), dag, execution.DAGRunStatus{
 		Status: status.Success,
 		Nodes:  nodes,
 	}, nil)
@@ -216,14 +216,14 @@ func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG
 	require.Equal(t, 1, mock.count)
 }
 
-func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *core.DAG, _ []*models.Node) {
-	status := models.NewStatusBuilder(dag).Create("run-id", status.Error, 0, time.Now())
+func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *core.DAG, _ []*execution.Node) {
+	status := execution.NewStatusBuilder(dag).Create("run-id", status.Error, 0, time.Now())
 	summary := renderDAGSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
 	require.Contains(t, summary, dag.Name)
 }
 
-func testRenderTable(t *testing.T, _ *reporter, _ *mockSender, _ *core.DAG, nodes []*models.Node) {
+func testRenderTable(t *testing.T, _ *reporter, _ *mockSender, _ *core.DAG, nodes []*execution.Node) {
 	summary := renderStepSummary(nodes)
 	require.Contains(t, summary, nodes[0].Step.Name)
 	require.Contains(t, summary, nodes[0].Step.Args[0])
@@ -250,7 +250,7 @@ func (m *mockSender) Send(_ context.Context, from string, to []string, subject, 
 // to ensure the format is correct and prevent regressions
 func TestRenderHTMLComprehensive(t *testing.T) {
 	// Create comprehensive test data with various scenarios
-	nodes := []*models.Node{
+	nodes := []*execution.Node{
 		{
 			Step: core.Step{
 				Name:    "setup-database",

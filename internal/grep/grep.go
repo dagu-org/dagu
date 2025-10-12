@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/samber/lo"
 )
 
@@ -42,7 +42,7 @@ var DefaultGrepOptions = GrepOptions{
 
 // Grep reads data and returns lines that match the given pattern.
 // If opts is nil, default options will be used.
-func Grep(dat []byte, pattern string, opts GrepOptions) ([]*models.Match, error) {
+func Grep(dat []byte, pattern string, opts GrepOptions) ([]*execution.Match, error) {
 	if pattern == "" {
 		return nil, ErrEmptyPattern
 	}
@@ -91,15 +91,15 @@ func scanLines(dat []byte, matcher Matcher) ([]string, []int, error) {
 }
 
 // buildMatches constructs Match objects from matched line indices.
-func buildMatches(lines []string, matches []int, opts GrepOptions) []*models.Match {
-	var ret []*models.Match
+func buildMatches(lines []string, matches []int, opts GrepOptions) []*execution.Match {
+	var ret []*execution.Match
 
 	for _, m := range matches {
 		low := lo.Max([]int{0, m - opts.Before})
 		high := lo.Min([]int{len(lines), m + opts.After + 1})
 		matchText := strings.Join(lines[low:high], "\n")
 
-		ret = append(ret, &models.Match{
+		ret = append(ret, &execution.Match{
 			StartLine:  low + 1,
 			LineNumber: m + 1,
 			Line:       matchText,

@@ -8,8 +8,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
@@ -22,7 +22,7 @@ import (
 type Scheduler struct {
 	Helper
 	EntryReader    scheduler.EntryReader
-	QueueStore     models.QueueStore
+	QueueStore     execution.QueueStore
 	CoordinatorCli core.Dispatcher
 }
 

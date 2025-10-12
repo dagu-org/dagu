@@ -6,17 +6,17 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
 var _ core.Database = &dbClient{}
 
 type dbClient struct {
-	ds  models.DAGStore
-	drs models.DAGRunStore
+	ds  execution.DAGStore
+	drs execution.DAGRunStore
 }
 
-func newDBClient(drs models.DAGRunStore, ds models.DAGStore) *dbClient {
+func newDBClient(drs execution.DAGRunStore, ds execution.DAGStore) *dbClient {
 	return &dbClient{drs: drs, ds: ds}
 }
 

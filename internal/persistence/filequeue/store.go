@@ -9,11 +9,11 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 )
 
-var _ models.QueueStore = (*Store)(nil)
+var _ execution.QueueStore = (*Store)(nil)
 
 // Store implements models.QueueStore.
 // It provides a dead-simple queue implementation using files.
@@ -27,11 +27,11 @@ type Store struct {
 }
 
 // All implements models.QueueStore.
-func (s *Store) All(ctx context.Context) ([]models.QueuedItemData, error) {
+func (s *Store) All(ctx context.Context) ([]execution.QueuedItemData, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	var items []models.QueuedItemData
+	var items []execution.QueuedItemData
 
 	patterns := []string{
 		filepath.Join(s.baseDir, "*", "item_high_*.json"),
@@ -62,7 +62,7 @@ func (s *Store) All(ctx context.Context) ([]models.QueuedItemData, error) {
 }
 
 // DequeueByName implements models.QueueStore.
-func (s *Store) DequeueByName(ctx context.Context, name string) (models.QueuedItemData, error) {
+func (s *Store) DequeueByName(ctx context.Context, name string) (execution.QueuedItemData, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -82,7 +82,7 @@ func (s *Store) DequeueByName(ctx context.Context, name string) (models.QueuedIt
 	q := s.queues[name]
 	item, err := q.Dequeue(ctx)
 	if errors.Is(err, ErrQueueEmpty) {
-		return nil, models.ErrQueueEmpty
+		return nil, execution.ErrQueueEmpty
 	}
 
 	if err != nil {
@@ -106,7 +106,7 @@ func (s *Store) Len(ctx context.Context, name string) (int, error) {
 }
 
 // List implements models.QueueStore.
-func (s *Store) List(ctx context.Context, name string) ([]models.QueuedItemData, error) {
+func (s *Store) List(ctx context.Context, name string) ([]execution.QueuedItemData, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -123,12 +123,12 @@ func (s *Store) List(ctx context.Context, name string) ([]models.QueuedItemData,
 	return items, nil
 }
 
-func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]models.QueuedItemData, error) {
+func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]execution.QueuedItemData, error) {
 	items, err := s.List(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	var ret []models.QueuedItemData
+	var ret []execution.QueuedItemData
 	for _, item := range items {
 		if item.Data().Name == dagName {
 			ret = append(ret, item)
@@ -138,11 +138,11 @@ func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]mode
 }
 
 // DequeueByDAGRunID implements models.QueueStore.
-func (s *Store) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([]models.QueuedItemData, error) {
+func (s *Store) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([]execution.QueuedItemData, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	var items []models.QueuedItemData
+	var items []execution.QueuedItemData
 	if _, ok := s.queues[name]; !ok {
 		s.queues[name] = s.createDualQueue(name)
 	}
@@ -164,14 +164,14 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([
 	items = append(items, item...)
 
 	if len(items) == 0 {
-		return nil, models.ErrQueueItemNotFound
+		return nil, execution.ErrQueueItemNotFound
 	}
 
 	return items, nil
 }
 
 // Enqueue implements models.QueueStore.
-func (s *Store) Enqueue(ctx context.Context, name string, p models.QueuePriority, dagRun core.DAGRunRef) error {
+func (s *Store) Enqueue(ctx context.Context, name string, p execution.QueuePriority, dagRun core.DAGRunRef) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -188,7 +188,7 @@ func (s *Store) Enqueue(ctx context.Context, name string, p models.QueuePriority
 }
 
 // Reader implements models.QueueStore.
-func (s *Store) Reader(_ context.Context) models.QueueReader {
+func (s *Store) Reader(_ context.Context) execution.QueueReader {
 	return newQueueReader(s)
 }
 
@@ -203,7 +203,7 @@ func (s *Store) BaseDir() string {
 	return s.baseDir
 }
 
-func New(baseDir string) models.QueueStore {
+func New(baseDir string) execution.QueueStore {
 	return &Store{
 		baseDir: baseDir,
 		queues:  make(map[string]*DualQueue),

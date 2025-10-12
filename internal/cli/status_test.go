@@ -7,8 +7,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cli"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -109,7 +109,7 @@ func TestStatusCommand(t *testing.T) {
 
 		// Create a fake failed DAG run for testing status
 		dagRunID := uuid.Must(uuid.NewV7()).String()
-		attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), dagRunID, models.NewDAGRunAttemptOptions{})
+		attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), dagRunID, execution.NewDAGRunAttemptOptions{})
 		require.NoError(t, err)
 
 		// Open the attempt for writing
@@ -117,14 +117,14 @@ func TestStatusCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Write a failed status
-		status := models.DAGRunStatus{
+		status := execution.DAGRunStatus{
 			Name:       dag.Name,
 			DAGRunID:   dagRunID,
 			Status:     status.Error,
 			StartedAt:  time.Now().Format(time.RFC3339),
 			FinishedAt: time.Now().Format(time.RFC3339),
 			AttemptID:  attempt.ID(),
-			Nodes: []*models.Node{
+			Nodes: []*execution.Node{
 				{
 					Step:   core.Step{Name: "error"},
 					Status: status.NodeError,
@@ -287,7 +287,7 @@ steps:
 
 		// Create a fake DAG run with skipped steps
 		dagRunID := uuid.Must(uuid.NewV7()).String()
-		attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), dagRunID, models.NewDAGRunAttemptOptions{})
+		attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), dagRunID, execution.NewDAGRunAttemptOptions{})
 		require.NoError(t, err)
 
 		// Open the attempt for writing
@@ -295,14 +295,14 @@ steps:
 		require.NoError(t, err)
 
 		// Write a status with skipped steps
-		status := models.DAGRunStatus{
+		status := execution.DAGRunStatus{
 			Name:       dag.Name,
 			DAGRunID:   dagRunID,
 			Status:     status.Error,
 			StartedAt:  time.Now().Format(time.RFC3339),
 			FinishedAt: time.Now().Format(time.RFC3339),
 			AttemptID:  attempt.ID(),
-			Nodes: []*models.Node{
+			Nodes: []*execution.Node{
 				{
 					Step:       core.Step{Name: "check"},
 					Status:     status.NodeError,
@@ -605,7 +605,7 @@ steps:
 
 		// Create a fake DAG run with binary log content
 		dagRunID := uuid.Must(uuid.NewV7()).String()
-		attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), dagRunID, models.NewDAGRunAttemptOptions{})
+		attempt, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), dagRunID, execution.NewDAGRunAttemptOptions{})
 		require.NoError(t, err)
 
 		// Open the attempt for writing
@@ -613,14 +613,14 @@ steps:
 		require.NoError(t, err)
 
 		// Write a status with fake binary log paths
-		status := models.DAGRunStatus{
+		status := execution.DAGRunStatus{
 			Name:       dag.Name,
 			DAGRunID:   dagRunID,
 			Status:     status.Success,
 			StartedAt:  time.Now().Format(time.RFC3339),
 			FinishedAt: time.Now().Format(time.RFC3339),
 			AttemptID:  attempt.ID(),
-			Nodes: []*models.Node{
+			Nodes: []*execution.Node{
 				{
 					Step:   core.Step{Name: "binary_output"},
 					Status: status.NodeSuccess,

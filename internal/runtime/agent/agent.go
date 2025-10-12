@@ -24,10 +24,10 @@ import (
 	"github.com/dagu-org/dagu/internal/container"
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/otel"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
@@ -52,16 +52,16 @@ type Agent struct {
 
 	// retryTarget is the target status to retry the DAG.
 	// It is nil if it's not a retry execution.
-	retryTarget *models.DAGRunStatus
+	retryTarget *execution.DAGRunStatus
 
 	// dagStore is the database to store the DAG definitions.
-	dagStore models.DAGStore
+	dagStore execution.DAGStore
 
 	// dagRunStore is the database to store the run history.
-	dagRunStore models.DAGRunStore
+	dagRunStore execution.DAGRunStore
 
 	// registry is the service registry to find the coordinator service.
-	registry models.ServiceRegistry
+	registry execution.ServiceRegistry
 
 	// peerConfig is the configuration for the peer connections.
 	peerConfig config.Peer
@@ -133,7 +133,7 @@ type Options struct {
 	// RetryTarget is the target status (runstore of execution) to retry.
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
-	RetryTarget *models.DAGRunStatus
+	RetryTarget *execution.DAGRunStatus
 	// ParentDAGRun is the dag-run reference of the parent dag-run.
 	// It is required for child dag-runs to identify the parent dag-run.
 	ParentDAGRun core.DAGRunRef
@@ -151,9 +151,9 @@ func New(
 	logDir string,
 	logFile string,
 	drm dagrun.Manager,
-	ds models.DAGStore,
-	drs models.DAGRunStore,
-	reg models.ServiceRegistry,
+	ds execution.DAGStore,
+	drs execution.DAGRunStore,
+	reg execution.ServiceRegistry,
 	root core.DAGRunRef,
 	peerConfig config.Peer,
 	opts Options,
@@ -243,7 +243,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	}
 
-	var attempt models.DAGRunAttempt
+	var attempt execution.DAGRunAttempt
 
 	// Check if the DAG is already running.
 	if err := a.checkIsAlreadyRunning(ctx); err != nil {
@@ -533,10 +533,10 @@ func (a *Agent) Run(ctx context.Context) error {
 }
 
 // nodeToModelNode converts a scheduler NodeData to a models.Node
-func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *models.Node {
-	children := make([]models.ChildDAGRun, len(nodeData.State.Children))
+func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *execution.Node {
+	children := make([]execution.ChildDAGRun, len(nodeData.State.Children))
 	for i, child := range nodeData.State.Children {
-		children[i] = models.ChildDAGRun(child)
+		children[i] = execution.ChildDAGRun(child)
 	}
 
 	var errText string
@@ -544,7 +544,7 @@ func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *models.Node {
 		errText = nodeData.State.Error.Error()
 	}
 
-	return &models.Node{
+	return &execution.Node{
 		Step:            nodeData.Step,
 		Stdout:          nodeData.State.Stdout,
 		Stderr:          nodeData.State.Stderr,
@@ -571,7 +571,7 @@ func (a *Agent) PrintSummary(ctx context.Context) {
 }
 
 // Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status(ctx context.Context) models.DAGRunStatus {
+func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -582,28 +582,28 @@ func (a *Agent) Status(ctx context.Context) models.DAGRunStatus {
 		schedulerStatus = status.Running
 	}
 
-	opts := []models.StatusOption{
-		models.WithFinishedAt(a.graph.FinishAt()),
-		models.WithNodes(a.graph.NodeData()),
-		models.WithLogFilePath(a.logFile),
-		models.WithOnExitNode(a.scheduler.HandlerNode(core.HandlerOnExit)),
-		models.WithOnSuccessNode(a.scheduler.HandlerNode(core.HandlerOnSuccess)),
-		models.WithOnFailureNode(a.scheduler.HandlerNode(core.HandlerOnFailure)),
-		models.WithOnCancelNode(a.scheduler.HandlerNode(core.HandlerOnCancel)),
-		models.WithAttemptID(a.dagRunAttemptID),
-		models.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
-		models.WithPreconditions(a.dag.Preconditions),
+	opts := []execution.StatusOption{
+		execution.WithFinishedAt(a.graph.FinishAt()),
+		execution.WithNodes(a.graph.NodeData()),
+		execution.WithLogFilePath(a.logFile),
+		execution.WithOnExitNode(a.scheduler.HandlerNode(core.HandlerOnExit)),
+		execution.WithOnSuccessNode(a.scheduler.HandlerNode(core.HandlerOnSuccess)),
+		execution.WithOnFailureNode(a.scheduler.HandlerNode(core.HandlerOnFailure)),
+		execution.WithOnCancelNode(a.scheduler.HandlerNode(core.HandlerOnCancel)),
+		execution.WithAttemptID(a.dagRunAttemptID),
+		execution.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
+		execution.WithPreconditions(a.dag.Preconditions),
 	}
 
 	// If the current execution is a retry, we need to copy some data
 	// from the retry target to the current status.
 	if a.retryTarget != nil {
-		opts = append(opts, models.WithQueuedAt(a.retryTarget.QueuedAt))
-		opts = append(opts, models.WithCreatedAt(a.retryTarget.CreatedAt))
+		opts = append(opts, execution.WithQueuedAt(a.retryTarget.QueuedAt))
+		opts = append(opts, execution.WithCreatedAt(a.retryTarget.CreatedAt))
 	}
 
 	// Create the status object to record the current status.
-	return models.NewStatusBuilder(a.dag).
+	return execution.NewStatusBuilder(a.dag).
 		Create(
 			a.dagRunID,
 			schedulerStatus,
@@ -614,7 +614,7 @@ func (a *Agent) Status(ctx context.Context) models.DAGRunStatus {
 }
 
 // watchCancelRequested is a goroutine that watches for cancel requests
-func (a *Agent) watchCancelRequested(ctx context.Context, attempt models.DAGRunAttempt) {
+func (a *Agent) watchCancelRequested(ctx context.Context, attempt execution.DAGRunAttempt) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -887,13 +887,13 @@ func (a *Agent) setupDefaultRetryGraph(ctx context.Context, nodes []*runtime.Nod
 	return nil
 }
 
-func (a *Agent) setupDAGRunAttempt(ctx context.Context) (models.DAGRunAttempt, error) {
+func (a *Agent) setupDAGRunAttempt(ctx context.Context) (execution.DAGRunAttempt, error) {
 	retentionDays := a.dag.HistRetentionDays
 	if err := a.dagRunStore.RemoveOldDAGRuns(ctx, a.dag.Name, retentionDays); err != nil {
 		logger.Error(ctx, "dag-runs data cleanup failed", "err", err)
 	}
 
-	opts := models.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil}
+	opts := execution.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil}
 	if a.isChildDAGRun.Load() {
 		opts.RootDAGRun = &a.rootDAGRun
 	}

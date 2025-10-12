@@ -18,11 +18,11 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
@@ -176,12 +176,12 @@ type Helper struct {
 	Cancel          context.CancelFunc
 	Config          *config.Config
 	LoggingOutput   *SyncBuffer
-	DAGStore        models.DAGStore
-	DAGRunStore     models.DAGRunStore
+	DAGStore        execution.DAGStore
+	DAGRunStore     execution.DAGRunStore
 	DAGRunMgr       dagrun.Manager
-	ProcStore       models.ProcStore
-	QueueStore      models.QueueStore
-	ServiceRegistry models.ServiceRegistry
+	ProcStore       execution.ProcStore
+	QueueStore      execution.QueueStore
+	ServiceRegistry execution.ServiceRegistry
 	SubCmdBuilder   *dagrun.SubCmdBuilder
 
 	tmpDir string

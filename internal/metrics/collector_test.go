@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 )
 
 // Mock implementations
@@ -32,9 +32,9 @@ func (m *mockDAGStore) Delete(ctx context.Context, fileName string) error {
 	return args.Error(0)
 }
 
-func (m *mockDAGStore) List(ctx context.Context, params models.ListDAGsOptions) (models.PaginatedResult[*core.DAG], []string, error) {
+func (m *mockDAGStore) List(ctx context.Context, params execution.ListDAGsOptions) (execution.PaginatedResult[*core.DAG], []string, error) {
 	args := m.Called(ctx, params)
-	return args.Get(0).(models.PaginatedResult[*core.DAG]), args.Get(1).([]string), args.Error(2)
+	return args.Get(0).(execution.PaginatedResult[*core.DAG]), args.Get(1).([]string), args.Error(2)
 }
 
 func (m *mockDAGStore) GetMetadata(ctx context.Context, fileName string) (*core.DAG, error) {
@@ -53,9 +53,9 @@ func (m *mockDAGStore) GetDetails(ctx context.Context, fileName string, opts ...
 	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
-func (m *mockDAGStore) Grep(ctx context.Context, pattern string) ([]*models.GrepDAGsResult, []string, error) {
+func (m *mockDAGStore) Grep(ctx context.Context, pattern string) ([]*execution.GrepDAGsResult, []string, error) {
 	args := m.Called(ctx, pattern)
-	return args.Get(0).([]*models.GrepDAGsResult), args.Get(1).([]string), args.Error(2)
+	return args.Get(0).([]*execution.GrepDAGsResult), args.Get(1).([]string), args.Error(2)
 }
 
 func (m *mockDAGStore) Rename(ctx context.Context, oldID, newID string) error {
@@ -96,7 +96,7 @@ func (m *mockDAGStore) IsSuspended(ctx context.Context, fileName string) bool {
 	return args.Bool(0)
 }
 
-var _ models.DAGRunStore = (*mockDAGRunStore)(nil)
+var _ execution.DAGRunStore = (*mockDAGRunStore)(nil)
 
 type mockDAGRunStore struct {
 	mock.Mock
@@ -107,49 +107,49 @@ func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ core.DAGRunRef) erro
 	panic("unimplemented")
 }
 
-func (m *mockDAGRunStore) CreateAttempt(ctx context.Context, dag *core.DAG, ts time.Time, dagRunID string, opts models.NewDAGRunAttemptOptions) (models.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) CreateAttempt(ctx context.Context, dag *core.DAG, ts time.Time, dagRunID string, opts execution.NewDAGRunAttemptOptions) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dag, ts, dagRunID, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(models.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) RecentAttempts(ctx context.Context, name string, itemLimit int) []models.DAGRunAttempt {
+func (m *mockDAGRunStore) RecentAttempts(ctx context.Context, name string, itemLimit int) []execution.DAGRunAttempt {
 	args := m.Called(ctx, name, itemLimit)
-	return args.Get(0).([]models.DAGRunAttempt)
+	return args.Get(0).([]execution.DAGRunAttempt)
 }
 
-func (m *mockDAGRunStore) LatestAttempt(ctx context.Context, name string) (models.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) LatestAttempt(ctx context.Context, name string) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(models.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) ListStatuses(ctx context.Context, opts ...models.ListDAGRunStatusesOption) ([]*models.DAGRunStatus, error) {
+func (m *mockDAGRunStore) ListStatuses(ctx context.Context, opts ...execution.ListDAGRunStatusesOption) ([]*execution.DAGRunStatus, error) {
 	args := m.Called(ctx, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*models.DAGRunStatus), args.Error(1)
+	return args.Get(0).([]*execution.DAGRunStatus), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef) (models.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun core.DAGRunRef) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(models.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun core.DAGRunRef, childDAGRunID string) (models.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun core.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun, childDAGRunID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(models.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
 func (m *mockDAGRunStore) RemoveOldDAGRuns(ctx context.Context, name string, retentionDays int) error {
@@ -162,33 +162,33 @@ func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName st
 	return args.Error(0)
 }
 
-var _ models.QueueStore = (*mockQueueStore)(nil)
+var _ execution.QueueStore = (*mockQueueStore)(nil)
 
 type mockQueueStore struct {
 	mock.Mock
 }
 
 // ListByDAGName implements models.QueueStore.
-func (m *mockQueueStore) ListByDAGName(_ context.Context, _, _ string) ([]models.QueuedItemData, error) {
+func (m *mockQueueStore) ListByDAGName(_ context.Context, _, _ string) ([]execution.QueuedItemData, error) {
 	return nil, nil
 }
 
-func (m *mockQueueStore) Enqueue(ctx context.Context, name string, priority models.QueuePriority, dagRun core.DAGRunRef) error {
+func (m *mockQueueStore) Enqueue(ctx context.Context, name string, priority execution.QueuePriority, dagRun core.DAGRunRef) error {
 	args := m.Called(ctx, name, priority, dagRun)
 	return args.Error(0)
 }
 
-func (m *mockQueueStore) DequeueByName(ctx context.Context, name string) (models.QueuedItemData, error) {
+func (m *mockQueueStore) DequeueByName(ctx context.Context, name string) (execution.QueuedItemData, error) {
 	args := m.Called(ctx, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(models.QueuedItemData), args.Error(1)
+	return args.Get(0).(execution.QueuedItemData), args.Error(1)
 }
 
-func (m *mockQueueStore) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([]models.QueuedItemData, error) {
+func (m *mockQueueStore) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([]execution.QueuedItemData, error) {
 	args := m.Called(ctx, name, dagRunID)
-	return args.Get(0).([]models.QueuedItemData), args.Error(1)
+	return args.Get(0).([]execution.QueuedItemData), args.Error(1)
 }
 
 func (m *mockQueueStore) Len(ctx context.Context, name string) (int, error) {
@@ -196,29 +196,29 @@ func (m *mockQueueStore) Len(ctx context.Context, name string) (int, error) {
 	return args.Int(0), args.Error(1)
 }
 
-func (m *mockQueueStore) List(ctx context.Context, name string) ([]models.QueuedItemData, error) {
+func (m *mockQueueStore) List(ctx context.Context, name string) ([]execution.QueuedItemData, error) {
 	args := m.Called(ctx, name)
-	return args.Get(0).([]models.QueuedItemData), args.Error(1)
+	return args.Get(0).([]execution.QueuedItemData), args.Error(1)
 }
 
-func (m *mockQueueStore) All(ctx context.Context) ([]models.QueuedItemData, error) {
+func (m *mockQueueStore) All(ctx context.Context) ([]execution.QueuedItemData, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]models.QueuedItemData), args.Error(1)
+	return args.Get(0).([]execution.QueuedItemData), args.Error(1)
 }
 
-func (m *mockQueueStore) Reader(ctx context.Context) models.QueueReader {
+func (m *mockQueueStore) Reader(ctx context.Context) execution.QueueReader {
 	args := m.Called(ctx)
-	return args.Get(0).(models.QueueReader)
+	return args.Get(0).(execution.QueueReader)
 }
 
 type mockServiceRegistry struct {
 	mock.Mock
 }
 
-func (m *mockServiceRegistry) Register(ctx context.Context, serviceName models.ServiceName, hostInfo models.HostInfo) error {
+func (m *mockServiceRegistry) Register(ctx context.Context, serviceName execution.ServiceName, hostInfo execution.HostInfo) error {
 	args := m.Called(ctx, serviceName, hostInfo)
 	return args.Error(0)
 }
@@ -227,15 +227,15 @@ func (m *mockServiceRegistry) Unregister(ctx context.Context) {
 	m.Called(ctx)
 }
 
-func (m *mockServiceRegistry) GetServiceMembers(ctx context.Context, serviceName models.ServiceName) ([]models.HostInfo, error) {
+func (m *mockServiceRegistry) GetServiceMembers(ctx context.Context, serviceName execution.ServiceName) ([]execution.HostInfo, error) {
 	args := m.Called(ctx, serviceName)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]models.HostInfo), args.Error(1)
+	return args.Get(0).([]execution.HostInfo), args.Error(1)
 }
 
-func (m *mockServiceRegistry) UpdateStatus(ctx context.Context, serviceName models.ServiceName, status models.ServiceStatus) error {
+func (m *mockServiceRegistry) UpdateStatus(ctx context.Context, serviceName execution.ServiceName, status execution.ServiceStatus) error {
 	args := m.Called(ctx, serviceName, status)
 	return args.Error(0)
 }
@@ -244,7 +244,7 @@ func (m *mockServiceRegistry) UpdateStatus(ctx context.Context, serviceName mode
 
 func TestNewCollector(t *testing.T) {
 	serviceRegistry := &mockServiceRegistry{}
-	serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return([]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}}, nil)
+	serviceRegistry.On("GetServiceMembers", mock.Anything, execution.ServiceNameScheduler).Return([]execution.HostInfo{{Host: "localhost", Status: execution.ServiceStatusActive}}, nil)
 
 	collector := NewCollector(
 		"1.0.0",
@@ -288,15 +288,15 @@ func TestCollector_Collect_BasicMetrics(t *testing.T) {
 
 	// Setup mocks to return empty data
 	dagStore.On("List", mock.Anything, mock.Anything).Return(
-		models.PaginatedResult[*core.DAG]{},
+		execution.PaginatedResult[*core.DAG]{},
 		[]string{},
 		nil,
 	)
-	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*models.DAGRunStatus{}, nil)
-	queueStore.On("All", mock.Anything).Return([]models.QueuedItemData{}, nil)
+	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*execution.DAGRunStatus{}, nil)
+	queueStore.On("All", mock.Anything).Return([]execution.QueuedItemData{}, nil)
 
 	serviceRegistry := &mockServiceRegistry{}
-	serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return([]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}}, nil).Maybe()
+	serviceRegistry.On("GetServiceMembers", mock.Anything, execution.ServiceNameScheduler).Return([]execution.HostInfo{{Host: "localhost", Status: execution.ServiceStatusActive}}, nil).Maybe()
 
 	collector := NewCollector(
 		"1.0.0",
@@ -326,7 +326,7 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 
 	// Mock DAG store response
 	dagStore.On("List", mock.Anything, mock.Anything).Return(
-		models.PaginatedResult[*core.DAG]{
+		execution.PaginatedResult[*core.DAG]{
 			Items:      []*core.DAG{{}, {}, {}},
 			TotalCount: 3,
 		},
@@ -335,7 +335,7 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 	)
 
 	// Mock DAG run store response
-	statuses := []*models.DAGRunStatus{
+	statuses := []*execution.DAGRunStatus{
 		{Status: status.Success},
 		{Status: status.Success},
 		{Status: status.Error},
@@ -346,10 +346,10 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return(statuses, nil)
 
 	// Mock queue store response
-	queueStore.On("All", mock.Anything).Return([]models.QueuedItemData{nil, nil}, nil)
+	queueStore.On("All", mock.Anything).Return([]execution.QueuedItemData{nil, nil}, nil)
 
 	serviceRegistry := &mockServiceRegistry{}
-	serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return([]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}}, nil).Maybe()
+	serviceRegistry.On("GetServiceMembers", mock.Anything, execution.ServiceNameScheduler).Return([]execution.HostInfo{{Host: "localhost", Status: execution.ServiceStatusActive}}, nil).Maybe()
 
 	collector := NewCollector(
 		"1.0.0",
@@ -425,12 +425,12 @@ func TestCollector_Collect_WithErrors(t *testing.T) {
 
 	// Mock errors
 	dagStore.On("List", mock.Anything, mock.Anything).Return(
-		models.PaginatedResult[*core.DAG]{},
+		execution.PaginatedResult[*core.DAG]{},
 		[]string{},
 		assert.AnError,
 	)
-	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*models.DAGRunStatus(nil), assert.AnError)
-	queueStore.On("All", mock.Anything).Return([]models.QueuedItemData(nil), assert.AnError)
+	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*execution.DAGRunStatus(nil), assert.AnError)
+	queueStore.On("All", mock.Anything).Return([]execution.QueuedItemData(nil), assert.AnError)
 
 	collector := NewCollector(
 		"1.0.0",
@@ -459,12 +459,12 @@ func TestNewRegistry(t *testing.T) {
 
 	// Setup mocks
 	dagStore.On("List", mock.Anything, mock.Anything).Return(
-		models.PaginatedResult[*core.DAG]{},
+		execution.PaginatedResult[*core.DAG]{},
 		[]string{},
 		nil,
 	)
-	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*models.DAGRunStatus{}, nil)
-	queueStore.On("All", mock.Anything).Return([]models.QueuedItemData{}, nil)
+	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*execution.DAGRunStatus{}, nil)
+	queueStore.On("All", mock.Anything).Return([]execution.QueuedItemData{}, nil)
 
 	collector := NewCollector(
 		"1.0.0",
@@ -497,17 +497,17 @@ func TestCollector_SchedulerStatus(t *testing.T) {
 
 	// Set up default mock responses
 	dagStore.On("List", mock.Anything, mock.Anything).Return(
-		models.PaginatedResult[*core.DAG]{Items: []*core.DAG{}, TotalCount: 0},
+		execution.PaginatedResult[*core.DAG]{Items: []*core.DAG{}, TotalCount: 0},
 		[]string{},
 		nil,
 	)
-	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*models.DAGRunStatus{}, nil)
-	queueStore.On("All", mock.Anything).Return([]models.QueuedItemData{}, nil)
+	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*execution.DAGRunStatus{}, nil)
+	queueStore.On("All", mock.Anything).Return([]execution.QueuedItemData{}, nil)
 
 	t.Run("ActiveScheduler", func(t *testing.T) {
 		serviceRegistry := &mockServiceRegistry{}
-		serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return(
-			[]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusActive}},
+		serviceRegistry.On("GetServiceMembers", mock.Anything, execution.ServiceNameScheduler).Return(
+			[]execution.HostInfo{{Host: "localhost", Status: execution.ServiceStatusActive}},
 			nil,
 		).Maybe()
 
@@ -532,8 +532,8 @@ func TestCollector_SchedulerStatus(t *testing.T) {
 
 	t.Run("InactiveScheduler", func(t *testing.T) {
 		serviceRegistry := &mockServiceRegistry{}
-		serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return(
-			[]models.HostInfo{{Host: "localhost", Status: models.ServiceStatusInactive}},
+		serviceRegistry.On("GetServiceMembers", mock.Anything, execution.ServiceNameScheduler).Return(
+			[]execution.HostInfo{{Host: "localhost", Status: execution.ServiceStatusInactive}},
 			nil,
 		).Maybe()
 
@@ -558,8 +558,8 @@ func TestCollector_SchedulerStatus(t *testing.T) {
 
 	t.Run("NoSchedulerInstances", func(t *testing.T) {
 		serviceRegistry := &mockServiceRegistry{}
-		serviceRegistry.On("GetServiceMembers", mock.Anything, models.ServiceNameScheduler).Return(
-			[]models.HostInfo{},
+		serviceRegistry.On("GetServiceMembers", mock.Anything, execution.ServiceNameScheduler).Return(
+			[]execution.HostInfo{},
 			nil,
 		).Maybe()
 

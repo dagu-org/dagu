@@ -6,9 +6,9 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
 )
 
@@ -103,17 +103,17 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 		return fmt.Errorf("DAG %q with ID %q already exists", dag.Name, dagRunID)
 	}
 
-	att, err := ctx.DAGRunStore.CreateAttempt(ctx.Context, dag, time.Now(), dagRunID, models.NewDAGRunAttemptOptions{})
+	att, err := ctx.DAGRunStore.CreateAttempt(ctx.Context, dag, time.Now(), dagRunID, execution.NewDAGRunAttemptOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create run: %w", err)
 	}
 
-	opts := []models.StatusOption{
-		models.WithLogFilePath(logFile),
-		models.WithAttemptID(att.ID()),
-		models.WithPreconditions(dag.Preconditions),
-		models.WithQueuedAt(stringutil.FormatTime(time.Now())),
-		models.WithHierarchyRefs(
+	opts := []execution.StatusOption{
+		execution.WithLogFilePath(logFile),
+		execution.WithAttemptID(att.ID()),
+		execution.WithPreconditions(dag.Preconditions),
+		execution.WithQueuedAt(stringutil.FormatTime(time.Now())),
+		execution.WithHierarchyRefs(
 			core.NewDAGRunRef(dag.Name, dagRunID),
 			core.DAGRunRef{},
 		),
@@ -121,7 +121,7 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 
 	// As a prototype, we save the status to the database to enqueue the dag-run.
 	// This could be changed to save to a queue file in the future
-	dagStatus := models.NewStatusBuilder(dag).Create(dagRunID, status.Queued, 0, time.Time{}, opts...)
+	dagStatus := execution.NewStatusBuilder(dag).Create(dagRunID, status.Queued, 0, time.Time{}, opts...)
 
 	if err := att.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
@@ -134,7 +134,7 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 	}
 
 	// Enqueue the dag-run to the queue
-	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.Name, models.QueuePriorityLow, dagRun); err != nil {
+	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.Name, execution.QueuePriorityLow, dagRun); err != nil {
 		return fmt.Errorf("failed to enqueue dag-run: %w", err)
 	}
 

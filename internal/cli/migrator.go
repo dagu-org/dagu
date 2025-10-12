@@ -10,24 +10,24 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
 )
 
 // historyMigrator handles migration from legacy history format to new format
 type historyMigrator struct {
-	dagRunStore models.DAGRunStore
-	dagStore    models.DAGStore
+	dagRunStore execution.DAGRunStore
+	dagStore    execution.DAGStore
 	dataDir     string
 	dagsDir     string
 }
 
 // newHistoryMigrator creates a new history migrator
 func newHistoryMigrator(
-	dagRunStore models.DAGRunStore,
-	dagStore models.DAGStore,
+	dagRunStore execution.DAGRunStore,
+	dagStore execution.DAGStore,
 	dataDir string,
 	dagsDir string,
 ) *historyMigrator {
@@ -199,7 +199,7 @@ func (m *historyMigrator) migrateRun(ctx context.Context, legacyStatusFile *lega
 	}
 
 	// Create attempt in new store
-	attempt, err := m.dagRunStore.CreateAttempt(ctx, dag, startedAt, newStatus.DAGRunID, models.NewDAGRunAttemptOptions{
+	attempt, err := m.dagRunStore.CreateAttempt(ctx, dag, startedAt, newStatus.DAGRunID, execution.NewDAGRunAttemptOptions{
 		RootDAGRun: nil, // No hierarchy info in legacy format
 		Retry:      false,
 	})
@@ -228,7 +228,7 @@ func (m *historyMigrator) migrateRun(ctx context.Context, legacyStatusFile *lega
 }
 
 // convertStatus converts legacy status to new DAGRunStatus format
-func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DAG) *models.DAGRunStatus {
+func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DAG) *execution.DAGRunStatus {
 	// Convert timestamps
 	startedAt, _ := m.parseTime(legacy.StartedAt)
 	finishedAt, _ := m.parseTime(legacy.FinishedAt)
@@ -239,13 +239,13 @@ func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DA
 		createdAt = startedAt.UnixMilli()
 	}
 
-	status := &models.DAGRunStatus{
+	status := &execution.DAGRunStatus{
 		Name:       legacy.Name,
 		DAGRunID:   legacy.RequestID,
 		Status:     legacy.Status,
-		PID:        models.PID(legacy.PID),
+		PID:        execution.PID(legacy.PID),
 		Log:        legacy.Log,
-		Nodes:      make([]*models.Node, 0),
+		Nodes:      make([]*execution.Node, 0),
 		Params:     legacy.Params,
 		ParamsList: legacy.ParamsList,
 		CreatedAt:  createdAt,
@@ -282,8 +282,8 @@ func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DA
 }
 
 // convertNode converts legacy node to new Node format
-func (m *historyMigrator) convertNode(legacy *legacymodel.Node) *models.Node {
-	node := &models.Node{
+func (m *historyMigrator) convertNode(legacy *legacymodel.Node) *execution.Node {
+	node := &execution.Node{
 		Step:       legacy.Step,
 		Status:     legacy.Status,
 		Error:      legacy.Error,

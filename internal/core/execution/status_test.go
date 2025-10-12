@@ -1,4 +1,4 @@
-package models_test
+package execution_test
 
 import (
 	"encoding/json"
@@ -7,8 +7,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -34,12 +34,12 @@ func TestStatusSerialization(t *testing.T) {
 		SMTP:      &core.SMTPConfig{},
 	}
 	dagRunID := uuid.Must(uuid.NewV7()).String()
-	statusToPersist := models.NewStatusBuilder(dag).Create(dagRunID, status.Success, 0, startedAt, models.WithFinishedAt(finishedAt))
+	statusToPersist := execution.NewStatusBuilder(dag).Create(dagRunID, status.Success, 0, startedAt, execution.WithFinishedAt(finishedAt))
 
 	rawJSON, err := json.Marshal(statusToPersist)
 	require.NoError(t, err)
 
-	statusObject, err := models.StatusFromJSON(string(rawJSON))
+	statusObject, err := execution.StatusFromJSON(string(rawJSON))
 	require.NoError(t, err)
 
 	require.Equal(t, statusToPersist.Name, statusObject.Name)
@@ -66,7 +66,7 @@ func TestStatusBuilder(t *testing.T) {
 		},
 	}
 
-	builder := models.NewStatusBuilder(dag)
+	builder := execution.NewStatusBuilder(dag)
 	dagRunID := "test-run-123"
 	s := status.Running
 	pid := 12345
@@ -78,7 +78,7 @@ func TestStatusBuilder(t *testing.T) {
 	assert.Equal(t, dag.Name, result.Name)
 	assert.Equal(t, dagRunID, result.DAGRunID)
 	assert.Equal(t, s, result.Status)
-	assert.Equal(t, models.PID(pid), result.PID)
+	assert.Equal(t, execution.PID(pid), result.PID)
 	assert.NotEmpty(t, result.StartedAt)
 	assert.Equal(t, 2, len(result.Nodes))
 	assert.NotNil(t, result.OnExit)
@@ -98,7 +98,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 		},
 	}
 
-	builder := models.NewStatusBuilder(dag)
+	builder := execution.NewStatusBuilder(dag)
 	dagRunID := "test-run-456"
 	s := status.Success
 	pid := 54321
@@ -131,18 +131,18 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 		s,
 		pid,
 		startedAt,
-		models.WithFinishedAt(finishedAt),
-		models.WithNodes(nodes),
-		models.WithOnExitNode(exitNode),
-		models.WithOnSuccessNode(successNode),
-		models.WithOnFailureNode(failureNode),
-		models.WithOnCancelNode(cancelNode),
-		models.WithLogFilePath("/tmp/log.txt"),
-		models.WithPreconditions([]*core.Condition{{Condition: "test", Expected: "true"}}),
-		models.WithHierarchyRefs(rootRef, parentRef),
-		models.WithAttemptID("attempt-789"),
-		models.WithQueuedAt("2024-01-01 12:00:00"),
-		models.WithCreatedAt(1234567890),
+		execution.WithFinishedAt(finishedAt),
+		execution.WithNodes(nodes),
+		execution.WithOnExitNode(exitNode),
+		execution.WithOnSuccessNode(successNode),
+		execution.WithOnFailureNode(failureNode),
+		execution.WithOnCancelNode(cancelNode),
+		execution.WithLogFilePath("/tmp/log.txt"),
+		execution.WithPreconditions([]*core.Condition{{Condition: "test", Expected: "true"}}),
+		execution.WithHierarchyRefs(rootRef, parentRef),
+		execution.WithAttemptID("attempt-789"),
+		execution.WithQueuedAt("2024-01-01 12:00:00"),
+		execution.WithCreatedAt(1234567890),
 	)
 
 	assert.Equal(t, stringutil.FormatTime(finishedAt), result.FinishedAt)
@@ -179,11 +179,11 @@ func TestInitialStatus(t *testing.T) {
 		},
 	}
 
-	st := models.InitialStatus(dag)
+	st := execution.InitialStatus(dag)
 
 	assert.Equal(t, dag.Name, st.Name)
 	assert.Equal(t, status.None, st.Status)
-	assert.Equal(t, models.PID(0), st.PID)
+	assert.Equal(t, execution.PID(0), st.PID)
 	assert.Equal(t, 2, len(st.Nodes))
 	assert.NotNil(t, st.OnExit)
 	assert.NotNil(t, st.OnSuccess)
@@ -199,16 +199,16 @@ func TestInitialStatus(t *testing.T) {
 
 func TestStatusFromJSONError(t *testing.T) {
 	// Test with invalid JSON
-	_, err := models.StatusFromJSON("invalid json")
+	_, err := execution.StatusFromJSON("invalid json")
 	assert.Error(t, err)
 
 	// Test with empty string
-	_, err = models.StatusFromJSON("")
+	_, err = execution.StatusFromJSON("")
 	assert.Error(t, err)
 }
 
 func TestDAGRunStatus_DAGRun(t *testing.T) {
-	dagRunStatus := &models.DAGRunStatus{
+	dagRunStatus := &execution.DAGRunStatus{
 		Name:     "test-dag",
 		DAGRunID: "run-123",
 	}
@@ -219,16 +219,16 @@ func TestDAGRunStatus_DAGRun(t *testing.T) {
 }
 
 func TestDAGRunStatus_Errors(t *testing.T) {
-	dagRunStatus := &models.DAGRunStatus{
-		Nodes: []*models.Node{
+	dagRunStatus := &execution.DAGRunStatus{
+		Nodes: []*execution.Node{
 			{Step: core.Step{Name: "step1"}, Error: "error1"},
 			{Step: core.Step{Name: "step2"}, Error: ""},
 			{Step: core.Step{Name: "step3"}, Error: "error3"},
 		},
-		OnExit:    &models.Node{Step: core.Step{Name: "exit"}, Error: "exit error"},
-		OnSuccess: &models.Node{Step: core.Step{Name: "success"}, Error: ""},
-		OnFailure: &models.Node{Step: core.Step{Name: "failure"}, Error: "failure error"},
-		OnCancel:  &models.Node{Step: core.Step{Name: "cancel"}, Error: "cancel error"},
+		OnExit:    &execution.Node{Step: core.Step{Name: "exit"}, Error: "exit error"},
+		OnSuccess: &execution.Node{Step: core.Step{Name: "success"}, Error: ""},
+		OnFailure: &execution.Node{Step: core.Step{Name: "failure"}, Error: "failure error"},
+		OnCancel:  &execution.Node{Step: core.Step{Name: "cancel"}, Error: "cancel error"},
 	}
 
 	errors := dagRunStatus.Errors()
@@ -241,15 +241,15 @@ func TestDAGRunStatus_Errors(t *testing.T) {
 }
 
 func TestDAGRunStatus_NodeByName(t *testing.T) {
-	dagRunStatus := &models.DAGRunStatus{
-		Nodes: []*models.Node{
+	dagRunStatus := &execution.DAGRunStatus{
+		Nodes: []*execution.Node{
 			{Step: core.Step{Name: "step1"}},
 			{Step: core.Step{Name: "step2"}},
 		},
-		OnExit:    &models.Node{Step: core.Step{Name: "exit"}},
-		OnSuccess: &models.Node{Step: core.Step{Name: "success"}},
-		OnFailure: &models.Node{Step: core.Step{Name: "failure"}},
-		OnCancel:  &models.Node{Step: core.Step{Name: "cancel"}},
+		OnExit:    &execution.Node{Step: core.Step{Name: "exit"}},
+		OnSuccess: &execution.Node{Step: core.Step{Name: "success"}},
+		OnFailure: &execution.Node{Step: core.Step{Name: "failure"}},
+		OnCancel:  &execution.Node{Step: core.Step{Name: "cancel"}},
 	}
 
 	// Test finding regular nodes
@@ -275,22 +275,22 @@ func TestDAGRunStatus_NodeByName(t *testing.T) {
 func TestPID_String(t *testing.T) {
 	tests := []struct {
 		name     string
-		pid      models.PID
+		pid      execution.PID
 		expected string
 	}{
 		{
 			name:     "PositivePID",
-			pid:      models.PID(12345),
+			pid:      execution.PID(12345),
 			expected: "12345",
 		},
 		{
 			name:     "ZeroPID",
-			pid:      models.PID(0),
+			pid:      execution.PID(0),
 			expected: "",
 		},
 		{
 			name:     "NegativePID",
-			pid:      models.PID(-1),
+			pid:      execution.PID(-1),
 			expected: "",
 		},
 	}
@@ -316,7 +316,7 @@ func TestNodesFromSteps(t *testing.T) {
 		},
 	}
 
-	nodes := models.NodesFromSteps(steps)
+	nodes := execution.NodesFromSteps(steps)
 
 	assert.Equal(t, 2, len(nodes))
 	assert.Equal(t, "step1", nodes[0].Step.Name)
@@ -327,11 +327,11 @@ func TestNodesFromSteps(t *testing.T) {
 
 func TestWithCreatedAtDefaultTime(t *testing.T) {
 	dag := &core.DAG{Name: "test"}
-	dagRunStatus := models.InitialStatus(dag)
+	dagRunStatus := execution.InitialStatus(dag)
 
 	// Test WithCreatedAt with 0 - should use current time
 	beforeTime := time.Now().UnixMilli()
-	models.WithCreatedAt(0)(&dagRunStatus)
+	execution.WithCreatedAt(0)(&dagRunStatus)
 	afterTime := time.Now().UnixMilli()
 
 	assert.GreaterOrEqual(t, dagRunStatus.CreatedAt, beforeTime)

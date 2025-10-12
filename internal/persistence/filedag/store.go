@@ -15,13 +15,13 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/grep"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 )
 
-var _ models.DAGStore = (*Storage)(nil)
+var _ execution.DAGStore = (*Storage)(nil)
 
 // Option is a functional option for configuring the DAG repository
 type Option func(*Options)
@@ -63,7 +63,7 @@ func WithSkipExamples(skip bool) Option {
 }
 
 // New creates a new DAG store implementation using the local filesystem
-func New(baseDir string, opts ...Option) models.DAGStore {
+func New(baseDir string, opts ...Option) execution.DAGStore {
 	options := &Options{}
 	for _, opt := range opts {
 		opt(options)
@@ -140,7 +140,7 @@ func (store *Storage) GetDetails(ctx context.Context, name string, opts ...spec.
 func (store *Storage) GetSpec(_ context.Context, name string) (string, error) {
 	filePath, err := store.locateDAG(name)
 	if err != nil {
-		return "", models.ErrDAGNotFound
+		return "", execution.ErrDAGNotFound
 	}
 	dat, err := os.ReadFile(filePath) // nolint:gosec
 	if err != nil {
@@ -192,7 +192,7 @@ func (store *Storage) Create(_ context.Context, name string, spec []byte) error 
 	}
 	filePath := store.generateFilePath(name)
 	if fileExists(filePath) {
-		return models.ErrDAGAlreadyExists
+		return execution.ErrDAGAlreadyExists
 	}
 	if err := os.WriteFile(filePath, spec, defaultPerm); err != nil {
 		return fmt.Errorf("failed to write DAG %s: %w", name, err)
@@ -236,19 +236,19 @@ func (store *Storage) ensureDirExist() error {
 }
 
 // List lists DAGs with pagination support.
-func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (models.PaginatedResult[*core.DAG], []string, error) {
+func (store *Storage) List(ctx context.Context, opts execution.ListDAGsOptions) (execution.PaginatedResult[*core.DAG], []string, error) {
 	var allDags []*core.DAG
 	var errList []string
 
 	if opts.Paginator == nil {
-		p := models.DefaultPaginator()
+		p := execution.DefaultPaginator()
 		opts.Paginator = &p
 	}
 
 	entries, err := os.ReadDir(store.baseDir)
 	if err != nil {
 		errList = append(errList, fmt.Sprintf("failed to read directory %s: %s", store.baseDir, err))
-		return models.NewPaginatedResult([]*core.DAG{}, 0, *opts.Paginator), errList, err
+		return execution.NewPaginatedResult([]*core.DAG{}, 0, *opts.Paginator), errList, err
 	}
 
 	// First, collect all matching DAGs
@@ -358,7 +358,7 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 		paginatedDags = allDags[start:end]
 	}
 
-	result := models.NewPaginatedResult(
+	result := execution.NewPaginatedResult(
 		paginatedDags, totalCount, *opts.Paginator,
 	)
 
@@ -367,7 +367,7 @@ func (store *Storage) List(ctx context.Context, opts models.ListDAGsOptions) (mo
 
 // Grep searches for a pattern in all DAGs.
 func (store *Storage) Grep(ctx context.Context, pattern string) (
-	ret []*models.GrepDAGsResult, errs []string, err error,
+	ret []*execution.GrepDAGsResult, errs []string, err error,
 ) {
 	if pattern == "" {
 		// return empty result if pattern is empty
@@ -406,7 +406,7 @@ func (store *Storage) Grep(ctx context.Context, pattern string) (
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", entry.Name(), err))
 				continue
 			}
-			ret = append(ret, &models.GrepDAGsResult{
+			ret = append(ret, &execution.GrepDAGsResult{
 				Name:    strings.TrimSuffix(entry.Name(), path.Ext(entry.Name())),
 				DAG:     dag,
 				Matches: matches,
@@ -443,7 +443,7 @@ func (store *Storage) Rename(_ context.Context, oldID, newID string) error {
 	}
 	newFilePath := store.generateFilePath(newID)
 	if fileExists(newFilePath) {
-		return models.ErrDAGAlreadyExists
+		return execution.ErrDAGAlreadyExists
 	}
 	return os.Rename(oldFilePath, newFilePath)
 }

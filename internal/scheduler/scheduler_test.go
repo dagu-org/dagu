@@ -7,8 +7,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/robfig/cron/v3"
@@ -167,7 +167,7 @@ func TestJobReady(t *testing.T) {
 				Next:     tt.now,
 			}
 
-			lastRunStatus := models.DAGRunStatus{
+			lastRunStatus := execution.DAGRunStatus{
 				Status:    tt.lastStatus,
 				StartedAt: stringutil.FormatTime(tt.lastRunTime),
 			}

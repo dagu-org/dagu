@@ -12,8 +12,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -57,7 +57,7 @@ var _ Client = (*clientImpl)(nil)
 // clientImpl is the concrete implementation
 type clientImpl struct {
 	config   *Config
-	registry models.ServiceRegistry
+	registry execution.ServiceRegistry
 
 	clientsMu sync.RWMutex
 	clients   map[string]*client // Cache of gRPC clients by coordinator ID
@@ -81,7 +81,7 @@ var (
 )
 
 // New creates a new coordinator client with the given configuration
-func New(registry models.ServiceRegistry, config *Config) Client {
+func New(registry execution.ServiceRegistry, config *Config) Client {
 	return &clientImpl{
 		config:   config,
 		registry: registry,
@@ -104,7 +104,7 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 
 	return backoff.Retry(ctx, func(ctx context.Context) error {
 		// Get all available coordinators from registry
-		members, err := cli.registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
+		members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
 		if err != nil {
 			return fmt.Errorf("failed to get coordinator members: %w", err)
 		}
@@ -113,7 +113,7 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 			return fmt.Errorf("no coordinator instances available")
 		}
 
-		return cli.attemptCall(ctx, members, func(ctx context.Context, member models.HostInfo, client *client) error {
+		return cli.attemptCall(ctx, members, func(ctx context.Context, member execution.HostInfo, client *client) error {
 			// Create request
 			req := &coordinatorv1.DispatchRequest{Task: task}
 
@@ -143,7 +143,7 @@ func (cli *clientImpl) Poll(ctx context.Context, policy backoff.RetryPolicy, req
 	var task *coordinatorv1.Task
 	err := backoff.Retry(ctx, func(ctx context.Context) error {
 		// Get all available coordinators from registry
-		members, err := cli.registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
+		members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
 		if err != nil {
 			return fmt.Errorf("failed to get coordinator members: %w", err)
 		}
@@ -152,7 +152,7 @@ func (cli *clientImpl) Poll(ctx context.Context, policy backoff.RetryPolicy, req
 			return fmt.Errorf("no coordinator instances available")
 		}
 
-		return cli.attemptCall(ctx, members, func(ctx context.Context, member models.HostInfo, client *client) error {
+		return cli.attemptCall(ctx, members, func(ctx context.Context, member execution.HostInfo, client *client) error {
 			resp, err := client.client.Poll(ctx, req)
 			if err != nil {
 				return fmt.Errorf("failed to poll task from coordinator %s: %w", member.ID, err)
@@ -184,7 +184,7 @@ func (cli *clientImpl) Metrics() Metrics {
 	return *cli.state
 }
 
-func (cli *clientImpl) attemptCall(ctx context.Context, members []models.HostInfo, callback func(ctx context.Context, member models.HostInfo, client *client) error) error {
+func (cli *clientImpl) attemptCall(ctx context.Context, members []execution.HostInfo, callback func(ctx context.Context, member execution.HostInfo, client *client) error) error {
 	// Shuffle members to distribute load evenly
 	rand.Shuffle(len(members), func(i, j int) {
 		members[i], members[j] = members[j], members[i]
@@ -236,7 +236,7 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []models.HostInf
 	return lastErr
 }
 
-func (cli *clientImpl) isHealthy(ctx context.Context, member models.HostInfo) error {
+func (cli *clientImpl) isHealthy(ctx context.Context, member execution.HostInfo) error {
 	// Get or create client for this coordinator
 	client, err := cli.getOrCreateClient(ctx, member)
 	if err != nil {
@@ -261,7 +261,7 @@ func (cli *clientImpl) isHealthy(ctx context.Context, member models.HostInfo) er
 }
 
 // getOrCreateClient gets an existing client or creates a new one for the given member
-func (cli *clientImpl) getOrCreateClient(ctx context.Context, member models.HostInfo) (*client, error) {
+func (cli *clientImpl) getOrCreateClient(ctx context.Context, member execution.HostInfo) (*client, error) {
 	// Try to get existing client with read lock
 	cli.clientsMu.RLock()
 	if c, exists := cli.clients[member.ID]; exists {
@@ -291,7 +291,7 @@ func (cli *clientImpl) getOrCreateClient(ctx context.Context, member models.Host
 }
 
 // createClient creates a new gRPC client for the given coordinator
-func (cli *clientImpl) createClient(_ context.Context, member models.HostInfo) (*client, error) {
+func (cli *clientImpl) createClient(_ context.Context, member execution.HostInfo) (*client, error) {
 	// Get dial options based on TLS configuration
 	dialOpts, err := getDialOptions(cli.config)
 	if err != nil {
@@ -374,7 +374,7 @@ func (cli *clientImpl) recordSuccess(ctx context.Context) {
 // GetWorkers retrieves the list of workers from all coordinators
 func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error) {
 	// Get all available coordinators from discovery
-	members, err := cli.registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
+	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
 	}
@@ -435,7 +435,7 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 // Heartbeat sends a heartbeat to coordinators
 func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) error {
 	// Get all available coordinators from discovery
-	members, err := cli.registry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
+	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
 	if err != nil {
 		return fmt.Errorf("failed to discover coordinators: %w", err)
 	}
@@ -445,7 +445,7 @@ func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.Heartbe
 	}
 
 	// Use attemptCall to send heartbeat to any available coordinator
-	return cli.attemptCall(ctx, members, func(ctx context.Context, member models.HostInfo, client *client) error {
+	return cli.attemptCall(ctx, members, func(ctx context.Context, member execution.HostInfo, client *client) error {
 		// Send heartbeat
 		_, err := client.client.Heartbeat(ctx, req)
 		if err != nil {

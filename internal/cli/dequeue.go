@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/spf13/cobra"
 )
 
@@ -101,7 +101,7 @@ func dequeueDAGRun(ctx *Context, dagRun core.DAGRunRef) error {
 	// Read the latest attempt and if it's NotStarted, we can remove the DAGRun from the store
 	// as it only has the queued status and no other attempts.
 	_, err = ctx.DAGRunStore.FindAttempt(ctx, dagRun)
-	if errors.Is(err, models.ErrNoStatusData) {
+	if errors.Is(err, execution.ErrNoStatusData) {
 		if err := ctx.DAGRunStore.RemoveDAGRun(ctx, dagRun); err != nil {
 			return fmt.Errorf("failed to remove dag-run %s from store: %w", dagRun.ID, err)
 		}

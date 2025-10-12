@@ -15,10 +15,10 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/dirlock"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -40,9 +40,9 @@ type Scheduler struct {
 	stopChan            chan struct{}
 	running             atomic.Bool
 	location            *time.Location
-	dagRunStore         models.DAGRunStore
-	queueStore          models.QueueStore
-	procStore           models.ProcStore
+	dagRunStore         execution.DAGRunStore
+	queueStore          execution.QueueStore
+	procStore           execution.ProcStore
 	cancel              context.CancelFunc
 	lock                sync.Mutex
 	queueConfigs        sync.Map
@@ -50,7 +50,7 @@ type Scheduler struct {
 	dirLock             dirlock.DirLock // File-based lock to prevent multiple scheduler instances
 	dagExecutor         *DAGExecutor
 	healthServer        *HealthServer // Health check server for monitoring
-	serviceRegistry     models.ServiceRegistry
+	serviceRegistry     execution.ServiceRegistry
 	disableHealthServer bool // Disable health server when running from start-all
 	heartbeatCancel     context.CancelFunc
 	heartbeatDone       chan struct{}
@@ -66,10 +66,10 @@ func New(
 	cfg *config.Config,
 	er EntryReader,
 	drm dagrun.Manager,
-	drs models.DAGRunStore,
-	qs models.QueueStore,
-	ps models.ProcStore,
-	reg models.ServiceRegistry,
+	drs execution.DAGRunStore,
+	qs execution.QueueStore,
+	ps execution.ProcStore,
+	reg execution.ServiceRegistry,
 	coordinatorCli core.Dispatcher,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Global.Location
@@ -125,14 +125,14 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	// Register with service registry as inactive initially
 	if s.serviceRegistry != nil {
 		hostname, _ := os.Hostname()
-		hostInfo := models.HostInfo{
+		hostInfo := execution.HostInfo{
 			ID:        s.instanceID,
 			Host:      hostname,
 			Port:      s.config.Scheduler.Port, // Health check port (0 if disabled)
-			Status:    models.ServiceStatusInactive,
+			Status:    execution.ServiceStatusInactive,
 			StartedAt: time.Now(),
 		}
-		if err := s.serviceRegistry.Register(ctx, models.ServiceNameScheduler, hostInfo); err != nil {
+		if err := s.serviceRegistry.Register(ctx, execution.ServiceNameScheduler, hostInfo); err != nil {
 			logger.Error(ctx, "Failed to register with service registry", "err", err)
 			// Continue anyway - service registry is not critical
 		} else {
@@ -160,7 +160,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	// Update status to active after acquiring lock
 	if s.serviceRegistry != nil {
-		if err := s.serviceRegistry.UpdateStatus(ctx, models.ServiceNameScheduler, models.ServiceStatusActive); err != nil {
+		if err := s.serviceRegistry.UpdateStatus(ctx, execution.ServiceNameScheduler, execution.ServiceStatusActive); err != nil {
 			logger.Error(ctx, "Failed to update status to active", "err", err)
 		} else {
 			logger.Info(ctx, "Updated scheduler status to active")
@@ -187,10 +187,10 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	}
 
 	// Start queue reader only if queues are enabled
-	var qr models.QueueReader
+	var qr execution.QueueReader
 	var wgQueue sync.WaitGroup
 	if s.config.Queues.Enabled {
-		queueCh := make(chan models.QueuedItem, 1)
+		queueCh := make(chan execution.QueuedItem, 1)
 		wgQueue.Add(1)
 
 		go func() {
@@ -303,7 +303,7 @@ func (s *Scheduler) startHeartbeat(ctx context.Context) {
 // The handler uses OPERATION_RETRY for all executions, which means "retry the dispatch"
 // rather than "retry a failed execution". This allows the system to retry dispatching
 // to the coordinator if it was temporarily unavailable.
-func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, done chan any) {
+func (s *Scheduler) handleQueue(ctx context.Context, ch chan execution.QueuedItem, done chan any) {
 	for {
 		select {
 		case <-done:
@@ -319,10 +319,10 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			logger.Info(ctx, "Received item from queue", "data", data)
 			var (
 				dag       *core.DAG
-				attempt   models.DAGRunAttempt
-				st        *models.DAGRunStatus
+				attempt   execution.DAGRunAttempt
+				st        *execution.DAGRunStatus
 				err       error
-				result    = models.QueuedItemProcessingResultRetry
+				result    = execution.QueuedItemProcessingResultRetry
 				startedAt time.Time
 				queueName string
 				queueCfg  queueConfig
@@ -334,16 +334,16 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 			if err != nil {
 				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
 				// If the attempt doesn't exist at all, mark as discard
-				if errors.Is(err, models.ErrDAGRunIDNotFound) {
+				if errors.Is(err, execution.ErrDAGRunIDNotFound) {
 					logger.Error(ctx, "DAG run not found, marking as discard", "data", data)
-					result = models.QueuedItemProcessingResultDiscard
+					result = execution.QueuedItemProcessingResultDiscard
 				}
 				goto SEND_RESULT
 			}
 
 			if attempt.Hidden() {
 				logger.Info(ctx, "DAG run is hidden, marking as discard", "data", data)
-				result = models.QueuedItemProcessingResultDiscard
+				result = execution.QueuedItemProcessingResultDiscard
 				goto SEND_RESULT
 			}
 
@@ -361,9 +361,9 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 
 			st, err = attempt.ReadStatus(ctx)
 			if err != nil {
-				if errors.Is(err, models.ErrCorruptedStatusFile) {
+				if errors.Is(err, execution.ErrCorruptedStatusFile) {
 					logger.Error(ctx, "Status file is corrupted, marking as invalid", "err", err, "data", data)
-					result = models.QueuedItemProcessingResultDiscard
+					result = execution.QueuedItemProcessingResultDiscard
 				} else if ctx.Err() != nil {
 					logger.Debug(ctx, "Context is cancelled", "err", err)
 				} else {
@@ -374,7 +374,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 
 			if st.Status != status.Queued {
 				logger.Info(ctx, "Skipping item from queue", "data", data, "status", st.Status)
-				result = models.QueuedItemProcessingResultDiscard
+				result = execution.QueuedItemProcessingResultDiscard
 				goto SEND_RESULT
 			}
 
@@ -419,7 +419,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				} else if isAlive {
 					// Process has started and has heartbeat
 					logger.Info(ctx, "DAG run has started (heartbeat detected)", "data", data)
-					result = models.QueuedItemProcessingResultSuccess
+					result = execution.QueuedItemProcessingResultSuccess
 					break WAIT_FOR_RUN
 				}
 
@@ -433,7 +433,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 					}
 
 					logger.Info(ctx, "Discard the queue item due to timeout", "data", data)
-					result = models.QueuedItemProcessingResultDiscard
+					result = execution.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN
 				}
 
@@ -441,13 +441,13 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				st, err = attempt.ReadStatus(ctx)
 				if err != nil {
 					logger.Error(ctx, "Failed to read status. Is it corrupted?", "err", err, "data", data)
-					result = models.QueuedItemProcessingResultDiscard
+					result = execution.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN
 				}
 
 				if st.Status != status.Queued {
 					logger.Info(ctx, "Looks like the DAG is already executed", "data", data, "status", st.Status.String())
-					result = models.QueuedItemProcessingResultDiscard
+					result = execution.QueuedItemProcessingResultDiscard
 					break WAIT_FOR_RUN
 				}
 
@@ -459,7 +459,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 				}
 			}
 
-			if result == models.QueuedItemProcessingResultSuccess {
+			if result == execution.QueuedItemProcessingResultSuccess {
 				logger.Info(ctx, "Successfully processed item from queue", "data", data)
 			}
 
@@ -469,7 +469,7 @@ func (s *Scheduler) handleQueue(ctx context.Context, ch chan models.QueuedItem, 
 	}
 }
 
-func (s *Scheduler) markStatusFailed(ctx context.Context, attempt models.DAGRunAttempt) error {
+func (s *Scheduler) markStatusFailed(ctx context.Context, attempt execution.DAGRunAttempt) error {
 	st, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read status to update status: %w", err)
@@ -569,7 +569,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 
 	// Update status to inactive before stopping
 	if s.serviceRegistry != nil {
-		if err := s.serviceRegistry.UpdateStatus(ctx, models.ServiceNameScheduler, models.ServiceStatusInactive); err != nil {
+		if err := s.serviceRegistry.UpdateStatus(ctx, execution.ServiceNameScheduler, execution.ServiceStatusInactive); err != nil {
 			logger.Error(ctx, "Failed to update status to inactive", "err", err)
 		}
 	}

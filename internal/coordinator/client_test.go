@@ -11,7 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,8 +64,8 @@ func TestClientDispatch(t *testing.T) {
 		defer server.Stop()
 
 		monitor := &mockServiceMonitor{
-			members: []models.HostInfo{
-				{ID: "coord-1", Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive},
+			members: []execution.HostInfo{
+				{ID: "coord-1", Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: execution.ServiceStatusActive},
 			},
 		}
 
@@ -89,7 +89,7 @@ func TestClientDispatch(t *testing.T) {
 		config.RequestTimeout = 100 * time.Millisecond
 
 		monitor := &mockServiceMonitor{
-			members: []models.HostInfo{}, // No coordinators
+			members: []execution.HostInfo{}, // No coordinators
 		}
 
 		client := coordinator.New(monitor, config)
@@ -131,7 +131,7 @@ func TestClientPoll(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
+		members: []execution.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: execution.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -176,7 +176,7 @@ func TestClientGetWorkers(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
+		members: []execution.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: execution.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -207,7 +207,7 @@ func TestClientHeartbeat(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
+		members: []execution.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: execution.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -249,7 +249,7 @@ func TestClientMetrics(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
+		members: []execution.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: execution.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -289,7 +289,7 @@ func TestClientCleanup(t *testing.T) {
 	defer server.Stop()
 
 	monitor := &mockServiceMonitor{
-		members: []models.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: models.ServiceStatusActive}},
+		members: []execution.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: execution.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -332,7 +332,7 @@ func TestClientDispatcherInterface(t *testing.T) {
 	}
 
 	// Should fail gracefully with no coordinators
-	monitor.members = []models.HostInfo{}
+	monitor.members = []execution.HostInfo{}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -347,16 +347,16 @@ func TestClientDispatcherInterface(t *testing.T) {
 // Mock implementations
 
 type mockServiceMonitor struct {
-	members   []models.HostInfo
+	members   []execution.HostInfo
 	err       error
 	onMembers func()
 }
 
-func (m *mockServiceMonitor) Register(_ context.Context, _ models.ServiceName, _ models.HostInfo) error {
+func (m *mockServiceMonitor) Register(_ context.Context, _ execution.ServiceName, _ execution.HostInfo) error {
 	return nil
 }
 
-func (m *mockServiceMonitor) GetServiceMembers(_ context.Context, _ models.ServiceName) ([]models.HostInfo, error) {
+func (m *mockServiceMonitor) GetServiceMembers(_ context.Context, _ execution.ServiceName) ([]execution.HostInfo, error) {
 	if m.onMembers != nil {
 		m.onMembers()
 	}
@@ -370,7 +370,7 @@ func (m *mockServiceMonitor) Unregister(_ context.Context) {
 	// No-op
 }
 
-func (m *mockServiceMonitor) UpdateStatus(_ context.Context, _ models.ServiceName, _ models.ServiceStatus) error {
+func (m *mockServiceMonitor) UpdateStatus(_ context.Context, _ execution.ServiceName, _ execution.ServiceStatus) error {
 	return nil
 }
 

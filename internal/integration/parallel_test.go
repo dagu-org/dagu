@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +42,7 @@ steps:
 		expectedNodes     int
 		parallelNodeIndex int
 		expectedChildren  int
-		verify            func(*testing.T, *models.DAGRunStatus, *models.Node)
+		verify            func(*testing.T, *execution.DAGRunStatus, *execution.Node)
 	}{
 		{
 			name: "simple items",
@@ -76,7 +76,7 @@ steps:
 			expectedNodes:     1,
 			parallelNodeIndex: 0,
 			expectedChildren:  3,
-			verify: func(t *testing.T, _ *models.DAGRunStatus, node *models.Node) {
+			verify: func(t *testing.T, _ *execution.DAGRunStatus, node *execution.Node) {
 				for _, child := range node.Children {
 					require.Contains(t, child.Params, `"REGION"`)
 					require.Contains(t, child.Params, `"VERSION"`)
@@ -131,7 +131,7 @@ steps:
 			expectedNodes:     2,
 			parallelNodeIndex: 0,
 			expectedChildren:  3,
-			verify: func(t *testing.T, dagStatus *models.DAGRunStatus, _ *models.Node) {
+			verify: func(t *testing.T, dagStatus *execution.DAGRunStatus, _ *execution.Node) {
 				require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 				aggregate := dagStatus.Nodes[1]
 				require.Equal(t, status.NodeSuccess, aggregate.Status)

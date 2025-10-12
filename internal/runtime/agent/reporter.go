@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
@@ -32,7 +32,7 @@ func newReporter(f SenderFn) *reporter {
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	ctx context.Context, dag *core.DAG, dagStatus models.DAGRunStatus, node *runtime.Node,
+	ctx context.Context, dag *core.DAG, dagStatus execution.DAGRunStatus, node *runtime.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != status.NodeNone {
@@ -50,7 +50,7 @@ func (r *reporter) reportStep(
 }
 
 // report is a function that reports the status of the scheduler.
-func (r *reporter) getSummary(_ context.Context, dagStatus models.DAGRunStatus, err error) string {
+func (r *reporter) getSummary(_ context.Context, dagStatus execution.DAGRunStatus, err error) string {
 	var buf bytes.Buffer
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Summary ->\n"))
@@ -62,7 +62,7 @@ func (r *reporter) getSummary(_ context.Context, dagStatus models.DAGRunStatus, 
 }
 
 // send is a function that sends a report mail.
-func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus models.DAGRunStatus, err error) error {
+func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus execution.DAGRunStatus, err error) error {
 	if err != nil || dagStatus.Status == status.Error {
 		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
 			fromAddress := dag.ErrorMail.From
@@ -95,7 +95,7 @@ var dagHeader = table.Row{
 	"Error",
 }
 
-func renderDAGSummary(dagStatus models.DAGRunStatus, err error) string {
+func renderDAGSummary(dagStatus execution.DAGRunStatus, err error) string {
 	dataRow := table.Row{
 		dagStatus.DAGRunID,
 		dagStatus.Name,
@@ -126,7 +126,7 @@ var stepHeader = table.Row{
 	"Error",
 }
 
-func renderStepSummary(nodes []*models.Node) string {
+func renderStepSummary(nodes []*execution.Node) string {
 	stepTable := table.NewWriter()
 	stepTable.AppendHeader(stepHeader)
 
@@ -151,7 +151,7 @@ func renderStepSummary(nodes []*models.Node) string {
 	return stepTable.Render()
 }
 
-func renderHTML(nodes []*models.Node) string {
+func renderHTML(nodes []*execution.Node) string {
 	var buffer bytes.Buffer
 
 	// Start with basic HTML structure with improved styling
@@ -282,7 +282,7 @@ func renderHTML(nodes []*models.Node) string {
 	return buffer.String()
 }
 
-func renderHTMLWithDAGInfo(dagStatus models.DAGRunStatus) string {
+func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
 	var buffer bytes.Buffer
 
 	// Start with enhanced HTML structure and styling
@@ -600,7 +600,7 @@ func renderHTMLWithDAGInfo(dagStatus models.DAGRunStatus) string {
 }
 
 func addAttachments(
-	trigger bool, nodes []*models.Node,
+	trigger bool, nodes []*execution.Node,
 ) (attachments []string) {
 	if trigger {
 		for _, n := range nodes {

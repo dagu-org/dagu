@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -103,7 +103,7 @@ func TestJSONDB(t *testing.T) {
 		// Verify an error is returned if the dag-run ID does not exist
 		refNonExist := core.NewDAGRunRef("test_DAG", "nonexistent-id")
 		_, err = th.Store.FindAttempt(th.Context, refNonExist)
-		assert.ErrorIs(t, err, models.ErrDAGRunIDNotFound)
+		assert.ErrorIs(t, err, execution.ErrDAGRunIDNotFound)
 	})
 	t.Run("RemoveOld", func(t *testing.T) {
 		th := setupTestStore(t)
@@ -149,7 +149,7 @@ func TestJSONDB(t *testing.T) {
 		// Create a child attempt
 		rootDAGRun := core.NewDAGRunRef("test_DAG", "parent-id")
 		childDAG := th.DAG("child")
-		childAttempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, "sub-id", models.NewDAGRunAttemptOptions{
+		childAttempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, "sub-id", execution.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
 		})
 		require.NoError(t, err)
@@ -161,7 +161,7 @@ func TestJSONDB(t *testing.T) {
 			_ = childAttempt.Close(th.Context)
 		}()
 
-		statusToWrite := models.InitialStatus(childDAG.DAG)
+		statusToWrite := execution.InitialStatus(childDAG.DAG)
 		statusToWrite.DAGRunID = "sub-id"
 		err = childAttempt.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
@@ -190,7 +190,7 @@ func TestJSONDB(t *testing.T) {
 
 		rootDAGRun := core.NewDAGRunRef("test_DAG", parentDAGRunID)
 		childDAG := th.DAG("child")
-		attempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, childDAGRunID, models.NewDAGRunAttemptOptions{
+		attempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, childDAGRunID, execution.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
 		})
 		require.NoError(t, err)
@@ -202,7 +202,7 @@ func TestJSONDB(t *testing.T) {
 			_ = attempt.Close(th.Context)
 		}()
 
-		statusToWrite := models.InitialStatus(childDAG.DAG)
+		statusToWrite := execution.InitialStatus(childDAG.DAG)
 		statusToWrite.DAGRunID = childDAGRunID
 		statusToWrite.Status = status.Running
 		err = attempt.Write(th.Context, statusToWrite)
@@ -219,7 +219,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, status.Running.String(), existingAttemptStatus.Status.String())
 
 		// Create a retry record and write different status
-		retryAttempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, childDAGRunID, models.NewDAGRunAttemptOptions{
+		retryAttempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, childDAGRunID, execution.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
 			Retry:      true,
 		})
@@ -253,7 +253,7 @@ func TestJSONDB(t *testing.T) {
 			_ = rec.Close(th.Context)
 		}()
 
-		statusToWrite := models.InitialStatus(rec.dag)
+		statusToWrite := execution.InitialStatus(rec.dag)
 		statusToWrite.DAGRunID = "parent-id"
 
 		err = rec.Write(th.Context, statusToWrite)
@@ -386,12 +386,12 @@ func TestListStatuses(t *testing.T) {
 		th.CreateAttempt(t, ts3, "dagrun-id-3", status.Success)
 
 		// Filter by time range (only ts2 should be included)
-		from := models.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
-		to := models.NewUTC(time.Date(2021, 1, 2, 12, 0, 0, 0, time.UTC))
+		from := execution.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
+		to := execution.NewUTC(time.Date(2021, 1, 2, 12, 0, 0, 0, time.UTC))
 
 		statuses, err := th.Store.ListStatuses(th.Context,
-			models.WithFrom(from),
-			models.WithTo(to),
+			execution.WithFrom(from),
+			execution.WithTo(to),
 		)
 
 		require.NoError(t, err)
@@ -410,8 +410,8 @@ func TestListStatuses(t *testing.T) {
 
 		// Filter by status (only StatusError should be included)
 		statuses, err := th.Store.ListStatuses(th.Context,
-			models.WithStatuses([]status.Status{status.Error}),
-			models.WithFrom(models.NewUTC(ts)),
+			execution.WithStatuses([]status.Status{status.Error}),
+			execution.WithFrom(execution.NewUTC(ts)),
 		)
 
 		require.NoError(t, err)
@@ -430,10 +430,10 @@ func TestListStatuses(t *testing.T) {
 		}
 
 		// Limit to 3 results
-		options := &models.ListDAGRunStatusesOptions{Limit: 3}
-		statuses, err := th.Store.ListStatuses(th.Context, func(o *models.ListDAGRunStatusesOptions) {
+		options := &execution.ListDAGRunStatusesOptions{Limit: 3}
+		statuses, err := th.Store.ListStatuses(th.Context, func(o *execution.ListDAGRunStatusesOptions) {
 			o.Limit = options.Limit
-		}, models.WithFrom(models.NewUTC(ts)))
+		}, execution.WithFrom(execution.NewUTC(ts)))
 
 		require.NoError(t, err)
 		require.Len(t, statuses, 3)
@@ -452,7 +452,7 @@ func TestListStatuses(t *testing.T) {
 
 		// Get all statuses
 		statuses, err := th.Store.ListStatuses(
-			th.Context, models.WithFrom(models.NewUTC(ts1)),
+			th.Context, execution.WithFrom(execution.NewUTC(ts1)),
 		)
 
 		require.NoError(t, err)

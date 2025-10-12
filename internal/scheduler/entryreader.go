@@ -11,10 +11,10 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
 	"github.com/robfig/cron/v3"
 
@@ -48,14 +48,14 @@ type entryReaderImpl struct {
 	targetDir   string
 	registry    map[string]*core.DAG
 	lock        sync.Mutex
-	dagStore    models.DAGStore
+	dagStore    execution.DAGStore
 	dagRunMgr   dagrun.Manager
 	executable  string
 	dagExecutor *DAGExecutor
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
-func NewEntryReader(dir string, dagCli models.DAGStore, drm dagrun.Manager, de *DAGExecutor, executable string) EntryReader {
+func NewEntryReader(dir string, dagCli execution.DAGStore, drm dagrun.Manager, de *DAGExecutor, executable string) EntryReader {
 	return &entryReaderImpl{
 		targetDir:   dir,
 		lock:        sync.Mutex{},

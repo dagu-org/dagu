@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 )
 
 // Errors for the queue file
@@ -65,7 +65,7 @@ func (q *QueueFile) Push(_ context.Context, dagRun core.DAGRunRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	timestamp := models.NewUTC(time.Now())
+	timestamp := execution.NewUTC(time.Now())
 
 	// Create the queue file name
 	fileName := queueFileName(q.prefix, dagRun.ID, timestamp)
@@ -318,7 +318,7 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 // parseRegex is the regex used to parse the queue file name
 var parseRegex = regexp.MustCompile(`^item_(high|low)_(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`)
 
-func queueFileName(priority, dagRunID string, t models.TimeInUTC) string {
+func queueFileName(priority, dagRunID string, t execution.TimeInUTC) string {
 	mill := t.UnixMilli()
 	timestamp := t.Format(dateTimeFormatUTC) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"
 	return itemPrefix + priority + timestamp + "_" + dagRunID + ".json"

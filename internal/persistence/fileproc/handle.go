@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 )
 
 // Error messages
@@ -19,7 +19,7 @@ var (
 	ErrHeartbeatAlreadyStarted = fmt.Errorf("heartbeat already started")
 )
 
-var _ models.ProcHandle = (*ProcHandle)(nil)
+var _ execution.ProcHandle = (*ProcHandle)(nil)
 
 // ProcHandle is a struct that implements the ProcHandle interface.
 type ProcHandle struct {
@@ -29,18 +29,18 @@ type ProcHandle struct {
 	cancel   context.CancelFunc
 	mu       sync.Mutex
 	wg       sync.WaitGroup
-	meta     models.ProcMeta
+	meta     execution.ProcMeta
 }
 
 // GetMeta implements models.ProcHandle.
-func (p *ProcHandle) GetMeta() models.ProcMeta {
+func (p *ProcHandle) GetMeta() execution.ProcMeta {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.meta
 }
 
 // NewProcHandler creates a new instance of Proc with the specified file name.
-func NewProcHandler(file string, meta models.ProcMeta) *ProcHandle {
+func NewProcHandler(file string, meta execution.ProcMeta) *ProcHandle {
 	return &ProcHandle{
 		fileName: file,
 		meta:     meta,

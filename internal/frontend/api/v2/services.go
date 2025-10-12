@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 )
 
 // GetSchedulerStatus returns the status of all registered scheduler instances
@@ -27,7 +27,7 @@ func (a *API) GetSchedulerStatus(ctx context.Context, _ api.GetSchedulerStatusRe
 	}
 
 	// Get all scheduler instances from service registry
-	members, err := a.serviceRegistry.GetServiceMembers(ctx, models.ServiceNameScheduler)
+	members, err := a.serviceRegistry.GetServiceMembers(ctx, execution.ServiceNameScheduler)
 	if err != nil {
 		logger.Error(ctx, "Failed to get scheduler members from service registry", "err", err)
 		return api.GetSchedulerStatusdefaultJSONResponse{
@@ -43,11 +43,11 @@ func (a *API) GetSchedulerStatus(ctx context.Context, _ api.GetSchedulerStatusRe
 	for _, member := range members {
 		var status api.SchedulerInstanceStatus
 		switch member.Status {
-		case models.ServiceStatusActive:
+		case execution.ServiceStatusActive:
 			status = api.SchedulerInstanceStatusActive
-		case models.ServiceStatusInactive:
+		case execution.ServiceStatusInactive:
 			status = api.SchedulerInstanceStatusInactive
-		case models.ServiceStatusUnknown:
+		case execution.ServiceStatusUnknown:
 			status = api.SchedulerInstanceStatusUnknown
 		}
 
@@ -82,7 +82,7 @@ func (a *API) GetCoordinatorStatus(ctx context.Context, _ api.GetCoordinatorStat
 	}
 
 	// Get all coordinator instances from service registry
-	members, err := a.serviceRegistry.GetServiceMembers(ctx, models.ServiceNameCoordinator)
+	members, err := a.serviceRegistry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
 	if err != nil {
 		logger.Error(ctx, "Failed to get coordinator members from service registry", "err", err)
 		return api.GetCoordinatorStatusdefaultJSONResponse{
@@ -98,11 +98,11 @@ func (a *API) GetCoordinatorStatus(ctx context.Context, _ api.GetCoordinatorStat
 	for _, member := range members {
 		var status api.CoordinatorInstanceStatus
 		switch member.Status {
-		case models.ServiceStatusActive:
+		case execution.ServiceStatusActive:
 			status = api.CoordinatorInstanceStatusActive
-		case models.ServiceStatusInactive:
+		case execution.ServiceStatusInactive:
 			status = api.CoordinatorInstanceStatusInactive
-		case models.ServiceStatusUnknown:
+		case execution.ServiceStatusUnknown:
 			status = api.CoordinatorInstanceStatusUnknown
 		}
 

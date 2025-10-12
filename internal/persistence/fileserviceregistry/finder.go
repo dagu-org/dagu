@@ -7,27 +7,27 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/dirlock"
 )
 
 // finder provides file-based service registry
 type finder struct {
 	baseDir      string
-	serviceName  models.ServiceName
+	serviceName  execution.ServiceName
 	staleTimeout time.Duration
 	dirLock      dirlock.DirLock
 	mu           sync.Mutex
 
 	// Cache fields
-	cachedMembers []models.HostInfo
+	cachedMembers []execution.HostInfo
 	cacheTime     time.Time
 	cacheDuration time.Duration
 }
 
 // newFinder creates a new finder for a specific service
-func newFinder(baseDir string, serviceName models.ServiceName) *finder {
+func newFinder(baseDir string, serviceName execution.ServiceName) *finder {
 	serviceDir := filepath.Join(baseDir, string(serviceName))
 
 	// Create directory lock for this service
@@ -46,12 +46,12 @@ func newFinder(baseDir string, serviceName models.ServiceName) *finder {
 }
 
 // members returns all active instances of the service
-func (f *finder) members(ctx context.Context) ([]models.HostInfo, error) {
+func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
 	f.mu.Lock()
 
 	// Check if we have a valid cache
 	if len(f.cachedMembers) > 0 && time.Since(f.cacheTime) < f.cacheDuration {
-		members := make([]models.HostInfo, len(f.cachedMembers))
+		members := make([]execution.HostInfo, len(f.cachedMembers))
 		copy(members, f.cachedMembers)
 		f.mu.Unlock()
 		return members, nil
@@ -62,7 +62,7 @@ func (f *finder) members(ctx context.Context) ([]models.HostInfo, error) {
 
 	// If directory doesn't exist, return empty list (no instances)
 	if _, err := os.Stat(serviceDir); os.IsNotExist(err) {
-		return []models.HostInfo{}, nil
+		return []execution.HostInfo{}, nil
 	}
 
 	f.mu.Lock()
@@ -88,7 +88,7 @@ func (f *finder) members(ctx context.Context) ([]models.HostInfo, error) {
 		return nil, err
 	}
 
-	members := []models.HostInfo{}
+	members := []execution.HostInfo{}
 	staleFiles := []string{}
 
 	// First pass: collect members and identify stale files
@@ -123,7 +123,7 @@ func (f *finder) members(ctx context.Context) ([]models.HostInfo, error) {
 			continue
 		}
 
-		members = append(members, models.HostInfo{
+		members = append(members, execution.HostInfo{
 			ID:        info.ID,
 			Host:      info.Host,
 			Port:      info.Port,
@@ -144,7 +144,7 @@ func (f *finder) members(ctx context.Context) ([]models.HostInfo, error) {
 
 	// Update cache if members is not empty
 	if len(members) > 0 {
-		f.cachedMembers = make([]models.HostInfo, len(members))
+		f.cachedMembers = make([]execution.HostInfo, len(members))
 		copy(f.cachedMembers, members)
 		f.cacheTime = time.Now()
 	}

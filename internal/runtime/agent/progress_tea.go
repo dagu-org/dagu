@@ -10,17 +10,17 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 )
 
 // nodeProgress represents the progress state of a single node
 type nodeProgress struct {
-	node      *models.Node
+	node      *execution.Node
 	startTime time.Time
 	endTime   time.Time
 	status    status.NodeStatus
-	children  []models.ChildDAGRun
+	children  []execution.ChildDAGRun
 }
 
 // Message types for Bubble Tea
@@ -30,12 +30,12 @@ type (
 
 	// NodeUpdateMsg is sent when a node's status changes
 	NodeUpdateMsg struct {
-		Node *models.Node
+		Node *execution.Node
 	}
 
 	// StatusUpdateMsg is sent when the overall DAG status changes
 	StatusUpdateMsg struct {
-		Status *models.DAGRunStatus
+		Status *execution.DAGRunStatus
 	}
 
 	// FinalizeMsg is sent when the display should stop
@@ -46,7 +46,7 @@ type (
 type ProgressModel struct {
 	// DAG information
 	dag      *core.DAG
-	status   *models.DAGRunStatus
+	status   *execution.DAGRunStatus
 	dagRunID string
 	params   string
 
@@ -105,7 +105,7 @@ func NewProgressModel(dag *core.DAG) ProgressModel {
 	if dag != nil {
 		for _, step := range dag.Steps {
 			m.nodes[step.Name] = &nodeProgress{
-				node: &models.Node{
+				node: &execution.Node{
 					Step:       step,
 					Status:     status.NodeNone,
 					StartedAt:  "-",
@@ -227,7 +227,7 @@ func (m ProgressModel) View() string {
 	return strings.Join(sections, "\n\n")
 }
 
-func (m *ProgressModel) updateNode(node *models.Node) {
+func (m *ProgressModel) updateNode(node *execution.Node) {
 	np, exists := m.nodes[node.Step.Name]
 	if !exists {
 		np = &nodeProgress{}
@@ -621,7 +621,7 @@ func (m ProgressModel) getStatusIcon(s status.NodeStatus) string {
 	}
 }
 
-func (m ProgressModel) formatChildStatus(child models.ChildDAGRun) string {
+func (m ProgressModel) formatChildStatus(child execution.ChildDAGRun) string {
 	params := ""
 	if child.Params != "" {
 		params = m.faintStyle.Render(fmt.Sprintf(" [%s]", truncateString(child.Params, 20)))
@@ -786,7 +786,7 @@ func (p *ProgressTeaDisplay) Stop() {
 }
 
 // UpdateNode sends a node update to the display
-func (p *ProgressTeaDisplay) UpdateNode(node *models.Node) {
+func (p *ProgressTeaDisplay) UpdateNode(node *execution.Node) {
 	if p.program != nil {
 		p.model.updateNode(node)
 		p.program.Send(NodeUpdateMsg{Node: node})
@@ -794,7 +794,7 @@ func (p *ProgressTeaDisplay) UpdateNode(node *models.Node) {
 }
 
 // UpdateStatus sends a status update to the display
-func (p *ProgressTeaDisplay) UpdateStatus(status *models.DAGRunStatus) {
+func (p *ProgressTeaDisplay) UpdateStatus(status *execution.DAGRunStatus) {
 	if p.program != nil {
 		p.model.status = status
 		p.program.Send(StatusUpdateMsg{Status: status})
@@ -804,7 +804,7 @@ func (p *ProgressTeaDisplay) UpdateStatus(status *models.DAGRunStatus) {
 // SetDAGRunInfo sets the DAG run ID and parameters
 func (p *ProgressTeaDisplay) SetDAGRunInfo(dagRunID, params string) {
 	if p.program != nil {
-		status := &models.DAGRunStatus{
+		status := &execution.DAGRunStatus{
 			DAGRunID: dagRunID,
 			Params:   params,
 		}

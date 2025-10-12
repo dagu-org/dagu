@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/dirlock"
 )
 
@@ -168,14 +168,14 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 // It returns a new Proc instance with the generated file name.
 func (pg *ProcGroup) Acquire(_ context.Context, dagRun core.DAGRunRef) (*ProcHandle, error) {
 	// Generate the proc file name
-	fileName := pg.getFileName(models.NewUTC(time.Now()), dagRun)
-	return NewProcHandler(fileName, models.ProcMeta{
+	fileName := pg.getFileName(execution.NewUTC(time.Now()), dagRun)
+	return NewProcHandler(fileName, execution.ProcMeta{
 		StartedAt: time.Now().Unix(),
 	}), nil
 }
 
 // getFileName generates a proc file name based on the dag-run reference and the current time.
-func (pg *ProcGroup) getFileName(t models.TimeInUTC, dagRun core.DAGRunRef) string {
+func (pg *ProcGroup) getFileName(t execution.TimeInUTC, dagRun core.DAGRunRef) string {
 	timestamp := t.Format(dateTimeFormatUTC)
 	fileName := procFilePrefix + timestamp + "Z_" + dagRun.ID + ".proc"
 	return filepath.Join(pg.baseDir, dagRun.Name, fileName)

@@ -12,10 +12,10 @@ import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/frontend/auth"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -26,30 +26,30 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagStore           models.DAGStore
-	dagRunStore        models.DAGRunStore
+	dagStore           execution.DAGStore
+	dagRunStore        execution.DAGRunStore
 	dagRunMgr          dagrun.Manager
-	queueStore         models.QueueStore
-	procStore          models.ProcStore
+	queueStore         execution.QueueStore
+	procStore          execution.ProcStore
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
 	config             *config.Config
 	metricsRegistry    *prometheus.Registry
 	coordinatorCli     coordinator.Client
-	serviceRegistry    models.ServiceRegistry
+	serviceRegistry    execution.ServiceRegistry
 	subCmdBuilder      *dagrun.SubCmdBuilder
 }
 
 func New(
-	dr models.DAGStore,
-	drs models.DAGRunStore,
-	qs models.QueueStore,
-	ps models.ProcStore,
+	dr execution.DAGStore,
+	drs execution.DAGRunStore,
+	qs execution.QueueStore,
+	ps execution.ProcStore,
 	drm dagrun.Manager,
 	cfg *config.Config,
 	cc coordinator.Client,
-	sr models.ServiceRegistry,
+	sr execution.ServiceRegistry,
 	mr *prometheus.Registry,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
@@ -165,15 +165,15 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 	}
 
 	switch {
-	case errors.Is(err, models.ErrDAGNotFound):
+	case errors.Is(err, execution.ErrDAGNotFound):
 		code = api.ErrorCodeNotFound
 		message = "DAG not found"
 
-	case errors.Is(err, models.ErrDAGRunIDNotFound):
+	case errors.Is(err, execution.ErrDAGRunIDNotFound):
 		code = api.ErrorCodeNotFound
 		message = "dag-run ID not found"
 
-	case errors.Is(err, models.ErrDAGAlreadyExists):
+	case errors.Is(err, execution.ErrDAGAlreadyExists):
 		code = api.ErrorCodeAlreadyExists
 		message = "DAG already exists"
 
@@ -218,7 +218,7 @@ func valueOf[T any](ptr *T) T {
 }
 
 // toPagination converts a paginated result to an API pagination object.
-func toPagination[T any](paginatedResult models.PaginatedResult[T]) api.Pagination {
+func toPagination[T any](paginatedResult execution.PaginatedResult[T]) api.Pagination {
 	return api.Pagination{
 		CurrentPage:  paginatedResult.CurrentPage,
 		NextPage:     paginatedResult.NextPage,

@@ -8,8 +8,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
@@ -86,7 +86,7 @@ func runStatus(ctx *Context, args []string) error {
 }
 
 // displayDetailedStatus renders a formatted table with DAG run information
-func displayDetailedStatus(dag *core.DAG, dagStatus *models.DAGRunStatus) {
+func displayDetailedStatus(dag *core.DAG, dagStatus *execution.DAGRunStatus) {
 	// Create header with 80 character width
 	fmt.Println()
 	headerColor := color.New(color.FgCyan, color.Bold)
@@ -186,7 +186,7 @@ func displayDetailedStatus(dag *core.DAG, dagStatus *models.DAGRunStatus) {
 }
 
 // displayStepSummary shows a summary of all steps in the DAG run
-func displayStepSummary(nodes []*models.Node) {
+func displayStepSummary(nodes []*execution.Node) {
 	headerColor := color.New(color.FgCyan, color.Bold)
 
 	// Create a boxed header with 80 character width
@@ -226,7 +226,7 @@ func displayStepSummary(nodes []*models.Node) {
 
 	// Show first few steps and any failed steps
 	shownSteps := 0
-	failedSteps := []*models.Node{}
+	failedSteps := []*execution.Node{}
 
 	for _, node := range nodes {
 		if node.Status == status.NodeError {
@@ -469,7 +469,7 @@ func formatNodeStatus(s status.NodeStatus) string {
 }
 
 // formatPID formats the process ID, showing "-" if not available
-func formatPID(pid models.PID) string {
+func formatPID(pid execution.PID) string {
 	if pid > 0 {
 		return fmt.Sprintf("%d", pid)
 	}
@@ -495,7 +495,7 @@ func extractDAGName(ctx *Context, name string) (string, error) {
 	return name, nil
 }
 
-func extractAttemptID(ctx *Context, name, dagRunID string) (models.DAGRunAttempt, error) {
+func extractAttemptID(ctx *Context, name, dagRunID string) (execution.DAGRunAttempt, error) {
 	if dagRunID != "" {
 		// Retrieve the previous run's record for the specified dag-run ID.
 		dagRunRef := core.NewDAGRunRef(name, dagRunID)

@@ -3,7 +3,7 @@ package api
 import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
 func toDAG(dag *core.DAG) api.DAG {
@@ -105,7 +105,7 @@ func toPrecondition(obj *core.Condition) api.Condition {
 	}
 }
 
-func toDAGRunSummary(s models.DAGRunStatus) api.DAGRunSummary {
+func toDAGRunSummary(s execution.DAGRunStatus) api.DAGRunSummary {
 	return api.DAGRunSummary{
 		RootDAGRunName:   s.Root.Name,
 		RootDAGRunId:     s.Root.ID,
@@ -123,7 +123,7 @@ func toDAGRunSummary(s models.DAGRunStatus) api.DAGRunSummary {
 	}
 }
 
-func toDAGRunDetails(s models.DAGRunStatus) api.DAGRunDetails {
+func toDAGRunDetails(s execution.DAGRunStatus) api.DAGRunDetails {
 	preconditions := make([]api.Condition, len(s.Preconditions))
 	for i, p := range s.Preconditions {
 		preconditions[i] = toPrecondition(p)
@@ -154,7 +154,7 @@ func toDAGRunDetails(s models.DAGRunStatus) api.DAGRunDetails {
 	}
 }
 
-func toNode(node *models.Node) api.Node {
+func toNode(node *execution.Node) api.Node {
 	if node == nil {
 		return api.Node{}
 	}
@@ -174,7 +174,7 @@ func toNode(node *models.Node) api.Node {
 	}
 }
 
-func toChildDAGRuns(childDAGRuns []models.ChildDAGRun) []api.ChildDAGRun {
+func toChildDAGRuns(childDAGRuns []execution.ChildDAGRun) []api.ChildDAGRun {
 	var result []api.ChildDAGRun
 	for _, w := range childDAGRuns {
 		result = append(result, api.ChildDAGRun{

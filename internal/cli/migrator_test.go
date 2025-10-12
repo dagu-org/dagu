@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
 	"github.com/stretchr/testify/assert"
@@ -30,12 +30,12 @@ func (m *mockDAGStore) GetDetails(_ context.Context, path string, _ ...spec.Load
 	return nil, os.ErrNotExist
 }
 
-func (m *mockDAGStore) List(_ context.Context, _ models.ListDAGsOptions) (models.PaginatedResult[*core.DAG], []string, error) {
+func (m *mockDAGStore) List(_ context.Context, _ execution.ListDAGsOptions) (execution.PaginatedResult[*core.DAG], []string, error) {
 	var dags []*core.DAG
 	for _, dag := range m.dags {
 		dags = append(dags, dag)
 	}
-	return models.PaginatedResult[*core.DAG]{
+	return execution.PaginatedResult[*core.DAG]{
 		Items:      dags,
 		TotalCount: len(dags),
 	}, nil, nil
@@ -82,7 +82,7 @@ func (m *mockDAGStore) GetMetadata(_ context.Context, _ string) (*core.DAG, erro
 	return nil, nil
 }
 
-func (m *mockDAGStore) Grep(_ context.Context, _ string) ([]*models.GrepDAGsResult, []string, error) {
+func (m *mockDAGStore) Grep(_ context.Context, _ string) ([]*execution.GrepDAGsResult, []string, error) {
 	return nil, nil, nil
 }
 
@@ -272,7 +272,7 @@ func TestConvertStatus(t *testing.T) {
 	assert.Equal(t, "test-dag", result.Name)
 	assert.Equal(t, "req123", result.DAGRunID)
 	assert.Equal(t, status.Success, result.Status)
-	assert.Equal(t, models.PID(12345), result.PID)
+	assert.Equal(t, execution.PID(12345), result.PID)
 	assert.Equal(t, "test log", result.Log)
 	assert.Equal(t, "param1=value1", result.Params)
 	assert.Equal(t, []string{"param1", "value1"}, result.ParamsList)

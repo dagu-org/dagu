@@ -8,9 +8,9 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cli/dagpicker"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -332,7 +332,7 @@ func handleChildDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params stri
 
 	// Look for existing execution childAttempt
 	childAttempt, err := ctx.DAGRunStore.FindChildAttempt(ctx, root, dagRunID)
-	if errors.Is(err, models.ErrDAGRunIDNotFound) {
+	if errors.Is(err, execution.ErrDAGRunIDNotFound) {
 		// If the dag-run ID is not found, proceed with new execution
 		return executeDAGRun(ctx, dag, parent, dagRunID, root)
 	}

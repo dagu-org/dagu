@@ -13,10 +13,10 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/models"
 )
 
 // ExecuteDAGRunFromSpec implements api.StrictServerInterface.
@@ -114,7 +114,7 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	}
 
 	// Ensure the dag-run ID is not already used for this DAG name
-	if _, err := a.dagRunStore.FindAttempt(ctx, core.DAGRunRef{Name: dag.Name, ID: dagRunId}); !errors.Is(err, models.ErrDAGRunIDNotFound) {
+	if _, err := a.dagRunStore.FindAttempt(ctx, core.DAGRunRef{Name: dag.Name, ID: dagRunId}); !errors.Is(err, execution.ErrDAGRunIDNotFound) {
 		return nil, &Error{
 			HTTPStatus: http.StatusConflict,
 			Code:       api.ErrorCodeAlreadyExists,
@@ -161,25 +161,25 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 // no sanitize helper: DAG name is validated by core.ValidateDAGName
 
 func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObject) (api.ListDAGRunsResponseObject, error) {
-	var opts []models.ListDAGRunStatusesOption
+	var opts []execution.ListDAGRunStatusesOption
 	if request.Params.Status != nil {
-		opts = append(opts, models.WithStatuses([]status.Status{
+		opts = append(opts, execution.WithStatuses([]status.Status{
 			status.Status(*request.Params.Status),
 		}))
 	}
 	if request.Params.FromDate != nil {
-		dt := models.NewUTC(time.Unix(*request.Params.FromDate, 0))
-		opts = append(opts, models.WithFrom(dt))
+		dt := execution.NewUTC(time.Unix(*request.Params.FromDate, 0))
+		opts = append(opts, execution.WithFrom(dt))
 	}
 	if request.Params.ToDate != nil {
-		dt := models.NewUTC(time.Unix(*request.Params.ToDate, 0))
-		opts = append(opts, models.WithTo(dt))
+		dt := execution.NewUTC(time.Unix(*request.Params.ToDate, 0))
+		opts = append(opts, execution.WithTo(dt))
 	}
 	if request.Params.Name != nil {
-		opts = append(opts, models.WithName(*request.Params.Name))
+		opts = append(opts, execution.WithName(*request.Params.Name))
 	}
 	if request.Params.DagRunId != nil {
-		opts = append(opts, models.WithDAGRunID(*request.Params.DagRunId))
+		opts = append(opts, execution.WithDAGRunID(*request.Params.DagRunId))
 	}
 
 	dagRuns, err := a.listDAGRuns(ctx, opts)
@@ -193,25 +193,25 @@ func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObj
 }
 
 func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNameRequestObject) (api.ListDAGRunsByNameResponseObject, error) {
-	opts := []models.ListDAGRunStatusesOption{
-		models.WithExactName(request.Name),
+	opts := []execution.ListDAGRunStatusesOption{
+		execution.WithExactName(request.Name),
 	}
 
 	if request.Params.Status != nil {
-		opts = append(opts, models.WithStatuses([]status.Status{
+		opts = append(opts, execution.WithStatuses([]status.Status{
 			status.Status(*request.Params.Status),
 		}))
 	}
 	if request.Params.FromDate != nil {
-		dt := models.NewUTC(time.Unix(*request.Params.FromDate, 0))
-		opts = append(opts, models.WithFrom(dt))
+		dt := execution.NewUTC(time.Unix(*request.Params.FromDate, 0))
+		opts = append(opts, execution.WithFrom(dt))
 	}
 	if request.Params.ToDate != nil {
-		dt := models.NewUTC(time.Unix(*request.Params.ToDate, 0))
-		opts = append(opts, models.WithTo(dt))
+		dt := execution.NewUTC(time.Unix(*request.Params.ToDate, 0))
+		opts = append(opts, execution.WithTo(dt))
 	}
 	if request.Params.DagRunId != nil {
-		opts = append(opts, models.WithDAGRunID(*request.Params.DagRunId))
+		opts = append(opts, execution.WithDAGRunID(*request.Params.DagRunId))
 	}
 
 	dagRuns, err := a.listDAGRuns(ctx, opts)
@@ -224,7 +224,7 @@ func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNa
 	}, nil
 }
 
-func (a *API) listDAGRuns(ctx context.Context, opts []models.ListDAGRunStatusesOption) ([]api.DAGRunSummary, error) {
+func (a *API) listDAGRuns(ctx context.Context, opts []execution.ListDAGRunStatusesOption) ([]api.DAGRunSummary, error) {
 	statuses, err := a.dagRunStore.ListStatuses(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing dag-runs: %w", err)

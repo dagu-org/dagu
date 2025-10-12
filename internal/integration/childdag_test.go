@@ -8,8 +8,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cli"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -55,7 +55,7 @@ steps:
 	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
 	require.NoError(t, err)
 
-	updateStatus := func(rec models.DAGRunAttempt, dagRunStatus *models.DAGRunStatus) {
+	updateStatus := func(rec execution.DAGRunAttempt, dagRunStatus *execution.DAGRunStatus) {
 		err = rec.Open(ctx)
 		require.NoError(t, err)
 		err = rec.Write(ctx, *dagRunStatus)

@@ -6,8 +6,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +47,7 @@ func TestProgressModel_UpdateNode(t *testing.T) {
 	model := NewProgressModel(dag)
 
 	// Update node status
-	node := &models.Node{
+	node := &execution.Node{
 		Step:      core.Step{Name: "step1"},
 		Status:    status.NodeRunning,
 		StartedAt: time.Now().Format(time.RFC3339),
@@ -64,7 +64,7 @@ func TestProgressModel_UpdateStatus(t *testing.T) {
 	dag := &core.DAG{Name: "test-dag"}
 	model := NewProgressModel(dag)
 
-	dagRunStatus := &models.DAGRunStatus{
+	dagRunStatus := &execution.DAGRunStatus{
 		DAGRunID: "run-123",
 		Params:   "KEY=value",
 		Status:   status.Running,
@@ -180,15 +180,15 @@ func TestProgressModel_NodeSorting(t *testing.T) {
 	now := time.Now()
 	nodes := []*nodeProgress{
 		{
-			node:      &models.Node{Step: core.Step{Name: "b"}},
+			node:      &execution.Node{Step: core.Step{Name: "b"}},
 			startTime: now.Add(2 * time.Second),
 		},
 		{
-			node:      &models.Node{Step: core.Step{Name: "a"}},
+			node:      &execution.Node{Step: core.Step{Name: "a"}},
 			startTime: now.Add(1 * time.Second),
 		},
 		{
-			node:      &models.Node{Step: core.Step{Name: "c"}},
+			node:      &execution.Node{Step: core.Step{Name: "c"}},
 			startTime: now,
 		},
 	}
@@ -235,7 +235,7 @@ func TestProgressTeaDisplay_Integration(t *testing.T) {
 	display.SetDAGRunInfo("run-123", "KEY=value")
 
 	// Update a node
-	node := &models.Node{
+	node := &execution.Node{
 		Step:      core.Step{Name: "step1"},
 		Status:    status.NodeRunning,
 		StartedAt: time.Now().Format(time.RFC3339),
@@ -243,7 +243,7 @@ func TestProgressTeaDisplay_Integration(t *testing.T) {
 	display.UpdateNode(node)
 
 	// Update status
-	status := &models.DAGRunStatus{
+	status := &execution.DAGRunStatus{
 		DAGRunID: "run-123",
 		Status:   status.Running,
 	}
@@ -262,7 +262,7 @@ func TestProgressModel_ChildDAGsRendering(t *testing.T) {
 	model.width = 80
 
 	// Add child DAG info
-	model.nodes["parent-step"].children = []models.ChildDAGRun{
+	model.nodes["parent-step"].children = []execution.ChildDAGRun{
 		{
 			DAGRunID: "child-run-1",
 			Params:   "CHILD_KEY=value",

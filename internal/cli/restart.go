@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
 )
@@ -50,7 +50,7 @@ func runRestart(ctx *Context, args []string) error {
 
 	name := args[0]
 
-	var attempt models.DAGRunAttempt
+	var attempt execution.DAGRunAttempt
 	if dagRunID != "" {
 		// Retrieve the previous run for the specified dag-run ID.
 		dagRunRef := core.NewDAGRunRef(name, dagRunID)
