@@ -8,7 +8,9 @@ import (
 )
 
 func TestConfigSet(t *testing.T) {
+	t.Parallel()
 	t.Run("NewConfigSet", func(t *testing.T) {
+		t.Parallel()
 		configSet := NewConfigSet()
 		assert.NotNil(t, configSet)
 		assert.NotNil(t, configSet.configs)
@@ -16,6 +18,7 @@ func TestConfigSet(t *testing.T) {
 	})
 
 	t.Run("GetNonExistentConfig", func(t *testing.T) {
+		t.Parallel()
 		configSet := NewConfigSet()
 		config := configSet.Get("non-existent")
 		// Should return zero value of Config
@@ -23,6 +26,7 @@ func TestConfigSet(t *testing.T) {
 	})
 
 	t.Run("SetAndGet", func(t *testing.T) {
+		t.Parallel()
 		configSet := NewConfigSet()
 		dagName := "test-dag"
 		expectedConfig := Config{
@@ -36,10 +40,12 @@ func TestConfigSet(t *testing.T) {
 	})
 
 	t.Run("DefaultDAGConfig", func(t *testing.T) {
+		t.Parallel()
 		assert.Equal(t, 1, DefaultConfig.ConcurrencyLimit)
 	})
 
 	t.Run("ConcurrentAccess", func(t *testing.T) {
+		t.Parallel()
 		configSet := NewConfigSet()
 		dagName := "concurrent-dag"
 
@@ -71,6 +77,7 @@ func TestConfigSet(t *testing.T) {
 	})
 
 	t.Run("MultipleDAGs", func(t *testing.T) {
+		t.Parallel()
 		configSet := NewConfigSet()
 
 		dag1 := "dag-1"

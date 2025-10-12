@@ -12,8 +12,6 @@ import (
 )
 
 func TestRestartCommand(t *testing.T) {
-	t.Parallel()
-
 	th := test.SetupCommand(t)
 
 	dag := th.DAG(t, `params: "p1"
