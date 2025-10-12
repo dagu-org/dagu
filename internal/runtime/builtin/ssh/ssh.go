@@ -11,22 +11,21 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
-	"github.com/dagu-org/dagu/internal/sshutil"
 )
 
 var _ executor.Executor = (*sshExecutor)(nil)
 
 type sshClientCtxKey = struct{}
 
-// WithSSHClient creates a new context with sshutil.client
-func WithSSHClient(ctx context.Context, cli *sshutil.Client) context.Context {
+// WithSSHClient creates a new context with client
+func WithSSHClient(ctx context.Context, cli *Client) context.Context {
 	return context.WithValue(ctx, sshClientCtxKey{}, cli)
 }
 
-// getSSHClientFromContext retrieves the sshutil.Client from the context.
-func getSSHClientFromContext(ctx context.Context) *sshutil.Client {
+// getSSHClientFromContext retrieves the Client from the context.
+func getSSHClientFromContext(ctx context.Context) *Client {
 	// Retrieve the SSH client stored in context by WithSSHClient
-	if cli, ok := ctx.Value(sshClientCtxKey{}).(*sshutil.Client); ok {
+	if cli, ok := ctx.Value(sshClientCtxKey{}).(*Client); ok {
 		return cli
 	}
 	return nil
@@ -34,18 +33,18 @@ func getSSHClientFromContext(ctx context.Context) *sshutil.Client {
 
 type sshExecutor struct {
 	step    core.Step
-	client  *sshutil.Client
+	client  *Client
 	stdout  io.Writer
 	stderr  io.Writer
 	session *ssh.Session
 }
 
 func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
-	var client *sshutil.Client
+	var client *Client
 
 	// Prefer step-level SSH configuration if present
 	if len(step.ExecutorConfig.Config) > 0 {
-		c, err := sshutil.FromMapConfig(ctx, step.ExecutorConfig.Config)
+		c, err := FromMapConfig(ctx, step.ExecutorConfig.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to setup ssh executor")
 		}

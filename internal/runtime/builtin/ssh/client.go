@@ -1,4 +1,4 @@
-package sshutil
+package ssh
 
 import (
 	"fmt"

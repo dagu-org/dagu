@@ -32,7 +32,6 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
 	"github.com/dagu-org/dagu/internal/runtime/scheduler"
-	"github.com/dagu-org/dagu/internal/sshutil"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -363,7 +362,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create SSH Client if the DAG has SSH configuration.
 	if a.dag.SSH != nil {
-		sshConfig, err := cmdutil.EvalObject(ctx, sshutil.Config{
+		sshConfig, err := cmdutil.EvalObject(ctx, ssh.Config{
 			User:          a.dag.SSH.User,
 			Host:          a.dag.SSH.Host,
 			Port:          a.dag.SSH.Port,
@@ -376,7 +375,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			initErr = fmt.Errorf("failed to evaluate ssh config: %w", err)
 			return initErr
 		}
-		cli, err := sshutil.NewClient(&sshConfig)
+		cli, err := ssh.NewClient(&sshConfig)
 		if err != nil {
 			initErr = fmt.Errorf("failed to create ssh client: %w", err)
 			return initErr
