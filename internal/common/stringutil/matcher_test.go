@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 )
 
 func TestMatchPattern(t *testing.T) {

@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 )
 
 // Errors for start command

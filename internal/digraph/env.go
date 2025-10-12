@@ -6,8 +6,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/dagu-org/dagu/internal/cmdutil"
-	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 )

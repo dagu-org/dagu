@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 func FromSteps(steps []digraph.Step) []*Node {

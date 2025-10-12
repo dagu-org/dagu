@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cmdutil"
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	digraph "github.com/dagu-org/dagu/internal/digraph"
 )
 

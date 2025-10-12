@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/persistence/legacy/model"
-	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

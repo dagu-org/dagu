@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 func StatusFromJSON(s string) (*Status, error) {

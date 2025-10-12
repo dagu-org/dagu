@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/frontend/metrics"
-	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 // GetHealth implements api.StrictServerInterface.

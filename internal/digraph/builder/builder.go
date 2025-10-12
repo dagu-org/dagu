@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/signal"
 	"github.com/go-viper/mapstructure/v2"
 )
 

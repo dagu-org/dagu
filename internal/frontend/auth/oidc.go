@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	oidc "github.com/coreos/go-oidc"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/stringutil"
 	"golang.org/x/oauth2"
 )
 

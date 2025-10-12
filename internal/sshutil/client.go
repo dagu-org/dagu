@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 )

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/sock"
+	"github.com/dagu-org/dagu/internal/common/sock"
 	"github.com/stretchr/testify/require"
 )
 

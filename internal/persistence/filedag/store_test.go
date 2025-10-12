@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/models"
 
 	"github.com/stretchr/testify/assert"

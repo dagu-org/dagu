@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/frontend/metrics"
-	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 func (a *API) GetHealthStatus(_ context.Context, _ api.GetHealthStatusRequestObject) (api.GetHealthStatusResponseObject, error) {

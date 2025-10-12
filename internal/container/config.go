@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/go-viper/mapstructure/v2"

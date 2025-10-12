@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"dario.cat/mergo"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	digraph "github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/goccy/go-yaml"

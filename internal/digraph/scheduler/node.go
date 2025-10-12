@@ -18,13 +18,13 @@ import (
 
 	"syscall"
 
-	"github.com/dagu-org/dagu/internal/cmdutil"
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/signal"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/signal"
-	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 // outputCapture handles concurrent reading from a pipe to avoid deadlocks

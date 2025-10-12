@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 // Data is a thread-safe wrapper around NodeData.

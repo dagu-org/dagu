@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/stretchr/testify/assert"
 )
 

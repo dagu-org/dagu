@@ -9,12 +9,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dagu-org/dagu/internal/common/sock"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/digraph/status"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/test"
 )
 

@@ -18,11 +18,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence/legacy"
 	"github.com/dagu-org/dagu/internal/persistence/legacy/model"
-	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 var (
