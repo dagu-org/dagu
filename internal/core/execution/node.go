@@ -3,7 +3,6 @@ package execution
 import (
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 )
 
 // Node represents a DAG step with its execution state for persistence
@@ -13,7 +12,7 @@ type Node struct {
 	Stderr           string               `json:"stderr"` // standard error log file path
 	StartedAt        string               `json:"startedAt"`
 	FinishedAt       string               `json:"finishedAt"`
-	Status           core1.NodeStatus     `json:"status"`
+	Status           core.NodeStatus      `json:"status"`
 	RetriedAt        string               `json:"retriedAt,omitempty"`
 	RetryCount       int                  `json:"retryCount,omitempty"`
 	DoneCount        int                  `json:"doneCount,omitempty"`
@@ -45,7 +44,7 @@ func NewNodeFromStep(step core.Step) *Node {
 		Step:       step,
 		StartedAt:  "-",
 		FinishedAt: "-",
-		Status:     core1.NodeNone,
+		Status:     core.NodeNone,
 	}
 }
 

@@ -12,7 +12,6 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/dagu-org/dagu/internal/test"
 
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,13 +25,13 @@ func TestAgent_Run(t *testing.T) {
 `)
 		dagAgent := dag.Agent()
 
-		dag.AssertLatestStatus(t, core1.None)
+		dag.AssertLatestStatus(t, core.None)
 
 		go func() {
 			dagAgent.RunSuccess(t)
 		}()
 
-		dag.AssertLatestStatus(t, core1.Success)
+		dag.AssertLatestStatus(t, core.Success)
 	})
 	t.Run("DeleteOldHistory", func(t *testing.T) {
 		th := test.Setup(t)
@@ -69,7 +68,7 @@ func TestAgent_Run(t *testing.T) {
 			close(done)
 		}()
 
-		dag.AssertCurrentStatus(t, core1.Running)
+		dag.AssertCurrentStatus(t, core.Running)
 
 		isRunning := th.DAGRunMgr.IsRunning(context.Background(), dag.DAG, "test-dag-run")
 		require.True(t, isRunning, "DAG should be running")
@@ -94,9 +93,9 @@ func TestAgent_Run(t *testing.T) {
 
 		// Check if all nodes are not executed
 		dagRunStatus := dagAgent.Status(th.Context)
-		require.Equal(t, core1.Cancel.String(), dagRunStatus.Status.String())
-		require.Equal(t, core1.NodeNone.String(), dagRunStatus.Nodes[0].Status.String())
-		require.Equal(t, core1.NodeNone.String(), dagRunStatus.Nodes[1].Status.String())
+		require.Equal(t, core.Cancel.String(), dagRunStatus.Status.String())
+		require.Equal(t, core.NodeNone.String(), dagRunStatus.Nodes[0].Status.String())
+		require.Equal(t, core.NodeNone.String(), dagRunStatus.Nodes[1].Status.String())
 	})
 	t.Run("FinishWithError", func(t *testing.T) {
 		th := test.Setup(t)
@@ -107,7 +106,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent.RunError(t)
 
 		// Check if the status is saved correctly
-		require.Equal(t, core1.Error, dagAgent.Status(th.Context).Status)
+		require.Equal(t, core.Error, dagAgent.Status(th.Context).Status)
 	})
 	t.Run("FinishWithTimeout", func(t *testing.T) {
 		th := test.Setup(t)
@@ -120,7 +119,7 @@ steps:
 		dagAgent.RunError(t)
 
 		// Check if the status is saved correctly
-		require.Equal(t, core1.Error, dagAgent.Status(th.Context).Status)
+		require.Equal(t, core.Error, dagAgent.Status(th.Context).Status)
 	})
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		th := test.Setup(t)
@@ -136,7 +135,7 @@ steps:
 		}()
 
 		// wait for the DAG to start
-		dag.AssertLatestStatus(t, core1.Running)
+		dag.AssertLatestStatus(t, core.Running)
 
 		// send a signal to cancel the DAG
 		dagAgent.Abort()
@@ -144,7 +143,7 @@ steps:
 		<-done
 
 		// wait for the DAG to be canceled
-		dag.AssertLatestStatus(t, core1.Cancel)
+		dag.AssertLatestStatus(t, core.Cancel)
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
 		th := test.Setup(t)
@@ -160,13 +159,13 @@ steps:
 
 		// Check if the DAG is executed successfully
 		dagRunStatus := dagAgent.Status(th.Context)
-		require.Equal(t, core1.Success.String(), dagRunStatus.Status.String())
+		require.Equal(t, core.Success.String(), dagRunStatus.Status.String())
 		for _, s := range dagRunStatus.Nodes {
-			require.Equal(t, core1.NodeSuccess.String(), s.Status.String())
+			require.Equal(t, core.NodeSuccess.String(), s.Status.String())
 		}
 
 		// Check if the exit handler is executed
-		require.Equal(t, core1.NodeSuccess.String(), dagRunStatus.OnExit.Status.String())
+		require.Equal(t, core.NodeSuccess.String(), dagRunStatus.OnExit.Status.String())
 	})
 }
 
@@ -182,7 +181,7 @@ func TestAgent_DryRun(t *testing.T) {
 		dagAgent.RunSuccess(t)
 
 		curStatus := dagAgent.Status(th.Context)
-		require.Equal(t, core1.Success, curStatus.Status)
+		require.Equal(t, core.Success, curStatus.Status)
 
 		// Check if the status is not saved
 		dag.AssertDAGRunCount(t, 0)
@@ -252,8 +251,8 @@ func TestAgent_Retry(t *testing.T) {
 		dagAgent.RunSuccess(t)
 
 		for _, node := range dagAgent.Status(th.Context).Nodes {
-			if node.Status != core1.NodeSuccess &&
-				node.Status != core1.NodeSkipped {
+			if node.Status != core.NodeSuccess &&
+				node.Status != core.NodeSkipped {
 				t.Errorf("node %q is not successful: %s", node.Step.Name, node.Status)
 			}
 		}
@@ -345,7 +344,7 @@ func TestAgent_Retry(t *testing.T) {
 
 			if _, isRetried := retried[name]; isRetried {
 				// Only step '5' should be retried and successful
-				if node.Status != core1.NodeSuccess && node.Status != core1.NodeSkipped {
+				if node.Status != core.NodeSuccess && node.Status != core.NodeSkipped {
 					t.Errorf("step %q is not successful or skipped after step retry: %s", name, node.Status)
 				}
 				// FinishedAt should be fresher (more recent) than before, if it was set
@@ -355,7 +354,7 @@ func TestAgent_Retry(t *testing.T) {
 			} else {
 				// Assert that steps with "false" commands are still failed
 				if _, isFalseStep := falseSteps[name]; isFalseStep {
-					if node.Status != core1.NodeError {
+					if node.Status != core.NodeError {
 						t.Errorf("non-retried step %q (false command) should remain failed after step retry, got: %s", name, node.Status)
 					}
 				}
@@ -386,7 +385,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}()
 
 		// Wait for the DAG to start
-		dag.AssertLatestStatus(t, core1.Running)
+		dag.AssertLatestStatus(t, core.Running)
 
 		// Get the status of the DAG
 		var mockResponseWriter = mockResponseWriter{}
@@ -398,7 +397,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		// Check if the status is returned correctly
 		dagRunStatus, err := execution.StatusFromJSON(mockResponseWriter.body)
 		require.NoError(t, err)
-		require.Equal(t, core1.Running, dagRunStatus.Status)
+		require.Equal(t, core.Running, dagRunStatus.Status)
 
 		// Stop the DAG
 		dagAgent.Abort()
@@ -406,7 +405,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		// Give the process a moment to handle the signal and update status
 		time.Sleep(100 * time.Millisecond)
 
-		dag.AssertLatestStatus(t, core1.Cancel)
+		dag.AssertLatestStatus(t, core.Cancel)
 	})
 	t.Run("HTTPInvalidRequest", func(t *testing.T) {
 		t.Parallel()
@@ -423,7 +422,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}()
 
 		// Wait for the DAG to start
-		dag.AssertLatestStatus(t, core1.Running)
+		dag.AssertLatestStatus(t, core.Running)
 
 		var mockResponseWriter = mockResponseWriter{}
 
@@ -436,7 +435,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Stop the DAG
 		dagAgent.Abort()
-		dag.AssertLatestStatus(t, core1.Cancel)
+		dag.AssertLatestStatus(t, core.Cancel)
 	})
 	t.Run("HTTPHandleCancel", func(t *testing.T) {
 		t.Parallel()
@@ -455,7 +454,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}()
 
 		// Wait for the DAG to start
-		dag.AssertLatestStatus(t, core1.Running)
+		dag.AssertLatestStatus(t, core.Running)
 
 		// Cancel the DAG
 		var mockResponseWriter = mockResponseWriter{}
@@ -468,7 +467,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Wait for the DAG to stop
 		<-done
-		dag.AssertLatestStatus(t, core1.Cancel)
+		dag.AssertLatestStatus(t, core.Cancel)
 	})
 }
 

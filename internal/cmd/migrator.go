@@ -11,7 +11,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
 )
@@ -147,7 +146,7 @@ func (m *historyMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 			continue
 		}
 
-		if statusFile == nil || statusFile.Status.RequestID == "" || statusFile.Status.Status == core1.None {
+		if statusFile == nil || statusFile.Status.RequestID == "" || statusFile.Status.Status == core.None {
 			result.SkippedRuns++
 			err := fmt.Sprintf("skipped invalid status file %s, RequestID=%s, Status=%s", file.Name(), statusFile.Status.RequestID, statusFile.Status.Status.String())
 			result.Errors = append(result.Errors, err)

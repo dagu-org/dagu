@@ -19,7 +19,6 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
@@ -262,7 +261,7 @@ type DAG struct {
 	*core.DAG
 }
 
-func (d *DAG) AssertLatestStatus(t *testing.T, expected core1.Status) {
+func (d *DAG) AssertLatestStatus(t *testing.T, expected core.Status) {
 	t.Helper()
 
 	require.Eventually(t, func() bool {
@@ -284,7 +283,7 @@ func (d *DAG) AssertDAGRunCount(t *testing.T, expected int) {
 	require.Len(t, runstore, expected)
 }
 
-func (d *DAG) AssertCurrentStatus(t *testing.T, expected core1.Status) {
+func (d *DAG) AssertCurrentStatus(t *testing.T, expected core.Status) {
 	t.Helper()
 
 	assert.Eventually(t, func() bool {
@@ -424,26 +423,26 @@ func (a *Agent) RunError(t *testing.T) {
 	assert.Error(t, err)
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, core1.Error.String(), st.String())
+	require.Equal(t, core.Error.String(), st.String())
 }
 
 func (a *Agent) RunCancel(t *testing.T) {
 	t.Helper()
 
-	proc, err := a.ProcStore.Acquire(a.Context, a.DAG.ProcGroup(), execution.DAGRunRef{
-		Name: a.DAG.Name,
+	proc, err := a.ProcStore.Acquire(a.Context, a.ProcGroup(), execution.DAGRunRef{
+		Name: a.Name,
 		ID:   a.dagRunID,
 	})
 	require.NoError(t, err, "failed to acquire proc")
 	t.Cleanup(func() {
-		proc.Stop(a.Context)
+		_ = proc.Stop(a.Context)
 	})
 
 	err = a.Run(a.Context)
 	assert.NoError(t, err)
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, core1.Cancel.String(), st.String())
+	require.Equal(t, core.Cancel.String(), st.String())
 }
 
 func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
@@ -453,7 +452,7 @@ func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
 	require.Error(t, err, "expected error %q, got nil", expectedErr)
 	require.Contains(t, err.Error(), expectedErr)
 	st := a.Status(a.Context)
-	require.Equal(t, core1.Cancel.String(), st.Status.String())
+	require.Equal(t, core.Cancel.String(), st.Status.String())
 }
 
 func (a *Agent) RunSuccess(t *testing.T) {
@@ -463,12 +462,12 @@ func (a *Agent) RunSuccess(t *testing.T) {
 	assert.NoError(t, err, "failed to run agent")
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, core1.Success.String(), st.String(), "expected status %q, got %q", core1.Success, st)
+	require.Equal(t, core.Success.String(), st.String(), "expected status %q, got %q", core.Success, st)
 
 	// check all nodes are in success or skipped state
 	for _, node := range a.Status(a.Context).Nodes {
 		st := node.Status
-		if st == core1.NodeSkipped || st == core1.NodeSuccess {
+		if st == core.NodeSkipped || st == core.NodeSuccess {
 			continue
 		}
 		t.Errorf("expected node %q to be in success state, got %q", node.Step.Name, st.String())

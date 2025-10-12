@@ -10,7 +10,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/stretchr/testify/require"
@@ -58,7 +57,7 @@ func TestReporter(t *testing.T) {
 						Command: "true",
 						Args:    []string{"param-x"},
 					},
-					Status:     core1.NodeRunning,
+					Status:     core.NodeRunning,
 					StartedAt:  stringutil.FormatTime(time.Now()),
 					FinishedAt: stringutil.FormatTime(time.Now().Add(time.Minute * 10)),
 				},
@@ -77,7 +76,7 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 	status := execution.DAGRunStatus{
 		Name:       "test-workflow",
 		DAGRunID:   "01975986-c13d-7b6d-b75e-abf4380a03fc",
-		Status:     core1.Success,
+		Status:     core.Success,
 		StartedAt:  "2025-01-15T10:30:00Z",
 		FinishedAt: "2025-01-15T10:35:00Z",
 		Params:     "env=production batch_size=1000",
@@ -89,7 +88,7 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 					Args:        []string{"-h", "localhost", "-U", "admin", "-d", "mydb", "-f", "schema.sql"},
 					CmdWithArgs: "psql -h localhost -U admin -d mydb -f schema.sql",
 				},
-				Status:     core1.NodeSuccess,
+				Status:     core.NodeSuccess,
 				StartedAt:  "2025-01-15T10:30:00Z",
 				FinishedAt: "2025-01-15T10:30:45Z",
 				Error:      "",
@@ -101,7 +100,7 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 					Args:        []string{"up"},
 					CmdWithArgs: "migrate up",
 				},
-				Status:     core1.NodeError,
+				Status:     core.NodeError,
 				StartedAt:  "2025-01-15T10:31:00Z",
 				FinishedAt: "2025-01-15T10:31:15Z",
 				Error:      "Migration failed: Table 'users' already exists",
@@ -181,7 +180,7 @@ func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, 
 	dag.MailOn.Success = false
 
 	_ = rp.send(context.Background(), dag, execution.DAGRunStatus{
-		Status: core1.Error,
+		Status: core.Error,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
 
@@ -195,7 +194,7 @@ func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG
 	dag.MailOn.Success = true
 
 	err := rp.send(context.Background(), dag, execution.DAGRunStatus{
-		Status: core1.Error,
+		Status: core.Error,
 		Nodes:  nodes,
 	}, nil)
 	require.NoError(t, err)
@@ -207,7 +206,7 @@ func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG
 	dag.MailOn.Success = true
 
 	err := rp.send(context.Background(), dag, execution.DAGRunStatus{
-		Status: core1.Success,
+		Status: core.Success,
 		Nodes:  nodes,
 	}, nil)
 	require.NoError(t, err)
@@ -218,7 +217,7 @@ func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG
 }
 
 func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *core.DAG, _ []*execution.Node) {
-	status := transform.NewStatusBuilder(dag).Create("run-id", core1.Error, 0, time.Now())
+	status := transform.NewStatusBuilder(dag).Create("run-id", core.Error, 0, time.Now())
 	summary := renderDAGSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
 	require.Contains(t, summary, dag.Name)
@@ -258,7 +257,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 				Command: "docker",
 				Args:    []string{"run", "-d", "--name", "test-db", "postgres:13"},
 			},
-			Status:     core1.NodeSuccess,
+			Status:     core.NodeSuccess,
 			StartedAt:  "2025-01-15T10:30:00Z",
 			FinishedAt: "2025-01-15T10:30:45Z",
 			Error:      "",
@@ -269,7 +268,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 				Command: "python",
 				Args:    []string{"manage.py", "migrate", "--settings=production"},
 			},
-			Status:     core1.NodeError,
+			Status:     core.NodeError,
 			StartedAt:  "2025-01-15T10:30:45Z",
 			FinishedAt: "2025-01-15T10:31:20Z",
 			Error:      "Migration failed: Table 'users' already exists",
@@ -280,7 +279,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 				Command: "kubectl",
 				Args:    []string{"apply", "-f", "deployment.yaml"},
 			},
-			Status:     core1.NodeSkipped,
+			Status:     core.NodeSkipped,
 			StartedAt:  "",
 			FinishedAt: "",
 			Error:      "",
@@ -291,7 +290,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 				Command: "curl",
 				Args:    []string{"-X", "POST", "https://api.slack.com/webhook", "-d", `{"text":"Deployment complete"}`},
 			},
-			Status:     core1.NodeRunning,
+			Status:     core.NodeRunning,
 			StartedAt:  "2025-01-15T10:32:00Z",
 			FinishedAt: "",
 			Error:      "",
@@ -302,7 +301,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 				Command: "bash",
 				Args:    nil, // Test nil args
 			},
-			Status:     core1.NodeSuccess,
+			Status:     core.NodeSuccess,
 			StartedAt:  "2025-01-15T10:32:30Z",
 			FinishedAt: "2025-01-15T10:32:35Z",
 			Error:      "",
@@ -314,7 +313,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 				Args:        []string{"<script>alert('xss')</script>", "&", "\"quotes\""},
 				CmdWithArgs: "echo <script>alert('xss')</script> & \"quotes\"",
 			},
-			Status:     core1.NodeError,
+			Status:     core.NodeError,
 			StartedAt:  "2025-01-15T10:33:00Z",
 			FinishedAt: "2025-01-15T10:33:05Z",
 			Error:      "Command failed with exit code 1: <error> & \"special chars\"",

@@ -10,7 +10,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
@@ -38,13 +37,13 @@ func TestMigrateHistoryCommand(t *testing.T) {
 	legacyStatus := legacymodel.Status{
 		RequestID:  "req123",
 		Name:       "test-dag",
-		Status:     core1.Success,
+		Status:     core.Success,
 		StartedAt:  time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
 		FinishedAt: time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
 		Nodes: []*legacymodel.Node{
 			{
 				Step:       core.Step{Name: "step1"},
-				Status:     core1.NodeSuccess,
+				Status:     core.NodeSuccess,
 				StartedAt:  time.Now().Add(-50 * time.Minute).Format(time.RFC3339),
 				FinishedAt: time.Now().Add(-40 * time.Minute).Format(time.RFC3339),
 			},
@@ -94,7 +93,7 @@ func TestMigrateHistoryCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "req123", dagRunStatus.DAGRunID)
 		assert.Equal(t, "test-dag", dagRunStatus.Name)
-		assert.Equal(t, core1.Success, dagRunStatus.Status)
+		assert.Equal(t, core.Success, dagRunStatus.Status)
 
 		// Verify legacy directory was moved
 		_, err = os.Stat(legacyDagDir)

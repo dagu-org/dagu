@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +35,7 @@ func setupTestStore(t *testing.T) StoreTest {
 	return th
 }
 
-func (th StoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s core1.Status) *Attempt {
+func (th StoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s core.Status) *Attempt {
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
@@ -109,7 +108,7 @@ func (w WriterTest) Write(t *testing.T, dagRunStatus execution.DAGRunStatus) {
 	require.NoError(t, err)
 }
 
-func (w WriterTest) AssertContent(t *testing.T, name, dagRunID string, st core1.Status) {
+func (w WriterTest) AssertContent(t *testing.T, name, dagRunID string, st core.Status) {
 	t.Helper()
 
 	data, err := ParseStatusFile(w.FilePath)

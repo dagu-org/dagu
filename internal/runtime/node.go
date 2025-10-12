@@ -25,7 +25,6 @@ import (
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
@@ -165,31 +164,31 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 
 	s := n.Status()
 	switch s {
-	case core1.NodeSuccess:
+	case core.NodeSuccess:
 		return true
 
-	case core1.NodeError:
+	case core.NodeError:
 		if continueOn.Failure {
 			return true
 		}
 
-	case core1.NodeCancel:
+	case core.NodeCancel:
 		return false
 
-	case core1.NodeSkipped:
+	case core.NodeSkipped:
 		if continueOn.Skipped {
 			return true
 		}
 		return false
 
-	case core1.NodePartialSuccess:
+	case core.NodePartialSuccess:
 		// Partial success is treated like success for continue on
 		return true
 
-	case core1.NodeNone:
+	case core.NodeNone:
 		fallthrough
 
-	case core1.NodeRunning:
+	case core.NodeRunning:
 		// Unexpected state
 		logger.Error(ctx, "Unexpected node status", "status", s.String())
 		return false
@@ -512,7 +511,7 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	defer n.mu.Unlock()
 
 	s := n.Status()
-	if s == core1.NodeRunning && n.cmd != nil {
+	if s == core.NodeRunning && n.cmd != nil {
 		sigsig := sig
 		if allowOverride && n.SignalOnStop() != "" {
 			sigsig = syscall.Signal(signal.GetSignalNum(n.SignalOnStop()))
@@ -523,8 +522,8 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 		}
 	}
 
-	if signal.IsTerminationSignalOS(sig) && s == core1.NodeRunning {
-		n.SetStatus(core1.NodeCancel)
+	if signal.IsTerminationSignalOS(sig) && s == core.NodeRunning {
+		n.SetStatus(core.NodeCancel)
 	}
 }
 
@@ -532,8 +531,8 @@ func (n *Node) Cancel(ctx context.Context) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	s := n.Status()
-	if s == core1.NodeRunning {
-		n.SetStatus(core1.NodeCancel)
+	if s == core.NodeRunning {
+		n.SetStatus(core.NodeCancel)
 	}
 	if n.cancelFunc != nil {
 		logger.Info(ctx, "Canceling node", "step", n.Name())

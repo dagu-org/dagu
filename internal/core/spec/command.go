@@ -6,7 +6,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
-	digraph "github.com/dagu-org/dagu/internal/core"
 )
 
 // buildCommand parses the command field in the step definition.
@@ -45,7 +44,7 @@ func buildCommand(_ StepBuildContext, def stepDef, step *core.Step) error {
 		// Case 2: command is a string
 		val = strings.TrimSpace(val)
 		if val == "" {
-			return digraph.NewValidationError("command", val, ErrStepCommandIsEmpty)
+			return core.NewValidationError("command", val, ErrStepCommandIsEmpty)
 		}
 
 		// If the value is multi-line, treat it as a script
@@ -58,7 +57,7 @@ func buildCommand(_ StepBuildContext, def stepDef, step *core.Step) error {
 		step.CmdWithArgs = val
 		cmd, args, err := cmdutil.SplitCommand(val)
 		if err != nil {
-			return digraph.NewValidationError("command", val, fmt.Errorf("failed to parse command: %w", err))
+			return core.NewValidationError("command", val, fmt.Errorf("failed to parse command: %w", err))
 		}
 		step.Command = strings.TrimSpace(cmd)
 		step.Args = args
@@ -99,7 +98,7 @@ func buildCommand(_ StepBuildContext, def stepDef, step *core.Step) error {
 
 	default:
 		// Unknown type for command field.
-		return digraph.NewValidationError("command", val, ErrStepCommandMustBeArrayOrString)
+		return core.NewValidationError("command", val, ErrStepCommandMustBeArrayOrString)
 
 	}
 

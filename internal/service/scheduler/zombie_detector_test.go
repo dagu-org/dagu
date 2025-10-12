@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -63,7 +62,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		runningStatus := &execution.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
-			Status:   core1.Running,
+			Status:   core.Running,
 		}
 		dagRunStore.On("ListStatuses", ctx, mock.Anything).Return([]*execution.DAGRunStatus{runningStatus}, nil)
 
@@ -106,7 +105,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		runningStatus := &execution.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
-			Status:   core1.Running,
+			Status:   core.Running,
 		}
 		dagRunStore.On("ListStatuses", ctx, mock.Anything).Return([]*execution.DAGRunStatus{runningStatus}, nil)
 
@@ -129,7 +128,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		// Expect status update
 		attempt.On("Open", ctx).Return(nil)
 		attempt.On("Write", ctx, mock.MatchedBy(func(s execution.DAGRunStatus) bool {
-			return s.Status == core1.Error && s.FinishedAt != ""
+			return s.Status == core.Error && s.FinishedAt != ""
 		})).Return(nil)
 		attempt.On("Close", ctx).Return(nil)
 
@@ -204,7 +203,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		status := &execution.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
-			Status:   core1.Running,
+			Status:   core.Running,
 		}
 
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
@@ -227,7 +226,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		status := &execution.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
-			Status:   core1.Running,
+			Status:   core.Running,
 		}
 
 		attempt := &mockDAGRunAttempt{}
@@ -253,7 +252,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		status := &execution.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
-			Status:   core1.Running,
+			Status:   core.Running,
 		}
 
 		attempt := &mockDAGRunAttempt{}
@@ -288,7 +287,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		status := &execution.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
-			Status:   core1.Running,
+			Status:   core.Running,
 		}
 
 		attempt := &mockDAGRunAttempt{}

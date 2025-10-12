@@ -7,7 +7,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
@@ -101,7 +100,7 @@ func TestJobReady(t *testing.T) {
 		schedule       string
 		now            time.Time
 		lastRunTime    time.Time
-		lastStatus     core1.Status
+		lastStatus     core.Status
 		skipSuccessful bool
 		wantErr        error
 	}{
@@ -110,7 +109,7 @@ func TestJobReady(t *testing.T) {
 			schedule:       "0 * * * *", // Every hour
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC), // 1 min after prev schedule
-			lastStatus:     core1.Success,
+			lastStatus:     core.Success,
 			skipSuccessful: true,
 			wantErr:        scheduler.ErrJobSuccess,
 		},
@@ -119,7 +118,7 @@ func TestJobReady(t *testing.T) {
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC),
-			lastStatus:     core1.Success,
+			lastStatus:     core.Success,
 			skipSuccessful: false,
 			wantErr:        nil,
 		},
@@ -128,7 +127,7 @@ func TestJobReady(t *testing.T) {
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-			lastStatus:     core1.Running,
+			lastStatus:     core.Running,
 			skipSuccessful: true,
 			wantErr:        scheduler.ErrJobRunning,
 		},
@@ -137,7 +136,7 @@ func TestJobReady(t *testing.T) {
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),
-			lastStatus:     core1.Success,
+			lastStatus:     core.Success,
 			skipSuccessful: true,
 			wantErr:        scheduler.ErrJobFinished,
 		},
@@ -146,7 +145,7 @@ func TestJobReady(t *testing.T) {
 			schedule:       "0 * * * *",
 			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC),
-			lastStatus:     core1.Error,
+			lastStatus:     core.Error,
 			skipSuccessful: true,
 			wantErr:        nil,
 		},

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	core1 "github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -68,7 +68,7 @@ steps:
 	require.NoError(t, err)
 
 	child1Node := parentStatus.Nodes[0]
-	child1Node.Status = core1.NodeError
+	child1Node.Status = core.NodeError
 	updateStatus(parentAttempt, parentStatus)
 
 	// (2) Find the child_1 dag-run ID to update its status
@@ -80,7 +80,7 @@ steps:
 
 	// (3) Find the child_2 node and update its status to "failed"
 	child2Node := child1Status.Nodes[0]
-	child2Node.Status = core1.NodeError
+	child2Node.Status = core.NodeError
 	updateStatus(child1Attempt, child1Status)
 
 	// (4) Find the child_2 dag-run ID to update its status
@@ -90,16 +90,16 @@ steps:
 	child2Status, err := child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, core1.NodeSuccess.String(), child2Status.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), child2Status.Status.String())
 
 	// (5) Update the step in child_2 to "failed" to simulate a retry
-	child2Status.Nodes[0].Status = core1.NodeError
+	child2Status.Nodes[0].Status = core.NodeError
 	updateStatus(child2Attempt, child2Status)
 
 	// (6) Check if the child_2 status is now "failed"
 	child2Status, err = child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, core1.NodeError.String(), child2Status.Nodes[0].Status.String())
+	require.Equal(t, core.NodeError.String(), child2Status.Nodes[0].Status.String())
 
 	// Retry the DAG
 
@@ -114,7 +114,7 @@ steps:
 	require.NoError(t, err)
 	child2Status, err = child2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, core1.NodeSuccess.String(), child2Status.Nodes[0].Status.String())
+	require.Equal(t, core.NodeSuccess.String(), child2Status.Nodes[0].Status.String())
 
 	require.Equal(t, "parent", child2Status.Root.Name, "parent")
 	require.Equal(t, dagRunID, child2Status.Root.ID)
@@ -171,22 +171,22 @@ steps:
 
 	parentStatus, err := parentAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, core1.NodeSuccess.String(), parentStatus.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), parentStatus.Status.String())
 
 	// Find child DAG run
 	childNode := parentStatus.Nodes[0]
-	require.Equal(t, core1.NodeSuccess.String(), childNode.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), childNode.Status.String())
 
 	childAttempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, childNode.Children[0].DAGRunID)
 	require.NoError(t, err)
 
 	childStatus, err := childAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, core1.NodeSuccess.String(), childStatus.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), childStatus.Status.String())
 
 	// Verify the step in child DAG completed successfully after retry
 	retryStep := childStatus.Nodes[0]
-	require.Equal(t, core1.NodeSuccess.String(), retryStep.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), retryStep.Status.String())
 
 	// Verify output was captured from the successful retry attempt
 	require.NotNil(t, retryStep.OutputVariables, "OutputVariables should not be nil")
@@ -230,22 +230,22 @@ steps:
 
 	parentStatus, err := parentAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, core1.NodeSuccess.String(), parentStatus.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), parentStatus.Status.String())
 
 	// Find child DAG run
 	childNode := parentStatus.Nodes[0]
-	require.Equal(t, core1.NodeSuccess.String(), childNode.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), childNode.Status.String())
 
 	childAttempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, childNode.Children[0].DAGRunID)
 	require.NoError(t, err)
 
 	childStatus, err := childAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, core1.NodeSuccess.String(), childStatus.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), childStatus.Status.String())
 
 	// Verify the step in child DAG completed successfully
 	basicStep := childStatus.Nodes[0]
-	require.Equal(t, core1.NodeSuccess.String(), basicStep.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), basicStep.Status.String())
 
 	// Debug: Print all output variables
 	if basicStep.OutputVariables != nil {
@@ -306,11 +306,11 @@ steps:
 
 	dagRunStatus, err := attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, core1.NodeSuccess.String(), dagRunStatus.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), dagRunStatus.Status.String())
 
 	// Verify the step completed successfully after retry
 	retryStep := dagRunStatus.Nodes[0]
-	require.Equal(t, core1.NodeSuccess.String(), retryStep.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), retryStep.Status.String())
 
 	// Debug retry output
 	require.NotNil(t, retryStep.OutputVariables, "OutputVariables should not be nil")
@@ -357,11 +357,11 @@ steps:
 
 	dagRunStatus, err := attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, core1.NodeSuccess.String(), dagRunStatus.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), dagRunStatus.Status.String())
 
 	// Verify the step completed successfully on first attempt
 	successStep := dagRunStatus.Nodes[0]
-	require.Equal(t, core1.NodeSuccess.String(), successStep.Status.String())
+	require.Equal(t, core.NodeSuccess.String(), successStep.Status.String())
 
 	// Debug output for first attempt success
 	require.NotNil(t, successStep.OutputVariables, "OutputVariables should not be nil")

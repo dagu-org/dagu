@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
@@ -149,13 +148,13 @@ func TestReadLegacyStatusFile(t *testing.T) {
 	status1 := legacymodel.Status{
 		RequestID: "req123",
 		Name:      "test-dag",
-		Status:    core1.Running,
+		Status:    core.Running,
 		StartedAt: "2024-01-01T10:00:00Z",
 	}
 	status2 := legacymodel.Status{
 		RequestID:  "req123",
 		Name:       "test-dag",
-		Status:     core1.Success,
+		Status:     core.Success,
 		StartedAt:  "2024-01-01T10:00:00Z",
 		FinishedAt: "2024-01-01T10:05:00Z",
 	}
@@ -180,7 +179,7 @@ func TestReadLegacyStatusFile(t *testing.T) {
 
 	// Should get the last status (finished one)
 	assert.Equal(t, "req123", statusFile.Status.RequestID)
-	assert.Equal(t, core1.Success, statusFile.Status.Status)
+	assert.Equal(t, core.Success, statusFile.Status.Status)
 	assert.Equal(t, "2024-01-01T10:05:00Z", statusFile.Status.FinishedAt)
 }
 
@@ -233,7 +232,7 @@ func TestConvertStatus(t *testing.T) {
 	legacy := &legacymodel.Status{
 		RequestID:  "req123",
 		Name:       "test-dag",
-		Status:     core1.Success,
+		Status:     core.Success,
 		PID:        legacymodel.PID(12345),
 		Log:        "test log",
 		StartedAt:  "2024-01-01T10:00:00Z",
@@ -245,7 +244,7 @@ func TestConvertStatus(t *testing.T) {
 				Step: core.Step{
 					Name: "step1",
 				},
-				Status:     core1.NodeSuccess,
+				Status:     core.NodeSuccess,
 				StartedAt:  "2024-01-01T10:01:00Z",
 				FinishedAt: "2024-01-01T10:02:00Z",
 				Log:        "step log",
@@ -255,7 +254,7 @@ func TestConvertStatus(t *testing.T) {
 			Step: core.Step{
 				Name: "on_success",
 			},
-			Status: core1.NodeSuccess,
+			Status: core.NodeSuccess,
 		},
 	}
 
@@ -271,7 +270,7 @@ func TestConvertStatus(t *testing.T) {
 
 	assert.Equal(t, "test-dag", result.Name)
 	assert.Equal(t, "req123", result.DAGRunID)
-	assert.Equal(t, core1.Success, result.Status)
+	assert.Equal(t, core.Success, result.Status)
 	assert.Equal(t, execution.PID(12345), result.PID)
 	assert.Equal(t, "test log", result.Log)
 	assert.Equal(t, "param1=value1", result.Params)
@@ -455,13 +454,13 @@ func TestFullMigration(t *testing.T) {
 	legacyStatus := legacymodel.Status{
 		RequestID:  "req123",
 		Name:       "test-dag",
-		Status:     core1.Success,
+		Status:     core.Success,
 		StartedAt:  time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
 		FinishedAt: time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
 		Nodes: []*legacymodel.Node{
 			{
 				Step:   core.Step{Name: "step1"},
-				Status: core1.NodeSuccess,
+				Status: core.NodeSuccess,
 			},
 		},
 	}
@@ -512,7 +511,7 @@ func TestFullMigration(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "req123", dagRunStatus.DAGRunID)
 	assert.Equal(t, "test-dag", dagRunStatus.Name)
-	assert.Equal(t, core1.Success, dagRunStatus.Status)
+	assert.Equal(t, core.Success, dagRunStatus.Status)
 	assert.Len(t, dagRunStatus.Nodes, 1)
 
 	// Move legacy data

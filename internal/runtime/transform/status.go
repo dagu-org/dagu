@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 )
@@ -124,7 +123,7 @@ func WithPreconditions(conditions []*core.Condition) StatusOption {
 // Create builds a Status object for a dag-run with the specified parameters
 func (f *StatusBuilder) Create(
 	dagRunID string,
-	status core1.Status,
+	status core.Status,
 	pid int,
 	startedAt time.Time,
 	opts ...StatusOption,

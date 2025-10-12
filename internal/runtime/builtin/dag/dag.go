@@ -11,7 +11,6 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
@@ -90,23 +89,23 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 }
 
 // DetermineNodeStatus implements NodeStatusDeterminer.
-func (e *dagExecutor) DetermineNodeStatus(_ context.Context) (core1.NodeStatus, error) {
+func (e *dagExecutor) DetermineNodeStatus(_ context.Context) (core.NodeStatus, error) {
 	if e.result == nil {
-		return core1.NodeError, fmt.Errorf("no result available for node status determination")
+		return core.NodeError, fmt.Errorf("no result available for node status determination")
 	}
 
 	// Check if the status is partial success or success
 	// For error cases, we return an error with the status
 	switch e.result.Status {
-	case core1.Success:
-		return core1.NodeSuccess, nil
-	case core1.PartialSuccess:
-		return core1.NodePartialSuccess, nil
-	case core1.None, core1.Running, core1.Error, core1.Cancel, core1.Queued:
-		return core1.NodeError, fmt.Errorf("child DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
+	case core.Success:
+		return core.NodeSuccess, nil
+	case core.PartialSuccess:
+		return core.NodePartialSuccess, nil
+	case core.None, core.Running, core.Error, core.Cancel, core.Queued:
+		return core.NodeError, fmt.Errorf("child DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
 	default:
 		// This should never happen, but satisfies the exhaustive check
-		return core1.NodeError, fmt.Errorf("child DAG run %s failed with unknown status: %s", e.result.DAGRunID, e.result.Status)
+		return core.NodeError, fmt.Errorf("child DAG run %s failed with unknown status: %s", e.result.DAGRunID, e.result.Status)
 	}
 }
 

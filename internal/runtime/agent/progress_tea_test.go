@@ -6,7 +6,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,8 +27,8 @@ func TestProgressModel_Init(t *testing.T) {
 	assert.Len(t, model.nodes, 2)
 	assert.NotNil(t, model.nodes["step1"])
 	assert.NotNil(t, model.nodes["step2"])
-	assert.Equal(t, core1.NodeNone, model.nodes["step1"].status)
-	assert.Equal(t, core1.NodeNone, model.nodes["step2"].status)
+	assert.Equal(t, core.NodeNone, model.nodes["step1"].status)
+	assert.Equal(t, core.NodeNone, model.nodes["step2"].status)
 
 	// Test Init command
 	cmd := model.Init()
@@ -49,14 +48,14 @@ func TestProgressModel_UpdateNode(t *testing.T) {
 	// Update node status
 	node := &execution.Node{
 		Step:      core.Step{Name: "step1"},
-		Status:    core1.NodeRunning,
+		Status:    core.NodeRunning,
 		StartedAt: time.Now().Format(time.RFC3339),
 	}
 
 	updatedModel, _ := model.Update(NodeUpdateMsg{Node: node})
 	m := updatedModel.(ProgressModel)
 
-	assert.Equal(t, core1.NodeRunning, m.nodes["step1"].status)
+	assert.Equal(t, core.NodeRunning, m.nodes["step1"].status)
 	assert.False(t, m.nodes["step1"].startTime.IsZero())
 }
 
@@ -67,7 +66,7 @@ func TestProgressModel_UpdateStatus(t *testing.T) {
 	dagRunStatus := &execution.DAGRunStatus{
 		DAGRunID: "run-123",
 		Params:   "KEY=value",
-		Status:   core1.Running,
+		Status:   core.Running,
 	}
 
 	updatedModel, _ := model.Update(StatusUpdateMsg{Status: dagRunStatus})
@@ -75,7 +74,7 @@ func TestProgressModel_UpdateStatus(t *testing.T) {
 
 	assert.Equal(t, "run-123", m.dagRunID)
 	assert.Equal(t, "KEY=value", m.params)
-	assert.Equal(t, core1.Running, m.status.Status)
+	assert.Equal(t, core.Running, m.status.Status)
 }
 
 func TestProgressModel_WindowResize(t *testing.T) {
@@ -139,10 +138,10 @@ func TestProgressModel_ProgressCalculation(t *testing.T) {
 	model.width = 80
 
 	// Mark some steps as completed
-	model.nodes["step1"].status = core1.NodeSuccess
-	model.nodes["step2"].status = core1.NodeError
-	model.nodes["step3"].status = core1.NodeRunning
-	model.nodes["step4"].status = core1.NodeNone
+	model.nodes["step1"].status = core.NodeSuccess
+	model.nodes["step2"].status = core.NodeError
+	model.nodes["step3"].status = core.NodeRunning
+	model.nodes["step4"].status = core.NodeNone
 
 	view := model.View()
 
@@ -157,15 +156,15 @@ func TestProgressModel_StatusFormatting(t *testing.T) {
 	model := NewProgressModel(dag)
 
 	tests := []struct {
-		status   core1.Status
+		status   core.Status
 		expected string
 	}{
-		{core1.Success, "Success ✓"},
-		{core1.Error, "Failed ✗"},
-		{core1.Running, "Running ●"},
-		{core1.Cancel, "Cancelled ⚠"},
-		{core1.Queued, "Queued ●"},
-		{core1.None, "Not Started ○"},
+		{core.Success, "Success ✓"},
+		{core.Error, "Failed ✗"},
+		{core.Running, "Running ●"},
+		{core.Cancel, "Cancelled ⚠"},
+		{core.Queued, "Queued ●"},
+		{core.None, "Not Started ○"},
 	}
 
 	for _, tt := range tests {
@@ -237,7 +236,7 @@ func TestProgressTeaDisplay_Integration(t *testing.T) {
 	// Update a node
 	node := &execution.Node{
 		Step:      core.Step{Name: "step1"},
-		Status:    core1.NodeRunning,
+		Status:    core.NodeRunning,
 		StartedAt: time.Now().Format(time.RFC3339),
 	}
 	display.UpdateNode(node)
@@ -245,7 +244,7 @@ func TestProgressTeaDisplay_Integration(t *testing.T) {
 	// Update status
 	status := &execution.DAGRunStatus{
 		DAGRunID: "run-123",
-		Status:   core1.Running,
+		Status:   core.Running,
 	}
 	display.UpdateStatus(status)
 }
@@ -287,7 +286,7 @@ func TestProgressModel_ErrorDisplay(t *testing.T) {
 	model.width = 100
 
 	// Mark step as failed with error
-	model.nodes["failing-step"].status = core1.NodeError
+	model.nodes["failing-step"].status = core.NodeError
 	model.nodes["failing-step"].node.Error = "Connection timeout"
 	model.nodes["failing-step"].endTime = time.Now()
 	model.nodes["failing-step"].startTime = time.Now().Add(-5 * time.Second)

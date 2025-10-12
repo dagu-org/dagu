@@ -7,7 +7,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
@@ -35,7 +34,7 @@ func TestStatusSerialization(t *testing.T) {
 		SMTP:      &core.SMTPConfig{},
 	}
 	dagRunID := uuid.Must(uuid.NewV7()).String()
-	statusToPersist := transform.NewStatusBuilder(dag).Create(dagRunID, core1.Success, 0, startedAt, transform.WithFinishedAt(finishedAt))
+	statusToPersist := transform.NewStatusBuilder(dag).Create(dagRunID, core.Success, 0, startedAt, transform.WithFinishedAt(finishedAt))
 
 	rawJSON, err := json.Marshal(statusToPersist)
 	require.NoError(t, err)
@@ -69,7 +68,7 @@ func TestStatusBuilder(t *testing.T) {
 
 	builder := transform.NewStatusBuilder(dag)
 	dagRunID := "test-run-123"
-	s := core1.Running
+	s := core.Running
 	pid := 12345
 	startedAt := time.Now()
 
@@ -101,7 +100,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 
 	builder := transform.NewStatusBuilder(dag)
 	dagRunID := "test-run-456"
-	s := core1.Success
+	s := core.Success
 	pid := 54321
 	startedAt := time.Now()
 	finishedAt := startedAt.Add(5 * time.Minute)
@@ -111,7 +110,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 		{
 			Step: core.Step{Name: "step1"},
 			State: runtime.NodeState{
-				Status:     core1.NodeSuccess,
+				Status:     core.NodeSuccess,
 				StartedAt:  startedAt,
 				FinishedAt: finishedAt,
 			},
@@ -183,7 +182,7 @@ func TestInitialStatus(t *testing.T) {
 	st := execution.InitialStatus(dag)
 
 	assert.Equal(t, dag.Name, st.Name)
-	assert.Equal(t, core1.None, st.Status)
+	assert.Equal(t, core.None, st.Status)
 	assert.Equal(t, execution.PID(0), st.PID)
 	assert.Equal(t, 2, len(st.Nodes))
 	assert.NotNil(t, st.OnExit)
@@ -322,8 +321,8 @@ func TestNodesFromSteps(t *testing.T) {
 	assert.Equal(t, 2, len(nodes))
 	assert.Equal(t, "step1", nodes[0].Step.Name)
 	assert.Equal(t, "step2", nodes[1].Step.Name)
-	assert.Equal(t, core1.NodeNone, nodes[0].Status)
-	assert.Equal(t, core1.NodeNone, nodes[1].Status)
+	assert.Equal(t, core.NodeNone, nodes[0].Status)
+	assert.Equal(t, core.NodeNone, nodes[1].Status)
 }
 
 func TestWithCreatedAtDefaultTime(t *testing.T) {

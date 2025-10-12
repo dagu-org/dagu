@@ -11,7 +11,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/sock"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
@@ -33,7 +32,7 @@ func TestManager(t *testing.T) {
 			dag.SockAddr(dagRunID),
 			func(w http.ResponseWriter, _ *http.Request) {
 				status := transform.NewStatusBuilder(dag.DAG).Create(
-					dagRunID, core1.Running, 0, time.Now(),
+					dagRunID, core.Running, 0, time.Now(),
 				)
 				w.WriteHeader(http.StatusOK)
 				jsonData, err := json.Marshal(status)
@@ -50,11 +49,11 @@ func TestManager(t *testing.T) {
 			_ = socketServer.Shutdown(ctx)
 		}()
 
-		dag.AssertCurrentStatus(t, core1.Running)
+		dag.AssertCurrentStatus(t, core.Running)
 
 		_ = socketServer.Shutdown(ctx)
 
-		dag.AssertCurrentStatus(t, core1.None)
+		dag.AssertCurrentStatus(t, core.None)
 	})
 	t.Run("UpdateStatus", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
@@ -74,7 +73,7 @@ func TestManager(t *testing.T) {
 		err = att.Open(ctx)
 		require.NoError(t, err)
 
-		dagRunStatus := testNewStatus(dag.DAG, dagRunID, core1.Success, core1.NodeSuccess)
+		dagRunStatus := testNewStatus(dag.DAG, dagRunID, core.Success, core.NodeSuccess)
 
 		err = att.Write(ctx, dagRunStatus)
 		require.NoError(t, err)
@@ -84,10 +83,10 @@ func TestManager(t *testing.T) {
 		ref := execution.NewDAGRunRef(dag.Name, dagRunID)
 		statusToCheck, err := cli.GetSavedStatus(ctx, ref)
 		require.NoError(t, err)
-		require.Equal(t, core1.NodeSuccess, statusToCheck.Nodes[0].Status)
+		require.Equal(t, core.NodeSuccess, statusToCheck.Nodes[0].Status)
 
 		// Update the status.
-		newStatus := core1.NodeError
+		newStatus := core.NodeError
 		dagRunStatus.Nodes[0].Status = newStatus
 
 		root := execution.NewDAGRunRef(dag.Name, dagRunID)
@@ -117,7 +116,7 @@ steps:
 		err := runtime.Start(th.Context, spec)
 		require.NoError(t, err)
 
-		dag.AssertLatestStatus(t, core1.Success)
+		dag.AssertLatestStatus(t, core.Success)
 
 		// Get the child dag-run status.
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -128,17 +127,17 @@ steps:
 		root := execution.NewDAGRunRef(dag.Name, dagRunID)
 		childDAGRunStatus, err := th.DAGRunMgr.FindChildDAGRunStatus(th.Context, root, childDAGRun.DAGRunID)
 		require.NoError(t, err)
-		require.Equal(t, core1.Success.String(), childDAGRunStatus.Status.String())
+		require.Equal(t, core.Success.String(), childDAGRunStatus.Status.String())
 
 		// Update the the child dag-run status.
-		childDAGRunStatus.Nodes[0].Status = core1.NodeError
+		childDAGRunStatus.Nodes[0].Status = core.NodeError
 		err = th.DAGRunMgr.UpdateStatus(th.Context, root, *childDAGRunStatus)
 		require.NoError(t, err)
 
 		// Check if the child dag-run status is updated.
 		childDAGRunStatus, err = th.DAGRunMgr.FindChildDAGRunStatus(th.Context, root, childDAGRun.DAGRunID)
 		require.NoError(t, err)
-		require.Equal(t, core1.NodeError.String(), childDAGRunStatus.Nodes[0].Status.String())
+		require.Equal(t, core.NodeError.String(), childDAGRunStatus.Nodes[0].Status.String())
 	})
 	t.Run("InvalidUpdateStatusWithInvalidDAGRunID", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
@@ -149,7 +148,7 @@ steps:
 		cli := th.DAGRunMgr
 
 		// update with invalid dag-run ID.
-		status := testNewStatus(dag.DAG, "unknown-req-id", core1.Error, core1.NodeError)
+		status := testNewStatus(dag.DAG, "unknown-req-id", core.Error, core.NodeError)
 
 		// Check if the update fails.
 		root := execution.NewDAGRunRef(dag.Name, "unknown-req-id")
@@ -158,7 +157,7 @@ steps:
 	})
 }
 
-func testNewStatus(dag *core.DAG, dagRunID string, dagStatus core1.Status, nodeStatus core1.NodeStatus) execution.DAGRunStatus {
+func testNewStatus(dag *core.DAG, dagRunID string, dagStatus core.Status, nodeStatus core.NodeStatus) execution.DAGRunStatus {
 	nodes := []runtime.NodeData{{State: runtime.NodeState{Status: nodeStatus}}}
 	tm := time.Now()
 	startedAt := &tm

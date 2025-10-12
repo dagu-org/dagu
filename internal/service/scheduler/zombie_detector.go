@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
-	core1 "github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
@@ -70,7 +70,7 @@ func (z *ZombieDetector) Start(ctx context.Context) {
 func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 	// Query all running DAG runs
 	statuses, err := z.dagRunStore.ListStatuses(ctx,
-		execution.WithStatuses([]core1.Status{core1.Running}))
+		execution.WithStatuses([]core.Status{core.Running}))
 	if err != nil {
 		logger.Error(ctx, "Failed to list running DAG runs", "err", err)
 		return
@@ -116,11 +116,11 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.
 		"name", st.Name, "dagRunID", st.DAGRunID)
 
 	// Update the status to error
-	st.Status = core1.Error
+	st.Status = core.Error
 	st.FinishedAt = time.Now().Format(time.RFC3339)
 	for _, n := range st.Nodes {
-		if n.Status == core1.NodeRunning {
-			n.Status = core1.NodeError
+		if n.Status == core.NodeRunning {
+			n.Status = core.NodeError
 			n.Error = "process terminated unexpectedly - zombie process detected"
 		}
 	}

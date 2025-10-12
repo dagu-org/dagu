@@ -13,7 +13,6 @@ import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	runtime1 "github.com/dagu-org/dagu/internal/runtime"
@@ -231,7 +230,7 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 		}
 	}
 
-	if dagStatus.Status == core1.Running {
+	if dagStatus.Status == core.Running {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeNotRunning,
@@ -340,17 +339,17 @@ func (a *API) readHistoryData(
 	_ context.Context,
 	statusList []execution.DAGRunStatus,
 ) []api.DAGGridItem {
-	data := map[string][]core1.NodeStatus{}
+	data := map[string][]core.NodeStatus{}
 
 	addStatusFn := func(
-		data map[string][]core1.NodeStatus,
+		data map[string][]core.NodeStatus,
 		logLen int,
 		logIdx int,
 		nodeName string,
-		nodeStatus core1.NodeStatus,
+		nodeStatus core.NodeStatus,
 	) {
 		if _, ok := data[nodeName]; !ok {
-			data[nodeName] = make([]core1.NodeStatus, logLen)
+			data[nodeName] = make([]core.NodeStatus, logLen)
 		}
 		data[nodeName][logIdx] = nodeStatus
 	}
@@ -377,7 +376,7 @@ func (a *API) readHistoryData(
 		return strings.Compare(grid[i].Name, grid[j].Name) <= 0
 	})
 
-	handlers := map[string][]core1.NodeStatus{}
+	handlers := map[string][]core.NodeStatus{}
 	for idx, status := range statusList {
 		if n := status.OnSuccess; n != nil {
 			addStatusFn(handlers, len(statusList), idx, n.Step.Name, n.Status)
@@ -655,7 +654,7 @@ waitLoop:
 			if dagStatus == nil {
 				continue
 			}
-			if dagStatus.Status != core1.None {
+			if dagStatus.Status != core.None {
 				// If status is not None, it means the DAG has started or even finished
 				running = true
 				timer.Stop()
@@ -768,7 +767,7 @@ waitLoop:
 			if dagStatus == nil {
 				continue
 			}
-			if dagStatus.Status != core1.None {
+			if dagStatus.Status != core.None {
 				// If status is not None, it means the DAG has started or even finished
 				ok = true
 				timer.Stop()
@@ -858,7 +857,7 @@ func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequ
 	// Get all running DAG-runs for this DAG
 	runningStatuses, err := a.dagRunStore.ListStatuses(ctx,
 		execution.WithExactName(dag.Name),
-		execution.WithStatuses([]core1.Status{core1.Running}),
+		execution.WithStatuses([]core.Status{core.Running}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error listing running DAG-runs: %w", err)

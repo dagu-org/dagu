@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 )
 
 // ExecutionGraph represents a graph of steps.
@@ -105,10 +104,10 @@ func (g *ExecutionGraph) IsRunning() bool {
 	defer g.lock.RUnlock()
 	for _, node := range g.nodes {
 		s := node.State().Status
-		if s == core1.NodeRunning {
+		if s == core.NodeRunning {
 			return true
 		}
-		if s == core1.NodeNone && g.finishedAt.IsZero() {
+		if s == core.NodeNone && g.finishedAt.IsZero() {
 			// If the node is not started and the graph is not finished,
 			// it means the node is still pending to be executed.
 			return true
@@ -153,7 +152,7 @@ func (g *ExecutionGraph) NodeByName(name string) *Node {
 }
 
 func (g *ExecutionGraph) setupRetry(ctx context.Context, steps map[string]core.Step) error {
-	dict := map[int]core1.NodeStatus{}
+	dict := map[int]core.NodeStatus{}
 	retry := map[int]bool{}
 	for _, node := range g.nodes {
 		dict[node.id] = node.Status()
@@ -168,8 +167,8 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context, steps map[string]core.S
 	for len(frontier) > 0 {
 		var next []int
 		for _, u := range frontier {
-			if retry[u] || dict[u] == core1.NodeError ||
-				dict[u] == core1.NodeCancel {
+			if retry[u] || dict[u] == core.NodeError ||
+				dict[u] == core.NodeCancel {
 				logger.Debug(ctx, "Clearing node state", "step", g.nodeByID[u].Name())
 				step, ok := steps[g.nodeByID[u].Name()]
 				if !ok {
@@ -262,8 +261,8 @@ func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 
 func (g *ExecutionGraph) isFinished() bool {
 	for _, node := range g.nodes {
-		if node.State().Status == core1.NodeRunning ||
-			node.State().Status == core1.NodeNone {
+		if node.State().Status == core.NodeRunning ||
+			node.State().Status == core.NodeNone {
 			return false
 		}
 	}
@@ -273,7 +272,7 @@ func (g *ExecutionGraph) isFinished() bool {
 func (g *ExecutionGraph) runningCount() int {
 	count := 0
 	for _, node := range g.nodes {
-		if node.State().Status == core1.NodeRunning {
+		if node.State().Status == core.NodeRunning {
 			count++
 		}
 	}

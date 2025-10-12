@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 )
@@ -336,12 +335,12 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 
 	// Mock DAG run store response
 	statuses := []*execution.DAGRunStatus{
-		{Status: core1.Success},
-		{Status: core1.Success},
-		{Status: core1.Error},
-		{Status: core1.Running},
-		{Status: core1.Queued},
-		{Status: core1.Cancel},
+		{Status: core.Success},
+		{Status: core.Success},
+		{Status: core.Error},
+		{Status: core.Running},
+		{Status: core.Queued},
+		{Status: core.Cancel},
 	}
 	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return(statuses, nil)
 

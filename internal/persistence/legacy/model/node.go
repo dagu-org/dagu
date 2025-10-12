@@ -6,7 +6,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime"
 )
 
@@ -42,16 +41,16 @@ func FromNode(node runtime.NodeData) *Node {
 }
 
 type Node struct {
-	Step       core.Step        `json:"Step"`
-	Log        string           `json:"Log"`
-	StartedAt  string           `json:"StartedAt"`
-	FinishedAt string           `json:"FinishedAt"`
-	Status     core1.NodeStatus `json:"Status"`
-	RetriedAt  string           `json:"RetriedAt,omitempty"`
-	RetryCount int              `json:"RetryCount,omitempty"`
-	DoneCount  int              `json:"DoneCount,omitempty"`
-	Error      string           `json:"Error,omitempty"`
-	StatusText string           `json:"StatusText"`
+	Step       core.Step       `json:"Step"`
+	Log        string          `json:"Log"`
+	StartedAt  string          `json:"StartedAt"`
+	FinishedAt string          `json:"FinishedAt"`
+	Status     core.NodeStatus `json:"Status"`
+	RetriedAt  string          `json:"RetriedAt,omitempty"`
+	RetryCount int             `json:"RetryCount,omitempty"`
+	DoneCount  int             `json:"DoneCount,omitempty"`
+	Error      string          `json:"Error,omitempty"`
+	StatusText string          `json:"StatusText"`
 }
 
 func (n *Node) ToNode() *runtime.Node {
@@ -75,8 +74,8 @@ func NewNode(step core.Step) *Node {
 		Step:       step,
 		StartedAt:  "-",
 		FinishedAt: "-",
-		Status:     core1.NodeNone,
-		StatusText: core1.NodeNone.String(),
+		Status:     core.NodeNone,
+		StatusText: core.NodeNone.String(),
 	}
 }
 

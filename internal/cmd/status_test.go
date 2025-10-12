@@ -7,7 +7,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -41,7 +40,7 @@ func TestStatusCommand(t *testing.T) {
 				return false
 			}
 
-			return core1.Running == dagRunStatus.Status
+			return core.Running == dagRunStatus.Status
 		}, time.Second*3, time.Millisecond*50)
 
 		// Check the current status - just verify it runs without error
@@ -120,14 +119,14 @@ func TestStatusCommand(t *testing.T) {
 		status := execution.DAGRunStatus{
 			Name:       dag.Name,
 			DAGRunID:   dagRunID,
-			Status:     core1.Error,
+			Status:     core.Error,
 			StartedAt:  time.Now().Format(time.RFC3339),
 			FinishedAt: time.Now().Format(time.RFC3339),
 			AttemptID:  attempt.ID(),
 			Nodes: []*execution.Node{
 				{
 					Step:   core.Step{Name: "error"},
-					Status: core1.NodeError,
+					Status: core.NodeError,
 					Error:  "exit status 1",
 				},
 			},
@@ -298,21 +297,21 @@ steps:
 		status := execution.DAGRunStatus{
 			Name:       dag.Name,
 			DAGRunID:   dagRunID,
-			Status:     core1.Error,
+			Status:     core.Error,
 			StartedAt:  time.Now().Format(time.RFC3339),
 			FinishedAt: time.Now().Format(time.RFC3339),
 			AttemptID:  attempt.ID(),
 			Nodes: []*execution.Node{
 				{
 					Step:       core.Step{Name: "check"},
-					Status:     core1.NodeError,
+					Status:     core.NodeError,
 					Error:      "exit status 1",
 					StartedAt:  time.Now().Format(time.RFC3339),
 					FinishedAt: time.Now().Format(time.RFC3339),
 				},
 				{
 					Step:       core.Step{Name: "skipped"},
-					Status:     core1.NodeSkipped,
+					Status:     core.NodeSkipped,
 					StartedAt:  "-",
 					FinishedAt: time.Now().Format(time.RFC3339),
 				},
@@ -362,7 +361,7 @@ steps:
 			if err != nil {
 				return false
 			}
-			return core1.Running == dagRunStatus.Status
+			return core.Running == dagRunStatus.Status
 		}, time.Second*3, time.Millisecond*50)
 
 		// Cancel the DAG
@@ -492,7 +491,7 @@ steps:
 			if err != nil {
 				return false
 			}
-			return core1.Running == dagRunStatus.Status
+			return core.Running == dagRunStatus.Status
 		}, time.Second*3, time.Millisecond*50)
 
 		// Check the status runs without error
@@ -616,14 +615,14 @@ steps:
 		status := execution.DAGRunStatus{
 			Name:       dag.Name,
 			DAGRunID:   dagRunID,
-			Status:     core1.Success,
+			Status:     core.Success,
 			StartedAt:  time.Now().Format(time.RFC3339),
 			FinishedAt: time.Now().Format(time.RFC3339),
 			AttemptID:  attempt.ID(),
 			Nodes: []*execution.Node{
 				{
 					Step:   core.Step{Name: "binary_output"},
-					Status: core1.NodeSuccess,
+					Status: core.NodeSuccess,
 					Stdout: "/nonexistent/binary.log", // This will trigger "(unable to read)"
 					Stderr: "",
 				},

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	core1 "github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,9 +24,9 @@ func TestDAGRun(t *testing.T) {
 		ts2 := execution.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
 		ts3 := execution.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
 
-		_ = run.WriteStatus(t, ts1, core1.Running)
-		_ = run.WriteStatus(t, ts2, core1.Success)
-		_ = run.WriteStatus(t, ts3, core1.Error)
+		_ = run.WriteStatus(t, ts1, core.Running)
+		_ = run.WriteStatus(t, ts2, core.Success)
+		_ = run.WriteStatus(t, ts3, core.Error)
 
 		latestRun, err := run.LatestAttempt(run.Context, nil)
 		require.NoError(t, err)
@@ -35,7 +34,7 @@ func TestDAGRun(t *testing.T) {
 		dagRunStatus, err := latestRun.ReadStatus(run.Context)
 		require.NoError(t, err)
 
-		require.Equal(t, core1.Error.String(), dagRunStatus.Status.String())
+		require.Equal(t, core.Error.String(), dagRunStatus.Status.String())
 	})
 }
 
@@ -45,7 +44,7 @@ type DAGRunTest struct {
 	TB testing.TB
 }
 
-func (dr DAGRunTest) WriteStatus(t *testing.T, ts execution.TimeInUTC, s core1.Status) *Attempt {
+func (dr DAGRunTest) WriteStatus(t *testing.T, ts execution.TimeInUTC, s core.Status) *Attempt {
 	t.Helper()
 
 	dag := &core.DAG{Name: "test-dag"}
@@ -119,7 +118,7 @@ func TestListLogFiles(t *testing.T) {
 		dag := &core.DAG{Name: "test-dag"}
 		dagRunStatus := execution.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
-		dagRunStatus.Status = core1.Success
+		dagRunStatus.Status = core.Success
 		dagRunStatus.Log = "/tmp/test.log"
 		dagRunStatus.Nodes = []*execution.Node{
 			{
@@ -179,7 +178,7 @@ func TestRemoveLogFiles(t *testing.T) {
 		dag := &core.DAG{Name: "test-dag"}
 		dagRunStatus := execution.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
-		dagRunStatus.Status = core1.Success
+		dagRunStatus.Status = core.Success
 		dagRunStatus.Log = logFiles[0]
 		dagRunStatus.Nodes = []*execution.Node{
 			{
@@ -316,7 +315,7 @@ func TestDAGRunRemove(t *testing.T) {
 		dag := &core.DAG{Name: "test-dag"}
 		dagRunStatus := execution.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
-		dagRunStatus.Status = core1.Success
+		dagRunStatus.Status = core.Success
 		dagRunStatus.Log = logFiles[0]
 		dagRunStatus.Nodes = []*execution.Node{
 			{
@@ -536,7 +535,7 @@ func TestDAGRun_listAttemptDirs(t *testing.T) {
 	// Create status files so attempts are considered valid
 	for _, dir := range []string{normalAttempt1, normalAttempt2, hiddenAttempt} {
 		statusFile := filepath.Join(dir, JSONLStatusFile)
-		status := createTestStatus(core1.Success)
+		status := createTestStatus(core.Success)
 		data, err := json.Marshal(status)
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(statusFile, append(data, '\n'), 0600))

@@ -14,7 +14,6 @@ import (
 	"dario.cat/mergo"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
-	digraph "github.com/dagu-org/dagu/internal/core"
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/goccy/go-yaml"
@@ -173,7 +172,7 @@ func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.D
 				BuildErrors: []error{err},
 			}, nil
 		}
-		return nil, digraph.ErrorList{err}
+		return nil, core.ErrorList{err}
 	}
 
 	def, err := decode(raw)
@@ -185,7 +184,7 @@ func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.D
 				BuildErrors: []error{err},
 			}, nil
 		}
-		return nil, digraph.ErrorList{err}
+		return nil, core.ErrorList{err}
 	}
 
 	return build(BuildContext{ctx: ctx, opts: opts}, def)
@@ -208,14 +207,14 @@ func LoadBaseConfig(ctx BuildContext, file string) (*core.DAG, error) {
 	// Decode the raw data into a config definition.
 	def, err := decode(raw)
 	if err != nil {
-		return nil, digraph.ErrorList{err}
+		return nil, core.ErrorList{err}
 	}
 
 	ctx = ctx.WithOpts(BuildOpts{NoEval: ctx.opts.NoEval}).WithFile(file)
 	dag, err := build(ctx, def)
 
 	if err != nil {
-		return nil, digraph.ErrorList{err}
+		return nil, core.ErrorList{err}
 	}
 	return dag, nil
 }
@@ -276,7 +275,7 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 		}
 	}
 
-	digraph.InitializeDefaults(mainDAG)
+	core.InitializeDefaults(mainDAG)
 
 	return mainDAG, nil
 }
@@ -456,7 +455,7 @@ func (*mergeTransformer) Transformer(
 	typ reflect.Type,
 ) func(dst, src reflect.Value) error {
 	// mergo does not override a value with zero value for a pointer.
-	if typ == reflect.TypeOf(digraph.MailOn{}) {
+	if typ == reflect.TypeOf(core.MailOn{}) {
 		// We need to explicitly override the value for a pointer with a zero
 		// value.
 		return func(dst, src reflect.Value) error {
