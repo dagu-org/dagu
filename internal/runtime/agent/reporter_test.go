@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
+	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/stretchr/testify/require"
 )
 
@@ -217,7 +218,7 @@ func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG
 }
 
 func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *core.DAG, _ []*execution.Node) {
-	status := execution.NewStatusBuilder(dag).Create("run-id", status.Error, 0, time.Now())
+	status := transform.NewStatusBuilder(dag).Create("run-id", status.Error, 0, time.Now())
 	summary := renderDAGSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
 	require.Contains(t, summary, dag.Name)

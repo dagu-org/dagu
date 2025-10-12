@@ -1,4 +1,4 @@
-package execution_test
+package transform_test
 
 import (
 	"encoding/json"
@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +35,7 @@ func TestStatusSerialization(t *testing.T) {
 		SMTP:      &core.SMTPConfig{},
 	}
 	dagRunID := uuid.Must(uuid.NewV7()).String()
-	statusToPersist := execution.NewStatusBuilder(dag).Create(dagRunID, status.Success, 0, startedAt, execution.WithFinishedAt(finishedAt))
+	statusToPersist := transform.NewStatusBuilder(dag).Create(dagRunID, status.Success, 0, startedAt, transform.WithFinishedAt(finishedAt))
 
 	rawJSON, err := json.Marshal(statusToPersist)
 	require.NoError(t, err)
@@ -66,7 +67,7 @@ func TestStatusBuilder(t *testing.T) {
 		},
 	}
 
-	builder := execution.NewStatusBuilder(dag)
+	builder := transform.NewStatusBuilder(dag)
 	dagRunID := "test-run-123"
 	s := status.Running
 	pid := 12345
@@ -98,7 +99,7 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 		},
 	}
 
-	builder := execution.NewStatusBuilder(dag)
+	builder := transform.NewStatusBuilder(dag)
 	dagRunID := "test-run-456"
 	s := status.Success
 	pid := 54321
@@ -131,18 +132,18 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 		s,
 		pid,
 		startedAt,
-		execution.WithFinishedAt(finishedAt),
-		execution.WithNodes(nodes),
-		execution.WithOnExitNode(exitNode),
-		execution.WithOnSuccessNode(successNode),
-		execution.WithOnFailureNode(failureNode),
-		execution.WithOnCancelNode(cancelNode),
-		execution.WithLogFilePath("/tmp/log.txt"),
-		execution.WithPreconditions([]*core.Condition{{Condition: "test", Expected: "true"}}),
-		execution.WithHierarchyRefs(rootRef, parentRef),
-		execution.WithAttemptID("attempt-789"),
-		execution.WithQueuedAt("2024-01-01 12:00:00"),
-		execution.WithCreatedAt(1234567890),
+		transform.WithFinishedAt(finishedAt),
+		transform.WithNodes(nodes),
+		transform.WithOnExitNode(exitNode),
+		transform.WithOnSuccessNode(successNode),
+		transform.WithOnFailureNode(failureNode),
+		transform.WithOnCancelNode(cancelNode),
+		transform.WithLogFilePath("/tmp/log.txt"),
+		transform.WithPreconditions([]*core.Condition{{Condition: "test", Expected: "true"}}),
+		transform.WithHierarchyRefs(rootRef, parentRef),
+		transform.WithAttemptID("attempt-789"),
+		transform.WithQueuedAt("2024-01-01 12:00:00"),
+		transform.WithCreatedAt(1234567890),
 	)
 
 	assert.Equal(t, stringutil.FormatTime(finishedAt), result.FinishedAt)
@@ -331,7 +332,7 @@ func TestWithCreatedAtDefaultTime(t *testing.T) {
 
 	// Test WithCreatedAt with 0 - should use current time
 	beforeTime := time.Now().UnixMilli()
-	execution.WithCreatedAt(0)(&dagRunStatus)
+	transform.WithCreatedAt(0)(&dagRunStatus)
 	afterTime := time.Now().UnixMilli()
 
 	assert.GreaterOrEqual(t, dagRunStatus.CreatedAt, beforeTime)

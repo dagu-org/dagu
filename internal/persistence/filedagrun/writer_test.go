@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
+	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,7 +19,7 @@ func TestWriter(t *testing.T) {
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
 		dag := th.DAG("test_write_status")
 		dagRunID := uuid.Must(uuid.NewV7()).String()
-		dagRunStatus := execution.NewStatusBuilder(dag.DAG).Create(dagRunID, status.Running, 1, time.Now())
+		dagRunStatus := transform.NewStatusBuilder(dag.DAG).Create(dagRunID, status.Running, 1, time.Now())
 		writer := dag.Writer(t, dagRunID, time.Now())
 		writer.Write(t, dagRunStatus)
 
@@ -33,7 +33,7 @@ func TestWriter(t *testing.T) {
 
 		writer := dag.Writer(t, dagRunID, startedAt)
 
-		dagRunStatus := execution.NewStatusBuilder(dag.DAG).Create(dagRunID, status.Cancel, 1, time.Now())
+		dagRunStatus := transform.NewStatusBuilder(dag.DAG).Create(dagRunID, status.Cancel, 1, time.Now())
 
 		// Write initial status
 		writer.Write(t, dagRunStatus)
@@ -80,7 +80,7 @@ func TestWriterErrorHandling(t *testing.T) {
 
 		dag := th.DAG("test_write_to_closed_writer")
 		dagRunID := uuid.Must(uuid.NewV7()).String()
-		dagRunStatus := execution.NewStatusBuilder(dag.DAG).Create(dagRunID, status.Running, 1, time.Now())
+		dagRunStatus := transform.NewStatusBuilder(dag.DAG).Create(dagRunID, status.Running, 1, time.Now())
 		assert.Error(t, writer.write(dagRunStatus))
 	})
 
@@ -99,7 +99,7 @@ func TestWriterRename(t *testing.T) {
 	dag := th.DAG("test_rename_old")
 	writer := dag.Writer(t, "dag-run-id-1", time.Now())
 	dagRunID := uuid.Must(uuid.NewV7()).String()
-	dagRunStatus := execution.NewStatusBuilder(dag.DAG).Create(dagRunID, status.Running, 1, time.Now())
+	dagRunStatus := transform.NewStatusBuilder(dag.DAG).Create(dagRunID, status.Running, 1, time.Now())
 	writer.Write(t, dagRunStatus)
 	writer.Close(t)
 	require.FileExists(t, writer.FilePath)

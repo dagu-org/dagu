@@ -1,13 +1,9 @@
 package execution
 
 import (
-	"errors"
-
 	"github.com/dagu-org/dagu/internal/common/collections"
-	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/runtime"
 )
 
 // Node represents a DAG step with its execution state for persistence
@@ -34,51 +30,17 @@ type ChildDAGRun struct {
 	Params   string `json:"params,omitempty"`
 }
 
-// ToNode converts a persistence Node back to a scheduler Node
-func (n *Node) ToNode() *runtime.Node {
-	startedAt, _ := stringutil.ParseTime(n.StartedAt)
-	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
-	retriedAt, _ := stringutil.ParseTime(n.RetriedAt)
-	children := make([]runtime.ChildDAGRun, len(n.Children))
-	for i, r := range n.Children {
-		children[i] = runtime.ChildDAGRun(r)
-	}
-	childrenRepeated := make([]runtime.ChildDAGRun, len(n.ChildrenRepeated))
-	for i, r := range n.ChildrenRepeated {
-		childrenRepeated[i] = runtime.ChildDAGRun(r)
-	}
-	var err error
-	if n.Error != "" {
-		err = errors.New(n.Error)
-	}
-	return runtime.NewNode(n.Step, runtime.NodeState{
-		Status:           n.Status,
-		Stdout:           n.Stdout,
-		Stderr:           n.Stderr,
-		StartedAt:        startedAt,
-		FinishedAt:       finishedAt,
-		RetriedAt:        retriedAt,
-		RetryCount:       n.RetryCount,
-		DoneCount:        n.DoneCount,
-		Repeated:         n.Repeated,
-		Error:            err,
-		Children:         children,
-		ChildrenRepeated: childrenRepeated,
-		OutputVariables:  n.OutputVariables,
-	})
-}
-
 // NodesFromSteps converts a list of DAG steps to persistence Node objects
 func NodesFromSteps(steps []core.Step) []*Node {
 	var ret []*Node
 	for _, s := range steps {
-		ret = append(ret, newNodeFromStep(s))
+		ret = append(ret, NewNodeFromStep(s))
 	}
 	return ret
 }
 
 // newNodeFromStep creates a new Node with default status values for the given step
-func newNodeFromStep(step core.Step) *Node {
+func NewNodeFromStep(step core.Step) *Node {
 	return &Node{
 		Step:       step,
 		StartedAt:  "-",
@@ -87,34 +49,10 @@ func newNodeFromStep(step core.Step) *Node {
 	}
 }
 
-// newNode converts a single scheduler NodeData to a persistence Node
-func newNode(node runtime.NodeData) *Node {
-	children := make([]ChildDAGRun, len(node.State.Children))
-	for i, child := range node.State.Children {
-		children[i] = ChildDAGRun(child)
+// NewNodeOrNil creates a Node from a Step or returns nil if the step is nil
+func NewNodeOrNil(s *core.Step) *Node {
+	if s == nil {
+		return nil
 	}
-	var errText string
-	if node.State.Error != nil {
-		errText = node.State.Error.Error()
-	}
-	childrenRepeated := make([]ChildDAGRun, len(node.State.ChildrenRepeated))
-	for i, child := range node.State.ChildrenRepeated {
-		childrenRepeated[i] = ChildDAGRun(child)
-	}
-	return &Node{
-		Step:             node.Step,
-		Stdout:           node.State.Stdout,
-		Stderr:           node.State.Stderr,
-		StartedAt:        stringutil.FormatTime(node.State.StartedAt),
-		FinishedAt:       stringutil.FormatTime(node.State.FinishedAt),
-		Status:           node.State.Status,
-		RetriedAt:        stringutil.FormatTime(node.State.RetriedAt),
-		RetryCount:       node.State.RetryCount,
-		DoneCount:        node.State.DoneCount,
-		Repeated:         node.State.Repeated,
-		Error:            errText,
-		Children:         children,
-		ChildrenRepeated: childrenRepeated,
-		OutputVariables:  node.State.OutputVariables,
-	}
+	return NewNodeFromStep(*s)
 }

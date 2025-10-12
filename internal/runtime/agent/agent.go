@@ -32,6 +32,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
+	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -582,28 +583,28 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 		schedulerStatus = status.Running
 	}
 
-	opts := []execution.StatusOption{
-		execution.WithFinishedAt(a.graph.FinishAt()),
-		execution.WithNodes(a.graph.NodeData()),
-		execution.WithLogFilePath(a.logFile),
-		execution.WithOnExitNode(a.scheduler.HandlerNode(core.HandlerOnExit)),
-		execution.WithOnSuccessNode(a.scheduler.HandlerNode(core.HandlerOnSuccess)),
-		execution.WithOnFailureNode(a.scheduler.HandlerNode(core.HandlerOnFailure)),
-		execution.WithOnCancelNode(a.scheduler.HandlerNode(core.HandlerOnCancel)),
-		execution.WithAttemptID(a.dagRunAttemptID),
-		execution.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
-		execution.WithPreconditions(a.dag.Preconditions),
+	opts := []transform.StatusOption{
+		transform.WithFinishedAt(a.graph.FinishAt()),
+		transform.WithNodes(a.graph.NodeData()),
+		transform.WithLogFilePath(a.logFile),
+		transform.WithOnExitNode(a.scheduler.HandlerNode(core.HandlerOnExit)),
+		transform.WithOnSuccessNode(a.scheduler.HandlerNode(core.HandlerOnSuccess)),
+		transform.WithOnFailureNode(a.scheduler.HandlerNode(core.HandlerOnFailure)),
+		transform.WithOnCancelNode(a.scheduler.HandlerNode(core.HandlerOnCancel)),
+		transform.WithAttemptID(a.dagRunAttemptID),
+		transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
+		transform.WithPreconditions(a.dag.Preconditions),
 	}
 
 	// If the current execution is a retry, we need to copy some data
 	// from the retry target to the current status.
 	if a.retryTarget != nil {
-		opts = append(opts, execution.WithQueuedAt(a.retryTarget.QueuedAt))
-		opts = append(opts, execution.WithCreatedAt(a.retryTarget.CreatedAt))
+		opts = append(opts, transform.WithQueuedAt(a.retryTarget.QueuedAt))
+		opts = append(opts, transform.WithCreatedAt(a.retryTarget.CreatedAt))
 	}
 
 	// Create the status object to record the current status.
-	return execution.NewStatusBuilder(a.dag).
+	return transform.NewStatusBuilder(a.dag).
 		Create(
 			a.dagRunID,
 			schedulerStatus,
@@ -859,7 +860,7 @@ func (a *Agent) setupGraph(ctx context.Context) error {
 func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	nodes := make([]*runtime.Node, 0, len(a.retryTarget.Nodes))
 	for _, n := range a.retryTarget.Nodes {
-		nodes = append(nodes, n.ToNode())
+		nodes = append(nodes, transform.ToNode(n))
 	}
 	if a.stepRetry != "" {
 		return a.setupStepRetryGraph(ctx, nodes)

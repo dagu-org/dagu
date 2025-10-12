@@ -9,6 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/spf13/cobra"
 )
 
@@ -108,12 +109,12 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 		return fmt.Errorf("failed to create run: %w", err)
 	}
 
-	opts := []execution.StatusOption{
-		execution.WithLogFilePath(logFile),
-		execution.WithAttemptID(att.ID()),
-		execution.WithPreconditions(dag.Preconditions),
-		execution.WithQueuedAt(stringutil.FormatTime(time.Now())),
-		execution.WithHierarchyRefs(
+	opts := []transform.StatusOption{
+		transform.WithLogFilePath(logFile),
+		transform.WithAttemptID(att.ID()),
+		transform.WithPreconditions(dag.Preconditions),
+		transform.WithQueuedAt(stringutil.FormatTime(time.Now())),
+		transform.WithHierarchyRefs(
 			core.NewDAGRunRef(dag.Name, dagRunID),
 			core.DAGRunRef{},
 		),
@@ -121,7 +122,7 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 
 	// As a prototype, we save the status to the database to enqueue the dag-run.
 	// This could be changed to save to a queue file in the future
-	dagStatus := execution.NewStatusBuilder(dag).Create(dagRunID, status.Queued, 0, time.Time{}, opts...)
+	dagStatus := transform.NewStatusBuilder(dag).Create(dagRunID, status.Queued, 0, time.Time{}, opts...)
 
 	if err := att.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
