@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkdagu=self.webpackChunkdagu||[]).push([[8055],{88055:(e,a,s)=>{s.d(a,{createInfoServices:()=>u.v});var u=s(64555);s(31966)}}]);

@@ -3,7 +3,7 @@ coverage:
     # Generated code
     - "api"
     # Ignore frontend code for now
-    - "internal/frontend"
+    - "internal/service/frontend"
     # Test code
     - "internal/test"
     # Executor code does not measure coverage for now
