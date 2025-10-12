@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cli"
+	"github.com/dagu-org/dagu/internal/apps/cli"
 	"github.com/dagu-org/dagu/internal/test"
 )
 

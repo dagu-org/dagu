@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cli"
+	"github.com/dagu-org/dagu/internal/apps/cli"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"

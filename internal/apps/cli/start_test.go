@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cli"
+	"github.com/dagu-org/dagu/internal/apps/cli"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/term"

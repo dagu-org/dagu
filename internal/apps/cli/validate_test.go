@@ -7,7 +7,7 @@ import (
 
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cli"
+	"github.com/dagu-org/dagu/internal/apps/cli"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/spf13/cobra"
 )

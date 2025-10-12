@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cli"
+	"github.com/dagu-org/dagu/internal/apps/cli"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

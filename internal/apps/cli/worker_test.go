@@ -3,7 +3,7 @@ package cli_test
 import (
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cli"
+	"github.com/dagu-org/dagu/internal/apps/cli"
 	"github.com/stretchr/testify/require"
 )
 
