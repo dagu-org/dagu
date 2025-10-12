@@ -29,7 +29,8 @@ import (
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/otel"
-	"github.com/dagu-org/dagu/internal/runtime/builtin"
+	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
+	"github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
 	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 	"github.com/dagu-org/dagu/internal/sshutil"
 	"go.opentelemetry.io/otel/attribute"
@@ -350,7 +351,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 
 		// Set the container client in the context for the execution.
-		ctx = builtin.WithContainerClient(ctx, ctCli)
+		ctx = docker.WithContainerClient(ctx, ctCli)
 
 		defer func() {
 			ctCli.StopContainerKeepAlive(ctx)
@@ -378,7 +379,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			initErr = fmt.Errorf("failed to create ssh client: %w", err)
 			return initErr
 		}
-		ctx = builtin.WithSSHClient(ctx, cli)
+		ctx = ssh.WithSSHClient(ctx, cli)
 	}
 
 	listenerErrCh := make(chan error)
@@ -479,7 +480,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Add registry authentication to context for docker executors
 	if len(a.dag.RegistryAuths) > 0 {
-		ctx = builtin.WithRegistryAuth(ctx, a.dag.RegistryAuths)
+		ctx = docker.WithRegistryAuth(ctx, a.dag.RegistryAuths)
 	}
 
 	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
