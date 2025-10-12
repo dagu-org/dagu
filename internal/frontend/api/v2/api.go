@@ -13,9 +13,9 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/frontend/auth"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -28,7 +28,7 @@ var _ api.StrictServerInterface = (*API)(nil)
 type API struct {
 	dagStore           execution.DAGStore
 	dagRunStore        execution.DAGRunStore
-	dagRunMgr          dagrun.Manager
+	dagRunMgr          runtime.Manager
 	queueStore         execution.QueueStore
 	procStore          execution.ProcStore
 	remoteNodes        map[string]config.RemoteNode
@@ -38,7 +38,7 @@ type API struct {
 	metricsRegistry    *prometheus.Registry
 	coordinatorCli     coordinator.Client
 	serviceRegistry    execution.ServiceRegistry
-	subCmdBuilder      *dagrun.SubCmdBuilder
+	subCmdBuilder      *runtime.SubCmdBuilder
 }
 
 func New(
@@ -46,7 +46,7 @@ func New(
 	drs execution.DAGRunStore,
 	qs execution.QueueStore,
 	ps execution.ProcStore,
-	drm dagrun.Manager,
+	drm runtime.Manager,
 	cfg *config.Config,
 	cc coordinator.Client,
 	sr execution.ServiceRegistry,
@@ -65,7 +65,7 @@ func New(
 		dagRunMgr:          drm,
 		logEncodingCharset: cfg.UI.LogEncodingCharset,
 		remoteNodes:        remoteNodes,
-		subCmdBuilder:      dagrun.NewSubCmdBuilder(cfg),
+		subCmdBuilder:      runtime.NewSubCmdBuilder(cfg),
 		apiBasePath:        cfg.Server.APIBasePath,
 		config:             cfg,
 		coordinatorCli:     cc,

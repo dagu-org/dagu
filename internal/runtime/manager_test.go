@@ -1,4 +1,4 @@
-package dagrun_test
+package runtime_test
 
 import (
 	"encoding/json"
@@ -13,7 +13,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/test"
@@ -114,8 +113,8 @@ steps:
 ---
 `)
 
-		spec := th.SubCmdBuilder.Start(dag.DAG, dagrun.StartOptions{})
-		err := dagrun.Start(th.Context, spec)
+		spec := th.SubCmdBuilder.Start(dag.DAG, runtime.StartOptions{})
+		err := runtime.Start(th.Context, spec)
 		require.NoError(t, err)
 
 		dag.AssertLatestStatus(t, status.Success)

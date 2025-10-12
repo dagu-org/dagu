@@ -11,8 +11,8 @@ import (
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/frontend/auth"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -24,18 +24,18 @@ var _ api.StrictServerInterface = (*API)(nil)
 type API struct {
 	dagStore           execution.DAGStore
 	dagRunStore        execution.DAGRunStore
-	dagRunManager      dagrun.Manager
+	dagRunManager      runtime.Manager
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
 	config             *config.Config
-	subCmdBuilder      *dagrun.SubCmdBuilder
+	subCmdBuilder      *runtime.SubCmdBuilder
 }
 
 func New(
 	dr execution.DAGStore,
 	drs execution.DAGRunStore,
-	drm dagrun.Manager,
+	drm runtime.Manager,
 	cfg *config.Config,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
@@ -51,7 +51,7 @@ func New(
 		remoteNodes:        remoteNodes,
 		apiBasePath:        cfg.Server.APIBasePath,
 		config:             cfg,
-		subCmdBuilder:      dagrun.NewSubCmdBuilder(cfg),
+		subCmdBuilder:      runtime.NewSubCmdBuilder(cfg),
 	}
 }
 

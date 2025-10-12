@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -46,13 +46,13 @@ import (
 // - ExecuteDAG(): Executes/dispatches already-persisted jobs (no persistence)
 type DAGExecutor struct {
 	coordinatorCli core.Dispatcher
-	subCmdBuilder  *dagrun.SubCmdBuilder
+	subCmdBuilder  *runtime.SubCmdBuilder
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
 func NewDAGExecutor(
 	coordinatorCli core.Dispatcher,
-	subCmdBuilder *dagrun.SubCmdBuilder,
+	subCmdBuilder *runtime.SubCmdBuilder,
 ) *DAGExecutor {
 	return &DAGExecutor{
 		coordinatorCli: coordinatorCli,
@@ -85,10 +85,10 @@ func (e *DAGExecutor) HandleJob(
 			"runId", runID,
 			"workerSelector", dag.WorkerSelector)
 
-		spec := e.subCmdBuilder.Enqueue(dag, dagrun.EnqueueOptions{
+		spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
 			DAGRunID: runID,
 		})
-		if err := dagrun.Run(ctx, spec); err != nil {
+		if err := runtime.Run(ctx, spec); err != nil {
 			return fmt.Errorf("failed to enqueue DAG run: %w", err)
 		}
 		return nil
@@ -128,15 +128,15 @@ func (e *DAGExecutor) ExecuteDAG(
 	// Local execution
 	switch operation {
 	case coordinatorv1.Operation_OPERATION_START:
-		spec := e.subCmdBuilder.Start(dag, dagrun.StartOptions{
+		spec := e.subCmdBuilder.Start(dag, runtime.StartOptions{
 			DAGRunID: runID,
 			Quiet:    true,
 		})
-		return dagrun.Start(ctx, spec)
+		return runtime.Start(ctx, spec)
 
 	case coordinatorv1.Operation_OPERATION_RETRY:
 		spec := e.subCmdBuilder.Retry(dag, runID, "", true)
-		return dagrun.Run(ctx, spec)
+		return runtime.Run(ctx, spec)
 
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
 		return errors.New("operation not specified")
@@ -181,10 +181,10 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 
 // Restart restarts a DAG unconditionally.
 func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG) error {
-	spec := e.subCmdBuilder.Restart(dag, dagrun.RestartOptions{
+	spec := e.subCmdBuilder.Restart(dag, runtime.RestartOptions{
 		Quiet: true,
 	})
-	return dagrun.Start(ctx, spec)
+	return runtime.Start(ctx, spec)
 }
 
 // Close closes any resources held by the DAGExecutor, including the coordinator client

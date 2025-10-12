@@ -1,4 +1,4 @@
-package dagrun_test
+package runtime_test
 
 import (
 	"os"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/dagrun"
+	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -25,7 +25,7 @@ func TestNewSubCmdBuilder(t *testing.T) {
 		},
 	}
 
-	builder := dagrun.NewSubCmdBuilder(cfg)
+	builder := runtime.NewSubCmdBuilder(cfg)
 	require.NotNil(t, builder)
 }
 
@@ -40,7 +40,7 @@ func TestStart(t *testing.T) {
 		},
 	}
 
-	builder := dagrun.NewSubCmdBuilder(cfg)
+	builder := runtime.NewSubCmdBuilder(cfg)
 	dag := &core.DAG{
 		Name:       "test-dag",
 		Location:   "/path/to/dag.yaml",
@@ -49,7 +49,7 @@ func TestStart(t *testing.T) {
 
 	t.Run("BasicStart", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.StartOptions{}
+		opts := runtime.StartOptions{}
 		spec := builder.Start(dag, opts)
 
 		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
@@ -63,7 +63,7 @@ func TestStart(t *testing.T) {
 
 	t.Run("StartWithParams", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.StartOptions{
+		opts := runtime.StartOptions{
 			Params: "key=value",
 		}
 		spec := builder.Start(dag, opts)
@@ -74,7 +74,7 @@ func TestStart(t *testing.T) {
 
 	t.Run("StartWithQuiet", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.StartOptions{
+		opts := runtime.StartOptions{
 			Quiet: true,
 		}
 		spec := builder.Start(dag, opts)
@@ -84,7 +84,7 @@ func TestStart(t *testing.T) {
 
 	t.Run("StartWithNoQueue", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.StartOptions{
+		opts := runtime.StartOptions{
 			NoQueue: true,
 		}
 		spec := builder.Start(dag, opts)
@@ -94,7 +94,7 @@ func TestStart(t *testing.T) {
 
 	t.Run("StartWithDAGRunID", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.StartOptions{
+		opts := runtime.StartOptions{
 			DAGRunID: "test-run-id",
 		}
 		spec := builder.Start(dag, opts)
@@ -104,7 +104,7 @@ func TestStart(t *testing.T) {
 
 	t.Run("StartWithAllOptions", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.StartOptions{
+		opts := runtime.StartOptions{
 			Params:   "env=prod",
 			Quiet:    true,
 			NoQueue:  true,
@@ -132,8 +132,8 @@ func TestStart(t *testing.T) {
 				ConfigFileUsed: "",
 			},
 		}
-		builderNoFile := dagrun.NewSubCmdBuilder(cfgNoFile)
-		opts := dagrun.StartOptions{}
+		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
+		opts := runtime.StartOptions{}
 		spec := builderNoFile.Start(dag, opts)
 
 		assert.NotContains(t, spec.Args, "--config")
@@ -151,7 +151,7 @@ func TestEnqueue(t *testing.T) {
 		},
 	}
 
-	builder := dagrun.NewSubCmdBuilder(cfg)
+	builder := runtime.NewSubCmdBuilder(cfg)
 	dag := &core.DAG{
 		Name:       "test-dag",
 		Location:   "/path/to/dag.yaml",
@@ -160,7 +160,7 @@ func TestEnqueue(t *testing.T) {
 
 	t.Run("BasicEnqueue", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.EnqueueOptions{}
+		opts := runtime.EnqueueOptions{}
 		spec := builder.Enqueue(dag, opts)
 
 		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
@@ -175,7 +175,7 @@ func TestEnqueue(t *testing.T) {
 
 	t.Run("EnqueueWithParams", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.EnqueueOptions{
+		opts := runtime.EnqueueOptions{
 			Params: "key=value",
 		}
 		spec := builder.Enqueue(dag, opts)
@@ -186,7 +186,7 @@ func TestEnqueue(t *testing.T) {
 
 	t.Run("EnqueueWithQuiet", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.EnqueueOptions{
+		opts := runtime.EnqueueOptions{
 			Quiet: true,
 		}
 		spec := builder.Enqueue(dag, opts)
@@ -196,7 +196,7 @@ func TestEnqueue(t *testing.T) {
 
 	t.Run("EnqueueWithDAGRunID", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.EnqueueOptions{
+		opts := runtime.EnqueueOptions{
 			DAGRunID: "enqueue-run-id",
 		}
 		spec := builder.Enqueue(dag, opts)
@@ -206,7 +206,7 @@ func TestEnqueue(t *testing.T) {
 
 	t.Run("EnqueueWithQueue", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.EnqueueOptions{
+		opts := runtime.EnqueueOptions{
 			Queue: "custom-queue",
 		}
 		spec := builder.Enqueue(dag, opts)
@@ -217,7 +217,7 @@ func TestEnqueue(t *testing.T) {
 
 	t.Run("EnqueueWithAllOptions", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.EnqueueOptions{
+		opts := runtime.EnqueueOptions{
 			Params:   "env=staging",
 			Quiet:    true,
 			DAGRunID: "full-enqueue-id",
@@ -247,7 +247,7 @@ func TestDequeue(t *testing.T) {
 		},
 	}
 
-	builder := dagrun.NewSubCmdBuilder(cfg)
+	builder := runtime.NewSubCmdBuilder(cfg)
 	dag := &core.DAG{
 		Name:       "test-dag",
 		Location:   "/path/to/dag.yaml",
@@ -276,7 +276,7 @@ func TestDequeue(t *testing.T) {
 				Executable: "/usr/bin/dagu",
 			},
 		}
-		builderNoFile := dagrun.NewSubCmdBuilder(cfgNoFile)
+		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
 		dagRun := core.NewDAGRunRef("test-dag", "run-456")
 		spec := builderNoFile.Dequeue(dag, dagRun)
 
@@ -296,7 +296,7 @@ func TestRestart(t *testing.T) {
 		},
 	}
 
-	builder := dagrun.NewSubCmdBuilder(cfg)
+	builder := runtime.NewSubCmdBuilder(cfg)
 	dag := &core.DAG{
 		Name:       "test-dag",
 		Location:   "/path/to/dag.yaml",
@@ -305,7 +305,7 @@ func TestRestart(t *testing.T) {
 
 	t.Run("BasicRestart", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.RestartOptions{}
+		opts := runtime.RestartOptions{}
 		spec := builder.Restart(dag, opts)
 
 		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
@@ -318,7 +318,7 @@ func TestRestart(t *testing.T) {
 
 	t.Run("RestartWithQuiet", func(t *testing.T) {
 		t.Parallel()
-		opts := dagrun.RestartOptions{
+		opts := runtime.RestartOptions{
 			Quiet: true,
 		}
 		spec := builder.Restart(dag, opts)
@@ -333,8 +333,8 @@ func TestRestart(t *testing.T) {
 				Executable: "/usr/bin/dagu",
 			},
 		}
-		builderNoFile := dagrun.NewSubCmdBuilder(cfgNoFile)
-		opts := dagrun.RestartOptions{}
+		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
+		opts := runtime.RestartOptions{}
 		spec := builderNoFile.Restart(dag, opts)
 
 		assert.NotContains(t, spec.Args, "--config")
@@ -352,7 +352,7 @@ func TestRetry(t *testing.T) {
 		},
 	}
 
-	builder := dagrun.NewSubCmdBuilder(cfg)
+	builder := runtime.NewSubCmdBuilder(cfg)
 	dag := &core.DAG{
 		Name:       "test-dag",
 		Location:   "/path/to/dag.yaml",
@@ -404,7 +404,7 @@ func TestRetry(t *testing.T) {
 				Executable: "/usr/bin/dagu",
 			},
 		}
-		builderNoFile := dagrun.NewSubCmdBuilder(cfgNoFile)
+		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
 		spec := builderNoFile.Retry(dag, "retry-run-id", "", false)
 
 		assert.NotContains(t, spec.Args, "--config")
@@ -422,7 +422,7 @@ func TestTaskStart(t *testing.T) {
 		},
 	}
 
-	builder := dagrun.NewSubCmdBuilder(cfg)
+	builder := runtime.NewSubCmdBuilder(cfg)
 
 	t.Run("BasicTaskStart", func(t *testing.T) {
 		t.Parallel()
@@ -513,7 +513,7 @@ func TestTaskStart(t *testing.T) {
 				Executable: "/usr/bin/dagu",
 			},
 		}
-		builderNoFile := dagrun.NewSubCmdBuilder(cfgNoFile)
+		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
 		task := &coordinatorv1.Task{
 			DagRunId: "task-run-id",
 			Target:   "/path/to/task.yaml",
@@ -535,7 +535,7 @@ func TestTaskRetry(t *testing.T) {
 		},
 	}
 
-	builder := dagrun.NewSubCmdBuilder(cfg)
+	builder := runtime.NewSubCmdBuilder(cfg)
 
 	t.Run("BasicTaskRetry", func(t *testing.T) {
 		t.Parallel()
@@ -572,7 +572,7 @@ func TestTaskRetry(t *testing.T) {
 				Executable: "/usr/bin/dagu",
 			},
 		}
-		builderNoFile := dagrun.NewSubCmdBuilder(cfgNoFile)
+		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
 		task := &coordinatorv1.Task{
 			DagRunId: "retry-run-id",
 			Target:   "/path/to/task.yaml",
@@ -587,7 +587,7 @@ func TestCmdSpec(t *testing.T) {
 	t.Parallel()
 	t.Run("CmdSpecStructure", func(t *testing.T) {
 		t.Parallel()
-		spec := dagrun.CmdSpec{
+		spec := runtime.CmdSpec{
 			Executable: "/usr/bin/test",
 			Args:       []string{"arg1", "arg2"},
 			WorkingDir: "/tmp",

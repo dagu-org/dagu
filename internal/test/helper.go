@@ -21,13 +21,13 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/persistence/fileserviceregistry"
+	runtimepkg "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -122,7 +122,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
-	drm := dagrun.New(runStore, procStore, cfg)
+	drm := runtimepkg.NewManager(runStore, procStore, cfg)
 
 	helper := Helper{
 		Context:         ctx,
@@ -133,7 +133,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		ProcStore:       procStore,
 		QueueStore:      queueStore,
 		ServiceRegistry: serviceMonitor,
-		SubCmdBuilder:   dagrun.NewSubCmdBuilder(cfg),
+		SubCmdBuilder:   runtimepkg.NewSubCmdBuilder(cfg),
 
 		tmpDir: tmpDir,
 	}
@@ -178,11 +178,11 @@ type Helper struct {
 	LoggingOutput   *SyncBuffer
 	DAGStore        execution.DAGStore
 	DAGRunStore     execution.DAGRunStore
-	DAGRunMgr       dagrun.Manager
+	DAGRunMgr       runtimepkg.Manager
 	ProcStore       execution.ProcStore
 	QueueStore      execution.QueueStore
 	ServiceRegistry execution.ServiceRegistry
-	SubCmdBuilder   *dagrun.SubCmdBuilder
+	SubCmdBuilder   *runtimepkg.SubCmdBuilder
 
 	tmpDir string
 }

@@ -16,7 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/dagrun"
+	"github.com/dagu-org/dagu/internal/runtime"
 )
 
 // ExecuteDAGRunFromSpec implements api.StrictServerInterface.
@@ -592,14 +592,14 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 
 	if request.Body.StepName != nil && *request.Body.StepName != "" {
 		spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, *request.Body.StepName, true)
-		if err := dagrun.Start(ctx, spec); err != nil {
+		if err := runtime.Start(ctx, spec); err != nil {
 			return nil, fmt.Errorf("error retrying DAG step: %w", err)
 		}
 		return api.RetryDAGRun200Response{}, nil
 	}
 
 	spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, "", false)
-	if err := dagrun.Start(ctx, spec); err != nil {
+	if err := runtime.Start(ctx, spec); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 
@@ -683,7 +683,7 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 	}
 
 	spec := a.subCmdBuilder.Dequeue(dag, dagRun)
-	if err := dagrun.Run(ctx, spec); err != nil {
+	if err := runtime.Run(ctx, spec); err != nil {
 		return nil, fmt.Errorf("error dequeueing dag-run: %w", err)
 	}
 

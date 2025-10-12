@@ -9,11 +9,11 @@ import (
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
 )
@@ -64,11 +64,11 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 	qs := filequeue.New(helper.Config.Paths.QueueDir)
 
 	// Create DAG run manager
-	drm := dagrun.New(drs, ps, helper.Config)
+	drm := runtime.NewManager(drs, ps, helper.Config)
 
 	// Create entry reader
 	coordinatorCli := coordinator.New(helper.ServiceRegistry, coordinator.DefaultConfig())
-	de := scheduler.NewDAGExecutor(coordinatorCli, dagrun.NewSubCmdBuilder(helper.Config))
+	de := scheduler.NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(helper.Config))
 	em := scheduler.NewEntryReader(helper.Config.Paths.DAGsDir, ds, drm, de, "")
 
 	// Update helper with scheduler-specific stores

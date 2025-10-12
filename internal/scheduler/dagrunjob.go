@@ -9,8 +9,8 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	dagstatus "github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/robfig/cron/v3"
 )
@@ -31,7 +31,7 @@ type DAGRunJob struct {
 	DAG         *core.DAG
 	Next        time.Time
 	Schedule    cron.Schedule
-	Client      dagrun.Manager
+	Client      runtime.Manager
 	DAGExecutor *DAGExecutor
 }
 

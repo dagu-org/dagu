@@ -26,10 +26,10 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/otel"
 	"github.com/dagu-org/dagu/internal/runtime"
+	runtime1 "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
@@ -68,7 +68,7 @@ type Agent struct {
 	peerConfig config.Peer
 
 	// dagRunMgr is the runstore dagRunMgr to communicate with the history.
-	dagRunMgr dagrun.Manager
+	dagRunMgr runtime1.Manager
 
 	// scheduler is the scheduler instance to run the DAG.
 	scheduler *runtime.Scheduler
@@ -151,7 +151,7 @@ func New(
 	dag *core.DAG,
 	logDir string,
 	logFile string,
-	drm dagrun.Manager,
+	drm runtime1.Manager,
 	ds execution.DAGStore,
 	drs execution.DAGRunStore,
 	reg execution.ServiceRegistry,

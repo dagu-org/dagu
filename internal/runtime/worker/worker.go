@@ -10,8 +10,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/coordinator"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -48,7 +48,7 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 		id:             workerID,
 		maxActiveRuns:  maxActiveRuns,
 		coordinatorCli: coordinatorClient,
-		handler:        &taskHandler{subCmdBuilder: dagrun.NewSubCmdBuilder(cfg)},
+		handler:        &taskHandler{subCmdBuilder: runtime.NewSubCmdBuilder(cfg)},
 		labels:         labels,
 		runningTasks:   make(map[string]*coordinatorv1.RunningTask),
 	}

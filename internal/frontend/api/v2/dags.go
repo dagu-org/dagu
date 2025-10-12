@@ -16,7 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/dagrun"
+	runtime1 "github.com/dagu-org/dagu/internal/runtime"
 )
 
 // ValidateDAGSpec implements api.StrictServerInterface.
@@ -622,14 +622,14 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 }
 
 func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID string, singleton bool) error {
-	spec := a.subCmdBuilder.Start(dag, dagrun.StartOptions{
+	spec := a.subCmdBuilder.Start(dag, runtime1.StartOptions{
 		Params:   params,
 		DAGRunID: dagRunID,
 		Quiet:    true,
 		NoQueue:  singleton || dag.MaxActiveRuns == 1,
 	})
 
-	if err := dagrun.Start(ctx, spec); err != nil {
+	if err := runtime1.Start(ctx, spec); err != nil {
 		return fmt.Errorf("error starting DAG: %w", err)
 	}
 
@@ -738,7 +738,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 }
 
 func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID string) error {
-	opts := dagrun.EnqueueOptions{
+	opts := runtime1.EnqueueOptions{
 		Params:   params,
 		DAGRunID: dagRunID,
 	}
@@ -747,7 +747,7 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID
 	}
 
 	spec := a.subCmdBuilder.Enqueue(dag, opts)
-	if err := dagrun.Run(ctx, spec); err != nil {
+	if err := runtime1.Run(ctx, spec); err != nil {
 		return fmt.Errorf("error enqueuing DAG: %w", err)
 	}
 

@@ -1,4 +1,4 @@
-package dagrun
+package runtime
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 
 // New creates a new Manager instance.
 // The Manager is used to interact with the DAG.
-func New(drs execution.DAGRunStore, ps execution.ProcStore, cfg *config.Config) Manager {
+func NewManager(drs execution.DAGRunStore, ps execution.ProcStore, cfg *config.Config) Manager {
 	return Manager{
 		dagRunStore:   drs,
 		procStore:     ps,

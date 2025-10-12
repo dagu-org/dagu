@@ -10,8 +10,8 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
 )
@@ -122,7 +122,7 @@ func handleRestartProcess(ctx *Context, d *core.DAG, dagRunID string) error {
 	return executeDAG(ctx, ctx.DAGRunMgr, d)
 }
 
-func executeDAG(ctx *Context, cli dagrun.Manager, dag *core.DAG) error {
+func executeDAG(ctx *Context, cli runtime.Manager, dag *core.DAG) error {
 	dagRunID, err := genRunID()
 	if err != nil {
 		return fmt.Errorf("failed to generate dag-run ID: %w", err)
@@ -171,7 +171,7 @@ func executeDAG(ctx *Context, cli dagrun.Manager, dag *core.DAG) error {
 	return nil
 }
 
-func stopDAGIfRunning(ctx context.Context, cli dagrun.Manager, dag *core.DAG, dagRunID string) error {
+func stopDAGIfRunning(ctx context.Context, cli runtime.Manager, dag *core.DAG, dagRunID string) error {
 	dagStatus, err := cli.GetCurrentStatus(ctx, dag, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to get current status: %w", err)
@@ -186,7 +186,7 @@ func stopDAGIfRunning(ctx context.Context, cli dagrun.Manager, dag *core.DAG, da
 	return nil
 }
 
-func stopRunningDAG(ctx context.Context, cli dagrun.Manager, dag *core.DAG, dagRunID string) error {
+func stopRunningDAG(ctx context.Context, cli runtime.Manager, dag *core.DAG, dagRunID string) error {
 	const stopPollInterval = 100 * time.Millisecond
 	for {
 		dagStatus, err := cli.GetCurrentStatus(ctx, dag, dagRunID)

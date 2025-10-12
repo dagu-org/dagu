@@ -17,9 +17,9 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence/dirlock"
+	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -34,7 +34,7 @@ type Job interface {
 }
 
 type Scheduler struct {
-	hm                  dagrun.Manager
+	hm                  runtime.Manager
 	er                  EntryReader
 	logDir              string
 	stopChan            chan struct{}
@@ -65,7 +65,7 @@ type queueConfig struct {
 func New(
 	cfg *config.Config,
 	er EntryReader,
-	drm dagrun.Manager,
+	drm runtime.Manager,
 	drs execution.DAGRunStore,
 	qs execution.QueueStore,
 	ps execution.ProcStore,
@@ -84,7 +84,7 @@ func New(
 		})
 
 	// Create DAG executor
-	dagExecutor := NewDAGExecutor(coordinatorCli, dagrun.NewSubCmdBuilder(cfg))
+	dagExecutor := NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(cfg))
 
 	// Create health server
 	healthServer := NewHealthServer(cfg.Scheduler.Port)

@@ -19,7 +19,6 @@ import (
 	"github.com/dagu-org/dagu/internal/coordinator"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/metrics"
@@ -28,6 +27,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/persistence/fileserviceregistry"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -44,7 +44,7 @@ type Context struct {
 	Quiet   bool
 
 	DAGRunStore     execution.DAGRunStore
-	DAGRunMgr       dagrun.Manager
+	DAGRunMgr       runtime.Manager
 	ProcStore       execution.ProcStore
 	QueueStore      execution.QueueStore
 	ServiceRegistry execution.ServiceRegistry
@@ -129,7 +129,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	ps := fileproc.New(cfg.Paths.ProcDir)
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
-	drm := dagrun.New(drs, ps, cfg)
+	drm := runtime.NewManager(drs, ps, cfg)
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
@@ -202,7 +202,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	}
 
 	coordinatorCli := c.NewCoordinatorClient()
-	de := scheduler.NewDAGExecutor(coordinatorCli, dagrun.NewSubCmdBuilder(c.Config))
+	de := scheduler.NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(c.Config))
 	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable)
 	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli)
 }

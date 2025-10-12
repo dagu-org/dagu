@@ -11,7 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/dagrun"
+	runtime1 "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
@@ -31,8 +31,8 @@ func TestTaskHandler(t *testing.T) {
 		ctx := th.Context
 
 		// First, start a DAG run
-		spec := th.SubCmdBuilder.Start(dag.DAG, dagrun.StartOptions{})
-		err := dagrun.Start(th.Context, spec)
+		spec := th.SubCmdBuilder.Start(dag.DAG, runtime1.StartOptions{})
+		err := runtime1.Start(th.Context, spec)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
@@ -74,8 +74,8 @@ func TestTaskHandler(t *testing.T) {
 		cli := th.DAGRunMgr
 
 		// First, start a DAG run
-		spec := th.SubCmdBuilder.Start(dag.DAG, dagrun.StartOptions{})
-		err := dagrun.Start(th.Context, spec)
+		spec := th.SubCmdBuilder.Start(dag.DAG, runtime1.StartOptions{})
+		err := runtime1.Start(th.Context, spec)
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish

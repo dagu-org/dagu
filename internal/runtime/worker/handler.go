@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -22,11 +22,11 @@ var _ TaskHandler = (*taskHandler)(nil)
 // NewTaskHandler creates a new TaskHandler
 func NewTaskHandler(cfg *config.Config) TaskHandler {
 	return &taskHandler{
-		subCmdBuilder: dagrun.NewSubCmdBuilder(cfg),
+		subCmdBuilder: runtime.NewSubCmdBuilder(cfg),
 	}
 }
 
-type taskHandler struct{ subCmdBuilder *dagrun.SubCmdBuilder }
+type taskHandler struct{ subCmdBuilder *runtime.SubCmdBuilder }
 
 // Handle runs the task using the dagrun.Manager
 func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
@@ -66,7 +66,7 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 	}
 
 	// Build command spec based on operation
-	var spec dagrun.CmdSpec
+	var spec runtime.CmdSpec
 
 	switch task.Operation {
 	case coordinatorv1.Operation_OPERATION_START:
@@ -79,7 +79,7 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 		return fmt.Errorf("unknown operation: %v", task.Operation)
 	}
 
-	return dagrun.Run(ctx, spec) // Synchronous execution
+	return runtime.Run(ctx, spec) // Synchronous execution
 }
 
 func createTempDAGFile(dagName string, yamlData []byte) (string, error) {
