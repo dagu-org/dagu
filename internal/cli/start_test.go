@@ -60,7 +60,7 @@ steps:
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			th.RunCommand(t, cli.CmdStart(), tc)
+			th.RunCommand(t, cli.Start(), tc)
 		})
 	}
 }
@@ -77,7 +77,7 @@ steps:
 		dagFile := th.CreateDAGFile(t, "test.yaml", dagContent)
 
 		// Providing a DAG path should work
-		cli := cli.CmdStart()
+		cli := cli.Start()
 		cli.SetArgs([]string{dagFile})
 		// The actual execution might fail for other reasons in test environment,
 		// but it should accept the DAG file argument
@@ -108,7 +108,7 @@ steps:
 `
 		dagFile := th.CreateDAGFile(t, "test-params.yaml", dagContent)
 
-		cli := cli.CmdStart()
+		cli := cli.Start()
 		cli.SetArgs([]string{dagFile, "--", "KEY1=value1", "KEY2=value2"})
 
 		// Execute will fail due to missing context setup, but we're testing
@@ -126,7 +126,7 @@ steps:
 `
 		dagFile := th.CreateDAGFile(t, "test-params-flag.yaml", dagContent)
 
-		cli := cli.CmdStart()
+		cli := cli.Start()
 		cli.SetArgs([]string{dagFile, "--params", "KEY=value"})
 
 		// Execute will fail due to missing context setup, but we're testing

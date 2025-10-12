@@ -10,14 +10,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// CmdValidate creates the 'validate' CLI command that checks a DAG spec for errors.
+// Validate creates the 'validate' CLI command that checks a DAG spec for errors.
 //
 // It follows the same validation logic used by the API's UpdateDAGSpec handler:
 // - Load the YAML without evaluation
 // - Run DAG.Validate()
 //
 // The command prints validation results and any errors found.
-func CmdValidate() *cobra.Command {
+func Validate() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "validate [flags] <DAG definition>",

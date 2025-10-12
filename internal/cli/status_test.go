@@ -27,7 +27,7 @@ func TestStatusCommand(t *testing.T) {
 		go func() {
 			// Start a DAG to check the status.
 			args := []string{"start", dagFile.Location}
-			th.RunCommand(t, cli.CmdStart(), test.CmdTest{Args: args})
+			th.RunCommand(t, cli.Start(), test.CmdTest{Args: args})
 			close(done)
 		}()
 
@@ -45,7 +45,7 @@ func TestStatusCommand(t *testing.T) {
 		}, time.Second*3, time.Millisecond*50)
 
 		// Check the current status - just verify it runs without error
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
@@ -56,7 +56,7 @@ func TestStatusCommand(t *testing.T) {
 
 		// Stop the DAG.
 		args := []string{"stop", dagFile.Location}
-		th.RunCommand(t, cli.CmdStop(), test.CmdTest{Args: args})
+		th.RunCommand(t, cli.Stop(), test.CmdTest{Args: args})
 		<-done
 	})
 
@@ -69,7 +69,7 @@ func TestStatusCommand(t *testing.T) {
 `)
 
 		// Run the DAG to completion
-		startCmd := cli.CmdStart()
+		startCmd := cli.Start()
 		startCmd.SetContext(th.Context)
 		startCmd.SetArgs([]string{dagFile.Location})
 		startCmd.SilenceErrors = true
@@ -82,7 +82,7 @@ func TestStatusCommand(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 
 		// Check the status runs without error
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
@@ -140,7 +140,7 @@ func TestStatusCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check the status runs without error even for failed DAGs
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
@@ -162,7 +162,7 @@ steps:
 `)
 
 		// Run the DAG with custom parameters
-		startCmd := cli.CmdStart()
+		startCmd := cli.Start()
 		startCmd.SetContext(th.Context)
 		startCmd.SetArgs([]string{dagFile.Location, "--params=custom1 custom2"})
 		startCmd.SilenceErrors = true
@@ -175,7 +175,7 @@ steps:
 		time.Sleep(200 * time.Millisecond)
 
 		// Check the status runs without error
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
@@ -195,7 +195,7 @@ steps:
 		runID := uuid.Must(uuid.NewV7()).String()
 
 		// Run the DAG with a specific run ID
-		startCmd := cli.CmdStart()
+		startCmd := cli.Start()
 		startCmd.SetContext(th.Context)
 		startCmd.SetArgs([]string{dagFile.Location, "--run-id=" + runID})
 		startCmd.SilenceErrors = true
@@ -208,7 +208,7 @@ steps:
 		time.Sleep(200 * time.Millisecond)
 
 		// Check the status with the specific run ID
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location, "--run-id=" + runID})
 		statusCmd.SilenceErrors = true
@@ -227,7 +227,7 @@ steps:
 `)
 
 		// Run the DAG twice
-		startCmd := cli.CmdStart()
+		startCmd := cli.Start()
 		startCmd.SetContext(th.Context)
 		startCmd.SetArgs([]string{dagFile.Location})
 		startCmd.SilenceErrors = true
@@ -239,7 +239,7 @@ steps:
 		// Wait a bit to ensure different timestamps
 		time.Sleep(200 * time.Millisecond)
 
-		startCmd2 := cli.CmdStart()
+		startCmd2 := cli.Start()
 		startCmd2.SetContext(th.Context)
 		startCmd2.SetArgs([]string{dagFile.Location})
 		startCmd2.SilenceErrors = true
@@ -252,7 +252,7 @@ steps:
 		time.Sleep(200 * time.Millisecond)
 
 		// Status without run ID should show the latest run
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
@@ -326,7 +326,7 @@ steps:
 		require.NoError(t, err)
 
 		// Check the status runs without error
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
@@ -348,7 +348,7 @@ steps:
 		go func() {
 			// Start a long-running DAG
 			args := []string{"start", dagFile.Location}
-			th.RunCommand(t, cli.CmdStart(), test.CmdTest{Args: args})
+			th.RunCommand(t, cli.Start(), test.CmdTest{Args: args})
 			close(done)
 		}()
 
@@ -366,14 +366,14 @@ steps:
 		}, time.Second*3, time.Millisecond*50)
 
 		// Cancel the DAG
-		th.RunCommand(t, cli.CmdStop(), test.CmdTest{
+		th.RunCommand(t, cli.Stop(), test.CmdTest{
 			Args: []string{"stop", dagFile.Location},
 		})
 
 		<-done
 
 		// Check the status runs without error
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
@@ -411,7 +411,7 @@ steps:
 `)
 
 		// Run the DAG
-		startCmd := cli.CmdStart()
+		startCmd := cli.Start()
 		startCmd.SetContext(th.Context)
 		startCmd.SetArgs([]string{dagFile.Location})
 		startCmd.SilenceErrors = true
@@ -424,7 +424,7 @@ steps:
 		time.Sleep(200 * time.Millisecond)
 
 		// Check the status runs without error
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
@@ -443,7 +443,7 @@ steps:
 `)
 
 		// Run the DAG
-		startCmd := cli.CmdStart()
+		startCmd := cli.Start()
 		startCmd.SetContext(th.Context)
 		startCmd.SetArgs([]string{dagFile.Location})
 		startCmd.SilenceErrors = true
@@ -456,7 +456,7 @@ steps:
 		time.Sleep(200 * time.Millisecond)
 
 		// Check status using DAG name instead of file path
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
@@ -478,7 +478,7 @@ steps:
 		go func() {
 			// Start a DAG to check the PID
 			args := []string{"start", dagFile.Location}
-			th.RunCommand(t, cli.CmdStart(), test.CmdTest{Args: args})
+			th.RunCommand(t, cli.Start(), test.CmdTest{Args: args})
 			close(done)
 		}()
 
@@ -496,7 +496,7 @@ steps:
 		}, time.Second*3, time.Millisecond*50)
 
 		// Check the status runs without error
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
@@ -506,7 +506,7 @@ steps:
 		require.NoError(t, err)
 
 		// Stop the DAG
-		th.RunCommand(t, cli.CmdStop(), test.CmdTest{
+		th.RunCommand(t, cli.Stop(), test.CmdTest{
 			Args: []string{"stop", dagFile.Location},
 		})
 		<-done
@@ -521,7 +521,7 @@ steps:
 `)
 
 		// Run the DAG
-		startCmd := cli.CmdStart()
+		startCmd := cli.Start()
 		startCmd.SetContext(th.Context)
 		startCmd.SetArgs([]string{dagFile.Location})
 		startCmd.SilenceErrors = true
@@ -542,7 +542,7 @@ steps:
 		require.NoError(t, err)
 
 		// Check the status runs without error
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
@@ -564,7 +564,7 @@ steps:
 `)
 
 		// Run the DAG
-		startCmd := cli.CmdStart()
+		startCmd := cli.Start()
 		startCmd.SetContext(th.Context)
 		startCmd.SetArgs([]string{dagFile.Location})
 		startCmd.SilenceErrors = true
@@ -577,7 +577,7 @@ steps:
 		time.Sleep(200 * time.Millisecond)
 
 		// Check the status runs without error (it shows the log preview)
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true
@@ -637,7 +637,7 @@ steps:
 		require.NoError(t, err)
 
 		// Check the status runs without error even with binary content
-		statusCmd := cli.CmdStatus()
+		statusCmd := cli.Status()
 		statusCmd.SetContext(th.Context)
 		statusCmd.SetArgs([]string{dagFile.Location})
 		statusCmd.SilenceErrors = true

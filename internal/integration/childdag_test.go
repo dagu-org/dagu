@@ -43,7 +43,7 @@ steps:
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
 	args := []string{"start", "--run-id", dagRunID, "parent"}
-	th.RunCommand(t, cli.CmdStart(), test.CmdTest{
+	th.RunCommand(t, cli.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"dag-run finished"},
 	})
@@ -105,7 +105,7 @@ steps:
 	// Retry the DAG
 
 	args = []string{"retry", "--run-id", dagRunID, "parent"}
-	th.RunCommand(t, cli.CmdRetry(), test.CmdTest{
+	th.RunCommand(t, cli.Retry(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"dag-run finished"},
 	})
@@ -159,7 +159,7 @@ steps:
       intervalSec: 1
 `)
 	args := []string{"start", "--run-id", dagRunID, "parent_retry"}
-	th.RunCommand(t, cli.CmdStart(), test.CmdTest{
+	th.RunCommand(t, cli.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"dag-run finished"},
 	})
@@ -218,7 +218,7 @@ steps:
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
 	args := []string{"start", "--run-id", dagRunID, "parent_basic"}
-	th.RunCommand(t, cli.CmdStart(), test.CmdTest{
+	th.RunCommand(t, cli.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"dag-run finished"},
 	})
@@ -294,7 +294,7 @@ steps:
 `)
 
 	args := []string{"start", "--run-id", dagRunID, "basic_retry"}
-	th.RunCommand(t, cli.CmdStart(), test.CmdTest{
+	th.RunCommand(t, cli.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"dag-run finished"},
 	})
@@ -345,7 +345,7 @@ steps:
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
 	args := []string{"start", "--run-id", dagRunID, "no_retry"}
-	th.RunCommand(t, cli.CmdStart(), test.CmdTest{
+	th.RunCommand(t, cli.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"dag-run finished"},
 	})

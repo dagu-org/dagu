@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func CmdStatus() *cobra.Command {
+func Status() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "status [flags] <DAG name>",

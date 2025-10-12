@@ -80,7 +80,7 @@ func TestValidateCommand_HelperExit(t *testing.T) {
 	dagFile := os.Getenv("DAG_FILE_PATH")
 
 	root := &cobra.Command{Use: "root"}
-	root.AddCommand(cli.CmdValidate())
+	root.AddCommand(cli.Validate())
 	root.SetArgs([]string{"validate", dagFile})
 
 	// This will os.Exit(1) on validation failure via NewCommand wrapper

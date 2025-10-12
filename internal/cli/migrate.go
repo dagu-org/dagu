@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// CmdMigrate creates the migrate command with subcommands
-func CmdMigrate() *cobra.Command {
+// Migrate creates the migrate command with subcommands
+func Migrate() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Migrate legacy data to new format",

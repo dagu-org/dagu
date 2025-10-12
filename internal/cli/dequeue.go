@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func CmdDequeue() *cobra.Command {
+func Dequeue() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "dequeue [flags]",

@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func CmdServer() *cobra.Command {
+func Server() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "server [flags]",

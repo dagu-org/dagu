@@ -153,7 +153,7 @@ func TestMigrateCommand_NoLegacyData(t *testing.T) {
 }
 
 func TestCmdMigrate(t *testing.T) {
-	cmd := CmdMigrate()
+	cmd := Migrate()
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "migrate", cmd.Use)
 	assert.True(t, cmd.HasSubCommands())

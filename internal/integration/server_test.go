@@ -69,7 +69,7 @@ steps:
 			}
 			args = append(args, dagPath)
 
-			th.RunCommand(t, cli.CmdStart(), test.CmdTest{
+			th.RunCommand(t, cli.Start(), test.CmdTest{
 				Args:        args,
 				ExpectedOut: []string{"dag-run finished"},
 			})

@@ -30,8 +30,8 @@ var (
 	ErrDAGRunIDTooLong = errors.New("dag-run ID length must be less than 64 characters")
 )
 
-// CmdStart creates and returns a cobra command for starting a dag-run
-func CmdStart() *cobra.Command {
+// Start creates and returns a cobra command for starting a dag-run
+func Start() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "start [flags] <DAG definition> [-- param1 param2 ...]",

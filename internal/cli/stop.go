@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func CmdStop() *cobra.Command {
+func Stop() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "stop [flags] <DAG name>",

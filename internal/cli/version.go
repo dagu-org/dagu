@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func CmdVersion() *cobra.Command {
+func Version() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Display the Dagu version information",

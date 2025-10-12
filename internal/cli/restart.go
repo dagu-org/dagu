@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func CmdRestart() *cobra.Command {
+func Restart() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "restart [flags] <DAG name>",

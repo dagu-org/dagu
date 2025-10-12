@@ -21,13 +21,13 @@ func TestDequeueCommand(t *testing.T) {
 `)
 
 	// Enqueue the DAG first
-	th.RunCommand(t, cli.CmdEnqueue(), test.CmdTest{
+	th.RunCommand(t, cli.Enqueue(), test.CmdTest{
 		Name: "Enqueue",
 		Args: []string{"enqueue", "--run-id", "test-DAG", dag.Location},
 	})
 
 	// Now test the dequeue command
-	th.RunCommand(t, cli.CmdDequeue(), test.CmdTest{
+	th.RunCommand(t, cli.Dequeue(), test.CmdTest{
 		Name:        "Dequeue",
 		Args:        []string{"dequeue", "--dag-run", dag.Name + ":test-DAG"},
 		ExpectedOut: []string{"Dequeued dag-run"},
@@ -45,7 +45,7 @@ func TestDequeueCommand_PreservesState(t *testing.T) {
 `)
 
 	// First run the DAG successfully
-	th.RunCommand(t, cli.CmdStart(), test.CmdTest{
+	th.RunCommand(t, cli.Start(), test.CmdTest{
 		Name: "RunDAG",
 		Args: []string{"start", "--run-id", "success-run", dag.Location},
 	})
@@ -62,13 +62,13 @@ func TestDequeueCommand_PreservesState(t *testing.T) {
 	assert.Equal(t, status.Success, dagStatus.Status)
 
 	// Now enqueue a new run
-	th.RunCommand(t, cli.CmdEnqueue(), test.CmdTest{
+	th.RunCommand(t, cli.Enqueue(), test.CmdTest{
 		Name: "Enqueue",
 		Args: []string{"enqueue", "--run-id", "queued-run", dag.Location},
 	})
 
 	// Dequeue it
-	th.RunCommand(t, cli.CmdDequeue(), test.CmdTest{
+	th.RunCommand(t, cli.Dequeue(), test.CmdTest{
 		Name:        "Dequeue",
 		Args:        []string{"dequeue", "--dag-run", dag.Name + ":queued-run"},
 		ExpectedOut: []string{"Dequeued dag-run"},

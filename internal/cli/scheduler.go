@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func CmdScheduler() *cobra.Command {
+func Scheduler() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "scheduler [flags]",

@@ -23,7 +23,7 @@ steps:
 
 		// Run a DAG.
 		args := []string{"start", `--params="foo"`, dagFile.Location}
-		th.RunCommand(t, cli.CmdStart(), test.CmdTest{Args: args})
+		th.RunCommand(t, cli.Start(), test.CmdTest{Args: args})
 
 		// Find the dag-run ID.
 		dagStore := th.DAGStore
@@ -39,7 +39,7 @@ steps:
 
 		// Retry with the dag-run ID using file path.
 		args = []string{"retry", fmt.Sprintf("--run-id=%s", dagRunStatus.DAGRunID), dagFile.Location}
-		th.RunCommand(t, cli.CmdRetry(), test.CmdTest{
+		th.RunCommand(t, cli.Retry(), test.CmdTest{
 			Args:        args,
 			ExpectedOut: []string{`[1=foo]`},
 		})
@@ -56,7 +56,7 @@ steps:
 
 		// Run a DAG.
 		args := []string{"start", `--params="bar"`, dagFile.Location}
-		th.RunCommand(t, cli.CmdStart(), test.CmdTest{Args: args})
+		th.RunCommand(t, cli.Start(), test.CmdTest{Args: args})
 
 		// Find the dag-run ID.
 		dagStore := th.DAGStore
@@ -72,7 +72,7 @@ steps:
 
 		// Retry with the dag-run ID using DAG name.
 		args = []string{"retry", fmt.Sprintf("--run-id=%s", dagRunStatus.DAGRunID), dag.Name}
-		th.RunCommand(t, cli.CmdRetry(), test.CmdTest{
+		th.RunCommand(t, cli.Retry(), test.CmdTest{
 			Args:        args,
 			ExpectedOut: []string{`[1=bar]`},
 		})

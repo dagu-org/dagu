@@ -79,7 +79,7 @@ func startServer(t *testing.T, configFile, port string) func() {
 
 	done := make(chan struct{})
 	go func() {
-		th.RunCommand(t, cli.CmdServer(), test.CmdTest{
+		th.RunCommand(t, cli.Server(), test.CmdTest{
 			Args:        []string{"server", "--config", configFile, "--port=" + port},
 			ExpectedOut: []string{"Server is starting"},
 		})

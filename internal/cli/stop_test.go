@@ -23,7 +23,7 @@ func TestStopCommand(t *testing.T) {
 		go func() {
 			// Start the DAG to stop.
 			args := []string{"start", dag.Location}
-			th.RunCommand(t, cli.CmdStart(), test.CmdTest{Args: args})
+			th.RunCommand(t, cli.Start(), test.CmdTest{Args: args})
 			close(done)
 		}()
 
@@ -33,7 +33,7 @@ func TestStopCommand(t *testing.T) {
 		dag.AssertLatestStatus(t, status.Running)
 
 		// Stop the dag-run.
-		th.RunCommand(t, cli.CmdStop(), test.CmdTest{
+		th.RunCommand(t, cli.Stop(), test.CmdTest{
 			Args:        []string{"stop", dag.Location},
 			ExpectedOut: []string{"stopped"}})
 
@@ -54,7 +54,7 @@ func TestStopCommand(t *testing.T) {
 		go func() {
 			// Start the dag-run to stop.
 			args := []string{"start", "--run-id=" + dagRunID, dag.Location}
-			th.RunCommand(t, cli.CmdStart(), test.CmdTest{Args: args})
+			th.RunCommand(t, cli.Start(), test.CmdTest{Args: args})
 			close(done)
 		}()
 
@@ -64,7 +64,7 @@ func TestStopCommand(t *testing.T) {
 		dag.AssertLatestStatus(t, status.Running)
 
 		// Stop the dag-run with a specific run ID.
-		th.RunCommand(t, cli.CmdStop(), test.CmdTest{
+		th.RunCommand(t, cli.Stop(), test.CmdTest{
 			Args:        []string{"stop", dag.Location, "--run-id=" + dagRunID},
 			ExpectedOut: []string{"stopped"}})
 

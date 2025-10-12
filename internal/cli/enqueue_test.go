@@ -51,7 +51,7 @@ steps:
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			th.RunCommand(t, cli.CmdEnqueue(), tc)
+			th.RunCommand(t, cli.Enqueue(), tc)
 		})
 	}
 }

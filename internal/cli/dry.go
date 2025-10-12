@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func CmdDry() *cobra.Command {
+func Dry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "dry [flags] <DAG definition> [-- param1 param2 ...]",

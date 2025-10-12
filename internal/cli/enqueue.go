@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func CmdEnqueue() *cobra.Command {
+func Enqueue() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "enqueue [flags]",

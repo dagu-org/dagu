@@ -28,22 +28,22 @@ func main() {
 }
 
 func init() {
-	rootCmd.AddCommand(cli.CmdStart())
-	rootCmd.AddCommand(cli.CmdEnqueue())
-	rootCmd.AddCommand(cli.CmdDequeue())
-	rootCmd.AddCommand(cli.CmdStop())
-	rootCmd.AddCommand(cli.CmdRestart())
-	rootCmd.AddCommand(cli.CmdDry())
-	rootCmd.AddCommand(cli.CmdValidate())
-	rootCmd.AddCommand(cli.CmdStatus())
-	rootCmd.AddCommand(cli.CmdVersion())
-	rootCmd.AddCommand(cli.CmdServer())
-	rootCmd.AddCommand(cli.CmdScheduler())
+	rootCmd.AddCommand(cli.Start())
+	rootCmd.AddCommand(cli.Enqueue())
+	rootCmd.AddCommand(cli.Dequeue())
+	rootCmd.AddCommand(cli.Stop())
+	rootCmd.AddCommand(cli.Restart())
+	rootCmd.AddCommand(cli.Dry())
+	rootCmd.AddCommand(cli.Validate())
+	rootCmd.AddCommand(cli.Status())
+	rootCmd.AddCommand(cli.Version())
+	rootCmd.AddCommand(cli.Server())
+	rootCmd.AddCommand(cli.Scheduler())
 	rootCmd.AddCommand(cli.CmdCoordinator())
 	rootCmd.AddCommand(cli.CmdWorker())
-	rootCmd.AddCommand(cli.CmdRetry())
-	rootCmd.AddCommand(cli.CmdStartAll())
-	rootCmd.AddCommand(cli.CmdMigrate())
+	rootCmd.AddCommand(cli.Retry())
+	rootCmd.AddCommand(cli.StartAll())
+	rootCmd.AddCommand(cli.Migrate())
 
 	config.Version = version
 }

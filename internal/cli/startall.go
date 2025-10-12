@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func CmdStartAll() *cobra.Command {
+func StartAll() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "start-all [flags]",

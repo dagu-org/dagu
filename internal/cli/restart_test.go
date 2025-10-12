@@ -25,7 +25,7 @@ steps:
 	go func() {
 		// Start the DAG to restart.
 		args := []string{"start", `--params="foo"`, dag.Location}
-		th.RunCommand(t, cli.CmdStart(), test.CmdTest{Args: args})
+		th.RunCommand(t, cli.Start(), test.CmdTest{Args: args})
 	}()
 
 	// Wait for the DAG to be running.
@@ -37,14 +37,14 @@ steps:
 	go func() {
 		defer close(done)
 		args := []string{"restart", dag.Location}
-		th.RunCommand(t, cli.CmdRestart(), test.CmdTest{Args: args})
+		th.RunCommand(t, cli.Restart(), test.CmdTest{Args: args})
 	}()
 
 	// Wait for the dag-run running again.
 	dag.AssertCurrentStatus(t, status.Running)
 
 	// Stop the restarted DAG.
-	th.RunCommand(t, cli.CmdStop(), test.CmdTest{Args: []string{"stop", dag.Location}})
+	th.RunCommand(t, cli.Stop(), test.CmdTest{Args: []string{"stop", dag.Location}})
 
 	// Wait for the DAG is stopped.
 	dag.AssertCurrentStatus(t, status.None)

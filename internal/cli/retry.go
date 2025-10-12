@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func CmdRetry() *cobra.Command {
+func Retry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "retry [flags] <DAG name or file>",
