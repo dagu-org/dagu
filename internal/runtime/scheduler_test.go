@@ -1,4 +1,4 @@
-package scheduler_test
+package runtime_test
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -1196,44 +1196,44 @@ func newStep(name string, opts ...stepOption) core.Step {
 type testHelper struct {
 	test.Helper
 
-	Scheduler *scheduler.Scheduler
-	Config    *scheduler.Config
+	Scheduler *runtime.Scheduler
+	Config    *runtime.Config
 }
 
-type schedulerOption func(*scheduler.Config)
+type schedulerOption func(*runtime.Config)
 
 func withTimeout(d time.Duration) schedulerOption {
-	return func(cfg *scheduler.Config) {
+	return func(cfg *runtime.Config) {
 		cfg.Timeout = d
 	}
 }
 
 func withMaxActiveRuns(n int) schedulerOption {
-	return func(cfg *scheduler.Config) {
+	return func(cfg *runtime.Config) {
 		cfg.MaxActiveSteps = n
 	}
 }
 
 func withOnExit(step core.Step) schedulerOption {
-	return func(cfg *scheduler.Config) {
+	return func(cfg *runtime.Config) {
 		cfg.OnExit = &step
 	}
 }
 
 func withOnCancel(step core.Step) schedulerOption {
-	return func(cfg *scheduler.Config) {
+	return func(cfg *runtime.Config) {
 		cfg.OnCancel = &step
 	}
 }
 
 func withOnSuccess(step core.Step) schedulerOption {
-	return func(cfg *scheduler.Config) {
+	return func(cfg *runtime.Config) {
 		cfg.OnSuccess = &step
 	}
 }
 
 func withOnFailure(step core.Step) schedulerOption {
-	return func(cfg *scheduler.Config) {
+	return func(cfg *runtime.Config) {
 		cfg.OnFailure = &step
 	}
 }
@@ -1243,14 +1243,14 @@ func setupScheduler(t *testing.T, opts ...schedulerOption) testHelper {
 
 	th := test.Setup(t)
 
-	cfg := &scheduler.Config{
+	cfg := &runtime.Config{
 		LogDir:   th.Config.Paths.LogDir,
 		DAGRunID: uuid.Must(uuid.NewV7()).String(),
 	}
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	sc := scheduler.New(cfg)
+	sc := runtime.New(cfg)
 
 	return testHelper{
 		Helper:    test.Setup(t),
@@ -1262,7 +1262,7 @@ func setupScheduler(t *testing.T, opts ...schedulerOption) testHelper {
 func (th testHelper) newGraph(t *testing.T, steps ...core.Step) graphHelper {
 	t.Helper()
 
-	graph, err := scheduler.NewExecutionGraph(steps...)
+	graph, err := runtime.NewExecutionGraph(steps...)
 	require.NoError(t, err)
 
 	return graphHelper{
@@ -1273,7 +1273,7 @@ func (th testHelper) newGraph(t *testing.T, steps ...core.Step) graphHelper {
 
 type graphHelper struct {
 	testHelper
-	*scheduler.ExecutionGraph
+	*runtime.ExecutionGraph
 }
 
 func (gh graphHelper) Schedule(t *testing.T, expectedStatus status.Status) scheduleResult {
@@ -1285,8 +1285,8 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus status.Status) sched
 
 	ctx := core.SetupDAGContext(gh.Context, dag, nil, core.DAGRunRef{}, gh.Config.DAGRunID, logFilePath, nil, nil)
 
-	var doneNodes []*scheduler.Node
-	progressCh := make(chan *scheduler.Node)
+	var doneNodes []*runtime.Node
+	progressCh := make(chan *runtime.Node)
 
 	done := make(chan struct{})
 	go func() {
@@ -1338,7 +1338,7 @@ func (gh graphHelper) Cancel(t *testing.T) {
 
 type scheduleResult struct {
 	graphHelper
-	Done  []*scheduler.Node
+	Done  []*runtime.Node
 	Error error
 }
 
@@ -1374,7 +1374,7 @@ func (sr scheduleResult) AssertNodeStatus(t *testing.T, stepName string, expecte
 	require.Equal(t, expected.String(), target.State().Status.String(), "expected status %q, got %q", expected.String(), target.State().Status.String())
 }
 
-func (sr scheduleResult) Node(t *testing.T, stepName string) *scheduler.Node {
+func (sr scheduleResult) Node(t *testing.T, stepName string) *runtime.Node {
 	t.Helper()
 
 	if node := sr.NodeByName(stepName); node != nil {
@@ -1440,7 +1440,7 @@ func TestStatus_IsActive(t *testing.T) {
 }
 
 func TestScheduler_DryRun(t *testing.T) {
-	sc := setupScheduler(t, func(cfg *scheduler.Config) {
+	sc := setupScheduler(t, func(cfg *runtime.Config) {
 		cfg.Dry = true
 	})
 
@@ -1460,7 +1460,7 @@ func TestScheduler_DryRun(t *testing.T) {
 
 func TestScheduler_DryRunWithHandlers(t *testing.T) {
 	sc := setupScheduler(t,
-		func(cfg *scheduler.Config) {
+		func(cfg *runtime.Config) {
 			cfg.Dry = true
 		},
 		withOnExit(successStep("onExit")),
@@ -1511,7 +1511,7 @@ func TestScheduler_ErrorHandling(t *testing.T) {
 	t.Run("SetupError", func(t *testing.T) {
 		// Create a scheduler with invalid log directory
 		invalidLogDir := "/nonexistent/path/that/should/not/exist"
-		sc := setupScheduler(t, func(cfg *scheduler.Config) {
+		sc := setupScheduler(t, func(cfg *runtime.Config) {
 			cfg.LogDir = invalidLogDir
 		})
 
@@ -2481,23 +2481,23 @@ func TestScheduler_StepRetryExecution(t *testing.T) {
 		result.AssertNodeStatus(t, "C", status.NodeSuccess)
 
 		// Create nodes with their current states
-		nodes := []*scheduler.Node{
-			scheduler.NodeWithData(scheduler.NodeData{
+		nodes := []*runtime.Node{
+			runtime.NodeWithData(runtime.NodeData{
 				Step:  dag.Steps[0],
-				State: scheduler.NodeState{Status: status.NodeSuccess},
+				State: runtime.NodeState{Status: status.NodeSuccess},
 			}),
-			scheduler.NodeWithData(scheduler.NodeData{
+			runtime.NodeWithData(runtime.NodeData{
 				Step:  dag.Steps[1],
-				State: scheduler.NodeState{Status: status.NodeSuccess},
+				State: runtime.NodeState{Status: status.NodeSuccess},
 			}),
-			scheduler.NodeWithData(scheduler.NodeData{
+			runtime.NodeWithData(runtime.NodeData{
 				Step:  dag.Steps[2],
-				State: scheduler.NodeState{Status: status.NodeSuccess},
+				State: runtime.NodeState{Status: status.NodeSuccess},
 			}),
 		}
 
 		// Retry step B
-		retryGraph, err := scheduler.CreateStepRetryGraph(context.Background(), dag, nodes, "B")
+		retryGraph, err := runtime.CreateStepRetryGraph(context.Background(), dag, nodes, "B")
 		require.NoError(t, err)
 
 		// Schedule the retry

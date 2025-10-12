@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 )
 
 // StatusBuilder creates Status objects for a specific DAG
@@ -54,7 +54,7 @@ func WithHierarchyRefs(root core.DAGRunRef, parent core.DAGRunRef) StatusOption 
 }
 
 // WithNodes returns a StatusOption that sets the node data for the status
-func WithNodes(nodes []scheduler.NodeData) StatusOption {
+func WithNodes(nodes []runtime.NodeData) StatusOption {
 	return func(s *DAGRunStatus) {
 		s.Nodes = s.setNodes(nodes)
 	}
@@ -91,7 +91,7 @@ func WithFinishedAt(t time.Time) StatusOption {
 }
 
 // WithOnExitNode returns a StatusOption that sets the exit handler node
-func WithOnExitNode(node *scheduler.Node) StatusOption {
+func WithOnExitNode(node *runtime.Node) StatusOption {
 	return func(s *DAGRunStatus) {
 		if node != nil {
 			s.OnExit = newNode(node.NodeData())
@@ -100,7 +100,7 @@ func WithOnExitNode(node *scheduler.Node) StatusOption {
 }
 
 // WithOnSuccessNode returns a StatusOption that sets the success handler node
-func WithOnSuccessNode(node *scheduler.Node) StatusOption {
+func WithOnSuccessNode(node *runtime.Node) StatusOption {
 	return func(s *DAGRunStatus) {
 		if node != nil {
 			s.OnSuccess = newNode(node.NodeData())
@@ -109,7 +109,7 @@ func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 }
 
 // WithOnFailureNode returns a StatusOption that sets the failure handler node
-func WithOnFailureNode(node *scheduler.Node) StatusOption {
+func WithOnFailureNode(node *runtime.Node) StatusOption {
 	return func(s *DAGRunStatus) {
 		if node != nil {
 			s.OnFailure = newNode(node.NodeData())
@@ -118,7 +118,7 @@ func WithOnFailureNode(node *scheduler.Node) StatusOption {
 }
 
 // WithOnCancelNode returns a StatusOption that sets the cancel handler node
-func WithOnCancelNode(node *scheduler.Node) StatusOption {
+func WithOnCancelNode(node *runtime.Node) StatusOption {
 	return func(s *DAGRunStatus) {
 		if node != nil {
 			s.OnCancel = newNode(node.NodeData())
@@ -247,7 +247,7 @@ func (st *DAGRunStatus) NodeByName(name string) (*Node, error) {
 }
 
 // setNodes converts scheduler NodeData objects to persistence Node objects
-func (s *DAGRunStatus) setNodes(nodes []scheduler.NodeData) []*Node {
+func (s *DAGRunStatus) setNodes(nodes []runtime.NodeData) []*Node {
 	var ret []*Node
 	for _, node := range nodes {
 		ret = append(ret, newNode(node))

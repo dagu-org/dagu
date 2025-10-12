@@ -1,4 +1,4 @@
-package scheduler_test
+package runtime_test
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 )
 
 func TestDebugVariables(t *testing.T) {
@@ -25,7 +25,7 @@ func TestDebugVariables(t *testing.T) {
 	fmt.Printf("Variables map: %#v\n", vars)
 
 	// Try evaluating directly
-	result, err := scheduler.EvalString(ctx, "${SPACES}")
+	result, err := runtime.EvalString(ctx, "${SPACES}")
 	if err != nil {
 		t.Fatalf("Error: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestDebugVariables(t *testing.T) {
 	vars2 := env.Variables.Variables()
 	fmt.Printf("\nVariables map with special: %#v\n", vars2)
 
-	result2, err := scheduler.EvalString(ctx, "${SPECIAL}")
+	result2, err := runtime.EvalString(ctx, "${SPECIAL}")
 	if err != nil {
 		t.Fatalf("Error: %v", err)
 	}
@@ -68,9 +68,9 @@ func TestDebugVariables(t *testing.T) {
 	env.Variables.Store("ESCAPED", "ESCAPED=\\$pecial")
 	ctx = core.WithEnv(ctx, env)
 
-	r3, _ := scheduler.EvalString(ctx, "${DOLLAR}")
-	r4, _ := scheduler.EvalString(ctx, "${DOLLAR_P}")
-	r5, _ := scheduler.EvalString(ctx, "${ESCAPED}")
+	r3, _ := runtime.EvalString(ctx, "${DOLLAR}")
+	r4, _ := runtime.EvalString(ctx, "${DOLLAR_P}")
+	r5, _ := runtime.EvalString(ctx, "${ESCAPED}")
 
 	fmt.Printf("\n'${DOLLAR}' -> '%s'\n", r3)
 	fmt.Printf("'${DOLLAR_P}' -> '%s'\n", r4)
@@ -82,6 +82,6 @@ func TestDebugVariables(t *testing.T) {
 	ctx = core.WithEnv(ctx, env)
 
 	// This should expand $HOME
-	r6, _ := scheduler.EvalString(ctx, "${TEST_DOLLAR}")
+	r6, _ := runtime.EvalString(ctx, "${TEST_DOLLAR}")
 	fmt.Printf("With env expansion: '${TEST_DOLLAR}' -> '%s'\n", r6)
 }

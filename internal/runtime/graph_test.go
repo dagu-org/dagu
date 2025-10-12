@@ -1,4 +1,4 @@
-package scheduler_test
+package runtime_test
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +19,7 @@ func TestCycleDetection(t *testing.T) {
 	step2.Name = "2"
 	step2.Depends = []string{"1"}
 
-	_, err := scheduler.NewExecutionGraph(step1, step2)
+	_, err := runtime.NewExecutionGraph(step1, step2)
 
 	if err == nil {
 		t.Fatal("cycle detection should be detected.")
@@ -39,73 +39,73 @@ func TestRetryExecution(t *testing.T) {
 		},
 	}
 
-	nodes := []*scheduler.Node{
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+	nodes := []*runtime.Node{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "1", Command: "true"},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeSuccess,
 				},
 			}),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "2", Command: "true", Depends: []string{"1"}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeError,
 				},
 			},
 		),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "3", Command: "true", Depends: []string{"2"}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeCancel,
 				},
 			},
 		),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "4", Command: "true", Depends: []string{}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeSkipped,
 				},
 			},
 		),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "5", Command: "true", Depends: []string{"4"}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeError,
 				},
 			},
 		),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "6", Command: "true", Depends: []string{"5"}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeSuccess,
 				},
 			},
 		),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "7", Command: "true", Depends: []string{"6"}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeSkipped,
 				},
 			},
 		),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "8", Command: "true", Depends: []string{}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeSkipped,
 				},
 			},
 		),
 	}
 	ctx := context.Background()
-	_, err := scheduler.CreateRetryExecutionGraph(ctx, dag, nodes...)
+	_, err := runtime.CreateRetryExecutionGraph(ctx, dag, nodes...)
 	require.NoError(t, err)
 	require.Equal(t, status.NodeSuccess, nodes[0].State().Status)
 	require.Equal(t, status.NodeNone, nodes[1].State().Status)
@@ -130,65 +130,65 @@ func TestStepRetryExecution(t *testing.T) {
 		},
 	}
 
-	nodes := []*scheduler.Node{
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+	nodes := []*runtime.Node{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "1", Command: "true"},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeSuccess,
 				},
 			}),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "2", Command: "true", Depends: []string{"1"}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeError,
 				},
 			},
 		),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "3", Command: "true", Depends: []string{"2"}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeCancel,
 				},
 			},
 		),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "4", Command: "true", Depends: []string{}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeSkipped,
 				},
 			},
 		),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "5", Command: "true", Depends: []string{"4"}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeError,
 				},
 			},
 		),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "6", Command: "true", Depends: []string{"5"}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeSuccess,
 				},
 			},
 		),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "7", Command: "true", Depends: []string{"6"}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeSkipped,
 				},
 			},
 		),
 	}
 	ctx := context.Background()
-	_, err := scheduler.CreateStepRetryGraph(ctx, dag, nodes, "2")
+	_, err := runtime.CreateStepRetryGraph(ctx, dag, nodes, "2")
 	require.NoError(t, err)
 	// Only step 2 should be reset to NodeStatusNone, downstream steps remain untouched
 	require.Equal(t, status.NodeSuccess, nodes[0].State().Status) // 1 (unchanged)
@@ -211,26 +211,26 @@ func TestStepRetryExecutionForSuccessfulStep(t *testing.T) {
 	}
 
 	// All nodes are successful
-	nodes := []*scheduler.Node{
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+	nodes := []*runtime.Node{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "step1", Command: "echo 1"},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeSuccess,
 				},
 			}),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "step2", Command: "echo 2", Depends: []string{"step1"}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeSuccess,
 				},
 			},
 		),
-		scheduler.NodeWithData(
-			scheduler.NodeData{
+		runtime.NodeWithData(
+			runtime.NodeData{
 				Step: core.Step{Name: "step3", Command: "echo 3", Depends: []string{"step2"}},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status.NodeSuccess,
 				},
 			},
@@ -240,7 +240,7 @@ func TestStepRetryExecutionForSuccessfulStep(t *testing.T) {
 	ctx := context.Background()
 
 	// Test retrying a successful step in the middle
-	graph, err := scheduler.CreateStepRetryGraph(ctx, dag, nodes, "step2")
+	graph, err := runtime.CreateStepRetryGraph(ctx, dag, nodes, "step2")
 	require.NoError(t, err)
 	require.NotNil(t, graph)
 
@@ -253,7 +253,7 @@ func TestStepRetryExecutionForSuccessfulStep(t *testing.T) {
 	// Reset nodes to original state
 	nodes[1].SetStatus(status.NodeSuccess)
 
-	graph, err = scheduler.CreateStepRetryGraph(ctx, dag, nodes, "step1")
+	graph, err = runtime.CreateStepRetryGraph(ctx, dag, nodes, "step1")
 	require.NoError(t, err)
 	require.NotNil(t, graph)
 
@@ -266,7 +266,7 @@ func TestStepRetryExecutionForSuccessfulStep(t *testing.T) {
 	// Reset nodes to original state
 	nodes[0].SetStatus(status.NodeSuccess)
 
-	graph, err = scheduler.CreateStepRetryGraph(ctx, dag, nodes, "step3")
+	graph, err = runtime.CreateStepRetryGraph(ctx, dag, nodes, "step3")
 	require.NoError(t, err)
 	require.NotNil(t, graph)
 
@@ -288,7 +288,7 @@ func TestExecutionGraphDependencies(t *testing.T) {
 		}
 
 		// Create execution graph
-		graph, err := scheduler.NewExecutionGraph(steps...)
+		graph, err := runtime.NewExecutionGraph(steps...)
 		require.NoError(t, err)
 
 		// Verify the graph was set up correctly
@@ -307,7 +307,7 @@ func TestExecutionGraphDependencies(t *testing.T) {
 		}
 
 		// Create execution graph
-		graph, err := scheduler.NewExecutionGraph(steps...)
+		graph, err := runtime.NewExecutionGraph(steps...)
 		require.NoError(t, err)
 		require.NotNil(t, graph)
 
@@ -338,7 +338,7 @@ func TestGraphWithMixedDependencies(t *testing.T) {
 		{Name: "cleanup", Command: "rm temp", Depends: []string{"process"}},                              // ID resolved to name
 	}
 
-	graph, err := scheduler.NewExecutionGraph(steps...)
+	graph, err := runtime.NewExecutionGraph(steps...)
 	require.NoError(t, err)
 	require.NotNil(t, graph)
 

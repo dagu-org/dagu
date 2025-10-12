@@ -14,7 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/dagrun"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 )
 
@@ -159,7 +159,7 @@ steps:
 }
 
 func testNewStatus(dag *core.DAG, dagRunID string, dagStatus status.Status, nodeStatus status.NodeStatus) models.DAGRunStatus {
-	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
+	nodes := []runtime.NodeData{{State: runtime.NodeState{Status: nodeStatus}}}
 	tm := time.Now()
 	startedAt := &tm
 	return models.NewStatusBuilder(dag).Create(dagRunID, dagStatus, 0, *startedAt, models.WithNodes(nodes))

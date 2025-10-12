@@ -1,4 +1,4 @@
-package scheduler_test
+package runtime_test
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -113,14 +113,14 @@ func TestCondition_Eval(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			ctx = core.WithEnv(ctx, core.NewEnv(ctx, core.Step{}))
-			err := scheduler.EvalConditions(ctx, "sh", tt.condition)
+			err := runtime.EvalConditions(ctx, "sh", tt.condition)
 			if tt.wantErr {
 				require.Error(t, err, "expected error but got nil")
 			} else {
 				require.NoError(t, err, "expected no error but got %v", err)
 			}
 			if err != nil {
-				require.ErrorIs(t, err, scheduler.ErrConditionNotMet)
+				require.ErrorIs(t, err, runtime.ErrConditionNotMet)
 				require.NotEmpty(t, tt.condition[0].GetErrorMessage())
 			}
 		})

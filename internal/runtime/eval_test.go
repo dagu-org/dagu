@@ -1,11 +1,11 @@
-package scheduler_test
+package runtime_test
 
 import (
 	"context"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -53,7 +53,7 @@ func TestEvalString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := scheduler.EvalString(ctx, tt.input)
+			result, err := runtime.EvalString(ctx, tt.input)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -129,7 +129,7 @@ func TestEvalBool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := scheduler.EvalBool(ctx, tt.input)
+			result, err := runtime.EvalBool(ctx, tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -182,12 +182,12 @@ func TestEvalObject(t *testing.T) {
 	}
 
 	// Test EvalObject
-	result, err := scheduler.EvalObject(ctx, testObj)
+	result, err := runtime.EvalObject(ctx, testObj)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, result)
 
 	// Test with a non-struct type
-	_, err = scheduler.EvalObject(ctx, "not a struct")
+	_, err = runtime.EvalObject(ctx, "not a struct")
 	assert.NoError(t, err)
 }
 
@@ -228,7 +228,7 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 	}
 
 	// Test EvalObject
-	result, err := scheduler.EvalObject(ctx, config.Config)
+	result, err := runtime.EvalObject(ctx, config.Config)
 	assert.NoError(t, err)
 
 	// Check Config map values
@@ -283,18 +283,18 @@ func TestGenerateChildDAGRunID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := scheduler.GenerateChildDAGRunID(ctx, tt.params, tt.repeated)
+			result := runtime.GenerateChildDAGRunID(ctx, tt.params, tt.repeated)
 			assert.NotEmpty(t, result)
 			// Base58 encoded strings should be at least this length
 			assert.GreaterOrEqual(t, len(result), tt.expectLen)
 
 			// For non-repeated runs, the same parameters should generate the same ID
 			if !tt.repeated {
-				result2 := scheduler.GenerateChildDAGRunID(ctx, tt.params, tt.repeated)
+				result2 := runtime.GenerateChildDAGRunID(ctx, tt.params, tt.repeated)
 				assert.Equal(t, result, result2)
 			} else {
 				// For repeated runs, the same parameters should generate different IDs
-				result2 := scheduler.GenerateChildDAGRunID(ctx, tt.params, tt.repeated)
+				result2 := runtime.GenerateChildDAGRunID(ctx, tt.params, tt.repeated)
 				assert.NotEqual(t, result, result2)
 			}
 		})
@@ -454,7 +454,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := scheduler.EvalObject(ctx, tt.input)
+			result, err := runtime.EvalObject(ctx, tt.input)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -518,7 +518,7 @@ func TestEvalStringEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := scheduler.EvalString(ctx, tt.input)
+			result, err := runtime.EvalString(ctx, tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -600,7 +600,7 @@ func TestEvalObjectWithDirectStringEvaluation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := scheduler.EvalObject(ctx, tt.input)
+			result, err := runtime.EvalObject(ctx, tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -697,7 +697,7 @@ func TestEvalBoolEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := scheduler.EvalBool(ctx, tt.input)
+			result, err := runtime.EvalBool(ctx, tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

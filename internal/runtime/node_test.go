@@ -1,4 +1,4 @@
-package scheduler_test
+package runtime_test
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -244,7 +244,7 @@ func TestNodeShouldMarkSuccess(t *testing.T) {
 				Name:       "test-step",
 				ContinueOn: tt.continueOnSettings,
 			}
-			node := scheduler.NewNode(step, scheduler.NodeState{
+			node := runtime.NewNode(step, runtime.NodeState{
 				Status: tt.nodeStatus,
 			})
 
@@ -339,7 +339,7 @@ Line 5: Process completed
 			step := core.Step{Name: "test-step"}
 
 			// Setup node properly with log file
-			node := scheduler.NewNode(step, scheduler.NodeState{})
+			node := runtime.NewNode(step, runtime.NodeState{})
 			err := node.Setup(ctx, tempDir, "test-run")
 			require.NoError(t, err)
 
@@ -494,7 +494,7 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 				Parallel: tt.parallel,
 				ChildDAG: tt.childDAG,
 			}
-			node := scheduler.NewNode(step, scheduler.NodeState{})
+			node := runtime.NewNode(step, runtime.NodeState{})
 
 			// Now we can test the public method directly
 			runs, err := node.BuildChildDAGRuns(ctx, tt.childDAG)
@@ -585,7 +585,7 @@ func TestNodeItemToParam(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a node to call the method on
 			step := core.Step{Name: "test-step"}
-			node := scheduler.NewNode(step, scheduler.NodeState{})
+			node := runtime.NewNode(step, runtime.NodeState{})
 
 			// Now we can test the public method directly
 			result, err := node.ItemToParam(tt.item)
@@ -603,13 +603,13 @@ func TestNodeItemToParam(t *testing.T) {
 func TestRetryPolicyShouldRetry(t *testing.T) {
 	tests := []struct {
 		name        string
-		policy      scheduler.RetryPolicy
+		policy      runtime.RetryPolicy
 		exitCode    int
 		shouldRetry bool
 	}{
 		{
 			name: "RetryOnAnyNonZeroWhenNoExitCodesSpecified",
-			policy: scheduler.RetryPolicy{
+			policy: runtime.RetryPolicy{
 				Limit:    3,
 				Interval: time.Second,
 			},
@@ -618,7 +618,7 @@ func TestRetryPolicyShouldRetry(t *testing.T) {
 		},
 		{
 			name: "NoRetryOnZeroWhenNoExitCodesSpecified",
-			policy: scheduler.RetryPolicy{
+			policy: runtime.RetryPolicy{
 				Limit:    3,
 				Interval: time.Second,
 			},
@@ -627,7 +627,7 @@ func TestRetryPolicyShouldRetry(t *testing.T) {
 		},
 		{
 			name: "RetryOnlyOnSpecificExitCodes",
-			policy: scheduler.RetryPolicy{
+			policy: runtime.RetryPolicy{
 				Limit:     3,
 				Interval:  time.Second,
 				ExitCodes: []int{1, 2, 3},
@@ -637,7 +637,7 @@ func TestRetryPolicyShouldRetry(t *testing.T) {
 		},
 		{
 			name: "NoRetryOnNonSpecifiedExitCode",
-			policy: scheduler.RetryPolicy{
+			policy: runtime.RetryPolicy{
 				Limit:     3,
 				Interval:  time.Second,
 				ExitCodes: []int{1, 2, 3},
@@ -647,7 +647,7 @@ func TestRetryPolicyShouldRetry(t *testing.T) {
 		},
 		{
 			name: "NoRetryOnZeroEvenWhenInExitCodes",
-			policy: scheduler.RetryPolicy{
+			policy: runtime.RetryPolicy{
 				Limit:     3,
 				Interval:  time.Second,
 				ExitCodes: []int{0, 1, 2},
@@ -677,7 +677,7 @@ func TestNodeSetupAndTeardown(t *testing.T) {
 		Args:    []string{"hello"},
 	}
 
-	node := scheduler.NewNode(step, scheduler.NodeState{})
+	node := runtime.NewNode(step, runtime.NodeState{})
 
 	// Test Setup
 	dagRunID := "test-run-123"
@@ -704,8 +704,8 @@ func TestNodeInit(t *testing.T) {
 	step := core.Step{Name: "test-step"}
 
 	// Create multiple nodes to verify they get different IDs
-	node1 := scheduler.NewNode(step, scheduler.NodeState{})
-	node2 := scheduler.NewNode(step, scheduler.NodeState{})
+	node1 := runtime.NewNode(step, runtime.NodeState{})
+	node2 := runtime.NewNode(step, runtime.NodeState{})
 
 	// Call Init on first node
 	node1.Init()
@@ -736,7 +736,7 @@ func TestNodeCancel(t *testing.T) {
 		Args:    []string{"10"},
 	}
 
-	node := scheduler.NewNode(step, scheduler.NodeState{})
+	node := runtime.NewNode(step, runtime.NodeState{})
 	node.SetStatus(status.NodeRunning)
 
 	// Cancel the node
@@ -752,7 +752,7 @@ func TestNodeSetupContextBeforeExec(t *testing.T) {
 	ctx = core.WithEnv(ctx, env)
 
 	step := core.Step{Name: "test-step"}
-	node := scheduler.NewNode(step, scheduler.NodeState{
+	node := runtime.NewNode(step, runtime.NodeState{
 		Stdout: "/tmp/stdout.log",
 		Stderr: "/tmp/stderr.log",
 	})
@@ -821,7 +821,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 				Output:  "CAPTURED_OUTPUT",
 			}
 
-			node := scheduler.NewNode(step, scheduler.NodeState{})
+			node := runtime.NewNode(step, runtime.NodeState{})
 			node.Init()
 
 			// Setup node
@@ -879,7 +879,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 					Output:  "TEST_VAR",
 				}
 
-				node := scheduler.NewNode(step, scheduler.NodeState{})
+				node := runtime.NewNode(step, runtime.NodeState{})
 				node.Init()
 
 				// The node should respect the configured MaxOutputSize
@@ -898,7 +898,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		nodeStatus         status.NodeStatus
 		exitCode           int
 		continueOnSettings core.ContinueOn
-		setupOutput        func(t *testing.T, node *scheduler.Node)
+		setupOutput        func(t *testing.T, node *runtime.Node)
 		expectContinue     bool
 	}{
 		{
@@ -957,7 +957,7 @@ func TestNodeShouldContinue(t *testing.T) {
 			continueOnSettings: core.ContinueOn{
 				Output: []string{"WARNING"},
 			},
-			setupOutput: func(t *testing.T, node *scheduler.Node) {
+			setupOutput: func(t *testing.T, node *runtime.Node) {
 				tempDir := t.TempDir()
 				ctx := context.Background()
 				err := node.Setup(ctx, tempDir, "test-run")
@@ -976,7 +976,7 @@ func TestNodeShouldContinue(t *testing.T) {
 			continueOnSettings: core.ContinueOn{
 				Output: []string{"re:.*timeout.*"},
 			},
-			setupOutput: func(t *testing.T, node *scheduler.Node) {
+			setupOutput: func(t *testing.T, node *runtime.Node) {
 				tempDir := t.TempDir()
 				ctx := context.Background()
 				err := node.Setup(ctx, tempDir, "test-run")
@@ -1009,7 +1009,7 @@ func TestNodeShouldContinue(t *testing.T) {
 				Name:       "test-step",
 				ContinueOn: tt.continueOnSettings,
 			}
-			node := scheduler.NewNode(step, scheduler.NodeState{
+			node := runtime.NewNode(step, runtime.NodeState{
 				Status:   tt.nodeStatus,
 				ExitCode: tt.exitCode,
 			})
@@ -1029,50 +1029,50 @@ func TestNodeShouldContinue(t *testing.T) {
 }
 
 type nodeHelper struct {
-	*scheduler.Node
+	*runtime.Node
 	test.Helper
 }
 
-type nodeOption func(*scheduler.NodeData)
+type nodeOption func(*runtime.NodeData)
 
 func withNodeCmdArgs(cmd string) nodeOption {
-	return func(data *scheduler.NodeData) {
+	return func(data *runtime.NodeData) {
 		data.Step.CmdWithArgs = cmd
 	}
 }
 
 func withNodeCommand(command string) nodeOption {
-	return func(data *scheduler.NodeData) {
+	return func(data *runtime.NodeData) {
 		data.Step.Command = command
 	}
 }
 
 func withNodeSignalOnStop(signal string) nodeOption {
-	return func(data *scheduler.NodeData) {
+	return func(data *runtime.NodeData) {
 		data.Step.SignalOnStop = signal
 	}
 }
 
 func withNodeStdout(stdout string) nodeOption {
-	return func(data *scheduler.NodeData) {
+	return func(data *runtime.NodeData) {
 		data.Step.Stdout = stdout
 	}
 }
 
 func withNodeStderr(stderr string) nodeOption {
-	return func(data *scheduler.NodeData) {
+	return func(data *runtime.NodeData) {
 		data.Step.Stderr = stderr
 	}
 }
 
 func withNodeScript(script string) nodeOption {
-	return func(data *scheduler.NodeData) {
+	return func(data *runtime.NodeData) {
 		data.Step.Script = script
 	}
 }
 
 func withNodeOutput(output string) nodeOption {
-	return func(data *scheduler.NodeData) {
+	return func(data *runtime.NodeData) {
 		data.Step.Output = output
 	}
 }
@@ -1082,14 +1082,14 @@ func setupNode(t *testing.T, opts ...nodeOption) nodeHelper {
 
 	th := test.Setup(t)
 
-	data := scheduler.NodeData{Step: core.Step{}}
+	data := runtime.NodeData{Step: core.Step{}}
 	for _, opt := range opts {
 		opt(&data)
 	}
 
 	return nodeHelper{
 		Helper: th,
-		Node:   scheduler.NodeWithData(data),
+		Node:   runtime.NodeWithData(data),
 	}
 }
 
@@ -1156,7 +1156,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 			Stdout:  stdoutPath,
 		}
 
-		node := scheduler.NewNode(step, scheduler.NodeState{})
+		node := runtime.NewNode(step, runtime.NodeState{})
 		node.Init()
 
 		// Setup context with working directory
@@ -1196,7 +1196,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 			Stdout:  stdoutPath,
 		}
 
-		node := scheduler.NewNode(step, scheduler.NodeState{})
+		node := runtime.NewNode(step, runtime.NodeState{})
 		node.Init()
 
 		// Setup context with working directory
@@ -1241,7 +1241,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 			Stderr:  stderrPath,
 		}
 
-		node := scheduler.NewNode(step, scheduler.NodeState{})
+		node := runtime.NewNode(step, runtime.NodeState{})
 		node.Init()
 
 		// Setup context with working directory
@@ -1287,7 +1287,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 			Stdout:  stdoutPath,
 		}
 
-		node := scheduler.NewNode(step, scheduler.NodeState{})
+		node := runtime.NewNode(step, runtime.NodeState{})
 		node.Init()
 
 		// Setup context with working directory

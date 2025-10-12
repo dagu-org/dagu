@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,10 +106,10 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 	finishedAt := startedAt.Add(5 * time.Minute)
 
 	// Create nodes for options
-	nodes := []scheduler.NodeData{
+	nodes := []runtime.NodeData{
 		{
 			Step: core.Step{Name: "step1"},
-			State: scheduler.NodeState{
+			State: runtime.NodeState{
 				Status:     status.NodeSuccess,
 				StartedAt:  startedAt,
 				FinishedAt: finishedAt,
@@ -117,10 +117,10 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 		},
 	}
 
-	exitNode := scheduler.NewNode(core.Step{Name: "exit-step"}, scheduler.NodeState{})
-	successNode := scheduler.NewNode(core.Step{Name: "success-step"}, scheduler.NodeState{})
-	failureNode := scheduler.NewNode(core.Step{Name: "failure-step"}, scheduler.NodeState{})
-	cancelNode := scheduler.NewNode(core.Step{Name: "cancel-step"}, scheduler.NodeState{})
+	exitNode := runtime.NewNode(core.Step{Name: "exit-step"}, runtime.NodeState{})
+	successNode := runtime.NewNode(core.Step{Name: "success-step"}, runtime.NodeState{})
+	failureNode := runtime.NewNode(core.Step{Name: "failure-step"}, runtime.NodeState{})
+	cancelNode := runtime.NewNode(core.Step{Name: "cancel-step"}, runtime.NodeState{})
 
 	rootRef := core.NewDAGRunRef("root-dag", "root-run-123")
 	parentRef := core.NewDAGRunRef("parent-dag", "parent-run-456")

@@ -10,7 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
@@ -32,7 +32,7 @@ func newReporter(f SenderFn) *reporter {
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	ctx context.Context, dag *core.DAG, dagStatus models.DAGRunStatus, node *scheduler.Node,
+	ctx context.Context, dag *core.DAG, dagStatus models.DAGRunStatus, node *runtime.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != status.NodeNone {

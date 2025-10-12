@@ -7,7 +7,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 )
 
 // Node represents a DAG step with its execution state for persistence
@@ -35,23 +35,23 @@ type ChildDAGRun struct {
 }
 
 // ToNode converts a persistence Node back to a scheduler Node
-func (n *Node) ToNode() *scheduler.Node {
+func (n *Node) ToNode() *runtime.Node {
 	startedAt, _ := stringutil.ParseTime(n.StartedAt)
 	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
 	retriedAt, _ := stringutil.ParseTime(n.RetriedAt)
-	children := make([]scheduler.ChildDAGRun, len(n.Children))
+	children := make([]runtime.ChildDAGRun, len(n.Children))
 	for i, r := range n.Children {
-		children[i] = scheduler.ChildDAGRun(r)
+		children[i] = runtime.ChildDAGRun(r)
 	}
-	childrenRepeated := make([]scheduler.ChildDAGRun, len(n.ChildrenRepeated))
+	childrenRepeated := make([]runtime.ChildDAGRun, len(n.ChildrenRepeated))
 	for i, r := range n.ChildrenRepeated {
-		childrenRepeated[i] = scheduler.ChildDAGRun(r)
+		childrenRepeated[i] = runtime.ChildDAGRun(r)
 	}
 	var err error
 	if n.Error != "" {
 		err = errors.New(n.Error)
 	}
-	return scheduler.NewNode(n.Step, scheduler.NodeState{
+	return runtime.NewNode(n.Step, runtime.NodeState{
 		Status:           n.Status,
 		Stdout:           n.Stdout,
 		Stderr:           n.Stderr,
@@ -88,7 +88,7 @@ func newNodeFromStep(step core.Step) *Node {
 }
 
 // newNode converts a single scheduler NodeData to a persistence Node
-func newNode(node scheduler.NodeData) *Node {
+func newNode(node runtime.NodeData) *Node {
 	children := make([]ChildDAGRun, len(node.State.Children))
 	for i, child := range node.State.Children {
 		children[i] = ChildDAGRun(child)

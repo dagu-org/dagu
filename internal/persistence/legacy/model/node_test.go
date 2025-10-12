@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
 	"github.com/dagu-org/dagu/internal/persistence/legacy/model"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,13 +43,13 @@ func TestFromNodes(t *testing.T) {
 	later := now.Add(5 * time.Second)
 	retryTime := now.Add(2 * time.Second)
 
-	nodeDataList := []scheduler.NodeData{
+	nodeDataList := []runtime.NodeData{
 		{
 			Step: core.Step{
 				Name:    "step1",
 				Command: "echo hello",
 			},
-			State: scheduler.NodeState{
+			State: runtime.NodeState{
 				Status:     status.NodeSuccess,
 				Stdout:     "/tmp/step1.log",
 				StartedAt:  now,
@@ -64,7 +64,7 @@ func TestFromNodes(t *testing.T) {
 				Name:    "step2",
 				Command: "false",
 			},
-			State: scheduler.NodeState{
+			State: runtime.NodeState{
 				Status:     status.NodeError,
 				Stdout:     "/tmp/step2.log",
 				StartedAt:  now,
@@ -100,14 +100,14 @@ func TestFromNode(t *testing.T) {
 	now := time.Now()
 	later := now.Add(5 * time.Second)
 
-	nodeData := scheduler.NodeData{
+	nodeData := runtime.NodeData{
 		Step: core.Step{
 			Name:        "test-step",
 			Command:     "echo test",
 			Description: "Test step",
 			Dir:         "/tmp",
 		},
-		State: scheduler.NodeState{
+		State: runtime.NodeState{
 			Status:     status.NodeSuccess,
 			Stdout:     "/tmp/test.log",
 			StartedAt:  now,
@@ -304,9 +304,9 @@ func TestErrText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test through the public interface
-			nodeData := scheduler.NodeData{
+			nodeData := runtime.NodeData{
 				Step: core.Step{Name: "test"},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Error: tt.input,
 				},
 			}
@@ -329,11 +329,11 @@ func TestNodeWithAllStatuses(t *testing.T) {
 
 	for _, status := range statuses {
 		t.Run(status.String(), func(t *testing.T) {
-			nodeData := scheduler.NodeData{
+			nodeData := runtime.NodeData{
 				Step: core.Step{
 					Name: "status-test-step",
 				},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status,
 				},
 			}
@@ -350,13 +350,13 @@ func TestNodeWithAllStatuses(t *testing.T) {
 }
 
 func TestFromNodesPreservesOrder(t *testing.T) {
-	var nodeDataList []scheduler.NodeData
+	var nodeDataList []runtime.NodeData
 	for i := 0; i < 10; i++ {
-		nodeDataList = append(nodeDataList, scheduler.NodeData{
+		nodeDataList = append(nodeDataList, runtime.NodeData{
 			Step: core.Step{
 				Name: string(rune('A' + i)),
 			},
-			State: scheduler.NodeState{
+			State: runtime.NodeState{
 				Status: status.NodeSuccess,
 			},
 		})

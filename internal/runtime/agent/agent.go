@@ -29,9 +29,9 @@ import (
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/models"
 	"github.com/dagu-org/dagu/internal/otel"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -70,10 +70,10 @@ type Agent struct {
 	dagRunMgr dagrun.Manager
 
 	// scheduler is the scheduler instance to run the DAG.
-	scheduler *scheduler.Scheduler
+	scheduler *runtime.Scheduler
 
 	// graph is the execution graph for the DAG.
-	graph *scheduler.ExecutionGraph
+	graph *runtime.ExecutionGraph
 
 	// reporter is responsible for sending the report to the user.
 	reporter *reporter
@@ -413,7 +413,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Setup channels to receive status updates for each node in the DAG.
 	// It should receive node instance when the node status changes, for
 	// example, when started, stopped, or cancelled, etc.
-	progressCh := make(chan *scheduler.Node)
+	progressCh := make(chan *runtime.Node)
 	progressDone := make(chan struct{})
 	defer func() {
 		close(progressCh)
@@ -533,7 +533,7 @@ func (a *Agent) Run(ctx context.Context) error {
 }
 
 // nodeToModelNode converts a scheduler NodeData to a models.Node
-func (a *Agent) nodeToModelNode(nodeData scheduler.NodeData) *models.Node {
+func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *models.Node {
 	children := make([]models.ChildDAGRun, len(nodeData.State.Children))
 	for i, child := range nodeData.State.Children {
 		children[i] = models.ChildDAGRun(child)
@@ -702,13 +702,13 @@ func (a *Agent) setupReporter(ctx context.Context) {
 }
 
 // newScheduler creates a scheduler instance for the dag-run.
-func (a *Agent) newScheduler() *scheduler.Scheduler {
+func (a *Agent) newScheduler() *runtime.Scheduler {
 	// schedulerLogDir is the directory to store the log files for each node in the dag-run.
 	const dateTimeFormatUTC = "20060102_150405Z"
 	ts := time.Now().UTC().Format(dateTimeFormatUTC)
 	schedulerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.dagRunAttemptID)
 
-	cfg := &scheduler.Config{
+	cfg := &runtime.Config{
 		LogDir:         schedulerLogDir,
 		MaxActiveSteps: a.dag.MaxActiveSteps,
 		Timeout:        a.dag.Timeout,
@@ -733,7 +733,7 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 		cfg.OnCancel = a.dag.HandlerOn.Cancel
 	}
 
-	return scheduler.New(cfg)
+	return runtime.New(cfg)
 }
 
 // createCoordinatorClient creates a coordinator client factory for distributed execution
@@ -762,7 +762,7 @@ func (a *Agent) createCoordinatorClient(ctx context.Context) core.Dispatcher {
 func (a *Agent) dryRun(ctx context.Context) error {
 	// progressCh channel receives the node when the node is progressCh.
 	// It's a way to update the status in real-time in efficient manner.
-	progressCh := make(chan *scheduler.Node)
+	progressCh := make(chan *runtime.Node)
 	defer func() {
 		close(progressCh)
 	}()
@@ -847,7 +847,7 @@ func (a *Agent) setupGraph(ctx context.Context) error {
 	if a.retryTarget != nil {
 		return a.setupGraphForRetry(ctx)
 	}
-	graph, err := scheduler.NewExecutionGraph(a.dag.Steps...)
+	graph, err := runtime.NewExecutionGraph(a.dag.Steps...)
 	if err != nil {
 		return err
 	}
@@ -857,7 +857,7 @@ func (a *Agent) setupGraph(ctx context.Context) error {
 
 // setupGraphForRetry setsup the graph for retry.
 func (a *Agent) setupGraphForRetry(ctx context.Context) error {
-	nodes := make([]*scheduler.Node, 0, len(a.retryTarget.Nodes))
+	nodes := make([]*runtime.Node, 0, len(a.retryTarget.Nodes))
 	for _, n := range a.retryTarget.Nodes {
 		nodes = append(nodes, n.ToNode())
 	}
@@ -868,8 +868,8 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 }
 
 // setupStepRetryGraph sets up the graph for retrying a specific step.
-func (a *Agent) setupStepRetryGraph(ctx context.Context, nodes []*scheduler.Node) error {
-	graph, err := scheduler.CreateStepRetryGraph(ctx, a.dag, nodes, a.stepRetry)
+func (a *Agent) setupStepRetryGraph(ctx context.Context, nodes []*runtime.Node) error {
+	graph, err := runtime.CreateStepRetryGraph(ctx, a.dag, nodes, a.stepRetry)
 	if err != nil {
 		return err
 	}
@@ -878,8 +878,8 @@ func (a *Agent) setupStepRetryGraph(ctx context.Context, nodes []*scheduler.Node
 }
 
 // setupDefaultRetryGraph sets up the graph for the default retry behavior (all failed/canceled nodes and downstreams).
-func (a *Agent) setupDefaultRetryGraph(ctx context.Context, nodes []*scheduler.Node) error {
-	graph, err := scheduler.CreateRetryExecutionGraph(ctx, a.dag, nodes...)
+func (a *Agent) setupDefaultRetryGraph(ctx context.Context, nodes []*runtime.Node) error {
+	graph, err := runtime.CreateRetryExecutionGraph(ctx, a.dag, nodes...)
 	if err != nil {
 		return err
 	}

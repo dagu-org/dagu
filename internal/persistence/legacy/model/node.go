@@ -7,7 +7,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/status"
-	"github.com/dagu-org/dagu/internal/runtime/scheduler"
+	"github.com/dagu-org/dagu/internal/runtime"
 )
 
 func FromSteps(steps []core.Step) []*Node {
@@ -18,7 +18,7 @@ func FromSteps(steps []core.Step) []*Node {
 	return ret
 }
 
-func FromNodes(nodes []scheduler.NodeData) []*Node {
+func FromNodes(nodes []runtime.NodeData) []*Node {
 	var ret []*Node
 	for _, node := range nodes {
 		ret = append(ret, FromNode(node))
@@ -26,7 +26,7 @@ func FromNodes(nodes []scheduler.NodeData) []*Node {
 	return ret
 }
 
-func FromNode(node scheduler.NodeData) *Node {
+func FromNode(node runtime.NodeData) *Node {
 	return &Node{
 		Step:       node.Step,
 		Log:        node.State.Stdout,
@@ -54,11 +54,11 @@ type Node struct {
 	StatusText string            `json:"StatusText"`
 }
 
-func (n *Node) ToNode() *scheduler.Node {
+func (n *Node) ToNode() *runtime.Node {
 	startedAt, _ := stringutil.ParseTime(n.StartedAt)
 	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
 	retriedAt, _ := stringutil.ParseTime(n.RetriedAt)
-	return scheduler.NewNode(n.Step, scheduler.NodeState{
+	return runtime.NewNode(n.Step, runtime.NodeState{
 		Status:     n.Status,
 		Stdout:     n.Log,
 		StartedAt:  startedAt,
