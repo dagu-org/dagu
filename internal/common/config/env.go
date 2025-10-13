@@ -17,11 +17,12 @@ func NewBaseEnv(vars []string) BaseEnv {
 
 // defaultWhitelist defines which env vars to pass to child processes.
 var defaultWhitelist = map[string]bool{
-	"PATH":  true,
-	"HOME":  true,
-	"LANG":  true,
-	"TZ":    true,
-	"SHELL": true,
+	"PATH":            true,
+	"HOME":            true,
+	"LANG":            true,
+	"TZ":              true,
+	"SHELL":           true,
+	"LD_LIBRARY_PATH": true,
 }
 
 // defaultPrefixes defines prefixes of env vars allowed to propagate.
