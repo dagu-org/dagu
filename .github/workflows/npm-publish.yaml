@@ -12,6 +12,10 @@ env:
   VERSION: ${{ github.event.release.tag_name || inputs.version }}
   NODE_VERSION: "22"
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   # First, publish all platform-specific packages
   publish-platform-packages:
@@ -134,7 +138,7 @@ jobs:
         run: |
           cd npm/${{ matrix.package }}
           # Try to publish, but don't fail if version already exists
-          npm publish --access public 2>&1 | tee publish.log || {
+          npm publish --access public --provenance 2>&1 | tee publish.log || {
             if grep -q "cannot publish over the previously published versions" publish.log; then
               echo "Version already published, skipping..."
               exit 0
@@ -200,7 +204,7 @@ jobs:
         run: |
           cd npm/dagu
           # Try to publish, but don't fail if version already exists
-          npm publish --access public 2>&1 | tee publish.log || {
+          npm publish --access public --provenance 2>&1 | tee publish.log || {
             if grep -q "cannot publish over the previously published versions" publish.log; then
               echo "Version already published, skipping..."
               exit 0
