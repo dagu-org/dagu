@@ -3,6 +3,7 @@
 ##############################################################################
 
 VERSION=
+TEST_TARGET?=./...
 
 ##############################################################################
 # Variables
@@ -155,15 +156,15 @@ run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 test: bin
 	@echo "${COLOR_GREEN}Running tests...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
-	@go clean -testcache
-	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ./...
+	@go clean -testcache ${TEST_TARGET}
+	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ${TEST_TARGET}
 
 # test-coverage runs all tests with coverage.
 .PHONY: test-coverage
 test-coverage:
 	@echo "${COLOR_GREEN}Running tests with coverage...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
-	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverprofile="coverage.txt" -covermode=atomic ./...
+	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverprofile="coverage.txt" -covermode=atomic ${TEST_TARGET}
 
 # open-coverage opens the coverage file
 .PHONY: open-coverage
