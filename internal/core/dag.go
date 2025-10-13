@@ -119,6 +119,19 @@ type DAG struct {
 	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
 	// SSH contains the default SSH configuration for the DAG.
 	SSH *SSHConfig `json:"ssh,omitempty"`
+	// MaskEnv configures environment variable masking.
+	// By default, all values from dag.env and step.env are masked.
+	MaskEnv *MaskEnvConfig `json:"maskEnv,omitempty"`
+}
+
+// MaskEnvConfig configures environment variable masking behavior.
+type MaskEnvConfig struct {
+	// Disable turns off masking when set to true.
+	// By default (false), all dag.env and step.env values are masked.
+	Disable bool `json:"disable,omitempty"`
+	// Safelist contains environment variable NAMES to exclude from masking.
+	// Empty by default - all dag.env and step.env values are masked.
+	Safelist []string `json:"safelist,omitempty"`
 }
 
 // HasTag checks if the DAG has the given tag.

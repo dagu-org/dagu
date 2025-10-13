@@ -365,3 +365,53 @@ func TestDAGRegistryAuths(t *testing.T) {
 		assert.Equal(t, "github-user", ghcrAuth.Username)
 	})
 }
+
+func TestMaskEnvConfig_Defaults(t *testing.T) {
+	t.Parallel()
+
+	config := &core.MaskEnvConfig{}
+
+	// Test defaults
+	assert.False(t, config.Disable)
+	assert.Empty(t, config.Safelist)
+}
+
+func TestDAG_MaskEnvConfig(t *testing.T) {
+	t.Parallel()
+
+	dag := &core.DAG{
+		Name: "test",
+		MaskEnv: &core.MaskEnvConfig{
+			Safelist: []string{"LOG_LEVEL"},
+		},
+	}
+
+	assert.NotNil(t, dag.MaskEnv)
+	assert.False(t, dag.MaskEnv.Disable)
+	assert.Equal(t, []string{"LOG_LEVEL"}, dag.MaskEnv.Safelist)
+}
+
+func TestDAG_MaskEnvConfig_Disabled(t *testing.T) {
+	t.Parallel()
+
+	dag := &core.DAG{
+		Name: "test",
+		MaskEnv: &core.MaskEnvConfig{
+			Disable: true,
+		},
+	}
+
+	assert.NotNil(t, dag.MaskEnv)
+	assert.True(t, dag.MaskEnv.Disable)
+}
+
+func TestDAG_MaskEnvConfig_Nil(t *testing.T) {
+	t.Parallel()
+
+	dag := &core.DAG{
+		Name: "test",
+	}
+
+	// Verify MaskEnv is nil when not specified (masking enabled by default)
+	assert.Nil(t, dag.MaskEnv)
+}
