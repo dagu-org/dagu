@@ -221,11 +221,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            test-install: npm install -g dagu
+            test-install: 'npm install -g @dagu-org/dagu'
           - os: macos-latest
-            test-install: npm install -g dagu
+            test-install: 'npm install -g @dagu-org/dagu'
           - os: windows-latest
-            test-install: npm install -g dagu
+            test-install: 'npm install -g @dagu-org/dagu'
 
     steps:
       - name: Setup Node.js
@@ -239,7 +239,7 @@ jobs:
           # Wait for package to be available with retries
           echo "Checking npm package availability..."
           for i in {1..30}; do
-            if npm view dagu version 2>/dev/null; then
+            if npm view @dagu-org/dagu version 2>/dev/null; then
               echo "Package is available!"
               break
             fi

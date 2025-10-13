@@ -115,7 +115,7 @@ brew update && brew upgrade dagu
 **npm**:
 ```bash
 # Install via npm
-npm install -g --ignore-scripts=false dagu
+npm install -g --ignore-scripts=false @dagu-org/dagu
 ```
 
 ### 2. Create your first workflow

@@ -1,20 +1,20 @@
-# dagu
+# @dagu-org/dagu
 
 > A powerful Workflow Orchestration Engine with simple declarative YAML API
 
-[![npm version](https://img.shields.io/npm/v/dagu.svg)](https://www.npmjs.com/package/dagu)
+[![npm version](https://img.shields.io/npm/v/%40dagu-org%2Fdagu.svg)](https://www.npmjs.com/package/@dagu-org/dagu)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 ## Installation
 
 ```bash
-npm install -g dagu
+npm install -g @dagu-org/dagu
 ```
 
 Or add to your project:
 
 ```bash
-npm install dagu
+npm install @dagu-org/dagu
 ```
 
 ## Usage
@@ -37,7 +37,7 @@ dagu status my-workflow.yaml
 ### Programmatic Usage
 
 ```javascript
-const { execute, getDaguPath } = require('dagu');
+const { execute, getDaguPath } = require('@dagu-org/dagu');
 
 // Get path to the binary
 const daguPath = getDaguPath();
@@ -46,7 +46,7 @@ const daguPath = getDaguPath();
 const child = execute(['start', 'workflow.yaml']);
 
 // Or use async/await
-const { executeAsync } = require('dagu');
+const { executeAsync } = require('@dagu-org/dagu');
 
 async function runWorkflow() {
   const result = await executeAsync(['start', 'workflow.yaml']);
