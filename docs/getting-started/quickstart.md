@@ -26,7 +26,7 @@ brew update && brew install dagu
 ```
 
 ```bash [npm]
-npm install -g --ignore-scripts=false dagu
+npm install -g --ignore-scripts=false @dagu-org/dagu
 ```
 
 :::

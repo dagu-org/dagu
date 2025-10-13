@@ -12,6 +12,10 @@ env:
   VERSION: ${{ github.event.release.tag_name || inputs.version }}
   NODE_VERSION: "22"
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   # First, publish all platform-specific packages
   publish-platform-packages:
@@ -134,7 +138,7 @@ jobs:
         run: |
           cd npm/${{ matrix.package }}
           # Try to publish, but don't fail if version already exists
-          npm publish --access public 2>&1 | tee publish.log || {
+          npm publish --access public --provenance 2>&1 | tee publish.log || {
             if grep -q "cannot publish over the previously published versions" publish.log; then
               echo "Version already published, skipping..."
               exit 0
@@ -200,7 +204,7 @@ jobs:
         run: |
           cd npm/dagu
           # Try to publish, but don't fail if version already exists
-          npm publish --access public 2>&1 | tee publish.log || {
+          npm publish --access public --provenance 2>&1 | tee publish.log || {
             if grep -q "cannot publish over the previously published versions" publish.log; then
               echo "Version already published, skipping..."
               exit 0
@@ -221,11 +225,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            test-install: npm install -g dagu
+            test-install: 'npm install -g @dagu-org/dagu'
           - os: macos-latest
-            test-install: npm install -g dagu
+            test-install: 'npm install -g @dagu-org/dagu'
           - os: windows-latest
-            test-install: npm install -g dagu
+            test-install: 'npm install -g @dagu-org/dagu'
 
     steps:
       - name: Setup Node.js
@@ -239,7 +243,7 @@ jobs:
           # Wait for package to be available with retries
           echo "Checking npm package availability..."
           for i in {1..30}; do
-            if npm view dagu version 2>/dev/null; then
+            if npm view @dagu-org/dagu version 2>/dev/null; then
               echo "Package is available!"
               break
             fi

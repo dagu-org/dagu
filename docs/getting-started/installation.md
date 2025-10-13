@@ -31,7 +31,7 @@ Visit http://localhost:8080
 ### npm
 
 ```bash
-npm install -g --ignore-scripts=false dagu 
+npm install -g --ignore-scripts=false @dagu-org/dagu
 ```
 
 This installs Dagu globally with automatic platform detection.

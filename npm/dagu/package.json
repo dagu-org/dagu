@@ -1,5 +1,5 @@
 {
-  "name": "dagu",
+  "name": "@dagu-org/dagu",
   "version": "0.0.0-development",
   "description": "A powerful Workflow Orchestration Engine with simple declarative YAML API. Zero-dependency, single binary for Linux, macOS, and Windows.",
   "keywords": [
