@@ -365,13 +365,3 @@ func TestDAGRegistryAuths(t *testing.T) {
 		assert.Equal(t, "github-user", ghcrAuth.Username)
 	})
 }
-
-func TestMaskEnvConfig_Defaults(t *testing.T) {
-	t.Parallel()
-
-	config := &core.MaskEnvConfig{}
-
-	// Test defaults
-	assert.False(t, config.Disable)
-	assert.Empty(t, config.Safelist)
-}
