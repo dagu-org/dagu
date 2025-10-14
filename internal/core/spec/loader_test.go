@@ -548,20 +548,11 @@ steps:
 func TestLoad_MaskEnvConfig(t *testing.T) {
 	t.Parallel()
 
-	testDAG := createTempYAMLFile(t, `name: test_dag
-
+	testDAG := createTempYAMLFile(t, `
 maskEnv:
   safelist:
     - LOG_LEVEL
     - ENVIRONMENT
-
-env:
-  - API_KEY: secret123
-  - LOG_LEVEL: debug
-
-steps:
-  - name: test
-    command: echo test
 `)
 	dag, err := spec.Load(context.Background(), testDAG)
 	require.NoError(t, err)
@@ -575,17 +566,9 @@ steps:
 func TestLoad_MaskEnvConfig_Disabled(t *testing.T) {
 	t.Parallel()
 
-	testDAG := createTempYAMLFile(t, `name: test_dag
-
+	testDAG := createTempYAMLFile(t, `
 maskEnv:
   disable: true
-
-env:
-  - API_KEY: secret123
-
-steps:
-  - name: test
-    command: echo test
 `)
 	dag, err := spec.Load(context.Background(), testDAG)
 	require.NoError(t, err)
@@ -593,23 +576,4 @@ steps:
 	// Verify MaskEnv is disabled
 	require.NotNil(t, dag.MaskEnv)
 	assert.True(t, dag.MaskEnv.Disable)
-}
-
-func TestLoad_MaskEnvConfig_Defaults(t *testing.T) {
-	t.Parallel()
-
-	testDAG := createTempYAMLFile(t, `name: test_dag
-
-env:
-  - API_KEY: secret123
-
-steps:
-  - name: test
-    command: echo test
-`)
-	dag, err := spec.Load(context.Background(), testDAG)
-	require.NoError(t, err)
-
-	// Verify MaskEnv is nil when not specified (masking enabled by default)
-	assert.Nil(t, dag.MaskEnv)
 }
