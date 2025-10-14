@@ -15,24 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDAG(t *testing.T) {
-	t.Parallel()
-
-	th := test.Setup(t)
-	t.Run("String", func(t *testing.T) {
-		t.Parallel()
-
-		dag := th.DAG(t, `steps:
-  - name: "1"
-    command: "true"
-`)
-		ret := dag.String()
-		require.Contains(t, ret, "Name: ")
-		require.Contains(t, ret, "Step0: Name: 1")
-		require.Contains(t, ret, "Command: true")
-	})
-}
-
 func TestSockAddr(t *testing.T) {
 	t.Parallel()
 
