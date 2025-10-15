@@ -22,6 +22,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/masking"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
@@ -918,6 +919,9 @@ type OutputCoordinator struct {
 	outputCaptured bool
 	maxOutputSize  int64          // Max output size in bytes
 	outputCapture  *outputCapture // Concurrent output capture handler
+
+	// Masker for environment variable masking
+	masker *masking.Masker
 }
 
 func (oc *OutputCoordinator) StdoutFile() string {
@@ -935,7 +939,51 @@ func (oc *OutputCoordinator) unlock() {
 	oc.mu.Unlock()
 }
 
+// setupMasker creates a masker for environment variable masking based on DAG and step configuration.
+// Returns nil masker if masking is disabled or if there's no DAG in context.
+func (oc *OutputCoordinator) setupMasker(ctx context.Context, data NodeData) error {
+	oc.mu.Lock()
+	defer oc.mu.Unlock()
+
+	// Get DAG from context
+	dagCtx := execution.GetDAGContextFromContext(ctx)
+	if dagCtx.DAG == nil {
+		// No DAG in context, skip masking
+		oc.masker = nil
+		return nil
+	}
+
+	dag := dagCtx.DAG
+
+	// Check if masking is explicitly disabled
+	if dag.MaskEnv != nil && dag.MaskEnv.Disable {
+		oc.masker = nil
+		return nil
+	}
+
+	// Collect safelist from DAG configuration
+	var safelist []string
+	if dag.MaskEnv != nil {
+		safelist = dag.MaskEnv.Safelist
+	}
+
+	// Create masker with environment variables from DAG and step
+	sources := masking.SourcedEnvVars{
+		DAGEnv:   dag.Env,
+		StepEnv:  data.Step.Env,
+		Safelist: safelist,
+	}
+
+	oc.masker = masking.NewMasker(sources)
+	return nil
+}
+
 func (oc *OutputCoordinator) setup(ctx context.Context, data NodeData) error {
+	// Setup masker for environment variable masking
+	if err := oc.setupMasker(ctx, data); err != nil {
+		return fmt.Errorf("failed to setup masker: %w", err)
+	}
+
 	if err := oc.setupWriters(ctx, data); err != nil {
 		return err
 	}
@@ -1072,7 +1120,12 @@ func (oc *OutputCoordinator) setupStdoutRedirect(ctx context.Context, data NodeD
 	}
 
 	oc.stdoutRedirectFile = file
-	oc.stdoutRedirectWriter = newSafeBufferedWriter(oc.stdoutRedirectFile)
+	// Wrap with MaskingWriter if masker is available
+	var writer io.Writer = oc.stdoutRedirectFile
+	if oc.masker != nil {
+		writer = masking.NewMaskingWriter(oc.stdoutRedirectFile, oc.masker)
+	}
+	oc.stdoutRedirectWriter = newSafeBufferedWriter(writer)
 
 	return nil
 }
@@ -1091,7 +1144,12 @@ func (oc *OutputCoordinator) setupStderrRedirect(ctx context.Context, data NodeD
 	}
 
 	oc.StderrRedirectFile = file
-	oc.stderrRedirectWriter = newSafeBufferedWriter(oc.StderrRedirectFile)
+	// Wrap with MaskingWriter if masker is available
+	var writer io.Writer = oc.StderrRedirectFile
+	if oc.masker != nil {
+		writer = masking.NewMaskingWriter(oc.StderrRedirectFile, oc.masker)
+	}
+	oc.stderrRedirectWriter = newSafeBufferedWriter(writer)
 
 	return nil
 }
@@ -1106,7 +1164,12 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
-	oc.stdoutWriter = newSafeBufferedWriter(oc.stdoutFile)
+	// Wrap with MaskingWriter if masker is available
+	var stdoutWriter io.Writer = oc.stdoutFile
+	if oc.masker != nil {
+		stdoutWriter = masking.NewMaskingWriter(oc.stdoutFile, oc.masker)
+	}
+	oc.stdoutWriter = newSafeBufferedWriter(stdoutWriter)
 	oc.stdoutFileName = data.State.Stdout
 
 	// stderr
@@ -1114,7 +1177,12 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 	if err != nil {
 		return fmt.Errorf("failed to open stderr file: %w", err)
 	}
-	oc.stderrWriter = newSafeBufferedWriter(oc.stderrFile)
+	// Wrap with MaskingWriter if masker is available
+	var stderrWriter io.Writer = oc.stderrFile
+	if oc.masker != nil {
+		stderrWriter = masking.NewMaskingWriter(oc.stderrFile, oc.masker)
+	}
+	oc.stderrWriter = newSafeBufferedWriter(stderrWriter)
 	oc.stderrFileName = data.State.Stderr
 
 	return nil
