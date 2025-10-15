@@ -18,7 +18,7 @@ func TestMasker_MaskString(t *testing.T) {
 		{
 			name: "single value",
 			sources: SourcedEnvVars{
-				DAGEnv: []string{"API_KEY=secret123"},
+				Secrets: []string{"API_KEY=secret123"},
 			},
 			input:    "The API key is secret123",
 			expected: "The API key is *******",
@@ -26,7 +26,7 @@ func TestMasker_MaskString(t *testing.T) {
 		{
 			name: "multiple values",
 			sources: SourcedEnvVars{
-				DAGEnv: []string{
+				Secrets: []string{
 					"API_KEY=secret123",
 					"PASSWORD=pass456",
 				},
@@ -35,26 +35,9 @@ func TestMasker_MaskString(t *testing.T) {
 			expected: "Key: *******, Pass: *******",
 		},
 		{
-			name: "with safelist",
-			sources: SourcedEnvVars{
-				DAGEnv:   []string{"API_KEY=secret123", "LOG_LEVEL=debug"},
-				Safelist: []string{"LOG_LEVEL"},
-			},
-			input:    "Key: secret123, Level: debug",
-			expected: "Key: *******, Level: debug",
-		},
-		{
-			name: "min length filter",
-			sources: SourcedEnvVars{
-				DAGEnv: []string{"SHORT=ab", "LONG=longvalue"},
-			},
-			input:    "Short: ab, Long: longvalue",
-			expected: "Short: ab, Long: *******",
-		},
-		{
 			name: "overlapping values",
 			sources: SourcedEnvVars{
-				DAGEnv: []string{"SHORT=abc", "LONG=abcdef"},
+				Secrets: []string{"SHORT=abc", "LONG=abcdef"},
 			},
 			input:    "Value: abcdef",
 			expected: "Value: *******",
@@ -62,19 +45,10 @@ func TestMasker_MaskString(t *testing.T) {
 		{
 			name: "no match",
 			sources: SourcedEnvVars{
-				DAGEnv: []string{"API_KEY=secret123"},
+				Secrets: []string{"API_KEY=secret123"},
 			},
 			input:    "This has no secrets",
 			expected: "This has no secrets",
-		},
-		{
-			name: "step env",
-			sources: SourcedEnvVars{
-				DAGEnv:  []string{"DAG_SECRET=dag123"},
-				StepEnv: []string{"STEP_SECRET=step456"},
-			},
-			input:    "DAG: dag123, Step: step456",
-			expected: "DAG: *******, Step: *******",
 		},
 	}
 
@@ -94,7 +68,7 @@ func TestMasker_MaskBytes(t *testing.T) {
 	t.Parallel()
 
 	sources := SourcedEnvVars{
-		DAGEnv: []string{"API_KEY=secret123"},
+		Secrets: []string{"API_KEY=secret123"},
 	}
 
 	m := NewMasker(sources)

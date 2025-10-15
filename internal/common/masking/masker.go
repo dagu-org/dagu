@@ -7,18 +7,11 @@ import (
 const (
 	// DefaultMaskString is the default replacement string for masked values
 	DefaultMaskString = "*******"
-	// DefaultMinLength is the minimum value length to mask
-	DefaultMinLength = 3
 )
 
 // SourcedEnvVars groups environment variables by their source
 type SourcedEnvVars struct {
-	// DAGEnv contains variables from dag.Env field (MASK by default)
-	DAGEnv []string
-	// StepEnv contains variables from step.Env field (MASK by default)
-	StepEnv []string
-	// Safelist contains variable NAMES that should NOT be masked
-	Safelist []string
+	Secrets []string // Environment variables from secrets
 }
 
 // Masker provides masking functionality for sensitive data
@@ -29,27 +22,10 @@ type Masker struct {
 // NewMasker creates a masker from sourced environment variables
 func NewMasker(sources SourcedEnvVars) *Masker {
 	sensitiveVals := make(map[string]bool)
-	safelistMap := make(map[string]bool)
 
-	// Build safelist lookup
-	for _, name := range sources.Safelist {
-		safelistMap[name] = true
-	}
-
-	// Extract values from DAG env (mask unless safelisted)
-	for _, env := range sources.DAGEnv {
-		name, value := splitEnv(env)
-		if name != "" && !safelistMap[name] && len(value) >= DefaultMinLength {
-			sensitiveVals[value] = true
-		}
-	}
-
-	// Extract values from Step env (mask unless safelisted)
-	for _, env := range sources.StepEnv {
-		name, value := splitEnv(env)
-		if name != "" && !safelistMap[name] && len(value) >= DefaultMinLength {
-			sensitiveVals[value] = true
-		}
+	for _, env := range sources.Secrets {
+		_, val := splitEnv(env)
+		sensitiveVals[val] = true
 	}
 
 	return &Masker{

@@ -15,7 +15,7 @@ func TestMaskingWriter_SingleWrite(t *testing.T) {
 
 	var buf bytes.Buffer
 	sources := SourcedEnvVars{
-		DAGEnv: []string{"API_KEY=secret123"},
+		Secrets: []string{"API_KEY=secret123"},
 	}
 	masker := NewMasker(sources)
 	writer := NewMaskingWriter(&buf, masker)
@@ -31,7 +31,7 @@ func TestMaskingWriter_MultipleLines(t *testing.T) {
 
 	var buf bytes.Buffer
 	sources := SourcedEnvVars{
-		DAGEnv: []string{"API_KEY=secret123"},
+		Secrets: []string{"API_KEY=secret123"},
 	}
 	masker := NewMasker(sources)
 	writer := NewMaskingWriter(&buf, masker)
@@ -47,7 +47,7 @@ func TestMaskingWriter_SplitAcrossWrites(t *testing.T) {
 
 	var buf bytes.Buffer
 	sources := SourcedEnvVars{
-		DAGEnv: []string{"API_KEY=secret123"},
+		Secrets: []string{"API_KEY=secret123"},
 	}
 	masker := NewMasker(sources)
 	writer := NewMaskingWriter(&buf, masker)
@@ -68,7 +68,7 @@ func TestMaskingWriter_SecretSplitAcrossWrites(t *testing.T) {
 
 	var buf bytes.Buffer
 	sources := SourcedEnvVars{
-		DAGEnv: []string{"API_KEY=secret123"},
+		Secrets: []string{"API_KEY=secret123"},
 	}
 	masker := NewMasker(sources)
 	writer := NewMaskingWriter(&buf, masker)
@@ -89,7 +89,7 @@ func TestMaskingWriter_NoNewline(t *testing.T) {
 
 	var buf bytes.Buffer
 	sources := SourcedEnvVars{
-		DAGEnv: []string{"API_KEY=secret123"},
+		Secrets: []string{"API_KEY=secret123"},
 	}
 	masker := NewMasker(sources)
 	writer := NewMaskingWriter(&buf, masker)
@@ -110,7 +110,7 @@ func TestMaskingWriter_MultipleSecrets(t *testing.T) {
 
 	var buf bytes.Buffer
 	sources := SourcedEnvVars{
-		DAGEnv: []string{
+		Secrets: []string{
 			"API_KEY=secret123",
 			"PASSWORD=pass456",
 		},
@@ -143,7 +143,7 @@ func TestMaskingWriter_EmptyWrite(t *testing.T) {
 
 	var buf bytes.Buffer
 	sources := SourcedEnvVars{
-		DAGEnv: []string{"API_KEY=secret123"},
+		Secrets: []string{"API_KEY=secret123"},
 	}
 	masker := NewMasker(sources)
 	writer := NewMaskingWriter(&buf, masker)
@@ -159,7 +159,7 @@ func TestMaskingWriter_Flush(t *testing.T) {
 
 	var buf bytes.Buffer
 	sources := SourcedEnvVars{
-		DAGEnv: []string{"API_KEY=secret123"},
+		Secrets: []string{"API_KEY=secret123"},
 	}
 	masker := NewMasker(sources)
 	writer := NewMaskingWriter(&buf, masker)
@@ -185,7 +185,7 @@ func TestMaskingWriter_Close(t *testing.T) {
 
 	var buf bytes.Buffer
 	sources := SourcedEnvVars{
-		DAGEnv: []string{"API_KEY=secret123"},
+		Secrets: []string{"API_KEY=secret123"},
 	}
 	masker := NewMasker(sources)
 	writer := NewMaskingWriter(&buf, masker)
@@ -206,7 +206,7 @@ func TestMaskingWriter_CloseWithCloser(t *testing.T) {
 	// Create a writer that implements io.Closer
 	closerWriter := &mockCloser{buf: &bytes.Buffer{}}
 	sources := SourcedEnvVars{
-		DAGEnv: []string{"API_KEY=secret123"},
+		Secrets: []string{"API_KEY=secret123"},
 	}
 	masker := NewMasker(sources)
 	writer := NewMaskingWriter(closerWriter, masker)
@@ -226,7 +226,7 @@ func TestMaskingWriter_LargeWrite(t *testing.T) {
 
 	var buf bytes.Buffer
 	sources := SourcedEnvVars{
-		DAGEnv: []string{"API_KEY=secret123"},
+		Secrets: []string{"API_KEY=secret123"},
 	}
 	masker := NewMasker(sources)
 	writer := NewMaskingWriter(&buf, masker)
@@ -253,7 +253,7 @@ func TestMaskingWriter_PartialLineBuffer(t *testing.T) {
 
 	var buf bytes.Buffer
 	sources := SourcedEnvVars{
-		DAGEnv: []string{"API_KEY=secret123"},
+		Secrets: []string{"API_KEY=secret123"},
 	}
 	masker := NewMasker(sources)
 	writer := NewMaskingWriter(&buf, masker)

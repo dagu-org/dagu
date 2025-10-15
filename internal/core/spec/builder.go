@@ -84,7 +84,6 @@ var builderRegistry = []builderEntry{
 	{name: "workerSelector", fn: buildWorkerSelector},
 	{name: "registryAuths", fn: buildRegistryAuths},
 	{name: "ssh", fn: buildSSH},
-	{name: "maskEnv", fn: buildMaskEnv},
 	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
 	{name: "logDir", fn: buildLogDir},
@@ -831,20 +830,6 @@ func buildSSH(_ BuildContext, spec *definition, dag *core.DAG) error {
 		Password:      spec.SSH.Password,
 		StrictHostKey: strictHostKey,
 		KnownHostFile: spec.SSH.KnownHostFile,
-	}
-
-	return nil
-}
-
-// buildMaskEnv builds the environment variable masking configuration for the DAG.
-func buildMaskEnv(_ BuildContext, spec *definition, dag *core.DAG) error {
-	if spec.MaskEnv == nil {
-		return nil
-	}
-
-	dag.MaskEnv = &core.MaskEnvConfig{
-		Disable:  spec.MaskEnv.Disable,
-		Safelist: spec.MaskEnv.Safelist,
 	}
 
 	return nil

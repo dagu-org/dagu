@@ -74,25 +74,9 @@ func (oc *OutputCoordinator) setupMasker(ctx context.Context, data NodeData) err
 		return nil
 	}
 
-	dag := dagCtx.DAG
-
-	// Check if masking is explicitly disabled
-	if dag.MaskEnv != nil && dag.MaskEnv.Disable {
-		oc.masker = nil
-		return nil
-	}
-
-	// Collect safelist from DAG configuration
-	var safelist []string
-	if dag.MaskEnv != nil {
-		safelist = dag.MaskEnv.Safelist
-	}
-
 	// Create masker with environment variables from DAG and step
 	sources := masking.SourcedEnvVars{
-		DAGEnv:   dag.Env,
-		StepEnv:  data.Step.Env,
-		Safelist: safelist,
+		// TODO: Add secrets
 	}
 
 	oc.masker = masking.NewMasker(sources)

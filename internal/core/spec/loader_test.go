@@ -544,36 +544,3 @@ steps:
 		assert.Equal(t, "64G", dag.WorkerSelector["memory"])
 	})
 }
-
-func TestLoad_MaskEnvConfig(t *testing.T) {
-	t.Parallel()
-
-	testDAG := createTempYAMLFile(t, `
-maskEnv:
-  safelist:
-    - LOG_LEVEL
-    - ENVIRONMENT
-`)
-	dag, err := spec.Load(context.Background(), testDAG)
-	require.NoError(t, err)
-
-	// Verify MaskEnv config loaded
-	require.NotNil(t, dag.MaskEnv)
-	assert.False(t, dag.MaskEnv.Disable)
-	assert.Equal(t, []string{"LOG_LEVEL", "ENVIRONMENT"}, dag.MaskEnv.Safelist)
-}
-
-func TestLoad_MaskEnvConfig_Disabled(t *testing.T) {
-	t.Parallel()
-
-	testDAG := createTempYAMLFile(t, `
-maskEnv:
-  disable: true
-`)
-	dag, err := spec.Load(context.Background(), testDAG)
-	require.NoError(t, err)
-
-	// Verify MaskEnv is disabled
-	require.NotNil(t, dag.MaskEnv)
-	assert.True(t, dag.MaskEnv.Disable)
-}
