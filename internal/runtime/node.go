@@ -460,7 +460,7 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	env := execution.GetEnv(ctx)
-	env = env.WithEnv(
+	env = env.WithVariables(
 		execution.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
 		execution.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)

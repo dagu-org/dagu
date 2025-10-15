@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/collections"
@@ -143,9 +144,19 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 		envs["PWD"] = workingDir
 	}
 
+	variables := &collections.SyncMap{}
+	if parentEnv.DAG != nil {
+		for _, param := range parentEnv.DAG.Params {
+			parts := strings.SplitN(param, "=", 2)
+			if len(parts) == 2 {
+				variables.Store(parts[0], param)
+			}
+		}
+	}
+
 	return Env{
 		DAGContext: GetDAGContextFromContext(ctx),
-		Variables:  &collections.SyncMap{},
+		Variables:  variables,
 		Step:       step,
 		Envs:       envs,
 		StepMap:    make(map[string]cmdutil.StepInfo),
@@ -213,6 +224,11 @@ func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
 	dagEnv := GetDAGContextFromContext(ctx)
 
+	option := cmdutil.NewEvalOptions()
+	for _, opt := range opts {
+		opt(option)
+	}
+
 	// Collect environment variables for evaluating the string.
 	// Variables are processed sequentially, and once a variable is replaced,
 	// it cannot be overridden by subsequent maps.
@@ -226,9 +242,13 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOptio
 	// ${FOO} will be replaced with "step" in the first iteration,
 	// leaving no ${FOO} for the DAG env to replace.
 
-	opts = append(opts, cmdutil.WithVariables(e.Envs))
-	opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
-	opts = append(opts, cmdutil.WithVariables(dagEnv.Envs))
+	if option.ExpandEnv {
+		opts = append(opts, cmdutil.WithVariables(e.Envs))
+		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
+		opts = append(opts, cmdutil.WithVariables(dagEnv.Envs))
+	} else {
+		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
+	}
 
 	// Step data for special variables such as step ID and exit code
 	opts = append(opts, cmdutil.WithStepMap(e.StepMap))
@@ -264,3 +284,14 @@ func (e Env) WithEnv(envs ...string) Env {
 }
 
 type envCtxKey struct{}
+
+// WithVariables returns a new execution context with the given variable(s).
+func (e Env) WithVariables(vars ...string) Env {
+	if len(vars)%2 != 0 {
+		panic("invalid number of arguments")
+	}
+	for i := 0; i < len(vars); i += 2 {
+		e.Variables.Store(vars[i], vars[i+1])
+	}
+	return e
+}

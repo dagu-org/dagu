@@ -47,7 +47,6 @@ func buildParams(ctx BuildContext, spec *definition, dag *core.DAG) error {
 		}
 		// Override the default parameters with the command line parameters
 		overrideParams(&paramPairs, overridePairs)
-		overrideEnvirons(&envs, overrideEnvs)
 	}
 
 	if len(ctx.opts.ParametersList) > 0 {
@@ -60,7 +59,6 @@ func buildParams(ctx BuildContext, spec *definition, dag *core.DAG) error {
 		}
 		// Override the default parameters with the command line parameters
 		overrideParams(&paramPairs, overridePairs)
-		overrideEnvirons(&envs, overrideEnvs)
 	}
 
 	// Validate the parameters against the provided schema, if it exists
