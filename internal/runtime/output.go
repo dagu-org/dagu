@@ -60,26 +60,15 @@ func (oc *OutputCoordinator) unlock() {
 	oc.mu.Unlock()
 }
 
-// setupMasker creates a masker for environment variable masking based on DAG and step configuration.
-// Returns nil masker if masking is disabled or if there's no DAG in context.
-func (oc *OutputCoordinator) setupMasker(ctx context.Context, data NodeData) error {
+// setupMasker creates a masker for environment variable masking.
+// Currently disabled - masking will be enabled when "secret" field is added.
+// The masking infrastructure (MaskingWriter, Masker) is kept for future use.
+func (oc *OutputCoordinator) setupMasker(_ context.Context, _ NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
-	// Get DAG from context
-	dagCtx := execution.GetDAGContextFromContext(ctx)
-	if dagCtx.DAG == nil {
-		// No DAG in context, skip masking
-		oc.masker = nil
-		return nil
-	}
-
-	// Create masker with environment variables from DAG and step
-	sources := masking.SourcedEnvVars{
-		// TODO: Add secrets
-	}
-
-	oc.masker = masking.NewMasker(sources)
+	// Masking is disabled for now
+	oc.masker = nil
 	return nil
 }
 
