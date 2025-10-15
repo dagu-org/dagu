@@ -21,6 +21,13 @@ type EvalOptions struct {
 	StepMap    map[string]StepInfo
 }
 
+func NewEvalOptions() *EvalOptions {
+	return &EvalOptions{
+		ExpandEnv:  true,
+		Substitute: true,
+	}
+}
+
 type EvalOption func(*EvalOptions)
 
 func WithVariables(vars map[string]string) EvalOption {
@@ -99,7 +106,7 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 		return "", nil // nothing to do
 	}
 
-	options := newEvalOptions()
+	options := NewEvalOptions()
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -168,7 +175,7 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 
 // EvalIntString substitutes environment variables and commands in the input string
 func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, error) {
-	options := newEvalOptions()
+	options := NewEvalOptions()
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -207,7 +214,7 @@ func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, 
 // variables and substituting command outputs. It takes a struct or map value and returns a new
 // modified struct or map value.
 func EvalStringFields[T any](ctx context.Context, obj T, opts ...EvalOption) (T, error) {
-	options := newEvalOptions()
+	options := NewEvalOptions()
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -473,6 +480,11 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 			return match
 		}
 
+		// Try first step ID property access
+		if val := handleStepProperty(); val != match {
+			return val
+		}
+
 		// First try regular variable lookup
 		jsonStr, ok := dataMap[name]
 		if !ok {
@@ -489,8 +501,9 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 		// Try to parse it as JSON and evaluate path
 		var raw any
 		if err := json.Unmarshal([]byte(jsonStr), &raw); err != nil {
-			// Not valid JSON, but might still be a step ID property
-			return handleStepProperty()
+			// If not valid JSON, leave as-is
+			logger.Warn(ctx, "failed to parse JSON for %q: %v", name, err)
+			return match
 		}
 
 		// Build a gojq query (like .bar.baz)
@@ -545,11 +558,4 @@ func replaceVars(template string, vars map[string]string) string {
 		}
 		return match
 	})
-}
-
-func newEvalOptions() *EvalOptions {
-	return &EvalOptions{
-		ExpandEnv:  true,
-		Substitute: true,
-	}
 }

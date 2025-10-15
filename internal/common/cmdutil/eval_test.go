@@ -1170,7 +1170,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 			want: "Unknown prop: ${download.unknown}",
 		},
 		{
-			name:  "RegularVariableTakesPrecedenceOverStepID",
+			name:  "StepIDPrecedenceOverVariable",
 			input: "Value: ${download.stdout}",
 			dataMap: map[string]string{
 				"download": `{"stdout": "from-variable"}`,
@@ -1180,7 +1180,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 					Stdout: "/tmp/logs/download.out",
 				},
 			},
-			want: "Value: from-variable",
+			want: "Value: /tmp/logs/download.out",
 		},
 	}
 

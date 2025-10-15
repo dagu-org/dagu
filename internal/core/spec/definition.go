@@ -81,6 +81,14 @@ type definition struct {
 	RegistryAuths any
 	// SSH is the default SSH configuration for the DAG.
 	SSH *sshDef
+	// MaskEnv defines environment variable masking configuration.
+	MaskEnv *maskEnvConfigDef
+}
+
+// maskEnvConfigDef is the YAML definition for masking configuration.
+type maskEnvConfigDef struct {
+	Disable  bool     `yaml:"disable,omitempty"`
+	Safelist []string `yaml:"safelist,omitempty"`
 }
 
 // handlerOnDef defines the steps to be executed on different events.

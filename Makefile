@@ -156,7 +156,7 @@ run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 test: bin
 	@echo "${COLOR_GREEN}Running tests...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
-	@go clean -testcache ${TEST_TARGET}
+	@go clean -testcache
 	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ${TEST_TARGET}
 
 # test-coverage runs all tests with coverage.

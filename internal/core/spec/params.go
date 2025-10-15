@@ -47,7 +47,6 @@ func buildParams(ctx BuildContext, spec *definition, dag *core.DAG) error {
 		}
 		// Override the default parameters with the command line parameters
 		overrideParams(&paramPairs, overridePairs)
-		overrideEnvirons(&envs, overrideEnvs)
 	}
 
 	if len(ctx.opts.ParametersList) > 0 {
@@ -60,7 +59,6 @@ func buildParams(ctx BuildContext, spec *definition, dag *core.DAG) error {
 		}
 		// Override the default parameters with the command line parameters
 		overrideParams(&paramPairs, overridePairs)
-		overrideEnvirons(&envs, overrideEnvs)
 	}
 
 	// Validate the parameters against the provided schema, if it exists
@@ -231,20 +229,6 @@ func overrideParams(paramPairs *[]paramPair, override []paramPair) {
 			(*paramPairs)[foundIndex] = paramPair
 		} else {
 			*paramPairs = append(*paramPairs, paramPair)
-		}
-	}
-}
-
-func overrideEnvirons(envs *[]string, override []string) {
-	envsIndex := make(map[string]int)
-	for i, env := range *envs {
-		envsIndex[env] = i
-	}
-	for _, env := range override {
-		if i, ok := envsIndex[env]; !ok {
-			*envs = append(*envs, env)
-		} else {
-			(*envs)[i] = env
 		}
 	}
 }
