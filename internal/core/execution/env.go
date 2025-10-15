@@ -291,7 +291,7 @@ func (e Env) WithVariables(vars ...string) Env {
 		panic("invalid number of arguments")
 	}
 	for i := 0; i < len(vars); i += 2 {
-		e.Variables.Store(vars[i], vars[i+1])
+		e.Variables.Store(vars[i], vars[i]+"="+vars[i+1])
 	}
 	return e
 }
