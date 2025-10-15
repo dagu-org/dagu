@@ -150,7 +150,6 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 			} else {
 				value = ExpandReferences(ctx, value, vars)
 			}
-			value = replaceVars(value, vars)
 		}
 	}
 	if options.Substitute {
