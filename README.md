@@ -327,6 +327,23 @@ pnpm dev
 
 Navigate to http://localhost:8081 to view the frontend.
 
+### Running Tests
+
+To ensure the integrity of the go code, you can run all Go unit and integration tests.
+
+Run all tests from the project root directory:
+
+```bash
+make test
+```
+
+To run tests with code coverage analysis:
+
+```bash
+make make-coverage
+```
+
+
 ## Roadmap
 
 **Legend:** 
