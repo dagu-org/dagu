@@ -233,20 +233,6 @@ func overrideParams(paramPairs *[]paramPair, override []paramPair) {
 	}
 }
 
-func overrideEnvirons(envs *[]string, override []string) {
-	envsIndex := make(map[string]int)
-	for i, env := range *envs {
-		envsIndex[env] = i
-	}
-	for _, env := range override {
-		if i, ok := envsIndex[env]; !ok {
-			*envs = append(*envs, env)
-		} else {
-			(*envs)[i] = env
-		}
-	}
-}
-
 // parseParams parses and processes the parameters for the DAG.
 func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]string, dag *core.DAG) error {
 	var paramPairs []paramPair
