@@ -15,12 +15,12 @@ func TestMaskingE2E(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		yaml           string
-		wantMasked     []string // Values that should be masked in logs
-		wantUnmasked   []string // Values that should NOT be masked in logs
-		wantInLog      []string // Strings that should appear in logs
-		skipLogCheck   bool     // Skip checking log content (for disabled test)
+		name         string
+		yaml         string
+		wantMasked   []string // Values that should be masked in logs
+		wantUnmasked []string // Values that should NOT be masked in logs
+		wantInLog    []string // Strings that should appear in logs
+		skipLogCheck bool     // Skip checking log content (for disabled test)
 	}{
 		{
 			name: "DefaultEnabled",
