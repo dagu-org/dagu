@@ -482,7 +482,7 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 
 	if len(cmd) > 0 {
 		ctCfg.Cmd = cmd
-		// Entrypoint should be nil if command is set
+		// Entrypoint should be empty slice to override image ENTRYPOINT
 		ctCfg.Entrypoint = []string{}
 	}
 
