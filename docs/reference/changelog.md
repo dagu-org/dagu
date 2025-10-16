@@ -16,6 +16,7 @@
 
 ### Fixed
 - DAG name validation is centralized and enforced consistently: names must be `<= 40` chars and match `[A-Za-z0-9_.-]+`. Endpoints that accept `name` now return `400 bad_request` for invalid names.
+- Docker: Fixed container initialization bug with `registryAuths` field (#1330)
 
 ## v1.22.0 (2025-08-24)
 
