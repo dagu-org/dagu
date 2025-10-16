@@ -51,16 +51,16 @@ steps:
 var _ executor.Executor = (*docker)(nil)
 var _ executor.ExitCoder = (*docker)(nil)
 
-type containerClientCtxKey = struct{}
-type registryAuthCtxKey = struct{}
+type containerClientCtxKey struct{}
+type registryAuthCtxKey struct{}
 
 // WithContainerClient creates a new context with a client for container
 func WithContainerClient(ctx context.Context, cli *Client) context.Context {
 	return context.WithValue(ctx, containerClientCtxKey{}, cli)
 }
 
-// getContainerClient retrieves the container client from the context.
-func getContainerClient(ctx context.Context) *Client {
+// GetContainerClient retrieves the container client from the context.
+func GetContainerClient(ctx context.Context) *Client {
 	if cli, ok := ctx.Value(containerClientCtxKey{}).(*Client); ok {
 		return cli
 	}
@@ -139,7 +139,7 @@ func (e *docker) Run(ctx context.Context) error {
 	tw := executor.NewTailWriter(e.stderr, 0)
 	e.stderr = tw
 
-	cli := getContainerClient(ctx)
+	cli := GetContainerClient(ctx)
 	if cli != nil {
 		// If it exists, use the client from the context
 		// This allows sharing the same container client across multiple executors.
