@@ -173,16 +173,10 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 			errs = append(errs, err.Error())
 		}
 	} else {
-		if len(dag.BuildErrors) > 0 {
-			for _, buildErr := range dag.BuildErrors {
-				errs = append(errs, buildErr.Error())
-			}
+		for _, buildErr := range dag.BuildErrors {
+			errs = append(errs, buildErr.Error())
 		}
-		if len(dag.BuildWarnings) > 0 {
-			for _, warning := range dag.BuildWarnings {
-				errs = append(errs, warning)
-			}
-		}
+		errs = append(errs, dag.BuildWarnings...)
 	}
 
 	return &api.GetDAGSpec200JSONResponse{

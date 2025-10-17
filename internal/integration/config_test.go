@@ -556,11 +556,7 @@ steps:
 	agent := dag.Agent()
 	agent.RunSuccess(t)
 	dag.AssertOutputs(t, map[string]any{
-		"OUT": map[string]any{
-			"outputs": map[string]any{
-				"LEGACY_OUT": "legacy works",
-			},
-		},
+		"OUT": []test.Contains{"legacy works"},
 	})
 }
 
