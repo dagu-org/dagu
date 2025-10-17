@@ -66,7 +66,7 @@ graph TD
 
 ```yaml
 steps:
-  - run: processor
+  - call: processor
     parallel:
       items: [A, B, C]
       maxConcurrent: 2
@@ -412,9 +412,9 @@ stateDiagram-v2
 
 ```yaml
 steps:
-  - run: etl.yaml
+  - call: etl.yaml
     params: "ENV=prod DATE=today"
-  - run: analyze.yaml
+  - call: analyze.yaml
 ```
 
 ```mermaid
@@ -453,7 +453,7 @@ graph TD
 
 ```yaml
 steps:
-  - run: data-processor
+  - call: data-processor
     params: "TYPE=daily"
 
 ---
@@ -468,7 +468,7 @@ steps:
 
 ```mermaid
 graph TD
-  M[Main] --> DP{{run: data-processor}}
+  M[Main] --> DP{{call: data-processor}}
   subgraph data-processor
     E["Extract TYPE data"] --> T[Transform]
   end
@@ -490,8 +490,8 @@ graph TD
 ```yaml
 steps:
   - python prepare_dataset.py
-  - run: train-model
-  - run: evaluate-model
+  - call: train-model
+  - call: evaluate-model
 
 ---
 name: train-model
@@ -537,7 +537,7 @@ steps:
   - wget https://data.example.com/dataset.tar.gz
     
   # Must run on specific worker type
-  - run: process-on-gpu
+  - call: process-on-gpu
     
   # Runs locally (no selector)
   - echo "Processing complete"
@@ -563,7 +563,7 @@ steps:
 steps:
   - command: python split_data.py --chunks=10
     output: CHUNKS
-  - run: chunk-processor
+  - call: chunk-processor
     parallel:
       items: ${CHUNKS}
       maxConcurrent: 5
@@ -857,7 +857,7 @@ steps:
 
 ```yaml
 steps:
-  - run: worker
+  - call: worker
     parallel:
       items: [east, west, eu]
     params: "REGION=${ITEM}"
@@ -955,7 +955,7 @@ steps:
 
 ```yaml
 steps:
-  - run: sub_workflow
+  - call: sub_workflow
     output: SUB_RESULT
   - echo "Result: ${SUB_RESULT.outputs.finalValue}"
 ```
@@ -1712,7 +1712,7 @@ otel:
 steps:
   - echo "Fetching data"
   - python process.py
-  - run: pipelines/transform
+  - call: pipelines/transform
 ```
 
 Enable OpenTelemetry tracing for observability.

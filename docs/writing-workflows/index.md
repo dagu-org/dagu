@@ -115,7 +115,7 @@ steps:
 ```yaml
 steps:
   - parallel: [file1, file2, file3]
-    run: process-file
+    call: process-file
     params: "FILE=${ITEM}"
 
 ---
