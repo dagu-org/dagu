@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/collections"
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/go-viper/mapstructure/v2"
@@ -1414,7 +1415,13 @@ func buildSignalOnStop(_ StepBuildContext, def stepDef, step *core.Step) error {
 func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 	name := strings.TrimSpace(def.Call)
 	if name == "" {
-		name = strings.TrimSpace(def.Run)
+		// TODO: remove legacy support in future major version
+		if legacyName := strings.TrimSpace(def.Run); legacyName != "" {
+			name = legacyName
+			message := fmt.Sprintf("Step field `run` is deprecated; use `call` instead (step name: '%s')", step.Name)
+			logger.Warn(ctx.ctx, message)
+			ctx.dag.BuildWarnings = append(ctx.dag.BuildWarnings, message)
+		}
 	}
 
 	// if the run field is not set, return nil.

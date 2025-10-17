@@ -1057,6 +1057,7 @@ steps:
 			"param1=\"value1\" param2=\"value2\"",
 		}, th.Steps[0].Args)
 		assert.Equal(t, "sub_dag param1=\"value1\" param2=\"value2\"", th.Steps[0].CmdWithArgs)
+		assert.Empty(t, dag.BuildWarnings)
 
 		// Legacy run field is still accepted
 		dataLegacy := []byte(`
@@ -1072,6 +1073,8 @@ steps:
 		assert.Equal(t, "run", thLegacy.Steps[0].Command)
 		assert.Equal(t, []string{"sub_dag_legacy", ""}, thLegacy.Steps[0].Args)
 		assert.Equal(t, "sub_dag_legacy", thLegacy.Steps[0].CmdWithArgs)
+		require.Len(t, dagLegacy.BuildWarnings, 1)
+		assert.Contains(t, dagLegacy.BuildWarnings[0], "deprecated field `run`")
 	})
 	t.Run("ContinueOn", func(t *testing.T) {
 		t.Parallel()
