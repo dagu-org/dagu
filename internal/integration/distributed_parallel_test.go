@@ -21,7 +21,7 @@ func TestParallelDistributedExecution(t *testing.T) {
 		yamlContent := `
 steps:
   - name: process-items
-    run: child-worker
+    call: child-worker
     parallel:
       items:
         - "item1"
@@ -130,7 +130,7 @@ steps:
 		yamlContent := `
 steps:
   - name: process-regions
-    run: child-regional
+    call: child-regional
     parallel:
       items:
         - "us-east"
@@ -219,7 +219,7 @@ steps:
 		yamlContent := `
 steps:
   - name: process-items
-    run: child-nonexistent
+    call: child-nonexistent
     parallel:
       items: ["a", "b", "c"]
     output: RESULTS
@@ -258,7 +258,7 @@ func TestParallelDistributedCancellation(t *testing.T) {
 		yamlContent := `
 steps:
   - name: process-items
-    run: child-sleep
+    call: child-sleep
     parallel:
       items:
         - "1"
@@ -387,12 +387,12 @@ steps:
 		yamlContent := `
 steps:
   - name: local-execution
-    run: child-local
+    call: child-local
     parallel:
       items: ["1", "1"]
     output: LOCAL_RESULTS
   - name: distributed-execution
-    run: child-distributed
+    call: child-distributed
     parallel:
       items: ["1", "1"]
     output: DISTRIBUTED_RESULTS
@@ -506,7 +506,7 @@ steps:
 		yamlContent := `
 steps:
   - name: high-concurrency
-    run: child-task
+    call: child-task
     parallel:
       items:
         - "task1"

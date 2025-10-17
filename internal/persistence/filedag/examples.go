@@ -89,7 +89,7 @@ description: Example of nested workflows
 steps:
   - command: echo "Preparing data for sub-workflows"
     
-  - run: sub-workflow
+  - call: sub-workflow
     params: "TASK_ID=123"
     
   - command: echo "Main workflow completed"

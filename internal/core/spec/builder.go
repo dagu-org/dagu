@@ -1412,7 +1412,10 @@ func buildSignalOnStop(_ StepBuildContext, def stepDef, step *core.Step) error {
 
 // buildChildDAG parses the child core.DAG definition and sets up the step to run a child DAG.
 func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
-	name := strings.TrimSpace(def.Run)
+	name := strings.TrimSpace(def.Call)
+	if name == "" {
+		name = strings.TrimSpace(def.Run)
+	}
 
 	// if the run field is not set, return nil.
 	if name == "" {
@@ -1449,7 +1452,7 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 
 	step.Command = "run"
 	step.Args = []string{name, paramsStr}
-	step.CmdWithArgs = fmt.Sprintf("%s %s", name, paramsStr)
+	step.CmdWithArgs = strings.TrimSpace(fmt.Sprintf("%s %s", name, paramsStr))
 	return nil
 }
 

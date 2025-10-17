@@ -103,7 +103,7 @@ func TestManager(t *testing.T) {
 		dag := th.DAG(t, `
 steps:
   - name: "1"
-    run: tree_child
+    call: tree_child
 ---
 name: tree_child
 steps:

@@ -253,9 +253,9 @@ func TestMultiDAGFile(t *testing.T) {
 		// Create a temporary multi-DAG YAML file
 		multiDAGContent := `steps:
   - name: process
-    run: transform-data
+    call: transform-data
   - name: archive
-    run: archive-results
+    call: archive-results
 
 ---
 name: transform-data
@@ -471,10 +471,10 @@ steps:
 schedule: "0 2 * * *"
 steps:
   - name: extract
-    run: extract-module
+    call: extract-module
     params: "SOURCE=customers TABLE=users"
   - name: transform
-    run: transform-module
+    call: transform-module
 
 ---
 name: extract-module

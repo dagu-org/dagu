@@ -15,7 +15,7 @@ func TestLocalDAGExecution(t *testing.T) {
 		yamlContent := `
 steps:
   - name: run-local-child
-    run: local-child
+    call: local-child
     params: "NAME=World"
     output: CHILD_RESULT
 
@@ -66,7 +66,7 @@ steps:
 		yamlContent := `
 steps:
   - name: parallel-tasks
-    run: worker-dag
+    call: worker-dag
     parallel:
       items:
         - TASK_ID=1 TASK_NAME=alpha
@@ -115,7 +115,7 @@ steps:
 		yamlContent := `
 steps:
   - name: run-middle-dag
-    run: middle-dag
+    call: middle-dag
     params: "ROOT_PARAM=FromRoot"
 
 ---
@@ -128,7 +128,7 @@ steps:
     output: MIDDLE_OUTPUT
 
   - name: run-leaf-dag
-    run: leaf-dag
+    call: leaf-dag
     params: "MIDDLE_PARAM=${MIDDLE_OUTPUT} LEAF_PARAM=FromMiddle"
 
 ---
@@ -175,13 +175,13 @@ steps:
     output: ENV_TYPE
 
   - name: run-prod-dag
-    run: production-dag
+    call: production-dag
     preconditions:
       - condition: "${ENV_TYPE}"
         expected: "production"
 
   - name: run-dev-dag
-    run: development-dag
+    call: development-dag
     preconditions:
       - condition: "${ENV_TYPE}"
         expected: "development"
@@ -234,11 +234,11 @@ steps:
 		yamlContent := `
 steps:
   - name: generate-data
-    run: generator-dag
+    call: generator-dag
     output: GEN_OUTPUT
 
   - name: process-data
-    run: processor-dag
+    call: processor-dag
     params: "INPUT_DATA=${GEN_OUTPUT.outputs.DATA}"
 
 ---
@@ -290,7 +290,7 @@ steps:
 		yamlContent := `
 steps:
   - name: run-missing-dag
-    run: non-existent-dag
+    call: non-existent-dag
 
 ---
 
@@ -330,12 +330,12 @@ steps:
     output: SETUP_STATUS
 
   - name: task1
-    run: task-dag
+    call: task-dag
     params: "TASK_NAME=Task1 SETUP=${SETUP_STATUS}"
     output: TASK1_RESULT
 
   - name: task2
-    run: task-dag
+    call: task-dag
     params: "TASK_NAME=Task2 SETUP=${SETUP_STATUS}"
     output: TASK2_RESULT
 
@@ -397,7 +397,7 @@ steps:
 		yamlContent := `
 steps:
   - name: parallel-tasks
-    run: worker-dag
+    call: worker-dag
     parallel:
       items:
         - TASK_ID=1 TASK_NAME=alpha
@@ -433,7 +433,7 @@ steps:
 		yamlContent := `
 steps:
   - name: parallel-tasks
-    run: worker-dag
+    call: worker-dag
 ---
 
 name: worker-dag
