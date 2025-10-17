@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 
@@ -48,6 +49,7 @@ func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) Paths {
 		return setLegacyPaths(configDir)
 	// If the legacy path exists, warn and use it.
 	case fileutil.FileExists(legacyPath):
+		log.Printf("Warning: Dagu legacy directory structure detected. This is deprecated.")
 		return setLegacyPaths(legacyPath)
 	// Fallback to default XDG-based paths.
 	default:
