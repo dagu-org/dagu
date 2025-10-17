@@ -118,7 +118,13 @@ func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 		}
 	}
 
-	return &Client{cfg: cfg, containerID: ctID, cli: dockerCli, platform: platform}, nil
+	return &Client{
+		cfg:         cfg,
+		containerID: ctID,
+		cli:         dockerCli,
+		platform:    platform,
+		authManager: cfg.AuthManager,
+	}, nil
 }
 
 // Close closes the container client and cleans up resources
@@ -162,6 +168,7 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 	if mode == "" {
 		mode = "keepalive"
 	}
+
 	switch mode {
 	case "keepalive":
 		if len(c.cfg.Container.Cmd) == 0 {
@@ -475,6 +482,8 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 
 	if len(cmd) > 0 {
 		ctCfg.Cmd = cmd
+		// Entrypoint should be empty slice to override image ENTRYPOINT
+		ctCfg.Entrypoint = []string{}
 	}
 
 	resp, err := cli.ContainerCreate(
