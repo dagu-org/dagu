@@ -1381,9 +1381,6 @@ func buildStepEnvs(ctx StepBuildContext, def stepDef, step *core.Step) error {
 	return nil
 }
 
-// maxStepNameLen is the maximum length of a step name.
-const maxStepNameLen = 40
-
 func buildStepPrecondition(ctx StepBuildContext, def stepDef, step *core.Step) error {
 	// Parse both `preconditions` and `precondition` fields.
 	conditions, err := parsePrecondition(ctx.BuildContext, def.Preconditions)
