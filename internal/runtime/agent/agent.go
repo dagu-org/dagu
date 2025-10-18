@@ -19,6 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/mailer"
+	"github.com/dagu-org/dagu/internal/common/secrets"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/common/sock"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
@@ -277,7 +278,25 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize coordinator client factory for distributed execution
 	coordinatorCli := a.createCoordinatorClient(ctx)
 
-	ctx = execution.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli)
+	// Resolve secrets if defined
+	var secretEnvs []string
+	if len(a.dag.Secrets) > 0 {
+		logger.Info(ctx, "Resolving secrets", "count", len(a.dag.Secrets))
+
+		// Create secret registry - all providers auto-registered via init()
+		secretRegistry := secrets.NewRegistry(a.dag.WorkingDir)
+
+		// Resolve all secrets - providers handle their own configuration
+		resolvedSecrets, err := secretRegistry.ResolveAll(ctx, a.dag.Secrets)
+		if err != nil {
+			return fmt.Errorf("failed to resolve secrets: %w", err)
+		}
+
+		secretEnvs = resolvedSecrets
+		logger.Debug(ctx, "Secrets resolved successfully", "count", len(secretEnvs))
+	}
+
+	ctx = execution.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli, secretEnvs)
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}
@@ -774,7 +793,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
-	dagCtx := execution.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil)
+	dagCtx := execution.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil, nil)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
 	a.lastErr = lastErr
 

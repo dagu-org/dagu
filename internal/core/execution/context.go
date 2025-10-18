@@ -20,21 +20,29 @@ type DAGContext struct {
 	DB             Database
 	BaseEnv        *config.BaseEnv
 	Envs           map[string]string
+	SecretEnvs     map[string]string // Secret environment variables (highest priority)
 	CoordinatorCli Dispatcher
 }
 
 // AllEnvs returns all environment variables as a slice of strings in "key=value" format.
+// Secrets have the highest priority and are appended last.
 func (e DAGContext) AllEnvs() []string {
 	envs := e.BaseEnv.AsSlice()
 	envs = append(envs, e.DAG.Env...)
 	for k, v := range e.Envs {
 		envs = append(envs, k+"="+v)
 	}
+	// Append secrets last (highest priority)
+	for k, v := range e.SecretEnvs {
+		envs = append(envs, k+"="+v)
+	}
 	return envs
 }
 
 // EvalString evaluates a string with the environment variables.
+// Secrets are included with highest priority.
 func (e DAGContext) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
+	opts = append(opts, cmdutil.WithVariables(e.SecretEnvs))
 	opts = append(opts, cmdutil.WithVariables(e.Envs))
 	return cmdutil.EvalString(ctx, s, opts...)
 }
@@ -93,7 +101,7 @@ type Dispatcher interface {
 }
 
 // SetupDAGContext initializes and returns a new context with DAG execution metadata.
-func SetupDAGContext(ctx context.Context, dag *core.DAG, db Database, rootDAGRun DAGRunRef, dagRunID, logFile string, params []string, coordinatorCli Dispatcher) context.Context {
+func SetupDAGContext(ctx context.Context, dag *core.DAG, db Database, rootDAGRun DAGRunRef, dagRunID, logFile string, params []string, coordinatorCli Dispatcher, secretEnvs []string) context.Context {
 	var envs = map[string]string{
 		EnvKeyDAGRunLogFile: logFile,
 		EnvKeyDAGRunID:      dagRunID,
@@ -116,11 +124,21 @@ func SetupDAGContext(ctx context.Context, dag *core.DAG, db Database, rootDAGRun
 		}
 	}
 
+	// Parse secret environment variables
+	secretEnvsMap := make(map[string]string)
+	for _, kv := range secretEnvs {
+		parts := strings.SplitN(kv, "=", 2)
+		if len(parts) == 2 {
+			secretEnvsMap[parts[0]] = parts[1]
+		}
+	}
+
 	return context.WithValue(ctx, dagCtxKey{}, DAGContext{
 		RootDAGRun:     rootDAGRun,
 		DAG:            dag,
 		DB:             db,
 		Envs:           envs,
+		SecretEnvs:     secretEnvsMap,
 		DAGRunID:       dagRunID,
 		BaseEnv:        config.GetBaseEnv(ctx),
 		CoordinatorCli: coordinatorCli,
