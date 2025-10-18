@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
@@ -37,14 +36,6 @@ func (e DAGContext) AllEnvs() []string {
 		envs = append(envs, k+"="+v)
 	}
 	return envs
-}
-
-// EvalString evaluates a string with the environment variables.
-// Secrets are included with highest priority.
-func (e DAGContext) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
-	opts = append(opts, cmdutil.WithVariables(e.SecretEnvs))
-	opts = append(opts, cmdutil.WithVariables(e.Envs))
-	return cmdutil.EvalString(ctx, s, opts...)
 }
 
 // Database is the interface for accessing the database to retrieve DAGs and dag-run statuses.
