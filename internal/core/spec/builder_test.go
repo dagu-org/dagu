@@ -1074,7 +1074,7 @@ steps:
 		assert.Equal(t, []string{"sub_dag_legacy", ""}, thLegacy.Steps[0].Args)
 		assert.Equal(t, "sub_dag_legacy", thLegacy.Steps[0].CmdWithArgs)
 		require.Len(t, dagLegacy.BuildWarnings, 1)
-		assert.Contains(t, dagLegacy.BuildWarnings[0], "deprecated field `run`")
+		assert.Contains(t, dagLegacy.BuildWarnings[0], "Step field `run` is deprecated")
 	})
 	t.Run("ContinueOn", func(t *testing.T) {
 		t.Parallel()
