@@ -352,4 +352,67 @@ steps:
 		require.Contains(t, string(stdoutContent), "*******", "masked value should appear")
 		require.Contains(t, string(stdoutContent), "Secret from DAG location", "log message should be present")
 	})
+
+	t.Run("SecretsInStepLevelEnv", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+
+		// Create secret file
+		secretValue := "super-secret-db-password-789"
+		secretFile := th.TempFile(t, "db-password.txt", []byte(secretValue))
+
+		// Set up environment variable for env provider
+		apiTokenValue := "api-token-xyz-123"
+
+		dag := th.DAG(t, `
+env:
+  - PROD_API_TOKEN: `+apiTokenValue+`
+
+secrets:
+  - name: API_TOKEN
+    provider: env
+    key: PROD_API_TOKEN
+  - name: DB_PASSWORD
+    provider: file
+    key: `+secretFile+`
+
+steps:
+  - name: use-secrets-in-env
+    command: |
+      echo "Auth header: $AUTH_HEADER"
+      echo "DB pass: $DB_PASS"
+      echo "Strict mode: $STRICT_MODE"
+    env:
+      AUTH_HEADER: "Bearer ${API_TOKEN}"
+      DB_PASS: "${DB_PASSWORD}"
+      STRICT_MODE: "1"
+    output: RESULT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Success)
+
+		// Get stdout file and verify masking
+		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+		require.NoError(t, err)
+		require.Len(t, status.Nodes, 1)
+
+		node := status.Nodes[0]
+		stdoutContent, err := os.ReadFile(node.Stdout)
+		require.NoError(t, err)
+
+		stdout := string(stdoutContent)
+
+		// Both secrets should be masked in output
+		require.NotContains(t, stdout, apiTokenValue, "API token should be masked")
+		require.NotContains(t, stdout, secretValue, "DB password should be masked")
+		require.Contains(t, stdout, "*******", "masked value should appear")
+
+		// Non-secret values should appear
+		require.Contains(t, stdout, "Strict mode: 1", "non-secret env var should appear")
+		require.Contains(t, stdout, "Auth header: Bearer", "prefix should appear")
+		require.Contains(t, stdout, "DB pass:", "label should appear")
+	})
 }
