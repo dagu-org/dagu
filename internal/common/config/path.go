@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -38,7 +38,7 @@ type XDGConfig struct {
 // a legacy path, and an XDGConfig. It chooses the configuration directory based on these inputs.
 //
 // Resolution logic:
-// 1. If the environment variable (appHomeEnv) is set, use its value and assume legacy directory structure.
+// 1. If the environment variable (appHomeEnv) is set, use its value and assume unified directory structure.
 // 2. Else, if the legacyPath exists on disk, use it and emit a warning to update configuration paths.
 // 3. Otherwise, fall back to XDG-compliant defaults.
 func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) Paths {
@@ -46,11 +46,13 @@ func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) Paths {
 	// Use the directory from the environment variable if available.
 	case os.Getenv(appHomeEnv) != "":
 		configDir := os.Getenv(appHomeEnv)
-		return setLegacyPaths(configDir)
+		return setUnifiedPaths(configDir)
 	// If the legacy path exists, warn and use it.
 	case fileutil.FileExists(legacyPath):
-		log.Printf("Warning: Dagu legacy directory structure detected. This is deprecated.")
-		return setLegacyPaths(legacyPath)
+		paths := setUnifiedPaths(legacyPath)
+		warning := fmt.Sprintf("Warning: Dagu legacy directory (%s) structure detected. This is deprecated.", legacyPath)
+		paths.Warnings = append(paths.Warnings, warning)
+		return paths
 	// Fallback to default XDG-based paths.
 	default:
 		configDir := filepath.Join(xdg.ConfigHome, AppSlug)
@@ -73,9 +75,9 @@ func setXDGPaths(xdg XDGConfig, configDir string) Paths {
 	}
 }
 
-// setLegacyPaths sets the application paths using the legacy directory structure,
-// where all subdirectories are placed within the configuration directory.
-func setLegacyPaths(configDir string) Paths {
+// setUnifiedPaths sets the application paths using a unified directory structure,
+// where all subdirectories (data, logs, suspend, dags) are placed within a single root directory.
+func setUnifiedPaths(configDir string) Paths {
 	return Paths{
 		ConfigDir:       configDir,
 		DataDir:         filepath.Join(configDir, "data"),
