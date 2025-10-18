@@ -257,4 +257,57 @@ steps:
 		require.Contains(t, string(stdoutContent), "*******", "masked value should appear")
 		require.Contains(t, string(stdoutContent), "Secret from relative path", "log message should be present")
 	})
+
+	t.Run("RelativePathFromDAGLocation", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+
+		// Create a working directory that's different from where the DAG file is
+		workDir := t.TempDir()
+
+		secretValue := "dag-location-secret-123"
+
+		// Ensure DAGsDir exists
+		require.NoError(t, os.MkdirAll(th.Config.Paths.DAGsDir, 0750))
+
+		// Create secret file in the DAG directory (th.Config.Paths.DAGsDir)
+		// The DAG method creates DAG files in this directory, so we put the secret there too
+		secretFilePath := th.Config.Paths.DAGsDir + "/secret.txt"
+		require.NoError(t, os.WriteFile(secretFilePath, []byte(secretValue), 0600))
+
+		// Create DAG with workingDir set to a different directory
+		// The secret file is NOT in workingDir, but in the DAG file's directory
+		dag := th.DAG(t, `
+workingDir: `+workDir+`
+
+secrets:
+  - name: DAG_SECRET
+    provider: file
+    key: secret.txt
+
+steps:
+  - name: use-dag-location-secret
+    command: |
+      echo "Secret from DAG location ${DAG_SECRET}"
+    output: OUTPUT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Success)
+
+		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+		require.NoError(t, err)
+		require.Len(t, status.Nodes, 1)
+
+		node := status.Nodes[0]
+		stdoutContent, err := os.ReadFile(node.Stdout)
+		require.NoError(t, err)
+
+		// Secret should be found (from DAG location) and masked
+		require.NotContains(t, string(stdoutContent), secretValue, "secret loaded from DAG location should be masked")
+		require.Contains(t, string(stdoutContent), "*******", "masked value should appear")
+		require.Contains(t, string(stdoutContent), "Secret from DAG location", "log message should be present")
+	})
 }

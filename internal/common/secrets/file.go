@@ -10,9 +10,9 @@ import (
 )
 
 func init() {
-	registerResolver("file", func(workingDir string) Resolver {
+	registerResolver("file", func(baseDirs []string) Resolver {
 		return &fileResolver{
-			workingDir: workingDir,
+			baseDirs: baseDirs,
 		}
 	})
 }
@@ -26,7 +26,7 @@ func init() {
 // Security note: NOT recommended for storing plain text secrets in DAG directories
 // or version control.
 type fileResolver struct {
-	workingDir string
+	baseDirs []string // Base directories to try for relative path resolution
 }
 
 // Name returns the provider identifier.
@@ -94,17 +94,25 @@ func (r *fileResolver) CheckAccessibility(ctx context.Context, ref core.SecretRe
 
 // resolvePath converts relative paths to absolute paths.
 // Absolute paths are returned as-is.
-// Relative paths are resolved against the working directory.
+// Relative paths are resolved by trying each base directory in order until a file is found.
 func (r *fileResolver) resolvePath(path string) string {
 	if filepath.IsAbs(path) {
 		return path
 	}
 
-	// Relative path: resolve against working directory
-	if r.workingDir != "" {
-		return filepath.Join(r.workingDir, path)
+	// Relative path: try each base directory in order
+	for _, baseDir := range r.baseDirs {
+		if baseDir == "" {
+			continue
+		}
+		absPath := filepath.Join(baseDir, path)
+		// Check if file exists at this path
+		if _, err := os.Stat(absPath); err == nil {
+			return absPath
+		}
 	}
 
-	// No working directory set, return as-is (will likely fail)
+	// If no base directories or file not found in any of them, return the path as-is
+	// This will cause a "file not found" error in Resolve()
 	return path
 }

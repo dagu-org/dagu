@@ -35,39 +35,40 @@ type Resolver interface {
 // Registry manages all secret resolvers.
 // It is thread-safe and can be used concurrently.
 type Registry struct {
-	resolvers  map[string]Resolver
-	mu         sync.RWMutex
-	workingDir string
+	resolvers map[string]Resolver
+	mu        sync.RWMutex
+	baseDirs  []string
 }
 
 var (
 	// globalResolvers stores resolver factories that are registered via init()
-	globalResolvers = make(map[string]func(workingDir string) Resolver)
+	globalResolvers = make(map[string]func(baseDirs []string) Resolver)
 	globalMu        sync.RWMutex
 )
 
 // registerResolver adds a resolver factory to be used by all registries.
 // This is called from init() functions in resolver implementation files.
-func registerResolver(name string, factory func(workingDir string) Resolver) {
+func registerResolver(name string, factory func(baseDirs []string) Resolver) {
 	globalMu.Lock()
 	defer globalMu.Unlock()
 	globalResolvers[name] = factory
 }
 
 // NewRegistry creates a new registry with all registered providers.
-// workingDir is used by the file provider to resolve relative paths.
-func NewRegistry(workingDir string) *Registry {
+// baseDirs is used by the file provider to resolve relative paths.
+// The file provider tries each base directory in order until a file is found.
+func NewRegistry(baseDirs ...string) *Registry {
 	globalMu.RLock()
 	defer globalMu.RUnlock()
 
 	r := &Registry{
-		resolvers:  make(map[string]Resolver),
-		workingDir: workingDir,
+		resolvers: make(map[string]Resolver),
+		baseDirs:  baseDirs,
 	}
 
 	// Instantiate all registered providers
 	for name, factory := range globalResolvers {
-		r.resolvers[name] = factory(workingDir)
+		r.resolvers[name] = factory(baseDirs)
 	}
 
 	return r

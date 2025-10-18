@@ -284,7 +284,15 @@ func (a *Agent) Run(ctx context.Context) error {
 		logger.Info(ctx, "Resolving secrets", "count", len(a.dag.Secrets))
 
 		// Create secret registry - all providers auto-registered via init()
-		secretRegistry := secrets.NewRegistry(a.dag.WorkingDir)
+		// File provider tries base directories in order:
+		// 1. DAG working directory (if set)
+		// 2. Directory containing the DAG file (if Location is set)
+		baseDirs := []string{a.dag.WorkingDir}
+		if a.dag.Location != "" {
+			dagDir := filepath.Dir(a.dag.Location)
+			baseDirs = append(baseDirs, dagDir)
+		}
+		secretRegistry := secrets.NewRegistry(baseDirs...)
 
 		// Resolve all secrets - providers handle their own configuration
 		resolvedSecrets, err := secretRegistry.ResolveAll(ctx, a.dag.Secrets)

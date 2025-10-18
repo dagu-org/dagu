@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	registerResolver("env", func(_ string) Resolver {
+	registerResolver("env", func(_ []string) Resolver {
 		return &envResolver{}
 	})
 }
