@@ -1,10 +1,21 @@
 import logoDark from '@/assets/images/logo_dark.png';
+import { FeedbackDialog } from '@/components/FeedbackDialog';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
-import { BarChart2, GitBranch, List, Search, Server, PanelLeft, Github, MessageSquare, Users, Activity, Layers } from 'lucide-react';
+import {
+  Activity,
+  BarChart2,
+  GitBranch,
+  Github,
+  Layers,
+  List,
+  MessageSquare,
+  PanelLeft,
+  Search,
+  Server,
+} from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FeedbackDialog } from '@/components/FeedbackDialog';
 
 // Discord SVG Icon component
 function DiscordIcon({ className }: { className?: string }) {
@@ -79,7 +90,10 @@ export const mainListItems = React.forwardRef<
             aria-label="Toggle sidebar"
           >
             {isHovered ? (
-              <PanelLeft size={20} className="text-primary-foreground hover:text-primary-foreground/70" />
+              <PanelLeft
+                size={20}
+                className="text-primary-foreground hover:text-primary-foreground/70"
+              />
             ) : (
               <img
                 src={logoDark}
@@ -107,9 +121,9 @@ export const mainListItems = React.forwardRef<
             </div>
             <button
               onClick={() => {
-              setIsHovered(false);
-              onToggle?.();
-            }}
+                setIsHovered(false);
+                onToggle?.();
+              }}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center z-10 text-primary-foreground/40 hover:text-primary-foreground/70 transition-all duration-200 cursor-pointer"
               aria-label="Toggle sidebar"
             >
@@ -221,7 +235,9 @@ export const mainListItems = React.forwardRef<
           title="Send Feedback"
         >
           <MessageSquare size={18} />
-          {isOpen && <span className="ml-3 text-xs font-medium">Send Feedback</span>}
+          {isOpen && (
+            <span className="ml-3 text-xs font-medium">Send Feedback</span>
+          )}
         </button>
       </div>
       {/* Discord Community link */}

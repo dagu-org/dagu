@@ -379,7 +379,7 @@ Each step in the `steps` array can have these fields:
 | `name` | string | Step name (optional - auto-generated if not provided) | Auto-generated |
 | `command` | string | Command to execute. Multi-line strings run as inline scripts (honors shebang) | - |
 | `script` | string | Inline script (alternative to command). Honors shebang when no shell is set. | - |
-| `run` | string | Run another DAG | - |
+| `run` (legacy) | string | Deprecated alias for `call` | - |
 | `depends` | string/array | Step dependencies | - |
 
 ### Step Definition Formats
@@ -426,7 +426,10 @@ In the nested array format:
 | `stderr` | string | Redirect stderr to file | - |
 | `output` | string | Capture output to variable | - |
 | `env` | array/object | Step-specific environment variables (overrides DAG-level) | - |
+| `call` | string | Name of a DAG to execute as a child DAG-run | - |
 | `params` | string | Parameters for sub-DAG | - |
+
+> ℹ️ The legacy `run` field is still accepted for backward compatibility, but it will be removed in a future release. Prefer `call` for new workflows.
 
 ### Parallel Execution
 
@@ -437,7 +440,7 @@ In the nested array format:
 
 ```yaml
 steps:
-  - run: file-processor
+  - call: file-processor
     parallel:
       items: [file1.csv, file2.csv, file3.csv]
       maxConcurrent: 2
@@ -586,7 +589,7 @@ When using distributed execution, specify `workerSelector` to route tasks to wor
 
 ```yaml
 steps:
-  - run: gpu-training
+  - call: gpu-training
 ---
 # Run on a worker with gpu
 name: gpu-training
@@ -766,7 +769,7 @@ steps:
       limit: 3
       intervalSec: 300
     
-  - run: transform-module
+  - call: transform-module
     parallel:
       items: [customers, orders, products]
       maxConcurrent: 2

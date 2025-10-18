@@ -2241,9 +2241,9 @@ components:
           description: "List of arguments to pass to the command"
           items:
             type: string
-        run:
+        call:
           type: string
-          description: "The name of the DAG to run as a child DAG-run"
+          description: "The name of the DAG to execute as a child DAG-run"
         params:
           type: string
           description: "Parameters to pass to the child DAG-run in JSON format"

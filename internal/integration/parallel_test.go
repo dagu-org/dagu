@@ -47,7 +47,7 @@ steps:
 		{
 			name: "simple items",
 			dag: `steps:
-  - run: child-echo
+  - call: child-echo
     parallel:
       items:
         - "item1"
@@ -62,7 +62,7 @@ steps:
 		{
 			name: "object items",
 			dag: `steps:
-  - run: child-process
+  - call: child-process
     parallel:
       items:
         - REGION: us-east-1
@@ -88,7 +88,7 @@ steps:
 			dag: `params:
   - ITEMS: '["alpha", "beta", "gamma", "delta"]'
 steps:
-  - run: child-echo
+  - call: child-echo
     parallel: ${ITEMS}
 ` + childEcho,
 			expectedNodes:     1,
@@ -100,7 +100,7 @@ steps:
 			dag: `env:
   - SERVERS: "server1 server2 server3"
 steps:
-  - run: child-echo
+  - call: child-echo
     parallel: ${SERVERS}
 ` + childEcho,
 			expectedNodes:     1,
@@ -112,7 +112,7 @@ steps:
 			dag: `env:
   - ITEMS: '["task1", "task2", "task3"]'
 steps:
-  - run: child-with-output
+  - call: child-with-output
     parallel: $ITEMS
   - name: aggregate-results
     command: echo "Completed parallel tasks"
@@ -167,7 +167,7 @@ steps:
 
 func TestParallelExecution_WithOutput(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-with-output
+  - call: child-with-output
     parallel:
       items:
         - "A"
@@ -236,7 +236,7 @@ steps:
 
 func TestParallelExecution_DeterministicIDs(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-echo
+  - call: child-echo
     parallel:
       items:
         - "test1"
@@ -282,7 +282,7 @@ steps:
 
 func TestParallelExecution_PartialFailure(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-conditional-fail
+  - call: child-conditional-fail
     parallel:
       items:
         - "ok1"
@@ -321,7 +321,7 @@ steps:
 
 func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-output-fail
+  - call: child-output-fail
     parallel:
       items:
         - "success"
@@ -376,7 +376,7 @@ func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
 
 	th := test.Setup(t)
 	dag := th.DAG(t, fmt.Sprintf(`steps:
-  - run: child-retry-simple
+  - call: child-retry-simple
     parallel:
       items:
         - "item1"
@@ -431,7 +431,7 @@ steps:
 
 func TestParallelExecution_MinimalRetry(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-fail
+  - call: child-fail
     parallel:
       items:
         - "item1"
@@ -462,7 +462,7 @@ steps:
 
 func TestParallelExecution_RetryAndContinueOn(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-fail-both
+  - call: child-fail-both
     parallel:
       items:
         - "item1"
@@ -506,7 +506,7 @@ steps:
 
 func TestParallelExecution_OutputsArray(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-with-output
+  - call: child-with-output
     parallel:
       items: ["task1", "task2", "task3"]
     output: RESULTS
@@ -573,7 +573,7 @@ func TestParallelExecution_ExceedsMaxLimit(t *testing.T) {
 
 	th := test.Setup(t)
 	dag := th.DAG(t, fmt.Sprintf(`steps:
-  - run: child-echo
+  - call: child-echo
     parallel:
       items:
 %s
@@ -604,7 +604,7 @@ func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
 	}
 
 	dag := helper.DAG(t, fmt.Sprintf(`steps:
-  - run: child-echo
+  - call: child-echo
     parallel:
       items:
 %s
@@ -648,7 +648,7 @@ func TestParallelExecution_ObjectItemProperties(t *testing.T) {
       ]'
     output: CONFIGS
 
-  - run: sync-data
+  - call: sync-data
     parallel:
       items: ${CONFIGS}
       maxConcurrent: 2
@@ -737,7 +737,7 @@ steps:
   - command: find %s -name "*.csv" -type f
     output: FILES
 
-  - run: process-file
+  - call: process-file
     parallel: ${FILES}
     params:
       - ITEM: ${ITEM}
@@ -784,7 +784,7 @@ steps:
 
 func TestParallelExecution_StaticObjectItems(t *testing.T) {
 	const dagContent = `steps:
-  - run: deploy-service
+  - call: deploy-service
     parallel:
       maxConcurrent: 3
       items:
@@ -871,7 +871,7 @@ func TestIssue1274_ParallelJSONSingleItem(t *testing.T) {
       echo '{"file": "params.txt", "config": "env"}'
     output: jsonList
 
-  - run: issue-1274-worker
+  - call: issue-1274-worker
     parallel:
       items: ${jsonList}
       maxConcurrent: 1
@@ -917,7 +917,7 @@ func TestIssue1274_ParallelJSONMultipleItems(t *testing.T) {
       echo '{"file": "file3.txt", "config": "dev"}'
     output: jsonList
 
-  - run: issue-1274-worker-multi
+  - call: issue-1274-worker-multi
     parallel:
       items: ${jsonList}
       maxConcurrent: 1

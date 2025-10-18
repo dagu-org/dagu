@@ -52,7 +52,7 @@ Specify `workerSelector` on any step to route it to workers with matching labels
 ```yaml
 steps:
   # This task will only run on workers with gpu=true label
-  - run: train
+  - call: train
 
 ---
 name: train
@@ -81,8 +81,8 @@ dagu worker --worker.labels cpu=true
 
 # DAG
 steps:
-  - run: gpu-task
-  - run: cpu-task
+  - call: gpu-task
+  - call: cpu-task
 
 ---
 # Run on a worker with gpu

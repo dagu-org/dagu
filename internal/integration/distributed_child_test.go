@@ -18,7 +18,7 @@ func TestDistributedLocalDAGExecution(t *testing.T) {
 		yamlContent := `
 steps:
   - name: run-local-on-worker
-    run: local-child
+    call: local-child
     output: RESULT
 
 ---
@@ -79,7 +79,7 @@ steps:
 		yamlContent := `
 steps:
   - name: run-on-nonexistent-worker
-    run: local-child
+    call: local-child
     output: RESULT
 
 ---
@@ -114,7 +114,7 @@ steps:
 		yamlContent := `
 steps:
   - name: run-local-on-worker
-    run: local-child
+    call: local-child
     output: RESULT
 
 ---

@@ -210,7 +210,7 @@ Capture outputs from nested workflows:
 ```yaml
 # parent.yaml
 steps:
-  - run: etl-workflow
+  - call: etl-workflow
     params: "DATE=${TODAY}"
     output: ETL_RESULT
     
@@ -241,7 +241,7 @@ Access outputs from deeply nested workflows:
 
 ```yaml
 steps:
-  - run: main-pipeline
+  - call: main-pipeline
     output: PIPELINE
     
   - |
@@ -256,7 +256,7 @@ When running parallel executions, outputs are aggregated:
 
 ```yaml
 steps:
-  - run: region-processor
+  - call: region-processor
     parallel:
       items: ["us-east", "us-west", "eu-central"]
     output: RESULTS

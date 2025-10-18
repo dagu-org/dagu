@@ -105,7 +105,9 @@ type DAG struct {
 	// OTel contains the OpenTelemetry configuration for the DAG.
 	OTel *OTelConfig `json:"otel,omitempty"`
 	// BuildErrors contains any errors encountered while building the DAG.
-	BuildErrors []error
+	BuildErrors []error `json:"-"`
+	// BuildWarnings contains non-fatal warnings detected while building the DAG.
+	BuildWarnings []string `json:"-"`
 	// LocalDAGs contains DAGs defined in the same file, keyed by DAG name
 	LocalDAGs map[string]*DAG `json:"localDAGs,omitempty"`
 	// YamlData contains the raw YAML data of the DAG.

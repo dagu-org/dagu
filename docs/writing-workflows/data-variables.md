@@ -209,7 +209,7 @@ Examples:
 
 ```yaml
 steps:
-  - run: sub_workflow
+  - call: sub_workflow
     output: SUB_RESULT
   - echo "The result is ${SUB_RESULT.outputs.finalValue}"
 ```
@@ -270,7 +270,7 @@ The result of the sub workflow will be available from the standard output of the
 
 ```yaml
 steps:
-  - run: sub_workflow
+  - call: sub_workflow
     params: "FOO=BAR"
     output: SUB_RESULT
   - echo $SUB_RESULT

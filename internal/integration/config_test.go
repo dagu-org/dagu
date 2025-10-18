@@ -518,7 +518,7 @@ func TestCallSubDAG(t *testing.T) {
 
 	// Use multi-document YAML to include both parent and sub DAG
 	dagContent := `steps:
-  - run: sub
+  - call: sub
     params: "SUB_P1=foo"
     output: OUT1
   - command: echo "${OUT1.outputs.OUT}"
@@ -540,6 +540,26 @@ steps:
 	})
 }
 
+func TestLegacyRunSubDAG(t *testing.T) {
+	th := test.Setup(t)
+
+	dagContent := `steps:
+  - run: legacy-sub
+    output: OUT
+---
+name: legacy-sub
+steps:
+  - command: echo "legacy works"
+    output: LEGACY_OUT
+`
+	dag := th.DAG(t, dagContent)
+	agent := dag.Agent()
+	agent.RunSuccess(t)
+	dag.AssertOutputs(t, map[string]any{
+		"OUT": []test.Contains{"legacy works"},
+	})
+}
+
 func TestNestedThreeLevelDAG(t *testing.T) {
 	th := test.Setup(t)
 
@@ -554,7 +574,7 @@ steps:
 
 	// Create parent and child DAGs using multi-document YAML
 	dagContent := `steps:
-  - run: nested_child
+  - call: nested_child
     params: "PARAM=123"
     output: CHILD_OUTPUT
   - command: echo ${CHILD_OUTPUT.outputs.OUTPUT}
@@ -564,7 +584,7 @@ name: nested_child
 params:
   PARAM: VALUE
 steps:
-  - run: nested_grand_child
+  - call: nested_grand_child
     params: "PARAM=${PARAM}"
     output: GRAND_CHILD_OUTPUT
   - command: echo ${GRAND_CHILD_OUTPUT.outputs.OUTPUT}

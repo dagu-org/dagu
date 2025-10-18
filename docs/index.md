@@ -162,7 +162,7 @@ steps:
   - command: python extract.py --date=${DATE}
     output: RAW_DATA
     
-  - run: transform-data
+  - call: transform-data
     parallel:
       items: [customers, orders, products]
     params: "TYPE=${ITEM} INPUT=${RAW_DATA}"

@@ -8,11 +8,9 @@ var exampleDAGs = map[string]string{
 description: Execute steps one after another
 
 steps:
-  - command: echo "Step 1 - Starting workflow"
-    
-  - command: echo "Step 2 - Processing data"
-    
-  - command: echo "Step 3 - Workflow complete"
+  - echo "Step 1 - Starting workflow"
+  - echo "Step 2 - Processing data"
+  - echo "Step 3 - Workflow complete"
 `,
 
 	"example-02-parallel-execution.yaml": `# Parallel Execution
@@ -74,11 +72,11 @@ description: Example of a scheduled workflow
 histRetentionDays: 7  # Keep 7 days of history
 
 steps:
-  - command: |
+  - |
+      #!env sh
       echo "Running scheduled task"
       echo "Current time: $(date)"
-      
-  - command: echo "Cleaning up old data"
+  - echo "Cleaning up old data"
 `,
 
 	"example-04-nested-workflows.yaml": `# Nested Workflows
@@ -87,12 +85,10 @@ steps:
 description: Example of nested workflows
 
 steps:
-  - command: echo "Preparing data for sub-workflows"
-    
-  - run: sub-workflow
+  - echo "Preparing data for sub-workflows"
+  - call: sub-workflow
     params: "TASK_ID=123"
-    
-  - command: echo "Main workflow completed"
+  - echo "Main workflow completed"
 
 ---
 # Sub-workflow definition
@@ -102,9 +98,8 @@ params:
   - TASK_ID: "000"
   
 steps:
-  - command: echo "Sub-workflow executing with TASK_ID=${TASK_ID}"
-    
-  - command: echo "Sub-workflow step 2"
+  - echo "Sub-workflow executing with TASK_ID=${TASK_ID}"
+  - echo "Sub-workflow step 2"
 `,
 
 	"example-05-container-workflow.yaml": `# Container-based Workflow
@@ -118,12 +113,12 @@ container:
     - /tmp/data:/data
 
 steps:
-  - # write data to a file
-    command: |
-      python -c "with open('/data/output.txt', 'w') as f: f.write('Hello from Dagu!')"
+  # write data to a file
+  - |
+    python -c "with open('/data/output.txt', 'w') as f: f.write('Hello from Dagu!')"
 
-  - # read data from the file
-    command: |
-      python -c "with open('/data/output.txt') as f: print(f.read())"
+  # read data from the file
+  - |
+    python -c "with open('/data/output.txt') as f: print(f.read())"
 `,
 }

@@ -21,7 +21,7 @@ func TestRetryChildDAGRun(t *testing.T) {
 	th.CreateDAGFile(t, "parent.yaml", `
 steps:
   - name: parent
-    run: child_1
+    call: child_1
     params: "PARAM=FOO"
 `)
 
@@ -29,7 +29,7 @@ steps:
 params: "PARAM=BAR"
 steps:
   - name: child_2
-    run: child_2
+    call: child_2
     params: "PARAM=$PARAM"
 `)
 
@@ -131,7 +131,7 @@ func TestRetryPolicyChildDAGRunWithOutputCapture(t *testing.T) {
 	th.CreateDAGFile(t, "parent_retry.yaml", `
 steps:
   - name: call_child
-    run: child_retry
+    call: child_retry
     output: CHILD_OUTPUT
 `)
 
@@ -204,7 +204,7 @@ func TestBasicChildDAGOutputCapture(t *testing.T) {
 	th.CreateDAGFile(t, "parent_basic.yaml", `
 steps:
   - name: call_child
-    run: child_basic
+    call: child_basic
     output: CHILD_OUTPUT
 `)
 

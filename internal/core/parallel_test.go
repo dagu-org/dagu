@@ -27,7 +27,7 @@ func TestBuildParallel(t *testing.T) {
 			yaml: `
 steps:
   - name: process
-    run: workflows/processor
+    call: workflows/processor
     parallel: ${ITEMS}
 `,
 			wantItems:    0,
@@ -39,7 +39,7 @@ steps:
 			yaml: `
 steps:
   - name: process
-    run: workflows/processor
+    call: workflows/processor
     parallel:
       - item1
       - item2
@@ -54,7 +54,7 @@ steps:
 			yaml: `
 steps:
   - name: process
-    run: workflows/processor
+    call: workflows/processor
     parallel:
       - SOURCE: s3://customers
       - SOURCE: s3://products
@@ -68,7 +68,7 @@ steps:
 			yaml: `
 steps:
   - name: process
-    run: workflows/processor
+    call: workflows/processor
     parallel:
       maxConcurrent: 2
       items:
@@ -84,7 +84,7 @@ steps:
 			yaml: `
 steps:
   - name: process
-    run: workflows/processor
+    call: workflows/processor
     parallel:
       items: ${ITEMS}
       maxConcurrent: 5
@@ -98,7 +98,7 @@ steps:
 			yaml: `
 steps:
   - name: process
-    run: workflows/processor
+    call: workflows/processor
     parallel:
       items:
         - item1
@@ -134,7 +134,7 @@ steps:
 			yaml: `
 steps:
   - name: process
-    run: workflows/processor
+    call: workflows/processor
     parallel:
       items: [1, 2, 3]
       maxConcurrent: 0
@@ -147,7 +147,7 @@ steps:
 			yaml: `
 steps:
   - name: process
-    run: workflows/processor
+    call: workflows/processor
     parallel:
       items: []
       maxConcurrent: 5
@@ -208,7 +208,7 @@ func TestParallelWithChildDAG(t *testing.T) {
 	yaml := `
 steps:
   - name: process-regions
-    run: workflows/deploy
+    call: workflows/deploy
     parallel:
       - REGION: us-east-1
       - REGION: eu-west-1
@@ -254,7 +254,7 @@ env:
   - REGIONS: '["us-east-1", "eu-west-1"]'
 steps:
   - name: deploy-all
-    run: workflows/deploy
+    call: workflows/deploy
     parallel: ${REGIONS}
 `,
 		},
@@ -267,7 +267,7 @@ steps:
     output: ITEMS
     
   - name: process-all
-    run: workflows/processor
+    call: workflows/processor
     parallel: ${ITEMS}
     depends: get-items
 `,

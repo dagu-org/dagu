@@ -63,7 +63,7 @@ func toStep(obj core.Step) api.Step {
 	}
 
 	if obj.ChildDAG != nil {
-		step.Run = ptrOf(obj.ChildDAG.Name)
+		step.Call = ptrOf(obj.ChildDAG.Name)
 		step.Params = ptrOf(obj.ChildDAG.Params)
 	}
 	if obj.Parallel != nil {

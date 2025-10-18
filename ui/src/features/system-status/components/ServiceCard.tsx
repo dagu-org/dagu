@@ -1,5 +1,5 @@
+import { ChevronDown, ChevronUp, Clock, Server } from 'lucide-react';
 import React from 'react';
-import { Clock, Server, Activity, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
 interface ServiceInstance {
@@ -18,30 +18,36 @@ interface ServiceCardProps {
   error?: string;
 }
 
-function ServiceCard({ title, instances, icon, isLoading, error }: ServiceCardProps) {
+function ServiceCard({
+  title,
+  instances,
+  icon,
+  isLoading,
+  error,
+}: ServiceCardProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
-  
+
   // Calculate overall status
-  const activeCount = instances.filter(i => i.status === 'active').length;
+  const activeCount = instances.filter((i) => i.status === 'active').length;
   const hasActive = activeCount > 0;
   const allActive = activeCount === instances.length && instances.length > 0;
-  
+
   const getStatusColor = () => {
     if (error) return 'text-red-500';
     if (!hasActive) return 'text-yellow-500';
     if (allActive) return 'text-green-500';
     return 'text-green-500';
   };
-  
+
   const getUptime = (startedAt: string): string => {
     const start = new Date(startedAt);
     const now = new Date();
     const diff = now.getTime() - start.getTime();
-    
+
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (days > 0) {
       return `${days}d ${hours}h`;
     } else if (hours > 0) {
@@ -50,7 +56,7 @@ function ServiceCard({ title, instances, icon, isLoading, error }: ServiceCardPr
       return `${minutes}m`;
     }
   };
-  
+
   return (
     <div className="border rounded-lg bg-card">
       <div className="p-3">
@@ -69,34 +75,42 @@ function ServiceCard({ title, instances, icon, isLoading, error }: ServiceCardPr
             </button>
           )}
         </div>
-        
+
         {/* Status Summary */}
         <div className="flex items-center gap-3 text-xs">
           <div className="flex items-center gap-1.5">
             <div className="relative">
-              <div className={cn(
-                "w-2 h-2 rounded-full transition-colors",
-                getStatusColor()
-              )} />
-              {hasActive && !error && (
-                <div className={cn(
-                  "absolute inset-0 rounded-full animate-ping opacity-75",
+              <div
+                className={cn(
+                  'w-2 h-2 rounded-full transition-colors',
                   getStatusColor()
-                )} />
+                )}
+              />
+              {hasActive && !error && (
+                <div
+                  className={cn(
+                    'absolute inset-0 rounded-full animate-ping opacity-75',
+                    getStatusColor()
+                  )}
+                />
               )}
             </div>
-            <span className={cn("font-medium", getStatusColor())}>
-              {error ? 'Error' : activeCount > 0 ? `${activeCount} Active` : 'Inactive'}
+            <span className={cn('font-medium', getStatusColor())}>
+              {error
+                ? 'Error'
+                : activeCount > 0
+                  ? `${activeCount} Active`
+                  : 'Inactive'}
             </span>
           </div>
-          
+
           {instances.length > 0 && (
             <div className="text-muted-foreground">
               {instances.length} instance{instances.length !== 1 ? 's' : ''}
             </div>
           )}
         </div>
-        
+
         {/* Primary Instance Info (always visible) */}
         {instances.length > 0 && instances[0] && !error && (
           <div className="mt-2 pt-2 border-t space-y-1">
@@ -117,18 +131,26 @@ function ServiceCard({ title, instances, icon, isLoading, error }: ServiceCardPr
             )}
           </div>
         )}
-        
+
         {/* Expanded Instance List */}
         {isExpanded && instances.length > 1 && (
           <div className="mt-2 pt-2 border-t space-y-2">
             {instances.slice(1).map((instance) => (
-              <div key={instance.instanceId} className="pl-3 border-l-2 border-muted">
+              <div
+                key={instance.instanceId}
+                className="pl-3 border-l-2 border-muted"
+              >
                 <div className="flex items-center gap-2 text-xs">
-                  <div className={cn(
-                    "w-1.5 h-1.5 rounded-full",
-                    instance.status === 'active' ? 'bg-green-500' : 
-                    instance.status === 'inactive' ? 'bg-yellow-500' : 'bg-gray-500'
-                  )} />
+                  <div
+                    className={cn(
+                      'w-1.5 h-1.5 rounded-full',
+                      instance.status === 'active'
+                        ? 'bg-green-500'
+                        : instance.status === 'inactive'
+                          ? 'bg-yellow-500'
+                          : 'bg-gray-500'
+                    )}
+                  />
                   <span className="text-muted-foreground">
                     {instance.host}
                     {instance.port ? `:${instance.port}` : ''}
@@ -146,19 +168,13 @@ function ServiceCard({ title, instances, icon, isLoading, error }: ServiceCardPr
             ))}
           </div>
         )}
-        
+
         {/* Error Message */}
-        {error && (
-          <div className="mt-2 text-xs text-red-500">
-            {error}
-          </div>
-        )}
-        
+        {error && <div className="mt-2 text-xs text-red-500">{error}</div>}
+
         {/* Loading State */}
         {isLoading && (
-          <div className="mt-2 text-xs text-muted-foreground">
-            Loading...
-          </div>
+          <div className="mt-2 text-xs text-muted-foreground">Loading...</div>
         )}
       </div>
     </div>

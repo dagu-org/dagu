@@ -224,7 +224,7 @@ Access outputs from nested workflows:
 
 ```yaml
 steps:
-  - run: etl-workflow
+  - call: etl-workflow
     params: "DATE=${TODAY}"
     output: ETL_RESULT
     

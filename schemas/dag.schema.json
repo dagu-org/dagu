@@ -770,9 +770,13 @@
           "type": "string",
           "description": "Signal to send when stopping this step (e.g., SIGINT). If empty, uses same signal as parent process."
         },
+        "call": {
+          "type": "string",
+          "description": "Name of a DAG to execute as a child dag-run."
+        },
         "run": {
           "type": "string",
-          "description": "Name of a DAG to run."
+          "description": "Legacy field for DAG execution. Deprecated: use call instead."
         },
         "params": {
           "oneOf": [

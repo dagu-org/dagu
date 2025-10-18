@@ -10,7 +10,7 @@ Execute the same workflow with different parameters in parallel.
 
 ```yaml
 steps:
-  - run: file-processor
+  - call: file-processor
     parallel:
       items:
         - "file1.csv"
@@ -30,7 +30,7 @@ steps:
 
 ```yaml
 steps:
-  - run: file-processor
+  - call: file-processor
     parallel:
       items: ${FILE_LIST}
       maxConcurrent: 2  # Process max 2 files at a time
@@ -44,7 +44,7 @@ steps:
   - command: find /data -name "*.csv" -type f
     output: CSV_FILES
   
-  - run: file-processor
+  - call: file-processor
     parallel: ${CSV_FILES}
     params: "FILE=${ITEM}"
 ```
@@ -53,7 +53,7 @@ steps:
 
 ```yaml
 steps:
-  - run: task-processor
+  - call: task-processor
     parallel:
       items: [1, 2, 3]
     output: RESULTS
