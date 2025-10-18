@@ -1415,9 +1415,11 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 		// TODO: remove legacy support in future major version
 		if legacyName := strings.TrimSpace(def.Run); legacyName != "" {
 			name = legacyName
-			message := fmt.Sprintf("Step field `run` is deprecated; use `call` instead (step name: '%s')", step.Name)
+			message := "Step field `run` is deprecated; use `call` instead"
 			logger.Warn(ctx.ctx, message)
-			ctx.dag.BuildWarnings = append(ctx.dag.BuildWarnings, message)
+			if ctx.dag != nil {
+				ctx.dag.BuildWarnings = append(ctx.dag.BuildWarnings, message)
+			}
 		}
 	}
 
@@ -1454,7 +1456,7 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 		step.ExecutorConfig.Type = core.ExecutorTypeDAG
 	}
 
-	step.Command = "run"
+	step.Command = "call"
 	step.Args = []string{name, paramsStr}
 	step.CmdWithArgs = strings.TrimSpace(fmt.Sprintf("%s %s", name, paramsStr))
 	return nil
