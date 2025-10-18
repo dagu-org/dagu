@@ -37,7 +37,7 @@ func (r *envResolver) Validate(ref core.SecretRef) error {
 }
 
 // Resolve fetches the secret value from the environment.
-func (r *envResolver) Resolve(ctx context.Context, ref core.SecretRef) (string, error) {
+func (r *envResolver) Resolve(_ context.Context, ref core.SecretRef) (string, error) {
 	value := os.Getenv(ref.Key)
 	if value == "" {
 		// Check if variable exists but is empty, or doesn't exist at all
@@ -52,7 +52,7 @@ func (r *envResolver) Resolve(ctx context.Context, ref core.SecretRef) (string, 
 }
 
 // CheckAccessibility verifies the environment variable exists without reading its value.
-func (r *envResolver) CheckAccessibility(ctx context.Context, ref core.SecretRef) error {
+func (r *envResolver) CheckAccessibility(_ context.Context, ref core.SecretRef) error {
 	_, exists := os.LookupEnv(ref.Key)
 	if !exists {
 		return fmt.Errorf("environment variable %q is not set", ref.Key)

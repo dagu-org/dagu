@@ -43,10 +43,11 @@ func (r *fileResolver) Validate(ref core.SecretRef) error {
 }
 
 // Resolve reads the secret value from a file.
-func (r *fileResolver) Resolve(ctx context.Context, ref core.SecretRef) (string, error) {
+func (r *fileResolver) Resolve(_ context.Context, ref core.SecretRef) (string, error) {
 	filePath := r.resolvePath(ref.Key)
 
 	// Read file content
+	//nolint:gosec // File path is from user configuration, this is expected
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -62,7 +63,7 @@ func (r *fileResolver) Resolve(ctx context.Context, ref core.SecretRef) (string,
 }
 
 // CheckAccessibility verifies the file exists and is readable without fetching its content.
-func (r *fileResolver) CheckAccessibility(ctx context.Context, ref core.SecretRef) error {
+func (r *fileResolver) CheckAccessibility(_ context.Context, ref core.SecretRef) error {
 	filePath := r.resolvePath(ref.Key)
 
 	// Check if file exists and get info
@@ -83,11 +84,14 @@ func (r *fileResolver) CheckAccessibility(ctx context.Context, ref core.SecretRe
 	}
 
 	// Verify file is readable (try opening)
+	//nolint:gosec // File path is from user configuration, this is expected
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("secret file is not readable: %s: %w", filePath, err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	return nil
 }
