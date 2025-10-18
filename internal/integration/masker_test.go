@@ -258,6 +258,48 @@ steps:
 		require.Contains(t, string(stdoutContent), "Secret from relative path", "log message should be present")
 	})
 
+	t.Run("EmptySecretValueDoesNotMaskEverything", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+
+		// Test that empty secret values don't cause masking of all output
+		// (which would happen if strings.ReplaceAll is called with empty string)
+		normalOutput := "This is normal output that should not be masked"
+
+		dag := th.DAG(t, `
+env:
+  - EMPTY_SECRET=
+
+secrets:
+  - name: EMPTY_SECRET
+    provider: env
+    key: EMPTY_SECRET
+
+steps:
+  - name: test-empty-secret
+    command: echo "`+normalOutput+`"
+    output: RESULT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Success)
+
+		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+		require.NoError(t, err)
+		require.Len(t, status.Nodes, 1)
+
+		node := status.Nodes[0]
+		stdoutContent, err := os.ReadFile(node.Stdout)
+		require.NoError(t, err)
+
+		// The output should NOT be masked (no stream of *******)
+		require.Contains(t, string(stdoutContent), normalOutput, "output should not be masked when secret is empty")
+		// Should not have replaced every character with *******
+		require.NotContains(t, string(stdoutContent), "*******T*******h*******i*******s", "should not mask between every character")
+	})
+
 	t.Run("RelativePathFromDAGLocation", func(t *testing.T) {
 		t.Parallel()
 

@@ -25,7 +25,11 @@ func NewMasker(sources SourcedEnvVars) *Masker {
 
 	for _, env := range sources.Secrets {
 		_, val := splitEnv(env)
-		sensitiveVals[val] = true
+		// Skip empty or invalid values to avoid masking everything
+		// (strings.ReplaceAll with empty string would insert mask between every character)
+		if val != "" {
+			sensitiveVals[val] = true
+		}
 	}
 
 	return &Masker{
