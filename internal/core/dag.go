@@ -119,6 +119,21 @@ type DAG struct {
 	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
 	// SSH contains the default SSH configuration for the DAG.
 	SSH *SSHConfig `json:"ssh,omitempty"`
+	// Secrets contains references to external secrets to be resolved at runtime.
+	Secrets []SecretRef `json:"secrets,omitempty"`
+}
+
+// SecretRef represents a reference to an external secret.
+// Secrets are resolved at DAG execution time and never persisted to disk.
+type SecretRef struct {
+	// Name is the environment variable name to set (required).
+	Name string `json:"name"`
+	// Provider specifies the secret backend (e.g., "env", "file", "gcp-secrets") (required).
+	Provider string `json:"provider"`
+	// Key is the provider-specific identifier for the secret (required).
+	Key string `json:"key"`
+	// Options contains provider-specific configuration (optional).
+	Options map[string]string `json:"options,omitempty"`
 }
 
 // HasTag checks if the DAG has the given tag.

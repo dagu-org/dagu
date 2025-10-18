@@ -13,6 +13,7 @@ const fullSidebar = [
       { text: "CLI", link: "/overview/cli" },
       { text: "Web UI", link: "/overview/web-ui" },
       { text: "API", link: "/overview/api" },
+      { text: "Changelog", link: "/reference/changelog" },
     ],
   },
   {
@@ -33,6 +34,7 @@ const fullSidebar = [
       { text: "Parameters", link: "/writing-workflows/parameters" },
       { text: "Control Flow", link: "/writing-workflows/control-flow" },
       { text: "Data & Variables", link: "/writing-workflows/data-variables" },
+      { text: "Secrets", link: "/writing-workflows/secrets" },
       { text: "Resource Limits", link: "/writing-workflows/resource-limits" },
       { text: "Lifecycle Handlers", link: "/writing-workflows/lifecycle-handlers" },
       { text: "Error Handling", link: "/writing-workflows/error-handling" },
@@ -132,7 +134,6 @@ const fullSidebar = [
       { text: "Configuration", link: "/reference/config" },
       { text: "Variables", link: "/reference/variables" },
       { text: "Executors", link: "/reference/executors" },
-      { text: "Changelog", link: "/reference/changelog" },
     ],
   },
 ];

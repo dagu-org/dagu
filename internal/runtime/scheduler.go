@@ -375,12 +375,14 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 			logger.Error(ctx, "Invalid environment variable format", "var", v)
 			continue
 		}
-		val, err := env.EvalString(ctx, v)
+		// Evaluate only the value part (parts[1]), not the entire "KEY=value" string
+		evaluatedValue, err := env.EvalString(ctx, parts[1])
 		if err != nil {
 			logger.Error(ctx, "Failed to evaluate environment variable", "var", v, "err", err)
 			continue
 		}
-		envVars.Store(parts[0], val)
+		// Store as "KEY=evaluatedValue" format
+		envVars.Store(parts[0], parts[0]+"="+evaluatedValue)
 	}
 
 	env.ForceLoadOutputVariables(envVars)

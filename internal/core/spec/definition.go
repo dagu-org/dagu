@@ -83,6 +83,8 @@ type definition struct {
 	SSH *sshDef
 	// MaskEnv defines environment variable masking configuration.
 	MaskEnv *maskEnvConfigDef
+	// Secrets contains references to external secrets.
+	Secrets []secretRefDef
 }
 
 // maskEnvConfigDef is the YAML definition for masking configuration.
@@ -278,4 +280,16 @@ type sshDef struct {
 	StrictHostKey *bool `yaml:"strictHostKey,omitempty"`
 	// KnownHostFile is the path to the known_hosts file. Defaults to ~/.ssh/known_hosts.
 	KnownHostFile string `yaml:"knownHostFile,omitempty"`
+}
+
+// secretRefDef defines a reference to an external secret.
+type secretRefDef struct {
+	// Name is the environment variable name (required).
+	Name string `yaml:"name"`
+	// Provider specifies the secret backend (required).
+	Provider string `yaml:"provider"`
+	// Key is the provider-specific identifier (required).
+	Key string `yaml:"key"`
+	// Options contains provider-specific configuration (optional).
+	Options map[string]string `yaml:"options,omitempty"`
 }

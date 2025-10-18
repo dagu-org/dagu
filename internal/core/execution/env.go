@@ -235,8 +235,9 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOptio
 	// Therefore, the effective precedence (highest to lowest) is:
 	// 1. Step level environment variables (e.Envs) - processed first, highest precedence
 	// 2. Output variables from previous steps (e.Variables) - processed second
-	// 3. DAG level environment variables (dagEnv.Envs) - processed third
-	// 4. Additional options passed as parameters - processed last
+	// 3. Secrets (dagEnv.SecretEnvs) - processed third
+	// 4. DAG level environment variables (dagEnv.Envs) - processed fourth
+	// 5. Additional options passed as parameters - processed last
 	//
 	// Example: If step env has FOO="step" and DAG env has FOO="dag",
 	// ${FOO} will be replaced with "step" in the first iteration,
@@ -245,6 +246,7 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOptio
 	if option.ExpandEnv {
 		opts = append(opts, cmdutil.WithVariables(e.Envs))
 		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
+		opts = append(opts, cmdutil.WithVariables(dagEnv.SecretEnvs))
 		opts = append(opts, cmdutil.WithVariables(dagEnv.Envs))
 	} else {
 		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
