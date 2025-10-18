@@ -16,6 +16,7 @@
 
 ### Fixed
 - DAG name validation is centralized and enforced consistently: names must be `<= 40` chars and match `[A-Za-z0-9_.-]+`. Endpoints that accept `name` now return `400 bad_request` for invalid names.
+- Docker: Fixed container initialization bug with `registryAuths` field (#1330)
 
 ## v1.22.0 (2025-08-24)
 
@@ -237,8 +238,8 @@ Thanks to our contributors for this release:
 | Scheduler health check feature request | [@jonasban](https://github.com/jonasban) |
 
 ### New Contributors
-- [@Sarvesh-11](https://github.com/Sarvesh-11) made their first contribution in [#1091](https://github.com/dagu-org/dagu/pull/1091)
-- [@reneleonhardt](https://github.com/reneleonhardt) made their first contribution in [#1127](https://github.com/dagu-org/dagu/pull/1127)
+- [@Sarvesh-11](https://github.com/Sarvesh-11) made their first contribution in [PR 1091](https://github.com/dagu-org/dagu/pull/1091)
+- [@reneleonhardt](https://github.com/reneleonhardt) made their first contribution in [PR 1127](https://github.com/dagu-org/dagu/pull/1127)
 
 **Full Changelog**: [v1.17.4...v1.18.0](https://github.com/dagu-org/dagu/compare/v1.17.4...v1.18.0)
 

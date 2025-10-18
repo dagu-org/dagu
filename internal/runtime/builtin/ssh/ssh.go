@@ -15,7 +15,7 @@ import (
 
 var _ executor.Executor = (*sshExecutor)(nil)
 
-type sshClientCtxKey = struct{}
+type sshClientCtxKey struct{}
 
 // WithSSHClient creates a new context with client
 func WithSSHClient(ctx context.Context, cli *Client) context.Context {

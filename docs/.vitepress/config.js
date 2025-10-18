@@ -13,6 +13,7 @@ const fullSidebar = [
       { text: "CLI", link: "/overview/cli" },
       { text: "Web UI", link: "/overview/web-ui" },
       { text: "API", link: "/overview/api" },
+      { text: "Changelog", link: "/reference/changelog" },
     ],
   },
   {
@@ -132,7 +133,6 @@ const fullSidebar = [
       { text: "Configuration", link: "/reference/config" },
       { text: "Variables", link: "/reference/variables" },
       { text: "Executors", link: "/reference/executors" },
-      { text: "Changelog", link: "/reference/changelog" },
     ],
   },
 ];
