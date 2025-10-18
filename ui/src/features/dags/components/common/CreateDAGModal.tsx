@@ -1,14 +1,10 @@
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
 import { useContext, useState } from 'react';
+import { DAGNameInputModal } from '../../../../components/DAGNameInputModal';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
-import { DAGNameInputModal } from '../../../../components/DAGNameInputModal';
 
 /**
  * CreateDAGModal displays a button that opens a modal to create a new DAG
@@ -75,7 +71,7 @@ function CreateDAGModal() {
         <Plus className="w-3.5 h-3.5" aria-hidden="true" />
         <span>New</span>
       </Button>
-      
+
       <DAGNameInputModal
         isOpen={isOpen}
         onClose={handleClose}
