@@ -32,7 +32,7 @@ func TestResolver(t *testing.T) {
 			BaseConfigFile:  filepath.Join(tmpDir, config.AppSlug, "base.yaml"),
 		}, paths)
 	})
-	t.Run("LegacyHomeDirectory", func(t *testing.T) {
+	t.Run("UnifiedHomeDirectory", func(t *testing.T) {
 		t.Parallel()
 		tmpDir := fileutil.MustTempDir("test")
 		defer os.RemoveAll(tmpDir)
@@ -52,6 +52,7 @@ func TestResolver(t *testing.T) {
 			LogsDir:         filepath.Join(tmpDir, hiddenDir, "logs"),
 			AdminLogsDir:    filepath.Join(tmpDir, hiddenDir, "logs", "admin"),
 			BaseConfigFile:  filepath.Join(tmpDir, hiddenDir, "base.yaml"),
+			Warnings:        []string{"Warning: Dagu legacy directory (" + legacyPath + ") structure detected. This is deprecated."},
 		}, paths)
 	})
 	t.Run("XDGCONFIGHOME", func(t *testing.T) {
