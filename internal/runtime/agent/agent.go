@@ -279,29 +279,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	coordinatorCli := a.createCoordinatorClient(ctx)
 
 	// Resolve secrets if defined
-	var secretEnvs []string
-	if len(a.dag.Secrets) > 0 {
-		logger.Info(ctx, "Resolving secrets", "count", len(a.dag.Secrets))
-
-		// Create secret registry - all providers auto-registered via init()
-		// File provider tries base directories in order:
-		// 1. DAG working directory (if set)
-		// 2. Directory containing the DAG file (if Location is set)
-		baseDirs := []string{a.dag.WorkingDir}
-		if a.dag.Location != "" {
-			dagDir := filepath.Dir(a.dag.Location)
-			baseDirs = append(baseDirs, dagDir)
-		}
-		secretRegistry := secrets.NewRegistry(baseDirs...)
-
-		// Resolve all secrets - providers handle their own configuration
-		resolvedSecrets, err := secretRegistry.ResolveAll(ctx, a.dag.Secrets)
-		if err != nil {
-			return fmt.Errorf("failed to resolve secrets: %w", err)
-		}
-
-		secretEnvs = resolvedSecrets
-		logger.Debug(ctx, "Secrets resolved successfully", "count", len(secretEnvs))
+	secretEnvs, err := a.resolveSecrets(ctx)
+	if err != nil {
+		return err
 	}
 
 	ctx = execution.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli, secretEnvs)
@@ -781,6 +761,37 @@ func (a *Agent) createCoordinatorClient(ctx context.Context) execution.Dispatche
 	coordinatorCliCfg.Insecure = a.peerConfig.Insecure
 
 	return coordinator.New(a.registry, coordinatorCliCfg)
+}
+
+// resolveSecrets resolves all secrets defined in the DAG and returns them as
+// environment variable strings in "NAME=value" format.
+// Returns an empty slice if no secrets are defined.
+func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
+	if len(a.dag.Secrets) == 0 {
+		return nil, nil
+	}
+
+	logger.Info(ctx, "Resolving secrets", "count", len(a.dag.Secrets))
+
+	// Create secret registry - all providers auto-registered via init()
+	// File provider tries base directories in order:
+	// 1. DAG working directory (if set)
+	// 2. Directory containing the DAG file (if Location is set)
+	baseDirs := []string{a.dag.WorkingDir}
+	if a.dag.Location != "" {
+		dagDir := filepath.Dir(a.dag.Location)
+		baseDirs = append(baseDirs, dagDir)
+	}
+	secretRegistry := secrets.NewRegistry(baseDirs...)
+
+	// Resolve all secrets - providers handle their own configuration
+	resolvedSecrets, err := secretRegistry.ResolveAll(ctx, a.dag.Secrets)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve secrets: %w", err)
+	}
+
+	logger.Debug(ctx, "Secrets resolved successfully", "count", len(resolvedSecrets))
+	return resolvedSecrets, nil
 }
 
 // dryRun performs a dry-run of the DAG. It only simulates the execution of
