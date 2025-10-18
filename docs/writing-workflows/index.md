@@ -68,6 +68,7 @@ Configuration precedence: System defaults → Base config → DAG config
 5. **[Error Handling](/writing-workflows/error-handling)** - Retries, failures, notifications
 6. **[Lifecycle Handlers](/writing-workflows/lifecycle-handlers)** - Cleanup, notifications, post-run tasks
 7. **[Patterns](/writing-workflows/control-flow#patterns)** - Composition, optimization, best practices
+8. **[Secrets](/writing-workflows/secrets)** - External providers, resolution order, masking behavior
 
 ## Complete Example
 
