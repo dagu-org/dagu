@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
+	"github.com/sirupsen/logrus"
 )
 
 // githubAction executor runs a GitHub Action locally using nektos/act
@@ -37,6 +38,26 @@ type githubAction struct {
 	stdout io.Writer
 	stderr io.Writer
 	cancel func()
+}
+
+// daguJobLoggerFactory implements runner.JobLoggerFactory to integrate
+// act's logging with Dagu's stderr writer without hijacking global stdout/stderr
+type daguJobLoggerFactory struct {
+	stderr io.Writer
+}
+
+// WithJobLogger creates a logrus logger that writes to Dagu's stderr
+func (f *daguJobLoggerFactory) WithJobLogger() *logrus.Logger {
+	logger := logrus.New()
+	logger.SetOutput(f.stderr) // Logs go to stderr
+	logger.SetLevel(logrus.InfoLevel)
+	logger.SetFormatter(&logrus.TextFormatter{
+		DisableColors:    false,
+		FullTimestamp:    true,
+		TimestampFormat:  "2006-01-02 15:04:05",
+		DisableTimestamp: false,
+	})
+	return logger
 }
 
 func (e *githubAction) SetStdout(out io.Writer) {
@@ -187,6 +208,13 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 		config.Token = token
 	}
 
+	// Inject custom JobLoggerFactory into context
+	// This makes act write logs to e.stderr without hijacking global stdout/stderr
+	loggerFactory := &daguJobLoggerFactory{
+		stderr: e.stderr,
+	}
+	ctx = runner.WithJobLoggerFactory(ctx, loggerFactory)
+
 	// Create runner
 	r, err := runner.New(config)
 	if err != nil {
@@ -199,50 +227,12 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 		return fmt.Errorf("failed to plan workflow: %w", err)
 	}
 
-	// Temporarily redirect os.Stdout and os.Stderr to capture act's output
-	oldStdout := os.Stdout
-	oldStderr := os.Stderr
-
-	// Create pipes for stdout and stderr
-	stdoutReader, stdoutWriter, _ := os.Pipe()
-	stderrReader, stderrWriter, _ := os.Pipe()
-
-	os.Stdout = stdoutWriter
-	os.Stderr = stderrWriter
-
-	// Restore original stdout/stderr when done
-	defer func() {
-		os.Stdout = oldStdout
-		os.Stderr = oldStderr
-		stdoutWriter.Close()
-		stderrWriter.Close()
-	}()
-
-	// Copy output to our writers in goroutines
-	done := make(chan struct{}, 2)
-	go func() {
-		io.Copy(e.stdout, stdoutReader)
-		done <- struct{}{}
-	}()
-	go func() {
-		io.Copy(e.stderr, stderrReader)
-		done <- struct{}{}
-	}()
-
 	// Execute the plan
+	// Logs will go to stderr via our JobLoggerFactory
+	// stdout is reserved for capturing action outputs
 	executor := r.NewPlanExecutor(plan)
-	execErr := executor(ctx)
-
-	// Close writers to signal EOF to readers
-	stdoutWriter.Close()
-	stderrWriter.Close()
-
-	// Wait for copy goroutines to complete
-	<-done
-	<-done
-
-	if execErr != nil {
-		return fmt.Errorf("failed to execute GitHub Action: %w", execErr)
+	if err := executor(ctx); err != nil {
+		return fmt.Errorf("failed to execute GitHub Action: %w", err)
 	}
 
 	return nil
