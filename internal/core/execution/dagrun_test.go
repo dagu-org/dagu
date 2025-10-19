@@ -141,7 +141,7 @@ func (m *mockDAGRunAttempt) Hidden() bool {
 func TestListDAGRunStatusesOptions(t *testing.T) {
 	from := execution.NewUTC(time.Now().Add(-24 * time.Hour))
 	to := execution.NewUTC(time.Now())
-	statuses := []core.Status{core.Success, core.Error}
+	statuses := []core.Status{core.Succeeded, core.Failed}
 
 	opts := execution.ListDAGRunStatusesOptions{}
 
@@ -208,7 +208,7 @@ func TestDAGRunStoreInterface(t *testing.T) {
 
 	// Test ListStatuses
 	statuses := []*execution.DAGRunStatus{
-		{Name: "test-dag", Status: core.Success},
+		{Name: "test-dag", Status: core.Succeeded},
 	}
 	store.On("ListStatuses", ctx, mock.Anything).Return(statuses, nil)
 
@@ -402,7 +402,7 @@ func TestListDAGRunStatusesWithOptions(t *testing.T) {
 	opts := []execution.ListDAGRunStatusesOption{
 		execution.WithFrom(from),
 		execution.WithTo(to),
-		execution.WithStatuses([]core.Status{core.Success}),
+		execution.WithStatuses([]core.Status{core.Succeeded}),
 		execution.WithName("test"),
 	}
 
@@ -410,7 +410,7 @@ func TestListDAGRunStatusesWithOptions(t *testing.T) {
 		{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
-			Status:   core.Success,
+			Status:   core.Succeeded,
 		},
 	}
 

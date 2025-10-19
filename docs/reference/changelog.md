@@ -3,9 +3,13 @@
 ## v1.23.0 (UNRELEASED)
 
 ### Changed
+- Status: Adopted canonical lowercase tokens for DAG and node lifecycle states (`not_started`, `queued`, `running`, `succeeded`, `partially_succeeded`, `failed`, `canceled`), and updated API examples, docs, and telemetry labels to match.
 - Security: Implemented security filtering for system environment variables passed to step processes and child DAGs. System variables remain available for expansion (`${VAR}`) during DAG configuration parsing, but only whitelisted variables (`PATH`, `HOME`, `LANG`, `TZ`, `SHELL`) and variables with allowed prefixes (`DAGU_*`, `LC_*`, `DAG_*`) are passed to the step execution environment. This prevents accidental exposure of sensitive credentials to subprocess environments. Other variables must be explicitly defined in the workflow's `env` section to be available in step processes.
+- Scheduler: Queue handler now processes items asynchronously, acknowledging work before heartbeat checks so long-running startups no longer starve the queue.
+- Runtime: Subcommand execution inherits the filtered base environment and uses the caller's working directory.
 
 ### Added
+- CLI: Added `--dagu-home` global flag to override the application home directory on a per-command basis. Useful for testing, running multiple instances with isolated data, and CI/CD scenarios.
 - CLI: Added `dagu validate` command to validate DAG specifications without executing them. Prints human‑readable errors and exits with code 1 on failure.
 - API: Added `POST /api/v2/dags/validate` to validate DAG YAML. Returns `{ valid: boolean, errors: string[], dag?: DAGDetails }`.
 - API: `POST /api/v2/dags` now accepts optional `spec` to initialize a DAG. The spec is validated before creation and returns 400 on invalid input.
@@ -15,6 +19,7 @@
 - Steps: Multi-line `command` strings now execute as inline scripts, including support for shebang.
 - DAG: Introduced a `secrets` block that references external providers (built-in `env` and `file`) and resolves values at runtime with automatic log/output masking.
 - Parameters: Added JSON Schema validation mode with `schema`.
+- Runtime: Injects `DAG_RUN_STATUS` into handler environments so exit/success/failure/cancel scripts can branch on the final canonical status.
 
 ### Fixed
 - DAG name validation is centralized and enforced consistently: names must be `<= 40` chars and match `[A-Za-z0-9_.-]+`. Endpoints that accept `name` now return `400 bad_request` for invalid names.
@@ -44,6 +49,7 @@ Thanks to our contributors for this release:
 | JSON Schema validation for params implementation (#1273) | [@thefishhat](https://github.com/thefishhat) |
 | SSH script validation implementation (#1308) | [@AdityaTel89](https://github.com/AdityaTel89) |
 | README updates (#1326), unit tests (#1329), and legacy directory warning (#858, #1336) | [@arky](https://github.com/arky) |
+| Extensive troubleshooting and community support: container name (#1237), SSH environment variables (#1238), DAG dependency resolution (#1262), cleanup and status propagation (#1305), environment variables behavior (#1320), clear queue feature (#1298), Docker-in-Docker (#1235), and CLI/masking discussions (#1314, #1317, #1273) | [@ghansham](https://github.com/ghansham) |
 
 ## v1.22.0 (2025-08-24)
 

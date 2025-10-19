@@ -135,7 +135,7 @@ All options support `DAGU_` prefix.
 - `DAGU_SKIP_EXAMPLES` - Skip automatic creation of example DAGs (default: `false`)
 
 ### Directories
-- `DAGU_HOME` - Set all directories to this path
+- `DAGU_HOME` - Set all directories to this path (can be overridden by `--dagu-home` flag)
 - `DAGU_DAGS_DIR` - DAG definitions
 - `DAGU_DAGS` - Alternative to `DAGU_DAGS_DIR`
 - `DAGU_WORK_DIR` - Default working directory
@@ -149,6 +149,8 @@ All options support `DAGU_` prefix.
 - `DAGU_PROC_DIR` - Process data directory
 - `DAGU_SERVICE_REGISTRY_DIR` - Service registry data directory
 - `DAGU_EXECUTABLE` - Path to Dagu executable
+
+**Note:** The `--dagu-home` CLI flag takes precedence over the `DAGU_HOME` environment variable.
 
 ### Authentication
 - `DAGU_AUTH_BASIC_USERNAME` - Basic auth username
@@ -241,17 +243,30 @@ errorMail:
 
 ## Command-Line Flags
 
+### Global Flags (All Commands)
+- `--config, -c` - Config file (default: `~/.config/dagu/config.yaml`)
+- `--dagu-home` - Override DAGU_HOME for this command invocation
+- `--quiet, -q` - Suppress output
+- `--cpu-profile` - Enable CPU profiling
+
+The `--dagu-home` flag sets a custom application home directory for the current command, overriding the `DAGU_HOME` environment variable. When set, all paths use a unified structure under the specified directory.
+
+**Example:**
+```bash
+# Use a custom home directory
+dagu --dagu-home=/tmp/dagu-test start my-workflow.yaml
+
+# Run server with isolated data
+dagu --dagu-home=/opt/dagu-prod start-all
+```
+
 ### Server/Start-All
-- `--host` - Server host
-- `--port` - Server port
-- `--dags` - DAGs directory
-- `--config` - Config file
-- `--debug` - Debug mode
+- `--host, -s` - Server host
+- `--port, -p` - Server port
+- `--dags, -d` - DAGs directory
 
 ### Scheduler
-- `--dags` - DAGs directory
-- `--config` - Config file
-- `--debug` - Debug mode
+- `--dags, -d` - DAGs directory
 
 ## Configuration Precedence
 
@@ -264,6 +279,9 @@ errorMail:
 ```bash
 # Port 9000 wins (CLI flag beats env var)
 DAGU_PORT=8080 dagu start-all --port 9000
+
+# --dagu-home flag overrides DAGU_HOME environment variable
+DAGU_HOME=/opt/dagu dagu --dagu-home=/tmp/dagu-test start my-workflow.yaml
 ```
 
 ## Special Environment Variables

@@ -37,13 +37,13 @@ func TestMigrateHistoryCommand(t *testing.T) {
 	legacyStatus := legacymodel.Status{
 		RequestID:  "req123",
 		Name:       "test-dag",
-		Status:     core.Success,
+		Status:     core.Succeeded,
 		StartedAt:  time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
 		FinishedAt: time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
 		Nodes: []*legacymodel.Node{
 			{
 				Step:       core.Step{Name: "step1"},
-				Status:     core.NodeSuccess,
+				Status:     core.NodeSucceeded,
 				StartedAt:  time.Now().Add(-50 * time.Minute).Format(time.RFC3339),
 				FinishedAt: time.Now().Add(-40 * time.Minute).Format(time.RFC3339),
 			},
@@ -93,7 +93,7 @@ func TestMigrateHistoryCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "req123", dagRunStatus.DAGRunID)
 		assert.Equal(t, "test-dag", dagRunStatus.Name)
-		assert.Equal(t, core.Success, dagRunStatus.Status)
+		assert.Equal(t, core.Succeeded, dagRunStatus.Status)
 
 		// Verify legacy directory was moved
 		_, err = os.Stat(legacyDagDir)

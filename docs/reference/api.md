@@ -270,7 +270,7 @@ Fetches detailed information about a specific DAG.
     "dagRunId": "20240211_140000_abc123",
     "name": "data_processing_pipeline",
     "status": 4,
-    "statusLabel": "finished",
+    "statusLabel": "succeeded",
     "queuedAt": "",
     "startedAt": "2024-02-11T14:00:00Z",
     "finishedAt": "2024-02-11T14:45:30Z",
@@ -548,7 +548,7 @@ Fetches execution history of a DAG.
       "dagRunId": "20240211_140000_abc123",
       "name": "data_processing_pipeline",
       "status": 4,
-      "statusLabel": "finished",
+      "statusLabel": "succeeded",
       "queuedAt": "",
       "startedAt": "2024-02-11T14:00:00Z",
       "finishedAt": "2024-02-11T14:45:30Z",
@@ -578,7 +578,7 @@ Fetches execution history of a DAG.
       "dagRunId": "20240210_140000_ghi789",
       "name": "data_processing_pipeline",
       "status": 4,
-      "statusLabel": "finished",
+      "statusLabel": "succeeded",
       "queuedAt": "",
       "startedAt": "2024-02-10T14:00:00Z",
       "finishedAt": "2024-02-10T14:42:15Z",
@@ -620,7 +620,7 @@ Gets detailed status of a specific DAG run.
     "dagRunId": "20240211_140000_abc123",
     "name": "data_processing_pipeline",
     "status": 4,
-    "statusLabel": "finished",
+    "statusLabel": "succeeded",
     "queuedAt": "",
     "startedAt": "2024-02-11T14:00:00Z",
     "finishedAt": "2024-02-11T14:45:30Z",
@@ -639,7 +639,7 @@ Gets detailed status of a specific DAG run.
         "startedAt": "2024-02-11T14:00:30Z",
         "finishedAt": "2024-02-11T14:15:45Z",
         "status": 4,
-        "statusLabel": "finished",
+        "statusLabel": "succeeded",
         "retryCount": 0,
         "doneCount": 1,
         "children": [],
@@ -658,7 +658,7 @@ Gets detailed status of a specific DAG run.
         "startedAt": "2024-02-11T14:15:45Z",
         "finishedAt": "2024-02-11T14:30:20Z",
         "status": 4,
-        "statusLabel": "finished",
+        "statusLabel": "succeeded",
         "retryCount": 0,
         "doneCount": 1,
         "children": [],
@@ -678,7 +678,7 @@ Gets detailed status of a specific DAG run.
         "startedAt": "2024-02-11T14:30:20Z",
         "finishedAt": "2024-02-11T14:45:30Z",
         "status": 4,
-        "statusLabel": "finished",
+        "statusLabel": "succeeded",
         "retryCount": 0,
         "doneCount": 1,
         "children": [
@@ -751,7 +751,7 @@ Retrieves all DAG runs with optional filtering.
       "dagRunId": "20240211_150000_backup",
       "name": "database_backup",
       "status": 4,
-      "statusLabel": "finished",
+      "statusLabel": "succeeded",
       "queuedAt": "",
       "startedAt": "2024-02-11T15:00:00Z",
       "finishedAt": "2024-02-11T15:45:30Z",
@@ -800,7 +800,7 @@ Fetches detailed status of a specific DAG run. You can use the special value "la
     "dagRunId": "20240211_120000",
     "name": "data-pipeline",
     "status": 4,
-    "statusLabel": "finished",
+    "statusLabel": "succeeded",
     "startedAt": "2024-02-11T12:00:00Z",
     "finishedAt": "2024-02-11T12:15:00Z",
     "params": "{\"date\": \"2024-02-11\", \"env\": \"prod\"}",
@@ -811,7 +811,7 @@ Fetches detailed status of a specific DAG run. You can use the special value "la
           "command": "python extract.py"
         },
         "status": 4,
-        "statusLabel": "finished",
+        "statusLabel": "succeeded",
         "startedAt": "2024-02-11T12:00:00Z",
         "finishedAt": "2024-02-11T12:05:00Z",
         "retryCount": 0,
@@ -825,7 +825,7 @@ Fetches detailed status of a specific DAG run. You can use the special value "la
           "depends": ["extract"]
         },
         "status": 4,
-        "statusLabel": "finished",
+        "statusLabel": "succeeded",
         "startedAt": "2024-02-11T12:05:00Z",
         "finishedAt": "2024-02-11T12:10:00Z",
         "retryCount": 0
@@ -837,7 +837,7 @@ Fetches detailed status of a specific DAG run. You can use the special value "la
           "params": "TARGET=warehouse"
         },
         "status": 4,
-        "statusLabel": "finished",
+        "statusLabel": "succeeded",
         "startedAt": "2024-02-11T12:10:00Z",
         "finishedAt": "2024-02-11T12:15:00Z",
         "children": [
@@ -845,7 +845,7 @@ Fetches detailed status of a specific DAG run. You can use the special value "la
             "dagRunId": "sub_20240211_121000",
             "name": "sub-workflow",
             "status": 4,
-            "statusLabel": "finished"
+            "statusLabel": "succeeded"
           }
         ]
       }
@@ -1201,9 +1201,9 @@ dagu_dag_runs_queued_total 8
 
 # HELP dagu_dag_runs_total Total number of DAG runs by status
 # TYPE dagu_dag_runs_total counter
-dagu_dag_runs_total{status="success"} 2493
-dagu_dag_runs_total{status="error"} 15
-dagu_dag_runs_total{status="cancelled"} 7
+dagu_dag_runs_total{status="succeeded"} 2493
+dagu_dag_runs_total{status="failed"} 15
+dagu_dag_runs_total{status="canceled"} 7
 
 # HELP dagu_dags_total Total number of DAGs
 # TYPE dagu_dags_total gauge
@@ -1261,7 +1261,7 @@ Fetches detailed status of a child DAG run.
     "dagRunId": "sub_20240211_143020_xyz456",
     "name": "warehouse_loader_subdag",
     "status": 4,
-    "statusLabel": "finished",
+    "statusLabel": "succeeded",
     "queuedAt": "",
     "startedAt": "2024-02-11T14:30:20Z",
     "finishedAt": "2024-02-11T14:45:30Z",
@@ -1280,7 +1280,7 @@ Fetches detailed status of a child DAG run.
         "startedAt": "2024-02-11T14:30:20Z",
         "finishedAt": "2024-02-11T14:30:35Z",
         "status": 4,
-        "statusLabel": "finished",
+        "statusLabel": "succeeded",
         "retryCount": 0,
         "doneCount": 1,
         "children": [],
@@ -1298,7 +1298,7 @@ Fetches detailed status of a child DAG run.
         "startedAt": "2024-02-11T14:30:35Z",
         "finishedAt": "2024-02-11T14:45:30Z",
         "status": 4,
-        "statusLabel": "finished",
+        "statusLabel": "succeeded",
         "retryCount": 0,
         "doneCount": 1,
         "children": [],
@@ -1505,7 +1505,7 @@ Lists all DAG runs for a specific DAG name.
       "dagRunId": "20240211_140000_abc123",
       "name": "data_processing_pipeline",
       "status": 4,
-      "statusLabel": "finished",
+      "statusLabel": "succeeded",
       "queuedAt": "",
       "startedAt": "2024-02-11T14:00:00Z",
       "finishedAt": "2024-02-11T14:45:30Z",
@@ -1607,7 +1607,7 @@ curl "http://localhost:8080/api/v2/dag-runs/data-processing-pipeline/latest" \
           "id": "extract"
         },
         "status": 4,
-        "statusLabel": "finished",
+        "statusLabel": "succeeded",
         "startedAt": "2024-02-11T16:00:30Z",
         "finishedAt": "2024-02-11T16:15:45Z",
         "retryCount": 0,
@@ -1631,7 +1631,7 @@ curl "http://localhost:8080/api/v2/dag-runs/data-processing-pipeline/latest" \
           "id": "load"
         },
         "status": 0,
-        "statusLabel": "not started",
+        "statusLabel": "not_started",
         "startedAt": "",
         "finishedAt": "",
         "retryCount": 0,

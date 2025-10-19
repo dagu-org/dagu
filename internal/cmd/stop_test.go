@@ -38,7 +38,7 @@ func TestStopCommand(t *testing.T) {
 			ExpectedOut: []string{"stopped"}})
 
 		// Check the dag-run is stopped.
-		dag.AssertLatestStatus(t, core.Cancel)
+		dag.AssertLatestStatus(t, core.Canceled)
 		<-done
 	})
 	t.Run("StopDAGRunWithRunID", func(t *testing.T) {
@@ -69,7 +69,7 @@ func TestStopCommand(t *testing.T) {
 			ExpectedOut: []string{"stopped"}})
 
 		// Check the dag-run is stopped.
-		dag.AssertLatestStatus(t, core.Cancel)
+		dag.AssertLatestStatus(t, core.Canceled)
 		<-done
 	})
 }

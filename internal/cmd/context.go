@@ -81,8 +81,17 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get quiet flag: %w", err)
 	}
+	daguHome, err := cmd.Flags().GetString("dagu-home")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dagu-home flag: %w", err)
+	}
 
 	var configLoaderOpts []config.ConfigLoaderOption
+	if daguHome != "" {
+		if resolvedHome := fileutil.ResolvePathOrBlank(daguHome); resolvedHome != "" {
+			configLoaderOpts = append(configLoaderOpts, config.WithAppHomeDir(resolvedHome))
+		}
+	}
 
 	// Use a custom config file if provided via the viper flag "config"
 	if cfgPath := viper.GetString("config"); cfgPath != "" {

@@ -162,7 +162,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 			status := execution.DAGRunStatus{
 				Name:     "test-dag",
 				DAGRunID: dagRunTest.dagRunID,
-				Status:   core.Success,
+				Status:   core.Succeeded,
 			}
 			require.NoError(t, attempt.Write(root.Context, status))
 			require.NoError(t, attempt.Close(root.Context))
@@ -208,7 +208,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 			status := execution.DAGRunStatus{
 				Name:     "test-dag",
 				DAGRunID: dagRunTest.dagRunID,
-				Status:   core.Success,
+				Status:   core.Succeeded,
 			}
 			require.NoError(t, attempt.Write(root.Context, status))
 			require.NoError(t, attempt.Close(root.Context))
@@ -254,7 +254,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 			status := execution.DAGRunStatus{
 				Name:     "test-dag",
 				DAGRunID: dagRunTest.dagRunID,
-				Status:   core.Success,
+				Status:   core.Succeeded,
 			}
 			require.NoError(t, attempt.Write(root.Context, status))
 			require.NoError(t, attempt.Close(root.Context))

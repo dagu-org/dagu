@@ -72,7 +72,7 @@ steps:
 		agent.RunSuccess(t)
 
 		// Verify the DAG completed successfully
-		dagWrapper.AssertLatestStatus(t, core.Success)
+		dagWrapper.AssertLatestStatus(t, core.Succeeded)
 	})
 	t.Run("DistributedExecutionFailure", func(t *testing.T) {
 		// Test that distributed execution failure is not fallback to local execution
@@ -108,7 +108,7 @@ steps:
 
 		// Verify the DAG did not complete successfully
 		st := agent.Status(coord.Context)
-		require.NotEqual(t, core.Success, st.Status)
+		require.NotEqual(t, core.Succeeded, st.Status)
 	})
 	t.Run("Cancellation", func(t *testing.T) {
 		yamlContent := `
@@ -179,7 +179,7 @@ steps:
 		require.NoError(t, err)
 
 		// Verify the DAG completed successfully
-		dagWrapper.AssertLatestStatus(t, core.Cancel)
+		dagWrapper.AssertLatestStatus(t, core.Canceled)
 
 		// Wait for run to finish
 		<-done

@@ -16,6 +16,12 @@ var (
 		bindViper: true,
 	}
 
+	// Override DAGU_HOME for this command invocation.
+	daguHomeFlag = commandLineFlag{
+		name:  "dagu-home",
+		usage: "Override DAGU_HOME for this command",
+	}
+
 	// Directory where DAG definition files are stored.
 	// If not provided, the default is "$HOME/.config/dagu/dags".
 	dagsFlag = commandLineFlag{
@@ -247,7 +253,7 @@ type commandLineFlag struct {
 }
 
 func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
-	flags := append([]commandLineFlag{configFlag, quietFlag, cpuProfileFlag}, additionalFlags...)
+	flags := append([]commandLineFlag{configFlag, daguHomeFlag, quietFlag, cpuProfileFlag}, additionalFlags...)
 
 	for _, flag := range flags {
 		if flag.isBool {

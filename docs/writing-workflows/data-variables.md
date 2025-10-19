@@ -219,12 +219,12 @@ If `SUB_RESULT` contains:
 ```json
 {
   "outputs": {
-    "finalValue": "success"
+    "finalValue": "succeeded"
   }
 }
 ```
 
-Then the expanded value of `${SUB_RESULT.outputs.finalValue}` will be `success`.
+Then the expanded value of `${SUB_RESULT.outputs.finalValue}` will be `succeeded`.
 
 ## Step ID References
 

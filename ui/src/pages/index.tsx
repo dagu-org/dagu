@@ -160,32 +160,32 @@ function Dashboard(): React.ReactElement | null {
       icon: <ListChecks className="h-5 w-5 text-muted-foreground" />,
     },
     {
-      title: 'Running',
+      title: 'running',
       value: metrics[Status.Running],
       icon: <Play className="h-5 w-5 text-[limegreen]" />,
     },
     {
-      title: 'Queued',
+      title: 'queued',
       value: metrics[Status.Queued],
       icon: <Clock className="h-5 w-5 text-[purple]" />,
     },
     {
-      title: 'Success',
+      title: 'succeeded',
       value: metrics[Status.Success],
       icon: <CheckCircle className="h-5 w-5 text-[green]" />,
     },
     {
-      title: 'Partial Success',
+      title: 'partially_succeeded',
       value: metrics[Status.PartialSuccess],
       icon: <CheckCircle className="h-5 w-5 text-[#f59e0b]" />,
     },
     {
-      title: 'Failed',
+      title: 'failed',
       value: metrics[Status.Failed],
       icon: <XCircle className="h-5 w-5 text-[red]" />,
     },
     {
-      title: 'Cancelled',
+      title: 'canceled',
       value: metrics[Status.Cancelled],
       icon: <StopCircle className="h-5 w-5 text-[deeppink]" />,
     },

@@ -38,7 +38,7 @@ func TestDBClient_GetChildDAGRunStatus(t *testing.T) {
 		mockAttempt.On("ReadStatus", ctx).Return(&execution.DAGRunStatus{
 			Name:     "child-dag",
 			DAGRunID: childRunID,
-			Status:   core.Success,
+			Status:   core.Succeeded,
 			Params:   "param1=value1",
 			Nodes: []*execution.Node{
 				{OutputVariables: outputs},
@@ -100,7 +100,7 @@ func TestDBClient_IsChildDAGRunCompleted(t *testing.T) {
 		mockAttempt.On("ReadStatus", ctx).Return(&execution.DAGRunStatus{
 			Name:     "child-dag",
 			DAGRunID: childRunID,
-			Status:   core.Success,
+			Status:   core.Succeeded,
 		}, nil)
 
 		dbClient := newDBClient(mockDAGRunStore, mockDAGStore)
@@ -127,7 +127,7 @@ func TestDBClient_IsChildDAGRunCompleted(t *testing.T) {
 		mockAttempt.On("ReadStatus", ctx).Return(&execution.DAGRunStatus{
 			Name:     "child-dag",
 			DAGRunID: childRunID,
-			Status:   core.Error,
+			Status:   core.Failed,
 		}, nil)
 
 		dbClient := newDBClient(mockDAGRunStore, mockDAGStore)

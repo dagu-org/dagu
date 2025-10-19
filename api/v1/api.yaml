@@ -623,12 +623,12 @@ components:
       type: string
       description: "Human-readable status description for the dag-run"
       enum:
-        - "not started"
+        - "not_started"
         - "running"
         - "failed"
-        - "cancelled"
-        - "finished"
-        - "partial success"
+        - "canceled"
+        - "succeeded"
+        - "partially_succeeded"
 
     NodeStatus:
       type: integer
@@ -647,13 +647,13 @@ components:
       type: string
       description: "Human-readable status description for the node"
       enum:
-        - "not started"
+        - "not_started"
         - "running"
         - "failed"
-        - "cancelled"
-        - "finished"
+        - "canceled"
+        - "succeeded"
         - "skipped"
-        - "partial success"
+        - "partially_succeeded"
 
     DAGStatusFileDetails:
       type: object

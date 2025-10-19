@@ -91,21 +91,21 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 // DetermineNodeStatus implements NodeStatusDeterminer.
 func (e *dagExecutor) DetermineNodeStatus(_ context.Context) (core.NodeStatus, error) {
 	if e.result == nil {
-		return core.NodeError, fmt.Errorf("no result available for node status determination")
+		return core.NodeFailed, fmt.Errorf("no result available for node status determination")
 	}
 
 	// Check if the status is partial success or success
 	// For error cases, we return an error with the status
 	switch e.result.Status {
-	case core.Success:
-		return core.NodeSuccess, nil
-	case core.PartialSuccess:
-		return core.NodePartialSuccess, nil
-	case core.None, core.Running, core.Error, core.Cancel, core.Queued:
-		return core.NodeError, fmt.Errorf("child DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
+	case core.Succeeded:
+		return core.NodeSucceeded, nil
+	case core.PartiallySucceeded:
+		return core.NodePartiallySucceeded, nil
+	case core.NotStarted, core.Running, core.Failed, core.Canceled, core.Queued:
+		return core.NodeFailed, fmt.Errorf("child DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
 	default:
 		// This should never happen, but satisfies the exhaustive check
-		return core.NodeError, fmt.Errorf("child DAG run %s failed with unknown status: %s", e.result.DAGRunID, e.result.Status)
+		return core.NodeFailed, fmt.Errorf("child DAG run %s failed with unknown status: %s", e.result.DAGRunID, e.result.Status)
 	}
 }
 

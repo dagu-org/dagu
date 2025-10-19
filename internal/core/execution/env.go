@@ -27,6 +27,7 @@ const (
 	EnvKeyDAGRunStepName       = "DAG_RUN_STEP_NAME"
 	EnvKeyDAGRunStepStdoutFile = "DAG_RUN_STEP_STDOUT_FILE"
 	EnvKeyDAGRunStepStderrFile = "DAG_RUN_STEP_STDERR_FILE"
+	EnvKeyDAGRunStatus         = "DAG_RUN_STATUS"
 )
 
 // AllEnvs returns all environment variables that needs to be passed to the command.
@@ -249,6 +250,7 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOptio
 		opts = append(opts, cmdutil.WithVariables(dagEnv.SecretEnvs))
 		opts = append(opts, cmdutil.WithVariables(dagEnv.Envs))
 	} else {
+		opts = append(opts, cmdutil.WithVariables(e.Envs))
 		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
 	}
 

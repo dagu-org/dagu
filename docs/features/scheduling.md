@@ -52,7 +52,7 @@ scheduler:
   zombieDetectionInterval: 45s  # Check interval (default: 45s, set to 0 to disable)
 ```
 
-When a zombie is detected, its status is automatically updated from "running" to "error". This ensures:
+When a zombie is detected, its status is automatically updated from "running" to "failed". This ensures:
 - Accurate status reporting
 - Queue slots are freed for new runs
 - No manual intervention required

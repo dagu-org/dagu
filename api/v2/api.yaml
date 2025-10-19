@@ -1818,13 +1818,13 @@ components:
       type: string
       description: "Human-readable status description for the DAG-run"
       enum:
-        - "not started"
+        - "not_started"
         - "running"
         - "failed"
-        - "cancelled"
-        - "finished"
+        - "canceled"
+        - "succeeded"
         - "queued"
-        - "partial success"
+        - "partially_succeeded"
 
     NodeStatus:
       type: integer
@@ -1851,13 +1851,13 @@ components:
       type: string
       description: "Human-readable status description for the node"
       enum:
-        - "not started"
+        - "not_started"
         - "running"
         - "failed"
-        - "cancelled"
-        - "finished"
+        - "canceled"
+        - "succeeded"
         - "skipped"
-        - "partial success"
+        - "partially_succeeded"
 
     SchedulerStatusResponse:
       type: object
