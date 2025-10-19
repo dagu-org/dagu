@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -793,6 +794,24 @@ func TestScheduler(t *testing.T) {
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=step_test", output, "unexpected output %q", output)
+	})
+
+	t.Run("DAGRunStatusNotAvailableToMainSteps", func(t *testing.T) {
+		sc := setupScheduler(t)
+
+		graph := sc.newGraph(t,
+			newStep("1",
+				withScript("if [ -z \"$DAG_RUN_STATUS\" ]; then echo unset; else echo set; fi"),
+				withOutput("RESULT"),
+			),
+		)
+
+		result := graph.Schedule(t, core.Succeeded)
+		node := result.Node(t, "1")
+
+		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
+		require.True(t, ok, "output variable not found")
+		require.Equal(t, "RESULT=unset", output, "unexpected output %q", output)
 	})
 
 	t.Run("RepeatPolicyRepeatsUntilCommandConditionMatchesExpected", func(t *testing.T) {
@@ -2821,6 +2840,24 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 		// Handler reference should not be resolved
 		assert.Contains(t, output, "${handler1.stdout}") // Should remain unresolved
 	})
+}
+
+func TestScheduler_DAGRunStatusHandlerEnv(t *testing.T) {
+	sc := setupScheduler(t,
+		withOnExit(core.Step{
+			Name:    "exit_handler",
+			Command: "echo status=${DAG_RUN_STATUS}",
+		}),
+	)
+
+	graph := sc.newGraph(t, successStep("main"))
+	result := graph.Schedule(t, core.Succeeded)
+
+	handlerNode := result.Node(t, "exit_handler")
+	handlerOutput, err := os.ReadFile(handlerNode.GetStdout())
+	require.NoError(t, err)
+
+	assert.Equal(t, "status=succeeded", strings.TrimSpace(string(handlerOutput)))
 }
 
 func TestSchedulerPartialSuccess(t *testing.T) {

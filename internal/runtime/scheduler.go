@@ -393,6 +393,8 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, graph *ExecutionGraph, no
 func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
 	env := execution.NewEnv(ctx, node.Step())
 
+	env.Envs[execution.EnvKeyDAGRunStatus] = sc.Status(ctx, graph).String()
+
 	// Populate step information for all nodes with IDs
 	for _, n := range graph.nodes {
 		if n.Step().ID != "" {

@@ -1,6 +1,6 @@
 # Lifecycle Handlers
 
-Lifecycle handlers let you run extra steps after the main DAG completes. Use the `handlerOn` block to trigger notifications, clean up resources, or kick off follow-up jobs without duplicating logic inside individual steps.
+Lifecycle handlers let you run extra steps after the main DAG completes. Use the `handlerOn` block to trigger notifications, clean up resources, or kick off follow-up jobs without duplicating logic inside individual steps. Every handler runs with the canonical `DAG_RUN_STATUS` environment variable so you can branch on the final outcome inside a single script.
 
 ## Supported Triggers
 
@@ -42,6 +42,7 @@ Each handler is a normal step definition. You can use `command`, `script`, `run`
 - Handlers are executed sequentially and synchronously. The DAG is still considered running until they finish.
 - If a handler exits with a non-zero status, the overall DAG run ends in `failed`, even if every main step succeeded.
 - Handler logs appear alongside other steps in the run history and respect the same log retention policy.
+- Each handler receives the `DAG_RUN_STATUS` environment variable so scripts can branch on `succeeded`, `partially_succeeded`, `failed`, or `canceled`.
 
 ## Patterns and Integrations
 
