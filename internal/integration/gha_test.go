@@ -16,11 +16,11 @@ func TestGitHubActionsExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: test-action
-    executor:
-      type: github-action
-      config:
-        action: actions/hello-world-javascript-action@main
-        time-to-greet: "Morning"
+    uses: actions/hello-world-javascript-action@main
+    with:
+      who-to-greet: "Morning"
+      # Use lightweight Node.js image for testing (faster pull, smaller size)
+      runnerImage: node:20-bullseye
     output: ACTION_OUTPUT
 `)
 		agent := dag.Agent()
@@ -30,10 +30,10 @@ func TestGitHubActionsExecutor(t *testing.T) {
 		dag.AssertLatestStatus(t, core.Succeeded)
 
 		// Verify that container output was captured to stdout
-		// The hello-world action should log "Hello Morning" to console
+		// The hello-world action should log "Hello, Morning!" to console
 		dag.AssertOutputs(t, map[string]any{
 			"ACTION_OUTPUT": []test.Contains{
-				"Hello Morning",
+				"Hello, Morning!",
 			},
 		})
 	})

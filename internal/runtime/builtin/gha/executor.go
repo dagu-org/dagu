@@ -6,9 +6,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/goccy/go-yaml"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
 	"github.com/sirupsen/logrus"
@@ -150,20 +152,43 @@ func (e *githubAction) Run(ctx context.Context) error {
 	return e.executeAct(ctx, actualWorkDir, workflowFile)
 }
 
+// workflowDefinition represents a GitHub Actions workflow
+type workflowDefinition struct {
+	Name string                 `yaml:"name"`
+	On   string                 `yaml:"on"`
+	Jobs map[string]jobDefinition `yaml:"jobs"`
+}
+
+type jobDefinition struct {
+	RunsOn string           `yaml:"runs-on"`
+	Steps  []stepDefinition `yaml:"steps"`
+}
+
+type stepDefinition struct {
+	Uses string         `yaml:"uses"`
+	With map[string]any `yaml:"with,omitempty"`
+}
+
 func (e *githubAction) generateWorkflowYAML() (string, error) {
 	if e.step.ExecutorConfig.Config == nil || e.step.ExecutorConfig.Config["action"] == nil {
 		return "", fmt.Errorf("uses field is required for GitHub Action executor")
 	}
 
-	// Copy with parameters to avoid modifying original
-	withParams := make(map[string]string)
+	action := fmt.Sprintf("%v", e.step.ExecutorConfig.Config["action"])
+	action = strings.TrimSpace(action)
+
+	// Copy with parameters, excluding Dagu-specific config keys
+	withParams := make(map[string]any)
 	for k, v := range e.step.ExecutorConfig.Config {
-		withParams[k] = fmt.Sprintf("%v", v)
+		// Skip Dagu-specific config keys that shouldn't go to the action's 'with:'
+		if k == "action" || k == "runnerImage" {
+			continue
+		}
+		withParams[k] = v
 	}
 
 	// Special handling: checkout action requires token input
 	// Auto-inject if not provided by user
-	action := fmt.Sprintf("%v", e.step.ExecutorConfig.Config["action"])
 	if action == "actions/checkout@v4" || action == "actions/checkout@v3" {
 		if _, hasToken := withParams["token"]; !hasToken {
 			// Use empty string to make the action use default unauthenticated access
@@ -172,33 +197,30 @@ func (e *githubAction) generateWorkflowYAML() (string, error) {
 		}
 	}
 
-	// Build the with section
-	withSection := ""
-	if len(withParams) > 0 {
-		withSection = "\n        with:\n"
-		for key, value := range withParams {
-			// Quote the value if it contains special characters or is empty
-			if value == "" || value == "${{ github.token }}" {
-				withSection += fmt.Sprintf("          %s: '%s'\n", key, value)
-			} else {
-				withSection += fmt.Sprintf("          %s: %s\n", key, value)
-			}
-		}
+	// Build workflow structure
+	workflow := workflowDefinition{
+		Name: "Dagu GitHub Action",
+		On:   "push",
+		Jobs: map[string]jobDefinition{
+			"run": {
+				RunsOn: "ubuntu-latest",
+				Steps: []stepDefinition{
+					{
+						Uses: action,
+						With: withParams,
+					},
+				},
+			},
+		},
 	}
 
-	// Generate workflow YAML
-	yaml := fmt.Sprintf(`name: Dagu GitHub Action
-on: push
-jobs:
-  run:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: %s%s`,
-		action,
-		withSection,
-	)
+	// Marshal to YAML
+	yamlBytes, err := yaml.Marshal(&workflow)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal workflow YAML: %w", err)
+	}
 
-	return yaml, nil
+	return string(yamlBytes), nil
 }
 
 func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile string) error {
@@ -219,6 +241,12 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 	// Only use if actually set - don't use dummy tokens as they cause auth failures
 	token := os.Getenv("GITHUB_TOKEN")
 
+	// Get runner image from step config, default to official Ubuntu latest
+	runnerImage := "ubuntu:latest" // Official Ubuntu image (safe but limited tools)
+	if img, ok := e.step.ExecutorConfig.Config["runnerImage"]; ok {
+		runnerImage = fmt.Sprintf("%v", img)
+	}
+
 	// Create act runner config with volume binding
 	// workDir is the actual working directory where files will be checked out
 	config := &runner.Config{
@@ -228,7 +256,7 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 		GitHubInstance: "github.com", // Configure GitHub instance for action resolution
 		LogOutput:      true,          // Enable logging of docker run output (marked with raw_output field)
 		Platforms: map[string]string{
-			"ubuntu-latest": "node:20-bullseye", // Use a lightweight Node.js image for ubuntu-latest
+			"ubuntu-latest": runnerImage,
 		},
 	}
 
