@@ -401,11 +401,11 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 		for _, label := range metric.Label {
 			if *label.Name == "status" {
 				switch *label.Value {
-				case "success":
+				case "succeeded":
 					assert.Equal(t, float64(2), *metric.Counter.Value)
-				case "error":
+				case "failed":
 					assert.Equal(t, float64(1), *metric.Counter.Value)
-				case "cancelled":
+				case "canceled":
 					assert.Equal(t, float64(1), *metric.Counter.Value)
 				case "running":
 					assert.Equal(t, float64(1), *metric.Counter.Value)

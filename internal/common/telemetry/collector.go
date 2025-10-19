@@ -179,27 +179,8 @@ func (c *Collector) collectDAGRunMetrics(ctx context.Context, ch chan<- promethe
 			currentlyRunning++
 		}
 
-		// Map internal status to user-friendly names
-		var statusLabel string
-		switch st.Status {
-		case core.Succeeded:
-			statusLabel = "success"
-		case core.Failed:
-			statusLabel = "error"
-		case core.PartiallySucceeded:
-			statusLabel = "partial_success"
-		case core.Canceled:
-			statusLabel = "cancelled"
-		case core.Running:
-			statusLabel = "running"
-		case core.Queued:
-			statusLabel = "queued"
-		case core.NotStarted:
-			statusLabel = "none"
-		default:
-			continue // Skip any unknown statuses
-		}
-
+		// Use the canonical status string from String() method
+		statusLabel := st.Status.String()
 		statusCounts[statusLabel]++
 	}
 
