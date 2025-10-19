@@ -13,6 +13,7 @@ dagu [global options] command [command options] [arguments...]
 ```
 
 - `--config, -c` - Config file (default: `~/.config/dagu/config.yaml`)
+- `--dagu-home` - Override DAGU_HOME for this command invocation
 - `--quiet, -q` - Suppress output
 - `--cpu-profile` - Enable CPU profiling
 - `--help, -h` - Show help
@@ -363,8 +364,38 @@ Workers automatically register in the service registry system, send regular hear
 
 Priority: CLI flags > Environment variables > Config file
 
+### Using Custom Home Directory
+
+The `--dagu-home` flag allows you to override the application home directory for a specific command invocation. This is useful for:
+- Testing with different configurations
+- Running multiple Dagu instances with isolated data
+- CI/CD scenarios requiring custom directories
+
+```bash
+# Use a custom home directory for this command
+dagu --dagu-home=/tmp/dagu-test start my-workflow.yaml
+
+# Start server with isolated data
+dagu --dagu-home=/opt/dagu-prod start-all
+
+# Run scheduler with specific configuration
+dagu --dagu-home=/var/lib/dagu scheduler
+```
+
+When `--dagu-home` is set, it overrides the `DAGU_HOME` environment variable and uses a unified directory structure:
+```
+$DAGU_HOME/
+├── dags/              # DAG definitions
+├── logs/              # All log files
+├── data/              # Application data
+├── suspend/           # DAG suspend flags
+├── config.yaml        # Main configuration
+└── base.yaml          # Shared DAG defaults
+```
+
 ### Key Environment Variables
 
+- `DAGU_HOME` - Set all directories to this path
 - `DAGU_HOST` - Server host (default: `127.0.0.1`)
 - `DAGU_PORT` - Server port (default: `8080`)
 - `DAGU_DAGS_DIR` - DAGs directory
