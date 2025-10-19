@@ -83,31 +83,34 @@ steps:
 
 ### Execution States
 
+- `not_started`: DAG has been defined but execution has not begun
 - `queued`: DAG is waiting to be executed
 - `running`: DAG is currently executing
-- `success`: All steps completed successfully
-- `partial_success`: Some steps failed but execution continued (via `continueOn`)
+- `succeeded`: All steps completed successfully
+- `partially_succeeded`: Some steps failed but execution continued (via `continueOn`)
 - `failed`: DAG execution failed
-- `cancelled`: DAG was manually cancelled
+- `canceled`: DAG was manually canceled
 
 ### Status Transitions
 
 ```mermaid
 graph LR
-    Q[queued] --> R[running]
-    R --> S[success]
-    R --> PS[partial_success]
+    N[not_started] --> Q[queued]
+    Q --> R[running]
+    R --> S[succeeded]
+    R --> PS[partially_succeeded]
     R --> F[failed]
-    R --> C[cancelled]
+    R --> C[canceled]
 ```
 
 ### Step Status
 
-- `pending`: Step is waiting for dependencies
+- `not_started`: Step is waiting for dependencies
 - `running`: Step is executing
-- `success`: Step completed successfully
+- `succeeded`: Step completed successfully
+- `partially_succeeded`: Step completed with warnings or continue-on logic
 - `failed`: Step execution failed
-- `cancelled`: Step was cancelled
+- `canceled`: Step was canceled
 - `skipped`: Step was skipped (precondition not met)
 
 ### Status Hooks
@@ -115,11 +118,11 @@ graph LR
 ```yaml
 handlerOn:
   success:
-    command: notify-team.sh "Workflow completed"
+    command: notify-team.sh "Workflow succeeded"
   failure:
     command: alert-oncall.sh "Workflow failed"
   partial_success:
-    command: log-partial.sh "Some steps failed"
+    command: log-partial.sh "Some steps partially succeeded"
 ```
 
 ## Executors

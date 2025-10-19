@@ -33,12 +33,12 @@ func TestWriter(t *testing.T) {
 
 		writer := dag.Writer(t, dagRunID, startedAt)
 
-		dagRunStatus := transform.NewStatusBuilder(dag.DAG).Create(dagRunID, core.Cancel, 1, time.Now())
+		dagRunStatus := transform.NewStatusBuilder(dag.DAG).Create(dagRunID, core.Canceled, 1, time.Now())
 
 		// Write initial status
 		writer.Write(t, dagRunStatus)
 		writer.Close(t)
-		writer.AssertContent(t, "test_append_to_existing", dagRunID, core.Cancel)
+		writer.AssertContent(t, "test_append_to_existing", dagRunID, core.Canceled)
 
 		// Append to existing file
 		dataRoot := NewDataRoot(th.TmpDir, dag.Name)
@@ -55,12 +55,12 @@ func TestWriter(t *testing.T) {
 		}()
 
 		// Append new status
-		dagRunStatus.Status = core.Success
+		dagRunStatus.Status = core.Succeeded
 		err = latestRun.Write(th.Context, dagRunStatus)
 		require.NoError(t, err)
 
 		// Verify appended data
-		writer.AssertContent(t, "test_append_to_existing", dagRunID, core.Success)
+		writer.AssertContent(t, "test_append_to_existing", dagRunID, core.Succeeded)
 	})
 }
 

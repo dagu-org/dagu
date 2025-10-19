@@ -320,7 +320,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		if initErr != nil {
 			logger.Error(ctx, "Failed to initialize DAG execution", "err", err)
 			st := a.Status(ctx)
-			st.Status = core.Error
+			st.Status = core.Failed
 			if err := attempt.Write(ctx, st); err != nil {
 				logger.Error(ctx, "Status write failed", "err", err)
 			}
@@ -583,7 +583,7 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	defer a.lock.RUnlock()
 
 	schedulerStatus := a.scheduler.Status(ctx, a.graph)
-	if schedulerStatus == core.None && a.graph.IsStarted() {
+	if schedulerStatus == core.NotStarted && a.graph.IsStarted() {
 		// Match the status to the execution graph.
 		schedulerStatus = core.Running
 	}

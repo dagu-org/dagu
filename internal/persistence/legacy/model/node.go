@@ -74,8 +74,8 @@ func NewNode(step core.Step) *Node {
 		Step:       step,
 		StartedAt:  "-",
 		FinishedAt: "-",
-		Status:     core.NodeNone,
-		StatusText: core.NodeNone.String(),
+		Status:     core.NodeNotStarted,
+		StatusText: core.NodeNotStarted.String(),
 	}
 }
 

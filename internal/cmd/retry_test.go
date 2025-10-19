@@ -34,7 +34,7 @@ steps:
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
-		require.Equal(t, dagRunStatus.Status, core.Success)
+		require.Equal(t, dagRunStatus.Status, core.Succeeded)
 		require.NotNil(t, dagRunStatus.Status)
 
 		// Retry with the dag-run ID using file path.
@@ -67,7 +67,7 @@ steps:
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
-		require.Equal(t, dagRunStatus.Status, core.Success)
+		require.Equal(t, dagRunStatus.Status, core.Succeeded)
 		require.NotNil(t, dagRunStatus.Status)
 
 		// Retry with the dag-run ID using DAG name.

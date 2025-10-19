@@ -67,12 +67,6 @@ function StatusChip({ status, children, size = 'md' }: Props) {
     lg: 'text-base py-1.5 px-4',
   };
 
-  // Capitalize first letter if children is a string
-  const displayChildren =
-    typeof children === 'string'
-      ? children.charAt(0).toUpperCase() + children.slice(1)
-      : children;
-
   // Render a pill-shaped badge with icon and text
   return (
     <div
@@ -90,7 +84,7 @@ function StatusChip({ status, children, size = 'md' }: Props) {
           textColorClass
         )}
       >
-        {displayChildren}
+        {children}
       </span>
     </div>
   );

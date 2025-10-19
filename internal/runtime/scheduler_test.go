@@ -34,11 +34,11 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeSuccess)
-		result.AssertNodeStatus(t, "3", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("SequentialStepsWithFailure", func(t *testing.T) {
 		t.Parallel()
@@ -52,13 +52,13 @@ func TestScheduler(t *testing.T) {
 			successStep("4", "3"),
 		)
 
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
 		// 1, 2, 3 should be executed and 4 should be canceled because 3 failed
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeSuccess)
-		result.AssertNodeStatus(t, "3", core.NodeError)
-		result.AssertNodeStatus(t, "4", core.NodeCancel)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "3", core.NodeFailed)
+		result.AssertNodeStatus(t, "4", core.NodeCanceled)
 	})
 	t.Run("ParallelSteps", func(t *testing.T) {
 		t.Parallel()
@@ -71,11 +71,11 @@ func TestScheduler(t *testing.T) {
 			successStep("3"),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeSuccess)
-		result.AssertNodeStatus(t, "3", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("ParallelStepsWithFailure", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -88,12 +88,12 @@ func TestScheduler(t *testing.T) {
 			successStep("4", "3"),
 		)
 
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeError)
-		result.AssertNodeStatus(t, "3", core.NodeSuccess)
-		result.AssertNodeStatus(t, "4", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeFailed)
+		result.AssertNodeStatus(t, "3", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "4", core.NodeSucceeded)
 	})
 	t.Run("ComplexCommand", func(t *testing.T) {
 		t.Parallel()
@@ -104,8 +104,8 @@ func TestScheduler(t *testing.T) {
 				withCommand("df / | awk 'NR==2 {exit $4 > 5000 ? 0 : 1}'"),
 			))
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnFailure", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -123,12 +123,12 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := graph.Schedule(t, core.PartialSuccess)
+		result := graph.Schedule(t, core.PartiallySucceeded)
 
 		// 1, 2, 3 should be executed even though 2 failed
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeError)
-		result.AssertNodeStatus(t, "3", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeFailed)
+		result.AssertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnSkip", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -150,11 +150,11 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 		result.AssertNodeStatus(t, "2", core.NodeSkipped)
-		result.AssertNodeStatus(t, "3", core.NodeSuccess)
+		result.AssertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnExitCode", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -170,11 +170,11 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := graph.Schedule(t, core.PartialSuccess)
+		result := graph.Schedule(t, core.PartiallySucceeded)
 
 		// 1, 2 should be executed even though 1 failed
-		result.AssertNodeStatus(t, "1", core.NodeError)
-		result.AssertNodeStatus(t, "2", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
+		result.AssertNodeStatus(t, "2", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnOutputStdout", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -192,11 +192,11 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := graph.Schedule(t, core.PartialSuccess)
+		result := graph.Schedule(t, core.PartiallySucceeded)
 
 		// 1, 2 should be executed even though 1 failed
-		result.AssertNodeStatus(t, "1", core.NodeError)
-		result.AssertNodeStatus(t, "2", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
+		result.AssertNodeStatus(t, "2", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnOutputStderr", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -214,11 +214,11 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := graph.Schedule(t, core.PartialSuccess)
+		result := graph.Schedule(t, core.PartiallySucceeded)
 
 		// Step 1 fails but matches continueOn output, allowing step 2 to run
-		result.AssertNodeStatus(t, "1", core.NodeError)
-		result.AssertNodeStatus(t, "2", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
+		result.AssertNodeStatus(t, "2", core.NodeSucceeded)
 
 		node := result.Node(t, "1")
 		stderrData, err := os.ReadFile(node.GetStderr())
@@ -241,11 +241,11 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := graph.Schedule(t, core.PartialSuccess)
+		result := graph.Schedule(t, core.PartiallySucceeded)
 
 		// 1, 2 should be executed even though 1 failed
-		result.AssertNodeStatus(t, "1", core.NodeError)
-		result.AssertNodeStatus(t, "2", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
+		result.AssertNodeStatus(t, "2", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnMarkSuccess", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -262,11 +262,11 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
 		// 1, 2 should be executed even though 1 failed
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeSucceeded)
 	})
 	t.Run("CancelSchedule", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -283,11 +283,11 @@ func TestScheduler(t *testing.T) {
 			graph.Cancel(t)
 		}()
 
-		result := graph.Schedule(t, core.Cancel)
+		result := graph.Schedule(t, core.Canceled)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeCancel)
-		result.AssertNodeStatus(t, "3", core.NodeNone)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeCanceled)
+		result.AssertNodeStatus(t, "3", core.NodeNotStarted)
 	})
 	t.Run("Timeout", func(t *testing.T) {
 		sc := setupScheduler(t, withTimeout(time.Millisecond*500))
@@ -299,13 +299,13 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
 		// 1 should be executed and 2 should be canceled because of timeout
 		// 3 should not be executed and should be canceled
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeCancel)
-		result.AssertNodeStatus(t, "3", core.NodeCancel)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeCanceled)
+		result.AssertNodeStatus(t, "3", core.NodeCanceled)
 	})
 	t.Run("RetryPolicyFail", func(t *testing.T) {
 		const file = "flag_test_retry_fail"
@@ -319,9 +319,9 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
-		result.AssertNodeStatus(t, "1", core.NodeError)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
 
 		node := result.Node(t, "1")
 		require.Equal(t, 2, node.State().RetryCount) // 2 retry
@@ -344,9 +344,9 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.Node(t, "1")
 		require.Equal(t, 1, node.State().DoneCount)  // 1 successful execution
@@ -382,7 +382,7 @@ func TestScheduler(t *testing.T) {
 			})
 		}()
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
 		// Check if the retry is successful
 		state := result.Node(t, "1").State()
@@ -390,7 +390,7 @@ func TestScheduler(t *testing.T) {
 		assert.Greater(t, state.RetryCount, 0)
 		assert.NotEmpty(t, state.RetriedAt)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 	})
 	t.Run("PreconditionMatch", func(t *testing.T) {
 		t.Parallel()
@@ -408,11 +408,11 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeSuccess)
-		result.AssertNodeStatus(t, "3", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("PreconditionNotMatch", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -428,10 +428,10 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
 		// 1 should be executed and 2, 3 should be skipped
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 		result.AssertNodeStatus(t, "2", core.NodeSkipped)
 		result.AssertNodeStatus(t, "3", core.NodeSkipped)
 	})
@@ -448,11 +448,11 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeSuccess)
-		result.AssertNodeStatus(t, "3", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("PreconditionWithCommandNotMet", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -467,10 +467,10 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
 		// 1 should be executed and 2, 3 should be skipped
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 		result.AssertNodeStatus(t, "2", core.NodeSkipped)
 		result.AssertNodeStatus(t, "3", core.NodeSkipped)
 	})
@@ -479,10 +479,10 @@ func TestScheduler(t *testing.T) {
 
 		graph := sc.newGraph(t, successStep("1"))
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "onExit", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "onExit", core.NodeSucceeded)
 	})
 	t.Run("OnExitHandlerFail", func(t *testing.T) {
 		sc := setupScheduler(t, withOnExit(failStep("onExit")))
@@ -490,10 +490,10 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t, successStep("1"))
 
 		// Overall status should be error because onExit failed
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "onExit", core.NodeError)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "onExit", core.NodeFailed)
 	})
 	t.Run("OnCancelHandler", func(t *testing.T) {
 		sc := setupScheduler(t, withOnCancel(successStep("onCancel")))
@@ -507,30 +507,30 @@ func TestScheduler(t *testing.T) {
 			graph.Signal(syscall.SIGTERM)
 		}()
 
-		result := graph.Schedule(t, core.Cancel)
+		result := graph.Schedule(t, core.Canceled)
 
-		result.AssertNodeStatus(t, "1", core.NodeCancel)
-		result.AssertNodeStatus(t, "onCancel", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeCanceled)
+		result.AssertNodeStatus(t, "onCancel", core.NodeSucceeded)
 	})
 	t.Run("OnSuccessHandler", func(t *testing.T) {
 		sc := setupScheduler(t, withOnSuccess(successStep("onSuccess")))
 
 		graph := sc.newGraph(t, successStep("1"))
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "onSuccess", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "onSuccess", core.NodeSucceeded)
 	})
 	t.Run("OnFailureHandler", func(t *testing.T) {
 		sc := setupScheduler(t, withOnFailure(successStep("onFailure")))
 
 		graph := sc.newGraph(t, failStep("1"))
 
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
-		result.AssertNodeStatus(t, "1", core.NodeError)
-		result.AssertNodeStatus(t, "onFailure", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
+		result.AssertNodeStatus(t, "onFailure", core.NodeSucceeded)
 	})
 	t.Run("CancelOnSignal", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -544,9 +544,9 @@ func TestScheduler(t *testing.T) {
 			graph.Signal(syscall.SIGTERM)
 		}()
 
-		result := graph.Schedule(t, core.Cancel)
+		result := graph.Schedule(t, core.Canceled)
 
-		result.AssertNodeStatus(t, "1", core.NodeCancel)
+		result.AssertNodeStatus(t, "1", core.NodeCanceled)
 	})
 	t.Run("Repeat", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -563,10 +563,10 @@ func TestScheduler(t *testing.T) {
 			graph.Cancel(t)
 		}()
 
-		result := graph.Schedule(t, core.Cancel)
+		result := graph.Schedule(t, core.Canceled)
 
 		// 1 should be repeated 2 times
-		result.AssertNodeStatus(t, "1", core.NodeCancel)
+		result.AssertNodeStatus(t, "1", core.NodeCanceled)
 
 		node := result.Node(t, "1")
 		// done count should be 1 because 2nd execution is canceled
@@ -582,10 +582,10 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
 		// Done count should be 1 because it failed and not repeated
-		result.AssertNodeStatus(t, "1", core.NodeError)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
 
 		node := result.Node(t, "1")
 		require.Equal(t, 1, node.State().DoneCount)
@@ -607,10 +607,10 @@ func TestScheduler(t *testing.T) {
 			close(done)
 		}()
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 		<-done
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 	})
 	t.Run("NodeSetupFailure", func(t *testing.T) {
 		sc := setupScheduler(t)
@@ -621,9 +621,9 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
-		result.AssertNodeStatus(t, "1", core.NodeError)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
 
 		require.Contains(t, result.Error.Error(), "no such file or directory")
 	})
@@ -638,10 +638,10 @@ func TestScheduler(t *testing.T) {
 			newStep("2", withCommand("echo $OUT"), withDepends("1"), withOutput("RESULT")),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeSucceeded)
 
 		node := result.Node(t, "2")
 
@@ -666,7 +666,7 @@ func TestScheduler(t *testing.T) {
 			newStep("5", withCommand("echo $OUT $OUT2"), withDepends("4"), withOutput("RESULT2")),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
 		node := result.Node(t, "3")
 		output, _ := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -685,7 +685,7 @@ func TestScheduler(t *testing.T) {
 			newStep("2", withCommand("echo ${OUT.key}"), withDepends("1"), withOutput("RESULT")),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
 		// check if RESULT variable is set to "value"
 		node := result.Node(t, "2")
@@ -702,7 +702,7 @@ func TestScheduler(t *testing.T) {
 			newStep("2", withCommand("echo '${OUT.key}'"), withDepends("1"), withOutput("RESULT")),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
 		// check if RESULT variable is set to "value"
 		node := result.Node(t, "2")
@@ -717,7 +717,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1", withCommand("echo $DAG_RUN_LOG_FILE"), withOutput("RESULT")),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 		node := result.Node(t, "1")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -731,7 +731,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1", withCommand("echo $DAG_RUN_STEP_STDOUT_FILE"), withOutput("RESULT")),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 		node := result.Node(t, "1")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -745,7 +745,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1", withCommand("echo $DAG_RUN_STEP_STDERR_FILE"), withOutput("RESULT")),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 		node := result.Node(t, "1")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -759,7 +759,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1", withCommand("echo $DAG_RUN_ID"), withOutput("RESULT")),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 		node := result.Node(t, "1")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -773,7 +773,7 @@ func TestScheduler(t *testing.T) {
 			newStep("1", withCommand("echo $DAG_NAME"), withOutput("RESULT")),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 		node := result.Node(t, "1")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -787,7 +787,7 @@ func TestScheduler(t *testing.T) {
 			newStep("step_test", withCommand("echo $DAG_RUN_STEP_NAME"), withOutput("RESULT")),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 		node := result.Node(t, "step_test")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -830,8 +830,8 @@ func TestScheduler(t *testing.T) {
 			require.NoError(t, err, "failed to write to file")
 		}()
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 		// Should have run at least twice (first: not ready, second: ready)
 		node := result.Node(t, "1")
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
@@ -870,8 +870,8 @@ func TestScheduler(t *testing.T) {
 			err := f.Close()
 			require.NoError(t, err)
 		}()
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.Node(t, "1")
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
@@ -908,8 +908,8 @@ func TestScheduler(t *testing.T) {
 			err := f.Close()
 			require.NoError(t, err)
 		}()
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.Node(t, "1")
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
@@ -941,8 +941,8 @@ func TestScheduler(t *testing.T) {
 			err := os.Setenv("TEST_REPEAT_MATCH_EXPR", "done")
 			require.NoError(t, err)
 		}()
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.Node(t, "1")
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
@@ -977,8 +977,8 @@ func TestScheduler(t *testing.T) {
 			err := os.WriteFile(file, []byte("done"), 0600)
 			require.NoError(t, err)
 		}()
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.Node(t, "1")
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
@@ -1018,9 +1018,9 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.Node(t, "1")
 		require.Equal(t, 1, node.State().DoneCount)  // 1 successful execution
@@ -1042,9 +1042,9 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
-		result.AssertNodeStatus(t, "1", core.NodeError)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
 
 		node := result.Node(t, "1")
 
@@ -1089,9 +1089,9 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
-		result.AssertNodeStatus(t, "1", core.NodeError)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
 
 		node := result.Node(t, "1")
 		require.Equal(t, 1, node.State().DoneCount)  // 1 execution (failed)
@@ -1301,13 +1301,13 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus core.Status) schedul
 	close(progressCh)
 
 	switch expectedStatus {
-	case core.Success, core.Cancel:
+	case core.Succeeded, core.Canceled:
 		require.NoError(t, err)
 
-	case core.Error, core.PartialSuccess:
+	case core.Failed, core.PartiallySucceeded:
 		require.Error(t, err)
 
-	case core.Running, core.None, core.Queued:
+	case core.Running, core.NotStarted, core.Queued:
 		t.Errorf("unexpected status %s", expectedStatus)
 
 	}
@@ -1403,13 +1403,13 @@ func TestStatus_String(t *testing.T) {
 		status   core.Status
 		expected string
 	}{
-		{core.None, "not started"},
+		{core.NotStarted, "not_started"},
 		{core.Running, "running"},
-		{core.Error, "failed"},
-		{core.Cancel, "cancelled"},
-		{core.Success, "finished"},
+		{core.Failed, "failed"},
+		{core.Canceled, "canceled"},
+		{core.Succeeded, "succeeded"},
 		{core.Queued, "queued"},
-		{core.Status(999), "not started"}, // Invalid status defaults to "not started"
+		{core.Status(999), "unknown"}, // Invalid status defaults to "unknown"
 	}
 
 	for _, tt := range tests {
@@ -1424,11 +1424,11 @@ func TestStatus_IsActive(t *testing.T) {
 		status   core.Status
 		expected bool
 	}{
-		{core.None, false},
+		{core.NotStarted, false},
 		{core.Running, true},
-		{core.Error, false},
-		{core.Cancel, false},
-		{core.Success, false},
+		{core.Failed, false},
+		{core.Canceled, false},
+		{core.Succeeded, false},
 		{core.Queued, true},
 	}
 
@@ -1450,12 +1450,12 @@ func TestScheduler_DryRun(t *testing.T) {
 		successStep("3", "2"),
 	)
 
-	result := graph.Schedule(t, core.Success)
+	result := graph.Schedule(t, core.Succeeded)
 
 	// In dry run, steps should be marked as success without actual execution
-	result.AssertNodeStatus(t, "1", core.NodeSuccess)
-	result.AssertNodeStatus(t, "2", core.NodeSuccess)
-	result.AssertNodeStatus(t, "3", core.NodeSuccess)
+	result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+	result.AssertNodeStatus(t, "2", core.NodeSucceeded)
+	result.AssertNodeStatus(t, "3", core.NodeSucceeded)
 }
 
 func TestScheduler_DryRunWithHandlers(t *testing.T) {
@@ -1469,11 +1469,11 @@ func TestScheduler_DryRunWithHandlers(t *testing.T) {
 
 	graph := sc.newGraph(t, successStep("1"))
 
-	result := graph.Schedule(t, core.Success)
+	result := graph.Schedule(t, core.Succeeded)
 
-	result.AssertNodeStatus(t, "1", core.NodeSuccess)
-	result.AssertNodeStatus(t, "onExit", core.NodeSuccess)
-	result.AssertNodeStatus(t, "onSuccess", core.NodeSuccess)
+	result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+	result.AssertNodeStatus(t, "onExit", core.NodeSucceeded)
+	result.AssertNodeStatus(t, "onSuccess", core.NodeSucceeded)
 }
 
 func TestScheduler_ConcurrentExecution(t *testing.T) {
@@ -1488,20 +1488,20 @@ func TestScheduler_ConcurrentExecution(t *testing.T) {
 	sequential := setupScheduler(t, withMaxActiveRuns(1))
 	graphSequential := sequential.newGraph(t, steps()...)
 	startSequential := time.Now()
-	resultSequential := graphSequential.Schedule(t, core.Success)
+	resultSequential := graphSequential.Schedule(t, core.Succeeded)
 	elapsedSequential := time.Since(startSequential)
-	resultSequential.AssertNodeStatus(t, "1", core.NodeSuccess)
-	resultSequential.AssertNodeStatus(t, "2", core.NodeSuccess)
-	resultSequential.AssertNodeStatus(t, "3", core.NodeSuccess)
+	resultSequential.AssertNodeStatus(t, "1", core.NodeSucceeded)
+	resultSequential.AssertNodeStatus(t, "2", core.NodeSucceeded)
+	resultSequential.AssertNodeStatus(t, "3", core.NodeSucceeded)
 
 	concurrent := setupScheduler(t, withMaxActiveRuns(3))
 	graphConcurrent := concurrent.newGraph(t, steps()...)
 	startConcurrent := time.Now()
-	resultConcurrent := graphConcurrent.Schedule(t, core.Success)
+	resultConcurrent := graphConcurrent.Schedule(t, core.Succeeded)
 	elapsedConcurrent := time.Since(startConcurrent)
-	resultConcurrent.AssertNodeStatus(t, "1", core.NodeSuccess)
-	resultConcurrent.AssertNodeStatus(t, "2", core.NodeSuccess)
-	resultConcurrent.AssertNodeStatus(t, "3", core.NodeSuccess)
+	resultConcurrent.AssertNodeStatus(t, "1", core.NodeSucceeded)
+	resultConcurrent.AssertNodeStatus(t, "2", core.NodeSucceeded)
+	resultConcurrent.AssertNodeStatus(t, "3", core.NodeSucceeded)
 
 	assert.Greater(t, elapsedSequential, elapsedConcurrent)
 	assert.Greater(t, elapsedSequential-elapsedConcurrent, 200*time.Millisecond)
@@ -1542,8 +1542,8 @@ func TestScheduler_ErrorHandling(t *testing.T) {
 		graph := sc.newGraph(t, panicStep)
 
 		// The scheduler should recover from the panic and mark the step as error
-		result := graph.Schedule(t, core.Error)
-		result.AssertNodeStatus(t, "panic", core.NodeError)
+		result := graph.Schedule(t, core.Failed)
+		result.AssertNodeStatus(t, "panic", core.NodeFailed)
 	})
 }
 
@@ -1559,7 +1559,7 @@ func TestScheduler_Metrics(t *testing.T) {
 		successStep("4", "1"),
 	)
 
-	result := graph.Schedule(t, core.Error)
+	result := graph.Schedule(t, core.Failed)
 
 	// Get metrics
 	metrics := sc.Scheduler.GetMetrics()
@@ -1572,10 +1572,10 @@ func TestScheduler_Metrics(t *testing.T) {
 	assert.NotEmpty(t, metrics["totalExecutionTime"])
 
 	// Verify individual node statuses
-	result.AssertNodeStatus(t, "1", core.NodeSuccess)
-	result.AssertNodeStatus(t, "2", core.NodeError)
+	result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+	result.AssertNodeStatus(t, "2", core.NodeFailed)
 	result.AssertNodeStatus(t, "3", core.NodeSkipped)
-	result.AssertNodeStatus(t, "4", core.NodeSuccess)
+	result.AssertNodeStatus(t, "4", core.NodeSucceeded)
 }
 
 func TestScheduler_DAGPreconditions(t *testing.T) {
@@ -1604,7 +1604,7 @@ func TestScheduler_DAGPreconditions(t *testing.T) {
 		require.NoError(t, err) // No error, but dag should be canceled
 
 		// Check that the scheduler was canceled
-		assert.Equal(t, core.Cancel, sc.Scheduler.Status(ctx, graph.ExecutionGraph))
+		assert.Equal(t, core.Canceled, sc.Scheduler.Status(ctx, graph.ExecutionGraph))
 	})
 }
 
@@ -1625,7 +1625,7 @@ func TestScheduler_SignalHandling(t *testing.T) {
 		}()
 
 		start := time.Now()
-		result := graph.Schedule(t, core.Cancel)
+		result := graph.Schedule(t, core.Canceled)
 
 		// Wait for signal completion
 		select {
@@ -1638,8 +1638,8 @@ func TestScheduler_SignalHandling(t *testing.T) {
 		elapsed := time.Since(start)
 		assert.Less(t, elapsed, 2*time.Second, "Should cancel quickly")
 
-		result.AssertNodeStatus(t, "1", core.NodeCancel)
-		result.AssertNodeStatus(t, "2", core.NodeNone)
+		result.AssertNodeStatus(t, "1", core.NodeCanceled)
+		result.AssertNodeStatus(t, "2", core.NodeNotStarted)
 	})
 
 	t.Run("SignalWithOverride", func(t *testing.T) {
@@ -1654,8 +1654,8 @@ func TestScheduler_SignalHandling(t *testing.T) {
 			sc.Scheduler.Signal(sc.Context, graph.ExecutionGraph, syscall.SIGKILL, nil, true)
 		}()
 
-		result := graph.Schedule(t, core.Cancel)
-		result.AssertNodeStatus(t, "1", core.NodeCancel)
+		result := graph.Schedule(t, core.Canceled)
+		result.AssertNodeStatus(t, "1", core.NodeCanceled)
 	})
 }
 
@@ -1671,12 +1671,12 @@ func TestScheduler_ComplexDependencyChains(t *testing.T) {
 			successStep("4", "2", "3"),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeSuccess)
-		result.AssertNodeStatus(t, "3", core.NodeSuccess)
-		result.AssertNodeStatus(t, "4", core.NodeSuccess)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "3", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "4", core.NodeSucceeded)
 	})
 
 	t.Run("ComplexFailurePropagation", func(t *testing.T) {
@@ -1691,12 +1691,12 @@ func TestScheduler_ComplexDependencyChains(t *testing.T) {
 			successStep("4", "2", "3"),
 		)
 
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "2", core.NodeError)
-		result.AssertNodeStatus(t, "3", core.NodeSuccess)
-		result.AssertNodeStatus(t, "4", core.NodeCancel) // Canceled due to 2's failure
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "2", core.NodeFailed)
+		result.AssertNodeStatus(t, "3", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "4", core.NodeCanceled) // Canceled due to 2's failure
 	})
 }
 
@@ -1705,7 +1705,7 @@ func TestScheduler_EdgeCases(t *testing.T) {
 		sc := setupScheduler(t)
 		graph := sc.newGraph(t) // No steps
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 		assert.NoError(t, result.Error)
 	})
 
@@ -1713,8 +1713,8 @@ func TestScheduler_EdgeCases(t *testing.T) {
 		sc := setupScheduler(t)
 		graph := sc.newGraph(t, successStep("single"))
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "single", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "single", core.NodeSucceeded)
 	})
 
 	t.Run("AllNodesFail", func(t *testing.T) {
@@ -1725,10 +1725,10 @@ func TestScheduler_EdgeCases(t *testing.T) {
 			failStep("3"),
 		)
 
-		result := graph.Schedule(t, core.Error)
-		result.AssertNodeStatus(t, "1", core.NodeError)
-		result.AssertNodeStatus(t, "2", core.NodeError)
-		result.AssertNodeStatus(t, "3", core.NodeError)
+		result := graph.Schedule(t, core.Failed)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
+		result.AssertNodeStatus(t, "2", core.NodeFailed)
+		result.AssertNodeStatus(t, "3", core.NodeFailed)
 	})
 }
 
@@ -1747,7 +1747,7 @@ func TestScheduler_HandlerNodeAccess(t *testing.T) {
 
 	// Run a simple graph to trigger setup
 	graph := sc.newGraph(t, successStep("1"))
-	_ = graph.Schedule(t, core.Success)
+	_ = graph.Schedule(t, core.Succeeded)
 
 	// Access handler nodes
 	assert.NotNil(t, sc.Scheduler.HandlerNode(core.HandlerOnExit))
@@ -1770,7 +1770,7 @@ func TestScheduler_PreconditionWithError(t *testing.T) {
 		),
 	)
 
-	result := graph.Schedule(t, core.Success)
+	result := graph.Schedule(t, core.Succeeded)
 
 	// The step should be skipped but no error should be set for condition not met
 	result.AssertNodeStatus(t, "1", core.NodeSkipped)
@@ -1789,12 +1789,12 @@ func TestScheduler_MultipleHandlerExecution(t *testing.T) {
 
 	graph := sc.newGraph(t, failStep("1"))
 
-	result := graph.Schedule(t, core.Error)
+	result := graph.Schedule(t, core.Failed)
 
 	// Both onFailure and onExit should execute
-	result.AssertNodeStatus(t, "1", core.NodeError)
-	result.AssertNodeStatus(t, "onFailure", core.NodeSuccess)
-	result.AssertNodeStatus(t, "onExit", core.NodeSuccess)
+	result.AssertNodeStatus(t, "1", core.NodeFailed)
+	result.AssertNodeStatus(t, "onFailure", core.NodeSucceeded)
+	result.AssertNodeStatus(t, "onExit", core.NodeSucceeded)
 }
 
 func TestScheduler_TimeoutDuringRetry(t *testing.T) {
@@ -1809,12 +1809,12 @@ func TestScheduler_TimeoutDuringRetry(t *testing.T) {
 	)
 
 	start := time.Now()
-	result := graph.Schedule(t, core.Error)
+	result := graph.Schedule(t, core.Failed)
 	elapsed := time.Since(start)
 
 	// Should timeout before completing all retries
 	assert.Less(t, elapsed, 5*time.Second)
-	result.AssertNodeStatus(t, "1", core.NodeCancel)
+	result.AssertNodeStatus(t, "1", core.NodeCanceled)
 }
 
 func TestScheduler_CancelDuringHandlerExecution(t *testing.T) {
@@ -1832,11 +1832,11 @@ func TestScheduler_CancelDuringHandlerExecution(t *testing.T) {
 
 	// Since we cancel during handler execution, the final status depends on timing
 	// The graph completes successfully before cancel takes effect
-	result := graph.Schedule(t, core.Success)
+	result := graph.Schedule(t, core.Succeeded)
 
-	result.AssertNodeStatus(t, "1", core.NodeSuccess)
+	result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 	// Handler should complete successfully
-	result.AssertNodeStatus(t, "onExit", core.NodeSuccess)
+	result.AssertNodeStatus(t, "onExit", core.NodeSucceeded)
 }
 
 func TestScheduler_RepeatPolicyWithCancel(t *testing.T) {
@@ -1854,8 +1854,8 @@ func TestScheduler_RepeatPolicyWithCancel(t *testing.T) {
 		sc.Scheduler.Cancel(sc.Context, graph.ExecutionGraph)
 	}()
 
-	result := graph.Schedule(t, core.Cancel)
-	result.AssertNodeStatus(t, "1", core.NodeCancel)
+	result := graph.Schedule(t, core.Canceled)
+	result.AssertNodeStatus(t, "1", core.NodeCanceled)
 
 	node := result.Node(t, "1")
 	// Should have repeated at least twice before cancel
@@ -1876,8 +1876,8 @@ func TestScheduler_RepeatPolicyWithLimit(t *testing.T) {
 		),
 	)
 
-	result := graph.Schedule(t, core.Success)
-	result.AssertNodeStatus(t, "1", core.NodeSuccess)
+	result := graph.Schedule(t, core.Succeeded)
+	result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 	node := result.Node(t, "1")
 	// Should have executed exactly 3 times (initial + 2 repeats)
@@ -1913,8 +1913,8 @@ func TestScheduler_RepeatPolicyWithLimitAndCondition(t *testing.T) {
 		),
 	)
 
-	result := graph.Schedule(t, core.Success)
-	result.AssertNodeStatus(t, "1", core.NodeSuccess)
+	result := graph.Schedule(t, core.Succeeded)
+	result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 	node := result.Node(t, "1")
 	// Should have executed exactly 5 times due to limit
@@ -1946,8 +1946,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			graph.Signal(syscall.SIGTERM)
 		}()
 
-		result := graph.Schedule(t, core.Cancel)
-		result.AssertNodeStatus(t, "1", core.NodeCancel)
+		result := graph.Schedule(t, core.Canceled)
+		result.AssertNodeStatus(t, "1", core.NodeCanceled)
 	})
 
 	t.Run("RetryWithSpecificExitCodes", func(t *testing.T) {
@@ -1978,8 +1978,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Error)
-		result.AssertNodeStatus(t, "1", core.NodeError)
+		result := graph.Schedule(t, core.Failed)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
 
 		node := result.Node(t, "1")
 		// Should retry once (first failure with code 42, then fail with code 100)
@@ -2003,8 +2003,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.Node(t, "1")
 		// Should have executed exactly 3 times (limit reached, step always succeeds)
@@ -2041,8 +2041,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Error)
-		result.AssertNodeStatus(t, "1", core.NodeError)
+		result := graph.Schedule(t, core.Failed)
+		result.AssertNodeStatus(t, "1", core.NodeFailed)
 
 		node := result.Node(t, "1")
 		// Should have executed exactly 3 times (2 successes, then 1 failure stops it)
@@ -2084,8 +2084,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.Node(t, "1")
 		// Should have executed exactly 3 times (fails twice, then succeeds)
@@ -2126,8 +2126,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			_ = f.Close()
 		}()
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.Node(t, "1")
 		// Should have run at least twice (first: file not found, second: file created)
@@ -2165,8 +2165,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.Node(t, "1")
 		// Should have executed at least 2 times (while expected matches)
@@ -2207,8 +2207,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			_ = f.Close()
 		}()
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.Node(t, "1")
 		// Should have run at least twice (first: file not found, second: file created)
@@ -2246,8 +2246,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.Node(t, "1")
 		// Should have executed at least 2 times (until expected matches)
@@ -2295,8 +2295,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			_ = f.Close()
 		}()
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.Node(t, "1")
 		// Should have executed at least 3 times (until exit code 42)
@@ -2319,8 +2319,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.Node(t, "1")
 		// Should have executed exactly 3 times (limit reached)
@@ -2360,8 +2360,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "1", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.Node(t, "1")
 		// Should have executed exactly 3 times (until COUNTER equals 3)
@@ -2402,11 +2402,11 @@ func TestScheduler_StepIDVariableExpansion(t *testing.T) {
 		),
 	)
 
-	result := graph.Schedule(t, core.Success)
+	result := graph.Schedule(t, core.Succeeded)
 
-	result.AssertNodeStatus(t, "step1", core.NodeSuccess)
-	result.AssertNodeStatus(t, "step2", core.NodeSuccess)
-	result.AssertNodeStatus(t, "step3", core.NodeSuccess)
+	result.AssertNodeStatus(t, "step1", core.NodeSucceeded)
+	result.AssertNodeStatus(t, "step2", core.NodeSucceeded)
+	result.AssertNodeStatus(t, "step3", core.NodeSucceeded)
 
 	node := result.Node(t, "step3")
 	output, ok := node.NodeData().State.OutputVariables.Load("COMBINED")
@@ -2426,8 +2426,8 @@ func TestScheduler_UnexpectedFinalStatus(t *testing.T) {
 	)
 
 	// Schedule normally
-	result := graph.Schedule(t, core.Success)
-	result.AssertNodeStatus(t, "1", core.NodeSuccess)
+	result := graph.Schedule(t, core.Succeeded)
+	result.AssertNodeStatus(t, "1", core.NodeSucceeded)
 
 	// The warning log about unexpected final status would be logged internally
 	// but we can't easily test for it without mock logging
@@ -2448,8 +2448,8 @@ func TestScheduler_RetryPolicyDefaults(t *testing.T) {
 		),
 	)
 
-	result := graph.Schedule(t, core.Error)
-	result.AssertNodeStatus(t, "1", core.NodeError)
+	result := graph.Schedule(t, core.Failed)
+	result.AssertNodeStatus(t, "1", core.NodeFailed)
 
 	node := result.Node(t, "1")
 	// Should have retried once
@@ -2475,24 +2475,24 @@ func TestScheduler_StepRetryExecution(t *testing.T) {
 			successStep("B", "A"),
 			successStep("C", "B"),
 		)
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "A", core.NodeSuccess)
-		result.AssertNodeStatus(t, "B", core.NodeSuccess)
-		result.AssertNodeStatus(t, "C", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "A", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "B", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "C", core.NodeSucceeded)
 
 		// Create nodes with their current states
 		nodes := []*runtime.Node{
 			runtime.NodeWithData(runtime.NodeData{
 				Step:  dag.Steps[0],
-				State: runtime.NodeState{Status: core.NodeSuccess},
+				State: runtime.NodeState{Status: core.NodeSucceeded},
 			}),
 			runtime.NodeWithData(runtime.NodeData{
 				Step:  dag.Steps[1],
-				State: runtime.NodeState{Status: core.NodeSuccess},
+				State: runtime.NodeState{Status: core.NodeSucceeded},
 			}),
 			runtime.NodeWithData(runtime.NodeData{
 				Step:  dag.Steps[2],
-				State: runtime.NodeState{Status: core.NodeSuccess},
+				State: runtime.NodeState{Status: core.NodeSucceeded},
 			}),
 		}
 
@@ -2501,12 +2501,12 @@ func TestScheduler_StepRetryExecution(t *testing.T) {
 		require.NoError(t, err)
 
 		// Schedule the retry
-		retryResult := graphHelper{testHelper: sc, ExecutionGraph: retryGraph}.Schedule(t, core.Success)
+		retryResult := graphHelper{testHelper: sc, ExecutionGraph: retryGraph}.Schedule(t, core.Succeeded)
 
 		// A and C should remain unchanged, only B should be re-executed
-		retryResult.AssertNodeStatus(t, "A", core.NodeSuccess)
-		retryResult.AssertNodeStatus(t, "B", core.NodeSuccess)
-		retryResult.AssertNodeStatus(t, "C", core.NodeSuccess)
+		retryResult.AssertNodeStatus(t, "A", core.NodeSucceeded)
+		retryResult.AssertNodeStatus(t, "B", core.NodeSucceeded)
+		retryResult.AssertNodeStatus(t, "C", core.NodeSucceeded)
 	})
 }
 
@@ -2529,9 +2529,9 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "step1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "step2", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "step1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "step2", core.NodeSucceeded)
 
 		// Step2 should have access to step1's stdout path
 		node2 := result.Node(t, "step2")
@@ -2562,10 +2562,10 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "step1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "step2", core.NodeSuccess)
-		result.AssertNodeStatus(t, "step3", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "step1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "step2", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "step3", core.NodeSucceeded)
 
 		node3 := result.Node(t, "step3")
 		stdoutFile := node3.GetStdout()
@@ -2595,9 +2595,9 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.PartialSuccess)
-		result.AssertNodeStatus(t, "check", core.NodeError)
-		result.AssertNodeStatus(t, "verify", core.NodeSuccess)
+		result := graph.Schedule(t, core.PartiallySucceeded)
+		result.AssertNodeStatus(t, "check", core.NodeFailed)
+		result.AssertNodeStatus(t, "verify", core.NodeSucceeded)
 
 		nodeVerify := result.Node(t, "verify")
 		stdoutFile := nodeVerify.GetStdout()
@@ -2630,14 +2630,14 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
 		// All steps should succeed
-		result.AssertNodeStatus(t, "main_step", core.NodeSuccess)
-		result.AssertNodeStatus(t, "worker_step", core.NodeSuccess)
+		result.AssertNodeStatus(t, "main_step", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "worker_step", core.NodeSucceeded)
 
 		// The handler should have executed
-		result.AssertNodeStatus(t, "success_handler", core.NodeSuccess)
+		result.AssertNodeStatus(t, "success_handler", core.NodeSucceeded)
 
 		// Get the handler node
 		handlerNode := result.Node(t, "success_handler")
@@ -2673,14 +2673,14 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
 		// Check step statuses
-		result.AssertNodeStatus(t, "setup", core.NodeSuccess)
-		result.AssertNodeStatus(t, "failing_step", core.NodeError)
+		result.AssertNodeStatus(t, "setup", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "failing_step", core.NodeFailed)
 
 		// The failure handler should have executed
-		result.AssertNodeStatus(t, "failure_handler", core.NodeSuccess)
+		result.AssertNodeStatus(t, "failure_handler", core.NodeSucceeded)
 
 		// Get the handler node
 		handlerNode := result.Node(t, "failure_handler")
@@ -2721,15 +2721,15 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
 		// All main steps should succeed
-		result.AssertNodeStatus(t, "first", core.NodeSuccess)
-		result.AssertNodeStatus(t, "second", core.NodeSuccess)
-		result.AssertNodeStatus(t, "third", core.NodeSuccess)
+		result.AssertNodeStatus(t, "first", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "second", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "third", core.NodeSucceeded)
 
 		// The exit handler should have executed
-		result.AssertNodeStatus(t, "exit_handler", core.NodeSuccess)
+		result.AssertNodeStatus(t, "exit_handler", core.NodeSucceeded)
 
 		// Get the handler node
 		handlerNode := result.Node(t, "exit_handler")
@@ -2762,11 +2762,11 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "main", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "main", core.NodeSucceeded)
 
 		// Handler should execute
-		result.AssertNodeStatus(t, "exit_handler_no_id", core.NodeSuccess)
+		result.AssertNodeStatus(t, "exit_handler_no_id", core.NodeSucceeded)
 
 		// Get the handler node to verify it has no ID
 		handlerNode := result.Node(t, "exit_handler_no_id")
@@ -2796,12 +2796,12 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := graph.Schedule(t, core.Success)
-		result.AssertNodeStatus(t, "main", core.NodeSuccess)
+		result := graph.Schedule(t, core.Succeeded)
+		result.AssertNodeStatus(t, "main", core.NodeSucceeded)
 
 		// Both handlers should have executed
-		result.AssertNodeStatus(t, "first_handler", core.NodeSuccess)
-		result.AssertNodeStatus(t, "final_handler", core.NodeSuccess)
+		result.AssertNodeStatus(t, "first_handler", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "final_handler", core.NodeSucceeded)
 
 		// Get the handler nodes
 		successHandler := result.Node(t, "first_handler")
@@ -2844,12 +2844,12 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		)
 
 		// The overall DAG should complete with partial success
-		result := graph.Schedule(t, core.PartialSuccess)
+		result := graph.Schedule(t, core.PartiallySucceeded)
 
 		// Verify individual node statuses
-		result.AssertNodeStatus(t, "step1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "step2", core.NodeError)
-		result.AssertNodeStatus(t, "step3", core.NodeSuccess)
+		result.AssertNodeStatus(t, "step1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "step2", core.NodeFailed)
+		result.AssertNodeStatus(t, "step3", core.NodeSucceeded)
 	})
 
 	t.Run("NodeStatusPartialSuccessWithMarkSuccess", func(t *testing.T) {
@@ -2873,12 +2873,12 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		)
 
 		// When markSuccess is true, the overall DAG should complete with success
-		result := graph.Schedule(t, core.Success)
+		result := graph.Schedule(t, core.Succeeded)
 
 		// Verify individual node statuses
-		result.AssertNodeStatus(t, "step1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "step2", core.NodeSuccess) // Marked as success
-		result.AssertNodeStatus(t, "step3", core.NodeSuccess)
+		result.AssertNodeStatus(t, "step1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "step2", core.NodeSucceeded) // Marked as success
+		result.AssertNodeStatus(t, "step3", core.NodeSucceeded)
 	})
 
 	t.Run("MultipleFailuresWithContinueOn", func(t *testing.T) {
@@ -2903,12 +2903,12 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		)
 
 		// The overall DAG should complete with partial success
-		result := graph.Schedule(t, core.PartialSuccess)
+		result := graph.Schedule(t, core.PartiallySucceeded)
 
 		// Verify individual node statuses
-		result.AssertNodeStatus(t, "step1", core.NodeError)
-		result.AssertNodeStatus(t, "step2", core.NodeError)
-		result.AssertNodeStatus(t, "step3", core.NodeSuccess)
+		result.AssertNodeStatus(t, "step1", core.NodeFailed)
+		result.AssertNodeStatus(t, "step2", core.NodeFailed)
+		result.AssertNodeStatus(t, "step3", core.NodeSucceeded)
 	})
 
 	t.Run("NoSuccessfulStepsWithContinueOn", func(t *testing.T) {
@@ -2934,11 +2934,11 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		)
 
 		// The overall DAG should complete with error since no steps succeeded
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
 		// Verify individual node statuses
-		result.AssertNodeStatus(t, "step1", core.NodeError)
-		result.AssertNodeStatus(t, "step2", core.NodeError)
+		result.AssertNodeStatus(t, "step1", core.NodeFailed)
+		result.AssertNodeStatus(t, "step2", core.NodeFailed)
 	})
 
 	t.Run("FailureWithoutContinueOn", func(t *testing.T) {
@@ -2953,11 +2953,11 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		)
 
 		// The overall DAG should complete with error
-		result := graph.Schedule(t, core.Error)
+		result := graph.Schedule(t, core.Failed)
 
 		// Verify individual node statuses
-		result.AssertNodeStatus(t, "step1", core.NodeSuccess)
-		result.AssertNodeStatus(t, "step2", core.NodeError)
-		result.AssertNodeStatus(t, "step3", core.NodeSuccess)
+		result.AssertNodeStatus(t, "step1", core.NodeSucceeded)
+		result.AssertNodeStatus(t, "step2", core.NodeFailed)
+		result.AssertNodeStatus(t, "step3", core.NodeSucceeded)
 	})
 }

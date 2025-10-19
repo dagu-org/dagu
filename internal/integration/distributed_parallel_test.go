@@ -84,7 +84,7 @@ steps:
 		agent.RunSuccess(t)
 
 		// Verify the DAG completed successfully
-		dagWrapper.AssertLatestStatus(t, core.Success)
+		dagWrapper.AssertLatestStatus(t, core.Succeeded)
 
 		// Get the latest st to verify parallel execution
 		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
@@ -95,7 +95,7 @@ steps:
 		// Check process-items node
 		processNode := st.Nodes[0]
 		require.Equal(t, "process-items", processNode.Step.Name)
-		require.Equal(t, core.NodeSuccess, processNode.Status)
+		require.Equal(t, core.NodeSucceeded, processNode.Status)
 
 		// Verify child DAG runs were created
 		require.NotEmpty(t, processNode.Children)
@@ -189,7 +189,7 @@ steps:
 		agent.RunSuccess(t)
 
 		// Verify successful completion
-		dagWrapper.AssertLatestStatus(t, core.Success)
+		dagWrapper.AssertLatestStatus(t, core.Succeeded)
 
 		// Get st to verify execution
 		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
@@ -199,7 +199,7 @@ steps:
 		// Check the parallel node
 		processNode := st.Nodes[0]
 		require.Equal(t, "process-regions", processNode.Step.Name)
-		require.Equal(t, core.NodeSuccess, processNode.Status)
+		require.Equal(t, core.NodeSucceeded, processNode.Status)
 		require.Len(t, processNode.Children, 3)
 
 		// Verify output shows all regions were processed
@@ -248,7 +248,7 @@ steps:
 
 		// Verify the DAG did not complete successfully
 		st := agent.Status(coord.Context)
-		require.NotEqual(t, core.Success, st.Status)
+		require.NotEqual(t, core.Succeeded, st.Status)
 	})
 }
 
@@ -368,13 +368,13 @@ steps:
 
 		// The step might be marked as failed, cancelled, or error depending on timing
 		require.True(t,
-			parallelNode.Status == core.NodeCancel ||
-				parallelNode.Status == core.NodeError ||
-				parallelNode.Status == core.NodeNone,
+			parallelNode.Status == core.NodeCanceled ||
+				parallelNode.Status == core.NodeFailed ||
+				parallelNode.Status == core.NodeNotStarted,
 			"parallel step should be cancelled, failed, or not started, got: %v", parallelNode.Status)
 
 		// If the step was actually started, verify that child DAG runs were created
-		if parallelNode.Status != core.NodeNone && len(parallelNode.Children) > 0 {
+		if parallelNode.Status != core.NodeNotStarted && len(parallelNode.Children) > 0 {
 			// Verify that distributed child runs were cancelled
 			for _, child := range parallelNode.Children {
 				t.Logf("Child DAG run %s with params %s", child.DAGRunID, child.Params)
@@ -492,9 +492,9 @@ steps:
 				t.Logf("Node %s status: %v", node.Step.Name, node.Status)
 				// Nodes might not have started or might be cancelled/failed
 				require.True(t,
-					node.Status == core.NodeCancel ||
-						node.Status == core.NodeError ||
-						node.Status == core.NodeNone ||
+					node.Status == core.NodeCanceled ||
+						node.Status == core.NodeFailed ||
+						node.Status == core.NodeNotStarted ||
 						node.Status == core.NodeRunning,
 					"node %s should show cancellation effect, got: %v", node.Step.Name, node.Status)
 			}
@@ -623,11 +623,11 @@ steps:
 		// The node should reflect cancellation or might not have completed
 		// In high concurrency scenarios, the status depends on timing
 		validStatuses := []core.NodeStatus{
-			core.NodeCancel,
-			core.NodeError,
+			core.NodeCanceled,
+			core.NodeFailed,
 			core.NodeRunning,
-			core.NodeNone,
-			core.NodeSuccess, // Some children might have completed before cancellation
+			core.NodeNotStarted,
+			core.NodeSucceeded, // Some children might have completed before cancellation
 		}
 
 		statusFound := false

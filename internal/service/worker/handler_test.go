@@ -36,7 +36,7 @@ func TestTaskHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
-		dag.AssertLatestStatus(t, core.Success)
+		dag.AssertLatestStatus(t, core.Succeeded)
 
 		// Get the st to get the dag-run ID
 		st, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
@@ -60,7 +60,7 @@ func TestTaskHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the DAG ran again successfully
-		dag.AssertLatestStatus(t, core.Success)
+		dag.AssertLatestStatus(t, core.Succeeded)
 	})
 
 	t.Run("HandleTaskRetryWithStep", func(t *testing.T) {
@@ -79,7 +79,7 @@ func TestTaskHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for the DAG to finish
-		dag.AssertLatestStatus(t, core.Success)
+		dag.AssertLatestStatus(t, core.Succeeded)
 
 		// Get the st to get the dag-run ID
 		st, err := cli.GetLatestStatus(ctx, dag.DAG)
@@ -104,7 +104,7 @@ func TestTaskHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the DAG ran again successfully
-		dag.AssertLatestStatus(t, core.Success)
+		dag.AssertLatestStatus(t, core.Succeeded)
 	})
 
 	t.Run("HandleTaskStart", func(t *testing.T) {
@@ -136,7 +136,7 @@ func TestTaskHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the DAG ran successfully
-		dag.AssertLatestStatus(t, core.Success)
+		dag.AssertLatestStatus(t, core.Succeeded)
 
 		// Verify the params were passed
 		status, err := cli.GetLatestStatus(ctx, dag.DAG)

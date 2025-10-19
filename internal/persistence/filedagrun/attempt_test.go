@@ -73,7 +73,7 @@ func TestAttempt_Read(t *testing.T) {
 
 	// Create test file with multiple status entries
 	status1 := createTestStatus(core.Running)
-	status2 := createTestStatus(core.Success)
+	status2 := createTestStatus(core.Succeeded)
 
 	// Create file directory if it doesn't exist
 	err := os.MkdirAll(filepath.Dir(file), 0750)
@@ -103,12 +103,12 @@ func TestAttempt_Read(t *testing.T) {
 	// Read status - should get the last entry (test2)
 	dagRunStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, core.Success.String(), dagRunStatus.Status.String())
+	assert.Equal(t, core.Succeeded.String(), dagRunStatus.Status.String())
 
 	// Read using ReadStatus
 	latestStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, core.Success.String(), latestStatus.Status.String())
+	assert.Equal(t, core.Succeeded.String(), latestStatus.Status.String())
 }
 
 func TestAttempt_Compact(t *testing.T) {
@@ -121,7 +121,7 @@ func TestAttempt_Compact(t *testing.T) {
 
 		if i == 9 {
 			// Make some status changes to create different attempts
-			testStatus.Status = core.Success
+			testStatus.Status = core.Succeeded
 		}
 
 		if i == 0 {
@@ -165,7 +165,7 @@ func TestAttempt_Compact(t *testing.T) {
 	// Verify content is still correct
 	dagRunStatus, err := att.ReadStatus(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, core.Success, dagRunStatus.Status)
+	assert.Equal(t, core.Succeeded, dagRunStatus.Status)
 }
 
 func TestAttempt_Close(t *testing.T) {
@@ -188,7 +188,7 @@ func TestAttempt_Close(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify we can't write after close
-	err = att.Write(context.Background(), createTestStatus(core.Success))
+	err = att.Write(context.Background(), createTestStatus(core.Succeeded))
 	assert.ErrorIs(t, err, ErrStatusFileNotOpen)
 
 	// Test double close is safe
@@ -208,7 +208,7 @@ func TestAttempt_HandleNonExistentFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Write to create the file
-	err = att.Write(context.Background(), createTestStatus(core.Success))
+	err = att.Write(context.Background(), createTestStatus(core.Succeeded))
 	assert.NoError(t, err)
 
 	// Verify the file was created with correct data

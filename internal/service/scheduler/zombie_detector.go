@@ -116,11 +116,11 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.
 		"name", st.Name, "dagRunID", st.DAGRunID)
 
 	// Update the status to error
-	st.Status = core.Error
+	st.Status = core.Failed
 	st.FinishedAt = time.Now().Format(time.RFC3339)
 	for _, n := range st.Nodes {
 		if n.Status == core.NodeRunning {
-			n.Status = core.NodeError
+			n.Status = core.NodeFailed
 			n.Error = "process terminated unexpectedly - zombie process detected"
 		}
 	}

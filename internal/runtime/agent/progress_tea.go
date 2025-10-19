@@ -106,11 +106,11 @@ func NewProgressModel(dag *core.DAG) ProgressModel {
 			m.nodes[step.Name] = &nodeProgress{
 				node: &execution.Node{
 					Step:       step,
-					Status:     core.NodeNone,
+					Status:     core.NodeNotStarted,
 					StartedAt:  "-",
 					FinishedAt: "-",
 				},
-				status: core.NodeNone,
+				status: core.NodeNotStarted,
 			}
 		}
 	}
@@ -363,10 +363,10 @@ func (m ProgressModel) renderProgressBar() string {
 	total := len(m.nodes)
 
 	for _, np := range m.nodes {
-		if np.status == core.NodeSuccess ||
-			np.status == core.NodeError ||
+		if np.status == core.NodeSucceeded ||
+			np.status == core.NodeFailed ||
 			np.status == core.NodeSkipped ||
-			np.status == core.NodeCancel {
+			np.status == core.NodeCanceled {
 			completed++
 		}
 	}
@@ -453,7 +453,7 @@ func (m ProgressModel) renderRecentlyCompleted() string {
 			truncateString(np.node.Step.Name, 30),
 			m.faintStyle.Render(duration))
 
-		if np.status == core.NodeError && np.node.Error != "" {
+		if np.status == core.NodeFailed && np.node.Error != "" {
 			availableSpace := m.width - 50
 			if availableSpace < 20 {
 				availableSpace = 20
@@ -489,7 +489,7 @@ func (m ProgressModel) renderAllCompleted() string {
 			truncateString(np.node.Step.Name, 30),
 			m.faintStyle.Render(duration))
 
-		if np.status == core.NodeError && np.node.Error != "" {
+		if np.status == core.NodeFailed && np.node.Error != "" {
 			availableSpace := m.width - 50
 			if availableSpace < 20 {
 				availableSpace = 20
@@ -505,7 +505,7 @@ func (m ProgressModel) renderAllCompleted() string {
 }
 
 func (m ProgressModel) renderQueued() string {
-	queued := m.getNodesByStatus(core.NodeNone)
+	queued := m.getNodesByStatus(core.NodeNotStarted)
 	if len(queued) == 0 {
 		return ""
 	}
@@ -564,11 +564,11 @@ func (m ProgressModel) renderFooter() string {
 	if m.finalized {
 		st := m.getOverallStatus()
 		switch st {
-		case core.Success:
+		case core.Succeeded:
 			return m.successStyle.Render("✓ Execution completed successfully")
-		case core.Error:
+		case core.Failed:
 			return m.errorStyle.Render("✗ Execution failed")
-		case core.Cancel:
+		case core.Canceled:
 			return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ Execution cancelled")
 		default:
 			return m.boldStyle.Render("Execution finished")
@@ -586,13 +586,13 @@ func (m ProgressModel) getOverallStatus() core.Status {
 
 func (m ProgressModel) formatStatus(st core.Status) string {
 	switch st {
-	case core.Success:
+	case core.Succeeded:
 		return m.successStyle.Render("Success ✓")
-	case core.Error:
+	case core.Failed:
 		return m.errorStyle.Render("Failed ✗")
 	case core.Running:
 		return m.runningStyle.Render("Running ●")
-	case core.Cancel:
+	case core.Canceled:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("Cancelled ⚠")
 	case core.Queued:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Render("Queued ●")
@@ -603,17 +603,17 @@ func (m ProgressModel) formatStatus(st core.Status) string {
 
 func (m ProgressModel) getStatusIcon(s core.NodeStatus) string {
 	switch s {
-	case core.NodeSuccess:
+	case core.NodeSucceeded:
 		return m.successStyle.Render("✓")
-	case core.NodeError:
+	case core.NodeFailed:
 		return m.errorStyle.Render("✗")
 	case core.NodeRunning:
 		return m.runningStyle.Render("●")
-	case core.NodeCancel:
+	case core.NodeCanceled:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠")
 	case core.NodeSkipped:
 		return m.faintStyle.Render("⊘")
-	case core.NodePartialSuccess:
+	case core.NodePartiallySucceeded:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("◐")
 	default:
 		return m.faintStyle.Render("○")
@@ -645,10 +645,10 @@ func (m ProgressModel) getNodesByStatus(s core.NodeStatus) []*nodeProgress {
 func (m ProgressModel) getCompletedNodes() []*nodeProgress {
 	var nodes []*nodeProgress
 	for _, np := range m.nodes {
-		if np.status == core.NodeSuccess ||
-			np.status == core.NodeError ||
+		if np.status == core.NodeSucceeded ||
+			np.status == core.NodeFailed ||
 			np.status == core.NodeSkipped ||
-			np.status == core.NodeCancel {
+			np.status == core.NodeCanceled {
 			nodes = append(nodes, np)
 		}
 	}

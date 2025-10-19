@@ -77,7 +77,7 @@ func dequeueDAGRun(ctx *Context, dagRun execution.DAGRunRef) error {
 	}
 
 	// Make the status as canceled
-	dagStatus.Status = core.Cancel
+	dagStatus.Status = core.Canceled
 
 	if err := attempt.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
