@@ -54,7 +54,7 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 	}
 }
 
@@ -82,7 +82,7 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 	}
@@ -99,7 +99,7 @@ func (b *SubCmdBuilder) Dequeue(dag *core.DAG, dagRun execution.DAGRunRef) CmdSp
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 	}
@@ -120,7 +120,7 @@ func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 	}
 }
 
@@ -142,7 +142,7 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string, d
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 	}
 }
 
@@ -172,7 +172,7 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 	}
 }
 
@@ -191,7 +191,7 @@ func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 	}
 }
 
