@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -193,6 +194,25 @@ func TestLoad_Env(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, cfg)
+}
+
+func TestLoad_WithAppHomeDir(t *testing.T) {
+	// Reset viper to ensure clean state
+	viper.Reset()
+	defer viper.Reset()
+
+	tempDir := t.TempDir()
+
+	cfg, err := Load(WithAppHomeDir(tempDir))
+	require.NoError(t, err)
+
+	resolved := filepath.Clean(tempDir)
+	assert.Equal(t, filepath.Join(resolved, "dags"), cfg.Paths.DAGsDir)
+	assert.Equal(t, filepath.Join(resolved, "data"), cfg.Paths.DataDir)
+	assert.Equal(t, filepath.Join(resolved, "logs"), cfg.Paths.LogDir)
+
+	baseEnv := cfg.Global.BaseEnv.AsSlice()
+	require.Contains(t, baseEnv, fmt.Sprintf("DAGU_HOME=%s", resolved))
 }
 
 func TestLoad_YAML(t *testing.T) {

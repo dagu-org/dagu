@@ -40,6 +40,7 @@ type ConfigLoader struct {
 	configFile        string   // Optional explicit path to the configuration file.
 	warnings          []string // Collected warnings during configuration resolution.
 	additionalBaseEnv []string // Additional environment variables to append to the base environment.
+	appHomeDir        string   // Optional override for DAGU_HOME style directory.
 }
 
 // ConfigLoaderOption defines a functional option for configuring a ConfigLoader.
@@ -55,7 +56,14 @@ func WithConfigFile(configFile string) ConfigLoaderOption {
 // WithAdditionalBaseEnv returns a ConfigLoaderOption that appends additional environment variables
 func WithAdditionalBaseEnv(env []string) ConfigLoaderOption {
 	return func(l *ConfigLoader) {
-		l.additionalBaseEnv = env
+		l.additionalBaseEnv = append(l.additionalBaseEnv, env...)
+	}
+}
+
+// WithAppHomeDir sets a custom application home directory (equivalent to DAGU_HOME).
+func WithAppHomeDir(dir string) ConfigLoaderOption {
+	return func(l *ConfigLoader) {
+		l.appHomeDir = dir
 	}
 }
 
@@ -83,7 +91,10 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		DataHome:   xdg.DataHome,
 		ConfigHome: filepath.Join(homeDir, ".config"),
 	}
-	warnings := setupViper(xdgConfig, homeDir, l.configFile)
+	if l.appHomeDir != "" {
+		l.additionalBaseEnv = append(l.additionalBaseEnv, fmt.Sprintf("DAGU_HOME=%s", fileutil.ResolvePathOrBlank(l.appHomeDir)))
+	}
+	warnings := setupViper(xdgConfig, homeDir, l.configFile, l.appHomeDir)
 	l.warnings = append(l.warnings, warnings...)
 
 	// Attempt to read the main config file. If not found, we proceed without error.
@@ -497,8 +508,14 @@ func (l *ConfigLoader) LoadLegacyEnv(cfg *Config) {
 	}
 }
 
-func setupViper(xdgConfig XDGConfig, homeDir, configFile string) (warnings []string) {
-	paths := ResolvePaths("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
+func setupViper(xdgConfig XDGConfig, homeDir, configFile, appHomeOverride string) (warnings []string) {
+	var paths Paths
+	if appHomeOverride != "" {
+		resolved := fileutil.ResolvePathOrBlank(appHomeOverride)
+		paths = setUnifiedPaths(resolved)
+	} else {
+		paths = ResolvePaths("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
+	}
 
 	configureViper(paths.ConfigDir, configFile)
 	bindEnvironmentVariables()
