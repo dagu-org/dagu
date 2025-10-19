@@ -1554,7 +1554,7 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *core.Step) error {
 		// For now, we only support GitHub Action executors via 'uses' field.
 		step.ExecutorConfig.Type = "github-action"
 		step.ExecutorConfig.Config = def.With
-		step.ExecutorConfig.Config["action"] = uses
+		step.ExecutorConfig.Config["__action"] = uses
 		return nil
 	}
 

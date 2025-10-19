@@ -2,6 +2,7 @@ package gha
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/goccy/go-yaml"
 	"github.com/nektos/act/pkg/model"
@@ -32,6 +34,19 @@ steps:
       go-version: '1.21'
 ```
 */
+
+const (
+	// Config keys for GitHub Action executor
+	configKeyAction = "__action" // The action to run (e.g., "actions/checkout@v4")
+	configKeyRunner = "runner"   // The Docker image to use as runner
+
+	// Act configuration defaults
+	defaultRunnerImage  = "node:20-bullseye" // Official Node.js image (most actions are JavaScript-based)
+	defaultPlatform     = "ubuntu-latest"
+	defaultEventName    = "push"
+	defaultGitHubHost   = "github.com"
+	defaultWorkflowName = "Dagu GitHub Action"
+)
 
 var _ executor.Executor = (*githubAction)(nil)
 
@@ -67,14 +82,19 @@ func (h *daguLogrusHook) Fire(entry *logrus.Entry) error {
 		_, err := h.stdout.Write([]byte(entry.Message))
 		return err
 	}
-	// All other logs go to stderr
-	return nil
+	// All other logs go to stderr - write only the message with newline
+	msg := entry.Message
+	if !strings.HasSuffix(msg, "\n") {
+		msg += "\n"
+	}
+	_, err := h.stderr.Write([]byte(msg))
+	return err
 }
 
 // WithJobLogger creates a logrus logger that routes output appropriately
 func (f *daguJobLoggerFactory) WithJobLogger() *logrus.Logger {
 	logger := logrus.New()
-	logger.SetOutput(f.stderr) // Default output to stderr
+	logger.SetOutput(io.Discard) // Disable default output, use hook instead
 	logger.SetLevel(logrus.InfoLevel)
 	logger.SetFormatter(&logrus.TextFormatter{
 		DisableColors:    false,
@@ -82,7 +102,7 @@ func (f *daguJobLoggerFactory) WithJobLogger() *logrus.Logger {
 		TimestampFormat:  "2006-01-02 15:04:05",
 		DisableTimestamp: false,
 	})
-	// Add hook to intercept raw_output and send to stdout
+	// Add hook to route output: raw_output to stdout, everything else to stderr
 	logger.AddHook(&daguLogrusHook{
 		stdout: f.stdout,
 		stderr: f.stderr,
@@ -154,8 +174,9 @@ func (e *githubAction) Run(ctx context.Context) error {
 
 // workflowDefinition represents a GitHub Actions workflow
 type workflowDefinition struct {
-	Name string                 `yaml:"name"`
-	On   string                 `yaml:"on"`
+	Name string                   `yaml:"name"`
+	On   string                   `yaml:"on"`
+	Env  map[string]string        `yaml:"env,omitempty"`
 	Jobs map[string]jobDefinition `yaml:"jobs"`
 }
 
@@ -170,40 +191,41 @@ type stepDefinition struct {
 }
 
 func (e *githubAction) generateWorkflowYAML() (string, error) {
-	if e.step.ExecutorConfig.Config == nil || e.step.ExecutorConfig.Config["action"] == nil {
+	if e.step.ExecutorConfig.Config == nil || e.step.ExecutorConfig.Config[configKeyAction] == nil {
 		return "", fmt.Errorf("uses field is required for GitHub Action executor")
 	}
 
-	action := fmt.Sprintf("%v", e.step.ExecutorConfig.Config["action"])
+	action := fmt.Sprintf("%v", e.step.ExecutorConfig.Config[configKeyAction])
 	action = strings.TrimSpace(action)
 
 	// Copy with parameters, excluding Dagu-specific config keys
 	withParams := make(map[string]any)
 	for k, v := range e.step.ExecutorConfig.Config {
 		// Skip Dagu-specific config keys that shouldn't go to the action's 'with:'
-		if k == "action" || k == "runner" {
+		if k == configKeyAction || k == configKeyRunner {
 			continue
 		}
 		withParams[k] = v
 	}
 
-	// Special handling: checkout action requires token input
-	// Auto-inject if not provided by user
-	if action == "actions/checkout@v4" || action == "actions/checkout@v3" {
-		if _, hasToken := withParams["token"]; !hasToken {
-			// Use empty string to make the action use default unauthenticated access
-			// This works for public repos
-			withParams["token"] = ""
+	// Build workflow-level environment variables from step env
+	// Parse "key=value" format into map
+	workflowEnv := make(map[string]string)
+	for _, envVar := range e.step.Env {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			workflowEnv[parts[0]] = parts[1]
 		}
 	}
 
 	// Build workflow structure
 	workflow := workflowDefinition{
-		Name: "Dagu GitHub Action",
-		On:   "push",
+		Name: defaultWorkflowName,
+		On:   defaultEventName,
+		Env:  workflowEnv,
 		Jobs: map[string]jobDefinition{
 			"run": {
-				RunsOn: "ubuntu-latest",
+				RunsOn: defaultPlatform,
 				Steps: []stepDefinition{
 					{
 						Uses: action,
@@ -223,6 +245,31 @@ func (e *githubAction) generateWorkflowYAML() (string, error) {
 	return string(yamlBytes), nil
 }
 
+// generateEventJSON creates a GitHub webhook event payload for the action
+// This provides the github.event context to actions
+func (e *githubAction) generateEventJSON() (string, error) {
+	// Create a minimal push event payload
+	// This provides basic GitHub context for actions
+	event := map[string]any{
+		"ref": "refs/heads/main",
+		"repository": map[string]any{
+			"name":      "dagu",
+			"full_name": "dagu-org/dagu",
+			"private":   false,
+		},
+		"pusher": map[string]any{
+			"name": "dagu",
+		},
+	}
+
+	eventBytes, err := json.Marshal(event)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal event.json: %w", err)
+	}
+
+	return string(eventBytes), nil
+}
+
 func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile string) error {
 	// Open and read the workflow file
 	file, err := os.Open(workflowFile)
@@ -237,32 +284,63 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 		return fmt.Errorf("failed to create workflow planner: %w", err)
 	}
 
-	// Get GitHub token from environment (optional)
-	// Only use if actually set - don't use dummy tokens as they cause auth failures
-	token := os.Getenv("GITHUB_TOKEN")
+	// Get execution environment to access secrets and env vars
+	env := execution.GetEnv(ctx)
 
 	// Get runner image from step config, default to official Ubuntu latest
-	runnerImage := "ubuntu:latest" // Official Ubuntu image (safe but limited tools)
-	if img, ok := e.step.ExecutorConfig.Config["runner"]; ok {
+	runnerImage := defaultRunnerImage
+	if img, ok := e.step.ExecutorConfig.Config[configKeyRunner]; ok {
 		runnerImage = fmt.Sprintf("%v", img)
+	}
+
+	// Build environment variables map for act
+	// Combine all env sources (step env takes precedence over DAG env)
+	actEnv := make(map[string]string)
+	// Start with DAG-level envs
+	for k, v := range env.Envs {
+		actEnv[k] = v
+	}
+	// Add step-level envs (these override DAG-level)
+	// Step env is in "key=value" format
+	for _, envVar := range e.step.Env {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			actEnv[parts[0]] = parts[1]
+		}
+	}
+
+	// Build secrets map for act (from SecretEnvs)
+	actSecrets := make(map[string]string)
+	for k, v := range env.SecretEnvs {
+		actSecrets[k] = v
+	}
+
+	// Generate event.json for GitHub context
+	eventJSON, err := e.generateEventJSON()
+	if err != nil {
+		return fmt.Errorf("failed to generate event.json: %w", err)
+	}
+
+	// Write event.json to temp file in the same directory as workflow file
+	eventFile := filepath.Join(filepath.Dir(workflowFile), "event.json")
+	if err := os.WriteFile(eventFile, []byte(eventJSON), 0644); err != nil {
+		return fmt.Errorf("failed to write event.json: %w", err)
 	}
 
 	// Create act runner config with volume binding
 	// workDir is the actual working directory where files will be checked out
 	config := &runner.Config{
 		Workdir:        workDir,
-		BindWorkdir:    true,  // Bind the workdir to the container so files persist on host
-		EventName:      "push",
-		GitHubInstance: "github.com", // Configure GitHub instance for action resolution
-		LogOutput:      true,          // Enable logging of docker run output (marked with raw_output field)
+		BindWorkdir:    true, // Bind the workdir to the container so files persist on host
+		EventName:      defaultEventName,
+		EventPath:      eventFile,        // Path to event.json for GitHub context
+		GitHubInstance: defaultGitHubHost, // Configure GitHub instance for action resolution
+		LogOutput:      true,             // Enable logging of docker run output (marked with raw_output field)
+		Env:            actEnv,           // Pass environment variables to actions
+		Secrets:        actSecrets,       // Pass secrets to actions (GITHUB_TOKEN included if present)
 		Platforms: map[string]string{
-			"ubuntu-latest": runnerImage,
+			defaultPlatform: runnerImage,
 		},
-	}
-
-	// Only set token if one is actually provided (for private repos/actions)
-	if token != "" {
-		config.Token = token
 	}
 
 	// Inject custom JobLoggerFactory into context
@@ -280,7 +358,7 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 	}
 
 	// Get the plan for the event
-	plan, err := planner.PlanEvent("push")
+	plan, err := planner.PlanEvent(defaultEventName)
 	if err != nil {
 		return fmt.Errorf("failed to plan workflow: %w", err)
 	}
@@ -297,10 +375,10 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 }
 
 func newGitHubAction(ctx context.Context, step core.Step) (executor.Executor, error) {
-	if step.ExecutorConfig.Config == nil || step.ExecutorConfig.Config["action"] == nil {
+	if step.ExecutorConfig.Config == nil || step.ExecutorConfig.Config[configKeyAction] == nil {
 		return nil, fmt.Errorf("uses field is required for GitHub Action executor")
 	}
-	action := fmt.Sprintf("%v", step.ExecutorConfig.Config["action"])
+	action := fmt.Sprintf("%v", step.ExecutorConfig.Config[configKeyAction])
 	if action == "" {
 		return nil, fmt.Errorf("uses field is required for GitHub Action executor")
 	}
