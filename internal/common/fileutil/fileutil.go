@@ -139,6 +139,8 @@ func EnsureYAMLExtension(filename string) string {
 // It handles empty paths, tilde expansion, environment variables,
 // and converts to an absolute path.
 func ResolvePath(path string) (string, error) {
+	path = strings.TrimSpace(path)
+
 	// Handle empty path case
 	if path == "" {
 		return "", nil

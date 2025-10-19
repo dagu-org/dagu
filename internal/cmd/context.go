@@ -88,8 +88,9 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	var configLoaderOpts []config.ConfigLoaderOption
 	if daguHome != "" {
-		resolvedHome := fileutil.ResolvePathOrBlank(daguHome)
-		configLoaderOpts = append(configLoaderOpts, config.WithAppHomeDir(resolvedHome))
+		if resolvedHome := fileutil.ResolvePathOrBlank(daguHome); resolvedHome != "" {
+			configLoaderOpts = append(configLoaderOpts, config.WithAppHomeDir(resolvedHome))
+		}
 	}
 
 	// Use a custom config file if provided via the viper flag "config"

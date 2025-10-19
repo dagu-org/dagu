@@ -53,13 +53,6 @@ func WithConfigFile(configFile string) ConfigLoaderOption {
 	}
 }
 
-// WithAdditionalBaseEnv returns a ConfigLoaderOption that appends additional environment variables
-func WithAdditionalBaseEnv(env []string) ConfigLoaderOption {
-	return func(l *ConfigLoader) {
-		l.additionalBaseEnv = append(l.additionalBaseEnv, env...)
-	}
-}
-
 // WithAppHomeDir sets a custom application home directory (equivalent to DAGU_HOME).
 func WithAppHomeDir(dir string) ConfigLoaderOption {
 	return func(l *ConfigLoader) {
