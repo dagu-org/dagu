@@ -133,6 +133,7 @@ const fullSidebar = [
       { text: "REST API", link: "/reference/api" },
       { text: "Configuration", link: "/reference/config" },
       { text: "Variables", link: "/reference/variables" },
+      { text: "Special Variables", link: "/reference/special-environment-variables" },
       { text: "Executors", link: "/reference/executors" },
     ],
   },
