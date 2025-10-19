@@ -67,10 +67,6 @@ type Step struct {
 	Parallel *ParallelConfig `json:"parallel,omitempty"`
 	// Env contains environment variables for the step.
 	Env []string `json:"env,omitempty"`
-	// Uses specifies a GitHub Action to run (e.g., "actions/checkout@v4")
-	Uses string `json:"uses,omitempty"`
-	// With contains input parameters for the GitHub Action
-	With map[string]string `json:"with,omitempty"`
 }
 
 // String returns a formatted string representation of the step

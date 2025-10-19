@@ -22,16 +22,6 @@ type ExecutorFactory func(ctx context.Context, step core.Step) (Executor, error)
 
 // NewExecutor creates a new Executor based on the step's executor type.
 func NewExecutor(ctx context.Context, step core.Step) (Executor, error) {
-	// If the step has a "uses" field, automatically use the github-action executor
-	if step.Uses != "" {
-		// TODO: support prefix "executor/" to specify other executor types in `uses` field
-		f, ok := executorRegistry["github-action"]
-		if ok {
-			return f(ctx, step)
-		}
-		return nil, fmt.Errorf("github-action executor not registered")
-	}
-
 	factory, ok := executorRegistry[step.ExecutorConfig.Type]
 	if ok {
 		return factory(ctx, step)

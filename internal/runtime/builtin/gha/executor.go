@@ -102,19 +102,20 @@ func (e *githubAction) Run(ctx context.Context) error {
 }
 
 func (e *githubAction) generateWorkflowYAML() (string, error) {
-	if e.step.Uses == "" {
+	if e.step.ExecutorConfig.Config == nil || e.step.ExecutorConfig.Config["action"] == nil {
 		return "", fmt.Errorf("uses field is required for GitHub Action executor")
 	}
 
 	// Copy with parameters to avoid modifying original
 	withParams := make(map[string]string)
-	for k, v := range e.step.With {
-		withParams[k] = v
+	for k, v := range e.step.ExecutorConfig.Config {
+		withParams[k] = fmt.Sprintf("%v", v)
 	}
 
 	// Special handling: checkout action requires token input
 	// Auto-inject if not provided by user
-	if e.step.Uses == "actions/checkout@v4" || e.step.Uses == "actions/checkout@v3" {
+	action := fmt.Sprintf("%v", e.step.ExecutorConfig.Config["action"])
+	if action == "actions/checkout@v4" || action == "actions/checkout@v3" {
 		if _, hasToken := withParams["token"]; !hasToken {
 			// Use empty string to make the action use default unauthenticated access
 			// This works for public repos
@@ -144,7 +145,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: %s%s`,
-		e.step.Uses,
+		action,
 		withSection,
 	)
 
@@ -248,7 +249,11 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 }
 
 func newGitHubAction(ctx context.Context, step core.Step) (executor.Executor, error) {
-	if step.Uses == "" {
+	if step.ExecutorConfig.Config == nil || step.ExecutorConfig.Config["action"] == nil {
+		return nil, fmt.Errorf("uses field is required for GitHub Action executor")
+	}
+	action := fmt.Sprintf("%v", step.ExecutorConfig.Config["action"])
+	if action == "" {
 		return nil, fmt.Errorf("uses field is required for GitHub Action executor")
 	}
 

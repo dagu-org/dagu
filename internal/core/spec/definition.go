@@ -166,7 +166,7 @@ type stepDef struct {
 	// Uses specifies a GitHub Action to run (e.g., "actions/checkout@v4")
 	Uses string `yaml:"uses,omitempty"`
 	// With contains input parameters for the GitHub Action
-	With map[string]string `yaml:"with,omitempty"`
+	With map[string]any `yaml:"with,omitempty"`
 }
 
 // continueOnDef defines the conditions to continue on failure or skipped.

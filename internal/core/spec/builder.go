@@ -1154,8 +1154,6 @@ func buildStep(ctx StepBuildContext, def stepDef) (*core.Step, error) {
 		Stderr:         strings.TrimSpace(def.Stderr),
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
-		Uses:           strings.TrimSpace(def.Uses),
-		With:           def.With,
 	}
 
 	for _, entry := range stepBuilderRegistry {
@@ -1550,6 +1548,15 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *core.Step) error {
 	)
 
 	executor := def.Executor
+
+	// Case 1: handle 'uses' and 'with' fields for executor configuration
+	if uses := strings.TrimSpace(def.Uses); uses != "" {
+		// For now, we only support GitHub Action executors via 'uses' field.
+		step.ExecutorConfig.Type = "github-action"
+		step.ExecutorConfig.Config = def.With
+		step.ExecutorConfig.Config["action"] = uses
+		return nil
+	}
 
 	// Case 1: executor is nil
 	if executor == nil {
