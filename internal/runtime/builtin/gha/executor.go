@@ -181,7 +181,7 @@ func (e *githubAction) generateWorkflowYAML() (string, error) {
 	withParams := make(map[string]any)
 	for k, v := range e.step.ExecutorConfig.Config {
 		// Skip Dagu-specific config keys that shouldn't go to the action's 'with:'
-		if k == "action" || k == "runnerImage" {
+		if k == "action" || k == "runner" {
 			continue
 		}
 		withParams[k] = v
@@ -243,7 +243,7 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 
 	// Get runner image from step config, default to official Ubuntu latest
 	runnerImage := "ubuntu:latest" // Official Ubuntu image (safe but limited tools)
-	if img, ok := e.step.ExecutorConfig.Config["runnerImage"]; ok {
+	if img, ok := e.step.ExecutorConfig.Config["runner"]; ok {
 		runnerImage = fmt.Sprintf("%v", img)
 	}
 

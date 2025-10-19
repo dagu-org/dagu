@@ -20,7 +20,7 @@ func TestGitHubActionsExecutor(t *testing.T) {
     with:
       who-to-greet: "Morning"
       # Use lightweight Node.js image for testing (faster pull, smaller size)
-      runnerImage: node:20-bullseye
+      runner: node:20-bullseye
     output: ACTION_OUTPUT
 `)
 		agent := dag.Agent()
