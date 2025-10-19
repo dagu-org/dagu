@@ -104,7 +104,7 @@ steps:
 		thCopy := th
 		thCopy.Context = ctx
 
-		schedulerDone <- thCopy.RunCommandWithError(cmd.Scheduler(), test.CmdTest{
+		schedulerDone <- thCopy.RunCommandWithError(t, cmd.Scheduler(), test.CmdTest{
 			Args: []string{
 				"scheduler",
 				"--dagu-home", daguHome,

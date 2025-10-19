@@ -42,8 +42,9 @@ func (th Command) RunCommand(t *testing.T, cmd *cobra.Command, testCase CmdTest)
 	}
 }
 
-// RunCommandWithError runs a command and returns the error (if any) without failing the test
-func (th Command) RunCommandWithError(cmd *cobra.Command, testCase CmdTest) error {
+// RunCommandWithError runs a command and returns the error (if any) without failing the test.
+func (th Command) RunCommandWithError(t *testing.T, cmd *cobra.Command, testCase CmdTest) error {
+	t.Helper()
 	cmdRoot := &cobra.Command{Use: "root"}
 	cmdRoot.AddCommand(cmd)
 
@@ -58,7 +59,7 @@ func (th Command) RunCommandWithError(cmd *cobra.Command, testCase CmdTest) erro
 		// Check if the expected output is present in the standard output.
 		for _, expectedOutput := range testCase.ExpectedOut {
 			if len(expectedOutput) > 0 {
-				require.Contains(nil, output, expectedOutput)
+				require.Contains(t, output, expectedOutput)
 			}
 		}
 	}
