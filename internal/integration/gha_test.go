@@ -21,11 +21,20 @@ func TestGitHubActionsExecutor(t *testing.T) {
       config:
         action: actions/hello-world-javascript-action@main
         time-to-greet: "Morning"
+    output: ACTION_OUTPUT
 `)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
 
 		dag.AssertLatestStatus(t, core.Succeeded)
+
+		// Verify that container output was captured to stdout
+		// The hello-world action should log "Hello Morning" to console
+		dag.AssertOutputs(t, map[string]any{
+			"ACTION_OUTPUT": []test.Contains{
+				"Hello Morning",
+			},
+		})
 	})
 }

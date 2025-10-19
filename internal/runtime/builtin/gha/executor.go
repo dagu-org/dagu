@@ -41,21 +41,49 @@ type githubAction struct {
 }
 
 // daguJobLoggerFactory implements runner.JobLoggerFactory to integrate
-// act's logging with Dagu's stderr writer without hijacking global stdout/stderr
+// act's logging with Dagu's stdout/stderr writers without hijacking global stdout/stderr
 type daguJobLoggerFactory struct {
+	stdout io.Writer
 	stderr io.Writer
 }
 
-// WithJobLogger creates a logrus logger that writes to Dagu's stderr
+// daguLogrusHook intercepts log entries and routes them based on content
+// Raw output (container stdout/stderr) goes to stdout, other logs go to stderr
+type daguLogrusHook struct {
+	stdout io.Writer
+	stderr io.Writer
+}
+
+func (h *daguLogrusHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+func (h *daguLogrusHook) Fire(entry *logrus.Entry) error {
+	// Check if this is raw output from the container
+	if rawOutput, ok := entry.Data["raw_output"]; ok && rawOutput == true {
+		// Container output goes to stdout - write only the message, not formatted log entry
+		_, err := h.stdout.Write([]byte(entry.Message))
+		return err
+	}
+	// All other logs go to stderr
+	return nil
+}
+
+// WithJobLogger creates a logrus logger that routes output appropriately
 func (f *daguJobLoggerFactory) WithJobLogger() *logrus.Logger {
 	logger := logrus.New()
-	logger.SetOutput(f.stderr) // Logs go to stderr
+	logger.SetOutput(f.stderr) // Default output to stderr
 	logger.SetLevel(logrus.InfoLevel)
 	logger.SetFormatter(&logrus.TextFormatter{
 		DisableColors:    false,
 		FullTimestamp:    true,
 		TimestampFormat:  "2006-01-02 15:04:05",
 		DisableTimestamp: false,
+	})
+	// Add hook to intercept raw_output and send to stdout
+	logger.AddHook(&daguLogrusHook{
+		stdout: f.stdout,
+		stderr: f.stderr,
 	})
 	return logger
 }
@@ -195,9 +223,10 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 	// workDir is the actual working directory where files will be checked out
 	config := &runner.Config{
 		Workdir:        workDir,
-		BindWorkdir:    true, // Bind the workdir to the container so files persist on host
+		BindWorkdir:    true,  // Bind the workdir to the container so files persist on host
 		EventName:      "push",
 		GitHubInstance: "github.com", // Configure GitHub instance for action resolution
+		LogOutput:      true,          // Enable logging of docker run output (marked with raw_output field)
 		Platforms: map[string]string{
 			"ubuntu-latest": "node:20-bullseye", // Use a lightweight Node.js image for ubuntu-latest
 		},
@@ -209,8 +238,9 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 	}
 
 	// Inject custom JobLoggerFactory into context
-	// This makes act write logs to e.stderr without hijacking global stdout/stderr
+	// This routes container output (raw_output=true) to stdout and other logs to stderr
 	loggerFactory := &daguJobLoggerFactory{
+		stdout: e.stdout,
 		stderr: e.stderr,
 	}
 	ctx = runner.WithJobLoggerFactory(ctx, loggerFactory)
