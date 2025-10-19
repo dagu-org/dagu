@@ -541,11 +541,11 @@ func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.Updat
 }
 
 var nodeStatusMapping = map[api.NodeStatus]core.NodeStatus{
-	api.NodeStatusNotStarted: core.NodeNone,
+	api.NodeStatusNotStarted: core.NodeNotStarted,
 	api.NodeStatusRunning:    core.NodeRunning,
-	api.NodeStatusFailed:     core.NodeError,
-	api.NodeStatusCancelled:  core.NodeCancel,
-	api.NodeStatusSuccess:    core.NodeSuccess,
+	api.NodeStatusFailed:     core.NodeFailed,
+	api.NodeStatusCancelled:  core.NodeCanceled,
+	api.NodeStatusSuccess:    core.NodeSucceeded,
 	api.NodeStatusSkipped:    core.NodeSkipped,
 }
 

@@ -399,7 +399,7 @@ func (m *Manager) checkAndUpdateStaleRunningStatus(
 		return nil
 	}
 	// Process is not alive, update status to error
-	st.Status = core.Error
+	st.Status = core.Failed
 
 	return nil
 }

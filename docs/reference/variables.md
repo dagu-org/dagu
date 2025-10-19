@@ -2,7 +2,9 @@
 
 ## Special Environment Variables
 
-Dagu automatically sets these environment variables for every step execution:
+Dagu automatically sets canonical environment variables while workflows run. Some are available to every step, while others are injected only for lifecycle handlers.
+
+### Per-step variables
 
 | Variable | Description | Example |
 |----------|-------------|---------|
@@ -12,6 +14,12 @@ Dagu automatically sets these environment variables for every step execution:
 | `DAG_RUN_LOG_FILE` | Path to the main log file | `/logs/my-workflow/20240115_140000.log` |
 | `DAG_RUN_STEP_STDOUT_FILE` | Path to step's stdout log | `/logs/my-workflow/process-data.stdout.log` |
 | `DAG_RUN_STEP_STDERR_FILE` | Path to step's stderr log | `/logs/my-workflow/process-data.stderr.log` |
+
+### Handler-only variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DAG_RUN_STATUS` | Final canonical status for the DAG run (`succeeded`, `partially_succeeded`, `failed`, `canceled`) | `succeeded` |
 
 Example usage:
 ```yaml

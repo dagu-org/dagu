@@ -1,36 +1,38 @@
 package core
 
-// Status represents the status of a DAG execution.
+// Status represents the canonical lifecycle phases for a DAG execution.
 type Status int
 
 const (
-	None Status = iota
+	NotStarted Status = iota
 	Running
-	Error
-	Cancel
-	Success
+	Failed
+	Canceled
+	Succeeded
 	Queued
-	PartialSuccess
+	PartiallySucceeded
 )
 
+// String returns the canonical lowercase token used across APIs, logs, and
+// environment variables.
 func (s Status) String() string {
 	switch s {
 	case Running:
 		return "running"
-	case Error:
+	case Failed:
 		return "failed"
-	case Cancel:
-		return "cancelled"
-	case Success:
-		return "finished"
+	case Canceled:
+		return "canceled"
+	case Succeeded:
+		return "succeeded"
 	case Queued:
 		return "queued"
-	case PartialSuccess:
-		return "partial success"
-	case None:
-		fallthrough
+	case PartiallySucceeded:
+		return "partially_succeeded"
+	case NotStarted:
+		return "not_started"
 	default:
-		return "not started"
+		return "unknown"
 	}
 }
 
@@ -41,44 +43,45 @@ func (s Status) IsActive() bool {
 
 // IsSuccess checks if the status indicates a successful execution.
 func (s Status) IsSuccess() bool {
-	return s == Success || s == PartialSuccess
+	return s == Succeeded || s == PartiallySucceeded
 }
 
-// NodeStatus represents the status of a node in a DAG.
+// NodeStatus represents the canonical lifecycle phases for an individual node.
 type NodeStatus int
 
 const (
-	NodeNone NodeStatus = iota
+	NodeNotStarted NodeStatus = iota
 	NodeRunning
-	NodeError
-	NodeCancel
-	NodeSuccess
+	NodeFailed
+	NodeCanceled
+	NodeSucceeded
 	NodeSkipped
-	NodePartialSuccess
+	NodePartiallySucceeded
 )
 
 // IsSuccess checks if the node status indicates a successful execution.
 func (s NodeStatus) IsSuccess() bool {
-	return s == NodeSuccess || s == NodePartialSuccess
+	return s == NodeSucceeded || s == NodePartiallySucceeded
 }
 
+// String returns the canonical lowercase token for the node lifecycle phase.
 func (s NodeStatus) String() string {
 	switch s {
 	case NodeRunning:
 		return "running"
-	case NodeError:
+	case NodeFailed:
 		return "failed"
-	case NodeCancel:
-		return "cancelled"
-	case NodeSuccess:
-		return "finished"
+	case NodeCanceled:
+		return "canceled"
+	case NodeSucceeded:
+		return "succeeded"
 	case NodeSkipped:
 		return "skipped"
-	case NodePartialSuccess:
-		return "partial success"
-	case NodeNone:
-		fallthrough
+	case NodePartiallySucceeded:
+		return "partially_succeeded"
+	case NodeNotStarted:
+		return "not_started"
 	default:
-		return "not started"
+		return "unknown"
 	}
 }

@@ -27,8 +27,8 @@ func TestProgressModel_Init(t *testing.T) {
 	assert.Len(t, model.nodes, 2)
 	assert.NotNil(t, model.nodes["step1"])
 	assert.NotNil(t, model.nodes["step2"])
-	assert.Equal(t, core.NodeNone, model.nodes["step1"].status)
-	assert.Equal(t, core.NodeNone, model.nodes["step2"].status)
+	assert.Equal(t, core.NodeNotStarted, model.nodes["step1"].status)
+	assert.Equal(t, core.NodeNotStarted, model.nodes["step2"].status)
 
 	// Test Init command
 	cmd := model.Init()
@@ -138,10 +138,10 @@ func TestProgressModel_ProgressCalculation(t *testing.T) {
 	model.width = 80
 
 	// Mark some steps as completed
-	model.nodes["step1"].status = core.NodeSuccess
-	model.nodes["step2"].status = core.NodeError
+	model.nodes["step1"].status = core.NodeSucceeded
+	model.nodes["step2"].status = core.NodeFailed
 	model.nodes["step3"].status = core.NodeRunning
-	model.nodes["step4"].status = core.NodeNone
+	model.nodes["step4"].status = core.NodeNotStarted
 
 	view := model.View()
 
@@ -159,12 +159,12 @@ func TestProgressModel_StatusFormatting(t *testing.T) {
 		status   core.Status
 		expected string
 	}{
-		{core.Success, "Success ✓"},
-		{core.Error, "Failed ✗"},
+		{core.Succeeded, "Success ✓"},
+		{core.Failed, "Failed ✗"},
 		{core.Running, "Running ●"},
-		{core.Cancel, "Cancelled ⚠"},
+		{core.Canceled, "Cancelled ⚠"},
 		{core.Queued, "Queued ●"},
-		{core.None, "Not Started ○"},
+		{core.NotStarted, "Not Started ○"},
 	}
 
 	for _, tt := range tests {
@@ -286,7 +286,7 @@ func TestProgressModel_ErrorDisplay(t *testing.T) {
 	model.width = 100
 
 	// Mark step as failed with error
-	model.nodes["failing-step"].status = core.NodeError
+	model.nodes["failing-step"].status = core.NodeFailed
 	model.nodes["failing-step"].node.Error = "Connection timeout"
 	model.nodes["failing-step"].endTime = time.Now()
 	model.nodes["failing-step"].startTime = time.Now().Add(-5 * time.Second)

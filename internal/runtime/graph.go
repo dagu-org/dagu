@@ -107,7 +107,7 @@ func (g *ExecutionGraph) IsRunning() bool {
 		if s == core.NodeRunning {
 			return true
 		}
-		if s == core.NodeNone && g.finishedAt.IsZero() {
+		if s == core.NodeNotStarted && g.finishedAt.IsZero() {
 			// If the node is not started and the graph is not finished,
 			// it means the node is still pending to be executed.
 			return true
@@ -167,8 +167,8 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context, steps map[string]core.S
 	for len(frontier) > 0 {
 		var next []int
 		for _, u := range frontier {
-			if retry[u] || dict[u] == core.NodeError ||
-				dict[u] == core.NodeCancel {
+			if retry[u] || dict[u] == core.NodeFailed ||
+				dict[u] == core.NodeCanceled {
 				logger.Debug(ctx, "Clearing node state", "step", g.nodeByID[u].Name())
 				step, ok := steps[g.nodeByID[u].Name()]
 				if !ok {
@@ -262,7 +262,7 @@ func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 func (g *ExecutionGraph) isFinished() bool {
 	for _, node := range g.nodes {
 		if node.State().Status == core.NodeRunning ||
-			node.State().Status == core.NodeNone {
+			node.State().Status == core.NodeNotStarted {
 			return false
 		}
 	}

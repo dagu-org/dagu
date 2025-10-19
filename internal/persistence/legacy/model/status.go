@@ -47,7 +47,7 @@ type Status struct {
 
 func (st *Status) CorrectRunningStatus() {
 	if st.Status == core.Running {
-		st.Status = core.Error
+		st.Status = core.Failed
 		st.StatusText = st.Status.String()
 	}
 }
