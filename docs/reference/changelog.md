@@ -47,6 +47,7 @@ Thanks to our contributors for this release:
 | JSON Schema validation for params implementation (#1273) | [@thefishhat](https://github.com/thefishhat) |
 | SSH script validation implementation (#1308) | [@AdityaTel89](https://github.com/AdityaTel89) |
 | README updates (#1326), unit tests (#1329), and legacy directory warning (#858, #1336) | [@arky](https://github.com/arky) |
+| Extensive troubleshooting and community support: container name (#1237), SSH environment variables (#1238), DAG dependency resolution (#1262), cleanup and status propagation (#1305), environment variables behavior (#1320), clear queue feature (#1298), Docker-in-Docker (#1235), and CLI/masking discussions (#1314, #1317, #1273) | [@ghansham](https://github.com/ghansham) |
 
 ## v1.22.0 (2025-08-24)
 
