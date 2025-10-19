@@ -461,8 +461,8 @@ func (s *Scheduler) processQueueItem(ctx context.Context, item execution.QueuedI
 		logger.Error(ctx, "Failed to mark status running", "err", err, "data", data)
 	}
 
-	sendResult(execution.QueuedItemProcessingResultSuccess)
 	result = execution.QueuedItemProcessingResultSuccess
+	sendResult(result)
 
 	// Wait until the DAG to be alive
 	time.Sleep(500 * time.Millisecond)
