@@ -133,7 +133,7 @@ func (e *githubAction) Run(ctx context.Context) error {
 
 	// Determine the actual working directory where files should be checked out
 	// This is where the action will run and where files will persist
-	actualWorkDir := e.step.Dir
+	actualWorkDir := execution.GetEnv(ctx).WorkingDir
 	if actualWorkDir == "" {
 		// If no dir specified, use current working directory
 		actualWorkDir, _ = os.Getwd()
@@ -324,11 +324,11 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, tmpDir, workflow
 		Workdir:        workDir,
 		BindWorkdir:    true, // Bind the workdir to the container so files persist on host
 		EventName:      defaultEventName,
-		EventPath:      eventFile,        // Path to event.json for GitHub context
+		EventPath:      eventFile,         // Path to event.json for GitHub context
 		GitHubInstance: defaultGitHubHost, // Configure GitHub instance for action resolution
-		LogOutput:      true,             // Enable logging of docker run output (marked with raw_output field)
-		Env:            actEnv,           // Pass environment variables to actions
-		Secrets:        actSecrets,       // Pass secrets to actions (GITHUB_TOKEN included if present)
+		LogOutput:      true,              // Enable logging of docker run output (marked with raw_output field)
+		Env:            actEnv,            // Pass environment variables to actions
+		Secrets:        actSecrets,        // Pass secrets to actions (GITHUB_TOKEN included if present)
 		Platforms: map[string]string{
 			defaultPlatform: runnerImage,
 		},
