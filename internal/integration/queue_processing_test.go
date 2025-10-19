@@ -33,6 +33,8 @@ import (
 // This integration test covers the fixed behaviour by pushing several quick DAGs
 // through the queue and asserting that they all complete within the timeout.
 func TestQueueProcessing(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 
 	// Enable queues
@@ -92,6 +94,7 @@ steps:
 
 	// Start scheduler
 	schedulerDone := make(chan error, 1)
+	daguHome := filepath.Dir(th.Config.Paths.DAGsDir)
 	go func() {
 		// Use timeout context for scheduler without modifying shared th.Context
 		ctx, cancel := context.WithTimeout(th.Context, 30*time.Second)
@@ -102,7 +105,10 @@ steps:
 		thCopy.Context = ctx
 
 		schedulerDone <- thCopy.RunCommandWithError(cmd.Scheduler(), test.CmdTest{
-			Args:        []string{"scheduler", "--dags", th.Config.Paths.DAGsDir},
+			Args: []string{
+				"scheduler",
+				"--dagu-home", daguHome,
+			},
 			ExpectedOut: []string{"Scheduler started"},
 		})
 	}()
@@ -143,7 +149,8 @@ DONE:
 	th.Cancel()
 
 	select {
-	case <-schedulerDone:
+	case err := <-schedulerDone:
+		require.NoError(t, err)
 	case <-time.After(5 * time.Second):
 	}
 
