@@ -7,9 +7,9 @@ package integration_test
 // get stuck in the queue due to synchronous processing in handleQueue().
 //
 // Key Files:
-// - internal/service/scheduler/scheduler.go:305-469 (handleQueue function)
-// - internal/service/scheduler/scheduler.go:192 (queue channel with buffer=1)
-// - internal/persistence/filequeue/reader.go (queue reader implementation)
+// - internal/service/scheduler/scheduler.go: handleQueue function
+// - internal/service/scheduler/scheduler.go: queue channel definition (buffer=1)
+// - internal/persistence/filequeue/reader.go: queue reader implementation
 
 import (
 	"context"
