@@ -299,6 +299,77 @@ func TestNewEnv_BasicFields(t *testing.T) {
 	assert.NotEmpty(t, env.WorkingDir)
 }
 
+func TestEnv_UserEnvsMap(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		setup    func(ctx context.Context) (context.Context, execution.Env)
+		expected map[string]string
+	}{
+		{
+			name: "IncludesVariablesFromPreviousSteps",
+			setup: func(ctx context.Context) (context.Context, execution.Env) {
+				dag := &core.DAG{Env: []string{"DAG_VAR=dag_value"}}
+				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
+				env := execution.NewEnv(ctx, core.Step{Name: "test"})
+				env.Variables.Store("OUTPUT_VAR", "OUTPUT_VAR=output_value")
+				return ctx, env
+			},
+			expected: map[string]string{
+				"DAG_VAR":    "dag_value",
+				"OUTPUT_VAR": "output_value",
+			},
+		},
+		{
+			name: "StepEnvOverridesAll",
+			setup: func(ctx context.Context) (context.Context, execution.Env) {
+				dag := &core.DAG{Env: []string{"KEY=dag"}}
+				secrets := []string{"KEY=secret"}
+				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, secrets)
+
+				step := core.Step{Name: "test", Env: []string{"KEY=step"}}
+				env := execution.NewEnv(ctx, step)
+				env.Variables.Store("KEY", "KEY=variable")
+				return ctx, env
+			},
+			expected: map[string]string{
+				"KEY": "step",
+			},
+		},
+		{
+			name: "ExcludesOSEnvironment",
+			setup: func(ctx context.Context) (context.Context, execution.Env) {
+				dag := &core.DAG{Env: []string{"USER_VAR=user"}}
+				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
+				env := execution.NewEnv(ctx, core.Step{Name: "test"})
+				return ctx, env
+			},
+			expected: map[string]string{
+				"USER_VAR": "user",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			ctx, env := tt.setup(ctx)
+
+			result := env.UserEnvsMap()
+
+			for key, expectedValue := range tt.expected {
+				assert.Equal(t, expectedValue, result[key], "key %s should have value %s", key, expectedValue)
+			}
+			// Ensure OS env is not included (PATH should not be in result)
+			_, hasPath := result["PATH"]
+			assert.False(t, hasPath, "UserEnvsMap should not include OS environment variables like PATH")
+		})
+	}
+}
+
 func TestEnv_EvalString_Precedence(t *testing.T) {
 	t.Parallel()
 

@@ -169,7 +169,7 @@ func (e *githubAction) Run(ctx context.Context) error {
 	}
 
 	// Run the action using act library, using actualWorkDir as the workspace
-	return e.executeAct(ctx, actualWorkDir, workflowFile)
+	return e.executeAct(ctx, actualWorkDir, tmpDir, workflowFile)
 }
 
 // workflowDefinition represents a GitHub Actions workflow
@@ -270,7 +270,7 @@ func (e *githubAction) generateEventJSON() (string, error) {
 	return string(eventBytes), nil
 }
 
-func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile string) error {
+func (e *githubAction) executeAct(ctx context.Context, workDir, tmpDir, workflowFile string) error {
 	// Open and read the workflow file
 	file, err := os.Open(workflowFile)
 	if err != nil {
@@ -287,32 +287,22 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 	// Get execution environment to access secrets and env vars
 	env := execution.GetEnv(ctx)
 
-	// Get runner image from step config, default to official Ubuntu latest
+	// Get runner image from step config, default to official Node.js image
 	runnerImage := defaultRunnerImage
 	if img, ok := e.step.ExecutorConfig.Config[configKeyRunner]; ok {
 		runnerImage = fmt.Sprintf("%v", img)
 	}
 
-	// Build environment variables map for act
-	// Combine all env sources (step env takes precedence over DAG env)
-	actEnv := make(map[string]string)
-	// Start with DAG-level envs
-	for k, v := range env.Envs {
-		actEnv[k] = v
-	}
-	// Add step-level envs (these override DAG-level)
-	// Step env is in "key=value" format
-	for _, envVar := range e.step.Env {
-		parts := strings.SplitN(envVar, "=", 2)
-		if len(parts) == 2 {
-			actEnv[parts[0]] = parts[1]
-		}
-	}
+	// Get all user-defined environment variables (excludes OS env, includes Variables)
+	// Includes: DAG env + step env + variables from previous steps
+	actEnv := env.UserEnvsMap()
 
-	// Build secrets map for act (from SecretEnvs)
+	// Build secrets map for act and remove secrets from actEnv
+	// Secrets should only be passed via Config.Secrets, not Config.Env
 	actSecrets := make(map[string]string)
 	for k, v := range env.SecretEnvs {
 		actSecrets[k] = v
+		delete(actEnv, k) // Remove from env to avoid duplication
 	}
 
 	// Generate event.json for GitHub context
@@ -321,8 +311,9 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, workflowFile str
 		return fmt.Errorf("failed to generate event.json: %w", err)
 	}
 
-	// Write event.json to temp file in the same directory as workflow file
-	eventFile := filepath.Join(filepath.Dir(workflowFile), "event.json")
+	// Write event.json to temp directory
+	// Use step name to make it unique in case of concurrent executions
+	eventFile := filepath.Join(tmpDir, fmt.Sprintf("event-%s.json", e.step.Name))
 	if err := os.WriteFile(eventFile, []byte(eventJSON), 0644); err != nil {
 		return fmt.Errorf("failed to write event.json: %w", err)
 	}

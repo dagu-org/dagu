@@ -23,7 +23,35 @@ type DAGContext struct {
 	CoordinatorCli Dispatcher
 }
 
+// UserEnvsMap returns only user-defined environment variables as a map,
+// excluding OS environment (BaseEnv). Use this for isolated execution environments.
+// Precedence: SecretEnvs > Envs > DAG.Env
+func (e DAGContext) UserEnvsMap() map[string]string {
+	result := make(map[string]string)
+
+	// Parse DAG.Env (lowest priority)
+	for _, env := range e.DAG.Env {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			result[parts[0]] = parts[1]
+		}
+	}
+
+	// Add computed envs
+	for k, v := range e.Envs {
+		result[k] = v
+	}
+
+	// Secrets last (highest priority)
+	for k, v := range e.SecretEnvs {
+		result[k] = v
+	}
+
+	return result
+}
+
 // AllEnvs returns all environment variables as a slice of strings in "key=value" format.
+// Includes OS environment (BaseEnv). Use this for command executor and DAG runner.
 // Secrets have the highest priority and are appended last.
 func (e DAGContext) AllEnvs() []string {
 	envs := e.BaseEnv.AsSlice()
