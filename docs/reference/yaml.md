@@ -426,7 +426,9 @@ In the nested array format:
 | `stderr` | string | Redirect stderr to file | - |
 | `output` | string | Capture output to variable | - |
 | `env` | array/object | Step-specific environment variables (overrides DAG-level) | - |
-| `params` | string | Parameters for sub-DAG | - |
+| `params` | string/object | Parameters passed to child DAGs (`run`) or executor-specific inputs (e.g., GitHub Actions `with:` map) | - |
+
+When targeting the experimental GitHub Actions executor, author `params` as a YAML map so keys align with the action's `with` inputs. The same field continues to support string-form parameters for child DAG execution.
 
 ### Parallel Execution
 

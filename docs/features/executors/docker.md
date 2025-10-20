@@ -73,7 +73,7 @@ Notes:
 - With both `image` and `containerName`, Dagu first attempts to exec into the named container. If it is missing or stopped, Dagu creates it using the supplied image (applying `container`/`host`/`network` settings) before running the command.
 - When creating a new container (`image` set) and `command` is omitted, Docker uses the image’s default `ENTRYPOINT`/`CMD`.
 - Low-level Docker options (`container`, `host`, `network`) only apply when Dagu starts the container; they are ignored if an existing running container is reused.
-- `host.autoRemove` from raw Docker config is ignored — use top‑level `config.autoRemove` instead.
+- `host.autoRemove` from raw Docker config is ignored. Use the top-level `config.autoRemove` field instead.
 - `pull` accepts booleans for backward compatibility: `true` = `always`, `false` = `never`.
 
 ### Behavior with DAG‑level `container`

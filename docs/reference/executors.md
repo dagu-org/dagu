@@ -10,6 +10,7 @@ Executors extend Dagu's capabilities beyond simple shell commands. Available exe
 - [HTTP](/features/executors/http) - Make HTTP requests
 - [Mail](/features/executors/mail) - Send emails
 - [JQ](/features/executors/jq) - Process JSON data
+- [GitHub Actions (_experimental_)](/features/executors/github-actions) - Run marketplace actions locally with nektos/act
 
 ::: tip
 For detailed documentation on each executor, click the links above to visit the feature pages.
@@ -145,6 +146,37 @@ steps:
             - ./config:/app/config               # Relative path
     command: python process.py /container/data
 ```
+
+## GitHub Actions Executor
+
+::: info
+For the full guide, see [GitHub Actions Executor](/features/executors/github-actions).
+:::
+
+Run marketplace actions (e.g. `actions/checkout@v4`) inside Dagu steps.
+
+```yaml
+secrets:
+  - name: GITHUB_TOKEN
+    provider: env
+    key: GITHUB_TOKEN
+
+steps:
+  - name: checkout
+    command: actions/checkout@v4
+    executor:
+      type: gha             # Aliases: github_action, github-action
+      config:
+        runner: node:22-bookworm
+    params:
+      repository: dagu-org/dagu
+      ref: main
+      token: "${GITHUB_TOKEN}"
+```
+
+::: warning
+This executor is experimental. It depends on Docker, downloads images on demand, and currently supports single-action invocations per step.
+:::
 
 ### Environment Variables
 
