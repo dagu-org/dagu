@@ -2,11 +2,14 @@ package execution_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
@@ -331,10 +334,48 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 				step := core.Step{Name: "test", Env: []string{"KEY=step"}}
 				env := execution.NewEnv(ctx, step)
 				env.Variables.Store("KEY", "KEY=variable")
-				return ctx, env
+
+				envCtx := execution.WithEnv(ctx, env)
+				parts := strings.SplitN(step.Env[0], "=", 2)
+				evaluated, err := env.EvalString(envCtx, parts[1])
+				if err != nil {
+					panic(fmt.Sprintf("failed to evaluate step env: %v", err))
+				}
+				vars := &collections.SyncMap{}
+				vars.Store(parts[0], fmt.Sprintf("%s=%s", parts[0], evaluated))
+				env.ForceLoadOutputVariables(vars)
+
+				return envCtx, env
 			},
 			expected: map[string]string{
 				"KEY": "step",
+			},
+		},
+		{
+			name: "StepEnvKeepsEvaluatedSecrets",
+			setup: func(ctx context.Context) (context.Context, execution.Env) {
+				dag := &core.DAG{}
+				secrets := []string{"MY_SECRET=super-secret"}
+				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, secrets)
+
+				step := core.Step{Name: "test", Env: []string{"GITHUB_TOKEN=${MY_SECRET}"}}
+				env := execution.NewEnv(ctx, step)
+
+				envCtx := execution.WithEnv(ctx, env)
+				parts := strings.SplitN(step.Env[0], "=", 2)
+				evaluated, err := env.EvalString(envCtx, parts[1])
+				if err != nil {
+					panic(fmt.Sprintf("failed to evaluate step env: %v", err))
+				}
+
+				vars := &collections.SyncMap{}
+				vars.Store(parts[0], fmt.Sprintf("%s=%s", parts[0], evaluated))
+				env.ForceLoadOutputVariables(vars)
+
+				return envCtx, env
+			},
+			expected: map[string]string{
+				"GITHUB_TOKEN": "super-secret",
 			},
 		},
 		{

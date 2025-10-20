@@ -116,9 +116,13 @@ func (e Env) UserEnvsMap() map[string]string {
 	// Add step-defined env (highest precedence)
 	for _, env := range e.Step.Env {
 		parts := strings.SplitN(env, "=", 2)
-		if len(parts) == 2 {
-			result[parts[0]] = parts[1]
+		if len(parts) != 2 {
+			continue
 		}
+		if _, exists := result[parts[0]]; exists {
+			continue
+		}
+		result[parts[0]] = parts[1]
 	}
 
 	return result

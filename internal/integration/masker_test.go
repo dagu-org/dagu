@@ -1,7 +1,9 @@
 package integration_test
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -93,6 +95,50 @@ steps:
 
 		require.NotContains(t, string(stdoutContent), secretValue, "secret should be masked")
 		require.Contains(t, string(stdoutContent), "*******", "masked value should appear")
+	})
+
+	t.Run("EnvSecretFromDotenvFile", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+
+		secretValue := "dotenv-loaded-secret-2468"
+		dotenvContent := fmt.Sprintf("DOTENV_SECRET=%s\n", secretValue)
+		dotenvPath := th.TempFile(t, ".env", []byte(dotenvContent))
+		workDir := filepath.Dir(dotenvPath)
+
+		dag := th.DAG(t, fmt.Sprintf(`
+workingDir: %q
+dotenv: .env
+
+secrets:
+  - name: DOTENV_SECRET
+    provider: env
+    key: DOTENV_SECRET
+
+steps:
+  - name: use-dotenv-secret
+    command: echo "Dotenv secret is ${DOTENV_SECRET}"
+    output: RESULT
+`, workDir))
+
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+
+		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+		require.NoError(t, err)
+		require.Len(t, status.Nodes, 1)
+
+		stdoutContent, err := os.ReadFile(status.Nodes[0].Stdout)
+		require.NoError(t, err)
+
+		stdout := string(stdoutContent)
+
+		require.NotContains(t, stdout, secretValue, "secret from dotenv should be masked in stdout")
+		require.Contains(t, stdout, "*******", "masked value should appear")
+		require.Contains(t, stdout, "Dotenv secret is", "expected log message")
 	})
 
 	t.Run("MultipleSecretsMaskedCorrectly", func(t *testing.T) {
