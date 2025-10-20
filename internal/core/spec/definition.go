@@ -163,10 +163,6 @@ type stepDef struct {
 	WorkerSelector map[string]string `yaml:"workerSelector,omitempty"`
 	// Env specifies the environment variables for the step.
 	Env any `yaml:"env,omitempty"`
-	// Uses specifies a GitHub Action to run (e.g., "actions/checkout@v4")
-	Uses string `yaml:"uses,omitempty"`
-	// With contains input parameters for the GitHub Action
-	With map[string]any `yaml:"with,omitempty"`
 }
 
 // continueOnDef defines the conditions to continue on failure or skipped.

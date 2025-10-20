@@ -67,6 +67,8 @@ type Step struct {
 	Parallel *ParallelConfig `json:"parallel,omitempty"`
 	// Env contains environment variables for the step.
 	Env []string `json:"env,omitempty"`
+	// Params contains parameters/inputs for the step (e.g., action inputs for GitHub Actions).
+	Params Params `json:"params,omitzero"`
 }
 
 // String returns a formatted string representation of the step
@@ -88,6 +90,11 @@ func (s *Step) String() string {
 	}
 
 	return strings.Join(parts, "\t")
+}
+
+// Params contains parameters/inputs for a step.
+type Params struct {
+	Data map[string]string `json:"data,omitempty"`
 }
 
 // ChildDAG contains information about a child DAG to be executed.

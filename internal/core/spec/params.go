@@ -476,3 +476,26 @@ func extractSchemaReference(params any) string {
 
 	return schemaRefStr
 }
+
+// buildStepParams parses the params field in the step definition.
+// Params are converted to map[string]string and stored in step.Params.Data
+func buildStepParams(ctx StepBuildContext, def stepDef, step *core.Step) error {
+	if def.Params == nil {
+		return nil
+	}
+
+	// Parse params using existing parseParamValue function
+	paramPairs, err := parseParamValue(ctx.BuildContext, def.Params)
+	if err != nil {
+		return core.NewValidationError("params", def.Params, err)
+	}
+
+	// Convert to map[string]string
+	paramsData := make(map[string]string)
+	for _, pair := range paramPairs {
+		paramsData[pair.Name] = pair.Value
+	}
+
+	step.Params = core.Params{Data: paramsData}
+	return nil
+}

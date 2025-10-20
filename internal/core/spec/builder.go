@@ -109,6 +109,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "workingDir", fn: buildStepWorkingDir},
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
+	{name: "params", fn: buildStepParams},
 	{name: "depends", fn: buildDepends},
 	{name: "parallel", fn: buildParallel}, // Must be before childDAG to set executor type correctly
 	{name: "childDAG", fn: buildChildDAG},
@@ -1548,15 +1549,6 @@ func buildExecutor(ctx StepBuildContext, def stepDef, step *core.Step) error {
 	)
 
 	executor := def.Executor
-
-	// Case 1: handle 'uses' and 'with' fields for executor configuration
-	if uses := strings.TrimSpace(def.Uses); uses != "" {
-		// For now, we only support GitHub Action executors via 'uses' field.
-		step.ExecutorConfig.Type = "github-action"
-		step.ExecutorConfig.Config = def.With
-		step.ExecutorConfig.Config["__action"] = uses
-		return nil
-	}
 
 	// Case 1: executor is nil
 	if executor == nil {

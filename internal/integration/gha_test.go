@@ -16,11 +16,13 @@ func TestGitHubActionsExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: test-action
-    uses: actions/hello-world-javascript-action@main
-    with:
+    command: actions/hello-world-javascript-action@main
+    executor:
+      type: github_action
+      config:
+        runner: node:20-bullseye
+    params:
       who-to-greet: "Morning"
-      # Use lightweight Node.js image for testing (faster pull, smaller size)
-      runner: node:20-bullseye
     output: ACTION_OUTPUT
 `)
 		agent := dag.Agent()

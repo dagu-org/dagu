@@ -23,22 +23,27 @@ import (
 ```yaml
 steps:
   - name: checkout
-    uses: actions/checkout@v4
-    with:
+    command: actions/checkout@v4
+    executor:
+      type: github_action
+      config:
+        runner: node:20-bullseye
+    params:
       repository: myorg/myrepo
       ref: main
 
   - name: setup-go
-    uses: actions/setup-go@v5
-    with:
+    command: actions/setup-go@v5
+    executor:
+      type: github_action
+    params:
       go-version: '1.21'
 ```
 */
 
 const (
 	// Config keys for GitHub Action executor
-	configKeyAction = "__action" // The action to run (e.g., "actions/checkout@v4")
-	configKeyRunner = "runner"   // The Docker image to use as runner
+	configKeyRunner = "runner" // The Docker image to use as runner
 
 	// Act configuration defaults
 	defaultRunnerImage  = "node:20-bullseye" // Official Node.js image (most actions are JavaScript-based)
@@ -152,7 +157,7 @@ func (e *githubAction) Run(ctx context.Context) error {
 	defer os.RemoveAll(tmpDir)
 
 	// Generate GitHub Actions workflow YAML
-	workflowYAML, err := e.generateWorkflowYAML()
+	workflowYAML, err := e.generateWorkflowYAML(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to generate workflow YAML: %w", err)
 	}
@@ -190,32 +195,30 @@ type stepDefinition struct {
 	With map[string]any `yaml:"with,omitempty"`
 }
 
-func (e *githubAction) generateWorkflowYAML() (string, error) {
-	if e.step.ExecutorConfig.Config == nil || e.step.ExecutorConfig.Config[configKeyAction] == nil {
-		return "", fmt.Errorf("uses field is required for GitHub Action executor")
+func (e *githubAction) generateWorkflowYAML(ctx context.Context) (string, error) {
+	if e.step.Command == "" {
+		return "", fmt.Errorf("command field is required for GitHub Action executor (e.g., command: actions/checkout@v4)")
 	}
 
-	action := fmt.Sprintf("%v", e.step.ExecutorConfig.Config[configKeyAction])
-	action = strings.TrimSpace(action)
+	action := strings.TrimSpace(e.step.Command)
+	env := execution.GetEnv(ctx)
 
-	// Copy with parameters, excluding Dagu-specific config keys
-	withParams := make(map[string]any)
-	for k, v := range e.step.ExecutorConfig.Config {
-		// Skip Dagu-specific config keys that shouldn't go to the action's 'with:'
-		if k == configKeyAction || k == configKeyRunner {
-			continue
+	// Copy action inputs from step.Params.Data to avoid mutation
+	withParams := make(map[string]any, len(e.step.Params.Data))
+	for k, v := range e.step.Params.Data {
+		val, err := env.EvalString(ctx, v)
+		if err != nil {
+			return "", fmt.Errorf("failed to evaluate action input %q: %w", k, err)
 		}
-		withParams[k] = v
+		withParams[k] = val
 	}
 
-	// Build workflow-level environment variables from step env
-	// Parse "key=value" format into map
-	workflowEnv := make(map[string]string)
-	for _, envVar := range e.step.Env {
-		parts := strings.SplitN(envVar, "=", 2)
-		if len(parts) == 2 {
-			workflowEnv[parts[0]] = parts[1]
-		}
+	// Build workflow-level environment variables from execution context
+	// This includes DAG env, Variables from previous steps, step env
+	// Secrets are excluded (they're passed separately via act's Config.Secrets)
+	workflowEnv := env.UserEnvsMap()
+	for k := range env.SecretEnvs {
+		delete(workflowEnv, k)
 	}
 
 	// Build workflow structure
@@ -366,12 +369,8 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, tmpDir, workflow
 }
 
 func newGitHubAction(ctx context.Context, step core.Step) (executor.Executor, error) {
-	if step.ExecutorConfig.Config == nil || step.ExecutorConfig.Config[configKeyAction] == nil {
-		return nil, fmt.Errorf("uses field is required for GitHub Action executor")
-	}
-	action := fmt.Sprintf("%v", step.ExecutorConfig.Config[configKeyAction])
-	if action == "" {
-		return nil, fmt.Errorf("uses field is required for GitHub Action executor")
+	if step.Command == "" {
+		return nil, fmt.Errorf("command field is required for GitHub Action executor (e.g., command: actions/checkout@v4)")
 	}
 
 	return &githubAction{
@@ -382,5 +381,7 @@ func newGitHubAction(ctx context.Context, step core.Step) (executor.Executor, er
 }
 
 func init() {
+	executor.RegisterExecutor("github_action", newGitHubAction, nil)
 	executor.RegisterExecutor("github-action", newGitHubAction, nil)
+	executor.RegisterExecutor("gha", newGitHubAction, nil)
 }
