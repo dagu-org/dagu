@@ -11,7 +11,7 @@ Create `/etc/systemd/system/dagu.service`:
 ```ini
 [Unit]
 Description=Dagu Workflow Engine
-Documentation=https://dagu.cloud/
+Documentation=https://dagu.io/
 After=network.target
 Wants=network-online.target
 
