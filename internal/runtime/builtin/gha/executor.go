@@ -87,12 +87,13 @@ func (h *daguLogrusHook) Fire(entry *logrus.Entry) error {
 		_, err := h.stdout.Write([]byte(entry.Message))
 		return err
 	}
-	// All other logs go to stderr - write only the message with newline
+	// All other logs go to stderr - write timestamp + tab + message
+	timestamp := entry.Time.Format("2006-01-02 15:04:05")
 	msg := entry.Message
 	if !strings.HasSuffix(msg, "\n") {
 		msg += "\n"
 	}
-	_, err := h.stderr.Write([]byte(msg))
+	_, err := h.stderr.Write([]byte(timestamp + "\t" + msg))
 	return err
 }
 
