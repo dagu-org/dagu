@@ -286,14 +286,7 @@ DAGU_HOME=/opt/dagu dagu --dagu-home=/tmp/dagu-test start my-workflow.yaml
 
 ## Special Environment Variables
 
-Automatically set during DAG execution:
-
-- `DAG_NAME` - Current DAG name
-- `DAG_RUN_ID` - Unique execution ID
-- `DAG_RUN_LOG_FILE` - Main log file path
-- `DAG_RUN_STEP_NAME` - Current step name
-- `DAG_RUN_STEP_STDOUT_FILE` - Step stdout log
-- `DAG_RUN_STEP_STDERR_FILE` - Step stderr log
+Dagu sets metadata like `DAG_RUN_ID`, `DAG_RUN_LOG_FILE`, and the active `DAG_RUN_STEP_NAME` while each workflow runs. Consult [Special Environment Variables](/reference/special-environment-variables) for the full list and examples of how to use them in automations.
 
 ## Directory Structure
 
