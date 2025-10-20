@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
@@ -326,7 +327,7 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, tmpDir, workflow
 
 	// Write event.json to temp directory
 	// Use step name to make it unique in case of concurrent executions
-	eventFile := filepath.Join(tmpDir, fmt.Sprintf("event-%s.json", e.step.Name))
+	eventFile := filepath.Join(tmpDir, fmt.Sprintf("event-%s.json", fileutil.SafeName(e.step.Name)))
 	if err := os.WriteFile(eventFile, []byte(eventJSON), 0644); err != nil {
 		return fmt.Errorf("failed to write event.json: %w", err)
 	}
