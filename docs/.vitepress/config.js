@@ -36,7 +36,10 @@ const fullSidebar = [
       { text: "Data & Variables", link: "/writing-workflows/data-variables" },
       { text: "Secrets", link: "/writing-workflows/secrets" },
       { text: "Resource Limits", link: "/writing-workflows/resource-limits" },
-      { text: "Lifecycle Handlers", link: "/writing-workflows/lifecycle-handlers" },
+      {
+        text: "Lifecycle Handlers",
+        link: "/writing-workflows/lifecycle-handlers",
+      },
       { text: "Error Handling", link: "/writing-workflows/error-handling" },
     ],
   },
@@ -121,7 +124,10 @@ const fullSidebar = [
           { text: "macOS Service", link: "/configurations/deployment/macos" },
           { text: "Linux Systemd", link: "/configurations/deployment/systemd" },
           { text: "Docker", link: "/configurations/deployment/docker" },
-          { text: "Docker Compose", link: "/configurations/deployment/docker-compose" },
+          {
+            text: "Docker Compose",
+            link: "/configurations/deployment/docker-compose",
+          },
         ],
       },
       { text: "Operations", link: "/configurations/operations" },
@@ -137,7 +143,10 @@ const fullSidebar = [
       { text: "REST API", link: "/reference/api" },
       { text: "Configuration", link: "/reference/config" },
       { text: "Variables", link: "/reference/variables" },
-      { text: "Special Variables", link: "/reference/special-environment-variables" },
+      {
+        text: "Special Variables",
+        link: "/reference/special-environment-variables",
+      },
       { text: "Executors", link: "/reference/executors" },
     ],
   },
@@ -189,7 +198,7 @@ export default withMermaid(
     themeConfig: {
       logo: "/logo-dark.webp",
       siteTitle: "Dagu",
-      logoLink: "https://dagu.cloud/",
+      logoLink: "https://dagu.io/",
 
       appearance: {
         defaultTheme: "dark",

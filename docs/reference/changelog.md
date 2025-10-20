@@ -25,6 +25,7 @@
 ### Fixed
 - DAG name validation is centralized and enforced consistently: names must be `<= 40` chars and match `[A-Za-z0-9_.-]+`. Endpoints that accept `name` now return `400 bad_request` for invalid names.
 - Docker: Fixed container initialization bug with `registryAuths` field (#1330)
+- Windows: Fixed process cancellation not terminating subprocesses by recursively killing all child processes (#1342)
 
 ### Contributors
 
@@ -50,6 +51,7 @@ Thanks to our contributors for this release:
 | JSON Schema validation for params implementation (#1273) | [@thefishhat](https://github.com/thefishhat) |
 | SSH script validation implementation (#1308) | [@AdityaTel89](https://github.com/AdityaTel89) |
 | README updates (#1326), unit tests (#1329), and legacy directory warning (#858, #1336) | [@arky](https://github.com/arky) |
+| Windows process cancellation fix with recursive subprocess termination (#1207, #1342) | [@lvoeg](https://github.com/lvoeg) |
 | Extensive troubleshooting and community support: container name (#1237), SSH environment variables (#1238), DAG dependency resolution (#1262), cleanup and status propagation (#1305), environment variables behavior (#1320), clear queue feature (#1298), Docker-in-Docker (#1235), and CLI/masking discussions (#1314, #1317, #1273) | [@ghansham](https://github.com/ghansham) |
 
 ## v1.22.0 (2025-08-24)
