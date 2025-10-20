@@ -92,11 +92,6 @@ func (s *Step) String() string {
 	return strings.Join(parts, "\t")
 }
 
-// Params contains parameters/inputs for a step.
-type Params struct {
-	Data map[string]string `json:"data,omitempty"`
-}
-
 // ChildDAG contains information about a child DAG to be executed.
 type ChildDAG struct {
 	Name   string `json:"name,omitempty"`

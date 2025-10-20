@@ -100,7 +100,7 @@ func (e Env) UserEnvsMap() map[string]string {
 	result := e.DAGContext.UserEnvsMap() // DAG-level + secrets, no OS env
 
 	// Add variables from previous steps
-	e.Variables.Range(func(key, value any) bool {
+	e.Variables.Range(func(_, value any) bool {
 		parts := strings.SplitN(value.(string), "=", 2)
 		if len(parts) == 2 {
 			result[parts[0]] = parts[1]

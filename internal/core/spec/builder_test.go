@@ -3467,9 +3467,11 @@ steps:
 		require.Len(t, dag.Steps, 1)
 
 		step := dag.Steps[0]
-		assert.Equal(t, "myorg/myrepo", step.Params.Data["repository"])
-		assert.Equal(t, "main", step.Params.Data["ref"])
-		assert.Equal(t, "secret123", step.Params.Data["token"])
+		params, err := step.Params.AsStringMap()
+		require.NoError(t, err)
+		assert.Equal(t, "myorg/myrepo", params["repository"])
+		assert.Equal(t, "main", params["ref"])
+		assert.Equal(t, "secret123", params["token"])
 	})
 
 	t.Run("ParamsAsString", func(t *testing.T) {
@@ -3488,8 +3490,10 @@ steps:
 		require.Len(t, dag.Steps, 1)
 
 		step := dag.Steps[0]
-		assert.Equal(t, "1.21", step.Params.Data["go-version"])
-		assert.Equal(t, "true", step.Params.Data["cache"])
+		params, err := step.Params.AsStringMap()
+		require.NoError(t, err)
+		assert.Equal(t, "1.21", params["go-version"])
+		assert.Equal(t, "true", params["cache"])
 	})
 
 	t.Run("ParamsWithNumbers", func(t *testing.T) {
@@ -3509,9 +3513,11 @@ steps:
 		require.Len(t, dag.Steps, 1)
 
 		step := dag.Steps[0]
-		assert.Equal(t, "300", step.Params.Data["timeout"])
-		assert.Equal(t, "3", step.Params.Data["retries"])
-		assert.Equal(t, "true", step.Params.Data["enabled"])
+		params, err := step.Params.AsStringMap()
+		require.NoError(t, err)
+		assert.Equal(t, "300", params["timeout"])
+		assert.Equal(t, "3", params["retries"])
+		assert.Equal(t, "true", params["enabled"])
 	})
 
 	t.Run("NoParams", func(t *testing.T) {
@@ -3527,7 +3533,7 @@ steps:
 		require.Len(t, dag.Steps, 1)
 
 		step := dag.Steps[0]
-		assert.Empty(t, step.Params.Data)
+		assert.True(t, step.Params.IsEmpty())
 	})
 
 	t.Run("EmptyParams", func(t *testing.T) {
@@ -3544,7 +3550,9 @@ steps:
 		require.Len(t, dag.Steps, 1)
 
 		step := dag.Steps[0]
-		assert.Empty(t, step.Params.Data)
+		params, err := step.Params.AsStringMap()
+		require.NoError(t, err)
+		assert.Empty(t, params)
 	})
 
 	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
@@ -3561,7 +3569,9 @@ steps:
 		require.Len(t, dag.Steps, 1)
 
 		step := dag.Steps[0]
-		assert.Equal(t, "hello world", step.Params.Data["message"])
-		assert.Equal(t, "42", step.Params.Data["count"])
+		params, err := step.Params.AsStringMap()
+		require.NoError(t, err)
+		assert.Equal(t, "hello world", params["message"])
+		assert.Equal(t, "42", params["count"])
 	})
 }

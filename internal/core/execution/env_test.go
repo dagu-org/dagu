@@ -356,7 +356,7 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			ctx, env := tt.setup(ctx)
+			_, env := tt.setup(ctx)
 
 			result := env.UserEnvsMap()
 

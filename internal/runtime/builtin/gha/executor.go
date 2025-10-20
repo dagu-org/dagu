@@ -203,9 +203,15 @@ func (e *githubAction) generateWorkflowYAML(ctx context.Context) (string, error)
 	action := strings.TrimSpace(e.step.Command)
 	env := execution.GetEnv(ctx)
 
-	// Copy action inputs from step.Params.Data to avoid mutation
-	withParams := make(map[string]any, len(e.step.Params.Data))
-	for k, v := range e.step.Params.Data {
+	// Get action inputs from step.Params
+	paramsMap, err := e.step.Params.AsStringMap()
+	if err != nil {
+		return "", fmt.Errorf("failed to get params as map: %w", err)
+	}
+
+	// Evaluate and copy action inputs to avoid mutation
+	withParams := make(map[string]any, len(paramsMap))
+	for k, v := range paramsMap {
 		val, err := env.EvalString(ctx, v)
 		if err != nil {
 			return "", fmt.Errorf("failed to evaluate action input %q: %w", k, err)
