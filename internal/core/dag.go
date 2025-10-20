@@ -243,8 +243,9 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 	}
 
 	relativeTos := []string{d.WorkingDir}
-	if d.Location != "" {
-		relativeTos = append(relativeTos, filepath.Dir(d.Location))
+	fileDir := filepath.Dir(d.Location)
+	if d.Location != "" && fileDir != d.WorkingDir {
+		relativeTos = append(relativeTos, fileDir)
 	}
 
 	resolver := fileutil.NewFileResolver(relativeTos)
