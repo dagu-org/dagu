@@ -42,20 +42,20 @@ steps:
 
 const (
 	// Config keys for GitHub Action executor
-	configKeyRunner          = "runner"          // The Docker image to use as runner
-	configKeyAutoRemove      = "autoRemove"      // Automatically remove containers after execution
-	configKeyNetwork         = "network"         // Docker network mode
-	configKeyGitHubInstance  = "githubInstance"  // GitHub instance for action resolution
-	configKeyDockerSocket    = "dockerSocket"    // Custom Docker socket path
-	configKeyArtifacts       = "artifacts"       // Artifact server configuration
-	configKeyReuseContainers = "reuseContainers" // Reuse containers between runs
-	configKeyForceRebuild    = "forceRebuild"    // Force rebuild of action images
+	configKeyRunner          = "runner"           // The Docker image to use as runner
+	configKeyAutoRemove      = "autoRemove"       // Automatically remove containers after execution
+	configKeyNetwork         = "network"          // Docker network mode
+	configKeyGitHubInstance  = "githubInstance"   // GitHub instance for action resolution
+	configKeyDockerSocket    = "dockerSocket"     // Custom Docker socket path
+	configKeyArtifacts       = "artifacts"        // Artifact server configuration
+	configKeyReuseContainers = "reuseContainers"  // Reuse containers between runs
+	configKeyForceRebuild    = "forceRebuild"     // Force rebuild of action images
 	configKeyContainerOpts   = "containerOptions" // Additional Docker run options
-	configKeyPrivileged      = "privileged"      // Run containers in privileged mode
-	configKeyCapabilities    = "capabilities"    // Linux capabilities configuration
+	configKeyPrivileged      = "privileged"       // Run containers in privileged mode
+	configKeyCapabilities    = "capabilities"     // Linux capabilities configuration
 
 	// Act configuration defaults
-	defaultRunnerImage  = "catthehacker/ubuntu:act-latest" // Medium-size runner with common tools
+	defaultRunnerImage  = "node:24-bookworm"
 	defaultPlatform     = "ubuntu-latest"
 	defaultEventName    = "push"
 	defaultGitHubHost   = "github.com"

@@ -45,7 +45,7 @@ func TestBuildRunnerConfig(t *testing.T) {
 			step: core.Step{
 				ExecutorConfig: core.ExecutorConfig{
 					Config: map[string]any{
-						"runner": "node:22-bookworm-slim",
+						"runner": "node:24-bookworm-slim",
 					},
 				},
 			},
@@ -53,7 +53,7 @@ func TestBuildRunnerConfig(t *testing.T) {
 
 		config := e.buildRunnerConfig("/workdir", "/event.json", map[string]string{}, map[string]string{})
 
-		assert.Equal(t, "node:22-bookworm-slim", config.Platforms[defaultPlatform])
+		assert.Equal(t, "node:24-bookworm-slim", config.Platforms[defaultPlatform])
 	})
 
 	t.Run("AutoRemoveFalse", func(t *testing.T) {
@@ -344,6 +344,13 @@ func TestParseStringSlice(t *testing.T) {
 		assert.Equal(t, input, result)
 	})
 
+	t.Run("EmptyStringSlice", func(t *testing.T) {
+		input := []string{}
+		result := parseStringSlice(input)
+		assert.NotNil(t, result)
+		assert.Len(t, result, 0)
+	})
+
 	t.Run("AnySlice", func(t *testing.T) {
 		input := []any{"foo", "bar", 123}
 		result := parseStringSlice(input)
@@ -351,6 +358,32 @@ func TestParseStringSlice(t *testing.T) {
 		assert.Equal(t, "foo", result[0])
 		assert.Equal(t, "bar", result[1])
 		assert.Equal(t, "123", result[2])
+	})
+
+	t.Run("EmptyAnySlice", func(t *testing.T) {
+		input := []any{}
+		result := parseStringSlice(input)
+		assert.NotNil(t, result)
+		assert.Len(t, result, 0)
+	})
+
+	t.Run("AnySliceWithMixedTypes", func(t *testing.T) {
+		input := []any{"string", 42, true, 3.14}
+		result := parseStringSlice(input)
+		require.Len(t, result, 4)
+		assert.Equal(t, "string", result[0])
+		assert.Equal(t, "42", result[1])
+		assert.Equal(t, "true", result[2])
+		assert.Equal(t, "3.14", result[3])
+	})
+
+	t.Run("AnySliceWithNil", func(t *testing.T) {
+		input := []any{"foo", nil, "bar"}
+		result := parseStringSlice(input)
+		require.Len(t, result, 3)
+		assert.Equal(t, "foo", result[0])
+		assert.Equal(t, "<nil>", result[1])
+		assert.Equal(t, "bar", result[2])
 	})
 
 	t.Run("SingleString", func(t *testing.T) {
@@ -373,6 +406,12 @@ func TestParseStringSlice(t *testing.T) {
 
 	t.Run("UnsupportedType", func(t *testing.T) {
 		input := 123
+		result := parseStringSlice(input)
+		assert.Nil(t, result)
+	})
+
+	t.Run("UnsupportedTypeMap", func(t *testing.T) {
+		input := map[string]string{"key": "value"}
 		result := parseStringSlice(input)
 		assert.Nil(t, result)
 	})

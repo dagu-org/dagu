@@ -167,7 +167,7 @@ steps:
     executor:
       type: gha             # Aliases: github_action, github-action
       config:
-        runner: node:22-bookworm
+        runner: node:24-bookworm
     params:
       repository: dagu-org/dagu
       ref: main

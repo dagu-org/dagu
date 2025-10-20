@@ -108,7 +108,7 @@ The `container` field supports all Docker configuration options:
 
 ```yaml
 container:
-  image: node:20                    # Required
+  image: node:24                    # Required
   pullPolicy: missing               # always, missing, never
   env:
     - NODE_ENV=production

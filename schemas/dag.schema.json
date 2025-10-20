@@ -511,7 +511,7 @@
                 "config": {
                   "type": "object",
                   "additionalProperties": true,
-                  "description": "Executor-specific configuration options. For the Docker executor, set `image`, `containerName`, or both; with only `containerName` the container must already be running, and with both set Dagu creates the container from the `image` if it is missing or stopped. For the 'gha' executor (GitHub Actions), you can set `runner` to specify the Docker image to use (defaults to 'node:20-bullseye')."
+                  "description": "Executor-specific configuration options."
                 }
               },
               "required": ["type"]
@@ -531,7 +531,7 @@
               }
             }
           ],
-          "description": "Command to execute. Can be a shell command, script interpreter, or executable. If omitted when script is provided, uses system default shell. For 'gha' executor, this should be the action reference (e.g., 'actions/checkout@v4')."
+          "description": "Command to execute. Can be a shell command, script interpreter, or executable."
         },
         "shell": {
           "type": "string",

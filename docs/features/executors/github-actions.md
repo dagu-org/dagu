@@ -69,12 +69,7 @@ The `executor.config` object accepts the following parameters:
 ### `runner`
 
 - **Type**: `string`
-- **Default**: `catthehacker/ubuntu:act-latest`
-
-Docker image to use as the runner environment. Common options:
-- `catthehacker/ubuntu:act-latest` - Medium size (~500MB), includes git, docker, node, jq
-- `catthehacker/ubuntu:full-latest` - Large size (~20GB), includes all GitHub Actions tools
-- `node:22-bookworm-slim` - Minimal size (~200MB), Node.js only
+- **Default**: `node:24-bookworm`
 
 ### `autoRemove`
 

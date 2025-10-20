@@ -20,7 +20,7 @@ func TestGitHubActionsExecutor(t *testing.T) {
     executor:
       type: github_action
       config:
-        runner: node:22-bookworm
+        runner: node:24-bookworm
     params:
       who-to-greet: "Morning"
     output: ACTION_OUTPUT

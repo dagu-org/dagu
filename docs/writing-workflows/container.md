@@ -19,7 +19,7 @@ All steps run in the same container instance, sharing the filesystem and install
 
 ```yaml
 container:
-  image: node:20
+  image: node:24
   volumes:
     - ./src:/app
     - ./data:/data
