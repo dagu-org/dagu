@@ -328,16 +328,7 @@ steps:
 
 ## Special Environment Variables
 
-Dagu automatically sets these variables:
-
-| Variable | Description |
-|----------|-------------|
-| `DAG_NAME` | Name of the current DAG |
-| `DAG_RUN_ID` | Unique execution ID |
-| `DAG_RUN_STEP_NAME` | Current step name |
-| `DAG_RUN_LOG_FILE` | Main log file path |
-| `DAG_RUN_STEP_STDOUT_FILE` | Step's stdout log path |
-| `DAG_RUN_STEP_STDERR_FILE` | Step's stderr log path |
+Dagu automatically injects run metadata such as `DAG_RUN_ID`, `DAG_RUN_STEP_NAME`, and log file locations. See [Special Environment Variables](/reference/special-environment-variables) for the complete reference.
 
 Example usage:
 ```yaml

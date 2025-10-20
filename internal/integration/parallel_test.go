@@ -134,7 +134,7 @@ steps:
 			verify: func(t *testing.T, dagStatus *execution.DAGRunStatus, _ *execution.Node) {
 				require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 				aggregate := dagStatus.Nodes[1]
-				require.Equal(t, core.NodeSuccess, aggregate.Status)
+				require.Equal(t, core.NodeSucceeded, aggregate.Status)
 			},
 		},
 	}
@@ -146,7 +146,7 @@ steps:
 			agent := dag.Agent()
 			err := agent.Run(agent.Context)
 			require.NoError(t, err)
-			dag.AssertLatestStatus(t, core.Success)
+			dag.AssertLatestStatus(t, core.Succeeded)
 
 			dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 			require.NoError(t, statusErr)
@@ -155,7 +155,7 @@ steps:
 
 			require.Greater(t, len(dagStatus.Nodes), tc.parallelNodeIndex, "node index out of range")
 			parallelNode := dagStatus.Nodes[tc.parallelNodeIndex]
-			require.Equal(t, core.NodeSuccess, parallelNode.Status)
+			require.Equal(t, core.NodeSucceeded, parallelNode.Status)
 			require.Len(t, parallelNode.Children, tc.expectedChildren)
 
 			if tc.verify != nil {
@@ -194,7 +194,7 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
@@ -203,7 +203,7 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	parallelNode := dagStatus.Nodes[0]
-	require.Equal(t, core.NodeSuccess, parallelNode.Status)
+	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
 	require.Len(t, parallelNode.Children, 3)
 
 	require.NotNil(t, parallelNode.OutputVariables, "no outputs recorded for node %s", parallelNode.Step.Name)
@@ -231,7 +231,7 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	useOutputNode := dagStatus.Nodes[1]
-	require.Equal(t, core.NodeSuccess, useOutputNode.Status)
+	require.Equal(t, core.NodeSucceeded, useOutputNode.Status)
 }
 
 func TestParallelExecution_DeterministicIDs(t *testing.T) {
@@ -258,7 +258,7 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
@@ -266,7 +266,7 @@ steps:
 	require.Len(t, dagStatus.Nodes, 1)
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	node := dagStatus.Nodes[0]
-	require.Equal(t, core.NodeSuccess, node.Status)
+	require.Equal(t, core.NodeSucceeded, node.Status)
 	require.Len(t, node.Children, 3)
 
 	unique := make(map[string]string)
@@ -315,7 +315,7 @@ steps:
 	require.Len(t, dagStatus.Nodes, 1)
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	node := dagStatus.Nodes[0]
-	require.Equal(t, core.NodeError, node.Status)
+	require.Equal(t, core.NodeFailed, node.Status)
 	require.Len(t, node.Children, 4)
 }
 
@@ -352,7 +352,7 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	node := dagStatus.Nodes[0]
-	require.Equal(t, core.NodeError, node.Status)
+	require.Equal(t, core.NodeFailed, node.Status)
 
 	require.NotNil(t, node.OutputVariables, "no outputs recorded for node %s", node.Step.Name)
 	rawOutput, ok := node.OutputVariables.Load("RESULTS")
@@ -403,14 +403,14 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	node := dagStatus.Nodes[0]
-	require.Equal(t, core.NodeSuccess, node.Status)
+	require.Equal(t, core.NodeSucceeded, node.Status)
 
 	require.NotNil(t, node.OutputVariables, "no outputs recorded for node %s", node.Step.Name)
 	rawRaw, ok := node.OutputVariables.Load("RESULTS")
@@ -456,7 +456,7 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	node := dagStatus.Nodes[0]
-	require.Equal(t, core.NodeError, node.Status)
+	require.Equal(t, core.NodeFailed, node.Status)
 	require.Equal(t, 1, node.RetryCount)
 }
 
@@ -492,12 +492,12 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	parallelNode := dagStatus.Nodes[0]
-	require.Equal(t, core.NodeError, parallelNode.Status)
+	require.Equal(t, core.NodeFailed, parallelNode.Status)
 	require.Equal(t, 1, parallelNode.RetryCount)
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	nextNode := dagStatus.Nodes[1]
-	require.Equal(t, core.NodeSuccess, nextNode.Status)
+	require.Equal(t, core.NodeSucceeded, nextNode.Status)
 
 	require.NotNil(t, parallelNode.OutputVariables, "no outputs recorded for node %s", parallelNode.Step.Name)
 	_, ok := parallelNode.OutputVariables.Load("RESULTS")
@@ -534,14 +534,14 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	parallelNode := dagStatus.Nodes[0]
-	require.Equal(t, core.NodeSuccess, parallelNode.Status)
+	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
 	require.Len(t, parallelNode.Children, 3)
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
@@ -675,7 +675,7 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
@@ -684,7 +684,7 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	syncNode := dagStatus.Nodes[1]
-	require.Equal(t, core.NodeSuccess, syncNode.Status)
+	require.Equal(t, core.NodeSucceeded, syncNode.Status)
 	require.Len(t, syncNode.Children, 3)
 
 	require.NotNil(t, syncNode.OutputVariables, "no outputs recorded for node %s", syncNode.Step.Name)
@@ -747,7 +747,7 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
@@ -765,7 +765,7 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	processFiles := dagStatus.Nodes[1]
-	require.Equal(t, core.NodeSuccess, processFiles.Status)
+	require.Equal(t, core.NodeSucceeded, processFiles.Status)
 	require.Len(t, processFiles.Children, 3)
 
 	require.NotNil(t, processFiles.OutputVariables, "no outputs recorded for node %s", processFiles.Step.Name)
@@ -845,7 +845,7 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	node := dagStatus.Nodes[0]
-	require.Equal(t, core.NodeError, node.Status)
+	require.Equal(t, core.NodeFailed, node.Status)
 	require.Len(t, node.Children, 3)
 
 	require.NotNil(t, node.OutputVariables, "no outputs recorded for node %s", node.Step.Name)
@@ -894,7 +894,7 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
@@ -903,7 +903,7 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	parallelNode := dagStatus.Nodes[1]
-	require.Equal(t, core.NodeSuccess, parallelNode.Status)
+	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
 	require.Len(t, parallelNode.Children, 1, "should dispatch exactly 1 worker instance for 1 JSON item")
 }
 
@@ -940,7 +940,7 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
@@ -949,7 +949,7 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	parallelNode := dagStatus.Nodes[1]
-	require.Equal(t, core.NodeSuccess, parallelNode.Status)
+	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
 	require.Len(t, parallelNode.Children, 3, "should dispatch exactly 3 worker instances for 3 JSON items")
 }
 

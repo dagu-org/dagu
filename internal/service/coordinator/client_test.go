@@ -235,7 +235,7 @@ func TestClientMetrics(t *testing.T) {
 	// Test metrics tracking during failures
 	config := coordinator.DefaultConfig()
 	config.MaxRetries = 0 // No retries
-	config.RequestTimeout = 100 * time.Millisecond
+	config.RequestTimeout = 500 * time.Millisecond
 
 	// Create a failing coordinator
 	mockCoord := &mockCoordinatorService{

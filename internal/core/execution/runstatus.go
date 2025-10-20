@@ -14,7 +14,7 @@ import (
 func InitialStatus(dag *core.DAG) DAGRunStatus {
 	return DAGRunStatus{
 		Name:          dag.Name,
-		Status:        core.None,
+		Status:        core.NotStarted,
 		PID:           PID(0),
 		Nodes:         NodesFromSteps(dag.Steps),
 		OnExit:        NewNodeOrNil(dag.HandlerOn.Exit),

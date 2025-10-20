@@ -12,6 +12,7 @@ Dagu provides a comprehensive set of features for building and managing workflow
 - [Data Flow](/features/data-flow)
 - [Execution Control](/features/execution-control)
 - [Scheduling with Cron Expressions](/features/scheduling)
+- [Secrets Management](/writing-workflows/secrets)
 
 ### Executors
 - [Executor - Shell](/features/executors/shell)

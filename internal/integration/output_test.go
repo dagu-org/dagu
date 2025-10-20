@@ -31,7 +31,7 @@ func TestLargeOutput_128KB(t *testing.T) {
 	require.NoError(t, err, "DAG should complete without hanging with large output")
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	// Get the latest status
 	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
@@ -40,6 +40,6 @@ func TestLargeOutput_128KB(t *testing.T) {
 
 	// Verify the step completed successfully
 	require.Len(t, dagRunStatus.Nodes, 1)
-	assert.Equal(t, core.NodeSuccess, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, core.NodeSucceeded, dagRunStatus.Nodes[0].Status)
 	assert.Equal(t, "read-128kb-file", dagRunStatus.Nodes[0].Step.Name)
 }

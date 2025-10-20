@@ -61,23 +61,35 @@ func (oc *OutputCoordinator) unlock() {
 }
 
 // setupMasker creates a masker for environment variable masking.
-// Currently disabled - masking will be enabled when "secret" field is added.
-// The masking infrastructure (MaskingWriter, Masker) is kept for future use.
-func (oc *OutputCoordinator) setupMasker(_ context.Context, _ NodeData) error {
+func (oc *OutputCoordinator) setupMasker(ctx context.Context, _ NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
-	// Masking is disabled for now
-	oc.masker = nil
+	// Get secrets from DAGContext
+	dagCtx := execution.GetDAGContextFromContext(ctx)
+
+	// Convert secret envs map to []string format for masker
+	var secretEnvs []string
+	for k, v := range dagCtx.SecretEnvs {
+		secretEnvs = append(secretEnvs, k+"="+v)
+	}
+
+	// Create masker if there are secrets to mask
+	if len(secretEnvs) > 0 {
+		oc.masker = masking.NewMasker(masking.SourcedEnvVars{
+			Secrets: secretEnvs,
+		})
+	} else {
+		oc.masker = nil
+	}
+
 	return nil
 }
 
 func (oc *OutputCoordinator) setup(ctx context.Context, data NodeData) error {
-	// Setup masker for environment variable masking
 	if err := oc.setupMasker(ctx, data); err != nil {
 		return fmt.Errorf("failed to setup masker: %w", err)
 	}
-
 	if err := oc.setupWriters(ctx, data); err != nil {
 		return err
 	}

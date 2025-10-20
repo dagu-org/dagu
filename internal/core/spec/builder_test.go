@@ -3273,3 +3273,193 @@ steps:
 		assert.Equal(t, "test_value", envMap["TEST_VAR_LOAD_ENV"])
 	})
 }
+
+func TestSecrets(t *testing.T) {
+	t.Run("ValidSecretsArray", func(t *testing.T) {
+		data := []byte(`
+secrets:
+  - name: DB_PASSWORD
+    provider: gcp-secrets
+    key: secret/data/prod/db
+    options:
+      namespace: production
+  - name: API_KEY
+    provider: env
+    key: API_KEY
+steps:
+  - name: test
+    command: echo "test"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Secrets, 2)
+
+		// Verify first secret
+		assert.Equal(t, "DB_PASSWORD", dag.Secrets[0].Name)
+		assert.Equal(t, "gcp-secrets", dag.Secrets[0].Provider)
+		assert.Equal(t, "secret/data/prod/db", dag.Secrets[0].Key)
+		assert.Equal(t, "production", dag.Secrets[0].Options["namespace"])
+
+		// Verify second secret
+		assert.Equal(t, "API_KEY", dag.Secrets[1].Name)
+		assert.Equal(t, "env", dag.Secrets[1].Provider)
+		assert.Equal(t, "API_KEY", dag.Secrets[1].Key)
+		assert.Empty(t, dag.Secrets[1].Options)
+	})
+
+	t.Run("MinimalValidSecret", func(t *testing.T) {
+		data := []byte(`
+secrets:
+  - name: MY_SECRET
+    provider: env
+    key: MY_SECRET
+steps:
+  - name: test
+    command: echo "test"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Secrets, 1)
+		assert.Equal(t, "MY_SECRET", dag.Secrets[0].Name)
+		assert.Equal(t, "env", dag.Secrets[0].Provider)
+		assert.Equal(t, "MY_SECRET", dag.Secrets[0].Key)
+	})
+
+	t.Run("MissingNameField", func(t *testing.T) {
+		data := []byte(`
+secrets:
+  - provider: vault
+    key: secret/data/test
+steps:
+  - name: test
+    command: echo "test"
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "'name' field is required")
+	})
+
+	t.Run("MissingProviderField", func(t *testing.T) {
+		data := []byte(`
+secrets:
+  - name: MY_SECRET
+    key: secret/data/test
+steps:
+  - name: test
+    command: echo "test"
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "'provider' field is required")
+	})
+
+	t.Run("MissingKeyField", func(t *testing.T) {
+		data := []byte(`
+secrets:
+  - name: MY_SECRET
+    provider: vault
+steps:
+  - name: test
+    command: echo "test"
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "'key' field is required")
+	})
+
+	t.Run("DuplicateSecretNames", func(t *testing.T) {
+		data := []byte(`
+secrets:
+  - name: API_KEY
+    provider: vault
+    key: secret/v1
+  - name: API_KEY
+    provider: env
+    key: API_KEY
+steps:
+  - name: test
+    command: echo "test"
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "duplicate secret name")
+		assert.Contains(t, err.Error(), "API_KEY")
+	})
+
+	t.Run("InvalidSecretsType", func(t *testing.T) {
+		data := []byte(`
+secrets: "invalid string"
+steps:
+  - name: test
+    command: echo "test"
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		// YAML unmarshaler validates type before our code runs
+		assert.Contains(t, err.Error(), "Secrets")
+		assert.Contains(t, err.Error(), "array or slice")
+	})
+
+	t.Run("InvalidSecretItemType", func(t *testing.T) {
+		data := []byte(`
+secrets:
+  - "invalid string item"
+steps:
+  - name: test
+    command: echo "test"
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		// YAML unmarshaler validates type before our code runs
+		assert.Contains(t, err.Error(), "Secrets")
+		assert.Contains(t, err.Error(), "map or struct")
+	})
+
+	t.Run("EmptySecretsArray", func(t *testing.T) {
+		data := []byte(`
+secrets: []
+steps:
+  - name: test
+    command: echo "test"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Empty(t, dag.Secrets)
+	})
+
+	t.Run("NoSecretsField", func(t *testing.T) {
+		data := []byte(`
+steps:
+  - name: test
+    command: echo "test"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Nil(t, dag.Secrets)
+	})
+
+	t.Run("ComplexProviderOptions", func(t *testing.T) {
+		data := []byte(`
+secrets:
+  - name: DB_PASSWORD
+    provider: gcp-secrets
+    key: projects/my-project/secrets/db-password/versions/latest
+    options:
+      projectId: my-project
+      timeout: "30s"
+      retries: "3"
+steps:
+  - name: test
+    command: echo "test"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Secrets, 1)
+		assert.Equal(t, "DB_PASSWORD", dag.Secrets[0].Name)
+		assert.Equal(t, "gcp-secrets", dag.Secrets[0].Provider)
+		assert.Equal(t, "projects/my-project/secrets/db-password/versions/latest", dag.Secrets[0].Key)
+		assert.Equal(t, "my-project", dag.Secrets[0].Options["projectId"])
+		assert.Equal(t, "30s", dag.Secrets[0].Options["timeout"])
+		assert.Equal(t, "3", dag.Secrets[0].Options["retries"])
+	})
+}

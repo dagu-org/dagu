@@ -1,28 +1,6 @@
 # Variables Reference
 
-## Special Environment Variables
-
-Dagu automatically sets these environment variables for every step execution:
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `DAG_NAME` | Name of the current DAG | `my-workflow` |
-| `DAG_RUN_ID` | Unique ID for this execution | `20240115_140000_abc123` |
-| `DAG_RUN_STEP_NAME` | Name of the current step | `process-data` |
-| `DAG_RUN_LOG_FILE` | Path to the main log file | `/logs/my-workflow/20240115_140000.log` |
-| `DAG_RUN_STEP_STDOUT_FILE` | Path to step's stdout log | `/logs/my-workflow/process-data.stdout.log` |
-| `DAG_RUN_STEP_STDERR_FILE` | Path to step's stderr log | `/logs/my-workflow/process-data.stderr.log` |
-
-Example usage:
-```yaml
-steps:
-  - name: log-context
-    command: |
-      echo "Running DAG: ${DAG_NAME}"
-      echo "Execution ID: ${DAG_RUN_ID}"
-      echo "Current step: ${DAG_RUN_STEP_NAME}"
-      echo "Logs at: ${DAG_RUN_LOG_FILE}"
-```
+For a complete list of the automatically injected run metadata, see [Special Environment Variables](/reference/special-environment-variables).
 
 ## Environment Variables
 

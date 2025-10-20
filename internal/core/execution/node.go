@@ -44,7 +44,7 @@ func NewNodeFromStep(step core.Step) *Node {
 		Step:       step,
 		StartedAt:  "-",
 		FinishedAt: "-",
-		Status:     core.NodeNone,
+		Status:     core.NodeNotStarted,
 	}
 }
 

@@ -85,6 +85,7 @@ var builderRegistry = []builderEntry{
 	{name: "workerSelector", fn: buildWorkerSelector},
 	{name: "registryAuths", fn: buildRegistryAuths},
 	{name: "ssh", fn: buildSSH},
+	{name: "secrets", fn: buildSecrets},
 	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
 	{name: "logDir", fn: buildLogDir},
@@ -834,6 +835,57 @@ func buildSSH(_ BuildContext, spec *definition, dag *core.DAG) error {
 	}
 
 	return nil
+}
+
+// buildSecrets builds the secrets references from the spec.
+func buildSecrets(_ BuildContext, spec *definition, dag *core.DAG) error {
+	if spec.Secrets == nil {
+		return nil
+	}
+
+	secrets, err := parseSecretRefs(spec.Secrets)
+	if err != nil {
+		return err
+	}
+
+	dag.Secrets = secrets
+	return nil
+}
+
+// parseSecretRefs parses secret references from the YAML definition.
+func parseSecretRefs(secretDefs []secretRefDef) ([]core.SecretRef, error) {
+
+	// Convert secretRefDef to core.SecretRef and validate
+	secrets := make([]core.SecretRef, 0, len(secretDefs))
+	names := make(map[string]bool)
+
+	for i, def := range secretDefs {
+		// Validate required fields
+		if def.Name == "" {
+			return nil, core.NewValidationError("secrets", def, fmt.Errorf("secret at index %d: 'name' field is required", i))
+		}
+		if def.Provider == "" {
+			return nil, core.NewValidationError("secrets", def, fmt.Errorf("secret at index %d: 'provider' field is required", i))
+		}
+		if def.Key == "" {
+			return nil, core.NewValidationError("secrets", def, fmt.Errorf("secret at index %d: 'key' field is required", i))
+		}
+
+		// Check for duplicate names
+		if names[def.Name] {
+			return nil, core.NewValidationError("secrets", def, fmt.Errorf("duplicate secret name %q", def.Name))
+		}
+		names[def.Name] = true
+
+		secrets = append(secrets, core.SecretRef{
+			Name:     def.Name,
+			Provider: def.Provider,
+			Key:      def.Key,
+			Options:  def.Options,
+		})
+	}
+
+	return secrets, nil
 }
 
 // generateTypedStepName generates a type-based name for a step after it's been built

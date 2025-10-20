@@ -2932,13 +2932,13 @@ export enum Status {
     PartialSuccess = 6
 }
 export enum StatusLabel {
-    not_started = "not started",
+    not_started = "not_started",
     running = "running",
     failed = "failed",
-    cancelled = "cancelled",
-    finished = "finished",
+    canceled = "canceled",
+    succeeded = "succeeded",
     queued = "queued",
-    partial_success = "partial success"
+    partially_succeeded = "partially_succeeded"
 }
 export enum NodeStatus {
     NotStarted = 0,
@@ -2950,13 +2950,13 @@ export enum NodeStatus {
     PartialSuccess = 6
 }
 export enum NodeStatusLabel {
-    not_started = "not started",
+    not_started = "not_started",
     running = "running",
     failed = "failed",
-    cancelled = "cancelled",
-    finished = "finished",
+    canceled = "canceled",
+    succeeded = "succeeded",
     skipped = "skipped",
-    partial_success = "partial success"
+    partially_succeeded = "partially_succeeded"
 }
 export enum SchedulerInstanceStatus {
     active = "active",

@@ -54,8 +54,7 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		WorkingDir: dag.WorkingDir,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 	}
 }
 
@@ -83,15 +82,14 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		WorkingDir: dag.WorkingDir,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 	}
 }
 
 // Dequeue creates a dequeue command spec.
-func (b *SubCmdBuilder) Dequeue(dag *core.DAG, dagRun execution.DAGRunRef) CmdSpec {
+func (b *SubCmdBuilder) Dequeue(_ *core.DAG, dagRun execution.DAGRunRef) CmdSpec {
 	args := []string{"dequeue", fmt.Sprintf("--dag-run=%s", dagRun.String())}
 
 	if b.configFile != "" {
@@ -101,8 +99,7 @@ func (b *SubCmdBuilder) Dequeue(dag *core.DAG, dagRun execution.DAGRunRef) CmdSp
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		WorkingDir: dag.WorkingDir,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 	}
@@ -123,8 +120,7 @@ func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		WorkingDir: dag.WorkingDir,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 	}
 }
 
@@ -146,8 +142,7 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string, d
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		WorkingDir: dag.WorkingDir,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 	}
 }
 
@@ -177,7 +172,7 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 	}
 }
 
@@ -196,7 +191,7 @@ func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        os.Environ(),
+		Env:        b.baseEnv.AsSlice(),
 	}
 }
 
@@ -204,7 +199,6 @@ func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 type CmdSpec struct {
 	Executable string
 	Args       []string
-	WorkingDir string
 	Env        []string
 	Stdout     *os.File
 	Stderr     *os.File
@@ -236,7 +230,6 @@ func Run(ctx context.Context, spec CmdSpec) error {
 	// nolint:gosec
 	cmd := exec.CommandContext(ctx, spec.Executable, spec.Args...)
 	cmdutil.SetupCommand(cmd)
-	cmd.Dir = spec.WorkingDir
 	cmd.Env = spec.Env
 
 	// If custom streams are provided, use them and call Run()
@@ -266,7 +259,6 @@ func Start(ctx context.Context, spec CmdSpec) error {
 	// nolint:gosec
 	cmd := exec.Command(spec.Executable, spec.Args...)
 	cmdutil.SetupCommand(cmd)
-	cmd.Dir = spec.WorkingDir
 	cmd.Env = spec.Env
 
 	if spec.Stdout != nil {

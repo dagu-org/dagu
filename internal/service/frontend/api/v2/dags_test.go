@@ -49,7 +49,7 @@ steps:
 			var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
 			statusResp.Unmarshal(t, &dagRunStatus)
 
-			return dagRunStatus.DagRun.Status == api.Status(core.Success)
+			return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
 		}, 5*time.Second, 1*time.Second, "expected DAG to complete")
 
 		// Delete the created DAG

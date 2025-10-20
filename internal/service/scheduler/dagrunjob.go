@@ -89,7 +89,7 @@ func (j *DAGRunJob) Ready(ctx context.Context, latestStatus execution.DAGRunStat
 // If so, the current run is skipped.
 func (j *DAGRunJob) skipIfSuccessful(ctx context.Context, latestStatus execution.DAGRunStatus, latestStartedAt time.Time) error {
 	// If skip is not configured, or the DAG is not currently successful, do nothing.
-	if !j.DAG.SkipIfSuccessful || latestStatus.Status != core.Success {
+	if !j.DAG.SkipIfSuccessful || latestStatus.Status != core.Succeeded {
 		return nil
 	}
 

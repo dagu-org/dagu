@@ -50,6 +50,25 @@ func TestMasker_MaskString(t *testing.T) {
 			input:    "This has no secrets",
 			expected: "This has no secrets",
 		},
+		{
+			name: "empty secret value does not mask everything",
+			sources: SourcedEnvVars{
+				Secrets: []string{
+					"EMPTY_SECRET=",
+					"REAL_SECRET=actual_value",
+				},
+			},
+			input:    "Testing empty secrets with actual_value here",
+			expected: "Testing empty secrets with ******* here",
+		},
+		{
+			name: "only empty secrets",
+			sources: SourcedEnvVars{
+				Secrets: []string{"EMPTY1=", "EMPTY2="},
+			},
+			input:    "This should not be masked at all",
+			expected: "This should not be masked at all",
+		},
 	}
 
 	for _, tt := range tests {

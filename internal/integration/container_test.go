@@ -80,7 +80,7 @@ steps:
 			th := test.Setup(t)
 			dag := th.DAG(t, tt.dagConfig)
 			dag.Agent().RunSuccess(t)
-			dag.AssertLatestStatus(t, core.Success)
+			dag.AssertLatestStatus(t, core.Succeeded)
 			dag.AssertOutputs(t, tt.expectedOutputs)
 		})
 	}
@@ -256,7 +256,7 @@ steps:
 			th := test.Setup(t)
 			dag := th.DAG(t, tt.dagConfigFunc(tempDir))
 			dag.Agent().RunSuccess(t)
-			dag.AssertLatestStatus(t, core.Success)
+			dag.AssertLatestStatus(t, core.Succeeded)
 			dag.AssertOutputs(t, tt.expectedOutputs)
 		})
 	}
@@ -290,7 +290,7 @@ steps:
 	// Now test that pull policy "never" works with the pre-existing image
 	dag := th.DAG(t, pullPolicyTestDAG)
 	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 	dag.AssertOutputs(t, map[string]any{
 		"OUT1": "pull policy test",
 	})
@@ -315,7 +315,7 @@ steps:
 
 	dag := th.DAG(t, dagConfig)
 	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 	dag.AssertOutputs(t, map[string]any{
 		"ENTRYPOINT_OK": "entrypoint-ok",
 	})
@@ -338,7 +338,7 @@ steps:
 
 	dag := th.DAG(t, dagConfig)
 	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 	dag.AssertOutputs(t, map[string]any{
 		"COMMAND_OK": "command-ok",
 	})
@@ -370,7 +370,7 @@ steps:
 
 	dag := th.DAG(t, dagConfig)
 	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 	dag.AssertOutputs(t, map[string]any{
 		"EXEC_EXISTING_OUT": "hello-existing",
 	})

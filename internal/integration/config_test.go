@@ -509,7 +509,7 @@ steps:
 		require.NoError(t, err)
 
 		// The test should fail with the current implementation
-		dag.AssertLatestStatus(t, core.Success)
+		dag.AssertLatestStatus(t, core.Succeeded)
 	})
 }
 
@@ -703,7 +703,7 @@ steps:
 	require.NoError(t, agent.Run(agent.Context))
 
 	// Verify successful completion
-	dag.AssertLatestStatus(t, core.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	// Assert the output contains the step-level environment variable
 	dag.AssertOutputs(t, map[string]any{

@@ -104,6 +104,7 @@ schedule:
 |-------|------|-------------|---------|
 | `params` | array | Default parameters | `[]` |
 | `env` | array | Environment variables | `[]` |
+| `secrets` | array | External secret references resolved at runtime and exposed as environment variables | `[]` |
 | `dotenv` | string/array | .env files to load | `[".env"]` |
 | `workingDir` | string | Working directory for the DAG | Directory of DAG file |
 | `logDir` | string | Custom log directory | System default |
@@ -145,6 +146,33 @@ container:
 > the step command (see [Execution Model and Entrypoint Behavior](/writing-workflows/container#execution-model-and-entrypoint-behavior)).
 > Readiness waiting (running/healthy and optional logPattern) times out after
 > 120 seconds with a clear error including the last known state.
+
+### Secrets
+
+The `secrets` block defines environment variables whose values are fetched at runtime from external providers. Each item is an object with the following fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Environment variable name exposed to steps (required) |
+| `provider` | string | Secret provider identifier (required). Built-in providers are `env` and `file`. |
+| `key` | string | Provider-specific key (required). For the `env` provider this is the source environment variable; for `file` it is a file path. |
+| `options` | object | Provider-specific options (optional). Values must be strings. |
+
+Example:
+
+```yaml
+secrets:
+  - name: DB_PASSWORD
+    provider: env
+    key: PROD_DB_PASSWORD        # Read from process environment
+  - name: API_TOKEN
+    provider: file
+    key: ../secrets/api-token    # Relative paths resolve using workingDir then DAG file directory
+```
+
+Secret values are injected after DAG-level variables and built-in runtime variables, meaning they take precedence over everything except step-level overrides. Resolved values never touch persistent storage and are automatically masked in logs and captured step output.
+
+See [Secrets](/writing-workflows/secrets) for provider reference, masking behavior, and extension tips.
 
 ### SSH Configuration
 
