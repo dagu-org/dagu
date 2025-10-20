@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/docker/docker/api/types/container"
 	"github.com/goccy/go-yaml"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
@@ -25,9 +26,7 @@ steps:
   - name: checkout
     command: actions/checkout@v4
     executor:
-      type: github_action
-      config:
-        runner: node:20-bullseye
+      type: gha
     params:
       repository: myorg/myrepo
       ref: main
@@ -35,18 +34,28 @@ steps:
   - name: setup-go
     command: actions/setup-go@v5
     executor:
-      type: github_action
+      type: gha
     params:
-      go-version: '1.21'
+      go-version: '1.23'
 ```
 */
 
 const (
 	// Config keys for GitHub Action executor
-	configKeyRunner = "runner" // The Docker image to use as runner
+	configKeyRunner          = "runner"          // The Docker image to use as runner
+	configKeyAutoRemove      = "autoRemove"      // Automatically remove containers after execution
+	configKeyNetwork         = "network"         // Docker network mode
+	configKeyGitHubInstance  = "githubInstance"  // GitHub instance for action resolution
+	configKeyDockerSocket    = "dockerSocket"    // Custom Docker socket path
+	configKeyArtifacts       = "artifacts"       // Artifact server configuration
+	configKeyReuseContainers = "reuseContainers" // Reuse containers between runs
+	configKeyForceRebuild    = "forceRebuild"    // Force rebuild of action images
+	configKeyContainerOpts   = "containerOptions" // Additional Docker run options
+	configKeyPrivileged      = "privileged"      // Run containers in privileged mode
+	configKeyCapabilities    = "capabilities"    // Linux capabilities configuration
 
 	// Act configuration defaults
-	defaultRunnerImage  = "node:20-bullseye" // Official Node.js image (most actions are JavaScript-based)
+	defaultRunnerImage  = "catthehacker/ubuntu:act-latest" // Medium-size runner with common tools
 	defaultPlatform     = "ubuntu-latest"
 	defaultEventName    = "push"
 	defaultGitHubHost   = "github.com"
@@ -297,12 +306,6 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, tmpDir, workflow
 	// Get execution environment to access secrets and env vars
 	env := execution.GetEnv(ctx)
 
-	// Get runner image from step config, default to official Node.js image
-	runnerImage := defaultRunnerImage
-	if img, ok := e.step.ExecutorConfig.Config[configKeyRunner]; ok {
-		runnerImage = fmt.Sprintf("%v", img)
-	}
-
 	// Get all user-defined environment variables (excludes OS env, includes Variables)
 	// Includes: DAG env + step env + variables from previous steps
 	actEnv := env.UserEnvsMap()
@@ -328,21 +331,8 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, tmpDir, workflow
 		return fmt.Errorf("failed to write event.json: %w", err)
 	}
 
-	// Create act runner config with volume binding
-	// workDir is the actual working directory where files will be checked out
-	config := &runner.Config{
-		Workdir:        workDir,
-		BindWorkdir:    true, // Bind the workdir to the container so files persist on host
-		EventName:      defaultEventName,
-		EventPath:      eventFile,         // Path to event.json for GitHub context
-		GitHubInstance: defaultGitHubHost, // Configure GitHub instance for action resolution
-		LogOutput:      true,              // Enable logging of docker run output (marked with raw_output field)
-		Env:            actEnv,            // Pass environment variables to actions
-		Secrets:        actSecrets,        // Pass secrets to actions (GITHUB_TOKEN included if present)
-		Platforms: map[string]string{
-			defaultPlatform: runnerImage,
-		},
-	}
+	// Build runner config from step executor config
+	config := e.buildRunnerConfig(workDir, eventFile, actEnv, actSecrets)
 
 	// Inject custom JobLoggerFactory into context
 	// This routes container output (raw_output=true) to stdout and other logs to stderr
@@ -373,6 +363,162 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, tmpDir, workflow
 	}
 
 	return nil
+}
+
+// buildRunnerConfig constructs runner.Config from step executor config
+func (e *githubAction) buildRunnerConfig(workDir, eventFile string, actEnv, actSecrets map[string]string) *runner.Config {
+	cfg := e.step.ExecutorConfig.Config
+
+	// Get runner image, default to official Node.js image
+	runnerImage := defaultRunnerImage
+	if img, ok := cfg[configKeyRunner]; ok {
+		runnerImage = fmt.Sprintf("%v", img)
+	}
+
+	// Get GitHub instance, default to github.com
+	githubInstance := defaultGitHubHost
+	if instance, ok := cfg[configKeyGitHubInstance]; ok {
+		githubInstance = fmt.Sprintf("%v", instance)
+	}
+
+	// Get autoRemove, default to true for security and disk space
+	autoRemove := true
+	if val, ok := cfg[configKeyAutoRemove]; ok {
+		if b, ok := val.(bool); ok {
+			autoRemove = b
+		}
+	}
+
+	// Get reuseContainers, default to false
+	reuseContainers := false
+	if val, ok := cfg[configKeyReuseContainers]; ok {
+		if b, ok := val.(bool); ok {
+			reuseContainers = b
+		}
+	}
+
+	// Get forceRebuild, default to false
+	forceRebuild := false
+	if val, ok := cfg[configKeyForceRebuild]; ok {
+		if b, ok := val.(bool); ok {
+			forceRebuild = b
+		}
+	}
+
+	// Get privileged mode, default to false (SECURITY: should never default to true)
+	privileged := false
+	if val, ok := cfg[configKeyPrivileged]; ok {
+		if b, ok := val.(bool); ok {
+			privileged = b
+		}
+	}
+
+	// Get network mode, default to empty (Docker default)
+	networkMode := ""
+	if val, ok := cfg[configKeyNetwork]; ok {
+		networkMode = fmt.Sprintf("%v", val)
+	}
+
+	// Get Docker socket, default to empty (Docker default)
+	dockerSocket := ""
+	if val, ok := cfg[configKeyDockerSocket]; ok {
+		dockerSocket = fmt.Sprintf("%v", val)
+	}
+
+	// Get container options, default to empty
+	containerOpts := ""
+	if val, ok := cfg[configKeyContainerOpts]; ok {
+		containerOpts = fmt.Sprintf("%v", val)
+	}
+
+	// Parse capabilities configuration
+	var capAdd, capDrop []string
+	if capsVal, ok := cfg[configKeyCapabilities]; ok {
+		if capsMap, ok := capsVal.(map[string]any); ok {
+			if add, ok := capsMap["add"]; ok {
+				capAdd = parseStringSlice(add)
+			}
+			if drop, ok := capsMap["drop"]; ok {
+				capDrop = parseStringSlice(drop)
+			}
+		}
+	}
+
+	// Parse artifacts configuration
+	var artifactServerPath, artifactServerPort string
+	if artifactsVal, ok := cfg[configKeyArtifacts]; ok {
+		if artifactsMap, ok := artifactsVal.(map[string]any); ok {
+			if path, ok := artifactsMap["path"]; ok {
+				artifactServerPath = fmt.Sprintf("%v", path)
+			}
+			if port, ok := artifactsMap["port"]; ok {
+				artifactServerPort = fmt.Sprintf("%v", port)
+			}
+		}
+	}
+
+	// Build runner config
+	config := &runner.Config{
+		// Core configuration
+		Workdir:        workDir,
+		BindWorkdir:    true,
+		EventName:      defaultEventName,
+		EventPath:      eventFile,
+		GitHubInstance: githubInstance,
+		LogOutput:      true,
+		Env:            actEnv,
+		Secrets:        actSecrets,
+		Platforms: map[string]string{
+			defaultPlatform: runnerImage,
+		},
+
+		// Container lifecycle
+		AutoRemove:      autoRemove,
+		ReuseContainers: reuseContainers,
+		ForceRebuild:    forceRebuild,
+
+		// Docker configuration
+		ContainerDaemonSocket: dockerSocket,
+		ContainerOptions:      containerOpts,
+
+		// Security
+		Privileged:       privileged,
+		ContainerCapAdd:  capAdd,
+		ContainerCapDrop: capDrop,
+
+		// Artifacts
+		ArtifactServerPath: artifactServerPath,
+		ArtifactServerPort: artifactServerPort,
+	}
+
+	// Set network mode if specified (requires type conversion)
+	if networkMode != "" {
+		config.ContainerNetworkMode = container.NetworkMode(networkMode)
+	}
+
+	return config
+}
+
+// parseStringSlice converts various input types to []string
+func parseStringSlice(input any) []string {
+	switch v := input.(type) {
+	case []string:
+		return v
+	case []any:
+		result := make([]string, 0, len(v))
+		for _, item := range v {
+			result = append(result, fmt.Sprintf("%v", item))
+		}
+		return result
+	case string:
+		// Single string, return as single-element slice
+		if v != "" {
+			return []string{v}
+		}
+		return nil
+	default:
+		return nil
+	}
 }
 
 func newGitHubAction(ctx context.Context, step core.Step) (executor.Executor, error) {

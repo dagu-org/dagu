@@ -21,8 +21,6 @@ steps:
     command: actions/checkout@v4          # Action to run
     executor:
       type: gha                           # Aliases: github_action, github-action
-      config:
-        runner: node:22-bookworm          # Optional; defaults to node:22-bookworm
     params:
       repository: dagu-org/dagu
       ref: main
@@ -31,7 +29,7 @@ steps:
 
 - `command` holds the action reference (`owner/repo@ref`).
 - `executor.type` must be `gha` (or one of the registered aliases shown above).
-- `executor.config.runner` overrides the Docker image used as the virtual runner; omit it to use the default Node.js image.
+- `executor.config` contains runner configuration options (see Configuration section below).
 - `params` maps directly to the `with:` block in GitHub Actions YAML. Values support the same variable substitution rules as other step fields.
 
 ## Working Directory
@@ -64,19 +62,103 @@ steps:
       ref: main
 ```
 
-## Example: Repository Checkout
+## Configuration
+
+The `executor.config` object accepts the following parameters:
+
+### `runner`
+
+- **Type**: `string`
+- **Default**: `catthehacker/ubuntu:act-latest`
+
+Docker image to use as the runner environment. Common options:
+- `catthehacker/ubuntu:act-latest` - Medium size (~500MB), includes git, docker, node, jq
+- `catthehacker/ubuntu:full-latest` - Large size (~20GB), includes all GitHub Actions tools
+- `node:22-bookworm-slim` - Minimal size (~200MB), Node.js only
+
+### `autoRemove`
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+Automatically remove containers after execution. Set to `false` to keep containers for debugging.
+
+### `network`
+
+- **Type**: `string`
+- **Default**: `""` (Docker default bridge)
+
+Docker network mode for containers. Options: `bridge`, `host`, `none`, or a custom network name.
+
+### `githubInstance`
+
+- **Type**: `string`
+- **Default**: `github.com`
+
+GitHub instance for action resolution. Use for GitHub Enterprise Server (e.g., `github.company.com`).
+
+### `dockerSocket`
+
+- **Type**: `string`
+- **Default**: `""` (Docker default socket)
+
+Custom Docker socket path. Examples:
+- `/var/run/docker.sock` - Default Unix socket
+- `tcp://remote-docker:2375` - Remote Docker daemon
+- `/run/user/1000/docker.sock` - Rootless Docker
+
+### `containerOptions`
+
+- **Type**: `string`
+- **Default**: `""`
+
+Additional Docker run options passed to the container (e.g., `--memory=2g --cpus=2`).
+
+### `reuseContainers`
+
+- **Type**: `boolean`
+- **Default**: `false`
+
+Reuse containers between action runs for performance. May cause state pollution.
+
+### `forceRebuild`
+
+- **Type**: `boolean`
+- **Default**: `false`
+
+Force rebuild of action Docker images. Useful when developing custom actions.
+
+### `privileged`
+
+- **Type**: `boolean`
+- **Default**: `false`
+
+Run containers in privileged mode (full host access). Required for Docker-in-Docker but poses security risks.
+
+### `capabilities`
+
+- **Type**: `object`
+- **Default**: `{}`
+
+Linux capabilities configuration:
 
 ```yaml
-workingDir: /tmp/workspace
+capabilities:
+  add: [SYS_ADMIN, NET_ADMIN]    # Capabilities to add
+  drop: [NET_RAW, CHOWN]         # Capabilities to drop
+```
 
-steps:
-  - command: actions/checkout@v4
-    executor:
-      type: gha
-    params:
-      repository: dagu-org/dagu
-      ref: main
-      token: "<github token>"
+### `artifacts`
+
+- **Type**: `object`
+- **Default**: `{}`
+
+Artifact server configuration for `actions/upload-artifact` and `actions/download-artifact`:
+
+```yaml
+artifacts:
+  path: /tmp/dagu-artifacts      # Directory for artifact storage
+  port: "34567"                  # Artifact server port
 ```
 
 ## Limitations
