@@ -245,8 +245,9 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 	}
 
 	relativeTos := []string{d.WorkingDir}
-	if d.Location != "" {
-		relativeTos = append(relativeTos, filepath.Dir(d.Location))
+	fileDir := filepath.Dir(d.Location)
+	if d.Location != "" && fileDir != d.WorkingDir {
+		relativeTos = append(relativeTos, fileDir)
 	}
 
 	resolver := fileutil.NewFileResolver(relativeTos)
@@ -278,6 +279,13 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 		for k, v := range vars {
 			d.Env = append(d.Env, fmt.Sprintf("%s=%s", k, v))
 		}
+		// Set os environment variables for the current process
+		for k, v := range vars {
+			if err := os.Setenv(k, v); err != nil {
+				logger.Warn(ctx, "Failed to set env var from .env", "key", k, "file", resolvedPath, "err", err)
+			}
+		}
+		logger.Info(ctx, "Loaded .env file", "file", resolvedPath)
 
 		// Load the first found one
 		return

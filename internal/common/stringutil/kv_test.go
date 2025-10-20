@@ -172,3 +172,101 @@ func TestKeyValueJSON(t *testing.T) {
 		}
 	})
 }
+
+func TestKeyValuesToMap(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []string
+		want  map[string]string
+	}{
+		{
+			name:  "NormalKeyValues",
+			input: []string{"FOO=bar", "BAZ=qux"},
+			want: map[string]string{
+				"FOO": "bar",
+				"BAZ": "qux",
+			},
+		},
+		{
+			name:  "EmptyValues",
+			input: []string{"FOO=", "BAR=value"},
+			want: map[string]string{
+				"FOO": "",
+				"BAR": "value",
+			},
+		},
+		{
+			name:  "MultipleEqualsSigns",
+			input: []string{"FOO=bar=baz", "KEY=value=with=equals"},
+			want: map[string]string{
+				"FOO": "bar=baz",
+				"KEY": "value=with=equals",
+			},
+		},
+		{
+			name:  "NoEqualsSign",
+			input: []string{"INVALID", "FOO=bar"},
+			want: map[string]string{
+				"FOO": "bar",
+			},
+		},
+		{
+			name:  "EmptySlice",
+			input: []string{},
+			want:  map[string]string{},
+		},
+		{
+			name:  "NilSlice",
+			input: nil,
+			want:  map[string]string{},
+		},
+		{
+			name:  "MixedValidAndInvalid",
+			input: []string{"VALID=value", "INVALID", "ANOTHER=test", "=emptykey"},
+			want: map[string]string{
+				"VALID":   "value",
+				"ANOTHER": "test",
+				"":        "emptykey",
+			},
+		},
+		{
+			name:  "DuplicateKeys",
+			input: []string{"FOO=first", "FOO=second"},
+			want: map[string]string{
+				"FOO": "second", // Last value wins
+			},
+		},
+		{
+			name:  "SpecialCharacters",
+			input: []string{"PATH=/usr/local/bin", "URL=https://example.com"},
+			want: map[string]string{
+				"PATH": "/usr/local/bin",
+				"URL":  "https://example.com",
+			},
+		},
+		{
+			name:  "Whitespace",
+			input: []string{"KEY = value", "ANOTHER=  spaces  "},
+			want: map[string]string{
+				"KEY ":    " value",
+				"ANOTHER": "  spaces  ",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stringutil.KeyValuesToMap(tt.input)
+			if len(got) != len(tt.want) {
+				t.Errorf("KeyValuesToMap() length = %v, want %v", len(got), len(tt.want))
+			}
+			for k, v := range tt.want {
+				if gotV, ok := got[k]; !ok {
+					t.Errorf("KeyValuesToMap() missing key %q", k)
+				} else if gotV != v {
+					t.Errorf("KeyValuesToMap()[%q] = %q, want %q", k, gotV, v)
+				}
+			}
+		})
+	}
+}

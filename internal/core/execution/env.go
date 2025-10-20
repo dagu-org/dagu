@@ -93,6 +93,41 @@ func (e Env) VariablesMap() map[string]string {
 	return m
 }
 
+// UserEnvsMap returns user-defined environment variables as a map,
+// excluding OS environment (BaseEnv). Use this for isolated execution environments.
+// Precedence: Step.Env > Envs > Variables > SecretEnvs > DAGContext.Envs > DAG.Env
+func (e Env) UserEnvsMap() map[string]string {
+	result := e.DAGContext.UserEnvsMap() // DAG-level + secrets, no OS env
+
+	// Add variables from previous steps
+	e.Variables.Range(func(_, value any) bool {
+		parts := strings.SplitN(value.(string), "=", 2)
+		if len(parts) == 2 {
+			result[parts[0]] = parts[1]
+		}
+		return true
+	})
+
+	// Add step-specific envs (PWD, DAG_RUN_STEP_NAME, etc)
+	for k, v := range e.Envs {
+		result[k] = v
+	}
+
+	// Add step-defined env (highest precedence)
+	for _, env := range e.Step.Env {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		if _, exists := result[parts[0]]; exists {
+			continue
+		}
+		result[parts[0]] = parts[1]
+	}
+
+	return result
+}
+
 // NewEnv creates a new execution context with the given step.
 func NewEnv(ctx context.Context, step core.Step) Env {
 	parentEnv := GetDAGContextFromContext(ctx)

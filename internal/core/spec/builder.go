@@ -110,6 +110,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "workingDir", fn: buildStepWorkingDir},
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
+	{name: "params", fn: buildStepParams},
 	{name: "depends", fn: buildDepends},
 	{name: "parallel", fn: buildParallel}, // Must be before childDAG to set executor type correctly
 	{name: "childDAG", fn: buildChildDAG},

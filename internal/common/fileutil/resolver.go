@@ -3,6 +3,7 @@ package fileutil
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
 // FileResolver handles file path resolution across multiple locations
@@ -20,8 +21,9 @@ func NewFileResolver(relativeTos []string) *FileResolver {
 // ResolveFilePath attempts to find a file in multiple locations in the following order:
 func (r *FileResolver) ResolveFilePath(file string) (string, error) {
 	// Check if it's an absolute path
-	if filepath.IsAbs(file) {
-		if FileExists(file) {
+	if filepath.IsAbs(file) || strings.HasPrefix(file, "~") {
+		file, err := ResolvePath(file)
+		if err == nil && FileExists(file) {
 			return file, nil
 		}
 		return "", &FileNotFoundError{Path: file}
@@ -35,8 +37,9 @@ func (r *FileResolver) ResolveFilePath(file string) (string, error) {
 
 	// Try each location
 	for _, path := range searchPaths {
-		if FileExists(path) {
-			return path, nil
+		file, err := ResolvePath(path)
+		if err == nil && FileExists(file) {
+			return file, nil
 		}
 	}
 

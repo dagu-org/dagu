@@ -427,9 +427,9 @@ In the nested array format:
 | `output` | string | Capture output to variable | - |
 | `env` | array/object | Step-specific environment variables (overrides DAG-level) | - |
 | `call` | string | Name of a DAG to execute as a child DAG-run | - |
-| `params` | string | Parameters for sub-DAG | - |
+| `params` | string/object | Parameters passed to child DAGs (`run`) or executor-specific inputs (e.g., GitHub Actions `with:` map) | - |
 
-> ℹ️ The legacy `run` field is still accepted for backward compatibility, but it will be removed in a future release. Prefer `call` for new workflows.
+> ℹ️ The legacy `run` field is still accepted for backward compatibility until v1.24.0, but it will be removed in a future release. Prefer `call` for new workflows.
 
 ### Parallel Execution
 

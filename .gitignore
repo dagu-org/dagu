@@ -37,3 +37,7 @@ __debug_bin*
 
 # Doc build files
 docs/build
+
+# Go cache
+.gocache
+.gomodcache

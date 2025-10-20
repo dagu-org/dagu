@@ -21,6 +21,7 @@ Dagu provides a comprehensive set of features for building and managing workflow
 - [Executor - HTTP](/features/executors/http)
 - [Executor - Mail](/features/executors/mail)
 - [Executor - JQ](/features/executors/jq)
+- [Executor - GitHub Actions](/features/executors/github-actions)
 
 ## Authentication & Authorization
 - [Authentication Options](/configurations/authentication)

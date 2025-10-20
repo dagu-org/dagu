@@ -2,11 +2,14 @@ package execution_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
@@ -297,6 +300,115 @@ func TestNewEnv_BasicFields(t *testing.T) {
 
 	// Check that WorkingDir is set
 	assert.NotEmpty(t, env.WorkingDir)
+}
+
+func TestEnv_UserEnvsMap(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		setup    func(ctx context.Context) (context.Context, execution.Env)
+		expected map[string]string
+	}{
+		{
+			name: "IncludesVariablesFromPreviousSteps",
+			setup: func(ctx context.Context) (context.Context, execution.Env) {
+				dag := &core.DAG{Env: []string{"DAG_VAR=dag_value"}}
+				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
+				env := execution.NewEnv(ctx, core.Step{Name: "test"})
+				env.Variables.Store("OUTPUT_VAR", "OUTPUT_VAR=output_value")
+				return ctx, env
+			},
+			expected: map[string]string{
+				"DAG_VAR":    "dag_value",
+				"OUTPUT_VAR": "output_value",
+			},
+		},
+		{
+			name: "StepEnvOverridesAll",
+			setup: func(ctx context.Context) (context.Context, execution.Env) {
+				dag := &core.DAG{Env: []string{"KEY=dag"}}
+				secrets := []string{"KEY=secret"}
+				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, secrets)
+
+				step := core.Step{Name: "test", Env: []string{"KEY=step"}}
+				env := execution.NewEnv(ctx, step)
+				env.Variables.Store("KEY", "KEY=variable")
+
+				envCtx := execution.WithEnv(ctx, env)
+				parts := strings.SplitN(step.Env[0], "=", 2)
+				evaluated, err := env.EvalString(envCtx, parts[1])
+				if err != nil {
+					panic(fmt.Sprintf("failed to evaluate step env: %v", err))
+				}
+				vars := &collections.SyncMap{}
+				vars.Store(parts[0], fmt.Sprintf("%s=%s", parts[0], evaluated))
+				env.ForceLoadOutputVariables(vars)
+
+				return envCtx, env
+			},
+			expected: map[string]string{
+				"KEY": "step",
+			},
+		},
+		{
+			name: "StepEnvKeepsEvaluatedSecrets",
+			setup: func(ctx context.Context) (context.Context, execution.Env) {
+				dag := &core.DAG{}
+				secrets := []string{"MY_SECRET=super-secret"}
+				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, secrets)
+
+				step := core.Step{Name: "test", Env: []string{"GITHUB_TOKEN=${MY_SECRET}"}}
+				env := execution.NewEnv(ctx, step)
+
+				envCtx := execution.WithEnv(ctx, env)
+				parts := strings.SplitN(step.Env[0], "=", 2)
+				evaluated, err := env.EvalString(envCtx, parts[1])
+				if err != nil {
+					panic(fmt.Sprintf("failed to evaluate step env: %v", err))
+				}
+
+				vars := &collections.SyncMap{}
+				vars.Store(parts[0], fmt.Sprintf("%s=%s", parts[0], evaluated))
+				env.ForceLoadOutputVariables(vars)
+
+				return envCtx, env
+			},
+			expected: map[string]string{
+				"GITHUB_TOKEN": "super-secret",
+			},
+		},
+		{
+			name: "ExcludesOSEnvironment",
+			setup: func(ctx context.Context) (context.Context, execution.Env) {
+				dag := &core.DAG{Env: []string{"USER_VAR=user"}}
+				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
+				env := execution.NewEnv(ctx, core.Step{Name: "test"})
+				return ctx, env
+			},
+			expected: map[string]string{
+				"USER_VAR": "user",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			_, env := tt.setup(ctx)
+
+			result := env.UserEnvsMap()
+
+			for key, expectedValue := range tt.expected {
+				assert.Equal(t, expectedValue, result[key], "key %s should have value %s", key, expectedValue)
+			}
+			// Ensure OS env is not included (PATH should not be in result)
+			_, hasPath := result["PATH"]
+			assert.False(t, hasPath, "UserEnvsMap should not include OS environment variables like PATH")
+		})
+	}
 }
 
 func TestEnv_EvalString_Precedence(t *testing.T) {
