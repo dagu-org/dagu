@@ -3444,3 +3444,134 @@ steps:
 		assert.Equal(t, "3", dag.Secrets[0].Options["retries"])
 	})
 }
+
+func TestBuildStepParams(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ParamsAsMap", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    command: actions/checkout@v4
+    executor:
+      type: github_action
+    params:
+      repository: myorg/myrepo
+      ref: main
+      token: secret123
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		step := dag.Steps[0]
+		params, err := step.Params.AsStringMap()
+		require.NoError(t, err)
+		assert.Equal(t, "myorg/myrepo", params["repository"])
+		assert.Equal(t, "main", params["ref"])
+		assert.Equal(t, "secret123", params["token"])
+	})
+
+	t.Run("ParamsAsString", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    command: actions/setup-go@v5
+    executor:
+      type: github_action
+    params: go-version=1.21 cache=true
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		step := dag.Steps[0]
+		params, err := step.Params.AsStringMap()
+		require.NoError(t, err)
+		assert.Equal(t, "1.21", params["go-version"])
+		assert.Equal(t, "true", params["cache"])
+	})
+
+	t.Run("ParamsWithNumbers", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    command: some-action
+    params:
+      timeout: 300
+      retries: 3
+      enabled: true
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		step := dag.Steps[0]
+		params, err := step.Params.AsStringMap()
+		require.NoError(t, err)
+		assert.Equal(t, "300", params["timeout"])
+		assert.Equal(t, "3", params["retries"])
+		assert.Equal(t, "true", params["enabled"])
+	})
+
+	t.Run("NoParams", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		step := dag.Steps[0]
+		assert.True(t, step.Params.IsEmpty())
+	})
+
+	t.Run("EmptyParams", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    command: echo hello
+    params: {}
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		step := dag.Steps[0]
+		params, err := step.Params.AsStringMap()
+		require.NoError(t, err)
+		assert.Empty(t, params)
+	})
+
+	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    command: some-action
+    params: message="hello world" count="42"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		step := dag.Steps[0]
+		params, err := step.Params.AsStringMap()
+		require.NoError(t, err)
+		assert.Equal(t, "hello world", params["message"])
+		assert.Equal(t, "42", params["count"])
+	})
+}

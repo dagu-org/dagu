@@ -505,19 +505,19 @@
               "properties": {
                 "type": {
                   "type": "string",
-                  "enum": ["docker", "http", "mail", "ssh", "jq"],
+                  "enum": ["docker", "http", "mail", "ssh", "jq", "gha"],
                   "description": "Type of executor to use for this step"
                 },
                 "config": {
                   "type": "object",
                   "additionalProperties": true,
-                  "description": "Executor-specific configuration options. For the Docker executor, set `image`, `containerName`, or both; with only `containerName` the container must already be running, and with both set Dagu creates the container from the `image` if it is missing or stopped."
+                  "description": "Executor-specific configuration options."
                 }
               },
               "required": ["type"]
             }
           ],
-          "description": "Specialized executor configuration for running the step (e.g., docker for containerized execution, http for API calls, mail for sending emails)."
+          "description": "Specialized executor configuration for running the step (e.g., docker for containerized execution, http for API calls, mail for sending emails, gha for running GitHub Actions locally)."
         },
         "command": {
           "oneOf": [
@@ -531,7 +531,7 @@
               }
             }
           ],
-          "description": "Command to execute. Can be a shell command, script interpreter, or executable. If omitted when script is provided, uses system default shell."
+          "description": "Command to execute. Can be a shell command, script interpreter, or executable."
         },
         "shell": {
           "type": "string",
@@ -786,15 +786,15 @@
                 "type": "object",
                 "additionalProperties": true
               },
-              "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+              "description": "Named parameters as key-value pairs"
             },
             {
               "type": "object",
               "additionalProperties": true,
-              "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+              "description": "Named parameters as key-value pairs"
             }
           ],
-          "description": "Default parameters that can be overridden when triggering the DAG. Can be positional (accessed as $1, $2) or named (accessed as ${KEY})."
+          "description": "Parameters for the step. For sub-DAG execution (when 'run' is specified), these are passed to the child DAG and accessible as ${KEY}. For 'gha' executor, these are passed as action inputs (the 'with:' section in GitHub Actions syntax). For example, when using actions/checkout@v4, you can specify 'repository', 'ref', 'token', etc."
         },
         "parallel": {
           "oneOf": [

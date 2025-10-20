@@ -54,6 +54,10 @@ const fullSidebar = [
           { text: "HTTP", link: "/features/executors/http" },
           { text: "Mail", link: "/features/executors/mail" },
           { text: "JQ", link: "/features/executors/jq" },
+          {
+            text: "GitHub Actions",
+            link: "/features/executors/github-actions",
+          },
         ],
       },
       { text: "Scheduling", link: "/features/scheduling" },

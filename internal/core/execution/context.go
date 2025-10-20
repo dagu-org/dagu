@@ -7,6 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -23,18 +24,57 @@ type DAGContext struct {
 	CoordinatorCli Dispatcher
 }
 
+// UserEnvsMap returns only user-defined environment variables as a map,
+// excluding OS environment (BaseEnv). Use this for isolated execution environments.
+// Precedence: SecretEnvs > Envs > DAG.Env
+func (e DAGContext) UserEnvsMap() map[string]string {
+	result := make(map[string]string)
+
+	// Parse DAG.Env (lowest priority)
+	for _, env := range e.DAG.Env {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			result[parts[0]] = parts[1]
+		}
+	}
+
+	// Add computed envs
+	for k, v := range e.Envs {
+		result[k] = v
+	}
+
+	// Secrets last (highest priority)
+	for k, v := range e.SecretEnvs {
+		result[k] = v
+	}
+
+	return result
+}
+
 // AllEnvs returns all environment variables as a slice of strings in "key=value" format.
+// Includes OS environment (BaseEnv). Use this for command executor and DAG runner.
 // Secrets have the highest priority and are appended last.
 func (e DAGContext) AllEnvs() []string {
-	envs := e.BaseEnv.AsSlice()
-	envs = append(envs, e.DAG.Env...)
+	distinctEntries := make(map[string]string)
+
+	for k, v := range stringutil.KeyValuesToMap(e.BaseEnv.AsSlice()) {
+		distinctEntries[k] = v
+	}
+	for k, v := range stringutil.KeyValuesToMap(e.DAG.Env) {
+		distinctEntries[k] = v
+	}
 	for k, v := range e.Envs {
-		envs = append(envs, k+"="+v)
+		distinctEntries[k] = v
 	}
-	// Append secrets last (highest priority)
 	for k, v := range e.SecretEnvs {
+		distinctEntries[k] = v
+	}
+
+	var envs []string
+	for k, v := range distinctEntries {
 		envs = append(envs, k+"="+v)
 	}
+
 	return envs
 }
 
@@ -99,30 +139,15 @@ func SetupDAGContext(ctx context.Context, dag *core.DAG, db Database, rootDAGRun
 		EnvKeyDAGName:       dag.Name,
 	}
 
-	for _, param := range params {
-		parts := strings.SplitN(param, "=", 2)
-		if len(parts) != 2 {
-			logger.Error(ctx, "invalid parameter: %s", param)
-			continue
-		}
-		envs[parts[0]] = parts[1]
+	for k, v := range stringutil.KeyValuesToMap(params) {
+		envs[k] = v
 	}
 
-	for _, kv := range dag.Env {
-		parts := strings.SplitN(kv, "=", 2)
-		if len(parts) == 2 {
-			envs[parts[0]] = parts[1]
-		}
+	for k, v := range stringutil.KeyValuesToMap(dag.Env) {
+		envs[k] = v
 	}
 
-	// Parse secret environment variables
-	secretEnvsMap := make(map[string]string)
-	for _, kv := range secretEnvs {
-		parts := strings.SplitN(kv, "=", 2)
-		if len(parts) == 2 {
-			secretEnvsMap[parts[0]] = parts[1]
-		}
-	}
+	secretEnvsMap := stringutil.KeyValuesToMap(secretEnvs)
 
 	return context.WithValue(ctx, dagCtxKey{}, DAGContext{
 		RootDAGRun:     rootDAGRun,

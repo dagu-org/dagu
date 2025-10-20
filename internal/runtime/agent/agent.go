@@ -279,10 +279,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	coordinatorCli := a.createCoordinatorClient(ctx)
 
 	// Resolve secrets if defined
-	secretEnvs, err := a.resolveSecrets(ctx)
-	if err != nil {
-		return err
-	}
+	secretEnvs, secretErr := a.resolveSecrets(ctx)
 
 	ctx = execution.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli, secretEnvs)
 
@@ -329,6 +326,12 @@ func (a *Agent) Run(ctx context.Context) error {
 			logger.Error(ctx, "Failed to close runstore store", "err", err)
 		}
 	}()
+
+	// If there was an error resolving secrets, stop execution here
+	if secretErr != nil {
+		initErr = secretErr // Stop execution if secret resolution failed
+		return initErr
+	}
 
 	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
 		logger.Error(ctx, "Failed to write status", "err", err)

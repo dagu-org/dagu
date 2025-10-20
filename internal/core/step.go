@@ -67,6 +67,8 @@ type Step struct {
 	Parallel *ParallelConfig `json:"parallel,omitempty"`
 	// Env contains environment variables for the step.
 	Env []string `json:"env,omitempty"`
+	// Params contains parameters/inputs for the step (e.g., action inputs for GitHub Actions).
+	Params Params `json:"params,omitzero"`
 }
 
 // String returns a formatted string representation of the step
