@@ -25,8 +25,8 @@ func TestDAGRun(t *testing.T) {
 		ts3 := execution.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
 
 		_ = run.WriteStatus(t, ts1, core.Running)
-		_ = run.WriteStatus(t, ts2, core.Success)
-		_ = run.WriteStatus(t, ts3, core.Error)
+		_ = run.WriteStatus(t, ts2, core.Succeeded)
+		_ = run.WriteStatus(t, ts3, core.Failed)
 
 		latestRun, err := run.LatestAttempt(run.Context, nil)
 		require.NoError(t, err)
@@ -34,7 +34,7 @@ func TestDAGRun(t *testing.T) {
 		dagRunStatus, err := latestRun.ReadStatus(run.Context)
 		require.NoError(t, err)
 
-		require.Equal(t, core.Error.String(), dagRunStatus.Status.String())
+		require.Equal(t, core.Failed.String(), dagRunStatus.Status.String())
 	})
 }
 
@@ -118,7 +118,7 @@ func TestListLogFiles(t *testing.T) {
 		dag := &core.DAG{Name: "test-dag"}
 		dagRunStatus := execution.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
-		dagRunStatus.Status = core.Success
+		dagRunStatus.Status = core.Succeeded
 		dagRunStatus.Log = "/tmp/test.log"
 		dagRunStatus.Nodes = []*execution.Node{
 			{
@@ -178,7 +178,7 @@ func TestRemoveLogFiles(t *testing.T) {
 		dag := &core.DAG{Name: "test-dag"}
 		dagRunStatus := execution.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
-		dagRunStatus.Status = core.Success
+		dagRunStatus.Status = core.Succeeded
 		dagRunStatus.Log = logFiles[0]
 		dagRunStatus.Nodes = []*execution.Node{
 			{
@@ -315,7 +315,7 @@ func TestDAGRunRemove(t *testing.T) {
 		dag := &core.DAG{Name: "test-dag"}
 		dagRunStatus := execution.InitialStatus(dag)
 		dagRunStatus.DAGRunID = "test-dag-run"
-		dagRunStatus.Status = core.Success
+		dagRunStatus.Status = core.Succeeded
 		dagRunStatus.Log = logFiles[0]
 		dagRunStatus.Nodes = []*execution.Node{
 			{
@@ -535,7 +535,7 @@ func TestDAGRun_listAttemptDirs(t *testing.T) {
 	// Create status files so attempts are considered valid
 	for _, dir := range []string{normalAttempt1, normalAttempt2, hiddenAttempt} {
 		statusFile := filepath.Join(dir, JSONLStatusFile)
-		status := createTestStatus(core.Success)
+		status := createTestStatus(core.Succeeded)
 		data, err := json.Marshal(status)
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(statusFile, append(data, '\n'), 0600))

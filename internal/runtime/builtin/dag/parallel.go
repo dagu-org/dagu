@@ -189,7 +189,7 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 // DetermineNodeStatus implements NodeStatusDeterminer.
 func (e *parallelExecutor) DetermineNodeStatus(_ context.Context) (core.NodeStatus, error) {
 	if len(e.results) == 0 {
-		return core.NodeError, fmt.Errorf("no results available for node status determination")
+		return core.NodeFailed, fmt.Errorf("no results available for node status determination")
 	}
 
 	// Check if all child DAGs succeeded or if any had partial success
@@ -197,17 +197,17 @@ func (e *parallelExecutor) DetermineNodeStatus(_ context.Context) (core.NodeStat
 	var partialSuccess bool
 	for _, result := range e.results {
 		if !result.Status.IsSuccess() {
-			return core.NodeError, fmt.Errorf("child DAG run %s failed with status: %s", result.DAGRunID, result.Status)
+			return core.NodeFailed, fmt.Errorf("child DAG run %s failed with status: %s", result.DAGRunID, result.Status)
 		}
-		if result.Status == core.PartialSuccess {
+		if result.Status == core.PartiallySucceeded {
 			partialSuccess = true
 		}
 	}
 
 	if partialSuccess {
-		return core.NodePartialSuccess, nil
+		return core.NodePartiallySucceeded, nil
 	}
-	return core.NodeSuccess, nil
+	return core.NodeSucceeded, nil
 }
 
 // executeChild executes a single child DAG with the given parameters

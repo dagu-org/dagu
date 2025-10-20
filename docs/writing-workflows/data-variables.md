@@ -107,6 +107,39 @@ Files can be specified as:
 - Relative to the base config directory
 - Relative to the user's home directory
 
+## Secrets
+
+Use the `secrets` block to declare sensitive values without embedding them in YAML. Each secret defines an environment variable that is resolved at runtime from a provider and injected before the DAG runs:
+
+```yaml
+secrets:
+  - name: API_TOKEN
+    provider: env
+    key: PROD_API_TOKEN    # Read from process environment
+  - name: DB_PASSWORD
+    provider: file
+    key: secrets/db-pass   # Relative to workingDir, then the DAG file directory
+
+steps:
+  - name: migrate
+    command: ./migrate.sh
+    env:
+      - STRICT_MODE: "1"   # Step-level env still overrides secrets if needed
+```
+
+### Built-in providers
+
+- `env` reads from existing environment variables. Use it when CI/CD or your process manager injects secrets into the runtime environment.
+- `file` reads from files. Relative paths first try the DAG’s `workingDir`, then fall back to the directory containing the DAG file—ideal for Secret Store CSI or Docker secrets mounted beside the DAG.
+
+Providers can expose additional configuration through the optional `options` map. Values must be strings so they can be forwarded to provider-specific clients.
+
+### Resolution and masking
+
+Secrets are evaluated after DAG-level variables and system-provided runtime variables, so they override values defined in `env` or `.env` files unless a step sets its own value. Resolved secrets are never written to disk or the database, and Dagu automatically masks them in step output and scheduler logs.
+
+Read the dedicated [Secrets guide](/writing-workflows/secrets) for provider details, masking behavior, and best practices.
+
 ## Parameters
 
 ### Positional Parameters
@@ -186,12 +219,12 @@ If `SUB_RESULT` contains:
 ```json
 {
   "outputs": {
-    "finalValue": "success"
+    "finalValue": "succeeded"
   }
 }
 ```
 
-Then the expanded value of `${SUB_RESULT.outputs.finalValue}` will be `success`.
+Then the expanded value of `${SUB_RESULT.outputs.finalValue}` will be `succeeded`.
 
 ## Step ID References
 

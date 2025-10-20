@@ -80,15 +80,15 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 
 	s := n.Status()
 	switch s {
-	case core.NodeSuccess:
+	case core.NodeSucceeded:
 		return true
 
-	case core.NodeError:
+	case core.NodeFailed:
 		if continueOn.Failure {
 			return true
 		}
 
-	case core.NodeCancel:
+	case core.NodeCanceled:
 		return false
 
 	case core.NodeSkipped:
@@ -97,11 +97,11 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 		}
 		return false
 
-	case core.NodePartialSuccess:
+	case core.NodePartiallySucceeded:
 		// Partial success is treated like success for continue on
 		return true
 
-	case core.NodeNone:
+	case core.NodeNotStarted:
 		fallthrough
 
 	case core.NodeRunning:
@@ -439,7 +439,7 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	}
 
 	if signal.IsTerminationSignalOS(sig) && s == core.NodeRunning {
-		n.SetStatus(core.NodeCancel)
+		n.SetStatus(core.NodeCanceled)
 	}
 }
 
@@ -448,7 +448,7 @@ func (n *Node) Cancel(ctx context.Context) {
 	defer n.mu.Unlock()
 	s := n.Status()
 	if s == core.NodeRunning {
-		n.SetStatus(core.NodeCancel)
+		n.SetStatus(core.NodeCanceled)
 	}
 	if n.cancelFunc != nil {
 		logger.Info(ctx, "Canceling node", "step", n.Name())

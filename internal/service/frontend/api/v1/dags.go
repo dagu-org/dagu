@@ -639,9 +639,9 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 				Message:    "step is required for mark-success action",
 			}
 		}
-		toStatus := core.NodeSuccess
+		toStatus := core.NodeSucceeded
 		if action == api.DAGActionMarkFailed {
-			toStatus = core.NodeError
+			toStatus = core.NodeFailed
 		}
 
 		if err := a.updateStatus(ctx, *request.Body.RequestId, *request.Body.Step, dag, toStatus); err != nil {

@@ -34,10 +34,10 @@ func (r *reporter) reportStep(
 	ctx context.Context, dag *core.DAG, dagStatus execution.DAGRunStatus, node *runtime.Node,
 ) error {
 	nodeStatus := node.State().Status
-	if nodeStatus != core.NodeNone {
+	if nodeStatus != core.NodeNotStarted {
 		logger.Info(ctx, "Step finished", "step", node.NodeData().Step.Name, "status", nodeStatus)
 	}
-	if nodeStatus == core.NodeError && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
+	if nodeStatus == core.NodeFailed && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
 		fromAddress := dag.ErrorMail.From
 		toAddresses := dag.ErrorMail.To
 		subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, dagStatus.Status)
@@ -62,7 +62,7 @@ func (r *reporter) getSummary(_ context.Context, dagStatus execution.DAGRunStatu
 
 // send is a function that sends a report mail.
 func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus execution.DAGRunStatus, err error) error {
-	if err != nil || dagStatus.Status == core.Error {
+	if err != nil || dagStatus.Status == core.Failed {
 		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
 			fromAddress := dag.ErrorMail.From
 			toAddresses := dag.ErrorMail.To
@@ -71,7 +71,7 @@ func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus execution.
 			attachments := addAttachments(dag.ErrorMail.AttachLogs, dagStatus.Nodes)
 			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
-	} else if dagStatus.Status == core.Success || dagStatus.Status == core.PartialSuccess {
+	} else if dagStatus.Status == core.Succeeded || dagStatus.Status == core.PartiallySucceeded {
 		if dag.MailOn != nil && dag.MailOn.Success && dag.InfoMail != nil {
 			fromAddress := dag.InfoMail.From
 			toAddresses := dag.InfoMail.To

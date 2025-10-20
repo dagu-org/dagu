@@ -128,7 +128,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		// Expect status update
 		attempt.On("Open", ctx).Return(nil)
 		attempt.On("Write", ctx, mock.MatchedBy(func(s execution.DAGRunStatus) bool {
-			return s.Status == core.Error && s.FinishedAt != ""
+			return s.Status == core.Failed && s.FinishedAt != ""
 		})).Return(nil)
 		attempt.On("Close", ctx).Return(nil)
 

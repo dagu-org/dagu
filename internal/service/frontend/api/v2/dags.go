@@ -654,8 +654,8 @@ waitLoop:
 			if dagStatus == nil {
 				continue
 			}
-			if dagStatus.Status != core.None {
-				// If status is not None, it means the DAG has started or even finished
+			if dagStatus.Status != core.NotStarted {
+				// If status is not NotStarted, it means the DAG has started or even finished
 				running = true
 				timer.Stop()
 				break waitLoop
@@ -767,8 +767,8 @@ waitLoop:
 			if dagStatus == nil {
 				continue
 			}
-			if dagStatus.Status != core.None {
-				// If status is not None, it means the DAG has started or even finished
+			if dagStatus.Status != core.NotStarted {
+				// If status is not NotStarted, it means the DAG has started or even finished
 				ok = true
 				timer.Stop()
 				break waitLoop

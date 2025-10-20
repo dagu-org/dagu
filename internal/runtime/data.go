@@ -443,5 +443,5 @@ func (d *Data) MarkError(err error) {
 	defer d.mu.Unlock()
 
 	d.inner.State.Error = err
-	d.inner.State.Status = core.NodeError
+	d.inner.State.Status = core.NodeFailed
 }

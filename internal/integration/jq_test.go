@@ -29,7 +29,7 @@ func TestJQExecutor(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, core.Success)
+		dag.AssertLatestStatus(t, core.Succeeded)
 		dag.AssertOutputs(t, map[string]any{
 			"RESULT": "1\n2\n3",
 		})
@@ -54,7 +54,7 @@ func TestJQExecutor(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, core.Success)
+		dag.AssertLatestStatus(t, core.Succeeded)
 		dag.AssertOutputs(t, map[string]any{
 			"RESULT": "1\n2\n3",
 		})
@@ -79,7 +79,7 @@ func TestJQExecutor(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, core.Success)
+		dag.AssertLatestStatus(t, core.Succeeded)
 		dag.AssertOutputs(t, map[string]any{
 			"RESULT": "hello\nworld",
 		})
@@ -104,7 +104,7 @@ func TestJQExecutor(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, core.Success)
+		dag.AssertLatestStatus(t, core.Succeeded)
 		dag.AssertOutputs(t, map[string]any{
 			"RESULT": "\"hello\"\n\"world\"",
 		})
@@ -129,7 +129,7 @@ func TestJQExecutor(t *testing.T) {
 
 		agent.RunSuccess(t)
 
-		dag.AssertLatestStatus(t, core.Success)
+		dag.AssertLatestStatus(t, core.Succeeded)
 		dag.AssertOutputs(t, map[string]any{
 			"RESULT": "1\t100\n2\t200\n3\t300",
 		})

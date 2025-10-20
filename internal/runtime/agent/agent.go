@@ -19,6 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/mailer"
+	"github.com/dagu-org/dagu/internal/common/secrets"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/common/sock"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
@@ -277,7 +278,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize coordinator client factory for distributed execution
 	coordinatorCli := a.createCoordinatorClient(ctx)
 
-	ctx = execution.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli)
+	// Resolve secrets if defined
+	secretEnvs, err := a.resolveSecrets(ctx)
+	if err != nil {
+		return err
+	}
+
+	ctx = execution.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli, secretEnvs)
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}
@@ -313,7 +320,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		if initErr != nil {
 			logger.Error(ctx, "Failed to initialize DAG execution", "err", err)
 			st := a.Status(ctx)
-			st.Status = core.Error
+			st.Status = core.Failed
 			if err := attempt.Write(ctx, st); err != nil {
 				logger.Error(ctx, "Status write failed", "err", err)
 			}
@@ -576,7 +583,7 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	defer a.lock.RUnlock()
 
 	schedulerStatus := a.scheduler.Status(ctx, a.graph)
-	if schedulerStatus == core.None && a.graph.IsStarted() {
+	if schedulerStatus == core.NotStarted && a.graph.IsStarted() {
 		// Match the status to the execution graph.
 		schedulerStatus = core.Running
 	}
@@ -756,6 +763,37 @@ func (a *Agent) createCoordinatorClient(ctx context.Context) execution.Dispatche
 	return coordinator.New(a.registry, coordinatorCliCfg)
 }
 
+// resolveSecrets resolves all secrets defined in the DAG and returns them as
+// environment variable strings in "NAME=value" format.
+// Returns an empty slice if no secrets are defined.
+func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
+	if len(a.dag.Secrets) == 0 {
+		return nil, nil
+	}
+
+	logger.Info(ctx, "Resolving secrets", "count", len(a.dag.Secrets))
+
+	// Create secret registry - all providers auto-registered via init()
+	// File provider tries base directories in order:
+	// 1. DAG working directory (if set)
+	// 2. Directory containing the DAG file (if Location is set)
+	baseDirs := []string{a.dag.WorkingDir}
+	if a.dag.Location != "" {
+		dagDir := filepath.Dir(a.dag.Location)
+		baseDirs = append(baseDirs, dagDir)
+	}
+	secretRegistry := secrets.NewRegistry(baseDirs...)
+
+	// Resolve all secrets - providers handle their own configuration
+	resolvedSecrets, err := secretRegistry.ResolveAll(ctx, a.dag.Secrets)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve secrets: %w", err)
+	}
+
+	logger.Debug(ctx, "Secrets resolved successfully", "count", len(resolvedSecrets))
+	return resolvedSecrets, nil
+}
+
 // dryRun performs a dry-run of the DAG. It only simulates the execution of
 // the DAG without running the actual command.
 func (a *Agent) dryRun(ctx context.Context) error {
@@ -774,7 +812,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
-	dagCtx := execution.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil)
+	dagCtx := execution.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil, nil)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
 	a.lastErr = lastErr
 

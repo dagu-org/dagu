@@ -45,6 +45,8 @@ type Scheduler struct {
 	cancel              context.CancelFunc
 	lock                sync.Mutex
 	queueConfigs        sync.Map
+	pendingMu           sync.Mutex
+	pendingRuns         map[string]int
 	config              *config.Config
 	dirLock             dirlock.DirLock // File-based lock to prevent multiple scheduler instances
 	dagExecutor         *DAGExecutor
@@ -97,6 +99,7 @@ func New(
 		dagRunStore:     drs,
 		queueStore:      qs,
 		procStore:       ps,
+		pendingRuns:     make(map[string]int),
 		config:          cfg,
 		dirLock:         dirLock,
 		dagExecutor:     dagExecutor,
@@ -303,169 +306,248 @@ func (s *Scheduler) startHeartbeat(ctx context.Context) {
 // rather than "retry a failed execution". This allows the system to retry dispatching
 // to the coordinator if it was temporarily unavailable.
 func (s *Scheduler) handleQueue(ctx context.Context, ch chan execution.QueuedItem, done chan any) {
+	processingCtx, cancelProcessing := context.WithCancel(ctx)
+	defer cancelProcessing()
+
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	for {
 		select {
 		case <-done:
-			logger.Info(ctx, "Stopping queue handler due to manager shutdown")
+			logger.Info(processingCtx, "Stopping queue handler due to manager shutdown")
+			cancelProcessing()
 			return
 
-		case <-ctx.Done():
+		case <-processingCtx.Done():
 			logger.Info(ctx, "Stopping queue handler due to context cancellation")
+			cancelProcessing()
 			return
 
-		case item := <-ch:
-			data := item.Data()
-			logger.Info(ctx, "Received item from queue", "data", data)
-			var (
-				dag       *core.DAG
-				attempt   execution.DAGRunAttempt
-				st        *execution.DAGRunStatus
-				err       error
-				result    = execution.QueuedItemProcessingResultRetry
-				startedAt time.Time
-				queueName string
-				queueCfg  queueConfig
-				alive     int
-			)
-
-			// Fetch the DAG of the dag-run attempt first to get queue configuration
-			attempt, err = s.dagRunStore.FindAttempt(ctx, data)
-			if err != nil {
-				logger.Error(ctx, "Failed to find run", "err", err, "data", data)
-				// If the attempt doesn't exist at all, mark as discard
-				if errors.Is(err, execution.ErrDAGRunIDNotFound) {
-					logger.Error(ctx, "DAG run not found, marking as discard", "data", data)
-					result = execution.QueuedItemProcessingResultDiscard
-				}
-				goto SEND_RESULT
+		case item, ok := <-ch:
+			if !ok {
+				logger.Info(processingCtx, "Queue channel closed, stopping queue handler")
+				cancelProcessing()
+				return
 			}
 
-			if attempt.Hidden() {
-				logger.Info(ctx, "DAG run is hidden, marking as discard", "data", data)
-				result = execution.QueuedItemProcessingResultDiscard
-				goto SEND_RESULT
-			}
-
-			dag, err = attempt.ReadDAG(ctx)
-			if err != nil {
-				logger.Error(ctx, "Failed to read dag", "err", err, "data", data)
-				goto SEND_RESULT
-			}
-
-			alive, err = s.procStore.CountAlive(ctx, dag.ProcGroup())
-			if err != nil {
-				logger.Error(ctx, "Failed to count alive processes", "err", err, "data", data)
-				goto SEND_RESULT
-			}
-
-			st, err = attempt.ReadStatus(ctx)
-			if err != nil {
-				if errors.Is(err, execution.ErrCorruptedStatusFile) {
-					logger.Error(ctx, "Status file is corrupted, marking as invalid", "err", err, "data", data)
-					result = execution.QueuedItemProcessingResultDiscard
-				} else if ctx.Err() != nil {
-					logger.Debug(ctx, "Context is cancelled", "err", err)
-				} else {
-					logger.Error(ctx, "Failed to read status", "err", err, "data", data)
-				}
-				goto SEND_RESULT
-			}
-
-			if st.Status != core.Queued {
-				logger.Info(ctx, "Skipping item from queue", "data", data, "status", st.Status)
-				result = execution.QueuedItemProcessingResultDiscard
-				goto SEND_RESULT
-			}
-
-			// Check concurrency limits based on queue configuration
-			queueCfg = s.getQueueConfig(dag.ProcGroup(), dag)
-			if queueCfg.MaxConcurrency > 0 && alive >= queueCfg.MaxConcurrency {
-				logger.Info(ctx, "Queue concurrency limit reached", "queue", queueName, "limit", queueCfg.MaxConcurrency, "alive", alive)
-				goto SEND_RESULT
-			}
-
-			// Update the queue configuration with the latest execution
-			s.queueConfigs.Store(data.Name, queueConfig{
-				MaxConcurrency: max(dag.MaxActiveRuns, 1),
-			})
-
-			startedAt = time.Now()
-
-			// Execute the DAG that was previously enqueued.
-			// IMPORTANT: We use OPERATION_RETRY here, which means "retry the dispatch", not "retry a failed execution".
-			// This is part of the persistence-first approach:
-			// 1. Scheduled jobs (via HandleJob) enqueue with status=QUEUED
-			// 2. Queue handler (here) picks up and dispatches with OPERATION_RETRY
-			// 3. For distributed execution, this dispatches to coordinator
-			// 4. For local execution, this runs the DAG
-			// The RETRY operation ensures the queue handler can retry dispatch if coordinator is temporarily down.
-			if err := s.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, data.ID); err != nil {
-				logger.Error(ctx, "Failed to execute dag", "err", err, "data", data)
-				goto SEND_RESULT
-			}
-
-			// Wait until the DAG to be alive
-			time.Sleep(500 * time.Millisecond)
-
-			// Wait for the DAG to be picked up by checking process heartbeat
-		WAIT_FOR_RUN:
-			for {
-				// Check if the process is alive (has heartbeat)
-				isAlive, err := s.procStore.IsRunAlive(ctx, dag.ProcGroup(), execution.DAGRunRef{Name: dag.Name, ID: data.ID})
-				if err != nil {
-					logger.Error(ctx, "Failed to check if run is alive", "err", err, "data", data)
-					// Continue checking on error, don't immediately fail
-				} else if isAlive {
-					// Process has started and has heartbeat
-					logger.Info(ctx, "DAG run has started (heartbeat detected)", "data", data)
-					result = execution.QueuedItemProcessingResultSuccess
-					break WAIT_FOR_RUN
-				}
-
-				// Check timeout
-				if time.Since(startedAt) > 30*time.Second {
-					logger.Error(ctx, "Cancelling due to timeout waiting for the run to be alive (10sec)", "data", data)
-
-					// Somehow it's failed to execute. Mark it failed and discard from queue.
-					if err := s.markStatusFailed(ctx, attempt); err != nil {
-						logger.Error(ctx, "Failed to mark the status cancelled")
-					}
-
-					logger.Info(ctx, "Discard the queue item due to timeout", "data", data)
-					result = execution.QueuedItemProcessingResultDiscard
-					break WAIT_FOR_RUN
-				}
-
-				// Check status if it's already finished
-				st, err = attempt.ReadStatus(ctx)
-				if err != nil {
-					logger.Error(ctx, "Failed to read status. Is it corrupted?", "err", err, "data", data)
-					result = execution.QueuedItemProcessingResultDiscard
-					break WAIT_FOR_RUN
-				}
-
-				if st.Status != core.Queued {
-					logger.Info(ctx, "Looks like the DAG is already executed", "data", data, "status", st.Status.String())
-					result = execution.QueuedItemProcessingResultDiscard
-					break WAIT_FOR_RUN
-				}
-
-				select {
-				case <-time.After(500 * time.Millisecond):
-				case <-ctx.Done():
-					logger.Info(ctx, "Context cancelled while waiting for run to start", "data", data)
-					return
-				}
-			}
-
-			if result == execution.QueuedItemProcessingResultSuccess {
-				logger.Info(ctx, "Successfully processed item from queue", "data", data)
-			}
-
-		SEND_RESULT:
-			item.Result <- result
+			wg.Add(1)
+			go func(it execution.QueuedItem) {
+				defer wg.Done()
+				s.processQueueItem(processingCtx, it)
+			}(item)
 		}
 	}
+}
+
+func (s *Scheduler) processQueueItem(ctx context.Context, item execution.QueuedItem) {
+	data := item.Data()
+	logger.Info(ctx, "Received item from queue", "data", data)
+
+	var (
+		dag        *core.DAG
+		attempt    execution.DAGRunAttempt
+		st         *execution.DAGRunStatus
+		err        error
+		queueName  string
+		queueCfg   queueConfig
+		pendingSet bool
+		result     = execution.QueuedItemProcessingResultRetry
+		resultSent bool
+		startedAt  time.Time
+	)
+
+	sendResult := func(res execution.QueuedItemProcessingResult) {
+		if resultSent {
+			return
+		}
+		select {
+		case item.Result <- res:
+			resultSent = true
+		case <-ctx.Done():
+			resultSent = true
+		}
+	}
+
+	defer func() {
+		if pendingSet {
+			s.decrementPending(queueName)
+		}
+		if !resultSent {
+			sendResult(result)
+		}
+	}()
+
+	// Fetch the DAG of the dag-run attempt first to get queue configuration
+	attempt, err = s.dagRunStore.FindAttempt(ctx, data)
+	if err != nil {
+		logger.Error(ctx, "Failed to find run", "err", err, "data", data)
+		// If the attempt doesn't exist at all, mark as discard
+		if errors.Is(err, execution.ErrDAGRunIDNotFound) {
+			logger.Error(ctx, "DAG run not found, marking as discard", "data", data)
+			result = execution.QueuedItemProcessingResultDiscard
+		}
+		return
+	}
+
+	if attempt.Hidden() {
+		logger.Info(ctx, "DAG run is hidden, marking as discard", "data", data)
+		result = execution.QueuedItemProcessingResultDiscard
+		return
+	}
+
+	dag, err = attempt.ReadDAG(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to read dag", "err", err, "data", data)
+		return
+	}
+
+	queueName = dag.ProcGroup()
+
+	st, err = attempt.ReadStatus(ctx)
+	if err != nil {
+		if errors.Is(err, execution.ErrCorruptedStatusFile) {
+			logger.Error(ctx, "Status file is corrupted, marking as invalid", "err", err, "data", data)
+			result = execution.QueuedItemProcessingResultDiscard
+		} else if ctx.Err() != nil {
+			logger.Debug(ctx, "Context is cancelled", "err", err)
+		} else {
+			logger.Error(ctx, "Failed to read status", "err", err, "data", data)
+		}
+		return
+	}
+
+	if st.Status != core.Queued {
+		logger.Info(ctx, "Skipping item from queue", "data", data, "status", st.Status)
+		result = execution.QueuedItemProcessingResultDiscard
+		return
+	}
+
+	// Check concurrency limits based on queue configuration
+	queueCfg = s.getQueueConfig(queueName, dag)
+	if queueCfg.MaxConcurrency > 0 {
+		if err := s.waitForQueueCapacity(ctx, queueName, queueCfg.MaxConcurrency); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				logger.Error(ctx, "Failed while waiting for queue capacity", "err", err, "queue", queueName)
+			}
+			return
+		}
+	}
+
+	// Update the queue configuration with the latest execution
+	s.queueConfigs.Store(queueName, queueConfig{
+		MaxConcurrency: max(dag.MaxActiveRuns, 1),
+	})
+
+	startedAt = time.Now()
+
+	s.incrementPending(queueName)
+	pendingSet = true
+
+	// Execute the DAG that was previously enqueued.
+	// IMPORTANT: We use OPERATION_RETRY here, which means "retry the dispatch", not "retry a failed execution".
+	// This is part of the persistence-first approach:
+	// 1. Scheduled jobs (via HandleJob) enqueue with status=QUEUED
+	// 2. Queue handler (here) picks up and dispatches with OPERATION_RETRY
+	// 3. For distributed execution, this dispatches to coordinator
+	// 4. For local execution, this runs the DAG
+	// The RETRY operation ensures the queue handler can retry dispatch if coordinator is temporarily down.
+	if err := s.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, data.ID); err != nil {
+		logger.Error(ctx, "Failed to execute dag", "err", err, "data", data)
+		return
+	}
+
+	if err := s.markStatusRunning(ctx, attempt, startedAt); err != nil {
+		logger.Error(ctx, "Failed to mark status running", "err", err, "data", data)
+	}
+
+	result = execution.QueuedItemProcessingResultSuccess
+	sendResult(result)
+
+	// Wait until the DAG to be alive
+	time.Sleep(500 * time.Millisecond)
+
+	// Wait for the DAG to be picked up by checking process heartbeat
+	for {
+		// Check if the process is alive (has heartbeat)
+		isAlive, err := s.procStore.IsRunAlive(ctx, queueName, execution.DAGRunRef{Name: dag.Name, ID: data.ID})
+		if err != nil {
+			logger.Error(ctx, "Failed to check if run is alive", "err", err, "data", data)
+			// Continue checking on error, don't immediately fail
+		} else if isAlive {
+			// Process has started and has heartbeat
+			logger.Info(ctx, "DAG run has started (heartbeat detected)", "data", data)
+			return
+		}
+
+		// Check timeout
+		if time.Since(startedAt) > 30*time.Second {
+			logger.Error(ctx, "Cancelling due to timeout waiting for the run to be alive (30sec)", "data", data)
+
+			// Somehow it's failed to execute. Mark it failed and discard from queue.
+			if err := s.markStatusFailed(ctx, attempt); err != nil {
+				logger.Error(ctx, "Failed to mark the status cancelled")
+			}
+
+			logger.Info(ctx, "Discard the queue item due to timeout", "data", data)
+			return
+		}
+
+		// Check status if it's already finished
+		st, err = attempt.ReadStatus(ctx)
+		if err != nil {
+			logger.Error(ctx, "Failed to read status. Is it corrupted?", "err", err, "data", data)
+			return
+		}
+
+		if st.Status != core.Queued {
+			logger.Info(ctx, "Looks like the DAG is already executed", "data", data, "status", st.Status.String())
+			return
+		}
+
+		select {
+		case <-time.After(500 * time.Millisecond):
+		case <-ctx.Done():
+			logger.Info(ctx, "Context cancelled while waiting for run to start", "data", data)
+			return
+		}
+	}
+}
+
+func (s *Scheduler) incrementPending(queueName string) {
+	if queueName == "" {
+		return
+	}
+
+	s.pendingMu.Lock()
+	s.pendingRuns[queueName]++
+	s.pendingMu.Unlock()
+}
+
+func (s *Scheduler) decrementPending(queueName string) {
+	if queueName == "" {
+		return
+	}
+
+	s.pendingMu.Lock()
+	if count, ok := s.pendingRuns[queueName]; ok {
+		if count <= 1 {
+			delete(s.pendingRuns, queueName)
+		} else {
+			s.pendingRuns[queueName] = count - 1
+		}
+	}
+	s.pendingMu.Unlock()
+}
+
+func (s *Scheduler) pendingCount(queueName string) int {
+	if queueName == "" {
+		return 0
+	}
+
+	s.pendingMu.Lock()
+	defer s.pendingMu.Unlock()
+	return s.pendingRuns[queueName]
 }
 
 func (s *Scheduler) markStatusFailed(ctx context.Context, attempt execution.DAGRunAttempt) error {
@@ -485,11 +567,64 @@ func (s *Scheduler) markStatusFailed(ctx context.Context, attempt execution.DAGR
 		logger.Info(ctx, "Tried to mark a queued item 'cancelled' but it's different status now", "status", st.Status.String())
 		return nil
 	}
-	st.Status = core.Cancel // Mark it cancel
+	st.Status = core.Canceled // Mark it cancel
 	if err := attempt.Write(ctx, *st); err != nil {
 		return fmt.Errorf("failed to open attempt: %w", err)
 	}
 	return nil
+}
+
+func (s *Scheduler) markStatusRunning(ctx context.Context, attempt execution.DAGRunAttempt, startedAt time.Time) error {
+	st, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to read status to update status: %w", err)
+	}
+	if st.Status != core.Queued {
+		return nil
+	}
+	if err := attempt.Open(ctx); err != nil {
+		return fmt.Errorf("failed to open attempt: %w", err)
+	}
+	defer func() {
+		if err := attempt.Close(ctx); err != nil {
+			logger.Error(ctx, "Failed to close attempt", "err", err)
+		}
+	}()
+	st.Status = core.Running
+	if st.StartedAt == "" {
+		st.StartedAt = execution.FormatTime(startedAt)
+	}
+	if st.QueuedAt == "" {
+		st.QueuedAt = execution.FormatTime(startedAt)
+	}
+	if st.CreatedAt == 0 {
+		st.CreatedAt = startedAt.Unix()
+	}
+	if err := attempt.Write(ctx, *st); err != nil {
+		return fmt.Errorf("failed to write status: %w", err)
+	}
+	return nil
+}
+
+func (s *Scheduler) waitForQueueCapacity(ctx context.Context, queueName string, maxConcurrency int) error {
+	for {
+		alive, err := s.procStore.CountAlive(ctx, queueName)
+		if err != nil {
+			return fmt.Errorf("failed to count alive processes: %w", err)
+		}
+		pending := s.pendingCount(queueName)
+		if alive+pending < maxConcurrency {
+			return nil
+		}
+
+		logger.Debug(ctx, "Queue concurrency limit reached, waiting", "queue", queueName, "limit", maxConcurrency, "alive", alive, "pending", pending)
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
 }
 
 // getQueueConfigByName gets the queue configuration by queue name.

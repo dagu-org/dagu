@@ -146,7 +146,7 @@ func (m *historyMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 			continue
 		}
 
-		if statusFile == nil || statusFile.Status.RequestID == "" || statusFile.Status.Status == core.None {
+		if statusFile == nil || statusFile.Status.RequestID == "" || statusFile.Status.Status == core.NotStarted {
 			result.SkippedRuns++
 			err := fmt.Sprintf("skipped invalid status file %s, RequestID=%s, Status=%s", file.Name(), statusFile.Status.RequestID, statusFile.Status.Status.String())
 			result.Errors = append(result.Errors, err)

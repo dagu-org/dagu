@@ -43,9 +43,8 @@ func TestStart(t *testing.T) {
 
 	builder := runtime.NewSubCmdBuilder(cfg)
 	dag := &core.DAG{
-		Name:       "test-dag",
-		Location:   "/path/to/dag.yaml",
-		WorkingDir: "/path/to",
+		Name:     "test-dag",
+		Location: "/path/to/dag.yaml",
 	}
 
 	t.Run("BasicStart", func(t *testing.T) {
@@ -58,7 +57,6 @@ func TestStart(t *testing.T) {
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
 		assert.Contains(t, spec.Args, "/path/to/dag.yaml")
-		assert.Equal(t, "/path/to", spec.WorkingDir)
 		assert.NotNil(t, spec.Env)
 	})
 
@@ -169,7 +167,6 @@ func TestEnqueue(t *testing.T) {
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
 		assert.Contains(t, spec.Args, "/path/to/dag.yaml")
-		assert.Equal(t, "/path/to", spec.WorkingDir)
 		assert.Equal(t, os.Stdout, spec.Stdout)
 		assert.Equal(t, os.Stderr, spec.Stderr)
 	})
@@ -265,7 +262,6 @@ func TestDequeue(t *testing.T) {
 		assert.Contains(t, spec.Args, "--dag-run=test-dag:run-123")
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
-		assert.Equal(t, "/path/to", spec.WorkingDir)
 		assert.Equal(t, os.Stdout, spec.Stdout)
 		assert.Equal(t, os.Stderr, spec.Stderr)
 	})
@@ -314,7 +310,6 @@ func TestRestart(t *testing.T) {
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
 		assert.Contains(t, spec.Args, "/path/to/dag.yaml")
-		assert.Equal(t, "/path/to", spec.WorkingDir)
 	})
 
 	t.Run("RestartWithQuiet", func(t *testing.T) {
@@ -370,7 +365,6 @@ func TestRetry(t *testing.T) {
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
 		assert.Contains(t, spec.Args, "test-dag")
-		assert.Equal(t, "/path/to", spec.WorkingDir)
 	})
 
 	t.Run("RetryWithStepName", func(t *testing.T) {
@@ -591,7 +585,6 @@ func TestCmdSpec(t *testing.T) {
 		spec := runtime.CmdSpec{
 			Executable: "/usr/bin/test",
 			Args:       []string{"arg1", "arg2"},
-			WorkingDir: "/tmp",
 			Env:        []string{"VAR=value"},
 			Stdout:     os.Stdout,
 			Stderr:     os.Stderr,
@@ -599,7 +592,6 @@ func TestCmdSpec(t *testing.T) {
 
 		assert.Equal(t, "/usr/bin/test", spec.Executable)
 		assert.Equal(t, []string{"arg1", "arg2"}, spec.Args)
-		assert.Equal(t, "/tmp", spec.WorkingDir)
 		assert.Equal(t, []string{"VAR=value"}, spec.Env)
 		assert.Equal(t, os.Stdout, spec.Stdout)
 		assert.Equal(t, os.Stderr, spec.Stderr)

@@ -237,7 +237,7 @@ function DAGRuns() {
                   </div>
                 ) : status === String(Status.NotStarted) ? (
                   <StatusChip status={Status.NotStarted} size="sm">
-                    not started
+                    not_started
                   </StatusChip>
                 ) : status === String(Status.Running) ? (
                   <StatusChip status={Status.Running} size="sm">
@@ -249,11 +249,11 @@ function DAGRuns() {
                   </StatusChip>
                 ) : status === String(Status.Cancelled) ? (
                   <StatusChip status={Status.Cancelled} size="sm">
-                    cancelled
+                    canceled
                   </StatusChip>
                 ) : status === String(Status.Success) ? (
                   <StatusChip status={Status.Success} size="sm">
-                    finished
+                    succeeded
                   </StatusChip>
                 ) : status === String(Status.Queued) ? (
                   <StatusChip status={Status.Queued} size="sm">
@@ -261,7 +261,7 @@ function DAGRuns() {
                   </StatusChip>
                 ) : status === String(Status.PartialSuccess) ? (
                   <StatusChip status={Status.PartialSuccess} size="sm">
-                    partial success
+                    partially_succeeded
                   </StatusChip>
                 ) : null}
               </SelectValue>
@@ -274,7 +274,7 @@ function DAGRuns() {
               </SelectItem>
               <SelectItem value={String(Status.NotStarted)}>
                 <StatusChip status={Status.NotStarted} size="sm">
-                  not started
+                  not_started
                 </StatusChip>
               </SelectItem>
               <SelectItem value={String(Status.Running)}>
@@ -289,12 +289,12 @@ function DAGRuns() {
               </SelectItem>
               <SelectItem value={String(Status.Cancelled)}>
                 <StatusChip status={Status.Cancelled} size="sm">
-                  cancelled
+                  canceled
                 </StatusChip>
               </SelectItem>
               <SelectItem value={String(Status.Success)}>
                 <StatusChip status={Status.Success} size="sm">
-                  finished
+                  succeeded
                 </StatusChip>
               </SelectItem>
               <SelectItem value={String(Status.Queued)}>
@@ -304,7 +304,7 @@ function DAGRuns() {
               </SelectItem>
               <SelectItem value={String(Status.PartialSuccess)}>
                 <StatusChip status={Status.PartialSuccess} size="sm">
-                  partial success
+                  partially_succeeded
                 </StatusChip>
               </SelectItem>
             </SelectContent>

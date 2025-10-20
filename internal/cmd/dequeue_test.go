@@ -59,7 +59,7 @@ func TestDequeueCommand_PreservesState(t *testing.T) {
 
 	dagStatus, err := attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, core.Success, dagStatus.Status)
+	assert.Equal(t, core.Succeeded, dagStatus.Status)
 
 	// Now enqueue a new run
 	th.RunCommand(t, cmd.Enqueue(), test.CmdTest{
@@ -80,5 +80,5 @@ func TestDequeueCommand_PreservesState(t *testing.T) {
 
 	latestStatus, err := latestAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, core.Success, latestStatus.Status, "Latest visible status should be Success")
+	assert.Equal(t, core.Succeeded, latestStatus.Status, "Latest visible status should be Success")
 }

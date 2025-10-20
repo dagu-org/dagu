@@ -119,14 +119,14 @@ func TestStatusCommand(t *testing.T) {
 		status := execution.DAGRunStatus{
 			Name:       dag.Name,
 			DAGRunID:   dagRunID,
-			Status:     core.Error,
+			Status:     core.Failed,
 			StartedAt:  time.Now().Format(time.RFC3339),
 			FinishedAt: time.Now().Format(time.RFC3339),
 			AttemptID:  attempt.ID(),
 			Nodes: []*execution.Node{
 				{
 					Step:   core.Step{Name: "error"},
-					Status: core.NodeError,
+					Status: core.NodeFailed,
 					Error:  "exit status 1",
 				},
 			},
@@ -297,14 +297,14 @@ steps:
 		status := execution.DAGRunStatus{
 			Name:       dag.Name,
 			DAGRunID:   dagRunID,
-			Status:     core.Error,
+			Status:     core.Failed,
 			StartedAt:  time.Now().Format(time.RFC3339),
 			FinishedAt: time.Now().Format(time.RFC3339),
 			AttemptID:  attempt.ID(),
 			Nodes: []*execution.Node{
 				{
 					Step:       core.Step{Name: "check"},
-					Status:     core.NodeError,
+					Status:     core.NodeFailed,
 					Error:      "exit status 1",
 					StartedAt:  time.Now().Format(time.RFC3339),
 					FinishedAt: time.Now().Format(time.RFC3339),
@@ -615,14 +615,14 @@ steps:
 		status := execution.DAGRunStatus{
 			Name:       dag.Name,
 			DAGRunID:   dagRunID,
-			Status:     core.Success,
+			Status:     core.Succeeded,
 			StartedAt:  time.Now().Format(time.RFC3339),
 			FinishedAt: time.Now().Format(time.RFC3339),
 			AttemptID:  attempt.ID(),
 			Nodes: []*execution.Node{
 				{
 					Step:   core.Step{Name: "binary_output"},
-					Status: core.NodeSuccess,
+					Status: core.NodeSucceeded,
 					Stdout: "/nonexistent/binary.log", // This will trigger "(unable to read)"
 					Stderr: "",
 				},
