@@ -31,7 +31,6 @@ import (
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // Context holds the configuration for a command.
@@ -93,8 +92,12 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		}
 	}
 
-	// Use a custom config file if provided via the viper flag "config"
-	if cfgPath := viper.GetString("config"); cfgPath != "" {
+	// Use a custom config file if provided via the command flag "config"
+	cfgPath, err := cmd.Flags().GetString("config")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get config flag: %w", err)
+	}
+	if cfgPath != "" {
 		configLoaderOpts = append(configLoaderOpts, config.WithConfigFile(cfgPath))
 	}
 
