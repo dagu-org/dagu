@@ -1,366 +1,568 @@
 /**
- * Graph component for visualizing DAG dagRuns using Mermaid.js
+ * DAGExecutionHistory component displays the execution history of a DAG.
  *
- * @module features/dags/components/visualization
+ * @module features/dags/components/dag-execution
  */
-import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
-import { Maximize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
-import React, { useState } from 'react';
-import { components, NodeStatus } from '../../../../api/v2/schema';
-import Mermaid from '../../../../ui/Mermaid';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { components, NodeStatus, Status } from '../../../../api/v2/schema';
+import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useClient, useQuery } from '../../../../hooks/api';
+import LoadingIndicator from '../../../../ui/LoadingIndicator';
+import { DAGContext } from '../../contexts/DAGContext';
+import { getEventHandlers } from '../../lib/getEventHandlers';
+import { DAGStatusOverview, NodeStatusTable } from '../dag-details';
+import { DAGGraph } from '../visualization';
+import { HistoryTable, LogViewer, StatusUpdateModal } from './';
 
-/** Callback type for node click events */
-type onClickNode = (name: string) => void;
-
-/** Callback type for node right-click events */
-type onRightClickNode = (name: string) => void;
-
-/** Flowchart direction type - TD (top-down) or LR (left-right) */
-export type FlowchartType = 'TD' | 'LR';
-
-/** Steps can be either configuration steps or runtime nodes */
-type Steps = components['schemas']['Step'][] | components['schemas']['Node'][];
-
-/** Props for the Graph component */
+/**
+ * Props for the DAGExecutionHistory component
+ */
 type Props = {
-  /** Type of graph to render - status shows runtime state, config shows definition */
-  type?: 'status' | 'config';
-  /** Direction of the flowchart - TD (top-down) or LR (left-right) */
-  flowchart?: FlowchartType;
-  /** Steps or nodes to visualize */
-  steps?: Steps;
-  /** Callback for node click events (double-click) */
-  onClickNode?: onClickNode;
-  /** Callback for node right-click events */
-  onRightClickNode?: onRightClickNode;
-  /** Whether to show status icons */
-  showIcons?: boolean;
-  /** Whether to animate running nodes */
-  animate?: boolean;
+  /** DAG file name */
+  fileName: string;
+  /** Whether the component is rendered in a modal */
+  isInModal?: boolean;
+  /** The active tab in the parent component */
+  activeTab?: string;
 };
 
-/** Extend window interface to include the click handler (kept for backward compatibility) */
-declare global {
-  interface Window {
-    onClickMermaidNode: onClickNode;
+/**
+ * DAGExecutionHistory displays the execution history of a DAG
+ * including a history table, graph visualization, and status details
+ */
+function DAGExecutionHistory({
+  fileName,
+}: Omit<Props, 'isInModal' | 'activeTab'>) {
+  const appBarContext = React.useContext(AppBarContext);
+
+  // Fetch execution history data
+  const { data } = useQuery(
+    '/dags/{fileName}/dag-runs',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+        path: {
+          fileName: fileName,
+        },
+      },
+    },
+    { refreshInterval: 2000 } // Refresh every 2 seconds
+  );
+
+  // Show loading indicator while fetching data
+  if (!data) {
+    return <LoadingIndicator />;
   }
+
+  // Show message if no execution history is found
+  if (!data.dagRuns?.length) {
+    return <div>Execution history was not found.</div>;
+  }
+
+  return (
+    <DAGHistoryTable
+      fileName={fileName}
+      dagRuns={data.dagRuns}
+      gridData={data.gridData}
+    />
+  );
 }
 
 /**
- * Graph component for visualizing DAG dagRuns
- * Renders a Mermaid.js flowchart with nodes and connections
+ * Props for the DAGHistoryTable component
  */
-const Graph: React.FC<Props> = ({
-  steps,
-  flowchart = 'TD',
-  type = 'status',
-  onClickNode,
-  onRightClickNode,
-  showIcons = true,
-}) => {
-  const [scale, setScale] = useState(1);
-  const containerRef = React.useRef<HTMLDivElement>(null);
-
-  /** Increase zoom level */
-  const zoomIn = () => {
-    setScale((prevScale) => Math.min(prevScale + 0.1, 2));
-  };
-
-  /** Decrease zoom level */
-  const zoomOut = () => {
-    setScale((prevScale) => Math.max(prevScale - 0.1, 0.1));
-  };
-
-  /** Reset zoom to default */
-  const resetZoom = () => {
-    setScale(1);
-  };
-
-  /** Fit graph to container - zoom out to show entire graph */
-  const fitToScreen = () => {
-    // Simple approach: set to a small scale that typically shows the full graph
-    // This is more reliable than trying to calculate exact dimensions
-    setScale(0.3);
-  };
-
-  // Calculate width based on flowchart type and graph breadth
-  const width = React.useMemo(() => {
-    if (!steps) return '100%';
-
-    if (flowchart === 'LR') {
-      return `${steps.length * 240}px`;
-    } else {
-      // For TD layout, calculate based on maximum breadth
-      const maxBreadth = calculateGraphBreadth(steps);
-      // Assuming each node needs about 200px of width, plus some padding
-      return `${Math.max(maxBreadth * 300, 600)}px`;
-    }
-  }, [steps, flowchart]);
-
-  const mermaidStyle = {
-    display: 'flex',
-    alignItems: 'flex-center',
-    justifyContent: 'flex-start',
-    width: width,
-    minWidth: '100%',
-    minHeight: '200px',
-    maxHeight: '300px',
-    padding: '2em',
-    borderRadius: '0.5em',
-    background: `
-      linear-gradient(90deg, #f8fafc 1px, transparent 1px),
-      linear-gradient(180deg, #f8fafc 1px, transparent 1px)
-    `,
-    backgroundSize: '20px 20px',
-  };
-
-  const graph = React.useMemo(() => {
-    if (!steps || steps.length === 0) return '';
-
-    const dat: string[] = [];
-    dat.push(`flowchart ${flowchart};`);
-
-    // Add legend comment
-    dat.push(
-      `%% Shapes: Rectangle=Normal Step, Hexagon=Child DAG, Stadium=Parallel Execution`
-    );
-
-    // Store the click handler in window for backward compatibility
-    // but we'll use double-click for navigation
-    if (onClickNode) {
-      window.onClickMermaidNode = onClickNode;
-    }
-
-    // Track link style indices for individual arrow styling
-    let linkIndex = 0;
-    const linkStyles: string[] = [];
-
-    const addNodeFn = (
-      step: components['schemas']['Step'],
-      status: NodeStatus,
-      node?: components['schemas']['Node']
-    ) => {
-      const id = step.name.replace(/[\s-]/g, 'dagutmp'); // Replace spaces and dashes with 'x'
-      const c = graphStatusMap[status] || '';
-
-      // Check if this is a child dagRun node (has a 'run' property)
-      const childDAGName = step.call;
-      const isChildDAGRun = !!childDAGName;
-      const hasParallelExecutions = node?.children && node.children.length > 1;
-
-      // Add indicator for child dagRun nodes in the label only
-      // Escape any special characters in the label to prevent Mermaid parsing errors
-      let label = step.name;
-      if (isChildDAGRun && childDAGName) {
-        if (hasParallelExecutions && node?.children) {
-          // Show parallel execution count in the label - avoid brackets in stadium nodes
-          label = `${step.name} → ${childDAGName} x${node.children.length}`;
-        } else {
-          // Single child DAG run
-          label = `${step.name} → ${childDAGName}`;
-        }
-      }
-
-      // Use different shape for child dagRuns
-      if (isChildDAGRun) {
-        dat.push(`${id}{{${label}}}${c};`);
-      } else {
-        dat.push(`${id}["${label}"]${c};`);
-      }
-
-      // Process dependencies and add connections
-      if (step.depends) {
-        step.depends.forEach((dep) => {
-          const depId = dep.replace(/[-\s]/g, 'dagutmp');
-          if (status === NodeStatus.Failed) {
-            // Dashed line for error state
-            dat.push(`${depId} -.- ${id};`);
-            linkStyles.push(
-              `linkStyle ${linkIndex} stroke:#ef4444,stroke-width:1.8px,stroke-dasharray:3`
-            );
-          } else if (status === NodeStatus.Success) {
-            // Solid line with success color
-            dat.push(`${depId} --> ${id};`);
-            linkStyles.push(
-              `linkStyle ${linkIndex} stroke:#16a34a,stroke-width:1.8px`
-            );
-          } else {
-            // Default connection style
-            dat.push(`${depId} --> ${id};`);
-            linkStyles.push(
-              `linkStyle ${linkIndex} stroke:#64748b,stroke-width:1px`
-            );
-          }
-          linkIndex++;
-        });
-      }
-
-      // We no longer add the standard Mermaid click handler
-      // Double-click will be handled by our custom implementation
-    };
-
-    // Process nodes based on type
-    if (type === 'status') {
-      (steps as components['schemas']['Node'][]).forEach((node) =>
-        addNodeFn(node.step, node.status, node)
-      );
-    } else {
-      (steps as components['schemas']['Step'][]).forEach((step) =>
-        addNodeFn(step, 0)
-      );
-    }
-
-    // Define node styles for different states with refined colors
-    // Check if dark mode is active
-    const isDarkMode = document.documentElement.classList.contains('dark');
-    const nodeFill = isDarkMode ? '#18181b' : 'white'; // zinc-900 for dark mode
-    const nodeColor = isDarkMode ? '#e4e4e7' : '#333'; // zinc-200 for dark mode text
-
-    dat.push(
-      `classDef none color:${nodeColor},fill:${nodeFill},stroke:lightblue,stroke-width:1.2px`
-    );
-    dat.push(
-      `classDef running color:${nodeColor},fill:${nodeFill},stroke:lime,stroke-width:1.2px`
-    );
-    dat.push(
-      `classDef error color:${nodeColor},fill:${nodeFill},stroke:red,stroke-width:1.2px`
-    );
-    dat.push(
-      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:pink,stroke-width:1.2px`
-    );
-    dat.push(
-      `classDef done color:${nodeColor},fill:${nodeFill},stroke:green,stroke-width:1.2px`
-    );
-    dat.push(
-      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:gray,stroke-width:1.2px`
-    );
-    dat.push(
-      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:1.2px`
-    );
-
-    // Add custom link styles
-    dat.push(...linkStyles);
-
-    return dat.join('\n');
-  }, [steps, onClickNode, flowchart, showIcons]);
-
-  return (
-    <div className="relative" ref={containerRef}>
-      <div className="absolute right-2 top-2 z-10 bg-white dark:bg-zinc-900 rounded-md">
-        <ToggleGroup aria-label="Zoom controls">
-          <ToggleButton
-            value="zoomin"
-            onClick={() => zoomIn()}
-            aria-label="Zoom in"
-            position="first"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </ToggleButton>
-          <ToggleButton
-            value="zoomout"
-            onClick={() => zoomOut()}
-            aria-label="Zoom out"
-            position="middle"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </ToggleButton>
-          <ToggleButton
-            value="fit"
-            onClick={() => fitToScreen()}
-            aria-label="Fit to screen"
-            position="middle"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </ToggleButton>
-          <ToggleButton
-            value="reset"
-            onClick={() => resetZoom()}
-            aria-label="Reset zoom"
-            position="last"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </ToggleButton>
-        </ToggleGroup>
-      </div>
-      <Mermaid
-        style={mermaidStyle}
-        def={graph}
-        scale={scale}
-        onDoubleClick={onClickNode}
-        onRightClick={onRightClickNode}
-      />
-    </div>
-  );
+type HistoryTableProps = {
+  /** DAG file name */
+  fileName: string;
+  /** Grid data for visualization */
+  gridData: components['schemas']['DAGGridItem'][] | null;
+  /** List of DAG dagRuns */
+  dagRuns: components['schemas']['DAGRunDetails'][] | null;
 };
 
 /**
- * Calculate the maximum breadth of the graph
- * This helps determine the appropriate width for the graph container
+ * DAGHistoryTable displays detailed execution history with interactive elements
  */
-const calculateGraphBreadth = (steps: Steps) => {
-  // Create a map of nodes and their dependencies
-  const nodeMap = new Map<string, string[]>();
-  const parentMap = new Map<string, string[]>();
+function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
+  const appBarContext = React.useContext(AppBarContext);
+  const client = useClient();
+  const navigate = useNavigate();
+  const [modal, setModal] = React.useState(false);
 
-  // Initialize maps
-  steps.forEach((node) => {
-    const step = 'step' in node ? node.step : node;
-    nodeMap.set(step.name, step.depends || []);
-    step.depends?.forEach((dep) => {
-      if (!parentMap.has(dep)) {
-        parentMap.set(dep, []);
-      }
-      parentMap.get(dep)?.push(step.name);
-    });
+  // State for log viewer
+  const [logViewer, setLogViewer] = useState({
+    isOpen: false,
+    logType: 'step' as 'execution' | 'step',
+    stepName: '',
+    dagRunId: '',
+    stream: 'stdout' as 'stdout' | 'stderr',
   });
 
-  // Calculate levels for each node
-  const nodeLevels = new Map<string, number>();
-  const visited = new Set<string>();
+  // Get the selected dagRun index from URL parameters using React Router
+  const [searchParams, setSearchParams] = useSearchParams();
+  const idxParam = searchParams.get('idx');
+  const [idx, setIdx] = React.useState(
+    idxParam
+      ? parseInt(idxParam)
+      : dagRuns && dagRuns.length
+        ? dagRuns.length - 1
+        : 0
+  );
 
-  const calculateLevel = (nodeName: string, level = 0) => {
-    if (visited.has(nodeName)) return;
-    visited.add(nodeName);
+  // Removed unused context since we're no longer directly updating it
 
-    nodeLevels.set(nodeName, Math.max(level, nodeLevels.get(nodeName) || 0));
+  // Ensure index is valid when dagRuns change (e.g., when switching DAGs)
+  React.useEffect(() => {
+    if (!dagRuns || dagRuns.length === 0) return;
 
-    // Process children
-    const children = parentMap.get(nodeName) || [];
-    children.forEach((child) => calculateLevel(child, level + 1));
+    // Clamp the index to be within valid range
+    const maxIdx = dagRuns.length - 1;
+    const validIdx = Math.max(0, Math.min(idx, maxIdx));
+
+    // Only update if the index needs adjustment
+    if (validIdx !== idx) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('idx', validIdx.toString());
+      setSearchParams(newParams);
+      setIdx(validIdx);
+    }
+  }, [dagRuns, idx]);
+
+  /**
+   * Update the selected dagRun index and update URL parameters
+   */
+  const updateIdx = (newIdx: number) => {
+    // Ensure newIdx is within valid range
+    if (newIdx < 0 || !dagRuns || newIdx >= dagRuns.length) {
+      return;
+    }
+
+    setIdx(newIdx);
+    const reversedDAGRuns = [...(dagRuns || [])].reverse();
+
+    if (reversedDAGRuns && reversedDAGRuns[newIdx]) {
+      // Instead of directly updating the context, update the URL with the dagRun ID
+      const selectedDAGRun = reversedDAGRuns[newIdx];
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('idx', newIdx.toString());
+
+      // Add or update the dagRunId parameter
+      newParams.set('dagRunId', selectedDAGRun.dagRunId);
+
+      // Add dagRunName parameter to avoid waiting for DAG details
+      newParams.set('dagRunName', selectedDAGRun.name);
+
+      setSearchParams(newParams);
+    }
   };
 
-  // Start from nodes with no dependencies
-  steps.forEach((node) => {
-    const step = 'step' in node ? node.step : node;
-    if (!step.depends || step.depends.length === 0) {
-      calculateLevel(step.name);
+  // Listen for URL parameter changes
+  useEffect(() => {
+    if (idxParam) {
+      const newIdx = parseInt(idxParam);
+      if (!isNaN(newIdx) && newIdx !== idx) {
+        setIdx(newIdx);
+
+        // No longer updating the RootDAGRunContext here
+        // The status details page will handle this based on URL parameters
+      }
     }
-  });
+  }, [idxParam, idx]);
 
-  // Count nodes at each level
-  const levelCounts = new Map<number, number>();
-  nodeLevels.forEach((level) => {
-    levelCounts.set(level, (levelCounts.get(level) || 0) + 1);
-  });
+  /**
+   * Handle keyboard navigation with arrow keys
+   */
+  const handleKeyDown = React.useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'ArrowLeft') {
+        // Navigate to previous history item
+        updateIdx(idx - 1);
+      } else if (event.key === 'ArrowRight') {
+        // Navigate to next history item
+        updateIdx(idx + 1);
+      }
+    },
+    [idx, dagRuns, updateIdx]
+  );
 
-  // Find maximum breadth
-  let maxBreadth = 0;
-  levelCounts.forEach((count) => {
-    maxBreadth = Math.max(maxBreadth, count);
-  });
+  // Add and remove keyboard event listener
+  React.useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
 
-  return maxBreadth;
-};
+  // Get event handlers for the selected dagRun
+  let handlers: components['schemas']['Node'][] | null = null;
+  if (dagRuns && idx < dagRuns.length && dagRuns[idx]) {
+    handlers = getEventHandlers(dagRuns[idx]);
+  }
 
-export default Graph;
+  // Reverse the dagRuns array for display (newest first)
+  const reversedDAGRuns = [...(dagRuns || [])].reverse();
 
-// Map node status to CSS classes for styling
-const graphStatusMap = {
-  [0]: ':::none',
-  [1]: ':::running',
-  [2]: ':::error',
-  [3]: ':::cancel',
-  [4]: ':::done',
-  [5]: ':::skipped',
-  [6]: ':::partial',
-};
+  // State for the selected step in the status update modal
+  const [selectedStep, setSelectedStep] = React.useState<
+    components['schemas']['Step'] | undefined
+  >(undefined);
+
+  /**
+   * Close the status update modal
+   */
+  const dismissModal = () => setModal(false);
+
+  /**
+   * Update the status of a step
+   */
+  const onUpdateStatus = async (
+    _step: components['schemas']['Step'],
+    status: NodeStatus
+  ) => {
+    if (
+      !selectedStep ||
+      !reversedDAGRuns ||
+      idx >= reversedDAGRuns.length ||
+      !reversedDAGRuns[idx]
+    ) {
+      return;
+    }
+
+    // Call the API to update the step status
+    const { error } = await client.PATCH(
+      '/dag-runs/{name}/{dagRunId}/steps/{stepName}/status',
+      {
+        params: {
+          path: {
+            name: reversedDAGRuns[idx].name,
+            dagRunId: reversedDAGRuns[idx].dagRunId,
+            stepName: selectedStep.name,
+          },
+          query: {
+            remoteNode: appBarContext.selectedRemoteNode || 'local',
+          },
+        },
+        body: {
+          status,
+        },
+      }
+    );
+
+    if (error) {
+      alert(error.message || 'An error occurred');
+      return;
+    }
+
+    dismissModal();
+  };
+
+  // Removed the effect that updates the DAG status context
+  // The status details page will handle this based on URL parameters
+
+  /**
+   * Handle double-click on graph node (navigate to child dagRun)
+   */
+  const onSelectStepOnGraph = React.useCallback(
+    async (id: string) => {
+      const dagRun = reversedDAGRuns[idx];
+      if (!dagRun) {
+        return;
+      }
+
+      // Find the clicked step
+      const n = dagRun.nodes?.find(
+        (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
+      );
+
+      if (!n || !n.step.run) return;
+
+      // If it's a child dagRun, navigate to its details
+      const childDAGRun = n.children?.[0];
+      if (childDAGRun && childDAGRun.dagRunId) {
+        // Navigate to the child dagRun details using React Router with search params
+        // Include dagRunName parameter to avoid waiting for DAG details
+        navigate({
+          pathname: `/dags/${fileName}`,
+          search: `?dagRunId=${dagRun.rootDAGRunId}&childDAGRunId=${childDAGRun.dagRunId}&dagRunName=${encodeURIComponent(dagRun.rootDAGRunName)}`,
+        });
+      }
+    },
+    [reversedDAGRuns, idx, navigate]
+  );
+
+  /**
+   * Handle right-click on graph node (show status update modal)
+   */
+  const onRightClickStepOnGraph = React.useCallback(
+    (id: string) => {
+      const dagRun = reversedDAGRuns[idx];
+      if (!dagRun) {
+        return;
+      }
+
+      // Only allow status updates for completed dagRuns
+      if (
+        dagRun.status == Status.Running ||
+        dagRun.status == Status.NotStarted
+      ) {
+        return;
+      }
+
+      // Find the right-clicked step
+      const n = dagRun.nodes?.find(
+        (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
+      );
+
+      if (n) {
+        setSelectedStep(n.step);
+        setModal(true);
+      }
+    },
+    [reversedDAGRuns, idx]
+  );
+
+  return (
+    <DAGContext.Consumer>
+      {(props) => (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+            <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Execution History
+              </h2>
+            </div>
+            <div className="p-6">
+              <HistoryTable
+                dagRuns={reversedDAGRuns || []}
+                gridData={gridData || []}
+                onSelect={updateIdx}
+                idx={idx}
+              />
+            </div>
+          </div>
+
+          {reversedDAGRuns && reversedDAGRuns[idx] ? (
+            <React.Fragment>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    DAGRun Visualization
+                  </h2>
+                </div>
+                <div className="p-6">
+                  <DAGGraph
+                    dagRun={reversedDAGRuns[idx]}
+                    onSelectStep={onSelectStepOnGraph}
+                    onRightClickStep={onRightClickStepOnGraph}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Execution Status
+                  </h2>
+                </div>
+                <div className="p-6">
+                  <DAGStatusOverview
+                    status={reversedDAGRuns[idx]}
+                    dagRunId={reversedDAGRuns[idx].dagRunId}
+                    {...props}
+                    onViewLog={(dagRunId) => {
+                      setLogViewer({
+                        isOpen: true,
+                        logType: 'execution',
+                        stepName: '',
+                        dagRunId,
+                        stream: 'stdout',
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Desktop Steps - Card Container */}
+              <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                    <span>Execution Steps</span>
+                    {reversedDAGRuns[idx].nodes && (
+                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                        {reversedDAGRuns[idx].nodes.length} step
+                        {reversedDAGRuns[idx].nodes.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <NodeStatusTable
+                    nodes={reversedDAGRuns[idx].nodes}
+                    status={reversedDAGRuns[idx]}
+                    {...props}
+                    onViewLog={(stepName, dagRunId) => {
+                      // Check if this is a stderr log (indicated by _stderr suffix)
+                      const isStderr = stepName.endsWith('_stderr');
+                      const actualStepName = isStderr
+                        ? stepName.slice(0, -7)
+                        : stepName; // Remove '_stderr' suffix
+
+                      setLogViewer({
+                        isOpen: true,
+                        logType: 'step',
+                        stepName: actualStepName,
+                        dagRunId:
+                          dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
+                        stream: isStderr ? 'stderr' : 'stdout',
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Mobile Steps - No Card Container */}
+              <div className="md:hidden">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                    <span>Execution Steps</span>
+                    {reversedDAGRuns[idx].nodes && (
+                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                        {reversedDAGRuns[idx].nodes.length} step
+                        {reversedDAGRuns[idx].nodes.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </h2>
+                </div>
+                <NodeStatusTable
+                  nodes={reversedDAGRuns[idx].nodes}
+                  status={reversedDAGRuns[idx]}
+                  {...props}
+                  onViewLog={(stepName, dagRunId) => {
+                    // Check if this is a stderr log (indicated by _stderr suffix)
+                    const isStderr = stepName.endsWith('_stderr');
+                    const actualStepName = isStderr
+                      ? stepName.slice(0, -7)
+                      : stepName; // Remove '_stderr' suffix
+
+                    setLogViewer({
+                      isOpen: true,
+                      logType: 'step',
+                      stepName: actualStepName,
+                      dagRunId:
+                        dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
+                      stream: isStderr ? 'stderr' : 'stdout',
+                    });
+                  }}
+                />
+              </div>
+
+              {handlers && handlers.length ? (
+                <>
+                  {/* Desktop Lifecycle Hooks - Card Container */}
+                  <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                    <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                        <span>Lifecycle Hooks</span>
+                        <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                          {handlers.length} hook
+                          {handlers.length !== 1 ? 's' : ''}
+                        </span>
+                      </h2>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <NodeStatusTable
+                        nodes={getEventHandlers(reversedDAGRuns[idx])}
+                        status={reversedDAGRuns[idx]}
+                        {...props}
+                        onViewLog={(stepName, dagRunId) => {
+                          // Check if this is a stderr log (indicated by _stderr suffix)
+                          const isStderr = stepName.endsWith('_stderr');
+                          const actualStepName = isStderr
+                            ? stepName.slice(0, -7)
+                            : stepName; // Remove '_stderr' suffix
+
+                          setLogViewer({
+                            isOpen: true,
+                            logType: 'step',
+                            stepName: actualStepName,
+                            dagRunId:
+                              dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
+                            stream: isStderr ? 'stderr' : 'stdout',
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Mobile Lifecycle Hooks - No Card Container */}
+                  <div className="md:hidden">
+                    <div className="mb-4">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                        <span>Lifecycle Hooks</span>
+                        <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                          {handlers.length} hook
+                          {handlers.length !== 1 ? 's' : ''}
+                        </span>
+                      </h2>
+                    </div>
+                    <NodeStatusTable
+                      nodes={getEventHandlers(reversedDAGRuns[idx])}
+                      status={reversedDAGRuns[idx]}
+                      {...props}
+                      onViewLog={(stepName, dagRunId) => {
+                        // Check if this is a stderr log (indicated by _stderr suffix)
+                        const isStderr = stepName.endsWith('_stderr');
+                        const actualStepName = isStderr
+                          ? stepName.slice(0, -7)
+                          : stepName; // Remove '_stderr' suffix
+
+                        setLogViewer({
+                          isOpen: true,
+                          logType: 'step',
+                          stepName: actualStepName,
+                          dagRunId:
+                            dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
+                          stream: isStderr ? 'stderr' : 'stdout',
+                        });
+                      }}
+                    />
+                  </div>
+                </>
+              ) : null}
+
+              {/* Log viewer modal - moved outside to handle all log viewing */}
+              <LogViewer
+                isOpen={logViewer.isOpen}
+                onClose={() =>
+                  setLogViewer((prev) => ({ ...prev, isOpen: false }))
+                }
+                logType={logViewer.logType}
+                dagName={
+                  reversedDAGRuns && reversedDAGRuns[idx]
+                    ? reversedDAGRuns[idx].name
+                    : ''
+                }
+                dagRunId={logViewer.dagRunId}
+                stepName={logViewer.stepName}
+                dagRun={reversedDAGRuns[idx]}
+                stream={logViewer.stream}
+              />
+            </React.Fragment>
+          ) : null}
+
+          <StatusUpdateModal
+            visible={modal}
+            step={selectedStep}
+            dismissModal={dismissModal}
+            onSubmit={onUpdateStatus}
+          />
+        </div>
+      )}
+    </DAGContext.Consumer>
+  );
+}
+
+export default DAGExecutionHistory;

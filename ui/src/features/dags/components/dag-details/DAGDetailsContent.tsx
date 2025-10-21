@@ -269,7 +269,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
           {activeTab === 'spec' ? <DAGSpec fileName={fileName} /> : null}
           {activeTab === 'history' ? (
             <div data-tab="history">
-              <DAGExecutionHistory />
+              <DAGExecutionHistory fileName={fileName || ''} />
             </div>
           ) : null}
           {activeTab === 'dagRun-log' ? (
