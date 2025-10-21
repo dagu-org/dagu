@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/adrg/xdg"
@@ -16,14 +15,11 @@ import (
 	"github.com/spf13/viper"
 )
 
-// loadLock synchronizes access to the Load function to ensure that only one configuration load occurs at a time.
-var loadLock sync.Mutex
-
 // Load creates a new configuration by instantiating a ConfigLoader with the provided options
 // and then invoking its Load method.
 func Load(opts ...ConfigLoaderOption) (*Config, error) {
-	loadLock.Lock()
-	defer loadLock.Unlock()
+	lockViper()
+	defer unlockViper()
 
 	loader := NewConfigLoader(opts...)
 	cfg, err := loader.Load()
@@ -34,9 +30,7 @@ func Load(opts ...ConfigLoaderOption) (*Config, error) {
 }
 
 // ConfigLoader is responsible for reading and merging configuration from various sources.
-// The internal mutex ensures thread-safety when loading the configuration.
 type ConfigLoader struct {
-	lock              sync.Mutex
 	configFile        string   // Optional explicit path to the configuration file.
 	warnings          []string // Collected warnings during configuration resolution.
 	additionalBaseEnv []string // Additional environment variables to append to the base environment.
@@ -71,10 +65,8 @@ func NewConfigLoader(options ...ConfigLoaderOption) *ConfigLoader {
 
 // Load initializes viper, reads configuration files, handles legacy configuration,
 // and returns a fully built and validated Config instance.
+// Note: This method must be called while holding the global viper lock (via config.Load()).
 func (l *ConfigLoader) Load() (*Config, error) {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
 	// Initialize viper with proper defaults, environment binding and warnings.
 	homeDir, err := getHomeDir()
 	if err != nil {
