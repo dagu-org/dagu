@@ -74,7 +74,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
       // For non-running DAGs, calculate once
       setCurrentDuration(calculateDuration());
     }
-  }, [isRunning, dagRunToDisplay.startedAt, dagRunToDisplay.finishedAt, calculateDuration]);
+  }, [isRunning, dagRunToDisplay.startedAt, dagRunToDisplay.finishedAt]);
 
   const handleRootDAGRunClick = (e: React.MouseEvent) => {
     e.preventDefault();
