@@ -21,11 +21,14 @@
 - Parameters: Added JSON Schema validation mode with `schema`.
 - Runtime: Injects `DAG_RUN_STATUS` into handler environments so exit/success/failure/cancel scripts can branch on the final canonical status.
 - Executors: Added an experimental GitHub Actions executor (`type: gha`) powered by nektos/act; action inputs come from the new step-level `params` map.
+- UI: Added accordion-style expandable node rows to display step logs inline, similar to GitHub Actions, reducing the need to open popup windows (#1313).
 
 ### Fixed
 - DAG name validation is centralized and enforced consistently: names must be `<= 40` chars and match `[A-Za-z0-9_.-]+`. Endpoints that accept `name` now return `400 bad_request` for invalid names.
 - Docker: Fixed container initialization bug with `registryAuths` field (#1330)
 - Windows: Fixed process cancellation not terminating subprocesses by recursively killing all child processes (#1342)
+- UI: Fixed duration display update bug in DAG run details
+- Other small issues and improvements
 
 ### Contributors
 
@@ -35,6 +38,7 @@ Thanks to our contributors for this release:
 | -------------------------------------- | ---------------------------------------- |
 | Docker-in-Docker container execution issues (#1228, #1231, #1235) and registryAuths bug report (#1327) | [@bellackn](https://github.com/bellackn) |
 | Container name support (#1237), bash requirement (#1239), command field (#1261), log buttons (#1301), and scroll issues (#1324) | [@Pangolin2097](https://github.com/Pangolin2097) |
+| Accordion-style log expansion feature request (#1313) | [@borestad](https://github.com/borestad) |
 | SSH environment variables feature request (#1238) | [@n3storm](https://github.com/n3storm) |
 | SSH config override issue report (#1249) | [@TrezOne](https://github.com/TrezOne) |
 | DAG dependency resolution error report (#1262) | [@JuchangGit](https://github.com/JuchangGit) |
