@@ -172,11 +172,11 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 		if err != nil {
 			errs = append(errs, err.Error())
 		}
-	} else if len(dag.BuildErrors) > 0 {
-		// Extract build errors from the DAG
+	} else {
 		for _, buildErr := range dag.BuildErrors {
 			errs = append(errs, buildErr.Error())
 		}
+		errs = append(errs, dag.BuildWarnings...)
 	}
 
 	return &api.GetDAGSpec200JSONResponse{

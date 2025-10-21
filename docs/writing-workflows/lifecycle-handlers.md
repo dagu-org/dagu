@@ -32,7 +32,7 @@ steps:
   - command: ./load.sh
 ```
 
-Each handler is a normal step definition. You can use `command`, `script`, `run`, `executor`, containers, timeouts, or any other step field that makes sense for a single task.
+Each handler is a normal step definition. You can use `command`, `script`, `call` (or the legacy `run`), `executor`, containers, timeouts, or any other step field that makes sense for a single task.
 
 ## Execution Model
 
@@ -67,7 +67,7 @@ handlerOn:
 ```yaml
 handlerOn:
   success:
-    run: sync-reporting
+    call: sync-reporting
     params: |
       parent_run_id: ${DAG_RUN_ID}
 ```

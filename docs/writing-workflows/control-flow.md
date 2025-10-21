@@ -39,13 +39,12 @@ Run other workflows as steps and compose them hierarchically.
 
 ```yaml
 steps:
-  - run: workflows/extract.yaml
+  - call: workflows/extract.yaml
     params: "SOURCE=production"
 
-  - run: workflows/transform.yaml
+  - call: workflows/transform.yaml
     params: "INPUT=${extract.output}"
-
-  - run: workflows/load.yaml
+  - call: workflows/load.yaml
     params: "DATA=${transform.output}"
 ```
 
@@ -55,7 +54,7 @@ Define multiple DAGs separated by `---` and call by name.
 
 ```yaml
 steps:
-  - run: data-processor
+  - call: data-processor
     params: "TYPE=daily"
 
 ---
@@ -77,8 +76,7 @@ steps:
   - command: |
       echo '["file1.csv","file2.csv","file3.csv"]'
     output: TASK_LIST
-
-  - run: worker
+  - call: worker
     parallel:
       items: ${TASK_LIST}
       maxConcurrent: 1
@@ -102,8 +100,7 @@ steps:
   - command: |
       echo '["chunk1","chunk2","chunk3"]'
     output: CHUNKS
-
-  - run: worker
+  - call: worker
     parallel:
       items: ${CHUNKS}
       maxConcurrent: 3

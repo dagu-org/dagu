@@ -122,9 +122,9 @@ otel:
 
 steps:
   - echo "Starting parent workflow"
-  - run: child-etl.yaml
+  - call: child-etl.yaml
     params: "SOURCE=production DATE=2024-01-01"
-  - run: child-analytics.yaml
+  - call: child-analytics.yaml
     params: "INPUT=${run-etl.output}"
   - echo "Parent workflow complete"
     

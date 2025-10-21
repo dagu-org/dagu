@@ -96,7 +96,7 @@ When a step executes another DAG, the trace context is automatically propagated:
 
 ```yaml
 steps:
-  - run: workflows/child-workflow.yaml
+  - call: workflows/child-workflow.yaml
     params: "PARAM1=value1"
 ```
 

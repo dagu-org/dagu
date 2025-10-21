@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/collections"
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/go-viper/mapstructure/v2"
@@ -1433,9 +1434,6 @@ func buildStepEnvs(ctx StepBuildContext, def stepDef, step *core.Step) error {
 	return nil
 }
 
-// maxStepNameLen is the maximum length of a step name.
-const maxStepNameLen = 40
-
 func buildStepPrecondition(ctx StepBuildContext, def stepDef, step *core.Step) error {
 	// Parse both `preconditions` and `precondition` fields.
 	conditions, err := parsePrecondition(ctx.BuildContext, def.Preconditions)
@@ -1465,7 +1463,18 @@ func buildSignalOnStop(_ StepBuildContext, def stepDef, step *core.Step) error {
 
 // buildChildDAG parses the child core.DAG definition and sets up the step to run a child DAG.
 func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
-	name := strings.TrimSpace(def.Run)
+	name := strings.TrimSpace(def.Call)
+	if name == "" {
+		// TODO: remove legacy support in future major version
+		if legacyName := strings.TrimSpace(def.Run); legacyName != "" {
+			name = legacyName
+			message := "Step field `run` is deprecated; use `call` instead"
+			logger.Warn(ctx.ctx, message)
+			if ctx.dag != nil {
+				ctx.dag.BuildWarnings = append(ctx.dag.BuildWarnings, message)
+			}
+		}
+	}
 
 	// if the run field is not set, return nil.
 	if name == "" {
@@ -1500,9 +1509,9 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 		step.ExecutorConfig.Type = core.ExecutorTypeDAG
 	}
 
-	step.Command = "run"
+	step.Command = "call"
 	step.Args = []string{name, paramsStr}
-	step.CmdWithArgs = fmt.Sprintf("%s %s", name, paramsStr)
+	step.CmdWithArgs = strings.TrimSpace(fmt.Sprintf("%s %s", name, paramsStr))
 	return nil
 }
 

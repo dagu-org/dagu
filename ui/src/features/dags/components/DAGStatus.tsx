@@ -7,7 +7,11 @@ import { useClient } from '../../../hooks/api';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
 import { DAGStatusOverview, NodeStatusTable } from './dag-details';
-import { LogViewer, ParallelExecutionModal, StatusUpdateModal } from './dag-execution';
+import {
+  LogViewer,
+  ParallelExecutionModal,
+  StatusUpdateModal,
+} from './dag-execution';
 import { DAGGraph } from './visualization';
 
 type Props = {
@@ -96,10 +100,14 @@ function DAGStatus({ dagRun, fileName }: Props) {
         (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
       );
 
-      if (n && n.step.run) {
+      const childDAGName = n?.step?.call;
+      if (n && childDAGName) {
         // Combine both regular children and repeated children
-        const allChildren = [...(n.children || []), ...(n.childrenRepeated || [])];
-        
+        const allChildren = [
+          ...(n.children || []),
+          ...(n.childrenRepeated || []),
+        ];
+
         // Check if there are multiple child runs (parallel execution or repeated)
         if (allChildren.length > 1) {
           // Show modal to select which execution to view
@@ -118,20 +126,28 @@ function DAGStatus({ dagRun, fileName }: Props) {
 
   // Helper function to navigate to a specific child DAG run
   const navigateToChildDagRun = React.useCallback(
-    (node: components['schemas']['Node'], childIndex: number, openInNewTab?: boolean) => {
+    (
+      node: components['schemas']['Node'],
+      childIndex: number,
+      openInNewTab?: boolean
+    ) => {
       // Combine both regular children and repeated children
-      const allChildren = [...(node.children || []), ...(node.childrenRepeated || [])];
+      const allChildren = [
+        ...(node.children || []),
+        ...(node.childrenRepeated || []),
+      ];
       const childDAGRun = allChildren[childIndex];
-      
+
       if (childDAGRun && childDAGRun.dagRunId) {
         // Navigate to the child DAG-run status page
         const dagRunId = dagRun.rootDAGRunId || dagRun.dagRunId;
 
         // Check if we're in a dagRun context or a DAG context
         const currentPath = window.location.pathname;
-        const isModal = document.querySelector('.dagRun-modal-content') !== null;
+        const isModal =
+          document.querySelector('.dagRun-modal-content') !== null;
         const isDAGRunContext = currentPath.startsWith('/dag-runs/') || isModal;
-        
+
         let url: string;
         if (isDAGRunContext) {
           // For DAG runs, use query parameters to navigate to the DAG-run details page
@@ -148,7 +164,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
           }
 
           searchParams.set('step', node.step.name);
-          
+
           // Determine root DAG name
           const rootDAGName = dagRun.rootDAGRunName || dagRun.name;
           url = `/dag-runs/${rootDAGName}/${dagRunId}?${searchParams.toString()}`;
@@ -197,7 +213,11 @@ function DAGStatus({ dagRun, fileName }: Props) {
   const handlers = getEventHandlers(dagRun);
 
   // Handler for opening log viewer
-  const handleViewLog = (stepName: string, dagRunId: string, node?: components['schemas']['Node']) => {
+  const handleViewLog = (
+    stepName: string,
+    dagRunId: string,
+    node?: components['schemas']['Node']
+  ) => {
     // Check if this is a stderr log (indicated by _stderr suffix)
     const isStderr = stepName.endsWith('_stderr');
     const actualStepName = isStderr ? stepName.slice(0, -7) : stepName; // Remove '_stderr' suffix
@@ -218,9 +238,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
       {dagRun.nodes && dagRun.nodes.length > 0 && (
         <div className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
           <div className="border-b border-border bg-muted/30 px-6 py-4">
-            <h2 className="text-lg font-semibold text-foreground">
-              Graph
-            </h2>
+            <h2 className="text-lg font-semibold text-foreground">Graph</h2>
           </div>
           <div className="p-6">
             <DAGGraph
@@ -377,13 +395,17 @@ function DAGStatus({ dagRun, fileName }: Props) {
           isOpen={parallelExecutionModal.isOpen}
           onClose={() => setParallelExecutionModal({ isOpen: false })}
           stepName={parallelExecutionModal.node.step.name}
-          childDAGName={parallelExecutionModal.node.step.run || ''}
+          childDAGName={parallelExecutionModal.node.step.call || ''}
           children={[
             ...(parallelExecutionModal.node.children || []),
-            ...(parallelExecutionModal.node.childrenRepeated || [])
+            ...(parallelExecutionModal.node.childrenRepeated || []),
           ]}
           onSelectChild={(childIndex, openInNewTab) => {
-            navigateToChildDagRun(parallelExecutionModal.node!, childIndex, openInNewTab);
+            navigateToChildDagRun(
+              parallelExecutionModal.node!,
+              childIndex,
+              openInNewTab
+            );
             if (!openInNewTab) {
               setParallelExecutionModal({ isOpen: false });
             }

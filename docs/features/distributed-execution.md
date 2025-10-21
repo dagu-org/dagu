@@ -88,7 +88,7 @@ Use `workerSelector` in your DAG definitions to route tasks:
 ```yaml
 steps:
   # This task requires GPU
-  - run: train-model
+  - call: train-model
     workerSelector:
       gpu: "true"
 

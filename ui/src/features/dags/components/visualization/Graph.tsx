@@ -145,20 +145,22 @@ const Graph: React.FC<Props> = ({
       const id = step.name.replace(/[\s-]/g, 'dagutmp'); // Replace spaces and dashes with 'x'
       const c = graphStatusMap[status] || '';
 
+      // Check if this is a child dagRun node (has a call property)
+      const childDAGName = step.call;
       // Check if this is a child dagRun node (has a 'run' property)
-      const isChildDAGRun = !!step.run;
+      const isChildDAGRun = !!step.call;
       const hasParallelExecutions = !!step.parallel;
 
       // Add indicator for child dagRun nodes in the label only
       // Escape any special characters in the label to prevent Mermaid parsing errors
       let label = step.name;
-      if (isChildDAGRun && step.run) {
+      if (isChildDAGRun && childDAGName) {
         if (hasParallelExecutions && node?.children) {
           // Show parallel execution count in the label - avoid brackets in stadium nodes
-          label = `${step.name} → ${step.run} x${node.children.length}`;
+          label = `${step.name} → ${childDAGName} x${node.children.length}`;
         } else {
           // Single child DAG run
-          label = `${step.name} → ${step.run}`;
+          label = `${step.name} → ${childDAGName}`;
         }
       }
 

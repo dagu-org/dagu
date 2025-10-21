@@ -3,15 +3,24 @@
  *
  * @module features/dags/components/dag-details
  */
+import { CommandDisplay } from '@/components/ui/command-display';
 import { TableCell } from '@/components/ui/table';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { CommandDisplay } from '@/components/ui/command-display';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { useClient, useQuery } from '@/hooks/api';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/ui/CustomDialog';
 import {
   ChevronDown,
   ChevronRight,
@@ -23,12 +32,9 @@ import {
 } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { components, NodeStatus } from '../../../../api/v2/schema';
+import { components, NodeStatus, Stream } from '../../../../api/v2/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/ui/CustomDialog';
-import { useClient, useQuery } from '@/hooks/api';
-import { AppBarContext } from '@/contexts/AppBarContext';
 import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
 
 /**
@@ -42,7 +48,11 @@ type Props = {
   /** DAG file name */
   name: string;
   /** Function to open log viewer */
-  onViewLog?: (stepName: string, dagRunId: string, node?: components['schemas']['Node']) => void;
+  onViewLog?: (
+    stepName: string,
+    dagRunId: string,
+    node?: components['schemas']['Node']
+  ) => void;
   /** Full dagRun details (optional) - used to determine if this is a child dagRun */
   dagRun: components['schemas']['DAGRunDetails'];
   /** View mode: desktop or mobile */
@@ -82,7 +92,7 @@ function InlineLogViewer({
   dagName: string;
   dagRunId: string;
   stepName: string;
-  stream: 'stdout' | 'stderr';
+  stream: components['schemas']['Stream'];
   dagRun?: components['schemas']['DAGRunDetails'];
 }) {
   const appBarContext = useContext(AppBarContext);
@@ -90,9 +100,7 @@ function InlineLogViewer({
 
   // Determine if this is a child DAG run
   const isChildDAGRun =
-    dagRun &&
-    dagRun.rootDAGRunId &&
-    dagRun.rootDAGRunId !== dagRun.dagRunId;
+    dagRun && dagRun.rootDAGRunId && dagRun.rootDAGRunId !== dagRun.dagRunId;
 
   // Determine the API endpoint
   const apiEndpoint = isChildDAGRun
@@ -133,7 +141,8 @@ function InlineLogViewer({
   );
 
   // Process log content
-  const content = data?.content?.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '') || '';
+  const content =
+    data?.content?.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '') || '';
   const lines = content ? content.split('\n') : [];
   const totalLines = data?.totalLines || 0;
   const lineCount = data?.lineCount || 0;
@@ -143,7 +152,9 @@ function InlineLogViewer({
       {isLoading && !data ? (
         <div className="text-zinc-400 text-xs py-4 px-3">Loading logs...</div>
       ) : lines.length === 0 ? (
-        <div className="text-zinc-400 text-xs py-4 px-3">&lt;No log output&gt;</div>
+        <div className="text-zinc-400 text-xs py-4 px-3">
+          &lt;No log output&gt;
+        </div>
       ) : (
         <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
           <pre className="font-mono text-[11px] text-zinc-100 p-2">
@@ -230,13 +241,19 @@ function NodeStatusTableRow({
   const [success, setSuccess] = useState(false);
   // State for inline log expansion
   const [isLogExpanded, setIsLogExpanded] = useState(false);
-  const [activeLogTab, setActiveLogTab] = useState<'stdout' | 'stderr'>('stdout');
+  const [activeLogTab, setActiveLogTab] = useState<'stdout' | 'stderr'>(
+    'stdout'
+  );
   // State for status update modal
   const [showStatusModal, setShowStatusModal] = useState(false);
   // Check if this is a child dagRun node
   // Include both regular children and repeated children
-  const allChildren = [...(node.children || []), ...(node.childrenRepeated || [])];
-  const hasChildDAGRun = !!node.step.run && allChildren.length > 0;
+  const allChildren = [
+    ...(node.children || []),
+    ...(node.childrenRepeated || []),
+  ];
+  const childDagName = node.step.call;
+  const hasChildDAGRun = !!childDagName && allChildren.length > 0;
 
   // Update duration every second for running tasks
   useEffect(() => {
@@ -378,7 +395,7 @@ function NodeStatusTableRow({
       await client.POST('/dag-runs/{name}/{dagRunId}/retry', {
         params: {
           path: { name: dagName, dagRunId },
-          query: { remoteNode }
+          query: { remoteNode },
         },
         body: { dagRunId, stepName: node.step.name },
       });
@@ -442,7 +459,8 @@ function NodeStatusTableRow({
   const hasLogs = hasStdout || hasStderr;
 
   // Determine which stream to show based on active tab
-  const currentStream = activeLogTab === 'stderr' && hasStderr ? 'stderr' : 'stdout';
+  const currentStream: components['schemas']['Stream'] =
+    activeLogTab === 'stderr' && hasStderr ? Stream.stderr : Stream.stdout;
 
   // Render desktop view (table row)
   if (view === 'desktop') {
@@ -463,234 +481,302 @@ function NodeStatusTableRow({
             }
           }}
         >
-        <TableCell className="text-center py-2">
-          <div className="flex items-center justify-center gap-2">
-            {hasLogs && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsLogExpanded(!isLogExpanded);
-                  if (!isLogExpanded) {
-                    setActiveLogTab(hasStdout ? 'stdout' : 'stderr');
-                  }
-                }}
-                className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-              >
-                {isLogExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </button>
-            )}
-            <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs">
-              {rownum}
-            </span>
-          </div>
-        </TableCell>
-
-        {/* Combined Step Name & Description */}
-        <TableCell>
-          <div className="space-y-0.5">
-            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all flex items-center gap-1.5">
-              {node.step.name}
-              {hasChildDAGRun && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex items-center text-blue-500 cursor-pointer">
-                      <GitBranch className="h-4 w-4" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <span className="text-xs">
-                      Child DAG Run: {node.step.run}
-                    </span>
-                  </TooltipContent>
-                </Tooltip>
+          <TableCell className="text-center py-2">
+            <div className="flex items-center justify-center gap-2">
+              {hasLogs && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsLogExpanded(!isLogExpanded);
+                    if (!isLogExpanded) {
+                      setActiveLogTab(hasStdout ? 'stdout' : 'stderr');
+                    }
+                  }}
+                  className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                >
+                  {isLogExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
               )}
+              <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs">
+                {rownum}
+              </span>
             </div>
-            {node.step.description && (
-              <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
-                {node.step.description}
+          </TableCell>
+
+          {/* Combined Step Name & Description */}
+          <TableCell>
+            <div className="space-y-0.5">
+              <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all flex items-center gap-1.5">
+                {node.step.name}
+                {hasChildDAGRun && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center text-blue-500 cursor-pointer">
+                        <GitBranch className="h-4 w-4" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <span className="text-xs">
+                        Child DAG Run: {childDagName}
+                      </span>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </div>
-            )}
-            
-            {/* Repeat Policy */}
-            {node.step.repeatPolicy?.repeat && (
-              <div className="flex items-start gap-1 mt-1">
-                <span className={`inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                  node.step.repeatPolicy.repeat === 'while'
-                    ? 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
-                    : node.step.repeatPolicy.repeat === 'until'
-                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                }`}>
-                  <RefreshCw className="h-2.5 w-2.5" />
-                  {node.step.repeatPolicy.repeat === 'while' ? 'WHILE' : 
-                   node.step.repeatPolicy.repeat === 'until' ? 'UNTIL' : 'REPEAT'}
-                  {node.step.repeatPolicy.interval && (
-                    <span className="opacity-75">{node.step.repeatPolicy.interval}s</span>
-                  )}
-                  {node.step.repeatPolicy.limit && (
-                    <span className="opacity-75">×{node.step.repeatPolicy.limit}</span>
-                  )}
-                </span>
-                
-                {node.step.repeatPolicy.condition && (
-                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">
-                    {node.step.repeatPolicy.condition.condition}
-                    {node.step.repeatPolicy.condition.expected && (
-                      <span className="text-emerald-600 dark:text-emerald-400">
-                        ={node.step.repeatPolicy.condition.expected}
+              {node.step.description && (
+                <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
+                  {node.step.description}
+                </div>
+              )}
+
+              {/* Repeat Policy */}
+              {node.step.repeatPolicy?.repeat && (
+                <div className="flex items-start gap-1 mt-1">
+                  <span
+                    className={`inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                      node.step.repeatPolicy.repeat === 'while'
+                        ? 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
+                        : node.step.repeatPolicy.repeat === 'until'
+                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                          : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                    }`}
+                  >
+                    <RefreshCw className="h-2.5 w-2.5" />
+                    {node.step.repeatPolicy.repeat === 'while'
+                      ? 'WHILE'
+                      : node.step.repeatPolicy.repeat === 'until'
+                        ? 'UNTIL'
+                        : 'REPEAT'}
+                    {node.step.repeatPolicy.interval && (
+                      <span className="opacity-75">
+                        {node.step.repeatPolicy.interval}s
+                      </span>
+                    )}
+                    {node.step.repeatPolicy.limit && (
+                      <span className="opacity-75">
+                        ×{node.step.repeatPolicy.limit}
                       </span>
                     )}
                   </span>
-                )}
-                
-                {node.step.repeatPolicy.exitCode && node.step.repeatPolicy.exitCode.length > 0 && (
-                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">
-                    exit:[{node.step.repeatPolicy.exitCode.join(',')}]
-                  </span>
-                )}
-              </div>
-            )}
-            
-            {hasChildDAGRun && (
-              <>
-                {allChildren.length === 1 ? (
-                  // Single child DAG run
-                  <>
-                    <div
-                      className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleChildDAGRunNavigation(0, e);
-                      }}
-                      title="Click to view child DAG run (Cmd/Ctrl+Click to open in new tab)"
-                    >
-                      View Child DAG Run: {node.step.run}
-                    </div>
-                    {allChildren[0]?.params && (
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Parameters:{' '}
-                        <span className="font-mono">
-                          {allChildren[0].params}
+
+                  {node.step.repeatPolicy.condition && (
+                    <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">
+                      {node.step.repeatPolicy.condition.condition}
+                      {node.step.repeatPolicy.condition.expected && (
+                        <span className="text-emerald-600 dark:text-emerald-400">
+                          ={node.step.repeatPolicy.condition.expected}
                         </span>
-                      </div>
+                      )}
+                    </span>
+                  )}
+
+                  {node.step.repeatPolicy.exitCode &&
+                    node.step.repeatPolicy.exitCode.length > 0 && (
+                      <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">
+                        exit:[{node.step.repeatPolicy.exitCode.join(',')}]
+                      </span>
                     )}
-                  </>
-                ) : (
-                  // Multiple child DAG runs (parallel execution or repeated)
-                  <>
-                    <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsExpanded(!isExpanded);
-                          }}
-                          className="flex items-center gap-1 text-blue-500 dark:text-blue-400 font-medium hover:underline"
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="h-3 w-3" />
-                          ) : (
-                            <ChevronRight className="h-3 w-3" />
-                          )}
-                          Multiple executions: {allChildren.length} child
-                          DAG runs
-                        </button>
+                </div>
+              )}
+
+              {hasChildDAGRun && (
+                <>
+                  {allChildren.length === 1 ? (
+                    // Single child DAG run
+                    <>
+                      <div
+                        className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleChildDAGRunNavigation(0, e);
+                        }}
+                        title="Click to view child DAG run (Cmd/Ctrl+Click to open in new tab)"
+                      >
+                        View Child DAG Run: {childDagName}
                       </div>
-                      {isExpanded && (
-                        <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
-                          {allChildren.map((child, index) => (
-                            <div key={child.dagRunId} className="py-1">
-                              <div
-                                className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleChildDAGRunNavigation(index, e);
-                                }}
-                                title="Click to view child DAG run (Cmd/Ctrl+Click to open in new tab)"
-                              >
-                                #{index + 1}: {node.step.run}
-                              </div>
-                              {child.params && (
-                                <div className="text-xs text-slate-500 dark:text-slate-400 ml-4 font-mono">
-                                  {child.params}
-                                </div>
-                              )}
-                            </div>
-                          ))}
+                      {allChildren[0]?.params && (
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Parameters:{' '}
+                          <span className="font-mono">
+                            {allChildren[0].params}
+                          </span>
                         </div>
                       )}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        </TableCell>
-
-        {/* Combined Command & Args */}
-        <TableCell>
-          {(node.step.command || node.step.cmdWithArgs) && (
-            <CommandDisplay
-              command={node.step.command || node.step.cmdWithArgs || ''}
-              args={node.step.command ? node.step.args : undefined}
-              icon="code"
-              maxLength={50}
-            />
-          )}
-        </TableCell>
-
-        {/* Last Run & Duration */}
-        <TableCell>
-          <div className="space-y-0.5">
-            <div className="font-medium text-slate-700 dark:text-slate-300 text-sm">
-              {formatTimestamp(node.startedAt)}
-            </div>
-            {node.startedAt && (
-              <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 leading-tight">
-                <span className="font-medium flex items-center">
-                  Duration:
-                  {node.status === NodeStatus.Running && (
-                    <span className="inline-block w-2 h-2 rounded-full bg-lime-500 ml-1.5 animate-pulse" />
+                    </>
+                  ) : (
+                    // Multiple child DAG runs (parallel execution or repeated)
+                    <>
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsExpanded(!isExpanded);
+                            }}
+                            className="flex items-center gap-1 text-blue-500 dark:text-blue-400 font-medium hover:underline"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-3 w-3" />
+                            ) : (
+                              <ChevronRight className="h-3 w-3" />
+                            )}
+                            Multiple executions: {allChildren.length} child DAG
+                            runs
+                          </button>
+                        </div>
+                        {isExpanded && (
+                          <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
+                            {allChildren.map((child, index) => (
+                              <div key={child.dagRunId} className="py-1">
+                                <div
+                                  className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleChildDAGRunNavigation(index, e);
+                                  }}
+                                  title="Click to view child DAG run (Cmd/Ctrl+Click to open in new tab)"
+                                >
+                                  #{index + 1}: {childDagName}
+                                </div>
+                                {child.params && (
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 ml-4 font-mono">
+                                    {child.params}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
-                </span>
-                {currentDuration}
-              </div>
+                </>
+              )}
+            </div>
+          </TableCell>
+
+          {/* Combined Command & Args */}
+          <TableCell>
+            {(node.step.command || node.step.cmdWithArgs) && (
+              <CommandDisplay
+                command={node.step.command || node.step.cmdWithArgs || ''}
+                args={node.step.command ? node.step.args : undefined}
+                icon="code"
+                maxLength={50}
+              />
             )}
-          </div>
-        </TableCell>
+          </TableCell>
 
-        {/* Status */}
-        <TableCell className="text-center">
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowStatusModal(true);
-            }}
-            className="inline-block cursor-pointer"
-            title="Click to update status"
-          >
-            <NodeStatusChip status={node.status} size="sm">
-              {node.statusLabel}
-            </NodeStatusChip>
-          </div>
-        </TableCell>
+          {/* Last Run & Duration */}
+          <TableCell>
+            <div className="space-y-0.5">
+              <div className="font-medium text-slate-700 dark:text-slate-300 text-sm">
+                {formatTimestamp(node.startedAt)}
+              </div>
+              {node.startedAt && (
+                <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 leading-tight">
+                  <span className="font-medium flex items-center">
+                    Duration:
+                    {node.status === NodeStatus.Running && (
+                      <span className="inline-block w-2 h-2 rounded-full bg-lime-500 ml-1.5 animate-pulse" />
+                    )}
+                  </span>
+                  {currentDuration}
+                </div>
+              )}
+            </div>
+          </TableCell>
 
-        {/* Error / Logs */}
-        <TableCell>
-          <div className="space-y-1.5">
-            {/* Logs */}
-            {(node.stdout || node.stderr) && (
-              <div className="flex items-center gap-1.5">
-                {/* Single log file - show simple button */}
-                {(node.stdout && !node.stderr) ||
+          {/* Status */}
+          <TableCell className="text-center">
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowStatusModal(true);
+              }}
+              className="inline-block cursor-pointer"
+              title="Click to update status"
+            >
+              <NodeStatusChip status={node.status} size="sm">
+                {node.statusLabel}
+              </NodeStatusChip>
+            </div>
+          </TableCell>
+
+          {/* Error / Logs */}
+          <TableCell>
+            <div className="space-y-1.5">
+              {/* Logs */}
+              {(node.stdout || node.stderr) && (
+                <div className="flex items-center gap-1.5">
+                  {/* Single log file - show simple button */}
+                  {(node.stdout && !node.stderr) ||
                   (!node.stdout && node.stderr) ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <a
-                        href={node.stderr ? `${url}&stream=stderr` : url}
-                        onClick={
-                          node.stderr
-                            ? (e) => {
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={node.stderr ? `${url}&stream=stderr` : url}
+                          onClick={
+                            node.stderr
+                              ? (e) => {
+                                  e.stopPropagation();
+                                  if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                                    e.preventDefault();
+                                    onViewLog(
+                                      `${node.step.name}_stderr`,
+                                      dagRunId || ''
+                                    );
+                                  }
+                                }
+                              : (e) => {
+                                  e.stopPropagation();
+                                  handleViewLog(e);
+                                }
+                          }
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 rounded cursor-pointer text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
+                          title={`Click to view ${node.stderr ? 'stderr' : 'stdout'} log (Cmd/Ctrl+Click to open in new tab)`}
+                        >
+                          <FileText className="h-3 w-3" />
+                          {node.stderr ? 'stderr' : 'stdout'}
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <span className="text-xs">
+                          {node.stderr ? 'Error' : 'Output'} Log
+                        </span>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    /* Both stdout and stderr - show combined button with split design */
+                    <div className="inline-flex rounded overflow-hidden">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <a
+                            href={url}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewLog(e);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer border-r border-slate-200 dark:border-slate-700"
+                            title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
+                          >
+                            <FileText className="h-3 w-3" />
+                            out
+                          </a>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <span className="text-xs">Output Log</span>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <a
+                            href={`${url}&stream=stderr`}
+                            onClick={(e) => {
                               e.stopPropagation();
                               if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                                 e.preventDefault();
@@ -699,222 +785,170 @@ function NodeStatusTableRow({
                                   dagRunId || ''
                                 );
                               }
-                            }
-                            : (e) => {
-                              e.stopPropagation();
-                              handleViewLog(e);
-                            }
-                        }
-                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 rounded cursor-pointer text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
-                        title={`Click to view ${node.stderr ? 'stderr' : 'stdout'} log (Cmd/Ctrl+Click to open in new tab)`}
-                      >
-                        <FileText className="h-3 w-3" />
-                        {node.stderr ? 'stderr' : 'stdout'}
-                      </a>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <span className="text-xs">
-                        {node.stderr ? 'Error' : 'Output'} Log
-                      </span>
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  /* Both stdout and stderr - show combined button with split design */
-                  <div className="inline-flex rounded overflow-hidden">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <a
-                          href={url}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewLog(e);
-                          }}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer border-r border-slate-200 dark:border-slate-700"
-                          title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
-                        >
-                          <FileText className="h-3 w-3" />
-                          out
-                        </a>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <span className="text-xs">Output Log</span>
-                      </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <a
-                          href={`${url}&stream=stderr`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                              e.preventDefault();
-                              onViewLog(
-                                `${node.step.name}_stderr`,
-                                dagRunId || ''
-                              );
-                            }
-                          }}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
-                          title="Click to view stderr log (Cmd/Ctrl+Click to open in new tab)"
-                        >
-                          <FileText className="h-3 w-3" />
-                          err
-                        </a>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <span className="text-xs">Error Log</span>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Errors - Simplified */}
-            {node.error && (
-              <div className="text-xs text-red-600 dark:text-red-400 leading-relaxed whitespace-normal break-words">
-                {node.error}
-              </div>
-            )}
-            {node.step.preconditions?.some((cond) => cond.error) && (
-              <div className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
-                Precondition unmet
-              </div>
-            )}
-          </div>
-        </TableCell>
-        {dagRunId && (
-          <TableCell className="text-center">
-            <button
-              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
-              title="Retry from this step"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowDialog(true);
-              }}
-              disabled={loading}
-            >
-              <PlayCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-            </button>
-            <Dialog open={showDialog} onOpenChange={setShowDialog}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Retry from this step?</DialogTitle>
-                </DialogHeader>
-                <div className="py-2 text-sm">
-                  This will re-execute <b>{node.step.name}</b>. Are you sure?
-                  {error && <div className="text-red-500 mt-2">{error}</div>}
-                  {success && (
-                    <div className="text-green-600 mt-2">Retry started!</div>
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
+                            title="Click to view stderr log (Cmd/Ctrl+Click to open in new tab)"
+                          >
+                            <FileText className="h-3 w-3" />
+                            err
+                          </a>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <span className="text-xs">Error Log</span>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                   )}
                 </div>
-                <DialogFooter>
-                  <button
-                    className="px-3 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 mr-2"
-                    onClick={() => setShowDialog(false)}
-                    disabled={loading}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-                    onClick={handleRetry}
-                    disabled={loading}
-                  >
-                    {loading ? 'Retrying...' : 'Retry'}
-                  </button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </TableCell>
-        )}
-      </StyledTableRow>
+              )}
 
-      {/* Inline log viewer row - spans entire table width */}
-      {isLogExpanded && hasLogs && (
-        <StyledTableRow className="bg-zinc-50 dark:bg-zinc-900">
-          <TableCell colSpan={dagRunId ? 7 : 6} className="p-3">
-            <div className="w-full">
-              {/* Header with tabs and expand button */}
-              <div className="flex items-center justify-between mb-2">
-                {/* Simple tabs for out/err */}
-                {hasStdout && hasStderr ? (
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveLogTab('stdout');
-                      }}
-                      className={cn(
-                        "px-3 py-1 text-xs font-medium transition-colors rounded",
-                        activeLogTab === 'stdout'
-                          ? "bg-slate-700 dark:bg-slate-600 text-white"
-                          : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
-                      )}
-                    >
-                      out
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveLogTab('stderr');
-                      }}
-                      className={cn(
-                        "px-3 py-1 text-xs font-medium transition-colors rounded",
-                        activeLogTab === 'stderr'
-                          ? "bg-slate-700 dark:bg-slate-600 text-white"
-                          : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
-                      )}
-                    >
-                      err
-                    </button>
-                  </div>
-                ) : (
-                  <div className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                    {hasStdout ? 'stdout' : 'stderr'}
-                  </div>
-                )}
-
-                {/* Expand to modal button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onViewLog) {
-                      onViewLog(
-                        currentStream === 'stderr' ? `${node.step.name}_stderr` : node.step.name,
-                        dagRunId || '',
-                        node
-                      );
-                    }
-                  }}
-                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-                  title="Open in full modal"
-                >
-                  <Code className="h-3 w-3" />
-                  <span>Full view</span>
-                </button>
-              </div>
-
-              {/* Simple inline log viewer - no controls */}
-              <InlineLogViewer
-                dagName={dagRun?.name || name}
-                dagRunId={dagRunId || ''}
-                stepName={node.step.name}
-                stream={currentStream}
-                dagRun={dagRun}
-              />
+              {/* Errors - Simplified */}
+              {node.error && (
+                <div className="text-xs text-red-600 dark:text-red-400 leading-relaxed whitespace-normal break-words">
+                  {node.error}
+                </div>
+              )}
+              {node.step.preconditions?.some((cond) => cond.error) && (
+                <div className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
+                  Precondition unmet
+                </div>
+              )}
             </div>
           </TableCell>
+          {dagRunId && (
+            <TableCell className="text-center">
+              <button
+                className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+                title="Retry from this step"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDialog(true);
+                }}
+                disabled={loading}
+              >
+                <PlayCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </button>
+              <Dialog open={showDialog} onOpenChange={setShowDialog}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Retry from this step?</DialogTitle>
+                  </DialogHeader>
+                  <div className="py-2 text-sm">
+                    This will re-execute <b>{node.step.name}</b>. Are you sure?
+                    {error && <div className="text-red-500 mt-2">{error}</div>}
+                    {success && (
+                      <div className="text-green-600 mt-2">Retry started!</div>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <button
+                      className="px-3 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 mr-2"
+                      onClick={() => setShowDialog(false)}
+                      disabled={loading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                      onClick={handleRetry}
+                      disabled={loading}
+                    >
+                      {loading ? 'Retrying...' : 'Retry'}
+                    </button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </TableCell>
+          )}
         </StyledTableRow>
-      )}
 
-      {/* Status Update Modal */}
-      <StatusUpdateModal
-        visible={showStatusModal}
-        dismissModal={() => setShowStatusModal(false)}
-        step={node.step}
-        onSubmit={handleStatusUpdate}
-      />
+        {/* Inline log viewer row - spans entire table width */}
+        {isLogExpanded && hasLogs && (
+          <StyledTableRow className="bg-zinc-50 dark:bg-zinc-900">
+            <TableCell colSpan={dagRunId ? 7 : 6} className="p-3">
+              <div className="w-full">
+                {/* Header with tabs and expand button */}
+                <div className="flex items-center justify-between mb-2">
+                  {/* Simple tabs for out/err */}
+                  {hasStdout && hasStderr ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveLogTab('stdout');
+                        }}
+                        className={cn(
+                          'px-3 py-1 text-xs font-medium transition-colors rounded',
+                          activeLogTab === 'stdout'
+                            ? 'bg-slate-700 dark:bg-slate-600 text-white'
+                            : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                        )}
+                      >
+                        out
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveLogTab('stderr');
+                        }}
+                        className={cn(
+                          'px-3 py-1 text-xs font-medium transition-colors rounded',
+                          activeLogTab === 'stderr'
+                            ? 'bg-slate-700 dark:bg-slate-600 text-white'
+                            : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                        )}
+                      >
+                        err
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                      {hasStdout ? 'stdout' : 'stderr'}
+                    </div>
+                  )}
+
+                  {/* Expand to modal button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onViewLog) {
+                        onViewLog(
+                          currentStream === 'stderr'
+                            ? `${node.step.name}_stderr`
+                            : node.step.name,
+                          dagRunId || '',
+                          node
+                        );
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                    title="Open in full modal"
+                  >
+                    <Code className="h-3 w-3" />
+                    <span>Full view</span>
+                  </button>
+                </div>
+
+                {/* Simple inline log viewer - no controls */}
+                <InlineLogViewer
+                  dagName={dagRun?.name || name}
+                  dagRunId={dagRunId || ''}
+                  stepName={node.step.name}
+                  stream={currentStream}
+                  dagRun={dagRun}
+                />
+              </div>
+            </TableCell>
+          </StyledTableRow>
+        )}
+
+        {/* Status Update Modal */}
+        <StatusUpdateModal
+          visible={showStatusModal}
+          dismissModal={() => setShowStatusModal(false)}
+          step={node.step}
+          onSubmit={handleStatusUpdate}
+        />
       </>
     );
   }
@@ -964,7 +998,7 @@ function NodeStatusTableRow({
                 className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline mb-1"
                 onClick={(e) => handleChildDAGRunNavigation(0, e)}
               >
-                View Child DAG Run: {node.step.run}
+                View Child DAG Run: {childDagName}
               </div>
               {allChildren[0]?.params && (
                 <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">
@@ -995,7 +1029,7 @@ function NodeStatusTableRow({
                         className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
                         onClick={(e) => handleChildDAGRunNavigation(index, e)}
                       >
-                        #{index + 1}: {node.step.run}
+                        #{index + 1}: {childDagName}
                       </div>
                       {child.params && (
                         <div className="text-xs text-slate-500 dark:text-slate-400 ml-4 font-mono">
@@ -1119,11 +1153,15 @@ function NodeStatusTableRow({
               onClick={
                 node.stderr
                   ? (e) => {
-                    if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                      e.preventDefault();
-                      onViewLog(`${node.step.name}_stderr`, dagRunId || '', node);
+                      if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                        e.preventDefault();
+                        onViewLog(
+                          `${node.step.name}_stderr`,
+                          dagRunId || '',
+                          node
+                        );
+                      }
                     }
-                  }
                   : handleViewLog
               }
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 rounded-md cursor-pointer text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
@@ -1171,9 +1209,7 @@ function NodeStatusTableRow({
             onClick={() => setShowDialog(true)}
             disabled={loading}
           >
-            <PlayCircle
-              className="h-6 w-6 text-green-600 dark:text-green-400"
-            />
+            <PlayCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
           </button>
           <Dialog open={showDialog} onOpenChange={setShowDialog}>
             <DialogContent>

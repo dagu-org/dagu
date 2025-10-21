@@ -1043,7 +1043,7 @@ steps:
 		data := []byte(`
 steps:
   - name: execute a sub-dag
-    run: sub_dag
+    call: sub_dag
     params: "param1=value1 param2=value2"
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
@@ -1051,11 +1051,30 @@ steps:
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.Equal(t, "dag", th.Steps[0].ExecutorConfig.Type)
-		assert.Equal(t, "run", th.Steps[0].Command)
+		assert.Equal(t, "call", th.Steps[0].Command)
 		assert.Equal(t, []string{
 			"sub_dag",
 			"param1=\"value1\" param2=\"value2\"",
 		}, th.Steps[0].Args)
+		assert.Equal(t, "sub_dag param1=\"value1\" param2=\"value2\"", th.Steps[0].CmdWithArgs)
+		assert.Empty(t, dag.BuildWarnings)
+
+		// Legacy run field is still accepted
+		dataLegacy := []byte(`
+steps:
+  - name: legacy sub-dag
+    run: sub_dag_legacy
+`)
+		dagLegacy, err := spec.LoadYAML(context.Background(), dataLegacy)
+		require.NoError(t, err)
+		thLegacy := DAG{t: t, DAG: dagLegacy}
+		assert.Len(t, thLegacy.Steps, 1)
+		assert.Equal(t, "dag", thLegacy.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "call", thLegacy.Steps[0].Command)
+		assert.Equal(t, []string{"sub_dag_legacy", ""}, thLegacy.Steps[0].Args)
+		assert.Equal(t, "sub_dag_legacy", thLegacy.Steps[0].CmdWithArgs)
+		require.Len(t, dagLegacy.BuildWarnings, 1)
+		assert.Contains(t, dagLegacy.BuildWarnings[0], "Step field `run` is deprecated")
 	})
 	t.Run("ContinueOn", func(t *testing.T) {
 		t.Parallel()
@@ -2015,7 +2034,7 @@ steps:
       type: http
       config:
         url: https://example.com
-  - run: child-dag
+  - call: child-dag
   - executor:
       type: docker
       config:

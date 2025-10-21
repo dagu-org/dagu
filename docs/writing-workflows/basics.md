@@ -62,7 +62,7 @@ steps:
       type: http
       config:
         url: https://api.example.com
-  - run: child-workflow            # Auto-named: dag_5
+  - call: child-workflow            # Auto-named: dag_5
 ```
 
 Auto-generated names follow the pattern `{type}_{number}`:

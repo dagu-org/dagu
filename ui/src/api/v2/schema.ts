@@ -1010,8 +1010,8 @@ export interface components {
             output?: string;
             /** @description List of arguments to pass to the command */
             args?: string[];
-            /** @description The name of the DAG to run as a child DAG-run */
-            run?: string;
+            /** @description The name of the DAG to execute as a child DAG-run */
+            call?: string;
             /** @description Parameters to pass to the child DAG-run in JSON format */
             params?: string;
             /** @description Configuration for parallel execution of the step */

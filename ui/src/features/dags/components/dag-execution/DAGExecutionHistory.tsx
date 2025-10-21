@@ -277,7 +277,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
         (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
       );
 
-      if (!n || !n.step.run) return;
+      if (!n || !n.step.call) return;
 
       // If it's a child dagRun, navigate to its details
       const childDAGRun = n.children?.[0];
