@@ -27,7 +27,7 @@ import { components, NodeStatus } from '../../../../api/v2/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/ui/CustomDialog';
-import { useClient } from '@/hooks/api';
+import { useClient, useQuery } from '@/hooks/api';
 import { AppBarContext } from '@/contexts/AppBarContext';
 
 /**
@@ -59,6 +59,112 @@ const formatTimestamp = (timestamp: string | undefined) => {
     return timestamp;
   }
 };
+
+/**
+ * ANSI color codes regex for stripping
+ */
+const ANSI_CODES_REGEX = [
+  '[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)',
+  '(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]))',
+].join('|');
+
+/**
+ * Simple inline log viewer - no controls, just logs
+ */
+function InlineLogViewer({
+  dagName,
+  dagRunId,
+  stepName,
+  stream,
+  dagRun,
+}: {
+  dagName: string;
+  dagRunId: string;
+  stepName: string;
+  stream: 'stdout' | 'stderr';
+  dagRun?: components['schemas']['DAGRunDetails'];
+}) {
+  const appBarContext = useContext(AppBarContext);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+
+  // Determine if this is a child DAG run
+  const isChildDAGRun =
+    dagRun &&
+    dagRun.rootDAGRunId &&
+    dagRun.rootDAGRunId !== dagRun.dagRunId;
+
+  // Determine the API endpoint
+  const apiEndpoint = isChildDAGRun
+    ? '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log'
+    : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log';
+
+  // Prepare path parameters
+  const pathParams = isChildDAGRun
+    ? {
+        name: dagRun.rootDAGRunName,
+        dagRunId: dagRun.rootDAGRunId,
+        childDAGRunId: dagRun.dagRunId,
+        stepName,
+      }
+    : {
+        name: dagName,
+        dagRunId,
+        stepName,
+      };
+
+  // Fetch last 100 lines
+  const { data, isLoading } = useQuery(
+    apiEndpoint,
+    {
+      params: {
+        query: {
+          remoteNode,
+          stream,
+          tail: 100,
+        },
+        path: pathParams,
+      },
+    },
+    {
+      refreshInterval: 2000, // Auto-refresh every 2s
+      revalidateOnFocus: false,
+    }
+  );
+
+  // Process log content
+  const content = data?.content?.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '') || '';
+  const lines = content ? content.split('\n') : [];
+  const totalLines = data?.totalLines || 0;
+  const lineCount = data?.lineCount || 0;
+
+  return (
+    <div className="bg-zinc-900 rounded overflow-hidden">
+      {isLoading && !data ? (
+        <div className="text-zinc-400 text-xs py-4 px-3">Loading logs...</div>
+      ) : lines.length === 0 ? (
+        <div className="text-zinc-400 text-xs py-4 px-3">&lt;No log output&gt;</div>
+      ) : (
+        <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+          <pre className="font-mono text-[11px] text-zinc-100 p-2">
+            {lines.map((line, index) => {
+              const lineNumber = totalLines - lineCount + index + 1;
+              return (
+                <div key={index} className="flex hover:bg-zinc-800 px-1 py-0.5">
+                  <span className="text-zinc-500 mr-3 select-none w-12 text-right flex-shrink-0">
+                    {lineNumber}
+                  </span>
+                  <span className="whitespace-pre-wrap break-all flex-grow">
+                    {line || ' '}
+                  </span>
+                </div>
+              );
+            })}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Calculate duration between two timestamps
@@ -121,6 +227,9 @@ function NodeStatusTableRow({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  // State for inline log expansion
+  const [isLogExpanded, setIsLogExpanded] = useState(false);
+  const [activeLogTab, setActiveLogTab] = useState<'stdout' | 'stderr'>('stdout');
   // Check if this is a child dagRun node
   // Include both regular children and repeated children
   const allChildren = [...(node.children || []), ...(node.childrenRepeated || [])];
@@ -280,19 +389,53 @@ function NodeStatusTableRow({
     }
   };
 
+  // Determine if logs are available
+  const hasStdout = !!node.stdout;
+  const hasStderr = !!node.stderr;
+  const hasLogs = hasStdout || hasStderr;
+
+  // Determine which stream to show based on active tab
+  const currentStream = activeLogTab === 'stderr' && hasStderr ? 'stderr' : 'stdout';
+
   // Render desktop view (table row)
   if (view === 'desktop') {
     return (
-      <StyledTableRow
-        className={cn(
-          'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200 h-auto',
-          getRowHighlight()
-        )}
-      >
+      <>
+        <StyledTableRow
+          className={cn(
+            'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200 h-auto cursor-pointer',
+            getRowHighlight()
+          )}
+          onClick={() => {
+            if (hasLogs) {
+              setIsLogExpanded(!isLogExpanded);
+              // Set default tab based on what's available
+              if (!isLogExpanded) {
+                setActiveLogTab(hasStdout ? 'stdout' : 'stderr');
+              }
+            }
+          }}
+        >
         <TableCell className="text-center py-2">
-          <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs">
-            {rownum}
-          </span>
+          <div className="flex items-center justify-center gap-2">
+            {hasLogs && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsLogExpanded(!isLogExpanded);
+                  if (!isLogExpanded) {
+                    setActiveLogTab(hasStdout ? 'stdout' : 'stderr');
+                  }
+                }}
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+              >
+                {isLogExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+            )}
+            <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs">
+              {rownum}
+            </span>
+          </div>
         </TableCell>
 
         {/* Combined Step Name & Description */}
@@ -368,7 +511,10 @@ function NodeStatusTableRow({
                   <>
                     <div
                       className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
-                      onClick={(e) => handleChildDAGRunNavigation(0, e)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleChildDAGRunNavigation(0, e);
+                      }}
                       title="Click to view child DAG run (Cmd/Ctrl+Click to open in new tab)"
                     >
                       View Child DAG Run: {node.step.run}
@@ -388,7 +534,10 @@ function NodeStatusTableRow({
                     <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => setIsExpanded(!isExpanded)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsExpanded(!isExpanded);
+                          }}
                           className="flex items-center gap-1 text-blue-500 dark:text-blue-400 font-medium hover:underline"
                         >
                           {isExpanded ? (
@@ -406,9 +555,10 @@ function NodeStatusTableRow({
                             <div key={child.dagRunId} className="py-1">
                               <div
                                 className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
-                                onClick={(e) =>
-                                  handleChildDAGRunNavigation(index, e)
-                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleChildDAGRunNavigation(index, e);
+                                }}
                                 title="Click to view child DAG run (Cmd/Ctrl+Click to open in new tab)"
                               >
                                 #{index + 1}: {node.step.run}
@@ -485,6 +635,7 @@ function NodeStatusTableRow({
                         onClick={
                           node.stderr
                             ? (e) => {
+                              e.stopPropagation();
                               if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                                 e.preventDefault();
                                 onViewLog(
@@ -493,7 +644,10 @@ function NodeStatusTableRow({
                                 );
                               }
                             }
-                            : handleViewLog
+                            : (e) => {
+                              e.stopPropagation();
+                              handleViewLog(e);
+                            }
                         }
                         className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 rounded cursor-pointer text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
                         title={`Click to view ${node.stderr ? 'stderr' : 'stdout'} log (Cmd/Ctrl+Click to open in new tab)`}
@@ -515,7 +669,10 @@ function NodeStatusTableRow({
                       <TooltipTrigger asChild>
                         <a
                           href={url}
-                          onClick={handleViewLog}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewLog(e);
+                          }}
                           className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer border-r border-slate-200 dark:border-slate-700"
                           title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
                         >
@@ -532,6 +689,7 @@ function NodeStatusTableRow({
                         <a
                           href={`${url}&stream=stderr`}
                           onClick={(e) => {
+                            e.stopPropagation();
                             if (!(e.metaKey || e.ctrlKey) && onViewLog) {
                               e.preventDefault();
                               onViewLog(
@@ -574,7 +732,10 @@ function NodeStatusTableRow({
             <button
               className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
               title="Retry from this step"
-              onClick={() => setShowDialog(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDialog(true);
+              }}
               disabled={loading}
             >
               <PlayCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -612,6 +773,85 @@ function NodeStatusTableRow({
           </TableCell>
         )}
       </StyledTableRow>
+
+      {/* Inline log viewer row - spans entire table width */}
+      {isLogExpanded && hasLogs && (
+        <StyledTableRow className="bg-zinc-50 dark:bg-zinc-900">
+          <TableCell colSpan={dagRunId ? 7 : 6} className="p-3">
+            <div className="w-full">
+              {/* Header with tabs and expand button */}
+              <div className="flex items-center justify-between mb-2">
+                {/* Simple tabs for out/err */}
+                {hasStdout && hasStderr ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveLogTab('stdout');
+                      }}
+                      className={cn(
+                        "px-3 py-1 text-xs font-medium transition-colors rounded",
+                        activeLogTab === 'stdout'
+                          ? "bg-slate-700 dark:bg-slate-600 text-white"
+                          : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
+                      )}
+                    >
+                      out
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveLogTab('stderr');
+                      }}
+                      className={cn(
+                        "px-3 py-1 text-xs font-medium transition-colors rounded",
+                        activeLogTab === 'stderr'
+                          ? "bg-slate-700 dark:bg-slate-600 text-white"
+                          : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
+                      )}
+                    >
+                      err
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                    {hasStdout ? 'stdout' : 'stderr'}
+                  </div>
+                )}
+
+                {/* Expand to modal button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onViewLog) {
+                      onViewLog(
+                        currentStream === 'stderr' ? `${node.step.name}_stderr` : node.step.name,
+                        dagRunId || '',
+                        node
+                      );
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                  title="Open in full modal"
+                >
+                  <Code className="h-3 w-3" />
+                  <span>Full view</span>
+                </button>
+              </div>
+
+              {/* Simple inline log viewer - no controls */}
+              <InlineLogViewer
+                dagName={dagRun?.name || name}
+                dagRunId={dagRunId || ''}
+                stepName={node.step.name}
+                stream={currentStream}
+                dagRun={dagRun}
+              />
+            </div>
+          </TableCell>
+        </StyledTableRow>
+      )}
+      </>
     );
   }
 

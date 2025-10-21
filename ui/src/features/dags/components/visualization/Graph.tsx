@@ -211,10 +211,6 @@ const Graph: React.FC<Props> = ({
       // Double-click will be handled by our custom implementation
     };
 
-    console.log({
-      step: steps,
-    });
-
     // Process nodes based on type
     if (type === 'status') {
       (steps as components['schemas']['Node'][]).forEach((node) =>
