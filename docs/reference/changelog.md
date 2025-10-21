@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.23.0 (UNRELEASED)
+## v1.23.0 (2025-10-21)
 
 ### Changed
 - Status: Adopted canonical lowercase tokens for DAG and node lifecycle states (`not_started`, `queued`, `running`, `succeeded`, `partially_succeeded`, `failed`, `canceled`), and updated API examples, docs, and telemetry labels to match.
