@@ -16,6 +16,7 @@ import {
   Terminal,
   Timer,
 } from 'lucide-react';
+import React from 'react';
 import { components, Status } from '../../../../api/v2/schema';
 import LabeledItem from '../../../../ui/LabeledItem';
 import StatusChip from '../../../../ui/StatusChip';
@@ -50,6 +51,9 @@ function DAGStatusOverview({
     searchParams.set('dagRunId', dagRunId);
   }
   const url = `/dags/${fileName}/dagRun-log?${searchParams.toString()}`;
+
+  // State to store current duration for live updates
+  const [currentDuration, setCurrentDuration] = React.useState<string>('-');
 
   // Don't render if no status is provided
   if (!status) {
@@ -87,6 +91,25 @@ function DAGStatusOverview({
 
   // Determine if the DAG is currently running
   const isRunning = status.status === Status.Running;
+
+  // Auto-update duration every second for running DAGs
+  React.useEffect(() => {
+    if (isRunning && status.startedAt) {
+      // Initial calculation
+      setCurrentDuration(calculateDuration());
+
+      // Set up interval to update duration every second
+      const intervalId = setInterval(() => {
+        setCurrentDuration(calculateDuration());
+      }, 1000);
+
+      // Clean up interval on unmount or when status changes
+      return () => clearInterval(intervalId);
+    } else {
+      // For non-running DAGs, calculate once
+      setCurrentDuration(calculateDuration());
+    }
+  }, [isRunning, status.startedAt, status.finishedAt]);
 
   // Count nodes by status
   const nodeStatus = status.nodes?.reduce(
@@ -226,8 +249,11 @@ function DAGStatusOverview({
           <div className="flex items-center">
             <Timer className="w-3.5 mr-1 text-slate-500 dark:text-slate-400" />
             <LabeledItem label="Duration">
-              <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
-                {calculateDuration()}
+              <span className="font-medium text-slate-700 dark:text-slate-300 text-xs flex items-center gap-1">
+                {currentDuration}
+                {isRunning && (
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-lime-500 animate-pulse" />
+                )}
               </span>
             </LabeledItem>
           </div>
