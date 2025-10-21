@@ -425,7 +425,8 @@ function DAGSpec({ fileName }: Props) {
                         id="save-config"
                         variant="default"
                         size="sm"
-                        className="cursor-pointer shadow-sm hover:shadow-md transition-shadow duration-200"
+                        title="Save changes (Ctrl+S / Cmd+S)"
+                        className="cursor-pointer shadow-sm hover:shadow-md transition-shadow duration-200 relative group"
                         onClick={async () => {
                           await handleSave();
                           props.refresh();
@@ -433,6 +434,9 @@ function DAGSpec({ fileName }: Props) {
                       >
                         <Save className="h-4 w-4 mr-1" />
                         Save Changes
+                        <span className="absolute -bottom-1 -right-1 bg-primary-foreground text-primary text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                          {navigator.platform.indexOf('Mac') > -1 ? '⌘S' : 'Ctrl+S'}
+                        </span>
                       </Button>
                     </div>
                   ) : null}
