@@ -17,8 +17,6 @@ import (
 // the failed node. The expected behavior is that the retry should re-execute
 // the failed node, but the bug causes it to skip or fail incorrectly.
 func TestRetryDAGAfterManualStatusUpdate(t *testing.T) {
-	t.Parallel()
-
 	th := test.SetupCommand(t)
 
 	// Create a simple 3-step DAG where all steps should succeed
