@@ -634,7 +634,7 @@ func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID s
 
 	// Wait for the DAG to start
 	// Use longer timeout on Windows due to slower process startup
-	timeout := 3 * time.Second
+	timeout := 5 * time.Second // default timeout
 	if runtime.GOOS == "windows" {
 		timeout = 10 * time.Second
 	}
