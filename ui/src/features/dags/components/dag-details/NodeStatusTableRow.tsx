@@ -29,6 +29,7 @@ import { NodeStatusChip } from '../common';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/ui/CustomDialog';
 import { useClient, useQuery } from '@/hooks/api';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
 
 /**
  * Props for the NodeStatusTableRow component
@@ -230,6 +231,8 @@ function NodeStatusTableRow({
   // State for inline log expansion
   const [isLogExpanded, setIsLogExpanded] = useState(false);
   const [activeLogTab, setActiveLogTab] = useState<'stdout' | 'stderr'>('stdout');
+  // State for status update modal
+  const [showStatusModal, setShowStatusModal] = useState(false);
   // Check if this is a child dagRun node
   // Include both regular children and repeated children
   const allChildren = [...(node.children || []), ...(node.childrenRepeated || [])];
@@ -373,7 +376,7 @@ function NodeStatusTableRow({
     setError(null);
     try {
       await client.POST('/dag-runs/{name}/{dagRunId}/retry', {
-        params: { 
+        params: {
           path: { name: dagName, dagRunId },
           query: { remoteNode }
         },
@@ -387,6 +390,50 @@ function NodeStatusTableRow({
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle status update
+  const handleStatusUpdate = async (
+    step: components['schemas']['Step'],
+    status: NodeStatus
+  ) => {
+    // Check if this is a child DAG-run
+    const isChildDAGRun =
+      dagRun.rootDAGRunId &&
+      dagRun.rootDAGRunName &&
+      dagRun.rootDAGRunId !== dagRun.dagRunId;
+
+    // Define path parameters
+    const pathParams = {
+      name: isChildDAGRun ? dagRun.rootDAGRunName : dagName,
+      dagRunId: isChildDAGRun ? dagRun.rootDAGRunId : dagRunId || '',
+      stepName: step.name,
+      ...(isChildDAGRun ? { childDAGRunId: dagRun.dagRunId } : {}),
+    };
+
+    // Use the appropriate endpoint
+    const endpoint = isChildDAGRun
+      ? '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status'
+      : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/status';
+
+    const { error } = await client.PATCH(endpoint, {
+      params: {
+        path: pathParams,
+        query: {
+          remoteNode,
+        },
+      },
+      body: {
+        status,
+      },
+    });
+
+    if (error) {
+      alert(error.message || 'An error occurred');
+      return;
+    }
+
+    setShowStatusModal(false);
   };
 
   // Determine if logs are available
@@ -614,9 +661,18 @@ function NodeStatusTableRow({
 
         {/* Status */}
         <TableCell className="text-center">
-          <NodeStatusChip status={node.status} size="sm">
-            {node.statusLabel}
-          </NodeStatusChip>
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowStatusModal(true);
+            }}
+            className="inline-block cursor-pointer"
+            title="Click to update status"
+          >
+            <NodeStatusChip status={node.status} size="sm">
+              {node.statusLabel}
+            </NodeStatusChip>
+          </div>
         </TableCell>
 
         {/* Error / Logs */}
@@ -851,6 +907,14 @@ function NodeStatusTableRow({
           </TableCell>
         </StyledTableRow>
       )}
+
+      {/* Status Update Modal */}
+      <StatusUpdateModal
+        visible={showStatusModal}
+        dismissModal={() => setShowStatusModal(false)}
+        step={node.step}
+        onSubmit={handleStatusUpdate}
+      />
       </>
     );
   }
