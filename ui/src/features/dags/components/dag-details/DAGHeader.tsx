@@ -1,7 +1,7 @@
 import { Calendar, Terminal, Timer, RefreshCw } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { components } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v2/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
@@ -28,9 +28,53 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   const params = useParams<{ tab?: string }>();
   const rootDAGRunContext = React.useContext(RootDAGRunContext);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [currentDuration, setCurrentDuration] = React.useState<string>('--');
 
   // Use the DAG-run from context if available, otherwise use the prop
   const dagRunToDisplay = rootDAGRunContext.data || currentDAGRun;
+
+  // Calculate duration between start and end times
+  const calculateDuration = React.useCallback(() => {
+    if (!dagRunToDisplay.startedAt || dagRunToDisplay.startedAt === '-') {
+      return '--';
+    }
+
+    const end =
+      dagRunToDisplay.finishedAt && dagRunToDisplay.finishedAt !== '-'
+        ? dayjs(dagRunToDisplay.finishedAt)
+        : dayjs();
+
+    const start = dayjs(dagRunToDisplay.startedAt);
+    const diff = end.diff(start, 'second');
+
+    const hours = Math.floor(diff / 3600);
+    const minutes = Math.floor((diff % 3600) / 60);
+    const seconds = diff % 60;
+
+    return `${hours > 0 ? `${hours}h ` : ''}${minutes > 0 ? `${minutes}m ` : ''}${seconds}s`;
+  }, [dagRunToDisplay.startedAt, dagRunToDisplay.finishedAt]);
+
+  // Determine if the DAG is currently running
+  const isRunning = dagRunToDisplay.status === Status.Running;
+
+  // Auto-update duration every second for running DAGs
+  useEffect(() => {
+    if (isRunning && dagRunToDisplay.startedAt) {
+      // Initial calculation
+      setCurrentDuration(calculateDuration());
+
+      // Set up interval to update duration every second
+      const intervalId = setInterval(() => {
+        setCurrentDuration(calculateDuration());
+      }, 1000);
+
+      // Clean up interval on unmount or when status changes
+      return () => clearInterval(intervalId);
+    } else {
+      // For non-running DAGs, calculate once
+      setCurrentDuration(calculateDuration());
+    }
+  }, [isRunning, dagRunToDisplay.startedAt, dagRunToDisplay.finishedAt]);
 
   const handleRootDAGRunClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -184,18 +228,11 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 
               <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md px-3 py-1.5 border">
                 <Timer className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-                <span className="font-medium text-xs">
-                  {dagRunToDisplay.finishedAt
-                    ? formatDuration(
-                        dagRunToDisplay.startedAt,
-                        dagRunToDisplay.finishedAt
-                      )
-                    : dagRunToDisplay.startedAt
-                      ? formatDuration(
-                          dagRunToDisplay.startedAt,
-                          dayjs().toISOString()
-                        )
-                      : '--'}
+                <span className="font-medium text-xs flex items-center gap-1">
+                  {currentDuration}
+                  {isRunning && (
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-lime-500 animate-pulse" />
+                  )}
                 </span>
               </div>
 

@@ -149,7 +149,11 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	}
 
 	if err := a.startDAGRun(ctx, dag, params, dagRunId, singleton); err != nil {
-		return nil, fmt.Errorf("error starting dag-run: %w", err)
+		return nil, &Error{
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
+			Message:    fmt.Sprintf("failed to start dag-run: %s", err.Error()),
+		}
 	}
 
 	return api.ExecuteDAGRunFromSpec200JSONResponse{

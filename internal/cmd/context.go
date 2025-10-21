@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/pprof"
-	"sync"
 	"syscall"
 	"time"
 
@@ -31,7 +30,6 @@ import (
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // Context holds the configuration for a command.
@@ -93,8 +91,12 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		}
 	}
 
-	// Use a custom config file if provided via the viper flag "config"
-	if cfgPath := viper.GetString("config"); cfgPath != "" {
+	// Use a custom config file if provided via the command flag "config"
+	cfgPath, err := cmd.Flags().GetString("config")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get config flag: %w", err)
+	}
+	if cfgPath != "" {
 		configLoaderOpts = append(configLoaderOpts, config.WithConfigFile(cfgPath))
 	}
 
@@ -306,11 +308,11 @@ func (c *Context) GenLogFileName(dag *core.DAG, dagRunID string) (string, error)
 	return filepath.Join(d, cfg.LogFile()), nil
 }
 
-var viperLock sync.Mutex // protects viper access across commands
-
 // NewCommand creates a new command instance with the given cobra command and run function.
 func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *Context, args []string) error) *cobra.Command {
-	initFlags(cmd, flags...)
+	config.WithViperLock(func() {
+		initFlags(cmd, flags...)
+	})
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		// Setup cpu profiling if enabled.
@@ -329,9 +331,7 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 			}()
 		}
 
-		viperLock.Lock()
 		ctx, err := NewContext(cmd, flags)
-		viperLock.Unlock()
 
 		if err != nil {
 			fmt.Printf("Initialization error: %v\n", err)

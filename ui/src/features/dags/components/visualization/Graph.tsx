@@ -122,7 +122,7 @@ const Graph: React.FC<Props> = ({
 
     // Add legend comment
     dat.push(
-      `%% Shapes: Rectangle=Normal Step, Hexagon=Child DAG, Stadium=Parallel Execution`
+      `%% Shapes: Rectangle=Normal Step, Subprocess=Single Child DAG, Processes=Parallel Execution`
     );
 
     // Store the click handler in window for backward compatibility
@@ -134,6 +134,8 @@ const Graph: React.FC<Props> = ({
     // Track link style indices for individual arrow styling
     let linkIndex = 0;
     const linkStyles: string[] = [];
+    // Track node classes for separate application
+    const nodeClasses = new Map<string, string>();
 
     const addNodeFn = (
       step: components['schemas']['Step'],
@@ -145,7 +147,7 @@ const Graph: React.FC<Props> = ({
 
       // Check if this is a child dagRun node (has a 'run' property)
       const isChildDAGRun = !!step.run;
-      const hasParallelExecutions = node?.children && node.children.length > 1;
+      const hasParallelExecutions = !!step.parallel;
 
       // Add indicator for child dagRun nodes in the label only
       // Escape any special characters in the label to prevent Mermaid parsing errors
@@ -160,10 +162,21 @@ const Graph: React.FC<Props> = ({
         }
       }
 
-      // Use different shape for child dagRuns
+      // Use different shapes based on node type
       if (isChildDAGRun) {
-        dat.push(`${id}{{${label}}}${c};`);
+        if (hasParallelExecutions) {
+          // Multiple parallel executions - use procs icon
+          dat.push(`${id}@{ shape: procs, label: "${label}"};`);
+        } else {
+          // Single child DAG - use subproc icon
+          dat.push(`${id}@{ shape: subproc, label: "${label}"};`);
+        }
+        // Store class for later application (remove ::: prefix)
+        if (c) {
+          nodeClasses.set(id, c.replace(':::', ''));
+        }
       } else {
+        // Normal step - use rectangle with inline class syntax
         dat.push(`${id}["${label}"]${c};`);
       }
 
@@ -239,6 +252,11 @@ const Graph: React.FC<Props> = ({
 
     // Add custom link styles
     dat.push(...linkStyles);
+
+    // Apply classes to nodes that use the new shape syntax (procs/subproc)
+    nodeClasses.forEach((className, nodeId) => {
+      dat.push(`class ${nodeId} ${className};`);
+    });
 
     return dat.join('\n');
   }, [steps, onClickNode, flowchart, showIcons]);

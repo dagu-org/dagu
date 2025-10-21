@@ -32,8 +32,6 @@ type dockerExecutorTest struct {
 }
 
 func TestDockerExecutor(t *testing.T) {
-	t.Parallel()
-
 	tests := []dockerExecutorTest{
 		{
 			name: "BasicExecution",

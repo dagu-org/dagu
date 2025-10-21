@@ -129,12 +129,12 @@ func (e *ChildDAGExecutor) buildCommand(
 	traceEnvVars := extractTraceContext(ctx)
 	if len(traceEnvVars) > 0 {
 		cmd.Env = append(cmd.Env, traceEnvVars...)
-		logger.Info(ctx, "Injecting trace context into child DAG",
+		logger.Debug(ctx, "Injecting trace context into child DAG",
 			"traceEnvVars", traceEnvVars,
 			"childDAG", e.DAG.Name,
 		)
 	} else {
-		logger.Warn(ctx, "No trace context to inject into child DAG",
+		logger.Debug(ctx, "No trace context to inject into child DAG",
 			"childDAG", e.DAG.Name,
 		)
 	}
