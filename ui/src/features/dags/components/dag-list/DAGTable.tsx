@@ -322,7 +322,6 @@ const defaultColumns = [
         const searchValue = String(filterValue).toLowerCase();
 
         // Search in name and description
-        console.log({ data });
         if (
           fileName.includes(searchValue) ||
           name.includes(searchValue) ||
@@ -1254,7 +1253,10 @@ function DAGTable({
                         {groupRow.name}
                       </span>
                     </div>
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0">
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0"
+                    >
                       {row.subRows?.length || 0}
                     </Badge>
                   </div>
@@ -1263,7 +1265,10 @@ function DAGTable({
                   {isExpanded && row.subRows && row.subRows.length > 0 && (
                     <div className="space-y-1.5 pl-2 border-l-2 border-muted-foreground/20 ml-3">
                       {row.subRows.map((subRow) => {
-                        if (subRow.original?.kind === ItemKind.DAG && 'dag' in subRow.original) {
+                        if (
+                          subRow.original?.kind === ItemKind.DAG &&
+                          'dag' in subRow.original
+                        ) {
                           const dagRow = subRow.original as DAGRow;
                           const dag = dagRow.dag;
                           const fileName = dag.fileName;
@@ -1290,7 +1295,9 @@ function DAGTable({
                             >
                               {/* Compact header */}
                               <div className="flex justify-between items-start gap-2 mb-1.5">
-                                <div className="font-medium text-xs truncate flex-1 min-w-0">{dag.dag.name}</div>
+                                <div className="font-medium text-xs truncate flex-1 min-w-0">
+                                  {dag.dag.name}
+                                </div>
                                 <StatusChip status={status} size="xs">
                                   {statusLabel}
                                 </StatusChip>
@@ -1305,23 +1312,26 @@ function DAGTable({
 
                               {/* Schedule & Last Run - inline */}
                               <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground mb-1.5">
-                                {dag.dag.schedule && dag.dag.schedule.length > 0 ? (
-                                  dag.dag.schedule.map((schedule, idx) => (
-                                    <Badge
-                                      key={idx}
-                                      variant="outline"
-                                      className="text-[9px] font-normal px-1 py-0 h-3"
-                                    >
-                                      {schedule.expression}
-                                    </Badge>
-                                  ))
-                                ) : null}
-                                {dag.latestDAGRun.startedAt && dag.latestDAGRun.startedAt !== '-' && (
-                                  <span className="flex items-center gap-0.5">
-                                    <Calendar className="h-2.5 w-2.5" />
-                                    <span className="text-[9px]">{dag.latestDAGRun.startedAt}</span>
-                                  </span>
-                                )}
+                                {dag.dag.schedule && dag.dag.schedule.length > 0
+                                  ? dag.dag.schedule.map((schedule, idx) => (
+                                      <Badge
+                                        key={idx}
+                                        variant="outline"
+                                        className="text-[9px] font-normal px-1 py-0 h-3"
+                                      >
+                                        {schedule.expression}
+                                      </Badge>
+                                    ))
+                                  : null}
+                                {dag.latestDAGRun.startedAt &&
+                                  dag.latestDAGRun.startedAt !== '-' && (
+                                    <span className="flex items-center gap-0.5">
+                                      <Calendar className="h-2.5 w-2.5" />
+                                      <span className="text-[9px]">
+                                        {dag.latestDAGRun.startedAt}
+                                      </span>
+                                    </span>
+                                  )}
                               </div>
 
                               {/* Tags - compact */}
@@ -1356,7 +1366,11 @@ function DAGTable({
 
             // Render standalone DAG rows (not in a group)
             // Skip if this row has a parent (it's already rendered within a group)
-            if (row.original?.kind === ItemKind.DAG && 'dag' in row.original && row.depth === 0) {
+            if (
+              row.original?.kind === ItemKind.DAG &&
+              'dag' in row.original &&
+              row.depth === 0
+            ) {
               const dagRow = row.original as DAGRow;
               const dag = dagRow.dag;
               const fileName = dag.fileName;
@@ -1383,7 +1397,9 @@ function DAGTable({
                 >
                   {/* Compact header */}
                   <div className="flex justify-between items-start gap-2 mb-1.5">
-                    <div className="font-medium text-xs truncate flex-1 min-w-0">{dag.dag.name}</div>
+                    <div className="font-medium text-xs truncate flex-1 min-w-0">
+                      {dag.dag.name}
+                    </div>
                     <StatusChip status={status} size="xs">
                       {statusLabel}
                     </StatusChip>
@@ -1398,23 +1414,26 @@ function DAGTable({
 
                   {/* Schedule & Last Run - inline */}
                   <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground mb-1.5">
-                    {dag.dag.schedule && dag.dag.schedule.length > 0 ? (
-                      dag.dag.schedule.map((schedule, idx) => (
-                        <Badge
-                          key={idx}
-                          variant="outline"
-                          className="text-[9px] font-normal px-1 py-0 h-3"
-                        >
-                          {schedule.expression}
-                        </Badge>
-                      ))
-                    ) : null}
-                    {dag.latestDAGRun.startedAt && dag.latestDAGRun.startedAt !== '-' && (
-                      <span className="flex items-center gap-0.5">
-                        <Calendar className="h-2.5 w-2.5" />
-                        <span className="text-[9px]">{dag.latestDAGRun.startedAt}</span>
-                      </span>
-                    )}
+                    {dag.dag.schedule && dag.dag.schedule.length > 0
+                      ? dag.dag.schedule.map((schedule, idx) => (
+                          <Badge
+                            key={idx}
+                            variant="outline"
+                            className="text-[9px] font-normal px-1 py-0 h-3"
+                          >
+                            {schedule.expression}
+                          </Badge>
+                        ))
+                      : null}
+                    {dag.latestDAGRun.startedAt &&
+                      dag.latestDAGRun.startedAt !== '-' && (
+                        <span className="flex items-center gap-0.5">
+                          <Calendar className="h-2.5 w-2.5" />
+                          <span className="text-[9px]">
+                            {dag.latestDAGRun.startedAt}
+                          </span>
+                        </span>
+                      )}
                   </div>
 
                   {/* Tags - compact */}
@@ -1445,9 +1464,7 @@ function DAGTable({
         ) : (
           <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-card">
             <div className="text-6xl mb-4">🔍</div>
-            <h3 className="text-lg font-medium mb-2">
-              No DAGs found
-            </h3>
+            <h3 className="text-lg font-medium mb-2">No DAGs found</h3>
             <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
               There are no DAGs matching your current filters. Try adjusting
               your search criteria or tags.

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -270,9 +271,11 @@ func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 func bindFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 	flags := append([]commandLineFlag{configFlag}, additionalFlags...)
 
-	for _, flag := range flags {
-		if flag.bindViper {
-			_ = viper.BindPFlag(stringutil.KebabToCamel(flag.name), cmd.Flags().Lookup(flag.name))
+	config.WithViperLock(func() {
+		for _, flag := range flags {
+			if flag.bindViper {
+				_ = viper.BindPFlag(stringutil.KebabToCamel(flag.name), cmd.Flags().Lookup(flag.name))
+			}
 		}
-	}
+	})
 }

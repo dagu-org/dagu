@@ -21,10 +21,14 @@
 - Parameters: Added JSON Schema validation mode with `schema`.
 - Runtime: Injects `DAG_RUN_STATUS` into handler environments so exit/success/failure/cancel scripts can branch on the final canonical status.
 - Executors: Added an experimental GitHub Actions executor (`type: gha`) powered by nektos/act; action inputs come from the new step-level `params` map.
+- UI: Added accordion-style expandable node rows to display step logs inline, similar to GitHub Actions, reducing the need to open popup windows (#1313).
 
 ### Fixed
 - DAG name validation is centralized and enforced consistently: names must be `<= 40` chars and match `[A-Za-z0-9_.-]+`. Endpoints that accept `name` now return `400 bad_request` for invalid names.
 - Docker: Fixed container initialization bug with `registryAuths` field (#1330)
+- Windows: Fixed process cancellation not terminating subprocesses by recursively killing all child processes (#1342)
+- UI: Fixed duration display update bug in DAG run details
+- Other small issues and improvements
 
 ### Contributors
 
@@ -34,6 +38,7 @@ Thanks to our contributors for this release:
 | -------------------------------------- | ---------------------------------------- |
 | Docker-in-Docker container execution issues (#1228, #1231, #1235) and registryAuths bug report (#1327) | [@bellackn](https://github.com/bellackn) |
 | Container name support (#1237), bash requirement (#1239), command field (#1261), log buttons (#1301), and scroll issues (#1324) | [@Pangolin2097](https://github.com/Pangolin2097) |
+| Accordion-style log expansion feature request (#1313) | [@borestad](https://github.com/borestad) |
 | SSH environment variables feature request (#1238) | [@n3storm](https://github.com/n3storm) |
 | SSH config override issue report (#1249) | [@TrezOne](https://github.com/TrezOne) |
 | DAG dependency resolution error report (#1262) | [@JuchangGit](https://github.com/JuchangGit) |
@@ -50,6 +55,7 @@ Thanks to our contributors for this release:
 | JSON Schema validation for params implementation (#1273) | [@thefishhat](https://github.com/thefishhat) |
 | SSH script validation implementation (#1308) | [@AdityaTel89](https://github.com/AdityaTel89) |
 | README updates (#1326), unit tests (#1329), and legacy directory warning (#858, #1336) | [@arky](https://github.com/arky) |
+| Windows process cancellation fix with recursive subprocess termination (#1207, #1342) | [@lvoeg](https://github.com/lvoeg) |
 | Extensive troubleshooting and community support: container name (#1237), SSH environment variables (#1238), DAG dependency resolution (#1262), cleanup and status propagation (#1305), environment variables behavior (#1320), clear queue feature (#1298), Docker-in-Docker (#1235), and CLI/masking discussions (#1314, #1317, #1273) | [@ghansham](https://github.com/ghansham) |
 
 ## v1.22.0 (2025-08-24)
