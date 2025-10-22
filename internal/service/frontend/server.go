@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"mime"
 	"net"
 	"net/http"
 	"os"
@@ -171,6 +172,9 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) {
 
 	r.Get(assetsPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=86400")
+		if ctype := mime.TypeByExtension(path.Ext(r.URL.Path)); ctype != "" {
+			w.Header().Set("Content-Type", ctype)
+		}
 		fileServer.ServeHTTP(w, r)
 	})
 
