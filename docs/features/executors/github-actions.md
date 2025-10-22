@@ -4,9 +4,73 @@ Run individual GitHub Actions inside Dagu by delegating execution to [nektos/act
 
 ## Prerequisites
 
+- Install Dagu by following the [installation guide](/getting-started/installation) so the CLI and scheduler are available locally.
 - Docker or a compatible OCI runtime must be available because the executor launches action workloads inside containers.
 - Network egress must be permitted so `act` can resolve action bundles and container images.
 - Provide a GitHub token with at least `contents:read` scope when cloning private repositories or accessing private actions.
+
+## Quick Start
+
+1. Save the DAG below as `gha-hello.yaml` (or any filename you prefer):
+
+   ```yaml
+   steps:
+     - name: run-action
+       command: actions/hello-world-javascript-action@main
+       executor:
+         type: github_action
+         config:
+           runner: node:24-bookworm   # optional; defaults to node:24-bookworm
+       params:
+         who-to-greet: "Morning"
+       output: ACTION_OUTPUT          # capture action outputs for later steps
+
+     - name: inspect-output
+       command: echo "You got ${ACTION_OUTPUT}"
+   ```
+
+2. Execute the workflow with:
+
+   ```bash
+   dagu run gha-hello.yaml
+   ```
+
+The first step runs the referenced GitHub Action inside an ephemeral workflow powered by `nektos/act`. Dagu binds the step's working directory into the runner container (so files persist locally), evaluates `params` into the action `with:` block, and exposes the step's `output` as an environment variable for downstream steps. The follow-up command step can read `ACTION_OUTPUT` like any other Dagu variable.
+
+## Scheduled Runs
+
+Let Dagu trigger your GitHub Action on a cron schedule:
+
+```yaml
+schedules:
+  - cron: "0 7 * * 1-5"      # Weekdays at 07:00 server time
+
+secrets:
+  - name: GITHUB_TOKEN
+    provider: env
+    key: GITHUB_TOKEN
+
+steps:
+  - name: collect-pr-count
+    executor:
+      type: gha
+    command: actions/github-script@v7
+    params:
+      github-token: $GITHUB_TOKEN
+      script: |
+        const { data } = await github.rest.pulls.list({
+          owner: "dagu-org",
+          repo: "dagu",
+          state: "open",
+        });
+        core.setOutput("count", data.length);
+    output: PR_COUNT
+
+  - name: notify
+    command: echo "Open PRs: ${PR_COUNT.count}"
+```
+
+The first step runs `actions/github-script` inside an isolated Act runner container, executes the JavaScript snippet, and exposes its output as `PR_COUNT`. The follow-up command uses the standard command executor on the host, so no GitHub Action runtime is required locally. The scheduler evaluates the cron expression using the server timezone and executes the DAG automatically, but you can still run it ad-hoc (`dagu run pr-count.yaml`) before enabling the schedule.
 
 ## Basic Usage
 
@@ -16,11 +80,12 @@ secrets:
     provider: env
     key: GITHUB_TOKEN
 
+workingDir: /tmp/gha-workspace
+
 steps:
   - name: checkout
     command: actions/checkout@v4          # Action to run
-    executor:
-      type: gha                           # Aliases: github_action, github-action
+    executor: gha                         # Aliases: github_action, github-action
     params:
       repository: dagu-org/dagu
       ref: main
@@ -28,7 +93,8 @@ steps:
 ```
 
 - `command` holds the action reference (`owner/repo@ref`).
-- `executor.type` must be `gha` (or one of the registered aliases shown above).
+- `executor` can be the shorthand `gha` shown above, or a map with `type: gha` when you need to add `config`.
+- `workingDir` is set at the DAG level and determines the workspace Dagu mounts into the action container (defaults to the process CWD if omitted).
 - `executor.config` contains runner configuration options (see Configuration section below).
 - `params` maps directly to the `with:` block in GitHub Actions YAML. Values support the same variable substitution rules as other step fields.
 
