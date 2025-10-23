@@ -122,6 +122,12 @@ params:
   # Environment variables
   - USER: ${USER}
   - LOG_PATH: ${LOG_DIR:-/var/log}  # With default
+  
+  # Substring slices & param chaining
+  - SOURCE_ID: HBL01_22OCT2025_0536
+  - PREFIX: ${SOURCE_ID:0:5}
+  - REMAINDER: ${SOURCE_ID:5}
+  - ARTIFACT: backup-${PREFIX}-${DATE}.tar.gz
 
 steps:
   - backup-${DATE}-${GIT_COMMIT}.tar.gz

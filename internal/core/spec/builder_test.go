@@ -100,6 +100,44 @@ env:
 			"Z=A B C",
 		)
 	})
+	t.Run("ParamsWithSubstringAndDefaults", func(t *testing.T) {
+		data := []byte(`
+env:
+  - SOURCE_ID: HBL01_22OCT2025_0536
+params:
+  - BASE: ${SOURCE_ID}
+  - PREFIX: ${BASE:0:5}
+  - REMAINDER: ${BASE:5}
+  - FALLBACK: ${MISSING_VALUE:-fallback}
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+
+		th := DAG{t: t, DAG: dag}
+		th.AssertParam(t,
+			"BASE=HBL01_22OCT2025_0536",
+			"PREFIX=HBL01",
+			"REMAINDER=_22OCT2025_0536",
+			"FALLBACK=fallback",
+		)
+	})
+	t.Run("ParamsNoEvalPreservesRaw", func(t *testing.T) {
+		data := []byte(`
+env:
+  - SOURCE_ID: HBL01_22OCT2025_0536
+params:
+  - BASE: ${SOURCE_ID}
+  - PREFIX: ${BASE:0:5}
+`)
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{NoEval: true})
+		require.NoError(t, err)
+
+		th := DAG{t: t, DAG: dag}
+		th.AssertParam(t,
+			"BASE=${SOURCE_ID}",
+			"PREFIX=${BASE:0:5}",
+		)
+	})
 	t.Run("ParamsWithLocalSchemaReference", func(t *testing.T) {
 		schemaContent := `{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
