@@ -68,4 +68,25 @@ steps:
 			"STEP1_OUTPUT": "HBL01",
 		})
 	})
+
+	t.Run("ShellFallbacks", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+steps:
+  - name: default-env
+    env:
+      - OPTIONAL: ${UNSET_OPTIONAL:-default_value}
+    command: echo "${OPTIONAL}"
+    output: FALLBACK_OUTPUT
+`)
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+
+		dag.AssertOutputs(t, map[string]any{
+			"FALLBACK_OUTPUT": "default_value",
+		})
+	})
 }

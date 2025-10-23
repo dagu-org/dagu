@@ -477,6 +477,13 @@ func TestEvalString(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "ShellSubstringExpansion",
+			input:   "prefix ${UID:0:5} suffix",
+			opts:    []EvalOption{WithVariables(map[string]string{"UID": "HBL01_22OCT2025_0536"})},
+			want:    "prefix HBL01 suffix",
+			wantErr: false,
+		},
+		{
 			name:    "OnlyReplaceVars",
 			input:   "$TEST_ENV and `echo hello` and ${FOO}",
 			opts:    []EvalOption{OnlyReplaceVars(), WithVariables(map[string]string{"FOO": "foo"})},
