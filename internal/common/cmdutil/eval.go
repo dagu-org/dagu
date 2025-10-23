@@ -3,6 +3,7 @@ package cmdutil
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/itchyny/gojq"
+	"mvdan.cc/sh/v3/expand"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 type EvalOptions struct {
@@ -168,7 +171,13 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 		}
 	}
 	if options.ExpandEnv {
-		value = os.ExpandEnv(value)
+		expanded, err := expandWithShell(value, options)
+		if err != nil {
+			logger.Debug(ctx, "shell expansion failed, falling back to os.ExpandEnv", "err", err)
+			value = os.ExpandEnv(value)
+		} else {
+			value = expanded
+		}
 	}
 	return value, nil
 }
@@ -197,7 +206,13 @@ func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, 
 		}
 	}
 	if options.ExpandEnv {
-		value = os.ExpandEnv(value)
+		expanded, err := expandWithShell(value, options)
+		if err != nil {
+			logger.Debug(ctx, "shell expansion failed, falling back to os.ExpandEnv", "err", err)
+			value = os.ExpandEnv(value)
+		} else {
+			value = expanded
+		}
 	}
 	value, err := substituteCommands(value)
 	if err != nil {
@@ -558,4 +573,43 @@ func replaceVars(template string, vars map[string]string) string {
 		}
 		return match
 	})
+}
+
+func expandWithShell(input string, opts *EvalOptions) (string, error) {
+	parser := syntax.NewParser()
+	word, err := parser.Document(strings.NewReader(input))
+	if err != nil {
+		return "", err
+	}
+	if word == nil {
+		return "", nil
+	}
+
+	cfg := &expand.Config{
+		Env: expand.FuncEnviron(func(name string) string {
+			if val, ok := lookupVariable(name, opts.Variables); ok {
+				return val
+			}
+			return os.Getenv(name)
+		}),
+	}
+
+	result, err := expand.Literal(cfg, word)
+	if err != nil {
+		var unexpected expand.UnexpectedCommandError
+		if errors.As(err, &unexpected) {
+			return os.ExpandEnv(input), nil
+		}
+		return "", err
+	}
+	return result, nil
+}
+
+func lookupVariable(name string, scopes []map[string]string) (string, bool) {
+	for _, vars := range scopes {
+		if val, ok := vars[name]; ok {
+			return val, true
+		}
+	}
+	return "", false
 }
