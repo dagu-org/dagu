@@ -896,6 +896,50 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 			},
 			want: "Out: /tmp/out, Err: /tmp/err, Code: 1",
 		},
+		{
+			name:    "StepStdoutReferenceWithSlice",
+			input:   "Slice: ${step1.stdout:0:4}",
+			dataMap: map[string]string{},
+			stepMap: map[string]StepInfo{
+				"step1": {
+					Stdout: "abcdef",
+				},
+			},
+			want: "Slice: abcd",
+		},
+		{
+			name:    "StepStdoutReferenceWithOffsetOnly",
+			input:   "Tail: ${step1.stdout:3}",
+			dataMap: map[string]string{},
+			stepMap: map[string]StepInfo{
+				"step1": {
+					Stdout: "abcdef",
+				},
+			},
+			want: "Tail: def",
+		},
+		{
+			name:    "StepStdoutReferenceWithSliceBeyondLength",
+			input:   "Beyond: ${step1.stdout:10:3}",
+			dataMap: map[string]string{},
+			stepMap: map[string]StepInfo{
+				"step1": {
+					Stdout: "abc",
+				},
+			},
+			want: "Beyond: ",
+		},
+		{
+			name:    "StepStdoutReferenceWithInvalidSlice",
+			input:   "Invalid: ${step1.stdout:-1:2}",
+			dataMap: map[string]string{},
+			stepMap: map[string]StepInfo{
+				"step1": {
+					Stdout: "abcdef",
+				},
+			},
+			want: "Invalid: ${step1.stdout:-1:2}",
+		},
 	}
 
 	for _, tt := range tests {
@@ -940,6 +984,19 @@ func TestEvalString_WithStepMap(t *testing.T) {
 				}),
 			},
 			want:    "Var: value, Step: 0",
+			wantErr: false,
+		},
+		{
+			name:  "StepStdoutSlice",
+			input: "Slice: ${step1.stdout:0:3}",
+			opts: []EvalOption{
+				WithStepMap(map[string]StepInfo{
+					"step1": {
+						Stdout: "HBL01_22OCT2025_0536",
+					},
+				}),
+			},
+			want:    "Slice: HBL",
 			wantErr: false,
 		},
 	}

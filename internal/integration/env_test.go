@@ -89,4 +89,36 @@ steps:
 			"FALLBACK_OUTPUT": "default_value",
 		})
 	})
+
+	t.Run("StepOutputSubstrings", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+steps:
+  - id: producer
+    name: producer
+    command: echo "HBL01_22OCT2025_0536"
+    output: PRODUCER_OUTPUT
+  - id: substring_validate
+    name: substring-validate
+    depends: producer
+    command: |
+      if [ "${producer.stdout:0:5}${producer.stdout:5}" = "${producer.stdout}" ]; then
+        echo OK
+      else
+        echo FAIL
+        exit 1
+      fi
+    output: SUBSTRING_VALIDATION
+`)
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+
+		dag.AssertOutputs(t, map[string]any{
+			"PRODUCER_OUTPUT":      "HBL01_22OCT2025_0536",
+			"SUBSTRING_VALIDATION": "OK",
+		})
+	})
 }

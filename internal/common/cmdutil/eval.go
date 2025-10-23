@@ -470,22 +470,43 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 			if stepMap != nil {
 				if stepInfo, ok := stepMap[name]; ok {
 					// Handle step property access
-					switch path {
+					prop, sliceSpec, err := parseStepReference(path)
+					if err != nil {
+						logger.Warn(ctx, "invalid step reference slice", "step", name, "path", path, "err", err)
+						return match
+					}
+
+					var value string
+					var handled bool
+					switch prop {
 					case ".stdout":
 						if stepInfo.Stdout == "" {
 							logger.Debug(ctx, "step stdout is empty", "step", name)
 							return match // Keep original if empty
 						}
-						return stepInfo.Stdout
+						value = stepInfo.Stdout
+						handled = true
 					case ".stderr":
 						if stepInfo.Stderr == "" {
 							logger.Debug(ctx, "step stderr is empty", "step", name)
 							return match // Keep original if empty
 						}
-						return stepInfo.Stderr
+						value = stepInfo.Stderr
+						handled = true
 					case ".exitCode", ".exit_code":
-						return stepInfo.ExitCode
+						value = stepInfo.ExitCode
+						handled = true
+					default:
+						return match
 					}
+
+					if sliceSpec.hasStart || sliceSpec.hasLength {
+						value = applyStepSlice(value, sliceSpec)
+					}
+					if !handled {
+						return match
+					}
+					return value
 				} else {
 					logger.Debug(ctx, "step not found in stepMap", "step", name)
 				}
@@ -612,4 +633,83 @@ func lookupVariable(name string, scopes []map[string]string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+type stepSliceSpec struct {
+	hasStart  bool
+	start     int
+	hasLength bool
+	length    int
+}
+
+func parseStepReference(path string) (string, stepSliceSpec, error) {
+	spec := stepSliceSpec{}
+
+	if idx := strings.Index(path, ":"); idx != -1 {
+		prop := path[:idx]
+		sliceSpec := path[idx+1:]
+		if sliceSpec == "" {
+			return "", spec, fmt.Errorf("slice specification missing values")
+		}
+
+		parts := strings.Split(sliceSpec, ":")
+		if len(parts) > 2 {
+			return "", spec, fmt.Errorf("too many slice sections")
+		}
+
+		startStr := parts[0]
+		if startStr == "" {
+			return "", spec, fmt.Errorf("slice offset is required")
+		}
+
+		start, err := strconv.Atoi(startStr)
+		if err != nil {
+			return "", spec, fmt.Errorf("invalid slice offset: %w", err)
+		}
+		if start < 0 {
+			return "", spec, fmt.Errorf("slice offset must be non-negative")
+		}
+		spec.hasStart = true
+		spec.start = start
+
+		if len(parts) == 2 {
+			lengthStr := parts[1]
+			if lengthStr != "" {
+				length, err := strconv.Atoi(lengthStr)
+				if err != nil {
+					return "", spec, fmt.Errorf("invalid slice length: %w", err)
+				}
+				if length < 0 {
+					return "", spec, fmt.Errorf("slice length must be non-negative")
+				}
+				spec.hasLength = true
+				spec.length = length
+			}
+		}
+
+		return prop, spec, nil
+	}
+
+	return path, spec, nil
+}
+
+func applyStepSlice(value string, spec stepSliceSpec) string {
+	if !spec.hasStart {
+		return value
+	}
+
+	runes := []rune(value)
+	if spec.start >= len(runes) {
+		return ""
+	}
+
+	end := len(runes)
+	if spec.hasLength {
+		end = spec.start + spec.length
+		if end > len(runes) {
+			end = len(runes)
+		}
+	}
+
+	return string(runes[spec.start:end])
 }
