@@ -3,7 +3,6 @@ package integration_test
 import (
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 )
 
@@ -17,29 +16,27 @@ env:
   - TEST_ENV_1: "env_value_1"
 
 params:
-  - TEST_PARAM_1: ${TEST_ENV_1}_param
+  - TEST_PARAM_1: ${TEST_ENV_1:0:3}_param
 
 steps:
+  - command: echo "${TEST_PARAM_1}"
+    output: PARAM_OUTPUT
   - env:
       - STEP_ENV_1: "${TEST_PARAM_1}_step1"
     command: echo "${STEP_ENV_1}"
     output: STEP1_OUTPUT
   - env:
-      - STEP_ENV_1: "${TEST_ENV_1}_step2"
+      - STEP_ENV_1: "${TEST_ENV_1:0:3}_step2"
     command: echo "${STEP_ENV_1}"
     output: STEP2_OUTPUT
 `)
 		agent := dag.Agent()
 
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, core.Succeeded)
-
-		// Verify that container output was captured to stdout
-		// The hello-world action should log "Hello, Morning!" to console
 		dag.AssertOutputs(t, map[string]any{
-			"STEP1_OUTPUT": "env_value_1_param_step1",
-			"STEP2_OUTPUT": "env_value_1_step2",
+			"PARAM_OUTPUT": "env_param",
+			"STEP1_OUTPUT": "env_param_step1",
+			"STEP2_OUTPUT": "env_step2",
 		})
 	})
 
@@ -57,13 +54,7 @@ steps:
     output: STEP1_OUTPUT
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, core.Succeeded)
-
-		// Verify that container output was captured to stdout
-		// The hello-world action should log "Hello, Morning!" to console
 		dag.AssertOutputs(t, map[string]any{
 			"STEP1_OUTPUT": "HBL01",
 		})
@@ -80,11 +71,7 @@ steps:
     output: FALLBACK_OUTPUT
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, core.Succeeded)
-
 		dag.AssertOutputs(t, map[string]any{
 			"FALLBACK_OUTPUT": "default_value",
 		})
@@ -111,11 +98,7 @@ steps:
     output: SUBSTRING_VALIDATION
 `)
 		agent := dag.Agent()
-
 		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, core.Succeeded)
-
 		dag.AssertOutputs(t, map[string]any{
 			"PRODUCER_OUTPUT":      "HBL01_22OCT2025_0536",
 			"SUBSTRING_VALIDATION": "OK",
