@@ -14,6 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/google/jsonschema-go/jsonschema"
 )
@@ -261,8 +262,13 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 						return val
 					}
 				}
-				// Fall back to real env
-				return os.Getenv(key)
+				// Fallback to real environment variables
+				val, err := cmdutil.EvalString(ctx.ctx, fmt.Sprintf("${%s}", key))
+				if err != nil {
+					logger.FromContext(ctx.ctx).Warnf("failed to evaluate env var %s: %s", key, err)
+					return ""
+				}
+				return val
 			})
 		}
 
@@ -413,8 +419,14 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 				value = backtickRegex.ReplaceAllStringFunc(
 					value,
 					func(match string) string {
+						var err error
 						cmdStr := strings.Trim(match, "`")
-						cmdStr = os.ExpandEnv(cmdStr)
+						cmdStr, err = cmdutil.EvalString(ctx.ctx, cmdStr)
+						if err != nil {
+							cmdErr = err
+							// Leave the original command if it fails
+							return fmt.Sprintf("`%s`", cmdStr)
+						}
 						cmdOut, err := exec.Command("sh", "-c", cmdStr).Output() //nolint:gosec
 						if err != nil {
 							cmdErr = err
