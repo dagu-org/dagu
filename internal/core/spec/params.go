@@ -25,7 +25,7 @@ func buildParams(ctx BuildContext, spec *definition, dag *core.DAG) error {
 		envs       []string
 	)
 
-	if err := parseParams(ctx, spec.Params, &paramPairs, &envs, dag); err != nil {
+	if err := parseParams(ctx, spec.Params, &paramPairs, &envs); err != nil {
 		return err
 	}
 
@@ -42,7 +42,7 @@ func buildParams(ctx BuildContext, spec *definition, dag *core.DAG) error {
 			overridePairs []paramPair
 			overrideEnvs  []string
 		)
-		if err := parseParams(ctx, ctx.opts.Parameters, &overridePairs, &overrideEnvs, dag); err != nil {
+		if err := parseParams(ctx, ctx.opts.Parameters, &overridePairs, &overrideEnvs); err != nil {
 			return err
 		}
 		// Override the default parameters with the command line parameters
@@ -54,7 +54,7 @@ func buildParams(ctx BuildContext, spec *definition, dag *core.DAG) error {
 			overridePairs []paramPair
 			overrideEnvs  []string
 		)
-		if err := parseParams(ctx, ctx.opts.ParametersList, &overridePairs, &overrideEnvs, dag); err != nil {
+		if err := parseParams(ctx, ctx.opts.ParametersList, &overridePairs, &overrideEnvs); err != nil {
 			return err
 		}
 		// Override the default parameters with the command line parameters
@@ -234,7 +234,7 @@ func overrideParams(paramPairs *[]paramPair, override []paramPair) {
 }
 
 // parseParams parses and processes the parameters for the DAG.
-func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]string, dag *core.DAG) error {
+func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]string) error {
 	var paramPairs []paramPair
 
 	paramPairs, err := parseParamValue(ctx, value)
@@ -247,23 +247,11 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 
 	for index, paramPair := range paramPairs {
 		if !ctx.opts.NoEval {
-			// Use os.Expand with accumulated vars to support ${P1} references
-			// Also check buildEnv from env vars (e.g., P2=${A001} where A001 is in env)
-			paramPair.Value = os.Expand(paramPair.Value, func(key string) string {
-				// Check accumulated params first
-				if val, ok := accumulatedVars[key]; ok {
-					return val
-				}
-				// Then check env vars from dag.buildEnv (populated by buildEnvs)
-				// This allows params to reference env vars (e.g., P2=${A001} where A001 is in env)
-				if dag != nil && ctx.buildEnv != nil {
-					if val, ok := ctx.buildEnv[key]; ok {
-						return val
-					}
-				}
-				// Fall back to real env
-				return os.Getenv(key)
-			})
+			evaluated, err := evalParamValue(ctx, paramPair.Value, accumulatedVars)
+			if err != nil {
+				return core.NewValidationError("params", paramPair.Value, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
+			}
+			paramPair.Value = evaluated
 		}
 
 		*params = append(*params, paramPair)
@@ -274,10 +262,12 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 		// Positional params: $1, $2, $3, ...
 		accumulatedVars[strconv.Itoa(index+1)] = paramString
 
+		if paramPair.Name != "" {
+			accumulatedVars[paramPair.Name] = paramPair.Value
+		}
+
 		if !ctx.opts.NoEval && paramPair.Name != "" {
 			*envs = append(*envs, paramString)
-			// Store named param for next param expansion
-			accumulatedVars[paramPair.Name] = paramPair.Value
 		}
 
 		if paramPair.Name == "" {
@@ -286,6 +276,20 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 	}
 
 	return nil
+}
+
+func evalParamValue(ctx BuildContext, raw string, accumulatedVars map[string]string) (string, error) {
+	var evalOptions []cmdutil.EvalOption
+
+	if len(accumulatedVars) > 0 {
+		evalOptions = append(evalOptions, cmdutil.WithVariables(accumulatedVars))
+	}
+
+	if ctx.buildEnv != nil {
+		evalOptions = append(evalOptions, cmdutil.WithVariables(ctx.buildEnv))
+	}
+
+	return cmdutil.EvalString(ctx.ctx, raw, evalOptions...)
 }
 
 // parseParamValue parses the parameters for the DAG.
@@ -365,14 +369,6 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 
 				}
 
-				if !ctx.opts.NoEval {
-					parsed, err := cmdutil.EvalString(ctx.ctx, valueStr)
-					if err != nil {
-						return nil, core.NewValidationError("params", valueStr, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
-					}
-					valueStr = parsed
-				}
-
 				paramPair := paramPair{name, valueStr}
 				params = append(params, paramPair)
 			}
@@ -413,8 +409,14 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 				value = backtickRegex.ReplaceAllStringFunc(
 					value,
 					func(match string) string {
+						var err error
 						cmdStr := strings.Trim(match, "`")
-						cmdStr = os.ExpandEnv(cmdStr)
+						cmdStr, err = cmdutil.EvalString(ctx.ctx, cmdStr)
+						if err != nil {
+							cmdErr = err
+							// Leave the original command if it fails
+							return fmt.Sprintf("`%s`", cmdStr)
+						}
 						cmdOut, err := exec.Command("sh", "-c", cmdStr).Output() //nolint:gosec
 						if err != nil {
 							cmdErr = err
