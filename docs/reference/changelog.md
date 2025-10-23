@@ -3,7 +3,7 @@
 ## v1.24.0 (UNRELEASED)
 
 ### Added
-- DAG: `env` and `parameters` now able to evaluate `${VAR:offset:length}` slices, shell-style defaults (`${VAR:-fallback}`).
+- DAG: support shell-like parameter expansion for `env` and `parameters` field. It now is able to evaluate `${VAR:offset:length}` slices, shell-style defaults (`${VAR:-fallback}`).
 
 ## v1.23.0 (2025-10-21)
 
