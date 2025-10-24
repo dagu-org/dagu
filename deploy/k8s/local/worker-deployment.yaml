@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dagu-worker
+  namespace: dagu-dev
+  labels:
+    app: dagu
+    component: worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dagu
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: dagu
+        component: worker
+    spec:
+      containers:
+      - name: dagu
+        # Use official latest image
+        image: ghcr.io/dagu-org/dagu:latest
+        imagePullPolicy: IfNotPresent
+        command:
+          - dagu
+          - worker
+          - --worker.labels
+          - environment=dev,region=local,cluster=k8s
+          # Uncomment to customize worker ID and max active runs:
+          # - --worker.id
+          # - $(WORKER_ID)
+          # - --worker.max-active-runs
+          # - "50"
+        envFrom:
+        - configMapRef:
+            name: dagu-config
+        env:
+        # Workers connect to coordinator via service DNS name
+        - name: DAGU_COORDINATOR_HOST
+          value: "dagu-server"
+        - name: WORKER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts:
+        - name: dagu-data
+          mountPath: /var/lib/dagu
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: dagu-data
+        persistentVolumeClaim:
+          claimName: dagu-data
