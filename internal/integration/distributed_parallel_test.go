@@ -46,6 +46,9 @@ steps:
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
+		ctx, cancel := context.WithCancel(coord.Context)
+		t.Cleanup(cancel)
+
 		// Create and start multiple workers to handle parallel execution
 		workers := make([]*worker.Worker, 2)
 		for i := 0; i < 2; i++ {
@@ -58,20 +61,11 @@ steps:
 			)
 			workers[i] = workerInst
 
-			ctx, cancel := context.WithCancel(coord.Context)
-			t.Cleanup(cancel)
-
 			go func(w *worker.Worker) {
 				if err := w.Start(ctx); err != nil {
 					t.Logf("Worker stopped: %v", err)
 				}
 			}(workerInst)
-
-			t.Cleanup(func() {
-				if err := workerInst.Stop(coord.Context); err != nil {
-					t.Logf("Error stopping worker: %v", err)
-				}
-			})
 		}
 
 		// Give workers time to connect
@@ -155,6 +149,9 @@ steps:
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
+		ctx, cancel := context.WithCancel(coord.Context)
+		t.Cleanup(cancel)
+
 		// Create multiple workers of the same type
 		for i := 0; i < 3; i++ {
 			workerInst := worker.NewWorker(
@@ -165,20 +162,11 @@ steps:
 				coord.Config,
 			)
 
-			ctx, cancel := context.WithCancel(coord.Context)
-			t.Cleanup(cancel)
-
 			go func(w *worker.Worker) {
 				if err := w.Start(ctx); err != nil {
 					t.Logf("Worker stopped: %v", err)
 				}
 			}(workerInst)
-
-			t.Cleanup(func() {
-				if err := workerInst.Stop(coord.Context); err != nil {
-					t.Logf("Error stopping worker: %v", err)
-				}
-			})
 		}
 
 		// Give workers time to connect
@@ -239,8 +227,9 @@ steps:
       echo "Processed $1"
 `
 		coord := test.SetupCoordinator(t)
-
 		coordinatorClient := coord.GetCoordinatorClient(t)
+		ctx, cancel := context.WithCancel(coord.Context)
+		t.Cleanup(cancel)
 
 		workerInst := worker.NewWorker(
 			"test-worker-failure",
@@ -250,19 +239,11 @@ steps:
 			coord.Config,
 		)
 
-		ctx, cancel := context.WithCancel(coord.Context)
-		t.Cleanup(cancel)
-
 		go func() {
 			if err := workerInst.Start(ctx); err != nil {
 				t.Logf("Worker stopped: %v", err)
 			}
 		}()
-		t.Cleanup(func() {
-			if err := workerInst.Stop(coord.Context); err != nil {
-				t.Logf("Error stopping worker: %v", err)
-			}
-		})
 
 		time.Sleep(50 * time.Millisecond)
 
@@ -522,6 +503,9 @@ steps:
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
+		ctx, cancel := context.WithCancel(coord.Context)
+		t.Cleanup(cancel)
+
 		workerInst := worker.NewWorker(
 			"test-worker-1",
 			10,
@@ -530,20 +514,11 @@ steps:
 			coord.Config,
 		)
 
-		ctx, cancel := context.WithCancel(coord.Context)
-		t.Cleanup(cancel)
-
 		go func() {
 			if err := workerInst.Start(ctx); err != nil {
 				t.Logf("Worker stopped: %v", err)
 			}
 		}()
-
-		t.Cleanup(func() {
-			if err := workerInst.Stop(coord.Context); err != nil {
-				t.Logf("Error stopping worker: %v", err)
-			}
-		})
 
 		// Give worker time to connect
 		time.Sleep(100 * time.Millisecond)
@@ -638,6 +613,9 @@ steps:
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
+		ctx, cancel := context.WithCancel(coord.Context)
+		t.Cleanup(cancel)
+
 		numWorkers := 3
 		workers := make([]*worker.Worker, numWorkers)
 		for i := 0; i < numWorkers; i++ {
@@ -650,20 +628,11 @@ steps:
 			)
 			workers[i] = workerInst
 
-			ctx, cancel := context.WithCancel(coord.Context)
-			t.Cleanup(cancel)
-
 			go func(w *worker.Worker) {
 				if err := w.Start(ctx); err != nil {
 					t.Logf("Worker stopped: %v", err)
 				}
 			}(workerInst)
-
-			t.Cleanup(func() {
-				if err := workerInst.Stop(coord.Context); err != nil {
-					t.Logf("Error stopping worker: %v", err)
-				}
-			})
 		}
 
 		// Give workers time to connect
