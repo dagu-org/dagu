@@ -692,11 +692,11 @@ func TestNodeSetupAndTeardown(t *testing.T) {
 	assert.True(t, strings.HasPrefix(state.Stderr, tempDir))
 
 	// Test Teardown
-	err = node.Teardown(ctx)
+	err = node.Teardown()
 	assert.NoError(t, err)
 
 	// Test double teardown (should be idempotent)
-	err = node.Teardown(ctx)
+	err = node.Teardown()
 	assert.NoError(t, err)
 }
 
@@ -852,7 +852,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 			assert.Equal(t, tt.maxOutputSize, env.DAG.MaxOutputSize)
 
 			// Cleanup
-			err = node.Teardown(ctx)
+			err = node.Teardown()
 			assert.NoError(t, err)
 		})
 	}
@@ -1107,7 +1107,7 @@ func (n nodeHelper) Execute(t *testing.T) {
 	err = n.Node.Execute(n.execContext(dagRunID))
 	require.NoError(t, err, "failed to execute node")
 
-	err = n.Teardown(n.Context)
+	err = n.Teardown()
 	require.NoError(t, err, "failed to teardown node")
 }
 

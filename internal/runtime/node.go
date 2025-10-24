@@ -494,14 +494,14 @@ func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error 
 	return nil
 }
 
-func (n *Node) Teardown(ctx context.Context) error {
+func (n *Node) Teardown() error {
 	if n.done.Load() {
 		return nil
 	}
 	n.done.Store(true)
 
 	var lastErr error
-	if err := n.outputs.closeResources(ctx); err != nil {
+	if err := n.outputs.closeResources(); err != nil {
 		lastErr = err
 	}
 

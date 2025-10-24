@@ -190,7 +190,7 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 	})
 }
 
-func (a *API) isAllowed(_ context.Context, perm config.Permission) error {
+func (a *API) isAllowed(perm config.Permission) error {
 	if !a.config.Server.Permissions[perm] {
 		return &Error{
 			Code:       api.ErrorCodeForbidden,

@@ -179,7 +179,7 @@ func (oc *OutputCoordinator) flushWriters() error {
 	return lastErr
 }
 
-func (oc *OutputCoordinator) closeResources(_ context.Context) error {
+func (oc *OutputCoordinator) closeResources() error {
 	// First flush all writers
 	_ = oc.flushWriters()
 

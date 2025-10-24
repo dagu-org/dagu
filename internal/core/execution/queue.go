@@ -29,7 +29,7 @@ type QueueStore interface {
 	// ListByDAGName returns all items that has a specific DAG name
 	ListByDAGName(ctx context.Context, name, dagName string) ([]QueuedItemData, error)
 	// Reader returns a QueueReader for reading from the queue
-	Reader(ctx context.Context) QueueReader
+	Reader() QueueReader
 }
 
 // QueueReader provides an interface for reading from the queue

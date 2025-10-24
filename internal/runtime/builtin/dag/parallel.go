@@ -136,7 +136,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	}
 
 	// Always output aggregated results, even if some executions failed
-	if err := e.outputResults(ctx); err != nil {
+	if err := e.outputResults(); err != nil {
 		// Log the output error but don't fail the entire execution because of it
 		logger.Error(ctx, "Failed to output results", "err", err)
 	}
@@ -235,7 +235,7 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams executor.
 }
 
 // outputResults aggregates and outputs all child DAG results
-func (e *parallelExecutor) outputResults(_ context.Context) error {
+func (e *parallelExecutor) outputResults() error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 

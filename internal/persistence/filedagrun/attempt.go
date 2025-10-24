@@ -98,7 +98,7 @@ func (att *Attempt) ModTime() (time.Time, error) {
 }
 
 // ReadDAG implements models.DAGRunAttempt.
-func (att *Attempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
+func (att *Attempt) ReadDAG(_ context.Context) (*core.DAG, error) {
 	// Determine the path to the DAG definition file
 	dir := filepath.Dir(att.file)
 	dagFile := filepath.Join(dir, DAGDefinition)
@@ -320,7 +320,7 @@ func safeRename(source, target string) error {
 
 // ReadStatus reads the latest status from the file, using cache if available.
 // The context can be used to cancel the operation.
-func (att *Attempt) ReadStatus(ctx context.Context) (*execution.DAGRunStatus, error) {
+func (att *Attempt) ReadStatus(_ context.Context) (*execution.DAGRunStatus, error) {
 	// Try to use cache first if available
 	if att.cache != nil {
 		status, cacheErr := att.cache.LoadLatest(att.file, func() (*execution.DAGRunStatus, error) {

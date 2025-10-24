@@ -200,7 +200,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 			s.handleQueue(ctx, queueCh, done)
 		}()
 
-		qr = s.queueStore.Reader(ctx)
+		qr = s.queueStore.Reader()
 		if err := qr.Start(ctx, queueCh); err != nil {
 			return fmt.Errorf("failed to start queue reader: %w", err)
 		}

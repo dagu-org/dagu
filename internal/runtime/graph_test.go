@@ -186,8 +186,7 @@ func TestStepRetryExecution(t *testing.T) {
 			},
 		),
 	}
-	ctx := context.Background()
-	_, err := runtime.CreateStepRetryGraph(ctx, dag, nodes, "2")
+	_, err := runtime.CreateStepRetryGraph(dag, nodes, "2")
 	require.NoError(t, err)
 	// Only step 2 should be reset to NodeStatusNone, downstream steps remain untouched
 	require.Equal(t, core.NodeSucceeded, nodes[0].State().Status)  // 1 (unchanged)
@@ -236,10 +235,8 @@ func TestStepRetryExecutionForSuccessfulStep(t *testing.T) {
 		),
 	}
 
-	ctx := context.Background()
-
 	// Test retrying a successful step in the middle
-	graph, err := runtime.CreateStepRetryGraph(ctx, dag, nodes, "step2")
+	graph, err := runtime.CreateStepRetryGraph(dag, nodes, "step2")
 	require.NoError(t, err)
 	require.NotNil(t, graph)
 
@@ -252,7 +249,7 @@ func TestStepRetryExecutionForSuccessfulStep(t *testing.T) {
 	// Reset nodes to original state
 	nodes[1].SetStatus(core.NodeSucceeded)
 
-	graph, err = runtime.CreateStepRetryGraph(ctx, dag, nodes, "step1")
+	graph, err = runtime.CreateStepRetryGraph(dag, nodes, "step1")
 	require.NoError(t, err)
 	require.NotNil(t, graph)
 
@@ -265,7 +262,7 @@ func TestStepRetryExecutionForSuccessfulStep(t *testing.T) {
 	// Reset nodes to original state
 	nodes[0].SetStatus(core.NodeSucceeded)
 
-	graph, err = runtime.CreateStepRetryGraph(ctx, dag, nodes, "step3")
+	graph, err = runtime.CreateStepRetryGraph(dag, nodes, "step3")
 	require.NoError(t, err)
 	require.NotNil(t, graph)
 

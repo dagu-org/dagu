@@ -208,8 +208,8 @@ func (m *mockQueueStore) All(ctx context.Context) ([]execution.QueuedItemData, e
 	return args.Get(0).([]execution.QueuedItemData), args.Error(1)
 }
 
-func (m *mockQueueStore) Reader(ctx context.Context) execution.QueueReader {
-	args := m.Called(ctx)
+func (m *mockQueueStore) Reader() execution.QueueReader {
+	args := m.Called()
 	return args.Get(0).(execution.QueueReader)
 }
 

@@ -909,7 +909,7 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 
 // setupStepRetryGraph sets up the graph for retrying a specific step.
 func (a *Agent) setupStepRetryGraph(ctx context.Context, nodes []*runtime.Node) error {
-	graph, err := runtime.CreateStepRetryGraph(ctx, a.dag, nodes, a.stepRetry)
+	graph, err := runtime.CreateStepRetryGraph(a.dag, nodes, a.stepRetry)
 	if err != nil {
 		return err
 	}

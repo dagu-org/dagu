@@ -226,7 +226,7 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 	}
 
 	// Process files in parallel
-	errs := processFilesParallel(ctx, matches, func(targetDir string) error {
+	errs := processFilesParallel(matches, func(targetDir string) error {
 		// Construct the new directory path
 		day := filepath.Base(filepath.Dir(targetDir))
 		month := filepath.Base(filepath.Dir(filepath.Dir(targetDir)))
@@ -408,7 +408,7 @@ func (dr DataRoot) listDAGRunsInRange(ctx context.Context, start, end execution.
 					continue
 				}
 
-				_ = processFilesParallel(ctx, files, func(filePath string) error {
+				_ = processFilesParallel(files, func(filePath string) error {
 					run, err := NewDAGRun(filePath)
 					if err != nil {
 						logger.Debug(ctx, "Failed to create run from file %s", filePath, "err", err)
@@ -553,7 +553,7 @@ func listDirsSorted(path string, reverse bool, pattern *regexp.Regexp) ([]string
 //
 // Returns:
 //   - A slice of errors encountered during processing
-func processFilesParallel(ctx context.Context, files []string, processor func(string) error) []error {
+func processFilesParallel(files []string, processor func(string) error) []error {
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(files))
 	semaphore := make(chan struct{}, runtime.NumCPU())
