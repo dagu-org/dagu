@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/dirlock"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
@@ -17,7 +16,6 @@ type finder struct {
 	baseDir      string
 	serviceName  execution.ServiceName
 	staleTimeout time.Duration
-	dirLock      dirlock.DirLock
 	mu           sync.Mutex
 
 	// Cache fields
@@ -28,20 +26,11 @@ type finder struct {
 
 // newFinder creates a new finder for a specific service
 func newFinder(baseDir string, serviceName execution.ServiceName) *finder {
-	serviceDir := filepath.Join(baseDir, string(serviceName))
-
-	// Create directory lock for this service
-	lock := dirlock.New(serviceDir, &dirlock.LockOptions{
-		StaleThreshold: 5 * time.Second,       // Lock is stale after 5 seconds
-		RetryInterval:  50 * time.Millisecond, // Retry every 50ms
-	})
-
 	return &finder{
 		baseDir:       baseDir,
 		serviceName:   serviceName,
 		staleTimeout:  30 * time.Second, // Consider instances stale after 30 seconds
-		dirLock:       lock,
-		cacheDuration: 3 * time.Second, // Cache members for 15 seconds
+		cacheDuration: 3 * time.Second,  // Cache members for 15 seconds
 	}
 }
 
