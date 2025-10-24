@@ -253,6 +253,11 @@ func (store *Storage) List(ctx context.Context, opts execution.ListDAGsOptions) 
 
 	// First, collect all matching DAGs
 	for _, entry := range entries {
+		// Check context cancellation
+		if ctx.Err() != nil {
+			return execution.NewPaginatedResult([]*core.DAG{}, 0, *opts.Paginator), nil, ctx.Err()
+		}
+
 		if entry.IsDir() || !fileutil.IsYAMLFile(entry.Name()) {
 			continue
 		}
