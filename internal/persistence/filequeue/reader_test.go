@@ -33,7 +33,7 @@ func TestQueueReader(t *testing.T) {
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Get a reader from the store
-	reader := store.Reader(ctx)
+	reader := store.Reader()
 
 	// Create a channel to receive items
 	ch := make(chan execution.QueuedItem, 10)
@@ -87,7 +87,7 @@ func TestQueueReaderChannelFull(t *testing.T) {
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Get a reader from the store
-	reader := store.Reader(ctx)
+	reader := store.Reader()
 
 	// Create a channel with buffer size 0 to simulate a full channel
 	ch := make(chan execution.QueuedItem)
@@ -116,7 +116,7 @@ func TestQueueReaderStartStop(t *testing.T) {
 	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Get a reader from the store
-	reader := store.Reader(ctx)
+	reader := store.Reader()
 
 	// Create a channel to receive items
 	ch := make(chan execution.QueuedItem, 10)
@@ -152,7 +152,7 @@ func TestQueueReaderContextCancellation(t *testing.T) {
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Get a reader from the store
-	reader := store.Reader(ctx)
+	reader := store.Reader()
 
 	// Create a channel with buffer size 0 to simulate a full channel
 	ch := make(chan execution.QueuedItem)
@@ -195,7 +195,7 @@ func TestQueueReaderRetryDelay(t *testing.T) {
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Get a reader from the store
-	reader := store.Reader(ctx)
+	reader := store.Reader()
 
 	// Create a channel to receive items
 	ch := make(chan execution.QueuedItem, 1)
@@ -257,7 +257,7 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get a reader from the store
-	reader := store.Reader(ctx)
+	reader := store.Reader()
 
 	// Create a channel to receive items
 	ch := make(chan execution.QueuedItem, 1)

@@ -232,7 +232,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 					node.SetStatus(core.NodeSucceeded)
 				}
 
-				if err := sc.teardownNode(ctx, node); err != nil {
+				if err := sc.teardownNode(node); err != nil {
 					sc.setLastError(err)
 					node.SetStatus(core.NodeFailed)
 				}
@@ -316,9 +316,9 @@ func (sc *Scheduler) setupNode(ctx context.Context, node *Node) error {
 	return nil
 }
 
-func (sc *Scheduler) teardownNode(ctx context.Context, node *Node) error {
+func (sc *Scheduler) teardownNode(node *Node) error {
 	if !sc.dry {
-		return node.Teardown(ctx)
+		return node.Teardown()
 	}
 	return nil
 }
@@ -568,7 +568,7 @@ func (sc *Scheduler) runEventHandler(ctx context.Context, graph *ExecutionGraph,
 		}
 
 		defer func() {
-			_ = node.Teardown(ctx)
+			_ = node.Teardown()
 		}()
 
 		node.SetStatus(core.NodeRunning)

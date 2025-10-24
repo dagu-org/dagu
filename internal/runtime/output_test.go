@@ -111,7 +111,7 @@ func TestNode_LargeOutput(t *testing.T) {
 			}
 
 			// Cleanup
-			_ = node.Teardown(ctx)
+			_ = node.Teardown()
 		})
 	}
 }
@@ -162,7 +162,7 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 		t.Fatal("Command execution hung - possible deadlock detected")
 	}
 
-	_ = node.Teardown(ctx)
+	_ = node.Teardown()
 }
 
 func TestNode_OutputExceedsLimit(t *testing.T) {
@@ -195,7 +195,7 @@ func TestNode_OutputExceedsLimit(t *testing.T) {
 	assert.Error(t, err, "should return error when output exceeds limit")
 	assert.Contains(t, err.Error(), "output exceeded maximum size limit", "error should mention output size limit")
 
-	_ = node.Teardown(ctx)
+	_ = node.Teardown()
 }
 
 func TestNode_CustomOutputLimit(t *testing.T) {
@@ -231,7 +231,7 @@ func TestNode_CustomOutputLimit(t *testing.T) {
 	assert.Error(t, err, "should return error when output exceeds custom limit")
 	assert.Contains(t, err.Error(), "output exceeded maximum size limit", "error should mention output size limit")
 
-	_ = node.Teardown(ctx)
+	_ = node.Teardown()
 }
 
 func TestNode_ConcurrentOutputCapture(t *testing.T) {
@@ -275,5 +275,5 @@ func TestNode_ConcurrentOutputCapture(t *testing.T) {
 	assert.NotEmpty(t, output, "output should be captured")
 	assert.Contains(t, output, "Process", "output should contain process output")
 
-	_ = node.Teardown(ctx)
+	_ = node.Teardown()
 }

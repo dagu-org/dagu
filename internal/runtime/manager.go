@@ -326,14 +326,6 @@ func (m *Manager) ListRecentStatus(ctx context.Context, name string, n int) []ex
 
 // UpdateStatus updates the status of a dag-run.
 func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun execution.DAGRunRef, newStatus execution.DAGRunStatus) error {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("update canceled: %w", ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	// Find the attempt for the status.
 	var attempt execution.DAGRunAttempt
 

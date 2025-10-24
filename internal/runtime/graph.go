@@ -281,7 +281,7 @@ func (g *ExecutionGraph) runningCount() int {
 
 // CreateStepRetryGraph creates a new execution graph for retrying a specific step.
 // Only the specified step will be reset for re-execution, leaving all downstream steps untouched.
-func CreateStepRetryGraph(_ context.Context, dag *core.DAG, nodes []*Node, stepName string) (*ExecutionGraph, error) {
+func CreateStepRetryGraph(dag *core.DAG, nodes []*Node, stepName string) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
 		nodeByID:  make(map[int]*Node),
 		From:      make(map[int][]int),

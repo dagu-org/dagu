@@ -69,7 +69,7 @@ func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRe
 }
 
 func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestObject) (api.CreateNewDAGResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
 		return nil, err
 	}
 
@@ -123,7 +123,7 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 }
 
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
 		return nil, err
 	}
 
@@ -187,7 +187,7 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 }
 
 func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecRequestObject) (api.UpdateDAGSpecResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
 		return nil, err
 	}
 
@@ -208,7 +208,7 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 }
 
 func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject) (api.RenameDAGResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionWriteDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
 		return nil, err
 	}
 
@@ -535,7 +535,7 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 }
 
 func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObject) (api.ExecuteDAGResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
 
@@ -676,7 +676,7 @@ waitLoop:
 }
 
 func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRunRequestObject) (api.EnqueueDAGDAGRunResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
 
@@ -789,7 +789,7 @@ waitLoop:
 }
 
 func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDAGSuspensionStateRequestObject) (api.UpdateDAGSuspensionStateResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
 
@@ -840,7 +840,7 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 }
 
 func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequestObject) (api.StopAllDAGRunsResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
 

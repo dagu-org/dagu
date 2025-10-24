@@ -44,9 +44,9 @@ type ExitCoder interface {
 	ExitCode() int
 }
 
-// NodeStatusDeterminer is an interface for executors that can determine the status of a node.
+// NodeStatusDeterminer is an interface for reporting the status of a node execution.
 type NodeStatusDeterminer interface {
-	DetermineNodeStatus(ctx context.Context) (core.NodeStatus, error)
+	DetermineNodeStatus() (core.NodeStatus, error)
 }
 
 // DAGExecutor is an interface for child DAG executors.

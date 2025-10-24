@@ -1,7 +1,6 @@
 package runtime_test
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -2516,7 +2515,7 @@ func TestScheduler_StepRetryExecution(t *testing.T) {
 		}
 
 		// Retry step B
-		retryGraph, err := runtime.CreateStepRetryGraph(context.Background(), dag, nodes, "B")
+		retryGraph, err := runtime.CreateStepRetryGraph(dag, nodes, "B")
 		require.NoError(t, err)
 
 		// Schedule the retry

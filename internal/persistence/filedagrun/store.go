@@ -341,15 +341,6 @@ func (b *Store) newChildRecord(ctx context.Context, dag *core.DAG, timestamp tim
 
 // RecentAttempts returns the most recent history records for the specified DAG name.
 func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimit int) []execution.DAGRunAttempt {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		logger.Errorf(ctx, "Recent canceled: %v", ctx.Err())
-		return nil
-	default:
-		// Continue with operation
-	}
-
 	if itemLimit <= 0 {
 		logger.Warnf(ctx, "Invalid itemLimit %d, using default of 10", itemLimit)
 		itemLimit = 10
@@ -376,14 +367,6 @@ func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimi
 // LatestAttempt returns the most recent history record for the specified DAG name.
 // If latestStatusToday is true, it only returns today's status.
 func (store *Store) LatestAttempt(ctx context.Context, dagName string) (execution.DAGRunAttempt, error) {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("Latest canceled: %w", ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	root := NewDataRoot(store.baseDir, dagName)
 
 	if store.latestStatusToday {
@@ -411,14 +394,6 @@ func (store *Store) LatestAttempt(ctx context.Context, dagName string) (executio
 
 // FindAttempt finds a history record by dag-run ID.
 func (store *Store) FindAttempt(ctx context.Context, ref execution.DAGRunRef) (execution.DAGRunAttempt, error) {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("find canceled: %w", ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	if ref.ID == "" {
 		return nil, ErrDAGRunIDEmpty
 	}
@@ -435,14 +410,6 @@ func (store *Store) FindAttempt(ctx context.Context, ref execution.DAGRunRef) (e
 // FindChildAttempt finds a child dag-run by its ID.
 // It returns the latest record for the specified child dag-run ID.
 func (store *Store) FindChildAttempt(ctx context.Context, ref execution.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("FindChildDAGRun canceled: %w", ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	if ref.ID == "" {
 		return nil, ErrDAGRunIDEmpty
 	}
@@ -466,14 +433,6 @@ func (store *Store) FindChildAttempt(ctx context.Context, ref execution.DAGRunRe
 // If retentionDays is zero, all files will be removed.
 // If retentionDays is positive, only files older than the specified number of days will be removed.
 func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retentionDays int) error {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("RemoveOld canceled: %w", ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	if retentionDays < 0 {
 		logger.Warnf(ctx, "Negative retentionDays %d, no files will be removed", retentionDays)
 		return nil
@@ -485,14 +444,6 @@ func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retent
 
 // RemoveDAGRun implements models.DAGRunStore.
 func (store *Store) RemoveDAGRun(ctx context.Context, dagRun execution.DAGRunRef) error {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("RemoveDAGRun canceled: %w", ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	if dagRun.ID == "" {
 		return ErrDAGRunIDEmpty
 	}
@@ -522,14 +473,6 @@ func (store *Store) RemoveDAGRun(ctx context.Context, dagRun execution.DAGRunRef
 
 // RenameDAGRuns renames all history records for the specified DAG name.
 func (store *Store) RenameDAGRuns(ctx context.Context, oldNameOrPath, newNameOrPath string) error {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("Rename canceled: %w", ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	root := NewDataRoot(store.baseDir, oldNameOrPath)
 	newRoot := NewDataRoot(store.baseDir, newNameOrPath)
 	return root.Rename(ctx, newRoot)

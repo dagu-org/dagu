@@ -50,7 +50,7 @@ func NewTracer(ctx context.Context, dag *core.DAG) (*Tracer, error) {
 		return nil, fmt.Errorf("failed to create OTel exporter: %w", err)
 	}
 
-	res, err := createResource(ctx, dag)
+	res, err := createResource(dag)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OTel resource: %w", err)
 	}
@@ -133,7 +133,7 @@ func createGRPCExporter(ctx context.Context, config *core.OTelConfig) (sdktrace.
 }
 
 // createResource creates the OpenTelemetry resource for the DAG
-func createResource(_ context.Context, dag *core.DAG) (*resource.Resource, error) {
+func createResource(dag *core.DAG) (*resource.Resource, error) {
 	attrs := []attribute.KeyValue{
 		semconv.ServiceName("dagu"),
 	}

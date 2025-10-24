@@ -187,7 +187,7 @@ func (s *Store) Enqueue(ctx context.Context, name string, p execution.QueuePrior
 }
 
 // Reader implements models.QueueStore.
-func (s *Store) Reader(_ context.Context) execution.QueueReader {
+func (s *Store) Reader() execution.QueueReader {
 	return newQueueReader(s)
 }
 

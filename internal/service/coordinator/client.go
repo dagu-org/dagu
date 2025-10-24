@@ -193,7 +193,7 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []execution.Host
 	var lastErr error
 	for _, member := range members {
 		// Get or create client for this coordinator
-		client, err := cli.getOrCreateClient(ctx, member)
+		client, err := cli.getOrCreateClient(member)
 		if err != nil {
 			logger.Warn(ctx, "Failed to connect to coordinator",
 				"coordinator_id", member.ID,
@@ -237,7 +237,7 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []execution.Host
 
 func (cli *clientImpl) isHealthy(ctx context.Context, member execution.HostInfo) error {
 	// Get or create client for this coordinator
-	client, err := cli.getOrCreateClient(ctx, member)
+	client, err := cli.getOrCreateClient(member)
 	if err != nil {
 		return fmt.Errorf("failed to get coordinator client: %w", err)
 	}
@@ -260,7 +260,7 @@ func (cli *clientImpl) isHealthy(ctx context.Context, member execution.HostInfo)
 }
 
 // getOrCreateClient gets an existing client or creates a new one for the given member
-func (cli *clientImpl) getOrCreateClient(ctx context.Context, member execution.HostInfo) (*client, error) {
+func (cli *clientImpl) getOrCreateClient(member execution.HostInfo) (*client, error) {
 	// Try to get existing client with read lock
 	cli.clientsMu.RLock()
 	if c, exists := cli.clients[member.ID]; exists {
@@ -279,7 +279,7 @@ func (cli *clientImpl) getOrCreateClient(ctx context.Context, member execution.H
 	}
 
 	// Create new client
-	c, err := cli.createClient(ctx, member)
+	c, err := cli.createClient(member)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func (cli *clientImpl) getOrCreateClient(ctx context.Context, member execution.H
 }
 
 // createClient creates a new gRPC client for the given coordinator
-func (cli *clientImpl) createClient(_ context.Context, member execution.HostInfo) (*client, error) {
+func (cli *clientImpl) createClient(member execution.HostInfo) (*client, error) {
 	// Get dial options based on TLS configuration
 	dialOpts, err := getDialOptions(cli.config)
 	if err != nil {
@@ -384,7 +384,7 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 
 	for _, member := range members {
 		// Get or create client for this member
-		c, err := cli.getOrCreateClient(ctx, member)
+		c, err := cli.getOrCreateClient(member)
 		if err != nil {
 			logger.Warn(ctx, "Failed to connect to coordinator",
 				"id", member.ID,

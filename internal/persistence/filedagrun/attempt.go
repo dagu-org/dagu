@@ -98,15 +98,7 @@ func (att *Attempt) ModTime() (time.Time, error) {
 }
 
 // ReadDAG implements models.DAGRunAttempt.
-func (att *Attempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
-	default:
-		// Continue with operation
-	}
-
+func (att *Attempt) ReadDAG(_ context.Context) (*core.DAG, error) {
 	// Determine the path to the DAG definition file
 	dir := filepath.Dir(att.file)
 	dagFile := filepath.Join(dir, DAGDefinition)
@@ -137,14 +129,6 @@ func (att *Attempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
 // Open initializes the status file for writing. It returns an error if the file is already open.
 // The context can be used to cancel the operation.
 func (att *Attempt) Open(ctx context.Context) error {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	att.mu.Lock()
 	defer att.mu.Unlock()
 
@@ -248,14 +232,6 @@ func (att *Attempt) Close(ctx context.Context) error {
 // Compact performs file compaction to optimize storage and read performance.
 // It's safe to call while the file is open or closed. The context can be used to cancel the operation.
 func (att *Attempt) Compact(ctx context.Context) error {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	// Set the closing flag to prevent new writes during compaction
 	att.isClosing.Store(true)
 	defer att.isClosing.Store(false)
@@ -268,14 +244,6 @@ func (att *Attempt) Compact(ctx context.Context) error {
 
 // compactLocked performs actual compaction with the lock already held
 func (att *Attempt) compactLocked(ctx context.Context) error {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	status, err := att.parseLocked()
 	if err == io.EOF {
 		return nil // Empty file, nothing to compact
@@ -352,15 +320,7 @@ func safeRename(source, target string) error {
 
 // ReadStatus reads the latest status from the file, using cache if available.
 // The context can be used to cancel the operation.
-func (att *Attempt) ReadStatus(ctx context.Context) (*execution.DAGRunStatus, error) {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
-	default:
-		// Continue with operation
-	}
-
+func (att *Attempt) ReadStatus(_ context.Context) (*execution.DAGRunStatus, error) {
 	// Try to use cache first if available
 	if att.cache != nil {
 		status, cacheErr := att.cache.LoadLatest(att.file, func() (*execution.DAGRunStatus, error) {
@@ -454,14 +414,6 @@ func (att *Attempt) RequestCancel(ctx context.Context) error {
 
 // CancelRequested checks if a cancel request has been made for this attempt.
 func (att *Attempt) CancelRequested(ctx context.Context) (bool, error) {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return false, fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	cancelFile := filepath.Join(filepath.Dir(att.file), CancelRequestedFlag)
 	if _, err := os.Stat(cancelFile); err != nil {
 		if os.IsNotExist(err) {
@@ -488,14 +440,6 @@ func (att *Attempt) Hidden() bool {
 // Hide renames the attempt directory to hide it from normal operations.
 // It prefixes the directory name with a dot to make it hidden.
 func (att *Attempt) Hide(ctx context.Context) error {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	att.mu.Lock()
 	defer att.mu.Unlock()
 

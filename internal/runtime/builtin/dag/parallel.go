@@ -3,6 +3,7 @@ package dag
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -135,7 +136,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	}
 
 	// Always output aggregated results, even if some executions failed
-	if err := e.outputResults(ctx); err != nil {
+	if err := e.outputResults(); err != nil {
 		// Log the output error but don't fail the entire execution because of it
 		logger.Error(ctx, "Failed to output results", "err", err)
 	}
@@ -144,7 +145,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	if len(e.errors) > 0 {
 		// Check if any error is due to context cancellation
 		for _, err := range e.errors {
-			if err == context.Canceled {
+			if errors.Is(err, context.Canceled) {
 				return fmt.Errorf("parallel execution cancelled")
 			}
 		}
@@ -187,7 +188,7 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 }
 
 // DetermineNodeStatus implements NodeStatusDeterminer.
-func (e *parallelExecutor) DetermineNodeStatus(_ context.Context) (core.NodeStatus, error) {
+func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 	if len(e.results) == 0 {
 		return core.NodeFailed, fmt.Errorf("no results available for node status determination")
 	}
@@ -196,17 +197,25 @@ func (e *parallelExecutor) DetermineNodeStatus(_ context.Context) (core.NodeStat
 	// For error cases, we return an error status with error message
 	var partialSuccess bool
 	for _, result := range e.results {
-		if !result.Status.IsSuccess() {
-			return core.NodeFailed, fmt.Errorf("child DAG run %s failed with status: %s", result.DAGRunID, result.Status)
-		}
-		if result.Status == core.PartiallySucceeded {
+		switch result.Status {
+		case core.Succeeded:
+			// continue checking other results
+		case core.PartiallySucceeded:
 			partialSuccess = true
+		default:
+			return core.NodeFailed, fmt.Errorf("child DAG run %s is still in progress with status: %s", result.DAGRunID, result.Status)
 		}
+	}
+
+	// Check count of items equal to count of succeeded items
+	if len(e.results) != len(e.runParamsList) {
+		partialSuccess = true
 	}
 
 	if partialSuccess {
 		return core.NodePartiallySucceeded, nil
 	}
+
 	return core.NodeSucceeded, nil
 }
 
@@ -226,7 +235,7 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams executor.
 }
 
 // outputResults aggregates and outputs all child DAG results
-func (e *parallelExecutor) outputResults(_ context.Context) error {
+func (e *parallelExecutor) outputResults() error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 

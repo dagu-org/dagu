@@ -20,7 +20,7 @@ import (
 
 // ExecuteDAGRunFromSpec implements api.StrictServerInterface.
 func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGRunFromSpecRequestObject) (api.ExecuteDAGRunFromSpecResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
 
@@ -325,7 +325,7 @@ func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLog
 }
 
 func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGRunStepStatusRequestObject) (api.UpdateDAGRunStepStatusResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
 
@@ -502,7 +502,7 @@ func (a *API) GetChildDAGRunStepLog(ctx context.Context, request api.GetChildDAG
 
 // UpdateChildDAGRunStepStatus implements api.StrictServerInterface.
 func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.UpdateChildDAGRunStepStatusRequestObject) (api.UpdateChildDAGRunStepStatusResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
 
@@ -554,7 +554,7 @@ var nodeStatusMapping = map[api.NodeStatus]core.NodeStatus{
 }
 
 func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObject) (api.RetryDAGRunResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
 
@@ -610,7 +610,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 }
 
 func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRequestObject) (api.TerminateDAGRunResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
 
@@ -653,7 +653,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 }
 
 func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunRequestObject) (api.DequeueDAGRunResponseObject, error) {
-	if err := a.isAllowed(ctx, config.PermissionRunDAGs); err != nil {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
 

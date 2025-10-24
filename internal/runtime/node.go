@@ -199,13 +199,11 @@ func (n *Node) Execute(ctx context.Context) error {
 	}
 
 	if status, ok := cmd.(executor.NodeStatusDeterminer); ok {
-		// Determine the node status based on the executor's implementation
-		nodeStatus, err := status.DetermineNodeStatus(ctx)
-		// Only set the status if it is a success
-		// Handle the error case at the scheduler level for simplicity
-		if err == nil && nodeStatus.IsSuccess() {
-			n.SetStatus(nodeStatus)
+		nodeStatus, err := status.DetermineNodeStatus()
+		if err != nil {
+			return err
 		}
+		n.SetStatus(nodeStatus)
 	}
 
 	return n.Error()
@@ -496,14 +494,14 @@ func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error 
 	return nil
 }
 
-func (n *Node) Teardown(ctx context.Context) error {
+func (n *Node) Teardown() error {
 	if n.done.Load() {
 		return nil
 	}
 	n.done.Store(true)
 
 	var lastErr error
-	if err := n.outputs.closeResources(ctx); err != nil {
+	if err := n.outputs.closeResources(); err != nil {
 		lastErr = err
 	}
 
