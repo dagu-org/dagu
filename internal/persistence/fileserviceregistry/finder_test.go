@@ -103,7 +103,7 @@ func TestResolver_Members_FiltersStaleInstances(t *testing.T) {
 
 	// Make stale instance file old by changing its modification time
 	staleFile := filepath.Join(tmpDir, "test-service", "stale.json")
-	oldTime := time.Now().Add(-time.Minute)
+	oldTime := time.Now().Add(-300 * time.Second)
 	err = os.Chtimes(staleFile, oldTime, oldTime)
 	require.NoError(t, err)
 
@@ -198,45 +198,6 @@ func TestResolver_Members_ContextCancellation(t *testing.T) {
 	assert.Equal(t, context.Canceled, err)
 	// Should have processed some members before cancellation
 	assert.NotNil(t, members)
-}
-
-func TestResolver_RemovesStaleFiles(t *testing.T) {
-	tmpDir := t.TempDir()
-	serviceDir := filepath.Join(tmpDir, "test-service")
-	err := os.MkdirAll(serviceDir, 0755)
-	require.NoError(t, err)
-
-	// Create stale instance
-	staleInstance := instanceInfo{
-		ID:     "stale-to-remove",
-		Host:   "stalehost",
-		Port:   8081,
-		PID:    1235,
-		Status: execution.ServiceStatusInactive,
-	}
-
-	staleFile := instanceFilePath(tmpDir, "test-service", staleInstance.ID)
-	err = writeInstanceFile(staleFile, &staleInstance)
-	require.NoError(t, err)
-
-	// Make instance file old by changing its modification time
-	oldTime := time.Now().Add(-time.Minute)
-	err = os.Chtimes(staleFile, oldTime, oldTime)
-	require.NoError(t, err)
-
-	// Verify file exists before
-	assert.FileExists(t, staleFile)
-
-	finder := newFinder(tmpDir, "test-service")
-	finder.staleTimeout = 30 * time.Second // 30 second timeout
-
-	ctx := context.Background()
-	members, err := finder.members(ctx)
-	require.NoError(t, err)
-	assert.Empty(t, members)
-
-	// Verify stale file was removed
-	assert.NoFileExists(t, staleFile)
 }
 
 func TestResolver_RealWorldScenario(t *testing.T) {

@@ -68,21 +68,6 @@ func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	// Acquire lock for reading and cleaning
-	if f.dirLock != nil {
-		if err := f.dirLock.TryLock(); err != nil {
-			// If we can't get the lock, still try to read (another process may be cleaning)
-			logger.Warn(ctx, "Could not acquire lock for service directory", "service", f.serviceName)
-		} else {
-			// Ensure we unlock when done
-			defer func() {
-				if err := f.dirLock.Unlock(); err != nil {
-					logger.Error(ctx, "Failed to unlock service directory", "service", f.serviceName, "err", err)
-				}
-			}()
-		}
-	}
-
 	entries, err := os.ReadDir(serviceDir)
 	if err != nil {
 		return nil, err
@@ -112,8 +97,13 @@ func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
 		}
 
 		// Check if instance is stale
-		if time.Since(fileInfo.ModTime()) > f.staleTimeout {
-			staleFiles = append(staleFiles, instancePath)
+		modTime := fileInfo.ModTime()
+		elapsedTime := time.Since(modTime)
+		if elapsedTime > f.staleTimeout {
+			if elapsedTime > 10*f.staleTimeout {
+				// Definitely stale, mark for removal
+				staleFiles = append(staleFiles, instancePath)
+			}
 			continue
 		}
 
@@ -133,11 +123,10 @@ func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
 	}
 
 	// Second pass: remove stale files (only if we have the lock)
-	if f.dirLock != nil && len(staleFiles) > 0 {
-		// We already have the lock from above, so we can safely remove stale files
+	if len(staleFiles) > 0 {
 		for _, staleFile := range staleFiles {
 			if err := removeInstanceFile(staleFile); err != nil {
-				logger.Error(ctx, "Failed to remove stale instance file", "file", staleFile, "err", err)
+				logger.Warn(ctx, "Failed to remove stale instance file", "file", staleFile, "err", err)
 			}
 		}
 	}
