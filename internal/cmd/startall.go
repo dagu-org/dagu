@@ -147,7 +147,6 @@ func runStartAll(ctx *Context, _ []string) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			logger.Info(serviceCtx, "Coordinator initialization", "host", serviceCtx.Config.Coordinator.Host, "port", serviceCtx.Config.Coordinator.Port)
 			if err := coordinator.Start(serviceCtx); err != nil {
 				select {
 				case errCh <- fmt.Errorf("coordinator failed: %w", err):
