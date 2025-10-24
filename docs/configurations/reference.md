@@ -174,6 +174,7 @@ All options support `DAGU_` prefix.
 
 ### Coordinator
 - `DAGU_COORDINATOR_HOST` - Coordinator bind address (default: `127.0.0.1`)
+- `DAGU_COORDINATOR_ADVERTISE` - Address to advertise in service registry (default: auto-detected hostname)
 - `DAGU_COORDINATOR_PORT` - Coordinator gRPC port (default: `50055`)
 
 ### Worker

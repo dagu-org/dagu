@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/spf13/cobra"
 )
 
@@ -15,20 +16,24 @@ func StartAll() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "start-all [flags]",
-			Short: "Launch web UI server, scheduler, and coordinator in a single process",
-			Long: `Simultaneously start the web UI server, scheduler, and coordinator in a single command.
+			Short: "Launch web UI server, scheduler, and optionally coordinator in a single process",
+			Long: `Simultaneously start the web UI server, scheduler, and optionally coordinator in a single command.
 
 This convenience command combines the functionality of 'dagu server', 'dagu scheduler',
-and 'dagu coordinator' into a single process, making it easier to run a complete Dagu
-instance with distributed execution capabilities. The web UI provides the management
+and optionally 'dagu coordinator' into a single process. The web UI provides the management
 interface, the scheduler handles automated DAG-run execution based on defined schedules,
-and the coordinator manages distributed task execution across workers.
+and the coordinator (when enabled) manages distributed task execution across workers.
+
+By default, start-all runs in single instance mode without the coordinator. The coordinator
+is only started when --coordinator.host is set to a non-localhost address (not 127.0.0.1
+or localhost), enabling distributed execution mode.
 
 Flags:
   --host string                     Host address to bind the web server to (default: 127.0.0.1)
   --port int                        Port number for the web server to listen on (default: 8080)
   --dags string                     Path to the directory containing DAG definition files
   --coordinator.host string         Host address to bind the coordinator gRPC server to (default: 127.0.0.1)
+  --coordinator.advertise string    Address to advertise in service registry (default: auto-detected hostname)
   --coordinator.port int            Port number for the coordinator gRPC server (default: 50055)
   --peer.cert-file string           Path to TLS certificate file for peer connections
   --peer.key-file string            Path to TLS key file for peer connections
@@ -37,7 +42,14 @@ Flags:
   --peer.skip-tls-verify            Skip TLS certificate verification (insecure)
 
 Example:
-  dagu start-all --host=0.0.0.0 --port=8080 --dags=/path/to/dags --coordinator.port=50055
+  # Single instance mode (coordinator disabled)
+  dagu start-all
+
+  # Distributed mode (coordinator enabled)
+  dagu start-all --coordinator.host=0.0.0.0 --coordinator.port=50055
+
+  # Production with both web and coordinator on all interfaces
+  dagu start-all --host=0.0.0.0 --port=8080 --coordinator.host=0.0.0.0
 
 This process runs continuously in the foreground until terminated.
 `,
@@ -51,6 +63,7 @@ var startAllFlags = []commandLineFlag{
 	portFlag,
 	coordinatorHostFlag,
 	coordinatorPortFlag,
+	coordinatorAdvertiseFlag,
 	// Peer configuration flags for TLS
 	peerInsecureFlag,
 	peerCertFileFlag,
@@ -81,9 +94,17 @@ func runStartAll(ctx *Context, _ []string) error {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
-	coordinator, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry)
-	if err != nil {
-		return fmt.Errorf("failed to initialize coordinator: %w", err)
+	// Only start coordinator if not bound to localhost
+	var coordinator *coordinator.Service
+	enableCoordinator := ctx.Config.Coordinator.Host != "127.0.0.1" && ctx.Config.Coordinator.Host != "localhost"
+
+	if enableCoordinator {
+		coordinator, err = newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry)
+		if err != nil {
+			return fmt.Errorf("failed to initialize coordinator: %w", err)
+		}
+	} else {
+		logger.Info(ctx, "Coordinator disabled (bound to localhost). Set --coordinator.host=0.0.0.0 to enable distributed execution")
 	}
 
 	// Create a new context with the signal context for services
@@ -102,7 +123,11 @@ func runStartAll(ctx *Context, _ []string) error {
 
 	// WaitGroup to track all services
 	var wg sync.WaitGroup
-	errCh := make(chan error, 3)
+	serviceCount := 2 // scheduler + server
+	if enableCoordinator {
+		serviceCount = 3 // + coordinator
+	}
+	errCh := make(chan error, serviceCount)
 
 	// Start scheduler
 	wg.Add(1)
@@ -117,18 +142,20 @@ func runStartAll(ctx *Context, _ []string) error {
 		}
 	}()
 
-	// Start coordinator
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		logger.Info(serviceCtx, "Coordinator initialization", "host", serviceCtx.Config.Coordinator.Host, "port", serviceCtx.Config.Coordinator.Port)
-		if err := coordinator.Start(serviceCtx); err != nil {
-			select {
-			case errCh <- fmt.Errorf("coordinator failed: %w", err):
-			default:
+	// Start coordinator (if enabled)
+	if enableCoordinator {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			logger.Info(serviceCtx, "Coordinator initialization", "host", serviceCtx.Config.Coordinator.Host, "port", serviceCtx.Config.Coordinator.Port)
+			if err := coordinator.Start(serviceCtx); err != nil {
+				select {
+				case errCh <- fmt.Errorf("coordinator failed: %w", err):
+				default:
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	// Start server
 	wg.Add(1)
@@ -159,9 +186,11 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Stop all services gracefully
 	logger.Info(ctx, "Stopping all services...")
 
-	// Stop coordinator first to unregister from service registry
-	if err := coordinator.Stop(ctx); err != nil {
-		logger.Error(ctx, "Failed to stop coordinator", "err", err)
+	// Stop coordinator first to unregister from service registry (if it was started)
+	if enableCoordinator && coordinator != nil {
+		if err := coordinator.Stop(ctx); err != nil {
+			logger.Error(ctx, "Failed to stop coordinator", "err", err)
+		}
 	}
 
 	// Wait for all services to finish with timeout

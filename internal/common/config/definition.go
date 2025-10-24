@@ -251,8 +251,12 @@ type QueueDef struct {
 
 // CoordinatorDef holds the configuration for the coordinator service.
 type CoordinatorDef struct {
-	// Host is the hostname or IP address for the coordinator service.
+	// Host is the bind address for the coordinator gRPC server.
 	Host string `mapstructure:"host"`
+
+	// Advertise is the address to advertise in the service registry.
+	// If empty, the hostname will be auto-detected.
+	Advertise string `mapstructure:"advertise"`
 
 	// Port is the port number for the coordinator service.
 	Port int `mapstructure:"port"`

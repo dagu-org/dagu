@@ -278,7 +278,8 @@ This configuration is used for worker instances that execute DAGs. See the [Dist
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
-| `DAGU_COORDINATOR_HOST` | `127.0.0.1` | Coordinator gRPC server host |
+| `DAGU_COORDINATOR_HOST` | `127.0.0.1` | Coordinator gRPC server bind address |
+| `DAGU_COORDINATOR_ADVERTISE` | (auto) | Address to advertise in service registry (default: hostname) |
 | `DAGU_COORDINATOR_PORT` | `50055` | Coordinator gRPC server port |
 | `DAGU_WORKER_ID` | - | Worker instance ID |
 | `DAGU_WORKER_MAX_ACTIVE_RUNS` | `100` | Maximum concurrent runs per worker |

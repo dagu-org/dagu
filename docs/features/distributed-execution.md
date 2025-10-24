@@ -51,17 +51,44 @@ The distributed execution system features automatic service registry and health 
 
 ### Step 1: Start the Coordinator
 
-The coordinator service is automatically started when you use `dagu start-all`:
+The coordinator service can be started with `dagu start-all` (requires `--coordinator.host` set to a non-localhost address):
 
 ```bash
-# Start all services including coordinator
-dagu start-all --host=0.0.0.0 --port=8080
+# Start all services including coordinator (distributed mode)
+dagu start-all --coordinator.host=0.0.0.0 --port=8080
+
+# Single instance mode (coordinator disabled, default)
+dagu start-all
 
 # Or start coordinator separately
 dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
 ```
 
+**Note:** The coordinator is only started by `start-all` when `--coordinator.host` is set to a non-localhost address (not `127.0.0.1` or `localhost`). This allows running in single instance mode by default.
+
 The coordinator automatically registers itself in the service registry system and begins accepting worker connections.
+
+**For containerized environments (Docker, Kubernetes)**, you need to configure both the bind address and advertise address:
+
+```bash
+# Bind to all interfaces and advertise the service name
+dagu coordinator \
+  --coordinator.host=0.0.0.0 \
+  --coordinator.advertise=dagu-server \
+  --coordinator.port=50055
+```
+
+Or using environment variables:
+
+```bash
+DAGU_COORDINATOR_HOST=0.0.0.0 \
+DAGU_COORDINATOR_ADVERTISE=dagu-server \
+DAGU_COORDINATOR_PORT=50055 \
+dagu coordinator
+```
+
+- `--coordinator.host`: Address to bind the gRPC server (use `0.0.0.0` for containers)
+- `--coordinator.advertise`: Address workers use to connect (defaults to hostname if not set)
 
 ### Step 2: Deploy Workers
 
