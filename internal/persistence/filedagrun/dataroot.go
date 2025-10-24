@@ -559,14 +559,6 @@ func processFilesParallel(ctx context.Context, files []string, processor func(st
 	semaphore := make(chan struct{}, runtime.NumCPU())
 
 	for _, file := range files {
-		// Check for context cancellation
-		select {
-		case <-ctx.Done():
-			return []error{fmt.Errorf("operation canceled: %w", ctx.Err())}
-		default:
-			// Continue processing
-		}
-
 		wg.Add(1)
 		semaphore <- struct{}{}
 

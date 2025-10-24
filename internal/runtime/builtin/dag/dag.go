@@ -89,7 +89,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 }
 
 // DetermineNodeStatus implements NodeStatusDeterminer.
-func (e *dagExecutor) DetermineNodeStatus(_ context.Context) (core.NodeStatus, error) {
+func (e *dagExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 	if e.result == nil {
 		return core.NodeFailed, fmt.Errorf("no result available for node status determination")
 	}

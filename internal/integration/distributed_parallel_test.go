@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -214,6 +215,73 @@ steps:
 		}
 	})
 
+	t.Run("ParallelDistributedFailurePropagatesToParentStep", func(t *testing.T) {
+		yamlContent := `
+steps:
+  - name: process-items
+    call: child-worker
+    parallel:
+      items:
+        - "ok"
+        - "fail"
+
+---
+name: child-worker
+workerSelector:
+  type: test-worker
+steps:
+  - name: run
+    command: |
+      if [ "$1" = "fail" ]; then
+        echo "Simulated failure"
+        exit 1
+      fi
+      echo "Processed $1"
+`
+		coord := test.SetupCoordinator(t)
+
+		coordinatorClient := coord.GetCoordinatorClient(t)
+
+		workerInst := worker.NewWorker(
+			"test-worker-failure",
+			10,
+			coordinatorClient,
+			map[string]string{"type": "test-worker"},
+			coord.Config,
+		)
+
+		ctx, cancel := context.WithCancel(coord.Context)
+		t.Cleanup(cancel)
+
+		go func() {
+			if err := workerInst.Start(ctx); err != nil {
+				t.Logf("Worker stopped: %v", err)
+			}
+		}()
+		t.Cleanup(func() {
+			if err := workerInst.Stop(coord.Context); err != nil {
+				t.Logf("Error stopping worker: %v", err)
+			}
+		})
+
+		time.Sleep(50 * time.Millisecond)
+
+		dagWrapper := coord.DAG(t, yamlContent)
+		agent := dagWrapper.Agent()
+		err := agent.Run(agent.Context)
+		require.Error(t, err)
+
+		st, statusErr := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
+		require.NoError(t, statusErr)
+		require.NotNil(t, st)
+		require.Len(t, st.Nodes, 1)
+
+		node := st.Nodes[0]
+		require.Equal(t, "process-items", node.Step.Name)
+		require.Equal(t, core.NodeFailed, node.Status)
+		require.Len(t, node.Children, 2)
+	})
+
 	t.Run("ParallelDistributedWithNoMatchingWorkers", func(t *testing.T) {
 		// Test that parallel execution fails gracefully when no workers match
 		yamlContent := `
@@ -261,10 +329,10 @@ steps:
     call: child-sleep
     parallel:
       items:
-        - "1"
-        - "1"
-        - "1"
-        - "1"
+        - "100"
+        - "101"
+        - "102"
+        - "103"
       maxConcurrent: 2
 
 ---
@@ -322,42 +390,52 @@ steps:
 			})
 		}
 
-		// Give workers time to connect
-		time.Sleep(50 * time.Millisecond)
-
 		// Load the DAG using helper
-		dagWrapper := coord.DAG(t, yamlContent)
+		dag := coord.DAG(t, yamlContent)
 
 		// Create agent with cancellable context
-		ctx, cancel := context.WithCancel(coord.Context)
-		agent := dagWrapper.Agent()
+		agent := dag.Agent()
+		done := make(chan struct{})
 
 		// Start the DAG in a goroutine
-		errChan := make(chan error, 1)
 		go func() {
-			agent.Context = ctx
-			errChan <- agent.Run(agent.Context)
+			agent.Context = coord.Context
+			_ = agent.Run(agent.Context)
+			close(done)
 		}()
 
-		// Wait a bit to ensure parallel execution has started on workers
-		time.Sleep(100 * time.Millisecond)
+		// Wait the step to be running
+		require.Eventually(t, func() bool {
+			st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag.DAG)
+			if err != nil || !st.Status.IsActive() {
+				return false
+			}
+			if len(st.Nodes) == 0 {
+				return false
+			}
+			parallelNode := st.Nodes[0]
+			return parallelNode.Status == core.NodeRunning
+		}, 5*time.Second, 100*time.Millisecond)
 
-		// Cancel the execution
-		cancel()
+		// Cancel the execution after waiting workers are processing distributed tasks
+		require.Eventually(t, func() bool {
+			workerInfo, err := coordinatorClient.GetWorkers(coord.Context)
+			require.NoError(t, err)
+			var runningTasks int
+			for _, w := range workerInfo {
+				runningTasks += len(w.RunningTasks)
+			}
+			return runningTasks > 0
+		}, 5*time.Second, 100*time.Millisecond)
+
+		// Perform cancellation
+		agent.Signal(coord.Context, os.Signal(syscall.SIGINT))
 
 		// Wait for the agent to finish
-		err = <-errChan
-		require.Error(t, err, "agent should return an error when cancelled")
-
-		// The error should indicate cancellation
-		require.True(t,
-			strings.Contains(err.Error(), "context canceled") ||
-				strings.Contains(err.Error(), "cancelled") ||
-				strings.Contains(err.Error(), "killed"),
-			"error should indicate cancellation: %v", err)
+		<-done
 
 		// Get the latest st
-		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
+		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag.DAG)
 		require.NoError(t, err)
 		require.NotNil(t, st)
 
@@ -366,12 +444,25 @@ steps:
 		parallelNode := st.Nodes[0]
 		require.Equal(t, "process-items", parallelNode.Step.Name)
 
-		// The step might be marked as failed, cancelled, or error depending on timing
-		require.True(t,
-			parallelNode.Status == core.NodeCanceled ||
-				parallelNode.Status == core.NodeFailed ||
-				parallelNode.Status == core.NodeNotStarted,
-			"parallel step should be cancelled, failed, or not started, got: %v", parallelNode.Status)
+		// Verify that the parallel step status
+		require.Equal(t, core.NodeCanceled, parallelNode.Status)
+
+		// Verify child DAG runs were cancelled
+		runRef := execution.NewDAGRunRef(st.Name, st.DAGRunID)
+		var canceled bool
+		for _, child := range parallelNode.Children {
+			att, _ := coord.DAGRunStore.FindChildAttempt(coord.Context, runRef, child.DAGRunID)
+			if att == nil {
+				continue
+			}
+			require.NoError(t, err)
+
+			status, err := att.ReadStatus(coord.Context)
+			require.NoError(t, err)
+			require.Equal(t, core.Canceled, status.Status)
+			canceled = true
+		}
+		require.True(t, canceled, "expected at least one child DAG run to be cancelled")
 
 		// If the step was actually started, verify that child DAG runs were created
 		if parallelNode.Status != core.NodeNotStarted && len(parallelNode.Children) > 0 {
@@ -515,7 +606,7 @@ steps:
         - "task4"
         - "task5"
         - "task6"
-      maxConcurrent: 4
+      maxConcurrent: 2
 
 ---
 name: child-task
@@ -582,25 +673,23 @@ steps:
 		dagWrapper := coord.DAG(t, yamlContent)
 
 		// Create agent with cancellable context
-		ctx, cancel := context.WithCancel(coord.Context)
 		agent := dagWrapper.Agent()
 
 		// Start the DAG in a goroutine
-		errChan := make(chan error, 1)
+		done := make(chan struct{})
 		go func() {
-			agent.Context = ctx
-			errChan <- agent.Run(agent.Context)
+			_ = agent.Run(agent.Context)
+			close(done)
 		}()
 
 		// Wait to ensure concurrent execution has started across workers
 		time.Sleep(100 * time.Millisecond)
 
 		// Cancel the execution
-		cancel()
+		agent.Signal(coord.Context, os.Signal(syscall.SIGTERM))
 
 		// Wait for the agent to finish
-		err = <-errChan
-		require.Error(t, err, "agent should return an error when cancelled")
+		<-done
 
 		// Get the latest st
 		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
@@ -620,24 +709,6 @@ steps:
 			}
 		}
 
-		// The node should reflect cancellation or might not have completed
-		// In high concurrency scenarios, the status depends on timing
-		validStatuses := []core.NodeStatus{
-			core.NodeCanceled,
-			core.NodeFailed,
-			core.NodeRunning,
-			core.NodeNotStarted,
-			core.NodeSucceeded, // Some children might have completed before cancellation
-		}
-
-		statusFound := false
-		for _, validStatus := range validStatuses {
-			if concurrentNode.Status == validStatus {
-				statusFound = true
-				break
-			}
-		}
-		require.True(t, statusFound,
-			"concurrent node should have a valid status reflecting the execution state, got: %v", concurrentNode.Status)
+		require.Equal(t, core.NodePartiallySucceeded, concurrentNode.Status)
 	})
 }

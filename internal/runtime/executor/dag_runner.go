@@ -38,6 +38,9 @@ type ChildDAGExecutor struct {
 	cmds            map[string]*exec.Cmd // runID -> cmd for local processes
 	distributedRuns map[string]bool      // runID -> true for distributed runs
 	env             execution.Env        // for DB access when cancelling distributed runs
+
+	// killed should be closed when Kill is called
+	killed chan struct{}
 }
 
 // NewChildDAGExecutor creates a new ChildDAGExecutor.
@@ -66,6 +69,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 				cmds:            make(map[string]*exec.Cmd),
 				distributedRuns: make(map[string]bool),
 				env:             execution.GetEnv(ctx),
+				killed:          make(chan struct{}),
 			}, nil
 		}
 	}
@@ -82,6 +86,7 @@ func NewChildDAGExecutor(ctx context.Context, childName string) (*ChildDAGExecut
 		cmds:            make(map[string]*exec.Cmd),
 		distributedRuns: make(map[string]bool),
 		env:             execution.GetEnv(ctx),
+		killed:          make(chan struct{}),
 	}, nil
 }
 
@@ -340,8 +345,34 @@ func (e *ChildDAGExecutor) waitForCompletionWithResult(ctx context.Context, dagR
 
 	for {
 		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("distributed execution cancelled: %w", ctx.Err())
+		case <-e.killed:
+			// Timeout to allow cancellation to propagate
+			timeout := time.After(30 * time.Second)
+
+			// Wait for child DAGs to be finished being killed
+			ticker := time.NewTicker(1000 * time.Millisecond)
+			defer ticker.Stop()
+
+			for {
+				status, _ := env.DB.GetChildDAGRunStatus(ctx, dagRunID, env.RootDAGRun)
+				var running bool
+				if status != nil {
+					if status.Status.IsActive() {
+						running = true
+					}
+					if !running {
+						return status, nil
+					}
+				}
+
+				select {
+				case <-timeout:
+					return nil, fmt.Errorf("distributed execution cancellation timed out for dag-run ID %s", dagRunID)
+				case <-ticker.C:
+					// continue waiting
+				}
+			}
+
 		case <-ticker.C:
 			// Check if the child DAG run has completed
 			isCompleted, err := env.DB.IsChildDAGRunCompleted(ctx, dagRunID, env.RootDAGRun)
@@ -423,6 +454,9 @@ func (e *ChildDAGExecutor) Kill(sig os.Signal) error {
 			}
 		}
 	}
+
+	// Close the killed channel when Kill is called
+	close(e.killed)
 
 	// Return the first error if any occurred
 	if len(errs) > 0 {

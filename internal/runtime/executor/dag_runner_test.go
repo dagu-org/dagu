@@ -191,6 +191,7 @@ func TestBuildCommand(t *testing.T) {
 			Name:     "test-child",
 			Location: "/path/to/test.yaml",
 		},
+		killed: make(chan struct{}),
 	}
 
 	// Build command
@@ -239,7 +240,8 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 	ctx = execution.WithEnv(ctx, env)
 
 	executor := &ChildDAGExecutor{
-		DAG: &core.DAG{Name: "test-child"},
+		DAG:    &core.DAG{Name: "test-child"},
+		killed: make(chan struct{}),
 	}
 
 	// Build command without RunID
@@ -300,6 +302,7 @@ func TestCleanup_LocalDAG(t *testing.T) {
 	executor := &ChildDAGExecutor{
 		DAG:      &core.DAG{Name: "test-child"},
 		tempFile: tempFile,
+		killed:   make(chan struct{}),
 	}
 
 	// Verify file exists
@@ -319,6 +322,7 @@ func TestCleanup_NonExistentFile(t *testing.T) {
 	executor := &ChildDAGExecutor{
 		DAG:      &core.DAG{Name: "test-child"},
 		tempFile: "/non/existent/file.yaml",
+		killed:   make(chan struct{}),
 	}
 
 	// Cleanup should not error on non-existent file
@@ -394,6 +398,7 @@ func TestChildDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 			"distributed-run-1": true,
 			"distributed-run-2": true,
 		},
+		killed: make(chan struct{}),
 	}
 
 	// Set up expectations for RequestChildCancel
@@ -439,6 +444,7 @@ func TestChildDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 			"distributed-run-1": true,
 			"distributed-run-2": true,
 		},
+		killed: make(chan struct{}),
 	}
 
 	// Set up expectations for RequestChildCancel
@@ -482,6 +488,7 @@ func TestChildDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 			"local-run-1": &exec.Cmd{Process: &os.Process{Pid: 1234}},
 		},
 		distributedRuns: make(map[string]bool),
+		killed:          make(chan struct{}),
 	}
 
 	// Call Kill
@@ -519,6 +526,7 @@ func TestChildDAGExecutor_Kill_Empty(t *testing.T) {
 		env:             env,
 		cmds:            make(map[string]*exec.Cmd),
 		distributedRuns: make(map[string]bool),
+		killed:          make(chan struct{}),
 	}
 
 	// Call Kill
