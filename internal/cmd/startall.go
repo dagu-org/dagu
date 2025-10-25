@@ -96,7 +96,7 @@ func runStartAll(ctx *Context, _ []string) error {
 
 	// Only start coordinator if not bound to localhost
 	var coordinator *coordinator.Service
-	enableCoordinator := ctx.Config.Coordinator.Host != "127.0.0.1" && ctx.Config.Coordinator.Host != "localhost"
+	enableCoordinator := ctx.Config.Coordinator.Host != "127.0.0.1" && ctx.Config.Coordinator.Host != "localhost" && ctx.Config.Coordinator.Host != "::1"
 
 	if enableCoordinator {
 		coordinator, err = newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry)
