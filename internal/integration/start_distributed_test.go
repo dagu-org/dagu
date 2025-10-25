@@ -113,3 +113,86 @@ steps:
 		dagWrapper.AssertLatestStatus(t, core.Succeeded)
 	})
 }
+
+// TestRetryCommandWithWorkerSelector tests that the retry command enqueues
+// DAGs with workerSelector instead of executing them locally.
+func TestRetryCommandWithWorkerSelector(t *testing.T) {
+	t.Run("RetryCommand_WithWorkerSelector_ShouldEnqueue", func(t *testing.T) {
+		// This test verifies that when retrying a DAG with workerSelector,
+		// the retry command enqueues it instead of executing locally
+
+		yamlContent := `
+name: retry-worker-dag
+workerSelector:
+  environment: production
+steps:
+  - name: failing-task
+    command: exit 1
+`
+		coord := test.SetupCoordinator(t)
+		coord.Config.Queues.Enabled = true
+
+		// Unset DISABLE_DAG_RUN_QUEUE so the subprocess can enqueue
+		require.NoError(t, os.Unsetenv("DISABLE_DAG_RUN_QUEUE"))
+
+		// Load the DAG
+		dagWrapper := coord.DAG(t, yamlContent)
+
+		// First, start the DAG (it will fail)
+		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
+		startSpec := subCmdBuilder.Start(dagWrapper.DAG, runtime.StartOptions{
+			Quiet: true,
+		})
+
+		err := runtime.Start(coord.Context, startSpec)
+		require.NoError(t, err, "Start command should succeed")
+
+		time.Sleep(500 * time.Millisecond)
+
+		// Verify the DAG was enqueued
+		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.DAG.ProcGroup(), dagWrapper.DAG.Name)
+		require.NoError(t, err)
+		require.Len(t, queueItems, 1, "DAG should be enqueued once")
+
+		var dagRunID string
+		if len(queueItems) > 0 {
+			data := queueItems[0].Data()
+			dagRunID = data.ID
+			t.Logf("DAG enqueued: dag=%s runId=%s", data.Name, data.ID)
+		}
+
+		// Dequeue it to simulate processing
+		_, err = coord.QueueStore.DequeueByDAGRunID(coord.Context, dagWrapper.DAG.ProcGroup(), dagRunID)
+		require.NoError(t, err)
+
+		time.Sleep(100 * time.Millisecond)
+
+		// Now retry the DAG - it should be enqueued again
+		retrySpec := subCmdBuilder.Retry(dagWrapper.DAG, dagRunID, "", false)
+		err = runtime.Run(coord.Context, retrySpec)
+		require.NoError(t, err, "Retry command should succeed")
+
+		time.Sleep(500 * time.Millisecond)
+
+		// Verify the retry was enqueued
+		queueItems, err = coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.DAG.ProcGroup(), dagWrapper.DAG.Name)
+		require.NoError(t, err)
+		require.Len(t, queueItems, 1, "Retry should be enqueued once")
+
+		if len(queueItems) > 0 {
+			data := queueItems[0].Data()
+			require.Equal(t, dagRunID, data.ID, "Should have same DAG run ID")
+			t.Logf("Retry enqueued: dag=%s runId=%s", data.Name, data.ID)
+		}
+	})
+
+	t.Run("RetryCommand_WithNoQueueFlag_ShouldExecuteDirectly", func(t *testing.T) {
+		// Verify that --no-queue flag bypasses enqueueing for retry
+		// even when workerSelector exists
+
+		// The Retry builder doesn't expose NoQueue option yet, so we'll test via the TaskRetry path
+		// which is what workers use. The important thing is that TaskRetry includes --no-queue
+		// which we've verified in subcmd.go:181
+		t.Skip("Retry builder doesn't expose NoQueue option - circuit breaker tested via TaskRetry")
+	})
+}

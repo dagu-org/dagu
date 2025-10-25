@@ -178,7 +178,7 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 
 // TaskRetry creates a retry command spec for coordinator tasks.
 func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
-	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId)}
+	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId), "--no-queue"}
 
 	if task.Step != "" {
 		args = append(args, fmt.Sprintf("--step=%s", task.Step))

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
@@ -32,7 +33,7 @@ Examples:
 	)
 }
 
-var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry, disableMaxActiveRuns}
+var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry, disableMaxActiveRuns, noQueueFlag}
 
 func runRetry(ctx *Context, args []string) error {
 	dagRunID, _ := ctx.StringParam("run-id")
@@ -61,6 +62,35 @@ func runRetry(ctx *Context, args []string) error {
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read DAG from record: %w", err)
+	}
+
+	// Check if queue is disabled
+	var queueDisabled bool
+	if os.Getenv("DISABLE_DAG_RUN_QUEUE") != "" || ctx.Command.Flags().Changed("no-queue") {
+		queueDisabled = true
+	}
+
+	// Check if this DAG should be distributed to workers
+	// If the DAG has a workerSelector and the queue is not disabled,
+	// enqueue it so the scheduler can dispatch it to a worker.
+	// The --no-queue flag acts as a circuit breaker to prevent infinite loops
+	// when the worker executes the dispatched retry task.
+	if !queueDisabled && len(dag.WorkerSelector) > 0 {
+		logger.Info(ctx, "DAG has workerSelector, enqueueing retry for distributed execution",
+			"dag", dag.Name,
+			"dagRunId", dagRunID,
+			"workerSelector", dag.WorkerSelector)
+
+		// Enqueue the retry by re-enqueuing the existing DAG run
+		dagRun := execution.NewDAGRunRef(dag.Name, dagRunID)
+		if err := ctx.QueueStore.Enqueue(ctx.Context, dag.ProcGroup(), execution.QueuePriorityLow, dagRun); err != nil {
+			return fmt.Errorf("failed to enqueue retry: %w", err)
+		}
+
+		logger.Info(ctx.Context, "Retry enqueued",
+			"dag", dag.Name,
+			"dagRunId", dagRunID)
+		return nil
 	}
 
 	// Try lock proc store to avoid race
