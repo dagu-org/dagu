@@ -61,7 +61,7 @@ steps:
 		time.Sleep(500 * time.Millisecond)
 
 		// Verify the DAG was enqueued (not executed locally)
-		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.DAG.ProcGroup(), dagWrapper.DAG.Name)
+		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
 		require.NoError(t, err)
 		require.Len(t, queueItems, 1, "DAG should be enqueued once")
 
@@ -105,7 +105,7 @@ steps:
 		require.NoError(t, err)
 
 		// Should NOT be enqueued (executed directly)
-		queueItems, err := coord.QueueStore.ListByDAGName(ctx, dagWrapper.DAG.ProcGroup(), dagWrapper.DAG.Name)
+		queueItems, err := coord.QueueStore.ListByDAGName(ctx, dagWrapper.ProcGroup(), dagWrapper.Name)
 		require.NoError(t, err)
 		require.Len(t, queueItems, 0, "DAG should NOT be enqueued when --no-queue is set")
 
@@ -150,7 +150,7 @@ steps:
 		time.Sleep(500 * time.Millisecond)
 
 		// Verify the DAG was enqueued
-		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.DAG.ProcGroup(), dagWrapper.DAG.Name)
+		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
 		require.NoError(t, err)
 		require.Len(t, queueItems, 1, "DAG should be enqueued once")
 
@@ -162,7 +162,7 @@ steps:
 		}
 
 		// Dequeue it to simulate processing
-		_, err = coord.QueueStore.DequeueByDAGRunID(coord.Context, dagWrapper.DAG.ProcGroup(), dagRunID)
+		_, err = coord.QueueStore.DequeueByDAGRunID(coord.Context, dagWrapper.ProcGroup(), dagRunID)
 		require.NoError(t, err)
 
 		time.Sleep(100 * time.Millisecond)
@@ -175,7 +175,7 @@ steps:
 		time.Sleep(500 * time.Millisecond)
 
 		// Verify the retry was enqueued
-		queueItems, err = coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.DAG.ProcGroup(), dagWrapper.DAG.Name)
+		queueItems, err = coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
 		require.NoError(t, err)
 		require.Len(t, queueItems, 1, "Retry should be enqueued once")
 
