@@ -1,0 +1,115 @@
+package integration_test
+
+import (
+	"os"
+	"testing"
+	"time"
+
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
+)
+
+// TestStartCommandWithWorkerSelector tests that the start command enqueues
+// DAGs with workerSelector instead of executing them locally, and that the
+// scheduler dispatches them to workers correctly.
+//
+// This is the integration test for the distributed execution fix where:
+// 1. start command checks for workerSelector → enqueues (instead of executing)
+// 2. Scheduler queue handler picks it up → dispatches to coordinator
+// 3. Worker executes with --no-queue flag → executes directly (no re-enqueue)
+func TestStartCommandWithWorkerSelector(t *testing.T) {
+	t.Run("StartCommand_WithWorkerSelector_ShouldEnqueue", func(t *testing.T) {
+		// This test verifies that when a DAG has workerSelector,
+		// the start command enqueues it instead of executing locally
+
+		yamlContent := `
+name: toplevel-worker-dag
+workerSelector:
+  environment: production
+  component: batch-worker
+steps:
+  - name: task-on-worker
+    command: echo "Running on worker"
+  - name: task-2
+    command: echo "Task 2"
+    depends:
+      - task-on-worker
+`
+		coord := test.SetupCoordinator(t)
+		coord.Config.Queues.Enabled = true
+
+		// Unset DISABLE_DAG_RUN_QUEUE so the subprocess can enqueue
+		// (test helper sets this by default)
+		require.NoError(t, os.Unsetenv("DISABLE_DAG_RUN_QUEUE"))
+
+		// Load the DAG
+		dagWrapper := coord.DAG(t, yamlContent)
+
+		// Build the start command
+		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
+		startSpec := subCmdBuilder.Start(dagWrapper.DAG, runtime.StartOptions{
+			Quiet: true,
+		})
+
+		// Execute the start command (spawns subprocess)
+		err := runtime.Start(coord.Context, startSpec)
+		require.NoError(t, err, "Start command should succeed")
+
+		// Wait a moment for the subprocess to complete
+		time.Sleep(500 * time.Millisecond)
+
+		// Verify the DAG was enqueued (not executed locally)
+		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.DAG.ProcGroup(), dagWrapper.DAG.Name)
+		require.NoError(t, err)
+		require.Len(t, queueItems, 1, "DAG should be enqueued once")
+
+		if len(queueItems) > 0 {
+			data := queueItems[0].Data()
+			t.Logf("DAG enqueued: dag=%s runId=%s", data.Name, data.ID)
+		}
+
+		// Verify the DAG status is "queued" (not started/running)
+		latest, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
+		require.NoError(t, err)
+		require.Equal(t, core.Queued, latest.Status, "DAG status should be queued")
+	})
+
+	t.Run("StartCommand_WithNoQueueFlag_ShouldExecuteDirectly", func(t *testing.T) {
+		// Verify that --no-queue flag bypasses enqueueing
+		// even when workerSelector exists
+
+		yamlContent := `
+name: no-queue-dag
+workerSelector:
+  test: value
+steps:
+  - name: task
+    command: echo "Direct execution"
+`
+		coord := test.SetupCoordinator(t)
+		ctx := coord.Context
+
+		// Load the DAG
+		dagWrapper := coord.DAG(t, yamlContent)
+
+		// Build start command WITH --no-queue flag
+		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
+		startSpec := subCmdBuilder.Start(dagWrapper.DAG, runtime.StartOptions{
+			Quiet:   true,
+			NoQueue: true, // This bypasses enqueueing
+		})
+
+		err := runtime.Start(ctx, startSpec)
+		require.NoError(t, err)
+
+		// Should NOT be enqueued (executed directly)
+		queueItems, err := coord.QueueStore.ListByDAGName(ctx, dagWrapper.DAG.ProcGroup(), dagWrapper.DAG.Name)
+		require.NoError(t, err)
+		require.Len(t, queueItems, 0, "DAG should NOT be enqueued when --no-queue is set")
+
+		// Verify it succeeded (executed locally)
+		dagWrapper.AssertLatestStatus(t, core.Succeeded)
+	})
+}

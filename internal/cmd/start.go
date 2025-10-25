@@ -120,6 +120,19 @@ func runStart(ctx *Context, args []string) error {
 		"dagRunId", dagRunID,
 	)
 
+	// Check if this DAG should be distributed to workers
+	// If the DAG has a workerSelector and the queue is not disabled,
+	// enqueue it so the scheduler can dispatch it to a worker.
+	// The --no-queue flag acts as a circuit breaker to prevent infinite loops
+	// when the worker executes the dispatched task.
+	if !queueDisabled && len(dag.WorkerSelector) > 0 {
+		logger.Info(ctx, "DAG has workerSelector, enqueueing for distributed execution",
+			"dag", dag.Name,
+			"dagRunId", dagRunID,
+			"workerSelector", dag.WorkerSelector)
+		return enqueueDAGRun(ctx, dag, dagRunID)
+	}
+
 	err = tryExecuteDAG(ctx, dag, dagRunID, root)
 	if errors.Is(err, errMaxRunReached) && !queueDisabled {
 		dag.Location = "" // Queued dag-runs must not have a location
