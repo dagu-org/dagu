@@ -1,0 +1,55 @@
+# Git
+.git/
+.github/
+.gitignore
+
+# Node/UI
+ui/node_modules/
+ui/dist/
+node_modules/
+*.log
+npm-debug.log*
+
+# Go
+bin/
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Build artifacts
+internal/service/frontend/assets/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation (not needed in container)
+docs/
+spec/
+*.md
+!README.md
+
+# Test data
+tmp/
+.tmp/
+testdata/
+
+# CI/CD
+.github/
+
+# Development files
+docker-compose*.yml
+deploy/
+
+# Kubernetes
+*.yaml
+!ui/*.yaml

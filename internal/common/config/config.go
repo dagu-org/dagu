@@ -204,9 +204,10 @@ type QueueConfig struct {
 
 // Coordinator represents the coordinator service configuration
 type Coordinator struct {
-	ID   string // Coordinator instance ID (default: hostname@port)
-	Host string // gRPC server host address
-	Port int    // gRPC server port number
+	ID        string // Coordinator instance ID (default: hostname@port)
+	Host      string // gRPC server bind address (e.g., 0.0.0.0, 127.0.0.1)
+	Advertise string // Address to advertise in service registry (default: auto-detected hostname)
+	Port      int    // gRPC server port number
 }
 
 // Worker represents the worker configuration

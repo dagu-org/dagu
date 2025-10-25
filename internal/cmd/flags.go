@@ -183,6 +183,15 @@ var (
 		bindViper:    true,
 	}
 
+	// coordinatorAdvertiseFlag is the address to advertise in the service registry.
+	coordinatorAdvertiseFlag = commandLineFlag{
+		name:         "coordinator.advertise",
+		shorthand:    "A",
+		defaultValue: "",
+		usage:        "Address to advertise in service registry (default: auto-detected hostname)",
+		bindViper:    true,
+	}
+
 	// workerIDFlag is the unique identifier for the worker instance.
 	workerIDFlag = commandLineFlag{
 		name:      "worker.id",

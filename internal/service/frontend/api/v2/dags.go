@@ -621,11 +621,23 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 }
 
 func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID string, singleton bool) error {
+	var noQueue bool
+	if singleton || dag.MaxActiveRuns == 1 {
+		noQueue = true
+	}
+
+	if len(dag.WorkerSelector) > 0 {
+		// If workerSelector is set, we should queue the DAG-run, so that
+		// it gets dispatched to qualified workers rather than being started
+		// directly on the local node.
+		noQueue = false
+	}
+
 	spec := a.subCmdBuilder.Start(dag, runtime1.StartOptions{
 		Params:   params,
 		DAGRunID: dagRunID,
 		Quiet:    true,
-		NoQueue:  singleton || dag.MaxActiveRuns == 1,
+		NoQueue:  noQueue,
 	})
 
 	if err := runtime1.Start(ctx, spec); err != nil {

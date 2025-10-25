@@ -82,12 +82,12 @@ steps:
 		require.NoError(t, att.Close(th.Context))
 
 		// Enqueue to queue
-		err = th.QueueStore.Enqueue(th.Context, dag.Name, execution.QueuePriorityLow, execution.NewDAGRunRef(dag.Name, dagRunID))
+		err = th.QueueStore.Enqueue(th.Context, dag.ProcGroup(), execution.QueuePriorityLow, execution.NewDAGRunRef(dag.Name, dagRunID))
 		require.NoError(t, err)
 	}
 
 	// Verify queue has correct number of items
-	queuedItems, err := th.QueueStore.List(th.Context, dag.Name)
+	queuedItems, err := th.QueueStore.List(th.Context, dag.ProcGroup())
 	require.NoError(t, err)
 	require.Len(t, queuedItems, numItems)
 	t.Logf("Enqueued %d items", numItems)

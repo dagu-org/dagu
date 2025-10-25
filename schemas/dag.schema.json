@@ -419,6 +419,13 @@
         }
       },
       "description": "Configuration for controlling user interactions when starting DAG runs. Allows restricting parameter editing and custom run ID input."
+    },
+    "workerSelector": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Key-value pairs specifying worker label requirements for executing this DAG. The DAG will only run on workers that have all specified labels with matching values. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels. This setting applies to the entire DAG; individual steps can override this with their own workerSelector."
     }
   },
   "definitions": {

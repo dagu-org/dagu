@@ -162,7 +162,7 @@ dagu scheduler --dags=/opt/dags # Custom directory
 
 ### `start-all`
 
-Start scheduler, web UI, and coordinator service.
+Start scheduler, web UI, and optionally coordinator service.
 
 ```bash
 dagu start-all [options]
@@ -172,13 +172,22 @@ dagu start-all [options]
 - `--host, -s` - Host (default: localhost)
 - `--port, -p` - Port (default: 8080)
 - `--dags, -d` - DAGs directory
+- `--coordinator.host` - Coordinator bind address (default: 127.0.0.1)
+- `--coordinator.advertise` - Address to advertise in service registry
+- `--coordinator.port` - Coordinator gRPC port (default: 50055)
 
 ```bash
-dagu start-all                           # Default settings
-dagu start-all --host=0.0.0.0 --port=9000 # Production mode
+# Single instance mode (coordinator disabled)
+dagu start-all
+
+# Distributed mode with coordinator enabled
+dagu start-all --coordinator.host=0.0.0.0 --coordinator.port=50055
+
+# Production mode
+dagu start-all --host=0.0.0.0 --port=9000 --coordinator.host=0.0.0.0
 ```
 
-**Note:** This command now also starts the coordinator service for distributed execution.
+**Note:** The coordinator service is only started when `--coordinator.host` is set to a non-localhost address (not `127.0.0.1` or `localhost`). By default, `start-all` runs in single instance mode without the coordinator.
 
 ### `validate`
 
@@ -277,6 +286,7 @@ dagu coordinator [options]
 
 **Options:**
 - `--coordinator.host` - Host address to bind (default: `127.0.0.1`)
+- `--coordinator.advertise` - Address to advertise in service registry (default: auto-detected hostname)
 - `--coordinator.port` - Port number (default: `50055`)
 - `--peer.cert-file` - Path to TLS certificate file for peer connections
 - `--peer.key-file` - Path to TLS key file for peer connections
@@ -287,6 +297,12 @@ dagu coordinator [options]
 ```bash
 # Basic usage
 dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
+
+# Bind to all interfaces and advertise service name (for containers/K8s)
+dagu coordinator \
+  --coordinator.host=0.0.0.0 \
+  --coordinator.advertise=dagu-server \
+  --coordinator.port=50055
 
 # With TLS
 dagu coordinator \

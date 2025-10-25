@@ -535,8 +535,9 @@ func TestTaskRetry(t *testing.T) {
 	t.Run("BasicTaskRetry", func(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
-			DagRunId: "retry-run-id",
-			Target:   "/path/to/task.yaml",
+			DagRunId:       "retry-run-id",
+			Target:         "/path/to/task.yaml",
+			RootDagRunName: "root-dag",
 		}
 		spec := builder.TaskRetry(task)
 
@@ -545,7 +546,7 @@ func TestTaskRetry(t *testing.T) {
 		assert.Contains(t, spec.Args, "--run-id=retry-run-id")
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
-		assert.Contains(t, spec.Args, "/path/to/task.yaml")
+		assert.Contains(t, spec.Args, "root-dag")
 	})
 
 	t.Run("TaskRetryWithStep", func(t *testing.T) {

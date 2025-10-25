@@ -45,9 +45,11 @@ func TestTaskHandler(t *testing.T) {
 
 		// Create a retry task
 		task := &coordinatorv1.Task{
-			Operation: coordinatorv1.Operation_OPERATION_RETRY,
-			DagRunId:  dagRunID,
-			Target:    dag.Name,
+			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
+			DagRunId:       dagRunID,
+			Target:         dag.Name,
+			RootDagRunName: dag.Name,
+			RootDagRunId:   dagRunID,
 		}
 
 		// Create a context with timeout for the task execution
@@ -88,10 +90,12 @@ func TestTaskHandler(t *testing.T) {
 
 		// Create a retry task with specific step
 		task := &coordinatorv1.Task{
-			Operation: coordinatorv1.Operation_OPERATION_RETRY,
-			DagRunId:  dagRunID,
-			Target:    dag.Name,
-			Step:      "1",
+			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
+			DagRunId:       dagRunID,
+			Target:         dag.Name,
+			RootDagRunName: dag.Name,
+			RootDagRunId:   dagRunID,
+			Step:           "1",
 		}
 
 		// Create a context with timeout for the task execution

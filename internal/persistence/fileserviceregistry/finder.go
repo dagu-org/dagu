@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/dirlock"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
@@ -17,7 +16,6 @@ type finder struct {
 	baseDir      string
 	serviceName  execution.ServiceName
 	staleTimeout time.Duration
-	dirLock      dirlock.DirLock
 	mu           sync.Mutex
 
 	// Cache fields
@@ -28,20 +26,11 @@ type finder struct {
 
 // newFinder creates a new finder for a specific service
 func newFinder(baseDir string, serviceName execution.ServiceName) *finder {
-	serviceDir := filepath.Join(baseDir, string(serviceName))
-
-	// Create directory lock for this service
-	lock := dirlock.New(serviceDir, &dirlock.LockOptions{
-		StaleThreshold: 5 * time.Second,       // Lock is stale after 5 seconds
-		RetryInterval:  50 * time.Millisecond, // Retry every 50ms
-	})
-
 	return &finder{
 		baseDir:       baseDir,
 		serviceName:   serviceName,
 		staleTimeout:  30 * time.Second, // Consider instances stale after 30 seconds
-		dirLock:       lock,
-		cacheDuration: 3 * time.Second, // Cache members for 15 seconds
+		cacheDuration: 3 * time.Second,  // Cache members for 15 seconds
 	}
 }
 
@@ -67,21 +56,6 @@ func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
-
-	// Acquire lock for reading and cleaning
-	if f.dirLock != nil {
-		if err := f.dirLock.TryLock(); err != nil {
-			// If we can't get the lock, still try to read (another process may be cleaning)
-			logger.Warn(ctx, "Could not acquire lock for service directory", "service", f.serviceName)
-		} else {
-			// Ensure we unlock when done
-			defer func() {
-				if err := f.dirLock.Unlock(); err != nil {
-					logger.Error(ctx, "Failed to unlock service directory", "service", f.serviceName, "err", err)
-				}
-			}()
-		}
-	}
 
 	entries, err := os.ReadDir(serviceDir)
 	if err != nil {
@@ -112,8 +86,13 @@ func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
 		}
 
 		// Check if instance is stale
-		if time.Since(fileInfo.ModTime()) > f.staleTimeout {
-			staleFiles = append(staleFiles, instancePath)
+		modTime := fileInfo.ModTime()
+		elapsedTime := time.Since(modTime)
+		if elapsedTime > f.staleTimeout {
+			if elapsedTime > 10*f.staleTimeout {
+				// Definitely stale, mark for removal
+				staleFiles = append(staleFiles, instancePath)
+			}
 			continue
 		}
 
@@ -133,11 +112,10 @@ func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
 	}
 
 	// Second pass: remove stale files (only if we have the lock)
-	if f.dirLock != nil && len(staleFiles) > 0 {
-		// We already have the lock from above, so we can safely remove stale files
+	if len(staleFiles) > 0 {
 		for _, staleFile := range staleFiles {
 			if err := removeInstanceFile(staleFile); err != nil {
-				logger.Error(ctx, "Failed to remove stale instance file", "file", staleFile, "err", err)
+				logger.Warn(ctx, "Failed to remove stale instance file", "file", staleFile, "err", err)
 			}
 		}
 	}

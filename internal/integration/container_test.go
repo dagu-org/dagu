@@ -73,8 +73,6 @@ steps:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			th := test.Setup(t)
 			dag := th.DAG(t, tt.dagConfig)
 			dag.Agent().RunSuccess(t)
@@ -92,8 +90,6 @@ type containerTest struct {
 }
 
 func TestDAGLevelContainer(t *testing.T) {
-	t.Parallel()
-
 	tests := []containerTest{
 		{
 			name: "VolumeBindMounts",

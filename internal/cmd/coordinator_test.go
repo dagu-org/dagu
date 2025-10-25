@@ -84,4 +84,22 @@ func TestCoordinatorCommand(t *testing.T) {
 			ExpectedOut: []string{"Coordinator initialization", port},
 		})
 	})
+
+	t.Run("StartCoordinatorWithAdvertiseAddress", func(t *testing.T) {
+		th := test.SetupCommand(t)
+		go func() {
+			time.Sleep(time.Millisecond * 500)
+			th.Cancel()
+		}()
+		port := findPort(t)
+		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
+			Args: []string{
+				"coordinator",
+				"--coordinator.host=0.0.0.0",
+				"--coordinator.advertise=dagu-server",
+				fmt.Sprintf("--coordinator.port=%s", port),
+			},
+			ExpectedOut: []string{"Coordinator initialization", "bind_address=0.0.0.0", "advertise_address=dagu-server", port},
+		})
+	})
 }
