@@ -20,8 +20,6 @@ import (
 // 2. scheduler picks it up from the queue
 // 3. scheduler dispatches it to coordinator
 // 4. worker executes it successfully
-//
-// This is the comprehensive integration test for the distributed execution fix.
 func TestStartCommandE2E_WithWorkerSelector(t *testing.T) {
 	t.Run("E2E_StartCommand_Queue_Scheduler_Worker", func(t *testing.T) {
 		// Create test DAG with workerSelector
