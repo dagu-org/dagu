@@ -117,6 +117,15 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.
 		} else {
 			// Hostname detection failed, fallback to configured host
 			advertiseAddr = cfg.Coordinator.Host
+			// Warn if fallback address is potentially invalid
+			if advertiseAddr == "0.0.0.0" || advertiseAddr == "127.0.0.1" {
+				logger.Warn(ctx, "Coordinator advertise address fallback is potentially invalid for service discovery",
+					"advertise_address", advertiseAddr,
+					"reason", "hostname detection failed and no explicit advertise address provided; workers may not be able to connect")
+			} else {
+				logger.Warn(ctx, "Coordinator advertise address fallback to configured host due to hostname detection failure",
+					"advertise_address", advertiseAddr)
+			}
 		}
 	}
 
