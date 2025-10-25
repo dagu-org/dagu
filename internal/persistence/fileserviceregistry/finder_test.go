@@ -119,6 +119,12 @@ func TestResolver_Members_FiltersStaleInstances(t *testing.T) {
 
 	// Verify stale file was removed
 	assert.NoFileExists(t, staleFile)
+
+	quarantineFile := staleFile + ".gc"
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(quarantineFile)
+		return os.IsNotExist(err)
+	}, 5*time.Second, 100*time.Millisecond, "expected quarantined file to be cleaned up")
 }
 
 func TestResolver_Members_IgnoresInvalidFiles(t *testing.T) {

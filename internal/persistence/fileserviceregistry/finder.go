@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
@@ -17,6 +18,7 @@ type finder struct {
 	serviceName  execution.ServiceName
 	staleTimeout time.Duration
 	mu           sync.Mutex
+	cleanupCh    chan string
 
 	// Cache fields
 	cachedMembers []execution.HostInfo
@@ -26,12 +28,15 @@ type finder struct {
 
 // newFinder creates a new finder for a specific service
 func newFinder(baseDir string, serviceName execution.ServiceName) *finder {
-	return &finder{
+	f := &finder{
 		baseDir:       baseDir,
 		serviceName:   serviceName,
 		staleTimeout:  30 * time.Second, // Consider instances stale after 30 seconds
-		cacheDuration: 3 * time.Second,  // Cache members for 15 seconds
+		cacheDuration: 3 * time.Second,  // Cache members briefly to avoid thrashing
+		cleanupCh:     make(chan string, 32),
 	}
+	go f.cleanupLoop()
+	return f
 }
 
 // members returns all active instances of the service
@@ -54,8 +59,13 @@ func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
 		return []execution.HostInfo{}, nil
 	}
 
+	var quarantineTargets []string
+
 	f.mu.Lock()
-	defer f.mu.Unlock()
+	defer func() {
+		f.mu.Unlock()
+		f.enqueueCleanup(ctx, quarantineTargets)
+	}()
 
 	entries, err := os.ReadDir(serviceDir)
 	if err != nil {
@@ -63,11 +73,19 @@ func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
 	}
 
 	members := []execution.HostInfo{}
-	staleFiles := []string{}
 
 	// First pass: collect members and identify stale files
 	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+		if entry.IsDir() {
+			continue
+		}
+
+		ext := filepath.Ext(entry.Name())
+		if ext == ".gc" {
+			quarantineTargets = append(quarantineTargets, filepath.Join(serviceDir, entry.Name()))
+			continue
+		}
+		if ext != ".json" {
 			continue
 		}
 
@@ -89,9 +107,8 @@ func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
 		modTime := fileInfo.ModTime()
 		elapsedTime := time.Since(modTime)
 		if elapsedTime > f.staleTimeout {
-			if elapsedTime > 10*f.staleTimeout {
-				// Definitely stale, mark for removal
-				staleFiles = append(staleFiles, instancePath)
+			if quarantinedPath, ok := f.quarantineStaleFile(ctx, instancePath); ok {
+				quarantineTargets = append(quarantineTargets, quarantinedPath)
 			}
 			continue
 		}
@@ -111,15 +128,6 @@ func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
 		})
 	}
 
-	// Second pass: remove stale files (only if we have the lock)
-	if len(staleFiles) > 0 {
-		for _, staleFile := range staleFiles {
-			if err := removeInstanceFile(staleFile); err != nil {
-				logger.Warn(ctx, "Failed to remove stale instance file", "file", staleFile, "err", err)
-			}
-		}
-	}
-
 	// Update cache if members is not empty
 	if len(members) > 0 {
 		f.cachedMembers = make([]execution.HostInfo, len(members))
@@ -128,4 +136,49 @@ func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
 	}
 
 	return members, nil
+}
+
+// quarantineStaleFile renames a stale instance file to a quarantined suffix for later cleanup.
+func (f *finder) quarantineStaleFile(ctx context.Context, path string) (string, bool) {
+	quarantinePath := path + ".gc"
+	if err := os.Rename(path, quarantinePath); err != nil {
+		// If the file vanished meanwhile it's already gone
+		if !os.IsNotExist(err) {
+			logger.Warn(ctx, "Failed to quarantine stale instance file", "file", path, "err", err)
+		}
+		return "", false
+	}
+	return quarantinePath, true
+}
+
+// enqueueCleanup schedules quarantined files for background deletion.
+func (f *finder) enqueueCleanup(ctx context.Context, files []string) {
+	if len(files) == 0 || f.cleanupCh == nil {
+		return
+	}
+
+	for _, file := range files {
+		select {
+		case f.cleanupCh <- file:
+		default:
+			logger.Warn(ctx, "Cleanup queue is full; will retry later", "file", file)
+		}
+	}
+}
+
+// cleanupLoop removes quarantined files with retry backoff.
+func (f *finder) cleanupLoop() {
+	ctx := context.Background()
+	policy := backoff.NewExponentialBackoffPolicy(200 * time.Millisecond)
+	policy.MaxInterval = 2 * time.Second
+	policy.MaxRetries = 5
+
+	for file := range f.cleanupCh {
+		err := backoff.Retry(ctx, func(ctx context.Context) error {
+			return removeInstanceFile(file)
+		}, policy, nil)
+		if err != nil {
+			logger.Warn(ctx, "Failed to cleanup quarantined instance file", "file", file, "err", err)
+		}
+	}
 }
