@@ -134,7 +134,8 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 	}
 
 	// Enqueue the dag-run to the queue
-	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.Name, execution.QueuePriorityLow, dagRun); err != nil {
+	// Use ProcGroup() to get the correct queue name (respects dag.Queue if set, otherwise dag.Name)
+	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.ProcGroup(), execution.QueuePriorityLow, dagRun); err != nil {
 		return fmt.Errorf("failed to enqueue dag-run: %w", err)
 	}
 
