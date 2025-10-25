@@ -88,7 +88,7 @@ steps:
 		time.Sleep(500 * time.Millisecond)
 
 		// Verify the DAG was enqueued (not executed locally)
-		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.DAG.ProcGroup(), dagWrapper.DAG.Name)
+		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
 		require.NoError(t, err)
 		require.Len(t, queueItems, 1, "DAG should be enqueued once")
 
@@ -187,7 +187,7 @@ steps:
 		}
 
 		// Verify the queue is now empty
-		queueItems, err = coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.DAG.ProcGroup(), dagWrapper.DAG.Name)
+		queueItems, err = coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
 		require.NoError(t, err)
 		require.Empty(t, queueItems, "Queue should be empty after execution")
 
@@ -224,7 +224,7 @@ steps:
 		time.Sleep(1 * time.Second)
 
 		// Should NOT be enqueued (executed directly)
-		queueItems, err := coord.QueueStore.ListByDAGName(ctx, dagWrapper.DAG.ProcGroup(), dagWrapper.DAG.Name)
+		queueItems, err := coord.QueueStore.ListByDAGName(ctx, dagWrapper.ProcGroup(), dagWrapper.Name)
 		require.NoError(t, err)
 		require.Len(t, queueItems, 0, "DAG should NOT be enqueued when --no-queue is set")
 
