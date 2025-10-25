@@ -162,25 +162,27 @@ cd dagu
 Run with minimal setup:
 
 ```bash
-docker compose -f compose.minimal.yaml up -d
+docker compose -f deploy/docker/compose.minimal.yaml up -d
 # Visit http://localhost:8080
 ```
 
 Stop containers:
 
 ```bash
-docker compose -f compose.minimal.yaml down
+docker compose -f deploy/docker/compose.minimal.yaml down
 ```
 
-You can also use the production-like configuration `compose.prod.yaml` with OpenTelemetry, Prometheus, and Grafana:
+You can also use the production-like configuration `deploy/docker/compose.prod.yaml` with OpenTelemetry, Prometheus, and Grafana:
 
 ```bash
-docker compose -f compose.prod.yaml up -d
+docker compose -f deploy/docker/compose.prod.yaml up -d
 # Visit UI at http://localhost:8080
 # Jaeger at http://localhost:16686, Prometheus at http://localhost:9090, Grafana at http://localhost:3000
 ```
 
 Note: It's just for demonstration purposes. For production, please customize the configuration as needed.
+
+Looking for Kubernetes? See the example manifests in `deploy/k8s/README.md`.
 
 ## Documentation
 

@@ -47,14 +47,14 @@ The manifests use the official `ghcr.io/dagu-org/dagu:latest` image by default, 
 
 ```bash
 # Apply all manifests
-kubectl apply -f deploy/k8s/local/
+kubectl apply -f deploy/k8s/
 
 # Or apply individually in order:
-kubectl apply -f deploy/k8s/local/namespace.yaml
-kubectl apply -f deploy/k8s/local/configmap.yaml
-kubectl apply -f deploy/k8s/local/pvc.yaml
-kubectl apply -f deploy/k8s/local/server-deployment.yaml
-kubectl apply -f deploy/k8s/local/worker-deployment.yaml
+kubectl apply -f deploy/k8s/namespace.yaml
+kubectl apply -f deploy/k8s/configmap.yaml
+kubectl apply -f deploy/k8s/pvc.yaml
+kubectl apply -f deploy/k8s/server-deployment.yaml
+kubectl apply -f deploy/k8s/worker-deployment.yaml
 ```
 
 **Optional: Use Local Development Image**
@@ -71,8 +71,8 @@ kind load docker-image dagu:local --name dagu-test
 k3d image import dagu:local --cluster dagu-test
 
 # Update deployments to use local image
-sed -i '' 's|ghcr.io/dagu-org/dagu:latest|dagu:local|g' deploy/k8s/local/*-deployment.yaml
-sed -i '' 's|imagePullPolicy: Always|imagePullPolicy: IfNotPresent|g' deploy/k8s/local/*-deployment.yaml
+sed -i '' 's|ghcr.io/dagu-org/dagu:latest|dagu:local|g' deploy/k8s/*-deployment.yaml
+sed -i '' 's|imagePullPolicy: Always|imagePullPolicy: IfNotPresent|g' deploy/k8s/*-deployment.yaml
 ```
 
 ### 2. Verify Deployment
@@ -117,10 +117,10 @@ kubectl port-forward -n dagu-dev service/dagu-server 8080:8080
 SERVER_POD=$(kubectl get pod -n dagu-dev -l component=server -o jsonpath='{.items[0].metadata.name}')
 
 # Copy example DAG
-kubectl cp deploy/k8s/local/example-dag.yaml dagu-dev/$SERVER_POD:/var/lib/dagu/dags/test-distributed.yaml
+kubectl cp deploy/k8s/example-dag.yaml dagu-dev/$SERVER_POD:/var/lib/dagu/dags/test-distributed.yaml
 
 # Or create directly
-kubectl exec -n dagu-dev $SERVER_POD -- sh -c 'cat > /var/lib/dagu/dags/test-distributed.yaml' < deploy/k8s/local/example-dag.yaml
+kubectl exec -n dagu-dev $SERVER_POD -- sh -c 'cat > /var/lib/dagu/dags/test-distributed.yaml' < deploy/k8s/example-dag.yaml
 ```
 
 ### 2. Trigger DAG Execution via Web UI
@@ -204,7 +204,7 @@ Modify `configmap.yaml` to adjust configuration:
 
 After modifying:
 ```bash
-kubectl apply -f deploy/k8s/local/configmap.yaml
+kubectl apply -f deploy/k8s/configmap.yaml
 kubectl rollout restart deployment -n dagu-dev
 ```
 
@@ -279,7 +279,7 @@ kubectl get svc -n dagu-dev
 
 ```bash
 # Delete all resources
-kubectl delete -f deploy/k8s/local/
+kubectl delete -f deploy/k8s/
 
 # Or delete namespace (removes everything)
 kubectl delete namespace dagu-dev
@@ -314,5 +314,5 @@ For production-like testing with TLS:
 - Add more worker replicas for load testing
 - Configure worker labels for selective execution
 - Set up persistent storage for production
-- Enable OpenTelemetry tracing (see compose.prod.yaml for reference)
+- Enable OpenTelemetry tracing (see `deploy/docker/compose.prod.yaml` for reference)
 - Configure Prometheus metrics collection
