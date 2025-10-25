@@ -130,6 +130,7 @@ func runStart(ctx *Context, args []string) error {
 			"dag", dag.Name,
 			"dagRunId", dagRunID,
 			"workerSelector", dag.WorkerSelector)
+		dag.Location = "" // Queued dag-runs must not have a location
 		return enqueueDAGRun(ctx, dag, dagRunID)
 	}
 
