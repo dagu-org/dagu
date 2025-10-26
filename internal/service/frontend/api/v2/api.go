@@ -115,26 +115,32 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 		ResponseErrorHandlerFunc: a.handleError,
 	}
 
+	// Initialize auth configuration
+	authConfig := a.config.Server.Auth
+	authOptions := auth.Options{
+		Realm:            "restricted",
+		APITokenEnabled:  authConfig.Token.Value != "",
+		APIToken:         authConfig.Token.Value,
+		BasicAuthEnabled: authConfig.Basic.Username != "" && authConfig.Basic.Password != "",
+		Creds: map[string]string{
+			authConfig.Basic.Username: authConfig.Basic.Password,
+		},
+	}
+
+	// Initialize OIDC if enabled
+	oidcEnabled := authConfig.OIDC.ClientId != "" &&
+		authConfig.OIDC.ClientSecret != "" && authConfig.OIDC.Issuer != ""
+	if oidcEnabled {
+		oidcProvider, oidcVerify, oidcConfig, err := auth.InitVerifierAndConfig(authConfig.OIDC)
+		if err != nil {
+			return fmt.Errorf("failed to initialize OIDC: %w", err)
+		}
+		authOptions.OIDCAuthEnabled = true
+		authOptions.OIDCWhitelist = authConfig.OIDC.Whitelist
+		authOptions.OIDCProvider, authOptions.OIDCVerify, authOptions.OIDCConfig = oidcProvider, oidcVerify, oidcConfig
+	}
+
 	r.Group(func(r chi.Router) {
-		authConfig := a.config.Server.Auth
-		authOptions := auth.Options{
-			Realm:            "restricted",
-			APITokenEnabled:  authConfig.Token.Value != "",
-			APIToken:         authConfig.Token.Value,
-			BasicAuthEnabled: authConfig.Basic.Username != "" && authConfig.Basic.Password != "",
-			Creds: map[string]string{
-				authConfig.Basic.Username: authConfig.Basic.Password,
-			},
-		}
-		oidcEnabled := authConfig.OIDC.ClientId != "" &&
-			authConfig.OIDC.ClientSecret != "" && authConfig.OIDC.Issuer != ""
-		// Enable OIDC authentication if all required fields are set
-		if oidcEnabled {
-			oidcProvider, oidcVerify, oidcConfig := auth.InitVerifierAndConfig(authConfig.OIDC)
-			authOptions.OIDCAuthEnabled = true
-			authOptions.OIDCWhitelist = authConfig.OIDC.Whitelist
-			authOptions.OIDCProvider, authOptions.OIDCVerify, authOptions.OIDCConfig = oidcProvider, oidcVerify, oidcConfig
-		}
 		r.Use(auth.Middleware(authOptions))
 		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
 

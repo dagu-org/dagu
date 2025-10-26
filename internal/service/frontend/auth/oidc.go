@@ -8,16 +8,15 @@ import (
 
 	oidc "github.com/coreos/go-oidc"
 	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"golang.org/x/oauth2"
 )
 
-func InitVerifierAndConfig(i config.AuthOIDC) (*oidc.Provider, *oidc.IDTokenVerifier, *oauth2.Config) {
+func InitVerifierAndConfig(i config.AuthOIDC) (*oidc.Provider, *oidc.IDTokenVerifier, *oauth2.Config, error) {
 	providerCtx := context.Background()
 	provider, err := oidc.NewProvider(providerCtx, i.Issuer)
 	if err != nil {
-		logger.Fatalf(providerCtx, "Failed to init OIDC provider. Error: %v \n", err.Error())
+		return nil, nil, nil, fmt.Errorf("failed to init OIDC provider: %w", err)
 	}
 	oidcConfig := &oidc.Config{
 		ClientID: i.ClientId,
@@ -31,7 +30,7 @@ func InitVerifierAndConfig(i config.AuthOIDC) (*oidc.Provider, *oidc.IDTokenVeri
 		RedirectURL:  fmt.Sprintf("%s/oidc-callback", strings.TrimSuffix(i.ClientUrl, "/")),
 		Scopes:       i.Scopes,
 	}
-	return provider, verifier, config
+	return provider, verifier, config, nil
 }
 
 func callbackHandler(provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
