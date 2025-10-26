@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -141,20 +142,63 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 
 // sendHeartbeats sends periodic heartbeats to the coordinator
 func (w *Worker) sendHeartbeats(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+	basePolicy := backoff.NewExponentialBackoffPolicy(1 * time.Second)
+	basePolicy.BackoffFactor = 1.5
+	basePolicy.MaxInterval = 15 * time.Second
+	basePolicy.MaxRetries = 0 // unlimited retries
+	retryPolicy := backoff.WithJitter(basePolicy, backoff.Jitter)
+	retrier := backoff.NewRetrier(retryPolicy)
 
-	for {
+	const healthyInterval = 1 * time.Second
+
+	waitWithContext := func(ctx context.Context, d time.Duration) bool {
+		if d <= 0 {
+			return ctx.Err() == nil
+		}
+		timer := time.NewTimer(d)
+		defer timer.Stop()
 		select {
 		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if err := w.sendHeartbeat(ctx); err != nil {
-				logger.Error(ctx, "Failed to send heartbeat",
-					"worker_id", w.id,
-					"err", err)
-			}
+			return false
+		case <-timer.C:
+			return true
 		}
+	}
+
+	nextDelay := time.Duration(0)
+
+	for {
+		if !waitWithContext(ctx, nextDelay) {
+			return
+		}
+
+		if ctx.Err() != nil {
+			return
+		}
+
+		if err := w.sendHeartbeat(ctx); err != nil {
+			nextInterval, nextErr := retrier.Next(err)
+			if nextErr != nil {
+				logger.Error(ctx, "Failed to compute heartbeat backoff interval",
+					"worker_id", w.id,
+					"err", err,
+				)
+				nextInterval = healthyInterval
+			} else {
+				logger.Warn(ctx, "Heartbeat send failed; will retry with backoff",
+					"worker_id", w.id,
+					"err", err,
+					"next_retry_in", nextInterval,
+				)
+			}
+
+			nextDelay = nextInterval
+			continue
+		}
+
+		// Successful heartbeat; reset backoff and schedule healthy interval
+		retrier.Reset()
+		nextDelay = healthyInterval
 	}
 }
 
