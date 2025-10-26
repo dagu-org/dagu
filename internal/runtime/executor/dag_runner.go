@@ -117,6 +117,7 @@ func (e *ChildDAGExecutor) buildCommand(
 		fmt.Sprintf("--parent=%s", env.DAGRunRef().String()),
 		fmt.Sprintf("--run-id=%s", runParams.RunID),
 		"--no-queue",
+		"--disable-max-active-runs",
 		e.DAG.Location,
 	}
 	if configFile := config.ConfigFileUsed(ctx); configFile != "" {
