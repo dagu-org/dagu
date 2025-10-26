@@ -674,26 +674,6 @@ func configureViper(configDir, configFile string) {
 	viper.AutomaticEnv()
 }
 
-// validateConfig performs basic validation on the configuration to ensure required fields are set
-// and that numerical values fall within acceptable ranges.
-func validateConfig(cfg *Config) error {
-	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
-		return fmt.Errorf("invalid port number: %d", cfg.Server.Port)
-	}
-
-	if cfg.Server.TLS != nil {
-		if cfg.Server.TLS.CertFile == "" || cfg.Server.TLS.KeyFile == "" {
-			return fmt.Errorf("TLS configuration incomplete: both cert and key files are required")
-		}
-	}
-
-	if cfg.UI.MaxDashboardPageLimit < 1 {
-		return fmt.Errorf("invalid max dashboard page limit: %d", cfg.UI.MaxDashboardPageLimit)
-	}
-
-	return nil
-}
-
 func parseWorkerLabels(labelsStr string) map[string]string {
 	labels := make(map[string]string)
 	if labelsStr == "" {
