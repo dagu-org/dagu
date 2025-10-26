@@ -248,11 +248,6 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 
-	// Store command reference for Kill
-	e.mu.Lock()
-	e.cmds[runParams.RunID] = cmd
-	e.mu.Unlock()
-
 	// Ensure we clear command reference when done
 	defer func() {
 		e.mu.Lock()
@@ -266,10 +261,15 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 		"params", runParams.Params,
 	)
 
-	// Start and wait for the command
+	// Start the command first to initialize cmd.Process
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start child dag-run: %w", err)
 	}
+
+	// Store command reference for Kill AFTER starting, so cmd.Process is already set
+	e.mu.Lock()
+	e.cmds[runParams.RunID] = cmd
+	e.mu.Unlock()
 
 	waitErr = cmd.Wait()
 
