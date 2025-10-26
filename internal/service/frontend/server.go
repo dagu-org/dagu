@@ -96,7 +96,9 @@ func (srv *Server) Serve(ctx context.Context) error {
 	schema := srv.getSchema()
 
 	// Set up routes
-	srv.setupRoutes(ctx, r)
+	if err := srv.setupRoutes(ctx, r); err != nil {
+		return err
+	}
 
 	// Configure API routes
 	if err := srv.setupAPIRoutes(ctx, r, apiV1BasePath, apiV2BasePath, schema); err != nil {
@@ -148,11 +150,11 @@ func (srv *Server) getSchema() string {
 }
 
 // setupRoutes configures the web UI routes
-func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) {
+func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 	// Skip UI routes in headless mode
 	if srv.config.Server.Headless {
 		logger.Info(ctx, "Headless mode enabled: UI is disabled, but API remains active")
-		return
+		return nil
 	}
 
 	// Serve assets with proper cache control
@@ -180,22 +182,35 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) {
 
 	// Serve UI pages
 	indexHandler := srv.useTemplate(ctx, "index.gohtml", "index")
+
+	// Initialize OIDC if enabled
+	authConfig := srv.config.Server.Auth
+	oidcEnabled := authConfig.OIDC.ClientId != "" &&
+		authConfig.OIDC.ClientSecret != "" && authConfig.OIDC.Issuer != ""
+	var oidcAuthOptions *auth.Options
+	if oidcEnabled {
+		oidcCfg, err := auth.InitVerifierAndConfig(srv.config.Server.Auth.OIDC)
+		if err != nil {
+			return fmt.Errorf("failed to initialize OIDC: %w", err)
+		}
+		oidcAuthOptions = &auth.Options{
+			OIDCAuthEnabled: true,
+			OIDCWhitelist:   srv.config.Server.Auth.OIDC.Whitelist,
+			OIDCProvider:    oidcCfg.Provider,
+			OIDCVerify:      oidcCfg.Verifier,
+			OIDCConfig:      oidcCfg.Config,
+		}
+	}
+
 	r.Route("/", func(r chi.Router) {
-		authConfig := srv.config.Server.Auth
-		oidcEnabled := authConfig.OIDC.ClientId != "" &&
-			authConfig.OIDC.ClientSecret != "" && authConfig.OIDC.Issuer != ""
-		if oidcEnabled {
-			authOptions := auth.Options{}
-			oidcProvider, oidcVerify, oidcConfig := auth.InitVerifierAndConfig(srv.config.Server.Auth.OIDC)
-			authOptions.OIDCAuthEnabled = true
-			authOptions.OIDCWhitelist = srv.config.Server.Auth.OIDC.Whitelist
-			authOptions.OIDCProvider, authOptions.OIDCVerify, authOptions.OIDCConfig = oidcProvider, oidcVerify, oidcConfig
-			r.Use(auth.OIDCMiddleware(authOptions))
+		if oidcAuthOptions != nil {
+			r.Use(auth.OIDCMiddleware(*oidcAuthOptions))
 		}
 		r.Get("/*", func(w http.ResponseWriter, _ *http.Request) {
 			indexHandler(w, nil)
 		})
 	})
+	return nil
 }
 
 // setupAPIRoutes configures the API routes for both versions

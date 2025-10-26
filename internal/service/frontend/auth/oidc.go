@@ -13,11 +13,18 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func InitVerifierAndConfig(i config.AuthOIDC) (*oidc.Provider, *oidc.IDTokenVerifier, *oauth2.Config) {
+// OIDCConfig holds the initialized OIDC provider, verifier, and OAuth2 config
+type OIDCConfig struct {
+	Provider *oidc.Provider
+	Verifier *oidc.IDTokenVerifier
+	Config   *oauth2.Config
+}
+
+func InitVerifierAndConfig(i config.AuthOIDC) (*OIDCConfig, error) {
 	providerCtx := context.Background()
 	provider, err := oidc.NewProvider(providerCtx, i.Issuer)
 	if err != nil {
-		logger.Fatalf(providerCtx, "Failed to init OIDC provider. Error: %v \n", err.Error())
+		return nil, fmt.Errorf("failed to init OIDC provider: %w", err)
 	}
 	oidcConfig := &oidc.Config{
 		ClientID: i.ClientId,
@@ -31,7 +38,11 @@ func InitVerifierAndConfig(i config.AuthOIDC) (*oidc.Provider, *oidc.IDTokenVeri
 		RedirectURL:  fmt.Sprintf("%s/oidc-callback", strings.TrimSuffix(i.ClientUrl, "/")),
 		Scopes:       i.Scopes,
 	}
-	return provider, verifier, config
+	return &OIDCConfig{
+		Provider: provider,
+		Verifier: verifier,
+		Config:   config,
+	}, nil
 }
 
 func callbackHandler(provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
@@ -123,16 +134,39 @@ func checkOIDCAuth(next http.Handler, provider *oidc.Provider, verifier *oidc.ID
 }
 
 func checkOIDCToken(next http.Handler, verifier *oidc.IDTokenVerifier, w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	authorized, err := r.Cookie("oidcToken")
-	if err == nil && authorized.Value != "" {
-		if _, err := verifier.Verify(context.Background(), authorized.Value); err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r)
+
+	if err != nil {
+		// Cookie not found or error reading it
+		logger.Warn(ctx, "OIDC authentication failed: oidcToken cookie not found",
+			"path", r.URL.Path,
+			"method", r.Method,
+			"error", err)
+		http.Error(w, "Authentication required: OIDC token cookie not found", http.StatusUnauthorized)
 		return
 	}
-	w.WriteHeader(http.StatusUnauthorized)
+
+	if authorized.Value == "" {
+		logger.Warn(ctx, "OIDC authentication failed: oidcToken cookie is empty",
+			"path", r.URL.Path,
+			"method", r.Method)
+		http.Error(w, "Authentication required: OIDC token is empty", http.StatusUnauthorized)
+		return
+	}
+
+	// Verify the token
+	if _, err := verifier.Verify(context.Background(), authorized.Value); err != nil {
+		logger.Warn(ctx, "OIDC authentication failed: token verification failed",
+			"path", r.URL.Path,
+			"method", r.Method,
+			"error", err)
+		http.Error(w, "Authentication failed: invalid or expired OIDC token", http.StatusUnauthorized)
+		return
+	}
+
+	// Token is valid, proceed
+	next.ServeHTTP(w, r)
 }
 
 func setCookie(w http.ResponseWriter, r *http.Request, name, value string, expire int) {
