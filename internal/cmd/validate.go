@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/spf13/cobra"
@@ -17,21 +18,31 @@ import (
 // - Run DAG.Validate()
 //
 // The command prints validation results and any errors found.
+// Unlike other commands, this does NOT use NewCommand wrapper to allow proper
+// error handling in tests without requiring subprocess patterns.
 func Validate() *cobra.Command {
-	return NewCommand(
-		&cobra.Command{
-			Use:   "validate [flags] <DAG definition>",
-			Short: "Validate a DAG specification",
-			Long: `Validate a DAG YAML file without executing it.
+	cmd := &cobra.Command{
+		Use:   "validate [flags] <DAG definition>",
+		Short: "Validate a DAG specification",
+		Long: `Validate a DAG YAML file without executing it.
 
 Prints a human-readable result instead of structured logs.
 Checks structural correctness and references (e.g., step dependencies)
 similar to the server-side spec validation.`,
-			Args: cobra.ExactArgs(1),
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx, err := NewContext(cmd, nil)
+			if err != nil {
+				return fmt.Errorf("initialization error: %w", err)
+			}
+			return runValidate(ctx, args)
 		},
-		nil,
-		runValidate,
-	)
+	}
+
+	// Initialize flags required by NewContext
+	initFlags(cmd)
+
+	return cmd
 }
 
 func runValidate(ctx *Context, args []string) error {
@@ -54,7 +65,7 @@ func runValidate(ctx *Context, args []string) error {
 	}
 
 	// Success
-	_, _ = fmt.Fprintf(ctx.Command.OutOrStdout(), "DAG spec is valid: %s (name: %s)\n", args[0], dag.GetName())
+	logger.Info(ctx, "DAG spec is valid", "file", args[0], "name", dag.GetName())
 	return nil
 }
 

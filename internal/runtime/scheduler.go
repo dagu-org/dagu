@@ -114,7 +114,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	env := execution.GetDAGContextFromContext(ctx)
 	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", "err", err)
-		sc.Cancel(ctx, graph)
+		sc.Cancel(graph)
 	}
 
 	var wg = sync.WaitGroup{}
@@ -435,11 +435,6 @@ func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
 func (sc *Scheduler) Signal(
 	ctx context.Context, graph *ExecutionGraph, sig os.Signal, done chan bool, allowOverride bool,
 ) {
-	isTermination := signal.IsTerminationSignalOS(sig)
-	if !sc.isCanceled() && isTermination {
-		sc.setCanceled()
-	}
-
 	for _, node := range graph.nodes {
 		// for a repetitive task, we'll wait for the job to finish
 		// until time reaches max wait time
@@ -448,6 +443,11 @@ func (sc *Scheduler) Signal(
 			continue
 		}
 		node.Signal(ctx, sig, allowOverride)
+	}
+
+	isTermination := signal.IsTerminationSignalOS(sig)
+	if !sc.isCanceled() && isTermination {
+		sc.setCanceled()
 	}
 
 	if done != nil && isTermination {
@@ -461,10 +461,10 @@ func (sc *Scheduler) Signal(
 }
 
 // Cancel sends -1 signal to all nodes.
-func (sc *Scheduler) Cancel(ctx context.Context, g *ExecutionGraph) {
+func (sc *Scheduler) Cancel(g *ExecutionGraph) {
 	sc.setCanceled()
 	for _, node := range g.nodes {
-		node.Cancel(ctx)
+		node.Cancel()
 	}
 }
 

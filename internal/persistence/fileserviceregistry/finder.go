@@ -7,147 +7,152 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/dirlock"
-	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
-// finder provides file-based service registry
-type finder struct {
-	baseDir      string
-	serviceName  execution.ServiceName
-	staleTimeout time.Duration
-	dirLock      dirlock.DirLock
-	mu           sync.Mutex
+const (
+	defaultStaleTimeout  = 30 * time.Second
+	defaultCacheDuration = 3 * time.Second
+)
 
-	// Cache fields
+// finder discovers active service instances from the file system
+type finder struct {
+	baseDir     string
+	serviceName execution.ServiceName
+	quarantine  *quarantine
+	cleaner     *cleaner
+
+	// Cache to avoid excessive file system access
+	mu            sync.Mutex
 	cachedMembers []execution.HostInfo
 	cacheTime     time.Time
 	cacheDuration time.Duration
 }
 
-// newFinder creates a new finder for a specific service
-func newFinder(baseDir string, serviceName execution.ServiceName) *finder {
-	serviceDir := filepath.Join(baseDir, string(serviceName))
-
-	// Create directory lock for this service
-	lock := dirlock.New(serviceDir, &dirlock.LockOptions{
-		StaleThreshold: 5 * time.Second,       // Lock is stale after 5 seconds
-		RetryInterval:  50 * time.Millisecond, // Retry every 50ms
-	})
-
-	return &finder{
+// newFinder creates a finder for discovering service instances
+func newFinder(baseDir string, serviceName execution.ServiceName, enableCleanup bool) *finder {
+	f := &finder{
 		baseDir:       baseDir,
 		serviceName:   serviceName,
-		staleTimeout:  30 * time.Second, // Consider instances stale after 30 seconds
-		dirLock:       lock,
-		cacheDuration: 3 * time.Second, // Cache members for 15 seconds
+		quarantine:    newQuarantine(defaultStaleTimeout),
+		cacheDuration: defaultCacheDuration,
+	}
+
+	if enableCleanup {
+		f.cleaner = newCleaner(baseDir, serviceName)
+	}
+
+	return f
+}
+
+// close stops background cleanup if running
+func (f *finder) close() {
+	if f.cleaner != nil {
+		f.cleaner.stop()
 	}
 }
 
 // members returns all active instances of the service
 func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
-	f.mu.Lock()
-
-	// Check if we have a valid cache
-	if len(f.cachedMembers) > 0 && time.Since(f.cacheTime) < f.cacheDuration {
-		members := make([]execution.HostInfo, len(f.cachedMembers))
-		copy(members, f.cachedMembers)
-		f.mu.Unlock()
-		return members, nil
+	// Try to use cached results first
+	if cached := f.getCachedMembers(); cached != nil {
+		return cached, nil
 	}
-	f.mu.Unlock()
 
+	// Cache miss - scan file system
+	members, err := f.scanServiceDirectory(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update cache (only caches non-empty results to keep polling for new services)
+	f.updateCache(members)
+
+	return members, nil
+}
+
+// getCachedMembers returns cached members if the cache is still valid
+func (f *finder) getCachedMembers() []execution.HostInfo {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if len(f.cachedMembers) == 0 || time.Since(f.cacheTime) >= f.cacheDuration {
+		return nil
+	}
+
+	members := make([]execution.HostInfo, len(f.cachedMembers))
+	copy(members, f.cachedMembers)
+	return members
+}
+
+// scanServiceDirectory scans the service directory for active instances
+func (f *finder) scanServiceDirectory(ctx context.Context) ([]execution.HostInfo, error) {
+	instanceFiles, err := f.listInstanceFiles()
+	if err != nil {
+		return nil, err
+	}
+
+	members := make([]execution.HostInfo, 0, len(instanceFiles))
+
+	for _, path := range instanceFiles {
+		if ctx.Err() != nil {
+			return members, ctx.Err()
+		}
+
+		if info := f.processInstanceFile(ctx, path); info != nil {
+			members = append(members, *info)
+		}
+	}
+
+	return members, nil
+}
+
+// listInstanceFiles returns paths to all non-quarantined instance files
+func (f *finder) listInstanceFiles() ([]string, error) {
 	serviceDir := filepath.Join(f.baseDir, string(f.serviceName))
+	pattern := filepath.Join(serviceDir, "*.json")
+	return filepath.Glob(pattern)
+}
 
-	// If directory doesn't exist, return empty list (no instances)
-	if _, err := os.Stat(serviceDir); os.IsNotExist(err) {
-		return []execution.HostInfo{}, nil
+// processInstanceFile checks if an instance file is valid and returns its info
+func (f *finder) processInstanceFile(ctx context.Context, path string) *execution.HostInfo {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return nil
+	}
+
+	// Check if file is stale
+	if time.Since(fileInfo.ModTime()) > defaultStaleTimeout {
+		f.quarantine.markStaleFile(ctx, path, fileInfo.ModTime())
+		return nil
+	}
+
+	// Parse instance file
+	instance, err := readInstanceFile(path)
+	if err != nil {
+		return nil
+	}
+
+	return &execution.HostInfo{
+		ID:        instance.ID,
+		Host:      instance.Host,
+		Port:      instance.Port,
+		Status:    instance.Status,
+		StartedAt: instance.StartedAt,
+	}
+}
+
+// updateCache stores members in the cache (only caches non-empty results)
+func (f *finder) updateCache(members []execution.HostInfo) {
+	if len(members) == 0 {
+		// Don't cache empty results - keep scanning for new services
+		return
 	}
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	// Acquire lock for reading and cleaning
-	if f.dirLock != nil {
-		if err := f.dirLock.TryLock(); err != nil {
-			// If we can't get the lock, still try to read (another process may be cleaning)
-			logger.Warn(ctx, "Could not acquire lock for service directory", "service", f.serviceName)
-		} else {
-			// Ensure we unlock when done
-			defer func() {
-				if err := f.dirLock.Unlock(); err != nil {
-					logger.Error(ctx, "Failed to unlock service directory", "service", f.serviceName, "err", err)
-				}
-			}()
-		}
-	}
-
-	entries, err := os.ReadDir(serviceDir)
-	if err != nil {
-		return nil, err
-	}
-
-	members := []execution.HostInfo{}
-	staleFiles := []string{}
-
-	// First pass: collect members and identify stale files
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
-			continue
-		}
-
-		select {
-		case <-ctx.Done():
-			return members, ctx.Err()
-		default:
-		}
-
-		instancePath := filepath.Join(serviceDir, entry.Name())
-
-		// Get file info to check modification time
-		fileInfo, err := os.Stat(instancePath)
-		if err != nil {
-			continue
-		}
-
-		// Check if instance is stale
-		if time.Since(fileInfo.ModTime()) > f.staleTimeout {
-			staleFiles = append(staleFiles, instancePath)
-			continue
-		}
-
-		info, err := readInstanceFile(instancePath)
-		if err != nil {
-			// Skip invalid files
-			continue
-		}
-
-		members = append(members, execution.HostInfo{
-			ID:        info.ID,
-			Host:      info.Host,
-			Port:      info.Port,
-			Status:    info.Status,
-			StartedAt: info.StartedAt,
-		})
-	}
-
-	// Second pass: remove stale files (only if we have the lock)
-	if f.dirLock != nil && len(staleFiles) > 0 {
-		// We already have the lock from above, so we can safely remove stale files
-		for _, staleFile := range staleFiles {
-			if err := removeInstanceFile(staleFile); err != nil {
-				logger.Error(ctx, "Failed to remove stale instance file", "file", staleFile, "err", err)
-			}
-		}
-	}
-
-	// Update cache if members is not empty
-	if len(members) > 0 {
-		f.cachedMembers = make([]execution.HostInfo, len(members))
-		copy(f.cachedMembers, members)
-		f.cacheTime = time.Now()
-	}
-
-	return members, nil
+	f.cachedMembers = make([]execution.HostInfo, len(members))
+	copy(f.cachedMembers, members)
+	f.cacheTime = time.Now()
 }

@@ -27,6 +27,7 @@ type dagExecutor struct {
 	runParams executor.RunParams
 	step      core.Step
 	result    *execution.RunStatus
+	cancel    context.CancelFunc
 }
 
 // Errors for DAG executor
@@ -57,6 +58,10 @@ func newDAGExecutor(ctx context.Context, step core.Step) (executor.Executor, err
 }
 
 func (e *dagExecutor) Run(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	e.cancel = cancel
+	defer cancel()
+
 	// Ensure cleanup happens even if there's an error
 	defer func() {
 		if err := e.child.Cleanup(ctx); err != nil {
@@ -129,11 +134,14 @@ func (e *dagExecutor) SetStderr(out io.Writer) {
 
 func (e *dagExecutor) Kill(sig os.Signal) error {
 	// Kill all child processes (both local and distributed)
+	var err error
 	if e.child != nil {
-		return e.child.Kill(sig)
+		err = e.child.Kill(sig)
 	}
-
-	return nil
+	if e.cancel != nil {
+		e.cancel()
+	}
+	return err
 }
 
 func init() {

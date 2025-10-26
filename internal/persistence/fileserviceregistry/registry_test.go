@@ -287,3 +287,56 @@ func TestRegistry_MultipleInstances(t *testing.T) {
 	assert.Len(t, workerMembers, 1)
 	assert.Equal(t, "worker1.example.com:8080", fmt.Sprintf("%s:%d", workerMembers[0].Host, workerMembers[0].Port))
 }
+
+func TestRegistry_CleanupOnlyEnabledForCoordinator(t *testing.T) {
+	tmpDir := t.TempDir()
+	ctx := context.Background()
+
+	// Test 1: Registry without coordinator registration - cleanup disabled
+	registryScheduler := New(tmpDir)
+	hostInfoScheduler := execution.HostInfo{
+		ID:     "scheduler-1",
+		Host:   "localhost",
+		Port:   8080,
+		Status: execution.ServiceStatusActive,
+	}
+	err := registryScheduler.Register(ctx, execution.ServiceNameScheduler, hostInfoScheduler)
+	require.NoError(t, err)
+
+	// Get finder - should have cleanup disabled
+	_, err = registryScheduler.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	require.NoError(t, err)
+
+	registryScheduler.mu.RLock()
+	finder := registryScheduler.finders[execution.ServiceNameCoordinator]
+	registryScheduler.mu.RUnlock()
+
+	assert.NotNil(t, finder)
+	assert.Nil(t, finder.cleaner, "cleanup should be disabled for non-coordinator registry")
+
+	registryScheduler.Unregister(ctx)
+
+	// Test 2: Registry with coordinator registration - cleanup enabled
+	registryCoordinator := New(tmpDir)
+	hostInfoCoordinator := execution.HostInfo{
+		ID:     "coordinator-1",
+		Host:   "localhost",
+		Port:   9090,
+		Status: execution.ServiceStatusActive,
+	}
+	err = registryCoordinator.Register(ctx, execution.ServiceNameCoordinator, hostInfoCoordinator)
+	require.NoError(t, err)
+
+	// Get finder - should have cleanup enabled
+	_, err = registryCoordinator.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	require.NoError(t, err)
+
+	registryCoordinator.mu.RLock()
+	finderCoord := registryCoordinator.finders[execution.ServiceNameCoordinator]
+	registryCoordinator.mu.RUnlock()
+
+	assert.NotNil(t, finderCoord)
+	assert.NotNil(t, finderCoord.cleaner, "cleanup should be enabled for coordinator registry")
+
+	registryCoordinator.Unregister(ctx)
+}

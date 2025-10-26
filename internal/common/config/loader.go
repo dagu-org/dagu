@@ -270,6 +270,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	// Override with values from config file if provided
 	if def.Coordinator != nil {
 		cfg.Coordinator.Host = def.Coordinator.Host
+		cfg.Coordinator.Advertise = def.Coordinator.Advertise
 		cfg.Coordinator.Port = def.Coordinator.Port
 	}
 
@@ -529,8 +530,9 @@ func setViperDefaultValues(paths Paths) {
 	viper.SetDefault("latestStatusToday", false)
 
 	// Coordinator settings
-	viper.SetDefault("coordinatorHost", "127.0.0.1")
-	viper.SetDefault("coordinatorPort", 50055)
+	viper.SetDefault("coordinator.host", "127.0.0.1")
+	viper.SetDefault("coordinator.advertise", "") // Empty means auto-detect hostname
+	viper.SetDefault("coordinator.port", 50055)
 
 	// Worker settings - nested structure
 	viper.SetDefault("worker.maxActiveRuns", 100)
@@ -636,6 +638,7 @@ func bindEnvironmentVariables() {
 
 	// Coordinator service configuration (flat structure)
 	bindEnv("coordinator.host", "COORDINATOR_HOST")
+	bindEnv("coordinator.advertise", "COORDINATOR_ADVERTISE")
 	bindEnv("coordinator.port", "COORDINATOR_PORT")
 
 	// Worker configuration (nested structure)

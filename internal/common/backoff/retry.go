@@ -3,6 +3,8 @@ package backoff
 import (
 	"context"
 	"time"
+
+	"github.com/dagu-org/dagu/internal/common/logger"
 )
 
 type (
@@ -16,48 +18,78 @@ type (
 // Retry executes the operation with retry logic based on the provided policy.
 // If isRetriable is nil, all errors are considered retriable.
 func Retry(ctx context.Context, op Operation, policy RetryPolicy, isRetriable IsRetriableFunc) error {
-	// Default to retrying all errors if no function provided
 	if isRetriable == nil {
 		isRetriable = func(_ error) bool { return true }
 	}
 
 	retrier := NewRetrier(policy)
+	attempt := 0
+	var lastDebugLog time.Time
 
 	for {
-		// Check context before operation
+		attempt++
+
 		if err := ctx.Err(); err != nil {
+			logger.Warn(ctx, "Retry aborted due to context error", "attempt", attempt, "err", err)
 			return err
 		}
 
-		// Execute the operation
 		err := op(ctx)
 		if err == nil {
+			logSuccessIfNeeded(ctx, attempt, &lastDebugLog)
 			return nil
 		}
 
-		// Check if error is retriable
 		if !isRetriable(err) {
+			logger.Warn(ctx, "Retryable operation failed with non-retriable error", "attempt", attempt, "err", err)
 			return err
 		}
 
-		// Get next retry interval
 		interval, retryErr := retrier.Next(err)
 		if retryErr != nil {
-			// If retries exhausted, return the original operation error
+			logger.Warn(ctx, "Retry attempts exhausted", "attempt", attempt, "err", err)
 			return err
 		}
 
-		// Wait for the interval
-		if interval > 0 {
-			timer := time.NewTimer(interval)
-			select {
-			case <-timer.C:
-				// Continue to next iteration
-			case <-ctx.Done():
-				timer.Stop()
-				return ctx.Err()
-			}
-			timer.Stop()
+		if interval <= 0 {
+			interval = time.Millisecond * 100 // Default small delay
 		}
+
+		logRetryIfNeeded(ctx, attempt, interval, err, &lastDebugLog)
+
+		if err := waitWithContext(ctx, interval, attempt); err != nil {
+			return err
+		}
+	}
+}
+
+func logSuccessIfNeeded(ctx context.Context, attempt int, lastDebugLog *time.Time) {
+	if attempt > 1 && time.Since(*lastDebugLog) >= 30*time.Second {
+		logger.Debug(ctx, "Retryable operation succeeded", "attempt", attempt)
+		*lastDebugLog = time.Now()
+	}
+}
+
+func logRetryIfNeeded(ctx context.Context, attempt int, interval time.Duration, err error, lastDebugLog *time.Time) {
+	if time.Since(*lastDebugLog) >= 30*time.Second {
+		logger.Debug(ctx, "Retryable operation failed; scheduling retry",
+			"attempt", attempt,
+			"next_attempt_in", interval,
+			"err", err,
+		)
+		*lastDebugLog = time.Now()
+	}
+}
+
+func waitWithContext(ctx context.Context, interval time.Duration, attempt int) error {
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		logger.Warn(ctx, "Retry aborted during backoff wait", "attempt", attempt, "err", ctx.Err())
+		return ctx.Err()
 	}
 }

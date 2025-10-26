@@ -111,17 +111,33 @@ func (r *registry) getFinder(serviceName execution.ServiceName) *finder {
 	f, exists := r.finders[serviceName]
 	r.mu.RUnlock()
 
-	if !exists {
-		r.mu.Lock()
-		// Double-check after acquiring write lock
-		if f, exists = r.finders[serviceName]; !exists {
-			f = newFinder(r.baseDir, serviceName)
-			r.finders[serviceName] = f
-		}
-		r.mu.Unlock()
+	if exists {
+		return f
 	}
 
+	// Create new finder with double-check locking
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Double-check after acquiring write lock
+	if f, exists = r.finders[serviceName]; exists {
+		return f
+	}
+
+	// Only coordinator processes should run cleanup to avoid conflicts
+	enableCleanup := r.isCoordinatorService()
+	f = newFinder(r.baseDir, serviceName, enableCleanup)
+	r.finders[serviceName] = f
+
 	return f
+}
+
+// isCoordinatorService checks if this registry instance runs as coordinator
+func (r *registry) isCoordinatorService() bool {
+	r.registrationsMu.Lock()
+	defer r.registrationsMu.Unlock()
+	_, isCoordinator := r.registrations[execution.ServiceNameCoordinator]
+	return isCoordinator
 }
 
 // Unregister stops all service registrations
@@ -164,6 +180,14 @@ func (r *registry) Unregister(ctx context.Context) {
 			logger.Warn(ctx, "Timeout waiting for registry shutdown", "service", serviceName)
 		}
 	}
+
+	// Close all finders to stop their cleanup goroutines
+	r.mu.Lock()
+	for _, f := range r.finders {
+		f.close()
+	}
+	r.finders = make(map[execution.ServiceName]*finder)
+	r.mu.Unlock()
 }
 
 // UpdateStatus updates the status of the registered instance for the given service

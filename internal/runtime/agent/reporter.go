@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -34,9 +33,6 @@ func (r *reporter) reportStep(
 	ctx context.Context, dag *core.DAG, dagStatus execution.DAGRunStatus, node *runtime.Node,
 ) error {
 	nodeStatus := node.State().Status
-	if nodeStatus != core.NodeNotStarted {
-		logger.Info(ctx, "Step finished", "step", node.NodeData().Step.Name, "status", nodeStatus)
-	}
 	if nodeStatus == core.NodeFailed && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
 		fromAddress := dag.ErrorMail.From
 		toAddresses := dag.ErrorMail.To

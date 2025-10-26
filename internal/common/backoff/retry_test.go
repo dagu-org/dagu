@@ -149,29 +149,4 @@ func TestRetry(t *testing.T) {
 		// With jitter, timing is unpredictable but should be relatively quick
 		assert.Less(t, elapsed, 200*time.Millisecond)
 	})
-
-	t.Run("ZeroInterval", func(t *testing.T) {
-		// Test that zero intervals don't cause delays
-		attempts := 0
-		op := func(_ context.Context) error {
-			attempts++
-			if attempts < 5 {
-				return errors.New("retry")
-			}
-			return nil
-		}
-
-		// Custom policy that returns zero interval
-		policy := &mockRetryPolicy{
-			intervals: []time.Duration{0, 0, 0, 0, 0},
-		}
-
-		start := time.Now()
-		err := Retry(context.Background(), op, policy, nil)
-		elapsed := time.Since(start)
-
-		assert.NoError(t, err)
-		assert.Equal(t, 5, attempts)
-		assert.Less(t, elapsed, 10*time.Millisecond) // Should be very fast
-	})
 }

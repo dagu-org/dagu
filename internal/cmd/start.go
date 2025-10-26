@@ -55,7 +55,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, dagRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag}
+var startFlags = []commandLineFlag{paramsFlag, dagRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag, disableMaxActiveRuns}
 
 // runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
@@ -87,15 +87,15 @@ func runStart(ctx *Context, args []string) error {
 		return handleChildDAGRun(ctx, dag, dagRunID, params, root, parent)
 	}
 
-	var queueDisabled bool
-	if os.Getenv("DISABLE_DAG_RUN_QUEUE") != "" {
-		queueDisabled = true
-	}
+	// Check if queue is disabled via config or flag
+	queueDisabled := !ctx.Config.Queues.Enabled
 
-	// check no-queue flag
+	// check no-queue flag (overrides config)
 	if ctx.Command.Flags().Changed("no-queue") {
 		queueDisabled = true
 	}
+
+	disableMaxActiveRuns := ctx.Command.Flags().Changed("disable-max-active-runs")
 
 	// Check if the DAG run-id is unique
 	attempt, _ := ctx.DAGRunStore.FindAttempt(ctx, root)
@@ -109,7 +109,7 @@ func runStart(ctx *Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to access proc store: %w", err)
 	}
-	if dag.MaxActiveRuns == 1 && liveCount > 0 {
+	if !disableMaxActiveRuns && dag.MaxActiveRuns == 1 && liveCount > 0 {
 		return fmt.Errorf("DAG %s is already running, cannot start", dag.Name)
 	}
 
@@ -120,8 +120,22 @@ func runStart(ctx *Context, args []string) error {
 		"dagRunId", dagRunID,
 	)
 
-	err = tryExecuteDAG(ctx, dag, dagRunID, root)
-	if errors.Is(err, errMaxRunReached) && !queueDisabled {
+	// Check if this DAG should be distributed to workers
+	// If the DAG has a workerSelector and the queue is not disabled,
+	// enqueue it so the scheduler can dispatch it to a worker.
+	// The --no-queue flag acts as a circuit breaker to prevent infinite loops
+	// when the worker executes the dispatched task.
+	if !queueDisabled && len(dag.WorkerSelector) > 0 {
+		logger.Info(ctx, "DAG has workerSelector, enqueueing for distributed execution",
+			"dag", dag.Name,
+			"dagRunId", dagRunID,
+			"workerSelector", dag.WorkerSelector)
+		dag.Location = "" // Queued dag-runs must not have a location
+		return enqueueDAGRun(ctx, dag, dagRunID)
+	}
+
+	err = tryExecuteDAG(ctx, dag, dagRunID, root, disableMaxActiveRuns)
+	if errors.Is(err, errMaxRunReached) && !queueDisabled && !disableMaxActiveRuns {
 		dag.Location = "" // Queued dag-runs must not have a location
 
 		// If the DAG has a queue configured and maxActiveRuns > 1, ensure the number
@@ -147,24 +161,26 @@ var (
 )
 
 // tryExecuteDAG tries to run the DAG within the max concurrent run config
-func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef) error {
+func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef, disableMaxActiveRuns bool) error {
 	if err := ctx.ProcStore.TryLock(ctx, dag.ProcGroup()); err != nil {
 		logger.Debug(ctx, "failed to lock process group", "err", err)
 		return errMaxRunReached
 	}
 	defer ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
-	runningCount, err := ctx.ProcStore.CountAlive(ctx, dag.ProcGroup())
-	if err != nil {
-		logger.Debug(ctx, "failed to count live processes", "err", err)
-		return fmt.Errorf("failed to count live process for %s: %w", dag.ProcGroup(), errMaxRunReached)
-	}
+	if !disableMaxActiveRuns {
+		runningCount, err := ctx.ProcStore.CountAlive(ctx, dag.ProcGroup())
+		if err != nil {
+			logger.Debug(ctx, "failed to count live processes", "err", err)
+			return fmt.Errorf("failed to count live process for %s: %w", dag.ProcGroup(), errMaxRunReached)
+		}
 
-	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
-	// of active runs in the queue does not exceed this limit.
-	if dag.MaxActiveRuns > 0 && runningCount >= dag.MaxActiveRuns {
-		// It's not possible to run right now.
-		return fmt.Errorf("max active run is reached (%d >= %d): %w", runningCount, dag.MaxActiveRuns, errMaxRunReached)
+		// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
+		// of active runs in the queue does not exceed this limit.
+		if dag.MaxActiveRuns > 0 && runningCount >= dag.MaxActiveRuns {
+			// It's not possible to run right now.
+			return fmt.Errorf("max active run is reached (%d >= %d): %w", runningCount, dag.MaxActiveRuns, errMaxRunReached)
+		}
 	}
 
 	// Acquire process handle

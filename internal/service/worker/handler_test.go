@@ -45,9 +45,11 @@ func TestTaskHandler(t *testing.T) {
 
 		// Create a retry task
 		task := &coordinatorv1.Task{
-			Operation: coordinatorv1.Operation_OPERATION_RETRY,
-			DagRunId:  dagRunID,
-			Target:    dag.Name,
+			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
+			DagRunId:       dagRunID,
+			Target:         dag.Name,
+			RootDagRunName: dag.Name,
+			RootDagRunId:   dagRunID,
 		}
 
 		// Create a context with timeout for the task execution
@@ -88,10 +90,12 @@ func TestTaskHandler(t *testing.T) {
 
 		// Create a retry task with specific step
 		task := &coordinatorv1.Task{
-			Operation: coordinatorv1.Operation_OPERATION_RETRY,
-			DagRunId:  dagRunID,
-			Target:    dag.Name,
-			Step:      "1",
+			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
+			DagRunId:       dagRunID,
+			Target:         dag.Name,
+			RootDagRunName: dag.Name,
+			RootDagRunId:   dagRunID,
+			Step:           "1",
 		}
 
 		// Create a context with timeout for the task execution
@@ -224,6 +228,7 @@ func TestTaskHandlerStartWithDefinition(t *testing.T) {
 	require.Contains(t, argsLines, "start")
 	require.Contains(t, argsLines, "--run-id=run-123")
 	require.Contains(t, argsLines, "--no-queue")
+	require.Contains(t, argsLines, "--disable-max-active-runs")
 	require.Contains(t, argsLines, task.Target)
 	require.Contains(t, argsLines, "--")
 	require.Contains(t, argsLines, "foo=bar")

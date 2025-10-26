@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dagu-data
+  namespace: dagu-dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # For local k8s (Docker Desktop, minikube, kind), the default storageClass works
+  # storageClassName: standard

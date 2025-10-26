@@ -102,6 +102,10 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 	policy := backoff.WithJitter(basePolicy, backoff.FullJitter)
 
 	return backoff.Retry(ctx, func(ctx context.Context) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		// Get all available coordinators from registry
 		members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
 		if err != nil {
@@ -122,6 +126,13 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 
 			// Try to dispatch
 			if _, err := client.client.Dispatch(dispatchCtx, req); err != nil {
+				logger.Warn(ctx, "Failed to dispatch task to coordinator",
+					"dag_run_id", task.DagRunId,
+					"target", task.Target,
+					"worker_selector", task.WorkerSelector,
+					"coordinator_id", member.ID,
+				)
+
 				return fmt.Errorf("failed to dispatch task to coordinator %s: %w", member.ID, err)
 			}
 
@@ -444,16 +455,12 @@ func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.Heartbe
 	}
 
 	// Use attemptCall to send heartbeat to any available coordinator
-	return cli.attemptCall(ctx, members, func(ctx context.Context, member execution.HostInfo, client *client) error {
+	return cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
 		// Send heartbeat
 		_, err := client.client.Heartbeat(ctx, req)
 		if err != nil {
 			return fmt.Errorf("heartbeat failed: %w", err)
 		}
-
-		logger.Debug(ctx, "Heartbeat sent successfully",
-			"coordinator_id", member.ID,
-			"worker_id", req.WorkerId)
 		return nil
 	})
 }

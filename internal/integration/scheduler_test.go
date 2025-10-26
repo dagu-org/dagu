@@ -82,12 +82,12 @@ steps:
 		require.NoError(t, att.Close(th.Context))
 
 		// Enqueue to queue
-		err = th.QueueStore.Enqueue(th.Context, dag.Name, execution.QueuePriorityLow, execution.NewDAGRunRef(dag.Name, dagRunID))
+		err = th.QueueStore.Enqueue(th.Context, dag.ProcGroup(), execution.QueuePriorityLow, execution.NewDAGRunRef(dag.Name, dagRunID))
 		require.NoError(t, err)
 	}
 
 	// Verify queue has correct number of items
-	queuedItems, err := th.QueueStore.List(th.Context, dag.Name)
+	queuedItems, err := th.QueueStore.List(th.Context, dag.ProcGroup())
 	require.NoError(t, err)
 	require.Len(t, queuedItems, numItems)
 	t.Logf("Enqueued %d items", numItems)
@@ -113,39 +113,21 @@ steps:
 		})
 	}()
 
-	time.Sleep(500 * time.Millisecond)
-
-	// Poll until queue is empty
+	// Wait until queue is empty
 	startTime := time.Now()
-	ticker := time.NewTicker(200 * time.Millisecond)
-	defer ticker.Stop()
 
-	processed := false
-	timeout := time.After(25 * time.Second)
-
-	for {
-		select {
-		case <-ticker.C:
-			remaining, err := th.QueueStore.List(th.Context, dag.Name)
-			if err != nil {
-				t.Logf("Error checking queue: %v", err)
-				continue
-			}
-
-			t.Logf("Queue: %d/%d items remaining", len(remaining), numItems)
-
-			if len(remaining) == 0 {
-				processed = true
-				goto DONE
-			}
-
-		case <-timeout:
-			remaining, _ := th.QueueStore.List(th.Context, dag.Name)
-			t.Fatalf("Timeout: %d items still in queue", len(remaining))
+	require.Eventually(t, func() bool {
+		remaining, err := th.QueueStore.List(th.Context, dag.Name)
+		if err != nil {
+			t.Logf("Error checking queue: %v", err)
+			return false
 		}
-	}
 
-DONE:
+		t.Logf("Queue: %d/%d items remaining", len(remaining), numItems)
+
+		return len(remaining) == 0
+	}, 25*time.Second, 200*time.Millisecond, "Queue items should be processed")
+
 	th.Cancel()
 
 	select {
@@ -164,6 +146,4 @@ DONE:
 
 	// Verify processing time is reasonable
 	require.Less(t, duration, 20*time.Second, "took too long: %v", duration)
-
-	require.True(t, processed, "items should be processed")
 }

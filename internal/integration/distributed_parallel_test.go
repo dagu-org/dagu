@@ -2,16 +2,13 @@ package integration_test
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"path/filepath"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -43,33 +40,8 @@ steps:
 		// Setup and start coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Get dispatcher client from coordinator
-		coordinatorClient := coord.GetCoordinatorClient(t)
-
-		ctx, cancel := context.WithCancel(coord.Context)
-		t.Cleanup(cancel)
-
 		// Create and start multiple workers to handle parallel execution
-		workers := make([]*worker.Worker, 2)
-		for i := 0; i < 2; i++ {
-			workerInst := worker.NewWorker(
-				fmt.Sprintf("test-worker-%d", i+1),
-				10, // maxActiveRuns
-				coordinatorClient,
-				map[string]string{"type": "test-worker"},
-				coord.Config,
-			)
-			workers[i] = workerInst
-
-			go func(w *worker.Worker) {
-				if err := w.Start(ctx); err != nil {
-					t.Logf("Worker stopped: %v", err)
-				}
-			}(workerInst)
-		}
-
-		// Give workers time to connect
-		time.Sleep(50 * time.Millisecond)
+		setupWorkers(t, coord, 2, map[string]string{"type": "test-worker"})
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -146,31 +118,8 @@ steps:
 		// Setup and start coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Get dispatcher client from coordinator
-		coordinatorClient := coord.GetCoordinatorClient(t)
-
-		ctx, cancel := context.WithCancel(coord.Context)
-		t.Cleanup(cancel)
-
 		// Create multiple workers of the same type
-		for i := 0; i < 3; i++ {
-			workerInst := worker.NewWorker(
-				fmt.Sprintf("test-worker-%d", i+1),
-				10,
-				coordinatorClient,
-				map[string]string{"type": "test-worker"},
-				coord.Config,
-			)
-
-			go func(w *worker.Worker) {
-				if err := w.Start(ctx); err != nil {
-					t.Logf("Worker stopped: %v", err)
-				}
-			}(workerInst)
-		}
-
-		// Give workers time to connect
-		time.Sleep(50 * time.Millisecond)
+		setupWorkers(t, coord, 3, map[string]string{"type": "test-worker"})
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -227,25 +176,8 @@ steps:
       echo "Processed $1"
 `
 		coord := test.SetupCoordinator(t)
-		coordinatorClient := coord.GetCoordinatorClient(t)
-		ctx, cancel := context.WithCancel(coord.Context)
-		t.Cleanup(cancel)
 
-		workerInst := worker.NewWorker(
-			"test-worker-failure",
-			10,
-			coordinatorClient,
-			map[string]string{"type": "test-worker"},
-			coord.Config,
-		)
-
-		go func() {
-			if err := workerInst.Start(ctx); err != nil {
-				t.Logf("Worker stopped: %v", err)
-			}
-		}()
-
-		time.Sleep(50 * time.Millisecond)
+		setupWorker(t, coord, "test-worker-failure", 10, map[string]string{"type": "test-worker"})
 
 		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
@@ -328,48 +260,11 @@ steps:
 		tmpDir := t.TempDir()
 		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
 
-		// Create DAG run manager for workers
-		logDir := filepath.Join(tmpDir, "logs")
-		dataDir := filepath.Join(tmpDir, "data")
-		procDir := filepath.Join(tmpDir, "proc")
-
-		err := os.MkdirAll(logDir, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(dataDir, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(procDir, 0755)
-		require.NoError(t, err)
-
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Create and start multiple workers to handle parallel execution
-		workers := make([]*worker.Worker, 2)
-		for i := 0; i < 2; i++ {
-			workerInst := worker.NewWorker(
-				fmt.Sprintf("test-worker-%d", i+1),
-				10, // maxActiveRuns
-				coordinatorClient,
-				map[string]string{"type": "test-worker"},
-				coord.Config,
-			)
-			workers[i] = workerInst
-
-			ctx, cancel := context.WithCancel(coord.Context)
-			t.Cleanup(cancel)
-
-			go func(w *worker.Worker) {
-				if err := w.Start(ctx); err != nil {
-					t.Logf("Worker stopped: %v", err)
-				}
-			}(workerInst)
-
-			t.Cleanup(func() {
-				if err := workerInst.Stop(coord.Context); err != nil {
-					t.Logf("Error stopping worker: %v", err)
-				}
-			})
-		}
+		setupWorkers(t, coord, 2, map[string]string{"type": "test-worker"})
 
 		// Load the DAG using helper
 		dag := coord.DAG(t, yamlContent)
@@ -461,13 +356,15 @@ steps:
   - name: local-execution
     call: child-local
     parallel:
-      items: ["1", "1"]
+      items: ["3", "5"]
     output: LOCAL_RESULTS
+    depends: []
   - name: distributed-execution
     call: child-distributed
     parallel:
-      items: ["1", "1"]
+      items: ["4", "6"]
     output: DISTRIBUTED_RESULTS
+    depends: []
 
 ---
 name: child-local
@@ -487,82 +384,54 @@ steps:
 		tmpDir := t.TempDir()
 		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
 
-		// Create DAG run manager for worker
-		logDir := filepath.Join(tmpDir, "logs")
-		dataDir := filepath.Join(tmpDir, "data")
-		procDir := filepath.Join(tmpDir, "proc")
-
-		err := os.MkdirAll(logDir, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(dataDir, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(procDir, 0755)
-		require.NoError(t, err)
-
 		// Create worker for distributed execution
-		// Get dispatcher client from coordinator
-		coordinatorClient := coord.GetCoordinatorClient(t)
+		setupWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
 
-		ctx, cancel := context.WithCancel(coord.Context)
-		t.Cleanup(cancel)
-
-		workerInst := worker.NewWorker(
-			"test-worker-1",
-			10,
-			coordinatorClient,
-			map[string]string{"type": "test-worker"},
-			coord.Config,
-		)
-
-		go func() {
-			if err := workerInst.Start(ctx); err != nil {
-				t.Logf("Worker stopped: %v", err)
-			}
-		}()
-
-		// Give worker time to connect
-		time.Sleep(100 * time.Millisecond)
-
-		// Load the DAG using helper
+		// Load the DAG and create agent
 		dagWrapper := coord.DAG(t, yamlContent)
-
-		// Create agent with cancellable context
-		execCtx, execCancel := context.WithCancel(coord.Context)
 		agent := dagWrapper.Agent()
+		done := make(chan struct{})
 
 		// Start the DAG in a goroutine
-		errChan := make(chan error, 1)
 		go func() {
-			agent.Context = execCtx
-			errChan <- agent.Run(agent.Context)
+			agent.Context = coord.Context
+			_ = agent.Run(agent.Context)
+			close(done)
 		}()
 
-		// Wait to ensure both local and distributed executions have started
-		time.Sleep(100 * time.Millisecond)
+		// Wait for at least one step to be running
+		require.Eventually(t, func() bool {
+			st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
+			if err != nil || !st.Status.IsActive() {
+				return false
+			}
+			if len(st.Nodes) == 0 {
+				return false
+			}
+			// Check if any node is running
+			var started int
+			for _, node := range st.Nodes {
+				if node.Status == core.NodeRunning {
+					started++
+				}
+			}
+			return started == 2 // Both local and distributed steps should be running
+		}, 5*time.Second, 100*time.Millisecond)
 
-		// Cancel the execution
-		execCancel()
+		// Perform cancellation
+		agent.Signal(coord.Context, os.Signal(syscall.SIGTERM))
 
 		// Wait for the agent to finish
-		err = <-errChan
-		require.Error(t, err, "agent should return an error when cancelled")
+		<-done
 
-		// Get the latest st
-		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
-		require.NoError(t, err)
-		require.NotNil(t, st)
+		// Get the latest status
+		st := agent.Status(coord.Context)
 
 		// Both parallel steps should be affected by cancellation
 		for _, node := range st.Nodes {
 			if node.Step.Name == "local-execution" || node.Step.Name == "distributed-execution" {
-				t.Logf("Node %s status: %v", node.Step.Name, node.Status)
-				// Nodes might not have started or might be cancelled/failed
-				require.True(t,
-					node.Status == core.NodeCanceled ||
-						node.Status == core.NodeFailed ||
-						node.Status == core.NodeNotStarted ||
-						node.Status == core.NodeRunning,
-					"node %s should show cancellation effect, got: %v", node.Step.Name, node.Status)
+				require.Equal(t, core.NodeCanceled, node.Status,
+					"node %s should be canceled, got %v", node.Step.Name, node.Status)
 			}
 		}
 	})
@@ -598,61 +467,35 @@ steps:
 		tmpDir := t.TempDir()
 		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
 
-		// Create DAG run manager
-		logDir := filepath.Join(tmpDir, "logs")
-		dataDir := filepath.Join(tmpDir, "data")
-		procDir := filepath.Join(tmpDir, "proc")
-
-		err := os.MkdirAll(logDir, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(dataDir, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(procDir, 0755)
-		require.NoError(t, err)
-
-		// Get dispatcher client from coordinator
-		coordinatorClient := coord.GetCoordinatorClient(t)
-
-		ctx, cancel := context.WithCancel(coord.Context)
-		t.Cleanup(cancel)
-
-		numWorkers := 3
-		workers := make([]*worker.Worker, numWorkers)
-		for i := 0; i < numWorkers; i++ {
-			workerInst := worker.NewWorker(
-				fmt.Sprintf("test-worker-%d", i+1),
-				5, // maxActiveRuns per worker
-				coordinatorClient,
-				map[string]string{"type": "test-worker"},
-				coord.Config,
-			)
-			workers[i] = workerInst
-
-			go func(w *worker.Worker) {
-				if err := w.Start(ctx); err != nil {
-					t.Logf("Worker stopped: %v", err)
-				}
-			}(workerInst)
-		}
-
-		// Give workers time to connect
-		time.Sleep(50 * time.Millisecond)
+		// Create multiple workers using the helper
+		setupWorkers(t, coord, 3, map[string]string{"type": "test-worker"})
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
 
-		// Create agent with cancellable context
+		// Create agent
 		agent := dagWrapper.Agent()
 
 		// Start the DAG in a goroutine
 		done := make(chan struct{})
 		go func() {
+			agent.Context = coord.Context
 			_ = agent.Run(agent.Context)
 			close(done)
 		}()
 
-		// Wait to ensure concurrent execution has started across workers
-		time.Sleep(100 * time.Millisecond)
+		// Wait for the step to be running
+		require.Eventually(t, func() bool {
+			st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
+			if err != nil || !st.Status.IsActive() {
+				return false
+			}
+			if len(st.Nodes) == 0 {
+				return false
+			}
+			concurrentNode := st.Nodes[0]
+			return concurrentNode.Status == core.NodeRunning
+		}, 5*time.Second, 100*time.Millisecond)
 
 		// Cancel the execution
 		agent.Signal(coord.Context, os.Signal(syscall.SIGTERM))

@@ -729,7 +729,6 @@ func TestNodeInit(t *testing.T) {
 }
 
 func TestNodeCancel(t *testing.T) {
-	ctx := context.Background()
 	step := core.Step{
 		Name:    "test-step",
 		Command: "sleep",
@@ -740,7 +739,7 @@ func TestNodeCancel(t *testing.T) {
 	node.SetStatus(core.NodeRunning)
 
 	// Cancel the node
-	node.Cancel(ctx)
+	node.Cancel()
 
 	// Check status changed to cancel
 	assert.Equal(t, core.NodeCanceled, node.NodeData().State.Status)

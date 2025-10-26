@@ -158,7 +158,7 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 		args = append(args, fmt.Sprintf("--parent=%s:%s", task.ParentDagRunName, task.ParentDagRunId))
 	}
 
-	args = append(args, fmt.Sprintf("--run-id=%s", task.DagRunId), "--no-queue")
+	args = append(args, fmt.Sprintf("--run-id=%s", task.DagRunId), "--no-queue", "--disable-max-active-runs")
 
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
@@ -178,7 +178,7 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 
 // TaskRetry creates a retry command spec for coordinator tasks.
 func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
-	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId)}
+	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId), "--no-queue", "--disable-max-active-runs"}
 
 	if task.Step != "" {
 		args = append(args, fmt.Sprintf("--step=%s", task.Step))
@@ -186,7 +186,9 @@ func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
-	args = append(args, task.Target)
+	// Use RootDagRunName instead of Target, because Target may be a temporary file
+	// created by the worker, but retry needs the original DAG name
+	args = append(args, task.RootDagRunName)
 
 	return CmdSpec{
 		Executable: b.executable,

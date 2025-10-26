@@ -74,6 +74,11 @@ func TestLoad_Env(t *testing.T) {
 		// Queue configuration
 		"DAGU_QUEUE_ENABLED": "false",
 
+		// Coordinator configuration
+		"DAGU_COORDINATOR_HOST":      "0.0.0.0",
+		"DAGU_COORDINATOR_ADVERTISE": "dagu-coordinator",
+		"DAGU_COORDINATOR_PORT":      "50099",
+
 		// Worker configuration - env vars still bound but to nested structure
 		"DAGU_WORKER_ID":              "test-worker-123",
 		"DAGU_WORKER_MAX_ACTIVE_RUNS": "200",
@@ -181,6 +186,11 @@ func TestLoad_Env(t *testing.T) {
 			},
 		},
 		Queues: Queues{Enabled: false},
+		Coordinator: Coordinator{
+			Host:      "0.0.0.0",
+			Advertise: "dagu-coordinator",
+			Port:      50099,
+		},
 		Worker: Worker{
 			ID:            "test-worker-123",
 			MaxActiveRuns: 200,

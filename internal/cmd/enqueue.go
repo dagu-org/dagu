@@ -62,11 +62,6 @@ func runEnqueue(ctx *Context, args []string) error {
 		dag.Queue = queueOverride
 	}
 
-	// Queued dag-runs must not have a location because it is used to generate
-	// unix pipe. If two DAGs has same location, they can not run at the same time.
-	// Queued DAGs can be run at the same time depending on the `maxActiveRuns` setting.
-	dag.Location = ""
-
 	// Check queued DAG-runs
 	queuedRuns, err := ctx.QueueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
 	if err != nil {
@@ -87,6 +82,11 @@ func runEnqueue(ctx *Context, args []string) error {
 
 // enqueueDAGRun enqueues a dag-run to the queue.
 func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
+	// Queued dag-runs must not have a location because it is used to generate
+	// unix pipe. If two DAGs has same location, they can not run at the same time.
+	// Queued DAGs can be run at the same time depending on the `maxActiveRuns` setting.
+	dag.Location = ""
+
 	// Check if queues are enabled
 	if !ctx.Config.Queues.Enabled {
 		return fmt.Errorf("queues are disabled in configuration")
@@ -134,7 +134,8 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 	}
 
 	// Enqueue the dag-run to the queue
-	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.Name, execution.QueuePriorityLow, dagRun); err != nil {
+	// Use ProcGroup() to get the correct queue name (respects dag.Queue if set, otherwise dag.Name)
+	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.ProcGroup(), execution.QueuePriorityLow, dagRun); err != nil {
 		return fmt.Errorf("failed to enqueue dag-run: %w", err)
 	}
 

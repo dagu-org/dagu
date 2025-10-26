@@ -37,6 +37,7 @@ supports authentication via signing keys and TLS encryption.
 
 Flags:
   --coordinator.host string         Host address to bind the gRPC server to (default: 127.0.0.1)
+  --coordinator.advertise string    Address to advertise in service registry (default: auto-detected hostname)
   --coordinator.port int            Port number for the gRPC server to listen on (default: 50055)
   --peer.cert-file string           Path to TLS certificate file for peer connections
   --peer.key-file string            Path to TLS key file for peer connections
@@ -47,6 +48,9 @@ Flags:
 Example:
   # Basic usage
   dagu coordinator --coordinator.host=0.0.0.0 --coordinator.port=50055
+
+  # Bind to all interfaces and advertise service name (for containers/K8s)
+  dagu coordinator --coordinator.host=0.0.0.0 --coordinator.advertise=dagu-server
 
   # With TLS
   dagu coordinator --peer.cert-file=server.crt --peer.key-file=server.key
@@ -63,6 +67,7 @@ This process runs continuously in the foreground until terminated.
 var coordinatorFlags = []commandLineFlag{
 	coordinatorHostFlag,
 	coordinatorPortFlag,
+	coordinatorAdvertiseFlag,
 	// Peer configuration flags for TLS
 	peerInsecureFlag,
 	peerCertFileFlag,
@@ -102,8 +107,31 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.
 	}
 	instanceID := fmt.Sprintf("%s@%d", hostname, cfg.Coordinator.Port)
 
+	// Determine advertise address for service registry
+	advertiseAddr := cfg.Coordinator.Advertise
+	if advertiseAddr == "" {
+		// No advertise address specified, try auto-detection
+		if hostname != "unknown" {
+			// Use auto-detected hostname
+			advertiseAddr = hostname
+		} else {
+			// Hostname detection failed, fallback to configured host
+			advertiseAddr = cfg.Coordinator.Host
+			// Warn if fallback address is potentially invalid
+			if advertiseAddr == "0.0.0.0" || advertiseAddr == "127.0.0.1" {
+				logger.Warn(ctx, "Coordinator advertise address fallback is potentially invalid for service discovery",
+					"advertise_address", advertiseAddr,
+					"reason", "hostname detection failed and no explicit advertise address provided; workers may not be able to connect")
+			} else {
+				logger.Warn(ctx, "Coordinator advertise address fallback to configured host due to hostname detection failure",
+					"advertise_address", advertiseAddr)
+			}
+		}
+	}
+
 	logger.Info(ctx, "Coordinator initialization",
-		"host", cfg.Coordinator.Host,
+		"bind_address", cfg.Coordinator.Host,
+		"advertise_address", advertiseAddr,
 		"port", cfg.Coordinator.Port,
 		"instance_id", instanceID)
 	// Create gRPC server options
@@ -140,8 +168,8 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.
 	// Create handler
 	handler := coordinator.NewHandler()
 
-	// Create and return service
-	return coordinator.NewService(grpcServer, handler, listener, healthServer, registry, instanceID, cfg.Coordinator.Host), nil
+	// Create and return service with advertise address for service registry
+	return coordinator.NewService(grpcServer, handler, listener, healthServer, registry, instanceID, advertiseAddr), nil
 }
 
 // loadCoordinatorTLSCredentials loads TLS credentials for the coordinator server.

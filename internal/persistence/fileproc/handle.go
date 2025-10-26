@@ -145,6 +145,9 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 
 		for {
 			select {
+			case <-hbCtx.Done():
+				_ = fd.Sync()
+				return
 			case <-ticker.C:
 				binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix())) // nolint:gosec
 				if _, err := fd.WriteAt(buf, 0); err != nil {

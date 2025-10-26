@@ -754,7 +754,7 @@ func (a *Agent) createCoordinatorClient(ctx context.Context) execution.Dispatche
 
 	// Create and configure factory
 	coordinatorCliCfg := coordinator.DefaultConfig()
-	coordinatorCliCfg.MaxRetries = 10
+	coordinatorCliCfg.MaxRetries = 50
 
 	// Configure the coordinator client based on the global configuration
 	coordinatorCliCfg.CAFile = a.peerConfig.ClientCaFile
