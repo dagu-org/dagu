@@ -114,7 +114,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	env := execution.GetDAGContextFromContext(ctx)
 	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", "err", err)
-		sc.Cancel(ctx, graph)
+		sc.Cancel(graph)
 	}
 
 	var wg = sync.WaitGroup{}
@@ -461,10 +461,10 @@ func (sc *Scheduler) Signal(
 }
 
 // Cancel sends -1 signal to all nodes.
-func (sc *Scheduler) Cancel(ctx context.Context, g *ExecutionGraph) {
+func (sc *Scheduler) Cancel(g *ExecutionGraph) {
 	sc.setCanceled()
 	for _, node := range g.nodes {
-		node.Cancel(ctx)
+		node.Cancel()
 	}
 }
 

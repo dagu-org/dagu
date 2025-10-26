@@ -1351,7 +1351,7 @@ func (gh graphHelper) Signal(sig syscall.Signal) {
 func (gh graphHelper) Cancel(t *testing.T) {
 	t.Helper()
 
-	gh.Scheduler.Cancel(gh.Context, gh.ExecutionGraph)
+	gh.Scheduler.Cancel(gh.ExecutionGraph)
 }
 
 type scheduleResult struct {
@@ -1845,7 +1845,7 @@ func TestScheduler_CancelDuringHandlerExecution(t *testing.T) {
 	go func() {
 		// Wait for main step to complete and handler to start
 		time.Sleep(200 * time.Millisecond)
-		sc.Scheduler.Cancel(sc.Context, graph.ExecutionGraph)
+		sc.Scheduler.Cancel(graph.ExecutionGraph)
 	}()
 
 	// Since we cancel during handler execution, the final status depends on timing
@@ -1869,7 +1869,7 @@ func TestScheduler_RepeatPolicyWithCancel(t *testing.T) {
 
 	go func() {
 		time.Sleep(350 * time.Millisecond)
-		sc.Scheduler.Cancel(sc.Context, graph.ExecutionGraph)
+		sc.Scheduler.Cancel(graph.ExecutionGraph)
 	}()
 
 	result := graph.Schedule(t, core.Canceled)

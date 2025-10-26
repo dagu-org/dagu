@@ -441,7 +441,7 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	}
 }
 
-func (n *Node) Cancel(ctx context.Context) {
+func (n *Node) Cancel() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	s := n.Status()

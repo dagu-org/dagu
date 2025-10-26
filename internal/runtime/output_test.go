@@ -107,7 +107,7 @@ func TestNode_LargeOutput(t *testing.T) {
 					t.Errorf("Command hung unexpectedly for output size %d bytes", tt.outputSize)
 				}
 				// Cancel the context to clean up
-				node.Cancel(ctx)
+				node.Cancel()
 			}
 
 			// Cleanup
