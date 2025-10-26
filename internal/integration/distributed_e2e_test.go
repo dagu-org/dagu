@@ -50,7 +50,6 @@ steps:
 		// Load the DAG
 		dagWrapper := coord.DAG(t, yamlContent)
 
-
 		// Build the start command spec
 		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
 		startSpec := subCmdBuilder.Start(dagWrapper.DAG, runtime.StartOptions{
@@ -206,7 +205,6 @@ steps:
 
 		// Load the DAG
 		dagWrapper := coord.DAG(t, yamlContent)
-
 
 		// Build the start command spec
 		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)

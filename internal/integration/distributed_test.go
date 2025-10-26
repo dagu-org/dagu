@@ -129,7 +129,6 @@ steps:
 	coord := test.SetupCoordinator(t)
 	coord.Config.Queues.Enabled = true
 
-
 	// Load the DAG
 	dagWrapper := coord.DAG(t, yamlContent)
 
