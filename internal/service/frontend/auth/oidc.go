@@ -161,7 +161,7 @@ func checkOIDCToken(next http.Handler, verifier *oidc.IDTokenVerifier, w http.Re
 			"path", r.URL.Path,
 			"method", r.Method,
 			"error", err)
-		http.Error(w, fmt.Sprintf("Authentication failed: invalid or expired OIDC token: %v", err), http.StatusUnauthorized)
+		http.Error(w, "Authentication failed: invalid or expired OIDC token", http.StatusUnauthorized)
 		return
 	}
 
