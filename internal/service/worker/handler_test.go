@@ -228,6 +228,7 @@ func TestTaskHandlerStartWithDefinition(t *testing.T) {
 	require.Contains(t, argsLines, "start")
 	require.Contains(t, argsLines, "--run-id=run-123")
 	require.Contains(t, argsLines, "--no-queue")
+	require.Contains(t, argsLines, "--disable-max-active-runs")
 	require.Contains(t, argsLines, task.Target)
 	require.Contains(t, argsLines, "--")
 	require.Contains(t, argsLines, "foo=bar")

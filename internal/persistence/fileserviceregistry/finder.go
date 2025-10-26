@@ -7,178 +7,152 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/backoff"
-	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
-// finder provides file-based service registry
-type finder struct {
-	baseDir      string
-	serviceName  execution.ServiceName
-	staleTimeout time.Duration
-	mu           sync.Mutex
-	cleanupCh    chan string
+const (
+	defaultStaleTimeout  = 30 * time.Second
+	defaultCacheDuration = 3 * time.Second
+)
 
-	// Cache fields
+// finder discovers active service instances from the file system
+type finder struct {
+	baseDir     string
+	serviceName execution.ServiceName
+	quarantine  *quarantine
+	cleaner     *cleaner
+
+	// Cache to avoid excessive file system access
+	mu            sync.Mutex
 	cachedMembers []execution.HostInfo
 	cacheTime     time.Time
 	cacheDuration time.Duration
 }
 
-// newFinder creates a new finder for a specific service
-func newFinder(baseDir string, serviceName execution.ServiceName) *finder {
+// newFinder creates a finder for discovering service instances
+func newFinder(baseDir string, serviceName execution.ServiceName, enableCleanup bool) *finder {
 	f := &finder{
 		baseDir:       baseDir,
 		serviceName:   serviceName,
-		staleTimeout:  30 * time.Second, // Consider instances stale after 30 seconds
-		cacheDuration: 3 * time.Second,  // Cache members briefly to avoid thrashing
-		cleanupCh:     make(chan string, 32),
+		quarantine:    newQuarantine(defaultStaleTimeout),
+		cacheDuration: defaultCacheDuration,
 	}
-	go f.cleanupLoop()
+
+	if enableCleanup {
+		f.cleaner = newCleaner(baseDir, serviceName)
+	}
+
 	return f
+}
+
+// close stops background cleanup if running
+func (f *finder) close() {
+	if f.cleaner != nil {
+		f.cleaner.stop()
+	}
 }
 
 // members returns all active instances of the service
 func (f *finder) members(ctx context.Context) ([]execution.HostInfo, error) {
-	f.mu.Lock()
-
-	// Check if we have a valid cache
-	if len(f.cachedMembers) > 0 && time.Since(f.cacheTime) < f.cacheDuration {
-		members := make([]execution.HostInfo, len(f.cachedMembers))
-		copy(members, f.cachedMembers)
-		f.mu.Unlock()
-		return members, nil
-	}
-	f.mu.Unlock()
-
-	serviceDir := filepath.Join(f.baseDir, string(f.serviceName))
-
-	// If directory doesn't exist, return empty list (no instances)
-	if _, err := os.Stat(serviceDir); os.IsNotExist(err) {
-		return []execution.HostInfo{}, nil
+	// Try to use cached results first
+	if cached := f.getCachedMembers(); cached != nil {
+		return cached, nil
 	}
 
-	var quarantineTargets []string
-
-	f.mu.Lock()
-	defer func() {
-		f.mu.Unlock()
-		f.enqueueCleanup(ctx, quarantineTargets)
-	}()
-
-	entries, err := os.ReadDir(serviceDir)
+	// Cache miss - scan file system
+	members, err := f.scanServiceDirectory(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	members := []execution.HostInfo{}
+	// Update cache (only caches non-empty results to keep polling for new services)
+	f.updateCache(members)
 
-	// First pass: collect members and identify stale files
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
+	return members, nil
+}
 
-		ext := filepath.Ext(entry.Name())
-		if ext == ".gc" {
-			quarantineTargets = append(quarantineTargets, filepath.Join(serviceDir, entry.Name()))
-			continue
-		}
-		if ext != ".json" {
-			continue
-		}
+// getCachedMembers returns cached members if the cache is still valid
+func (f *finder) getCachedMembers() []execution.HostInfo {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
-		select {
-		case <-ctx.Done():
-			return members, ctx.Err()
-		default:
-		}
-
-		instancePath := filepath.Join(serviceDir, entry.Name())
-
-		// Get file info to check modification time
-		fileInfo, err := os.Stat(instancePath)
-		if err != nil {
-			continue
-		}
-
-		// Check if instance is stale
-		modTime := fileInfo.ModTime()
-		elapsedTime := time.Since(modTime)
-		if elapsedTime > f.staleTimeout {
-			if quarantinedPath, ok := f.quarantineStaleFile(ctx, instancePath); ok {
-				quarantineTargets = append(quarantineTargets, quarantinedPath)
-			}
-			continue
-		}
-
-		info, err := readInstanceFile(instancePath)
-		if err != nil {
-			// Skip invalid files
-			continue
-		}
-
-		members = append(members, execution.HostInfo{
-			ID:        info.ID,
-			Host:      info.Host,
-			Port:      info.Port,
-			Status:    info.Status,
-			StartedAt: info.StartedAt,
-		})
+	if len(f.cachedMembers) == 0 || time.Since(f.cacheTime) >= f.cacheDuration {
+		return nil
 	}
 
-	// Update cache if members is not empty
-	if len(members) > 0 {
-		f.cachedMembers = make([]execution.HostInfo, len(members))
-		copy(f.cachedMembers, members)
-		f.cacheTime = time.Now()
+	members := make([]execution.HostInfo, len(f.cachedMembers))
+	copy(members, f.cachedMembers)
+	return members
+}
+
+// scanServiceDirectory scans the service directory for active instances
+func (f *finder) scanServiceDirectory(ctx context.Context) ([]execution.HostInfo, error) {
+	instanceFiles, err := f.listInstanceFiles()
+	if err != nil {
+		return nil, err
+	}
+
+	members := make([]execution.HostInfo, 0, len(instanceFiles))
+
+	for _, path := range instanceFiles {
+		if ctx.Err() != nil {
+			return members, ctx.Err()
+		}
+
+		if info := f.processInstanceFile(ctx, path); info != nil {
+			members = append(members, *info)
+		}
 	}
 
 	return members, nil
 }
 
-// quarantineStaleFile renames a stale instance file to a quarantined suffix for later cleanup.
-func (f *finder) quarantineStaleFile(ctx context.Context, path string) (string, bool) {
-	quarantinePath := path + ".gc"
-	if err := os.Rename(path, quarantinePath); err != nil {
-		// If the file vanished meanwhile it's already gone
-		if !os.IsNotExist(err) {
-			logger.Warn(ctx, "Failed to quarantine stale instance file", "file", path, "err", err)
-		}
-		return "", false
-	}
-	return quarantinePath, true
+// listInstanceFiles returns paths to all non-quarantined instance files
+func (f *finder) listInstanceFiles() ([]string, error) {
+	serviceDir := filepath.Join(f.baseDir, string(f.serviceName))
+	pattern := filepath.Join(serviceDir, "*.json")
+	return filepath.Glob(pattern)
 }
 
-// enqueueCleanup schedules quarantined files for background deletion.
-func (f *finder) enqueueCleanup(ctx context.Context, files []string) {
-	if len(files) == 0 || f.cleanupCh == nil {
+// processInstanceFile checks if an instance file is valid and returns its info
+func (f *finder) processInstanceFile(ctx context.Context, path string) *execution.HostInfo {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return nil
+	}
+
+	// Check if file is stale
+	if time.Since(fileInfo.ModTime()) > defaultStaleTimeout {
+		f.quarantine.markStaleFile(ctx, path, fileInfo.ModTime())
+		return nil
+	}
+
+	// Parse instance file
+	instance, err := readInstanceFile(path)
+	if err != nil {
+		return nil
+	}
+
+	return &execution.HostInfo{
+		ID:        instance.ID,
+		Host:      instance.Host,
+		Port:      instance.Port,
+		Status:    instance.Status,
+		StartedAt: instance.StartedAt,
+	}
+}
+
+// updateCache stores members in the cache (only caches non-empty results)
+func (f *finder) updateCache(members []execution.HostInfo) {
+	if len(members) == 0 {
+		// Don't cache empty results - keep scanning for new services
 		return
 	}
 
-	for _, file := range files {
-		select {
-		case f.cleanupCh <- file:
-		default:
-			logger.Warn(ctx, "Cleanup queue is full; will retry later", "file", file)
-		}
-	}
-}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
-// cleanupLoop removes quarantined files with retry backoff.
-func (f *finder) cleanupLoop() {
-	ctx := context.Background()
-	policy := backoff.NewExponentialBackoffPolicy(200 * time.Millisecond)
-	policy.MaxInterval = 2 * time.Second
-	policy.MaxRetries = 5
-
-	for file := range f.cleanupCh {
-		err := backoff.Retry(ctx, func(ctx context.Context) error {
-			return removeInstanceFile(file)
-		}, policy, nil)
-		if err != nil {
-			logger.Warn(ctx, "Failed to cleanup quarantined instance file", "file", file, "err", err)
-		}
-	}
+	f.cachedMembers = make([]execution.HostInfo, len(members))
+	copy(f.cachedMembers, members)
+	f.cacheTime = time.Now()
 }
