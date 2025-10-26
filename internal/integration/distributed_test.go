@@ -57,8 +57,11 @@ steps:
 		err := runtime.Start(coord.Context, startSpec)
 		require.NoError(t, err, "Start command should succeed")
 
-		// Wait a moment for the subprocess to complete
-		time.Sleep(500 * time.Millisecond)
+		// Wait for the DAG to be enqueued
+		require.Eventually(t, func() bool {
+			queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
+			return err == nil && len(queueItems) == 1
+		}, 2*time.Second, 50*time.Millisecond, "DAG should be enqueued")
 
 		// Verify the DAG was enqueued (not executed locally)
 		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
@@ -146,7 +149,11 @@ steps:
 	err := runtime.Start(coord.Context, startSpec)
 	require.NoError(t, err, "Start command should succeed")
 
-	time.Sleep(500 * time.Millisecond)
+	// Wait for the DAG to be enqueued
+	require.Eventually(t, func() bool {
+		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
+		return err == nil && len(queueItems) == 1
+	}, 2*time.Second, 50*time.Millisecond, "DAG should be enqueued")
 
 	// Verify the DAG was enqueued
 	queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
@@ -164,14 +171,16 @@ steps:
 	_, err = coord.QueueStore.DequeueByDAGRunID(coord.Context, dagWrapper.ProcGroup(), dagRunID)
 	require.NoError(t, err)
 
-	time.Sleep(100 * time.Millisecond)
-
 	// Now retry the DAG - it should be enqueued again
 	retrySpec := subCmdBuilder.Retry(dagWrapper.DAG, dagRunID, "", false)
 	err = runtime.Run(coord.Context, retrySpec)
 	require.NoError(t, err, "Retry command should succeed")
 
-	time.Sleep(500 * time.Millisecond)
+	// Wait for the retry to be enqueued
+	require.Eventually(t, func() bool {
+		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
+		return err == nil && len(queueItems) == 1
+	}, 2*time.Second, 50*time.Millisecond, "Retry should be enqueued")
 
 	// Verify the retry was enqueued
 	queueItems, err = coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)

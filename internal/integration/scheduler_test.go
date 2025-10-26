@@ -113,8 +113,6 @@ steps:
 		})
 	}()
 
-	time.Sleep(500 * time.Millisecond)
-
 	// Wait until queue is empty
 	startTime := time.Now()
 

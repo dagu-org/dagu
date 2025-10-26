@@ -65,7 +65,10 @@ steps:
 		require.NoError(t, err, "Start command should succeed")
 
 		// Wait for the subprocess to complete enqueueing
-		time.Sleep(500 * time.Millisecond)
+		require.Eventually(t, func() bool {
+			queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
+			return err == nil && len(queueItems) == 1
+		}, 2*time.Second, 50*time.Millisecond, "DAG should be enqueued")
 
 		// Verify the DAG was enqueued (not executed locally)
 		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
@@ -94,9 +97,6 @@ steps:
 		go func() {
 			schedulerDone <- schedulerInst.Start(schedulerCtx)
 		}()
-
-		// Give scheduler time to start
-		time.Sleep(200 * time.Millisecond)
 
 		// Wait for execution completion
 		require.Eventually(t, func() bool {
@@ -167,16 +167,13 @@ steps:
 		err := runtime.Start(ctx, startSpec)
 		require.NoError(t, err)
 
-		// Wait for execution
-		time.Sleep(1 * time.Second)
+		// Wait for execution to complete
+		dagWrapper.AssertLatestStatus(t, core.Succeeded)
 
 		// Should NOT be enqueued (executed directly)
 		queueItems, err := coord.QueueStore.ListByDAGName(ctx, dagWrapper.ProcGroup(), dagWrapper.Name)
 		require.NoError(t, err)
 		require.Len(t, queueItems, 0, "DAG should NOT be enqueued when --no-queue is set")
-
-		// Verify it succeeded (executed locally)
-		dagWrapper.AssertLatestStatus(t, core.Succeeded)
 	})
 
 	t.Run("E2E_DistributedExecution_Cancellation_SubDAG", func(t *testing.T) {
@@ -226,9 +223,6 @@ steps:
 		err := runtime.Start(coord.Context, startSpec)
 		require.NoError(t, err, "Start command should succeed")
 
-		// Wait for the subprocess to complete enqueueing
-		time.Sleep(500 * time.Millisecond)
-
 		// Start the scheduler
 		schedulerCtx, schedulerCancel := context.WithTimeout(coord.Context, 30*time.Second)
 		defer schedulerCancel()
@@ -239,9 +233,6 @@ steps:
 		go func() {
 			schedulerDone <- schedulerInst.Start(schedulerCtx)
 		}()
-
-		// Give scheduler time to start and dispatch the task
-		time.Sleep(200 * time.Millisecond)
 
 		// Wait for the DAG to be running
 		var dagRunID string
@@ -273,8 +264,6 @@ steps:
 			t.Logf("DAG status after stop: %s", status.Status)
 			return status.Status == core.Canceled || status.Status == core.Failed
 		}, 15*time.Second, 500*time.Millisecond, "Timeout waiting for DAG to be cancelled")
-
-		time.Sleep(5 * time.Second)
 
 		schedulerCancel()
 

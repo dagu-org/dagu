@@ -3,7 +3,6 @@ package integration_test
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -34,9 +33,6 @@ func setupWorker(t *testing.T, coord *test.Coordinator, workerID string, maxActi
 			t.Logf("Error stopping worker: %v", err)
 		}
 	})
-
-	// Give worker time to connect
-	time.Sleep(100 * time.Millisecond)
 
 	return workerInst
 }
@@ -70,9 +66,6 @@ func setupWorkers(t *testing.T, coord *test.Coordinator, count int, labels map[s
 			}
 		})
 	}
-
-	// Give workers time to connect
-	time.Sleep(50 * time.Millisecond)
 
 	return workers
 }

@@ -37,9 +37,6 @@ func TestWorkerLabelMatching(t *testing.T) {
 			close(pollDone)
 		}()
 
-		// Give poller time to register
-		time.Sleep(100 * time.Millisecond)
-
 		// Dispatch task with matching selector
 		task := &coordinatorv1.Task{
 			Operation: coordinatorv1.Operation_OPERATION_START,
@@ -50,9 +47,13 @@ func TestWorkerLabelMatching(t *testing.T) {
 			},
 		}
 
+		// Wait for worker to register and dispatch successfully
 		dispatchReq := &coordinatorv1.DispatchRequest{Task: task}
-		_, err := handler.Dispatch(ctx, dispatchReq)
-		require.NoError(t, err)
+		var err error
+		require.Eventually(t, func() bool {
+			_, err = handler.Dispatch(ctx, dispatchReq)
+			return err == nil
+		}, 2*time.Second, 10*time.Millisecond, "Dispatch should succeed once worker is registered")
 
 		// Verify worker received the task
 		select {
@@ -86,10 +87,7 @@ func TestWorkerLabelMatching(t *testing.T) {
 			pollDone <- resp.Task != nil
 		}()
 
-		// Give poller time to register
-		time.Sleep(100 * time.Millisecond)
-
-		// Dispatch task requiring GPU
+		// Dispatch task requiring GPU (should fail - no matching worker)
 		task := &coordinatorv1.Task{
 			Operation: coordinatorv1.Operation_OPERATION_START,
 			DagRunId:  "test-run-2",
@@ -99,8 +97,18 @@ func TestWorkerLabelMatching(t *testing.T) {
 			},
 		}
 
+		// Wait for worker to register, then dispatch should fail with proper error
 		dispatchReq := &coordinatorv1.DispatchRequest{Task: task}
-		_, err := handler.Dispatch(ctx, dispatchReq)
+		var err error
+		require.Eventually(t, func() bool {
+			_, err = handler.Dispatch(ctx, dispatchReq)
+			// We expect an error, but it should be "no workers match" not "no available workers"
+			// The latter means no workers are registered yet
+			if err != nil {
+				return err.Error() != "rpc error: code = FailedPrecondition desc = no available workers"
+			}
+			return false
+		}, 2*time.Second, 10*time.Millisecond, "Worker should register before dispatch")
 		assert.Error(t, err) // Should fail as no matching worker
 
 		// Verify worker did not receive the task
@@ -137,9 +145,6 @@ func TestWorkerLabelMatching(t *testing.T) {
 			close(pollDone)
 		}()
 
-		// Give poller time to register
-		time.Sleep(100 * time.Millisecond)
-
 		// Dispatch task without selector (can run anywhere)
 		task := &coordinatorv1.Task{
 			Operation:      coordinatorv1.Operation_OPERATION_START,
@@ -148,9 +153,13 @@ func TestWorkerLabelMatching(t *testing.T) {
 			WorkerSelector: nil, // No selector - matches any worker
 		}
 
+		// Wait for worker to register and dispatch successfully
 		dispatchReq := &coordinatorv1.DispatchRequest{Task: task}
-		_, err := handler.Dispatch(ctx, dispatchReq)
-		require.NoError(t, err)
+		var err error
+		require.Eventually(t, func() bool {
+			_, err = handler.Dispatch(ctx, dispatchReq)
+			return err == nil
+		}, 2*time.Second, 10*time.Millisecond, "Dispatch should succeed once worker is registered")
 
 		// Verify worker received the task
 		select {
