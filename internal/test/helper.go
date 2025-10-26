@@ -77,14 +77,17 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
-	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir)) // Only relevant while loading config
+	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))
 
 	root := getProjectRoot(t)
 	executablePath := path.Join(root, ".local", "bin", "dagu")
+	_ = os.Setenv("DAGU_EXECUTABLE", executablePath)
 
 	ctx := createDefaultContext()
 	cfg, err := config.Load()
 	require.NoError(t, err)
+
+	ctx = config.WithConfig(ctx, cfg)
 
 	cfg.Global.Debug = true
 	cfg.Paths.Executable = executablePath
@@ -103,8 +106,6 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	if options.CoordinatorPort != 0 {
 		cfg.Coordinator.Port = options.CoordinatorPort
 	}
-
-	ctx = config.WithConfig(ctx, cfg)
 
 	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir), filedag.WithSkipExamples(true))
 	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
