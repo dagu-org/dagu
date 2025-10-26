@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -31,28 +30,7 @@ steps:
 `
 		coord := test.SetupCoordinator(t)
 
-		coordinatorClient := coord.GetCoordinatorClient(t)
-
-		workerInst := worker.NewWorker(
-			"test-worker-1",
-			10,
-			coordinatorClient,
-			map[string]string{"type": "test-worker"},
-			coord.Config,
-		)
-
-		go func() {
-			if err := workerInst.Start(coord.Context); err != nil {
-				t.Logf("Worker stopped: %v", err)
-			}
-		}()
-		defer func() {
-			if err := workerInst.Stop(coord.Context); err != nil {
-				t.Logf("Error stopping worker: %v", err)
-			}
-		}()
-
-		time.Sleep(50 * time.Millisecond)
+		setupWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
 
 		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
@@ -91,31 +69,8 @@ steps:
 		// Setup and start coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Get dispatcher client from coordinator
-		coordinatorClient := coord.GetCoordinatorClient(t)
-
 		// Create and start worker with selector labels
-		workerInst := worker.NewWorker(
-			"test-worker-1",
-			10, // maxActiveRuns
-			coordinatorClient,
-			map[string]string{"type": "test-worker"},
-			coord.Config,
-		)
-
-		go func() {
-			if err := workerInst.Start(coord.Context); err != nil {
-				t.Logf("Worker stopped: %v", err)
-			}
-		}()
-		defer func() {
-			if err := workerInst.Stop(coord.Context); err != nil {
-				t.Logf("Error stopping worker: %v", err)
-			}
-		}()
-
-		// Give worker time to connect
-		time.Sleep(50 * time.Millisecond)
+		setupWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -184,31 +139,8 @@ steps:
 		// Setup and start coordinator
 		coord := test.SetupCoordinator(t)
 
-		// Get dispatcher client from coordinator
-		coordinatorClient := coord.GetCoordinatorClient(t)
-
 		// Create and start worker with selector labels
-		workerInst := worker.NewWorker(
-			"test-worker-1",
-			10, // maxActiveRuns
-			coordinatorClient,
-			map[string]string{"type": "test-worker"},
-			coord.Config,
-		)
-
-		go func() {
-			if err := workerInst.Start(coord.Context); err != nil {
-				t.Logf("Worker stopped: %v", err)
-			}
-		}()
-		defer func() {
-			if err := workerInst.Stop(coord.Context); err != nil {
-				t.Logf("Error stopping worker: %v", err)
-			}
-		}()
-
-		// Give worker time to connect
-		time.Sleep(50 * time.Millisecond)
+		setupWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)

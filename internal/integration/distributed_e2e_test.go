@@ -9,8 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime"
-	"github.com/dagu-org/dagu/internal/service/scheduler"
-	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -45,25 +43,10 @@ steps:
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Create and start worker with matching labels
-		workerInst := worker.NewWorker(
-			"test-worker-1",
-			10, // maxActiveRuns
-			coordinatorClient,
-			map[string]string{
-				"environment": "production",
-				"component":   "batch-worker",
-			},
-			coord.Config,
-		)
-
-		go func(w *worker.Worker) {
-			if err := w.Start(coord.Context); err != nil {
-				t.Logf("Worker stopped: %v", err)
-			}
-		}(workerInst)
-
-		// Give worker time to connect
-		time.Sleep(100 * time.Millisecond)
+		setupWorker(t, coord, "test-worker-1", 10, map[string]string{
+			"environment": "production",
+			"component":   "batch-worker",
+		})
 
 		// Load the DAG
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -105,23 +88,7 @@ steps:
 		schedulerCtx, schedulerCancel := context.WithTimeout(coord.Context, 30*time.Second)
 		defer schedulerCancel()
 
-		// Create DAGExecutor using coordinator's service registry
-		schedulerCoordCli := coordinatorClient // Use the same coordinator client as the worker
-		de := scheduler.NewDAGExecutor(schedulerCoordCli, runtime.NewSubCmdBuilder(coord.Config))
-		em := scheduler.NewEntryReader(coord.Config.Paths.DAGsDir, coord.DAGStore, coord.DAGRunMgr, de, "")
-
-		// Create scheduler instance
-		schedulerInst, err := scheduler.New(
-			coord.Config,
-			em,
-			coord.DAGRunMgr,
-			coord.DAGRunStore,
-			coord.QueueStore,
-			coord.ProcStore,
-			coord.ServiceRegistry,
-			schedulerCoordCli,
-		)
-		require.NoError(t, err, "failed to create scheduler")
+		schedulerInst := setupSchedulerWithCoordinator(t, coord, coordinatorClient)
 
 		schedulerDone := make(chan error, 1)
 		go func() {
@@ -239,24 +206,9 @@ steps:
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Create and start worker with matching labels (matching the sub-DAG's workerSelector)
-		workerInst := worker.NewWorker(
-			"test-worker-cancel",
-			10, // maxActiveRuns
-			coordinatorClient,
-			map[string]string{
-				"foo": "bar", // Match the sub-DAG's workerSelector
-			},
-			coord.Config,
-		)
-
-		go func(w *worker.Worker) {
-			if err := w.Start(coord.Context); err != nil {
-				t.Logf("Worker stopped: %v", err)
-			}
-		}(workerInst)
-
-		// Give worker time to connect
-		time.Sleep(100 * time.Millisecond)
+		setupWorker(t, coord, "test-worker-cancel", 10, map[string]string{
+			"foo": "bar", // Match the sub-DAG's workerSelector
+		})
 
 		// Load the DAG
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -281,21 +233,7 @@ steps:
 		schedulerCtx, schedulerCancel := context.WithTimeout(coord.Context, 30*time.Second)
 		defer schedulerCancel()
 
-		schedulerCoordCli := coordinatorClient
-		de := scheduler.NewDAGExecutor(schedulerCoordCli, runtime.NewSubCmdBuilder(coord.Config))
-		em := scheduler.NewEntryReader(coord.Config.Paths.DAGsDir, coord.DAGStore, coord.DAGRunMgr, de, "")
-
-		schedulerInst, err := scheduler.New(
-			coord.Config,
-			em,
-			coord.DAGRunMgr,
-			coord.DAGRunStore,
-			coord.QueueStore,
-			coord.ProcStore,
-			coord.ServiceRegistry,
-			schedulerCoordCli,
-		)
-		require.NoError(t, err, "failed to create scheduler")
+		schedulerInst := setupSchedulerWithCoordinator(t, coord, coordinatorClient)
 
 		schedulerDone := make(chan error, 1)
 		go func() {
