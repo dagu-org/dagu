@@ -60,6 +60,14 @@ var (
 		usage:     "Parameters to pass to the dag-run (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
 	}
 
+	// nameFlag is used to override the DAG name from the CLI.
+	// If not provided, the DAG name will be determined from the DAG definition or filename.
+	nameFlag = commandLineFlag{
+		name:      "name",
+		shorthand: "N",
+		usage:     "Override the DAG name (default: name from DAG definition or filename)",
+	}
+
 	// noQueueFlag is used to indicate that the dag-run should not be queued and should be executed immediately.
 	noQueueFlag = commandLineFlag{
 		name:      "no-queue",

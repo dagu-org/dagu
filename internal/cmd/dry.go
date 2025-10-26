@@ -33,12 +33,21 @@ Example:
 	)
 }
 
-var dryFlags = []commandLineFlag{paramsFlag}
+var dryFlags = []commandLineFlag{paramsFlag, nameFlag}
 
 func runDry(ctx *Context, args []string) error {
 	loadOpts := []spec.LoadOption{
 		spec.WithBaseConfig(ctx.Config.Paths.BaseConfig),
 		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+	}
+
+	// Get name override from flags if provided
+	nameOverride, err := ctx.StringParam("name")
+	if err != nil {
+		return fmt.Errorf("failed to get name override: %w", err)
+	}
+	if nameOverride != "" {
+		loadOpts = append(loadOpts, spec.WithName(nameOverride))
 	}
 
 	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 {

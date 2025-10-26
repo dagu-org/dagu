@@ -36,6 +36,7 @@ dagu start [options] DAG_NAME_OR_FILE [-- PARAMS...]
 
 **Options:**
 - `--params, -p` - Parameters as JSON
+- `--name, -N` - Override the DAG name (default: name from DAG definition or filename)
 - `--run-id, -r` - Custom run ID
 - `--no-queue, -n` - Execute immediately
 
@@ -51,6 +52,9 @@ dagu start etl.yaml -- DATE=2024-01-01 ENV=prod
 
 # Custom run ID
 dagu start --run-id batch-001 etl.yaml
+
+# Override DAG name
+dagu start --name my_custom_name my-workflow.yaml
 ```
 
 ### `stop`
@@ -223,9 +227,14 @@ Validate a DAG without executing it.
 dagu dry [options] DAG_FILE [-- PARAMS...]
 ```
 
+**Options:**
+- `--params, -p` - Parameters as JSON
+- `--name, -N` - Override the DAG name (default: name from DAG definition or filename)
+
 ```bash
 dagu dry my-workflow.yaml
 dagu dry etl.yaml -- DATE=2024-01-01  # With parameters
+dagu dry --name my_custom_name my-workflow.yaml  # Override DAG name
 ```
 
 ### `enqueue`
@@ -239,6 +248,7 @@ dagu enqueue [options] DAG_FILE [-- PARAMS...]
 **Options:**
 - `--run-id, -r` - Custom run ID
 - `--params, -p` - Parameters as JSON
+- `--name, -N` - Override the DAG name (default: name from DAG definition or filename)
 - `--queue, -u` - Override DAG-level queue name for this enqueue
 
 ```bash
@@ -246,6 +256,8 @@ dagu enqueue my-workflow.yaml
 dagu enqueue --run-id=batch-001 etl.yaml -- TYPE=daily
 # Enqueue to a specific queue (override)
 dagu enqueue --queue=high-priority my-workflow.yaml
+# Override DAG name
+dagu enqueue --name my_custom_name my-workflow.yaml
 ```
 
 ### `dequeue`

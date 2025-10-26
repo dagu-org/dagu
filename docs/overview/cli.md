@@ -45,6 +45,9 @@ dagu start etl.yaml -- DATE=2024-01-01 ENV=prod
 # With positional parameters
 dagu start my-workflow.yaml -- value1 value2 value3
 
+# Override DAG name
+dagu start --name my_custom_name my-workflow.yaml
+
 # Queue for later
 dagu enqueue my-workflow.yaml
 ```
@@ -119,6 +122,9 @@ dagu dry my-workflow.yaml
 
 # With parameters
 dagu dry my-workflow.yaml -- DATE=2024-01-01
+
+# Override DAG name
+dagu dry --name my_custom_name my-workflow.yaml
 ```
 
 ### Server Commands
@@ -219,6 +225,9 @@ dagu enqueue my-workflow.yaml -- KEY=value
 
 # Add to queue using a specific queue (override)
 dagu enqueue --queue=high-priority my-workflow.yaml
+
+# Override DAG name
+dagu enqueue --name my_custom_name my-workflow.yaml
 
 # Remove from queue (requires DAG-name:run-id format)
 dagu dequeue --dag-run=my-workflow:custom-001
