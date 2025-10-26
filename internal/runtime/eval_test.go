@@ -246,7 +246,7 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 	assert.Equal(t, nestedExpected["value"], nestedResult["value"])
 }
 
-func TestGenerateChildDAGRunID(t *testing.T) {
+func TestGenerateSubDAGRunID(t *testing.T) {
 	t.Parallel()
 
 	// Create a test context with environment variables
@@ -284,18 +284,18 @@ func TestGenerateChildDAGRunID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := runtime.GenerateChildDAGRunID(ctx, tt.params, tt.repeated)
+			result := runtime.GenerateSubDAGRunID(ctx, tt.params, tt.repeated)
 			assert.NotEmpty(t, result)
 			// Base58 encoded strings should be at least this length
 			assert.GreaterOrEqual(t, len(result), tt.expectLen)
 
 			// For non-repeated runs, the same parameters should generate the same ID
 			if !tt.repeated {
-				result2 := runtime.GenerateChildDAGRunID(ctx, tt.params, tt.repeated)
+				result2 := runtime.GenerateSubDAGRunID(ctx, tt.params, tt.repeated)
 				assert.Equal(t, result, result2)
 			} else {
 				// For repeated runs, the same parameters should generate different IDs
-				result2 := runtime.GenerateChildDAGRunID(ctx, tt.params, tt.repeated)
+				result2 := runtime.GenerateSubDAGRunID(ctx, tt.params, tt.repeated)
 				assert.NotEqual(t, result, result2)
 			}
 		})

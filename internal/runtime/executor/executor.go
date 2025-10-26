@@ -49,11 +49,11 @@ type NodeStatusDeterminer interface {
 	DetermineNodeStatus() (core.NodeStatus, error)
 }
 
-// DAGExecutor is an interface for child DAG executors.
+// DAGExecutor is an interface for sub DAG executors.
 type DAGExecutor interface {
 	Executor
 
-	// SetParams sets the parameters for running a child DAG.
+	// SetParams sets the parameters for running a sub DAG.
 	SetParams(RunParams)
 }
 
@@ -61,11 +61,11 @@ type DAGExecutor interface {
 type ParallelExecutor interface {
 	Executor
 
-	// SetParamsList sets the parameters for running multiple child DAGs in parallel.
+	// SetParamsList sets the parameters for running multiple sub DAGs in parallel.
 	SetParamsList([]RunParams)
 }
 
-// RunParams holds the parameters for running a child DAG.
+// RunParams holds the parameters for running a sub DAG.
 type RunParams struct {
 	RunID  string
 	Params string

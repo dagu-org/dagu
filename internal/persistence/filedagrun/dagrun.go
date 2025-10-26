@@ -24,11 +24,11 @@ var (
 )
 
 const (
-	// ChildDAGRunsDir is the name of the directory where status files for child dag-runs are stored.
-	ChildDAGRunsDir = "children"
+	// SubDAGRunsDir is the name of the directory where status files for sub dag-runs are stored.
+	SubDAGRunsDir = "children"
 
-	// ChildDAGRunDirPrefix is the prefix for child dag-run directories.
-	ChildDAGRunDirPrefix = "child_"
+	// SubDAGRunDirPrefix is the prefix for sub dag-run directories.
+	SubDAGRunDirPrefix = "child_"
 
 	// DAGRunDirPrefix is the prefix for dag-run directories.
 	DAGRunDirPrefix = "dag-run_"
@@ -53,10 +53,10 @@ type DAGRun struct {
 // NewDAGRun creates a new Run instance from a directory path.
 // It parses the directory name to extract the timestamp and dag-run ID.
 func NewDAGRun(dir string) (*DAGRun, error) {
-	// Determine if the run is a child dag-run or a regular dag-run.
+	// Determine if the run is a sub dag-run or a regular dag-run.
 	parentDir := filepath.Dir(dir)
-	if filepath.Base(parentDir) == ChildDAGRunsDir {
-		matches := reChildDAGRunDir.FindStringSubmatch(filepath.Base(dir))
+	if filepath.Base(parentDir) == SubDAGRunsDir {
+		matches := reSubDAGRunDir.FindStringSubmatch(filepath.Base(dir))
 		if len(matches) != 2 {
 			return nil, ErrInvalidDAGRunsDir
 		}
@@ -99,25 +99,25 @@ func (dr DAGRun) CreateAttempt(_ context.Context, ts execution.TimeInUTC, cache 
 	return NewAttempt(filepath.Join(dir, JSONLStatusFile), cache, opts...)
 }
 
-// CreateChildDAGRun creates a new child dag-run with the given timestamp and dag-run ID.
-func (dr DAGRun) CreateChildDAGRun(_ context.Context, dagRunID string) (*DAGRun, error) {
-	dirName := "child_" + dagRunID
-	dir := filepath.Join(dr.baseDir, ChildDAGRunsDir, dirName)
+// CreateSubDAGRun creates a new sub dag-run with the given timestamp and dag-run ID.
+func (dr DAGRun) CreateSubDAGRun(_ context.Context, dagRunID string) (*DAGRun, error) {
+	dirName := SubDAGRunDirPrefix + dagRunID
+	dir := filepath.Join(dr.baseDir, SubDAGRunsDir, dirName)
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		return nil, fmt.Errorf("failed to create child dag-run directory: %w", err)
+		return nil, fmt.Errorf("failed to create sub dag-run directory: %w", err)
 	}
 	return NewDAGRun(dir)
 }
 
-// FindChildDAGRun searches for a child dag-run by its run ID.
-func (dr DAGRun) FindChildDAGRun(_ context.Context, dagRunID string) (*DAGRun, error) {
-	globPattern := filepath.Join(dr.baseDir, ChildDAGRunsDir, "child_"+dagRunID)
+// FindSubDAGRun searches for a sub dag-run by its run ID.
+func (dr DAGRun) FindSubDAGRun(_ context.Context, dagRunID string) (*DAGRun, error) {
+	globPattern := filepath.Join(dr.baseDir, SubDAGRunsDir, SubDAGRunDirPrefix+dagRunID)
 	matches, err := filepath.Glob(globPattern)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list child dag-runs: %w", err)
+		return nil, fmt.Errorf("failed to list sub dag-runs: %w", err)
 	}
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no matching child dag-run found for ID %s (glob=%s): %w", dagRunID, globPattern, execution.ErrDAGRunIDNotFound)
+		return nil, fmt.Errorf("no matching sub dag-run found for ID %s (glob=%s): %w", dagRunID, globPattern, execution.ErrDAGRunIDNotFound)
 	}
 	// Sort the matches by timestamp
 	sort.Slice(matches, func(i, j int) bool {
@@ -126,14 +126,14 @@ func (dr DAGRun) FindChildDAGRun(_ context.Context, dagRunID string) (*DAGRun, e
 	return NewDAGRun(matches[0])
 }
 
-func (dr DAGRun) ListChildDAGRuns(ctx context.Context) ([]*DAGRun, error) {
-	childDir := filepath.Join(dr.baseDir, ChildDAGRunsDir)
-	entries, err := os.ReadDir(childDir)
+func (dr DAGRun) ListSubDAGRuns(ctx context.Context) ([]*DAGRun, error) {
+	subDir := filepath.Join(dr.baseDir, SubDAGRunsDir)
+	entries, err := os.ReadDir(subDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []*DAGRun{}, nil
 		}
-		return nil, fmt.Errorf("failed to read child dag-runs directory: %w", err)
+		return nil, fmt.Errorf("failed to read sub dag-runs directory: %w", err)
 	}
 
 	var dagRuns []*DAGRun
@@ -142,17 +142,17 @@ func (dr DAGRun) ListChildDAGRuns(ctx context.Context) ([]*DAGRun, error) {
 			continue
 		}
 
-		// check if the directory name matches the child dag-run directory pattern
-		if !reChildDAGRunDir.MatchString(entry.Name()) {
+		// check if the directory name matches the sub dag-run directory pattern
+		if !reSubDAGRunDir.MatchString(entry.Name()) {
 			continue
 		}
 
-		childDAGRun, err := NewDAGRun(filepath.Join(childDir, entry.Name()))
+		subDAGRun, err := NewDAGRun(filepath.Join(subDir, entry.Name()))
 		if err != nil {
-			logger.Error(ctx, "failed to read child dag-run data", "err", err, "dagRunId", dr.dagRunID, "childDAGRunDir", entry.Name())
+			logger.Error(ctx, "failed to read sub dag-run data", "err", err, "dagRunId", dr.dagRunID, "subDAGRunDir", entry.Name())
 			continue
 		}
-		dagRuns = append(dagRuns, childDAGRun)
+		dagRuns = append(dagRuns, subDAGRun)
 	}
 	return dagRuns, nil
 }
@@ -190,23 +190,23 @@ func (dr DAGRun) Remove(ctx context.Context) error {
 	return os.RemoveAll(dr.baseDir)
 }
 
-// removeLogFiles removes all log files associated with the dag-run and its child dag-runs.
+// removeLogFiles removes all log files associated with the dag-run and its sub dag-runs.
 func (dr DAGRun) removeLogFiles(ctx context.Context) error {
 	deleteFiles, err := dr.listLogFiles(ctx)
 	if err != nil {
 		logger.Error(ctx, "failed to list log files to remove", "err", err, "dagRunId", dr.dagRunID)
 	}
 
-	children, err := dr.ListChildDAGRuns(ctx)
+	children, err := dr.ListSubDAGRuns(ctx)
 	if err != nil {
-		logger.Error(ctx, "failed to list child dag-runs", "err", err, "dagRunId", dr.dagRunID)
+		logger.Error(ctx, "failed to list sub dag-runs", "err", err, "dagRunId", dr.dagRunID)
 	}
 	for _, child := range children {
-		childLogFiles, err := child.listLogFiles(ctx)
+		subLogFiles, err := child.listLogFiles(ctx)
 		if err != nil {
-			logger.Error(ctx, "failed to list log files for child dag-run", "err", err, "dagRunId", child.dagRunID)
+			logger.Error(ctx, "failed to list log files for sub dag-run", "err", err, "dagRunId", child.dagRunID)
 		}
-		deleteFiles = append(deleteFiles, childLogFiles...)
+		deleteFiles = append(deleteFiles, subLogFiles...)
 	}
 
 	parentDirs := make(map[string]struct{})
@@ -306,7 +306,7 @@ func (dr DAGRun) listLogFiles(ctx context.Context) ([]string, error) {
 // Regular expressions for parsing directory names
 var reDAGRunDir = regexp.MustCompile(`^` + DAGRunDirPrefix + `(\d{8}_\d{6}Z)_(.*)$`)         // Matches dag-run directory names
 var reAttemptDir = regexp.MustCompile(`^` + AttemptDirPrefix + `(\d{8}_\d{6}_\d{3}Z)_(.*)$`) // Matches attempt directory names
-var reChildDAGRunDir = regexp.MustCompile(`^` + ChildDAGRunDirPrefix + `(.*)$`)              // Matches child dag-run directory names
+var reSubDAGRunDir = regexp.MustCompile(`^` + SubDAGRunDirPrefix + `(.*)$`)                  // Matches sub dag-run directory names
 
 // formatDAGRunTimestamp formats a models.TimeInUTC instance into a string representation (without milliseconds).
 // The format is "YYYYMMDD_HHMMSSZ".

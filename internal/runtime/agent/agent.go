@@ -111,9 +111,9 @@ type Agent struct {
 	// lastErr is the last error occurred during the dag-run.
 	lastErr error
 
-	// isChildDAGRun is true if the current dag-run is not the root dag-run,
-	// meaning that it is a child dag-run of another dag-run.
-	isChildDAGRun atomic.Bool
+	// isSubDAGRun is true if the current dag-run is not the root dag-run,
+	// meaning that it is a sub dag-run of another dag-run.
+	isSubDAGRun atomic.Bool
 
 	// progressDisplay is the progress display for showing real-time execution progress.
 	progressDisplay ProgressReporter
@@ -135,7 +135,7 @@ type Options struct {
 	// configuration as the specified history.
 	RetryTarget *execution.DAGRunStatus
 	// ParentDAGRun is the dag-run reference of the parent dag-run.
-	// It is required for child dag-runs to identify the parent dag-run.
+	// It is required for sub dag-runs to identify the parent dag-run.
 	ParentDAGRun execution.DAGRunRef
 	// ProgressDisplay indicates if the progress display should be shown.
 	// This is typically enabled for CLI execution in a TTY environment.
@@ -192,7 +192,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	telemetry.InitializePropagators()
 
 	// Extract trace context from environment variables if present
-	// This must be done BEFORE initializing the tracer so child DAGs
+	// This must be done BEFORE initializing the tracer so sub DAGs
 	// can continue the parent's trace
 	if a.dag.OTel != nil && a.dag.OTel.Enabled {
 		ctx = telemetry.ExtractTraceContext(ctx)
@@ -224,7 +224,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			spanAttrs = append(spanAttrs, attribute.String("dag.parent_name", a.parentDAGRun.Name))
 		}
 
-		// For child DAGs, ensure we're creating the span as a child of the parent context
+		// For sub DAGs, ensure we're creating the span as a child of the parent context
 		spanName := fmt.Sprintf("DAG: %s", a.dag.Name)
 		ctx, span = a.tracer.Start(ctx, spanName, trace.WithAttributes(spanAttrs...))
 		defer func() {
@@ -236,10 +236,10 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	if a.rootDAGRun.ID != a.dagRunID {
-		logger.Debug(ctx, "Initiating a child dag-run", "root-run", a.rootDAGRun.String(), "parent-run", a.parentDAGRun.String())
-		a.isChildDAGRun.Store(true)
+		logger.Debug(ctx, "Initiating a sub dag-run", "root-run", a.rootDAGRun.String(), "parent-run", a.parentDAGRun.String())
+		a.isSubDAGRun.Store(true)
 		if a.parentDAGRun.Zero() {
-			return fmt.Errorf("parent dag-run is not specified for the child dag-run %s", a.dagRunID)
+			return fmt.Errorf("parent dag-run is not specified for the sub dag-run %s", a.dagRunID)
 		}
 	}
 
@@ -285,7 +285,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Add structured logging context
 	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}
-	if a.isChildDAGRun.Load() {
+	if a.isSubDAGRun.Load() {
 		logFields = append(logFields, "root", a.rootDAGRun.String(), "parent", a.parentDAGRun.String())
 	}
 	ctx = logger.WithValues(ctx, logFields...)
@@ -543,9 +543,9 @@ func (a *Agent) Run(ctx context.Context) error {
 
 // nodeToModelNode converts a scheduler NodeData to a models.Node
 func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *execution.Node {
-	children := make([]execution.ChildDAGRun, len(nodeData.State.Children))
-	for i, child := range nodeData.State.Children {
-		children[i] = execution.ChildDAGRun(child)
+	subRuns := make([]execution.SubDAGRun, len(nodeData.State.SubRuns))
+	for i, child := range nodeData.State.SubRuns {
+		subRuns[i] = execution.SubDAGRun(child)
 	}
 
 	var errText string
@@ -564,7 +564,7 @@ func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *execution.Node {
 		RetryCount:      nodeData.State.RetryCount,
 		DoneCount:       nodeData.State.DoneCount,
 		Error:           errText,
-		Children:        children,
+		SubRuns:         subRuns,
 		OutputVariables: nodeData.State.OutputVariables,
 	}
 }
@@ -934,7 +934,7 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (execution.DAGRunAttempt
 	}
 
 	opts := execution.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil}
-	if a.isChildDAGRun.Load() {
+	if a.isSubDAGRun.Load() {
 		opts.RootDAGRun = &a.rootDAGRun
 	}
 
@@ -944,9 +944,9 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (execution.DAGRunAttempt
 // setupSocketServer create socket server instance.
 func (a *Agent) setupSocketServer(ctx context.Context) error {
 	var socketAddr string
-	if a.isChildDAGRun.Load() {
+	if a.isSubDAGRun.Load() {
 		// Use separate socket address for child
-		socketAddr = a.dag.SockAddrForChildDAGRun(a.dagRunID)
+		socketAddr = a.dag.SockAddrForSubDAGRun(a.dagRunID)
 	} else {
 		socketAddr = a.dag.SockAddr(a.dagRunID)
 	}
@@ -960,8 +960,8 @@ func (a *Agent) setupSocketServer(ctx context.Context) error {
 
 // checkIsAlreadyRunning returns error if the DAG is already running.
 func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
-	if a.isChildDAGRun.Load() {
-		return nil // Skip the check for child dag-runs
+	if a.isSubDAGRun.Load() {
+		return nil // Skip the check for sub dag-runs
 	}
 	if a.dagRunMgr.IsRunning(ctx, a.dag, a.dagRunID) {
 		return fmt.Errorf("already running. dag-run ID=%s, socket=%s", a.dagRunID, a.dag.SockAddr(a.dagRunID))

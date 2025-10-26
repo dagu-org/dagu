@@ -16,10 +16,10 @@ func TestDistributedLocalDAGExecution(t *testing.T) {
 		yamlContent := `
 steps:
   - name: run-local-on-worker
-    call: local-child
+    call: local-sub
 
 ---
-name: local-child
+name: local-sub
 workerSelector:
   type: test-worker
 steps:
@@ -47,18 +47,18 @@ steps:
 		node := st.Nodes[0]
 		require.Equal(t, "run-local-on-worker", node.Step.Name)
 		require.Equal(t, core.NodeFailed, node.Status)
-		require.Len(t, node.Children, 1)
+		require.Len(t, node.SubRuns, 1)
 	})
 	t.Run("LocalDAG", func(t *testing.T) {
-		// Create test DAG with local child that uses workerSelector
+		// Create test DAG with local sub that uses workerSelector
 		yamlContent := `
 steps:
   - name: run-local-on-worker
-    call: local-child
+    call: local-sub
     output: RESULT
 
 ---
-name: local-child
+name: local-sub
 workerSelector:
   type: test-worker
 steps:
@@ -89,12 +89,12 @@ steps:
 		yamlContent := `
 steps:
   - name: run-on-nonexistent-worker
-    call: local-child
+    call: local-sub
     output: RESULT
 
 ---
 
-name: local-child
+name: local-sub
 workerSelector:
   type: nonexistent-worker
 steps:
@@ -124,11 +124,11 @@ steps:
 		yamlContent := `
 steps:
   - name: run-local-on-worker
-    call: local-child
+    call: local-sub
     output: RESULT
 
 ---
-name: local-child
+name: local-sub
 workerSelector:
   type: test-worker
 steps:

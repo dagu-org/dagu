@@ -86,7 +86,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   const handleParentDAGRunClick = (e: React.MouseEvent) => {
     e.preventDefault();
     navigate(
-      `/dags/${fileName}?childDAGRunId=${dagRunToDisplay.parentDAGRunId}&dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`
+      `/dags/${fileName}?subDAGRunId=${dagRunToDisplay.parentDAGRunId}&dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`
     );
   };
 
@@ -157,7 +157,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               dagRunToDisplay.parentDAGRunName !== dagRunToDisplay.name && (
                 <>
                   <a
-                    href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&childDAGRunId=${dagRunToDisplay.parentDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
+                    href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&subDAGRunId=${dagRunToDisplay.parentDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
                     onClick={handleParentDAGRunClick}
                     className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors font-medium"
                   >

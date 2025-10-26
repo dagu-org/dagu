@@ -59,8 +59,8 @@ type Step struct {
 	Preconditions []*Condition `json:"preconditions,omitempty"`
 	// SignalOnStop is the signal to send on stop.
 	SignalOnStop string `json:"signalOnStop,omitempty"`
-	// ChildDAG contains the information about a child DAG to be executed.
-	ChildDAG *ChildDAG `json:"childDag,omitempty"`
+	// SubDAG contains the information about a sub DAG to be executed.
+	SubDAG *SubDAG `json:"childDag,omitempty"`
 	// WorkerSelector specifies required worker labels for execution.
 	WorkerSelector map[string]string `json:"workerSelector,omitempty"`
 	// Parallel contains the configuration for parallel execution.
@@ -92,8 +92,8 @@ func (s *Step) String() string {
 	return strings.Join(parts, "\t")
 }
 
-// ChildDAG contains information about a child DAG to be executed.
-type ChildDAG struct {
+// SubDAG contains information about a sub DAG to be executed.
+type SubDAG struct {
 	Name   string `json:"name,omitempty"`
 	Params string `json:"params,omitempty"`
 }
@@ -227,7 +227,7 @@ type ContinueOn struct {
 }
 
 const (
-	// ExecutorTypeDAG is the executor type for a child DAG.
+	// ExecutorTypeDAG is the executor type for a sub DAG.
 	ExecutorTypeDAG = "dag"
 
 	// ExecutorTypeParallel is the executor type for parallel steps.

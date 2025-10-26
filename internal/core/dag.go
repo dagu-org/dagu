@@ -157,9 +157,9 @@ func (d *DAG) SockAddr(dagRunID string) string {
 	return SockAddr(d.Name, dagRunID)
 }
 
-// SockAddrForChildDAGRun returns the unix socket address for a specific dag-run ID.
-// This is used to control child dag-runs.
-func (d *DAG) SockAddrForChildDAGRun(dagRunID string) string {
+// SockAddrForSubDAGRun returns the unix socket address for a specific dag-run ID.
+// This is used to control sub dag-runs.
+func (d *DAG) SockAddrForSubDAGRun(dagRunID string) string {
 	return SockAddr(d.GetName(), dagRunID)
 }
 

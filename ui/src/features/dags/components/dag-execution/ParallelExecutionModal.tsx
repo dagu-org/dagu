@@ -13,17 +13,17 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   stepName: string;
-  childDAGName: string;
-  children: components['schemas']['ChildDAGRun'][];
-  onSelectChild: (childIndex: number, openInNewTab?: boolean) => void;
+  subDAGName: string;
+  subRuns: components['schemas']['SubDAGRun'][];
+  onSelectSubRun: (subRunIndex: number, openInNewTab?: boolean) => void;
 };
 
 export function ParallelExecutionModal({
   isOpen,
   onClose,
-  childDAGName,
-  children,
-  onSelectChild,
+  subDAGName,
+  subRuns,
+  onSelectSubRun,
 }: Props) {
   const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
   const [selectedIndex, setSelectedIndex] = React.useState<number | null>(null);
@@ -37,17 +37,17 @@ export function ParallelExecutionModal({
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          setSelectedIndex((prev) => prev === null ? 0 : (prev + 1) % children.length);
+          setSelectedIndex((prev) => prev === null ? 0 : (prev + 1) % subRuns.length);
           break;
         case 'ArrowUp':
           e.preventDefault();
-          setSelectedIndex((prev) => prev === null ? children.length - 1 : (prev - 1 + children.length) % children.length);
+          setSelectedIndex((prev) => prev === null ? subRuns.length - 1 : (prev - 1 + subRuns.length) % subRuns.length);
           break;
         case 'Enter':
           e.preventDefault();
           if (selectedIndex !== null) {
             const openInNewTab = e.metaKey || e.ctrlKey;
-            onSelectChild(selectedIndex, openInNewTab);
+            onSelectSubRun(selectedIndex, openInNewTab);
             if (!openInNewTab) {
               onClose();
             }
@@ -58,7 +58,7 @@ export function ParallelExecutionModal({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, selectedIndex, children.length, onSelectChild, onClose]);
+  }, [isOpen, selectedIndex, subRuns.length, onSelectSubRun, onClose]);
 
   // Auto-scroll to selected item
   React.useEffect(() => {
@@ -83,10 +83,10 @@ export function ParallelExecutionModal({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-mono">
               <Layers className="h-4 w-4 text-violet-600 dark:text-violet-500" />
-              {childDAGName}
+              {subDAGName}
             </DialogTitle>
             <DialogDescription className="text-xs mt-1 font-mono text-muted-foreground">
-              {children.length} child DAG-runs
+              {subRuns.length} sub DAG-runs
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -96,9 +96,9 @@ export function ParallelExecutionModal({
             ref={scrollContainerRef}
             className="space-y-1 max-h-[400px] overflow-y-auto"
           >
-            {children.map((child, index) => (
+            {subRuns.map((subRun, index) => (
               <div 
-                key={child.dagRunId} 
+                key={subRun.dagRunId} 
                 className="group relative flex items-center gap-2"
                 onMouseEnter={() => setSelectedIndex(index)}
               >
@@ -112,7 +112,7 @@ export function ParallelExecutionModal({
                   `}
                   onClick={(e) => {
                     const openInNewTab = e.metaKey || e.ctrlKey;
-                    onSelectChild(index, openInNewTab);
+                    onSelectSubRun(index, openInNewTab);
                     if (!openInNewTab) {
                       onClose();
                     }
@@ -121,9 +121,9 @@ export function ParallelExecutionModal({
                   <span className="font-mono text-xs text-zinc-500 dark:text-zinc-600 min-w-[24px]">
                     {String(index + 1).padStart(2, '0')}
                   </span>
-                  {child.params ? (
+                  {subRun.params ? (
                     <code className="text-sm font-mono text-zinc-700 dark:text-zinc-300">
-                      {child.params}
+                      {subRun.params}
                     </code>
                   ) : (
                     <span className="text-sm text-zinc-400 dark:text-zinc-600 italic">
@@ -134,7 +134,7 @@ export function ParallelExecutionModal({
                 <button
                   className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 focus:outline-none"
                   onClick={() => {
-                    onSelectChild(index, true);
+                    onSelectSubRun(index, true);
                   }}
                   title="Open in new tab"
                 >

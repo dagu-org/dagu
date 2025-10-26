@@ -28,7 +28,7 @@ function DAGDetails() {
   // Extract query parameters
   const dagRunId = searchParams.get('dagRunId');
   const stepName = searchParams.get('step');
-  const childDAGRunId = searchParams.get('childDAGRunId');
+  const subDAGRunId = searchParams.get('subDAGRunId');
   const queriedDAGRunName = searchParams.get('dagRunName');
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const fileName = params.fileName || '';
@@ -103,37 +103,37 @@ function DAGDetails() {
     },
     {
       isPaused: () =>
-        (!dagRunName && !queriedDAGRunName) || !dagRunId || !!childDAGRunId,
+        (!dagRunName && !queriedDAGRunName) || !dagRunId || !!subDAGRunId,
       refreshInterval: 1000,
     }
   );
 
-  // Fetch child DAG-run data if needed
-  const { data: childDAGRunResponse, mutate: mutateChildDagRun } = useQuery(
-    '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}',
+  // Fetch sub DAG-run data if needed
+  const { data: subDAGRunResponse, mutate: mutateSubDagRun } = useQuery(
+    '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
     {
       params: {
         path: {
           name: dagRunName,
           dagRunId: dagRunId || '',
-          childDAGRunId: childDAGRunId || '',
+          subDAGRunId: subDAGRunId || '',
         },
         query: { remoteNode },
       },
     },
     {
       refreshInterval: 1000,
-      isPaused: () => !childDAGRunId || !dagRunId || !dagRunName,
+      isPaused: () => !subDAGRunId || !dagRunId || !dagRunName,
     }
   );
 
   // Determine the current DAG-run to display
   let currentDAGRun: DAGRunDetails | undefined;
-  if (childDAGRunId && childDAGRunResponse?.dagRunDetails) {
-    currentDAGRun = childDAGRunResponse.dagRunDetails;
-  } else if (dagRunId && !childDAGRunId && dagRunResponse?.dagRunDetails) {
+  if (subDAGRunId && subDAGRunResponse?.dagRunDetails) {
+    currentDAGRun = subDAGRunResponse.dagRunDetails;
+  } else if (dagRunId && !subDAGRunId && dagRunResponse?.dagRunDetails) {
     currentDAGRun = dagRunResponse.dagRunDetails;
-  } else if (!childDAGRunId) {
+  } else if (!subDAGRunId) {
     currentDAGRun = dagData?.latestDAGRun;
   }
 
@@ -166,13 +166,13 @@ function DAGDetails() {
   // Refresh function
   const refreshData = useCallback(() => {
     mutateDag();
-    if (dagRunId && !childDAGRunId) {
+    if (dagRunId && !subDAGRunId) {
       mutateDagRun();
     }
-    if (childDAGRunId) {
-      mutateChildDagRun();
+    if (subDAGRunId) {
+      mutateSubDagRun();
     }
-  }, [mutateDag, mutateDagRun, mutateChildDagRun, dagRunId, childDAGRunId]);
+  }, [mutateDag, mutateDagRun, mutateSubDagRun, dagRunId, subDAGRunId]);
 
   // Determine which DAG-run to display in the header
   // We want to show the header even when content is loading

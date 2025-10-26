@@ -1147,23 +1147,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}:
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}:
     get:
-      summary: "Retrieve detailed status of a child DAG-run"
-      description: "Fetches detailed status information about a specific child DAG-run"
-      operationId: "getChildDAGRunDetails"
+      summary: "Retrieve detailed status of a sub DAG-run"
+      description: "Fetches detailed status information about a specific sub DAG-run"
+      operationId: "getSubDAGRunDetails"
       tags:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
-        - name: "childDAGRunId"
+        - name: "subDAGRunId"
           in: "path"
           required: true
           schema:
             type: "string"
-          description: "ID of the child DAG-run to retrieve details for"
+          description: "ID of the sub DAG-run to retrieve details for"
       responses:
         "200":
           description: "A successful response"
@@ -1177,7 +1177,7 @@ paths:
                 required:
                   - dagRunDetails
         "404":
-          description: "Child DAG-run not found"
+          description: "Sub DAG-run not found"
           content:
             application/json:
               schema:
@@ -1189,11 +1189,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log:
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log:
     get:
-      summary: "Retrieve log for a specific child DAG-run"
-      description: "Fetches the log for an individual child DAG-run"
-      operationId: "getChildDAGRunLog"
+      summary: "Retrieve log for a specific sub DAG-run"
+      description: "Fetches the log for an individual sub DAG-run"
+      operationId: "getSubDAGRunLog"
       tags:
         - "dag-runs"
       parameters:
@@ -1204,12 +1204,12 @@ paths:
         - $ref: "#/components/parameters/Head"
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
-        - name: "childDAGRunId"
+        - name: "subDAGRunId"
           in: "path"
           required: true
           schema:
             type: "string"
-          description: "ID of the child DAG-run to retrieve the log for"
+          description: "ID of the sub DAG-run to retrieve the log for"
       responses:
         "200":
           description: "A successful response"
@@ -1230,11 +1230,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log:
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log:
     get:
-      summary: "Retrieve log for a specific step in a child DAG-run"
-      description: "Fetches the log for an individual step in a child DAG-run"
-      operationId: "getChildDAGRunStepLog"
+      summary: "Retrieve log for a specific step in a sub DAG-run"
+      description: "Fetches the log for an individual step in a sub DAG-run"
+      operationId: "getSubDAGRunStepLog"
       tags:
         - "dag-runs"
       parameters:
@@ -1246,12 +1246,12 @@ paths:
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Stream"
-        - name: "childDAGRunId"
+        - name: "subDAGRunId"
           in: "path"
           required: true
           schema:
             type: "string"
-          description: "ID of the child DAG-run to retrieve the log for"
+          description: "ID of the sub DAG-run to retrieve the log for"
         - $ref: "#/components/parameters/StepName"
       responses:
         "200":
@@ -1273,23 +1273,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status:
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/status:
     patch:
-      summary: "Manually update a step's execution status in a child DAG-run"
-      description: "Changes the status of a specific step within a child DAG-run"
-      operationId: "updateChildDAGRunStepStatus"
+      summary: "Manually update a step's execution status in a sub DAG-run"
+      description: "Changes the status of a specific step within a sub DAG-run"
+      operationId: "updateSubDAGRunStepStatus"
       tags:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
-        - name: "childDAGRunId"
+        - name: "subDAGRunId"
           in: "path"
           required: true
           schema:
             type: "string"
-          description: "ID of the child DAG-run to update the step status for"
+          description: "ID of the sub DAG-run to update the step status for"
         - $ref: "#/components/parameters/StepName"
       requestBody:
         required: true
@@ -2110,7 +2110,7 @@ components:
 
     DAGRunDetails:
       type: object
-      description: "Detailed status of a DAG-run including child DAG-run nodes"
+      description: "Detailed status of a DAG-run including sub DAG-run nodes"
       allOf:
         - $ref: "#/components/schemas/DAGRunSummary"
         - type: object
@@ -2165,16 +2165,16 @@ components:
         doneCount:
           type: integer
           description: "Number of successful completions for repeating steps"
-        children:
+        subRuns:
           type: array
-          description: "List of child DAG-runs associated with this step"
+          description: "List of sub DAG-runs associated with this step"
           items:
-            $ref: "#/components/schemas/ChildDAGRun"
-        childrenRepeated:
+            $ref: "#/components/schemas/SubDAGRun"
+        subRunsRepeated:
           type: array
-          description: "List of repeated child DAG-runs when using repeatPolicy"
+          description: "List of repeated sub DAG-runs when using repeatPolicy"
           items:
-            $ref: "#/components/schemas/ChildDAGRun"
+            $ref: "#/components/schemas/SubDAGRun"
         error:
           type: string
           description: "Error message if the step failed"
@@ -2189,15 +2189,15 @@ components:
         - retryCount
         - doneCount
 
-    ChildDAGRun:
+    SubDAGRun:
       type: object
-      description: "Metadata for a child DAG-run"
+      description: "Metadata for a sub DAG-run"
       properties:
         dagRunId:
           $ref: "#/components/schemas/DAGRunId"
         params:
           type: string
-          description: "Parameters passed to the child DAG-run in JSON format"
+          description: "Parameters passed to the sub DAG-run in JSON format"
       required:
         - dagRunId
         - params
@@ -2243,10 +2243,10 @@ components:
             type: string
         call:
           type: string
-          description: "The name of the DAG to execute as a child DAG-run"
+          description: "The name of the DAG to execute as a sub DAG-run"
         params:
           type: string
-          description: "Parameters to pass to the child DAG-run in JSON format"
+          description: "Parameters to pass to the sub DAG-run in JSON format"
         parallel:
           type: object
           description: "Configuration for parallel execution of the step"

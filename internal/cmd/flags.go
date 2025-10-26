@@ -138,16 +138,16 @@ var (
 		usage:     "Override the DAG-level queue definition",
 	}
 
-	// rootDAGRunFlag reads the root DAG name for starting a child dag-run.
+	// rootDAGRunFlag reads the root DAG name for starting a sub dag-run.
 	rootDAGRunFlag = commandLineFlag{
 		name:  "root",
-		usage: "[only for child dag-runs] reference for the root dag-run",
+		usage: "[only for sub dag-runs] reference for the root dag-run",
 	}
 
-	// parentDAGRunFlag reads the parent ref for starting a child dag-run.
+	// parentDAGRunFlag reads the parent ref for starting a sub dag-run.
 	parentDAGRunFlag = commandLineFlag{
 		name:  "parent",
-		usage: "[only for child dag-runs] reference for the parent dag-run",
+		usage: "[only for sub dag-runs] reference for the parent dag-run",
 	}
 
 	// quietFlag is used to suppress output during command execution.

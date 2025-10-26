@@ -263,7 +263,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
   // The status details page will handle this based on URL parameters
 
   /**
-   * Handle double-click on graph node (navigate to child dagRun)
+   * Handle double-click on graph node (navigate to sub dagRun)
    */
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
@@ -279,14 +279,18 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
 
       if (!n || !n.step.call) return;
 
-      // If it's a child dagRun, navigate to its details
-      const childDAGRun = n.children?.[0];
-      if (childDAGRun && childDAGRun.dagRunId) {
-        // Navigate to the child dagRun details using React Router with search params
+      // If it's a sub dagRun, navigate to its details
+      const subRuns = [
+        ...(n.subRuns ?? []),
+        ...(n.subRunsRepeated ?? []),
+      ];
+      const subDAGRun = subRuns[0];
+      if (subDAGRun && subDAGRun.dagRunId) {
+        // Navigate to the sub dagRun details using React Router with search params
         // Include dagRunName parameter to avoid waiting for DAG details
         navigate({
           pathname: `/dags/${fileName}`,
-          search: `?dagRunId=${dagRun.rootDAGRunId}&childDAGRunId=${childDAGRun.dagRunId}&dagRunName=${encodeURIComponent(dagRun.rootDAGRunName)}`,
+          search: `?dagRunId=${dagRun.rootDAGRunId}&subDAGRunId=${subDAGRun.dagRunId}&dagRunName=${encodeURIComponent(dagRun.rootDAGRunName)}`,
         });
       }
     },

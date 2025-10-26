@@ -204,7 +204,7 @@ steps:
 	}
 }
 
-func TestParallelWithChildDAG(t *testing.T) {
+func TestParallelWithSubDAG(t *testing.T) {
 	yaml := `
 steps:
   - name: process-regions
@@ -229,12 +229,12 @@ steps:
 
 	step := dag.Steps[0]
 	require.NotNil(t, step.Parallel)
-	require.NotNil(t, step.ChildDAG)
+	require.NotNil(t, step.SubDAG)
 
 	assert.Equal(t, 3, len(step.Parallel.Items))
 	assert.Equal(t, 10, step.Parallel.MaxConcurrent)
-	assert.Equal(t, "workflows/deploy", step.ChildDAG.Name)
-	assert.Equal(t, "VERSION=\"1.0.0\"", step.ChildDAG.Params)
+	assert.Equal(t, "workflows/deploy", step.SubDAG.Name)
+	assert.Equal(t, "VERSION=\"1.0.0\"", step.SubDAG.Params)
 
 	// Check the items
 	items := step.Parallel.Items

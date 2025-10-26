@@ -12,7 +12,7 @@ Dagu provides multiple mechanisms for passing data through workflows:
 - File-based Passing - Redirect output to files
 - JSON Path References - Access nested data structures
 - Step ID References - Reference step properties and files
-- Child DAG Outputs - Capture results from sub-workflows
+- Sub DAG Outputs - Capture results from sub-workflows
 
 ## Output Variables
 
@@ -201,7 +201,7 @@ Available properties:
 - `${id.stdout}` - Path to stdout log file
 - `${id.stderr}` - Path to stderr log file
 
-## Child DAG Outputs
+## Sub DAG Outputs
 
 Capture outputs from nested workflows:
 
@@ -222,7 +222,7 @@ steps:
 
 ### Output Structure
 
-Child DAG output contains:
+Sub DAG output contains:
 ```json
 {
   "name": "etl-workflow",

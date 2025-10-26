@@ -53,7 +53,7 @@ type Props = {
     dagRunId: string,
     node?: components['schemas']['Node']
   ) => void;
-  /** Full dagRun details (optional) - used to determine if this is a child dagRun */
+  /** Full dagRun details (optional) - used to determine if this is a sub dagRun */
   dagRun: components['schemas']['DAGRunDetails'];
   /** View mode: desktop or mobile */
   view?: 'desktop' | 'mobile';
@@ -98,21 +98,21 @@ function InlineLogViewer({
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
-  // Determine if this is a child DAG run
-  const isChildDAGRun =
+  // Determine if this is a sub DAG run
+  const isSubDAGRun =
     dagRun && dagRun.rootDAGRunId && dagRun.rootDAGRunId !== dagRun.dagRunId;
 
   // Determine the API endpoint
-  const apiEndpoint = isChildDAGRun
-    ? '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log'
+  const apiEndpoint = isSubDAGRun
+    ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log'
     : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log';
 
   // Prepare path parameters
-  const pathParams = isChildDAGRun
+  const pathParams = isSubDAGRun
     ? {
         name: dagRun.rootDAGRunName,
         dagRunId: dagRun.rootDAGRunId,
-        childDAGRunId: dagRun.dagRunId,
+        subDAGRunId: dagRun.dagRunId,
         stepName,
       }
     : {
@@ -246,14 +246,14 @@ function NodeStatusTableRow({
   );
   // State for status update modal
   const [showStatusModal, setShowStatusModal] = useState(false);
-  // Check if this is a child dagRun node
-  // Include both regular children and repeated children
-  const allChildren = [
-    ...(node.children || []),
-    ...(node.childrenRepeated || []),
+  // Check if this is a sub dagRun node
+  // Include both regular and repeated sub runs
+  const allSubRuns = [
+    ...(node.subRuns || []),
+    ...(node.subRunsRepeated || []),
   ];
-  const childDagName = node.step.call;
-  const hasChildDAGRun = !!childDagName && allChildren.length > 0;
+  const subDagName = node.step.call;
+  const hasSubDAGRun = !!subDagName && allSubRuns.length > 0;
 
   // Update duration every second for running tasks
   useEffect(() => {
@@ -298,13 +298,13 @@ function NodeStatusTableRow({
     }
   };
 
-  // Handle child dagRun navigation
-  const handleChildDAGRunNavigation = (
-    childIndex: number = 0,
+  // Handle sub dagRun navigation
+  const handleSubDAGRunNavigation = (
+    subRunIndex: number = 0,
     e?: React.MouseEvent
   ) => {
-    if (hasChildDAGRun && allChildren[childIndex]) {
-      const childDAGRunId = allChildren[childIndex].dagRunId;
+    if (hasSubDAGRun && allSubRuns[subRunIndex]) {
+      const subDAGRunId = allSubRuns[subRunIndex].dagRunId;
 
       // Check if we're in a dagRun context or a DAG context
       // More reliable detection by checking the current URL path or the dagRun object
@@ -314,16 +314,16 @@ function NodeStatusTableRow({
         dagRun && (currentPath.startsWith('/dag-runs/') || isModal);
 
       if (isDAGRunContext) {
-        // For dagRuns, navigate to /dag-runs/{root-dag-name}/{root-dag-run-id}?childDAGRunId=...
+        // For dagRuns, navigate to /dag-runs/{root-dag-name}/{root-dag-run-id}?subDAGRunId=...
         const searchParams = new URLSearchParams();
-        searchParams.set('childDAGRunId', childDAGRunId);
+        searchParams.set('subDAGRunId', subDAGRunId);
 
         // Determine root DAG information
         let rootDAGRunId: string;
         let rootDAGName: string;
 
         if (dagRun && dagRun.rootDAGRunId) {
-          // If this is already a child dagRun, use its root information
+          // If this is already a sub dagRun, use its root information
           rootDAGRunId = dagRun.rootDAGRunId;
           rootDAGName = dagRun.rootDAGRunName;
           searchParams.set('dagRunId', dagRun.rootDAGRunId);
@@ -348,11 +348,11 @@ function NodeStatusTableRow({
       } else {
         // For DAGs, use the existing approach with query parameters
         const searchParams = new URLSearchParams();
-        searchParams.set('childDAGRunId', childDAGRunId);
+        searchParams.set('subDAGRunId', subDAGRunId);
 
         // Use root dagRun information from the dagRun prop if available
         if (dagRun && dagRun.rootDAGRunId) {
-          // If this is already a child dagRun, use its root information
+          // If this is already a sub dagRun, use its root information
           searchParams.set('dagRunId', dagRun.rootDAGRunId);
         } else {
           // Otherwise, use the current dagRun as the root
@@ -414,23 +414,23 @@ function NodeStatusTableRow({
     step: components['schemas']['Step'],
     status: NodeStatus
   ) => {
-    // Check if this is a child DAG-run
-    const isChildDAGRun =
+    // Check if this is a sub DAG-run
+    const isSubDAGRun =
       dagRun.rootDAGRunId &&
       dagRun.rootDAGRunName &&
       dagRun.rootDAGRunId !== dagRun.dagRunId;
 
     // Define path parameters
     const pathParams = {
-      name: isChildDAGRun ? dagRun.rootDAGRunName : dagName,
-      dagRunId: isChildDAGRun ? dagRun.rootDAGRunId : dagRunId || '',
+      name: isSubDAGRun ? dagRun.rootDAGRunName : dagName,
+      dagRunId: isSubDAGRun ? dagRun.rootDAGRunId : dagRunId || '',
       stepName: step.name,
-      ...(isChildDAGRun ? { childDAGRunId: dagRun.dagRunId } : {}),
+      ...(isSubDAGRun ? { subDAGRunId: dagRun.dagRunId } : {}),
     };
 
     // Use the appropriate endpoint
-    const endpoint = isChildDAGRun
-      ? '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status'
+    const endpoint = isSubDAGRun
+      ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/status'
       : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/status';
 
     const { error } = await client.PATCH(endpoint, {
@@ -512,7 +512,7 @@ function NodeStatusTableRow({
             <div className="space-y-0.5">
               <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all flex items-center gap-1.5">
                 {node.step.name}
-                {hasChildDAGRun && (
+                {hasSubDAGRun && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="inline-flex items-center text-blue-500 cursor-pointer">
@@ -521,7 +521,7 @@ function NodeStatusTableRow({
                     </TooltipTrigger>
                     <TooltipContent>
                       <span className="text-xs">
-                        Child DAG Run: {childDagName}
+                        Sub DAG Run: {subDagName}
                       </span>
                     </TooltipContent>
                   </Tooltip>
@@ -583,32 +583,32 @@ function NodeStatusTableRow({
                 </div>
               )}
 
-              {hasChildDAGRun && (
+              {hasSubDAGRun && (
                 <>
-                  {allChildren.length === 1 ? (
-                    // Single child DAG run
+                  {allSubRuns.length === 1 ? (
+                    // Single sub DAG run
                     <>
                       <div
                         className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleChildDAGRunNavigation(0, e);
+                          handleSubDAGRunNavigation(0, e);
                         }}
-                        title="Click to view child DAG run (Cmd/Ctrl+Click to open in new tab)"
+                        title="Click to view sub DAG run (Cmd/Ctrl+Click to open in new tab)"
                       >
-                        View Child DAG Run: {childDagName}
+                        View Sub DAG Run: {subDagName}
                       </div>
-                      {allChildren[0]?.params && (
+                      {allSubRuns[0]?.params && (
                         <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                           Parameters:{' '}
                           <span className="font-mono">
-                            {allChildren[0].params}
+                            {allSubRuns[0].params}
                           </span>
                         </div>
                       )}
                     </>
                   ) : (
-                    // Multiple child DAG runs (parallel execution or repeated)
+                    // Multiple sub DAG runs (parallel execution or repeated)
                     <>
                       <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                         <div className="flex items-center gap-1">
@@ -624,27 +624,27 @@ function NodeStatusTableRow({
                             ) : (
                               <ChevronRight className="h-3 w-3" />
                             )}
-                            Multiple executions: {allChildren.length} child DAG
+                            Multiple executions: {allSubRuns.length} sub DAG
                             runs
                           </button>
                         </div>
                         {isExpanded && (
                           <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
-                            {allChildren.map((child, index) => (
-                              <div key={child.dagRunId} className="py-1">
+                            {allSubRuns.map((subRun, index) => (
+                              <div key={subRun.dagRunId} className="py-1">
                                 <div
                                   className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleChildDAGRunNavigation(index, e);
+                                    handleSubDAGRunNavigation(index, e);
                                   }}
-                                  title="Click to view child DAG run (Cmd/Ctrl+Click to open in new tab)"
+                                  title="Click to view sub DAG run (Cmd/Ctrl+Click to open in new tab)"
                                 >
-                                  #{index + 1}: {childDagName}
+                                  #{index + 1}: {subDagName}
                                 </div>
-                                {child.params && (
+                                {subRun.params && (
                                   <div className="text-xs text-slate-500 dark:text-slate-400 ml-4 font-mono">
-                                    {child.params}
+                                    {subRun.params}
                                   </div>
                                 )}
                               </div>
@@ -969,7 +969,7 @@ function NodeStatusTableRow({
           </span>
           <h3 className="font-semibold text-slate-800 dark:text-slate-200">
             {node.step.name}
-            {hasChildDAGRun && (
+            {hasSubDAGRun && (
               <span className="inline-flex items-center text-blue-500 ml-1.5">
                 <GitBranch className="h-4 w-4" />
               </span>
@@ -988,27 +988,27 @@ function NodeStatusTableRow({
         </div>
       )}
 
-      {/* Child dagRun link */}
-      {hasChildDAGRun && (
+      {/* Sub dagRun link */}
+      {hasSubDAGRun && (
         <>
-          {allChildren.length === 1 ? (
-            // Single child DAG run
+          {allSubRuns.length === 1 ? (
+            // Single sub DAG run
             <>
               <div
                 className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline mb-1"
-                onClick={(e) => handleChildDAGRunNavigation(0, e)}
+                onClick={(e) => handleSubDAGRunNavigation(0, e)}
               >
-                View Child DAG Run: {childDagName}
+                View Sub DAG Run: {subDagName}
               </div>
-              {allChildren[0]?.params && (
+              {allSubRuns[0]?.params && (
                 <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">
                   Parameters:{' '}
-                  <span className="font-mono">{allChildren[0].params}</span>
+                  <span className="font-mono">{allSubRuns[0].params}</span>
                 </div>
               )}
             </>
           ) : (
-            // Multiple child DAG runs (parallel execution or repeated)
+            // Multiple sub DAG runs (parallel execution or repeated)
             <div className="mb-3">
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
@@ -1019,21 +1019,21 @@ function NodeStatusTableRow({
                 ) : (
                   <ChevronRight className="h-3 w-3" />
                 )}
-                Multiple executions: {allChildren.length} child DAG runs
+                Multiple executions: {allSubRuns.length} sub DAG runs
               </button>
               {isExpanded && (
                 <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
-                  {allChildren.map((child, index) => (
-                    <div key={child.dagRunId} className="py-1">
+                  {allSubRuns.map((subRun, index) => (
+                    <div key={subRun.dagRunId} className="py-1">
                       <div
                         className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
-                        onClick={(e) => handleChildDAGRunNavigation(index, e)}
+                        onClick={(e) => handleSubDAGRunNavigation(index, e)}
                       >
-                        #{index + 1}: {childDagName}
+                        #{index + 1}: {subDagName}
                       </div>
-                      {child.params && (
+                      {subRun.params && (
                         <div className="text-xs text-slate-500 dark:text-slate-400 ml-4 font-mono">
-                          {child.params}
+                          {subRun.params}
                         </div>
                       )}
                     </div>

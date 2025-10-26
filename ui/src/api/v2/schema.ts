@@ -508,7 +508,7 @@ export interface paths {
         patch: operations["updateDAGRunStepStatus"];
         trace?: never;
     };
-    "/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}": {
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -516,10 +516,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Retrieve detailed status of a child DAG-run
-         * @description Fetches detailed status information about a specific child DAG-run
+         * Retrieve detailed status of a sub DAG-run
+         * @description Fetches detailed status information about a specific sub DAG-run
          */
-        get: operations["getChildDAGRunDetails"];
+        get: operations["getSubDAGRunDetails"];
         put?: never;
         post?: never;
         delete?: never;
@@ -528,7 +528,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log": {
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log": {
         parameters: {
             query?: never;
             header?: never;
@@ -536,10 +536,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Retrieve log for a specific child DAG-run
-         * @description Fetches the log for an individual child DAG-run
+         * Retrieve log for a specific sub DAG-run
+         * @description Fetches the log for an individual sub DAG-run
          */
-        get: operations["getChildDAGRunLog"];
+        get: operations["getSubDAGRunLog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -548,7 +548,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log": {
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log": {
         parameters: {
             query?: never;
             header?: never;
@@ -556,10 +556,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Retrieve log for a specific step in a child DAG-run
-         * @description Fetches the log for an individual step in a child DAG-run
+         * Retrieve log for a specific step in a sub DAG-run
+         * @description Fetches the log for an individual step in a sub DAG-run
          */
-        get: operations["getChildDAGRunStepLog"];
+        get: operations["getSubDAGRunStepLog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -568,7 +568,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status": {
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -582,10 +582,10 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Manually update a step's execution status in a child DAG-run
-         * @description Changes the status of a specific step within a child DAG-run
+         * Manually update a step's execution status in a sub DAG-run
+         * @description Changes the status of a specific step within a sub DAG-run
          */
-        patch: operations["updateChildDAGRunStepStatus"];
+        patch: operations["updateSubDAGRunStepStatus"];
         trace?: never;
     };
     "/queues": {
@@ -945,7 +945,7 @@ export interface components {
             /** @description Runtime parameters passed to the DAG-run in JSON format */
             params?: string;
         };
-        /** @description Detailed status of a DAG-run including child DAG-run nodes */
+        /** @description Detailed status of a DAG-run including sub DAG-run nodes */
         DAGRunDetails: components["schemas"]["DAGRunSummary"] & {
             /** @description Status of individual steps within the DAG-run */
             nodes: components["schemas"]["Node"][];
@@ -973,17 +973,17 @@ export interface components {
             retryCount: number;
             /** @description Number of successful completions for repeating steps */
             doneCount: number;
-            /** @description List of child DAG-runs associated with this step */
-            children?: components["schemas"]["ChildDAGRun"][];
-            /** @description List of repeated child DAG-runs when using repeatPolicy */
-            childrenRepeated?: components["schemas"]["ChildDAGRun"][];
+            /** @description List of sub DAG-runs associated with this step */
+            subRuns?: components["schemas"]["SubDAGRun"][];
+            /** @description List of repeated sub DAG-runs when using repeatPolicy */
+            subRunsRepeated?: components["schemas"]["SubDAGRun"][];
             /** @description Error message if the step failed */
             error?: string;
         };
-        /** @description Metadata for a child DAG-run */
-        ChildDAGRun: {
+        /** @description Metadata for a sub DAG-run */
+        SubDAGRun: {
             dagRunId: components["schemas"]["DAGRunId"];
-            /** @description Parameters passed to the child DAG-run in JSON format */
+            /** @description Parameters passed to the sub DAG-run in JSON format */
             params: string;
         };
         /** @description Individual task definition that performs a specific operation in a DAG-run */
@@ -1010,9 +1010,9 @@ export interface components {
             output?: string;
             /** @description List of arguments to pass to the command */
             args?: string[];
-            /** @description The name of the DAG to execute as a child DAG-run */
+            /** @description The name of the DAG to execute as a sub DAG-run */
             call?: string;
-            /** @description Parameters to pass to the child DAG-run in JSON format */
+            /** @description Parameters to pass to the sub DAG-run in JSON format */
             params?: string;
             /** @description Configuration for parallel execution of the step */
             parallel?: {
@@ -2539,7 +2539,7 @@ export interface operations {
             };
         };
     };
-    getChildDAGRunDetails: {
+    getSubDAGRunDetails: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -2551,8 +2551,8 @@ export interface operations {
                 name: components["parameters"]["DAGName"];
                 /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
                 dagRunId: components["parameters"]["DAGRunId"];
-                /** @description ID of the child DAG-run to retrieve details for */
-                childDAGRunId: string;
+                /** @description ID of the sub DAG-run to retrieve details for */
+                subDAGRunId: string;
             };
             cookie?: never;
         };
@@ -2569,7 +2569,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Child DAG-run not found */
+            /** @description Sub DAG-run not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2589,7 +2589,7 @@ export interface operations {
             };
         };
     };
-    getChildDAGRunLog: {
+    getSubDAGRunLog: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -2609,8 +2609,8 @@ export interface operations {
                 name: components["parameters"]["DAGName"];
                 /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
                 dagRunId: components["parameters"]["DAGRunId"];
-                /** @description ID of the child DAG-run to retrieve the log for */
-                childDAGRunId: string;
+                /** @description ID of the sub DAG-run to retrieve the log for */
+                subDAGRunId: string;
             };
             cookie?: never;
         };
@@ -2645,7 +2645,7 @@ export interface operations {
             };
         };
     };
-    getChildDAGRunStepLog: {
+    getSubDAGRunStepLog: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -2667,8 +2667,8 @@ export interface operations {
                 name: components["parameters"]["DAGName"];
                 /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
                 dagRunId: components["parameters"]["DAGRunId"];
-                /** @description ID of the child DAG-run to retrieve the log for */
-                childDAGRunId: string;
+                /** @description ID of the sub DAG-run to retrieve the log for */
+                subDAGRunId: string;
                 /** @description name of the step */
                 stepName: components["parameters"]["StepName"];
             };
@@ -2705,7 +2705,7 @@ export interface operations {
             };
         };
     };
-    updateChildDAGRunStepStatus: {
+    updateSubDAGRunStepStatus: {
         parameters: {
             query?: {
                 /** @description name of the remote node */
@@ -2717,8 +2717,8 @@ export interface operations {
                 name: components["parameters"]["DAGName"];
                 /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
                 dagRunId: components["parameters"]["DAGRunId"];
-                /** @description ID of the child DAG-run to update the step status for */
-                childDAGRunId: string;
+                /** @description ID of the sub DAG-run to update the step status for */
+                subDAGRunId: string;
                 /** @description name of the step */
                 stepName: components["parameters"]["StepName"];
             };

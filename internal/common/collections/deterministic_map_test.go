@@ -364,8 +364,8 @@ func TestDeterministicMap_Integration_ParallelItem(t *testing.T) {
 	assert.Equal(t, item.Params, restored.Params)
 }
 
-func TestDeterministicMap_RealWorldChildDAGParams(t *testing.T) {
-	// Test real-world scenario where child DAGs receive complex JSON parameters
+func TestDeterministicMap_RealWorldSubDAGParams(t *testing.T) {
+	// Test real-world scenario where sub DAGs receive complex JSON parameters
 	tests := []struct {
 		name     string
 		params   collections.DeterministicMap
@@ -412,7 +412,7 @@ func TestDeterministicMap_RealWorldChildDAGParams(t *testing.T) {
 				assert.Equal(t, string(data), string(data2), "marshal should be deterministic")
 			}
 
-			// Verify hash stability (simulating child DAG ID generation)
+			// Verify hash stability (simulating sub DAG ID generation)
 			hash1 := fmt.Sprintf("%x", data)
 			data3, _ := json.Marshal(item.Params)
 			hash2 := fmt.Sprintf("%x", data3)

@@ -38,7 +38,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
     e.preventDefault();
     if (dagRun.parentDAGRunId) {
       const searchParams = new URLSearchParams();
-      searchParams.set('childDAGRunId', dagRun.parentDAGRunId);
+      searchParams.set('subDAGRunId', dagRun.parentDAGRunId);
       searchParams.set('dagRunId', dagRun.rootDAGRunId);
       searchParams.set('dagRunName', dagRun.rootDAGRunName);
       navigate(

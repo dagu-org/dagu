@@ -250,7 +250,7 @@ func (store *Store) collectStatusesFromRoots(
 }
 
 // CreateAttempt creates a new history record for the specified dag-run ID.
-// If opts.Root is not nil, it creates a new history record for a child dag-run.
+// If opts.Root is not nil, it creates a new history record for a sub dag-run.
 // If opts.Retry is true, it creates a retry record for the specified dag-run ID.
 func (store *Store) CreateAttempt(ctx context.Context, dag *core.DAG, timestamp time.Time, dagRunID string, opts execution.NewDAGRunAttemptOptions) (execution.DAGRunAttempt, error) {
 	if dagRunID == "" {
@@ -305,7 +305,7 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *core.DAG, timestamp 
 	return record, nil
 }
 
-// newChildRecord creates a new history record for a child dag-run.
+// newChildRecord creates a new history record for a sub dag-run.
 func (b *Store) newChildRecord(ctx context.Context, dag *core.DAG, timestamp time.Time, dagRunID string, opts execution.NewDAGRunAttemptOptions) (execution.DAGRunAttempt, error) {
 	dataRoot := NewDataRoot(b.baseDir, opts.RootDAGRun.Name)
 	root, err := dataRoot.FindByDAGRunID(ctx, opts.RootDAGRun.ID)
@@ -317,22 +317,22 @@ func (b *Store) newChildRecord(ctx context.Context, dag *core.DAG, timestamp tim
 
 	var run *DAGRun
 	if opts.Retry {
-		r, err := root.FindChildDAGRun(ctx, dagRunID)
+		r, err := root.FindSubDAGRun(ctx, dagRunID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find child dag-run record: %w", err)
+			return nil, fmt.Errorf("failed to find sub dag-run record: %w", err)
 		}
 		run = r
 	} else {
-		r, err := root.CreateChildDAGRun(ctx, dagRunID)
+		r, err := root.CreateSubDAGRun(ctx, dagRunID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create child dag-run: %w", err)
+			return nil, fmt.Errorf("failed to create sub dag-run: %w", err)
 		}
 		run = r
 	}
 
 	record, err := run.CreateAttempt(ctx, ts, b.cache, WithDAG(dag))
 	if err != nil {
-		logger.Error(ctx, "Failed to create child dag-run record", "err", err)
+		logger.Error(ctx, "Failed to create sub dag-run record", "err", err)
 		return nil, err
 	}
 
@@ -407,9 +407,9 @@ func (store *Store) FindAttempt(ctx context.Context, ref execution.DAGRunRef) (e
 	return run.LatestAttempt(ctx, store.cache)
 }
 
-// FindChildAttempt finds a child dag-run by its ID.
-// It returns the latest record for the specified child dag-run ID.
-func (store *Store) FindChildAttempt(ctx context.Context, ref execution.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
+// FindSubAttempt finds a sub dag-run by its ID.
+// It returns the latest record for the specified sub dag-run ID.
+func (store *Store) FindSubAttempt(ctx context.Context, ref execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
 	if ref.ID == "" {
 		return nil, ErrDAGRunIDEmpty
 	}
@@ -420,11 +420,11 @@ func (store *Store) FindChildAttempt(ctx context.Context, ref execution.DAGRunRe
 		return nil, fmt.Errorf("failed to find execution: %w", err)
 	}
 
-	childDAGRun, err := dagRun.FindChildDAGRun(ctx, childDAGRunID)
+	subDAGRun, err := dagRun.FindSubDAGRun(ctx, subDAGRunID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find child dag-run: %w", err)
+		return nil, fmt.Errorf("failed to find sub dag-run: %w", err)
 	}
-	return childDAGRun.LatestAttempt(ctx, store.cache)
+	return subDAGRun.LatestAttempt(ctx, store.cache)
 }
 
 // RemoveOldDAGRuns removes old history records older than the specified retention days.

@@ -83,15 +83,15 @@ func (e DAGContext) AllEnvs() []string {
 type Database interface {
 	// GetDAG retrieves a DAG by its name.
 	GetDAG(ctx context.Context, name string) (*core.DAG, error)
-	// GetChildDAGRunStatus retrieves the status of a child dag-run by its ID and the root dag-run reference.
-	GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (*RunStatus, error)
-	// IsChildDAGRunCompleted checks if a child dag-run has completed.
-	IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (bool, error)
-	// RequestChildCancel requests cancellation of a child dag-run.
+	// GetSubDAGRunStatus retrieves the status of a sub dag-run by its ID and the root dag-run reference.
+	GetSubDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (*RunStatus, error)
+	// IsSubDAGRunCompleted checks if a sub dag-run has completed.
+	IsSubDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) (bool, error)
+	// RequestChildCancel requests cancellation of a sub dag-run.
 	RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun DAGRunRef) error
 }
 
-// ChildDAGRunStatus is an interface that represents the status of a child dag-run.
+// SubDAGRunStatus is an interface that represents the status of a sub dag-run.
 type RunStatus struct {
 	// Name represents the name of the executed DAG.
 	Name string

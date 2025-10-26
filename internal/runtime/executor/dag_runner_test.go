@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
+func TestNewSubDAGExecutor_LocalDAG(t *testing.T) {
 	// Create a context with environment
 	ctx := context.Background()
 
@@ -51,7 +51,7 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 	ctx = execution.WithEnv(ctx, env)
 
 	// Test creating executor for local DAG
-	executor, err := NewChildDAGExecutor(ctx, "local-child")
+	executor, err := NewSubDAGExecutor(ctx, "local-child")
 	require.NoError(t, err)
 	require.NotNil(t, executor)
 
@@ -75,7 +75,7 @@ func TestNewChildDAGExecutor_LocalDAG(t *testing.T) {
 	assert.NoFileExists(t, executor.tempFile)
 }
 
-func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
+func TestNewSubDAGExecutor_RegularDAG(t *testing.T) {
 	// Create a context with environment
 	ctx := context.Background()
 
@@ -108,7 +108,7 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 	mockDB.On("GetDAG", ctx, "regular-child").Return(expectedDAG, nil)
 
 	// Test creating executor for regular DAG
-	executor, err := NewChildDAGExecutor(ctx, "regular-child")
+	executor, err := NewSubDAGExecutor(ctx, "regular-child")
 	require.NoError(t, err)
 	require.NotNil(t, executor)
 
@@ -123,7 +123,7 @@ func TestNewChildDAGExecutor_RegularDAG(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestNewChildDAGExecutor_NotFound(t *testing.T) {
+func TestNewSubDAGExecutor_NotFound(t *testing.T) {
 	// Create a context with environment
 	ctx := context.Background()
 
@@ -155,7 +155,7 @@ func TestNewChildDAGExecutor_NotFound(t *testing.T) {
 	mockDB.On("GetDAG", ctx, "non-existent").Return(nil, assert.AnError)
 
 	// Test creating executor for non-existent DAG
-	executor, err := NewChildDAGExecutor(ctx, "non-existent")
+	executor, err := NewSubDAGExecutor(ctx, "non-existent")
 	assert.Error(t, err)
 	assert.Nil(t, executor)
 	assert.Contains(t, err.Error(), "failed to find DAG")
@@ -186,7 +186,7 @@ func TestBuildCommand(t *testing.T) {
 	ctx = execution.WithEnv(ctx, env)
 
 	// Create executor
-	executor := &ChildDAGExecutor{
+	executor := &SubDAGExecutor{
 		DAG: &core.DAG{
 			Name:     "test-child",
 			Location: "/path/to/test.yaml",
@@ -239,7 +239,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 	}
 	ctx = execution.WithEnv(ctx, env)
 
-	executor := &ChildDAGExecutor{
+	executor := &SubDAGExecutor{
 		DAG:    &core.DAG{Name: "test-child"},
 		killed: make(chan struct{}),
 	}
@@ -274,7 +274,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 	}
 	ctx = execution.WithEnv(ctx, env)
 
-	executor := &ChildDAGExecutor{
+	executor := &SubDAGExecutor{
 		DAG: &core.DAG{Name: "test-child"},
 	}
 
@@ -299,7 +299,7 @@ func TestCleanup_LocalDAG(t *testing.T) {
 	err = os.WriteFile(tempFile, []byte("test content"), 0600)
 	require.NoError(t, err)
 
-	executor := &ChildDAGExecutor{
+	executor := &SubDAGExecutor{
 		DAG:      &core.DAG{Name: "test-child"},
 		tempFile: tempFile,
 		killed:   make(chan struct{}),
@@ -319,7 +319,7 @@ func TestCleanup_LocalDAG(t *testing.T) {
 func TestCleanup_NonExistentFile(t *testing.T) {
 	ctx := context.Background()
 
-	executor := &ChildDAGExecutor{
+	executor := &SubDAGExecutor{
 		DAG:      &core.DAG{Name: "test-child"},
 		tempFile: "/non/existent/file.yaml",
 		killed:   make(chan struct{}),
@@ -367,7 +367,7 @@ func TestExecutablePath(t *testing.T) {
 	assert.NotEmpty(t, path)
 }
 
-func TestChildDAGExecutor_Kill_MixedProcesses(t *testing.T) {
+func TestSubDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 	// Create a mock database
 	mockDB := new(mockDatabase)
 
@@ -381,14 +381,14 @@ func TestChildDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 	}
 	_ = execution.WithEnv(context.Background(), env)
 
-	// Create a child DAG
-	childDAG := &core.DAG{
-		Name: "child-dag",
+	// Create a sub DAG
+	subDAG := &core.DAG{
+		Name: "sub-dag",
 	}
 
 	// Create child executor with both local and distributed processes
-	executor := &ChildDAGExecutor{
-		DAG: childDAG,
+	executor := &SubDAGExecutor{
+		DAG: subDAG,
 		env: env,
 		cmds: map[string]*exec.Cmd{
 			"local-run-1": &exec.Cmd{Process: &os.Process{Pid: 1234}},
@@ -416,7 +416,7 @@ func TestChildDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestChildDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
+func TestSubDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 	// Create a mock database
 	mockDB := new(mockDatabase)
 
@@ -430,14 +430,14 @@ func TestChildDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 	}
 	_ = execution.WithEnv(context.Background(), env)
 
-	// Create a child DAG
-	childDAG := &core.DAG{
-		Name: "child-dag",
+	// Create a sub DAG
+	subDAG := &core.DAG{
+		Name: "sub-dag",
 	}
 
 	// Create child executor with only distributed processes
-	executor := &ChildDAGExecutor{
-		DAG:  childDAG,
+	executor := &SubDAGExecutor{
+		DAG:  subDAG,
 		env:  env,
 		cmds: make(map[string]*exec.Cmd),
 		distributedRuns: map[string]bool{
@@ -461,7 +461,7 @@ func TestChildDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestChildDAGExecutor_Kill_OnlyLocal(t *testing.T) {
+func TestSubDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 	// Create a mock database
 	mockDB := new(mockDatabase)
 
@@ -475,14 +475,14 @@ func TestChildDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 	}
 	_ = execution.WithEnv(context.Background(), env)
 
-	// Create a child DAG
-	childDAG := &core.DAG{
-		Name: "child-dag",
+	// Create a sub DAG
+	subDAG := &core.DAG{
+		Name: "sub-dag",
 	}
 
 	// Create child executor with only local processes
-	executor := &ChildDAGExecutor{
-		DAG: childDAG,
+	executor := &SubDAGExecutor{
+		DAG: subDAG,
 		env: env,
 		cmds: map[string]*exec.Cmd{
 			"local-run-1": &exec.Cmd{Process: &os.Process{Pid: 1234}},
@@ -501,7 +501,7 @@ func TestChildDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 	mockDB.AssertNotCalled(t, "RequestChildCancel")
 }
 
-func TestChildDAGExecutor_Kill_Empty(t *testing.T) {
+func TestSubDAGExecutor_Kill_Empty(t *testing.T) {
 	// Create a mock database
 	mockDB := new(mockDatabase)
 
@@ -515,14 +515,14 @@ func TestChildDAGExecutor_Kill_Empty(t *testing.T) {
 	}
 	_ = execution.WithEnv(context.Background(), env)
 
-	// Create a child DAG
-	childDAG := &core.DAG{
-		Name: "child-dag",
+	// Create a sub DAG
+	subDAG := &core.DAG{
+		Name: "sub-dag",
 	}
 
 	// Create child executor with no processes
-	executor := &ChildDAGExecutor{
-		DAG:             childDAG,
+	executor := &SubDAGExecutor{
+		DAG:             subDAG,
 		env:             env,
 		cmds:            make(map[string]*exec.Cmd),
 		distributedRuns: make(map[string]bool),
@@ -554,7 +554,7 @@ func (m *mockDatabase) GetDAG(ctx context.Context, name string) (*core.DAG, erro
 	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
-func (m *mockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (*execution.RunStatus, error) {
+func (m *mockDatabase) GetSubDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (*execution.RunStatus, error) {
 	args := m.Called(ctx, dagRunID, rootDAGRun)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -562,8 +562,8 @@ func (m *mockDatabase) GetChildDAGRunStatus(ctx context.Context, dagRunID string
 	return args.Get(0).(*execution.RunStatus), args.Error(1)
 }
 
-// IsChildDAGRunCompleted implements core.Database.
-func (m *mockDatabase) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (bool, error) {
+// IsSubDAGRunCompleted implements core.Database.
+func (m *mockDatabase) IsSubDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (bool, error) {
 	args := m.Called(ctx, dagRunID, rootDAGRun)
 	return args.Bool(0), args.Error(1)
 }

@@ -114,7 +114,7 @@ func validateStep(step Step) error {
 
 	if step.Parallel != nil {
 		// Parallel steps must have a run field (child-DAG only for MVP)
-		if step.ChildDAG == nil {
+		if step.SubDAG == nil {
 			return NewValidationError("parallel", step.Parallel, fmt.Errorf("parallel execution is only supported for child-DAGs (must have 'run' field)"))
 		}
 

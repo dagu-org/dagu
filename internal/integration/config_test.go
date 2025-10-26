@@ -563,7 +563,7 @@ steps:
 func TestNestedThreeLevelDAG(t *testing.T) {
 	th := test.Setup(t)
 
-	// Create the grandchild DAG as a separate file
+	// Create the grandsub DAG as a separate file
 	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "nested_grand_child", []byte(`
 params:
   PARAM: VALUE
@@ -572,12 +572,12 @@ steps:
     output: OUTPUT
 `))
 
-	// Create parent and child DAGs using multi-document YAML
+	// Create parent and sub DAGs using multi-document YAML
 	dagContent := `steps:
   - call: nested_child
     params: "PARAM=123"
-    output: CHILD_OUTPUT
-  - command: echo ${CHILD_OUTPUT.outputs.OUTPUT}
+    output: SUB_OUTPUT
+  - command: echo ${SUB_OUTPUT.outputs.OUTPUT}
     output: OUT1
 ---
 name: nested_child
@@ -586,8 +586,8 @@ params:
 steps:
   - call: nested_grand_child
     params: "PARAM=${PARAM}"
-    output: GRAND_CHILD_OUTPUT
-  - command: echo ${GRAND_CHILD_OUTPUT.outputs.OUTPUT}
+    output: GRAND_SUB_OUTPUT
+  - command: echo ${GRAND_SUB_OUTPUT.outputs.OUTPUT}
     output: OUTPUT
 `
 	dag := th.DAG(t, dagContent)

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDBClient_GetChildDAGRunStatus(t *testing.T) {
+func TestDBClient_GetSubDAGRunStatus(t *testing.T) {
 	t.Run("BasicCase", func(t *testing.T) {
 		ctx := context.Background()
 
@@ -25,7 +25,7 @@ func TestDBClient_GetChildDAGRunStatus(t *testing.T) {
 		mockAttempt := new(mockDAGRunAttempt)
 
 		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-123")
-		childRunID := "child-run-123"
+		subRunID := "child-run-123"
 
 		// Setup outputs
 		outputs := &collections.SyncMap{}
@@ -34,10 +34,10 @@ func TestDBClient_GetChildDAGRunStatus(t *testing.T) {
 		mockAttempt.outputs = outputs
 
 		// Setup expectations
-		mockDAGRunStore.On("FindChildAttempt", ctx, rootRef, childRunID).Return(mockAttempt, nil)
+		mockDAGRunStore.On("FindSubAttempt", ctx, rootRef, subRunID).Return(mockAttempt, nil)
 		mockAttempt.On("ReadStatus", ctx).Return(&execution.DAGRunStatus{
-			Name:     "child-dag",
-			DAGRunID: childRunID,
+			Name:     "sub-dag",
+			DAGRunID: subRunID,
 			Status:   core.Succeeded,
 			Params:   "param1=value1",
 			Nodes: []*execution.Node{
@@ -48,14 +48,14 @@ func TestDBClient_GetChildDAGRunStatus(t *testing.T) {
 		// Create dbClient
 		dbClient := newDBClient(mockDAGRunStore, mockDAGStore)
 
-		// Test GetChildDAGRunStatus
-		st, err := dbClient.GetChildDAGRunStatus(ctx, childRunID, rootRef)
+		// Test GetSubDAGRunStatus
+		st, err := dbClient.GetSubDAGRunStatus(ctx, subRunID, rootRef)
 		require.NoError(t, err)
 		require.NotNil(t, st)
 
 		// Verify the status
-		assert.Equal(t, "child-dag", st.Name)
-		assert.Equal(t, childRunID, st.DAGRunID)
+		assert.Equal(t, "sub-dag", st.Name)
+		assert.Equal(t, subRunID, st.DAGRunID)
 		assert.Equal(t, "param1=value1", st.Params)
 		assert.Equal(t, map[string]string{"result": "success", "count": "42"}, st.Outputs)
 
@@ -70,13 +70,13 @@ func TestDBClient_GetChildDAGRunStatus(t *testing.T) {
 		mockDAGRunStore := new(mockDAGRunStore)
 
 		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-notfound")
-		childRunID := "non-existent-child"
+		subRunID := "non-existent-child"
 
-		mockDAGRunStore.On("FindChildAttempt", ctx, rootRef, childRunID).Return(nil, errors.New("not found"))
+		mockDAGRunStore.On("FindSubAttempt", ctx, rootRef, subRunID).Return(nil, errors.New("not found"))
 
 		dbClient := newDBClient(mockDAGRunStore, mockDAGStore)
 
-		status, err := dbClient.GetChildDAGRunStatus(ctx, childRunID, rootRef)
+		status, err := dbClient.GetSubDAGRunStatus(ctx, subRunID, rootRef)
 		assert.Error(t, err)
 		assert.Nil(t, status)
 		assert.Contains(t, err.Error(), "failed to find run for dag-run ID")
@@ -85,7 +85,7 @@ func TestDBClient_GetChildDAGRunStatus(t *testing.T) {
 	})
 }
 
-func TestDBClient_IsChildDAGRunCompleted(t *testing.T) {
+func TestDBClient_IsSubDAGRunCompleted(t *testing.T) {
 	t.Run("CompletedWithSuccess", func(t *testing.T) {
 		ctx := context.Background()
 
@@ -94,18 +94,18 @@ func TestDBClient_IsChildDAGRunCompleted(t *testing.T) {
 		mockAttempt := new(mockDAGRunAttempt)
 
 		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-completed")
-		childRunID := "child-completed-success"
+		subRunID := "child-completed-success"
 
-		mockDAGRunStore.On("FindChildAttempt", ctx, rootRef, childRunID).Return(mockAttempt, nil)
+		mockDAGRunStore.On("FindSubAttempt", ctx, rootRef, subRunID).Return(mockAttempt, nil)
 		mockAttempt.On("ReadStatus", ctx).Return(&execution.DAGRunStatus{
-			Name:     "child-dag",
-			DAGRunID: childRunID,
+			Name:     "sub-dag",
+			DAGRunID: subRunID,
 			Status:   core.Succeeded,
 		}, nil)
 
 		dbClient := newDBClient(mockDAGRunStore, mockDAGStore)
 
-		completed, err := dbClient.IsChildDAGRunCompleted(ctx, childRunID, rootRef)
+		completed, err := dbClient.IsSubDAGRunCompleted(ctx, subRunID, rootRef)
 		require.NoError(t, err)
 		assert.True(t, completed, "StatusSuccess should be completed")
 
@@ -121,18 +121,18 @@ func TestDBClient_IsChildDAGRunCompleted(t *testing.T) {
 		mockAttempt := new(mockDAGRunAttempt)
 
 		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-error")
-		childRunID := "child-completed-error"
+		subRunID := "child-completed-error"
 
-		mockDAGRunStore.On("FindChildAttempt", ctx, rootRef, childRunID).Return(mockAttempt, nil)
+		mockDAGRunStore.On("FindSubAttempt", ctx, rootRef, subRunID).Return(mockAttempt, nil)
 		mockAttempt.On("ReadStatus", ctx).Return(&execution.DAGRunStatus{
-			Name:     "child-dag",
-			DAGRunID: childRunID,
+			Name:     "sub-dag",
+			DAGRunID: subRunID,
 			Status:   core.Failed,
 		}, nil)
 
 		dbClient := newDBClient(mockDAGRunStore, mockDAGStore)
 
-		completed, err := dbClient.IsChildDAGRunCompleted(ctx, childRunID, rootRef)
+		completed, err := dbClient.IsSubDAGRunCompleted(ctx, subRunID, rootRef)
 		require.NoError(t, err)
 		assert.True(t, completed, "StatusError should be completed")
 
@@ -146,13 +146,13 @@ func TestDBClient_IsChildDAGRunCompleted(t *testing.T) {
 		mockDAGRunStore := new(mockDAGRunStore)
 
 		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-notfound")
-		childRunID := "non-existent-child"
+		subRunID := "non-existent-child"
 
-		mockDAGRunStore.On("FindChildAttempt", ctx, rootRef, childRunID).Return(nil, errors.New("not found"))
+		mockDAGRunStore.On("FindSubAttempt", ctx, rootRef, subRunID).Return(nil, errors.New("not found"))
 
 		dbClient := newDBClient(mockDAGRunStore, mockDAGStore)
 
-		completed, err := dbClient.IsChildDAGRunCompleted(ctx, childRunID, rootRef)
+		completed, err := dbClient.IsSubDAGRunCompleted(ctx, subRunID, rootRef)
 		assert.Error(t, err)
 		assert.False(t, completed)
 		assert.Contains(t, err.Error(), "failed to find run for dag-run ID")
@@ -289,7 +289,7 @@ func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun execution.DAGR
 	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, rootDAGRun execution.DAGRunRef, dagRunID string) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindSubAttempt(ctx context.Context, rootDAGRun execution.DAGRunRef, dagRunID string) (execution.DAGRunAttempt, error) {
 	args := m.Called(ctx, rootDAGRun, dagRunID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

@@ -165,8 +165,8 @@ mailOn:
 logDir: "/base/logs"
 `)
 		testDAG := createTempYAMLFile(t, `env:
-  CHILD_ENV: "child_value"
-  OVERWRITE_ENV: "child_overwrite_value"
+  SUB_ENV: "sub_value"
+  OVERWRITE_ENV: "sub_overwrite_value"
 
 steps:
   - name: "step1"
@@ -179,9 +179,9 @@ steps:
 		// Check if fields are inherited correctly
 		assert.Equal(t, "/base/logs", dag.LogDir)
 		assert.Contains(t, dag.Env, "BASE_ENV=base_value")
-		assert.Contains(t, dag.Env, "CHILD_ENV=child_value")
-		assert.Contains(t, dag.Env, "OVERWRITE_ENV=child_overwrite_value")
-		// 3 from base + 1 from child. For now we keep the base env vars that are overwritten in the child DAG
+		assert.Contains(t, dag.Env, "SUB_ENV=sub_value")
+		assert.Contains(t, dag.Env, "OVERWRITE_ENV=sub_overwrite_value")
+		// 3 from base + 1 from child. For now we keep the base env vars that are overwritten in the sub DAG
 		// TODO: This should be changed not
 		assert.Len(t, dag.Env, 4)
 	})
@@ -279,15 +279,15 @@ steps:
 		// Verify main DAG
 		assert.Len(t, dag.Steps, 2)
 		assert.Equal(t, "process", dag.Steps[0].Name)
-		assert.Equal(t, "transform-data", dag.Steps[0].ChildDAG.Name)
+		assert.Equal(t, "transform-data", dag.Steps[0].SubDAG.Name)
 		assert.Equal(t, "archive", dag.Steps[1].Name)
-		assert.Equal(t, "archive-results", dag.Steps[1].ChildDAG.Name)
+		assert.Equal(t, "archive-results", dag.Steps[1].SubDAG.Name)
 
-		// Verify child DAGs
+		// Verify sub DAGs
 		require.NotNil(t, dag.LocalDAGs)
 		assert.Len(t, dag.LocalDAGs, 2)
 
-		// Check transform-data child DAG
+		// Check transform-data sub DAG
 		_, exists := dag.LocalDAGs["transform-data"]
 		require.True(t, exists)
 		transformDAG := dag.LocalDAGs["transform-data"]
@@ -296,7 +296,7 @@ steps:
 		assert.Equal(t, "transform", transformDAG.Steps[0].Name)
 		assert.Equal(t, "transform.py", transformDAG.Steps[0].Command)
 
-		// Check archive-results child DAG
+		// Check archive-results sub DAG
 		_, exists = dag.LocalDAGs["archive-results"]
 		require.True(t, exists)
 		archiveDAG := dag.LocalDAGs["archive-results"]
@@ -328,7 +328,7 @@ steps:
     command: echo "main"
 
 ---
-name: child-dag
+name: sub-dag
 env:
   - SERVICE: worker
 steps:
@@ -352,17 +352,17 @@ steps:
 		assert.Contains(t, dag.Env, "API_KEY=secret123")
 		assert.Contains(t, dag.Env, "APP=myapp")
 
-		// Verify child DAG also inherits base config
-		childDAG := dag.LocalDAGs["child-dag"]
-		require.NotNil(t, childDAG)
-		assert.Equal(t, "/base/logs", childDAG.LogDir)
-		assert.NotNil(t, childDAG.SMTP)
-		assert.Equal(t, "smtp.example.com", childDAG.SMTP.Host)
+		// Verify sub DAG also inherits base config
+		subDAG := dag.LocalDAGs["sub-dag"]
+		require.NotNil(t, subDAG)
+		assert.Equal(t, "/base/logs", subDAG.LogDir)
+		assert.NotNil(t, subDAG.SMTP)
+		assert.Equal(t, "smtp.example.com", subDAG.SMTP.Host)
 
-		// Verify child DAG has merged env vars
-		assert.Contains(t, childDAG.Env, "ENV=production")
-		assert.Contains(t, childDAG.Env, "API_KEY=secret123")
-		assert.Contains(t, childDAG.Env, "SERVICE=worker")
+		// Verify sub DAG has merged env vars
+		assert.Contains(t, subDAG.Env, "ENV=production")
+		assert.Contains(t, subDAG.Env, "API_KEY=secret123")
+		assert.Contains(t, subDAG.Env, "SERVICE=worker")
 	})
 
 	t.Run("SingleDAGFileCompatibility", func(t *testing.T) {
@@ -379,12 +379,12 @@ steps:
 		dag, err := spec.Load(context.Background(), tmpFile)
 		require.NoError(t, err)
 
-		// Verify it loads correctly without child DAGs
+		// Verify it loads correctly without sub DAGs
 		assert.Len(t, dag.Steps, 1)
-		assert.Nil(t, dag.LocalDAGs) // No child DAGs for single DAG file
+		assert.Nil(t, dag.LocalDAGs) // No sub DAGs for single DAG file
 	})
 
-	t.Run("DuplicateChildDAGNames", func(t *testing.T) {
+	t.Run("DuplicateSubDAGNames", func(t *testing.T) {
 		t.Parallel()
 
 		// Multi-DAG file with duplicate names
@@ -412,10 +412,10 @@ steps:
 		assert.Contains(t, err.Error(), "duplicate DAG name")
 	})
 
-	t.Run("ChildDAGWithoutName", func(t *testing.T) {
+	t.Run("SubDAGWithoutName", func(t *testing.T) {
 		t.Parallel()
 
-		// Multi-DAG file where child DAG has no name
+		// Multi-DAG file where sub DAG has no name
 		multiDAGContent := `steps:
   - name: step1
     command: echo "main"
@@ -427,7 +427,7 @@ steps:
 `
 		tmpFile := createTempYAMLFile(t, multiDAGContent)
 
-		// Load should fail because child DAG has no name
+		// Load should fail because sub DAG has no name
 		_, err := spec.Load(context.Background(), tmpFile)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must have a name")
@@ -438,7 +438,7 @@ steps:
 
 		// TODO: The YAML parser has limitations with empty documents (---)
 		// The behavior is inconsistent - sometimes it skips them, sometimes it errors.
-		// For now, we test that it loads something, but the child DAG after
+		// For now, we test that it loads something, but the sub DAG after
 		// the empty document may or may not be loaded.
 		multiDAGContent := `steps:
   - name: step1
@@ -504,19 +504,19 @@ steps:
 		assert.Equal(t, "0 2 * * *", dag.Schedule[0].Expression)
 		assert.Contains(t, dag.Params, "ENVIRONMENT=dev")
 
-		// Verify child DAG references and parameters
-		assert.Equal(t, "extract-module", dag.Steps[0].ChildDAG.Name)
-		assert.Equal(t, `SOURCE="customers" TABLE="users"`, dag.Steps[0].ChildDAG.Params)
-		assert.Equal(t, "transform-module", dag.Steps[1].ChildDAG.Name)
+		// Verify sub DAG references and parameters
+		assert.Equal(t, "extract-module", dag.Steps[0].SubDAG.Name)
+		assert.Equal(t, `SOURCE="customers" TABLE="users"`, dag.Steps[0].SubDAG.Params)
+		assert.Equal(t, "transform-module", dag.Steps[1].SubDAG.Name)
 
-		// Verify extract-module child DAG
+		// Verify extract-module sub DAG
 		extractDAG := dag.LocalDAGs["extract-module"]
 		require.NotNil(t, extractDAG)
 		assert.Contains(t, extractDAG.Params, "SOURCE=default_source")
 		assert.Contains(t, extractDAG.Params, "TABLE=default_table")
 		assert.Len(t, extractDAG.Steps, 2)
 
-		// Verify dependencies in child DAG
+		// Verify dependencies in sub DAG
 		assert.Contains(t, extractDAG.Steps[1].Depends, "validate")
 	})
 

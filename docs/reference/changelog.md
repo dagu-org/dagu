@@ -9,7 +9,7 @@
 
 ### Changed
 - Status: Adopted canonical lowercase tokens for DAG and node lifecycle states (`not_started`, `queued`, `running`, `succeeded`, `partially_succeeded`, `failed`, `canceled`), and updated API examples, docs, and telemetry labels to match.
-- Security: Implemented security filtering for system environment variables passed to step processes and child DAGs. System variables remain available for expansion (`${VAR}`) during DAG configuration parsing, but only whitelisted variables (`PATH`, `HOME`, `LANG`, `TZ`, `SHELL`) and variables with allowed prefixes (`DAGU_*`, `LC_*`, `DAG_*`) are passed to the step execution environment. This prevents accidental exposure of sensitive credentials to subprocess environments. Other variables must be explicitly defined in the workflow's `env` section to be available in step processes.
+- Security: Implemented security filtering for system environment variables passed to step processes and sub DAGs. System variables remain available for expansion (`${VAR}`) during DAG configuration parsing, but only whitelisted variables (`PATH`, `HOME`, `LANG`, `TZ`, `SHELL`) and variables with allowed prefixes (`DAGU_*`, `LC_*`, `DAG_*`) are passed to the step execution environment. This prevents accidental exposure of sensitive credentials to subprocess environments. Other variables must be explicitly defined in the workflow's `env` section to be available in step processes.
 - Scheduler: Queue handler now processes items asynchronously, acknowledging work before heartbeat checks so long-running startups no longer starve the queue.
 - Runtime: Subcommand execution inherits the filtered base environment and uses the caller's working directory.
 
@@ -374,7 +374,7 @@ Thanks to our contributors for this release:
 
 ### New Features
 - **One-click Step Re-run**: Retry an individual step without touching the rest of the DAG (#1030)
-- **Nested-DAG Log Viewer**: See logs for every repeated child run instead of only the last execution (#1029)
+- **Nested-DAG Log Viewer**: See logs for every repeated sub run instead of only the last execution (#1029)
 
 ### Bug Fixes
 - **Docker**: Fixed asset serving with base path and corrected storage volume locations (#1037)
@@ -388,7 +388,7 @@ Thanks to our contributors for this release:
 | Contribution | Author |
 |--------------|--------|
 | One-click Step Re-run – retry an individual step without touching the rest of the DAG | 🛠️ [@thefishhat](https://github.com/thefishhat) |
-| Nested-DAG Log Viewer – see logs for every repeated child run | 💡 [@jeremydelattre59](https://github.com/jeremydelattre59) |
+| Nested-DAG Log Viewer – see logs for every repeated sub run | 💡 [@jeremydelattre59](https://github.com/jeremydelattre59) |
 | Docker image polish – fixes for asset paths & storage volumes | 🐳 [@jhuang732](https://github.com/jhuang732) (report) |
 
 ## v1.17.0 (2025-06-18)

@@ -99,7 +99,7 @@ func TestManager(t *testing.T) {
 		require.Equal(t, 1, len(dagRunStatus.Nodes))
 		require.Equal(t, newStatus, statusByDAGRunID.Nodes[0].Status)
 	})
-	t.Run("UpdateChildDAGRunStatus", func(t *testing.T) {
+	t.Run("UpdateSubDAGRunStatus", func(t *testing.T) {
 		dag := th.DAG(t, `
 steps:
   - name: "1"
@@ -118,26 +118,26 @@ steps:
 
 		dag.AssertLatestStatus(t, core.Succeeded)
 
-		// Get the child dag-run status.
+		// Get the sub dag-run status.
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
 		dagRunID := dagRunStatus.DAGRunID
-		childDAGRun := dagRunStatus.Nodes[0].Children[0]
+		subDAGRun := dagRunStatus.Nodes[0].SubRuns[0]
 
 		root := execution.NewDAGRunRef(dag.Name, dagRunID)
-		childDAGRunStatus, err := th.DAGRunMgr.FindChildDAGRunStatus(th.Context, root, childDAGRun.DAGRunID)
+		subDAGRunStatus, err := th.DAGRunMgr.FindSubDAGRunStatus(th.Context, root, subDAGRun.DAGRunID)
 		require.NoError(t, err)
-		require.Equal(t, core.Succeeded.String(), childDAGRunStatus.Status.String())
+		require.Equal(t, core.Succeeded.String(), subDAGRunStatus.Status.String())
 
-		// Update the the child dag-run status.
-		childDAGRunStatus.Nodes[0].Status = core.NodeFailed
-		err = th.DAGRunMgr.UpdateStatus(th.Context, root, *childDAGRunStatus)
+		// Update the the sub dag-run status.
+		subDAGRunStatus.Nodes[0].Status = core.NodeFailed
+		err = th.DAGRunMgr.UpdateStatus(th.Context, root, *subDAGRunStatus)
 		require.NoError(t, err)
 
-		// Check if the child dag-run status is updated.
-		childDAGRunStatus, err = th.DAGRunMgr.FindChildDAGRunStatus(th.Context, root, childDAGRun.DAGRunID)
+		// Check if the sub dag-run status is updated.
+		subDAGRunStatus, err = th.DAGRunMgr.FindSubDAGRunStatus(th.Context, root, subDAGRun.DAGRunID)
 		require.NoError(t, err)
-		require.Equal(t, core.NodeFailed.String(), childDAGRunStatus.Nodes[0].Status.String())
+		require.Equal(t, core.NodeFailed.String(), subDAGRunStatus.Nodes[0].Status.String())
 	})
 	t.Run("InvalidUpdateStatusWithInvalidDAGRunID", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
