@@ -8,6 +8,7 @@ import (
 
 	oidc "github.com/coreos/go-oidc"
 	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"golang.org/x/oauth2"
 )
@@ -122,16 +123,39 @@ func checkOIDCAuth(next http.Handler, provider *oidc.Provider, verifier *oidc.ID
 }
 
 func checkOIDCToken(next http.Handler, verifier *oidc.IDTokenVerifier, w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	authorized, err := r.Cookie("oidcToken")
-	if err == nil && authorized.Value != "" {
-		if _, err := verifier.Verify(context.Background(), authorized.Value); err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r)
+
+	if err != nil {
+		// Cookie not found or error reading it
+		logger.Warn(ctx, "OIDC authentication failed: oidcToken cookie not found",
+			"path", r.URL.Path,
+			"method", r.Method,
+			"error", err)
+		http.Error(w, "Authentication required: OIDC token cookie not found", http.StatusUnauthorized)
 		return
 	}
-	w.WriteHeader(http.StatusUnauthorized)
+
+	if authorized.Value == "" {
+		logger.Warn(ctx, "OIDC authentication failed: oidcToken cookie is empty",
+			"path", r.URL.Path,
+			"method", r.Method)
+		http.Error(w, "Authentication required: OIDC token is empty", http.StatusUnauthorized)
+		return
+	}
+
+	// Verify the token
+	if _, err := verifier.Verify(context.Background(), authorized.Value); err != nil {
+		logger.Warn(ctx, "OIDC authentication failed: token verification failed",
+			"path", r.URL.Path,
+			"method", r.Method,
+			"error", err)
+		http.Error(w, fmt.Sprintf("Authentication failed: invalid or expired OIDC token: %v", err), http.StatusUnauthorized)
+		return
+	}
+
+	// Token is valid, proceed
+	next.ServeHTTP(w, r)
 }
 
 func setCookie(w http.ResponseWriter, r *http.Request, name, value string, expire int) {
