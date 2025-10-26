@@ -79,7 +79,23 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 		return fmt.Errorf("unknown operation: %v", task.Operation)
 	}
 
-	return runtime.Run(ctx, spec) // Synchronous execution
+	if err := runtime.Run(ctx, spec); err != nil {
+		logger.Error(ctx, "Distributed task execution failed",
+			"operation", task.Operation.String(),
+			"target", task.Target,
+			"dag_run_id", task.DagRunId,
+			"err", err,
+		)
+		return err
+	}
+
+	logger.Info(ctx, "Distributed task execution finished",
+		"operation", task.Operation.String(),
+		"target", task.Target,
+		"dag_run_id", task.DagRunId,
+	)
+
+	return nil
 }
 
 func createTempDAGFile(dagName string, yamlData []byte) (string, error) {

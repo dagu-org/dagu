@@ -462,6 +462,7 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 		execution.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
 		execution.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)
+	ctx = logger.WithValues(ctx, "step", n.Name())
 	return execution.WithEnv(ctx, env)
 }
 

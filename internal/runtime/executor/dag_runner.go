@@ -300,9 +300,22 @@ func (e *ChildDAGExecutor) ExecuteWithResult(ctx context.Context, runParams RunP
 // executeDistributedWithResult runs the child DAG via coordinator and returns the result
 func (e *ChildDAGExecutor) executeDistributedWithResult(ctx context.Context, runParams RunParams) (*execution.RunStatus, error) {
 	// Dispatch to coordinator
-	if err := e.dispatchToCoordinator(ctx, runParams); err != nil {
+	err := e.dispatchToCoordinator(ctx, runParams)
+
+	if ctx.Err() != nil {
+		logger.Info(ctx, "Cancellation requested for distributed child DAG dispatch")
+		return nil, ctx.Err()
+	}
+
+	if err != nil {
+		logger.Error(ctx, "Distributed child DAG dispatch failed", "err", err)
 		return nil, fmt.Errorf("distributed execution failed: %w", err)
 	}
+
+	logger.Info(ctx, "Distributed child DAG dispatched; awaiting completion",
+		"dag_run_id", runParams.RunID,
+		"dag", e.DAG.Name,
+	)
 
 	// Wait for completion with result
 	return e.waitForCompletionWithResult(ctx, runParams.RunID)
@@ -343,33 +356,64 @@ func (e *ChildDAGExecutor) waitForCompletionWithResult(ctx context.Context, dagR
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
+	// Periodically log while waiting so long polls do not look stalled
+	logInterval := 15 * time.Second
+	logTicker := time.NewTicker(logInterval)
+	defer logTicker.Stop()
+	start := time.Now()
+
 	for {
 		select {
 		case <-e.killed:
+			logger.Info(ctx, "Cancellation requested for distributed child DAG run; waiting for termination",
+				"dag_run_id", dagRunID,
+				"dag", e.DAG.Name,
+			)
+
 			// Timeout to allow cancellation to propagate
 			timeout := time.After(30 * time.Second)
 
 			// Wait for child DAGs to be finished being killed
-			ticker := time.NewTicker(1000 * time.Millisecond)
-			defer ticker.Stop()
+			killTicker := time.NewTicker(1 * time.Second)
+			defer killTicker.Stop()
+
+			killLogTicker := time.NewTicker(5 * time.Second)
+			defer killLogTicker.Stop()
+
+			var status *execution.RunStatus
 
 			for {
-				status, _ := env.DB.GetChildDAGRunStatus(ctx, dagRunID, env.RootDAGRun)
-				var running bool
-				if status != nil {
-					if status.Status.IsActive() {
-						running = true
-					}
-					if !running {
-						return status, nil
-					}
+				var err error
+				status, err = env.DB.GetChildDAGRunStatus(ctx, dagRunID, env.RootDAGRun)
+				if err != nil {
+					logger.Warn(ctx, "Failed to get child DAG run status during cancellation wait",
+						"dag_run_id", dagRunID,
+						"err", err,
+					)
+				}
+				if status != nil && !status.Status.IsActive() {
+					return status, nil
 				}
 
 				select {
 				case <-timeout:
 					return nil, fmt.Errorf("distributed execution cancellation timed out for dag-run ID %s", dagRunID)
-				case <-ticker.C:
+
+				case <-killTicker.C:
 					// continue waiting
+
+				case <-killLogTicker.C:
+					lastStatus := "unknown"
+					if status != nil {
+						lastStatus = status.Status.String()
+					}
+
+					logger.Info(ctx, "Still waiting for distributed child DAG run to terminate",
+						"dag_run_id", dagRunID,
+						"dag", e.DAG.Name,
+						"elapsed", time.Since(start).Round(time.Second),
+						"last_status", lastStatus,
+					)
 				}
 			}
 
@@ -377,7 +421,7 @@ func (e *ChildDAGExecutor) waitForCompletionWithResult(ctx context.Context, dagR
 			// Check if the child DAG run has completed
 			isCompleted, err := env.DB.IsChildDAGRunCompleted(ctx, dagRunID, env.RootDAGRun)
 			if err != nil {
-				logger.Error(ctx, "Failed to check child DAG run completion",
+				logger.Warn(ctx, "Failed to check child DAG run completion",
 					"dag_run_id", dagRunID,
 					"err", err,
 				)
@@ -409,6 +453,13 @@ func (e *ChildDAGExecutor) waitForCompletionWithResult(ctx context.Context, dagR
 			)
 
 			return result, nil
+
+		case <-logTicker.C:
+			logger.Info(ctx, "Waiting for distributed child DAG run to complete",
+				"dag_run_id", dagRunID,
+				"dag", e.DAG.Name,
+				"elapsed", time.Since(start).Round(time.Second),
+			)
 		}
 	}
 }
@@ -421,10 +472,11 @@ func (e *ChildDAGExecutor) Kill(sig os.Signal) error {
 	ctx := context.Background()
 	var errs []error
 
+	logger.Info(ctx, "Killing child DAG executor", "signal", sig)
+
 	// Cancel distributed runs
 	for runID := range e.distributedRuns {
 		logger.Info(ctx, "Requesting cancellation for distributed child DAG",
-			"dag", e.DAG.Name,
 			"runId", runID,
 		)
 		if err := e.env.DB.RequestChildCancel(ctx, runID, e.env.RootDAGRun); err != nil {

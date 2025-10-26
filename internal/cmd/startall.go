@@ -104,7 +104,7 @@ func runStartAll(ctx *Context, _ []string) error {
 			return fmt.Errorf("failed to initialize coordinator: %w", err)
 		}
 	} else {
-		logger.Info(ctx, "Coordinator disabled (bound to localhost). Set --coordinator.host=0.0.0.0 to enable distributed execution")
+		logger.Info(ctx, "Coordinator disabled (bound to localhost). Set --coordinator.host and --coordinator.advertise to enable distributed mode.")
 	}
 
 	// Create a new context with the signal context for services

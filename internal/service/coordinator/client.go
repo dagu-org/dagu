@@ -102,6 +102,10 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 	policy := backoff.WithJitter(basePolicy, backoff.FullJitter)
 
 	return backoff.Retry(ctx, func(ctx context.Context) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		// Get all available coordinators from registry
 		members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
 		if err != nil {
@@ -450,10 +454,6 @@ func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.Heartbe
 		if err != nil {
 			return fmt.Errorf("heartbeat failed: %w", err)
 		}
-
-		logger.Debug(ctx, "Heartbeat sent successfully",
-			"coordinator_id", member.ID,
-			"worker_id", req.WorkerId)
 		return nil
 	})
 }
