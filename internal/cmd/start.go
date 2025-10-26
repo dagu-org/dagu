@@ -87,12 +87,10 @@ func runStart(ctx *Context, args []string) error {
 		return handleChildDAGRun(ctx, dag, dagRunID, params, root, parent)
 	}
 
-	var queueDisabled bool
-	if os.Getenv("DISABLE_DAG_RUN_QUEUE") != "" {
-		queueDisabled = true
-	}
+	// Check if queue is disabled via config or flag
+	queueDisabled := !ctx.Config.Queues.Enabled
 
-	// check no-queue flag
+	// check no-queue flag (overrides config)
 	if ctx.Command.Flags().Changed("no-queue") {
 		queueDisabled = true
 	}

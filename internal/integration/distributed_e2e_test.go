@@ -3,7 +3,6 @@ package integration_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -51,8 +50,6 @@ steps:
 		// Load the DAG
 		dagWrapper := coord.DAG(t, yamlContent)
 
-		// Unset DISABLE_DAG_RUN_QUEUE so the subprocess can enqueue
-		require.NoError(t, os.Unsetenv("DISABLE_DAG_RUN_QUEUE"))
 
 		// Build the start command spec
 		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
@@ -210,8 +207,6 @@ steps:
 		// Load the DAG
 		dagWrapper := coord.DAG(t, yamlContent)
 
-		// Unset DISABLE_DAG_RUN_QUEUE so the subprocess can enqueue
-		require.NoError(t, os.Unsetenv("DISABLE_DAG_RUN_QUEUE"))
 
 		// Build the start command spec
 		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)

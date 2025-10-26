@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -39,10 +38,6 @@ steps:
 `
 		coord := test.SetupCoordinator(t)
 		coord.Config.Queues.Enabled = true
-
-		// Unset DISABLE_DAG_RUN_QUEUE so the subprocess can enqueue
-		// (test helper sets this by default)
-		require.NoError(t, os.Unsetenv("DISABLE_DAG_RUN_QUEUE"))
 
 		// Load the DAG
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -134,8 +129,6 @@ steps:
 	coord := test.SetupCoordinator(t)
 	coord.Config.Queues.Enabled = true
 
-	// Unset DISABLE_DAG_RUN_QUEUE so the subprocess can enqueue
-	require.NoError(t, os.Unsetenv("DISABLE_DAG_RUN_QUEUE"))
 
 	// Load the DAG
 	dagWrapper := coord.DAG(t, yamlContent)

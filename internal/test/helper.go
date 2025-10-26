@@ -81,9 +81,6 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	// Set the CI flag
 	_ = os.Setenv("CI", "true")
 
-	// Disable the DAG run queue for tests
-	_ = os.Setenv("DISABLE_DAG_RUN_QUEUE", "true")
-
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
 	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))

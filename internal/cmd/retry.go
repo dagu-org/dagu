@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -67,11 +66,8 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}
 
-	// Check if queue is disabled
-	var queueDisabled bool
-	if os.Getenv("DISABLE_DAG_RUN_QUEUE") != "" || ctx.Command.Flags().Changed("no-queue") {
-		queueDisabled = true
-	}
+	// Check if queue is disabled via config or flag
+	queueDisabled := !ctx.Config.Queues.Enabled || ctx.Command.Flags().Changed("no-queue")
 
 	// Check if this DAG should be distributed to workers
 	// If the DAG has a workerSelector and the queue is not disabled,
