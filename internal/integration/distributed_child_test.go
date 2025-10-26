@@ -41,19 +41,16 @@ steps:
 			coord.Config,
 		)
 
-		ctx, cancel := context.WithCancel(coord.Context)
-		defer cancel()
-
 		go func() {
-			if err := workerInst.Start(ctx); err != nil {
+			if err := workerInst.Start(coord.Context); err != nil {
 				t.Logf("Worker stopped: %v", err)
 			}
 		}()
-		t.Cleanup(func() {
+		defer func() {
 			if err := workerInst.Stop(coord.Context); err != nil {
 				t.Logf("Error stopping worker: %v", err)
 			}
-		})
+		}()
 
 		time.Sleep(50 * time.Millisecond)
 
@@ -106,19 +103,16 @@ steps:
 			coord.Config,
 		)
 
-		ctx, cancel := context.WithCancel(coord.Context)
-		defer cancel()
-
 		go func() {
-			if err := workerInst.Start(ctx); err != nil {
+			if err := workerInst.Start(coord.Context); err != nil {
 				t.Logf("Worker stopped: %v", err)
 			}
 		}()
-		t.Cleanup(func() {
-			if err := workerInst.Stop(ctx); err != nil {
+		defer func() {
+			if err := workerInst.Stop(coord.Context); err != nil {
 				t.Logf("Error stopping worker: %v", err)
 			}
-		})
+		}()
 
 		// Give worker time to connect
 		time.Sleep(50 * time.Millisecond)
@@ -202,19 +196,16 @@ steps:
 			coord.Config,
 		)
 
-		ctx, cancel := context.WithCancel(coord.Context)
-		defer cancel()
-
 		go func() {
-			if err := workerInst.Start(ctx); err != nil {
+			if err := workerInst.Start(coord.Context); err != nil {
 				t.Logf("Worker stopped: %v", err)
 			}
 		}()
-		t.Cleanup(func() {
-			if err := workerInst.Stop(ctx); err != nil {
+		defer func() {
+			if err := workerInst.Stop(coord.Context); err != nil {
 				t.Logf("Error stopping worker: %v", err)
 			}
-		})
+		}()
 
 		// Give worker time to connect
 		time.Sleep(50 * time.Millisecond)

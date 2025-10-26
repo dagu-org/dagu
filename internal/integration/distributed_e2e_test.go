@@ -44,9 +44,6 @@ steps:
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
-		ctx, cancel := context.WithCancel(coord.Context)
-		t.Cleanup(cancel)
-
 		// Create and start worker with matching labels
 		workerInst := worker.NewWorker(
 			"test-worker-1",
@@ -60,7 +57,7 @@ steps:
 		)
 
 		go func(w *worker.Worker) {
-			if err := w.Start(ctx); err != nil {
+			if err := w.Start(coord.Context); err != nil {
 				t.Logf("Worker stopped: %v", err)
 			}
 		}(workerInst)
@@ -105,7 +102,7 @@ steps:
 		// Now start the scheduler to process the queue
 		t.Log("Starting scheduler to process queue...")
 
-		schedulerCtx, schedulerCancel := context.WithTimeout(ctx, 30*time.Second)
+		schedulerCtx, schedulerCancel := context.WithTimeout(coord.Context, 30*time.Second)
 		defer schedulerCancel()
 
 		// Create DAGExecutor using coordinator's service registry
@@ -241,9 +238,6 @@ steps:
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
-		ctx, cancel := context.WithCancel(coord.Context)
-		t.Cleanup(cancel)
-
 		// Create and start worker with matching labels (matching the sub-DAG's workerSelector)
 		workerInst := worker.NewWorker(
 			"test-worker-cancel",
@@ -256,7 +250,7 @@ steps:
 		)
 
 		go func(w *worker.Worker) {
-			if err := w.Start(ctx); err != nil {
+			if err := w.Start(coord.Context); err != nil {
 				t.Logf("Worker stopped: %v", err)
 			}
 		}(workerInst)
@@ -284,7 +278,7 @@ steps:
 		time.Sleep(500 * time.Millisecond)
 
 		// Start the scheduler
-		schedulerCtx, schedulerCancel := context.WithTimeout(ctx, 30*time.Second)
+		schedulerCtx, schedulerCancel := context.WithTimeout(coord.Context, 30*time.Second)
 		defer schedulerCancel()
 
 		schedulerCoordCli := coordinatorClient
