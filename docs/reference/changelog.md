@@ -3,7 +3,68 @@
 ## v1.24.0 (UNRELEASED)
 
 ### Added
-- DAG: support shell-like parameter expansion for `env` and `parameters` field. It now is able to evaluate `${VAR:offset:length}` slices, shell-style defaults (`${VAR:-fallback}`).
+- No changes yet.
+
+## v1.23.3 (2025-10-26)
+
+### Added
+- CLI: Added `--name` flag to `start`, `retry`, and `enqueue` commands to override the DAG name specified in the YAML file (#1363)
+- DAG: Support shell-like parameter expansion for `env` and `parameters` fields, including `${VAR:offset:length}` slices and shell-style defaults (`${VAR:-fallback}`) (#1354)
+- Distributed: Added comprehensive Kubernetes deployment manifests with ConfigMaps, PVCs, and separate server/worker deployments (#1360)
+- Distributed: Added automatic cleanup of stale coordinator service registrations (#1360)
+- Distributed: Added retry mechanism with exponential backoff for coordinator client connections (#1360)
+
+### Improved
+- Distributed: Enhanced distributed execution with better worker coordination and status propagation (#1360)
+- Distributed: Improved child DAG status propagation in distributed mode to correctly report final status to parent workflows (#1358)
+- OIDC: Improved OIDC configuration validation with better error messages and logging (#1361)
+- OIDC: Enhanced OIDC authentication flow with proper state management and error handling (#1361)
+- API: Better error handling in API endpoints with more descriptive error messages (#1361)
+
+### Fixed
+- Distributed: Fixed child DAG status not being properly propagated to parent in distributed execution (#1358)
+- Distributed: Fixed parallel execution status tracking for sub-DAGs (#1358)
+- Distributed: Fixed service registry cleanup and stale entry detection (#1360)
+
+### Contributors
+
+Thanks to our contributors for this release:
+
+| Contribution                           | Author                                   |
+| -------------------------------------- | ---------------------------------------- |
+| `--name` flag feature clarification and feedback (#1349) | [@ghansham](https://github.com/ghansham) |
+| OIDC authentication broken interface issue report (#1359) | [@mitchplze](https://github.com/mitchplze) |
+| Distributed execution lock issue on Kubernetes (#1353) | [@yangkghjh](https://github.com/yangkghjh) |
+| Shell-like parameter expansion feature request (#1352) | [@ghansham](https://github.com/ghansham) |
+
+**Full Changelog**: [v1.23.2...v1.23.3](https://github.com/dagu-org/dagu/compare/v1.23.2...v1.23.3)
+
+## v1.23.2 (2025-10-22)
+
+### Fixed
+- Server: Fixed subprocess environment variable propagation - server now correctly passes environment variables to subprocesses (#1351)
+
+### Contributors
+
+Thanks to our contributors for this release:
+
+| Contribution                           | Author                                   |
+| -------------------------------------- | ---------------------------------------- |
+| DAG manual launch bug report and detailed reproduction (#1345) | [@jeremydelattre59](https://github.com/jeremydelattre59) |
+| WebUI blank page MIME type error report (#1350) | [@overflowy](https://github.com/overflowy) |
+
+**Full Changelog**: [v1.23.1...v1.23.2](https://github.com/dagu-org/dagu/compare/v1.23.1...v1.23.2)
+
+## v1.23.1 (2025-10-21)
+
+### Documentation
+- Updated GitHub Actions executor documentation
+
+### Contributors
+
+No external contributors for this release - documentation update only.
+
+**Full Changelog**: [v1.23.0...v1.23.1](https://github.com/dagu-org/dagu/compare/v1.23.0...v1.23.1)
 
 ## v1.23.0 (2025-10-21)
 
