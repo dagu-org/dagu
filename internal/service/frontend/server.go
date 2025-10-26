@@ -189,16 +189,16 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 		authConfig.OIDC.ClientSecret != "" && authConfig.OIDC.Issuer != ""
 	var oidcAuthOptions *auth.Options
 	if oidcEnabled {
-		oidcProvider, oidcVerify, oidcConfig, err := auth.InitVerifierAndConfig(srv.config.Server.Auth.OIDC)
+		oidcCfg, err := auth.InitVerifierAndConfig(srv.config.Server.Auth.OIDC)
 		if err != nil {
 			return fmt.Errorf("failed to initialize OIDC: %w", err)
 		}
 		oidcAuthOptions = &auth.Options{
 			OIDCAuthEnabled: true,
 			OIDCWhitelist:   srv.config.Server.Auth.OIDC.Whitelist,
-			OIDCProvider:    oidcProvider,
-			OIDCVerify:      oidcVerify,
-			OIDCConfig:      oidcConfig,
+			OIDCProvider:    oidcCfg.Provider,
+			OIDCVerify:      oidcCfg.Verifier,
+			OIDCConfig:      oidcCfg.Config,
 		}
 	}
 

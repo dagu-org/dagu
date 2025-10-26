@@ -131,13 +131,15 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 	oidcEnabled := authConfig.OIDC.ClientId != "" &&
 		authConfig.OIDC.ClientSecret != "" && authConfig.OIDC.Issuer != ""
 	if oidcEnabled {
-		oidcProvider, oidcVerify, oidcConfig, err := auth.InitVerifierAndConfig(authConfig.OIDC)
+		oidcCfg, err := auth.InitVerifierAndConfig(authConfig.OIDC)
 		if err != nil {
 			return fmt.Errorf("failed to initialize OIDC: %w", err)
 		}
 		authOptions.OIDCAuthEnabled = true
 		authOptions.OIDCWhitelist = authConfig.OIDC.Whitelist
-		authOptions.OIDCProvider, authOptions.OIDCVerify, authOptions.OIDCConfig = oidcProvider, oidcVerify, oidcConfig
+		authOptions.OIDCProvider = oidcCfg.Provider
+		authOptions.OIDCVerify = oidcCfg.Verifier
+		authOptions.OIDCConfig = oidcCfg.Config
 	}
 
 	r.Group(func(r chi.Router) {

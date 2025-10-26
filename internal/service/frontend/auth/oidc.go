@@ -13,11 +13,18 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func InitVerifierAndConfig(i config.AuthOIDC) (*oidc.Provider, *oidc.IDTokenVerifier, *oauth2.Config, error) {
+// OIDCConfig holds the initialized OIDC provider, verifier, and OAuth2 config
+type OIDCConfig struct {
+	Provider *oidc.Provider
+	Verifier *oidc.IDTokenVerifier
+	Config   *oauth2.Config
+}
+
+func InitVerifierAndConfig(i config.AuthOIDC) (*OIDCConfig, error) {
 	providerCtx := context.Background()
 	provider, err := oidc.NewProvider(providerCtx, i.Issuer)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to init OIDC provider: %w", err)
+		return nil, fmt.Errorf("failed to init OIDC provider: %w", err)
 	}
 	oidcConfig := &oidc.Config{
 		ClientID: i.ClientId,
@@ -31,7 +38,11 @@ func InitVerifierAndConfig(i config.AuthOIDC) (*oidc.Provider, *oidc.IDTokenVeri
 		RedirectURL:  fmt.Sprintf("%s/oidc-callback", strings.TrimSuffix(i.ClientUrl, "/")),
 		Scopes:       i.Scopes,
 	}
-	return provider, verifier, config, nil
+	return &OIDCConfig{
+		Provider: provider,
+		Verifier: verifier,
+		Config:   config,
+	}, nil
 }
 
 func callbackHandler(provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
