@@ -134,37 +134,22 @@ steps:
 		// Give scheduler time to start
 		time.Sleep(200 * time.Millisecond)
 
-		// Poll for execution completion
-		var executionSucceeded bool
-		timeout := time.After(25 * time.Second)
-		ticker := time.NewTicker(500 * time.Millisecond)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
-				if err != nil {
-					continue
-				}
-
-				t.Logf("DAG status: %s", status.Status)
-
-				if status.Status == core.Succeeded {
-					executionSucceeded = true
-					goto DONE
-				}
-
-				if status.Status == core.Failed {
-					t.Fatalf("DAG execution failed")
-				}
-
-			case <-timeout:
-				t.Fatal("Timeout waiting for DAG execution to complete")
+		// Wait for execution completion
+		require.Eventually(t, func() bool {
+			status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
+			if err != nil {
+				return false
 			}
-		}
 
-	DONE:
+			t.Logf("DAG status: %s", status.Status)
+
+			if status.Status == core.Failed {
+				t.Fatalf("DAG execution failed")
+			}
+
+			return status.Status == core.Succeeded
+		}, 25*time.Second, 500*time.Millisecond, "Timeout waiting for DAG execution to complete")
+
 		schedulerCancel()
 
 		// Wait for scheduler to stop
@@ -172,8 +157,6 @@ steps:
 		case <-schedulerDone:
 		case <-time.After(5 * time.Second):
 		}
-
-		require.True(t, executionSucceeded, "DAG should have executed successfully on worker")
 
 		// Verify the final status
 		finalStatus, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)

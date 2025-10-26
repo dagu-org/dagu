@@ -482,48 +482,34 @@ func waitForContainerRunning(ctx context.Context, dockerClient *client.Client, c
 		pollInterval = 100 * time.Millisecond
 	)
 
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	timeoutChan := time.After(timeout)
-
-	for {
-		select {
-		case <-timeoutChan:
-			return fmt.Errorf("timeout waiting for container %s to be running", containerID)
-		case <-ticker.C:
-			inspect, err := dockerClient.ContainerInspect(ctx, containerID)
-			if err != nil {
-				return fmt.Errorf("failed to inspect container %s: %w", containerID, err)
-			}
-			if inspect.State.Running {
-				return nil
-			}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		inspect, err := dockerClient.ContainerInspect(ctx, containerID)
+		if err != nil {
+			return fmt.Errorf("failed to inspect container %s: %w", containerID, err)
 		}
+		if inspect.State.Running {
+			return nil
+		}
+		time.Sleep(pollInterval)
 	}
+	return fmt.Errorf("timeout waiting for container %s to be running", containerID)
 }
 
 func waitForContainerStop(t *testing.T, th test.Helper, dockerClient *client.Client, containerID string, timeout, pollInterval time.Duration) bool {
 	t.Helper()
 
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	timeoutChan := time.After(timeout)
-
-	for {
-		select {
-		case <-timeoutChan:
-			return false
-		case <-ticker.C:
-			inspect, err := dockerClient.ContainerInspect(th.Context, containerID)
-			if err != nil {
-				// Container might have been removed or doesn't exist
-				return true
-			}
-			if !inspect.State.Running {
-				return true
-			}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		inspect, err := dockerClient.ContainerInspect(th.Context, containerID)
+		if err != nil {
+			// Container might have been removed or doesn't exist
+			return true
 		}
+		if !inspect.State.Running {
+			return true
+		}
+		time.Sleep(pollInterval)
 	}
+	return false
 }
