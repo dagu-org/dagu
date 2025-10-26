@@ -448,7 +448,7 @@ func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.Heartbe
 	}
 
 	// Use attemptCall to send heartbeat to any available coordinator
-	return cli.attemptCall(ctx, members, func(ctx context.Context, member execution.HostInfo, client *client) error {
+	return cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
 		// Send heartbeat
 		_, err := client.client.Heartbeat(ctx, req)
 		if err != nil {
