@@ -15,18 +15,19 @@ import (
 func Enqueue() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "enqueue [flags]",
+			Use:   "enqueue [flags] <DAG definition> [-- param1 param2 ...]",
 			Short: "Enqueue a DAG-run to the queue.",
 			Long: `Enqueue a DAG-run to the queue.
 
-Example:
+Examples:
 	dagu enqueue --run-id=run_id my_dag -- P1=foo P2=bar
+	dagu enqueue --name my_custom_name my_dag.yaml -- P1=foo P2=bar
 `,
 		}, enqueueFlags, runEnqueue,
 	)
 }
 
-var enqueueFlags = []commandLineFlag{paramsFlag, dagRunIDFlag, queueFlag}
+var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
 	// Get Run ID from the context or generate a new one

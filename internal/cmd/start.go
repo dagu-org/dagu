@@ -38,14 +38,15 @@ func Start() *cobra.Command {
 			Short: "Execute a DAG from a DAG definition",
 			Long: `Begin execution of a DAG-run based on the specified DAG definition.
 
-A DAG definition is a blueprint that defines the DAG structure. This command creates a new DAG-run 
+A DAG definition is a blueprint that defines the DAG structure. This command creates a new DAG-run
 instance with a unique DAG-run ID.
 
 Parameters after the "--" separator are passed as execution parameters (either positional or key=value pairs).
-Flags can override default settings such as DAG-run ID or suppress output.
+Flags can override default settings such as DAG-run ID, DAG name, or suppress output.
 
-Example:
+Examples:
   dagu start my_dag -- P1=foo P2=bar
+  dagu start --name my_custom_name my_dag.yaml -- P1=foo P2=bar
 
 This command parses the DAG definition, resolves parameters, and initiates the DAG-run execution.
 `,
@@ -55,7 +56,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, dagRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag, disableMaxActiveRuns}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag, disableMaxActiveRuns}
 
 // runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
@@ -282,9 +283,17 @@ func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
 		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
 	}
 
+	// Get name override from flags if provided
+	nameOverride, err := ctx.StringParam("name")
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get name override: %w", err)
+	}
+	if nameOverride != "" {
+		loadOpts = append(loadOpts, spec.WithName(nameOverride))
+	}
+
 	// Load parameters from command line arguments
 	var params string
-	var err error
 
 	// Check if parameters are provided after "--"
 	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 && len(args) > 0 {
