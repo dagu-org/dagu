@@ -108,7 +108,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	// Create a logger context based on config and quiet mode
 	var opts []logger.Option
-	if cfg.Global.Debug || os.Getenv("DEBUG") != "" {
+	if cfg.Global.Debug {
 		opts = append(opts, logger.WithDebug())
 	}
 	if quiet {

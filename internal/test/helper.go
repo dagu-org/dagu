@@ -75,12 +75,6 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		opt(&options)
 	}
 
-	// Set the log level to debug
-	_ = os.Setenv("DEBUG", "true")
-
-	// Set the CI flag
-	_ = os.Setenv("CI", "true")
-
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
 	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))
@@ -95,6 +89,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	ctx = config.WithConfig(ctx, cfg)
 
+	cfg.Global.Debug = true
 	cfg.Paths.Executable = executablePath
 	cfg.Paths.LogDir = filepath.Join(tmpDir, "logs")
 	if options.DAGsDir != "" {
