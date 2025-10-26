@@ -59,36 +59,8 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
 
-  check-dockerfiles:
-    name: Check Dockerfile existence
-    runs-on: ubuntu-latest
-    outputs:
-      has-dev: ${{ steps.check.outputs.has-dev }}
-      has-alpine: ${{ steps.check.outputs.has-alpine }}
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ inputs.ref }}
-      
-      - name: Check Dockerfiles
-        id: check
-        run: |
-          if [ -f "Dockerfile.dev" ]; then
-            echo "has-dev=true" >> $GITHUB_OUTPUT
-          else
-            echo "has-dev=false" >> $GITHUB_OUTPUT
-          fi
-          if [ -f "Dockerfile.alpine" ]; then
-            echo "has-alpine=true" >> $GITHUB_OUTPUT
-          else
-            echo "has-alpine=false" >> $GITHUB_OUTPUT
-          fi
-
   docker-dev:
     name: Build and push dev image
-    needs: check-dockerfiles
-    if: needs.check-dockerfiles.outputs.has-dev == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -140,8 +112,6 @@ jobs:
 
   docker-alpine:
     name: Build and push alpine image
-    needs: check-dockerfiles
-    if: needs.check-dockerfiles.outputs.has-alpine == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
