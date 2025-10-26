@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -480,6 +481,10 @@ func (e *ChildDAGExecutor) Kill(sig os.Signal) error {
 			"runId", runID,
 		)
 		if err := e.env.DB.RequestChildCancel(ctx, runID, e.env.RootDAGRun); err != nil {
+			if errors.Is(err, execution.ErrDAGRunIDNotFound) {
+				logger.Info(ctx, "Child DAG run not found; may have not started", "runId", runID)
+				continue
+			}
 			logger.Error(ctx, "Failed to request child DAG cancellation",
 				"runId", runID,
 				"err", err,

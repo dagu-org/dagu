@@ -34,7 +34,6 @@ type Node struct {
 	id           int
 	mu           sync.RWMutex
 	cmd          executor.Executor
-	cancelFunc   func()
 	done         atomic.Bool
 	retryPolicy  RetryPolicy
 	cmdEvaluated atomic.Bool
@@ -138,6 +137,9 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 }
 
 func (n *Node) Execute(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	cmd, err := n.setupExecutor(ctx)
 	if err != nil {
 		n.SetError(fmt.Errorf("failed to setup executor: %w", err))
@@ -217,10 +219,6 @@ func (n *Node) clearVariable(key string) {
 func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-
-	ctx, fn := context.WithCancel(ctx)
-
-	n.cancelFunc = fn
 
 	// Clear the cache
 	n.clearVariable(execution.SystemVariablePrefix + "CONTINUE_ON." + n.Name())
@@ -436,8 +434,10 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 		}
 	}
 
-	if signal.IsTerminationSignalOS(sig) && s == core.NodeRunning {
-		n.SetStatus(core.NodeCanceled)
+	if signal.IsTerminationSignalOS(sig) {
+		if s == core.NodeRunning {
+			n.SetStatus(core.NodeCanceled)
+		}
 	}
 }
 
@@ -447,10 +447,6 @@ func (n *Node) Cancel(ctx context.Context) {
 	s := n.Status()
 	if s == core.NodeRunning {
 		n.SetStatus(core.NodeCanceled)
-	}
-	if n.cancelFunc != nil {
-		logger.Info(ctx, "Canceling node", "step", n.Name())
-		n.cancelFunc()
 	}
 }
 

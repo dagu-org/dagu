@@ -435,11 +435,6 @@ func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
 func (sc *Scheduler) Signal(
 	ctx context.Context, graph *ExecutionGraph, sig os.Signal, done chan bool, allowOverride bool,
 ) {
-	isTermination := signal.IsTerminationSignalOS(sig)
-	if !sc.isCanceled() && isTermination {
-		sc.setCanceled()
-	}
-
 	for _, node := range graph.nodes {
 		// for a repetitive task, we'll wait for the job to finish
 		// until time reaches max wait time
@@ -448,6 +443,11 @@ func (sc *Scheduler) Signal(
 			continue
 		}
 		node.Signal(ctx, sig, allowOverride)
+	}
+
+	isTermination := signal.IsTerminationSignalOS(sig)
+	if !sc.isCanceled() && isTermination {
+		sc.setCanceled()
 	}
 
 	if done != nil && isTermination {

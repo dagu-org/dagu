@@ -126,6 +126,13 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 
 			// Try to dispatch
 			if _, err := client.client.Dispatch(dispatchCtx, req); err != nil {
+				logger.Warn(ctx, "Failed to dispatch task to coordinator",
+					"dag_run_id", task.DagRunId,
+					"target", task.Target,
+					"worker_selector", task.WorkerSelector,
+					"coordinator_id", member.ID,
+				)
+
 				return fmt.Errorf("failed to dispatch task to coordinator %s: %w", member.ID, err)
 			}
 

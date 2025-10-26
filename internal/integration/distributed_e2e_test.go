@@ -231,4 +231,151 @@ steps:
 		// Verify it succeeded (executed locally)
 		dagWrapper.AssertLatestStatus(t, core.Succeeded)
 	})
+
+	t.Run("E2E_DistributedExecution_Cancellation_SubDAG", func(t *testing.T) {
+		// This test replicates the user's exact scenario:
+		// Parent DAG calls a sub-DAG (in same YAML file with ---)
+		// The sub-DAG has workerSelector and runs on a worker
+		// When we cancel the parent, the sub-DAG should also be cancelled
+		yamlContent := `
+steps:
+  - run: dotest
+params:
+  - URL: default_value
+---
+name: dotest
+workerSelector:
+  foo: bar
+steps:
+  - name: long-sleep
+    command: sleep 30
+`
+
+		// Setup coordinator
+		coord := test.SetupCoordinator(t)
+		coord.Config.Queues.Enabled = true
+
+		// Get dispatcher client from coordinator
+		coordinatorClient := coord.GetCoordinatorClient(t)
+
+		ctx, cancel := context.WithCancel(coord.Context)
+		t.Cleanup(cancel)
+
+		// Create and start worker with matching labels (matching the sub-DAG's workerSelector)
+		workerInst := worker.NewWorker(
+			"test-worker-cancel",
+			10, // maxActiveRuns
+			coordinatorClient,
+			map[string]string{
+				"foo": "bar", // Match the sub-DAG's workerSelector
+			},
+			coord.Config,
+		)
+
+		go func(w *worker.Worker) {
+			if err := w.Start(ctx); err != nil {
+				t.Logf("Worker stopped: %v", err)
+			}
+		}(workerInst)
+
+		// Give worker time to connect
+		time.Sleep(100 * time.Millisecond)
+
+		// Load the DAG
+		dagWrapper := coord.DAG(t, yamlContent)
+
+		// Unset DISABLE_DAG_RUN_QUEUE so the subprocess can enqueue
+		require.NoError(t, os.Unsetenv("DISABLE_DAG_RUN_QUEUE"))
+
+		// Build the start command spec
+		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
+		startSpec := subCmdBuilder.Start(dagWrapper.DAG, runtime.StartOptions{
+			Quiet: true,
+		})
+
+		// Execute the start command (spawns subprocess)
+		err := runtime.Start(coord.Context, startSpec)
+		require.NoError(t, err, "Start command should succeed")
+
+		// Wait for the subprocess to complete enqueueing
+		time.Sleep(500 * time.Millisecond)
+
+		// Start the scheduler
+		schedulerCtx, schedulerCancel := context.WithTimeout(ctx, 30*time.Second)
+		defer schedulerCancel()
+
+		schedulerCoordCli := coordinatorClient
+		de := scheduler.NewDAGExecutor(schedulerCoordCli, runtime.NewSubCmdBuilder(coord.Config))
+		em := scheduler.NewEntryReader(coord.Config.Paths.DAGsDir, coord.DAGStore, coord.DAGRunMgr, de, "")
+
+		schedulerInst, err := scheduler.New(
+			coord.Config,
+			em,
+			coord.DAGRunMgr,
+			coord.DAGRunStore,
+			coord.QueueStore,
+			coord.ProcStore,
+			coord.ServiceRegistry,
+			schedulerCoordCli,
+		)
+		require.NoError(t, err, "failed to create scheduler")
+
+		schedulerDone := make(chan error, 1)
+		go func() {
+			schedulerDone <- schedulerInst.Start(schedulerCtx)
+		}()
+
+		// Give scheduler time to start and dispatch the task
+		time.Sleep(200 * time.Millisecond)
+
+		// Wait for the DAG to be running
+		var dagRunID string
+		require.Eventually(t, func() bool {
+			status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
+			if err != nil {
+				return false
+			}
+			t.Logf("DAG status while waiting: %s", status.Status)
+			if status.Status == core.Running {
+				dagRunID = status.DAGRunID
+				t.Logf("DAG is now running with ID: %s", dagRunID)
+				return true
+			}
+			return false
+		}, 10*time.Second, 200*time.Millisecond, "Timeout waiting for DAG to start running")
+
+		// Now send the stop signal
+		t.Log("Sending stop signal to the running DAG...")
+		err = coord.DAGRunMgr.Stop(coord.Context, dagWrapper.DAG, dagRunID)
+		require.NoError(t, err, "Stop command should succeed")
+
+		// Wait for the DAG to be cancelled/stopped
+		require.Eventually(t, func() bool {
+			status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
+			if err != nil {
+				return false
+			}
+			t.Logf("DAG status after stop: %s", status.Status)
+			return status.Status == core.Canceled || status.Status == core.Failed
+		}, 15*time.Second, 500*time.Millisecond, "Timeout waiting for DAG to be cancelled")
+
+		time.Sleep(5 * time.Second)
+
+		schedulerCancel()
+
+		// Wait for scheduler to stop
+		select {
+		case <-schedulerDone:
+		case <-time.After(5 * time.Second):
+		}
+
+		// Verify the final status
+		finalStatus, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
+		require.NoError(t, err)
+		require.Contains(t, []core.Status{core.Canceled, core.Failed}, finalStatus.Status,
+			"DAG should have been canceled or failed")
+
+		t.Log("Cancellation test completed successfully!")
+	})
+
 }
