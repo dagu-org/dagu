@@ -39,7 +39,7 @@
 
 Thanks to our contributors for this release:
 
-| Contribution                           | Author                                   |
+| Contribution                           | Contributor                              |
 | -------------------------------------- | ---------------------------------------- |
 | Docker-in-Docker container execution issues (#1228, #1231, #1235) and registryAuths bug report (#1327) | [@bellackn](https://github.com/bellackn) |
 | Container name support (#1237), bash requirement (#1239), command field (#1261), log buttons (#1301), and scroll issues (#1324) | [@Pangolin2097](https://github.com/Pangolin2097) |
@@ -99,7 +99,7 @@ Thanks to our contributors for this release:
 
 Thanks to our contributors for this release:
 
-| Contribution                           | Author                                   |
+| Contribution                           | Contributor                              |
 | -------------------------------------- | ---------------------------------------- |
 | Script execution bug report (command not found error) | [@Kaiden0001](https://github.com/Kaiden0001) |
 | Parallel execution with JSON references issue report | [@tetedange13](https://github.com/tetedange13) |
@@ -129,7 +129,7 @@ Thanks to our contributors for this release:
 
 Thanks to our contributors for this release:
 
-| Contribution                           | Author                                   |
+| Contribution                           | Contributor                              |
 | -------------------------------------- | ---------------------------------------- |
 | Optional step names feature request (40 char limit issue) | [@jonathonc](https://github.com/jonathonc) |
 | Singleton flag feature request (split start API) | [@Kaiden0001](https://github.com/Kaiden0001) |
@@ -162,7 +162,7 @@ Thanks to our contributors for this release:
 
 Thanks to our contributors for this release:
 
-| Contribution                           | Author                                   |
+| Contribution                           | Contributor                              |
 | -------------------------------------- | ---------------------------------------- |
 | DAG run configuration with parameter locking | [@kriyanshii](https://github.com/kriyanshii) |
 | Timeout issues report and feedback | [@jrisch](https://github.com/jrisch) |
@@ -195,7 +195,7 @@ Thanks to our contributors for this release:
 
 Thanks to our contributors for this release:
 
-| Contribution                           | Author                                   |
+| Contribution                           | Contributor                              |
 | -------------------------------------- | ---------------------------------------- |
 | Zombie DAG detection feedback, health check and queue processing bug reports | [@jonasban](https://github.com/jonasban) |
 | Continue on skipped bug report, stop operation issue report | [@jeremydelattre59](https://github.com/jeremydelattre59) |
@@ -222,7 +222,7 @@ Thanks to our contributors for this release:
 
 Thanks to our contributors for this release:
 
-| Contribution                           | Author                                   |
+| Contribution                           | Contributor                              |
 | -------------------------------------- | ---------------------------------------- |
 | Health check race condition (report) | [@jonasban](https://github.com/jonasban) |
 | Upgraded Node.js to 22 | [@reneleonhardt](https://github.com/reneleonhardt) |
@@ -271,7 +271,7 @@ Thanks to our contributors for this release:
 
 Thanks to our contributors for this release:
 
-| Contribution | Author |
+| Contribution | Contributor |
 |--------------|--------|
 | Installation script fixes, exponential backoff for retry policies | [@Sarvesh-11](https://github.com/Sarvesh-11) |
 | Dependency upgrades | [@reneleonhardt](https://github.com/reneleonhardt) |
@@ -317,7 +317,7 @@ Thanks to our contributors for this release:
 
 Thanks to our contributors for this release:
 
-| Contribution | Author |
+| Contribution | Contributor |
 |--------------|--------|
 | Initial Windows support - PowerShell/cmd.exe compatibility | [@pdoronila](https://github.com/pdoronila) |
 | Scheduler refactoring for improved maintainability | [@thefishhat](https://github.com/thefishhat) |
@@ -348,7 +348,7 @@ Thanks to our contributors for this release:
 
 Thanks to our contributors for this release:
 
-| Contribution | Author |
+| Contribution | Contributor |
 |--------------|--------|
 | HTTP executor skipTLSVerify feature | [@mnmercer](https://github.com/mnmercer) (report), [@nightly-brew](https://github.com/nightly-brew) (feedback) |
 | DAGU_DAGS_DIR environment variable fix | [@Daffdi](https://github.com/Daffdi) (report) |
@@ -366,7 +366,7 @@ Thanks to our contributors for this release:
 
 Thanks to our contributors for this release:
 
-| Contribution | Author |
+| Contribution | Contributor |
 |--------------|--------|
 | HTTP executor output capture fix | [@nightly-brew](https://github.com/nightly-brew) (report) |
 
@@ -385,7 +385,7 @@ Thanks to our contributors for this release:
 
 Thanks to our contributors for this release:
 
-| Contribution | Author |
+| Contribution | Contributor |
 |--------------|--------|
 | One-click Step Re-run – retry an individual step without touching the rest of the DAG | 🛠️ [@thefishhat](https://github.com/thefishhat) |
 | Nested-DAG Log Viewer – see logs for every repeated sub run | 💡 [@jeremydelattre59](https://github.com/jeremydelattre59) |
@@ -576,7 +576,7 @@ After successful migration, legacy history directories are moved to `<DAGU_DATA_
 
 Huge thanks to our contributors for this release:
 
-| Contribution | Author |
+| Contribution | Contributor |
 |--------------|--------|
 | Optimized Docker image size and split into baseline images | [@jerry-yuan](https://github.com/jerry-yuan) |
 | Container name & image platform support | [@vnghia](https://github.com/vnghia) |
@@ -779,7 +779,7 @@ steps:
 
 Thanks to our contributor for this release:
 
-| Contribution | Author |
+| Contribution | Contributor |
 |--------------|--------|
 | Improved parameter handling for CLI - support for both named and positional parameters | [@kriyanshii](https://github.com/kriyanshii) |
 
