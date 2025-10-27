@@ -93,7 +93,7 @@ Click any DAG to see detailed information including real-time status, logs, and 
 
 ### Information Tabs
 - **Graph**: Visual representation
-  - **Drill-down**: Navigate to child DAG executions by double-clicking steps
+  - **Drill-down**: Navigate to sub DAG executions by double-clicking steps
   - **Update Status**: Change step status manually by right-clicking steps
 - **Config**: YAML definition
 - **History**: Past executions
@@ -194,7 +194,7 @@ For each running task, you can see:
 - **DAG Name**: The workflow being executed
 - **DAG Run ID**: Unique execution identifier
 - **Root DAG**: Top-level workflow (for nested DAGs)
-- **Parent DAG**: Immediate parent (for child DAGs)
+- **Parent DAG**: Immediate parent (for sub DAGs)
 - **Started At**: Task start time
 
 ### Navigating to Task Details

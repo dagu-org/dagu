@@ -230,12 +230,12 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *core.DAG
 	return st, nil
 }
 
-// FindChildDAGRunStatus retrieves the status of a child dag-run by its ID.
+// FindSubDAGRunStatus retrieves the status of a sub dag-run by its ID.
 // It looks up the child attempt in the dag-run store and reads its status.
-func (m *Manager) FindChildDAGRunStatus(ctx context.Context, rootDAGRun execution.DAGRunRef, childRunID string) (*execution.DAGRunStatus, error) {
-	attempt, err := m.dagRunStore.FindChildAttempt(ctx, rootDAGRun, childRunID)
+func (m *Manager) FindSubDAGRunStatus(ctx context.Context, rootDAGRun execution.DAGRunRef, subRunID string) (*execution.DAGRunStatus, error) {
+	attempt, err := m.dagRunStore.FindSubAttempt(ctx, rootDAGRun, subRunID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find child dag-run attempt: %w", err)
+		return nil, fmt.Errorf("failed to find sub dag-run attempt: %w", err)
 	}
 	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
@@ -338,10 +338,10 @@ func (m *Manager) UpdateStatus(ctx context.Context, rootDAGRun execution.DAGRunR
 		attempt = att
 	} else {
 		// If the dag-run ID does not match the root dag-run ID,
-		// find the attempt by the child dag-run ID
-		att, err := m.dagRunStore.FindChildAttempt(ctx, rootDAGRun, newStatus.DAGRunID)
+		// find the attempt by the sub dag-run ID
+		att, err := m.dagRunStore.FindSubAttempt(ctx, rootDAGRun, newStatus.DAGRunID)
 		if err != nil {
-			return fmt.Errorf("failed to find child dag-run: %w", err)
+			return fmt.Errorf("failed to find sub dag-run: %w", err)
 		}
 		attempt = att
 	}

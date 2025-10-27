@@ -149,12 +149,12 @@ type stepDef struct {
 	// When it is empty, the same signal as the parent process is sent.
 	// It can be KILL when the process does not stop over the timeout.
 	SignalOnStop *string `yaml:"signalOnStop,omitempty"`
-	// Call is the name of a DAG to run as a child dag-run.
+	// Call is the name of a DAG to run as a sub dag-run.
 	Call string `yaml:"call,omitempty"`
-	// Run is the name of a DAG to run as a child dag-run.
+	// Run is the name of a DAG to run as a sub dag-run.
 	// Deprecated: use Call instead.
 	Run string `yaml:"run,omitempty"`
-	// Params specifies the parameters for the child dag-run.
+	// Params specifies the parameters for the sub dag-run.
 	Params any `yaml:"params,omitempty"`
 	// Parallel specifies parallel execution configuration.
 	// Can be:

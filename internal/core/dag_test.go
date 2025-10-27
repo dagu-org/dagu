@@ -197,20 +197,20 @@ func TestSockAddr(t *testing.T) {
 		require.Equal(t, expectedAddr2, addr2)
 	})
 
-	t.Run("SockAddrForChildDAGRun", func(t *testing.T) {
+	t.Run("SockAddrForSubDAGRun", func(t *testing.T) {
 		t.Parallel()
 
-		// Test SockAddrForChildDAGRun always uses GetName() and dagRunID
+		// Test SockAddrForSubDAGRun always uses GetName() and dagRunID
 		dag := &core.DAG{
 			Name:     "parentdag",
 			Location: "path/to/parent.yml",
 		}
 
-		childRunID := "child-run-456"
-		addr := dag.SockAddrForChildDAGRun(childRunID)
+		subRunID := "child-run-456"
+		addr := dag.SockAddrForSubDAGRun(subRunID)
 
-		// Should use the DAG name (not location) with the child run ID
-		expectedAddr := core.SockAddr("parentdag", childRunID)
+		// Should use the DAG name (not location) with the sub run ID
+		expectedAddr := core.SockAddr("parentdag", subRunID)
 		require.Equal(t, expectedAddr, addr)
 	})
 }

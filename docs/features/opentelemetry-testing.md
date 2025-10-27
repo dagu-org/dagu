@@ -130,7 +130,7 @@ steps:
     
 ```
 
-### 2. Create Child DAGs
+### 2. Create Sub DAGs
 
 ```yaml
 # child-etl.yaml
@@ -172,7 +172,7 @@ dagu start parent-workflow.yaml
 In Jaeger, you should see:
 - One trace containing all DAG executions
 - Parent-child relationships preserved
-- `dag.parent_run_id` attribute on child DAGs
+- `dag.parent_run_id` attribute on sub DAGs
 
 ## Production-Like Testing
 

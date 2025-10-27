@@ -779,7 +779,7 @@
         },
         "call": {
           "type": "string",
-          "description": "Name of a DAG to execute as a child dag-run."
+          "description": "Name of a DAG to execute as a sub dag-run."
         },
         "run": {
           "type": "string",
@@ -805,7 +805,7 @@
               "description": "Named parameters as key-value pairs"
             }
           ],
-          "description": "Parameters for the step. For sub-DAG execution (when 'run' is specified), these are passed to the child DAG and accessible as ${KEY}. For 'gha' executor, these are passed as action inputs (the 'with:' section in GitHub Actions syntax). For example, when using actions/checkout@v4, you can specify 'repository', 'ref', 'token', etc."
+          "description": "Parameters for the step. For sub-DAG execution (when 'run' is specified), these are passed to the sub DAG and accessible as ${KEY}. For 'gha' executor, these are passed as action inputs (the 'with:' section in GitHub Actions syntax). For example, when using actions/checkout@v4, you can specify 'repository', 'ref', 'token', etc."
         },
         "parallel": {
           "oneOf": [
@@ -873,7 +873,7 @@
               "description": "Parallel execution configuration with concurrency control"
             }
           ],
-          "description": "Configuration for parallel execution of child DAGs. Only applicable when 'run' is specified. Allows processing multiple items concurrently using the same workflow definition."
+          "description": "Configuration for parallel execution of sub DAGs. Only applicable when 'run' is specified. Allows processing multiple items concurrently using the same workflow definition."
         },
         "workerSelector": {
           "type": "object",

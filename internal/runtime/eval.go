@@ -29,10 +29,10 @@ func EvalObject[T any](ctx context.Context, obj T) (T, error) {
 	return cmdutil.EvalObject(ctx, obj, vars)
 }
 
-// GenerateChildDAGRunID generates a unique run ID based on the current DAG run ID, step name, and parameters.
-func GenerateChildDAGRunID(ctx context.Context, params string, repeated bool) string {
+// GenerateSubDAGRunID generates a unique run ID based on the current DAG run ID, step name, and parameters.
+func GenerateSubDAGRunID(ctx context.Context, params string, repeated bool) string {
 	if repeated {
-		// If this is a repeated child DAG run, we need to generate a unique ID with randomness
+		// If this is a repeated sub DAG run, we need to generate a unique ID with randomness
 		// to avoid collisions with previous runs.
 		randomBytes := make([]byte, 8)
 		if _, err := rand.Read(randomBytes); err != nil {

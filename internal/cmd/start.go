@@ -20,8 +20,8 @@ import (
 
 // Errors for start command
 var (
-	// ErrDAGRunIDRequired is returned when a child dag-run is attempted without providing a dag-run ID
-	ErrDAGRunIDRequired = errors.New("dag-run ID must be provided for child dag-runs")
+	// ErrDAGRunIDRequired is returned when a sub dag-run is attempted without providing a dag-run ID
+	ErrDAGRunIDRequired = errors.New("dag-run ID must be provided for sub dag-runs")
 
 	// ErrDAGRunIDFormat is returned when the provided dag-run ID is not valid
 	ErrDAGRunIDFormat = errors.New("dag-run ID must only contain alphanumeric characters, dashes, and underscores")
@@ -61,7 +61,7 @@ var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, parentDAG
 // runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
 	// Get dag-run ID and references
-	dagRunID, rootRef, parentRef, isChildDAGRun, err := getDAGRunInfo(ctx)
+	dagRunID, rootRef, parentRef, isSubDAGRun, err := getDAGRunInfo(ctx)
 	if err != nil {
 		return err
 	}
@@ -73,19 +73,19 @@ func runStart(ctx *Context, args []string) error {
 	}
 
 	// Create or get root execution reference
-	root, err := determineRootDAGRun(isChildDAGRun, rootRef, dag, dagRunID)
+	root, err := determineRootDAGRun(isSubDAGRun, rootRef, dag, dagRunID)
 	if err != nil {
 		return err
 	}
 
-	// Handle child dag-run if applicable
-	if isChildDAGRun {
+	// Handle sub dag-run if applicable
+	if isSubDAGRun {
 		// Parse parent execution reference
 		parent, err := execution.ParseDAGRunRef(parentRef)
 		if err != nil {
 			return fmt.Errorf("failed to parse parent dag-run reference: %w", err)
 		}
-		return handleChildDAGRun(ctx, dag, dagRunID, params, root, parent)
+		return handleSubDAGRun(ctx, dag, dagRunID, params, root, parent)
 	}
 
 	// Check if queue is disabled via config or flag
@@ -203,7 +203,7 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.
 
 // getDAGRunInfo extracts and validates dag-run ID and references from command flags
 // nolint:revive
-func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isChildDAGRun bool, err error) {
+func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isSubDAGRun bool, err error) {
 	dagRunID, err = ctx.StringParam("run-id")
 	if err != nil {
 		return "", "", "", false, fmt.Errorf("failed to get dag-run ID: %w", err)
@@ -212,10 +212,10 @@ func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isC
 	// Get root and parent execution references
 	rootDAGRun, _ = ctx.Command.Flags().GetString("root")
 	parentDAGRun, _ = ctx.Command.Flags().GetString("parent")
-	isChildDAGRun = parentDAGRun != "" || rootDAGRun != ""
+	isSubDAGRun = parentDAGRun != "" || rootDAGRun != ""
 
-	// Validate dag-run ID for child dag-runs
-	if isChildDAGRun && dagRunID == "" {
+	// Validate dag-run ID for sub dag-runs
+	if isSubDAGRun && dagRunID == "" {
 		return "", "", "", false, ErrDAGRunIDRequired
 	}
 
@@ -232,7 +232,7 @@ func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isC
 		}
 	}
 
-	return dagRunID, rootDAGRun, parentDAGRun, isChildDAGRun, nil
+	return dagRunID, rootDAGRun, parentDAGRun, isSubDAGRun, nil
 }
 
 // loadDAGWithParams loads the DAG and its parameters from command arguments
@@ -322,9 +322,9 @@ func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
 }
 
 // determineRootDAGRun creates or parses the root execution reference
-func determineRootDAGRun(isChildDAGRun bool, rootDAGRun string, dag *core.DAG, dagRunID string) (execution.DAGRunRef, error) {
-	if isChildDAGRun {
-		// Parse the rootDAGRun execution reference for child dag-runs
+func determineRootDAGRun(isSubDAGRun bool, rootDAGRun string, dag *core.DAG, dagRunID string) (execution.DAGRunRef, error) {
+	if isSubDAGRun {
+		// Parse the rootDAGRun execution reference for sub dag-runs
 		rootDAGRun, err := execution.ParseDAGRunRef(rootDAGRun)
 		if err != nil {
 			return execution.DAGRunRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
@@ -336,10 +336,10 @@ func determineRootDAGRun(isChildDAGRun bool, rootDAGRun string, dag *core.DAG, d
 	return execution.NewDAGRunRef(dag.Name, dagRunID), nil
 }
 
-// handleChildDAGRun processes a child dag-run, checking for previous runs
-func handleChildDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root execution.DAGRunRef, parent execution.DAGRunRef) error {
-	// Log child dag-run execution
-	logger.Info(ctx, "Executing child dag-run",
+// handleSubDAGRun processes a sub dag-run, checking for previous runs
+func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root execution.DAGRunRef, parent execution.DAGRunRef) error {
+	// Log sub dag-run execution
+	logger.Info(ctx, "Executing sub dag-run",
 		"dag", dag.Name,
 		"params", params,
 		"dagRunId", dagRunID,
@@ -349,14 +349,14 @@ func handleChildDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params stri
 
 	// Double-check dag-run ID is provided (should be caught earlier, but being defensive)
 	if dagRunID == "" {
-		return fmt.Errorf("dag-run ID must be provided for child DAGrun")
+		return fmt.Errorf("dag-run ID must be provided for sub DAGrun")
 	}
 
-	// Check for previous child dag-run with this ID
-	logger.Debug(ctx, "Checking for previous child dag-run with the dag-run ID", "dagRunId", dagRunID)
+	// Check for previous sub dag-run with this ID
+	logger.Debug(ctx, "Checking for previous sub dag-run with the dag-run ID", "dagRunId", dagRunID)
 
-	// Look for existing execution childAttempt
-	childAttempt, err := ctx.DAGRunStore.FindChildAttempt(ctx, root, dagRunID)
+	// Look for existing execution subAttempt
+	subAttempt, err := ctx.DAGRunStore.FindSubAttempt(ctx, root, dagRunID)
 	if errors.Is(err, execution.ErrDAGRunIDNotFound) {
 		// If the dag-run ID is not found, proceed with new execution
 		return executeDAGRun(ctx, dag, parent, dagRunID, root)
@@ -366,7 +366,7 @@ func handleChildDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params stri
 	}
 
 	// Read the status of the previous run
-	status, err := childAttempt.ReadStatus(ctx)
+	status, err := subAttempt.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read previous run status for dag-run ID %s: %w", dagRunID, err)
 	}

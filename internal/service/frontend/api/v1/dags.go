@@ -840,9 +840,9 @@ func toStep(obj core.Step) api.Step {
 		Script:        ptrOf(obj.Script),
 	}
 
-	if obj.ChildDAG != nil {
-		step.Run = ptrOf(obj.ChildDAG.Name)
-		step.Params = ptrOf(obj.ChildDAG.Params)
+	if obj.SubDAG != nil {
+		step.Run = ptrOf(obj.SubDAG.Name)
+		step.Params = ptrOf(obj.SubDAG.Params)
 	}
 	return step
 }

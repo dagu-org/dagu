@@ -404,29 +404,29 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 	}, nil
 }
 
-// GetChildDAGRunDetails implements api.StrictServerInterface.
-func (a *API) GetChildDAGRunDetails(ctx context.Context, request api.GetChildDAGRunDetailsRequestObject) (api.GetChildDAGRunDetailsResponseObject, error) {
+// GetSubDAGRunDetails implements api.StrictServerInterface.
+func (a *API) GetSubDAGRunDetails(ctx context.Context, request api.GetSubDAGRunDetailsRequestObject) (api.GetSubDAGRunDetailsResponseObject, error) {
 	root := execution.NewDAGRunRef(request.Name, request.DagRunId)
-	dagStatus, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
+	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, root, request.SubDAGRunId)
 	if err != nil {
-		return &api.GetChildDAGRunDetails404JSONResponse{
+		return &api.GetSubDAGRunDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("child dag-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
+			Message: fmt.Sprintf("sub dag-run ID %s not found for DAG %s", request.SubDAGRunId, request.Name),
 		}, nil
 	}
-	return &api.GetChildDAGRunDetails200JSONResponse{
+	return &api.GetSubDAGRunDetails200JSONResponse{
 		DagRunDetails: toDAGRunDetails(*dagStatus),
 	}, nil
 }
 
-// GetChildDAGRunLog implements api.StrictServerInterface.
-func (a *API) GetChildDAGRunLog(ctx context.Context, request api.GetChildDAGRunLogRequestObject) (api.GetChildDAGRunLogResponseObject, error) {
+// GetSubDAGRunLog implements api.StrictServerInterface.
+func (a *API) GetSubDAGRunLog(ctx context.Context, request api.GetSubDAGRunLogRequestObject) (api.GetSubDAGRunLogResponseObject, error) {
 	root := execution.NewDAGRunRef(request.Name, request.DagRunId)
-	dagStatus, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
+	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, root, request.SubDAGRunId)
 	if err != nil {
-		return &api.GetChildDAGRunLog404JSONResponse{
+		return &api.GetSubDAGRunLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("child dag-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
+			Message: fmt.Sprintf("sub dag-run ID %s not found for DAG %s", request.SubDAGRunId, request.Name),
 		}, nil
 	}
 
@@ -444,7 +444,7 @@ func (a *API) GetChildDAGRunLog(ctx context.Context, request api.GetChildDAGRunL
 		return nil, fmt.Errorf("error reading %s: %w", dagStatus.Log, err)
 	}
 
-	return &api.GetChildDAGRunLog200JSONResponse{
+	return &api.GetSubDAGRunLog200JSONResponse{
 		Content:    content,
 		LineCount:  ptrOf(lineCount),
 		TotalLines: ptrOf(totalLines),
@@ -453,20 +453,20 @@ func (a *API) GetChildDAGRunLog(ctx context.Context, request api.GetChildDAGRunL
 	}, nil
 }
 
-// GetChildDAGRunStepLog implements api.StrictServerInterface.
-func (a *API) GetChildDAGRunStepLog(ctx context.Context, request api.GetChildDAGRunStepLogRequestObject) (api.GetChildDAGRunStepLogResponseObject, error) {
+// GetSubDAGRunStepLog implements api.StrictServerInterface.
+func (a *API) GetSubDAGRunStepLog(ctx context.Context, request api.GetSubDAGRunStepLogRequestObject) (api.GetSubDAGRunStepLogResponseObject, error) {
 	root := execution.NewDAGRunRef(request.Name, request.DagRunId)
-	dagStatus, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
+	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, root, request.SubDAGRunId)
 	if err != nil {
-		return &api.GetChildDAGRunStepLog404JSONResponse{
+		return &api.GetSubDAGRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("child dag-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
+			Message: fmt.Sprintf("sub dag-run ID %s not found for DAG %s", request.SubDAGRunId, request.Name),
 		}, nil
 	}
 
 	node, err := dagStatus.NodeByName(request.StepName)
 	if err != nil {
-		return &api.GetChildDAGRunStepLog404JSONResponse{
+		return &api.GetSubDAGRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.Name),
 		}, nil
@@ -491,7 +491,7 @@ func (a *API) GetChildDAGRunStepLog(ctx context.Context, request api.GetChildDAG
 		return nil, fmt.Errorf("error reading %s: %w", node.Stdout, err)
 	}
 
-	return &api.GetChildDAGRunStepLog200JSONResponse{
+	return &api.GetSubDAGRunStepLog200JSONResponse{
 		Content:    content,
 		LineCount:  ptrOf(lineCount),
 		TotalLines: ptrOf(totalLines),
@@ -500,22 +500,22 @@ func (a *API) GetChildDAGRunStepLog(ctx context.Context, request api.GetChildDAG
 	}, nil
 }
 
-// UpdateChildDAGRunStepStatus implements api.StrictServerInterface.
-func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.UpdateChildDAGRunStepStatusRequestObject) (api.UpdateChildDAGRunStepStatusResponseObject, error) {
+// UpdateSubDAGRunStepStatus implements api.StrictServerInterface.
+func (a *API) UpdateSubDAGRunStepStatus(ctx context.Context, request api.UpdateSubDAGRunStepStatusRequestObject) (api.UpdateSubDAGRunStepStatusResponseObject, error) {
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
 
 	root := execution.NewDAGRunRef(request.Name, request.DagRunId)
-	dagStatus, err := a.dagRunMgr.FindChildDAGRunStatus(ctx, root, request.ChildDAGRunId)
+	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, root, request.SubDAGRunId)
 	if err != nil {
-		return &api.UpdateChildDAGRunStepStatus404JSONResponse{
+		return &api.UpdateSubDAGRunStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("child dag-run ID %s not found for DAG %s", request.ChildDAGRunId, request.Name),
+			Message: fmt.Sprintf("sub dag-run ID %s not found for DAG %s", request.SubDAGRunId, request.Name),
 		}, nil
 	}
 	if dagStatus.Status == core.Running {
-		return &api.UpdateChildDAGRunStepStatus400JSONResponse{
+		return &api.UpdateSubDAGRunStepStatus400JSONResponse{
 			Code:    api.ErrorCodeBadRequest,
 			Message: fmt.Sprintf("dag-run ID %s for DAG %s is still running", request.DagRunId, request.Name),
 		}, nil
@@ -529,7 +529,7 @@ func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.Updat
 		}
 	}
 	if idxToUpdate < 0 {
-		return &api.UpdateChildDAGRunStepStatus404JSONResponse{
+		return &api.UpdateSubDAGRunStepStatus404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.Name),
 		}, nil
@@ -541,7 +541,7 @@ func (a *API) UpdateChildDAGRunStepStatus(ctx context.Context, request api.Updat
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
-	return &api.UpdateChildDAGRunStepStatus200Response{}, nil
+	return &api.UpdateSubDAGRunStepStatus200Response{}, nil
 }
 
 var nodeStatusMapping = map[api.NodeStatus]core.NodeStatus{

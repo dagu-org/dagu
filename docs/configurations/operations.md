@@ -228,7 +228,7 @@ Deletes:
 - Execution logs
 - Step output (.out, .err)
 - Status files (.jsonl)
-- Child DAG logs
+- Sub DAG logs
 
 ### Alerting
 
@@ -308,15 +308,15 @@ handlerOn:
 
 ### Environment Variable Filtering
 
-Dagu implements environment variable filtering to prevent accidental exposure of sensitive data to step processes and child DAGs.
+Dagu implements environment variable filtering to prevent accidental exposure of sensitive data to step processes and sub DAGs.
 
 **How It Works:**
 
-System environment variables are available for variable expansion (`${VAR}`) when parsing the DAG configuration, but only filtered variables are passed to the actual step execution environment and child DAG processes.
+System environment variables are available for variable expansion (`${VAR}`) when parsing the DAG configuration, but only filtered variables are passed to the actual step execution environment and sub DAG processes.
 
 **Filtered Variables (passed to step processes):**
 
-Only these system environment variables are automatically passed to step processes and child DAGs:
+Only these system environment variables are automatically passed to step processes and sub DAGs:
 
 - **Whitelisted:** `PATH`, `HOME`, `LANG`, `TZ`, `SHELL`
 - **Allowed Prefixes:** `DAGU_*`, `LC_*`, `DAG_*`

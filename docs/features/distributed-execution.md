@@ -227,7 +227,7 @@ Access the Workers page in the Web UI to monitor:
 - Connected workers and their labels
 - Worker health status (Healthy/Warning/Unhealthy)
 - Currently running tasks on each worker
-- Task hierarchy (root/parent/child DAGs)
+- Task hierarchy (root/parent/sub DAGs)
 
 ### Health Status Indicators
 

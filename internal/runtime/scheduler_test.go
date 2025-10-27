@@ -1071,11 +1071,11 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "ERROR_MSG=error_output", output, "expected output %q, got %q", "error_output", output)
 	})
-	t.Run("RetryPolicyChildDAGRunWithOutputCapture", func(t *testing.T) {
+	t.Run("RetryPolicySubDAGRunWithOutputCapture", func(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Create a counter file for tracking retry attempts
-		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_child_output_%s.txt", uuid.Must(uuid.NewV7()).String()))
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_sub_output_%s.txt", uuid.Must(uuid.NewV7()).String()))
 		defer func() {
 			_ = os.Remove(counterFile)
 		}()

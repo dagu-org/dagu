@@ -67,45 +67,45 @@ func (dr DAGRunTest) WriteStatus(t *testing.T, ts execution.TimeInUTC, s core.St
 	return run
 }
 
-func TestListChildDAGRuns(t *testing.T) {
-	t.Run("NoChildDAGRuns", func(t *testing.T) {
+func TestListSubDAGRuns(t *testing.T) {
+	t.Run("NoSubDAGRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 		run := root.CreateTestDAGRun(t, "test-dag-run", execution.NewUTC(time.Now()))
 
-		children, err := run.ListChildDAGRuns(run.Context)
+		subRuns, err := run.ListSubDAGRuns(run.Context)
 		require.NoError(t, err)
-		assert.Empty(t, children, "should return empty list when no child dag-run exist")
+		assert.Empty(t, subRuns, "should return empty list when no sub dag-run exist")
 	})
 
-	t.Run("WithChildDAGRuns", func(t *testing.T) {
+	t.Run("WithSubDAGRuns", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 		run := root.CreateTestDAGRun(t, "parent-dag-run", execution.NewUTC(time.Now()))
 
-		// Create child dag-run directory and some child dag-run directories
-		childDir := filepath.Join(run.baseDir, ChildDAGRunsDir)
-		require.NoError(t, os.MkdirAll(childDir, 0750))
+		// Create sub dag-run directory and some sub dag-run directories
+		subDir := filepath.Join(run.baseDir, SubDAGRunsDir)
+		require.NoError(t, os.MkdirAll(subDir, 0750))
 
-		// Create two child dag-run directories
-		child1Dir := filepath.Join(childDir, ChildDAGRunDirPrefix+"child1")
-		child2Dir := filepath.Join(childDir, ChildDAGRunDirPrefix+"child2")
-		require.NoError(t, os.MkdirAll(child1Dir, 0750))
-		require.NoError(t, os.MkdirAll(child2Dir, 0750))
+		// Create two sub dag-run directories
+		sub1Dir := filepath.Join(subDir, SubDAGRunDirPrefix+"sub1")
+		sub2Dir := filepath.Join(subDir, SubDAGRunDirPrefix+"sub2")
+		require.NoError(t, os.MkdirAll(sub1Dir, 0750))
+		require.NoError(t, os.MkdirAll(sub2Dir, 0750))
 
 		// Create a non-directory file (should be ignored)
-		nonDirFile := filepath.Join(childDir, "not-a-directory.txt")
+		nonDirFile := filepath.Join(subDir, "not-a-directory.txt")
 		require.NoError(t, os.WriteFile(nonDirFile, []byte("test"), 0600))
 
-		children, err := run.ListChildDAGRuns(run.Context)
+		subRuns, err := run.ListSubDAGRuns(run.Context)
 		require.NoError(t, err)
-		assert.Len(t, children, 2, "should return two child dag-runs")
+		assert.Len(t, subRuns, 2, "should return two sub dag-runs")
 
-		// Verify child dag-run directories
-		childIDs := make([]string, len(children))
-		for i, child := range children {
-			childIDs[i] = child.dagRunID
+		// Verify sub dag-run directories
+		subIDs := make([]string, len(subRuns))
+		for i, subRun := range subRuns {
+			subIDs[i] = subRun.dagRunID
 		}
-		assert.Contains(t, childIDs, "child1")
-		assert.Contains(t, childIDs, "child2")
+		assert.Contains(t, subIDs, "sub1")
+		assert.Contains(t, subIDs, "sub2")
 	})
 }
 
@@ -212,20 +212,20 @@ func TestRemoveLogFiles(t *testing.T) {
 		}
 	})
 
-	t.Run("RemoveChildDAGRunLogFiles", func(t *testing.T) {
+	t.Run("RemoveSubDAGRunLogFiles", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		// Create test log files for parent and child
+		// Create test log files for parent and sub run
 		parentLogFiles := []string{
 			filepath.Join(tmpDir, "parent.log"),
 			filepath.Join(tmpDir, "parent_step.out"),
 		}
-		childLogFiles := []string{
-			filepath.Join(tmpDir, "child.log"),
-			filepath.Join(tmpDir, "child_step.out"),
+		subRunLogFiles := []string{
+			filepath.Join(tmpDir, "sub.log"),
+			filepath.Join(tmpDir, "sub_step.out"),
 		}
 
-		allLogFiles := append(parentLogFiles, childLogFiles...)
+		allLogFiles := append(parentLogFiles, subRunLogFiles...)
 		for _, logFile := range allLogFiles {
 			require.NoError(t, os.WriteFile(logFile, []byte("test log content"), 0600))
 		}
@@ -250,30 +250,30 @@ func TestRemoveLogFiles(t *testing.T) {
 		require.NoError(t, att.Write(run.Context, dagRunStatus))
 		require.NoError(t, att.Close(run.Context))
 
-		// Create child dag-run directory
-		childDir := filepath.Join(run.baseDir, ChildDAGRunsDir)
-		require.NoError(t, os.MkdirAll(childDir, 0750))
+		// Create sub dag-run directory
+		subDir := filepath.Join(run.baseDir, SubDAGRunsDir)
+		require.NoError(t, os.MkdirAll(subDir, 0750))
 
-		childDAGRunDir := filepath.Join(childDir, ChildDAGRunDirPrefix+"child1")
-		require.NoError(t, os.MkdirAll(childDAGRunDir, 0750))
+		subDAGRunDir := filepath.Join(subDir, SubDAGRunDirPrefix+"sub1")
+		require.NoError(t, os.MkdirAll(subDAGRunDir, 0750))
 
-		childDAGRun, err := NewDAGRun(childDAGRunDir)
+		subDAGRun, err := NewDAGRun(subDAGRunDir)
 		require.NoError(t, err)
 
-		// Create child run with log files
-		childStatus := execution.InitialStatus(dag)
-		childStatus.DAGRunID = "child1"
-		childStatus.Log = childLogFiles[0]
-		childStatus.Nodes = []*execution.Node{{
-			Step:   core.Step{Name: "child-step"},
-			Stdout: childLogFiles[1],
+		// Create sub run with log files
+		subStatus := execution.InitialStatus(dag)
+		subStatus.DAGRunID = "sub1"
+		subStatus.Log = subRunLogFiles[0]
+		subStatus.Nodes = []*execution.Node{{
+			Step:   core.Step{Name: "sub-step"},
+			Stdout: subRunLogFiles[1],
 		}}
 
-		childRun, err := childDAGRun.CreateAttempt(run.Context, ts, nil)
+		subRun, err := subDAGRun.CreateAttempt(run.Context, ts, nil)
 		require.NoError(t, err)
-		require.NoError(t, childRun.Open(run.Context))
-		require.NoError(t, childRun.Write(run.Context, childStatus))
-		require.NoError(t, childRun.Close(run.Context))
+		require.NoError(t, subRun.Open(run.Context))
+		require.NoError(t, subRun.Write(run.Context, subStatus))
+		require.NoError(t, subRun.Close(run.Context))
 
 		// Verify all files exist before removal
 		for _, logFile := range allLogFiles {
@@ -281,7 +281,7 @@ func TestRemoveLogFiles(t *testing.T) {
 			require.NoError(t, err, "log file should exist before removal: %s", logFile)
 		}
 
-		// Remove log files (should remove both parent and child log files)
+		// Remove log files (should remove both parent and sub log files)
 		err = run.removeLogFiles(run.Context)
 		require.NoError(t, err)
 
@@ -356,24 +356,24 @@ func TestDAGRunRemove(t *testing.T) {
 		}
 	})
 
-	t.Run("RemoveWithChildDAGRuns", func(t *testing.T) {
+	t.Run("RemoveWithSubDAGRuns", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		// Create test log files for parent and children
+		// Create test log files for parent and sub runs
 		parentLogFiles := []string{
 			filepath.Join(tmpDir, "parent.log"),
 			filepath.Join(tmpDir, "parent_step.out"),
 		}
-		child1LogFiles := []string{
-			filepath.Join(tmpDir, "child1.log"),
-			filepath.Join(tmpDir, "child1_step.out"),
+		sub1LogFiles := []string{
+			filepath.Join(tmpDir, "sub1.log"),
+			filepath.Join(tmpDir, "sub1_step.out"),
 		}
-		child2LogFiles := []string{
-			filepath.Join(tmpDir, "child2.log"),
-			filepath.Join(tmpDir, "child2_step.out"),
+		sub2LogFiles := []string{
+			filepath.Join(tmpDir, "sub2.log"),
+			filepath.Join(tmpDir, "sub2_step.out"),
 		}
 
-		allLogFiles := append(append(parentLogFiles, child1LogFiles...), child2LogFiles...)
+		allLogFiles := append(append(parentLogFiles, sub1LogFiles...), sub2LogFiles...)
 		for _, logFile := range allLogFiles {
 			require.NoError(t, os.WriteFile(logFile, []byte("test log content"), 0600))
 		}
@@ -398,39 +398,39 @@ func TestDAGRunRemove(t *testing.T) {
 		require.NoError(t, att.Write(run.Context, dagRunStatus))
 		require.NoError(t, att.Close(run.Context))
 
-		// Create child dag-run directory
-		childDir := filepath.Join(run.baseDir, ChildDAGRunsDir)
-		require.NoError(t, os.MkdirAll(childDir, 0750))
+		// Create sub dag-run directory
+		subDir := filepath.Join(run.baseDir, SubDAGRunsDir)
+		require.NoError(t, os.MkdirAll(subDir, 0750))
 
-		// Create two child dag-run with their own log files
-		childDAGRuns := []struct {
+		// Create two sub dag-runs with their own log files
+		subDAGRuns := []struct {
 			dagRunID string
 			logFiles []string
 		}{
-			{"child1", child1LogFiles},
-			{"child2", child2LogFiles},
+			{"sub1", sub1LogFiles},
+			{"sub2", sub2LogFiles},
 		}
 
-		for _, child := range childDAGRuns {
-			childDAGRunDir := filepath.Join(childDir, ChildDAGRunDirPrefix+child.dagRunID)
-			require.NoError(t, os.MkdirAll(childDAGRunDir, 0750))
+		for _, subRun := range subDAGRuns {
+			subDAGRunDir := filepath.Join(subDir, SubDAGRunDirPrefix+subRun.dagRunID)
+			require.NoError(t, os.MkdirAll(subDAGRunDir, 0750))
 
-			childDAGRun, err := NewDAGRun(childDAGRunDir)
+			subDAGRun, err := NewDAGRun(subDAGRunDir)
 			require.NoError(t, err)
 
-			childStatus := execution.InitialStatus(dag)
-			childStatus.DAGRunID = child.dagRunID
-			childStatus.Log = child.logFiles[0]
-			childStatus.Nodes = []*execution.Node{{
-				Step:   core.Step{Name: fmt.Sprintf("%s-step", child.dagRunID)},
-				Stdout: child.logFiles[1],
+			subStatus := execution.InitialStatus(dag)
+			subStatus.DAGRunID = subRun.dagRunID
+			subStatus.Log = subRun.logFiles[0]
+			subStatus.Nodes = []*execution.Node{{
+				Step:   core.Step{Name: fmt.Sprintf("%s-step", subRun.dagRunID)},
+				Stdout: subRun.logFiles[1],
 			}}
 
-			childRun, err := childDAGRun.CreateAttempt(run.Context, ts, nil)
+			subRunAttempt, err := subDAGRun.CreateAttempt(run.Context, ts, nil)
 			require.NoError(t, err)
-			require.NoError(t, childRun.Open(run.Context))
-			require.NoError(t, childRun.Write(run.Context, childStatus))
-			require.NoError(t, childRun.Close(run.Context))
+			require.NoError(t, subRunAttempt.Open(run.Context))
+			require.NoError(t, subRunAttempt.Write(run.Context, subStatus))
+			require.NoError(t, subRunAttempt.Close(run.Context))
 		}
 
 		// Verify all files exist before removal
@@ -439,7 +439,7 @@ func TestDAGRunRemove(t *testing.T) {
 			require.NoError(t, err, "log file should exist before removal: %s", logFile)
 		}
 
-		// Remove the parent dag-run (should remove all log files including child dag-runs)
+		// Remove the parent dag-run (should remove all log files including sub dag-runs)
 		err = run.Remove(run.Context)
 		require.NoError(t, err)
 
@@ -447,7 +447,7 @@ func TestDAGRunRemove(t *testing.T) {
 		_, err = os.Stat(run.baseDir)
 		assert.True(t, os.IsNotExist(err), "dag-run directory should be removed")
 
-		// Verify all log files are removed (parent and children)
+		// Verify all log files are removed (parent and subRuns)
 		for _, logFile := range allLogFiles {
 			_, err := os.Stat(logFile)
 			assert.True(t, os.IsNotExist(err), "log file should be removed: %s", logFile)

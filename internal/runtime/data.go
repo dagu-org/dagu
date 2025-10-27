@@ -55,10 +55,10 @@ type NodeState struct {
 	// This is populated when a step has parallel configuration and tracks
 	// all the items that need to be executed in parallel.
 	*Parallel
-	// Children stores the child dag-runs.
-	Children []ChildDAGRun
-	// ChildrenRepeated stores the repeated child dag-runs.
-	ChildrenRepeated []ChildDAGRun
+	// SubRuns stores the sub dag-runs.
+	SubRuns []SubDAGRun
+	// SubRunsRepeated stores the repeated sub dag-runs.
+	SubRunsRepeated []SubDAGRun
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
 	OutputVariables *collections.SyncMap
@@ -68,7 +68,7 @@ type NodeState struct {
 // It contains the expanded list of items to be processed in parallel.
 type Parallel struct {
 	// Items contains all the parallel items to be executed.
-	// Each item will result in a separate child DAG run.
+	// Each item will result in a separate sub DAG run.
 	Items []ParallelItem
 }
 
@@ -80,23 +80,23 @@ type ParallelItem struct {
 	Item core.ParallelItem
 }
 
-// ChildDAGRun represents a child DAG execution within a parent DAG.
-// Each child DAG run has a deterministic ID based on its parameters to ensure idempotency.
-type ChildDAGRun struct {
-	// DAGRunID is the unique identifier for the child dag-run.
+// SubDAGRun represents a sub DAG execution within a parent DAG.
+// Each sub DAG run has a deterministic ID based on its parameters to ensure idempotency.
+type SubDAGRun struct {
+	// DAGRunID is the unique identifier for the sub dag-run.
 	// It is generated as a base58-encoded SHA-256 hash of the string:
 	// "<parent-dag-run-id>:<step-name>:<deterministic-json-params>"
 	//
 	// This deterministic ID generation ensures:
-	// - Same parameters always produce the same child DAG run ID
-	// - Retries reuse existing child DAG runs instead of creating duplicates
+	// - Same parameters always produce the same sub DAG run ID
+	// - Retries reuse existing sub DAG runs instead of creating duplicates
 	// - Each step's children are namespaced by step name to prevent collisions
 	//
 	// The params are encoded as deterministic JSON (sorted keys) before hashing.
 	// Example input: "abc123:process-regions:{"REGION":"us-east-1","VERSION":"1.0.0"}"
 	// Example output: "5Kd3NBUAdUnhyzenEwVLy9pBKxSwXvE9FMPyR4UKZvpe"
 	DAGRunID string
-	// Params contains the raw parameters passed to the child DAG run.
+	// Params contains the raw parameters passed to the sub DAG run.
 	// This can be:
 	// - A simple string: "param1 param2"
 	// - Key-value pairs: "KEY1=value1 KEY2=value2"
@@ -124,11 +124,11 @@ func (d *Data) SetExecutorConfig(cfg core.ExecutorConfig) {
 	d.inner.Step.ExecutorConfig = cfg
 }
 
-func (d *Data) SetChildDAG(childDAG core.ChildDAG) {
+func (d *Data) SetSubDAG(subDAG core.SubDAG) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.inner.Step.ChildDAG = &childDAG
+	d.inner.Step.SubDAG = &subDAG
 }
 
 func (d *Data) Args() []string {
@@ -176,22 +176,22 @@ func (s *Data) Data() NodeData {
 	return s.inner
 }
 
-// SetChildRuns sets the children of the node.
-func (d *Data) SetChildRuns(children []ChildDAGRun) {
+// SetSubRuns replaces the sub DAG runs associated with the node.
+func (d *Data) SetSubRuns(subRuns []SubDAGRun) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	// Clear the existing children and set the new ones
-	d.inner.State.Children = make([]ChildDAGRun, len(children))
-	copy(d.inner.State.Children, children)
+	// Clear the existing sub runs and set the new ones.
+	d.inner.State.SubRuns = make([]SubDAGRun, len(subRuns))
+	copy(d.inner.State.SubRuns, subRuns)
 }
 
-// AddChildRunsRepeated adds the repeated child runs to the node.
-func (d *Data) AddChildRunsRepeated(child ...ChildDAGRun) {
+// AddSubRunsRepeated appends repeated sub DAG runs to the node.
+func (d *Data) AddSubRunsRepeated(subRun ...SubDAGRun) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.inner.State.ChildrenRepeated = append(d.inner.State.ChildrenRepeated, child...)
+	d.inner.State.SubRunsRepeated = append(d.inner.State.SubRunsRepeated, subRun...)
 }
 
 func (d *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) error {

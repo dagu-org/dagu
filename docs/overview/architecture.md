@@ -90,8 +90,8 @@ Dagu follows the XDG Base Directory specification for file organization:
 │   │                           │   ├── step1.stdout.log # Step stdout
 │   │                           │   ├── step1.stderr.log # Step stderr
 │   │                           │   └── step2.stdout.log
-│   │                           └── children/           # Child DAG runs (nested workflows)
-│   │                               └── child_xyz789/
+│   │                           └── subdags/           # Sub DAG runs (nested workflows)
+│   │                               └── sub_xyz789/
 │   │                                   └── attempt_20240315_120002_456Z_ghi012/
 │   │                                       └── status.jsonl
 │   ├── queue/         # File-based execution queue

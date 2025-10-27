@@ -64,12 +64,12 @@ steps:
 		require.Equal(t, "process-items", processNode.Step.Name)
 		require.Equal(t, core.NodeSucceeded, processNode.Status)
 
-		// Verify child DAG runs were created
-		require.NotEmpty(t, processNode.Children)
-		require.Len(t, processNode.Children, 3) // 3 child runs
+		// Verify sub DAG runs were created
+		require.NotEmpty(t, processNode.SubRuns)
+		require.Len(t, processNode.SubRuns, 3) // 3 sub runs
 
 		// Verify all children completed successfully
-		for _, child := range processNode.Children {
+		for _, child := range processNode.SubRuns {
 			// Each child should have been executed on a worker
 			require.Contains(t, child.Params, "item")
 		}
@@ -138,7 +138,7 @@ steps:
 		processNode := st.Nodes[0]
 		require.Equal(t, "process-regions", processNode.Step.Name)
 		require.Equal(t, core.NodeSucceeded, processNode.Status)
-		require.Len(t, processNode.Children, 3)
+		require.Len(t, processNode.SubRuns, 3)
 
 		// Verify output shows all regions were processed
 		if value, ok := processNode.OutputVariables.Load("RESULTS"); ok {
@@ -192,7 +192,7 @@ steps:
 		node := st.Nodes[0]
 		require.Equal(t, "process-items", node.Step.Name)
 		require.Equal(t, core.NodeFailed, node.Status)
-		require.Len(t, node.Children, 2)
+		require.Len(t, node.SubRuns, 2)
 	})
 
 	t.Run("ParallelDistributedWithNoMatchingWorkers", func(t *testing.T) {
@@ -323,11 +323,11 @@ steps:
 		// Verify that the parallel step status
 		require.Equal(t, core.NodeCanceled, parallelNode.Status)
 
-		// Verify child DAG runs were cancelled
+		// Verify sub DAG runs were cancelled
 		runRef := execution.NewDAGRunRef(st.Name, st.DAGRunID)
 		var canceled bool
-		for _, child := range parallelNode.Children {
-			att, _ := coord.DAGRunStore.FindChildAttempt(coord.Context, runRef, child.DAGRunID)
+		for _, child := range parallelNode.SubRuns {
+			att, _ := coord.DAGRunStore.FindSubAttempt(coord.Context, runRef, child.DAGRunID)
 			if att == nil {
 				continue
 			}
@@ -338,19 +338,19 @@ steps:
 			require.Equal(t, core.Canceled, status.Status)
 			canceled = true
 		}
-		require.True(t, canceled, "expected at least one child DAG run to be cancelled")
+		require.True(t, canceled, "expected at least one sub DAG run to be cancelled")
 
-		// If the step was actually started, verify that child DAG runs were created
-		if parallelNode.Status != core.NodeNotStarted && len(parallelNode.Children) > 0 {
-			// Verify that distributed child runs were cancelled
-			for _, child := range parallelNode.Children {
-				t.Logf("Child DAG run %s with params %s", child.DAGRunID, child.Params)
+		// If the step was actually started, verify that sub DAG runs were created
+		if parallelNode.Status != core.NodeNotStarted && len(parallelNode.SubRuns) > 0 {
+			// Verify that distributed sub runs were cancelled
+			for _, child := range parallelNode.SubRuns {
+				t.Logf("Sub DAG run %s with params %s", child.DAGRunID, child.Params)
 			}
 		}
 	})
 
 	t.Run("MixedLocalAndDistributedCancellation", func(t *testing.T) {
-		// Create test DAGs with both local and distributed child DAGs
+		// Create test DAGs with both local and distributed sub DAGs
 		yamlContent := `
 steps:
   - name: local-execution
@@ -513,11 +513,11 @@ steps:
 		concurrentNode := st.Nodes[0]
 		require.Equal(t, "high-concurrency", concurrentNode.Step.Name)
 
-		// Log information about child runs
-		if len(concurrentNode.Children) > 0 {
-			t.Logf("Created %d child runs before cancellation", len(concurrentNode.Children))
-			for _, child := range concurrentNode.Children {
-				t.Logf("Child run %s for %s", child.DAGRunID, child.Params)
+		// Log information about sub runs
+		if len(concurrentNode.SubRuns) > 0 {
+			t.Logf("Created %d sub runs before cancellation", len(concurrentNode.SubRuns))
+			for _, child := range concurrentNode.SubRuns {
+				t.Logf("Sub run %s for %s", child.DAGRunID, child.Params)
 			}
 		}
 

@@ -391,8 +391,8 @@ func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun execution.DAGR
 	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindChildAttempt(ctx context.Context, dagRun execution.DAGRunRef, childDAGRunID string) (execution.DAGRunAttempt, error) {
-	args := m.Called(ctx, dagRun, childDAGRunID)
+func (m *mockDAGRunStore) FindSubAttempt(ctx context.Context, dagRun execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
+	args := m.Called(ctx, dagRun, subDAGRunID)
 	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 

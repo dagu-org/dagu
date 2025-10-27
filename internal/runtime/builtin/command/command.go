@@ -470,8 +470,8 @@ func validateCommandStep(step core.Step) error {
 		// Command only - valid
 	case step.Command == "" && step.Script != "":
 		// Script only - valid
-	case step.ChildDAG != nil:
-		// Child DAG - valid
+	case step.SubDAG != nil:
+		// Sub DAG - valid
 	default:
 		return core.ErrStepCommandIsRequired
 	}

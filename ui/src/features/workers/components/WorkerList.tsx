@@ -197,7 +197,7 @@ function TaskRow({ task, onTaskClick }: { task: RunningTask; onTaskClick?: (task
       let url: string;
       if (task.parentDagRunName && task.parentDagRunId) {
         const searchParams = new URLSearchParams();
-        searchParams.set('childDAGRunId', task.dagRunId);
+        searchParams.set('subDAGRunId', task.dagRunId);
         searchParams.set('dagRunId', task.parentDagRunId);
         searchParams.set('dagRunName', task.parentDagRunName);
         url = `/dag-runs/${task.parentDagRunName}/${task.parentDagRunId}?${searchParams.toString()}`;

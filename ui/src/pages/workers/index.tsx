@@ -91,10 +91,10 @@ function Workers() {
 
   // Handle task click
   const handleTaskClick = React.useCallback((task: components['schemas']['RunningTask']) => {
-    // For nested tasks, we need to set up the URL params for child DAG view
+    // For nested tasks, we need to set up the URL params for sub DAG view
     if (task.parentDagRunName && task.parentDagRunId) {
       const searchParams = new URLSearchParams();
-      searchParams.set('childDAGRunId', task.dagRunId);
+      searchParams.set('subDAGRunId', task.dagRunId);
       searchParams.set('dagRunId', task.parentDagRunId);
       searchParams.set('dagRunName', task.parentDagRunName);
       window.history.pushState({}, '', `${window.location.pathname}?${searchParams.toString()}`);

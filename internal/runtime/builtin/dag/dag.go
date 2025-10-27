@@ -19,7 +19,7 @@ var _ executor.DAGExecutor = (*dagExecutor)(nil)
 var _ executor.NodeStatusDeterminer = (*dagExecutor)(nil)
 
 type dagExecutor struct {
-	child     *executor.ChildDAGExecutor
+	child     *executor.SubDAGExecutor
 	lock      sync.Mutex
 	workDir   string
 	stdout    io.Writer
@@ -36,11 +36,11 @@ var (
 )
 
 func newDAGExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
-	if step.ChildDAG == nil {
-		return nil, fmt.Errorf("child DAG configuration is missing")
+	if step.SubDAG == nil {
+		return nil, fmt.Errorf("sub DAG configuration is missing")
 	}
 
-	child, err := executor.NewChildDAGExecutor(ctx, step.ChildDAG.Name)
+	child, err := executor.NewSubDAGExecutor(ctx, step.SubDAG.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 	// Ensure cleanup happens even if there's an error
 	defer func() {
 		if err := e.child.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup child DAG executor", "err", err)
+			logger.Error(ctx, "Failed to cleanup sub DAG executor", "err", err)
 		}
 	}()
 
@@ -107,10 +107,10 @@ func (e *dagExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 	case core.PartiallySucceeded:
 		return core.NodePartiallySucceeded, nil
 	case core.NotStarted, core.Running, core.Failed, core.Canceled, core.Queued:
-		return core.NodeFailed, fmt.Errorf("child DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
+		return core.NodeFailed, fmt.Errorf("sub DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
 	default:
 		// This should never happen, but satisfies the exhaustive check
-		return core.NodeFailed, fmt.Errorf("child DAG run %s failed with unknown status: %s", e.result.DAGRunID, e.result.Status)
+		return core.NodeFailed, fmt.Errorf("sub DAG run %s failed with unknown status: %s", e.result.DAGRunID, e.result.Status)
 	}
 }
 
