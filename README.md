@@ -49,7 +49,7 @@ steps:
 - Use existing programs, scripts, and container images without any modification
 - Schedule workflows with cron expressions
 - Run in HA mode and distribute tasks to workers through built-in queue system.
-- Modularize workflows by nesting them.
+- Modularize workflows by nesting them with sub DAGs (and inspect each sub-run in the UI).
 
 ### CLI Preview
 ![Demo CLI](./assets/images/demo-cli.webp)
