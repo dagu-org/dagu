@@ -122,7 +122,7 @@ const Graph: React.FC<Props> = ({
 
     // Add legend comment
     dat.push(
-      `%% Shapes: Rectangle=Normal Step, Subprocess=Single Child DAG, Processes=Parallel Execution`
+      `%% Shapes: Rectangle=Normal Step, Subprocess=Single Sub DAG, Processes=Parallel Execution`
     );
 
     // Store the click handler in window for backward compatibility
@@ -145,32 +145,32 @@ const Graph: React.FC<Props> = ({
       const id = step.name.replace(/[\s-]/g, 'dagutmp'); // Replace spaces and dashes with 'x'
       const c = graphStatusMap[status] || '';
 
-      // Check if this is a child dagRun node (has a call property)
-      const childDAGName = step.call;
-      // Check if this is a child dagRun node (has a 'run' property)
-      const isChildDAGRun = !!step.call;
+      // Check if this is a sub dagRun node (has a call property)
+      const subDAGName = step.call;
+      // Check if this is a sub dagRun node (has a 'run' property)
+      const isSubDAGRun = !!step.call;
       const hasParallelExecutions = !!step.parallel;
 
-      // Add indicator for child dagRun nodes in the label only
+      // Add indicator for sub dagRun nodes in the label only
       // Escape any special characters in the label to prevent Mermaid parsing errors
       let label = step.name;
-      if (isChildDAGRun && childDAGName) {
-        if (hasParallelExecutions && node?.children) {
+      if (isSubDAGRun && subDAGName) {
+        if (hasParallelExecutions && node?.subRuns) {
           // Show parallel execution count in the label - avoid brackets in stadium nodes
-          label = `${step.name} → ${childDAGName} x${node.children.length}`;
+          label = `${step.name} → ${subDAGName} x${node.subRuns.length}`;
         } else {
-          // Single child DAG run
-          label = `${step.name} → ${childDAGName}`;
+          // Single sub DAG run
+          label = `${step.name} → ${subDAGName}`;
         }
       }
 
       // Use different shapes based on node type
-      if (isChildDAGRun) {
+      if (isSubDAGRun) {
         if (hasParallelExecutions) {
           // Multiple parallel executions - use procs icon
           dat.push(`${id}@{ shape: procs, label: "${label}"};`);
         } else {
-          // Single child DAG - use subproc icon
+          // Single sub DAG - use subproc icon
           dat.push(`${id}@{ shape: subproc, label: "${label}"};`);
         }
         // Store class for later application (remove ::: prefix)

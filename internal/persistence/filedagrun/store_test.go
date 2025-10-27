@@ -136,7 +136,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "dagrun-id-1", dagRunStatus.DAGRunID)
 		assert.Equal(t, core.Running, dagRunStatus.Status)
 	})
-	t.Run("ChildDAGRun", func(t *testing.T) {
+	t.Run("SubDAGRun", func(t *testing.T) {
 		th := setupTestStore(t)
 
 		// Create a timestamp for the parent record
@@ -147,34 +147,34 @@ func TestJSONDB(t *testing.T) {
 
 		// Create a child attempt
 		rootDAGRun := execution.NewDAGRunRef("test_DAG", "parent-id")
-		childDAG := th.DAG("child")
-		childAttempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, "sub-id", execution.NewDAGRunAttemptOptions{
+		subDAG := th.DAG("child")
+		subAttempt, err := th.Store.CreateAttempt(th.Context, subDAG.DAG, ts, "sub-id", execution.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
 		})
 		require.NoError(t, err)
 
 		// Write the status
-		err = childAttempt.Open(th.Context)
+		err = subAttempt.Open(th.Context)
 		require.NoError(t, err)
 		defer func() {
-			_ = childAttempt.Close(th.Context)
+			_ = subAttempt.Close(th.Context)
 		}()
 
-		statusToWrite := execution.InitialStatus(childDAG.DAG)
+		statusToWrite := execution.InitialStatus(subDAG.DAG)
 		statusToWrite.DAGRunID = "sub-id"
-		err = childAttempt.Write(th.Context, statusToWrite)
+		err = subAttempt.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
 		// Verify record is created
 		dagRunRef := execution.NewDAGRunRef("test_DAG", "parent-id")
-		existingAttempt, err := th.Store.FindChildAttempt(th.Context, dagRunRef, "sub-id")
+		existingAttempt, err := th.Store.FindSubAttempt(th.Context, dagRunRef, "sub-id")
 		require.NoError(t, err)
 
 		dagRunStatus, err := existingAttempt.ReadStatus(th.Context)
 		require.NoError(t, err)
 		assert.Equal(t, "sub-id", dagRunStatus.DAGRunID)
 	})
-	t.Run("ChildDAGRunRetry", func(t *testing.T) {
+	t.Run("SubDAGRunRetry", func(t *testing.T) {
 		th := setupTestStore(t)
 
 		// Create a timestamp for the parent record
@@ -183,13 +183,13 @@ func TestJSONDB(t *testing.T) {
 		// Create a parent record
 		_ = th.CreateAttempt(t, ts, "parent-id", core.Running)
 
-		// Create a child dag-run
-		const childDAGRunID = "child-dagrun-id"
+		// Create a sub dag-run
+		const subDAGRunID = "sub-dagrun-id"
 		const parentDAGRunID = "parent-id"
 
 		rootDAGRun := execution.NewDAGRunRef("test_DAG", parentDAGRunID)
-		childDAG := th.DAG("child")
-		attempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, childDAGRunID, execution.NewDAGRunAttemptOptions{
+		subDAG := th.DAG("child")
+		attempt, err := th.Store.CreateAttempt(th.Context, subDAG.DAG, ts, subDAGRunID, execution.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
 		})
 		require.NoError(t, err)
@@ -201,24 +201,24 @@ func TestJSONDB(t *testing.T) {
 			_ = attempt.Close(th.Context)
 		}()
 
-		statusToWrite := execution.InitialStatus(childDAG.DAG)
-		statusToWrite.DAGRunID = childDAGRunID
+		statusToWrite := execution.InitialStatus(subDAG.DAG)
+		statusToWrite.DAGRunID = subDAGRunID
 		statusToWrite.Status = core.Running
 		err = attempt.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
-		// Find the child dag-run record
+		// Find the sub dag-run record
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
 		dagRunRef := execution.NewDAGRunRef("test_DAG", parentDAGRunID)
-		existingAttempt, err := th.Store.FindChildAttempt(th.Context, dagRunRef, childDAGRunID)
+		existingAttempt, err := th.Store.FindSubAttempt(th.Context, dagRunRef, subDAGRunID)
 		require.NoError(t, err)
 		existingAttemptStatus, err := existingAttempt.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, childDAGRunID, existingAttemptStatus.DAGRunID)
+		assert.Equal(t, subDAGRunID, existingAttemptStatus.DAGRunID)
 		assert.Equal(t, core.Running.String(), existingAttemptStatus.Status.String())
 
 		// Create a retry record and write different status
-		retryAttempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, childDAGRunID, execution.NewDAGRunAttemptOptions{
+		retryAttempt, err := th.Store.CreateAttempt(th.Context, subDAG.DAG, ts, subDAGRunID, execution.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
 			Retry:      true,
 		})
@@ -229,11 +229,11 @@ func TestJSONDB(t *testing.T) {
 		_ = retryAttempt.Close(th.Context)
 
 		// Verify the retry record is created
-		existingAttempt, err = th.Store.FindChildAttempt(th.Context, dagRunRef, childDAGRunID)
+		existingAttempt, err = th.Store.FindSubAttempt(th.Context, dagRunRef, subDAGRunID)
 		require.NoError(t, err)
 		existingAttemptStatus, err = existingAttempt.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, childDAGRunID, existingAttemptStatus.DAGRunID)
+		assert.Equal(t, subDAGRunID, existingAttemptStatus.DAGRunID)
 		assert.Equal(t, core.Succeeded.String(), existingAttemptStatus.Status.String())
 	})
 	t.Run("ReadDAG", func(t *testing.T) {

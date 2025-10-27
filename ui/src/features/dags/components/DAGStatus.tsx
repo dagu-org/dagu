@@ -55,24 +55,24 @@ function DAGStatus({ dagRun, fileName }: Props) {
     step: components['schemas']['Step'],
     status: NodeStatus
   ) => {
-    // Check if this is a child DAG-run by checking if rootDAGRunId and rootDAGRunName exist
+    // Check if this is a sub DAG-run by checking if rootDAGRunId and rootDAGRunName exist
     // and are different from the current DAG-run's ID and name
-    const isChildDAGRun =
+    const isSubDAGRun =
       dagRun.rootDAGRunId &&
       dagRun.rootDAGRunName &&
       dagRun.rootDAGRunId !== dagRun.dagRunId;
 
     // Define path parameters with proper typing
     const pathParams = {
-      name: isChildDAGRun ? dagRun.rootDAGRunName : dagRun.name,
-      dagRunId: isChildDAGRun ? dagRun.rootDAGRunId : dagRun.dagRunId,
+      name: isSubDAGRun ? dagRun.rootDAGRunName : dagRun.name,
+      dagRunId: isSubDAGRun ? dagRun.rootDAGRunId : dagRun.dagRunId,
       stepName: step.name,
-      ...(isChildDAGRun ? { childDAGRunId: dagRun.dagRunId } : {}),
+      ...(isSubDAGRun ? { subDAGRunId: dagRun.dagRunId } : {}),
     };
 
-    // Use the appropriate endpoint based on whether this is a child DAG-run
-    const endpoint = isChildDAGRun
-      ? '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status'
+    // Use the appropriate endpoint based on whether this is a sub DAG-run
+    const endpoint = isSubDAGRun
+      ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/status'
       : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/status';
 
     const { error } = await client.PATCH(endpoint, {
@@ -92,7 +92,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
     }
     dismissModal();
   };
-  // Handle double-click on graph node (navigate to child dagRun)
+  // Handle double-click on graph node (navigate to sub dagRun)
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
       // find the clicked step
@@ -100,46 +100,46 @@ function DAGStatus({ dagRun, fileName }: Props) {
         (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
       );
 
-      const childDAGName = n?.step?.call;
-      if (n && childDAGName) {
+      const subDAGName = n?.step?.call;
+      if (n && subDAGName) {
         // Combine both regular children and repeated children
-        const allChildren = [
-          ...(n.children || []),
-          ...(n.childrenRepeated || []),
+        const allSubRuns = [
+          ...(n.subRuns || []),
+          ...(n.subRunsRepeated || []),
         ];
 
-        // Check if there are multiple child runs (parallel execution or repeated)
-        if (allChildren.length > 1) {
+        // Check if there are multiple sub runs (parallel execution or repeated)
+        if (allSubRuns.length > 1) {
           // Show modal to select which execution to view
           setParallelExecutionModal({
             isOpen: true,
             node: n,
           });
-        } else if (allChildren.length === 1) {
-          // Single child dagRun - navigate directly
-          navigateToChildDagRun(n, 0);
+        } else if (allSubRuns.length === 1) {
+          // Single sub dagRun - navigate directly
+          navigateToSubDagRun(n, 0);
         }
       }
     },
     [dagRun, navigate, fileName]
   );
 
-  // Helper function to navigate to a specific child DAG run
-  const navigateToChildDagRun = React.useCallback(
+  // Helper function to navigate to a specific sub DAG run
+  const navigateToSubDagRun = React.useCallback(
     (
       node: components['schemas']['Node'],
       childIndex: number,
       openInNewTab?: boolean
     ) => {
       // Combine both regular children and repeated children
-      const allChildren = [
-        ...(node.children || []),
-        ...(node.childrenRepeated || []),
+      const allSubRuns = [
+        ...(node.subRuns || []),
+        ...(node.subRunsRepeated || []),
       ];
-      const childDAGRun = allChildren[childIndex];
+      const subDAGRun = allSubRuns[childIndex];
 
-      if (childDAGRun && childDAGRun.dagRunId) {
-        // Navigate to the child DAG-run status page
+      if (subDAGRun && subDAGRun.dagRunId) {
+        // Navigate to the sub DAG-run status page
         const dagRunId = dagRun.rootDAGRunId || dagRun.dagRunId;
 
         // Check if we're in a dagRun context or a DAG context
@@ -152,7 +152,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
         if (isDAGRunContext) {
           // For DAG runs, use query parameters to navigate to the DAG-run details page
           const searchParams = new URLSearchParams();
-          searchParams.set('childDAGRunId', childDAGRun.dagRunId);
+          searchParams.set('subDAGRunId', subDAGRun.dagRunId);
 
           // Use root DAG-run information
           if (dagRun.rootDAGRunId) {
@@ -170,7 +170,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
           url = `/dag-runs/${rootDAGName}/${dagRunId}?${searchParams.toString()}`;
         } else {
           // For DAGs, use the existing approach with query parameters
-          url = `/dags/${fileName}?childDAGRunId=${childDAGRun.dagRunId}&dagRunId=${dagRunId}&step=${node.step.name}&dagRunName=${encodeURIComponent(dagRun.rootDAGRunName || dagRun.name)}`;
+          url = `/dags/${fileName}?subDAGRunId=${subDAGRun.dagRunId}&dagRunId=${dagRunId}&step=${node.step.name}&dagRunName=${encodeURIComponent(dagRun.rootDAGRunName || dagRun.name)}`;
         }
 
         if (openInNewTab) {
@@ -395,15 +395,15 @@ function DAGStatus({ dagRun, fileName }: Props) {
           isOpen={parallelExecutionModal.isOpen}
           onClose={() => setParallelExecutionModal({ isOpen: false })}
           stepName={parallelExecutionModal.node.step.name}
-          childDAGName={parallelExecutionModal.node.step.call || ''}
-          children={[
-            ...(parallelExecutionModal.node.children || []),
-            ...(parallelExecutionModal.node.childrenRepeated || []),
+          subDAGName={parallelExecutionModal.node.step.call || ''}
+          subRuns={[
+            ...(parallelExecutionModal.node.subRuns || []),
+            ...(parallelExecutionModal.node.subRunsRepeated || []),
           ]}
-          onSelectChild={(childIndex, openInNewTab) => {
-            navigateToChildDagRun(
+          onSelectSubRun={(subRunIndex, openInNewTab) => {
+            navigateToSubDagRun(
               parallelExecutionModal.node!,
-              childIndex,
+              subRunIndex,
               openInNewTab
             );
             if (!openInNewTab) {

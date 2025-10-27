@@ -243,15 +243,15 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	execConfig.Config = cfg
 	n.SetExecutorConfig(execConfig)
 
-	// Evaluate the child DAG if set
-	if child := n.Step().ChildDAG; child != nil {
+	// Evaluate the sub DAG if set
+	if child := n.Step().SubDAG; child != nil {
 		dagName, err := EvalString(ctx, child.Name)
 		if err != nil {
-			return nil, fmt.Errorf("failed to eval child DAG name: %w", err)
+			return nil, fmt.Errorf("failed to eval sub DAG name: %w", err)
 		}
 		copy := *child
 		copy.Name = dagName
-		n.SetChildDAG(copy)
+		n.SetSubDAG(copy)
 	}
 
 	// Evaluate script if set
@@ -278,37 +278,37 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		return nil, fmt.Errorf("failed to setup executor IO: %w", err)
 	}
 
-	// Handle child DAG execution
-	if childDAG := n.Step().ChildDAG; childDAG != nil {
-		childRuns, err := n.BuildChildDAGRuns(ctx, childDAG)
+	// Handle sub DAG execution
+	if subDAG := n.Step().SubDAG; subDAG != nil {
+		subRuns, err := n.BuildSubDAGRuns(ctx, subDAG)
 		if err != nil {
 			return nil, err
 		}
-		n.SetChildRuns(childRuns)
+		n.SetSubRuns(subRuns)
 
-		// Setup the executor with child DAG run information
+		// Setup the executor with sub DAG run information
 		if n.Step().Parallel == nil {
-			// Single child DAG execution
+			// Single sub DAG execution
 			exec, ok := cmd.(executor.DAGExecutor)
 			if !ok {
-				return nil, fmt.Errorf("executor %T does not support child DAG execution", cmd)
+				return nil, fmt.Errorf("executor %T does not support sub DAG execution", cmd)
 			}
 			exec.SetParams(executor.RunParams{
-				RunID:  childRuns[0].DAGRunID,
-				Params: childRuns[0].Params,
+				RunID:  subRuns[0].DAGRunID,
+				Params: subRuns[0].Params,
 			})
 		} else {
-			// Parallel child DAG execution
+			// Parallel sub DAG execution
 			exec, ok := cmd.(executor.ParallelExecutor)
 			if !ok {
 				return nil, fmt.Errorf("executor %T does not support parallel execution", cmd)
 			}
-			// Convert ChildDAGRun to executor.RunParams
+			// Convert SubDAGRun to executor.RunParams
 			var runParamsList []executor.RunParams
-			for _, childRun := range childRuns {
+			for _, subRun := range subRuns {
 				runParamsList = append(runParamsList, executor.RunParams{
-					RunID:  childRun.DAGRunID,
-					Params: childRun.Params,
+					RunID:  subRun.DAGRunID,
+					Params: subRun.Params,
 				})
 			}
 			exec.SetParamsList(runParamsList)
@@ -585,22 +585,22 @@ func (n *Node) Init() {
 	n.id = getNextNodeID()
 }
 
-// BuildChildDAGRuns constructs the child DAG runs based on parallel configuration
-func (n *Node) BuildChildDAGRuns(ctx context.Context, childDAG *core.ChildDAG) ([]ChildDAGRun, error) {
+// BuildSubDAGRuns constructs the sub DAG runs based on parallel configuration
+func (n *Node) BuildSubDAGRuns(ctx context.Context, subDAG *core.SubDAG) ([]SubDAGRun, error) {
 	parallel := n.Step().Parallel
 
-	// Single child DAG execution (non-parallel)
+	// Single sub DAG execution (non-parallel)
 	if parallel == nil {
-		params, err := EvalString(ctx, childDAG.Params)
+		params, err := EvalString(ctx, subDAG.Params)
 		if err != nil {
-			return nil, fmt.Errorf("failed to eval child dag params: %w", err)
+			return nil, fmt.Errorf("failed to eval sub dag params: %w", err)
 		}
 		repeated := n.IsRepeated()
-		if repeated && len(n.State().Children) > 0 {
-			n.AddChildRunsRepeated(n.State().Children[0])
+		if repeated && len(n.State().SubRuns) > 0 {
+			n.AddSubRunsRepeated(n.State().SubRuns[0])
 		}
-		dagRunID := GenerateChildDAGRunID(ctx, params, repeated)
-		return []ChildDAGRun{{
+		dagRunID := GenerateSubDAGRunID(ctx, params, repeated)
+		return []SubDAGRun{{
 			DAGRunID: dagRunID,
 			Params:   params,
 		}}, nil
@@ -664,12 +664,12 @@ func (n *Node) BuildChildDAGRuns(ctx context.Context, childDAG *core.ChildDAG) (
 		return nil, fmt.Errorf("parallel execution exceeds maximum limit: %d items (max: %d)", len(items), maxParallelItems)
 	}
 
-	// Build child runs with deduplication
-	childRunMap := make(map[string]ChildDAGRun)
+	// Build sub runs with deduplication
+	subRunMap := make(map[string]SubDAGRun)
 	repeated := n.IsRepeated()
 
 	if repeated {
-		n.AddChildRunsRepeated(n.State().Children...)
+		n.AddSubRunsRepeated(n.State().SubRuns...)
 	}
 
 	for i, item := range items {
@@ -680,12 +680,12 @@ func (n *Node) BuildChildDAGRuns(ctx context.Context, childDAG *core.ChildDAG) (
 
 		// Merge the item param with the step's params if they exist
 		finalParams := param
-		if childDAG.Params != "" {
+		if subDAG.Params != "" {
 			// Create variables map with ITEM set to the current item value
 			variables := map[string]string{
 				"ITEM": param,
 			}
-			params := childDAG.Params
+			params := subDAG.Params
 			evaluatedStepParams, err := EvalString(ctx, params, cmdutil.WithVariables(variables))
 			if err != nil {
 				return nil, fmt.Errorf("failed to eval step params: %w", err)
@@ -693,21 +693,21 @@ func (n *Node) BuildChildDAGRuns(ctx context.Context, childDAG *core.ChildDAG) (
 			finalParams = evaluatedStepParams
 		}
 
-		dagRunID := GenerateChildDAGRunID(ctx, finalParams, repeated)
+		dagRunID := GenerateSubDAGRunID(ctx, finalParams, repeated)
 		// Use dagRunID as key to deduplicate - same params will generate same ID
-		childRunMap[dagRunID] = ChildDAGRun{
+		subRunMap[dagRunID] = SubDAGRun{
 			DAGRunID: dagRunID,
 			Params:   finalParams,
 		}
 	}
 
 	// Convert map back to slice
-	var childRuns []ChildDAGRun
-	for _, run := range childRunMap {
-		childRuns = append(childRuns, run)
+	var subRuns []SubDAGRun
+	for _, run := range subRunMap {
+		subRuns = append(subRuns, run)
 	}
 
-	return childRuns, nil
+	return subRuns, nil
 }
 
 // ItemToParam converts a parallel item to a parameter string

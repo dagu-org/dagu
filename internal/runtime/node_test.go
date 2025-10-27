@@ -358,13 +358,13 @@ Line 5: Process completed
 	}
 }
 
-func TestNodeBuildChildDAGRuns(t *testing.T) {
+func TestNodeBuildSubDAGRuns(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name          string
 		parallel      *core.ParallelConfig
-		childDAG      *core.ChildDAG
+		subDAG        *core.SubDAG
 		setupEnv      func(ctx context.Context) context.Context
 		expectCount   int
 		expectError   bool
@@ -373,8 +373,8 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 		{
 			name:     "NonParallelExecution",
 			parallel: nil,
-			childDAG: &core.ChildDAG{
-				Name:   "child-dag",
+			subDAG: &core.SubDAG{
+				Name:   "sub-dag",
 				Params: "param1=value1",
 			},
 			expectCount: 1,
@@ -384,8 +384,8 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 			parallel: &core.ParallelConfig{
 				Variable: "${LIST_VAR}",
 			},
-			childDAG: &core.ChildDAG{
-				Name: "child-dag",
+			subDAG: &core.SubDAG{
+				Name: "sub-dag",
 			},
 			setupEnv: func(ctx context.Context) context.Context {
 				env := execution.GetEnv(ctx)
@@ -399,8 +399,8 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 			parallel: &core.ParallelConfig{
 				Variable: "${SPACE_VAR}",
 			},
-			childDAG: &core.ChildDAG{
-				Name: "child-dag",
+			subDAG: &core.SubDAG{
+				Name: "sub-dag",
 			},
 			setupEnv: func(ctx context.Context) context.Context {
 				env := execution.GetEnv(ctx)
@@ -417,8 +417,8 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 					{Value: "item2"},
 				},
 			},
-			childDAG: &core.ChildDAG{
-				Name: "child-dag",
+			subDAG: &core.SubDAG{
+				Name: "sub-dag",
 			},
 			expectCount: 2,
 		},
@@ -430,8 +430,8 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 					{Params: map[string]string{"key2": "value2"}},
 				},
 			},
-			childDAG: &core.ChildDAG{
-				Name: "child-dag",
+			subDAG: &core.SubDAG{
+				Name: "sub-dag",
 			},
 			expectCount: 2,
 		},
@@ -440,8 +440,8 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 			parallel: &core.ParallelConfig{
 				Variable: "${NONEXISTENT}",
 			},
-			childDAG: &core.ChildDAG{
-				Name: "child-dag",
+			subDAG: &core.SubDAG{
+				Name: "sub-dag",
 			},
 			expectError:   true,
 			errorContains: "requires at least one item",
@@ -457,8 +457,8 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 					return items
 				}(),
 			},
-			childDAG: &core.ChildDAG{
-				Name: "child-dag",
+			subDAG: &core.SubDAG{
+				Name: "sub-dag",
 			},
 			expectError:   true,
 			errorContains: "exceeds maximum limit",
@@ -468,8 +468,8 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 			parallel: &core.ParallelConfig{
 				Variable: "${SPACE_VAR}",
 			},
-			childDAG: &core.ChildDAG{
-				Name:   "child-dag",
+			subDAG: &core.SubDAG{
+				Name:   "sub-dag",
 				Params: "item=${ITEM}",
 			},
 			setupEnv: func(ctx context.Context) context.Context {
@@ -492,12 +492,12 @@ func TestNodeBuildChildDAGRuns(t *testing.T) {
 			step := core.Step{
 				Name:     "test-step",
 				Parallel: tt.parallel,
-				ChildDAG: tt.childDAG,
+				SubDAG:   tt.subDAG,
 			}
 			node := runtime.NewNode(step, runtime.NodeState{})
 
 			// Now we can test the public method directly
-			runs, err := node.BuildChildDAGRuns(ctx, tt.childDAG)
+			runs, err := node.BuildSubDAGRuns(ctx, tt.subDAG)
 
 			if tt.expectError {
 				assert.Error(t, err)

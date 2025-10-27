@@ -23,7 +23,7 @@ func TestBase58EncodeSHA256(t *testing.T) {
 			input: "",
 		},
 		{
-			name:  "ChildDAGIDFormat",
+			name:  "SubDAGIDFormat",
 			input: "12345:process-data:{\"REGION\":\"us-east-1\",\"VERSION\":\"1.0.0\"}",
 		},
 		{
@@ -96,8 +96,8 @@ func TestBase58Encode(t *testing.T) {
 	}
 }
 
-func TestBase58EncodeSHA256_ChildDAGScenarios(t *testing.T) {
-	// Test specific scenarios for child DAG ID generation
+func TestBase58EncodeSHA256_SubDAGScenarios(t *testing.T) {
+	// Test specific scenarios for sub DAG ID generation
 	tests := []struct {
 		name           string
 		parentRunID    string
@@ -106,21 +106,21 @@ func TestBase58EncodeSHA256_ChildDAGScenarios(t *testing.T) {
 		expectedLength int // Expected length range
 	}{
 		{
-			name:           "SimpleChildDAG",
+			name:           "SimpleSubDAG",
 			parentRunID:    "parent-12345",
 			stepName:       "process",
 			params:         `{"env":"prod"}`,
 			expectedLength: 40, // Base58 encoded SHA256 is typically 43-44 chars
 		},
 		{
-			name:           "ChildDAGWithComplexParams",
+			name:           "SubDAGWithComplexParams",
 			parentRunID:    "workflow-abc-123",
 			stepName:       "etl-pipeline",
 			params:         `{"AWS_REGION":"us-east-1","BATCH_SIZE":"1000","MODE":"parallel"}`,
 			expectedLength: 40,
 		},
 		{
-			name:           "NestedChildDAGScenario",
+			name:           "NestedSubDAGScenario",
 			parentRunID:    "root-workflow:child-workflow:grandchild-12345",
 			stepName:       "data-processor",
 			params:         `{"input":"/data/raw","output":"/data/processed"}`,

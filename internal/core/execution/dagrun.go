@@ -31,8 +31,8 @@ type DAGRunStore interface {
 	ListStatuses(ctx context.Context, opts ...ListDAGRunStatusesOption) ([]*DAGRunStatus, error)
 	// FindAttempt finds the latest attempt for the dag-run.
 	FindAttempt(ctx context.Context, dagRun DAGRunRef) (DAGRunAttempt, error)
-	// FindChildAttempt finds a child dag-run record by dag-run ID.
-	FindChildAttempt(ctx context.Context, dagRun DAGRunRef, childDAGRunID string) (DAGRunAttempt, error)
+	// FindSubAttempt finds a sub dag-run record by dag-run ID.
+	FindSubAttempt(ctx context.Context, dagRun DAGRunRef, subDAGRunID string) (DAGRunAttempt, error)
 	// RemoveOldDAGRuns delete dag-run records older than retentionDays
 	// If retentionDays is negative, it won't delete any records.
 	// If retentionDays is zero, it will delete all records for the DAG name.

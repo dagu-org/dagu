@@ -112,8 +112,8 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "command", fn: buildCommand},
 	{name: "params", fn: buildStepParams},
 	{name: "depends", fn: buildDepends},
-	{name: "parallel", fn: buildParallel}, // Must be before childDAG to set executor type correctly
-	{name: "childDAG", fn: buildChildDAG},
+	{name: "parallel", fn: buildParallel}, // Must be before subDAG to set executor type correctly
+	{name: "subDAG", fn: buildSubDAG},
 	{name: "continueOn", fn: buildContinueOn},
 	{name: "retryPolicy", fn: buildRetryPolicy},
 	{name: "repeatPolicy", fn: buildRepeatPolicy},
@@ -898,7 +898,7 @@ func generateTypedStepName(existingNames map[string]struct{}, step *core.Step, i
 		prefix = step.ExecutorConfig.Type
 	} else if step.Parallel != nil {
 		prefix = "parallel"
-	} else if step.ChildDAG != nil {
+	} else if step.SubDAG != nil {
 		prefix = "dag"
 	} else if step.Script != "" {
 		prefix = "script"
@@ -1461,8 +1461,8 @@ func buildSignalOnStop(_ StepBuildContext, def stepDef, step *core.Step) error {
 	return nil
 }
 
-// buildChildDAG parses the child core.DAG definition and sets up the step to run a child DAG.
-func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
+// buildSubDAG parses the child core.DAG definition and sets up the step to run a sub DAG.
+func buildSubDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 	name := strings.TrimSpace(def.Call)
 	if name == "" {
 		// TODO: remove legacy support in future major version
@@ -1500,7 +1500,7 @@ func buildChildDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 		paramsStr = strings.Join(paramsToJoin, " ")
 	}
 
-	step.ChildDAG = &core.ChildDAG{Name: name, Params: paramsStr}
+	step.SubDAG = &core.SubDAG{Name: name, Params: paramsStr}
 
 	// Set executor type based on whether parallel execution is configured
 	if step.Parallel != nil {

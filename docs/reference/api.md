@@ -642,8 +642,8 @@ Gets detailed status of a specific DAG run.
         "statusLabel": "succeeded",
         "retryCount": 0,
         "doneCount": 1,
-        "children": [],
-        "childrenRepeated": [],
+        "subRuns": [],
+        "subRunsRepeated": [],
         "error": ""
       },
       {
@@ -661,8 +661,8 @@ Gets detailed status of a specific DAG run.
         "statusLabel": "succeeded",
         "retryCount": 0,
         "doneCount": 1,
-        "children": [],
-        "childrenRepeated": [],
+        "subRuns": [],
+        "subRunsRepeated": [],
         "error": ""
       },
       {
@@ -681,13 +681,13 @@ Gets detailed status of a specific DAG run.
         "statusLabel": "succeeded",
         "retryCount": 0,
         "doneCount": 1,
-        "children": [
+        "subRuns": [
           {
             "dagRunId": "sub_20240211_143020_xyz456",
             "params": "{\"file\": \"/tmp/transformed_20240211.csv\", \"table\": \"fact_sales\"}"
           }
         ],
-        "childrenRepeated": [],
+        "subRunsRepeated": [],
         "error": ""
       }
     ]
@@ -840,7 +840,7 @@ Fetches detailed status of a specific DAG run. You can use the special value "la
         "statusLabel": "succeeded",
         "startedAt": "2024-02-11T12:10:00Z",
         "finishedAt": "2024-02-11T12:15:00Z",
-        "children": [
+        "subRuns": [
           {
             "dagRunId": "sub_20240211_121000",
             "name": "sub-workflow",
@@ -966,7 +966,7 @@ Fetches the execution log for a DAG run.
 **Response (200)**:
 ```json
 {
-  "content": "2024-02-11 14:00:00 INFO DAG data_processing_pipeline started\n2024-02-11 14:00:00 INFO Run ID: 20240211_140000_abc123\n2024-02-11 14:00:00 INFO Parameters: {\"date\": \"2024-02-11\", \"env\": \"production\", \"batch_size\": 5000}\n2024-02-11 14:00:00 INFO Checking preconditions...\n2024-02-11 14:00:01 INFO Precondition passed: Weekday check (current day: 7)\n2024-02-11 14:00:01 INFO Starting step: extract_data\n2024-02-11 14:00:30 INFO [extract_data] Executing: python extract.py --date 2024-02-11\n2024-02-11 14:15:45 INFO [extract_data] Step completed successfully\n2024-02-11 14:15:45 INFO [extract_data] Output saved to variable: EXTRACTED_FILE = /tmp/extracted_20240211.csv\n2024-02-11 14:15:45 INFO Starting step: transform_data\n2024-02-11 14:15:45 INFO [transform_data] Executing: python transform.py --input=/tmp/extracted_20240211.csv\n2024-02-11 14:30:20 INFO [transform_data] Step completed successfully\n2024-02-11 14:30:20 INFO [transform_data] Output saved to variable: TRANSFORMED_FILE = /tmp/transformed_20240211.csv\n2024-02-11 14:30:20 INFO Starting step: load_to_warehouse\n2024-02-11 14:30:20 INFO [load_to_warehouse] Running child DAG: warehouse-loader\n2024-02-11 14:30:20 INFO [load_to_warehouse] Child DAG started with ID: sub_20240211_143020_xyz456\n2024-02-11 14:45:30 INFO [load_to_warehouse] Child DAG completed successfully\n2024-02-11 14:45:30 INFO Executing onSuccess handler: notify_success\n2024-02-11 14:45:32 INFO [notify_success] Handler completed\n2024-02-11 14:45:32 INFO Executing onExit handler: cleanup\n2024-02-11 14:45:35 INFO [cleanup] Handler completed\n2024-02-11 14:45:35 INFO DAG completed successfully\n",
+  "content": "2024-02-11 14:00:00 INFO DAG data_processing_pipeline started\n2024-02-11 14:00:00 INFO Run ID: 20240211_140000_abc123\n2024-02-11 14:00:00 INFO Parameters: {\"date\": \"2024-02-11\", \"env\": \"production\", \"batch_size\": 5000}\n2024-02-11 14:00:00 INFO Checking preconditions...\n2024-02-11 14:00:01 INFO Precondition passed: Weekday check (current day: 7)\n2024-02-11 14:00:01 INFO Starting step: extract_data\n2024-02-11 14:00:30 INFO [extract_data] Executing: python extract.py --date 2024-02-11\n2024-02-11 14:15:45 INFO [extract_data] Step completed successfully\n2024-02-11 14:15:45 INFO [extract_data] Output saved to variable: EXTRACTED_FILE = /tmp/extracted_20240211.csv\n2024-02-11 14:15:45 INFO Starting step: transform_data\n2024-02-11 14:15:45 INFO [transform_data] Executing: python transform.py --input=/tmp/extracted_20240211.csv\n2024-02-11 14:30:20 INFO [transform_data] Step completed successfully\n2024-02-11 14:30:20 INFO [transform_data] Output saved to variable: TRANSFORMED_FILE = /tmp/transformed_20240211.csv\n2024-02-11 14:30:20 INFO Starting step: load_to_warehouse\n2024-02-11 14:30:20 INFO [load_to_warehouse] Running sub DAG: warehouse-loader\n2024-02-11 14:30:20 INFO [load_to_warehouse] Sub DAG started with ID: sub_20240211_143020_xyz456\n2024-02-11 14:45:30 INFO [load_to_warehouse] Sub DAG completed successfully\n2024-02-11 14:45:30 INFO Executing onSuccess handler: notify_success\n2024-02-11 14:45:32 INFO [notify_success] Handler completed\n2024-02-11 14:45:32 INFO Executing onExit handler: cleanup\n2024-02-11 14:45:35 INFO [cleanup] Handler completed\n2024-02-11 14:45:35 INFO DAG completed successfully\n",
   "lineCount": 22,
   "totalLines": 156,
   "hasMore": true,
@@ -1242,13 +1242,13 @@ All endpoints return structured error responses:
 | not_running | DAG is not running |
 | already_exists | Resource already exists |
 
-## Child DAG Run Endpoints
+## Sub DAG Run Endpoints
 
-### Get Child DAG Run Details
+### Get Sub DAG Run Details
 
-**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}`
+**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}`
 
-Fetches detailed status of a child DAG run.
+Fetches detailed status of a sub DAG run.
 
 **Response (200)**:
 ```json
@@ -1283,8 +1283,8 @@ Fetches detailed status of a child DAG run.
         "statusLabel": "succeeded",
         "retryCount": 0,
         "doneCount": 1,
-        "children": [],
-        "childrenRepeated": [],
+        "subRuns": [],
+        "subRunsRepeated": [],
         "error": ""
       },
       {
@@ -1301,8 +1301,8 @@ Fetches detailed status of a child DAG run.
         "statusLabel": "succeeded",
         "retryCount": 0,
         "doneCount": 1,
-        "children": [],
-        "childrenRepeated": [],
+        "subRuns": [],
+        "subRunsRepeated": [],
         "error": ""
       }
     ],
@@ -1315,16 +1315,16 @@ Fetches detailed status of a child DAG run.
 }
 ```
 
-### Get Child DAG Run Log
+### Get Sub DAG Run Log
 
-**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log`
+**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log`
 
-Fetches the log for a child DAG run.
+Fetches the log for a sub DAG run.
 
 **Response (200)**:
 ```json
 {
-  "content": "2024-02-11 14:30:20 INFO Starting child DAG: warehouse_loader_subdag\n2024-02-11 14:30:20 INFO Parameters: {\"file\": \"/tmp/transformed_20240211.csv\", \"table\": \"fact_sales\"}\n2024-02-11 14:30:20 INFO Parent DAG: data_processing_pipeline (20240211_140000_abc123)\n2024-02-11 14:30:20 INFO Step 'validate_schema' started\n2024-02-11 14:30:22 INFO Schema validation: Checking table structure for 'fact_sales'\n2024-02-11 14:30:35 INFO Step 'validate_schema' completed successfully\n2024-02-11 14:30:35 INFO Step 'load_data' started\n2024-02-11 14:30:36 INFO Opening file: /tmp/transformed_20240211.csv\n2024-02-11 14:30:37 INFO File contains 50000 records\n2024-02-11 14:30:38 INFO Beginning bulk insert to warehouse.fact_sales\n2024-02-11 14:35:00 INFO Progress: 25000/50000 records loaded (50%)\n2024-02-11 14:40:00 INFO Progress: 45000/50000 records loaded (90%)\n2024-02-11 14:45:28 INFO All 50000 records loaded successfully\n2024-02-11 14:45:29 INFO Committing transaction\n2024-02-11 14:45:30 INFO Step 'load_data' completed successfully\n2024-02-11 14:45:30 INFO Child DAG completed successfully\n",
+  "content": "2024-02-11 14:30:20 INFO Starting sub DAG: warehouse_loader_subdag\n2024-02-11 14:30:20 INFO Parameters: {\"file\": \"/tmp/transformed_20240211.csv\", \"table\": \"fact_sales\"}\n2024-02-11 14:30:20 INFO Parent DAG: data_processing_pipeline (20240211_140000_abc123)\n2024-02-11 14:30:20 INFO Step 'validate_schema' started\n2024-02-11 14:30:22 INFO Schema validation: Checking table structure for 'fact_sales'\n2024-02-11 14:30:35 INFO Step 'validate_schema' completed successfully\n2024-02-11 14:30:35 INFO Step 'load_data' started\n2024-02-11 14:30:36 INFO Opening file: /tmp/transformed_20240211.csv\n2024-02-11 14:30:37 INFO File contains 50000 records\n2024-02-11 14:30:38 INFO Beginning bulk insert to warehouse.fact_sales\n2024-02-11 14:35:00 INFO Progress: 25000/50000 records loaded (50%)\n2024-02-11 14:40:00 INFO Progress: 45000/50000 records loaded (90%)\n2024-02-11 14:45:28 INFO All 50000 records loaded successfully\n2024-02-11 14:45:29 INFO Committing transaction\n2024-02-11 14:45:30 INFO Step 'load_data' completed successfully\n2024-02-11 14:45:30 INFO Sub DAG completed successfully\n",
   "lineCount": 7,
   "totalLines": 7,
   "hasMore": false,
@@ -1334,9 +1334,9 @@ Fetches the log for a child DAG run.
 
 ### Get Child Step Log
 
-**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/log`
+**Endpoint**: `GET /api/v2/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log`
 
-Fetches the log for a step in a child DAG run.
+Fetches the log for a step in a sub DAG run.
 
 **Response (200)**:
 ```json
@@ -1351,9 +1351,9 @@ Fetches the log for a step in a child DAG run.
 
 ### Update Child Step Status
 
-**Endpoint**: `PATCH /api/v2/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/steps/{stepName}/status`
+**Endpoint**: `PATCH /api/v2/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/status`
 
-Updates the status of a step in a child DAG run.
+Updates the status of a step in a sub DAG run.
 
 **Request Body**:
 ```json
@@ -1368,7 +1368,7 @@ Updates the status of a step in a child DAG run.
 ```json
 {
   "code": "not_found",
-  "message": "Child DAG run or step not found"
+  "message": "Sub DAG run or step not found"
 }
 ```
 
@@ -1729,18 +1729,18 @@ curl "http://localhost:8080/api/v2/dag-runs/etl-pipeline/20240211_120000/steps/t
 curl "http://localhost:8080/api/v2/dag-runs/etl-pipeline/20240211_120000/log?offset=1000&limit=500"
 ```
 
-### Working with Child DAGs
+### Working with Sub DAGs
 ```bash
-# Get child DAG run details
-curl "http://localhost:8080/api/v2/dag-runs/data-processing-pipeline/20240211_140000_abc123/children/sub_20240211_143020_xyz456" \
+# Get sub DAG run details
+curl "http://localhost:8080/api/v2/dag-runs/data-processing-pipeline/20240211_140000_abc123/sub-dag-runs/sub_20240211_143020_xyz456" \
      -H "Authorization: Bearer your-token"
 
-# Get child DAG step log
-curl "http://localhost:8080/api/v2/dag-runs/data-processing-pipeline/20240211_140000_abc123/children/sub_20240211_143020_xyz456/steps/load_data/log" \
+# Get sub DAG step log
+curl "http://localhost:8080/api/v2/dag-runs/data-processing-pipeline/20240211_140000_abc123/sub-dag-runs/sub_20240211_143020_xyz456/steps/load_data/log" \
      -H "Authorization: Bearer your-token"
 
-# Update child DAG step status
-curl -X PATCH "http://localhost:8080/api/v2/dag-runs/data-processing-pipeline/20240211_140000_abc123/children/sub_20240211_143020_xyz456/steps/load_data/status" \
+# Update sub DAG step status
+curl -X PATCH "http://localhost:8080/api/v2/dag-runs/data-processing-pipeline/20240211_140000_abc123/sub-dag-runs/sub_20240211_143020_xyz456/steps/load_data/status" \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer your-token" \
      -d '{"status": 4}'

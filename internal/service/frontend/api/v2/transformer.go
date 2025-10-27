@@ -62,9 +62,9 @@ func toStep(obj core.Step) api.Step {
 		Script:        ptrOf(obj.Script),
 	}
 
-	if obj.ChildDAG != nil {
-		step.Call = ptrOf(obj.ChildDAG.Name)
-		step.Params = ptrOf(obj.ChildDAG.Params)
+	if obj.SubDAG != nil {
+		step.Call = ptrOf(obj.SubDAG.Name)
+		step.Params = ptrOf(obj.SubDAG.Params)
 	}
 	if obj.Parallel != nil {
 		parallel := struct {
@@ -159,25 +159,25 @@ func toNode(node *execution.Node) api.Node {
 		return api.Node{}
 	}
 	return api.Node{
-		DoneCount:        node.DoneCount,
-		FinishedAt:       node.FinishedAt,
-		Stdout:           node.Stdout,
-		Stderr:           node.Stderr,
-		RetryCount:       node.RetryCount,
-		StartedAt:        node.StartedAt,
-		Status:           api.NodeStatus(node.Status),
-		StatusLabel:      api.NodeStatusLabel(node.Status.String()),
-		Step:             toStep(node.Step),
-		Error:            ptrOf(node.Error),
-		Children:         ptrOf(toChildDAGRuns(node.Children)),
-		ChildrenRepeated: ptrOf(toChildDAGRuns(node.ChildrenRepeated)),
+		DoneCount:       node.DoneCount,
+		FinishedAt:      node.FinishedAt,
+		Stdout:          node.Stdout,
+		Stderr:          node.Stderr,
+		RetryCount:      node.RetryCount,
+		StartedAt:       node.StartedAt,
+		Status:          api.NodeStatus(node.Status),
+		StatusLabel:     api.NodeStatusLabel(node.Status.String()),
+		Step:            toStep(node.Step),
+		Error:           ptrOf(node.Error),
+		SubRuns:         ptrOf(toSubDAGRuns(node.SubRuns)),
+		SubRunsRepeated: ptrOf(toSubDAGRuns(node.SubRunsRepeated)),
 	}
 }
 
-func toChildDAGRuns(childDAGRuns []execution.ChildDAGRun) []api.ChildDAGRun {
-	var result []api.ChildDAGRun
-	for _, w := range childDAGRuns {
-		result = append(result, api.ChildDAGRun{
+func toSubDAGRuns(subDAGRuns []execution.SubDAGRun) []api.SubDAGRun {
+	var result []api.SubDAGRun
+	for _, w := range subDAGRuns {
+		result = append(result, api.SubDAGRun{
 			DagRunId: w.DAGRunID,
 			Params:   w.Params,
 		})

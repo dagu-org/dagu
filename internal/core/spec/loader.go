@@ -263,15 +263,15 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 	// Get the main core.DAG (first one)
 	mainDAG := dags[0]
 
-	// If there are child DAGs, add them to the main core.DAG
+	// If there are sub DAGs, add them to the main core.DAG
 	if len(dags) > 1 {
 		mainDAG.LocalDAGs = make(map[string]*core.DAG)
 		for i := 1; i < len(dags); i++ {
-			childDAG := dags[i]
-			if childDAG.Name == "" {
+			subDAG := dags[i]
+			if subDAG.Name == "" {
 				return nil, fmt.Errorf("child core.DAG at index %d must have a name", i)
 			}
-			mainDAG.LocalDAGs[childDAG.Name] = childDAG
+			mainDAG.LocalDAGs[subDAG.Name] = subDAG
 		}
 	}
 

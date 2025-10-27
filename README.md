@@ -22,6 +22,9 @@ Dagu is a lightweight workflow engine with a modern Web UI. Workflows are define
 
 For a quick feel of how it works, take a look at the [examples](https://docs.dagu.cloud/writing-workflows/examples).
 
+### Name
+"Dagu" comes from DAG (Directed Acyclic Graph) and also from the Mandarin word 大鼓 (dà gǔ), meaning "big drum 🥁".
+
 ### Motivation
 
 Legacy systems often have complex and implicit dependencies between jobs. When there are hundreds of cron jobs on a server, it can be difficult to keep track of these dependencies and to determine which job to rerun if one fails. It can also be a hassle to SSH into a server to view logs and manually rerun shell scripts one by one. Dagu aims to solve these problems by allowing you to explicitly visualize and manage pipeline dependencies as a DAG, and by providing a web UI for checking dependencies, execution status, and logs and for rerunning or stopping jobs with a simple mouse click.
@@ -49,7 +52,7 @@ steps:
 - Use existing programs, scripts, and container images without any modification
 - Schedule workflows with cron expressions
 - Run in HA mode and distribute tasks to workers through built-in queue system.
-- Modularize workflows by nesting them.
+- Modularize workflows by nesting them with sub DAGs (and inspect each sub-run in the UI).
 
 ### CLI Preview
 ![Demo CLI](./assets/images/demo-cli.webp)

@@ -6,7 +6,7 @@ Dagu provides multiple ways to handle data and variables in your DAGs, from simp
 
 ### System Environment Variable Security
 
-For security, Dagu limits which system environment variables are passed to step processes and child DAGs.
+For security, Dagu limits which system environment variables are passed to step processes and sub DAGs.
 
 **How It Works:**
 

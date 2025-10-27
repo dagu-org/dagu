@@ -14,29 +14,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRetryChildDAGRun(t *testing.T) {
+func TestRetrySubDAGRun(t *testing.T) {
 	// Get DAG path
 	th := test.SetupCommand(t)
 
 	th.CreateDAGFile(t, "parent.yaml", `
 steps:
   - name: parent
-    call: child_1
+    call: sub_1
     params: "PARAM=FOO"
 `)
 
-	th.CreateDAGFile(t, "child_1.yaml", `
+	th.CreateDAGFile(t, "sub_1.yaml", `
 params: "PARAM=BAR"
 steps:
-  - name: child_2
-    call: child_2
+  - name: sub_2
+    call: sub_2
     params: "PARAM=$PARAM"
 `)
 
-	th.CreateDAGFile(t, "child_2.yaml", `
+	th.CreateDAGFile(t, "sub_2.yaml", `
 params: "PARAM=BAZ"
 steps:
-  - name: child_2
+  - name: sub_2
     command: echo "Hello, $PARAM"
 `)
 
@@ -47,8 +47,8 @@ steps:
 		ExpectedOut: []string{"dag-run finished"},
 	})
 
-	// Update the child_2 status to "failed" to simulate a retry
-	// First, find the child_2 dag-run ID to update its status
+	// Update the sub_2 status to "failed" to simulate a retry
+	// First, find the sub_2 dag-run ID to update its status
 	ctx := context.Background()
 	ref := execution.NewDAGRunRef("parent", dagRunID)
 	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
@@ -63,43 +63,43 @@ steps:
 		require.NoError(t, err)
 	}
 
-	// (1) Find the child_1 node and update its status to "failed"
+	// (1) Find the sub_1 node and update its status to "failed"
 	parentStatus, err := parentAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
 
-	child1Node := parentStatus.Nodes[0]
-	child1Node.Status = core.NodeFailed
+	sub1Node := parentStatus.Nodes[0]
+	sub1Node.Status = core.NodeFailed
 	updateStatus(parentAttempt, parentStatus)
 
-	// (2) Find the child_1 dag-run ID to update its status
-	child1Attempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, child1Node.Children[0].DAGRunID)
+	// (2) Find the sub_1 dag-run ID to update its status
+	sub1Attempt, err := th.DAGRunStore.FindSubAttempt(ctx, ref, sub1Node.SubRuns[0].DAGRunID)
 	require.NoError(t, err)
 
-	child1Status, err := child1Attempt.ReadStatus(ctx)
+	sub1Status, err := sub1Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
 
-	// (3) Find the child_2 node and update its status to "failed"
-	child2Node := child1Status.Nodes[0]
-	child2Node.Status = core.NodeFailed
-	updateStatus(child1Attempt, child1Status)
+	// (3) Find the sub_2 node and update its status to "failed"
+	sub2Node := sub1Status.Nodes[0]
+	sub2Node.Status = core.NodeFailed
+	updateStatus(sub1Attempt, sub1Status)
 
-	// (4) Find the child_2 dag-run ID to update its status
-	child2Attempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, child2Node.Children[0].DAGRunID)
+	// (4) Find the sub_2 dag-run ID to update its status
+	sub2Attempt, err := th.DAGRunStore.FindSubAttempt(ctx, ref, sub2Node.SubRuns[0].DAGRunID)
 	require.NoError(t, err)
 
-	child2Status, err := child2Attempt.ReadStatus(ctx)
+	sub2Status, err := sub2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, core.NodeSucceeded.String(), child2Status.Status.String())
+	require.Equal(t, core.NodeSucceeded.String(), sub2Status.Status.String())
 
-	// (5) Update the step in child_2 to "failed" to simulate a retry
-	child2Status.Nodes[0].Status = core.NodeFailed
-	updateStatus(child2Attempt, child2Status)
+	// (5) Update the step in sub_2 to "failed" to simulate a retry
+	sub2Status.Nodes[0].Status = core.NodeFailed
+	updateStatus(sub2Attempt, sub2Status)
 
-	// (6) Check if the child_2 status is now "failed"
-	child2Status, err = child2Attempt.ReadStatus(ctx)
+	// (6) Check if the sub_2 status is now "failed"
+	sub2Status, err = sub2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, core.NodeFailed.String(), child2Status.Nodes[0].Status.String())
+	require.Equal(t, core.NodeFailed.String(), sub2Status.Nodes[0].Status.String())
 
 	// Retry the DAG
 
@@ -109,18 +109,18 @@ steps:
 		ExpectedOut: []string{"dag-run finished"},
 	})
 
-	// Check if the child_2 status is now "success"
-	child2Attempt, err = th.DAGRunStore.FindChildAttempt(ctx, ref, child2Node.Children[0].DAGRunID)
+	// Check if the sub_2 status is now "success"
+	sub2Attempt, err = th.DAGRunStore.FindSubAttempt(ctx, ref, sub2Node.SubRuns[0].DAGRunID)
 	require.NoError(t, err)
-	child2Status, err = child2Attempt.ReadStatus(ctx)
+	sub2Status, err = sub2Attempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, core.NodeSucceeded.String(), child2Status.Nodes[0].Status.String())
+	require.Equal(t, core.NodeSucceeded.String(), sub2Status.Nodes[0].Status.String())
 
-	require.Equal(t, "parent", child2Status.Root.Name, "parent")
-	require.Equal(t, dagRunID, child2Status.Root.ID)
+	require.Equal(t, "parent", sub2Status.Root.Name, "parent")
+	require.Equal(t, dagRunID, sub2Status.Root.ID)
 }
 
-func TestRetryPolicyChildDAGRunWithOutputCapture(t *testing.T) {
+func TestRetryPolicySubDAGRunWithOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -130,12 +130,12 @@ func TestRetryPolicyChildDAGRunWithOutputCapture(t *testing.T) {
 
 	th.CreateDAGFile(t, "parent_retry.yaml", `
 steps:
-  - name: call_child
-    call: child_retry
-    output: CHILD_OUTPUT
+  - name: call_sub
+    call: sub_retry
+    output: SUB_OUTPUT
 `)
 
-	th.CreateDAGFile(t, "child_retry.yaml", `
+	th.CreateDAGFile(t, "sub_retry.yaml", `
 steps:
   - name: retry_step
     command: |
@@ -173,19 +173,19 @@ steps:
 	require.NoError(t, err)
 	require.Equal(t, core.NodeSucceeded.String(), parentStatus.Status.String())
 
-	// Find child DAG run
-	childNode := parentStatus.Nodes[0]
-	require.Equal(t, core.NodeSucceeded.String(), childNode.Status.String())
+	// Find sub DAG run
+	subNode := parentStatus.Nodes[0]
+	require.Equal(t, core.NodeSucceeded.String(), subNode.Status.String())
 
-	childAttempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, childNode.Children[0].DAGRunID)
+	subAttempt, err := th.DAGRunStore.FindSubAttempt(ctx, ref, subNode.SubRuns[0].DAGRunID)
 	require.NoError(t, err)
 
-	childStatus, err := childAttempt.ReadStatus(ctx)
+	subStatus, err := subAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, core.NodeSucceeded.String(), childStatus.Status.String())
+	require.Equal(t, core.NodeSucceeded.String(), subStatus.Status.String())
 
-	// Verify the step in child DAG completed successfully after retry
-	retryStep := childStatus.Nodes[0]
+	// Verify the step in sub DAG completed successfully after retry
+	retryStep := subStatus.Nodes[0]
 	require.Equal(t, core.NodeSucceeded.String(), retryStep.Status.String())
 
 	// Verify output was captured from the successful retry attempt
@@ -198,20 +198,20 @@ steps:
 	require.Contains(t, variables["STEP_OUTPUT"], "output_attempt_2_success", "Output should contain success message from retry")
 }
 
-func TestBasicChildDAGOutputCapture(t *testing.T) {
+func TestBasicSubDAGOutputCapture(t *testing.T) {
 	th := test.SetupCommand(t)
 
 	th.CreateDAGFile(t, "parent_basic.yaml", `
 steps:
-  - name: call_child
-    call: child_basic
-    output: CHILD_OUTPUT
+  - name: call_sub
+    call: sub_basic
+    output: SUB_OUTPUT
 `)
 
-	th.CreateDAGFile(t, "child_basic.yaml", `
+	th.CreateDAGFile(t, "sub_basic.yaml", `
 steps:
   - name: basic_step
-    command: echo "hello_from_child"
+    command: echo "hello_from_sub"
     output: STEP_OUTPUT
 `)
 
@@ -232,19 +232,19 @@ steps:
 	require.NoError(t, err)
 	require.Equal(t, core.NodeSucceeded.String(), parentStatus.Status.String())
 
-	// Find child DAG run
-	childNode := parentStatus.Nodes[0]
-	require.Equal(t, core.NodeSucceeded.String(), childNode.Status.String())
+	// Find sub DAG run
+	subNode := parentStatus.Nodes[0]
+	require.Equal(t, core.NodeSucceeded.String(), subNode.Status.String())
 
-	childAttempt, err := th.DAGRunStore.FindChildAttempt(ctx, ref, childNode.Children[0].DAGRunID)
+	subAttempt, err := th.DAGRunStore.FindSubAttempt(ctx, ref, subNode.SubRuns[0].DAGRunID)
 	require.NoError(t, err)
 
-	childStatus, err := childAttempt.ReadStatus(ctx)
+	subStatus, err := subAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	require.Equal(t, core.NodeSucceeded.String(), childStatus.Status.String())
+	require.Equal(t, core.NodeSucceeded.String(), subStatus.Status.String())
 
-	// Verify the step in child DAG completed successfully
-	basicStep := childStatus.Nodes[0]
+	// Verify the step in sub DAG completed successfully
+	basicStep := subStatus.Nodes[0]
 	require.Equal(t, core.NodeSucceeded.String(), basicStep.Status.String())
 
 	// Debug: Print all output variables
@@ -252,7 +252,7 @@ steps:
 		variables := basicStep.OutputVariables.Variables()
 		t.Logf("Output variables: %+v", variables)
 		require.Contains(t, variables, "STEP_OUTPUT", "Output variable STEP_OUTPUT should exist")
-		require.Contains(t, variables["STEP_OUTPUT"], "hello_from_child", "Output should contain expected text")
+		require.Contains(t, variables["STEP_OUTPUT"], "hello_from_sub", "Output should contain expected text")
 	} else {
 		t.Logf("OutputVariables is nil")
 		require.Fail(t, "OutputVariables should not be nil")

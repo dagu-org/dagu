@@ -101,7 +101,7 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
               </TooltipTrigger>
               <TooltipContent>
                 <div className="space-y-1">
-                  <p>Double-click: Navigate to child dagRun</p>
+                  <p>Double-click: Navigate to sub dagRun</p>
                   {config.permissions.runDags && (
                     <p>Right-click: Update node status</p>
                   )}

@@ -11,15 +11,15 @@ import (
 
 func TestLocalDAGExecution(t *testing.T) {
 	t.Run("SimpleLocalDAG", func(t *testing.T) {
-		// Create a DAG with local child DAGs using separator
+		// Create a DAG with local sub DAGs using separator
 		yamlContent := `
 steps:
   - name: run-local-child
     call: local-child
     params: "NAME=World"
-    output: CHILD_RESULT
+    output: SUB_RESULT
 
-  - echo "Child said ${CHILD_RESULT.outputs.GREETING}"
+  - echo "Child said ${SUB_RESULT.outputs.GREETING}"
 
 ---
 
@@ -50,7 +50,7 @@ steps:
 		require.NoError(t, err)
 
 		// Verify the first step (run-local-child) completed successfully
-		// Note: The child DAG's output is not directly visible in the parent's stdout
+		// Note: The sub DAG's output is not directly visible in the parent's stdout
 		require.Len(t, dagRunStatus.Nodes, 2)
 		require.Equal(t, "run-local-child", dagRunStatus.Nodes[0].Step.Name)
 		require.Equal(t, core.NodeSucceeded, dagRunStatus.Nodes[0].Status)
@@ -428,7 +428,7 @@ steps:
 		testDAG.AssertLatestStatus(t, core.PartiallySucceeded)
 	})
 
-	t.Run("PartialSuccessChildDAG", func(t *testing.T) {
+	t.Run("PartialSuccessSubDAG", func(t *testing.T) {
 		// Create a DAG with parallel execution of local DAGs
 		yamlContent := `
 steps:

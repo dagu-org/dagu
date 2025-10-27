@@ -249,7 +249,7 @@ func TestProgressTeaDisplay_Integration(t *testing.T) {
 	display.UpdateStatus(status)
 }
 
-func TestProgressModel_ChildDAGsRendering(t *testing.T) {
+func TestProgressModel_SubDAGsRendering(t *testing.T) {
 	dag := &core.DAG{
 		Name: "test-dag",
 		Steps: []core.Step{
@@ -260,16 +260,16 @@ func TestProgressModel_ChildDAGsRendering(t *testing.T) {
 	model := NewProgressModel(dag)
 	model.width = 80
 
-	// Add child DAG info
-	model.nodes["parent-step"].children = []execution.ChildDAGRun{
+	// Add sub DAG info
+	model.nodes["parent-step"].children = []execution.SubDAGRun{
 		{
 			DAGRunID: "child-run-1",
-			Params:   "CHILD_KEY=value",
+			Params:   "SUB_KEY=value",
 		},
 	}
 
 	view := model.View()
-	assert.Contains(t, view, "Child DAGs:")
+	assert.Contains(t, view, "Sub DAGs:")
 	assert.Contains(t, view, "parent-step")
 	assert.Contains(t, view, "child-run-1")
 }

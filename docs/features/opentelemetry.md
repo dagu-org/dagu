@@ -100,13 +100,13 @@ steps:
     params: "PARAM1=value1"
 ```
 
-The child DAG's root span will be linked to the parent step span, creating a complete trace across all execution levels.
+The sub DAG's root span will be linked to the parent step span, creating a complete trace across all execution levels.
 
 ### Trace Context Propagation
 
-Dagu uses the W3C Trace Context standard for propagating trace information between parent and child DAGs:
+Dagu uses the W3C Trace Context standard for propagating trace information between parent and sub DAGs:
 
-- **Automatic propagation**: Trace context is automatically passed to child DAGs via environment variables
+- **Automatic propagation**: Trace context is automatically passed to sub DAGs via environment variables
 - **W3C format**: Uses standard `TRACEPARENT` and `TRACESTATE` environment variables
 - **Cross-process tracing**: Enables distributed tracing across separate processes
 

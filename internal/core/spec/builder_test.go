@@ -2072,7 +2072,7 @@ steps:
       type: http
       config:
         url: https://example.com
-  - call: child-dag
+  - call: sub-dag
   - executor:
       type: docker
       config:

@@ -25,12 +25,12 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*core.DAG, error) {
 	return o.ds.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (*execution.RunStatus, error) {
-	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
+func (o *dbClient) GetSubDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (*execution.RunStatus, error) {
+	subAttempt, err := o.drs.FindSubAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
 	}
-	status, err := childAttempt.ReadStatus(ctx)
+	status, err := subAttempt.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
@@ -58,12 +58,12 @@ func (o *dbClient) GetChildDAGRunStatus(ctx context.Context, dagRunID string, ro
 	}, nil
 }
 
-func (o *dbClient) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (bool, error) {
-	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
+func (o *dbClient) IsSubDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (bool, error) {
+	subAttempt, err := o.drs.FindSubAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return false, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
 	}
-	status, err := childAttempt.ReadStatus(ctx)
+	status, err := subAttempt.ReadStatus(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to read status: %w", err)
 	}
@@ -72,9 +72,9 @@ func (o *dbClient) IsChildDAGRunCompleted(ctx context.Context, dagRunID string, 
 }
 
 func (o *dbClient) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) error {
-	childAttempt, err := o.drs.FindChildAttempt(ctx, rootDAGRun, dagRunID)
+	subAttempt, err := o.drs.FindSubAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to find child attempt for dag-run ID %s: %w", dagRunID, err)
 	}
-	return childAttempt.RequestCancel(ctx)
+	return subAttempt.RequestCancel(ctx)
 }

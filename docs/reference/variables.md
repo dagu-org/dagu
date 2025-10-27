@@ -6,7 +6,7 @@ For a complete list of the automatically injected run metadata, see [Special Env
 
 ### System Environment Variable Filtering
 
-For security, Dagu filters which system environment variables are passed to step processes and child DAGs.
+For security, Dagu filters which system environment variables are passed to step processes and sub DAGs.
 
 **How It Works:**
 
@@ -14,7 +14,7 @@ System environment variables are available for expansion (`${VAR}`) when the DAG
 
 **Filtered Variables:**
 
-Only these system environment variables are automatically passed to step processes and child DAGs:
+Only these system environment variables are automatically passed to step processes and sub DAGs:
 
 - **Whitelisted:** `PATH`, `HOME`, `LANG`, `TZ`, `SHELL`
 - **Allowed Prefixes:** `DAGU_*`, `LC_*`, `DAG_*`

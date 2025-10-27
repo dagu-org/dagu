@@ -19,7 +19,7 @@ type nodeProgress struct {
 	startTime time.Time
 	endTime   time.Time
 	status    core.NodeStatus
-	children  []execution.ChildDAGRun
+	children  []execution.SubDAGRun
 }
 
 // Message types for Bubble Tea
@@ -215,8 +215,8 @@ func (m ProgressModel) View() string {
 		}
 	}
 
-	// Child DAGs
-	if children := m.renderChildDAGs(); children != "" {
+	// Sub DAGs
+	if children := m.renderSubDAGs(); children != "" {
 		sections = append(sections, children)
 	}
 
@@ -248,8 +248,8 @@ func (m *ProgressModel) updateNode(node *execution.Node) {
 		}
 	}
 
-	if node.Children != nil {
-		np.children = node.Children
+	if node.SubRuns != nil {
+		np.children = node.SubRuns
 	}
 }
 
@@ -529,26 +529,26 @@ func (m ProgressModel) renderQueued() string {
 	return strings.Join(lines, "\n")
 }
 
-func (m ProgressModel) renderChildDAGs() string {
-	childNodes := m.getNodesWithChildren()
-	if len(childNodes) == 0 {
+func (m ProgressModel) renderSubDAGs() string {
+	subNodes := m.getNodesWithChildren()
+	if len(subNodes) == 0 {
 		return ""
 	}
 
 	var lines []string
-	lines = append(lines, m.sectionStyle.Render("Child DAGs:"))
+	lines = append(lines, m.sectionStyle.Render("Sub DAGs:"))
 
-	for _, np := range childNodes {
+	for _, np := range subNodes {
 		if len(np.children) == 1 {
-			// Single child DAG
+			// Single sub DAG
 			child := np.children[0]
 			lines = append(lines, fmt.Sprintf("  ▸ %s → %s",
 				truncateString(np.node.Step.Name, 20),
-				m.formatChildStatus(child)))
+				m.formatSubStatus(child)))
 		} else {
 			// Parallel execution
 			total := len(np.children)
-			statusInfo := fmt.Sprintf("(%d child DAGs)", total)
+			statusInfo := fmt.Sprintf("(%d sub DAGs)", total)
 
 			lines = append(lines, fmt.Sprintf("  ▸ %s %s %s",
 				truncateString(np.node.Step.Name, 20),
@@ -620,7 +620,7 @@ func (m ProgressModel) getStatusIcon(s core.NodeStatus) string {
 	}
 }
 
-func (m ProgressModel) formatChildStatus(child execution.ChildDAGRun) string {
+func (m ProgressModel) formatSubStatus(child execution.SubDAGRun) string {
 	params := ""
 	if child.Params != "" {
 		params = m.faintStyle.Render(fmt.Sprintf(" [%s]", truncateString(child.Params, 20)))

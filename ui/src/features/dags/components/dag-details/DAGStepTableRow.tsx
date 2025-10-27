@@ -35,7 +35,7 @@ type Props = {
  * DAGStepTableRow displays information about a single step in a DAG
  */
 function DAGStepTableRow({ step, index }: Props) {
-  const childDagName = step.call;
+  const subDagName = step.call;
   // Format preconditions as a list
   const preconditions = step.preconditions?.map((c, index) => (
     <div
@@ -73,11 +73,11 @@ function DAGStepTableRow({ step, index }: Props) {
               {step.description}
             </div>
           )}
-          {childDagName && (
+          {subDagName && (
             <div className="mt-1 flex w-fit items-center gap-1.5 rounded-md bg-purple-50 px-1.5 py-0.5 text-xs dark:bg-purple-900/20">
               <GitBranch className="h-3.5 w-3.5 text-purple-500 dark:text-purple-400" />
               <span className="font-medium text-purple-600 dark:text-purple-400">
-                Sub-DAG: {childDagName}
+                Sub-DAG: {subDagName}
               </span>
             </div>
           )}

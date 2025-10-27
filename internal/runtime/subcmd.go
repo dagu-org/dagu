@@ -150,7 +150,7 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string, d
 func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 	args := []string{"start"}
 
-	// Add hierarchy flags for child DAGs
+	// Add hierarchy flags for sub DAGs
 	if task.RootDagRunId != "" {
 		args = append(args, fmt.Sprintf("--root=%s:%s", task.RootDagRunName, task.RootDagRunId))
 	}

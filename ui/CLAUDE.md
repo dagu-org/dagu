@@ -61,7 +61,7 @@ Dagu is a **modern, powerful, yet surprisingly simple workflow orchestration eng
   - **Multi-level nesting**: Parent → Child → Grandchild → ... (unlimited depth)
   - **Full hierarchy tracking**: Root, parent, and child relationships maintained
   - **Parameter inheritance**: Pass parameters down the hierarchy chain
-  - **Output bubbling**: Access child DAG outputs in parent workflows
+  - **Output bubbling**: Access sub DAG outputs in parent workflows
   - **Isolated execution**: Each level runs in its own process
   - **Reusable components**: Build a library of composable workflow modules
   - **Dynamic composition**: Conditionally execute different sub-workflows

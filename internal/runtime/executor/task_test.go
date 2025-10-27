@@ -57,7 +57,7 @@ steps:
 		t.Parallel()
 
 		dag := &core.DAG{
-			Name: "child-dag",
+			Name: "sub-dag",
 		}
 
 		rootRef := execution.DAGRunRef{
@@ -76,7 +76,7 @@ steps:
 		assert.Equal(t, "root-dag", task.RootDagRunName)
 		assert.Equal(t, "root-run-123", task.RootDagRunId)
 		assert.Equal(t, "child-run-456", task.DagRunId)
-		assert.Equal(t, "child-dag", task.Target)
+		assert.Equal(t, "sub-dag", task.Target)
 	})
 
 	t.Run("WithParentDagRunOption", func(t *testing.T) {
@@ -88,8 +88,8 @@ steps:
 		}
 
 		task := executor.CreateTask(
-			"child-dag",
-			`name: child-dag`,
+			"sub-dag",
+			`name: sub-dag`,
 			coordinatorv1.Operation_OPERATION_START,
 			"child-run-456",
 			executor.WithParentDagRun(parentRef),
@@ -97,7 +97,7 @@ steps:
 
 		assert.Equal(t, "parent-dag", task.ParentDagRunName)
 		assert.Equal(t, "parent-run-789", task.ParentDagRunId)
-		assert.Equal(t, "child-dag", task.RootDagRunName)
+		assert.Equal(t, "sub-dag", task.RootDagRunName)
 		assert.Equal(t, "child-run-456", task.RootDagRunId)
 	})
 
@@ -114,8 +114,8 @@ steps:
 		}
 
 		task := executor.CreateTask(
-			"grandchild-dag",
-			`name: grandchild-dag`,
+			"grandsub-dag",
+			`name: grandsub-dag`,
 			coordinatorv1.Operation_OPERATION_START,
 			"grandchild-run-789",
 			executor.WithTaskParams("nested=true"),
@@ -129,7 +129,7 @@ steps:
 		assert.Equal(t, "parent-dag", task.ParentDagRunName)
 		assert.Equal(t, "parent-run-456", task.ParentDagRunId)
 		assert.Equal(t, "grandchild-run-789", task.DagRunId)
-		assert.Equal(t, "grandchild-dag", task.Target)
+		assert.Equal(t, "grandsub-dag", task.Target)
 		assert.Equal(t, "nested=true", task.Params)
 		assert.Equal(t, map[string]string{"env": "prod"}, task.WorkerSelector)
 	})

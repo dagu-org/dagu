@@ -21,7 +21,7 @@ var _ executor.ParallelExecutor = (*parallelExecutor)(nil)
 var _ executor.NodeStatusDeterminer = (*parallelExecutor)(nil)
 
 type parallelExecutor struct {
-	child         *executor.ChildDAGExecutor
+	child         *executor.SubDAGExecutor
 	lock          sync.Mutex
 	workDir       string
 	stdout        io.Writer
@@ -43,11 +43,11 @@ func newParallelExecutor(
 	// The parallel executor doesn't use the params from the step directly
 	// as they are passed through SetParamsList
 
-	if step.ChildDAG == nil {
-		return nil, fmt.Errorf("child DAG configuration is missing")
+	if step.SubDAG == nil {
+		return nil, fmt.Errorf("sub DAG configuration is missing")
 	}
 
-	child, err := executor.NewChildDAGExecutor(ctx, step.ChildDAG.Name)
+	child, err := executor.NewSubDAGExecutor(ctx, step.SubDAG.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -76,12 +76,12 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Ensure cleanup happens even if there's an error
 	defer func() {
 		if err := e.child.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup child DAG executor", "err", err)
+			logger.Error(ctx, "Failed to cleanup sub DAG executor", "err", err)
 		}
 	}()
 
 	if len(e.runParamsList) == 0 {
-		return fmt.Errorf("no child DAG runs to execute")
+		return fmt.Errorf("no sub DAG runs to execute")
 	}
 
 	// Create a cancellable context for all child executions
@@ -100,7 +100,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 		"dag", e.child.DAG.Name,
 	)
 
-	// Launch all child DAG executions
+	// Launch all sub DAG executions
 	for _, params := range e.runParamsList {
 		e.wg.Add(1)
 		go func(runParams executor.RunParams) {
@@ -115,13 +115,13 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 				return
 			}
 
-			// Execute child DAG
+			// Execute sub DAG
 			if err := e.executeChild(ctx, runParams); err != nil {
-				logger.Error(ctx, "Child DAG execution failed",
+				logger.Error(ctx, "Sub DAG execution failed",
 					"runId", runParams.RunID,
 					"err", err,
 				)
-				errChan <- fmt.Errorf("child DAG %s failed: %w", runParams.RunID, err)
+				errChan <- fmt.Errorf("sub DAG %s failed: %w", runParams.RunID, err)
 			}
 		}(params)
 	}
@@ -152,7 +152,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("parallel execution failed with %d errors: %v", len(e.errors), e.errors[0])
 	}
 
-	// Check if any child DAGs failed (even if they completed without execution errors)
+	// Check if any sub DAGs failed (even if they completed without execution errors)
 	e.lock.Lock()
 	failedCount := 0
 	for _, result := range e.results {
@@ -163,7 +163,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	e.lock.Unlock()
 
 	if failedCount > 0 {
-		return fmt.Errorf("parallel execution failed: %d child dag(s) failed", failedCount)
+		return fmt.Errorf("parallel execution failed: %d sub dag(s) failed", failedCount)
 	}
 
 	return nil
@@ -193,7 +193,7 @@ func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 		return core.NodeFailed, fmt.Errorf("no results available for node status determination")
 	}
 
-	// Check if all child DAGs succeeded or if any had partial success
+	// Check if all sub DAGs succeeded or if any had partial success
 	// For error cases, we return an error status with error message
 	var partialSuccess bool
 	for _, result := range e.results {
@@ -203,7 +203,7 @@ func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 		case core.PartiallySucceeded:
 			partialSuccess = true
 		default:
-			return core.NodeFailed, fmt.Errorf("child DAG run %s is still in progress with status: %s", result.DAGRunID, result.Status)
+			return core.NodeFailed, fmt.Errorf("sub DAG run %s is still in progress with status: %s", result.DAGRunID, result.Status)
 		}
 	}
 
@@ -219,7 +219,7 @@ func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 	return core.NodeSucceeded, nil
 }
 
-// executeChild executes a single child DAG with the given parameters
+// executeChild executes a single sub DAG with the given parameters
 func (e *parallelExecutor) executeChild(ctx context.Context, runParams executor.RunParams) error {
 	// Use the new ExecuteWithResult API
 	result, err := e.child.ExecuteWithResult(ctx, runParams, e.workDir)
@@ -234,7 +234,7 @@ func (e *parallelExecutor) executeChild(ctx context.Context, runParams executor.
 	return err
 }
 
-// outputResults aggregates and outputs all child DAG results
+// outputResults aggregates and outputs all sub DAG results
 func (e *parallelExecutor) outputResults() error {
 	e.lock.Lock()
 	defer e.lock.Unlock()

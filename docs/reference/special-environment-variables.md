@@ -6,7 +6,7 @@ Dagu injects a small set of read-only environment variables whenever it runs a w
 
 - **Step execution** – Every step receives the run-level variables plus a step-specific name and log file paths while it executes.
 - **Lifecycle handlers** – `onExit`, `onSuccess`, `onFailure`, and `onCancel` handlers inherit the same variables. They additionally receive the final `DAG_RUN_STATUS` so that post-run automation can branch on success or failure.
-- **Nested contexts** – When a step launches a child DAG through the `dagu` CLI, the child run gets its own identifiers and log locations; the parent identifiers remain accessible in the parent process for chaining or notifications.
+- **Nested contexts** – When a step launches a sub DAG through the `dagu` CLI, the sub run gets its own identifiers and log locations; the parent identifiers remain accessible in the parent process for chaining or notifications.
 
 Values are refreshed for each step, so `DAG_RUN_STEP_NAME`, `DAG_RUN_STEP_STDOUT_FILE`, and `DAG_RUN_STEP_STDERR_FILE` always point at whichever step (or handler) is currently running.
 
