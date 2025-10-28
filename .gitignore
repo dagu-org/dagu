@@ -35,9 +35,6 @@ __debug_bin*
 # Profile files
 *.prof
 
-# Doc build files
-docs/build
-
 # Go cache
 .gocache
 .gomodcache
