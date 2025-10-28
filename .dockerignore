@@ -33,8 +33,6 @@ dist/
 Thumbs.db
 
 # Documentation (not needed in container)
-docs/
-spec/
 *.md
 !README.md
 
