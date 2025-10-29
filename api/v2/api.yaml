@@ -952,6 +952,44 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs:
+    get:
+      summary: "Get sub DAG runs with timing info"
+      description: "Retrieves timing and status information for all sub DAG runs (including repeated executions) of a specific step"
+      operationId: "getSubDAGRuns"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subRuns:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SubDAGRunDetail"
+                required:
+                  - subRuns
+        "404":
+          description: "DAG run not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs/{name}/{dagRunId}/dequeue:
     get:
       summary: "Dequeue a queued DAG-run"
@@ -2206,7 +2244,32 @@ components:
           description: "Parameters passed to the sub DAG-run in JSON format"
       required:
         - dagRunId
-        - params
+
+    SubDAGRunDetail:
+      type: object
+      description: "Detailed information for a sub DAG-run including timing and status"
+      properties:
+        dagRunId:
+          type: string
+          description: "Unique identifier for the sub DAG-run"
+        params:
+          type: string
+          description: "Parameters passed to the sub DAG-run in JSON format"
+        status:
+          $ref: "#/components/schemas/Status"
+        statusLabel:
+          $ref: "#/components/schemas/StatusLabel"
+        startedAt:
+          type: string
+          description: "RFC 3339 timestamp when the sub DAG-run started"
+        finishedAt:
+          type: string
+          description: "RFC 3339 timestamp when the sub DAG-run finished"
+      required:
+        - dagRunId
+        - status
+        - statusLabel
+        - startedAt
 
     Step:
       type: object

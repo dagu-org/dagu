@@ -14,6 +14,7 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient, useQuery } from '@/hooks/api';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
+import { SubDAGRunsList } from './SubDAGRunsList';
 import {
   Dialog,
   DialogContent,
@@ -584,77 +585,15 @@ function NodeStatusTableRow({
               )}
 
               {hasSubDAGRun && (
-                <>
-                  {allSubRuns.length === 1 ? (
-                    // Single sub DAG run
-                    <>
-                      <div
-                        className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSubDAGRunNavigation(0, e);
-                        }}
-                        title="Click to view sub DAG run (Cmd/Ctrl+Click to open in new tab)"
-                      >
-                        View Sub DAG Run: {subDagName}
-                      </div>
-                      {allSubRuns[0]?.params && (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                          Parameters:{' '}
-                          <span className="font-mono">
-                            {allSubRuns[0].params}
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    // Multiple sub DAG runs (parallel execution or repeated)
-                    <>
-                      <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsExpanded(!isExpanded);
-                            }}
-                            className="flex items-center gap-1 text-blue-500 dark:text-blue-400 font-medium hover:underline"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="h-3 w-3" />
-                            ) : (
-                              <ChevronRight className="h-3 w-3" />
-                            )}
-                            Multiple executions: {allSubRuns.length} sub DAG
-                            runs
-                          </button>
-                        </div>
-                        {isExpanded && (
-                          <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
-                            {allSubRuns.map((subRun, index) => (
-                              <div key={subRun.dagRunId} className="py-1">
-                                <div
-                                  className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSubDAGRunNavigation(index, e);
-                                  }}
-                                  title="Click to view sub DAG run (Cmd/Ctrl+Click to open in new tab)"
-                                >
-                                  #{index + 1}: {subDagName}
-                                </div>
-                                {subRun.params && (
-                                  <div className="text-xs text-slate-500 dark:text-slate-400 ml-4 font-mono">
-                                    {subRun.params}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </>
+                <SubDAGRunsList
+                  dagName={dagName}
+                  dagRunId={dagRunId || ''}
+                  subDagName={subDagName || ''}
+                  allSubRuns={allSubRuns}
+                  isExpanded={isExpanded}
+                  onToggleExpand={() => setIsExpanded(!isExpanded)}
+                  onNavigate={handleSubDAGRunNavigation}
+                />
               )}
             </div>
           </TableCell>
@@ -1010,36 +949,15 @@ function NodeStatusTableRow({
           ) : (
             // Multiple sub DAG runs (parallel execution or repeated)
             <div className="mb-3">
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 font-medium hover:underline"
-              >
-                {isExpanded ? (
-                  <ChevronDown className="h-3 w-3" />
-                ) : (
-                  <ChevronRight className="h-3 w-3" />
-                )}
-                Multiple executions: {allSubRuns.length} sub DAG runs
-              </button>
-              {isExpanded && (
-                <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
-                  {allSubRuns.map((subRun, index) => (
-                    <div key={subRun.dagRunId} className="py-1">
-                      <div
-                        className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
-                        onClick={(e) => handleSubDAGRunNavigation(index, e)}
-                      >
-                        #{index + 1}: {subDagName}
-                      </div>
-                      {subRun.params && (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 ml-4 font-mono">
-                          {subRun.params}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <SubDAGRunsList
+                dagName={dagName}
+                dagRunId={dagRunId || ''}
+                subDagName={subDagName || ''}
+                allSubRuns={allSubRuns}
+                isExpanded={isExpanded}
+                onToggleExpand={() => setIsExpanded(!isExpanded)}
+                onNavigate={handleSubDAGRunNavigation}
+              />
             </div>
           )}
         </>
