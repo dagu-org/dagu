@@ -550,11 +550,24 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 
 	var dagRunId, params string
 	var singleton bool
+	var nameOverride string
 
 	if request.Body != nil {
 		dagRunId = valueOf(request.Body.DagRunId)
 		params = valueOf(request.Body.Params)
 		singleton = valueOf(request.Body.Singleton)
+		nameOverride = strings.TrimSpace(valueOf(request.Body.DagName))
+	}
+
+	if nameOverride != "" {
+		if err := core.ValidateDAGName(nameOverride); err != nil {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+			}
+		}
+		dag.Name = nameOverride
 	}
 
 	if dagRunId == "" {
@@ -611,7 +624,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	if err := a.startDAGRun(ctx, dag, params, dagRunId, singleton); err != nil {
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, singleton); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
@@ -620,7 +633,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	}, nil
 }
 
-func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID string, singleton bool) error {
+func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, singleton bool) error {
 	var noQueue bool
 	if singleton || dag.MaxActiveRuns == 1 {
 		noQueue = true
@@ -634,10 +647,11 @@ func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID s
 	}
 
 	spec := a.subCmdBuilder.Start(dag, runtime1.StartOptions{
-		Params:   params,
-		DAGRunID: dagRunID,
-		Quiet:    true,
-		NoQueue:  noQueue,
+		Params:       params,
+		DAGRunID:     dagRunID,
+		Quiet:        true,
+		NoQueue:      noQueue,
+		NameOverride: nameOverride,
 	})
 
 	if err := runtime1.Start(ctx, spec); err != nil {
@@ -706,6 +720,21 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		dag.Queue = *request.Body.Queue
 	}
 
+	var nameOverride string
+	if request.Body != nil {
+		nameOverride = strings.TrimSpace(valueOf(request.Body.DagName))
+	}
+	if nameOverride != "" {
+		if err := core.ValidateDAGName(nameOverride); err != nil {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+			}
+		}
+		dag.Name = nameOverride
+	}
+
 	dagRunId := valueOf(request.Body.DagRunId)
 	if dagRunId == "" {
 		var err error
@@ -739,7 +768,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		}
 	}
 
-	if err := a.enqueueDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId); err != nil {
+	if err := a.enqueueDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId, nameOverride); err != nil {
 		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
 	}
 
@@ -748,10 +777,11 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	}, nil
 }
 
-func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID string) error {
+func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string) error {
 	opts := runtime1.EnqueueOptions{
-		Params:   params,
-		DAGRunID: dagRunID,
+		Params:       params,
+		DAGRunID:     dagRunID,
+		NameOverride: nameOverride,
 	}
 	if dag.Queue != "" {
 		opts.Queue = dag.Queue
