@@ -7,6 +7,7 @@ import { useContext } from 'react';
 import { StatusDot } from '../common';
 
 type SubDAGRun = components['schemas']['SubDAGRun'];
+type SubDAGRunDetail = components['schemas']['SubDAGRunDetail'];
 
 type Props = {
   dagName: string;
@@ -34,20 +35,21 @@ export function SubDAGRunsList({
   // Only fetch if we have multiple sub runs AND expanded
   const shouldFetch = allSubRuns.length > 1 && isExpanded;
   const { data: subRunsData } = useQuery(
-    shouldFetch ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs' : null,
-    shouldFetch
-      ? {
-          params: {
-            path: {
-              name: dagName,
-              dagRunId,
-            },
-            query: {
-              remoteNode,
-            },
-          },
-        }
-      : undefined
+    '/dag-runs/{name}/{dagRunId}/sub-dag-runs',
+    {
+      params: {
+        path: {
+          name: dagName,
+          dagRunId,
+        },
+        query: {
+          remoteNode,
+        },
+      },
+    },
+    {
+      isPaused: () => !shouldFetch,
+    }
   );
 
   // Create a map of dagRunIds that belong to THIS node
@@ -63,8 +65,10 @@ export function SubDAGRunsList({
   const subRunsWithTiming = subRunsData?.subRuns
     ? subRunsData.subRuns
         // FILTER: Only include sub runs that belong to THIS node
-        .filter((apiSubRun) => nodeSubRunIds.has(apiSubRun.dagRunId))
-        .map((apiSubRun) => {
+        .filter((apiSubRun: SubDAGRunDetail) =>
+          nodeSubRunIds.has(apiSubRun.dagRunId)
+        )
+        .map((apiSubRun: SubDAGRunDetail) => {
           // Find the matching original sub run to get the index
           const matchingSubRun = subRunsWithIndex.find(
             (sr) => sr.dagRunId === apiSubRun.dagRunId
@@ -74,7 +78,7 @@ export function SubDAGRunsList({
             originalIndex: matchingSubRun?.originalIndex ?? 0,
           };
         })
-        .sort((a, b) => {
+        .sort((a: any, b: any) => {
           const timeA = new Date(a.startedAt).getTime();
           const timeB = new Date(b.startedAt).getTime();
           return timeB - timeA; // Descending order (newest first)
@@ -126,12 +130,12 @@ export function SubDAGRunsList({
       </div>
       {isExpanded && (
         <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
-          {subRunsWithTiming.map((subRun, displayIndex) => {
+          {subRunsWithTiming.map((subRun: any, displayIndex: number) => {
             const startedAt =
-              'startedAt' in subRun ? (subRun as any).startedAt : null;
-            const status = 'status' in subRun ? (subRun as any).status : null;
+              'startedAt' in subRun ? subRun.startedAt : null;
+            const status = 'status' in subRun ? subRun.status : null;
             const statusLabel =
-              'statusLabel' in subRun ? (subRun as any).statusLabel : null;
+              'statusLabel' in subRun ? subRun.statusLabel : null;
             // Display number: when sorted newest first, show descending numbers
             // So if we have 40 items, displayIndex 0 -> #40, displayIndex 1 -> #39, etc.
             const displayNumber = allSubRuns.length - displayIndex;
