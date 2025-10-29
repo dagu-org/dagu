@@ -148,7 +148,7 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 		}
 	}
 
-	if err := a.startDAGRun(ctx, dag, params, dagRunId, singleton); err != nil {
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), singleton); err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusInternalServerError,
 			Code:       api.ErrorCodeInternalError,

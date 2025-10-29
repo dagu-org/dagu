@@ -46,6 +46,9 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	if opts.DAGRunID != "" {
 		args = append(args, fmt.Sprintf("--run-id=%s", opts.DAGRunID))
 	}
+	if opts.NameOverride != "" {
+		args = append(args, fmt.Sprintf("--name=%s", opts.NameOverride))
+	}
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
@@ -70,6 +73,9 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	}
 	if opts.DAGRunID != "" {
 		args = append(args, fmt.Sprintf("--run-id=%s", opts.DAGRunID))
+	}
+	if opts.NameOverride != "" {
+		args = append(args, fmt.Sprintf("--name=%s", opts.NameOverride))
 	}
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
@@ -208,18 +214,20 @@ type CmdSpec struct {
 
 // StartOptions contains options for initiating a dag-run.
 type StartOptions struct {
-	Params   string // Parameters to pass to the DAG
-	Quiet    bool   // Whether to run in quiet mode
-	DAGRunID string // ID for the dag-run
-	NoQueue  bool   // Do not allow queueing
+	Params       string // Parameters to pass to the DAG
+	Quiet        bool   // Whether to run in quiet mode
+	DAGRunID     string // ID for the dag-run
+	NoQueue      bool   // Do not allow queueing
+	NameOverride string // Optional DAG name override
 }
 
 // EnqueueOptions contains options for enqueuing a dag-run.
 type EnqueueOptions struct {
-	Params   string // Parameters to pass to the DAG
-	Quiet    bool   // Whether to run in quiet mode
-	DAGRunID string // ID for the dag-run
-	Queue    string // Queue name to enqueue to
+	Params       string // Parameters to pass to the DAG
+	Quiet        bool   // Whether to run in quiet mode
+	DAGRunID     string // ID for the dag-run
+	Queue        string // Queue name to enqueue to
+	NameOverride string // Optional DAG name override
 }
 
 // RestartOptions contains options for restarting a dag-run.
