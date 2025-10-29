@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -62,10 +63,11 @@ func buildParams(ctx BuildContext, spec *definition, dag *core.DAG) error {
 		overrideParams(&paramPairs, overridePairs)
 	}
 
-	// Validate the parameters against the provided schema, if it exists
-	schemaRef := extractSchemaReference(spec.Params)
-	if schemaRef != "" {
-		updatedPairs, err := validateParams(paramPairs, schemaRef)
+	// Validate the parameters against a resolved schema (if declared)
+	if resolvedSchema, err := resolveSchemaFromParams(spec.Params, spec.WorkingDir, dag.Location); err != nil {
+		return fmt.Errorf("failed to get JSON schema: %w", err)
+	} else if resolvedSchema != nil {
+		updatedPairs, err := validateParams(paramPairs, resolvedSchema)
 		if err != nil {
 			return err
 		}
@@ -81,12 +83,7 @@ func buildParams(ctx BuildContext, spec *definition, dag *core.DAG) error {
 	return nil
 }
 
-func validateParams(paramPairs []paramPair, schemaRef string) ([]paramPair, error) {
-	schema, err := getSchemaFromRef(schemaRef)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get JSON schema: %w", err)
-	}
-
+func validateParams(paramPairs []paramPair, schema *jsonschema.Resolved) ([]paramPair, error) {
 	// Convert paramPairs to a map for validation
 	paramMap := make(map[string]any)
 	for _, pair := range paramPairs {
@@ -129,7 +126,7 @@ func validateParams(paramPairs []paramPair, schemaRef string) ([]paramPair, erro
 }
 
 // Schema Ref can be a local file (relative or absolute paths), or a remote URL
-func getSchemaFromRef(schemaRef string) (*jsonschema.Resolved, error) {
+func getSchemaFromRef(workingDir string, dagLocation string, schemaRef string) (*jsonschema.Resolved, error) {
 	var schemaData []byte
 	var err error
 
@@ -137,7 +134,7 @@ func getSchemaFromRef(schemaRef string) (*jsonschema.Resolved, error) {
 	if strings.HasPrefix(schemaRef, "http://") || strings.HasPrefix(schemaRef, "https://") {
 		schemaData, err = loadSchemaFromURL(schemaRef)
 	} else {
-		schemaData, err = loadSchemaFromFile(schemaRef)
+		schemaData, err = loadSchemaFromFile(workingDir, dagLocation, schemaRef)
 	}
 
 	if err != nil {
@@ -196,15 +193,64 @@ func loadSchemaFromURL(schemaURL string) (data []byte, err error) {
 }
 
 // loadSchemaFromFile loads a JSON schema from a file path.
-func loadSchemaFromFile(filePath string) ([]byte, error) {
-	// Resolve the path (handles relative paths, env vars, tilde expansion)
-	resolvedPath, err := fileutil.ResolvePath(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve schema file path: %w", err)
+func loadSchemaFromFile(workingDir string, dagLocation string, filePath string) ([]byte, error) {
+	// Try to resolve the schema file path in the following order:
+	// 1) Current working directory (default ResolvePath behavior)
+	// 2) DAG's workingDir value
+	// 3) Directory of the DAG file (where it was loaded from)
+
+	var tried []string
+
+	// Attempts a candidate by joining base and filePath (if base provided),
+	// resolving env/tilde + absolute path, checking existence, and reading.
+	tryCandidate := func(label, base string) ([]byte, string, error) {
+		var candidate string
+		if strings.TrimSpace(base) == "" {
+			candidate = filePath
+		} else {
+			candidate = filepath.Join(base, filePath)
+		}
+		resolved, err := fileutil.ResolvePath(candidate)
+		if err != nil {
+			tried = append(tried, fmt.Sprintf("%s: resolve error: %v", label, err))
+			return nil, "", err
+		}
+		if !fileutil.FileExists(resolved) {
+			tried = append(tried, fmt.Sprintf("%s: %s", label, resolved))
+			return nil, resolved, os.ErrNotExist
+		}
+		data, err := os.ReadFile(resolved) // #nosec G304 - validated path
+		if err != nil {
+			tried = append(tried, fmt.Sprintf("%s: %s (read error: %v)", label, resolved, err))
+			return nil, resolved, err
+		}
+		return data, resolved, nil
 	}
 
-	// #nosec G304 - File path is validated by ResolvePath
-	return os.ReadFile(resolvedPath)
+	// 1) As provided (CWD/env/tilde expansion handled by ResolvePath)
+	if data, _, err := tryCandidate("cwd", ""); err == nil {
+		return data, nil
+	}
+
+	// 2) From DAG's workingDir value if present
+	if wd := strings.TrimSpace(workingDir); wd != "" {
+		if data, _, err := tryCandidate(fmt.Sprintf("workingDir(%s)", wd), wd); err == nil {
+			return data, nil
+		}
+	}
+
+	// 3) From the directory of the DAG file used to build
+	if dagLocation != "" {
+		base := filepath.Dir(dagLocation)
+		if data, _, err := tryCandidate(fmt.Sprintf("dagDir(%s)", base), base); err == nil {
+			return data, nil
+		}
+	}
+
+	if len(tried) == 0 {
+		return nil, fmt.Errorf("failed to resolve schema file path: %s (no candidates)", filePath)
+	}
+	return nil, fmt.Errorf("schema file not found for %q; tried %s", filePath, strings.Join(tried, ", "))
 }
 
 func overrideParams(paramPairs *[]paramPair, override []paramPair) {
@@ -486,6 +532,16 @@ func extractSchemaReference(params any) string {
 	}
 
 	return schemaRefStr
+}
+
+// resolveSchemaFromParams extracts a schema reference from params and resolves it.
+// Returns (nil, nil) if no schema is declared.
+func resolveSchemaFromParams(params any, workingDir, dagLocation string) (*jsonschema.Resolved, error) {
+	schemaRef := extractSchemaReference(params)
+	if schemaRef == "" {
+		return nil, nil
+	}
+	return getSchemaFromRef(workingDir, dagLocation, schemaRef)
 }
 
 // buildStepParams parses the params field in the step definition.
