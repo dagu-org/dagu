@@ -1586,6 +1586,8 @@ export interface operations {
                     params?: string;
                     /** @description Optional ID for the DAG-run, if not provided a new one will be generated */
                     dagRunId?: string;
+                    /** @description Optional DAG name override to use for the created dag-run */
+                    dagName?: string;
                     /**
                      * @description If true, prevent starting if DAG is already running (returns 409 conflict)
                      * @default false
@@ -1647,6 +1649,8 @@ export interface operations {
                     params?: string;
                     /** @description Optional ID for the DAG-run, if not provided a new one will be generated */
                     dagRunId?: string;
+                    /** @description Optional DAG name override to use for the queued dag-run */
+                    dagName?: string;
                     /** @description Override the DAG-level queue definition */
                     queue?: string;
                 };
