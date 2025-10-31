@@ -119,4 +119,97 @@ steps:
 			return s == api.Status(core.Queued) || s == api.Status(core.Running) || s == api.Status(core.Succeeded)
 		}, 5*time.Second, 250*time.Millisecond, "expected DAG-run to reach queued state")
 	})
+
+	t.Run("RetryWithFreshRunID", func(t *testing.T) {
+		spec := `
+steps:
+  - sleep 1
+`
+		name := "retry_fresh_id"
+
+		// Create DAG definition
+		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+			Name: name,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		// Start the DAG to create an initial history entry
+		startResp := server.Client().Post(fmt.Sprintf("/api/v2/dags/%s/start", name), api.ExecuteDAGJSONRequestBody{}).
+			ExpectStatus(http.StatusOK).
+			Send(t)
+
+		var execBody api.ExecuteDAG200JSONResponse
+		startResp.Unmarshal(t, &execBody)
+		require.NotEmpty(t, execBody.DagRunId, "expected a non-empty dag-run ID")
+
+		require.Eventually(t, func() bool {
+			statusResp := server.Client().
+				Get(fmt.Sprintf("/api/v2/dags/%s/dag-runs/%s", name, execBody.DagRunId)).
+				ExpectStatus(http.StatusOK).
+				Send(t)
+
+			var dagRun api.GetDAGDAGRunDetails200JSONResponse
+			statusResp.Unmarshal(t, &dagRun)
+
+			return dagRun.DagRun.Status == api.Status(core.Succeeded)
+		}, 5*time.Second, 250*time.Millisecond, "expected initial DAG-run to complete")
+
+		generateNew := true
+		retryResp := server.Client().
+			Post(
+				fmt.Sprintf("/api/v2/dag-runs/%s/%s/retry", name, execBody.DagRunId),
+				api.RetryDAGRunJSONRequestBody{
+					GenerateNewRunId: &generateNew,
+				},
+			).
+			ExpectStatus(http.StatusOK).
+			Send(t)
+
+		var retryBody api.RetryDAGRun200JSONResponse
+		retryResp.Unmarshal(t, &retryBody)
+		require.NotEmpty(t, retryBody.DagRunId, "expected a new dag-run ID")
+		require.NotEqual(t, execBody.DagRunId, retryBody.DagRunId, "expected a different dag-run ID")
+
+		require.Eventually(t, func() bool {
+			statusResp := server.Client().
+				Get(fmt.Sprintf("/api/v2/dags/%s/dag-runs/%s", name, retryBody.DagRunId)).
+				ExpectStatus(http.StatusOK).
+				Send(t)
+
+			var dagRun api.GetDAGDAGRunDetails200JSONResponse
+			statusResp.Unmarshal(t, &dagRun)
+
+			return dagRun.DagRun.Status == api.Status(core.Succeeded)
+		}, 5*time.Second, 250*time.Millisecond, "expected retried DAG-run to complete")
+
+		customID := "custom_retry_id"
+		retryResp = server.Client().
+			Post(
+				fmt.Sprintf("/api/v2/dag-runs/%s/%s/retry", name, retryBody.DagRunId),
+				api.RetryDAGRunJSONRequestBody{
+					DagRunId: &customID,
+				},
+			).
+			ExpectStatus(http.StatusOK).
+			Send(t)
+
+		var customRetry api.RetryDAGRun200JSONResponse
+		retryResp.Unmarshal(t, &customRetry)
+		require.Equal(t, customID, customRetry.DagRunId, "expected custom dag-run ID to be used")
+
+		require.Eventually(t, func() bool {
+			statusResp := server.Client().
+				Get(fmt.Sprintf("/api/v2/dags/%s/dag-runs/%s", name, customRetry.DagRunId)).
+				ExpectStatus(http.StatusOK).
+				Send(t)
+
+			var dagRun api.GetDAGDAGRunDetails200JSONResponse
+			statusResp.Unmarshal(t, &dagRun)
+
+			return dagRun.DagRun.Status == api.Status(core.Succeeded)
+		}, 5*time.Second, 250*time.Millisecond, "expected custom ID retry to complete")
+
+		// Clean up DAG definition
+		_ = server.Client().Delete(fmt.Sprintf("/api/v2/dags/%s", name)).ExpectStatus(http.StatusNoContent).Send(t)
+	})
 }

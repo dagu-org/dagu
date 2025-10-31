@@ -480,7 +480,12 @@ export interface paths {
         put?: never;
         /**
          * Retry DAG-run execution
-         * @description Creates a new DAG-run based on a previous execution
+         * @description Creates a new DAG-run based on a previous execution.
+         *
+         *     By default the original `dagRunId` is reused, mirroring the behaviour of
+         *     the CLI `dagu retry` command. Provide a different `dagRunId` or set
+         *     `generateNewRunId=true` to launch a fresh run with a new identifier while
+         *     reusing the stored DAG definition and parameters from the selected history entry.
          */
         post: operations["retryDAGRun"];
         delete?: never;
@@ -2532,20 +2537,34 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description ID of the DAG-run to retry */
-                    dagRunId: string;
+                    /**
+                     * @description Optional override for the DAG-run ID to use for the new execution. If omitted
+                     *     (or equal to the path parameter) the original run ID is reused. Provide a different
+                     *     value to start a fresh DAG-run with that identifier.
+                     */
+                    dagRunId?: string;
+                    /**
+                     * @description When true, a new DAG-run ID is generated server-side before retrying. This flag takes
+                     *     precedence over `dagRunId`.
+                     */
+                    generateNewRunId?: boolean;
                     /** @description Optional. If provided, only this step will be retried. */
                     stepName?: string;
                 };
             };
         };
         responses: {
-            /** @description A successful response */
+            /** @description Retry accepted */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @description Identifier used for the triggered DAG-run */
+                        dagRunId: string;
+                    };
+                };
             };
             /** @description Generic error response */
             default: {
