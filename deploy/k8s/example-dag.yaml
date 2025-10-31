@@ -1,0 +1,46 @@
+# Example DAG to test distributed execution
+# Place this in the dags directory: /var/lib/dagu/dags/
+
+name: test-distributed
+description: Test DAG for distributed worker execution
+
+# Queue this DAG to be executed by workers
+queue:
+  enabled: true
+  # priority: 1  # Higher number = higher priority
+  # Match workers with these labels (optional)
+  labels:
+    - environment=dev
+    - cluster=k8s
+
+env:
+  - TEST_ENV: "distributed-test"
+
+steps:
+  - name: step1
+    command: echo "Step 1 running on worker $(hostname)"
+
+  - name: step2
+    command: |
+      echo "Step 2 - simulating work on worker $(hostname)"
+      sleep 5
+      echo "Step 2 complete"
+    depends:
+      - step1
+
+  - name: step3
+    command: |
+      echo "Step 3 - parallel execution test $(hostname)"
+      sleep 3
+      echo "Step 3 done"
+    depends:
+      - step1
+
+  - name: step4
+    command: |
+      echo "Final step on worker $(hostname)"
+      echo "Environment: $TEST_ENV"
+      echo "All steps completed successfully"
+    depends:
+      - step2
+      - step3

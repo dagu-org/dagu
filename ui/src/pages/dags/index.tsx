@@ -1,8 +1,11 @@
 import { debounce } from 'lodash';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { components, PathsDagsGetParametersQuerySort, PathsDagsGetParametersQueryOrder } from '../../api/v2/schema';
-import { RefreshButton } from '../../components/ui/refresh-button';
+import {
+  components,
+  PathsDagsGetParametersQueryOrder,
+  PathsDagsGetParametersQuerySort,
+} from '../../api/v2/schema';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
 import { DAGErrors } from '../../features/dags/components/dag-editor';
@@ -31,8 +34,6 @@ function DAGs() {
   const handlePageLimitChange = (newLimit: number) => {
     updatePreference('pageLimit', newLimit);
   };
-
-
 
   const { data, mutate, isLoading } = useQuery(
     '/dags',

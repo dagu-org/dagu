@@ -9,9 +9,9 @@ import (
 
 func TestWorkerCommand(t *testing.T) {
 	t.Run("WorkerCommandExists", func(t *testing.T) {
-		cmd := cmd.CmdWorker()
-		require.NotNil(t, cmd)
-		require.Equal(t, "worker [flags]", cmd.Use)
-		require.Equal(t, "Start a worker that polls the coordinator for tasks", cmd.Short)
+		cli := cmd.CmdWorker()
+		require.NotNil(t, cli)
+		require.Equal(t, "worker [flags]", cli.Use)
+		require.Equal(t, "Start a worker that polls the coordinator for tasks", cli.Short)
 	})
 }

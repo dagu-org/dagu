@@ -4,8 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -25,14 +24,14 @@ func TestQueue(t *testing.T) {
 	require.Equal(t, 0, queueLen, "expected queue length to be 0")
 
 	// Add a low priority job to the queue
-	err = queue.Enqueue(th.Context, models.QueuePriorityLow, digraph.DAGRunRef{
+	err = queue.Enqueue(th.Context, execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "low-priority-dag-run",
 	})
 	require.NoError(t, err, "expected no error when adding job to queue")
 
 	// Add a high priority job to the queue
-	err = queue.Enqueue(th.Context, models.QueuePriorityHigh, digraph.DAGRunRef{
+	err = queue.Enqueue(th.Context, execution.QueuePriorityHigh, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "high-priority-dag-run",
 	})
@@ -75,14 +74,14 @@ func TestQueue_FindByDAGRunID(t *testing.T) {
 	queue := filequeue.NewDualQueue(queueDir, "test-name")
 
 	// Add a low priority job to the queue
-	err := queue.Enqueue(th.Context, models.QueuePriorityLow, digraph.DAGRunRef{
+	err := queue.Enqueue(th.Context, execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "low-priority-dag-run",
 	})
 	require.NoError(t, err, "expected no error when adding job to queue")
 
 	// Add a high priority job to the queue
-	err = queue.Enqueue(th.Context, models.QueuePriorityHigh, digraph.DAGRunRef{
+	err = queue.Enqueue(th.Context, execution.QueuePriorityHigh, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "high-priority-dag-run",
 	})

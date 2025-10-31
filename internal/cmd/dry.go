@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
 )
 
-func CmdDry() *cobra.Command {
+func Dry() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "dry [flags] <DAG definition> [-- param1 param2 ...]",
@@ -32,27 +33,36 @@ Example:
 	)
 }
 
-var dryFlags = []commandLineFlag{paramsFlag}
+var dryFlags = []commandLineFlag{paramsFlag, nameFlag}
 
 func runDry(ctx *Context, args []string) error {
-	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(ctx.Config.Paths.BaseConfig),
-		digraph.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+	loadOpts := []spec.LoadOption{
+		spec.WithBaseConfig(ctx.Config.Paths.BaseConfig),
+		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+	}
+
+	// Get name override from flags if provided
+	nameOverride, err := ctx.StringParam("name")
+	if err != nil {
+		return fmt.Errorf("failed to get name override: %w", err)
+	}
+	if nameOverride != "" {
+		loadOpts = append(loadOpts, spec.WithName(nameOverride))
 	}
 
 	if argsLenAtDash := ctx.Command.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
-		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
+		loadOpts = append(loadOpts, spec.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
 		params, err := ctx.Command.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
-		loadOpts = append(loadOpts, digraph.WithParams(stringutil.RemoveQuotes(params)))
+		loadOpts = append(loadOpts, spec.WithParams(stringutil.RemoveQuotes(params)))
 	}
 
-	dag, err := digraph.Load(ctx, args[0], loadOpts...)
+	dag, err := spec.Load(ctx, args[0], loadOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
@@ -77,7 +87,7 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	root := digraph.NewDAGRunRef(dag.Name, dagRunID)
+	root := execution.NewDAGRunRef(dag.Name, dagRunID)
 
 	agentInstance := agent.New(
 		dagRunID,

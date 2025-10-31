@@ -3,12 +3,12 @@
  *
  * @module features/dags/components/dag-details
  */
+import { CommandDisplay } from '@/components/ui/command-display';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { CommandDisplay } from '@/components/ui/command-display';
 import {
   ArrowRight,
   FileText,
@@ -35,6 +35,7 @@ type Props = {
  * DAGStepTableRow displays information about a single step in a DAG
  */
 function DAGStepTableRow({ step, index }: Props) {
+  const subDagName = step.call;
   // Format preconditions as a list
   const preconditions = step.preconditions?.map((c, index) => (
     <div
@@ -72,11 +73,11 @@ function DAGStepTableRow({ step, index }: Props) {
               {step.description}
             </div>
           )}
-          {step.run && (
+          {subDagName && (
             <div className="mt-1 flex w-fit items-center gap-1.5 rounded-md bg-purple-50 px-1.5 py-0.5 text-xs dark:bg-purple-900/20">
               <GitBranch className="h-3.5 w-3.5 text-purple-500 dark:text-purple-400" />
               <span className="font-medium text-purple-600 dark:text-purple-400">
-                Sub-DAG: {step.run}
+                Sub-DAG: {subDagName}
               </span>
             </div>
           )}
@@ -159,14 +160,17 @@ function DAGStepTableRow({ step, index }: Props) {
                   step.repeatPolicy.repeat === 'while'
                     ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800'
                     : step.repeatPolicy.repeat === 'until'
-                    ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800'
-                    : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                      ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800'
+                      : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
                 }`}
               >
                 <RefreshCw className="h-3 w-3" />
                 <span className="font-medium uppercase tracking-wider text-[10px]">
-                  {step.repeatPolicy.repeat === 'while' ? 'WHILE' : 
-                   step.repeatPolicy.repeat === 'until' ? 'UNTIL' : 'REPEAT'}
+                  {step.repeatPolicy.repeat === 'while'
+                    ? 'WHILE'
+                    : step.repeatPolicy.repeat === 'until'
+                      ? 'UNTIL'
+                      : 'REPEAT'}
                 </span>
                 {step.repeatPolicy.interval && (
                   <span className="text-[10px] opacity-75">
@@ -179,19 +183,25 @@ function DAGStepTableRow({ step, index }: Props) {
                   </span>
                 )}
               </Badge>
-              
+
               {/* Repeat Condition */}
               {step.repeatPolicy.condition && (
                 <div className="text-[10px] bg-slate-100 dark:bg-slate-800 rounded px-1.5 py-0.5 font-mono">
                   <span className="text-slate-500 dark:text-slate-400">
-                    {step.repeatPolicy.repeat === 'while' ? '↻ while' : '↻ until'}:
+                    {step.repeatPolicy.repeat === 'while'
+                      ? '↻ while'
+                      : '↻ until'}
+                    :
                   </span>{' '}
                   <span className="text-slate-700 dark:text-slate-300">
                     {step.repeatPolicy.condition.condition}
                   </span>
                   {step.repeatPolicy.condition.expected && (
                     <>
-                      <span className="text-slate-500 dark:text-slate-400"> = </span>
+                      <span className="text-slate-500 dark:text-slate-400">
+                        {' '}
+                        ={' '}
+                      </span>
                       <span className="text-emerald-600 dark:text-emerald-400">
                         {step.repeatPolicy.condition.expected}
                       </span>
@@ -199,18 +209,19 @@ function DAGStepTableRow({ step, index }: Props) {
                   )}
                 </div>
               )}
-              
+
               {/* Exit Codes */}
-              {step.repeatPolicy.exitCode && step.repeatPolicy.exitCode.length > 0 && (
-                <div className="text-[10px] bg-slate-100 dark:bg-slate-800 rounded px-1.5 py-0.5">
-                  <span className="text-slate-500 dark:text-slate-400">
-                    exit codes:
-                  </span>{' '}
-                  <span className="font-mono text-amber-600 dark:text-amber-400">
-                    [{step.repeatPolicy.exitCode.join(', ')}]
-                  </span>
-                </div>
-              )}
+              {step.repeatPolicy.exitCode &&
+                step.repeatPolicy.exitCode.length > 0 && (
+                  <div className="text-[10px] bg-slate-100 dark:bg-slate-800 rounded px-1.5 py-0.5">
+                    <span className="text-slate-500 dark:text-slate-400">
+                      exit codes:
+                    </span>{' '}
+                    <span className="font-mono text-amber-600 dark:text-amber-400">
+                      [{step.repeatPolicy.exitCode.join(', ')}]
+                    </span>
+                  </div>
+                )}
             </div>
           )}
 

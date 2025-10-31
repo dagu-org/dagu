@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/coordinator"
-	"github.com/dagu-org/dagu/internal/frontend"
-	"github.com/dagu-org/dagu/internal/metrics"
+	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/telemetry"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -55,14 +55,14 @@ func (srv *Server) runServer(t *testing.T) {
 
 	cc := coordinator.New(srv.ServiceRegistry, coordinator.DefaultConfig())
 
-	collector := metrics.NewCollector(
+	collector := telemetry.NewCollector(
 		config.Version,
 		srv.DAGStore,
 		srv.DAGRunStore,
 		srv.QueueStore,
 		srv.ServiceRegistry,
 	)
-	mr := metrics.NewRegistry(collector)
+	mr := telemetry.NewRegistry(collector)
 
 	server := frontend.NewServer(srv.Config, srv.DAGStore, srv.DAGRunStore, srv.QueueStore, srv.ProcStore, srv.DAGRunMgr, cc, srv.ServiceRegistry, mr)
 	err := server.Serve(srv.Context)

@@ -33,7 +33,7 @@ type Props = {
   name: string;
   /** DAG-run ID of the execution */
   dagRunId: string;
-  /** Full DAG-run details (optional) - used to determine if this is a child DAG-run */
+  /** Full DAG-run details (optional) - used to determine if this is a sub DAG-run */
   dagRun?: components['schemas']['DAGRunDetails'];
   /** Whether to show stdout or stderr logs */
   stream?: 'stdout' | 'stderr';
@@ -76,8 +76,8 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  // Determine if this is a child dagRun
-  const isChildDAGRun =
+  // Determine if this is a sub dagRun
+  const isSubDAGRun =
     dagRun && dagRun.rootDAGRunId && dagRun.rootDAGRunId !== dagRun.dagRunId;
 
   // Determine query parameters based on view mode
@@ -96,17 +96,17 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
     queryParams.limit = pageSize;
   }
 
-  // Determine the API endpoint based on whether this is a child DAG-run
-  const apiEndpoint = isChildDAGRun
-    ? '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}/log'
+  // Determine the API endpoint based on whether this is a sub DAG-run
+  const apiEndpoint = isSubDAGRun
+    ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log'
     : '/dag-runs/{name}/{dagRunId}/log';
 
-  // Prepare path parameters based on whether this is a child DAG-run
-  const pathParams = isChildDAGRun
+  // Prepare path parameters based on whether this is a sub DAG-run
+  const pathParams = isSubDAGRun
     ? {
         name: dagRun.rootDAGRunName,
         dagRunId: dagRun.rootDAGRunId,
-        childDAGRunId: dagRun.dagRunId,
+        subDAGRunId: dagRun.dagRunId,
       }
     : {
         name,

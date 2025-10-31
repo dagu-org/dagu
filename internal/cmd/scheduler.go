@@ -3,11 +3,11 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/spf13/cobra"
 )
 
-func CmdScheduler() *cobra.Command {
+func Scheduler() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "scheduler [flags]",

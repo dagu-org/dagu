@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: dagu-dev
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - pvc.yaml
+  - server-deployment.yaml
+  - worker-deployment.yaml
+
+# Optional: Add common labels to all resources
+commonLabels:
+  app: dagu
+  environment: local
+
+# Optional: Add common annotations
+commonAnnotations:
+  description: "Dagu distributed execution - local k8s setup"

@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -31,7 +31,7 @@ func TestQueueFile(t *testing.T) {
 	require.Equal(t, 0, queueLen, "expected queue length to be 0")
 
 	// Add a job to the queue
-	err = qf.Push(th.Context, digraph.DAGRunRef{
+	err = qf.Push(th.Context, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag",
 	})
@@ -76,7 +76,7 @@ func TestQueueFile_FindByDAGRunID(t *testing.T) {
 	}
 
 	// Add a job to the queue
-	err := qf.Push(th.Context, digraph.DAGRunRef{
+	err := qf.Push(th.Context, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag",
 	})
@@ -107,7 +107,7 @@ func TestQueueFile_Pop(t *testing.T) {
 	}
 
 	// Add a job to the queue
-	err := qf.Push(th.Context, digraph.DAGRunRef{
+	err := qf.Push(th.Context, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag",
 	})

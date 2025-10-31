@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"golang.org/x/term"
 )
 
 // ExecuteAgent runs an agent with optional progress display and handles common execution logic
-func ExecuteAgent(ctx *Context, agentInstance *agent.Agent, dag *digraph.DAG, dagRunID string, logFile *os.File) error {
+func ExecuteAgent(ctx *Context, agentInstance *agent.Agent, dag *core.DAG, dagRunID string, logFile *os.File) error {
 	// Check if progress display should be enabled
 	enableProgress := shouldEnableProgress(ctx)
 

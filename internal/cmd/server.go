@@ -3,11 +3,11 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/spf13/cobra"
 )
 
-func CmdServer() *cobra.Command {
+func Server() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
 			Use:   "server [flags]",

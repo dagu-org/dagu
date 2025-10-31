@@ -4,13 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime"
 )
 
-func FromSteps(steps []digraph.Step) []*Node {
+func FromSteps(steps []core.Step) []*Node {
 	var ret []*Node
 	for _, s := range steps {
 		ret = append(ret, NewNode(s))
@@ -18,7 +17,7 @@ func FromSteps(steps []digraph.Step) []*Node {
 	return ret
 }
 
-func FromNodes(nodes []scheduler.NodeData) []*Node {
+func FromNodes(nodes []runtime.NodeData) []*Node {
 	var ret []*Node
 	for _, node := range nodes {
 		ret = append(ret, FromNode(node))
@@ -26,7 +25,7 @@ func FromNodes(nodes []scheduler.NodeData) []*Node {
 	return ret
 }
 
-func FromNode(node scheduler.NodeData) *Node {
+func FromNode(node runtime.NodeData) *Node {
 	return &Node{
 		Step:       node.Step,
 		Log:        node.State.Stdout,
@@ -42,23 +41,23 @@ func FromNode(node scheduler.NodeData) *Node {
 }
 
 type Node struct {
-	Step       digraph.Step      `json:"Step"`
-	Log        string            `json:"Log"`
-	StartedAt  string            `json:"StartedAt"`
-	FinishedAt string            `json:"FinishedAt"`
-	Status     status.NodeStatus `json:"Status"`
-	RetriedAt  string            `json:"RetriedAt,omitempty"`
-	RetryCount int               `json:"RetryCount,omitempty"`
-	DoneCount  int               `json:"DoneCount,omitempty"`
-	Error      string            `json:"Error,omitempty"`
-	StatusText string            `json:"StatusText"`
+	Step       core.Step       `json:"Step"`
+	Log        string          `json:"Log"`
+	StartedAt  string          `json:"StartedAt"`
+	FinishedAt string          `json:"FinishedAt"`
+	Status     core.NodeStatus `json:"Status"`
+	RetriedAt  string          `json:"RetriedAt,omitempty"`
+	RetryCount int             `json:"RetryCount,omitempty"`
+	DoneCount  int             `json:"DoneCount,omitempty"`
+	Error      string          `json:"Error,omitempty"`
+	StatusText string          `json:"StatusText"`
 }
 
-func (n *Node) ToNode() *scheduler.Node {
+func (n *Node) ToNode() *runtime.Node {
 	startedAt, _ := stringutil.ParseTime(n.StartedAt)
 	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
 	retriedAt, _ := stringutil.ParseTime(n.RetriedAt)
-	return scheduler.NewNode(n.Step, scheduler.NodeState{
+	return runtime.NewNode(n.Step, runtime.NodeState{
 		Status:     n.Status,
 		Stdout:     n.Log,
 		StartedAt:  startedAt,
@@ -70,13 +69,13 @@ func (n *Node) ToNode() *scheduler.Node {
 	})
 }
 
-func NewNode(step digraph.Step) *Node {
+func NewNode(step core.Step) *Node {
 	return &Node{
 		Step:       step,
 		StartedAt:  "-",
 		FinishedAt: "-",
-		Status:     status.NodeNone,
-		StatusText: status.NodeNone.String(),
+		Status:     core.NodeNotStarted,
+		StatusText: core.NodeNotStarted.String(),
 	}
 }
 

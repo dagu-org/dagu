@@ -1,7 +1,7 @@
 # frontend assets
-internal/frontend/assets/fonts/*
-internal/frontend/assets/*
-!internal/frontend/assets/.gitkeep
+internal/service/frontend/assets/fonts/*
+internal/service/frontend/assets/*
+!internal/service/frontend/assets/.gitkeep
 
 # NVM
 .nvmrc
@@ -35,5 +35,6 @@ __debug_bin*
 # Profile files
 *.prof
 
-# Doc build files
-docs/build
+# Go cache
+.gocache
+.gomodcache

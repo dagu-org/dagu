@@ -11,3 +11,4 @@ export { default as DAGPagination } from './DAGPagination';
 export { default as LinkTab } from './LinkTab';
 export { default as LiveSwitch } from './LiveSwitch';
 export { default as NodeStatusChip } from './NodeStatusChip';
+export { StatusDot } from './StatusDot';

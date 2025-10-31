@@ -25,15 +25,15 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
 
-  // Check for child DAG-run ID in URL search params
+  // Check for sub DAG-run ID in URL search params
   const searchParams = new URLSearchParams(window.location.search);
-  const childDAGRunId = searchParams.get('childDAGRunId');
+  const subDAGRunId = searchParams.get('subDAGRunId');
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
 
-  // Determine the API endpoint based on whether this is a child DAG-run
-  const endpoint = childDAGRunId
-    ? '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}'
+  // Determine the API endpoint based on whether this is a sub DAG-run
+  const endpoint = subDAGRunId
+    ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}'
     : '/dag-runs/{name}/{dagRunId}';
 
   // Fetch DAG-run details
@@ -44,11 +44,11 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
-        path: childDAGRunId
+        path: subDAGRunId
           ? {
               name: parentName || '',
               dagRunId: parentDAGRunId || '',
-              childDAGRunId: childDAGRunId,
+              subDAGRunId: subDAGRunId,
             }
           : {
               name: name || '',

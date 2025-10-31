@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -65,7 +65,7 @@ func TestDataRootRuns(t *testing.T) {
 	t.Parallel()
 
 	t.Run("FindByDAGRunID", func(t *testing.T) {
-		ts := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
+		ts := execution.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
 		ctx := context.Background()
 
 		dr := setupTestDataRoot(t)
@@ -81,9 +81,9 @@ func TestDataRootRuns(t *testing.T) {
 	t.Run("Latest", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 
-		ts1 := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
-		ts2 := models.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
-		ts3 := models.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
+		ts1 := execution.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
+		ts2 := execution.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
+		ts3 := execution.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
 
 		_ = root.CreateTestDAGRun(t, "test-id1", ts1)
 		_ = root.CreateTestDAGRun(t, "test-id2", ts2)
@@ -98,17 +98,17 @@ func TestDataRootRuns(t *testing.T) {
 	t.Run("LatestAfter", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 
-		ts1 := models.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
-		ts2 := models.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
-		ts3 := models.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
-		ts4 := models.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 1, time.UTC))
+		ts1 := execution.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
+		ts2 := execution.NewUTC(time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC))
+		ts3 := execution.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC))
+		ts4 := execution.NewUTC(time.Date(2021, 1, 3, 0, 0, 0, 1, time.UTC))
 
 		_ = root.CreateTestDAGRun(t, "test-id1", ts1)
 		_ = root.CreateTestDAGRun(t, "test-id2", ts2)
 		latest := root.CreateTestDAGRun(t, "test-id3", ts3)
 
 		_, err := root.LatestAfter(context.Background(), ts4)
-		require.ErrorIs(t, err, models.ErrNoStatusData, "LatestAfter should return ErrNoStatusData when no runs are found")
+		require.ErrorIs(t, err, execution.ErrNoStatusData, "LatestAfter should return ErrNoStatusData when no runs are found")
 
 		run, err := root.LatestAfter(context.Background(), ts3)
 		require.NoError(t, err)
@@ -121,14 +121,14 @@ func TestDataRootRuns(t *testing.T) {
 
 		for date := 1; date <= 31; date++ {
 			for hour := 0; hour < 24; hour++ {
-				ts := models.NewUTC(time.Date(2021, 1, date, hour, 0, 0, 0, time.UTC))
+				ts := execution.NewUTC(time.Date(2021, 1, date, hour, 0, 0, 0, time.UTC))
 				_ = root.CreateTestDAGRun(t, fmt.Sprintf("test-id-%d-%d", date, hour), ts)
 			}
 		}
 
 		// list between 2021-01-01 05:00 and 2021-01-02 02:00
-		start := models.NewUTC(time.Date(2021, 1, 1, 5, 0, 0, 0, time.UTC))
-		end := models.NewUTC(time.Date(2021, 1, 2, 2, 0, 0, 0, time.UTC))
+		start := execution.NewUTC(time.Date(2021, 1, 1, 5, 0, 0, 0, time.UTC))
+		end := execution.NewUTC(time.Date(2021, 1, 2, 2, 0, 0, 0, time.UTC))
 
 		result := root.listDAGRunsInRange(context.Background(), start, end, &listDAGRunsInRangeOpts{})
 		require.Len(t, result, 21, "ListInRange should return the correct")
@@ -151,18 +151,18 @@ func TestDataRootRemoveOld(t *testing.T) {
 		ts2 := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
 
 		// Create dag-runs with old timestamps
-		dagRun1 := root.CreateTestDAGRun(t, "dag-run-1", models.NewUTC(ts1))
-		dagRun2 := root.CreateTestDAGRun(t, "dag-run-2", models.NewUTC(ts2))
+		dagRun1 := root.CreateTestDAGRun(t, "dag-run-1", execution.NewUTC(ts1))
+		dagRun2 := root.CreateTestDAGRun(t, "dag-run-2", execution.NewUTC(ts2))
 
 		// Create actual attempts with status data using old timestamps
 		createAttemptWithStatus := func(dagRunTest DAGRunTest, ts time.Time) *Attempt {
-			attempt, err := dagRunTest.CreateAttempt(root.Context, models.NewUTC(ts), nil)
+			attempt, err := dagRunTest.CreateAttempt(root.Context, execution.NewUTC(ts), nil)
 			require.NoError(t, err)
 			require.NoError(t, attempt.Open(root.Context))
-			status := models.DAGRunStatus{
+			status := execution.DAGRunStatus{
 				Name:     "test-dag",
 				DAGRunID: dagRunTest.dagRunID,
-				Status:   status.Success,
+				Status:   core.Succeeded,
 			}
 			require.NoError(t, attempt.Write(root.Context, status))
 			require.NoError(t, attempt.Close(root.Context))
@@ -197,18 +197,18 @@ func TestDataRootRemoveOld(t *testing.T) {
 		oldTime := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 		recentTime := time.Now().AddDate(0, 0, -1) // 1 day ago
 
-		dagRun1 := root.CreateTestDAGRun(t, "old-dag-run", models.NewUTC(oldTime))
-		dagRun2 := root.CreateTestDAGRun(t, "recent-dag-run", models.NewUTC(recentTime))
+		dagRun1 := root.CreateTestDAGRun(t, "old-dag-run", execution.NewUTC(oldTime))
+		dagRun2 := root.CreateTestDAGRun(t, "recent-dag-run", execution.NewUTC(recentTime))
 
 		// Create actual attempts with status data
 		createAttemptWithStatus := func(dagRunTest DAGRunTest, ts time.Time) *Attempt {
-			attempt, err := dagRunTest.CreateAttempt(root.Context, models.NewUTC(ts), nil)
+			attempt, err := dagRunTest.CreateAttempt(root.Context, execution.NewUTC(ts), nil)
 			require.NoError(t, err)
 			require.NoError(t, attempt.Open(root.Context))
-			status := models.DAGRunStatus{
+			status := execution.DAGRunStatus{
 				Name:     "test-dag",
 				DAGRunID: dagRunTest.dagRunID,
-				Status:   status.Success,
+				Status:   core.Succeeded,
 			}
 			require.NoError(t, attempt.Write(root.Context, status))
 			require.NoError(t, attempt.Close(root.Context))
@@ -243,18 +243,18 @@ func TestDataRootRemoveOld(t *testing.T) {
 		date1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		date2 := time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)
 
-		dagRun1 := root.CreateTestDAGRun(t, "dag-run-1", models.NewUTC(date1))
-		dagRun2 := root.CreateTestDAGRun(t, "dag-run-2", models.NewUTC(date2))
+		dagRun1 := root.CreateTestDAGRun(t, "dag-run-1", execution.NewUTC(date1))
+		dagRun2 := root.CreateTestDAGRun(t, "dag-run-2", execution.NewUTC(date2))
 
 		// Create actual attempts with status data
 		createAttemptWithStatus := func(dagRunTest DAGRunTest, ts time.Time) *Attempt {
-			attempt, err := dagRunTest.CreateAttempt(root.Context, models.NewUTC(ts), nil)
+			attempt, err := dagRunTest.CreateAttempt(root.Context, execution.NewUTC(ts), nil)
 			require.NoError(t, err)
 			require.NoError(t, attempt.Open(root.Context))
-			status := models.DAGRunStatus{
+			status := execution.DAGRunStatus{
 				Name:     "test-dag",
 				DAGRunID: dagRunTest.dagRunID,
-				Status:   status.Success,
+				Status:   core.Succeeded,
 			}
 			require.NoError(t, attempt.Write(root.Context, status))
 			require.NoError(t, attempt.Close(root.Context))
@@ -291,7 +291,7 @@ func TestDataRootRename(t *testing.T) {
 	root := setupTestDataRoot(t)
 
 	for date := 1; date <= 3; date++ {
-		ts := models.NewUTC(time.Date(2021, 1, date, 0, 0, 0, 0, time.UTC))
+		ts := execution.NewUTC(time.Date(2021, 1, date, 0, 0, 0, 0, time.UTC))
 		_ = root.CreateTestDAGRun(t, fmt.Sprintf("test-id-%d", date), ts)
 	}
 
@@ -330,7 +330,7 @@ func TestDataRootUtils(t *testing.T) {
 	assert.True(t, isEmpty, "IsEmpty should return true for empty directory")
 
 	// Add a file to the directory
-	root.CreateTestDAGRun(t, "test-id", models.NewUTC(time.Now()))
+	root.CreateTestDAGRun(t, "test-id", execution.NewUTC(time.Now()))
 	require.NoError(t, err)
 
 	// IsEmpty should return false for non-empty directory
@@ -363,7 +363,7 @@ type DataRootTest struct {
 
 // CreateTestDAGRun creates a test dag-run with the specified ID and timestamp.
 // It ensures the DataRoot directory exists before creating the dag-run.
-func (drt *DataRootTest) CreateTestDAGRun(t *testing.T, dagRunID string, ts models.TimeInUTC) DAGRunTest {
+func (drt *DataRootTest) CreateTestDAGRun(t *testing.T, dagRunID string, ts execution.TimeInUTC) DAGRunTest {
 	t.Helper()
 
 	err := drt.Create()

@@ -1,3 +1,0 @@
-port: 54322
-headless: true
-dags: /tmp/dagu_test

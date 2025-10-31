@@ -49,7 +49,7 @@ steps:
 - Use existing programs, scripts, and container images without any modification
 - Schedule workflows with cron expressions
 - Run in HA mode and distribute tasks to workers through built-in queue system.
-- Modularize workflows by nesting them.
+- Modularize workflows by nesting them with sub DAGs (and inspect each sub-run in the UI).
 
 ### CLI Preview
 ![Demo CLI](./assets/images/demo-cli.webp)
@@ -115,7 +115,7 @@ brew update && brew upgrade dagu
 **npm**:
 ```bash
 # Install via npm
-npm install -g --ignore-scripts=false dagu
+npm install -g --ignore-scripts=false @dagu-org/dagu
 ```
 
 ### 2. Create your first workflow
@@ -162,25 +162,27 @@ cd dagu
 Run with minimal setup:
 
 ```bash
-docker compose -f compose.minimal.yaml up -d
+docker compose -f deploy/docker/compose.minimal.yaml up -d
 # Visit http://localhost:8080
 ```
 
 Stop containers:
 
 ```bash
-docker compose -f compose.minimal.yaml down
+docker compose -f deploy/docker/compose.minimal.yaml down
 ```
 
-You can also use the production-like configuration `compose.prod.yaml` with OpenTelemetry, Prometheus, and Grafana:
+You can also use the production-like configuration `deploy/docker/compose.prod.yaml` with OpenTelemetry, Prometheus, and Grafana:
 
 ```bash
-docker compose -f compose.prod.yaml up -d
+docker compose -f deploy/docker/compose.prod.yaml up -d
 # Visit UI at http://localhost:8080
 # Jaeger at http://localhost:16686, Prometheus at http://localhost:9090, Grafana at http://localhost:3000
 ```
 
 Note: It's just for demonstration purposes. For production, please customize the configuration as needed.
+
+Looking for Kubernetes? See the example manifests in `deploy/k8s/README.md`.
 
 ## Documentation
 
@@ -278,7 +280,8 @@ This configuration is used for worker instances that execute DAGs. See the [Dist
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
-| `DAGU_COORDINATOR_HOST` | `127.0.0.1` | Coordinator gRPC server host |
+| `DAGU_COORDINATOR_HOST` | `127.0.0.1` | Coordinator gRPC server bind address |
+| `DAGU_COORDINATOR_ADVERTISE` | (auto) | Address to advertise in service registry (default: hostname) |
 | `DAGU_COORDINATOR_PORT` | `50055` | Coordinator gRPC server port |
 | `DAGU_WORKER_ID` | - | Worker instance ID |
 | `DAGU_WORKER_MAX_ACTIVE_RUNS` | `100` | Maximum concurrent runs per worker |
@@ -327,6 +330,23 @@ pnpm dev
 
 Navigate to http://localhost:8081 to view the frontend.
 
+### Running Tests
+
+To ensure the integrity of the go code, you can run all Go unit and integration tests.
+
+Run all tests from the project root directory:
+
+```bash
+make test
+```
+
+To run tests with code coverage analysis:
+
+```bash
+make make-coverage
+```
+
+
 ## Roadmap
 
 **Legend:** 
@@ -339,7 +359,7 @@ Navigate to http://localhost:8081 to view the frontend.
 |                             | Queue based execution           | Dispatch DAG execution to workers with labels and priorities            | ✅     |          | <a href="https://docs.dagu.cloud/features/queues">Queues</a> |
 |                             | Immediate execution             | Disable queue for immediate execution                                    | ✅     |          | <a href="https://docs.dagu.cloud/overview/cli">CLI</a> |
 |                             | Idempotency                     | Prevent duplicate DAG execution with same DAG-run ID                | ✅     |          |  <a href="https://docs.dagu.cloud/reference/cli#status">`start` command</a> |
-|                             | Status management               | queued → running → success/partial_success/failed/cancelled              | ✅     |          | <a href="http://localhost:5173/getting-started/concepts#status-management">Status Management</a> |
+|                             | Status management               | queued → running → succeeded/partially_succeeded/failed/canceled              | ✅     |          | <a href="http://localhost:5173/getting-started/concepts#status-management">Status Management</a> |
 |                             | Cancel propagation              | Cancel signals to sub-DAG                      | ✅     |          | |
 |                             | Cleanup hooks                   | Define cleanup processing with onExit handlers                           | ✅     |          | <a href="https://docs.dagu.cloud/getting-started/concepts#lifecycle-handlers">Lifecycle Handlers</a> |
 |                             | Status hooks                    | Define hooks on success / failure / cancel                         | ✅     |          |  <a href="https://docs.dagu.cloud/getting-started/concepts#lifecycle-handlers">Lifecycle Handlers</a> |

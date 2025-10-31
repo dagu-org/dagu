@@ -1,7 +1,8 @@
 package cmd
 
 import (
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -14,6 +15,12 @@ var (
 		shorthand: "c",
 		usage:     "Path to the configuration file (default: $HOME/.config/dagu/config.yaml)",
 		bindViper: true,
+	}
+
+	// Override DAGU_HOME for this command invocation.
+	daguHomeFlag = commandLineFlag{
+		name:  "dagu-home",
+		usage: "Override DAGU_HOME for this command",
 	}
 
 	// Directory where DAG definition files are stored.
@@ -51,6 +58,14 @@ var (
 		name:      "params",
 		shorthand: "p",
 		usage:     "Parameters to pass to the dag-run (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
+	}
+
+	// nameFlag is used to override the DAG name from the CLI.
+	// If not provided, the DAG name will be determined from the DAG definition or filename.
+	nameFlag = commandLineFlag{
+		name:      "name",
+		shorthand: "N",
+		usage:     "Override the DAG name (default: name from DAG definition or filename)",
 	}
 
 	// noQueueFlag is used to indicate that the dag-run should not be queued and should be executed immediately.
@@ -131,16 +146,16 @@ var (
 		usage:     "Override the DAG-level queue definition",
 	}
 
-	// rootDAGRunFlag reads the root DAG name for starting a child dag-run.
+	// rootDAGRunFlag reads the root DAG name for starting a sub dag-run.
 	rootDAGRunFlag = commandLineFlag{
 		name:  "root",
-		usage: "[only for child dag-runs] reference for the root dag-run",
+		usage: "[only for sub dag-runs] reference for the root dag-run",
 	}
 
-	// parentDAGRunFlag reads the parent ref for starting a child dag-run.
+	// parentDAGRunFlag reads the parent ref for starting a sub dag-run.
 	parentDAGRunFlag = commandLineFlag{
 		name:  "parent",
-		usage: "[only for child dag-runs] reference for the parent dag-run",
+		usage: "[only for sub dag-runs] reference for the parent dag-run",
 	}
 
 	// quietFlag is used to suppress output during command execution.
@@ -173,6 +188,15 @@ var (
 		shorthand:    "P",
 		defaultValue: "50055",
 		usage:        "Coordinator gRPC server port (default: 50055)",
+		bindViper:    true,
+	}
+
+	// coordinatorAdvertiseFlag is the address to advertise in the service registry.
+	coordinatorAdvertiseFlag = commandLineFlag{
+		name:         "coordinator.advertise",
+		shorthand:    "A",
+		defaultValue: "",
+		usage:        "Address to advertise in service registry (default: auto-detected hostname)",
 		bindViper:    true,
 	}
 
@@ -247,7 +271,7 @@ type commandLineFlag struct {
 }
 
 func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
-	flags := append([]commandLineFlag{configFlag, quietFlag, cpuProfileFlag}, additionalFlags...)
+	flags := append([]commandLineFlag{configFlag, daguHomeFlag, quietFlag, cpuProfileFlag}, additionalFlags...)
 
 	for _, flag := range flags {
 		if flag.isBool {
@@ -264,9 +288,11 @@ func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 func bindFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 	flags := append([]commandLineFlag{configFlag}, additionalFlags...)
 
-	for _, flag := range flags {
-		if flag.bindViper {
-			_ = viper.BindPFlag(stringutil.KebabToCamel(flag.name), cmd.Flags().Lookup(flag.name))
+	config.WithViperLock(func() {
+		for _, flag := range flags {
+			if flag.bindViper {
+				_ = viper.BindPFlag(stringutil.KebabToCamel(flag.name), cmd.Flags().Lookup(flag.name))
+			}
 		}
-	}
+	})
 }

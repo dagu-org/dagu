@@ -7,12 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
-var _ models.ProcStore = (*Store)(nil)
+var _ execution.ProcStore = (*Store)(nil)
 
 // Store is a struct that implements the ProcStore interface.
 type Store struct {
@@ -55,13 +54,13 @@ func (s *Store) CountAliveByDAGName(ctx context.Context, groupName, dagName stri
 }
 
 // ListAlive implements models.ProcStore.
-func (s *Store) ListAlive(ctx context.Context, groupName string) ([]digraph.DAGRunRef, error) {
+func (s *Store) ListAlive(ctx context.Context, groupName string) ([]execution.DAGRunRef, error) {
 	procGroup := s.newProcGroup(groupName)
 	return procGroup.ListAlive(ctx)
 }
 
 // Acquire implements models.ProcStore.
-func (s *Store) Acquire(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (models.ProcHandle, error) {
+func (s *Store) Acquire(ctx context.Context, groupName string, dagRun execution.DAGRunRef) (execution.ProcHandle, error) {
 	procGroup := s.newProcGroup(groupName)
 	proc, err := procGroup.Acquire(ctx, dagRun)
 	if err != nil {
@@ -74,15 +73,15 @@ func (s *Store) Acquire(ctx context.Context, groupName string, dagRun digraph.DA
 }
 
 // IsRunAlive implements models.ProcStore.
-func (s *Store) IsRunAlive(ctx context.Context, groupName string, dagRun digraph.DAGRunRef) (bool, error) {
+func (s *Store) IsRunAlive(ctx context.Context, groupName string, dagRun execution.DAGRunRef) (bool, error) {
 	procGroup := s.newProcGroup(groupName)
 	return procGroup.IsRunAlive(ctx, dagRun)
 }
 
 // ListAllAlive implements models.ProcStore.
 // Returns all running DAG runs across all process groups.
-func (s *Store) ListAllAlive(ctx context.Context) (map[string][]digraph.DAGRunRef, error) {
-	result := make(map[string][]digraph.DAGRunRef)
+func (s *Store) ListAllAlive(ctx context.Context) (map[string][]execution.DAGRunRef, error) {
+	result := make(map[string][]execution.DAGRunRef)
 
 	// Create base directory if it doesn't exist
 	if _, err := os.Stat(s.baseDir); os.IsNotExist(err) {

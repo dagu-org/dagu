@@ -12,9 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
 // Errors for the queue file
@@ -54,18 +53,18 @@ func NewQueueFile(baseDir, prefix string) *QueueFile {
 
 // ItemData represents the data stored in the queue file
 type ItemData struct {
-	FileName string            `json:"fileName"`
-	DAGRun   digraph.DAGRunRef `json:"dagRun"`
-	QueuedAt time.Time         `json:"queuedAt"`
+	FileName string              `json:"fileName"`
+	DAGRun   execution.DAGRunRef `json:"dagRun"`
+	QueuedAt time.Time           `json:"queuedAt"`
 }
 
 // Push adds a job to the queue
 // Since it's a prototype, it just create a json file with the job ID and dag-run reference
-func (q *QueueFile) Push(_ context.Context, dagRun digraph.DAGRunRef) error {
+func (q *QueueFile) Push(_ context.Context, dagRun execution.DAGRunRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	timestamp := models.NewUTC(time.Now())
+	timestamp := execution.NewUTC(time.Now())
 
 	// Create the queue file name
 	fileName := queueFileName(q.prefix, dagRun.ID, timestamp)
@@ -305,7 +304,7 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 	// Create the ItemData struct
 	item := ItemData{
 		FileName: fileName,
-		DAGRun: digraph.DAGRunRef{
+		DAGRun: execution.DAGRunRef{
 			Name: filepath.Base(filepath.Dir(path)),
 			ID:   matches[4],
 		},
@@ -318,7 +317,7 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 // parseRegex is the regex used to parse the queue file name
 var parseRegex = regexp.MustCompile(`^item_(high|low)_(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`)
 
-func queueFileName(priority, dagRunID string, t models.TimeInUTC) string {
+func queueFileName(priority, dagRunID string, t execution.TimeInUTC) string {
 	mill := t.UnixMilli()
 	timestamp := t.Format(dateTimeFormatUTC) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"
 	return itemPrefix + priority + timestamp + "_" + dagRunID + ".json"

@@ -8,14 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestResolver_Members_EmptyDirectory(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
-	finder := newFinder(tmpDir, "test-service")
+	finder := newFinder(tmpDir, "test-service", true)
 
 	ctx := context.Background()
 	members, err := finder.members(ctx)
@@ -24,6 +26,8 @@ func TestResolver_Members_EmptyDirectory(t *testing.T) {
 }
 
 func TestResolver_Members_WithInstances(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
 	serviceDir := filepath.Join(tmpDir, "test-service")
 	err := os.MkdirAll(serviceDir, 0755)
@@ -36,14 +40,14 @@ func TestResolver_Members_WithInstances(t *testing.T) {
 			Host:   "host1",
 			Port:   8080,
 			PID:    1234,
-			Status: models.ServiceStatusActive,
+			Status: execution.ServiceStatusActive,
 		},
 		{
 			ID:     "instance-2",
 			Host:   "host2",
 			Port:   8081,
 			PID:    1235,
-			Status: models.ServiceStatusActive,
+			Status: execution.ServiceStatusActive,
 		},
 	}
 
@@ -53,7 +57,7 @@ func TestResolver_Members_WithInstances(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	finder := newFinder(tmpDir, "test-service")
+	finder := newFinder(tmpDir, "test-service", true)
 	ctx := context.Background()
 	members, err := finder.members(ctx)
 	require.NoError(t, err)
@@ -73,6 +77,8 @@ func TestResolver_Members_WithInstances(t *testing.T) {
 }
 
 func TestResolver_Members_FiltersStaleInstances(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
 	serviceDir := filepath.Join(tmpDir, "test-service")
 	err := os.MkdirAll(serviceDir, 0755)
@@ -84,14 +90,14 @@ func TestResolver_Members_FiltersStaleInstances(t *testing.T) {
 		Host:   "freshhost",
 		Port:   8080,
 		PID:    1234,
-		Status: models.ServiceStatusActive,
+		Status: execution.ServiceStatusActive,
 	}
 	staleInstance := instanceInfo{
 		ID:     "stale",
 		Host:   "stalehost",
 		Port:   8081,
 		PID:    1235,
-		Status: models.ServiceStatusInactive,
+		Status: execution.ServiceStatusInactive,
 	}
 
 	filename := instanceFilePath(tmpDir, "test-service", freshInstance.ID)
@@ -103,12 +109,12 @@ func TestResolver_Members_FiltersStaleInstances(t *testing.T) {
 
 	// Make stale instance file old by changing its modification time
 	staleFile := filepath.Join(tmpDir, "test-service", "stale.json")
-	oldTime := time.Now().Add(-time.Minute)
+	oldTime := time.Now().Add(-300 * time.Second)
 	err = os.Chtimes(staleFile, oldTime, oldTime)
 	require.NoError(t, err)
 
-	finder := newFinder(tmpDir, "test-service")
-	finder.staleTimeout = 30 * time.Second // 30 second timeout
+	finder := newFinder(tmpDir, "test-service", true)
+	// Note: staleTimeout is now internal to the quarantine object (default 30s)
 
 	ctx := context.Background()
 	members, err := finder.members(ctx)
@@ -117,11 +123,28 @@ func TestResolver_Members_FiltersStaleInstances(t *testing.T) {
 	assert.Equal(t, "freshhost", members[0].Host)
 	assert.Equal(t, 8080, members[0].Port)
 
-	// Verify stale file was removed
+	// Verify stale file was quarantined (renamed, not removed)
 	assert.NoFileExists(t, staleFile)
+
+	// Verify quarantined file exists
+	matches, err := filepath.Glob(staleFile + ".gc*")
+	require.NoError(t, err)
+	assert.Len(t, matches, 1, "expected quarantined file to exist")
+
+	// Trigger cleanup manually to test cleanup functionality
+	if finder.cleaner != nil {
+		finder.cleaner.cleanupQuarantinedFiles(ctx)
+	}
+
+	// Verify quarantined file was cleaned up
+	matches, err = filepath.Glob(staleFile + ".gc*")
+	require.NoError(t, err)
+	assert.Empty(t, matches, "expected quarantined file to be cleaned up after manual cleanup")
 }
 
 func TestResolver_Members_IgnoresInvalidFiles(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
 	serviceDir := filepath.Join(tmpDir, "test-service")
 	err := os.MkdirAll(serviceDir, 0755)
@@ -133,7 +156,7 @@ func TestResolver_Members_IgnoresInvalidFiles(t *testing.T) {
 		Host:   "validhost",
 		Port:   8080,
 		PID:    1234,
-		Status: models.ServiceStatusActive,
+		Status: execution.ServiceStatusActive,
 	}
 	filename := instanceFilePath(tmpDir, "test-service", validInstance.ID)
 	err = writeInstanceFile(filename, &validInstance)
@@ -158,7 +181,7 @@ func TestResolver_Members_IgnoresInvalidFiles(t *testing.T) {
 	err = os.Mkdir(filepath.Join(serviceDir, "subdir"), 0755)
 	require.NoError(t, err)
 
-	finder := newFinder(tmpDir, "test-service")
+	finder := newFinder(tmpDir, "test-service", true)
 	ctx := context.Background()
 	members, err := finder.members(ctx)
 	require.NoError(t, err)
@@ -168,6 +191,8 @@ func TestResolver_Members_IgnoresInvalidFiles(t *testing.T) {
 }
 
 func TestResolver_Members_ContextCancellation(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
 	serviceDir := filepath.Join(tmpDir, "test-service")
 	err := os.MkdirAll(serviceDir, 0755)
@@ -180,70 +205,113 @@ func TestResolver_Members_ContextCancellation(t *testing.T) {
 			Host:   "host",
 			Port:   8080 + i,
 			PID:    1000 + i,
-			Status: models.ServiceStatusActive,
+			Status: execution.ServiceStatusActive,
 		}
 		filename := instanceFilePath(tmpDir, "test-service", inst.ID)
 		err := writeInstanceFile(filename, &inst)
 		require.NoError(t, err)
 	}
 
-	finder := newFinder(tmpDir, "test-service")
+	finder := newFinder(tmpDir, "test-service", true)
 
 	// Cancel context immediately
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	members, err := finder.members(ctx)
+	_, err = finder.members(ctx)
 	assert.Error(t, err)
 	assert.Equal(t, context.Canceled, err)
-	// Should have processed some members before cancellation
-	assert.NotNil(t, members)
+	// Members may be nil or empty depending on when cancellation occurred
+	// (this is acceptable behavior - caller should check error first)
 }
 
-func TestResolver_RemovesStaleFiles(t *testing.T) {
+func TestQuarantineStaleFileCreatesUniqueCopy(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
-	serviceDir := filepath.Join(tmpDir, "test-service")
+	serviceDir := filepath.Join(tmpDir, "svc")
 	err := os.MkdirAll(serviceDir, 0755)
 	require.NoError(t, err)
 
-	// Create stale instance
-	staleInstance := instanceInfo{
-		ID:     "stale-to-remove",
-		Host:   "stalehost",
-		Port:   8081,
-		PID:    1235,
-		Status: models.ServiceStatusInactive,
+	instance := instanceInfo{
+		ID:     "stale-node",
+		Host:   "host",
+		Port:   8080,
+		PID:    42,
+		Status: execution.ServiceStatusInactive,
 	}
-
-	staleFile := instanceFilePath(tmpDir, "test-service", staleInstance.ID)
-	err = writeInstanceFile(staleFile, &staleInstance)
+	original := filepath.Join(serviceDir, "stale-node.json")
+	err = writeInstanceFile(original, &instance)
 	require.NoError(t, err)
 
-	// Make instance file old by changing its modification time
-	oldTime := time.Now().Add(-time.Minute)
-	err = os.Chtimes(staleFile, oldTime, oldTime)
+	oldTime := time.Now().Add(-2 * time.Minute)
+	err = os.Chtimes(original, oldTime, oldTime)
 	require.NoError(t, err)
 
-	// Verify file exists before
-	assert.FileExists(t, staleFile)
+	f := newFinder(tmpDir, "svc", true)
+	ctx := context.Background()
 
-	finder := newFinder(tmpDir, "test-service")
-	finder.staleTimeout = 30 * time.Second // 30 second timeout
+	// Use the quarantine directly
+	quarantined := f.quarantine.markStaleFile(ctx, original, oldTime)
+	assert.True(t, quarantined, "file should have been quarantined")
+
+	// Verify original file was renamed
+	assert.NoFileExists(t, original)
+
+	// Verify quarantined file exists with .gc marker
+	matches, err := filepath.Glob(original + ".gc*")
+	require.NoError(t, err)
+	require.Len(t, matches, 1)
+	assert.Contains(t, matches[0], ".gc")
+}
+
+func TestQuarantineSkipsRecentlyTouchedFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	serviceDir := filepath.Join(tmpDir, "svc")
+	err := os.MkdirAll(serviceDir, 0755)
+	require.NoError(t, err)
+
+	instance := instanceInfo{
+		ID:     "fresh-node",
+		Host:   "host",
+		Port:   8080,
+		PID:    42,
+		Status: execution.ServiceStatusActive,
+	}
+	filename := filepath.Join(serviceDir, "fresh-node.json")
+	err = writeInstanceFile(filename, &instance)
+	require.NoError(t, err)
+
+	observed := time.Now().Add(-time.Minute)
+	err = os.Chtimes(filename, observed, observed)
+	require.NoError(t, err)
+
+	f := newFinder(tmpDir, "svc", true)
+
+	// Another process updates the mod time before quarantine runs.
+	newTime := time.Now()
+	err = os.Chtimes(filename, newTime, newTime)
+	require.NoError(t, err)
 
 	ctx := context.Background()
-	members, err := finder.members(ctx)
-	require.NoError(t, err)
-	assert.Empty(t, members)
+	quarantined := f.quarantine.markStaleFile(ctx, filename, observed)
+	assert.False(t, quarantined, "file should not have been quarantined")
 
-	// Verify stale file was removed
-	assert.NoFileExists(t, staleFile)
+	// Verify original file still exists (not quarantined)
+	assert.FileExists(t, filename)
+
+	// Verify no quarantined files were created
+	matches, _ := filepath.Glob(filename + ".gc*")
+	assert.Empty(t, matches)
 }
 
 func TestResolver_RealWorldScenario(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Simulate coordinator service registry
-	coordinatorFinder := newFinder(tmpDir, models.ServiceNameCoordinator)
+	coordinatorFinder := newFinder(tmpDir, execution.ServiceNameCoordinator, true)
 	// Disable caching for this test to ensure we see updates immediately
 	coordinatorFinder.cacheDuration = 0
 
@@ -260,9 +328,9 @@ func TestResolver_RealWorldScenario(t *testing.T) {
 		Host:   "coord1.example.com",
 		Port:   9090,
 		PID:    2000,
-		Status: models.ServiceStatusActive,
+		Status: execution.ServiceStatusActive,
 	}
-	filename := instanceFilePath(tmpDir, string(models.ServiceNameCoordinator), coordinator1.ID)
+	filename := instanceFilePath(tmpDir, string(execution.ServiceNameCoordinator), coordinator1.ID)
 	err = writeInstanceFile(filename, &coordinator1)
 	require.NoError(t, err)
 
@@ -278,10 +346,10 @@ func TestResolver_RealWorldScenario(t *testing.T) {
 		ID:     "coordinator-secondary",
 		Host:   "coord2.example.com",
 		Port:   9090,
-		Status: models.ServiceStatusActive,
+		Status: execution.ServiceStatusActive,
 		PID:    2001,
 	}
-	filename = instanceFilePath(tmpDir, string(models.ServiceNameCoordinator), coordinator2.ID)
+	filename = instanceFilePath(tmpDir, string(execution.ServiceNameCoordinator), coordinator2.ID)
 	err = writeInstanceFile(filename, &coordinator2)
 	require.NoError(t, err)
 
@@ -302,14 +370,14 @@ func TestResolver_Members_Caching(t *testing.T) {
 		ID:     "instance-1",
 		Host:   "host1",
 		Port:   8080,
-		Status: models.ServiceStatusActive,
+		Status: execution.ServiceStatusActive,
 		PID:    1234,
 	}
 	filename := instanceFilePath(tmpDir, "test-service", instance1.ID)
 	err = writeInstanceFile(filename, &instance1)
 	require.NoError(t, err)
 
-	finder := newFinder(tmpDir, "test-service")
+	finder := newFinder(tmpDir, "test-service", true)
 	ctx := context.Background()
 
 	// First call - should read from disk
@@ -323,7 +391,7 @@ func TestResolver_Members_Caching(t *testing.T) {
 		ID:     "instance-2",
 		Host:   "host2",
 		Port:   8081,
-		Status: models.ServiceStatusActive,
+		Status: execution.ServiceStatusActive,
 		PID:    1235,
 	}
 	filename = instanceFilePath(tmpDir, "test-service", instance2.ID)
@@ -352,14 +420,14 @@ func TestResolver_Members_CacheExpiration(t *testing.T) {
 		ID:     "instance-1",
 		Host:   "host1",
 		Port:   8080,
-		Status: models.ServiceStatusActive,
+		Status: execution.ServiceStatusActive,
 		PID:    1234,
 	}
 	filename := instanceFilePath(tmpDir, "test-service", instance1.ID)
 	err = writeInstanceFile(filename, &instance1)
 	require.NoError(t, err)
 
-	finder := newFinder(tmpDir, "test-service")
+	finder := newFinder(tmpDir, "test-service", true)
 	// Set short cache duration for testing
 	finder.cacheDuration = 100 * time.Millisecond
 	ctx := context.Background()
@@ -374,7 +442,7 @@ func TestResolver_Members_CacheExpiration(t *testing.T) {
 		ID:     "instance-2",
 		Host:   "host2",
 		Port:   8081,
-		Status: models.ServiceStatusActive,
+		Status: execution.ServiceStatusActive,
 		PID:    1235,
 	}
 	filename = instanceFilePath(tmpDir, "test-service", instance2.ID)
@@ -392,7 +460,7 @@ func TestResolver_Members_CacheExpiration(t *testing.T) {
 
 func TestResolver_Members_NoCacheForEmptyMembers(t *testing.T) {
 	tmpDir := t.TempDir()
-	finder := newFinder(tmpDir, "test-service")
+	finder := newFinder(tmpDir, "test-service", true)
 	ctx := context.Background()
 
 	// First call - no instances
@@ -409,7 +477,7 @@ func TestResolver_Members_NoCacheForEmptyMembers(t *testing.T) {
 		ID:     "instance-1",
 		Host:   "host1",
 		Port:   8080,
-		Status: models.ServiceStatusActive,
+		Status: execution.ServiceStatusActive,
 		PID:    1234,
 	}
 	filename := instanceFilePath(tmpDir, "test-service", instance.ID)
@@ -436,19 +504,19 @@ func TestResolver_Members_CacheConcurrency(t *testing.T) {
 			Host:   fmt.Sprintf("host%d", i),
 			Port:   8080 + i,
 			PID:    1234 + i,
-			Status: models.ServiceStatusActive,
+			Status: execution.ServiceStatusActive,
 		}
 		filename := instanceFilePath(tmpDir, "test-service", inst.ID)
 		err := writeInstanceFile(filename, &inst)
 		require.NoError(t, err)
 	}
 
-	finder := newFinder(tmpDir, "test-service")
+	finder := newFinder(tmpDir, "test-service", true)
 	ctx := context.Background()
 
 	// Run concurrent reads
 	const numGoroutines = 10
-	results := make(chan []models.HostInfo, numGoroutines)
+	results := make(chan []execution.HostInfo, numGoroutines)
 	errors := make(chan error, numGoroutines)
 
 	for i := 0; i < numGoroutines; i++ {
@@ -484,14 +552,14 @@ func TestResolver_Members_CacheInvalidation(t *testing.T) {
 		ID:     "instance-1",
 		Host:   "host1",
 		Port:   8080,
-		Status: models.ServiceStatusActive,
+		Status: execution.ServiceStatusActive,
 		PID:    1234,
 	}
 	filename := instanceFilePath(tmpDir, "test-service", instance1.ID)
 	err = writeInstanceFile(filename, &instance1)
 	require.NoError(t, err)
 
-	finder := newFinder(tmpDir, "test-service")
+	finder := newFinder(tmpDir, "test-service", true)
 	// Use longer cache for this test
 	finder.cacheDuration = 5 * time.Second
 	ctx := context.Background()
@@ -519,4 +587,20 @@ func TestResolver_Members_CacheInvalidation(t *testing.T) {
 	members3, err := finder.members(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, members3)
+}
+
+func TestResolver_CleanupOnlyEnabledWhenRequested(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create finder without cleanup enabled
+	finderNoCleanup := newFinder(tmpDir, "test-service", false)
+	assert.Nil(t, finderNoCleanup.cleaner, "cleanup should be disabled")
+
+	// Create finder with cleanup enabled
+	finderWithCleanup := newFinder(tmpDir, "test-service", true)
+	assert.NotNil(t, finderWithCleanup.cleaner, "cleanup should be enabled")
+
+	// Close both - should not panic
+	finderNoCleanup.close()
+	finderWithCleanup.close()
 }

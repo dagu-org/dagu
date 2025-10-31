@@ -7,10 +7,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
-	"github.com/dagu-org/dagu/internal/persistence/dirlock"
+	"github.com/dagu-org/dagu/internal/common/dirlock"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
 // Errors for the queue
@@ -20,8 +19,8 @@ var (
 )
 
 // priorities is a list of queue priorities
-var priorities = []models.QueuePriority{
-	models.QueuePriorityHigh, models.QueuePriorityLow,
+var priorities = []execution.QueuePriority{
+	execution.QueuePriorityHigh, execution.QueuePriorityLow,
 }
 
 // DualQueue represents a queue for storing dag-runs with two priorities:
@@ -34,7 +33,7 @@ type DualQueue struct {
 	// name is the name of the DAGs that this queue is for
 	name string
 	// queueFiles is a map of queue files, where the key is the priority
-	files map[models.QueuePriority]*QueueFile
+	files map[execution.QueuePriority]*QueueFile
 	// mu is the mutex for synchronizing access to the queue
 	mu sync.Mutex
 }
@@ -50,9 +49,9 @@ func NewDualQueue(baseDir, name string) *DualQueue {
 		DirLock: dirLock,
 		baseDir: baseDir,
 		name:    name,
-		files: map[models.QueuePriority]*QueueFile{
-			models.QueuePriorityHigh: NewQueueFile(baseDir, "high_"),
-			models.QueuePriorityLow:  NewQueueFile(baseDir, "low_"),
+		files: map[execution.QueuePriority]*QueueFile{
+			execution.QueuePriorityHigh: NewQueueFile(baseDir, "high_"),
+			execution.QueuePriorityLow:  NewQueueFile(baseDir, "low_"),
 		},
 	}
 }
@@ -60,7 +59,7 @@ func NewDualQueue(baseDir, name string) *DualQueue {
 // FindByDAGRunID retrieves a dag-run from the queue by its dag-run ID
 // without removing it. It returns the first found item in the queue files.
 // If the item is not found in any of the queue files, it returns ErrQueueItemNotFound.
-func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (models.QueuedItemData, error) {
+func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (execution.QueuedItemData, error) {
 	for _, priority := range priorities {
 		qf := q.files[priority]
 		item, err := qf.FindByDAGRunID(ctx, dagRunID)
@@ -76,11 +75,11 @@ func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (models
 }
 
 // DequeueByDAGRunID retrieves a dag-run from the queue by its dag-run ID
-func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRunID string) ([]models.QueuedItemData, error) {
+func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRunID string) ([]execution.QueuedItemData, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	var items []models.QueuedItemData
+	var items []execution.QueuedItemData
 	for _, priority := range priorities {
 		qf := q.files[priority]
 		popped, err := qf.PopByDAGRunID(ctx, dagRunID)
@@ -102,8 +101,8 @@ func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRunID string) ([]m
 }
 
 // List returns all items in the queue
-func (q *DualQueue) List(ctx context.Context) ([]models.QueuedItemData, error) {
-	var items []models.QueuedItemData
+func (q *DualQueue) List(ctx context.Context) ([]execution.QueuedItemData, error) {
+	var items []execution.QueuedItemData
 	for _, priority := range priorities {
 		qf := q.files[priority]
 		qItems, err := qf.List(ctx)
@@ -132,7 +131,7 @@ func (q *DualQueue) Len(ctx context.Context) (int, error) {
 }
 
 // Enqueue adds a dag-run to the queue with the specified priority
-func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, dagRun digraph.DAGRunRef) error {
+func (q *DualQueue) Enqueue(ctx context.Context, priority execution.QueuePriority, dagRun execution.DAGRunRef) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -149,7 +148,7 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority models.QueuePriority, 
 
 // Dequeue retrieves a dag-run from the queue and removes it.
 // It checks the high-priority queue first, then the low-priority queue
-func (q *DualQueue) Dequeue(ctx context.Context) (models.QueuedItemData, error) {
+func (q *DualQueue) Dequeue(ctx context.Context) (execution.QueuedItemData, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 

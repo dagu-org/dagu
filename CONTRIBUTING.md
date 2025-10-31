@@ -46,18 +46,24 @@ Building binary:
 make bin
 ```
 
-Running tests:
+## Running Tests
+
+To ensure the integrity of the go code, you can run all Go unit and integration tests.
+
+Run all tests from the project root directory:
 
 ```bash
 make lint
 make test
 ```
 
-Running test with coverage:
+To run tests with code coverage analysis:
 
 ```bash
 make test-coverage
 ```
+
+
 
 ## Frontend
 

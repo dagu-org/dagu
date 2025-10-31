@@ -14,7 +14,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -32,8 +32,6 @@ type dockerExecutorTest struct {
 }
 
 func TestDockerExecutor(t *testing.T) {
-	t.Parallel()
-
 	tests := []dockerExecutorTest{
 		{
 			name: "BasicExecution",
@@ -75,12 +73,10 @@ steps:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			th := test.Setup(t)
 			dag := th.DAG(t, tt.dagConfig)
 			dag.Agent().RunSuccess(t)
-			dag.AssertLatestStatus(t, status.Success)
+			dag.AssertLatestStatus(t, core.Succeeded)
 			dag.AssertOutputs(t, tt.expectedOutputs)
 		})
 	}
@@ -94,8 +90,6 @@ type containerTest struct {
 }
 
 func TestDAGLevelContainer(t *testing.T) {
-	t.Parallel()
-
 	tests := []containerTest{
 		{
 			name: "VolumeBindMounts",
@@ -256,7 +250,7 @@ steps:
 			th := test.Setup(t)
 			dag := th.DAG(t, tt.dagConfigFunc(tempDir))
 			dag.Agent().RunSuccess(t)
-			dag.AssertLatestStatus(t, status.Success)
+			dag.AssertLatestStatus(t, core.Succeeded)
 			dag.AssertOutputs(t, tt.expectedOutputs)
 		})
 	}
@@ -290,7 +284,7 @@ steps:
 	// Now test that pull policy "never" works with the pre-existing image
 	dag := th.DAG(t, pullPolicyTestDAG)
 	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 	dag.AssertOutputs(t, map[string]any{
 		"OUT1": "pull policy test",
 	})
@@ -315,7 +309,7 @@ steps:
 
 	dag := th.DAG(t, dagConfig)
 	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 	dag.AssertOutputs(t, map[string]any{
 		"ENTRYPOINT_OK": "entrypoint-ok",
 	})
@@ -338,7 +332,7 @@ steps:
 
 	dag := th.DAG(t, dagConfig)
 	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 	dag.AssertOutputs(t, map[string]any{
 		"COMMAND_OK": "command-ok",
 	})
@@ -370,7 +364,7 @@ steps:
 
 	dag := th.DAG(t, dagConfig)
 	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 	dag.AssertOutputs(t, map[string]any{
 		"EXEC_EXISTING_OUT": "hello-existing",
 	})
@@ -488,48 +482,34 @@ func waitForContainerRunning(ctx context.Context, dockerClient *client.Client, c
 		pollInterval = 100 * time.Millisecond
 	)
 
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	timeoutChan := time.After(timeout)
-
-	for {
-		select {
-		case <-timeoutChan:
-			return fmt.Errorf("timeout waiting for container %s to be running", containerID)
-		case <-ticker.C:
-			inspect, err := dockerClient.ContainerInspect(ctx, containerID)
-			if err != nil {
-				return fmt.Errorf("failed to inspect container %s: %w", containerID, err)
-			}
-			if inspect.State.Running {
-				return nil
-			}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		inspect, err := dockerClient.ContainerInspect(ctx, containerID)
+		if err != nil {
+			return fmt.Errorf("failed to inspect container %s: %w", containerID, err)
 		}
+		if inspect.State.Running {
+			return nil
+		}
+		time.Sleep(pollInterval)
 	}
+	return fmt.Errorf("timeout waiting for container %s to be running", containerID)
 }
 
 func waitForContainerStop(t *testing.T, th test.Helper, dockerClient *client.Client, containerID string, timeout, pollInterval time.Duration) bool {
 	t.Helper()
 
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	timeoutChan := time.After(timeout)
-
-	for {
-		select {
-		case <-timeoutChan:
-			return false
-		case <-ticker.C:
-			inspect, err := dockerClient.ContainerInspect(th.Context, containerID)
-			if err != nil {
-				// Container might have been removed or doesn't exist
-				return true
-			}
-			if !inspect.State.Running {
-				return true
-			}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		inspect, err := dockerClient.ContainerInspect(th.Context, containerID)
+		if err != nil {
+			// Container might have been removed or doesn't exist
+			return true
 		}
+		if !inspect.State.Running {
+			return true
+		}
+		time.Sleep(pollInterval)
 	}
+	return false
 }

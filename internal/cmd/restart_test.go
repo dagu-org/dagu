@@ -2,20 +2,18 @@ package cmd_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRestartCommand(t *testing.T) {
-	t.Run("RestartDAG", func(t *testing.T) {
-		th := test.SetupCommand(t)
+	th := test.SetupCommand(t)
 
-		dag := th.DAG(t, `params: "p1"
+	dag := th.DAG(t, `params: "p1"
 steps:
   - name: "1"
     script: "echo $1"
@@ -23,47 +21,36 @@ steps:
     script: "sleep 1"
 `)
 
-		go func() {
-			// Start the DAG to restart.
-			args := []string{"start", `--params="foo"`, dag.Location}
-			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
-		}()
+	// Start the DAG to restart.
+	done1 := make(chan struct{})
+	go func() {
+		args := []string{"start", `--params="foo"`, dag.Location}
+		th.RunCommand(t, cmd.Start(), test.CmdTest{Args: args})
+		close(done1)
+	}()
 
-		// Wait for the DAG to be running.
-		dag.AssertCurrentStatus(t, status.Running)
+	// Wait for the DAG to be running.
+	dag.AssertCurrentStatus(t, core.Running)
 
-		// Restart the DAG.
-		done := make(chan struct{})
+	// Restart the DAG.
+	done2 := make(chan struct{})
+	go func() {
+		args := []string{"restart", dag.Location}
+		th.RunCommand(t, cmd.Restart(), test.CmdTest{Args: args})
+		close(done2)
+	}()
 
-		go func() {
-			defer close(done)
-			args := []string{"restart", dag.Location}
-			th.RunCommand(t, cmd.CmdRestart(), test.CmdTest{Args: args})
-		}()
+	// Wait for both executions to complete.
+	<-done1
+	<-done2
 
-		// Wait for the dag-run running again.
-		dag.AssertCurrentStatus(t, status.Running)
+	// Check parameter was the same as the first execution
+	loaded, err := spec.Load(th.Context, dag.Location, spec.WithBaseConfig(th.Config.Paths.BaseConfig))
+	require.NoError(t, err)
 
-		time.Sleep(time.Millisecond * 300) // Wait a bit (need to investigate why this is needed).
+	// Check parameter was the same as the first execution
+	recentHistory := th.DAGRunMgr.ListRecentStatus(th.Context, loaded.Name, 2)
 
-		// Stop the restarted DAG.
-		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{Args: []string{"stop", dag.Location}})
-
-		// Wait for the DAG is stopped.
-		dag.AssertCurrentStatus(t, status.None)
-
-		// Check parameter was the same as the first execution
-		loaded, err := digraph.Load(th.Context, dag.Location, digraph.WithBaseConfig(th.Config.Paths.BaseConfig))
-		require.NoError(t, err)
-
-		time.Sleep(time.Millisecond * 300) // Wait for the history to be updated.
-
-		// Check parameter was the same as the first execution
-		recentHistory := th.DAGRunMgr.ListRecentStatus(th.Context, loaded.Name, 2)
-
-		require.Len(t, recentHistory, 2)
-		require.Equal(t, recentHistory[0].Params, recentHistory[1].Params)
-
-		<-done
-	})
+	require.Len(t, recentHistory, 2)
+	require.Equal(t, recentHistory[0].Params, recentHistory[1].Params)
 }

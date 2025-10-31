@@ -11,6 +11,9 @@
   "[go]": {
     "editor.defaultFormatter": "golang.go"
   },
+  "[markdown]": {
+    "editor.formatOnSave": false
+  },
   "files.eol": "\n",
   "files.insertFinalNewline": true,
   "files.associations": {

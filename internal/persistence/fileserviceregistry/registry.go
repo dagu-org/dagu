@@ -8,16 +8,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
 // registrationInfo holds information about a single service registration
 type registrationInfo struct {
 	instanceInfo *instanceInfo
 	fileName     string
-	serviceName  models.ServiceName
+	serviceName  execution.ServiceName
 	cancel       context.CancelFunc
 	wg           sync.WaitGroup
 }
@@ -25,11 +25,11 @@ type registrationInfo struct {
 // registry implements models.ServiceRegistry using file-based service registry
 type registry struct {
 	baseDir string
-	finders map[models.ServiceName]*finder
+	finders map[execution.ServiceName]*finder
 	mu      sync.RWMutex
 
 	// Map of service registrations (can have multiple)
-	registrations     map[models.ServiceName]*registrationInfo
+	registrations     map[execution.ServiceName]*registrationInfo
 	registrationsMu   sync.Mutex
 	heartbeatInterval time.Duration
 }
@@ -38,14 +38,14 @@ type registry struct {
 func New(serviceRegistryDir string) *registry {
 	return &registry{
 		baseDir:           serviceRegistryDir,
-		finders:           make(map[models.ServiceName]*finder),
-		registrations:     make(map[models.ServiceName]*registrationInfo),
+		finders:           make(map[execution.ServiceName]*finder),
+		registrations:     make(map[execution.ServiceName]*registrationInfo),
 		heartbeatInterval: 10 * time.Second, // default
 	}
 }
 
 // Register begins monitoring services and registers this instance
-func (r *registry) Register(ctx context.Context, serviceName models.ServiceName, hostInfo models.HostInfo) error {
+func (r *registry) Register(ctx context.Context, serviceName execution.ServiceName, hostInfo execution.HostInfo) error {
 	r.registrationsMu.Lock()
 	defer r.registrationsMu.Unlock()
 
@@ -100,35 +100,51 @@ func (r *registry) Register(ctx context.Context, serviceName models.ServiceName,
 
 // GetServiceMembers returns the list of active hosts for the given service.
 // This method combines service resolution and member lookup.
-func (r *registry) GetServiceMembers(ctx context.Context, serviceName models.ServiceName) ([]models.HostInfo, error) {
+func (r *registry) GetServiceMembers(ctx context.Context, serviceName execution.ServiceName) ([]execution.HostInfo, error) {
 	finder := r.getFinder(serviceName)
 	return finder.members(ctx)
 }
 
 // getFinder returns the service finder for a specific service (internal method)
-func (r *registry) getFinder(serviceName models.ServiceName) *finder {
+func (r *registry) getFinder(serviceName execution.ServiceName) *finder {
 	r.mu.RLock()
 	f, exists := r.finders[serviceName]
 	r.mu.RUnlock()
 
-	if !exists {
-		r.mu.Lock()
-		// Double-check after acquiring write lock
-		if f, exists = r.finders[serviceName]; !exists {
-			f = newFinder(r.baseDir, serviceName)
-			r.finders[serviceName] = f
-		}
-		r.mu.Unlock()
+	if exists {
+		return f
 	}
 
+	// Create new finder with double-check locking
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Double-check after acquiring write lock
+	if f, exists = r.finders[serviceName]; exists {
+		return f
+	}
+
+	// Only coordinator processes should run cleanup to avoid conflicts
+	enableCleanup := r.isCoordinatorService()
+	f = newFinder(r.baseDir, serviceName, enableCleanup)
+	r.finders[serviceName] = f
+
 	return f
+}
+
+// isCoordinatorService checks if this registry instance runs as coordinator
+func (r *registry) isCoordinatorService() bool {
+	r.registrationsMu.Lock()
+	defer r.registrationsMu.Unlock()
+	_, isCoordinator := r.registrations[execution.ServiceNameCoordinator]
+	return isCoordinator
 }
 
 // Unregister stops all service registrations
 func (r *registry) Unregister(ctx context.Context) {
 	r.registrationsMu.Lock()
 	registrations := r.registrations
-	r.registrations = make(map[models.ServiceName]*registrationInfo)
+	r.registrations = make(map[execution.ServiceName]*registrationInfo)
 	r.registrationsMu.Unlock()
 
 	// Stop all registrations
@@ -164,10 +180,18 @@ func (r *registry) Unregister(ctx context.Context) {
 			logger.Warn(ctx, "Timeout waiting for registry shutdown", "service", serviceName)
 		}
 	}
+
+	// Close all finders to stop their cleanup goroutines
+	r.mu.Lock()
+	for _, f := range r.finders {
+		f.close()
+	}
+	r.finders = make(map[execution.ServiceName]*finder)
+	r.mu.Unlock()
 }
 
 // UpdateStatus updates the status of the registered instance for the given service
-func (r *registry) UpdateStatus(_ context.Context, serviceName models.ServiceName, status models.ServiceStatus) error {
+func (r *registry) UpdateStatus(_ context.Context, serviceName execution.ServiceName, status execution.ServiceStatus) error {
 	r.registrationsMu.Lock()
 	defer r.registrationsMu.Unlock()
 
@@ -182,7 +206,7 @@ func (r *registry) UpdateStatus(_ context.Context, serviceName models.ServiceNam
 
 // startHeartbeat starts a background goroutine to update heartbeat for a specific service instance
 // Must be called with registrationsMu held
-func (r *registry) startHeartbeat(ctx context.Context, serviceName models.ServiceName, interval time.Duration) error {
+func (r *registry) startHeartbeat(ctx context.Context, serviceName execution.ServiceName, interval time.Duration) error {
 	reg := r.registrations[serviceName]
 	if reg == nil {
 		return fmt.Errorf("service not registered")

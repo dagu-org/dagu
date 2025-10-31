@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -23,23 +23,23 @@ steps:
 
 		// Run a DAG.
 		args := []string{"start", `--params="foo"`, dagFile.Location}
-		th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
+		th.RunCommand(t, cmd.Start(), test.CmdTest{Args: args})
 
 		// Find the dag-run ID.
-		cli := th.DAGStore
+		dagStore := th.DAGStore
 		ctx := context.Background()
 
-		dag, err := cli.GetMetadata(ctx, dagFile.Location)
+		dag, err := dagStore.GetMetadata(ctx, dagFile.Location)
 		require.NoError(t, err)
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
-		require.Equal(t, dagRunStatus.Status, status.Success)
+		require.Equal(t, dagRunStatus.Status, core.Succeeded)
 		require.NotNil(t, dagRunStatus.Status)
 
 		// Retry with the dag-run ID using file path.
 		args = []string{"retry", fmt.Sprintf("--run-id=%s", dagRunStatus.DAGRunID), dagFile.Location}
-		th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
+		th.RunCommand(t, cmd.Retry(), test.CmdTest{
 			Args:        args,
 			ExpectedOut: []string{`[1=foo]`},
 		})
@@ -56,23 +56,23 @@ steps:
 
 		// Run a DAG.
 		args := []string{"start", `--params="bar"`, dagFile.Location}
-		th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
+		th.RunCommand(t, cmd.Start(), test.CmdTest{Args: args})
 
 		// Find the dag-run ID.
-		cli := th.DAGStore
+		dagStore := th.DAGStore
 		ctx := context.Background()
 
-		dag, err := cli.GetMetadata(ctx, dagFile.Location)
+		dag, err := dagStore.GetMetadata(ctx, dagFile.Location)
 		require.NoError(t, err)
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
-		require.Equal(t, dagRunStatus.Status, status.Success)
+		require.Equal(t, dagRunStatus.Status, core.Succeeded)
 		require.NotNil(t, dagRunStatus.Status)
 
 		// Retry with the dag-run ID using DAG name.
 		args = []string{"retry", fmt.Sprintf("--run-id=%s", dagRunStatus.DAGRunID), dag.Name}
-		th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
+		th.RunCommand(t, cmd.Retry(), test.CmdTest{
 			Args:        args,
 			ExpectedOut: []string{`[1=bar]`},
 		})

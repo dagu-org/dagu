@@ -43,7 +43,7 @@ func TestCoordinatorCommand(t *testing.T) {
 			th.Cancel()
 		}()
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
-			Args:        []string{"coordinator", "--config", test.TestdataPath(t, "cmd/config_test.yaml")},
+			Args:        []string{"coordinator", "--config", test.TestdataPath(t, "cli/config_test.yaml")},
 			ExpectedOut: []string{"Coordinator initialization", "9876"},
 		})
 	})
@@ -82,6 +82,24 @@ func TestCoordinatorCommand(t *testing.T) {
 				fmt.Sprintf("--peer.client-ca-file=%s", test.TestdataPath(t, "certs/ca.pem")),
 			},
 			ExpectedOut: []string{"Coordinator initialization", port},
+		})
+	})
+
+	t.Run("StartCoordinatorWithAdvertiseAddress", func(t *testing.T) {
+		th := test.SetupCommand(t)
+		go func() {
+			time.Sleep(time.Millisecond * 500)
+			th.Cancel()
+		}()
+		port := findPort(t)
+		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
+			Args: []string{
+				"coordinator",
+				"--coordinator.host=0.0.0.0",
+				"--coordinator.advertise=dagu-server",
+				fmt.Sprintf("--coordinator.port=%s", port),
+			},
+			ExpectedOut: []string{"Coordinator initialization", "bind_address=0.0.0.0", "advertise_address=dagu-server", port},
 		})
 	})
 }

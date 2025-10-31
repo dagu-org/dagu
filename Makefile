@@ -3,6 +3,7 @@
 ##############################################################################
 
 VERSION=
+TEST_TARGET?=./...
 
 ##############################################################################
 # Variables
@@ -49,7 +50,7 @@ OAPI_CONFIG_FILE_V1=${OAPI_SPEC_DIR_V1}/config.yaml
 
 # Frontend directories
 
-FE_DIR=./internal/frontend
+FE_DIR=./internal/service/frontend
 FE_GEN_DIR=${FE_DIR}/gen
 FE_ASSETS_DIR=${FE_DIR}/assets
 FE_BUILD_DIR=./ui/dist
@@ -156,19 +157,15 @@ test: bin
 	@echo "${COLOR_GREEN}Running tests...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@go clean -testcache
-	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ./...
+	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ${TEST_TARGET}
 
 # test-coverage runs all tests with coverage.
 .PHONY: test-coverage
 test-coverage:
 	@echo "${COLOR_GREEN}Running tests with coverage...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
-	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverprofile="coverage.txt" -covermode=atomic ./...
-
-# open-coverage opens the coverage file
-.PHONY: open-coverage
-open-coverage:
-	@go tool cover -html=coverage.txt
+	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverprofile="coverage.out" -covermode=atomic ${TEST_TARGET}
+	@go tool cover -html=coverage.out
 
 # lint runs the linter.
 .PHONY: lint

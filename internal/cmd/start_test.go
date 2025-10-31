@@ -60,7 +60,7 @@ steps:
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			th.RunCommand(t, cmd.CmdStart(), tc)
+			th.RunCommand(t, cmd.Start(), tc)
 		})
 	}
 }
@@ -77,11 +77,11 @@ steps:
 		dagFile := th.CreateDAGFile(t, "test.yaml", dagContent)
 
 		// Providing a DAG path should work
-		cmd := cmd.CmdStart()
-		cmd.SetArgs([]string{dagFile})
+		cli := cmd.Start()
+		cli.SetArgs([]string{dagFile})
 		// The actual execution might fail for other reasons in test environment,
 		// but it should accept the DAG file argument
-		_ = cmd.Execute()
+		_ = cli.Execute()
 	})
 
 	t.Run("TerminalDetectionFunctionAvailable", func(t *testing.T) {
@@ -108,12 +108,12 @@ steps:
 `
 		dagFile := th.CreateDAGFile(t, "test-params.yaml", dagContent)
 
-		cmd := cmd.CmdStart()
-		cmd.SetArgs([]string{dagFile, "--", "KEY1=value1", "KEY2=value2"})
+		cli := cmd.Start()
+		cli.SetArgs([]string{dagFile, "--", "KEY1=value1", "KEY2=value2"})
 
 		// Execute will fail due to missing context setup, but we're testing
 		// that the command accepts the arguments
-		_ = cmd.Execute()
+		_ = cli.Execute()
 	})
 
 	t.Run("ShouldAcceptParamsFlag", func(t *testing.T) {
@@ -126,11 +126,11 @@ steps:
 `
 		dagFile := th.CreateDAGFile(t, "test-params-flag.yaml", dagContent)
 
-		cmd := cmd.CmdStart()
-		cmd.SetArgs([]string{dagFile, "--params", "KEY=value"})
+		cli := cmd.Start()
+		cli.SetArgs([]string{dagFile, "--params", "KEY=value"})
 
 		// Execute will fail due to missing context setup, but we're testing
 		// that the command accepts the arguments
-		_ = cmd.Execute()
+		_ = cli.Execute()
 	})
 }

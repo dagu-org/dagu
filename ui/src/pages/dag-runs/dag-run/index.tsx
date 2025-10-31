@@ -10,15 +10,15 @@ function DAGRunDetailsPage() {
   const appBarContext = React.useContext(AppBarContext);
   const location = window.location.search;
 
-  // Parse URL search params to check for childDAGRunId
+  // Parse URL search params to check for subDAGRunId
   const searchParams = new URLSearchParams(location);
-  const childDAGRunId = searchParams.get('childDAGRunId');
+  const subDAGRunId = searchParams.get('subDAGRunId');
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
 
-  // Determine the API endpoint based on whether this is a child DAG-run
-  const endpoint = childDAGRunId
-    ? '/dag-runs/{name}/{dagRunId}/children/{childDAGRunId}'
+  // Determine the API endpoint based on whether this is a sub DAG-run
+  const endpoint = subDAGRunId
+    ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}'
     : '/dag-runs/{name}/{dagRunId}';
 
   // Fetch DAG-run details
@@ -29,11 +29,11 @@ function DAGRunDetailsPage() {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
-        path: childDAGRunId
+        path: subDAGRunId
           ? {
               name: parentName || '',
               dagRunId: parentDAGRunId || '',
-              childDAGRunId: childDAGRunId,
+              subDAGRunId: subDAGRunId,
             }
           : {
               name: name || '',
@@ -91,9 +91,9 @@ function DAGRunDetailsPage() {
   // Both endpoints return data with a dagRunDetails property
   const dagRunDetails = data.dagRunDetails;
 
-  // Use the actual DAG-run ID from the response for child DAG runs
-  const displayDAGRunId = childDAGRunId || dagRunId || '';
-  const displayName = childDAGRunId
+  // Use the actual DAG-run ID from the response for sub DAG runs
+  const displayDAGRunId = subDAGRunId || dagRunId || '';
+  const displayName = subDAGRunId
     ? dagRunDetails?.name || parentName || ''
     : name || '';
 

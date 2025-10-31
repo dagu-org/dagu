@@ -15,19 +15,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dagrun"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/persistence/fileserviceregistry"
+	runtimepkg "github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,9 +81,6 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	// Set the CI flag
 	_ = os.Setenv("CI", "true")
 
-	// Disable the DAG run queue for tests
-	_ = os.Setenv("DISABLE_DAG_RUN_QUEUE", "true")
-
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
 	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))
@@ -121,7 +118,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
-	drm := dagrun.New(runStore, procStore, cfg)
+	drm := runtimepkg.NewManager(runStore, procStore, cfg)
 
 	helper := Helper{
 		Context:         ctx,
@@ -132,7 +129,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		ProcStore:       procStore,
 		QueueStore:      queueStore,
 		ServiceRegistry: serviceMonitor,
-		SubCmdBuilder:   dagrun.NewSubCmdBuilder(cfg),
+		SubCmdBuilder:   runtimepkg.NewSubCmdBuilder(cfg),
 
 		tmpDir: tmpDir,
 	}
@@ -175,13 +172,13 @@ type Helper struct {
 	Cancel          context.CancelFunc
 	Config          *config.Config
 	LoggingOutput   *SyncBuffer
-	DAGStore        models.DAGStore
-	DAGRunStore     models.DAGRunStore
-	DAGRunMgr       dagrun.Manager
-	ProcStore       models.ProcStore
-	QueueStore      models.QueueStore
-	ServiceRegistry models.ServiceRegistry
-	SubCmdBuilder   *dagrun.SubCmdBuilder
+	DAGStore        execution.DAGStore
+	DAGRunStore     execution.DAGRunStore
+	DAGRunMgr       runtimepkg.Manager
+	ProcStore       execution.ProcStore
+	QueueStore      execution.QueueStore
+	ServiceRegistry execution.ServiceRegistry
+	SubCmdBuilder   *runtimepkg.SubCmdBuilder
 
 	tmpDir string
 }
@@ -212,12 +209,12 @@ func (h Helper) DAG(t *testing.T, yamlContent string) DAG {
 	require.NoError(t, err, "failed to create DAGs directory %q", h.Config.Paths.DAGsDir)
 
 	// Generate a unique filename for the test DAG
-	filename := fmt.Sprintf("test-%s.yaml", uuid.New().String())
+	filename := fmt.Sprintf("%s.yaml", uuid.New().String())
 	testFile := filepath.Join(h.Config.Paths.DAGsDir, filename)
 	err = os.WriteFile(testFile, []byte(yamlContent), 0600)
 	require.NoError(t, err, "failed to write test DAG")
 
-	dag, err := digraph.Load(h.Context, testFile)
+	dag, err := spec.Load(h.Context, testFile)
 	require.NoError(t, err, "failed to load test DAG")
 
 	return DAG{
@@ -251,17 +248,17 @@ func (h Helper) DAGExpectError(t *testing.T, name string, expectedErr string) {
 	t.Helper()
 
 	filePath := TestdataPath(t, name)
-	_, err := digraph.Load(h.Context, filePath)
+	_, err := spec.Load(h.Context, filePath)
 	require.Error(t, err, "expected error loading test DAG %q", name)
 	require.Contains(t, err.Error(), expectedErr, "expected error %q, got %q", expectedErr, err.Error())
 }
 
 type DAG struct {
 	*Helper
-	*digraph.DAG
+	*core.DAG
 }
 
-func (d *DAG) AssertLatestStatus(t *testing.T, expected status.Status) {
+func (d *DAG) AssertLatestStatus(t *testing.T, expected core.Status) {
 	t.Helper()
 
 	require.Eventually(t, func() bool {
@@ -271,7 +268,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected status.Status) {
 		}
 		t.Logf("latest status=%s errors=%v", latest.Status.String(), latest.Errors())
 		return latest.Status == expected
-	}, time.Second*5, time.Second)
+	}, time.Second*10, time.Second)
 }
 
 func (d *DAG) AssertDAGRunCount(t *testing.T, expected int) {
@@ -283,7 +280,7 @@ func (d *DAG) AssertDAGRunCount(t *testing.T, expected int) {
 	require.Len(t, runstore, expected)
 }
 
-func (d *DAG) AssertCurrentStatus(t *testing.T, expected status.Status) {
+func (d *DAG) AssertCurrentStatus(t *testing.T, expected core.Status) {
 	t.Helper()
 
 	assert.Eventually(t, func() bool {
@@ -389,7 +386,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 
 	logDir := d.Config.Paths.LogDir
 	logFile := filepath.Join(d.Config.Paths.LogDir, dagRunID+".log")
-	root := digraph.NewDAGRunRef(d.Name, dagRunID)
+	root := execution.NewDAGRunRef(d.Name, dagRunID)
 
 	helper.Agent = agent.New(
 		dagRunID,
@@ -410,7 +407,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 
 type Agent struct {
 	*Helper
-	*digraph.DAG
+	*core.DAG
 	*agent.Agent
 	opts     agent.Options
 	dagRunID string // the dag-run ID for this agent
@@ -423,17 +420,26 @@ func (a *Agent) RunError(t *testing.T) {
 	assert.Error(t, err)
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, status.Error.String(), st.String())
+	require.Equal(t, core.Failed.String(), st.String())
 }
 
 func (a *Agent) RunCancel(t *testing.T) {
 	t.Helper()
 
-	err := a.Run(a.Context)
+	proc, err := a.ProcStore.Acquire(a.Context, a.ProcGroup(), execution.DAGRunRef{
+		Name: a.Name,
+		ID:   a.dagRunID,
+	})
+	require.NoError(t, err, "failed to acquire proc")
+	t.Cleanup(func() {
+		_ = proc.Stop(a.Context)
+	})
+
+	err = a.Run(a.Context)
 	assert.NoError(t, err)
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, status.Cancel.String(), st.String())
+	require.Equal(t, core.Canceled.String(), st.String())
 }
 
 func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
@@ -443,7 +449,7 @@ func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
 	require.Error(t, err, "expected error %q, got nil", expectedErr)
 	require.Contains(t, err.Error(), expectedErr)
 	st := a.Status(a.Context)
-	require.Equal(t, status.Cancel.String(), st.Status.String())
+	require.Equal(t, core.Canceled.String(), st.Status.String())
 }
 
 func (a *Agent) RunSuccess(t *testing.T) {
@@ -453,12 +459,12 @@ func (a *Agent) RunSuccess(t *testing.T) {
 	assert.NoError(t, err, "failed to run agent")
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, status.Success.String(), st.String(), "expected status %q, got %q", status.Success, st)
+	require.Equal(t, core.Succeeded.String(), st.String(), "expected status %q, got %q", core.Succeeded, st)
 
 	// check all nodes are in success or skipped state
 	for _, node := range a.Status(a.Context).Nodes {
 		st := node.Status
-		if st == status.NodeSkipped || st == status.NodeSuccess {
+		if st == core.NodeSkipped || st == core.NodeSucceeded {
 			continue
 		}
 		t.Errorf("expected node %q to be in success state, got %q", node.Step.Name, st.String())

@@ -4,7 +4,7 @@
 # Build UI assets
 echo "Building UI assets..."
 cd ui && pnpm install --frozen-lockfile && pnpm build && cd ..
-cp -r ui/dist/* internal/frontend/assets/
+cp -r ui/dist/* internal/service/frontend/assets/
 
 # Build for Windows platforms
 echo "Cross-compiling for Windows x86-64..."

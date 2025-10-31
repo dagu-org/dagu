@@ -53,6 +53,10 @@ function DAGSpec({ fileName }: Props) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const lastFetchedSpecRef = React.useRef<string | undefined>(undefined);
 
+  // Reference to save function and refresh callback for keyboard shortcut
+  const saveHandlerRef = React.useRef<(() => Promise<void>) | null>(null);
+  const refreshCallbackRef = React.useRef<(() => void) | null>(null);
+
   /**
    * Handle flowchart direction change and save preference to cookie
    */
@@ -124,6 +128,47 @@ function DAGSpec({ fileName }: Props) {
     }
   }, []);
 
+  // Save handler function
+  const handleSave = React.useCallback(async () => {
+    if (!currentValue) {
+      alert('No changes to save');
+      return;
+    }
+
+    // Save current scroll position before any operations that might cause re-render
+    saveScrollPosition();
+
+    const { data: responseData, error } = await client.PUT(
+      '/dags/{fileName}/spec',
+      {
+        params: {
+          path: {
+            fileName: fileName,
+          },
+          query: {
+            remoteNode: appBarContext.selectedRemoteNode || 'local',
+          },
+        },
+        body: {
+          spec: currentValue,
+        },
+      }
+    );
+
+    if (error) {
+      alert(error.message || 'Failed to save spec');
+      return;
+    }
+
+    if (responseData?.errors) {
+      alert(responseData.errors.join('\n'));
+      return;
+    }
+
+    // Show success toast notification
+    showToast('Changes saved successfully');
+  }, [currentValue, fileName, appBarContext.selectedRemoteNode, client, saveScrollPosition, showToast]);
+
   // Restore scroll position after render
   useEffect(() => {
     if (scrollPosition > 0) {
@@ -138,6 +183,43 @@ function DAGSpec({ fileName }: Props) {
       return () => clearTimeout(timer);
     }
   }, [scrollPosition]);
+
+  // Update save handler ref when handleSave changes
+  useEffect(() => {
+    saveHandlerRef.current = handleSave;
+  }, [handleSave]);
+
+  // Add keyboard shortcut for saving (Ctrl+S / Cmd+S)
+  useEffect(() => {
+    if (!editable) {
+      return;
+    }
+
+    const handleKeyDown = async (event: KeyboardEvent) => {
+      // Check for Ctrl+S (Windows/Linux) or Cmd+S (macOS)
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault(); // Prevent browser's default save dialog
+
+        // Call the save handler if available
+        if (saveHandlerRef.current) {
+          await saveHandlerRef.current();
+
+          // Refresh after saving
+          if (refreshCallbackRef.current) {
+            refreshCallbackRef.current();
+          }
+        }
+      }
+    };
+
+    // Add event listener to document
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup on unmount
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [editable]);
 
   // Show loading indicator while fetching data
   if (isLoading) {
@@ -260,8 +342,11 @@ function DAGSpec({ fileName }: Props) {
 
   return (
     <DAGContext.Consumer>
-      {(props) =>
-        data?.dag && (
+      {(props) => {
+        // Update refresh callback ref directly (safe in render)
+        refreshCallbackRef.current = props.refresh;
+
+        return data?.dag && (
           <React.Fragment>
             <div className="space-y-6" ref={containerRef}>
               {hasLocalDags ? (
@@ -340,47 +425,18 @@ function DAGSpec({ fileName }: Props) {
                         id="save-config"
                         variant="default"
                         size="sm"
-                        className="cursor-pointer shadow-sm hover:shadow-md transition-shadow duration-200"
+                        title="Save changes (Ctrl+S / Cmd+S)"
+                        className="cursor-pointer shadow-sm hover:shadow-md transition-shadow duration-200 relative group"
                         onClick={async () => {
-                          if (!currentValue) {
-                            alert('No changes to save');
-                            return;
-                          }
-                          // Save current scroll position before any operations that might cause re-render
-                          saveScrollPosition();
-                          const { data, error } = await client.PUT(
-                            '/dags/{fileName}/spec',
-                            {
-                              params: {
-                                path: {
-                                  fileName: props.fileName,
-                                },
-                                query: {
-                                  remoteNode:
-                                    appBarContext.selectedRemoteNode || 'local',
-                                },
-                              },
-                              body: {
-                                spec: currentValue,
-                              },
-                            }
-                          );
-                          if (error) {
-                            alert(error.message || 'Failed to save spec');
-                            return;
-                          }
-                          if (data?.errors) {
-                            alert(data.errors.join('\n'));
-                            return;
-                          }
-                          // Show success toast notification
-                          showToast('Changes saved successfully');
-
+                          await handleSave();
                           props.refresh();
                         }}
                       >
                         <Save className="h-4 w-4 mr-1" />
                         Save Changes
+                        <span className="absolute -bottom-1 -right-1 bg-primary-foreground text-primary text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                          {navigator.platform.indexOf('Mac') > -1 ? '⌘S' : 'Ctrl+S'}
+                        </span>
                       </Button>
                     </div>
                   ) : null}
@@ -403,8 +459,8 @@ function DAGSpec({ fileName }: Props) {
               </div>
             </div>
           </React.Fragment>
-        )
-      }
+        );
+      }}
     </DAGContext.Consumer>
   );
 }

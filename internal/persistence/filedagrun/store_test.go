@@ -8,9 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,9 +24,9 @@ func TestJSONDB(t *testing.T) {
 		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
 
 		// Create records with different statuses
-		th.CreateAttempt(t, ts1, "dagrun-id-1", status.Running)
-		th.CreateAttempt(t, ts2, "dagrun-id-2", status.Error)
-		th.CreateAttempt(t, ts3, "dagrun-id-3", status.Success)
+		th.CreateAttempt(t, ts1, "dagrun-id-1", core.Running)
+		th.CreateAttempt(t, ts2, "dagrun-id-2", core.Failed)
+		th.CreateAttempt(t, ts3, "dagrun-id-3", core.Succeeded)
 
 		// Request 2 most recent attempts
 		attempts := th.Store.RecentAttempts(th.Context, "test_DAG", 2)
@@ -60,9 +59,9 @@ func TestJSONDB(t *testing.T) {
 		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
 
 		// Create records with different statuses
-		th.CreateAttempt(t, ts1, "dagrun-id-1", status.Running)
-		th.CreateAttempt(t, ts2, "dagrun-id-2", status.Error)
-		th.CreateAttempt(t, ts3, "dagrun-id-3", status.Success)
+		th.CreateAttempt(t, ts1, "dagrun-id-1", core.Running)
+		th.CreateAttempt(t, ts2, "dagrun-id-2", core.Failed)
+		th.CreateAttempt(t, ts3, "dagrun-id-3", core.Succeeded)
 
 		// Set the database to return the latest status (even if it was created today)
 		// Verify that record created before today is returned
@@ -86,12 +85,12 @@ func TestJSONDB(t *testing.T) {
 		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
 
 		// Create records with different statuses
-		th.CreateAttempt(t, ts1, "dagrun-id-1", status.Running)
-		th.CreateAttempt(t, ts2, "dagrun-id-2", status.Error)
-		th.CreateAttempt(t, ts3, "dagrun-id-3", status.Success)
+		th.CreateAttempt(t, ts1, "dagrun-id-1", core.Running)
+		th.CreateAttempt(t, ts2, "dagrun-id-2", core.Failed)
+		th.CreateAttempt(t, ts3, "dagrun-id-3", core.Succeeded)
 
 		// Find the record with dag-run ID "dagrun-id-2"
-		ref := digraph.NewDAGRunRef("test_DAG", "dagrun-id-2")
+		ref := execution.NewDAGRunRef("test_DAG", "dagrun-id-2")
 		attempt, err := th.Store.FindAttempt(th.Context, ref)
 		require.NoError(t, err)
 
@@ -101,9 +100,9 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "dagrun-id-2", dagRunStatus.DAGRunID)
 
 		// Verify an error is returned if the dag-run ID does not exist
-		refNonExist := digraph.NewDAGRunRef("test_DAG", "nonexistent-id")
+		refNonExist := execution.NewDAGRunRef("test_DAG", "nonexistent-id")
 		_, err = th.Store.FindAttempt(th.Context, refNonExist)
-		assert.ErrorIs(t, err, models.ErrDAGRunIDNotFound)
+		assert.ErrorIs(t, err, execution.ErrDAGRunIDNotFound)
 	})
 	t.Run("RemoveOld", func(t *testing.T) {
 		th := setupTestStore(t)
@@ -114,9 +113,9 @@ func TestJSONDB(t *testing.T) {
 		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
 
 		// Create records with different statuses
-		th.CreateAttempt(t, ts1, "dagrun-id-1", status.Running)
-		th.CreateAttempt(t, ts2, "dagrun-id-2", status.Error)
-		th.CreateAttempt(t, ts3, "dagrun-id-3", status.Success)
+		th.CreateAttempt(t, ts1, "dagrun-id-1", core.Running)
+		th.CreateAttempt(t, ts2, "dagrun-id-2", core.Failed)
+		th.CreateAttempt(t, ts3, "dagrun-id-3", core.Succeeded)
 
 		// Verify attempts are present
 		attempts := th.Store.RecentAttempts(th.Context, "test_DAG", 3)
@@ -135,62 +134,62 @@ func TestJSONDB(t *testing.T) {
 		dagRunStatus, err := attempts[0].ReadStatus(th.Context)
 		require.NoError(t, err)
 		assert.Equal(t, "dagrun-id-1", dagRunStatus.DAGRunID)
-		assert.Equal(t, status.Running, dagRunStatus.Status)
+		assert.Equal(t, core.Running, dagRunStatus.Status)
 	})
-	t.Run("ChildDAGRun", func(t *testing.T) {
+	t.Run("SubDAGRun", func(t *testing.T) {
 		th := setupTestStore(t)
 
 		// Create a timestamp for the parent record
 		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 
 		// Create a parent record
-		_ = th.CreateAttempt(t, ts, "parent-id", status.Running)
+		_ = th.CreateAttempt(t, ts, "parent-id", core.Running)
 
 		// Create a child attempt
-		rootDAGRun := digraph.NewDAGRunRef("test_DAG", "parent-id")
-		childDAG := th.DAG("child")
-		childAttempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, "sub-id", models.NewDAGRunAttemptOptions{
+		rootDAGRun := execution.NewDAGRunRef("test_DAG", "parent-id")
+		subDAG := th.DAG("child")
+		subAttempt, err := th.Store.CreateAttempt(th.Context, subDAG.DAG, ts, "sub-id", execution.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
 		})
 		require.NoError(t, err)
 
 		// Write the status
-		err = childAttempt.Open(th.Context)
+		err = subAttempt.Open(th.Context)
 		require.NoError(t, err)
 		defer func() {
-			_ = childAttempt.Close(th.Context)
+			_ = subAttempt.Close(th.Context)
 		}()
 
-		statusToWrite := models.InitialStatus(childDAG.DAG)
+		statusToWrite := execution.InitialStatus(subDAG.DAG)
 		statusToWrite.DAGRunID = "sub-id"
-		err = childAttempt.Write(th.Context, statusToWrite)
+		err = subAttempt.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
 		// Verify record is created
-		dagRunRef := digraph.NewDAGRunRef("test_DAG", "parent-id")
-		existingAttempt, err := th.Store.FindChildAttempt(th.Context, dagRunRef, "sub-id")
+		dagRunRef := execution.NewDAGRunRef("test_DAG", "parent-id")
+		existingAttempt, err := th.Store.FindSubAttempt(th.Context, dagRunRef, "sub-id")
 		require.NoError(t, err)
 
 		dagRunStatus, err := existingAttempt.ReadStatus(th.Context)
 		require.NoError(t, err)
 		assert.Equal(t, "sub-id", dagRunStatus.DAGRunID)
 	})
-	t.Run("ChildDAGRunRetry", func(t *testing.T) {
+	t.Run("SubDAGRunRetry", func(t *testing.T) {
 		th := setupTestStore(t)
 
 		// Create a timestamp for the parent record
 		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 
 		// Create a parent record
-		_ = th.CreateAttempt(t, ts, "parent-id", status.Running)
+		_ = th.CreateAttempt(t, ts, "parent-id", core.Running)
 
-		// Create a child dag-run
-		const childDAGRunID = "child-dagrun-id"
+		// Create a sub dag-run
+		const subDAGRunID = "sub-dagrun-id"
 		const parentDAGRunID = "parent-id"
 
-		rootDAGRun := digraph.NewDAGRunRef("test_DAG", parentDAGRunID)
-		childDAG := th.DAG("child")
-		attempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, childDAGRunID, models.NewDAGRunAttemptOptions{
+		rootDAGRun := execution.NewDAGRunRef("test_DAG", parentDAGRunID)
+		subDAG := th.DAG("child")
+		attempt, err := th.Store.CreateAttempt(th.Context, subDAG.DAG, ts, subDAGRunID, execution.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
 		})
 		require.NoError(t, err)
@@ -202,40 +201,40 @@ func TestJSONDB(t *testing.T) {
 			_ = attempt.Close(th.Context)
 		}()
 
-		statusToWrite := models.InitialStatus(childDAG.DAG)
-		statusToWrite.DAGRunID = childDAGRunID
-		statusToWrite.Status = status.Running
+		statusToWrite := execution.InitialStatus(subDAG.DAG)
+		statusToWrite.DAGRunID = subDAGRunID
+		statusToWrite.Status = core.Running
 		err = attempt.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
-		// Find the child dag-run record
+		// Find the sub dag-run record
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
-		dagRunRef := digraph.NewDAGRunRef("test_DAG", parentDAGRunID)
-		existingAttempt, err := th.Store.FindChildAttempt(th.Context, dagRunRef, childDAGRunID)
+		dagRunRef := execution.NewDAGRunRef("test_DAG", parentDAGRunID)
+		existingAttempt, err := th.Store.FindSubAttempt(th.Context, dagRunRef, subDAGRunID)
 		require.NoError(t, err)
 		existingAttemptStatus, err := existingAttempt.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, childDAGRunID, existingAttemptStatus.DAGRunID)
-		assert.Equal(t, status.Running.String(), existingAttemptStatus.Status.String())
+		assert.Equal(t, subDAGRunID, existingAttemptStatus.DAGRunID)
+		assert.Equal(t, core.Running.String(), existingAttemptStatus.Status.String())
 
 		// Create a retry record and write different status
-		retryAttempt, err := th.Store.CreateAttempt(th.Context, childDAG.DAG, ts, childDAGRunID, models.NewDAGRunAttemptOptions{
+		retryAttempt, err := th.Store.CreateAttempt(th.Context, subDAG.DAG, ts, subDAGRunID, execution.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
 			Retry:      true,
 		})
 		require.NoError(t, err)
-		statusToWrite.Status = status.Success
+		statusToWrite.Status = core.Succeeded
 		_ = retryAttempt.Open(th.Context)
 		_ = retryAttempt.Write(th.Context, statusToWrite)
 		_ = retryAttempt.Close(th.Context)
 
 		// Verify the retry record is created
-		existingAttempt, err = th.Store.FindChildAttempt(th.Context, dagRunRef, childDAGRunID)
+		existingAttempt, err = th.Store.FindSubAttempt(th.Context, dagRunRef, subDAGRunID)
 		require.NoError(t, err)
 		existingAttemptStatus, err = existingAttempt.ReadStatus(th.Context)
 		require.NoError(t, err)
-		assert.Equal(t, childDAGRunID, existingAttemptStatus.DAGRunID)
-		assert.Equal(t, status.Success.String(), existingAttemptStatus.Status.String())
+		assert.Equal(t, subDAGRunID, existingAttemptStatus.DAGRunID)
+		assert.Equal(t, core.Succeeded.String(), existingAttemptStatus.Status.String())
 	})
 	t.Run("ReadDAG", func(t *testing.T) {
 		th := setupTestStore(t)
@@ -244,7 +243,7 @@ func TestJSONDB(t *testing.T) {
 		ts := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
 
 		// Create a parent record
-		rec := th.CreateAttempt(t, ts, "parent-id", status.Running)
+		rec := th.CreateAttempt(t, ts, "parent-id", core.Running)
 
 		// Write the status
 		err := rec.Open(th.Context)
@@ -253,7 +252,7 @@ func TestJSONDB(t *testing.T) {
 			_ = rec.Close(th.Context)
 		}()
 
-		statusToWrite := models.InitialStatus(rec.dag)
+		statusToWrite := execution.InitialStatus(rec.dag)
 		statusToWrite.DAGRunID = "parent-id"
 
 		err = rec.Write(th.Context, statusToWrite)
@@ -381,17 +380,17 @@ func TestListStatuses(t *testing.T) {
 		ts2 := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
 		ts3 := time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC)
 
-		th.CreateAttempt(t, ts1, "dagrun-id-1", status.Success)
-		th.CreateAttempt(t, ts2, "dagrun-id-2", status.Success)
-		th.CreateAttempt(t, ts3, "dagrun-id-3", status.Success)
+		th.CreateAttempt(t, ts1, "dagrun-id-1", core.Succeeded)
+		th.CreateAttempt(t, ts2, "dagrun-id-2", core.Succeeded)
+		th.CreateAttempt(t, ts3, "dagrun-id-3", core.Succeeded)
 
 		// Filter by time range (only ts2 should be included)
-		from := models.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
-		to := models.NewUTC(time.Date(2021, 1, 2, 12, 0, 0, 0, time.UTC))
+		from := execution.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
+		to := execution.NewUTC(time.Date(2021, 1, 2, 12, 0, 0, 0, time.UTC))
 
 		statuses, err := th.Store.ListStatuses(th.Context,
-			models.WithFrom(from),
-			models.WithTo(to),
+			execution.WithFrom(from),
+			execution.WithTo(to),
 		)
 
 		require.NoError(t, err)
@@ -404,20 +403,20 @@ func TestListStatuses(t *testing.T) {
 
 		// Create records with different statuses
 		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
-		th.CreateAttempt(t, ts, "dagrun-id-1", status.Running)
-		th.CreateAttempt(t, ts, "dagrun-id-2", status.Error)
-		th.CreateAttempt(t, ts, "dagrun-id-3", status.Success)
+		th.CreateAttempt(t, ts, "dagrun-id-1", core.Running)
+		th.CreateAttempt(t, ts, "dagrun-id-2", core.Failed)
+		th.CreateAttempt(t, ts, "dagrun-id-3", core.Succeeded)
 
 		// Filter by status (only StatusError should be included)
 		statuses, err := th.Store.ListStatuses(th.Context,
-			models.WithStatuses([]status.Status{status.Error}),
-			models.WithFrom(models.NewUTC(ts)),
+			execution.WithStatuses([]core.Status{core.Failed}),
+			execution.WithFrom(execution.NewUTC(ts)),
 		)
 
 		require.NoError(t, err)
 		require.Len(t, statuses, 1)
 		assert.Equal(t, "dagrun-id-2", statuses[0].DAGRunID)
-		assert.Equal(t, status.Error, statuses[0].Status)
+		assert.Equal(t, core.Failed, statuses[0].Status)
 	})
 
 	t.Run("LimitResults", func(t *testing.T) {
@@ -426,14 +425,14 @@ func TestListStatuses(t *testing.T) {
 		// Create multiple records
 		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 		for i := 1; i <= 5; i++ {
-			th.CreateAttempt(t, ts, fmt.Sprintf("dagrun-id-%d", i), status.Success)
+			th.CreateAttempt(t, ts, fmt.Sprintf("dagrun-id-%d", i), core.Succeeded)
 		}
 
 		// Limit to 3 results
-		options := &models.ListDAGRunStatusesOptions{Limit: 3}
-		statuses, err := th.Store.ListStatuses(th.Context, func(o *models.ListDAGRunStatusesOptions) {
+		options := &execution.ListDAGRunStatusesOptions{Limit: 3}
+		statuses, err := th.Store.ListStatuses(th.Context, func(o *execution.ListDAGRunStatusesOptions) {
 			o.Limit = options.Limit
-		}, models.WithFrom(models.NewUTC(ts)))
+		}, execution.WithFrom(execution.NewUTC(ts)))
 
 		require.NoError(t, err)
 		require.Len(t, statuses, 3)
@@ -446,13 +445,13 @@ func TestListStatuses(t *testing.T) {
 		ts2 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 		ts3 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 
-		th.CreateAttempt(t, ts1, "dagrun-id-1", status.Success)
-		th.CreateAttempt(t, ts2, "dagrun-id-2", status.Success)
-		th.CreateAttempt(t, ts3, "dagrun-id-3", status.Success)
+		th.CreateAttempt(t, ts1, "dagrun-id-1", core.Succeeded)
+		th.CreateAttempt(t, ts2, "dagrun-id-2", core.Succeeded)
+		th.CreateAttempt(t, ts3, "dagrun-id-3", core.Succeeded)
 
 		// Get all statuses
 		statuses, err := th.Store.ListStatuses(
-			th.Context, models.WithFrom(models.NewUTC(ts1)),
+			th.Context, execution.WithFrom(execution.NewUTC(ts1)),
 		)
 
 		require.NoError(t, err)
@@ -498,7 +497,7 @@ func TestLatestStatusTimezone(t *testing.T) {
 		assert.Equal(t, "2025-06-07 22:00:00 +0000 UTC", utcTime.String())
 
 		// Create the DAG run at 00:00 Paris time
-		th.CreateAttempt(t, utcTime, "midnight-run", status.Success)
+		th.CreateAttempt(t, utcTime, "midnight-run", core.Succeeded)
 
 		// Simulate checking the status on June 8, 2025 at 10:00 UTC
 		// (which is 12:00 Paris time on the same day)
@@ -559,7 +558,7 @@ func TestLatestStatusTimezone(t *testing.T) {
 		now := time.Now().In(tokyoLoc)
 		todayInTokyo := time.Date(now.Year(), now.Month(), now.Day(), 1, 0, 0, 0, tokyoLoc)
 
-		th.CreateAttempt(t, todayInTokyo, "tokyo-today-run", status.Success)
+		th.CreateAttempt(t, todayInTokyo, "tokyo-today-run", core.Succeeded)
 
 		// This should find the run because it's "today" in Tokyo timezone
 		attempt, err := th.Store.LatestAttempt(th.Context, "test_DAG")

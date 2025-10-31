@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/worker"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/spf13/cobra"
 )
 

@@ -146,6 +146,13 @@
       ],
       "description": "Environment variables available to all steps in the DAG. Can use shell expansions, references to other environment variables, or command substitutions. Note: These won't be stored in execution history data for security."
     },
+    "secrets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/secretRef"
+      },
+      "description": "List of external secret references resolved at runtime and exposed as environment variables. Each entry declares the target environment variable name, provider, key, and optional provider-specific options."
+    },
     "logDir": {
       "type": "string",
       "description": "Base directory for storing logs. Defaults to ${HOME}/.local/share/logs if not specified."
@@ -330,6 +337,46 @@
       "$ref": "#/definitions/container",
       "description": "Default container configuration for all steps in the DAG. Steps can override this configuration with their own container settings."
     },
+    "registryAuths": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Entire Docker authentication configuration as a JSON string, using the same format as DOCKER_AUTH_CONFIG or ~/.docker/config.json. Example: {\"auths\":{\"docker.io\":{\"auth\":\"base64(username:password)\"}}}"
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "Authentication value as a string. Can be: 1) base64-encoded 'username:password', 2) JSON string with username/password fields, or 3) environment variable reference like ${DOCKER_AUTH}"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "Registry username. Supports environment variable expansion (e.g., ${DOCKER_USERNAME})."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Registry password or access token. Supports environment variable expansion (e.g., ${DOCKER_PASSWORD})."
+                  },
+                  "auth": {
+                    "type": "string",
+                    "description": "Pre-encoded authentication string. Should be base64(username:password) or a JSON string with credentials. Use this instead of username/password for pre-encoded credentials."
+                  }
+                },
+                "description": "Authentication configuration object with username/password or pre-encoded auth string."
+              }
+            ]
+          },
+          "description": "Map of registry hostnames to authentication configurations. Registry hostnames should match the registry in your image names (e.g., 'docker.io', 'ghcr.io', 'gcr.io', '123456789012.dkr.ecr.us-east-1.amazonaws.com')."
+        }
+      ],
+      "description": "Authentication configuration for Docker container registries. Allows pulling images from private registries. Can be specified as a complete DOCKER_AUTH_CONFIG JSON string, or as a map of individual registry credentials. Authentication priority: 1) DAG-level registryAuths, 2) DOCKER_AUTH_CONFIG environment variable, 3) No authentication (public registries). Supports environment variable expansion with ${VAR} syntax."
+    },
     "ssh": {
       "$ref": "#/definitions/sshConfig",
       "description": "Default SSH configuration for all steps in the DAG. Steps can override this configuration with their own SSH settings. Note: SSH and container configurations are mutually exclusive at the DAG level."
@@ -372,9 +419,43 @@
         }
       },
       "description": "Configuration for controlling user interactions when starting DAG runs. Allows restricting parameter editing and custom run ID input."
+    },
+    "workerSelector": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Key-value pairs specifying worker label requirements for executing this DAG. The DAG will only run on workers that have all specified labels with matching values. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels. This setting applies to the entire DAG; individual steps can override this with their own workerSelector."
     }
   },
   "definitions": {
+    "secretRef": {
+      "type": "object",
+      "required": ["name", "provider", "key"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Environment variable name that will receive the secret value."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Secret provider identifier (e.g., env, file, custom providers)."
+        },
+        "key": {
+          "type": "string",
+          "description": "Provider-specific key or identifier used to look up the secret."
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Provider-specific configuration options. Values must be strings to support serialization."
+        }
+      },
+      "description": "Reference to an external secret that Dagu resolves at runtime. The resolved value is injected as an environment variable and masked in logs/output."
+    },
     "stepItem": {
       "oneOf": [
         {
@@ -431,19 +512,19 @@
               "properties": {
                 "type": {
                   "type": "string",
-                  "enum": ["docker", "http", "mail", "ssh", "jq"],
+                  "enum": ["docker", "http", "mail", "ssh", "jq", "gha"],
                   "description": "Type of executor to use for this step"
                 },
                 "config": {
                   "type": "object",
                   "additionalProperties": true,
-                  "description": "Executor-specific configuration options. For the Docker executor, set `image`, `containerName`, or both; with only `containerName` the container must already be running, and with both set Dagu creates the container from the `image` if it is missing or stopped."
+                  "description": "Executor-specific configuration options."
                 }
               },
               "required": ["type"]
             }
           ],
-          "description": "Specialized executor configuration for running the step (e.g., docker for containerized execution, http for API calls, mail for sending emails)."
+          "description": "Specialized executor configuration for running the step (e.g., docker for containerized execution, http for API calls, mail for sending emails, gha for running GitHub Actions locally)."
         },
         "command": {
           "oneOf": [
@@ -457,7 +538,7 @@
               }
             }
           ],
-          "description": "Command to execute. Can be a shell command, script interpreter, or executable. If omitted when script is provided, uses system default shell."
+          "description": "Command to execute. Can be a shell command, script interpreter, or executable."
         },
         "shell": {
           "type": "string",
@@ -696,9 +777,13 @@
           "type": "string",
           "description": "Signal to send when stopping this step (e.g., SIGINT). If empty, uses same signal as parent process."
         },
+        "call": {
+          "type": "string",
+          "description": "Name of a DAG to execute as a sub dag-run."
+        },
         "run": {
           "type": "string",
-          "description": "Name of a DAG to run."
+          "description": "Legacy field for DAG execution. Deprecated: use call instead."
         },
         "params": {
           "oneOf": [
@@ -712,15 +797,15 @@
                 "type": "object",
                 "additionalProperties": true
               },
-              "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+              "description": "Named parameters as key-value pairs"
             },
             {
               "type": "object",
               "additionalProperties": true,
-              "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+              "description": "Named parameters as key-value pairs"
             }
           ],
-          "description": "Default parameters that can be overridden when triggering the DAG. Can be positional (accessed as $1, $2) or named (accessed as ${KEY})."
+          "description": "Parameters for the step. For sub-DAG execution (when 'run' is specified), these are passed to the sub DAG and accessible as ${KEY}. For 'gha' executor, these are passed as action inputs (the 'with:' section in GitHub Actions syntax). For example, when using actions/checkout@v4, you can specify 'repository', 'ref', 'token', etc."
         },
         "parallel": {
           "oneOf": [
@@ -788,7 +873,7 @@
               "description": "Parallel execution configuration with concurrency control"
             }
           ],
-          "description": "Configuration for parallel execution of child DAGs. Only applicable when 'run' is specified. Allows processing multiple items concurrently using the same workflow definition."
+          "description": "Configuration for parallel execution of sub DAGs. Only applicable when 'run' is specified. Allows processing multiple items concurrently using the same workflow definition."
         },
         "workerSelector": {
           "type": "object",

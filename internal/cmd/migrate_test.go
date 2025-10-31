@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
 	"github.com/spf13/cobra"
@@ -37,13 +37,13 @@ func TestMigrateHistoryCommand(t *testing.T) {
 	legacyStatus := legacymodel.Status{
 		RequestID:  "req123",
 		Name:       "test-dag",
-		Status:     status.Success,
+		Status:     core.Succeeded,
 		StartedAt:  time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
 		FinishedAt: time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
 		Nodes: []*legacymodel.Node{
 			{
-				Step:       digraph.Step{Name: "step1"},
-				Status:     status.NodeSuccess,
+				Step:       core.Step{Name: "step1"},
+				Status:     core.NodeSucceeded,
 				StartedAt:  time.Now().Add(-50 * time.Minute).Format(time.RFC3339),
 				FinishedAt: time.Now().Add(-40 * time.Minute).Format(time.RFC3339),
 			},
@@ -85,7 +85,7 @@ func TestMigrateHistoryCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify migration
-		attempt, err := dagRunStore.FindAttempt(context.Background(), digraph.NewDAGRunRef("test-dag", "req123"))
+		attempt, err := dagRunStore.FindAttempt(context.Background(), execution.NewDAGRunRef("test-dag", "req123"))
 		require.NoError(t, err)
 		require.NotNil(t, attempt)
 
@@ -93,7 +93,7 @@ func TestMigrateHistoryCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "req123", dagRunStatus.DAGRunID)
 		assert.Equal(t, "test-dag", dagRunStatus.Name)
-		assert.Equal(t, status.Success, dagRunStatus.Status)
+		assert.Equal(t, core.Succeeded, dagRunStatus.Status)
 
 		// Verify legacy directory was moved
 		_, err = os.Stat(legacyDagDir)
@@ -153,7 +153,7 @@ func TestMigrateCommand_NoLegacyData(t *testing.T) {
 }
 
 func TestCmdMigrate(t *testing.T) {
-	cmd := CmdMigrate()
+	cmd := Migrate()
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "migrate", cmd.Use)
 	assert.True(t, cmd.HasSubCommands())

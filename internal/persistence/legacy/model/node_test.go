@@ -5,17 +5,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/digraph/status"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/persistence/legacy/model"
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFromSteps(t *testing.T) {
-	steps := []digraph.Step{
+	steps := []core.Step{
 		{
 			Name:    "step1",
 			Command: "echo hello",
@@ -34,8 +33,8 @@ func TestFromSteps(t *testing.T) {
 	assert.Equal(t, "step2", nodes[1].Step.Name)
 	assert.Equal(t, "-", nodes[0].StartedAt)
 	assert.Equal(t, "-", nodes[0].FinishedAt)
-	assert.Equal(t, status.NodeNone, nodes[0].Status)
-	assert.Equal(t, status.NodeNone.String(), nodes[0].StatusText)
+	assert.Equal(t, core.NodeNotStarted, nodes[0].Status)
+	assert.Equal(t, core.NodeNotStarted.String(), nodes[0].StatusText)
 }
 
 func TestFromNodes(t *testing.T) {
@@ -43,14 +42,14 @@ func TestFromNodes(t *testing.T) {
 	later := now.Add(5 * time.Second)
 	retryTime := now.Add(2 * time.Second)
 
-	nodeDataList := []scheduler.NodeData{
+	nodeDataList := []runtime.NodeData{
 		{
-			Step: digraph.Step{
+			Step: core.Step{
 				Name:    "step1",
 				Command: "echo hello",
 			},
-			State: scheduler.NodeState{
-				Status:     status.NodeSuccess,
+			State: runtime.NodeState{
+				Status:     core.NodeSucceeded,
 				Stdout:     "/tmp/step1.log",
 				StartedAt:  now,
 				FinishedAt: later,
@@ -60,12 +59,12 @@ func TestFromNodes(t *testing.T) {
 			},
 		},
 		{
-			Step: digraph.Step{
+			Step: core.Step{
 				Name:    "step2",
 				Command: "false",
 			},
-			State: scheduler.NodeState{
-				Status:     status.NodeError,
+			State: runtime.NodeState{
+				Status:     core.NodeFailed,
 				Stdout:     "/tmp/step2.log",
 				StartedAt:  now,
 				FinishedAt: later,
@@ -81,8 +80,8 @@ func TestFromNodes(t *testing.T) {
 	// Check first node
 	assert.Equal(t, "step1", nodes[0].Step.Name)
 	assert.Equal(t, "/tmp/step1.log", nodes[0].Log)
-	assert.Equal(t, status.NodeSuccess, nodes[0].Status)
-	assert.Equal(t, status.NodeSuccess.String(), nodes[0].StatusText)
+	assert.Equal(t, core.NodeSucceeded, nodes[0].Status)
+	assert.Equal(t, core.NodeSucceeded.String(), nodes[0].StatusText)
 	assert.Equal(t, stringutil.FormatTime(now), nodes[0].StartedAt)
 	assert.Equal(t, stringutil.FormatTime(later), nodes[0].FinishedAt)
 	assert.Equal(t, stringutil.FormatTime(retryTime), nodes[0].RetriedAt)
@@ -92,7 +91,7 @@ func TestFromNodes(t *testing.T) {
 
 	// Check second node
 	assert.Equal(t, "step2", nodes[1].Step.Name)
-	assert.Equal(t, status.NodeError, nodes[1].Status)
+	assert.Equal(t, core.NodeFailed, nodes[1].Status)
 	assert.Equal(t, "command failed", nodes[1].Error)
 }
 
@@ -100,15 +99,15 @@ func TestFromNode(t *testing.T) {
 	now := time.Now()
 	later := now.Add(5 * time.Second)
 
-	nodeData := scheduler.NodeData{
-		Step: digraph.Step{
+	nodeData := runtime.NodeData{
+		Step: core.Step{
 			Name:        "test-step",
 			Command:     "echo test",
 			Description: "Test step",
 			Dir:         "/tmp",
 		},
-		State: scheduler.NodeState{
-			Status:     status.NodeSuccess,
+		State: runtime.NodeState{
+			Status:     core.NodeSucceeded,
 			Stdout:     "/tmp/test.log",
 			StartedAt:  now,
 			FinishedAt: later,
@@ -123,8 +122,8 @@ func TestFromNode(t *testing.T) {
 	assert.Equal(t, "test-step", node.Step.Name)
 	assert.Equal(t, "echo test", node.Step.Command)
 	assert.Equal(t, "/tmp/test.log", node.Log)
-	assert.Equal(t, status.NodeSuccess, node.Status)
-	assert.Equal(t, status.NodeSuccess.String(), node.StatusText)
+	assert.Equal(t, core.NodeSucceeded, node.Status)
+	assert.Equal(t, core.NodeSucceeded.String(), node.StatusText)
 	assert.Equal(t, stringutil.FormatTime(now), node.StartedAt)
 	assert.Equal(t, stringutil.FormatTime(later), node.FinishedAt)
 	assert.Equal(t, 1, node.RetryCount)
@@ -133,7 +132,7 @@ func TestFromNode(t *testing.T) {
 }
 
 func TestNewNode(t *testing.T) {
-	step := digraph.Step{
+	step := core.Step{
 		Name:        "new-step",
 		Command:     "ls -la",
 		Description: "List files",
@@ -146,8 +145,8 @@ func TestNewNode(t *testing.T) {
 	assert.Equal(t, step, node.Step)
 	assert.Equal(t, "-", node.StartedAt)
 	assert.Equal(t, "-", node.FinishedAt)
-	assert.Equal(t, status.NodeNone, node.Status)
-	assert.Equal(t, status.NodeNone.String(), node.StatusText)
+	assert.Equal(t, core.NodeNotStarted, node.Status)
+	assert.Equal(t, core.NodeNotStarted.String(), node.StatusText)
 	assert.Empty(t, node.Log)
 	assert.Empty(t, node.Error)
 	assert.Empty(t, node.RetriedAt)
@@ -161,15 +160,15 @@ func TestNodeToNode(t *testing.T) {
 	retryTime := now.Add(5 * time.Second)
 
 	modelNode := &model.Node{
-		Step: digraph.Step{
+		Step: core.Step{
 			Name:    "convert-step",
 			Command: "sleep 1",
 		},
 		Log:        "/var/log/step.log",
 		StartedAt:  stringutil.FormatTime(now),
 		FinishedAt: stringutil.FormatTime(later),
-		Status:     status.NodeSuccess,
-		StatusText: status.NodeSuccess.String(),
+		Status:     core.NodeSucceeded,
+		StatusText: core.NodeSucceeded.String(),
 		RetriedAt:  stringutil.FormatTime(retryTime),
 		RetryCount: 3,
 		DoneCount:  4,
@@ -204,14 +203,14 @@ func TestNodeToNode(t *testing.T) {
 
 func TestNodeToNodeWithEmptyTimes(t *testing.T) {
 	modelNode := &model.Node{
-		Step: digraph.Step{
+		Step: core.Step{
 			Name: "empty-times-step",
 		},
 		StartedAt:  "-",
 		FinishedAt: "-",
 		RetriedAt:  "",
-		Status:     status.NodeNone,
-		StatusText: status.NodeNone.String(),
+		Status:     core.NodeNotStarted,
+		StatusText: core.NodeNotStarted.String(),
 	}
 
 	schedulerNode := modelNode.ToNode()
@@ -223,13 +222,13 @@ func TestNodeToNodeWithEmptyTimes(t *testing.T) {
 
 func TestNodeToNodeWithInvalidTimeFormat(t *testing.T) {
 	modelNode := &model.Node{
-		Step: digraph.Step{
+		Step: core.Step{
 			Name: "invalid-time-step",
 		},
 		StartedAt:  "invalid-time-format",
 		FinishedAt: "2024-13-45 25:61:70", // Invalid date/time
-		Status:     status.NodeError,
-		StatusText: status.NodeError.String(),
+		Status:     core.NodeFailed,
+		StatusText: core.NodeFailed.String(),
 	}
 
 	schedulerNode := modelNode.ToNode()
@@ -304,9 +303,9 @@ func TestErrText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test through the public interface
-			nodeData := scheduler.NodeData{
-				Step: digraph.Step{Name: "test"},
-				State: scheduler.NodeState{
+			nodeData := runtime.NodeData{
+				Step: core.Step{Name: "test"},
+				State: runtime.NodeState{
 					Error: tt.input,
 				},
 			}
@@ -318,22 +317,22 @@ func TestErrText(t *testing.T) {
 }
 
 func TestNodeWithAllStatuses(t *testing.T) {
-	statuses := []status.NodeStatus{
-		status.NodeNone,
-		status.NodeRunning,
-		status.NodeError,
-		status.NodeCancel,
-		status.NodeSuccess,
-		status.NodeSkipped,
+	statuses := []core.NodeStatus{
+		core.NodeNotStarted,
+		core.NodeRunning,
+		core.NodeFailed,
+		core.NodeCanceled,
+		core.NodeSucceeded,
+		core.NodeSkipped,
 	}
 
 	for _, status := range statuses {
 		t.Run(status.String(), func(t *testing.T) {
-			nodeData := scheduler.NodeData{
-				Step: digraph.Step{
+			nodeData := runtime.NodeData{
+				Step: core.Step{
 					Name: "status-test-step",
 				},
-				State: scheduler.NodeState{
+				State: runtime.NodeState{
 					Status: status,
 				},
 			}
@@ -350,14 +349,14 @@ func TestNodeWithAllStatuses(t *testing.T) {
 }
 
 func TestFromNodesPreservesOrder(t *testing.T) {
-	var nodeDataList []scheduler.NodeData
+	var nodeDataList []runtime.NodeData
 	for i := 0; i < 10; i++ {
-		nodeDataList = append(nodeDataList, scheduler.NodeData{
-			Step: digraph.Step{
+		nodeDataList = append(nodeDataList, runtime.NodeData{
+			Step: core.Step{
 				Name: string(rune('A' + i)),
 			},
-			State: scheduler.NodeState{
-				Status: status.NodeSuccess,
+			State: runtime.NodeState{
+				Status: core.NodeSucceeded,
 			},
 		})
 	}

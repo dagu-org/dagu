@@ -5,8 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -21,36 +20,36 @@ func TestQueueReader(t *testing.T) {
 	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add some items to the queue
-	err := store.Enqueue(ctx, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
+	err := store.Enqueue(ctx, "test-name", execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag-1",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
-	err = store.Enqueue(ctx, "test-name", models.QueuePriorityHigh, digraph.DAGRunRef{
+	err = store.Enqueue(ctx, "test-name", execution.QueuePriorityHigh, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag-2",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Get a reader from the store
-	reader := store.Reader(ctx)
+	reader := store.Reader()
 
 	// Create a channel to receive items
-	ch := make(chan models.QueuedItem, 10)
+	ch := make(chan execution.QueuedItem, 10)
 
 	// Start the reader
 	err = reader.Start(ctx, ch)
 	require.NoError(t, err, "expected no error when starting reader")
 
 	// Wait for items to be received
-	receivedItems := make([]models.QueuedItem, 0, 2)
+	receivedItems := make([]execution.QueuedItem, 0, 2)
 	timeout := time.After(5 * time.Second) // Account for processingDelay between items
 
 	for i := 0; i < 2; i++ {
 		select {
 		case item := <-ch:
-			item.Result <- models.QueuedItemProcessingResultSuccess // Simulate processing the item
+			item.Result <- execution.QueuedItemProcessingResultSuccess // Simulate processing the item
 			receivedItems = append(receivedItems, item)
 		case <-timeout:
 			t.Fatal("timeout waiting for items")
@@ -81,17 +80,17 @@ func TestQueueReaderChannelFull(t *testing.T) {
 	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add an item to the queue
-	err := store.Enqueue(ctx, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
+	err := store.Enqueue(ctx, "test-name", execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag-1",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Get a reader from the store
-	reader := store.Reader(ctx)
+	reader := store.Reader()
 
 	// Create a channel with buffer size 0 to simulate a full channel
-	ch := make(chan models.QueuedItem)
+	ch := make(chan execution.QueuedItem)
 
 	// Start the reader
 	err = reader.Start(ctx, ch)
@@ -117,10 +116,10 @@ func TestQueueReaderStartStop(t *testing.T) {
 	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Get a reader from the store
-	reader := store.Reader(ctx)
+	reader := store.Reader()
 
 	// Create a channel to receive items
-	ch := make(chan models.QueuedItem, 10)
+	ch := make(chan execution.QueuedItem, 10)
 
 	// Start the reader
 	err := reader.Start(ctx, ch)
@@ -146,17 +145,17 @@ func TestQueueReaderContextCancellation(t *testing.T) {
 	store := filequeue.New(th.Config.Paths.QueueDir)
 
 	// Add an item to the queue
-	err := store.Enqueue(ctx, "test-name", models.QueuePriorityLow, digraph.DAGRunRef{
+	err := store.Enqueue(ctx, "test-name", execution.QueuePriorityLow, execution.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag-1",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Get a reader from the store
-	reader := store.Reader(ctx)
+	reader := store.Reader()
 
 	// Create a channel with buffer size 0 to simulate a full channel
-	ch := make(chan models.QueuedItem)
+	ch := make(chan execution.QueuedItem)
 
 	// Create a context that will be cancelled
 	ctxWithCancel, cancelFunc := context.WithCancel(ctx)
@@ -189,17 +188,17 @@ func TestQueueReaderRetryDelay(t *testing.T) {
 
 	// Add a single item
 	queueName := "test-queue"
-	err := store.Enqueue(ctx, queueName, models.QueuePriorityHigh, digraph.DAGRunRef{
+	err := store.Enqueue(ctx, queueName, execution.QueuePriorityHigh, execution.DAGRunRef{
 		Name: queueName,
 		ID:   "test-dag-1",
 	})
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Get a reader from the store
-	reader := store.Reader(ctx)
+	reader := store.Reader()
 
 	// Create a channel to receive items
-	ch := make(chan models.QueuedItem, 1)
+	ch := make(chan execution.QueuedItem, 1)
 
 	// Start the reader
 	err = reader.Start(ctx, ch)
@@ -208,7 +207,7 @@ func TestQueueReaderRetryDelay(t *testing.T) {
 	// First attempt - return retry
 	select {
 	case item := <-ch:
-		item.Result <- models.QueuedItemProcessingResultRetry
+		item.Result <- execution.QueuedItemProcessingResultRetry
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for first item")
 	}
@@ -224,7 +223,7 @@ func TestQueueReaderRetryDelay(t *testing.T) {
 	// Wait a bit more and then we should get the retry
 	select {
 	case item := <-ch:
-		item.Result <- models.QueuedItemProcessingResultSuccess
+		item.Result <- execution.QueuedItemProcessingResultSuccess
 	case <-time.After(3 * time.Second):
 		t.Fatal("timeout waiting for retry")
 	}
@@ -245,23 +244,23 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 	queue1 := "queue-1"
 	queue2 := "queue-2"
 
-	err := store.Enqueue(ctx, queue1, models.QueuePriorityHigh, digraph.DAGRunRef{
+	err := store.Enqueue(ctx, queue1, execution.QueuePriorityHigh, execution.DAGRunRef{
 		Name: queue1,
 		ID:   "dag-1",
 	})
 	require.NoError(t, err)
 
-	err = store.Enqueue(ctx, queue2, models.QueuePriorityHigh, digraph.DAGRunRef{
+	err = store.Enqueue(ctx, queue2, execution.QueuePriorityHigh, execution.DAGRunRef{
 		Name: queue2,
 		ID:   "dag-2",
 	})
 	require.NoError(t, err)
 
 	// Get a reader from the store
-	reader := store.Reader(ctx)
+	reader := store.Reader()
 
 	// Create a channel to receive items
-	ch := make(chan models.QueuedItem, 1)
+	ch := make(chan execution.QueuedItem, 1)
 
 	// Start the reader
 	err = reader.Start(ctx, ch)
@@ -275,7 +274,7 @@ func TestQueueReaderRetryDelayPerQueue(t *testing.T) {
 		select {
 		case item := <-ch:
 			seenQueues[item.Data().Name] = true
-			item.Result <- models.QueuedItemProcessingResultRetry
+			item.Result <- execution.QueuedItemProcessingResultRetry
 		case <-time.After(2 * time.Second):
 			t.Fatal("timeout waiting for item")
 		}

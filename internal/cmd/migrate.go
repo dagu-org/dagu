@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/migration"
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/spf13/cobra"
 )
 
-// CmdMigrate creates the migrate command with subcommands
-func CmdMigrate() *cobra.Command {
+// Migrate creates the migrate command with subcommands
+func Migrate() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Migrate legacy data to new format",
@@ -56,7 +55,7 @@ func runMigration(ctx *Context) error {
 	}
 
 	// Create migrator
-	migrator := migration.NewHistoryMigrator(
+	migrator := newHistoryMigrator(
 		ctx.DAGRunStore,
 		dagStore,
 		ctx.Config.Paths.DataDir,

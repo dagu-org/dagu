@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph/status"
-	"github.com/dagu-org/dagu/internal/models"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -42,12 +42,12 @@ steps:
 		expectedNodes     int
 		parallelNodeIndex int
 		expectedChildren  int
-		verify            func(*testing.T, *models.DAGRunStatus, *models.Node)
+		verify            func(*testing.T, *execution.DAGRunStatus, *execution.Node)
 	}{
 		{
 			name: "simple items",
 			dag: `steps:
-  - run: child-echo
+  - call: child-echo
     parallel:
       items:
         - "item1"
@@ -62,7 +62,7 @@ steps:
 		{
 			name: "object items",
 			dag: `steps:
-  - run: child-process
+  - call: child-process
     parallel:
       items:
         - REGION: us-east-1
@@ -76,8 +76,8 @@ steps:
 			expectedNodes:     1,
 			parallelNodeIndex: 0,
 			expectedChildren:  3,
-			verify: func(t *testing.T, _ *models.DAGRunStatus, node *models.Node) {
-				for _, child := range node.Children {
+			verify: func(t *testing.T, _ *execution.DAGRunStatus, node *execution.Node) {
+				for _, child := range node.SubRuns {
 					require.Contains(t, child.Params, `"REGION"`)
 					require.Contains(t, child.Params, `"VERSION"`)
 				}
@@ -88,7 +88,7 @@ steps:
 			dag: `params:
   - ITEMS: '["alpha", "beta", "gamma", "delta"]'
 steps:
-  - run: child-echo
+  - call: child-echo
     parallel: ${ITEMS}
 ` + childEcho,
 			expectedNodes:     1,
@@ -100,7 +100,7 @@ steps:
 			dag: `env:
   - SERVERS: "server1 server2 server3"
 steps:
-  - run: child-echo
+  - call: child-echo
     parallel: ${SERVERS}
 ` + childEcho,
 			expectedNodes:     1,
@@ -112,7 +112,7 @@ steps:
 			dag: `env:
   - ITEMS: '["task1", "task2", "task3"]'
 steps:
-  - run: child-with-output
+  - call: child-with-output
     parallel: $ITEMS
   - name: aggregate-results
     command: echo "Completed parallel tasks"
@@ -131,23 +131,22 @@ steps:
 			expectedNodes:     2,
 			parallelNodeIndex: 0,
 			expectedChildren:  3,
-			verify: func(t *testing.T, dagStatus *models.DAGRunStatus, _ *models.Node) {
+			verify: func(t *testing.T, dagStatus *execution.DAGRunStatus, _ *execution.Node) {
 				require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 				aggregate := dagStatus.Nodes[1]
-				require.Equal(t, status.NodeSuccess, aggregate.Status)
+				require.Equal(t, core.NodeSucceeded, aggregate.Status)
 			},
 		},
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			th := test.Setup(t)
 			dag := th.DAG(t, tc.dag)
 			agent := dag.Agent()
 			err := agent.Run(agent.Context)
 			require.NoError(t, err)
-			dag.AssertLatestStatus(t, status.Success)
+			dag.AssertLatestStatus(t, core.Succeeded)
 
 			dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 			require.NoError(t, statusErr)
@@ -156,8 +155,8 @@ steps:
 
 			require.Greater(t, len(dagStatus.Nodes), tc.parallelNodeIndex, "node index out of range")
 			parallelNode := dagStatus.Nodes[tc.parallelNodeIndex]
-			require.Equal(t, status.NodeSuccess, parallelNode.Status)
-			require.Len(t, parallelNode.Children, tc.expectedChildren)
+			require.Equal(t, core.NodeSucceeded, parallelNode.Status)
+			require.Len(t, parallelNode.SubRuns, tc.expectedChildren)
 
 			if tc.verify != nil {
 				tc.verify(t, &dagStatus, parallelNode)
@@ -168,7 +167,7 @@ steps:
 
 func TestParallelExecution_WithOutput(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-with-output
+  - call: child-with-output
     parallel:
       items:
         - "A"
@@ -195,7 +194,7 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
@@ -204,8 +203,8 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	parallelNode := dagStatus.Nodes[0]
-	require.Equal(t, status.NodeSuccess, parallelNode.Status)
-	require.Len(t, parallelNode.Children, 3)
+	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
+	require.Len(t, parallelNode.SubRuns, 3)
 
 	require.NotNil(t, parallelNode.OutputVariables, "no outputs recorded for node %s", parallelNode.Step.Name)
 	rawOutput, ok := parallelNode.OutputVariables.Load("PARALLEL_RESULTS")
@@ -232,12 +231,12 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	useOutputNode := dagStatus.Nodes[1]
-	require.Equal(t, status.NodeSuccess, useOutputNode.Status)
+	require.Equal(t, core.NodeSucceeded, useOutputNode.Status)
 }
 
 func TestParallelExecution_DeterministicIDs(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-echo
+  - call: child-echo
     parallel:
       items:
         - "test1"
@@ -259,7 +258,7 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
@@ -267,11 +266,11 @@ steps:
 	require.Len(t, dagStatus.Nodes, 1)
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	node := dagStatus.Nodes[0]
-	require.Equal(t, status.NodeSuccess, node.Status)
-	require.Len(t, node.Children, 3)
+	require.Equal(t, core.NodeSucceeded, node.Status)
+	require.Len(t, node.SubRuns, 3)
 
 	unique := make(map[string]string)
-	for _, child := range node.Children {
+	for _, child := range node.SubRuns {
 		unique[child.Params] = child.DAGRunID
 	}
 
@@ -283,7 +282,7 @@ steps:
 
 func TestParallelExecution_PartialFailure(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-conditional-fail
+  - call: child-conditional-fail
     parallel:
       items:
         - "ok1"
@@ -316,13 +315,13 @@ steps:
 	require.Len(t, dagStatus.Nodes, 1)
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	node := dagStatus.Nodes[0]
-	require.Equal(t, status.NodeError, node.Status)
-	require.Len(t, node.Children, 4)
+	require.Equal(t, core.NodeFailed, node.Status)
+	require.Len(t, node.SubRuns, 4)
 }
 
 func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-output-fail
+  - call: child-output-fail
     parallel:
       items:
         - "success"
@@ -353,7 +352,7 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	node := dagStatus.Nodes[0]
-	require.Equal(t, status.NodeError, node.Status)
+	require.Equal(t, core.NodeFailed, node.Status)
 
 	require.NotNil(t, node.OutputVariables, "no outputs recorded for node %s", node.Step.Name)
 	rawOutput, ok := node.OutputVariables.Load("RESULTS")
@@ -377,7 +376,7 @@ func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
 
 	th := test.Setup(t)
 	dag := th.DAG(t, fmt.Sprintf(`steps:
-  - run: child-retry-simple
+  - call: child-retry-simple
     parallel:
       items:
         - "item1"
@@ -404,14 +403,14 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	node := dagStatus.Nodes[0]
-	require.Equal(t, status.NodeSuccess, node.Status)
+	require.Equal(t, core.NodeSucceeded, node.Status)
 
 	require.NotNil(t, node.OutputVariables, "no outputs recorded for node %s", node.Step.Name)
 	rawRaw, ok := node.OutputVariables.Load("RESULTS")
@@ -432,7 +431,7 @@ steps:
 
 func TestParallelExecution_MinimalRetry(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-fail
+  - call: child-fail
     parallel:
       items:
         - "item1"
@@ -457,13 +456,13 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	node := dagStatus.Nodes[0]
-	require.Equal(t, status.NodeError, node.Status)
+	require.Equal(t, core.NodeFailed, node.Status)
 	require.Equal(t, 1, node.RetryCount)
 }
 
 func TestParallelExecution_RetryAndContinueOn(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-fail-both
+  - call: child-fail-both
     parallel:
       items:
         - "item1"
@@ -493,12 +492,12 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	parallelNode := dagStatus.Nodes[0]
-	require.Equal(t, status.NodeError, parallelNode.Status)
+	require.Equal(t, core.NodeFailed, parallelNode.Status)
 	require.Equal(t, 1, parallelNode.RetryCount)
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	nextNode := dagStatus.Nodes[1]
-	require.Equal(t, status.NodeSuccess, nextNode.Status)
+	require.Equal(t, core.NodeSucceeded, nextNode.Status)
 
 	require.NotNil(t, parallelNode.OutputVariables, "no outputs recorded for node %s", parallelNode.Step.Name)
 	_, ok := parallelNode.OutputVariables.Load("RESULTS")
@@ -507,7 +506,7 @@ steps:
 
 func TestParallelExecution_OutputsArray(t *testing.T) {
 	const dagContent = `steps:
-  - run: child-with-output
+  - call: child-with-output
     parallel:
       items: ["task1", "task2", "task3"]
     output: RESULTS
@@ -535,15 +534,15 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	parallelNode := dagStatus.Nodes[0]
-	require.Equal(t, status.NodeSuccess, parallelNode.Status)
-	require.Len(t, parallelNode.Children, 3)
+	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
+	require.Len(t, parallelNode.SubRuns, 3)
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	firstNode := dagStatus.Nodes[1]
@@ -574,7 +573,7 @@ func TestParallelExecution_ExceedsMaxLimit(t *testing.T) {
 
 	th := test.Setup(t)
 	dag := th.DAG(t, fmt.Sprintf(`steps:
-  - run: child-echo
+  - call: child-echo
     parallel:
       items:
 %s
@@ -605,7 +604,7 @@ func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
 	}
 
 	dag := helper.DAG(t, fmt.Sprintf(`steps:
-  - run: child-echo
+  - call: child-echo
     parallel:
       items:
 %s
@@ -649,7 +648,7 @@ func TestParallelExecution_ObjectItemProperties(t *testing.T) {
       ]'
     output: CONFIGS
 
-  - run: sync-data
+  - call: sync-data
     parallel:
       items: ${CONFIGS}
       maxConcurrent: 2
@@ -676,7 +675,7 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
@@ -685,8 +684,8 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	syncNode := dagStatus.Nodes[1]
-	require.Equal(t, status.NodeSuccess, syncNode.Status)
-	require.Len(t, syncNode.Children, 3)
+	require.Equal(t, core.NodeSucceeded, syncNode.Status)
+	require.Len(t, syncNode.SubRuns, 3)
 
 	require.NotNil(t, syncNode.OutputVariables, "no outputs recorded for node %s", syncNode.Step.Name)
 	rawRaw, ok := syncNode.OutputVariables.Load("RESULTS")
@@ -738,7 +737,7 @@ steps:
   - command: find %s -name "*.csv" -type f
     output: FILES
 
-  - run: process-file
+  - call: process-file
     parallel: ${FILES}
     params:
       - ITEM: ${ITEM}
@@ -748,7 +747,7 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
@@ -766,8 +765,8 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	processFiles := dagStatus.Nodes[1]
-	require.Equal(t, status.NodeSuccess, processFiles.Status)
-	require.Len(t, processFiles.Children, 3)
+	require.Equal(t, core.NodeSucceeded, processFiles.Status)
+	require.Len(t, processFiles.SubRuns, 3)
 
 	require.NotNil(t, processFiles.OutputVariables, "no outputs recorded for node %s", processFiles.Step.Name)
 	rawRaw, ok := processFiles.OutputVariables.Load("RESULTS")
@@ -785,7 +784,7 @@ steps:
 
 func TestParallelExecution_StaticObjectItems(t *testing.T) {
 	const dagContent = `steps:
-  - run: deploy-service
+  - call: deploy-service
     parallel:
       maxConcurrent: 3
       items:
@@ -846,8 +845,8 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	node := dagStatus.Nodes[0]
-	require.Equal(t, status.NodeError, node.Status)
-	require.Len(t, node.Children, 3)
+	require.Equal(t, core.NodeFailed, node.Status)
+	require.Len(t, node.SubRuns, 3)
 
 	require.NotNil(t, node.OutputVariables, "no outputs recorded for node %s", node.Step.Name)
 	rawRaw, ok := node.OutputVariables.Load("DEPLOYMENT_RESULTS")
@@ -872,7 +871,7 @@ func TestIssue1274_ParallelJSONSingleItem(t *testing.T) {
       echo '{"file": "params.txt", "config": "env"}'
     output: jsonList
 
-  - run: issue-1274-worker
+  - call: issue-1274-worker
     parallel:
       items: ${jsonList}
       maxConcurrent: 1
@@ -895,7 +894,7 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
@@ -904,8 +903,8 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	parallelNode := dagStatus.Nodes[1]
-	require.Equal(t, status.NodeSuccess, parallelNode.Status)
-	require.Len(t, parallelNode.Children, 1, "should dispatch exactly 1 worker instance for 1 JSON item")
+	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
+	require.Len(t, parallelNode.SubRuns, 1, "should dispatch exactly 1 worker instance for 1 JSON item")
 }
 
 // TestIssue1274_ParallelJSONMultipleItems tests that parallel execution
@@ -918,7 +917,7 @@ func TestIssue1274_ParallelJSONMultipleItems(t *testing.T) {
       echo '{"file": "file3.txt", "config": "dev"}'
     output: jsonList
 
-  - run: issue-1274-worker-multi
+  - call: issue-1274-worker-multi
     parallel:
       items: ${jsonList}
       maxConcurrent: 1
@@ -941,7 +940,7 @@ steps:
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
 	require.NoError(t, err)
-	dag.AssertLatestStatus(t, status.Success)
+	dag.AssertLatestStatus(t, core.Succeeded)
 
 	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 	require.NoError(t, statusErr)
@@ -950,8 +949,8 @@ steps:
 
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	parallelNode := dagStatus.Nodes[1]
-	require.Equal(t, status.NodeSuccess, parallelNode.Status)
-	require.Len(t, parallelNode.Children, 3, "should dispatch exactly 3 worker instances for 3 JSON items")
+	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
+	require.Len(t, parallelNode.SubRuns, 3, "should dispatch exactly 3 worker instances for 3 JSON items")
 }
 
 type parallelSummary struct {

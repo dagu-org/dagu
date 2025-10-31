@@ -122,7 +122,7 @@ const Graph: React.FC<Props> = ({
 
     // Add legend comment
     dat.push(
-      `%% Shapes: Rectangle=Normal Step, Hexagon=Child DAG, Stadium=Parallel Execution`
+      `%% Shapes: Rectangle=Normal Step, Subprocess=Single Sub DAG, Processes=Parallel Execution`
     );
 
     // Store the click handler in window for backward compatibility
@@ -134,6 +134,8 @@ const Graph: React.FC<Props> = ({
     // Track link style indices for individual arrow styling
     let linkIndex = 0;
     const linkStyles: string[] = [];
+    // Track node classes for separate application
+    const nodeClasses = new Map<string, string>();
 
     const addNodeFn = (
       step: components['schemas']['Step'],
@@ -143,27 +145,40 @@ const Graph: React.FC<Props> = ({
       const id = step.name.replace(/[\s-]/g, 'dagutmp'); // Replace spaces and dashes with 'x'
       const c = graphStatusMap[status] || '';
 
-      // Check if this is a child dagRun node (has a 'run' property)
-      const isChildDAGRun = !!step.run;
-      const hasParallelExecutions = node?.children && node.children.length > 1;
+      // Check if this is a sub dagRun node (has a call property)
+      const subDAGName = step.call;
+      // Check if this is a sub dagRun node (has a 'run' property)
+      const isSubDAGRun = !!step.call;
+      const hasParallelExecutions = !!step.parallel;
 
-      // Add indicator for child dagRun nodes in the label only
+      // Add indicator for sub dagRun nodes in the label only
       // Escape any special characters in the label to prevent Mermaid parsing errors
       let label = step.name;
-      if (isChildDAGRun && step.run) {
-        if (hasParallelExecutions && node?.children) {
+      if (isSubDAGRun && subDAGName) {
+        if (hasParallelExecutions && node?.subRuns) {
           // Show parallel execution count in the label - avoid brackets in stadium nodes
-          label = `${step.name} → ${step.run} x${node.children.length}`;
+          label = `${step.name} → ${subDAGName} x${node.subRuns.length}`;
         } else {
-          // Single child DAG run
-          label = `${step.name} → ${step.run}`;
+          // Single sub DAG run
+          label = `${step.name} → ${subDAGName}`;
         }
       }
 
-      // Use different shape for child dagRuns
-      if (isChildDAGRun) {
-        dat.push(`${id}{{${label}}}${c};`);
+      // Use different shapes based on node type
+      if (isSubDAGRun) {
+        if (hasParallelExecutions) {
+          // Multiple parallel executions - use procs icon
+          dat.push(`${id}@{ shape: procs, label: "${label}"};`);
+        } else {
+          // Single sub DAG - use subproc icon
+          dat.push(`${id}@{ shape: subproc, label: "${label}"};`);
+        }
+        // Store class for later application (remove ::: prefix)
+        if (c) {
+          nodeClasses.set(id, c.replace(':::', ''));
+        }
       } else {
+        // Normal step - use rectangle with inline class syntax
         dat.push(`${id}["${label}"]${c};`);
       }
 
@@ -239,6 +254,11 @@ const Graph: React.FC<Props> = ({
 
     // Add custom link styles
     dat.push(...linkStyles);
+
+    // Apply classes to nodes that use the new shape syntax (procs/subproc)
+    nodeClasses.forEach((className, nodeId) => {
+      dat.push(`class ${nodeId} ${className};`);
+    });
 
     return dat.join('\n');
   }, [steps, onClickNode, flowchart, showIcons]);
