@@ -38,3 +38,4 @@ __debug_bin*
 # Go cache
 .gocache
 .gomodcache
+ui/package-lock.json

@@ -4,6 +4,8 @@
  * @module features/dagRuns/components/common
  */
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import {
   Tooltip,
   TooltipContent,
@@ -13,6 +15,7 @@ import {
 import dayjs from '@/lib/dayjs';
 import { RefreshCw, Square, X } from 'lucide-react';
 import React from 'react';
+import type { operations } from '../../../../api/v2/schema';
 import { components, Status } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
@@ -56,6 +59,8 @@ function DAGRunActions({
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
   const [isDequeueModal, setIsDequeueModal] = React.useState(false);
+  const [retryNewRunId, setRetryNewRunId] = React.useState('');
+  const [retryGenerateNewId, setRetryGenerateNewId] = React.useState(false);
 
   const client = useClient();
 
@@ -127,7 +132,11 @@ function DAGRunActions({
                   variant="ghost"
                   size="icon"
                   disabled={!buttonState['retry']}
-                  onClick={() => setIsRetryModal(true)}
+                  onClick={() => {
+                    setRetryNewRunId(dagRun?.dagRunId || '');
+                    setRetryGenerateNewId(false);
+                    setIsRetryModal(true);
+                  }}
                   className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
                 >
                   <RefreshCw className="h-4 w-4" />
@@ -138,7 +147,11 @@ function DAGRunActions({
                   variant="outline"
                   size="sm"
                   disabled={!buttonState['retry']}
-                  onClick={() => setIsRetryModal(true)}
+                  onClick={() => {
+                    setRetryNewRunId(dagRun?.dagRunId || '');
+                    setRetryGenerateNewId(false);
+                    setIsRetryModal(true);
+                  }}
                   className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
@@ -221,11 +234,22 @@ function DAGRunActions({
           title="Confirmation"
           buttonText="Retry"
           visible={isRetryModal}
-          dismissModal={() => setIsRetryModal(false)}
+          dismissModal={() => {
+            setIsRetryModal(false);
+            setRetryGenerateNewId(false);
+          }}
           onSubmit={async () => {
             setIsRetryModal(false);
 
-            const { error } = await client.POST('/dag-runs/{name}/{dagRunId}/retry', {
+            const trimmedNewId = retryNewRunId.trim();
+            const body: operations['retryDAGRun']['requestBody']['content']['application/json'] = {};
+            if (retryGenerateNewId) {
+              body.generateNewRunId = true;
+            } else if (trimmedNewId) {
+              body.dagRunId = trimmedNewId;
+            }
+
+            const { data, error } = await client.POST('/dag-runs/{name}/{dagRunId}/retry', {
               params: {
                 path: {
                   name: name,
@@ -235,13 +259,14 @@ function DAGRunActions({
                   remoteNode: appBarContext.selectedRemoteNode || 'local',
                 },
               },
-              body: {
-                dagRunId: dagRun.dagRunId,
-              },
+              body,
             });
             if (error) {
               alert(error.message || 'An error occurred');
               return;
+            }
+            if (data?.dagRunId) {
+              console.info('Retry triggered with DAG run ID', data.dagRunId);
             }
             reloadData();
           }}
@@ -275,6 +300,43 @@ function DAGRunActions({
                 </StatusChip>
               </LabeledItem>
             )}
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="retry-generate-new-id"
+                  checked={retryGenerateNewId}
+                  onCheckedChange={(checked) =>
+                    setRetryGenerateNewId(checked === true)
+                  }
+                />
+                <label
+                  htmlFor="retry-generate-new-id"
+                  className="text-sm font-medium leading-none"
+                >
+                  Generate a new Run ID
+                </label>
+              </div>
+              {!retryGenerateNewId && (
+                <div className="space-y-1">
+                  <label
+                    htmlFor="retry-new-run-id"
+                    className="text-sm font-medium leading-none"
+                  >
+                    Run ID to use
+                  </label>
+                  <Input
+                    id="retry-new-run-id"
+                    value={retryNewRunId}
+                    onChange={(event) => setRetryNewRunId(event.target.value)}
+                    placeholder="Leave unchanged to reuse the original ID"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Provide a different value or enable generation above to start a fresh DAG-run
+                    while reusing this DAG history.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </ConfirmModal>
 
