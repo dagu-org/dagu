@@ -83,7 +83,6 @@ export interface paths {
          *
          *     Returns a list of validation errors. When the spec can be partially parsed,
          *     the response may also include parsed DAG details built with error-tolerant loading.
-         *
          */
         post: operations["validateDAGSpec"];
         delete?: never;
@@ -339,9 +338,31 @@ export interface paths {
          *
          *     This endpoint does not require a pre-existing DAG file; the supplied `spec` is parsed and validated
          *     similarly to `/dags/validate`, and the run is executed immediately if valid.
-         *
          */
         post: operations["executeDAGRunFromSpec"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/enqueue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue a DAG-run from inline spec
+         * @description Creates a DAG-run directly from a provided DAG specification (YAML) and enqueues it for execution.
+         *
+         *     This endpoint does not require a pre-existing DAG file; the supplied `spec` is parsed and validated
+         *     similarly to `/dags/validate`, and the run is persisted to the queue if valid.
+         */
+        post: operations["enqueueDAGRunFromSpec"];
         delete?: never;
         options?: never;
         head?: never;
@@ -804,7 +825,6 @@ export interface components {
          *     4: "Success"
          *     5: "Queued"
          *     6: "Partial Success"
-         *
          * @enum {integer}
          */
         Status: Status;
@@ -822,7 +842,6 @@ export interface components {
          *     4: "Success"
          *     5: "Skipped"
          *     6: "Partial Success"
-         *
          * @enum {integer}
          */
         NodeStatus: NodeStatus;
@@ -1341,10 +1360,11 @@ export interface operations {
                 name?: string;
                 /** @description Filter DAGs by tag */
                 tag?: string;
-                /** @description Field to sort by:
+                /**
+                 * @description Field to sort by:
                  *     - `name`: Sort alphabetically by DAG name (case-insensitive)
                  *     - `nextRun`: Sort by next scheduled run time. DAGs with earlier next run times appear first in ascending order. DAGs without schedules appear last.
-                 *      */
+                 */
                 sort?: PathsDagsGetParametersQuerySort;
                 /** @description Sort order (ascending or descending) */
                 order?: PathsDagsGetParametersQueryOrder;
@@ -2167,6 +2187,74 @@ export interface operations {
                 };
             };
             /** @description A DAG with the same name is already running and singleton is enabled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    enqueueDAGRunFromSpec: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description DAG specification in YAML format */
+                    spec: string;
+                    /** @description Optional name to use when the spec omits a name */
+                    name?: string;
+                    /** @description Parameters to persist with the queued DAG-run in JSON format */
+                    params?: string;
+                    /** @description Optional ID for the DAG-run; if omitted a new one will be generated */
+                    dagRunId?: string;
+                    /** @description Override the queue to use for this DAG-run */
+                    queue?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description DAG-run successfully enqueued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description ID of the queued DAG-run */
+                        dagRunId: string;
+                    };
+                };
+            };
+            /** @description Invalid DAG spec or parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A DAG with the same name is already queued beyond maxActiveRuns */
             409: {
                 headers: {
                     [name: string]: unknown;
