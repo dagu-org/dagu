@@ -104,6 +104,14 @@ function DAGRuns() {
   // View mode comes from user preferences (local storage)
   const viewMode = preferences.dagRunsViewMode;
 
+  // Date range mode: 'preset' or 'custom'
+  const [dateRangeMode, setDateRangeMode] = React.useState<'preset' | 'custom'>(
+    query.get('dateMode') as 'preset' | 'custom' || 'preset'
+  );
+  const [datePreset, setDatePreset] = React.useState<string>(
+    query.get('preset') || 'today'
+  );
+
   React.useEffect(() => {
     appBarContext.setTitle('DAG Runs');
   }, [appBarContext]);
@@ -194,6 +202,59 @@ function DAGRuns() {
   const handleViewModeChange = (value: string) => {
     const newViewMode = value as 'list' | 'grouped';
     updatePreference('dagRunsViewMode', newViewMode);
+  };
+
+  const getPresetDates = (preset: string): { from: string; to?: string } => {
+    const now = dayjs();
+    const startOfDay = config.tzOffsetInSec !== undefined
+      ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+      : now.startOf('day');
+
+    switch (preset) {
+      case 'today':
+        return { from: startOfDay.format('YYYY-MM-DDTHH:mm') };
+      case 'yesterday':
+        return {
+          from: startOfDay.subtract(1, 'day').format('YYYY-MM-DDTHH:mm'),
+          to: startOfDay.format('YYYY-MM-DDTHH:mm'),
+        };
+      case 'last7days':
+        return { from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm') };
+      case 'last30days':
+        return { from: startOfDay.subtract(30, 'day').format('YYYY-MM-DDTHH:mm') };
+      case 'thisWeek':
+        return { from: startOfDay.startOf('week').format('YYYY-MM-DDTHH:mm') };
+      case 'thisMonth':
+        return { from: startOfDay.startOf('month').format('YYYY-MM-DDTHH:mm') };
+      default:
+        return { from: startOfDay.format('YYYY-MM-DDTHH:mm') };
+    }
+  };
+
+  const handleDatePresetChange = (preset: string) => {
+    setDatePreset(preset);
+    const dates = getPresetDates(preset);
+    setFromDate(dates.from);
+    setToDate(dates.to);
+    setApiFromDate(dates.from);
+    setApiToDate(dates.to);
+    addSearchParam('preset', preset);
+    addSearchParam('dateMode', 'preset');
+    // Trigger search with new dates
+    mutate();
+  };
+
+  const handleDateRangeModeToggle = () => {
+    const newMode = dateRangeMode === 'preset' ? 'custom' : 'preset';
+    setDateRangeMode(newMode);
+    addSearchParam('dateMode', newMode);
+
+    if (newMode === 'preset') {
+      // Apply current preset
+      const dates = getPresetDates(datePreset);
+      setFromDate(dates.from);
+      setToDate(dates.to);
+    }
   };
 
   const handleInputKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -357,16 +418,42 @@ function DAGRuns() {
           </Button>
           <RefreshButton onRefresh={async () => { await mutate(); }} />
         </div>
-        <DateRangePicker
-          fromDate={fromDate}
-          toDate={toDate}
-          onFromDateChange={setFromDate}
-          onToDateChange={setToDate}
-          onEnterPress={() => handleSearch()}
-          fromLabel={`From ${tzLabel}`}
-          toLabel={`To ${tzLabel}`}
-          className="w-full md:w-auto"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          {dateRangeMode === 'preset' ? (
+            <Select value={datePreset} onValueChange={handleDatePresetChange}>
+              <SelectTrigger className="w-[180px] bg-background">
+                <SelectValue placeholder="Select period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="yesterday">Yesterday</SelectItem>
+                <SelectItem value="last7days">Last 7 days</SelectItem>
+                <SelectItem value="last30days">Last 30 days</SelectItem>
+                <SelectItem value="thisWeek">This week</SelectItem>
+                <SelectItem value="thisMonth">This month</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <DateRangePicker
+              fromDate={fromDate}
+              toDate={toDate}
+              onFromDateChange={setFromDate}
+              onToDateChange={setToDate}
+              onEnterPress={() => handleSearch()}
+              fromLabel={`From ${tzLabel}`}
+              toLabel={`To ${tzLabel}`}
+              className="w-full md:w-auto"
+            />
+          )}
+          <Button
+            onClick={handleDateRangeModeToggle}
+            variant="outline"
+            size="default"
+            className="px-4 font-medium"
+          >
+            {dateRangeMode === 'preset' ? 'Custom Range' : 'Quick Select'}
+          </Button>
+        </div>
       </div>
       {viewMode === 'list' ? (
         <DAGRunTable dagRuns={data?.dagRuns || []} />
