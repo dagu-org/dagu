@@ -7,10 +7,12 @@ import React, {
 } from 'react';
 
 export type Theme = 'dark' | 'light';
+export type DAGRunsViewMode = 'list' | 'grouped';
 
 export type UserPreferences = {
   pageLimit: number;
   theme: Theme;
+  dagRunsViewMode: DAGRunsViewMode;
 };
 
 const UserPreferencesContext = createContext<{
@@ -33,6 +35,7 @@ export function UserPreferencesProvider({
       const defaultPrefs: UserPreferences = {
         pageLimit: 50,
         theme: 'dark', // Default to dark theme
+        dagRunsViewMode: 'list', // Default to list view
       };
       const prefs = saved
         ? { ...defaultPrefs, ...JSON.parse(saved) }
@@ -54,6 +57,7 @@ export function UserPreferencesProvider({
       return {
         pageLimit: 50,
         theme: 'dark' as Theme,
+        dagRunsViewMode: 'list' as DAGRunsViewMode,
       };
     }
   });
