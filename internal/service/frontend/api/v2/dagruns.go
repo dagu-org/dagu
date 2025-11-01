@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -691,6 +692,139 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 	}
 
 	return api.DequeueDAGRun200Response{}, nil
+}
+
+func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRunRequestObject) (api.RescheduleDAGRunResponseObject, error) {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
+	attempt, err := a.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(request.Name, request.DagRunId))
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+		}
+	}
+
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read status: %w", err)
+	}
+
+	dag, err := attempt.ReadDAG(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read DAG snapshot: %w", err)
+	}
+
+	dag.Params = status.ParamsList
+
+	var (
+		nameOverride string
+		newDagRunID  string
+		singleton    bool
+	)
+
+	if body := request.Body; body != nil {
+		if body.DefinitionStrategy != nil {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "definitionStrategy not supported",
+			}
+		}
+		if body.DagName != nil && *body.DagName != "" {
+			nameOverride = *body.DagName
+			if err := core.ValidateDAGName(nameOverride); err != nil {
+				return nil, &Error{
+					HTTPStatus: http.StatusBadRequest,
+					Code:       api.ErrorCodeBadRequest,
+					Message:    err.Error(),
+				}
+			}
+			dag.Name = nameOverride
+		}
+		if body.DagRunId != nil && *body.DagRunId != "" {
+			newDagRunID = *body.DagRunId
+		}
+		if body.Singleton != nil {
+			singleton = *body.Singleton
+		}
+	}
+
+	if newDagRunID == "" {
+		id, genErr := a.dagRunMgr.GenDAGRunID(ctx)
+		if genErr != nil {
+			return nil, fmt.Errorf("error generating dag-run ID: %w", genErr)
+		}
+		newDagRunID = id
+	}
+
+	if _, err := a.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(dag.Name, newDagRunID)); err == nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeAlreadyExists,
+			Message:    fmt.Sprintf("dag-run ID %s already exists for DAG %s", newDagRunID, dag.Name),
+		}
+	} else if !errors.Is(err, execution.ErrDAGRunIDNotFound) {
+		return nil, fmt.Errorf("failed to verify dag-run ID uniqueness: %w", err)
+	}
+
+	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to access proc store: %w", err)
+	}
+
+	if singleton || dag.MaxActiveRuns == 1 {
+		if liveCount > 0 {
+			return nil, &Error{
+				HTTPStatus: http.StatusConflict,
+				Code:       api.ErrorCodeMaxRunReached,
+				Message:    fmt.Sprintf("DAG %s is already running, cannot start", dag.Name),
+			}
+		}
+	}
+
+	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read queue: %w", err)
+	}
+	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
+		return nil, &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeMaxRunReached,
+			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns),
+		}
+	}
+
+	logger.Info(ctx, "Rescheduling dag-run",
+		"action", "reschedule",
+		"dag", dag.Name,
+		"fromDagRunId", request.DagRunId,
+		"dagRunId", newDagRunID,
+		"singleton", singleton,
+	)
+
+	if err := a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
+		dagRunID:     newDagRunID,
+		nameOverride: nameOverride,
+		fromRunID:    request.DagRunId,
+		target:       request.Name,
+		singleton:    singleton,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to start dag-run: %w", err)
+	}
+
+	queued := false
+	if dagStatus, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, newDagRunID); dagStatus != nil {
+		queued = dagStatus.Status == core.Queued
+	}
+
+	return api.RescheduleDAGRun200JSONResponse{
+		DagRunId: newDagRunID,
+		Queued:   queued,
+	}, nil
 }
 
 // GetSubDAGRuns returns timing and status information for all sub DAG runs

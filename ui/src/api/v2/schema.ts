@@ -388,6 +388,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/reschedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reschedule DAG-run with a new run ID
+         * @description Launch a fresh DAG-run from a historic execution while reusing its stored parameters.
+         */
+        post: operations["rescheduleDAGRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/sub-dag-runs": {
         parameters: {
             query?: never;
@@ -2280,6 +2300,94 @@ export interface operations {
             };
         };
     };
+    rescheduleDAGRun: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description Strategy for selecting which DAG definition to use when rescheduling. Currently experimental and not yet supported.
+                     * @enum {string}
+                     */
+                    definitionStrategy?: PathsDagRunsNameDagRunIdReschedulePostRequestBodyApplicationJsonDefinitionStrategy;
+                    /** @description Explicit run ID for the new DAG-run; if omitted a new ID is generated. */
+                    dagRunId?: string;
+                    /** @description Optional DAG name override for the new run. */
+                    dagName?: string;
+                    /**
+                     * @description If true, prevent starting if a DAG with the same name is already running (returns 409 conflict).
+                     * @default false
+                     */
+                    singleton?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Successfully scheduled a new DAG-run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description ID of the newly created DAG-run. */
+                        dagRunId: string;
+                        /** @description Indicates whether the run was queued instead of starting immediately. */
+                        queued: boolean;
+                    };
+                };
+            };
+            /** @description Invalid request parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Historic run not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict (run ID already exists or concurrency guard blocks execution) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getSubDAGRuns: {
         parameters: {
             query?: {
@@ -2986,6 +3094,9 @@ export enum PathsDagsGetParametersQuerySort {
 export enum PathsDagsGetParametersQueryOrder {
     asc = "asc",
     desc = "desc"
+}
+export enum PathsDagRunsNameDagRunIdReschedulePostRequestBodyApplicationJsonDefinitionStrategy {
+    latest = "latest"
 }
 export enum ErrorCode {
     forbidden = "forbidden",
