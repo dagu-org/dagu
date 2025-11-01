@@ -725,7 +725,7 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	var (
 		nameOverride       string
 		singleton          bool
-		definitionStrategy string = "snapshot"
+		definitionStrategy = "snapshot"
 		newDagRunID        string
 	)
 
