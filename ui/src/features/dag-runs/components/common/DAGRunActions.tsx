@@ -252,7 +252,7 @@ function DAGRunActions({
                 },
                 body: {
                   dagRunId: newRunId || undefined, // Auto-generate if empty
-                  dagName: dagNameOverride || undefined, // Use original if empty
+                  ...(dagNameOverride ? { dagName: dagNameOverride } : {}), // Use original if empty
                   singleton: false,
                 },
               });
