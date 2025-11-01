@@ -104,12 +104,16 @@ function DAGRuns() {
   // View mode comes from user preferences (local storage)
   const viewMode = preferences.dagRunsViewMode;
 
-  // Date range mode: 'preset' or 'custom'
-  const [dateRangeMode, setDateRangeMode] = React.useState<'preset' | 'custom'>(
-    query.get('dateMode') as 'preset' | 'custom' || 'preset'
+  // Date range mode: 'preset', 'specific', or 'custom'
+  const [dateRangeMode, setDateRangeMode] = React.useState<'preset' | 'specific' | 'custom'>(
+    query.get('dateMode') as 'preset' | 'specific' | 'custom' || 'preset'
   );
   const [datePreset, setDatePreset] = React.useState<string>(
     query.get('preset') || 'today'
+  );
+  const [specificPeriod, setSpecificPeriod] = React.useState<'date' | 'month' | 'year'>('date');
+  const [specificValue, setSpecificValue] = React.useState<string>(
+    query.get('specificValue') || dayjs().format('YYYY-MM-DD')
   );
 
   React.useEffect(() => {
@@ -244,8 +248,45 @@ function DAGRuns() {
     mutate();
   };
 
-  const handleDateRangeModeToggle = () => {
-    const newMode = dateRangeMode === 'preset' ? 'custom' : 'preset';
+  const getSpecificPeriodDates = (period: 'date' | 'month' | 'year', value: string): { from: string; to: string } => {
+    switch (period) {
+      case 'date': {
+        const date = dayjs(value);
+        return {
+          from: date.startOf('day').format('YYYY-MM-DDTHH:mm'),
+          to: date.endOf('day').format('YYYY-MM-DDTHH:mm'),
+        };
+      }
+      case 'month': {
+        const date = dayjs(value);
+        return {
+          from: date.startOf('month').format('YYYY-MM-DDTHH:mm'),
+          to: date.endOf('month').format('YYYY-MM-DDTHH:mm'),
+        };
+      }
+      case 'year': {
+        const date = dayjs(value);
+        return {
+          from: date.startOf('year').format('YYYY-MM-DDTHH:mm'),
+          to: date.endOf('year').format('YYYY-MM-DDTHH:mm'),
+        };
+      }
+    }
+  };
+
+  const handleSpecificPeriodChange = (value: string) => {
+    setSpecificValue(value);
+    const dates = getSpecificPeriodDates(specificPeriod, value);
+    setFromDate(dates.from);
+    setToDate(dates.to);
+    setApiFromDate(dates.from);
+    setApiToDate(dates.to);
+    addSearchParam('specificValue', value);
+    // Trigger search with new dates
+    mutate();
+  };
+
+  const handleDateRangeModeChange = (newMode: 'preset' | 'specific' | 'custom') => {
     setDateRangeMode(newMode);
     addSearchParam('dateMode', newMode);
 
@@ -254,6 +295,17 @@ function DAGRuns() {
       const dates = getPresetDates(datePreset);
       setFromDate(dates.from);
       setToDate(dates.to);
+      setApiFromDate(dates.from);
+      setApiToDate(dates.to);
+      mutate();
+    } else if (newMode === 'specific') {
+      // Apply current specific period value
+      const dates = getSpecificPeriodDates(specificPeriod, specificValue);
+      setFromDate(dates.from);
+      setToDate(dates.to);
+      setApiFromDate(dates.from);
+      setApiToDate(dates.to);
+      mutate();
     }
   };
 
@@ -419,6 +471,38 @@ function DAGRuns() {
           <RefreshButton onRefresh={async () => { await mutate(); }} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ToggleGroup aria-label="Date range mode">
+            <ToggleButton
+              value="preset"
+              groupValue={dateRangeMode}
+              onClick={() => handleDateRangeModeChange('preset')}
+              position="first"
+              aria-label="Quick select"
+              className="h-10 px-3 text-xs"
+            >
+              Quick
+            </ToggleButton>
+            <ToggleButton
+              value="specific"
+              groupValue={dateRangeMode}
+              onClick={() => handleDateRangeModeChange('specific')}
+              position="middle"
+              aria-label="Specific date/month/year"
+              className="h-10 px-3 text-xs"
+            >
+              Specific
+            </ToggleButton>
+            <ToggleButton
+              value="custom"
+              groupValue={dateRangeMode}
+              onClick={() => handleDateRangeModeChange('custom')}
+              position="last"
+              aria-label="Custom range"
+              className="h-10 px-3 text-xs"
+            >
+              Custom
+            </ToggleButton>
+          </ToggleGroup>
           {dateRangeMode === 'preset' ? (
             <Select value={datePreset} onValueChange={handleDatePresetChange}>
               <SelectTrigger className="w-[180px] bg-background">
@@ -433,6 +517,45 @@ function DAGRuns() {
                 <SelectItem value="thisMonth">This month</SelectItem>
               </SelectContent>
             </Select>
+          ) : dateRangeMode === 'specific' ? (
+            <>
+              <Select
+                value={specificPeriod}
+                onValueChange={(v) => {
+                  const newPeriod = v as 'date' | 'month' | 'year';
+                  setSpecificPeriod(newPeriod);
+                  // Update the value format based on the new period type
+                  let newValue: string;
+                  if (newPeriod === 'date') {
+                    newValue = dayjs().format('YYYY-MM-DD');
+                  } else if (newPeriod === 'month') {
+                    newValue = dayjs().format('YYYY-MM');
+                  } else {
+                    newValue = dayjs().format('YYYY');
+                  }
+                  setSpecificValue(newValue);
+                  handleSpecificPeriodChange(newValue);
+                }}
+              >
+                <SelectTrigger className="w-[120px] bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date">Date</SelectItem>
+                  <SelectItem value="month">Month</SelectItem>
+                  <SelectItem value="year">Year</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type={specificPeriod === 'date' ? 'date' : specificPeriod === 'month' ? 'month' : 'number'}
+                value={specificValue}
+                onChange={(e) => handleSpecificPeriodChange(e.target.value)}
+                placeholder={specificPeriod === 'year' ? 'YYYY' : undefined}
+                min={specificPeriod === 'year' ? '2000' : undefined}
+                max={specificPeriod === 'year' ? '2100' : undefined}
+                className="w-[160px] bg-background h-10"
+              />
+            </>
           ) : (
             <DateRangePicker
               fromDate={fromDate}
@@ -445,14 +568,6 @@ function DAGRuns() {
               className="w-full md:w-auto"
             />
           )}
-          <Button
-            onClick={handleDateRangeModeToggle}
-            variant="outline"
-            size="default"
-            className="px-4 font-medium"
-          >
-            {dateRangeMode === 'preset' ? 'Custom Range' : 'Quick Select'}
-          </Button>
         </div>
       </div>
       {viewMode === 'list' ? (
