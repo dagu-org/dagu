@@ -880,6 +880,75 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-runs/enqueue:
+    post:
+      summary: "Enqueue a DAG-run from inline spec"
+      description: |
+        Creates a DAG-run directly from a provided DAG specification (YAML) and enqueues it for execution.
+
+        This endpoint does not require a pre-existing DAG file; the supplied `spec` is parsed and validated
+        similarly to `/dags/validate`, and the run is persisted to the queue if valid.
+      operationId: "enqueueDAGRunFromSpec"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spec:
+                  type: string
+                  description: "DAG specification in YAML format"
+                name:
+                  type: string
+                  description: "Optional name to use when the spec omits a name"
+                params:
+                  type: string
+                  description: "Parameters to persist with the queued DAG-run in JSON format"
+                dagRunId:
+                  type: string
+                  description: "Optional ID for the DAG-run; if omitted a new one will be generated"
+                queue:
+                  type: string
+                  description: "Override the queue to use for this DAG-run"
+              required:
+                - spec
+      responses:
+        "200":
+          description: "DAG-run successfully enqueued"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRunId:
+                    type: string
+                    description: "ID of the queued DAG-run"
+                required:
+                  - dagRunId
+        "400":
+          description: "Invalid DAG spec or parameters"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "A DAG with the same name is already queued beyond maxActiveRuns"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs/{name}:
     get:
       summary: "List all DAG-runs with a specific name"
