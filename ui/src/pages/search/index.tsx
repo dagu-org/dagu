@@ -3,14 +3,91 @@ import { Input } from '@/components/ui/input';
 import React, { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useSearchState } from '../../contexts/SearchStateContext';
 import SearchResult from '../../features/search/components/SearchResult';
 import { useQuery } from '../../hooks/api';
 import Title from '../../ui/Title';
 
 function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchVal, setSearchVal] = React.useState(searchParams.get('q') || '');
   const appBarContext = React.useContext(AppBarContext);
+  const searchState = useSearchState();
+  const remoteKey = appBarContext.selectedRemoteNode || 'local';
+
+  type SearchFilters = {
+    searchVal: string;
+  };
+
+  const areFiltersEqual = (a: SearchFilters, b: SearchFilters) =>
+    a.searchVal === b.searchVal;
+
+  const defaultFilters = React.useMemo<SearchFilters>(
+    () => ({
+      searchVal: searchParams.get('q') || '',
+    }),
+    [searchParams]
+  );
+
+  const [searchVal, setSearchVal] = React.useState(defaultFilters.searchVal);
+
+  const currentFilters = React.useMemo<SearchFilters>(
+    () => ({
+      searchVal,
+    }),
+    [searchVal]
+  );
+
+  const currentFiltersRef = React.useRef(currentFilters);
+  React.useEffect(() => {
+    currentFiltersRef.current = currentFilters;
+  }, [currentFilters]);
+
+  const lastPersistedFiltersRef = React.useRef<SearchFilters | null>(null);
+
+  React.useEffect(() => {
+    const stored = searchState.readState<SearchFilters>('searchPage', remoteKey);
+    const hasUrl = !!searchParams.get('q');
+    let next: SearchFilters;
+    let shouldSyncUrl = false;
+
+    if (hasUrl) {
+      next = defaultFilters;
+    } else if (stored) {
+      next = {
+        searchVal: stored.searchVal ?? defaultFilters.searchVal,
+      };
+      shouldSyncUrl = !!stored.searchVal;
+    } else {
+      next = defaultFilters;
+      shouldSyncUrl = !!defaultFilters.searchVal;
+    }
+
+    const current = currentFiltersRef.current;
+    if (current && areFiltersEqual(current, next)) {
+      if (!stored || hasUrl) {
+        searchState.writeState('searchPage', remoteKey, next);
+      }
+      lastPersistedFiltersRef.current = next;
+      return;
+    }
+
+    setSearchVal(next.searchVal);
+    lastPersistedFiltersRef.current = next;
+    searchState.writeState('searchPage', remoteKey, next);
+
+    if (!hasUrl && shouldSyncUrl && next.searchVal) {
+      setSearchParams({ q: next.searchVal }, { replace: true });
+    }
+  }, [defaultFilters, remoteKey, searchParams, searchState, setSearchParams]);
+
+  React.useEffect(() => {
+    const persisted = lastPersistedFiltersRef.current;
+    if (persisted && areFiltersEqual(persisted, currentFilters)) {
+      return;
+    }
+    lastPersistedFiltersRef.current = currentFilters;
+    searchState.writeState('searchPage', remoteKey, currentFilters);
+  }, [currentFilters, remoteKey, searchState]);
 
   const q = searchParams.get('q') || '';
   // Use a conditional key pattern - this is a standard SWR pattern for conditional fetching
