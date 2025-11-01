@@ -11,6 +11,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'; // Import Shadcn Tooltip
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import dayjs from '@/lib/dayjs';
 import StatusChip from '@/ui/StatusChip';
 import { Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
@@ -63,6 +65,11 @@ function DAGActions({
   const [isRetryModal, setIsRetryModal] = React.useState(false);
   const [retryDagRunId, setRetryDagRunId] = React.useState<string>('');
   const [stopAllRunning, setStopAllRunning] = React.useState(false);
+
+  // Retry-as-new modal state
+  const [retryAsNew, setRetryAsNew] = React.useState(false);
+  const [newRunId, setNewRunId] = React.useState('');
+  const [dagNameOverride, setDagNameOverride] = React.useState('');
 
   const client = useClient();
 
@@ -418,35 +425,80 @@ function DAGActions({
           </div>
         </ConfirmModal>
         <ConfirmModal
-          title="Confirmation"
+          title={retryAsNew ? "Retry DAG Run as New" : "Confirmation"}
           buttonText="Rerun"
           visible={isRetryModal}
-          dismissModal={() => setIsRetryModal(false)}
+          dismissModal={() => {
+            setIsRetryModal(false);
+            setRetryAsNew(false);
+            setNewRunId('');
+            setDagNameOverride('');
+          }}
           onSubmit={async () => {
             setIsRetryModal(false);
 
             // Use dag-run API - requires DAG name and ID
             if (status?.name && retryDagRunId) {
-              const { error } = await client.POST(
-                '/dag-runs/{name}/{dagRunId}/retry',
-                {
-                  params: {
-                    path: {
-                      name: status.name,
+              if (retryAsNew) {
+                // Use reschedule endpoint for retry-as-new
+                const { error, data } = await client.POST(
+                  '/dag-runs/{name}/{dagRunId}/reschedule',
+                  {
+                    params: {
+                      path: {
+                        name: status.name,
+                        dagRunId: retryDagRunId,
+                      },
+                      query: {
+                        remoteNode: appBarContext.selectedRemoteNode || 'local',
+                      },
+                    },
+                    body: {
+                      dagRunId: newRunId || undefined, // Auto-generate if empty
+                      dagName: dagNameOverride || undefined, // Use original if empty
+                      singleton: false,
+                    },
+                  }
+                );
+                if (error) {
+                  alert(error.message || 'An error occurred');
+                  // Reset state on error
+                  setRetryAsNew(false);
+                  setNewRunId('');
+                  setDagNameOverride('');
+                  return;
+                }
+                // Show success message with new run ID
+                if (data?.dagRunId) {
+                  alert(`New DAG run created with ID: ${data.dagRunId}${data.queued ? ' (queued)' : ''}`);
+                }
+                // Reset state after success
+                setRetryAsNew(false);
+                setNewRunId('');
+                setDagNameOverride('');
+              } else {
+                // Use retry endpoint for regular retry
+                const { error } = await client.POST(
+                  '/dag-runs/{name}/{dagRunId}/retry',
+                  {
+                    params: {
+                      path: {
+                        name: status.name,
+                        dagRunId: retryDagRunId,
+                      },
+                      query: {
+                        remoteNode: appBarContext.selectedRemoteNode || 'local',
+                      },
+                    },
+                    body: {
                       dagRunId: retryDagRunId,
                     },
-                    query: {
-                      remoteNode: appBarContext.selectedRemoteNode || 'local',
-                    },
-                  },
-                  body: {
-                    dagRunId: retryDagRunId,
-                  },
+                  }
+                );
+                if (error) {
+                  alert(error.message || 'An error occurred');
+                  return;
                 }
-              );
-              if (error) {
-                alert(error.message || 'An error occurred');
-                return;
               }
               reloadData();
             } else {
@@ -456,7 +508,7 @@ function DAGActions({
           }}
         >
           {/* Keep modal content structure */}
-          <div>
+          <div className="space-y-3">
             <p className="mb-2">
               {status?.name && retryDagRunId
                 ? `Do you really want to retry the dag-run "${status.name}"?`
@@ -483,6 +535,49 @@ function DAGActions({
                   {status.statusLabel || ''}
                 </StatusChip>
               </LabeledItem>
+            )}
+
+            {/* Retry as new checkbox */}
+            <div className="flex items-center space-x-2 pt-2 border-t">
+              <Checkbox
+                id="retry-as-new-dag"
+                checked={retryAsNew}
+                onCheckedChange={(checked) => setRetryAsNew(checked as boolean)}
+                className="border-gray-400 dark:border-gray-500"
+              />
+              <Label htmlFor="retry-as-new-dag" className="cursor-pointer text-sm">
+                Retry as new DAG-run
+              </Label>
+            </div>
+
+            {/* Conditional inputs when retry-as-new is checked */}
+            {retryAsNew && (
+              <div className="space-y-3 pt-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="new-dagrun-id-dag" className="text-sm">
+                    New DAG-Run ID (optional)
+                  </Label>
+                  <Input
+                    id="new-dagrun-id-dag"
+                    placeholder="Auto-generated if empty"
+                    value={newRunId}
+                    onChange={(e) => setNewRunId(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="dag-name-override-dag" className="text-sm">
+                    DAG Name Override (optional)
+                  </Label>
+                  <Input
+                    id="dag-name-override-dag"
+                    placeholder={`Leave empty to use: ${status?.name || 'original'}`}
+                    value={dagNameOverride}
+                    onChange={(e) => setDagNameOverride(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
             )}
           </div>
         </ConfirmModal>
