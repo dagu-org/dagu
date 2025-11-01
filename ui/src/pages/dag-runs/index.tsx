@@ -248,7 +248,7 @@ function DAGRuns() {
     mutate();
   };
 
-  const getSpecificPeriodDates = (period: 'date' | 'month' | 'year', value: string): { from: string; to: string } => {
+  const getSpecificPeriodDates = (period: 'date' | 'month' | 'year', value: string): { from: string; to?: string } => {
     switch (period) {
       case 'date': {
         const date = dayjs(value);
@@ -271,6 +271,17 @@ function DAGRuns() {
           to: date.endOf('year').format('YYYY-MM-DDTHH:mm'),
         };
       }
+    }
+  };
+
+  const getInputTypeForPeriod = (period: 'date' | 'month' | 'year'): string => {
+    switch (period) {
+      case 'date':
+        return 'date';
+      case 'month':
+        return 'month';
+      case 'year':
+        return 'number';
     }
   };
 
@@ -547,7 +558,7 @@ function DAGRuns() {
                 </SelectContent>
               </Select>
               <Input
-                type={specificPeriod === 'date' ? 'date' : specificPeriod === 'month' ? 'month' : 'number'}
+                type={getInputTypeForPeriod(specificPeriod)}
                 value={specificValue}
                 onChange={(e) => handleSpecificPeriodChange(e.target.value)}
                 placeholder={specificPeriod === 'year' ? 'YYYY' : undefined}

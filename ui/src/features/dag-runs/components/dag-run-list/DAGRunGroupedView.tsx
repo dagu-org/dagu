@@ -232,8 +232,8 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {summary.allSameStatus ? (
-                    <StatusChip status={summary.uniformStatus!} size="xs">
+                  {summary.allSameStatus && summary.uniformStatus != null ? (
+                    <StatusChip status={summary.uniformStatus} size="xs">
                       {summary.latestRun.statusLabel}
                     </StatusChip>
                   ) : (
