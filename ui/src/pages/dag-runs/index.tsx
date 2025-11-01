@@ -4,7 +4,6 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Status } from '../../api/v2/schema';
 import { Button } from '../../components/ui/button';
-import { RefreshButton } from '../../components/ui/refresh-button';
 import { DateRangePicker } from '../../components/ui/date-range-picker';
 import { Input } from '../../components/ui/input';
 import {
@@ -285,9 +284,10 @@ function DAGRuns() {
     }
   };
 
-  const handleSpecificPeriodChange = (value: string) => {
+  const handleSpecificPeriodChange = (value: string, period?: 'date' | 'month' | 'year') => {
     setSpecificValue(value);
-    const dates = getSpecificPeriodDates(specificPeriod, value);
+    const periodToUse = period || specificPeriod;
+    const dates = getSpecificPeriodDates(periodToUse, value);
     setFromDate(dates.from);
     setToDate(dates.to);
     setApiFromDate(dates.from);
@@ -479,7 +479,6 @@ function DAGRuns() {
             <Search size={18} className="mr-2" />
             Search
           </Button>
-          <RefreshButton onRefresh={async () => { await mutate(); }} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ToggleGroup aria-label="Date range mode">
@@ -536,16 +535,23 @@ function DAGRuns() {
                   const newPeriod = v as 'date' | 'month' | 'year';
                   setSpecificPeriod(newPeriod);
                   // Update the value format based on the new period type
+                  // Extract the base date from current value and reformat
                   let newValue: string;
+                  const parsedDate = dayjs(specificValue);
+
                   if (newPeriod === 'date') {
-                    newValue = dayjs().format('YYYY-MM-DD');
+                    // If switching to date, use the parsed date or today
+                    newValue = parsedDate.isValid() ? parsedDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
                   } else if (newPeriod === 'month') {
-                    newValue = dayjs().format('YYYY-MM');
+                    // If switching to month, extract year-month from current value
+                    newValue = parsedDate.isValid() ? parsedDate.format('YYYY-MM') : dayjs().format('YYYY-MM');
                   } else {
-                    newValue = dayjs().format('YYYY');
+                    // If switching to year, extract year from current value
+                    newValue = parsedDate.isValid() ? parsedDate.format('YYYY') : dayjs().format('YYYY');
                   }
+
                   setSpecificValue(newValue);
-                  handleSpecificPeriodChange(newValue);
+                  handleSpecificPeriodChange(newValue, newPeriod);
                 }}
               >
                 <SelectTrigger className="w-[120px] bg-background">
