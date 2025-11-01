@@ -76,7 +76,7 @@ function DAGRuns() {
         return match[1];
       }
 
-      // If the value already looks like a datetime-local string, normalise length
+      // If the value already looks like a datetime-local string, normalize length
       if (dateParam.includes('T') && dateParam.length >= 16) {
         return dateParam.slice(0, 16);
       }
