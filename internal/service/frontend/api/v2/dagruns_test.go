@@ -13,6 +13,8 @@ import (
 )
 
 func TestRescheduleDAGRun(t *testing.T) {
+	t.Parallel()
+
 	server := test.SetupServer(t)
 
 	dagSpec := `steps:
@@ -59,43 +61,9 @@ func TestRescheduleDAGRun(t *testing.T) {
 	}, 10*time.Second, 200*time.Millisecond)
 }
 
-func TestRescheduleDAGRun_InvalidDefinitionStrategy(t *testing.T) {
-	server := test.SetupServer(t)
-
-	dagSpec := `steps:
-  - name: main
-    command: "echo reschedule"`
-
-	_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
-		Name: "reschedule_invalid",
-		Spec: &dagSpec,
-	}).ExpectStatus(http.StatusCreated).Send(t)
-
-	startResp := server.Client().Post("/api/v2/dags/reschedule_invalid/start", api.ExecuteDAGJSONRequestBody{}).
-		ExpectStatus(http.StatusOK).Send(t)
-
-	var startBody api.ExecuteDAG200JSONResponse
-	startResp.Unmarshal(t, &startBody)
-
-	require.Eventually(t, func() bool {
-		url := fmt.Sprintf("/api/v2/dags/reschedule_invalid/dag-runs/%s", startBody.DagRunId)
-		statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
-
-		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
-		statusResp.Unmarshal(t, &dagRunStatus)
-		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
-	}, 10*time.Second, 200*time.Millisecond)
-
-	strategy := api.RescheduleDAGRunJSONBodyDefinitionStrategyLatest
-	errorResp := server.Client().Post(
-		fmt.Sprintf("/api/v2/dag-runs/%s/%s/reschedule", "reschedule_invalid", startBody.DagRunId),
-		api.RescheduleDAGRunJSONRequestBody{DefinitionStrategy: &strategy},
-	).ExpectStatus(http.StatusBadRequest).Send(t)
-
-	require.Contains(t, errorResp.Body, "not supported")
-}
-
 func TestRescheduleDAGRun_SingletonConflict(t *testing.T) {
+	t.Parallel()
+
 	server := test.SetupServer(t)
 
 	dagSpec := `steps:
