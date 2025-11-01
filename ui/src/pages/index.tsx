@@ -140,13 +140,10 @@ function Dashboard(): React.ReactElement | null {
 
     const current = currentFiltersRef.current;
     if (current && areFiltersEqual(current, next)) {
-      if (stored) {
-        lastPersistedFiltersRef.current = next;
-      }
       if (!stored) {
         searchState.writeState('dashboard', remoteKey, next);
-        lastPersistedFiltersRef.current = next;
       }
+      lastPersistedFiltersRef.current = next;
       return;
     }
 
