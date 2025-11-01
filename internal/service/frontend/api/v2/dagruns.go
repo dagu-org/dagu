@@ -840,3 +840,76 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		Queued:   queued,
 	}, nil
 }
+
+// GetSubDAGRuns returns timing and status information for all sub DAG runs
+func (a *API) GetSubDAGRuns(ctx context.Context, request api.GetSubDAGRunsRequestObject) (api.GetSubDAGRunsResponseObject, error) {
+	dagName := request.Name
+	dagRunId := request.DagRunId
+
+	// Get the parent DAG run status
+	parentRef := execution.NewDAGRunRef(dagName, dagRunId)
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, parentRef)
+	if err != nil {
+		return &api.GetSubDAGRuns404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+		}, nil
+	}
+
+	subRuns := make([]api.SubDAGRunDetail, 0)
+
+	// Iterate through all nodes to find sub DAG runs
+	for _, node := range dagStatus.Nodes {
+		// Skip nodes without sub DAG runs
+		if len(node.SubRuns) == 0 && len(node.SubRunsRepeated) == 0 {
+			continue
+		}
+
+		// Collect regular sub runs
+		for _, subRun := range node.SubRuns {
+			detail, err := a.getSubDAGRunDetail(ctx, parentRef, subRun.DAGRunID, subRun.Params)
+			if err != nil {
+				// Skip if we can't fetch details
+				continue
+			}
+			subRuns = append(subRuns, detail)
+		}
+
+		// Collect repeated sub runs
+		for _, subRun := range node.SubRunsRepeated {
+			detail, err := a.getSubDAGRunDetail(ctx, parentRef, subRun.DAGRunID, subRun.Params)
+			if err != nil {
+				// Skip if we can't fetch details
+				continue
+			}
+			subRuns = append(subRuns, detail)
+		}
+	}
+
+	return &api.GetSubDAGRuns200JSONResponse{
+		SubRuns: subRuns,
+	}, nil
+}
+
+// getSubDAGRunDetail fetches timing and status info for a single sub DAG run
+func (a *API) getSubDAGRunDetail(ctx context.Context, parentRef execution.DAGRunRef, subRunID string, params string) (api.SubDAGRunDetail, error) {
+	// Use FindSubDAGRunStatus to properly fetch sub DAG run from parent's storage
+	status, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, parentRef, subRunID)
+	if err != nil {
+		return api.SubDAGRunDetail{}, err
+	}
+
+	detail := api.SubDAGRunDetail{
+		DagRunId:    subRunID,
+		Status:      api.Status(status.Status),
+		StatusLabel: api.StatusLabel(status.Status.String()),
+		StartedAt:   status.StartedAt,
+		FinishedAt:  &status.FinishedAt,
+	}
+
+	if params != "" {
+		detail.Params = &params
+	}
+
+	return detail, nil
+}

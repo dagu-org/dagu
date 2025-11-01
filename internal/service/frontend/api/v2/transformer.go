@@ -177,10 +177,13 @@ func toNode(node *execution.Node) api.Node {
 func toSubDAGRuns(subDAGRuns []execution.SubDAGRun) []api.SubDAGRun {
 	var result []api.SubDAGRun
 	for _, w := range subDAGRuns {
-		result = append(result, api.SubDAGRun{
+		subDAGRun := api.SubDAGRun{
 			DagRunId: w.DAGRunID,
-			Params:   w.Params,
-		})
+		}
+		if w.Params != "" {
+			subDAGRun.Params = &w.Params
+		}
+		result = append(result, subDAGRun)
 	}
 	return result
 }

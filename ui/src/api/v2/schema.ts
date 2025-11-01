@@ -408,6 +408,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get sub DAG runs with timing info
+         * @description Retrieves timing and status information for all sub DAG runs (including repeated executions) of a specific step
+         */
+        get: operations["getSubDAGRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/dequeue": {
         parameters: {
             query?: never;
@@ -1004,7 +1024,20 @@ export interface components {
         SubDAGRun: {
             dagRunId: components["schemas"]["DAGRunId"];
             /** @description Parameters passed to the sub DAG-run in JSON format */
-            params: string;
+            params?: string;
+        };
+        /** @description Detailed information for a sub DAG-run including timing and status */
+        SubDAGRunDetail: {
+            /** @description Unique identifier for the sub DAG-run */
+            dagRunId: string;
+            /** @description Parameters passed to the sub DAG-run in JSON format */
+            params?: string;
+            status: components["schemas"]["Status"];
+            statusLabel: components["schemas"]["StatusLabel"];
+            /** @description RFC 3339 timestamp when the sub DAG-run started */
+            startedAt: string;
+            /** @description RFC 3339 timestamp when the sub DAG-run finished */
+            finishedAt?: string;
         };
         /** @description Individual task definition that performs a specific operation in a DAG-run */
         Step: {
@@ -2337,6 +2370,54 @@ export interface operations {
             };
             /** @description Conflict (run ID already exists or concurrency guard blocks execution) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSubDAGRuns: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        subRuns: components["schemas"]["SubDAGRunDetail"][];
+                    };
+                };
+            };
+            /** @description DAG run not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
