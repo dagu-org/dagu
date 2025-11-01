@@ -87,4 +87,36 @@ steps:
 		// Clean up
 		_ = server.Client().Delete("/api/v2/dags/test_singleton_dag").ExpectStatus(http.StatusNoContent).Send(t)
 	})
+
+	t.Run("EnqueueDAGRunFromSpec", func(t *testing.T) {
+		spec := `
+steps:
+  - sleep 1
+`
+		name := "inline_enqueue_spec"
+
+		resp := server.Client().Post("/api/v2/dag-runs/enqueue", api.EnqueueDAGRunFromSpecJSONRequestBody{
+			Spec: spec,
+			Name: &name,
+		}).
+			ExpectStatus(http.StatusOK).
+			Send(t)
+
+		var body api.EnqueueDAGRunFromSpec200JSONResponse
+		resp.Unmarshal(t, &body)
+		require.NotEmpty(t, body.DagRunId, "expected a non-empty dag-run ID")
+
+		require.Eventually(t, func() bool {
+			statusResp := server.Client().
+				Get(fmt.Sprintf("/api/v2/dag-runs/%s/%s", name, body.DagRunId)).
+				ExpectStatus(http.StatusOK).
+				Send(t)
+
+			var dagRun api.GetDAGRunDetails200JSONResponse
+			statusResp.Unmarshal(t, &dagRun)
+
+			s := dagRun.DagRunDetails.Status
+			return s == api.Status(core.Queued) || s == api.Status(core.Running) || s == api.Status(core.Succeeded)
+		}, 5*time.Second, 250*time.Millisecond, "expected DAG-run to reach queued state")
+	})
 }

@@ -53,65 +53,11 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 		singleton = *request.Body.Singleton
 	}
 
-	// Create a temporary DAG directory and file from the provided spec
-	nameHint := "inline"
-	if request.Body.Name != nil && *request.Body.Name != "" {
-		// Validate provided name using shared validation
-		if err := core.ValidateDAGName(*request.Body.Name); err != nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    err.Error(),
-			}
-		}
-		nameHint = *request.Body.Name
-	} else {
-		// Validate the DAG spec has a name
-		dag, err := spec.LoadYAML(
-			ctx, []byte(request.Body.Spec),
-			spec.WithoutEval(),
-		)
-		if err != nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    err.Error(),
-			}
-		}
-		// Validate ensures the DAG has a name
-		if err := dag.Validate(); err != nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    err.Error(),
-			}
-		}
-	}
-
-	tmpDir := filepath.Join(os.TempDir(), nameHint, dagRunId)
-	if err := os.MkdirAll(tmpDir, 0o750); err != nil {
-		return nil, fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	// Ensure cleanup on all return paths
-	defer func() { _ = os.RemoveAll(tmpDir) }()
-	tfPath := filepath.Join(tmpDir, fmt.Sprintf("%s.yaml", nameHint))
-	if err := os.WriteFile(tfPath, []byte(request.Body.Spec), 0o600); err != nil {
-		return nil, fmt.Errorf("failed to write spec to temp file: %w", err)
-	}
-
-	// Load the DAG from the temp file to validate and prepare execution
-	var loadOpts []spec.LoadOption
-	if request.Body.Name != nil && *request.Body.Name != "" {
-		loadOpts = append(loadOpts, spec.WithName(*request.Body.Name))
-	}
-	dag, err := spec.Load(ctx, tfPath, loadOpts...)
+	dag, cleanup, err := a.loadInlineDAG(ctx, request.Body.Spec, request.Body.Name, dagRunId)
 	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    err.Error(),
-		}
+		return nil, err
 	}
+	defer cleanup()
 
 	// Ensure the dag-run ID is not already used for this DAG name
 	if _, err := a.dagRunStore.FindAttempt(ctx, execution.DAGRunRef{Name: dag.Name, ID: dagRunId}); !errors.Is(err, execution.ErrDAGRunIDNotFound) {
@@ -160,6 +106,143 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	return api.ExecuteDAGRunFromSpec200JSONResponse{
 		DagRunId: dagRunId,
 	}, nil
+}
+
+// EnqueueDAGRunFromSpec implements api.StrictServerInterface.
+func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGRunFromSpecRequestObject) (api.EnqueueDAGRunFromSpecResponseObject, error) {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+
+	if request.Body == nil || request.Body.Spec == "" {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "spec is required",
+		}
+	}
+
+	var dagRunId, params string
+	if request.Body.DagRunId != nil {
+		dagRunId = *request.Body.DagRunId
+	}
+	if dagRunId == "" {
+		var genErr error
+		dagRunId, genErr = a.dagRunMgr.GenDAGRunID(ctx)
+		if genErr != nil {
+			return nil, fmt.Errorf("error generating dag-run ID: %w", genErr)
+		}
+	}
+	if request.Body.Params != nil {
+		params = *request.Body.Params
+	}
+
+	dag, cleanup, err := a.loadInlineDAG(ctx, request.Body.Spec, request.Body.Name, dagRunId)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+
+	if request.Body.Queue != nil && *request.Body.Queue != "" {
+		dag.Queue = *request.Body.Queue
+	}
+
+	if _, err := a.dagRunStore.FindAttempt(ctx, execution.DAGRunRef{Name: dag.Name, ID: dagRunId}); !errors.Is(err, execution.ErrDAGRunIDNotFound) {
+		return nil, &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeAlreadyExists,
+			Message:    fmt.Sprintf("dag-run ID %s already exists for DAG %s", dagRunId, dag.Name),
+		}
+	}
+
+	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to access proc store: %w", err)
+	}
+
+	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read queue: %w", err)
+	}
+
+	if dag.Queue != "" && dag.MaxActiveRuns > 1 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
+		return nil, &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeMaxRunReached,
+			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot enqueue", dag.Name, dag.MaxActiveRuns),
+		}
+	}
+
+	if err := a.enqueueDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name)); err != nil {
+		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
+	}
+
+	return api.EnqueueDAGRunFromSpec200JSONResponse{
+		DagRunId: dagRunId,
+	}, nil
+}
+
+func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *string, dagRunID string) (*core.DAG, func(), error) {
+	nameHint := "inline"
+	if name != nil && *name != "" {
+		if err := core.ValidateDAGName(*name); err != nil {
+			return nil, func() {}, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+			}
+		}
+		nameHint = *name
+	} else {
+		dag, err := spec.LoadYAML(
+			ctx, []byte(specContent),
+			spec.WithoutEval(),
+		)
+		if err != nil {
+			return nil, func() {}, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+			}
+		}
+		if err := dag.Validate(); err != nil {
+			return nil, func() {}, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+			}
+		}
+	}
+
+	tmpDir := filepath.Join(os.TempDir(), nameHint, dagRunID)
+	if err := os.MkdirAll(tmpDir, 0o750); err != nil {
+		return nil, func() {}, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	cleanup := func() {
+		_ = os.RemoveAll(tmpDir)
+	}
+
+	tfPath := filepath.Join(tmpDir, fmt.Sprintf("%s.yaml", nameHint))
+	if err := os.WriteFile(tfPath, []byte(specContent), 0o600); err != nil {
+		cleanup()
+		return nil, func() {}, fmt.Errorf("failed to write spec to temp file: %w", err)
+	}
+
+	var loadOpts []spec.LoadOption
+	if name != nil && *name != "" {
+		loadOpts = append(loadOpts, spec.WithName(*name))
+	}
+	dag, err := spec.Load(ctx, tfPath, loadOpts...)
+	if err != nil {
+		cleanup()
+		return nil, func() {}, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
+	}
+
+	return dag, cleanup, nil
 }
 
 // no sanitize helper: DAG name is validated by core.ValidateDAGName
