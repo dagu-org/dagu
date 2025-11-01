@@ -56,20 +56,85 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag, disableMaxActiveRuns}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag, disableMaxActiveRuns}
+
+var fromRunIDFlag = commandLineFlag{
+	name:  "from-run-id",
+	usage: "Historic dag-run ID to use as the template for a new run",
+}
 
 // runStart handles the execution of the start command
 func runStart(ctx *Context, args []string) error {
+	fromRunID, err := ctx.StringParam("from-run-id")
+	if err != nil {
+		return fmt.Errorf("failed to get from-run-id: %w", err)
+	}
+
 	// Get dag-run ID and references
 	dagRunID, rootRef, parentRef, isSubDAGRun, err := getDAGRunInfo(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Load parameters and DAG
-	dag, params, err := loadDAGWithParams(ctx, args)
-	if err != nil {
-		return err
+	if fromRunID != "" && isSubDAGRun {
+		return fmt.Errorf("--from-run-id cannot be combined with --parent or --root")
+	}
+
+	disableMaxActiveRuns := ctx.Command.Flags().Changed("disable-max-active-runs")
+
+	var (
+		dag    *core.DAG
+		params string
+	)
+
+	if fromRunID != "" {
+		if len(args) == 0 {
+			return fmt.Errorf("DAG name or file must be provided when using --from-run-id")
+		}
+		if len(args) > 1 || ctx.Command.Flags().Changed("params") || ctx.Command.ArgsLenAtDash() != -1 {
+			return fmt.Errorf("parameters cannot be provided when using --from-run-id")
+		}
+
+		dagName, err := extractDAGName(ctx, args[0])
+		if err != nil {
+			return fmt.Errorf("failed to resolve DAG name: %w", err)
+		}
+
+		attempt, err := ctx.DAGRunStore.FindAttempt(ctx, execution.NewDAGRunRef(dagName, fromRunID))
+		if err != nil {
+			return fmt.Errorf("failed to find historic dag-run %s for DAG %s: %w", fromRunID, dagName, err)
+		}
+
+		status, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to read status for dag-run %s: %w", fromRunID, err)
+		}
+
+		snapshot, err := attempt.ReadDAG(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to read DAG snapshot for dag-run %s: %w", fromRunID, err)
+		}
+
+		dag = snapshot
+		params = status.Params
+		dag.Params = status.ParamsList
+
+		nameOverride, err := ctx.StringParam("name")
+		if err != nil {
+			return fmt.Errorf("failed to read name override: %w", err)
+		}
+		if nameOverride != "" {
+			if err := core.ValidateDAGName(nameOverride); err != nil {
+				return fmt.Errorf("invalid DAG name override: %w", err)
+			}
+			dag.Name = nameOverride
+		}
+	} else {
+		// Load parameters and DAG
+		dag, params, err = loadDAGWithParams(ctx, args)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Create or get root execution reference
@@ -96,8 +161,6 @@ func runStart(ctx *Context, args []string) error {
 		queueDisabled = true
 	}
 
-	disableMaxActiveRuns := ctx.Command.Flags().Changed("disable-max-active-runs")
-
 	// Check if the DAG run-id is unique
 	attempt, _ := ctx.DAGRunStore.FindAttempt(ctx, root)
 	if attempt != nil {
@@ -114,12 +177,22 @@ func runStart(ctx *Context, args []string) error {
 		return fmt.Errorf("DAG %s is already running, cannot start", dag.Name)
 	}
 
-	// Log root dag-run
-	logger.Info(ctx, "Executing root dag-run",
-		"dag", dag.Name,
-		"params", params,
-		"dagRunId", dagRunID,
-	)
+	// Log root dag-run or reschedule action
+	if fromRunID != "" {
+		logger.Info(ctx, "Rescheduling dag-run",
+			"action", "reschedule",
+			"dag", dag.Name,
+			"fromDagRunId", fromRunID,
+			"dagRunId", dagRunID,
+			"params", params,
+		)
+	} else {
+		logger.Info(ctx, "Executing root dag-run",
+			"dag", dag.Name,
+			"params", params,
+			"dagRunId", dagRunID,
+		)
+	}
 
 	// Check if this DAG should be distributed to workers
 	// If the DAG has a workerSelector and the queue is not disabled,

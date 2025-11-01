@@ -634,8 +634,26 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 }
 
 func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, singleton bool) error {
+	return a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
+		params:       params,
+		dagRunID:     dagRunID,
+		nameOverride: nameOverride,
+		singleton:    singleton,
+	})
+}
+
+type startDAGRunOptions struct {
+	params       string
+	dagRunID     string
+	nameOverride string
+	singleton    bool
+	fromRunID    string
+	target       string
+}
+
+func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
 	var noQueue bool
-	if singleton || dag.MaxActiveRuns == 1 {
+	if opts.singleton || dag.MaxActiveRuns == 1 {
 		noQueue = true
 	}
 
@@ -647,11 +665,13 @@ func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, 
 	}
 
 	spec := a.subCmdBuilder.Start(dag, runtime1.StartOptions{
-		Params:       params,
-		DAGRunID:     dagRunID,
+		Params:       opts.params,
+		DAGRunID:     opts.dagRunID,
 		Quiet:        true,
 		NoQueue:      noQueue,
-		NameOverride: nameOverride,
+		NameOverride: opts.nameOverride,
+		FromRunID:    opts.fromRunID,
+		Target:       opts.target,
 	})
 
 	if err := runtime1.Start(ctx, spec); err != nil {
@@ -676,7 +696,7 @@ waitLoop:
 		case <-ctx.Done():
 			break waitLoop
 		default:
-			dagStatus, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
+			dagStatus, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, opts.dagRunID)
 			if dagStatus == nil {
 				continue
 			}
