@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { Search } from 'lucide-react';
+import { List, Layers, Search } from 'lucide-react';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Status } from '../../api/v2/schema';
@@ -14,9 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
+import { ToggleGroup, ToggleButton } from '../../components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
+import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
 import { useQuery } from '../../hooks/api';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
@@ -95,6 +97,11 @@ function DAGRuns() {
   );
   const [apiToDate, setApiToDate] = React.useState<string | undefined>(
     query.get('toDate') || undefined
+  );
+
+  // State for view mode
+  const [viewMode, setViewMode] = React.useState<'list' | 'grouped'>(
+    (query.get('view') as 'list' | 'grouped') || 'list'
   );
 
   React.useEffect(() => {
@@ -184,6 +191,12 @@ function DAGRuns() {
     handleSearch(value);
   };
 
+  const handleViewModeChange = (value: string) => {
+    const newViewMode = value as 'list' | 'grouped';
+    setViewMode(newViewMode);
+    addSearchParam('view', newViewMode);
+  };
+
   const handleInputKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleSearch();
@@ -211,7 +224,33 @@ function DAGRuns() {
 
   return (
     <div className="flex flex-col">
-      <Title>DAG Runs</Title>
+      <div className="flex items-center justify-between mb-3">
+        <Title>DAG Runs</Title>
+        <ToggleGroup aria-label="View mode">
+          <ToggleButton
+            value="list"
+            groupValue={viewMode}
+            onClick={() => handleViewModeChange('list')}
+            position="first"
+            aria-label="List view"
+            className="h-8 px-3"
+          >
+            <List size={16} className="mr-1.5" />
+            List
+          </ToggleButton>
+          <ToggleButton
+            value="grouped"
+            groupValue={viewMode}
+            onClick={() => handleViewModeChange('grouped')}
+            position="last"
+            aria-label="Grouped view"
+            className="h-8 px-3"
+          >
+            <Layers size={16} className="mr-1.5" />
+            Grouped
+          </ToggleButton>
+        </ToggleGroup>
+      </div>
       <div className="bg-muted/50 dark:bg-zinc-900/50 rounded-lg p-3 mb-4 space-y-3">
         <div className="flex flex-wrap gap-2">
           <Input
@@ -326,7 +365,11 @@ function DAGRuns() {
           className="w-full md:w-auto"
         />
       </div>
-      <DAGRunTable dagRuns={data?.dagRuns || []} />
+      {viewMode === 'list' ? (
+        <DAGRunTable dagRuns={data?.dagRuns || []} />
+      ) : (
+        <DAGRunGroupedView dagRuns={data?.dagRuns || []} />
+      )}
     </div>
   );
 }
