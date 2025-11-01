@@ -969,12 +969,20 @@ paths:
             schema:
               type: object
               properties:
+                definitionStrategy:
+                  type: string
+                  description: "Strategy for selecting which DAG definition to use when rescheduling. Currently experimental and not yet supported."
+                  enum: ["latest"]
                 dagRunId:
                   type: string
                   description: "Explicit run ID for the new DAG-run; if omitted a new ID is generated."
                 dagName:
                   type: string
                   description: "Optional DAG name override for the new run."
+                singleton:
+                  type: boolean
+                  description: "If true, prevent starting if a DAG with the same name is already running (returns 409 conflict)."
+                  default: false
       responses:
         "200":
           description: "Successfully scheduled a new DAG-run"

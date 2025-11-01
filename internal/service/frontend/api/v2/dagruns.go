@@ -723,9 +723,17 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	var (
 		nameOverride string
 		newDagRunID  string
+		singleton    bool
 	)
 
 	if body := request.Body; body != nil {
+		if body.DefinitionStrategy != nil {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "definitionStrategy not supported",
+			}
+		}
 		if body.DagName != nil && *body.DagName != "" {
 			nameOverride = *body.DagName
 			if err := core.ValidateDAGName(nameOverride); err != nil {
@@ -739,6 +747,9 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		}
 		if body.DagRunId != nil && *body.DagRunId != "" {
 			newDagRunID = *body.DagRunId
+		}
+		if body.Singleton != nil {
+			singleton = *body.Singleton
 		}
 	}
 
@@ -765,7 +776,7 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		return nil, fmt.Errorf("failed to access proc store: %w", err)
 	}
 
-	if dag.MaxActiveRuns == 1 {
+	if singleton || dag.MaxActiveRuns == 1 {
 		if liveCount > 0 {
 			return nil, &Error{
 				HTTPStatus: http.StatusConflict,
@@ -792,6 +803,7 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		"dag", dag.Name,
 		"fromDagRunId", request.DagRunId,
 		"dagRunId", newDagRunID,
+		"singleton", singleton,
 	)
 
 	if err := a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
@@ -799,6 +811,7 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		nameOverride: nameOverride,
 		fromRunID:    request.DagRunId,
 		target:       request.Name,
+		singleton:    singleton,
 	}); err != nil {
 		return nil, fmt.Errorf("failed to start dag-run: %w", err)
 	}

@@ -94,3 +94,63 @@ func TestRescheduleDAGRun_InvalidDefinitionStrategy(t *testing.T) {
 
 	require.Contains(t, errorResp.Body, "not supported")
 }
+
+func TestRescheduleDAGRun_SingletonConflict(t *testing.T) {
+	server := test.SetupServer(t)
+
+	dagSpec := `steps:
+  - name: slow
+    command: "bash -lc 'sleep 5'"`
+
+	_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "reschedule_singleton_conflict",
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	firstRunResp := server.Client().Post("/api/v2/dags/reschedule_singleton_conflict/start", api.ExecuteDAGJSONRequestBody{}).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var firstRunBody api.ExecuteDAG200JSONResponse
+	firstRunResp.Unmarshal(t, &firstRunBody)
+	require.NotEmpty(t, firstRunBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v2/dags/reschedule_singleton_conflict/dag-runs/%s", firstRunBody.DagRunId)
+		statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+	}, 15*time.Second, 200*time.Millisecond)
+
+	secondRunResp := server.Client().Post("/api/v2/dags/reschedule_singleton_conflict/start", api.ExecuteDAGJSONRequestBody{}).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var secondRunBody api.ExecuteDAG200JSONResponse
+	secondRunResp.Unmarshal(t, &secondRunBody)
+	require.NotEmpty(t, secondRunBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v2/dags/reschedule_singleton_conflict/dag-runs/%s", secondRunBody.DagRunId)
+		statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Running)
+	}, 5*time.Second, 200*time.Millisecond)
+
+	singleton := true
+	server.Client().Post(
+		fmt.Sprintf("/api/v2/dag-runs/%s/%s/reschedule", "reschedule_singleton_conflict", firstRunBody.DagRunId),
+		api.RescheduleDAGRunJSONRequestBody{Singleton: &singleton},
+	).ExpectStatus(http.StatusConflict).Send(t)
+
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v2/dags/reschedule_singleton_conflict/dag-runs/%s", secondRunBody.DagRunId)
+		statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+	}, 20*time.Second, 200*time.Millisecond)
+}
