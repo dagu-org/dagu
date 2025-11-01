@@ -16,6 +16,7 @@ import {
 import { ToggleGroup, ToggleButton } from '../../components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
+import { useSearchState } from '../../contexts/SearchStateContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
 import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
@@ -23,20 +24,67 @@ import { useQuery } from '../../hooks/api';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
 
+type DAGRunsFilters = {
+  searchText: string;
+  dagRunId: string;
+  status: string;
+  fromDate?: string;
+  toDate?: string;
+  dateRangeMode: 'preset' | 'specific' | 'custom';
+  datePreset: string;
+  specificPeriod: 'date' | 'month' | 'year';
+  specificValue: string;
+};
+
+const areFiltersEqual = (a: DAGRunsFilters, b: DAGRunsFilters) =>
+  a.searchText === b.searchText &&
+  a.dagRunId === b.dagRunId &&
+  a.status === b.status &&
+  a.fromDate === b.fromDate &&
+  a.toDate === b.toDate &&
+  a.dateRangeMode === b.dateRangeMode &&
+  a.datePreset === b.datePreset &&
+  a.specificPeriod === b.specificPeriod &&
+  a.specificValue === b.specificValue;
+
 function DAGRuns() {
-  const query = new URLSearchParams(useLocation().search);
+  const location = useLocation();
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
   const { preferences, updatePreference } = useUserPreferences();
+  const searchState = useSearchState();
+  const remoteKey = appBarContext.selectedRemoteNode || 'local';
 
   // Extract short datetime format from URL if present
-  const parseDateFromUrl = (dateParam: string | null): string | undefined => {
-    if (!dateParam) return undefined;
-    // For datetime-local input, we need the format YYYY-MM-DDTHH:mm
-    const match = dateParam.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/);
-    return match ? match[1] : undefined;
-  };
+  const parseDateFromUrl = React.useCallback(
+    (dateParam: string | null): string | undefined => {
+      if (!dateParam) return undefined;
 
+      if (/^\d+$/.test(dateParam)) {
+        const timestamp = Number(dateParam);
+        if (!Number.isNaN(timestamp)) {
+          const parsed =
+            config.tzOffsetInSec !== undefined
+              ? dayjs.unix(timestamp).utcOffset(config.tzOffsetInSec / 60)
+              : dayjs.unix(timestamp);
+          return parsed.format('YYYY-MM-DDTHH:mm');
+        }
+      }
+
+      const match = dateParam.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/);
+      if (match) {
+        return match[1];
+      }
+
+      // If the value already looks like a datetime-local string, normalize length
+      if (dateParam.includes('T') && dateParam.length >= 16) {
+        return dateParam.slice(0, 16);
+      }
+
+      return undefined;
+    },
+    [config.tzOffsetInSec]
+  );
   // Convert datetime to unix timestamp (seconds) for API calls
   const formatDateForApi = (
     dateString: string | undefined
@@ -57,15 +105,8 @@ function DAGRuns() {
     }
   };
 
-  // State for search input, dagRun ID, status, and date ranges
-  const [searchText, setSearchText] = React.useState(query.get('name') || '');
-  const [dagRunId, setDagRunId] = React.useState(query.get('dagRunId') || '');
-  const [status, setStatus] = React.useState<string>(
-    query.get('status') || 'all'
-  );
-
   // Default "From" date to the start of current day in the configured timezone
-  const getDefaultFromDate = (): string => {
+  const getDefaultFromDate = React.useCallback((): string => {
     const now = dayjs();
     // Apply timezone offset and set to beginning of day (00:00)
     const startOfDay =
@@ -74,46 +115,205 @@ function DAGRuns() {
         : now.startOf('day');
     // Format for datetime-local input (YYYY-MM-DDTHH:mm)
     return startOfDay.format('YYYY-MM-DDTHH:mm');
-  };
+  }, [config.tzOffsetInSec]);
 
+  const defaultFilters = React.useMemo<DAGRunsFilters>(
+    () => ({
+      searchText: '',
+      dagRunId: '',
+      status: 'all',
+      fromDate: getDefaultFromDate(),
+      toDate: undefined,
+      dateRangeMode: 'preset',
+      datePreset: 'today',
+      specificPeriod: 'date',
+      specificValue: dayjs().format('YYYY-MM-DD'),
+    }),
+    [getDefaultFromDate]
+  );
+
+  // State for search input, dagRun ID, status, and date ranges
+  const [searchText, setSearchText] = React.useState(defaultFilters.searchText);
+  const [dagRunId, setDagRunId] = React.useState(defaultFilters.dagRunId);
+  const [status, setStatus] = React.useState<string>(defaultFilters.status);
   const [fromDate, setFromDate] = React.useState<string | undefined>(
-    parseDateFromUrl(query.get('fromDate')) || getDefaultFromDate()
+    defaultFilters.fromDate
   );
   const [toDate, setToDate] = React.useState<string | undefined>(
-    parseDateFromUrl(query.get('toDate'))
+    defaultFilters.toDate
   );
 
   // State for API parameters - these will be formatted with timezone
   const [apiSearchText, setAPISearchText] = React.useState(
-    query.get('name') || ''
+    defaultFilters.searchText
   );
   const [apiDagRunId, setApiDagRunId] = React.useState(
-    query.get('dagRunId') || ''
+    defaultFilters.dagRunId
   );
-  const [apiStatus, setApiStatus] = React.useState(
-    query.get('status') || 'all'
-  );
+  const [apiStatus, setApiStatus] = React.useState(defaultFilters.status);
   const [apiFromDate, setApiFromDate] = React.useState<string | undefined>(
-    query.get('fromDate') || getDefaultFromDate()
+    defaultFilters.fromDate
   );
   const [apiToDate, setApiToDate] = React.useState<string | undefined>(
-    query.get('toDate') || undefined
+    defaultFilters.toDate
   );
 
   // View mode comes from user preferences (local storage)
   const viewMode = preferences.dagRunsViewMode;
 
   // Date range mode: 'preset', 'specific', or 'custom'
-  const [dateRangeMode, setDateRangeMode] = React.useState<'preset' | 'specific' | 'custom'>(
-    query.get('dateMode') as 'preset' | 'specific' | 'custom' || 'preset'
-  );
+  const [dateRangeMode, setDateRangeMode] = React.useState<
+    'preset' | 'specific' | 'custom'
+  >(defaultFilters.dateRangeMode);
   const [datePreset, setDatePreset] = React.useState<string>(
-    query.get('preset') || 'today'
+    defaultFilters.datePreset
   );
-  const [specificPeriod, setSpecificPeriod] = React.useState<'date' | 'month' | 'year'>('date');
+  const [specificPeriod, setSpecificPeriod] = React.useState<
+    'date' | 'month' | 'year'
+  >(defaultFilters.specificPeriod);
   const [specificValue, setSpecificValue] = React.useState<string>(
-    query.get('specificValue') || dayjs().format('YYYY-MM-DD')
+    defaultFilters.specificValue
   );
+
+  const currentFilters = React.useMemo<DAGRunsFilters>(
+    () => ({
+      searchText,
+      dagRunId,
+      status,
+      fromDate,
+      toDate,
+      dateRangeMode,
+      datePreset,
+      specificPeriod,
+      specificValue,
+    }),
+    [
+      searchText,
+      dagRunId,
+      status,
+      fromDate,
+      toDate,
+      dateRangeMode,
+      datePreset,
+      specificPeriod,
+      specificValue,
+    ]
+  );
+
+  const currentFiltersRef = React.useRef(currentFilters);
+  React.useEffect(() => {
+    currentFiltersRef.current = currentFilters;
+  }, [currentFilters]);
+
+  const lastPersistedFiltersRef = React.useRef<DAGRunsFilters | null>(null);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const stored = searchState.readState<DAGRunsFilters>('dagRuns', remoteKey);
+    const base: DAGRunsFilters = {
+      ...defaultFilters,
+      ...(stored ?? {}),
+    };
+
+    const urlFilters: Partial<DAGRunsFilters> = {};
+    let hasUrlFilters = false;
+
+    if (params.has('name')) {
+      urlFilters.searchText = params.get('name') ?? '';
+      hasUrlFilters = true;
+    }
+
+    if (params.has('dagRunId')) {
+      urlFilters.dagRunId = params.get('dagRunId') ?? '';
+      hasUrlFilters = true;
+    }
+
+    if (params.has('status')) {
+      urlFilters.status = params.get('status') || 'all';
+      hasUrlFilters = true;
+    }
+
+    if (params.has('fromDate')) {
+      urlFilters.fromDate = parseDateFromUrl(params.get('fromDate'));
+      hasUrlFilters = true;
+    }
+
+    if (params.has('toDate')) {
+      urlFilters.toDate = parseDateFromUrl(params.get('toDate'));
+      hasUrlFilters = true;
+    }
+
+    const dateModeParam = params.get('dateMode');
+    if (dateModeParam === 'preset' || dateModeParam === 'specific' || dateModeParam === 'custom') {
+      urlFilters.dateRangeMode = dateModeParam;
+      hasUrlFilters = true;
+    }
+
+    if (params.has('preset')) {
+      urlFilters.datePreset = params.get('preset') || 'today';
+      hasUrlFilters = true;
+    }
+
+    const specificPeriodParam = params.get('specificPeriod');
+    if (
+      specificPeriodParam === 'date' ||
+      specificPeriodParam === 'month' ||
+      specificPeriodParam === 'year'
+    ) {
+      urlFilters.specificPeriod = specificPeriodParam;
+      hasUrlFilters = true;
+    }
+
+    if (params.has('specificValue')) {
+      urlFilters.specificValue = params.get('specificValue') || defaultFilters.specificValue;
+      hasUrlFilters = true;
+    }
+
+    const next = hasUrlFilters ? { ...base, ...urlFilters } : base;
+    const current = currentFiltersRef.current;
+
+    if (current && areFiltersEqual(current, next)) {
+      if (hasUrlFilters) {
+        lastPersistedFiltersRef.current = next;
+        searchState.writeState('dagRuns', remoteKey, next);
+      }
+      return;
+    }
+
+    setSearchText(next.searchText);
+    setDagRunId(next.dagRunId);
+    setStatus(next.status);
+    setFromDate(next.fromDate);
+    setToDate(next.toDate);
+    setDateRangeMode(next.dateRangeMode);
+    setDatePreset(next.datePreset);
+    setSpecificPeriod(next.specificPeriod);
+    setSpecificValue(next.specificValue);
+
+    setAPISearchText(next.searchText);
+    setApiDagRunId(next.dagRunId);
+    setApiStatus(next.status);
+    setApiFromDate(next.fromDate);
+    setApiToDate(next.toDate);
+
+    lastPersistedFiltersRef.current = next;
+    searchState.writeState('dagRuns', remoteKey, next);
+  }, [
+    defaultFilters,
+    location.search,
+    parseDateFromUrl,
+    remoteKey,
+    searchState,
+  ]);
+
+  React.useEffect(() => {
+    const persisted = lastPersistedFiltersRef.current;
+    if (persisted && areFiltersEqual(persisted, currentFilters)) {
+      return;
+    }
+    lastPersistedFiltersRef.current = currentFilters;
+    searchState.writeState('dagRuns', remoteKey, currentFilters);
+  }, [currentFilters, remoteKey, searchState]);
 
   React.useEffect(() => {
     appBarContext.setTitle('DAG Runs');
@@ -143,9 +343,9 @@ function DAGRuns() {
     }
   );
 
-  const addSearchParam = (key: string, value: string) => {
+  const addSearchParam = (key: string, value: string | undefined) => {
     const locationQuery = new URLSearchParams(window.location.search);
-    if (value) {
+    if (value && value.length > 0) {
       locationQuery.set(key, value);
     } else {
       locationQuery.delete(key);
@@ -158,10 +358,6 @@ function DAGRuns() {
   };
 
   const handleSearch = (overrideStatus?: string) => {
-    // Format dates for API and URL
-    const timestampFromDate = formatDateForApi(fromDate);
-    const timestampToDate = formatDateForApi(toDate);
-
     // Use override status if provided, otherwise use current status
     const statusToUse = overrideStatus !== undefined ? overrideStatus : status;
 
@@ -176,11 +372,12 @@ function DAGRuns() {
     addSearchParam('name', searchText);
     addSearchParam('dagRunId', dagRunId);
     addSearchParam('status', statusToUse);
-    addSearchParam(
-      'fromDate',
-      timestampFromDate ? timestampFromDate.toString() : ''
-    );
-    addSearchParam('toDate', timestampToDate ? timestampToDate.toString() : '');
+    addSearchParam('fromDate', fromDate);
+    addSearchParam('toDate', toDate);
+    addSearchParam('dateMode', dateRangeMode);
+    addSearchParam('preset', datePreset);
+    addSearchParam('specificValue', specificValue);
+    addSearchParam('specificPeriod', specificPeriod);
 
     // Force revalidation of the query even if parameters haven't changed
     mutate();
@@ -243,6 +440,8 @@ function DAGRuns() {
     setApiToDate(dates.to);
     addSearchParam('preset', preset);
     addSearchParam('dateMode', 'preset');
+    addSearchParam('fromDate', dates.from);
+    addSearchParam('toDate', dates.to);
     // Trigger search with new dates
     mutate();
   };
@@ -293,6 +492,10 @@ function DAGRuns() {
     setApiFromDate(dates.from);
     setApiToDate(dates.to);
     addSearchParam('specificValue', value);
+    addSearchParam('specificPeriod', periodToUse);
+    addSearchParam('dateMode', 'specific');
+    addSearchParam('fromDate', dates.from);
+    addSearchParam('toDate', dates.to);
     // Trigger search with new dates
     mutate();
   };
@@ -308,6 +511,11 @@ function DAGRuns() {
       setToDate(dates.to);
       setApiFromDate(dates.from);
       setApiToDate(dates.to);
+      addSearchParam('preset', datePreset);
+      addSearchParam('fromDate', dates.from);
+      addSearchParam('toDate', dates.to);
+      addSearchParam('specificValue', '');
+      addSearchParam('specificPeriod', '');
       mutate();
     } else if (newMode === 'specific') {
       // Apply current specific period value
@@ -316,7 +524,16 @@ function DAGRuns() {
       setToDate(dates.to);
       setApiFromDate(dates.from);
       setApiToDate(dates.to);
+      addSearchParam('specificPeriod', specificPeriod);
+      addSearchParam('specificValue', specificValue);
+      addSearchParam('fromDate', dates.from);
+      addSearchParam('toDate', dates.to);
+      addSearchParam('preset', '');
       mutate();
+    } else {
+      addSearchParam('preset', '');
+      addSearchParam('specificValue', '');
+      addSearchParam('specificPeriod', '');
     }
   };
 

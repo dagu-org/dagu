@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from '../../components/ui/tooltip';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useSearchState } from '../../contexts/SearchStateContext';
 import { useQuery } from '../../hooks/api';
 import type { components } from '../../api/v2/schema';
 import QueueMetrics from '../../features/queues/components/QueueMetrics';
@@ -17,10 +18,78 @@ import { cn } from '../../lib/utils';
 
 function Queues() {
   const appBarContext = React.useContext(AppBarContext);
-  const [searchText, setSearchText] = React.useState('');
+  const searchState = useSearchState();
+  const remoteKey = appBarContext.selectedRemoteNode || 'local';
+
+  type QueueFilters = {
+    searchText: string;
+    queueType: string;
+  };
+
+  const areQueueFiltersEqual = (a: QueueFilters, b: QueueFilters) =>
+    a.searchText === b.searchText && a.queueType === b.queueType;
+
+  const defaultFilters = React.useMemo<QueueFilters>(
+    () => ({
+      searchText: '',
+      queueType: 'all',
+    }),
+    []
+  );
+
+  const [searchText, setSearchText] = React.useState(defaultFilters.searchText);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
-  const [selectedQueueType, setSelectedQueueType] =
-    React.useState<string>('all');
+  const [selectedQueueType, setSelectedQueueType] = React.useState<string>(
+    defaultFilters.queueType
+  );
+
+  const currentFilters = React.useMemo<QueueFilters>(
+    () => ({
+      searchText,
+      queueType: selectedQueueType,
+    }),
+    [searchText, selectedQueueType]
+  );
+
+  const currentFiltersRef = React.useRef(currentFilters);
+  React.useEffect(() => {
+    currentFiltersRef.current = currentFilters;
+  }, [currentFilters]);
+
+  const lastPersistedFiltersRef = React.useRef<QueueFilters | null>(null);
+
+  React.useEffect(() => {
+    const stored = searchState.readState<QueueFilters>('queues', remoteKey);
+    const next = stored
+      ? {
+          searchText: stored.searchText ?? defaultFilters.searchText,
+          queueType: stored.queueType ?? defaultFilters.queueType,
+        }
+      : defaultFilters;
+
+    const current = currentFiltersRef.current;
+    if (current && areQueueFiltersEqual(current, next)) {
+      if (!stored) {
+        searchState.writeState('queues', remoteKey, next);
+      }
+      lastPersistedFiltersRef.current = next;
+      return;
+    }
+
+    setSearchText(next.searchText);
+    setSelectedQueueType(next.queueType);
+    lastPersistedFiltersRef.current = next;
+    searchState.writeState('queues', remoteKey, next);
+  }, [defaultFilters, remoteKey, searchState]);
+
+  React.useEffect(() => {
+    const persisted = lastPersistedFiltersRef.current;
+    if (persisted && areQueueFiltersEqual(persisted, currentFilters)) {
+      return;
+    }
+    lastPersistedFiltersRef.current = currentFilters;
+    searchState.writeState('queues', remoteKey, currentFilters);
+  }, [currentFilters, remoteKey, searchState]);
 
   // State for DAG run modal
   const [modalDAGRun, setModalDAGRun] = React.useState<{

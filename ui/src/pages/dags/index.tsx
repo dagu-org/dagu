@@ -7,6 +7,7 @@ import {
   PathsDagsGetParametersQuerySort,
 } from '../../api/v2/schema';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useSearchState } from '../../contexts/SearchStateContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
 import { DAGErrors } from '../../features/dags/components/dag-editor';
 import { DAGTable } from '../../features/dags/components/dag-list';
@@ -14,22 +15,159 @@ import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader
 import { useQuery } from '../../hooks/api';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 
+type DAGDefinitionsFilters = {
+  searchText: string;
+  searchTag: string;
+  page: number;
+  sortField: string;
+  sortOrder: string;
+};
+
+const areDAGDefinitionsFiltersEqual = (
+  a: DAGDefinitionsFilters,
+  b: DAGDefinitionsFilters
+) =>
+  a.searchText === b.searchText &&
+  a.searchTag === b.searchTag &&
+  a.page === b.page &&
+  a.sortField === b.sortField &&
+  a.sortOrder === b.sortOrder;
+
 function DAGs() {
-  const query = new URLSearchParams(useLocation().search);
+  const location = useLocation();
+  const query = React.useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search]
+  );
   const group = query.get('group') || '';
   const appBarContext = React.useContext(AppBarContext);
-  const [searchText, setSearchText] = React.useState(query.get('search') || '');
-  const [searchTag, setSearchTag] = React.useState(query.get('tag') || '');
-  const [page, setPage] = React.useState(parseInt(query.get('page') || '1'));
+  const searchState = useSearchState();
+  const remoteKey = appBarContext.selectedRemoteNode || 'local';
+  const { preferences, updatePreference } = useUserPreferences();
+
+  const defaultFilters = React.useMemo<DAGDefinitionsFilters>(
+    () => ({
+      searchText: '',
+      searchTag: '',
+      page: 1,
+      sortField: 'name',
+      sortOrder: 'asc',
+    }),
+    []
+  );
+
+  const [searchText, setSearchText] = React.useState(
+    defaultFilters.searchText
+  );
+  const [searchTag, setSearchTag] = React.useState(defaultFilters.searchTag);
+  const [page, setPage] = React.useState<number>(defaultFilters.page);
   const [apiSearchText, setAPISearchText] = React.useState(
-    query.get('search') || ''
+    defaultFilters.searchText
   );
   const [apiSearchTag, setAPISearchTag] = React.useState(
-    query.get('tag') || ''
+    defaultFilters.searchTag
   );
-  const [sortField, setSortField] = React.useState(query.get('sort') || 'name');
-  const [sortOrder, setSortOrder] = React.useState(query.get('order') || 'asc');
-  const { preferences, updatePreference } = useUserPreferences();
+  const [sortField, setSortField] = React.useState(defaultFilters.sortField);
+  const [sortOrder, setSortOrder] = React.useState(defaultFilters.sortOrder);
+
+  const currentFilters = React.useMemo<DAGDefinitionsFilters>(
+    () => ({
+      searchText,
+      searchTag,
+      page,
+      sortField,
+      sortOrder,
+    }),
+    [searchText, searchTag, page, sortField, sortOrder]
+  );
+
+  const currentFiltersRef = React.useRef(currentFilters);
+  React.useEffect(() => {
+    currentFiltersRef.current = currentFilters;
+  }, [currentFilters]);
+
+  const lastPersistedFiltersRef =
+    React.useRef<DAGDefinitionsFilters | null>(null);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const stored = searchState.readState<DAGDefinitionsFilters>(
+      'dagDefinitions',
+      remoteKey
+    );
+    const base: DAGDefinitionsFilters = {
+      ...defaultFilters,
+      ...(stored ?? {}),
+    };
+
+    const urlFilters: Partial<DAGDefinitionsFilters> = {};
+    let hasUrlFilters = false;
+
+    if (params.has('search')) {
+      urlFilters.searchText = params.get('search') ?? '';
+      hasUrlFilters = true;
+    }
+
+    if (params.has('tag')) {
+      urlFilters.searchTag = params.get('tag') ?? '';
+      hasUrlFilters = true;
+    }
+
+    if (params.has('page')) {
+      const pageParam = Number.parseInt(params.get('page') || '', 10);
+      if (!Number.isNaN(pageParam) && pageParam > 0) {
+        urlFilters.page = pageParam;
+        hasUrlFilters = true;
+      }
+    }
+
+    if (params.has('sort')) {
+      urlFilters.sortField = params.get('sort') || defaultFilters.sortField;
+      hasUrlFilters = true;
+    }
+
+    if (params.has('order')) {
+      urlFilters.sortOrder = params.get('order') || defaultFilters.sortOrder;
+      hasUrlFilters = true;
+    }
+
+    const next = hasUrlFilters ? { ...base, ...urlFilters } : base;
+    const current = currentFiltersRef.current;
+
+    if (current && areDAGDefinitionsFiltersEqual(current, next)) {
+      if (hasUrlFilters) {
+        lastPersistedFiltersRef.current = next;
+        searchState.writeState('dagDefinitions', remoteKey, next);
+      }
+      return;
+    }
+
+    setSearchText(next.searchText);
+    setSearchTag(next.searchTag);
+    setPage(next.page);
+    setAPISearchText(next.searchText);
+    setAPISearchTag(next.searchTag);
+    setSortField(next.sortField);
+    setSortOrder(next.sortOrder);
+
+    lastPersistedFiltersRef.current = next;
+    searchState.writeState('dagDefinitions', remoteKey, next);
+  }, [
+    defaultFilters,
+    location.search,
+    remoteKey,
+    searchState,
+  ]);
+
+  React.useEffect(() => {
+    const persisted = lastPersistedFiltersRef.current;
+    if (persisted && areDAGDefinitionsFiltersEqual(persisted, currentFilters)) {
+      return;
+    }
+
+    lastPersistedFiltersRef.current = currentFilters;
+    searchState.writeState('dagDefinitions', remoteKey, currentFilters);
+  }, [currentFilters, remoteKey, searchState]);
 
   const handlePageLimitChange = (newLimit: number) => {
     updatePreference('pageLimit', newLimit);
@@ -59,7 +197,11 @@ function DAGs() {
 
   const addSearchParam = (key: string, value: string) => {
     const locationQuery = new URLSearchParams(window.location.search);
-    locationQuery.set(key, value);
+    if (value && value.length > 0) {
+      locationQuery.set(key, value);
+    } else {
+      locationQuery.delete(key);
+    }
     window.history.pushState(
       {},
       '',

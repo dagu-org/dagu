@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshButton } from '@/components/ui/refresh-button';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
+import { useSearchState } from '../contexts/SearchStateContext';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import { useQuery } from '../hooks/api';
 // Import the main 'components' type and Status enum
@@ -58,23 +59,108 @@ function Dashboard(): React.ReactElement | null {
   // All hooks must be called unconditionally at the top level.
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
-  const [selectedDAGRun, setSelectedDAGRun] = React.useState<string>('all');
-  const [dateRange, setDateRange] = React.useState<{
-    startDate: number;
-    endDate: number | undefined;
-  }>(() => {
-    // Initialize with today's date range
+  const searchState = useSearchState();
+  const remoteKey = appBarContext.selectedRemoteNode || 'local';
+
+  type DashboardFilters = {
+    selectedDAGRun: string;
+    dateRange: {
+      startDate: number;
+      endDate: number | undefined;
+    };
+  };
+
+  const areFiltersEqual = (a: DashboardFilters, b: DashboardFilters) =>
+    a.selectedDAGRun === b.selectedDAGRun &&
+    a.dateRange.startDate === b.dateRange.startDate &&
+    (a.dateRange.endDate ?? null) === (b.dateRange.endDate ?? null);
+
+  const getDefaultDateRange = React.useCallback(() => {
     const now = dayjs();
     const startOfDay =
       config.tzOffsetInSec !== undefined
         ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
         : now.startOf('day');
-
     return {
       startDate: startOfDay.unix(),
-      endDate: undefined, // No end date by default to get all dagRuns until now
+      endDate: undefined,
     };
-  });
+  }, [config.tzOffsetInSec]);
+
+  const defaultFilters = React.useMemo<DashboardFilters>(
+    () => ({
+      selectedDAGRun: 'all',
+      dateRange: getDefaultDateRange(),
+    }),
+    [getDefaultDateRange]
+  );
+
+  const [selectedDAGRun, setSelectedDAGRun] = React.useState<string>(
+    defaultFilters.selectedDAGRun
+  );
+  const [dateRange, setDateRange] = React.useState<{
+    startDate: number;
+    endDate: number | undefined;
+  }>(defaultFilters.dateRange);
+
+  const currentFilters = React.useMemo<DashboardFilters>(
+    () => ({
+      selectedDAGRun,
+      dateRange,
+    }),
+    [selectedDAGRun, dateRange]
+  );
+
+  const currentFiltersRef = React.useRef(currentFilters);
+  React.useEffect(() => {
+    currentFiltersRef.current = currentFilters;
+  }, [currentFilters]);
+
+  const lastPersistedFiltersRef = React.useRef<DashboardFilters | null>(null);
+
+  React.useEffect(() => {
+    const stored = searchState.readState<DashboardFilters>(
+      'dashboard',
+      remoteKey
+    );
+    const base = defaultFilters;
+    const next = stored
+      ? {
+          selectedDAGRun: stored.selectedDAGRun || base.selectedDAGRun,
+          dateRange: {
+            startDate:
+              stored.dateRange?.startDate ?? base.dateRange.startDate,
+            endDate:
+              stored.dateRange?.endDate === undefined
+                ? base.dateRange.endDate
+                : stored.dateRange.endDate,
+          },
+        }
+      : base;
+
+    const current = currentFiltersRef.current;
+    if (current && areFiltersEqual(current, next)) {
+      if (!stored) {
+        searchState.writeState('dashboard', remoteKey, next);
+      }
+      lastPersistedFiltersRef.current = next;
+      return;
+    }
+
+    setSelectedDAGRun(next.selectedDAGRun);
+    setDateRange(next.dateRange);
+    lastPersistedFiltersRef.current = next;
+    searchState.writeState('dashboard', remoteKey, next);
+  }, [defaultFilters, remoteKey, searchState]);
+
+  React.useEffect(() => {
+    const persisted = lastPersistedFiltersRef.current;
+    if (persisted && areFiltersEqual(persisted, currentFilters)) {
+      return;
+    }
+    lastPersistedFiltersRef.current = currentFilters;
+    searchState.writeState('dashboard', remoteKey, currentFilters);
+  }, [currentFilters, remoteKey, searchState]);
 
   // Handle date change from the timeline component
   const handleDateChange = (startTimestamp: number, endTimestamp: number) => {
