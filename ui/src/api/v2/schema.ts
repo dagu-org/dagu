@@ -2410,11 +2410,6 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    /**
-                     * @description Strategy for selecting which DAG definition to use when rescheduling. Currently experimental and not yet supported.
-                     * @enum {string}
-                     */
-                    definitionStrategy?: PathsDagRunsNameDagRunIdReschedulePostRequestBodyApplicationJsonDefinitionStrategy;
                     /** @description Explicit run ID for the new DAG-run; if omitted a new ID is generated. */
                     dagRunId?: string;
                     /** @description Optional DAG name override for the new run. */
@@ -3186,9 +3181,6 @@ export enum PathsDagsGetParametersQuerySort {
 export enum PathsDagsGetParametersQueryOrder {
     asc = "asc",
     desc = "desc"
-}
-export enum PathsDagRunsNameDagRunIdReschedulePostRequestBodyApplicationJsonDefinitionStrategy {
-    latest = "latest"
 }
 export enum ErrorCode {
     forbidden = "forbidden",

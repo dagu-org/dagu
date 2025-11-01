@@ -810,13 +810,6 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	)
 
 	if body := request.Body; body != nil {
-		if body.DefinitionStrategy != nil {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    "definitionStrategy not supported",
-			}
-		}
 		if body.DagName != nil && *body.DagName != "" {
 			nameOverride = *body.DagName
 			if err := core.ValidateDAGName(nameOverride); err != nil {
