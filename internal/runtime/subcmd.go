@@ -49,10 +49,17 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	if opts.NameOverride != "" {
 		args = append(args, fmt.Sprintf("--name=%s", opts.NameOverride))
 	}
+	if opts.FromRunID != "" {
+		args = append(args, fmt.Sprintf("--from-run-id=%s", opts.FromRunID))
+	}
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
-	args = append(args, dag.Location)
+	target := dag.Location
+	if opts.Target != "" {
+		target = opts.Target
+	}
+	args = append(args, target)
 
 	return CmdSpec{
 		Executable: b.executable,
@@ -219,6 +226,8 @@ type StartOptions struct {
 	DAGRunID     string // ID for the dag-run
 	NoQueue      bool   // Do not allow queueing
 	NameOverride string // Optional DAG name override
+	FromRunID    string // Historic dag-run ID to use as a template
+	Target       string // Optional CLI argument override (DAG name or file path)
 }
 
 // EnqueueOptions contains options for enqueuing a dag-run.

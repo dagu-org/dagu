@@ -23,6 +23,9 @@ var defaultWhitelist = map[string]bool{
 	"TZ":              true,
 	"SHELL":           true,
 	"LD_LIBRARY_PATH": true,
+	"USERPROFILE":     true, // Windows Specifics equivalent of HOME
+	"PSModulePath":    true, // Windows Specifics, powershell modules path
+	"Path":            true, // Windows Specifics equivalent of PATH
 }
 
 // defaultPrefixes defines prefixes of env vars allowed to propagate.

@@ -1020,6 +1020,79 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /dag-runs/{name}/{dagRunId}/reschedule:
+    post:
+      summary: "Reschedule DAG-run with a new run ID"
+      description: "Launch a fresh DAG-run from a historic execution while reusing its stored parameters."
+      operationId: "rescheduleDAGRun"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                definitionStrategy:
+                  type: string
+                  description: "Strategy for selecting which DAG definition to use when rescheduling. Currently experimental and not yet supported."
+                  enum: ["latest"]
+                dagRunId:
+                  type: string
+                  description: "Explicit run ID for the new DAG-run; if omitted a new ID is generated."
+                dagName:
+                  type: string
+                  description: "Optional DAG name override for the new run."
+                singleton:
+                  type: boolean
+                  description: "If true, prevent starting if a DAG with the same name is already running (returns 409 conflict)."
+                  default: false
+      responses:
+        "200":
+          description: "Successfully scheduled a new DAG-run"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRunId:
+                    type: string
+                    description: "ID of the newly created DAG-run."
+                  queued:
+                    type: boolean
+                    description: "Indicates whether the run was queued instead of starting immediately."
+                required:
+                  - dagRunId
+                  - queued
+        "400":
+          description: "Invalid request parameters"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Historic run not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict (run ID already exists or concurrency guard blocks execution)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /dag-runs/{name}/{dagRunId}/sub-dag-runs:
     get:

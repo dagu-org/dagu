@@ -4,6 +4,7 @@ import { SWRConfig } from 'swr';
 import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
 import { Config, ConfigContext } from './contexts/ConfigContext';
+import { SearchStateProvider } from './contexts/SearchStateContext';
 import { UserPreferencesProvider } from './contexts/UserPreference';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
@@ -89,31 +90,33 @@ function App({ config }: Props) {
       >
         <ConfigContext.Provider value={config}>
           <UserPreferencesProvider>
-            <ToastProvider>
-              <BrowserRouter basename={config.basePath}>
-                <Layout {...config}>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/system-status" element={<SystemStatus />} />
-                    <Route path="/dags/" element={<DAGs />} />
-                    <Route
-                      path="/dags/:fileName/:tab"
-                      element={<DAGDetails />}
-                    />
-                    <Route path="/dags/:fileName/" element={<DAGDetails />} />
-                    <Route path="/search/" element={<Search />} />
-                    <Route path="/queues" element={<Queues />} />
-                    <Route path="/dag-runs" element={<DAGRuns />} />
-                    <Route
-                      path="/dag-runs/:name/:dagRunId"
-                      element={<DAGRunDetails />}
-                    />
-                    <Route path="/workers" element={<Workers />} />
-                  </Routes>
-                </Layout>
-              </BrowserRouter>
-            </ToastProvider>
+            <SearchStateProvider>
+              <ToastProvider>
+                <BrowserRouter basename={config.basePath}>
+                  <Layout {...config}>
+                    <Routes>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/system-status" element={<SystemStatus />} />
+                      <Route path="/dags/" element={<DAGs />} />
+                      <Route
+                        path="/dags/:fileName/:tab"
+                        element={<DAGDetails />}
+                      />
+                      <Route path="/dags/:fileName/" element={<DAGDetails />} />
+                      <Route path="/search/" element={<Search />} />
+                      <Route path="/queues" element={<Queues />} />
+                      <Route path="/dag-runs" element={<DAGRuns />} />
+                      <Route
+                        path="/dag-runs/:name/:dagRunId"
+                        element={<DAGRunDetails />}
+                      />
+                      <Route path="/workers" element={<Workers />} />
+                    </Routes>
+                  </Layout>
+                </BrowserRouter>
+              </ToastProvider>
+            </SearchStateProvider>
           </UserPreferencesProvider>
         </ConfigContext.Provider>
       </AppBarContext.Provider>

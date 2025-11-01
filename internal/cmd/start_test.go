@@ -1,10 +1,14 @@
 package cmd_test
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/term"
@@ -133,4 +137,48 @@ steps:
 		// that the command accepts the arguments
 		_ = cli.Execute()
 	})
+}
+
+func TestCmdStart_FromRunID(t *testing.T) {
+	t.Run("ReschedulesWithStoredParameters", func(t *testing.T) {
+		th := test.SetupCommand(t)
+
+		dag := th.DAG(t, `params: "alpha beta"
+steps:
+  - name: "echo"
+    command: "echo $1 $2"
+`)
+
+		// Kick off an initial run so we have history to clone.
+		th.RunCommand(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", dag.Location},
+		})
+
+		ctx := context.Background()
+		originalStatus, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, originalStatus.Status)
+
+		newRunID := "rescheduled_run"
+		th.RunCommand(t, cmd.Start(), test.CmdTest{
+			Args: []string{
+				"start",
+				fmt.Sprintf("--from-run-id=%s", originalStatus.DAGRunID),
+				fmt.Sprintf("--run-id=%s", newRunID),
+				dag.Name,
+			},
+		})
+
+		require.Eventually(t, func() bool {
+			status, err := th.DAGRunMgr.GetCurrentStatus(ctx, dag.DAG, newRunID)
+			return err == nil && status != nil && status.Status == core.Succeeded
+		}, 5*time.Second, 100*time.Millisecond)
+
+		newStatus, err := th.DAGRunMgr.GetCurrentStatus(ctx, dag.DAG, newRunID)
+		require.NoError(t, err)
+		require.NotNil(t, newStatus)
+		require.Equal(t, originalStatus.Params, newStatus.Params)
+		require.Equal(t, originalStatus.ParamsList, newStatus.ParamsList)
+	})
+
 }
