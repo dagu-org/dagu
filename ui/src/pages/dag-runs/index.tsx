@@ -258,17 +258,17 @@ function DAGRuns() {
             value={searchText}
             onChange={handleNameInputChange}
             onKeyDown={handleInputKeyPress}
-            className="flex-1 min-w-[200px] bg-background"
+            className="w-[220px] bg-background"
           />
           <Input
             placeholder="Filter by Run ID..."
             value={dagRunId}
             onChange={handleDagRunIdInputChange}
             onKeyDown={handleInputKeyPress}
-            className="flex-1 min-w-[180px] bg-background"
+            className="w-[200px] bg-background"
           />
           <Select value={status} onValueChange={handleStatusChange}>
-            <SelectTrigger className="w-auto min-w-[140px] bg-background">
+            <SelectTrigger className="w-[160px] bg-background">
               <SelectValue placeholder="Status">
                 {status === 'all' ? (
                   <div className="inline-flex items-center rounded-full border bg-gray-100 border-gray-300 text-gray-700 py-0.5 px-2 text-xs font-medium">
@@ -348,8 +348,12 @@ function DAGRuns() {
               </SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={() => handleSearch()} size="sm" className="px-4">
-            <Search size={16} className="mr-1" />
+          <Button
+            onClick={() => handleSearch()}
+            size="default"
+            className="px-6 font-medium"
+          >
+            <Search size={18} className="mr-2" />
             Search
           </Button>
           <RefreshButton onRefresh={async () => { await mutate(); }} />
