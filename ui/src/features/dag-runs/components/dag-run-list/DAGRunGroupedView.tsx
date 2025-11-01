@@ -1,7 +1,6 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { components, Status } from '../../../../api/v2/schema';
-import { useConfig } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import { DAGRunDetailsModal } from '../dag-run-details';
@@ -15,7 +14,6 @@ interface GroupedDAGRuns {
 }
 
 function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
-  const config = useConfig();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedDAGRun, setSelectedDAGRun] = useState<{
     name: string;
@@ -39,7 +37,10 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
       const runs = groups[dagName];
       if (runs) {
         runs.sort((a, b) => {
-          return dayjs(b.queuedAt || '').valueOf() - dayjs(a.queuedAt || '').valueOf();
+          return (
+            dayjs(b.queuedAt || '').valueOf() -
+            dayjs(a.queuedAt || '').valueOf()
+          );
         });
       }
     });
@@ -56,21 +57,6 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
       }
       return next;
     });
-  };
-
-  // Format timezone information for display
-  const getTimezoneInfo = (): string => {
-    if (config.tzOffsetInSec === undefined) return 'Local Timezone';
-
-    const offsetInMinutes = config.tzOffsetInSec / 60;
-    const hours = Math.floor(Math.abs(offsetInMinutes) / 60);
-    const minutes = Math.abs(offsetInMinutes) % 60;
-
-    const sign = offsetInMinutes >= 0 ? '+' : '-';
-    const formattedHours = hours.toString().padStart(2, '0');
-    const formattedMinutes = minutes.toString().padStart(2, '0');
-
-    return `${sign}${formattedHours}:${formattedMinutes}`;
   };
 
   // Calculate duration between start and finish times
@@ -120,8 +106,6 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
     return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`;
   };
 
-  const timezoneInfo = getTimezoneInfo();
-
   // Get the most recent run for each group for summary display
   const getGroupSummary = (runs: components['schemas']['DAGRunSummary'][]) => {
     if (!runs || runs.length === 0) {
@@ -139,12 +123,18 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
       (r) => r.status === Status.Success
     ).length;
 
+    // Check if all runs have the same status
+    const firstStatus = runs[0]?.status;
+    const allSameStatus = firstStatus !== undefined && runs.every((r) => r.status === firstStatus);
+
     return {
       latestRun,
       runningCount,
       failedCount,
       succeededCount,
       totalCount: runs.length,
+      allSameStatus,
+      uniformStatus: allSameStatus ? firstStatus : null,
     };
   };
 
@@ -196,15 +186,24 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                     }}
                   >
                     {isExpanded ? (
-                      <ChevronDown size={16} className="text-muted-foreground" />
+                      <ChevronDown
+                        size={16}
+                        className="text-muted-foreground"
+                      />
                     ) : (
-                      <ChevronRight size={16} className="text-muted-foreground" />
+                      <ChevronRight
+                        size={16}
+                        className="text-muted-foreground"
+                      />
                     )}
                   </button>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">{dagName}</div>
+                    <div className="font-medium text-sm truncate">
+                      {dagName}
+                    </div>
                     <div className="text-xs text-muted-foreground">
-                      {summary.totalCount} run{summary.totalCount !== 1 ? 's' : ''}
+                      {summary.totalCount} run
+                      {summary.totalCount !== 1 ? 's' : ''}
                       {summary.runningCount > 0 && (
                         <span className="ml-2">
                           {summary.runningCount} running
@@ -219,9 +218,15 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <StatusChip status={summary.latestRun.status} size="xs">
-                    {summary.latestRun.statusLabel}
-                  </StatusChip>
+                  {summary.allSameStatus ? (
+                    <StatusChip status={summary.uniformStatus!} size="xs">
+                      {summary.latestRun.statusLabel}
+                    </StatusChip>
+                  ) : (
+                    <StatusChip status={undefined} size="xs">
+                      Mixed
+                    </StatusChip>
+                  )}
                 </div>
               </div>
 
@@ -254,15 +259,21 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                             </div>
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                               <div className="whitespace-nowrap">
-                                <span className="text-muted-foreground">Queued: </span>
+                                <span className="text-muted-foreground">
+                                  Queued:{' '}
+                                </span>
                                 {dagRun.queuedAt || '-'}
                               </div>
                               <div className="whitespace-nowrap">
-                                <span className="text-muted-foreground">Started: </span>
+                                <span className="text-muted-foreground">
+                                  Started:{' '}
+                                </span>
                                 {dagRun.startedAt || '-'}
                               </div>
                               <div className="flex items-center gap-1 whitespace-nowrap">
-                                <span className="text-muted-foreground">Duration: </span>
+                                <span className="text-muted-foreground">
+                                  Duration:{' '}
+                                </span>
                                 {calculateDuration(
                                   dagRun.startedAt,
                                   dagRun.finishedAt,
