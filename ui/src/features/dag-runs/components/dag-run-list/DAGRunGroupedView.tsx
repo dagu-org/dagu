@@ -4,7 +4,7 @@ import { components, Status } from '../../../../api/v2/schema';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
-import { useNavigate } from 'react-router-dom';
+import { DAGRunDetailsModal } from '../dag-run-details';
 
 interface DAGRunGroupedViewProps {
   dagRuns: components['schemas']['DAGRunSummary'][];
@@ -16,8 +16,11 @@ interface GroupedDAGRuns {
 
 function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
   const config = useConfig();
-  const navigate = useNavigate();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [selectedDAGRun, setSelectedDAGRun] = useState<{
+    name: string;
+    dagRunId: string;
+  } | null>(null);
 
   // Group DAG runs by name
   const groupedDAGRuns = useMemo(() => {
@@ -237,7 +240,10 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                               '_blank'
                             );
                           } else {
-                            navigate(`/dag-runs/${dagRun.name}/${dagRun.dagRunId}`);
+                            setSelectedDAGRun({
+                              name: dagRun.name,
+                              dagRunId: dagRun.dagRunId,
+                            });
                           }
                         }}
                       >
@@ -284,6 +290,18 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
           );
         })}
       </div>
+
+      {/* DAG Run Details Modal */}
+      {selectedDAGRun && (
+        <DAGRunDetailsModal
+          name={selectedDAGRun.name}
+          dagRunId={selectedDAGRun.dagRunId}
+          isOpen={!!selectedDAGRun}
+          onClose={() => {
+            setSelectedDAGRun(null);
+          }}
+        />
+      )}
     </div>
   );
 }
