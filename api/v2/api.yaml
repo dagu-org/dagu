@@ -969,23 +969,12 @@ paths:
             schema:
               type: object
               properties:
-                newDagRunId:
+                dagRunId:
                   type: string
                   description: "Explicit run ID for the new DAG-run; if omitted a new ID is generated."
-                params:
-                  type: string
-                  description: "Parameter override (currently unsupported; requests should omit this field)."
-                singleton:
-                  type: boolean
-                  description: "Force singleton execution (disables queue dispatch)."
-                dagNameOverride:
+                dagName:
                   type: string
                   description: "Optional DAG name override for the new run."
-                definitionStrategy:
-                  type: string
-                  enum: ["snapshot", "latest"]
-                  default: "snapshot"
-                  description: "Select which DAG definition to execute. Only \"snapshot\" is supported in this release."
       responses:
         "200":
           description: "Successfully scheduled a new DAG-run"

@@ -2319,19 +2319,9 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @description Explicit run ID for the new DAG-run; if omitted a new ID is generated. */
-                    newDagRunId?: string;
-                    /** @description Parameter override (currently unsupported; requests should omit this field). */
-                    params?: string;
-                    /** @description Force singleton execution (disables queue dispatch). */
-                    singleton?: boolean;
+                    dagRunId?: string;
                     /** @description Optional DAG name override for the new run. */
-                    dagNameOverride?: string;
-                    /**
-                     * @description Select which DAG definition to execute. Only "snapshot" is supported in this release.
-                     * @default snapshot
-                     * @enum {string}
-                     */
-                    definitionStrategy?: PathsDagRunsNameDagRunIdReschedulePostRequestBodyApplicationJsonDefinitionStrategy;
+                    dagName?: string;
                 };
             };
         };
@@ -3094,10 +3084,6 @@ export enum PathsDagsGetParametersQuerySort {
 export enum PathsDagsGetParametersQueryOrder {
     asc = "asc",
     desc = "desc"
-}
-export enum PathsDagRunsNameDagRunIdReschedulePostRequestBodyApplicationJsonDefinitionStrategy {
-    snapshot = "snapshot",
-    latest = "latest"
 }
 export enum ErrorCode {
     forbidden = "forbidden",
