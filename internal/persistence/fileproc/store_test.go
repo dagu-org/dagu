@@ -2,6 +2,7 @@ package fileproc
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -28,30 +29,12 @@ func TestStore(t *testing.T) {
 	proc, err := store.Acquire(ctx, "test_queue", dagRun)
 	require.NoError(t, err, "failed to get proc")
 
-	// Stop the process after a short delay
-	done := make(chan struct{})
-	go func() {
-		time.Sleep(time.Millisecond * 100) // Give some time for the file to be created
-		err := proc.Stop(ctx)
-		require.NoError(t, err, "failed to stop proc")
-		close(done)
-	}()
+	requireCountAlive(t, ctx, store, "test_queue", 1)
 
-	// Give time for the heartbeat to start
-	time.Sleep(time.Millisecond * 50)
+	err = proc.Stop(ctx)
+	require.NoError(t, err, "failed to stop proc")
 
-	// Check if the count is 1
-	count, err := store.CountAlive(ctx, "test_queue")
-	require.NoError(t, err, "failed to count proc files")
-	require.Equal(t, 1, count, "expected 1 proc file")
-
-	// Wait for the process to stop
-	<-done
-
-	// Check if the count is 0
-	count, err = store.CountAlive(ctx, "test_queue")
-	require.NoError(t, err, "failed to count proc files")
-	require.Equal(t, 0, count, "expected 0 proc files")
+	requireCountAlive(t, ctx, store, "test_queue", 0)
 }
 
 func TestStore_IsRunAlive(t *testing.T) {
@@ -84,22 +67,13 @@ func TestStore_IsRunAlive(t *testing.T) {
 		proc, err := store.Acquire(ctx, "queue-2", dagRun)
 		require.NoError(t, err)
 
-		// Give a moment for the heartbeat to start
-		time.Sleep(time.Millisecond * 50)
-
-		// Check if the run is alive
-		alive, err := store.IsRunAlive(ctx, "queue-2", dagRun)
-		require.NoError(t, err)
-		require.True(t, alive)
+		requireRunAliveState(t, ctx, store, "queue-2", dagRun, true)
 
 		// Stop the process
 		err = proc.Stop(ctx)
 		require.NoError(t, err)
 
-		// Check again - should be false now
-		alive, err = store.IsRunAlive(ctx, "queue-2", dagRun)
-		require.NoError(t, err)
-		require.False(t, alive)
+		requireRunAliveState(t, ctx, store, "queue-2", dagRun, false)
 	})
 
 	t.Run("DifferentRunID", func(t *testing.T) {
@@ -111,8 +85,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 		proc1, err := store.Acquire(ctx, "queue-3", dagRun1)
 		require.NoError(t, err)
 
-		// Give a moment for the heartbeat to start
-		time.Sleep(time.Millisecond * 50)
+		requireRunAliveState(t, ctx, store, "queue-3", dagRun1, true)
 
 		// Check for a different run ID
 		dagRun2 := execution.DAGRunRef{
@@ -124,9 +97,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 		require.False(t, alive)
 
 		// Check the original run is still alive
-		alive, err = store.IsRunAlive(ctx, "queue-3", dagRun1)
-		require.NoError(t, err)
-		require.True(t, alive)
+		requireRunAliveState(t, ctx, store, "queue-3", dagRun1, true)
 
 		// Cleanup
 		err = proc1.Stop(ctx)
@@ -196,10 +167,11 @@ func TestStore_ListAllAlive(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = proc2.Stop(ctx) }()
 
-		// Give time for heartbeats to start
-		time.Sleep(time.Millisecond * 50)
+		requireListAllAlive(t, ctx, store, func(result map[string][]execution.DAGRunRef) bool {
+			queueRuns, ok := result["queue1"]
+			return ok && len(result) == 1 && len(queueRuns) == 2
+		}, "expected queue1 to contain both runs")
 
-		// List all alive processes
 		result, err := store.ListAllAlive(ctx)
 		require.NoError(t, err)
 		require.Len(t, result, 1)
@@ -242,10 +214,12 @@ func TestStore_ListAllAlive(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = proc3.Stop(ctx) }()
 
-		// Give time for heartbeats to start
-		time.Sleep(time.Millisecond * 50)
+		requireListAllAlive(t, ctx, store, func(result map[string][]execution.DAGRunRef) bool {
+			queueAlpha, alphaOK := result["queue-alpha"]
+			queueBeta, betaOK := result["queue-beta"]
+			return len(result) == 2 && alphaOK && betaOK && len(queueAlpha) == 2 && len(queueBeta) == 1
+		}, "expected both queues to be populated")
 
-		// List all alive processes
 		result, err := store.ListAllAlive(ctx)
 		require.NoError(t, err)
 		require.Len(t, result, 2)
@@ -282,12 +256,32 @@ func TestStore_ListAllAlive(t *testing.T) {
 		proc3, err := store.Acquire(ctx, "mixed-queue", dagRun3)
 		require.NoError(t, err)
 
-		// Give time for heartbeats to start
-		time.Sleep(time.Millisecond * 50)
-
 		// Stop proc2
 		err = proc2.Stop(ctx)
 		require.NoError(t, err)
+
+		requireListAllAlive(t, ctx, store, func(result map[string][]execution.DAGRunRef) bool {
+			queueRuns, ok := result["mixed-queue"]
+			if !ok || len(result) != 1 || len(queueRuns) != 2 {
+				return false
+			}
+
+			hasRunX := false
+			hasRunY := false
+			hasRunZ := false
+			for _, ref := range queueRuns {
+				switch ref.ID {
+				case "run-x1":
+					hasRunX = true
+				case "run-y1":
+					hasRunY = true
+				case "run-z1":
+					hasRunZ = true
+				}
+			}
+
+			return hasRunX && hasRunZ && !hasRunY
+		}, "expected only run-x1 and run-z1 to be alive")
 
 		// List all alive processes
 		result, err := store.ListAllAlive(ctx)
@@ -320,4 +314,38 @@ func TestStore_ListAllAlive(t *testing.T) {
 		require.NotNil(t, result)
 		require.Empty(t, result)
 	})
+}
+
+const (
+	heartbeatWait = 2 * time.Second
+	heartbeatPoll = 10 * time.Millisecond
+)
+
+func requireCountAlive(t *testing.T, ctx context.Context, store *Store, queue string, expected int) {
+	t.Helper()
+	message := fmt.Sprintf("expected %d proc file(s) in %s", expected, queue)
+	require.Eventually(t, func() bool {
+		count, err := store.CountAlive(ctx, queue)
+		require.NoError(t, err, "failed to count proc files")
+		return count == expected
+	}, heartbeatWait, heartbeatPoll, message)
+}
+
+func requireRunAliveState(t *testing.T, ctx context.Context, store *Store, queue string, dagRun execution.DAGRunRef, expected bool) {
+	t.Helper()
+	message := fmt.Sprintf("expected run %s/%s alive=%t", dagRun.Name, dagRun.ID, expected)
+	require.Eventually(t, func() bool {
+		alive, err := store.IsRunAlive(ctx, queue, dagRun)
+		require.NoError(t, err)
+		return alive == expected
+	}, heartbeatWait, heartbeatPoll, message)
+}
+
+func requireListAllAlive(t *testing.T, ctx context.Context, store *Store, predicate func(map[string][]execution.DAGRunRef) bool, message string) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		result, err := store.ListAllAlive(ctx)
+		require.NoError(t, err)
+		return predicate(result)
+	}, heartbeatWait, heartbeatPoll, message)
 }
