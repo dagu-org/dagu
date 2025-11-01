@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
@@ -657,27 +655,6 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
 
-	var targetRunID string
-	var generateNewRunID bool
-	if request.Body != nil {
-		targetRunID = strings.TrimSpace(valueOf(request.Body.DagRunId))
-		generateNewRunID = valueOf(request.Body.GenerateNewRunId)
-	}
-
-	if generateNewRunID {
-		targetRunID = ""
-	}
-
-	useSameRunID := !generateNewRunID && (targetRunID == "" || targetRunID == request.DagRunId)
-
-	if request.Body != nil && request.Body.StepName != nil && *request.Body.StepName != "" && !useSameRunID {
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "step retry does not support generating a new run ID; reuse the original run ID or omit stepName",
-		}
-	}
-
 	// Get count of running DAGs to check against maxActiveRuns (best effort)
 	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
 	if err != nil {
@@ -699,85 +676,20 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		}
 	}
 
-	if useSameRunID {
-		targetRunID = request.DagRunId
-		if request.Body != nil && request.Body.StepName != nil && *request.Body.StepName != "" {
-			spec := a.subCmdBuilder.Retry(dag, targetRunID, *request.Body.StepName, true)
-			if err := runtime.Start(ctx, spec); err != nil {
-				return nil, fmt.Errorf("error retrying DAG step: %w", err)
-			}
-			return api.RetryDAGRun200JSONResponse{DagRunId: targetRunID}, nil
-		}
-
-		spec := a.subCmdBuilder.Retry(dag, targetRunID, "", false)
+	if request.Body.StepName != nil && *request.Body.StepName != "" {
+		spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, *request.Body.StepName, true)
 		if err := runtime.Start(ctx, spec); err != nil {
-			return nil, fmt.Errorf("error retrying DAG: %w", err)
+			return nil, fmt.Errorf("error retrying DAG step: %w", err)
 		}
-
-		return api.RetryDAGRun200JSONResponse{DagRunId: targetRunID}, nil
+		return api.RetryDAGRun200Response{}, nil
 	}
 
-	if targetRunID != "" {
-		if err := validateDagRunID(targetRunID); err != nil {
-			return nil, err
-		}
-	}
-
-	if targetRunID == "" {
-		var genErr error
-		targetRunID, genErr = a.dagRunMgr.GenDAGRunID(ctx)
-		if genErr != nil {
-			return nil, fmt.Errorf("error generating dag-run ID: %w", genErr)
-		}
-	}
-
-	if _, err := a.dagRunStore.FindAttempt(ctx, execution.DAGRunRef{Name: dag.Name, ID: targetRunID}); !errors.Is(err, execution.ErrDAGRunIDNotFound) {
-		return nil, &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeAlreadyExists,
-			Message:    fmt.Sprintf("dag-run ID %s already exists for DAG %s", targetRunID, dag.Name),
-		}
-	}
-
-	status, err := attempt.ReadStatus(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error reading DAG-run status: %w", err)
-	}
-
-	if err := a.startDAGRun(ctx, dag, status.Params, targetRunID, "", false); err != nil {
+	spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, "", false)
+	if err := runtime.Start(ctx, spec); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 
-	return api.RetryDAGRun200JSONResponse{DagRunId: targetRunID}, nil
-}
-
-const maxDagRunIDLen = 64
-
-var dagRunIDRegex = regexp.MustCompile(`^[-a-zA-Z0-9_]+$`)
-
-func validateDagRunID(id string) error {
-	if id == "" {
-		return &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "dag-run ID must be provided when generateNewRunId is false",
-		}
-	}
-	if len(id) > maxDagRunIDLen {
-		return &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    fmt.Sprintf("dag-run ID length must be less than %d characters", maxDagRunIDLen),
-		}
-	}
-	if !dagRunIDRegex.MatchString(id) {
-		return &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "dag-run ID must only contain alphanumeric characters, dashes, and underscores",
-		}
-	}
-	return nil
+	return api.RetryDAGRun200Response{}, nil
 }
 
 func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRequestObject) (api.TerminateDAGRunResponseObject, error) {

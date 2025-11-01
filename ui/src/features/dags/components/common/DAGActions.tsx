@@ -4,19 +4,17 @@
  * @module features/dags/components/common
  */
 import { Button } from '@/components/ui/button'; // Import Shadcn Button
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'; // Import Shadcn Tooltip
+import { Checkbox } from '@/components/ui/checkbox';
 import dayjs from '@/lib/dayjs';
 import StatusChip from '@/ui/StatusChip';
 import { Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
 import React from 'react';
-import type { operations } from '../../../../api/v2/schema';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
@@ -64,8 +62,6 @@ function DAGActions({
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
   const [retryDagRunId, setRetryDagRunId] = React.useState<string>('');
-  const [retryNewRunId, setRetryNewRunId] = React.useState<string>('');
-  const [retryGenerateNewId, setRetryGenerateNewId] = React.useState(false);
   const [stopAllRunning, setStopAllRunning] = React.useState(false);
 
   const client = useClient();
@@ -224,8 +220,6 @@ function DAGActions({
 
                   // Set the dagRunId to use for retry
                   setRetryDagRunId(dagRunIdToUse);
-                  setRetryNewRunId(dagRunIdToUse);
-                  setRetryGenerateNewId(false);
 
                   // Show the modal
                   setIsRetryModal(true);
@@ -297,8 +291,6 @@ function DAGActions({
 
                   // Set the dagRunId to use for retry
                   setRetryDagRunId(dagRunIdToUse);
-                  setRetryNewRunId(dagRunIdToUse);
-                  setRetryGenerateNewId(false);
 
                   // Show the modal
                   setIsRetryModal(true);
@@ -429,24 +421,13 @@ function DAGActions({
           title="Confirmation"
           buttonText="Rerun"
           visible={isRetryModal}
-          dismissModal={() => {
-            setIsRetryModal(false);
-            setRetryGenerateNewId(false);
-          }}
+          dismissModal={() => setIsRetryModal(false)}
           onSubmit={async () => {
             setIsRetryModal(false);
-            const trimmedNewId = retryNewRunId.trim();
-            const body: operations['retryDAGRun']['requestBody']['content']['application/json'] = {};
-
-            if (retryGenerateNewId) {
-              body.generateNewRunId = true;
-            } else if (trimmedNewId) {
-              body.dagRunId = trimmedNewId;
-            }
 
             // Use dag-run API - requires DAG name and ID
             if (status?.name && retryDagRunId) {
-              const { data, error } = await client.POST(
+              const { error } = await client.POST(
                 '/dag-runs/{name}/{dagRunId}/retry',
                 {
                   params: {
@@ -458,15 +439,14 @@ function DAGActions({
                       remoteNode: appBarContext.selectedRemoteNode || 'local',
                     },
                   },
-                  body,
+                  body: {
+                    dagRunId: retryDagRunId,
+                  },
                 }
               );
               if (error) {
                 alert(error.message || 'An error occurred');
                 return;
-              }
-              if (data?.dagRunId) {
-                console.info('Retry triggered with DAG run ID', data.dagRunId);
               }
               reloadData();
             } else {
@@ -485,7 +465,7 @@ function DAGActions({
             <LabeledItem label="DAG-Run-Name">
               <span className="font-mono text-sm">{status?.name || 'N/A'}</span>
             </LabeledItem>
-            <LabeledItem label="Original DAG-Run-ID">
+            <LabeledItem label="DAG-Run-ID">
               <span className="font-mono text-sm">
                 {retryDagRunId || status?.dagRunId || 'N/A'}
               </span>
@@ -504,43 +484,6 @@ function DAGActions({
                 </StatusChip>
               </LabeledItem>
             )}
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="retry-generate-new-id"
-                  checked={retryGenerateNewId}
-                  onCheckedChange={(checked) =>
-                    setRetryGenerateNewId(checked === true)
-                  }
-                />
-                <label
-                  htmlFor="retry-generate-new-id"
-                  className="text-sm font-medium leading-none"
-                >
-                  Generate a new Run ID
-                </label>
-              </div>
-              {!retryGenerateNewId && (
-                <div className="space-y-1">
-                  <label
-                    htmlFor="retry-new-run-id"
-                    className="text-sm font-medium leading-none"
-                  >
-                    Run ID to use
-                  </label>
-                  <Input
-                    id="retry-new-run-id"
-                    value={retryNewRunId}
-                    onChange={(event) => setRetryNewRunId(event.target.value)}
-                    placeholder="Leave unchanged to reuse the original ID"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Provide a different value to create a fresh DAG-run with a new
-                    identifier.
-                  </p>
-                </div>
-              )}
-            </div>
           </div>
         </ConfirmModal>
         <StartDAGModal

@@ -83,6 +83,7 @@ export interface paths {
          *
          *     Returns a list of validation errors. When the spec can be partially parsed,
          *     the response may also include parsed DAG details built with error-tolerant loading.
+         *
          */
         post: operations["validateDAGSpec"];
         delete?: never;
@@ -338,6 +339,7 @@ export interface paths {
          *
          *     This endpoint does not require a pre-existing DAG file; the supplied `spec` is parsed and validated
          *     similarly to `/dags/validate`, and the run is executed immediately if valid.
+         *
          */
         post: operations["executeDAGRunFromSpec"];
         delete?: never;
@@ -361,6 +363,7 @@ export interface paths {
          *
          *     This endpoint does not require a pre-existing DAG file; the supplied `spec` is parsed and validated
          *     similarly to `/dags/validate`, and the run is persisted to the queue if valid.
+         *
          */
         post: operations["enqueueDAGRunFromSpec"];
         delete?: never;
@@ -480,12 +483,7 @@ export interface paths {
         put?: never;
         /**
          * Retry DAG-run execution
-         * @description Creates a new DAG-run based on a previous execution.
-         *
-         *     By default the original `dagRunId` is reused, mirroring the behaviour of
-         *     the CLI `dagu retry` command. Provide a different `dagRunId` or set
-         *     `generateNewRunId=true` to launch a fresh run with a new identifier while
-         *     reusing the stored DAG definition and parameters from the selected history entry.
+         * @description Creates a new DAG-run based on a previous execution
          */
         post: operations["retryDAGRun"];
         delete?: never;
@@ -830,6 +828,7 @@ export interface components {
          *     4: "Success"
          *     5: "Queued"
          *     6: "Partial Success"
+         *
          * @enum {integer}
          */
         Status: Status;
@@ -847,6 +846,7 @@ export interface components {
          *     4: "Success"
          *     5: "Skipped"
          *     6: "Partial Success"
+         *
          * @enum {integer}
          */
         NodeStatus: NodeStatus;
@@ -1365,11 +1365,10 @@ export interface operations {
                 name?: string;
                 /** @description Filter DAGs by tag */
                 tag?: string;
-                /**
-                 * @description Field to sort by:
+                /** @description Field to sort by:
                  *     - `name`: Sort alphabetically by DAG name (case-insensitive)
                  *     - `nextRun`: Sort by next scheduled run time. DAGs with earlier next run times appear first in ascending order. DAGs without schedules appear last.
-                 */
+                 *      */
                 sort?: PathsDagsGetParametersQuerySort;
                 /** @description Sort order (ascending or descending) */
                 order?: PathsDagsGetParametersQueryOrder;
@@ -2537,34 +2536,20 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /**
-                     * @description Optional override for the DAG-run ID to use for the new execution. If omitted
-                     *     (or equal to the path parameter) the original run ID is reused. Provide a different
-                     *     value to start a fresh DAG-run with that identifier.
-                     */
-                    dagRunId?: string;
-                    /**
-                     * @description When true, a new DAG-run ID is generated server-side before retrying. This flag takes
-                     *     precedence over `dagRunId`.
-                     */
-                    generateNewRunId?: boolean;
+                    /** @description ID of the DAG-run to retry */
+                    dagRunId: string;
                     /** @description Optional. If provided, only this step will be retried. */
                     stepName?: string;
                 };
             };
         };
         responses: {
-            /** @description Retry accepted */
+            /** @description A successful response */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": {
-                        /** @description Identifier used for the triggered DAG-run */
-                        dagRunId: string;
-                    };
-                };
+                content?: never;
             };
             /** @description Generic error response */
             default: {

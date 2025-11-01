@@ -1124,13 +1124,7 @@ paths:
   /dag-runs/{name}/{dagRunId}/retry:
     post:
       summary: "Retry DAG-run execution"
-      description: |
-        Creates a new DAG-run based on a previous execution.
-
-        By default the original `dagRunId` is reused, mirroring the behaviour of
-        the CLI `dagu retry` command. Provide a different `dagRunId` or set
-        `generateNewRunId=true` to launch a fresh run with a new identifier while
-        reusing the stored DAG definition and parameters from the selected history entry.
+      description: "Creates a new DAG-run based on a previous execution"
       operationId: "retryDAGRun"
       tags:
         - "dag-runs"
@@ -1147,31 +1141,15 @@ paths:
               properties:
                 dagRunId:
                   type: string
-                  description: |
-                    Optional override for the DAG-run ID to use for the new execution. If omitted
-                    (or equal to the path parameter) the original run ID is reused. Provide a different
-                    value to start a fresh DAG-run with that identifier.
-                generateNewRunId:
-                  type: boolean
-                  description: |
-                    When true, a new DAG-run ID is generated server-side before retrying. This flag takes
-                    precedence over `dagRunId`.
+                  description: "ID of the DAG-run to retry"
                 stepName:
                   type: string
                   description: "Optional. If provided, only this step will be retried."
+              required:
+                - dagRunId
       responses:
         "200":
-          description: "Retry accepted"
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  dagRunId:
-                    type: string
-                    description: "Identifier used for the triggered DAG-run"
-                required:
-                  - dagRunId
+          description: "A successful response"
         default:
           description: "Generic error response"
           content:
