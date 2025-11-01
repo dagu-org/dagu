@@ -241,21 +241,21 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                           }
                         }}
                       >
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0 space-y-1">
                             <div className="font-mono text-muted-foreground truncate">
                               {dagRun.dagRunId}
                             </div>
-                            <div className="flex items-center gap-3 text-xs">
-                              <div>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                              <div className="whitespace-nowrap">
                                 <span className="text-muted-foreground">Queued: </span>
                                 {dagRun.queuedAt || '-'}
                               </div>
-                              <div>
+                              <div className="whitespace-nowrap">
                                 <span className="text-muted-foreground">Started: </span>
                                 {dagRun.startedAt || '-'}
                               </div>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 whitespace-nowrap">
                                 <span className="text-muted-foreground">Duration: </span>
                                 {calculateDuration(
                                   dagRun.startedAt,
@@ -269,7 +269,7 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                               </div>
                             </div>
                           </div>
-                          <div className="flex-shrink-0">
+                          <div className="flex-shrink-0 mt-0.5">
                             <StatusChip status={dagRun.status} size="xs">
                               {dagRun.statusLabel}
                             </StatusChip>
@@ -277,9 +277,6 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                         </div>
                       </div>
                     ))}
-                  </div>
-                  <div className="px-3 py-1 text-[10px] text-muted-foreground text-right">
-                    {timezoneInfo}
                   </div>
                 </div>
               )}
