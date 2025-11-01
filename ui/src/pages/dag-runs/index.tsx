@@ -17,6 +17,7 @@ import {
 import { ToggleGroup, ToggleButton } from '../../components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
+import { useUserPreferences } from '../../contexts/UserPreference';
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
 import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
 import { useQuery } from '../../hooks/api';
@@ -27,6 +28,7 @@ function DAGRuns() {
   const query = new URLSearchParams(useLocation().search);
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
+  const { preferences, updatePreference } = useUserPreferences();
 
   // Extract short datetime format from URL if present
   const parseDateFromUrl = (dateParam: string | null): string | undefined => {
@@ -99,10 +101,8 @@ function DAGRuns() {
     query.get('toDate') || undefined
   );
 
-  // State for view mode
-  const [viewMode, setViewMode] = React.useState<'list' | 'grouped'>(
-    (query.get('view') as 'list' | 'grouped') || 'list'
-  );
+  // View mode comes from user preferences (local storage)
+  const viewMode = preferences.dagRunsViewMode;
 
   React.useEffect(() => {
     appBarContext.setTitle('DAG Runs');
@@ -193,8 +193,7 @@ function DAGRuns() {
 
   const handleViewModeChange = (value: string) => {
     const newViewMode = value as 'list' | 'grouped';
-    setViewMode(newViewMode);
-    addSearchParam('view', newViewMode);
+    updatePreference('dagRunsViewMode', newViewMode);
   };
 
   const handleInputKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
