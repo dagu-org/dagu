@@ -969,10 +969,6 @@ paths:
             schema:
               type: object
               properties:
-                definitionStrategy:
-                  type: string
-                  description: "Strategy for selecting which DAG definition to use when rescheduling. Currently experimental and not yet supported."
-                  enum: ["latest"]
                 dagRunId:
                   type: string
                   description: "Explicit run ID for the new DAG-run; if omitted a new ID is generated."
