@@ -13,8 +13,6 @@ import (
 )
 
 func TestRescheduleDAGRun(t *testing.T) {
-	t.Parallel()
-
 	server := test.SetupServer(t)
 
 	dagSpec := `steps:
