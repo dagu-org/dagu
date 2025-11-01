@@ -117,11 +117,10 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
       return null;
     }
 
-    const runningCount = runs.filter((r) => r.status === Status.Running).length;
     const failedCount = runs.filter((r) => r.status === Status.Failed).length;
-    const succeededCount = runs.filter(
-      (r) => r.status === Status.Success
-    ).length;
+    const cancelledCount = runs.filter((r) => r.status === Status.Cancelled).length;
+    const queuedCount = runs.filter((r) => r.status === Status.Queued).length;
+    const runningCount = runs.filter((r) => r.status === Status.Running).length;
 
     // Check if all runs have the same status
     const firstStatus = runs[0]?.status;
@@ -129,9 +128,10 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
 
     return {
       latestRun,
-      runningCount,
       failedCount,
-      succeededCount,
+      cancelledCount,
+      queuedCount,
+      runningCount,
       totalCount: runs.length,
       allSameStatus,
       uniformStatus: allSameStatus ? firstStatus : null,
@@ -204,15 +204,29 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                     <div className="text-xs text-muted-foreground">
                       {summary.totalCount} run
                       {summary.totalCount !== 1 ? 's' : ''}
-                      {summary.runningCount > 0 && (
-                        <span className="ml-2">
-                          {summary.runningCount} running
-                        </span>
-                      )}
-                      {summary.failedCount > 0 && (
-                        <span className="ml-2">
-                          {summary.failedCount} failed
-                        </span>
+                      {!summary.allSameStatus && (
+                        <>
+                          {summary.runningCount > 0 && (
+                            <span className="ml-2">
+                              {summary.runningCount} running
+                            </span>
+                          )}
+                          {summary.failedCount > 0 && (
+                            <span className="ml-2">
+                              {summary.failedCount} failed
+                            </span>
+                          )}
+                          {summary.cancelledCount > 0 && (
+                            <span className="ml-2">
+                              {summary.cancelledCount} cancelled
+                            </span>
+                          )}
+                          {summary.queuedCount > 0 && (
+                            <span className="ml-2">
+                              {summary.queuedCount} queued
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
