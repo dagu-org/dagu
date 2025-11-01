@@ -425,8 +425,8 @@ function DAGActions({
           </div>
         </ConfirmModal>
         <ConfirmModal
-          title={retryAsNew ? "Retry DAG Run as New" : "Confirmation"}
-          buttonText="Rerun"
+          title={retryAsNew ? "Reschedule DAG Run" : "Confirmation"}
+          buttonText={retryAsNew ? "Reschedule" : "Rerun"}
           visible={isRetryModal}
           dismissModal={() => {
             setIsRetryModal(false);
@@ -537,20 +537,20 @@ function DAGActions({
               </LabeledItem>
             )}
 
-            {/* Retry as new checkbox */}
+            {/* Reschedule checkbox */}
             <div className="flex items-center space-x-2 pt-2 border-t">
               <Checkbox
-                id="retry-as-new-dag"
+                id="reschedule-dag"
                 checked={retryAsNew}
                 onCheckedChange={(checked) => setRetryAsNew(checked as boolean)}
                 className="border-gray-400 dark:border-gray-500"
               />
-              <Label htmlFor="retry-as-new-dag" className="cursor-pointer text-sm">
-                Retry as new DAG-run
+              <Label htmlFor="reschedule-dag" className="cursor-pointer text-sm">
+                Reschedule with new DAG-run
               </Label>
             </div>
 
-            {/* Conditional inputs when retry-as-new is checked */}
+            {/* Conditional inputs when reschedule is checked */}
             {retryAsNew && (
               <div className="space-y-3 pt-2">
                 <div className="space-y-1.5">
