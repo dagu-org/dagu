@@ -213,7 +213,6 @@ func runExec(ctx *Context, args []string) error {
 
 	dagRunRef := execution.NewDAGRunRef(dag.Name, runID)
 
-
 	if !queueDisabled && len(workerLabels) > 0 {
 		logger.Info(ctx, "Queueing inline dag-run for distributed execution",
 			"dag", dag.Name,
