@@ -135,16 +135,28 @@
         {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": true
-          }
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Map format: {KEY: value}"
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*=.*$",
+                "description": "Key=Value format: 'KEY=value'"
+              }
+            ]
+          },
+          "description": "Array of environment variable definitions (map format or Key=Value strings)"
         },
         {
           "type": "object",
-          "additionalProperties": true
+          "additionalProperties": true,
+          "description": "Map format: {KEY1: value1, KEY2: value2}"
         }
       ],
-      "description": "Environment variables available to all steps in the DAG. Can use shell expansions, references to other environment variables, or command substitutions. Note: These won't be stored in execution history data for security."
+      "description": "Environment variables available to all steps in the DAG. Supports three formats: 1) Map format: env: {KEY: value}, 2) Array of maps: env: [{KEY: value}], 3) Array of Key=Value strings: env: ['KEY=value'] (Docker/docker-compose compatible). Can use shell expansions (${VAR}), references to other environment variables, or command substitutions (`cmd`). Note: These won't be stored in execution history data for security."
     },
     "secrets": {
       "type": "array",
@@ -512,7 +524,7 @@
               "properties": {
                 "type": {
                   "type": "string",
-                  "enum": ["docker", "http", "mail", "ssh", "jq", "gha"],
+                  "enum": ["docker", "http", "mail", "ssh", "jq", "gha", "archive"],
                   "description": "Type of executor to use for this step"
                 },
                 "config": {
@@ -887,16 +899,28 @@
             {
               "type": "array",
               "items": {
-                "type": "object",
-                "additionalProperties": true
-              }
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Map format: {KEY: value}"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*=.*$",
+                    "description": "Key=Value format: 'KEY=value'"
+                  }
+                ]
+              },
+              "description": "Array of environment variable definitions (map format or Key=Value strings)"
             },
             {
               "type": "object",
-              "additionalProperties": true
+              "additionalProperties": true,
+              "description": "Map format: {KEY1: value1, KEY2: value2}"
             }
           ],
-          "description": "Environment variables specific to this step. These override DAG-level environment variables with the same name. Can use shell expansions, references to other environment variables, or command substitutions."
+          "description": "Environment variables specific to this step. These override DAG-level environment variables with the same name. Supports three formats: 1) Map format: env: {KEY: value}, 2) Array of maps: env: [{KEY: value}], 3) Array of Key=Value strings: env: ['KEY=value'] (Docker/docker-compose compatible). Can use shell expansions (${VAR}), references to other environment variables, or command substitutions (`cmd`)."
         }
       }
     },
