@@ -314,13 +314,18 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 		initFlags(cmd, flags...)
 	})
 
+	cmd.SilenceUsage = true
+
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		// Setup cpu profiling if enabled.
-		if cpuProfileEnabled, _ := cmd.Flags().GetBool("cpu-profile"); cpuProfileEnabled {
+		cpuProfileEnabled, err := cmd.Flags().GetBool("cpu-profile")
+		if err != nil {
+			return fmt.Errorf("failed to read cpu-profile flag: %w", err)
+		}
+		if cpuProfileEnabled {
 			f, err := os.Create("cpu.prof")
 			if err != nil {
-				fmt.Printf("Failed to create CPU profile file: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to create CPU profile file: %w", err)
 			}
 			_ = pprof.StartCPUProfile(f)
 			defer func() {
@@ -334,14 +339,9 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 		ctx, err := NewContext(cmd, flags)
 
 		if err != nil {
-			fmt.Printf("Initialization error: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("initialization error: %w", err)
 		}
-		if err := runFunc(ctx, args); err != nil {
-			fmt.Printf("Command failed with following error: \n%v\n", err)
-			os.Exit(1)
-		}
-		return nil
+		return runFunc(ctx, args)
 	}
 
 	return cmd
