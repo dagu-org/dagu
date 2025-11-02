@@ -806,7 +806,7 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	var (
 		nameOverride string
 		newDagRunID  string
-		singleton    bool
+		singleton    = true
 	)
 
 	if body := request.Body; body != nil {
@@ -823,9 +823,6 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		}
 		if body.DagRunId != nil && *body.DagRunId != "" {
 			newDagRunID = *body.DagRunId
-		}
-		if body.Singleton != nil {
-			singleton = *body.Singleton
 		}
 	}
 

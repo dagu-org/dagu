@@ -1087,9 +1087,6 @@ type RescheduleDAGRunJSONBody struct {
 
 	// DagRunId Explicit run ID for the new DAG-run; if omitted a new ID is generated.
 	DagRunId *string `json:"dagRunId,omitempty"`
-
-	// Singleton If true, prevent starting if a DAG with the same name is already running (returns 409 conflict).
-	Singleton *bool `json:"singleton,omitempty"`
 }
 
 // RescheduleDAGRunParams defines parameters for RescheduleDAGRun.
