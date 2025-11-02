@@ -107,6 +107,19 @@ function Mermaid({
           svgEl.style.overflow = 'visible';
           svgEl.style.transform = `scale(${scale})`;
           svgEl.style.transformOrigin = 'top left';
+
+          // Adjust the SVG's wrapper div to account for the scale
+          // This ensures the horizontal scrollbar properly reflects the scaled size
+          const parent = svgEl.parentElement;
+          if (parent && scale !== 1) {
+            const bbox = svgEl.getBBox();
+            parent.style.width = `${bbox.width * scale}px`;
+            parent.style.height = `${bbox.height * scale}px`;
+          } else if (parent && scale === 1) {
+            // Reset to auto when scale is 1
+            parent.style.width = 'auto';
+            parent.style.height = 'auto';
+          }
         }
 
         // Restore scroll position *after* SVG is rendered
@@ -189,6 +202,19 @@ function Mermaid({
         svg.style.overflow = 'visible';
         svg.style.transform = `scale(${scale})`;
         svg.style.transformOrigin = 'top left'; // Keep origin consistent
+
+        // Adjust the SVG's wrapper div to account for the scale
+        // This ensures the horizontal scrollbar properly reflects the scaled size
+        const parent = svg.parentElement;
+        if (parent && scale !== 1) {
+          const bbox = svg.getBBox();
+          parent.style.width = `${bbox.width * scale}px`;
+          parent.style.height = `${bbox.height * scale}px`;
+        } else if (parent && scale === 1) {
+          // Reset to auto when scale is 1
+          parent.style.width = 'auto';
+          parent.style.height = 'auto';
+        }
       }
     }
   }, [scale]); // Apply scale separately
