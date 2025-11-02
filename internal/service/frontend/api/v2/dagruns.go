@@ -774,6 +774,7 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	var (
 		nameOverride string
 		newDagRunID  string
+		// Enforce singleton mode for rescheduled DAG runs to prevent duplicate runs of the same workflow execution.
 		singleton    = true
 	)
 
