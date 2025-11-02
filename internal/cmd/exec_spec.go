@@ -142,10 +142,6 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 	}
 	dag.Location = ""
 
-	commandSummary := strings.Join(opts.CommandArgs, " ")
-	dag.Params = []string{fmt.Sprintf("CMD=%s", commandSummary)}
-	dag.DefaultParams = strings.Join(dag.Params, " ")
-
 	return dag, string(specYAML), nil
 }
 
