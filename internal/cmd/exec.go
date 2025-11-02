@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime/pprof"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core/execution"
@@ -39,7 +41,7 @@ var (
 
 // Exec returns the cobra command for executing inline commands without a DAG spec.
 func Exec() *cobra.Command {
-	cmd := &cobra.Command{
+	command := &cobra.Command{
 		Use:   execCommandUsage,
 		Short: "Execute a one-off command as a DAG run",
 		Long: `Execute a one-off command as a DAG run without creating a DAG YAML file.
@@ -49,9 +51,33 @@ Examples:
   dagu exec --env FOO=bar -- sh -c 'echo $FOO'
   dagu exec --queue nightly --worker-label role=batch -- python nightly.py`,
 		Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if cpuProfileEnabled, _ := cmd.Flags().GetBool("cpu-profile"); cpuProfileEnabled {
+				f, err := os.Create("cpu.prof")
+				if err != nil {
+					return fmt.Errorf("failed to create CPU profile file: %w", err)
+				}
+				_ = pprof.StartCPUProfile(f)
+				defer func() {
+					pprof.StopCPUProfile()
+					if err := f.Close(); err != nil {
+						fmt.Printf("Failed to close CPU profile file: %v\n", err)
+					}
+				}()
+			}
+
+			ctx, err := NewContext(cmd, execFlags)
+			if err != nil {
+				return fmt.Errorf("initialization error: %w", err)
+			}
+			return runExec(ctx, args)
+		},
 	}
 
-	command := NewCommand(cmd, execFlags, runExec)
+	config.WithViperLock(func() {
+		initFlags(command, execFlags...)
+	})
+
 	command.Flags().StringArrayP(flagEnv, "E", nil, "Environment variable (KEY=VALUE) to include in the run; repeatable")
 	command.Flags().StringArray(flagDotenv, nil, "Path to a dotenv file to load before execution; repeatable")
 	command.Flags().StringArray(flagWorkerLabel, nil, "Worker label selector (key=value) for distributed execution; repeatable")

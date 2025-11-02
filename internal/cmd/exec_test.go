@@ -1,7 +1,6 @@
 package cmd_test
 
 import (
-	"os"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmd"
@@ -9,103 +8,68 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestExecCommand_Basic(t *testing.T) {
-	origShell, shellSet := os.LookupEnv("SHELL")
-	t.Cleanup(func() {
-		if shellSet {
-			_ = os.Setenv("SHELL", origShell)
-		} else {
-			_ = os.Unsetenv("SHELL")
-		}
-	})
-
-	th := test.SetupCommand(t)
-
-	testCase := test.CmdTest{
-		Name:        "ExecBasicCommand",
-		Args:        []string{"exec", "--", "sh", "-c", "echo exec-basic"},
-		ExpectedOut: []string{"Executing inline dag-run"},
+func TestExecCommand(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        []string
+		expectErr   string
+		expectedOut []string
+		env         map[string]string
+	}{
+		{
+			name:        "ExecBasicCommand",
+			args:        []string{"exec", "--", "sh", "-c", "echo exec-basic"},
+			expectedOut: []string{"Executing inline dag-run"},
+		},
+		{
+			name:      "ExecMissingCommand",
+			args:      []string{"exec"},
+			expectErr: "command is required",
+		},
+		{
+			name:      "ExecMissingBase",
+			args:      []string{"exec", "--base", "missing-base.yaml", "--", "sh", "-c", "echo hi"},
+			expectErr: "base DAG file",
+		},
+		{
+			name:      "ExecMissingDotenv",
+			args:      []string{"exec", "--dotenv", "missing.env", "--", "sh", "-c", "echo hi"},
+			expectErr: "dotenv file",
+		},
+		{
+			name: "ExecWorkerLabelWithoutQueue",
+			args: []string{"exec", "--worker-label", "role=batch", "--", "sh", "-c", "echo hi"},
+			env: map[string]string{
+				"DAGU_QUEUE_ENABLED": "false",
+			},
+			expectErr: "worker selector requires queues",
+		},
 	}
 
-	th.RunCommand(t, cmd.Exec(), testCase)
-}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Not using t.Parallel because SetupCommand manipulates process-wide env vars.
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+			th := test.SetupCommand(t)
+			run := cmd.Exec()
 
-func TestExecCommand_MissingCommand(t *testing.T) {
-	origShell, shellSet := os.LookupEnv("SHELL")
-	t.Cleanup(func() {
-		if shellSet {
-			_ = os.Setenv("SHELL", origShell)
-		} else {
-			_ = os.Unsetenv("SHELL")
-		}
-	})
+			if tc.expectErr != "" {
+				err := th.RunCommandWithError(t, run, test.CmdTest{
+					Name: tc.name,
+					Args: tc.args,
+				})
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.expectErr)
+				return
+			}
 
-	th := test.SetupCommand(t)
-
-	err := th.RunCommandWithError(t, cmd.Exec(), test.CmdTest{
-		Name: "ExecMissingCommand",
-		Args: []string{"exec"},
-	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "command is required")
-}
-
-func TestExecCommand_BaseFileMustExist(t *testing.T) {
-	origShell, shellSet := os.LookupEnv("SHELL")
-	t.Cleanup(func() {
-		if shellSet {
-			_ = os.Setenv("SHELL", origShell)
-		} else {
-			_ = os.Unsetenv("SHELL")
-		}
-	})
-
-	th := test.SetupCommand(t)
-
-	err := th.RunCommandWithError(t, cmd.Exec(), test.CmdTest{
-		Name: "ExecMissingBase",
-		Args: []string{"exec", "--base", "missing-base.yaml", "--", "sh", "-c", "echo hi"},
-	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "base DAG file")
-}
-
-func TestExecCommand_DotenvMustExist(t *testing.T) {
-	origShell, shellSet := os.LookupEnv("SHELL")
-	t.Cleanup(func() {
-		if shellSet {
-			_ = os.Setenv("SHELL", origShell)
-		} else {
-			_ = os.Unsetenv("SHELL")
-		}
-	})
-
-	th := test.SetupCommand(t)
-
-	err := th.RunCommandWithError(t, cmd.Exec(), test.CmdTest{
-		Name: "ExecMissingDotenv",
-		Args: []string{"exec", "--dotenv", "missing.env", "--", "sh", "-c", "echo hi"},
-	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "dotenv file")
-}
-
-func TestExecCommand_WorkerLabelRequiresQueue(t *testing.T) {
-	origShell, shellSet := os.LookupEnv("SHELL")
-	t.Cleanup(func() {
-		if shellSet {
-			_ = os.Setenv("SHELL", origShell)
-		} else {
-			_ = os.Unsetenv("SHELL")
-		}
-	})
-
-	th := test.SetupCommand(t)
-
-	err := th.RunCommandWithError(t, cmd.Exec(), test.CmdTest{
-		Name: "ExecWorkerLabelWithoutQueue",
-		Args: []string{"exec", "--worker-label", "role=batch", "--", "sh", "-c", "echo hi"},
-	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "worker selector requires queues")
+			th.RunCommand(t, run, test.CmdTest{
+				Name:        tc.name,
+				Args:        tc.args,
+				ExpectedOut: tc.expectedOut,
+			})
+		})
+	}
 }
