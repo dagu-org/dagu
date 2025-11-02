@@ -578,50 +578,8 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	// Check the dag-run ID is not already in use
-	_, err = a.dagRunStore.FindAttempt(ctx, execution.DAGRunRef{
-		Name: dag.Name,
-		ID:   dagRunId,
-	})
-	if !errors.Is(err, execution.ErrDAGRunIDNotFound) {
-		return nil, &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeAlreadyExists,
-			Message:    fmt.Sprintf("dag-run ID %s already exists for DAG %s", dagRunId, dag.Name),
-		}
-	}
-
-	// Get count of running DAGs to check against maxActiveRuns (best effort)
-	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to access proc store: %w", err)
-	}
-
-	// Check singleton flag - if enabled and DAG is already running, return 409
-	if singleton || dag.MaxActiveRuns == 1 {
-		if liveCount > 0 {
-			return nil, &Error{
-				HTTPStatus: http.StatusConflict,
-				Code:       api.ErrorCodeMaxRunReached,
-				Message:    fmt.Sprintf("DAG %s is already running, cannot start", dag.Name),
-			}
-		}
-	}
-
-	// Count queued DAG-runs and check against maxActiveRuns
-	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read queue: %w", err)
-	}
-	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
-	// of active runs in the queue does not exceed this limit.
-	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
-		// The same DAG is already in the queue
-		return nil, &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeMaxRunReached,
-			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns),
-		}
+	if err := a.ensureDAGRunStartable(ctx, dag, dagRunId, singleton); err != nil {
+		return nil, err
 	}
 
 	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, singleton); err != nil {
@@ -642,6 +600,72 @@ func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, 
 	})
 }
 
+// ensureDAGRunStartable validates that a DAG-run can be started.
+// It checks both DAG-run ID uniqueness and concurrency limits.
+// dagRunID must be non-empty before calling this function.
+func (a *API) ensureDAGRunStartable(ctx context.Context, dag *core.DAG, dagRunID string, singleton bool) error {
+	if err := a.ensureDAGRunIDUnique(ctx, dag, dagRunID); err != nil {
+		return err
+	}
+	return a.ensureDAGCapacity(ctx, dag, singleton)
+}
+
+// ensureDAGRunIDUnique validates that the given dagRunID is not already in use for this DAG.
+func (a *API) ensureDAGRunIDUnique(ctx context.Context, dag *core.DAG, dagRunID string) error {
+	if dagRunID == "" {
+		return fmt.Errorf("dagRunID must be non-empty")
+	}
+	if _, err := a.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(dag.Name, dagRunID)); err == nil {
+		return &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeAlreadyExists,
+			Message:    fmt.Sprintf("dag-run ID %s already exists for DAG %s", dagRunID, dag.Name),
+		}
+	} else if !errors.Is(err, execution.ErrDAGRunIDNotFound) {
+		return fmt.Errorf("failed to verify dag-run ID uniqueness: %w", err)
+	}
+	return nil
+}
+
+// ensureDAGCapacity validates that the DAG has capacity to start a new run.
+// It checks both singleton constraints and maxActiveRuns limits.
+func (a *API) ensureDAGCapacity(ctx context.Context, dag *core.DAG, singleton bool) error {
+	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return fmt.Errorf("failed to access proc store: %w", err)
+	}
+
+	if isSingletonExecution(dag, singleton) {
+		if liveCount > 0 {
+			return &Error{
+				HTTPStatus: http.StatusConflict,
+				Code:       api.ErrorCodeMaxRunReached,
+				Message:    fmt.Sprintf("DAG %s is already running, cannot start", dag.Name),
+			}
+		}
+	}
+
+	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return fmt.Errorf("failed to read queue: %w", err)
+	}
+
+	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
+		return &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeMaxRunReached,
+			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns),
+		}
+	}
+
+	return nil
+}
+
+// isSingletonExecution returns true if only one instance of the DAG should run at a time.
+func isSingletonExecution(dag *core.DAG, singleton bool) bool {
+	return singleton || dag.MaxActiveRuns == 1
+}
+
 type startDAGRunOptions struct {
 	params       string
 	dagRunID     string
@@ -653,7 +677,7 @@ type startDAGRunOptions struct {
 
 func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
 	var noQueue bool
-	if opts.singleton || dag.MaxActiveRuns == 1 {
+	if isSingletonExecution(dag, opts.singleton) {
 		noQueue = true
 	}
 
