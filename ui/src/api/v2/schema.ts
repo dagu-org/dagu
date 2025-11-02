@@ -2414,11 +2414,6 @@ export interface operations {
                     dagRunId?: string;
                     /** @description Optional DAG name override for the new run. */
                     dagName?: string;
-                    /**
-                     * @description If true, prevent starting if a DAG with the same name is already running (returns 409 conflict).
-                     * @default false
-                     */
-                    singleton?: boolean;
                 };
             };
         };
