@@ -59,40 +59,8 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	}
 	defer cleanup()
 
-	// Ensure the dag-run ID is not already used for this DAG name
-	if _, err := a.dagRunStore.FindAttempt(ctx, execution.DAGRunRef{Name: dag.Name, ID: dagRunId}); !errors.Is(err, execution.ErrDAGRunIDNotFound) {
-		return nil, &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeAlreadyExists,
-			Message:    fmt.Sprintf("dag-run ID %s already exists for DAG %s", dagRunId, dag.Name),
-		}
-	}
-
-	// Concurrency checks similar to ExecuteDAG
-	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to access proc store: %w", err)
-	}
-	if singleton || dag.MaxActiveRuns == 1 {
-		if liveCount > 0 {
-			return nil, &Error{
-				HTTPStatus: http.StatusConflict,
-				Code:       api.ErrorCodeMaxRunReached,
-				Message:    fmt.Sprintf("DAG %s is already running, cannot start", dag.Name),
-			}
-		}
-	}
-
-	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read queue: %w", err)
-	}
-	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
-		return nil, &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeMaxRunReached,
-			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns),
-		}
+	if err := a.ensureDAGRunStartable(ctx, dag, dagRunId, singleton); err != nil {
+		return nil, err
 	}
 
 	if err := a.startDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), singleton); err != nil {
@@ -834,41 +802,8 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		newDagRunID = id
 	}
 
-	if _, err := a.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(dag.Name, newDagRunID)); err == nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeAlreadyExists,
-			Message:    fmt.Sprintf("dag-run ID %s already exists for DAG %s", newDagRunID, dag.Name),
-		}
-	} else if !errors.Is(err, execution.ErrDAGRunIDNotFound) {
-		return nil, fmt.Errorf("failed to verify dag-run ID uniqueness: %w", err)
-	}
-
-	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to access proc store: %w", err)
-	}
-
-	if singleton || dag.MaxActiveRuns == 1 {
-		if liveCount > 0 {
-			return nil, &Error{
-				HTTPStatus: http.StatusConflict,
-				Code:       api.ErrorCodeMaxRunReached,
-				Message:    fmt.Sprintf("DAG %s is already running, cannot start", dag.Name),
-			}
-		}
-	}
-
-	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read queue: %w", err)
-	}
-	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
-		return nil, &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeMaxRunReached,
-			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns),
-		}
+	if err := a.ensureDAGRunStartable(ctx, dag, newDagRunID, singleton); err != nil {
+		return nil, err
 	}
 
 	logger.Info(ctx, "Rescheduling dag-run",
