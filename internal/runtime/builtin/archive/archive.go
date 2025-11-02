@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -212,7 +213,7 @@ func (e *executorImpl) secureJoin(base, rel string) (string, error) {
 		return base, nil
 	}
 	target := filepath.Join(base, rel)
-	if !strings.HasPrefix(filepath.Clean(target)+string(os.PathSeparator), filepath.Clean(base)+string(os.PathSeparator)) {
+	if !pathWithin(base, target) {
 		return "", fmt.Errorf("%w: target %q escapes destination", ErrCorrupted, rel)
 	}
 	return target, nil
@@ -258,4 +259,34 @@ func matchesFilters(path string, include, exclude []string) bool {
 		}
 	}
 	return true
+}
+
+func pathWithin(base, target string) bool {
+	baseClean := filepath.Clean(base)
+	targetClean := filepath.Clean(target)
+
+	rel, err := filepath.Rel(baseClean, targetClean)
+	if err != nil {
+		return false
+	}
+	if rel == "." || rel == "" {
+		return true
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return false
+	}
+
+	if runtime.GOOS == "windows" {
+		baseClean = strings.ToLower(baseClean)
+		targetClean = strings.ToLower(targetClean)
+	}
+
+	if !strings.HasSuffix(baseClean, string(os.PathSeparator)) {
+		baseClean += string(os.PathSeparator)
+	}
+	if !strings.HasSuffix(targetClean, string(os.PathSeparator)) {
+		targetClean += string(os.PathSeparator)
+	}
+
+	return strings.HasPrefix(targetClean, baseClean)
 }

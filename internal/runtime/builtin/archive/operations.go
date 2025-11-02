@@ -101,6 +101,7 @@ func (e *executorImpl) runExtract(ctx context.Context) error {
 	if dest == "" {
 		dest = "."
 	}
+	destRoot := filepath.Clean(dest)
 	if err := e.ensureDir(dest); err != nil {
 		return err
 	}
@@ -161,8 +162,29 @@ func (e *executorImpl) runExtract(ctx context.Context) error {
 		}
 
 		if file.Mode()&os.ModeSymlink != 0 {
+			linkTarget := file.LinkTarget
+			if linkTarget == "" {
+				return fmt.Errorf("%w: empty symlink target", ErrCorrupted)
+			}
+			if filepath.IsAbs(linkTarget) {
+				return fmt.Errorf("%w: symlink target %q is absolute", ErrCorrupted, linkTarget)
+			}
+
+			// Validate symlink doesn't escape destination directory
+			symlinkParent := filepath.Dir(targetPath)
+			resolvedTarget := filepath.Clean(filepath.Join(symlinkParent, linkTarget))
+			if !pathWithin(destRoot, resolvedTarget) {
+				return fmt.Errorf("%w: symlink target %q escapes destination", ErrCorrupted, linkTarget)
+			}
+
+			// Convert to safe relative path
+			safeTarget, err := filepath.Rel(symlinkParent, resolvedTarget)
+			if err != nil {
+				return wrapError(ErrExtract, err)
+			}
+
 			_ = os.Remove(targetPath)
-			if err := os.Symlink(file.LinkTarget, targetPath); err != nil {
+			if err := os.Symlink(safeTarget, targetPath); err != nil {
 				if errors.Is(err, fs.ErrPermission) {
 					return fmt.Errorf("%w: %v", ErrPermission, err)
 				}
