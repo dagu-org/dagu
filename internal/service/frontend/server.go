@@ -159,7 +159,12 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 	}
 
 	// Serve assets with proper cache control
-	basePath, _ := cmdutil.EvalString(ctx, srv.config.Server.BasePath)
+	basePath := srv.config.Server.BasePath
+	if evaluatedBasePath, err := cmdutil.EvalString(ctx, basePath); err != nil {
+		logger.Warn(ctx, "Failed to evaluate server base path", "path", basePath, "err", err)
+	} else {
+		basePath = evaluatedBasePath
+	}
 	assetsPath := path.Join(strings.TrimRight(basePath, "/"), "assets/*")
 	if !strings.HasPrefix(assetsPath, "/") {
 		assetsPath = "/" + assetsPath
@@ -185,8 +190,13 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 	indexHandler := srv.useTemplate(ctx, "index.gohtml", "index")
 
 	// Initialize OIDC if enabled
-	authConfig, _ := cmdutil.EvalObject(ctx, srv.config.Server.Auth, nil)
-	authOIDC, _ := cmdutil.EvalObject(ctx, authConfig.OIDC, nil)
+	authConfig := srv.config.Server.Auth
+	if evaluatedAuth, err := cmdutil.EvalObject(ctx, authConfig, nil); err != nil {
+		logger.Warn(ctx, "Failed to evaluate auth configuration", "err", err)
+	} else {
+		authConfig = evaluatedAuth
+	}
+	authOIDC := authConfig.OIDC
 
 	var oidcAuthOptions *auth.Options
 	if authConfig.OIDC.ClientId != "" && authConfig.OIDC.ClientSecret != "" && authOIDC.Issuer != "" {

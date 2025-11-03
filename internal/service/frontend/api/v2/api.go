@@ -83,7 +83,11 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	}
 
 	// Create a list of server URLs
-	baseURL, _ = cmdutil.EvalString(ctx, baseURL)
+	if evaluatedBaseURL, err := cmdutil.EvalString(ctx, baseURL); err != nil {
+		logger.Warn(ctx, "Failed to evaluate API base URL", "url", baseURL, "err", err)
+	} else {
+		baseURL = evaluatedBaseURL
+	}
 	baseURL = strings.TrimRight(baseURL, "/")
 	serverURLs := []string{baseURL}
 
@@ -93,7 +97,12 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	}
 
 	// Setup the API base path
-	basePath, _ := cmdutil.EvalString(ctx, a.config.Server.BasePath)
+	basePath := a.config.Server.BasePath
+	if evaluatedBasePath, err := cmdutil.EvalString(ctx, basePath); err != nil {
+		logger.Warn(ctx, "Failed to evaluate server base path", "path", basePath, "err", err)
+	} else {
+		basePath = evaluatedBasePath
+	}
 	if basePath != "" {
 		swagger.Servers = append(swagger.Servers, &openapi3.Server{
 			URL: path.Join(baseURL, basePath),
@@ -121,7 +130,12 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	}
 
 	// Initialize auth configuration
-	authConfig, _ := cmdutil.EvalObject(ctx, a.config.Server.Auth, nil)
+	authConfig := a.config.Server.Auth
+	if evaluatedAuth, err := cmdutil.EvalObject(ctx, authConfig, nil); err != nil {
+		logger.Warn(ctx, "Failed to evaluate auth configuration", "err", err)
+	} else {
+		authConfig = evaluatedAuth
+	}
 	authOptions := auth.Options{
 		Realm:            "restricted",
 		APITokenEnabled:  authConfig.Token.Value != "",
@@ -131,7 +145,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	}
 
 	// Initialize OIDC if enabled
-	authOIDC, _ := cmdutil.EvalObject(ctx, authConfig.OIDC, nil)
+	authOIDC := authConfig.OIDC
 	if authOIDC.ClientId != "" && authOIDC.ClientSecret != "" && authOIDC.Issuer != "" {
 		oidcCfg, err := auth.InitVerifierAndConfig(authOIDC)
 		if err != nil {
