@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core/execution"
@@ -158,7 +159,13 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 	}
 
 	// Serve assets with proper cache control
-	assetsPath := path.Join(srv.config.Server.BasePath, "assets/*")
+	basePath := srv.config.Server.BasePath
+	if evaluatedBasePath, err := cmdutil.EvalString(ctx, basePath); err != nil {
+		logger.Warn(ctx, "Failed to evaluate server base path", "path", basePath, "err", err)
+	} else {
+		basePath = evaluatedBasePath
+	}
+	assetsPath := path.Join(strings.TrimRight(basePath, "/"), "assets/*")
 	if !strings.HasPrefix(assetsPath, "/") {
 		assetsPath = "/" + assetsPath
 	}
@@ -167,9 +174,8 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 	fileServer := http.FileServer(http.FS(assetsFS))
 
 	// If there's a base path, we need to strip it from the request URL
-	if srv.config.Server.BasePath != "" && srv.config.Server.BasePath != "/" {
-		stripPrefix := strings.TrimSuffix(srv.config.Server.BasePath, "/")
-		fileServer = http.StripPrefix(stripPrefix, fileServer)
+	if basePath != "" && basePath != "/" {
+		fileServer = http.StripPrefix(strings.TrimRight(basePath, "/"), fileServer)
 	}
 
 	r.Get(assetsPath, func(w http.ResponseWriter, r *http.Request) {
@@ -185,17 +191,22 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 
 	// Initialize OIDC if enabled
 	authConfig := srv.config.Server.Auth
-	oidcEnabled := authConfig.OIDC.ClientId != "" &&
-		authConfig.OIDC.ClientSecret != "" && authConfig.OIDC.Issuer != ""
+	if evaluatedAuth, err := cmdutil.EvalObject(ctx, authConfig, nil); err != nil {
+		logger.Warn(ctx, "Failed to evaluate auth configuration", "err", err)
+	} else {
+		authConfig = evaluatedAuth
+	}
+	authOIDC := authConfig.OIDC
+
 	var oidcAuthOptions *auth.Options
-	if oidcEnabled {
-		oidcCfg, err := auth.InitVerifierAndConfig(srv.config.Server.Auth.OIDC)
+	if authConfig.OIDC.ClientId != "" && authConfig.OIDC.ClientSecret != "" && authOIDC.Issuer != "" {
+		oidcCfg, err := auth.InitVerifierAndConfig(authOIDC)
 		if err != nil {
 			return fmt.Errorf("failed to initialize OIDC: %w", err)
 		}
 		oidcAuthOptions = &auth.Options{
 			OIDCAuthEnabled: true,
-			OIDCWhitelist:   srv.config.Server.Auth.OIDC.Whitelist,
+			OIDCWhitelist:   authConfig.OIDC.Whitelist,
 			OIDCProvider:    oidcCfg.Provider,
 			OIDCVerify:      oidcCfg.Verifier,
 			OIDCConfig:      oidcCfg.Config,
@@ -227,7 +238,7 @@ func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath
 
 	r.Route(apiV2BasePath, func(r chi.Router) {
 		url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, apiV2BasePath)
-		if err := srv.apiV2.ConfigureRoutes(r, url); err != nil {
+		if err := srv.apiV2.ConfigureRoutes(ctx, r, url); err != nil {
 			logger.Error(ctx, "Failed to configure v2 API routes", "err", err)
 			setupErr = err
 		}
