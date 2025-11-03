@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"path"
 	"reflect"
+	"strings"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core/execution"
@@ -74,13 +76,15 @@ func New(
 	}
 }
 
-func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
+func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string) error {
 	swagger, err := api.GetSwagger()
 	if err != nil {
 		return fmt.Errorf("failed to get swagger: %w", err)
 	}
 
 	// Create a list of server URLs
+	baseURL, _ = cmdutil.EvalString(ctx, baseURL)
+	baseURL = strings.TrimRight(baseURL, "/")
 	serverURLs := []string{baseURL}
 
 	// Set the server URLs in the swagger spec
@@ -89,9 +93,10 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 	}
 
 	// Setup the API base path
-	if a.config.Server.BasePath != "" {
+	basePath, _ := cmdutil.EvalString(ctx, a.config.Server.BasePath)
+	if basePath != "" {
 		swagger.Servers = append(swagger.Servers, &openapi3.Server{
-			URL: path.Join(baseURL, a.config.Server.BasePath),
+			URL: path.Join(baseURL, basePath),
 		})
 	}
 
@@ -116,27 +121,24 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 	}
 
 	// Initialize auth configuration
-	authConfig := a.config.Server.Auth
+	authConfig, _ := cmdutil.EvalObject(ctx, a.config.Server.Auth, nil)
 	authOptions := auth.Options{
 		Realm:            "restricted",
 		APITokenEnabled:  authConfig.Token.Value != "",
 		APIToken:         authConfig.Token.Value,
 		BasicAuthEnabled: authConfig.Basic.Username != "" && authConfig.Basic.Password != "",
-		Creds: map[string]string{
-			authConfig.Basic.Username: authConfig.Basic.Password,
-		},
+		Creds:            map[string]string{authConfig.Basic.Username: authConfig.Basic.Password},
 	}
 
 	// Initialize OIDC if enabled
-	oidcEnabled := authConfig.OIDC.ClientId != "" &&
-		authConfig.OIDC.ClientSecret != "" && authConfig.OIDC.Issuer != ""
-	if oidcEnabled {
-		oidcCfg, err := auth.InitVerifierAndConfig(authConfig.OIDC)
+	authOIDC, _ := cmdutil.EvalObject(ctx, authConfig.OIDC, nil)
+	if authOIDC.ClientId != "" && authOIDC.ClientSecret != "" && authOIDC.Issuer != "" {
+		oidcCfg, err := auth.InitVerifierAndConfig(authOIDC)
 		if err != nil {
 			return fmt.Errorf("failed to initialize OIDC: %w", err)
 		}
 		authOptions.OIDCAuthEnabled = true
-		authOptions.OIDCWhitelist = authConfig.OIDC.Whitelist
+		authOptions.OIDCWhitelist = authOIDC.Whitelist
 		authOptions.OIDCProvider = oidcCfg.Provider
 		authOptions.OIDCVerify = oidcCfg.Verifier
 		authOptions.OIDCConfig = oidcCfg.Config
