@@ -135,16 +135,28 @@
         {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": true
-          }
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Map format: {KEY: value}"
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*=.*$",
+                "description": "Key=Value format: 'KEY=value'"
+              }
+            ]
+          },
+          "description": "Array of environment variable definitions (map format or Key=Value strings)"
         },
         {
           "type": "object",
-          "additionalProperties": true
+          "additionalProperties": true,
+          "description": "Map format: {KEY1: value1, KEY2: value2}"
         }
       ],
-      "description": "Environment variables available to all steps in the DAG. Can use shell expansions, references to other environment variables, or command substitutions. Note: These won't be stored in execution history data for security."
+      "description": "Environment variables available to all steps in the DAG. Supports three formats: 1) Map format: env: {KEY: value}, 2) Array of maps: env: [{KEY: value}], 3) Array of Key=Value strings: env: ['KEY=value'] (Docker/docker-compose compatible). Can use shell expansions (${VAR}), references to other environment variables, or command substitutions (`cmd`). Note: These won't be stored in execution history data for security."
     },
     "secrets": {
       "type": "array",
@@ -303,8 +315,15 @@
         {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": true
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ]
           },
           "description": "Named parameters as key-value pairs, accessible as ${KEY}"
         },
@@ -331,7 +350,7 @@
           "description": "JSON Schema validation mode: validates parameters against a schema. 'schema' field is required, 'values' field is optional."
         }
       ],
-      "description": "Default parameters that can be overridden when triggering the DAG. Supports positional parameters (accessed as $1, $2), named parameters (accessed as ${KEY}), or JSON Schema validation mode with reserved keywords 'schema' and 'values'."
+      "description": "Default parameters that can be overridden when triggering the DAG. Supports three formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array/Object format: named parameters as key-value pairs accessible as ${KEY}, supporting rich types (numbers, booleans, nested objects). 3) Schema validation format: object with 'schema' (path to JSON Schema file) and optional 'values' (parameter values) for runtime validation and defaults."
     },
     "container": {
       "$ref": "#/definitions/container",
@@ -490,6 +509,10 @@
           "type": "string",
           "description": "Unique identifier for the step within this DAG. If omitted, Dagu will automatically generate a name."
         },
+        "dir": {
+          "type": "string",
+          "description": "Deprecated alias for workingDir. Still accepted for backward compatibility."
+        },
         "id": {
           "type": "string",
           "description": "Optional short identifier for the step. Can be used in variable references like ${id.stdout} to access step properties. Must be unique within the DAG if specified."
@@ -512,8 +535,24 @@
               "properties": {
                 "type": {
                   "type": "string",
-                  "enum": ["docker", "http", "mail", "ssh", "jq", "gha"],
-                  "description": "Type of executor to use for this step"
+                  "enum": [
+                    "command",
+                    "shell",
+                    "docker",
+                    "container",
+                    "http",
+                    "mail",
+                    "ssh",
+                    "jq",
+                    "gha",
+                    "github_action",
+                    "github-action",
+                    "dag",
+                    "subworkflow",
+                    "parallel",
+                    "archive"
+                  ],
+                  "description": "Type of executor to use for this step. 'command' is the default shell command executor. 'dag' is for sub-DAG execution. 'parallel' is for parallel step execution."
                 },
                 "config": {
                   "type": "object",
@@ -534,7 +573,11 @@
             {
               "type": "array",
               "items": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
               }
             }
           ],
@@ -598,6 +641,10 @@
                 {
                   "type": "integer",
                   "description": "Exit code that should be treated as successful"
+                },
+                {
+                  "type": "string",
+                  "description": "Exit code represented as a string (parsed as integer at runtime)"
                 },
                 {
                   "type": "array",
@@ -794,8 +841,15 @@
             {
               "type": "array",
               "items": {
-                "type": "object",
-                "additionalProperties": true
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                ]
               },
               "description": "Named parameters as key-value pairs"
             },
@@ -805,7 +859,7 @@
               "description": "Named parameters as key-value pairs"
             }
           ],
-          "description": "Parameters for the step. For sub-DAG execution (when 'run' is specified), these are passed to the sub DAG and accessible as ${KEY}. For 'gha' executor, these are passed as action inputs (the 'with:' section in GitHub Actions syntax). For example, when using actions/checkout@v4, you can specify 'repository', 'ref', 'token', etc."
+          "description": "Parameters for the step. Supports three formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array format: named parameters as key-value objects preserving rich types (numbers, booleans, nested objects). 3) Object format: named parameters as simple key-value pairs. For sub-DAG execution (when 'call' or 'run' is specified), these are passed to the sub DAG and accessible as ${KEY}. For 'gha' executor, these are passed as action inputs (the 'with:' section in GitHub Actions syntax). Rich types are preserved when passing to executors that support them."
         },
         "parallel": {
           "oneOf": [
@@ -864,8 +918,8 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 1000,
-                  "default": 8,
-                  "description": "Maximum number of concurrent executions (default: 8, maximum: 1000)"
+                  "default": 10,
+                  "description": "Maximum number of concurrent executions (default: 10, maximum: 1000)"
                 }
               },
               "required": ["items"],
@@ -887,16 +941,28 @@
             {
               "type": "array",
               "items": {
-                "type": "object",
-                "additionalProperties": true
-              }
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Map format: {KEY: value}"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*=.*$",
+                    "description": "Key=Value format: 'KEY=value'"
+                  }
+                ]
+              },
+              "description": "Array of environment variable definitions (map format or Key=Value strings)"
             },
             {
               "type": "object",
-              "additionalProperties": true
+              "additionalProperties": true,
+              "description": "Map format: {KEY1: value1, KEY2: value2}"
             }
           ],
-          "description": "Environment variables specific to this step. These override DAG-level environment variables with the same name. Can use shell expansions, references to other environment variables, or command substitutions."
+          "description": "Environment variables specific to this step. These override DAG-level environment variables with the same name. Supports three formats: 1) Map format: env: {KEY: value}, 2) Array of maps: env: [{KEY: value}], 3) Array of Key=Value strings: env: ['KEY=value'] (Docker/docker-compose compatible). Can use shell expansions (${VAR}), references to other environment variables, or command substitutions (`cmd`)."
         }
       }
     },
@@ -906,6 +972,10 @@
         "condition": {
           "type": "string",
           "description": "Command or expression to evaluate. Can include shell commands, environment variables, or command substitutions with backticks."
+        },
+        "command": {
+          "type": "string",
+          "description": "Deprecated alias for condition. Still accepted for backward compatibility."
         },
         "expected": {
           "type": "string",
@@ -962,9 +1032,7 @@
         },
         "headers": {
           "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
+          "additionalProperties": true,
           "description": "Custom headers to include with OTLP export requests. Useful for authentication (e.g., Authorization: Bearer token)."
         },
         "insecure": {
@@ -978,9 +1046,7 @@
         },
         "resource": {
           "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
+          "additionalProperties": true,
           "properties": {
             "service.name": {
               "type": "string",
@@ -1023,17 +1089,43 @@
           "description": "Container image to use (e.g., 'python:3.11', 'node:20'). Required when using container configuration."
         },
         "pullPolicy": {
-          "type": "string",
-          "enum": ["always", "never", "missing"],
+          "oneOf": [
+            {
+              "type": "boolean",
+              "description": "Boolean shorthand: true = 'always', false = 'never'"
+            },
+            {
+              "type": "string",
+              "enum": ["always", "never", "missing"],
+              "description": "String policy: 'always' pulls the image every time, 'never' uses only local images, 'missing' pulls only if not present locally"
+            }
+          ],
           "default": "missing",
-          "description": "Image pull policy. 'always' pulls the image every time, 'never' uses only local images, 'missing' pulls only if not present locally."
+          "description": "Image pull policy. Accepts boolean (true='always', false='never') or string ('always', 'never', 'missing'). Default is 'missing'."
         },
         "env": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Environment variables to set in the container. Format: 'KEY=value'. Supports variable expansion (e.g., 'API_KEY=${API_KEY}')."
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*=.*$"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": true
+            }
+          ],
+          "description": "Environment variables to set in the container. Supports maps or arrays combining maps and KEY=value strings. Values can include variable expansion (e.g., 'API_KEY=${API_KEY}')."
         },
         "volumes": {
           "type": "array",
@@ -1049,6 +1141,10 @@
         "workingDir": {
           "type": "string",
           "description": "Working directory inside the container. Commands will be executed from this directory."
+        },
+        "workDir": {
+          "type": "string",
+          "description": "Deprecated alias for workingDir. Still accepted for backward compatibility."
         },
         "platform": {
           "type": "string",
@@ -1112,7 +1208,14 @@
           "description": "Hostname or IP address of the SSH server."
         },
         "port": {
-          "type": "string",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ],
           "default": "22",
           "description": "SSH port number. Defaults to 22."
         },
