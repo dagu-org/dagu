@@ -19,7 +19,7 @@ type jq struct {
 	stdout io.Writer
 	stderr io.Writer
 	query  string
-	input  map[string]any
+	input  any
 	cfg    *jqConfig
 }
 
@@ -36,7 +36,7 @@ func newJQ(_ context.Context, step core.Step) (executor.Executor, error) {
 			return nil, err
 		}
 	}
-	input := map[string]any{}
+	var input any
 	if err := json.Unmarshal([]byte(step.Script), &input); err != nil {
 		return nil, err
 	}

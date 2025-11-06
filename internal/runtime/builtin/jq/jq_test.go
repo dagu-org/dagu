@@ -3,6 +3,7 @@ package jq
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -19,6 +20,7 @@ func TestJQExecutor_RawOutput(t *testing.T) {
 		script         string
 		raw            bool
 		expectedOutput string
+		compareJSON    bool
 	}{
 		{
 			name:           "SingleStringWithRawTrue",
@@ -74,14 +76,16 @@ func TestJQExecutor_RawOutput(t *testing.T) {
 			query:          ".",
 			script:         `{"foo": "bar", "baz": 123}`,
 			raw:            true,
-			expectedOutput: "", // Key order is not guaranteed, will check separately
+			expectedOutput: `{"foo":"bar","baz":123}`,
+			compareJSON:    true,
 		},
 		{
 			name:           "ObjectWithRawFalse",
 			query:          ".",
 			script:         `{"foo": "bar", "baz": 123}`,
 			raw:            false,
-			expectedOutput: "", // Key order is not guaranteed, will check separately
+			expectedOutput: `{"foo":"bar","baz":123}`,
+			compareJSON:    true,
 		},
 		{
 			name:           "ArrayFromObjectWithRawTrue",
@@ -96,6 +100,34 @@ func TestJQExecutor_RawOutput(t *testing.T) {
 			script:         `{"items": [1, 2, 3]}`,
 			raw:            false,
 			expectedOutput: "[\n    1,\n    2,\n    3\n]\n",
+		},
+		{
+			name:           "TopLevelArrayWithRawTrue",
+			query:          ".",
+			script:         `["foo", "bar"]`,
+			raw:            true,
+			expectedOutput: "[\"foo\",\"bar\"]\n",
+		},
+		{
+			name:           "TopLevelArrayWithRawFalse",
+			query:          ".",
+			script:         `["foo", "bar"]`,
+			raw:            false,
+			expectedOutput: "[\n    \"foo\",\n    \"bar\"\n]\n",
+		},
+		{
+			name:           "TopLevelStringWithRawTrue",
+			query:          ".",
+			script:         `"bar"`,
+			raw:            true,
+			expectedOutput: "bar\n",
+		},
+		{
+			name:           "TopLevelStringWithRawFalse",
+			query:          ".",
+			script:         `"bar"`,
+			raw:            false,
+			expectedOutput: "\"bar\"\n",
 		},
 		{
 			name:           "StringWithSpecialCharsWithRawTrue",
@@ -154,22 +186,12 @@ func TestJQExecutor_RawOutput(t *testing.T) {
 			err = executor.Run(ctx)
 			require.NoError(t, err)
 
-			// Special handling for object outputs where key order is not guaranteed
-			if tt.name == "ObjectWithRawTrue" {
-				output := stdout.String()
-				assert.Contains(t, output, `"foo":"bar"`)
-				assert.Contains(t, output, `"baz":123`)
-				assert.Contains(t, output, "{")
-				assert.Contains(t, output, "}")
-			} else if tt.name == "ObjectWithRawFalse" {
-				output := stdout.String()
-				assert.Contains(t, output, `"foo": "bar"`)
-				assert.Contains(t, output, `"baz": 123`)
-				assert.Contains(t, output, "{")
-				assert.Contains(t, output, "}")
-			} else {
-				assert.Equal(t, tt.expectedOutput, stdout.String())
+			output := stdout.String()
+			if tt.compareJSON {
+				require.JSONEq(t, tt.expectedOutput, strings.TrimSpace(output))
+				return
 			}
+			assert.Equal(t, tt.expectedOutput, output)
 		})
 	}
 }
