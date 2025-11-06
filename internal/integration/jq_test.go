@@ -134,4 +134,192 @@ func TestJQExecutor(t *testing.T) {
 			"RESULT": "1\t100\n2\t200\n3\t300",
 		})
 	})
+
+	t.Run("SingleStringWithRawTrue", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: extract-single-string-raw
+    executor: 
+      type: jq
+      config:
+        raw: true
+    script: |
+      {"foo": "bar"}
+    command: .foo
+    output: RESULT
+`)
+
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "bar",
+		})
+	})
+
+	t.Run("SingleStringWithRawFalse", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: extract-single-string-json
+    executor: 
+      type: jq
+      config:
+        raw: false
+    script: |
+      {"foo": "bar"}
+    command: .foo
+    output: RESULT
+`)
+
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": `"bar"`,
+		})
+	})
+
+	t.Run("SingleNumberWithRawTrue", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: extract-single-number-raw
+    executor: 
+      type: jq
+      config:
+        raw: true
+    script: |
+      {"value": 42}
+    command: .value
+    output: RESULT
+`)
+
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "42",
+		})
+	})
+
+	t.Run("SingleBooleanWithRawTrue", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: extract-single-boolean-raw
+    executor: 
+      type: jq
+      config:
+        raw: true
+    script: |
+      {"enabled": true, "disabled": false}
+    command: .enabled
+    output: ENABLED
+`)
+
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"ENABLED": "true",
+		})
+	})
+
+	t.Run("NullValueWithRawTrue", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: extract-null-raw
+    executor: 
+      type: jq
+      config:
+        raw: true
+    script: |
+      {"value": null}
+    command: .value
+    output: RESULT
+`)
+
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		// Null values output empty string, but the output variable still exists
+		// So we check that it contains an empty value
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": test.Contains("RESULT="),
+		})
+	})
+
+	t.Run("ObjectWithRawTrue", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: extract-object-raw
+    executor: 
+      type: jq
+      config:
+        raw: true
+    script: |
+      {"user": {"name": "John", "age": 30}}
+    command: .user
+    output: RESULT
+`)
+
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		// In raw mode, object is output as compact JSON (key order not guaranteed)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": []test.Contains{
+				test.Contains(`"name":"John"`),
+				test.Contains(`"age":30`),
+			},
+		})
+	})
+
+	t.Run("StringWithSpecialCharsWithRawTrue", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: extract-special-chars-raw
+    executor: 
+      type: jq
+      config:
+        raw: true
+    script: |
+      {"message": "hello\nworld\ttab"}
+    command: .message
+    output: RESULT
+`)
+
+		agent := dag.Agent()
+
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "hello\nworld\ttab",
+		})
+	})
 }

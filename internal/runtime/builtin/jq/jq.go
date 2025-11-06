@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
@@ -20,7 +19,7 @@ type jq struct {
 	stdout io.Writer
 	stderr io.Writer
 	query  string
-	input  map[string]any
+	input  any
 	cfg    *jqConfig
 }
 
@@ -37,7 +36,7 @@ func newJQ(_ context.Context, step core.Step) (executor.Executor, error) {
 			return nil, err
 		}
 	}
-	input := map[string]any{}
+	var input any
 	if err := json.Unmarshal([]byte(step.Script), &input); err != nil {
 		return nil, err
 	}
@@ -77,18 +76,43 @@ func (e *jq) Run(_ context.Context) error {
 			continue
 		}
 		if e.cfg.Raw {
-			// In raw mode, handle strings specially to preserve tabs, newlines, etc
+			// In raw mode, output values without JSON encoding
 			switch v := v.(type) {
 			case string:
+				// For strings, print directly without quotes
+				_, _ = fmt.Fprintln(e.stdout, v)
+			case nil:
+				// For null, print nothing or empty line
+				_, _ = fmt.Fprintln(e.stdout)
+			case bool:
+				// For booleans, print as lowercase string
+				if v {
+					_, _ = fmt.Fprintln(e.stdout, "true")
+				} else {
+					_, _ = fmt.Fprintln(e.stdout, "false")
+				}
+			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+				// For numbers, print without quotes
 				_, _ = fmt.Fprintln(e.stdout, v)
 			default:
-				// For non-strings, convert to string representation
+				// For arrays/objects or other types, marshal to JSON
 				val, err := json.Marshal(v)
 				if err != nil {
 					_, _ = fmt.Fprintf(e.stderr, "failed to marshal jq output: %v", err)
 					continue
 				}
-				_, _ = fmt.Fprintln(e.stdout, strings.Trim(string(val), `"`))
+				// If the JSON is a quoted string, unquote it
+				output := string(val)
+				if len(output) >= 2 && output[0] == '"' && output[len(output)-1] == '"' {
+					var unquoted string
+					if err := json.Unmarshal(val, &unquoted); err == nil {
+						_, _ = fmt.Fprintln(e.stdout, unquoted)
+					} else {
+						_, _ = fmt.Fprintln(e.stdout, output)
+					}
+				} else {
+					_, _ = fmt.Fprintln(e.stdout, output)
+				}
 			}
 		} else {
 			// In non-raw mode, use JSON formatting
