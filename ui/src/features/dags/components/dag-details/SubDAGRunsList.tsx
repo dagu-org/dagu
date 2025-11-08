@@ -3,11 +3,14 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
 import dayjs from '@/lib/dayjs';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import { StatusDot } from '../common';
 
 type SubDAGRun = components['schemas']['SubDAGRun'];
 type SubDAGRunDetail = components['schemas']['SubDAGRunDetail'];
+type IndexedSubRun = SubDAGRun & { originalIndex: number };
+type IndexedSubRunDetail = SubDAGRunDetail & { originalIndex: number };
+type SubRunListItem = IndexedSubRun | IndexedSubRunDetail;
 
 type Props = {
   dagName: string;
@@ -30,11 +33,12 @@ export function SubDAGRunsList({
 }: Props) {
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const dagRunIdsKey = allSubRuns.map((sr) => sr.dagRunId).join('|');
 
   // Fetch sub DAG run details with timing information
   // Only fetch if we have multiple sub runs AND expanded
   const shouldFetch = allSubRuns.length > 1 && isExpanded;
-  const { data: subRunsData } = useQuery(
+  const { data: subRunsData, mutate: refetchSubRuns } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs',
     {
       params: {
@@ -49,27 +53,35 @@ export function SubDAGRunsList({
     },
     {
       isPaused: () => !shouldFetch,
+      refreshInterval: shouldFetch ? 3000 : 0,
     }
   );
+
+  // When the list of sub run ids changes (new executions), immediately refresh timing info
+  useEffect(() => {
+    if (!shouldFetch) {
+      return;
+    }
+    refetchSubRuns();
+  }, [shouldFetch, dagRunIdsKey, refetchSubRuns]);
 
   // Create a map of dagRunIds that belong to THIS node
   const nodeSubRunIds = new Set(allSubRuns.map((sr) => sr.dagRunId));
 
   // Map each sub run to include its original index
-  const subRunsWithIndex = allSubRuns.map((subRun, index) => ({
+  const subRunsWithIndex: IndexedSubRun[] = allSubRuns.map((subRun, index) => ({
     ...subRun,
     originalIndex: index,
   }));
 
   // If we have API data with timing, filter to only THIS node's sub runs, merge and sort
-  const subRunsWithTiming = subRunsData?.subRuns
+  const subRunsFromApi: IndexedSubRunDetail[] = subRunsData?.subRuns
     ? subRunsData.subRuns
         // FILTER: Only include sub runs that belong to THIS node
         .filter((apiSubRun: SubDAGRunDetail) =>
           nodeSubRunIds.has(apiSubRun.dagRunId)
         )
-        .map((apiSubRun: SubDAGRunDetail) => {
-          // Find the matching original sub run to get the index
+        .map((apiSubRun): IndexedSubRunDetail => {
           const matchingSubRun = subRunsWithIndex.find(
             (sr) => sr.dagRunId === apiSubRun.dagRunId
           );
@@ -78,12 +90,15 @@ export function SubDAGRunsList({
             originalIndex: matchingSubRun?.originalIndex ?? 0,
           };
         })
-        .sort((a: any, b: any) => {
+        .sort((a, b) => {
           const timeA = new Date(a.startedAt).getTime();
           const timeB = new Date(b.startedAt).getTime();
           return timeB - timeA; // Descending order (newest first)
         })
-    : subRunsWithIndex;
+    : [];
+
+  const subRunsWithTiming: SubRunListItem[] =
+    subRunsFromApi.length > 0 ? subRunsFromApi : subRunsWithIndex;
 
   if (allSubRuns.length === 1) {
     // Single sub DAG run
@@ -130,7 +145,7 @@ export function SubDAGRunsList({
       </div>
       {isExpanded && (
         <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
-          {subRunsWithTiming.map((subRun: any, displayIndex: number) => {
+          {subRunsWithTiming.map((subRun, displayIndex) => {
             const startedAt =
               'startedAt' in subRun ? subRun.startedAt : null;
             const status = 'status' in subRun ? subRun.status : null;

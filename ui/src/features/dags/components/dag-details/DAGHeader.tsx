@@ -41,18 +41,11 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 
     const end =
       dagRunToDisplay.finishedAt && dagRunToDisplay.finishedAt !== '-'
-        ? dayjs(dagRunToDisplay.finishedAt)
-        : dayjs();
+        ? dagRunToDisplay.finishedAt
+        : dayjs().toISOString();
 
-    const start = dayjs(dagRunToDisplay.startedAt);
-    const diff = end.diff(start, 'second');
-
-    const hours = Math.floor(diff / 3600);
-    const minutes = Math.floor((diff % 3600) / 60);
-    const seconds = diff % 60;
-
-    return `${hours > 0 ? `${hours}h ` : ''}${minutes > 0 ? `${minutes}m ` : ''}${seconds}s`;
-  }, [dagRunToDisplay.startedAt, dagRunToDisplay.finishedAt]);
+    return formatDuration(dagRunToDisplay.startedAt, end);
+  }, [dagRunToDisplay.startedAt, dagRunToDisplay.finishedAt, formatDuration]);
 
   // Determine if the DAG is currently running
   const isRunning = dagRunToDisplay.status === Status.Running;

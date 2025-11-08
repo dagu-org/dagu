@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -357,7 +358,15 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 			params = append(params, parsedParams...)
 
 		case map[string]any:
-			for name, value := range m {
+			// Iterate deterministically to avoid random param order from Go maps.
+			keys := make([]string, 0, len(m))
+			for name := range m {
+				keys = append(keys, name)
+			}
+			sort.Strings(keys)
+
+			for _, name := range keys {
+				value := m[name]
 				var valueStr string
 
 				switch v := value.(type) {
