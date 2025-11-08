@@ -55,6 +55,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --working-dir)
       shift
+      if [ -z "$1" ]; then
+        echo "Error: --working-dir requires a path argument" >&2
+        exit 1
+      fi
       WORKING_ROOT_DIR="$1"
       ;;
     *)
