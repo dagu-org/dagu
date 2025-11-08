@@ -95,7 +95,6 @@ case "$ARCHITECTURE" in
 esac
 
 # Prepare working directory for temporary files
-WORKING_ROOT_DIR="${WORKING_ROOT_DIR:-/tmp}"
 mkdir -p "$WORKING_ROOT_DIR" || {
   echo "Failed to create working directory: $WORKING_ROOT_DIR" >&2
   exit 1
