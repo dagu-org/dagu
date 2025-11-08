@@ -129,7 +129,7 @@ params:
   - BASE: ${SOURCE_ID}
   - PREFIX: ${BASE:0:5}
 `)
-		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{NoEval: true})
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{Flags: spec.BuildFlagNoEval})
 		require.NoError(t, err)
 
 		th := DAG{t: t, DAG: dag}
@@ -339,6 +339,25 @@ params:
 
 		// Should prefer schema.json from CWD (default 99) over workingDir (default 11)
 		require.Contains(t, th.Params, "batch_size=99")
+	})
+
+	t.Run("ParamsSkipSchemaValidationFlag", func(t *testing.T) {
+		data := []byte(`
+params:
+  schema: "missing-schema.json"
+  values:
+    foo: "bar"
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{
+			Flags: spec.BuildFlagSkipSchemaValidation,
+		})
+		require.NoError(t, err)
+
+		th := DAG{t: t, DAG: dag}
+		th.AssertParam(t, "foo=bar")
 	})
 	t.Run("ParamsWithSchemaAndOverrideValidation", func(t *testing.T) {
 		schemaContent := `{
@@ -3379,7 +3398,7 @@ steps:
   - echo hello
 `, tempDir)
 
-		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(yaml), spec.BuildOpts{NoEval: true})
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(yaml), spec.BuildOpts{Flags: spec.BuildFlagNoEval})
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 
@@ -3408,7 +3427,7 @@ env:
 steps:
   - echo hello
 `
-		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(yaml), spec.BuildOpts{NoEval: true})
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(yaml), spec.BuildOpts{Flags: spec.BuildFlagNoEval})
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 
