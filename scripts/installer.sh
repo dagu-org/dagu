@@ -11,6 +11,7 @@
 #   --version <version>       Install a specific version (e.g., --version v1.2.3)
 #   --install-dir <path>      Install to a custom directory (default: ~/.local/bin)
 #   --prefix <path>           Alias for --install-dir
+#   --working-dir <path>      Use a custom directory for temporary files (default: /tmp)
 #
 # Examples:
 #   # Install latest version to default location (~/.local/bin)
@@ -35,6 +36,7 @@ FILE_BASENAME="dagu"
 
 # Default values
 DAGU_INSTALL_DIR="${DAGU_INSTALL_DIR:-$HOME/.local/bin}"
+WORKING_ROOT_DIR="/tmp"
 
 # Parse CLI arguments
 while [ "$#" -gt 0 ]; do
@@ -50,6 +52,14 @@ while [ "$#" -gt 0 ]; do
     --prefix) # For compatibility with some conventions
       shift
       DAGU_INSTALL_DIR="$1"
+      ;;
+    --working-dir)
+      shift
+      if [ -z "$1" ]; then
+        echo "Error: --working-dir requires a path argument" >&2
+        exit 1
+      fi
+      WORKING_ROOT_DIR="$1"
       ;;
     *)
       ;;
@@ -84,8 +94,21 @@ case "$ARCHITECTURE" in
   armv6l) ARCHITECTURE="armv6" ;;
 esac
 
+# Prepare working directory for temporary files
+mkdir -p "$WORKING_ROOT_DIR" || {
+  echo "Failed to create working directory: $WORKING_ROOT_DIR" >&2
+  exit 1
+}
+NORMALIZED_WORKING_ROOT_DIR="${WORKING_ROOT_DIR%/}"
+if [ -z "$NORMALIZED_WORKING_ROOT_DIR" ]; then
+  NORMALIZED_WORKING_ROOT_DIR="/"
+fi
+
 # Create temporary working directory
-TMPDIR="$(mktemp -d)"
+TMPDIR="$(mktemp -d "${NORMALIZED_WORKING_ROOT_DIR}/dagu-installer.XXXXXX")" || {
+  echo "Failed to create temporary directory under: $WORKING_ROOT_DIR" >&2
+  exit 1
+}
 TAR_FILE="${TMPDIR}/${FILE_BASENAME}_${SYSTEM}_${ARCHITECTURE}.tar.gz"
 
 # Build download URL
