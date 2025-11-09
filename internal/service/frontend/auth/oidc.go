@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	oidc "github.com/coreos/go-oidc"
 	"github.com/dagu-org/dagu/internal/common/config"
@@ -108,17 +109,35 @@ func callbackHandler(provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
 			return
 		}
 		// set token
-		setCookie(w, r, "oidcToken", rawIDToken, 86400-120) //expire at 1 day
+		expireSeconds := int(time.Until(idToken.Expiry).Seconds())
+		if expireSeconds <= 0 {
+			// fall back to a short-lived cookie when token claims look off
+			expireSeconds = 60
+		}
+		setCookie(w, r, "oidcToken", rawIDToken, expireSeconds)
 		http.Redirect(w, r, originalURL.Value, http.StatusFound)
 	}
 }
 
 func checkOIDCAuth(next http.Handler, provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
 	config *oauth2.Config, whitelist []string, w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	authorized, err := r.Cookie("oidcToken")
 	if err == nil && authorized.Value != "" && !strings.HasSuffix(config.RedirectURL, r.URL.Path) {
-		next.ServeHTTP(w, r)
-		return
+		if verifier != nil {
+			if _, err := verifier.Verify(ctx, authorized.Value); err == nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+			logger.Warn(ctx, "OIDC cookie rejected: token verification failed during UI access",
+				"path", r.URL.Path,
+				"method", r.Method,
+				"error", err)
+			clearCookie(w, r, "oidcToken")
+		} else {
+			next.ServeHTTP(w, r)
+			return
+		}
 	}
 	// auth callback
 	if strings.HasSuffix(config.RedirectURL, r.URL.Path) {
@@ -161,6 +180,7 @@ func checkOIDCToken(next http.Handler, verifier *oidc.IDTokenVerifier, w http.Re
 			"path", r.URL.Path,
 			"method", r.Method,
 			"error", err)
+		clearCookie(w, r, "oidcToken")
 		http.Error(w, "Authentication failed: invalid or expired OIDC token", http.StatusUnauthorized)
 		return
 	}
@@ -174,8 +194,21 @@ func setCookie(w http.ResponseWriter, r *http.Request, name, value string, expir
 		Name:     name,
 		Value:    value,
 		MaxAge:   expire,
-		Secure:   r.TLS != nil,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+		Secure:   isSecureRequest(r),
 		HttpOnly: true,
 	}
 	http.SetCookie(w, c)
+}
+
+func clearCookie(w http.ResponseWriter, r *http.Request, name string) {
+	setCookie(w, r, name, "", -1)
+}
+
+func isSecureRequest(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
