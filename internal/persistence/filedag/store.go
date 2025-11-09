@@ -112,10 +112,18 @@ func (store *Storage) GetMetadata(ctx context.Context, name string) (*core.DAG, 
 		return nil, fmt.Errorf("failed to locate DAG %s in search paths (%v): %w", name, store.searchPaths, err)
 	}
 	if store.fileCache == nil {
-		return spec.Load(ctx, filePath, spec.OnlyMetadata(), spec.WithoutEval())
+		return spec.Load(ctx, filePath,
+			spec.OnlyMetadata(),
+			spec.WithoutEval(),
+			spec.SkipSchemaValidation(),
+		)
 	}
 	return store.fileCache.LoadLatest(filePath, func() (*core.DAG, error) {
-		return spec.Load(ctx, filePath, spec.OnlyMetadata(), spec.WithoutEval())
+		return spec.Load(ctx, filePath,
+			spec.OnlyMetadata(),
+			spec.WithoutEval(),
+			spec.SkipSchemaValidation(),
+		)
 	})
 }
 
@@ -276,7 +284,12 @@ func (store *Storage) List(ctx context.Context, opts execution.ListDAGsOptions) 
 		// Read the file and parse the DAG.
 		// Use WithAllowBuildErrors to include DAGs with errors in the list
 		filePath := filepath.Join(store.baseDir, entry.Name())
-		dag, err := spec.Load(ctx, filePath, spec.OnlyMetadata(), spec.WithoutEval(), spec.WithAllowBuildErrors())
+		dag, err := spec.Load(ctx, filePath,
+			spec.OnlyMetadata(),
+			spec.WithoutEval(),
+			spec.SkipSchemaValidation(),
+			spec.WithAllowBuildErrors(),
+		)
 		if err != nil {
 			// If it completely fails to load, skip it
 			errList = append(errList, fmt.Sprintf("reading %s failed: %s", dagName, err))
@@ -406,7 +419,11 @@ func (store *Storage) Grep(ctx context.Context, pattern string) (
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", entry.Name(), err))
 				continue
 			}
-			dag, err := spec.Load(ctx, filePath, spec.OnlyMetadata(), spec.WithoutEval())
+			dag, err := spec.Load(ctx, filePath,
+				spec.OnlyMetadata(),
+				spec.WithoutEval(),
+				spec.SkipSchemaValidation(),
+			)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", entry.Name(), err))
 				continue

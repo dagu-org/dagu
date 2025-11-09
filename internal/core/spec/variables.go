@@ -56,7 +56,7 @@ func loadVariables(ctx BuildContext, strVariables any) (
 	for _, pair := range pairs {
 		value := pair.val
 
-		if !ctx.opts.NoEval {
+		if !ctx.opts.Has(BuildFlagNoEval) {
 			// Evaluate the value of the environment variable.
 			// This also executes command substitution.
 			// Pass accumulated vars so ${VAR} can reference previously defined vars
