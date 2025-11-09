@@ -195,6 +195,7 @@ func setCookie(w http.ResponseWriter, r *http.Request, name, value string, expir
 		Value:    value,
 		MaxAge:   expire,
 		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
 		Secure:   r.TLS != nil,
 		HttpOnly: true,
 	}
