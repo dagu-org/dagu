@@ -196,7 +196,7 @@ func setCookie(w http.ResponseWriter, r *http.Request, name, value string, expir
 		MaxAge:   expire,
 		Path:     "/",
 		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil,
+		Secure:   isSecureRequest(r),
 		HttpOnly: true,
 	}
 	http.SetCookie(w, c)
@@ -204,4 +204,11 @@ func setCookie(w http.ResponseWriter, r *http.Request, name, value string, expir
 
 func clearCookie(w http.ResponseWriter, r *http.Request, name string) {
 	setCookie(w, r, name, "", -1)
+}
+
+func isSecureRequest(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
