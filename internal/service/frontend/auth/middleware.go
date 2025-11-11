@@ -135,4 +135,3 @@ func requireBearerAuth(w http.ResponseWriter, realm string) {
 	w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="%s"`, realm))
 	w.WriteHeader(http.StatusUnauthorized)
 }
-
