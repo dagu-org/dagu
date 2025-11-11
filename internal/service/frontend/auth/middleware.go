@@ -4,7 +4,6 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 
 	oidc "github.com/coreos/go-oidc"
@@ -39,14 +38,14 @@ func DefaultOptions() Options {
 
 // Middleware creates an HTTP middleware for authentication.
 func Middleware(opts Options) func(next http.Handler) http.Handler {
-	var publicPaths []string
+	publicPaths := make(map[string]struct{}, len(opts.PublicPaths))
 	for _, p := range opts.PublicPaths {
-		publicPaths = append(publicPaths, pathutil.NormalizePath(p))
+		publicPaths[pathutil.NormalizePath(p)] = struct{}{}
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Allow unauthenticated access to explicitly configured public paths.
-			if slices.Contains(publicPaths, pathutil.NormalizePath(r.URL.Path)) {
+			if _, ok := publicPaths[pathutil.NormalizePath(r.URL.Path)]; ok {
 				next.ServeHTTP(w, r)
 				return
 			}
