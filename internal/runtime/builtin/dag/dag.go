@@ -106,7 +106,7 @@ func (e *dagExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 		return core.NodeSucceeded, nil
 	case core.PartiallySucceeded:
 		return core.NodePartiallySucceeded, nil
-	case core.NotStarted, core.Running, core.Failed, core.Canceled, core.Queued:
+	case core.NotStarted, core.Running, core.Failed, core.Aborted, core.Queued:
 		return core.NodeFailed, fmt.Errorf("sub DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
 	default:
 		// This should never happen, but satisfies the exhaustive check

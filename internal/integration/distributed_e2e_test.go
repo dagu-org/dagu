@@ -255,7 +255,7 @@ steps:
 				return false
 			}
 			t.Logf("DAG status after stop: %s", status.Status)
-			return status.Status == core.Canceled || status.Status == core.Failed
+			return status.Status == core.Aborted || status.Status == core.Failed
 		}, 15*time.Second, 500*time.Millisecond, "Timeout waiting for DAG to be cancelled")
 
 		schedulerCancel()
@@ -269,7 +269,7 @@ steps:
 		// Verify the final status
 		finalStatus, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
 		require.NoError(t, err)
-		require.Contains(t, []core.Status{core.Canceled, core.Failed}, finalStatus.Status,
+		require.Contains(t, []core.Status{core.Aborted, core.Failed}, finalStatus.Status,
 			"DAG should have been canceled or failed")
 
 		t.Log("Cancellation test completed successfully!")

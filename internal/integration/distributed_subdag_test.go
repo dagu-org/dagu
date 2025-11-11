@@ -163,7 +163,7 @@ steps:
 		require.NoError(t, err)
 
 		// Verify the DAG completed successfully
-		dagWrapper.AssertLatestStatus(t, core.Canceled)
+		dagWrapper.AssertLatestStatus(t, core.Aborted)
 
 		// Wait for run to finish
 		<-done

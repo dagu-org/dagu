@@ -118,7 +118,7 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
     }
 
     const failedCount = runs.filter((r) => r.status === Status.Failed).length;
-    const abortedCount = runs.filter((r) => r.status === Status.Cancelled).length;
+    const abortedCount = runs.filter((r) => r.status === Status.Aborted).length;
     const queuedCount = runs.filter((r) => r.status === Status.Queued).length;
     const runningCount = runs.filter((r) => r.status === Status.Running).length;
 

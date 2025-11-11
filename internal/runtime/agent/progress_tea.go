@@ -366,7 +366,7 @@ func (m ProgressModel) renderProgressBar() string {
 		if np.status == core.NodeSucceeded ||
 			np.status == core.NodeFailed ||
 			np.status == core.NodeSkipped ||
-			np.status == core.NodeCanceled {
+			np.status == core.NodeAborted {
 			completed++
 		}
 	}
@@ -568,7 +568,7 @@ func (m ProgressModel) renderFooter() string {
 			return m.successStyle.Render("✓ Execution completed successfully")
 		case core.Failed:
 			return m.errorStyle.Render("✗ Execution failed")
-		case core.Canceled:
+		case core.Aborted:
 			return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ Execution aborted")
 		default:
 			return m.boldStyle.Render("Execution finished")
@@ -592,7 +592,7 @@ func (m ProgressModel) formatStatus(st core.Status) string {
 		return m.errorStyle.Render("Failed ✗")
 	case core.Running:
 		return m.runningStyle.Render("Running ●")
-	case core.Canceled:
+	case core.Aborted:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("Aborted ⚠")
 	case core.Queued:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Render("Queued ●")
@@ -609,7 +609,7 @@ func (m ProgressModel) getStatusIcon(s core.NodeStatus) string {
 		return m.errorStyle.Render("✗")
 	case core.NodeRunning:
 		return m.runningStyle.Render("●")
-	case core.NodeCanceled:
+	case core.NodeAborted:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠")
 	case core.NodeSkipped:
 		return m.faintStyle.Render("⊘")
@@ -648,7 +648,7 @@ func (m ProgressModel) getCompletedNodes() []*nodeProgress {
 		if np.status == core.NodeSucceeded ||
 			np.status == core.NodeFailed ||
 			np.status == core.NodeSkipped ||
-			np.status == core.NodeCanceled {
+			np.status == core.NodeAborted {
 			nodes = append(nodes, np)
 		}
 	}

@@ -87,7 +87,7 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 			return true
 		}
 
-	case core.NodeCanceled:
+	case core.NodeAborted:
 		return false
 
 	case core.NodeSkipped:
@@ -436,7 +436,7 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 
 	if signal.IsTerminationSignalOS(sig) {
 		if s == core.NodeRunning {
-			n.SetStatus(core.NodeCanceled)
+			n.SetStatus(core.NodeAborted)
 		}
 	}
 }
@@ -446,7 +446,7 @@ func (n *Node) Cancel() {
 	defer n.mu.Unlock()
 	s := n.Status()
 	if s == core.NodeRunning {
-		n.SetStatus(core.NodeCanceled)
+		n.SetStatus(core.NodeAborted)
 	}
 }
 

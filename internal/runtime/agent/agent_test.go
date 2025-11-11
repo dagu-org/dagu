@@ -93,7 +93,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// Check if all nodes are not executed
 		dagRunStatus := dagAgent.Status(th.Context)
-		require.Equal(t, core.Canceled.String(), dagRunStatus.Status.String())
+		require.Equal(t, core.Aborted.String(), dagRunStatus.Status.String())
 		require.Equal(t, core.NodeNotStarted.String(), dagRunStatus.Nodes[0].Status.String())
 		require.Equal(t, core.NodeNotStarted.String(), dagRunStatus.Nodes[1].Status.String())
 	})
@@ -143,7 +143,7 @@ steps:
 		<-done
 
 		// wait for the DAG to be canceled
-		dag.AssertLatestStatus(t, core.Canceled)
+		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
 		th := test.Setup(t)
@@ -405,7 +405,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		// Give the process a moment to handle the signal and update status
 		time.Sleep(100 * time.Millisecond)
 
-		dag.AssertLatestStatus(t, core.Canceled)
+		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("HTTPInvalidRequest", func(t *testing.T) {
 		t.Parallel()
@@ -435,7 +435,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Stop the DAG
 		dagAgent.Abort()
-		dag.AssertLatestStatus(t, core.Canceled)
+		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("HTTPHandleCancel", func(t *testing.T) {
 		t.Parallel()
@@ -467,7 +467,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Wait for the DAG to stop
 		<-done
-		dag.AssertLatestStatus(t, core.Canceled)
+		dag.AssertLatestStatus(t, core.Aborted)
 	})
 }
 

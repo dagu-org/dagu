@@ -321,7 +321,7 @@ func TestNodeWithAllStatuses(t *testing.T) {
 		core.NodeNotStarted,
 		core.NodeRunning,
 		core.NodeFailed,
-		core.NodeCanceled,
+		core.NodeAborted,
 		core.NodeSucceeded,
 		core.NodeSkipped,
 	}

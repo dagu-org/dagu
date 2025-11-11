@@ -7,7 +7,7 @@ const (
 	NotStarted Status = iota
 	Running
 	Failed
-	Canceled
+	Aborted
 	Succeeded
 	Queued
 	PartiallySucceeded
@@ -21,7 +21,7 @@ func (s Status) String() string {
 		return "running"
 	case Failed:
 		return "failed"
-	case Canceled:
+	case Aborted:
 		return "aborted"
 	case Succeeded:
 		return "succeeded"
@@ -53,7 +53,7 @@ const (
 	NodeNotStarted NodeStatus = iota
 	NodeRunning
 	NodeFailed
-	NodeCanceled
+	NodeAborted
 	NodeSucceeded
 	NodeSkipped
 	NodePartiallySucceeded
@@ -71,7 +71,7 @@ func (s NodeStatus) String() string {
 		return "running"
 	case NodeFailed:
 		return "failed"
-	case NodeCanceled:
+	case NodeAborted:
 		return "aborted"
 	case NodeSucceeded:
 		return "succeeded"

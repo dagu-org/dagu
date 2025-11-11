@@ -439,7 +439,7 @@ func (a *Agent) RunCancel(t *testing.T) {
 	assert.NoError(t, err)
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, core.Canceled.String(), st.String())
+	require.Equal(t, core.Aborted.String(), st.String())
 }
 
 func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
@@ -449,7 +449,7 @@ func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
 	require.Error(t, err, "expected error %q, got nil", expectedErr)
 	require.Contains(t, err.Error(), expectedErr)
 	st := a.Status(a.Context)
-	require.Equal(t, core.Canceled.String(), st.Status.String())
+	require.Equal(t, core.Aborted.String(), st.Status.String())
 }
 
 func (a *Agent) RunSuccess(t *testing.T) {

@@ -567,7 +567,7 @@ func (s *Scheduler) markStatusFailed(ctx context.Context, attempt execution.DAGR
 		logger.Info(ctx, "Tried to mark a queued item 'aborted' but it's different status now", "status", st.Status.String())
 		return nil
 	}
-	st.Status = core.Canceled // Mark it cancel
+	st.Status = core.Aborted // Mark it aborted
 	if err := attempt.Write(ctx, *st); err != nil {
 		return fmt.Errorf("failed to open attempt: %w", err)
 	}

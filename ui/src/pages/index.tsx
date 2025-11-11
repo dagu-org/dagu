@@ -42,7 +42,7 @@ const initializeMetrics = (): Metrics => {
     Status.Success,
     Status.Failed,
     Status.Running,
-    Status.Cancelled,
+    Status.Aborted,
     Status.Queued,
     Status.NotStarted, // Include NotStarted if relevant
     Status.PartialSuccess,
@@ -272,7 +272,7 @@ function Dashboard(): React.ReactElement | null {
     },
     {
       title: 'aborted',
-      value: metrics[Status.Cancelled],
+      value: metrics[Status.Aborted],
       icon: <StopCircle className="h-5 w-5 text-[deeppink]" />,
     },
   ];

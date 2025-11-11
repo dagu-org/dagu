@@ -50,7 +50,7 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
       pulseAnimation = 'animate-pulse';
       statusIcon = '●'; // Dot
       break;
-    case NodeStatus.Cancelled: // cancel -> pink
+    case NodeStatus.Aborted: // aborted -> pink
       bgColorClass =
         'bg-[rgba(255,192,203,0.1)] dark:bg-[rgba(255,20,147,0.2)]';
       borderColorClass = 'border-[pink] dark:border-[deeppink]';

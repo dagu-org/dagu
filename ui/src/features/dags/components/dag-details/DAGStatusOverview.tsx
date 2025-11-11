@@ -400,7 +400,7 @@ function DAGStatusOverview({
             <span>DAGRun is queued for execution</span>
           </div>
         )}
-        {status.status === Status.Cancelled && (
+        {status.status === Status.Aborted && (
           <div className="mt-1.5 flex items-center text-xs text-slate-600 dark:text-slate-400">
             <StopCircle className="h-3 w-3 mr-1 text-pink-400" />
             <span>Execution was aborted</span>

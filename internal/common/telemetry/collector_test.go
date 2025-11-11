@@ -340,7 +340,7 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 		{Status: core.Failed},
 		{Status: core.Running},
 		{Status: core.Queued},
-		{Status: core.Canceled},
+		{Status: core.Aborted},
 	}
 	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return(statuses, nil)
 

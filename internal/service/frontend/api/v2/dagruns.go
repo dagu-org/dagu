@@ -600,7 +600,7 @@ var nodeStatusMapping = map[api.NodeStatus]core.NodeStatus{
 	api.NodeStatusNotStarted: core.NodeNotStarted,
 	api.NodeStatusRunning:    core.NodeRunning,
 	api.NodeStatusFailed:     core.NodeFailed,
-	api.NodeStatusCancelled:  core.NodeCanceled,
+	api.NodeStatusAborted:    core.NodeAborted,
 	api.NodeStatusSuccess:    core.NodeSucceeded,
 	api.NodeStatusSkipped:    core.NodeSkipped,
 }
