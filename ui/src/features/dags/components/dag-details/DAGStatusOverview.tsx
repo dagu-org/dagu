@@ -331,11 +331,11 @@ function DAGStatusOverview({
             </div>
           )}
 
-          {nodeStatus.canceled && (
+          {nodeStatus.aborted && (
             <div className="flex items-center">
               <div className="h-2 w-2 mr-1 rounded-full bg-pink-400"></div>
               <span className="text-xs text-slate-600 dark:text-slate-400">
-                Canceled: {nodeStatus.canceled}
+                Aborted: {nodeStatus.aborted}
               </span>
             </div>
           )}
@@ -376,11 +376,11 @@ function DAGStatusOverview({
                 style={{ width: `${(nodeStatus.skipped / totalNodes) * 100}%` }}
               ></div>
             )}
-            {nodeStatus.canceled && (
+            {nodeStatus.aborted && (
               <div
                 className="h-full bg-pink-400 float-left"
                 style={{
-                  width: `${(nodeStatus.canceled / totalNodes) * 100}%`,
+                  width: `${(nodeStatus.aborted / totalNodes) * 100}%`,
                 }}
               ></div>
             )}
@@ -403,7 +403,7 @@ function DAGStatusOverview({
         {status.status === Status.Cancelled && (
           <div className="mt-1.5 flex items-center text-xs text-slate-600 dark:text-slate-400">
             <StopCircle className="h-3 w-3 mr-1 text-pink-400" />
-            <span>Execution was cancelled</span>
+            <span>Execution was aborted</span>
           </div>
         )}
       </div>

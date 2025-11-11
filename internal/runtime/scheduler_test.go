@@ -1424,7 +1424,7 @@ func TestStatus_String(t *testing.T) {
 		{core.NotStarted, "not_started"},
 		{core.Running, "running"},
 		{core.Failed, "failed"},
-		{core.Canceled, "canceled"},
+		{core.Canceled, "aborted"},
 		{core.Succeeded, "succeeded"},
 		{core.Queued, "queued"},
 		{core.Status(999), "unknown"}, // Invalid status defaults to "unknown"

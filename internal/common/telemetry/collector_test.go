@@ -405,7 +405,7 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 					assert.Equal(t, float64(2), *metric.Counter.Value)
 				case "failed":
 					assert.Equal(t, float64(1), *metric.Counter.Value)
-				case "canceled":
+				case "aborted":
 					assert.Equal(t, float64(1), *metric.Counter.Value)
 				case "running":
 					assert.Equal(t, float64(1), *metric.Counter.Value)

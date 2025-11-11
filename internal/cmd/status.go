@@ -176,7 +176,7 @@ func displayDetailedStatus(dag *core.DAG, dagStatus *execution.DAGRunStatus) {
 	case core.PartiallySucceeded:
 		fmt.Printf("%s The DAG completed with partial success.\n", color.YellowString("⚠"))
 	case core.Canceled:
-		fmt.Printf("%s The DAG was cancelled.\n", color.YellowString("⚠"))
+		fmt.Printf("%s The DAG was aborted.\n", color.YellowString("⚠"))
 	case core.Queued:
 		fmt.Printf("%s The DAG is queued for execution.\n", color.BlueString("●"))
 	case core.NotStarted:
@@ -435,7 +435,7 @@ func formatStatus(st core.Status) string {
 	case core.Running:
 		return color.New(color.FgHiGreen).Sprint("Running")
 	case core.Canceled:
-		return color.YellowString("Cancelled")
+		return color.YellowString("Aborted")
 	case core.Queued:
 		return color.BlueString("Queued")
 	case core.NotStarted:
@@ -455,7 +455,7 @@ func formatNodeStatus(s core.NodeStatus) string {
 	case core.NodeRunning:
 		return color.New(color.FgHiGreen).Sprint("Running")
 	case core.NodeCanceled:
-		return color.YellowString("Cancelled")
+		return color.YellowString("Aborted")
 	case core.NodeSkipped:
 		return color.New(color.Faint).Sprint("Skipped")
 	case core.NodePartiallySucceeded:

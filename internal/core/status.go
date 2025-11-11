@@ -22,7 +22,7 @@ func (s Status) String() string {
 	case Failed:
 		return "failed"
 	case Canceled:
-		return "canceled"
+		return "aborted"
 	case Succeeded:
 		return "succeeded"
 	case Queued:
@@ -72,7 +72,7 @@ func (s NodeStatus) String() string {
 	case NodeFailed:
 		return "failed"
 	case NodeCanceled:
-		return "canceled"
+		return "aborted"
 	case NodeSucceeded:
 		return "succeeded"
 	case NodeSkipped:

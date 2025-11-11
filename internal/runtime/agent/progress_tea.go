@@ -569,7 +569,7 @@ func (m ProgressModel) renderFooter() string {
 		case core.Failed:
 			return m.errorStyle.Render("✗ Execution failed")
 		case core.Canceled:
-			return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ Execution cancelled")
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ Execution aborted")
 		default:
 			return m.boldStyle.Render("Execution finished")
 		}
@@ -593,7 +593,7 @@ func (m ProgressModel) formatStatus(st core.Status) string {
 	case core.Running:
 		return m.runningStyle.Render("Running ●")
 	case core.Canceled:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("Cancelled ⚠")
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("Aborted ⚠")
 	case core.Queued:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Render("Queued ●")
 	default:

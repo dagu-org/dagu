@@ -844,7 +844,7 @@ export interface components {
          *     0: "Not started"
          *     1: "Running"
          *     2: "Failed"
-         *     3: "Cancelled"
+         *     3: "Aborted"
          *     4: "Success"
          *     5: "Queued"
          *     6: "Partial Success"
@@ -862,7 +862,7 @@ export interface components {
          *     0: "Not started"
          *     1: "Running"
          *     2: "Failed"
-         *     3: "Cancelled"
+         *     3: "Aborted"
          *     4: "Success"
          *     5: "Skipped"
          *     6: "Partial Success"
@@ -3210,7 +3210,7 @@ export enum StatusLabel {
     not_started = "not_started",
     running = "running",
     failed = "failed",
-    canceled = "canceled",
+    aborted = "aborted",
     succeeded = "succeeded",
     queued = "queued",
     partially_succeeded = "partially_succeeded"
@@ -3228,7 +3228,7 @@ export enum NodeStatusLabel {
     not_started = "not_started",
     running = "running",
     failed = "failed",
-    canceled = "canceled",
+    aborted = "aborted",
     succeeded = "succeeded",
     skipped = "skipped",
     partially_succeeded = "partially_succeeded"

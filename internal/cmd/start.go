@@ -340,7 +340,7 @@ func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
 		}
 
 		if result.Cancelled {
-			fmt.Println("DAG execution cancelled.")
+			fmt.Println("DAG execution aborted.")
 			os.Exit(0)
 		}
 

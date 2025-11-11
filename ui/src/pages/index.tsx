@@ -271,7 +271,7 @@ function Dashboard(): React.ReactElement | null {
       icon: <XCircle className="h-5 w-5 text-[red]" />,
     },
     {
-      title: 'canceled',
+      title: 'aborted',
       value: metrics[Status.Cancelled],
       icon: <StopCircle className="h-5 w-5 text-[deeppink]" />,
     },

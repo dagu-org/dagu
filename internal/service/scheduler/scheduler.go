@@ -486,7 +486,7 @@ func (s *Scheduler) processQueueItem(ctx context.Context, item execution.QueuedI
 
 			// Somehow it's failed to execute. Mark it failed and discard from queue.
 			if err := s.markStatusFailed(ctx, attempt); err != nil {
-				logger.Error(ctx, "Failed to mark the status cancelled")
+				logger.Error(ctx, "Failed to mark the status aborted")
 			}
 
 			logger.Info(ctx, "Discard the queue item due to timeout", "data", data)
@@ -564,7 +564,7 @@ func (s *Scheduler) markStatusFailed(ctx context.Context, attempt execution.DAGR
 		}
 	}()
 	if st.Status != core.Queued {
-		logger.Info(ctx, "Tried to mark a queued item 'cancelled' but it's different status now", "status", st.Status.String())
+		logger.Info(ctx, "Tried to mark a queued item 'aborted' but it's different status now", "status", st.Status.String())
 		return nil
 	}
 	st.Status = core.Canceled // Mark it cancel
