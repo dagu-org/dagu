@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -21,11 +22,28 @@ type OIDCConfig struct {
 	Config   *oauth2.Config
 }
 
-func InitVerifierAndConfig(i config.AuthOIDC) (*OIDCConfig, error) {
-	providerCtx := context.Background()
-	provider, err := oidc.NewProvider(providerCtx, i.Issuer)
+const oidcProviderInitTimeout = 10 * time.Second
+
+var oidcProviderFactory = func(ctx context.Context, issuer string) (*oidc.Provider, error) {
+	return oidc.NewProvider(ctx, issuer)
+}
+
+func InitVerifierAndConfig(i config.AuthOIDC) (_ *OIDCConfig, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("failed to init OIDC provider: %v", r)
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), oidcProviderInitTimeout)
+	defer cancel()
+
+	provider, err := oidcProviderFactory(ctx, i.Issuer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init OIDC provider: %w", err)
+	}
+	if provider == nil {
+		return nil, errors.New("failed to init OIDC provider: provider is nil")
 	}
 	oidcConfig := &oidc.Config{
 		ClientID: i.ClientId,
