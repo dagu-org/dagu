@@ -4,13 +4,13 @@ import { cn } from '@/lib/utils'; // Assuming cn utility is available
 import {
   Activity,
   BarChart2,
-  GitBranch,
   Github,
   Layers,
   List,
   PanelLeft,
   Search,
   Server,
+  Workflow,
 } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -177,7 +177,7 @@ export const mainListItems = React.forwardRef<
           <NavItem
             to="/dags"
             text="DAG Definitions"
-            icon={<GitBranch size={18} />}
+            icon={<Workflow size={18} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
