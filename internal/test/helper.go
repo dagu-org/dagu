@@ -42,6 +42,7 @@ type Options struct {
 	CaptureLoggingOutput bool // CaptureLoggingOutput enables capturing of logging output
 	DAGsDir              string
 	ServerConfig         *config.Server
+	ConfigMutators       []func(*config.Config)
 	CoordinatorHost      string
 	CoordinatorPort      int
 }
@@ -62,6 +63,13 @@ func WithDAGsDir(dir string) HelperOption {
 func WithServerConfig(cfg *config.Server) HelperOption {
 	return func(opts *Options) {
 		opts.ServerConfig = cfg
+	}
+}
+
+// WithConfigMutator applies mutations to the loaded configuration after defaults are set.
+func WithConfigMutator(mutator func(*config.Config)) HelperOption {
+	return func(opts *Options) {
+		opts.ConfigMutators = append(opts.ConfigMutators, mutator)
 	}
 }
 
@@ -103,6 +111,9 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	if options.ServerConfig != nil {
 		cfg.Server = *options.ServerConfig
+	}
+	for _, mutate := range options.ConfigMutators {
+		mutate(cfg)
 	}
 
 	if options.CoordinatorHost != "" {

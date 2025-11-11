@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	oidc "github.com/coreos/go-oidc"
+	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	"golang.org/x/oauth2"
 )
 
@@ -22,6 +23,7 @@ type Options struct {
 	OIDCConfig       *oauth2.Config
 	OIDCWhitelist    []string
 	Creds            map[string]string
+	PublicPaths      []string
 }
 
 // DefaultOptions provides sensible defaults for the middleware.
@@ -36,8 +38,18 @@ func DefaultOptions() Options {
 
 // Middleware creates an HTTP middleware for authentication.
 func Middleware(opts Options) func(next http.Handler) http.Handler {
+	publicPaths := make(map[string]struct{}, len(opts.PublicPaths))
+	for _, p := range opts.PublicPaths {
+		publicPaths[pathutil.NormalizePath(p)] = struct{}{}
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Allow unauthenticated access to explicitly configured public paths.
+			if _, ok := publicPaths[pathutil.NormalizePath(r.URL.Path)]; ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			// If no auth is enabled, skip authentication
 			if !opts.BasicAuthEnabled && !opts.APITokenEnabled && !opts.OIDCAuthEnabled {
 				next.ServeHTTP(w, r)
