@@ -498,12 +498,12 @@ func (m *mockDAGRunAttempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
 	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
-func (m *mockDAGRunAttempt) RequestCancel(ctx context.Context) error {
+func (m *mockDAGRunAttempt) Abort(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
 
-func (m *mockDAGRunAttempt) CancelRequested(ctx context.Context) (bool, error) {
+func (m *mockDAGRunAttempt) IsAborting(ctx context.Context) (bool, error) {
 	args := m.Called(ctx)
 	return args.Bool(0), args.Error(1)
 }

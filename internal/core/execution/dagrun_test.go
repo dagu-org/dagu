@@ -12,8 +12,9 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// Mock implementations for testing
+var _ execution.DAGRunStore = (*mockDAGRunStore)(nil)
 
+// Mock implementations for testing
 type mockDAGRunStore struct {
 	mock.Mock
 }
@@ -75,6 +76,14 @@ func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName st
 	args := m.Called(ctx, oldName, newName)
 	return args.Error(0)
 }
+
+// RemoveDAGRun implements execution.DAGRunStore.
+func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun execution.DAGRunRef) error {
+	args := m.Called(ctx, dagRun)
+	return args.Error(0)
+}
+
+var _ execution.DAGRunAttempt = (*mockDAGRunAttempt)(nil)
 
 type mockDAGRunAttempt struct {
 	mock.Mock
