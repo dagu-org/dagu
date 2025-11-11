@@ -80,7 +80,7 @@ const (
 
 // Defines values for NodeStatusText.
 const (
-	NodeStatusTextCancelled      NodeStatusText = "cancelled"
+	NodeStatusTextAborted        NodeStatusText = "aborted"
 	NodeStatusTextFailed         NodeStatusText = "failed"
 	NodeStatusTextFinished       NodeStatusText = "finished"
 	NodeStatusTextNotStarted     NodeStatusText = "not started"
@@ -101,7 +101,7 @@ const (
 
 // Defines values for RunStatusText.
 const (
-	RunStatusTextCancelled      RunStatusText = "cancelled"
+	RunStatusTextAborted        RunStatusText = "aborted"
 	RunStatusTextFailed         RunStatusText = "failed"
 	RunStatusTextFinished       RunStatusText = "finished"
 	RunStatusTextNotStarted     RunStatusText = "not started"
@@ -246,7 +246,7 @@ type DAGStatus struct {
 	// 0: "Not started"
 	// 1: "Running"
 	// 2: "Failed"
-	// 3: "Cancelled"
+	// 3: "Aborted"
 	// 4: "Success"
 	// 6: "Partial Success"
 	Status RunStatus `json:"Status"`
@@ -294,7 +294,7 @@ type DAGStatusDetails struct {
 	// 0: "Not started"
 	// 1: "Running"
 	// 2: "Failed"
-	// 3: "Cancelled"
+	// 3: "Aborted"
 	// 4: "Success"
 	// 6: "Partial Success"
 	Status RunStatus `json:"Status"`
@@ -420,7 +420,7 @@ type Node struct {
 	// 0: "Not started"
 	// 1: "Running"
 	// 2: "Failed"
-	// 3: "Cancelled"
+	// 3: "Aborted"
 	// 4: "Success"
 	// 5: "Skipped"
 	// 6: "Partial Success"
@@ -437,7 +437,7 @@ type Node struct {
 // 0: "Not started"
 // 1: "Running"
 // 2: "Failed"
-// 3: "Cancelled"
+// 3: "Aborted"
 // 4: "Success"
 // 5: "Skipped"
 // 6: "Partial Success"
@@ -490,7 +490,7 @@ type RepeatPolicy_Backoff struct {
 // 0: "Not started"
 // 1: "Running"
 // 2: "Failed"
-// 3: "Cancelled"
+// 3: "Aborted"
 // 4: "Success"
 // 6: "Partial Success"
 type RunStatus int

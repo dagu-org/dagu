@@ -76,8 +76,8 @@ func dequeueDAGRun(ctx *Context, dagRun execution.DAGRunRef) error {
 		return fmt.Errorf("failed to dequeue dag-run %s: %w", dagRun.ID, err)
 	}
 
-	// Make the status as canceled
-	dagStatus.Status = core.Canceled
+	// Mark the execution as aborted now that it is dequeued
+	dagStatus.Status = core.Aborted
 
 	if err := attempt.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
@@ -92,9 +92,9 @@ func dequeueDAGRun(ctx *Context, dagRun execution.DAGRunRef) error {
 		return fmt.Errorf("failed to close attempt: %w", err)
 	}
 
-	// Hide the canceled attempt to preserve the previous state
+	// Hide the aborted attempt to preserve the previous state
 	if err := attempt.Hide(ctx.Context); err != nil {
-		return fmt.Errorf("failed to hide canceled attempt: %w", err)
+		return fmt.Errorf("failed to hide aborted attempt: %w", err)
 	}
 
 	// Read the latest attempt and if it's NotStarted, we can remove the DAGRun from the store

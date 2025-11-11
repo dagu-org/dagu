@@ -129,7 +129,7 @@ func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID 
 	runRef := execution.NewDAGRunRef(dag.Name, dagRunID)
 	run, err := m.dagRunStore.FindAttempt(ctx, runRef)
 	if err == nil {
-		if err := run.RequestCancel(ctx); err != nil {
+		if err := run.Abort(ctx); err != nil {
 			return fmt.Errorf("failed to request cancel for dag-run %s: %w", dagRunID, err)
 		}
 		logger.Info(ctx, "Wrote stop file for running DAG", "name", dag.Name, "runID", dagRunID)

@@ -58,7 +58,7 @@ func TestRetryExecution(t *testing.T) {
 			runtime.NodeData{
 				Step: core.Step{Name: "3", Command: "true", Depends: []string{"2"}},
 				State: runtime.NodeState{
-					Status: core.NodeCanceled,
+					Status: core.NodeAborted,
 				},
 			},
 		),
@@ -149,7 +149,7 @@ func TestStepRetryExecution(t *testing.T) {
 			runtime.NodeData{
 				Step: core.Step{Name: "3", Command: "true", Depends: []string{"2"}},
 				State: runtime.NodeState{
-					Status: core.NodeCanceled,
+					Status: core.NodeAborted,
 				},
 			},
 		),
@@ -191,7 +191,7 @@ func TestStepRetryExecution(t *testing.T) {
 	// Only step 2 should be reset to NodeStatusNone, downstream steps remain untouched
 	require.Equal(t, core.NodeSucceeded, nodes[0].State().Status)  // 1 (unchanged)
 	require.Equal(t, core.NodeNotStarted, nodes[1].State().Status) // 2 (reset)
-	require.Equal(t, core.NodeCanceled, nodes[2].State().Status)   // 3 (unchanged)
+	require.Equal(t, core.NodeAborted, nodes[2].State().Status)    // 3 (unchanged)
 	require.Equal(t, core.NodeSkipped, nodes[3].State().Status)    // 4 (unchanged)
 	require.Equal(t, core.NodeFailed, nodes[4].State().Status)     // 5 (unchanged)
 	require.Equal(t, core.NodeSucceeded, nodes[5].State().Status)  // 6 (unchanged)

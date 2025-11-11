@@ -190,6 +190,7 @@ func renderHTML(nodes []*execution.Node) string {
         .status-failed { color: #dc2626; font-weight: 500; }
         .status-running { color: #2563eb; font-weight: 500; }
         .status-skipped { color: #6b7280; font-weight: 500; }
+        .status-aborted { color: #db2777; font-weight: 500; }
         .status-partial-success { color: #ea580c; font-weight: 500; }
         .row-number { 
             background-color: #f1f5f9; 
@@ -249,6 +250,8 @@ func renderHTML(nodes []*execution.Node) string {
 			statusClass = "status-skipped"
 		case "partial success":
 			statusClass = "status-partial-success"
+		case "aborted":
+			statusClass = "status-aborted"
 		}
 		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", statusClass, status))
 
@@ -352,6 +355,11 @@ func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
             background-color: #dbeafe;
             color: #1e40af;
             box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.1);
+        }
+        .status-badge.aborted {
+            background-color: #fce7f3;
+            color: #9d174d;
+            box-shadow: 0 0 0 1px rgba(219, 39, 119, 0.15);
         }
         .status-badge.skipped {
             background-color: #f3f4f6;
@@ -462,6 +470,8 @@ func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
 		statusClass = "running"
 	case "skipped":
 		statusClass = "skipped"
+	case "aborted":
+		statusClass = "aborted"
 	}
 	_, _ = buffer.WriteString(statusClass)
 	_, _ = buffer.WriteString(`">`)

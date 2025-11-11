@@ -29,7 +29,7 @@ function StatusChip({ status, children, size = 'md' }: Props) {
       borderColorClass = 'border-[lime] dark:border-[limegreen]';
       textColorClass = 'text-[limegreen] dark:text-[lime]';
       break;
-    case Status.Cancelled: // cancel -> pink
+    case Status.Aborted: // aborted -> pink
       bgColorClass =
         'bg-[rgba(255,192,203,0.1)] dark:bg-[rgba(255,20,147,0.2)]';
       borderColorClass = 'border-[pink] dark:border-[deeppink]';

@@ -43,7 +43,7 @@ function getStatusStyling(status: number) {
       borderColorClass = 'border-lime-600 dark:border-lime-700';
       pulseAnimation = 'animate-pulse';
       break;
-    case NodeStatus.Cancelled: // cancel -> pink
+    case NodeStatus.Aborted: // aborted -> pink
       bgColorClass = 'bg-pink-500 dark:bg-pink-600';
       borderColorClass = 'border-pink-600 dark:border-pink-700';
       break;

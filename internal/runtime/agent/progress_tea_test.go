@@ -162,7 +162,7 @@ func TestProgressModel_StatusFormatting(t *testing.T) {
 		{core.Succeeded, "Success ✓"},
 		{core.Failed, "Failed ✗"},
 		{core.Running, "Running ●"},
-		{core.Canceled, "Cancelled ⚠"},
+		{core.Aborted, "Aborted ⚠"},
 		{core.Queued, "Queued ●"},
 		{core.NotStarted, "Not Started ○"},
 	}

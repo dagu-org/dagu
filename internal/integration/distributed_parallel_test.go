@@ -321,7 +321,7 @@ steps:
 		require.Equal(t, "process-items", parallelNode.Step.Name)
 
 		// Verify that the parallel step status
-		require.Equal(t, core.NodeCanceled, parallelNode.Status)
+		require.Equal(t, core.NodeAborted, parallelNode.Status)
 
 		// Verify sub DAG runs were cancelled
 		runRef := execution.NewDAGRunRef(st.Name, st.DAGRunID)
@@ -335,7 +335,7 @@ steps:
 
 			status, err := att.ReadStatus(coord.Context)
 			require.NoError(t, err)
-			require.Equal(t, core.Canceled, status.Status)
+			require.Equal(t, core.Aborted, status.Status)
 			canceled = true
 		}
 		require.True(t, canceled, "expected at least one sub DAG run to be cancelled")
@@ -430,7 +430,7 @@ steps:
 		// Both parallel steps should be affected by cancellation
 		for _, node := range st.Nodes {
 			if node.Step.Name == "local-execution" || node.Step.Name == "distributed-execution" {
-				require.Equal(t, core.NodeCanceled, node.Status,
+				require.Equal(t, core.NodeAborted, node.Status,
 					"node %s should be canceled, got %v", node.Step.Name, node.Status)
 			}
 		}

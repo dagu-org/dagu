@@ -168,7 +168,7 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context, steps map[string]core.S
 		var next []int
 		for _, u := range frontier {
 			if retry[u] || dict[u] == core.NodeFailed ||
-				dict[u] == core.NodeCanceled {
+				dict[u] == core.NodeAborted {
 				logger.Debug(ctx, "Clearing node state", "step", g.nodeByID[u].Name())
 				step, ok := steps[g.nodeByID[u].Name()]
 				if !ok {

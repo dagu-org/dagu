@@ -76,5 +76,5 @@ func (o *dbClient) RequestChildCancel(ctx context.Context, dagRunID string, root
 	if err != nil {
 		return fmt.Errorf("failed to find child attempt for dag-run ID %s: %w", dagRunID, err)
 	}
-	return subAttempt.RequestCancel(ctx)
+	return subAttempt.Abort(ctx)
 }

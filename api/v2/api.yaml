@@ -1606,7 +1606,7 @@ paths:
                   # TYPE dagu_dag_runs_total counter
                   dagu_dag_runs_total{status="success"} 2493
                   dagu_dag_runs_total{status="error"} 15
-                  dagu_dag_runs_total{status="cancelled"} 7
+                  dagu_dag_runs_total{status="aborted"} 7
 
                   # HELP dagu_dags_total Total number of DAGs
                   # TYPE dagu_dags_total gauge
@@ -1978,7 +1978,7 @@ components:
         - "NotStarted"
         - "Running"
         - "Failed"
-        - "Cancelled"
+        - "Aborted"
         - "Success"
         - "Queued"
         - "PartialSuccess"
@@ -1987,7 +1987,7 @@ components:
         0: "Not started"
         1: "Running"
         2: "Failed"
-        3: "Cancelled"
+        3: "Aborted"
         4: "Success"
         5: "Queued"
         6: "Partial Success"
@@ -1999,7 +1999,7 @@ components:
         - "not_started"
         - "running"
         - "failed"
-        - "canceled"
+        - "aborted"
         - "succeeded"
         - "queued"
         - "partially_succeeded"
@@ -2011,7 +2011,7 @@ components:
         - "NotStarted"
         - "Running"
         - "Failed"
-        - "Cancelled"
+        - "Aborted"
         - "Success"
         - "Skipped"
         - "PartialSuccess"
@@ -2020,7 +2020,7 @@ components:
         0: "Not started"
         1: "Running"
         2: "Failed"
-        3: "Cancelled"
+        3: "Aborted"
         4: "Success"
         5: "Skipped"
         6: "Partial Success"
@@ -2032,7 +2032,7 @@ components:
         - "not_started"
         - "running"
         - "failed"
-        - "canceled"
+        - "aborted"
         - "succeeded"
         - "skipped"
         - "partially_succeeded"
