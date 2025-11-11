@@ -2,6 +2,8 @@ package integration_test
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,6 +12,8 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
@@ -196,6 +200,84 @@ steps:
 	t.Logf("Retry step retry count: %d", retryStep.RetryCount)
 	require.Contains(t, variables, "STEP_OUTPUT", "Output variable STEP_OUTPUT should exist")
 	require.Contains(t, variables["STEP_OUTPUT"], "output_attempt_2_success", "Output should contain success message from retry")
+}
+
+func TestSubDAGPostgresContainerRemainsRunning(t *testing.T) {
+	th := test.Setup(t)
+
+	hostPort := findAvailablePort(t)
+
+	t.Cleanup(func() {
+		dockerCli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		if err != nil {
+			return
+		}
+		defer dockerCli.Close()
+
+		containers, err := dockerCli.ContainerList(context.Background(), container.ListOptions{All: true})
+		if err != nil {
+			return
+		}
+
+		for _, ctr := range containers {
+			if ctr.Image != "postgres:17" {
+				continue
+			}
+			for _, port := range ctr.Ports {
+				if int(port.PublicPort) == hostPort {
+					_ = dockerCli.ContainerRemove(context.Background(), ctr.ID, container.RemoveOptions{Force: true})
+				}
+			}
+		}
+	})
+
+	dag := th.DAG(t, fmt.Sprintf(`name: parent-postgres-subdag
+steps:
+  - name: start-postgres
+    call: postgres-service
+  - name: verify-container-still-running
+    command: |
+      CONTAINER_ID=$(docker ps --filter ancestor=postgres:17 --format '{{.ID}} {{.Ports}}' | grep "%[1]d->5432/tcp" | awk '{print $1}' | head -n1)
+      if [ -z "$CONTAINER_ID" ]; then
+        echo "postgres container not running"
+        exit 1
+      fi
+      docker exec "$CONTAINER_ID" pg_isready -U postgres -d appdb
+---
+name: postgres-service
+container:
+  image: postgres:17
+  keepContainer: true
+  env:
+    - POSTGRES_PASSWORD=secret
+    - POSTGRES_DB=appdb
+  ports:
+    - "%[1]d:5432"
+  startup: entrypoint
+  waitFor: running
+steps:
+  - name: wait-ready
+    command: |
+      pg_isready -U postgres -d appdb
+    retryPolicy:
+      limit: 10
+      intervalSec: 1
+`, hostPort))
+
+	agent := dag.Agent()
+	err := agent.Run(agent.Context)
+	require.NoError(t, err)
+
+	dag.AssertLatestStatus(t, core.Succeeded)
+}
+
+func findAvailablePort(t *testing.T) int {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer l.Close()
+
+	return l.Addr().(*net.TCPAddr).Port
 }
 
 func TestBasicSubDAGOutputCapture(t *testing.T) {
