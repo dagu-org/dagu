@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -85,6 +86,7 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 	options := api.StrictHTTPServerOptions{
 		ResponseErrorHandlerFunc: a.handleError,
 	}
+	basePath := a.config.Server.BasePath
 
 	r.Group(func(r chi.Router) {
 		authConfig := a.config.Server.Auth
@@ -95,6 +97,9 @@ func (a *API) ConfigureRoutes(r chi.Router, baseURL string) error {
 			BasicAuthEnabled: authConfig.Basic.Username != "" && authConfig.Basic.Password != "",
 			Creds: map[string]string{
 				authConfig.Basic.Username: authConfig.Basic.Password,
+			},
+			PublicPaths: []string{
+				pathutil.BuildPublicEndpointPath(basePath, "api/v1/health"),
 			},
 		}
 		r.Use(auth.Middleware(authOptions))
