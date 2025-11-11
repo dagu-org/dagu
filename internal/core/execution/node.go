@@ -29,8 +29,8 @@ type SubDAGRun struct {
 	Params   string `json:"params,omitempty"`
 }
 
-// NodesFromSteps converts a list of DAG steps to persistence Node objects
-func NodesFromSteps(steps []core.Step) []*Node {
+// NewNodesFromSteps converts a list of DAG steps to persistence Node objects.
+func NewNodesFromSteps(steps []core.Step) []*Node {
 	var ret []*Node
 	for _, s := range steps {
 		ret = append(ret, NewNodeFromStep(s))
@@ -38,7 +38,7 @@ func NodesFromSteps(steps []core.Step) []*Node {
 	return ret
 }
 
-// newNodeFromStep creates a new Node with default status values for the given step
+// NewNodeFromStep creates a new Node with default status values for the given step.
 func NewNodeFromStep(step core.Step) *Node {
 	return &Node{
 		Step:       step,
@@ -48,7 +48,7 @@ func NewNodeFromStep(step core.Step) *Node {
 	}
 }
 
-// NewNodeOrNil creates a Node from a Step or returns nil if the step is nil
+// NewNodeOrNil creates a Node from a Step or returns nil if the step is nil.
 func NewNodeOrNil(s *core.Step) *Node {
 	if s == nil {
 		return nil

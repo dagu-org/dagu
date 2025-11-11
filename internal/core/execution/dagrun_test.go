@@ -116,12 +116,12 @@ func (m *mockDAGRunAttempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
 	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
-func (m *mockDAGRunAttempt) RequestCancel(ctx context.Context) error {
+func (m *mockDAGRunAttempt) Abort(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
 
-func (m *mockDAGRunAttempt) CancelRequested(ctx context.Context) (bool, error) {
+func (m *mockDAGRunAttempt) IsAborting(ctx context.Context) (bool, error) {
 	args := m.Called(ctx)
 	return args.Bool(0), args.Error(1)
 }
@@ -288,14 +288,14 @@ func TestDAGRunAttemptInterface(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, dag, readDAG)
 
-	// Test RequestCancel
-	attempt.On("RequestCancel", ctx).Return(nil)
-	err = attempt.RequestCancel(ctx)
+	// Test Abort
+	attempt.On("Abort", ctx).Return(nil)
+	err = attempt.Abort(ctx)
 	assert.NoError(t, err)
 
-	// Test CancelRequested
-	attempt.On("CancelRequested", ctx).Return(true, nil)
-	canceled, err := attempt.CancelRequested(ctx)
+	// Test IsAborting
+	attempt.On("IsAborting", ctx).Return(true, nil)
+	canceled, err := attempt.IsAborting(ctx)
 	assert.NoError(t, err)
 	assert.True(t, canceled)
 
@@ -361,9 +361,9 @@ func TestDAGRunAttemptErrors(t *testing.T) {
 	_, err = attempt.ReadDAG(ctx)
 	assert.Equal(t, expectedErr, err)
 
-	// CancelRequested error
-	attempt.On("CancelRequested", ctx).Return(false, expectedErr)
-	_, err = attempt.CancelRequested(ctx)
+	// IsAborting error
+	attempt.On("IsAborting", ctx).Return(false, expectedErr)
+	_, err = attempt.IsAborting(ctx)
 	assert.Equal(t, expectedErr, err)
 
 	attempt.AssertExpectations(t)

@@ -468,7 +468,7 @@ func createTestStatus(st core.Status) execution.DAGRunStatus {
 		Status:    st,
 		PID:       execution.PID(12345),
 		StartedAt: stringutil.FormatTime(time.Now()),
-		Nodes:     execution.NodesFromSteps(dag.Steps),
+		Nodes:     execution.NewNodesFromSteps(dag.Steps),
 	}
 }
 

@@ -302,7 +302,7 @@ func TestPID_String(t *testing.T) {
 	}
 }
 
-func TestNodesFromSteps(t *testing.T) {
+func TestNewNodesFromSteps(t *testing.T) {
 	steps := []core.Step{
 		{
 			Name:        "step1",
@@ -316,7 +316,7 @@ func TestNodesFromSteps(t *testing.T) {
 		},
 	}
 
-	nodes := execution.NodesFromSteps(steps)
+	nodes := execution.NewNodesFromSteps(steps)
 
 	assert.Equal(t, 2, len(nodes))
 	assert.Equal(t, "step1", nodes[0].Step.Name)

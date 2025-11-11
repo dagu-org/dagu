@@ -394,9 +394,9 @@ func ParseStatusFile(file string) (*execution.DAGRunStatus, error) {
 	}
 }
 
-// RequestCancel implements models.DAGRunAttempt.
+// Abort implements models.DAGRunAttempt.
 // It creates a flag to indicate that the attempt should be canceled.
-func (att *Attempt) RequestCancel(ctx context.Context) error {
+func (att *Attempt) Abort(ctx context.Context) error {
 	dir := filepath.Dir(att.file)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
@@ -412,8 +412,8 @@ func (att *Attempt) RequestCancel(ctx context.Context) error {
 	return nil
 }
 
-// CancelRequested checks if a cancel request has been made for this attempt.
-func (att *Attempt) CancelRequested(ctx context.Context) (bool, error) {
+// IsAborting checks if a cancel request has been made for this attempt.
+func (att *Attempt) IsAborting(ctx context.Context) (bool, error) {
 	cancelFile := filepath.Join(filepath.Dir(att.file), CancelRequestedFlag)
 	if _, err := os.Stat(cancelFile); err != nil {
 		if os.IsNotExist(err) {

@@ -9,23 +9,26 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 )
 
-func FromSteps(steps []core.Step) []*Node {
+// NewNodesFromSteps builds legacy Node entries with default values for each DAG step.
+func NewNodesFromSteps(steps []core.Step) []*Node {
 	var ret []*Node
 	for _, s := range steps {
-		ret = append(ret, NewNode(s))
+		ret = append(ret, NewPendingNode(s))
 	}
 	return ret
 }
 
-func FromNodes(nodes []runtime.NodeData) []*Node {
+// NewNodesFromRuntime converts runtime node snapshots into legacy Node entries.
+func NewNodesFromRuntime(nodes []runtime.NodeData) []*Node {
 	var ret []*Node
 	for _, node := range nodes {
-		ret = append(ret, FromNode(node))
+		ret = append(ret, NewNodeFromRuntime(node))
 	}
 	return ret
 }
 
-func FromNode(node runtime.NodeData) *Node {
+// NewNodeFromRuntime converts a runtime node record into the legacy Node shape.
+func NewNodeFromRuntime(node runtime.NodeData) *Node {
 	return &Node{
 		Step:       node.Step,
 		Log:        node.State.Stdout,
@@ -53,7 +56,8 @@ type Node struct {
 	StatusText string          `json:"StatusText"`
 }
 
-func (n *Node) ToNode() *runtime.Node {
+// ToRuntimeNode converts the legacy Node representation back into a runtime node.
+func (n *Node) ToRuntimeNode() *runtime.Node {
 	startedAt, _ := stringutil.ParseTime(n.StartedAt)
 	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
 	retriedAt, _ := stringutil.ParseTime(n.RetriedAt)
@@ -69,7 +73,8 @@ func (n *Node) ToNode() *runtime.Node {
 	})
 }
 
-func NewNode(step core.Step) *Node {
+// NewPendingNode returns a legacy Node initialized in the not-started state.
+func NewPendingNode(step core.Step) *Node {
 	return &Node{
 		Step:       step,
 		StartedAt:  "-",
