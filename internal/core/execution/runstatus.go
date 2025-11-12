@@ -16,7 +16,7 @@ func InitialStatus(dag *core.DAG) DAGRunStatus {
 		Name:          dag.Name,
 		Status:        core.NotStarted,
 		PID:           PID(0),
-		Nodes:         NodesFromSteps(dag.Steps),
+		Nodes:         NewNodesFromSteps(dag.Steps),
 		OnExit:        NewNodeOrNil(dag.HandlerOn.Exit),
 		OnSuccess:     NewNodeOrNil(dag.HandlerOn.Success),
 		OnFailure:     NewNodeOrNil(dag.HandlerOn.Failure),

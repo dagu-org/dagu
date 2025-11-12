@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFromSteps(t *testing.T) {
+func TestNewNodesFromSteps(t *testing.T) {
 	steps := []core.Step{
 		{
 			Name:    "step1",
@@ -26,7 +26,7 @@ func TestFromSteps(t *testing.T) {
 		},
 	}
 
-	nodes := model.FromSteps(steps)
+	nodes := model.NewNodesFromSteps(steps)
 
 	assert.Len(t, nodes, 2)
 	assert.Equal(t, "step1", nodes[0].Step.Name)
@@ -37,7 +37,7 @@ func TestFromSteps(t *testing.T) {
 	assert.Equal(t, core.NodeNotStarted.String(), nodes[0].StatusText)
 }
 
-func TestFromNodes(t *testing.T) {
+func TestNewNodesFromRuntime(t *testing.T) {
 	now := time.Now()
 	later := now.Add(5 * time.Second)
 	retryTime := now.Add(2 * time.Second)
@@ -73,7 +73,7 @@ func TestFromNodes(t *testing.T) {
 		},
 	}
 
-	nodes := model.FromNodes(nodeDataList)
+	nodes := model.NewNodesFromRuntime(nodeDataList)
 
 	assert.Len(t, nodes, 2)
 
@@ -95,7 +95,7 @@ func TestFromNodes(t *testing.T) {
 	assert.Equal(t, "command failed", nodes[1].Error)
 }
 
-func TestFromNode(t *testing.T) {
+func TestNewNodeFromRuntime(t *testing.T) {
 	now := time.Now()
 	later := now.Add(5 * time.Second)
 
@@ -117,7 +117,7 @@ func TestFromNode(t *testing.T) {
 		},
 	}
 
-	node := model.FromNode(nodeData)
+	node := model.NewNodeFromRuntime(nodeData)
 
 	assert.Equal(t, "test-step", node.Step.Name)
 	assert.Equal(t, "echo test", node.Step.Command)
@@ -131,7 +131,7 @@ func TestFromNode(t *testing.T) {
 	assert.Empty(t, node.Error)
 }
 
-func TestNewNode(t *testing.T) {
+func TestNewPendingNode(t *testing.T) {
 	step := core.Step{
 		Name:        "new-step",
 		Command:     "ls -la",
@@ -140,7 +140,7 @@ func TestNewNode(t *testing.T) {
 		Dir:         "/home",
 	}
 
-	node := model.NewNode(step)
+	node := model.NewPendingNode(step)
 
 	assert.Equal(t, step, node.Step)
 	assert.Equal(t, "-", node.StartedAt)
@@ -154,7 +154,7 @@ func TestNewNode(t *testing.T) {
 	assert.Equal(t, 0, node.DoneCount)
 }
 
-func TestNodeToNode(t *testing.T) {
+func TestNodeToRuntimeNode(t *testing.T) {
 	now := time.Now()
 	later := now.Add(10 * time.Second)
 	retryTime := now.Add(5 * time.Second)
@@ -175,7 +175,7 @@ func TestNodeToNode(t *testing.T) {
 		Error:      "some error occurred",
 	}
 
-	schedulerNode := modelNode.ToNode()
+	schedulerNode := modelNode.ToRuntimeNode()
 
 	assert.Equal(t, modelNode.Step, schedulerNode.NodeData().Step)
 	assert.Equal(t, modelNode.Log, schedulerNode.NodeData().State.Stdout)
@@ -201,7 +201,7 @@ func TestNodeToNode(t *testing.T) {
 	}
 }
 
-func TestNodeToNodeWithEmptyTimes(t *testing.T) {
+func TestNodeToRuntimeNodeWithEmptyTimes(t *testing.T) {
 	modelNode := &model.Node{
 		Step: core.Step{
 			Name: "empty-times-step",
@@ -213,14 +213,14 @@ func TestNodeToNodeWithEmptyTimes(t *testing.T) {
 		StatusText: core.NodeNotStarted.String(),
 	}
 
-	schedulerNode := modelNode.ToNode()
+	schedulerNode := modelNode.ToRuntimeNode()
 
 	assert.True(t, schedulerNode.NodeData().State.StartedAt.IsZero())
 	assert.True(t, schedulerNode.NodeData().State.FinishedAt.IsZero())
 	assert.True(t, schedulerNode.NodeData().State.RetriedAt.IsZero())
 }
 
-func TestNodeToNodeWithInvalidTimeFormat(t *testing.T) {
+func TestNodeToRuntimeNodeWithInvalidTimeFormat(t *testing.T) {
 	modelNode := &model.Node{
 		Step: core.Step{
 			Name: "invalid-time-step",
@@ -231,7 +231,7 @@ func TestNodeToNodeWithInvalidTimeFormat(t *testing.T) {
 		StatusText: core.NodeFailed.String(),
 	}
 
-	schedulerNode := modelNode.ToNode()
+	schedulerNode := modelNode.ToRuntimeNode()
 
 	// ParseTime should return zero time for invalid formats
 	assert.True(t, schedulerNode.NodeData().State.StartedAt.IsZero())
@@ -265,7 +265,7 @@ func TestErrFromText(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// We need to test through the public interface
 			node := &model.Node{Error: tt.input}
-			schedulerNode := node.ToNode()
+			schedulerNode := node.ToRuntimeNode()
 
 			if tt.expected == nil {
 				assert.Nil(t, schedulerNode.NodeData().State.Error)
@@ -310,7 +310,7 @@ func TestErrText(t *testing.T) {
 				},
 			}
 
-			node := model.FromNode(nodeData)
+			node := model.NewNodeFromRuntime(nodeData)
 			assert.Equal(t, tt.expected, node.Error)
 		})
 	}
@@ -321,7 +321,7 @@ func TestNodeWithAllStatuses(t *testing.T) {
 		core.NodeNotStarted,
 		core.NodeRunning,
 		core.NodeFailed,
-		core.NodeCanceled,
+		core.NodeAborted,
 		core.NodeSucceeded,
 		core.NodeSkipped,
 	}
@@ -337,18 +337,18 @@ func TestNodeWithAllStatuses(t *testing.T) {
 				},
 			}
 
-			modelNode := model.FromNode(nodeData)
+			modelNode := model.NewNodeFromRuntime(nodeData)
 			assert.Equal(t, status, modelNode.Status)
 			assert.Equal(t, status.String(), modelNode.StatusText)
 
 			// Convert back
-			schedulerNode := modelNode.ToNode()
+			schedulerNode := modelNode.ToRuntimeNode()
 			assert.Equal(t, status, schedulerNode.NodeData().State.Status)
 		})
 	}
 }
 
-func TestFromNodesPreservesOrder(t *testing.T) {
+func TestNewNodesFromRuntimePreservesOrder(t *testing.T) {
 	var nodeDataList []runtime.NodeData
 	for i := 0; i < 10; i++ {
 		nodeDataList = append(nodeDataList, runtime.NodeData{
@@ -361,7 +361,7 @@ func TestFromNodesPreservesOrder(t *testing.T) {
 		})
 	}
 
-	nodes := model.FromNodes(nodeDataList)
+	nodes := model.NewNodesFromRuntime(nodeDataList)
 
 	assert.Len(t, nodes, 10)
 	for i := 0; i < 10; i++ {

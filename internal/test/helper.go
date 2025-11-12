@@ -42,6 +42,7 @@ type Options struct {
 	CaptureLoggingOutput bool // CaptureLoggingOutput enables capturing of logging output
 	DAGsDir              string
 	ServerConfig         *config.Server
+	ConfigMutators       []func(*config.Config)
 	CoordinatorHost      string
 	CoordinatorPort      int
 }
@@ -62,6 +63,13 @@ func WithDAGsDir(dir string) HelperOption {
 func WithServerConfig(cfg *config.Server) HelperOption {
 	return func(opts *Options) {
 		opts.ServerConfig = cfg
+	}
+}
+
+// WithConfigMutator applies mutations to the loaded configuration after defaults are set.
+func WithConfigMutator(mutator func(*config.Config)) HelperOption {
+	return func(opts *Options) {
+		opts.ConfigMutators = append(opts.ConfigMutators, mutator)
 	}
 }
 
@@ -103,6 +111,9 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	if options.ServerConfig != nil {
 		cfg.Server = *options.ServerConfig
+	}
+	for _, mutate := range options.ConfigMutators {
+		mutate(cfg)
 	}
 
 	if options.CoordinatorHost != "" {
@@ -439,7 +450,7 @@ func (a *Agent) RunCancel(t *testing.T) {
 	assert.NoError(t, err)
 
 	st := a.Status(a.Context).Status
-	require.Equal(t, core.Canceled.String(), st.String())
+	require.Equal(t, core.Aborted.String(), st.String())
 }
 
 func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
@@ -449,7 +460,7 @@ func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
 	require.Error(t, err, "expected error %q, got nil", expectedErr)
 	require.Contains(t, err.Error(), expectedErr)
 	st := a.Status(a.Context)
-	require.Equal(t, core.Canceled.String(), st.Status.String())
+	require.Equal(t, core.Aborted.String(), st.Status.String())
 }
 
 func (a *Agent) RunSuccess(t *testing.T) {

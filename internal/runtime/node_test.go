@@ -48,7 +48,7 @@ func TestNode(t *testing.T) {
 		node.SetStatus(core.NodeRunning)
 
 		node.ExecuteFail(t, "signal: terminated")
-		require.Equal(t, core.NodeCanceled.String(), node.State().Status.String())
+		require.Equal(t, core.NodeAborted.String(), node.State().Status.String())
 	})
 	t.Run("SignalOnStop", func(t *testing.T) {
 		t.Parallel()
@@ -62,7 +62,7 @@ func TestNode(t *testing.T) {
 		node.SetStatus(core.NodeRunning)
 
 		node.ExecuteFail(t, "signal: interrupt")
-		require.Equal(t, core.NodeCanceled.String(), node.State().Status.String())
+		require.Equal(t, core.NodeAborted.String(), node.State().Status.String())
 	})
 	t.Run("LogOutput", func(t *testing.T) {
 		t.Parallel()
@@ -742,7 +742,7 @@ func TestNodeCancel(t *testing.T) {
 	node.Cancel()
 
 	// Check status changed to cancel
-	assert.Equal(t, core.NodeCanceled, node.NodeData().State.Status)
+	assert.Equal(t, core.NodeAborted, node.NodeData().State.Status)
 }
 
 func TestNodeSetupContextBeforeExec(t *testing.T) {
@@ -947,7 +947,7 @@ func TestNodeShouldContinue(t *testing.T) {
 		},
 		{
 			name:       "CancelNeverContinues",
-			nodeStatus: core.NodeCanceled,
+			nodeStatus: core.NodeAborted,
 			continueOnSettings: core.ContinueOn{
 				Failure: true,
 				Skipped: true,

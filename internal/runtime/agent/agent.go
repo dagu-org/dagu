@@ -632,7 +632,7 @@ func (a *Agent) watchCancelRequested(ctx context.Context, attempt execution.DAGR
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if cancelled, _ := attempt.CancelRequested(ctx); cancelled {
+			if cancelled, _ := attempt.IsAborting(ctx); cancelled {
 				a.signal(ctx, syscall.SIGTERM, true)
 			}
 		}

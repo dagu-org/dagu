@@ -150,7 +150,7 @@ export function SubDAGRunsList({
               'startedAt' in subRun ? subRun.startedAt : null;
             const status = 'status' in subRun ? subRun.status : null;
             const statusLabel =
-              'statusLabel' in subRun ? subRun.statusLabel : null;
+              'statusLabel' in subRun ? subRun.statusLabel : undefined;
             // Display number: when sorted newest first, show descending numbers
             // So if we have 40 items, displayIndex 0 -> #40, displayIndex 1 -> #39, etc.
             const displayNumber = allSubRuns.length - displayIndex;

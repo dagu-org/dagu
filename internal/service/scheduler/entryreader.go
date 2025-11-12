@@ -133,7 +133,13 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 	var dags []string
 	for _, fi := range fis {
 		if fileutil.IsYAMLFile(fi.Name()) {
-			dag, err := spec.Load(ctx, filepath.Join(er.targetDir, fi.Name()), spec.OnlyMetadata(), spec.WithoutEval())
+			dag, err := spec.Load(
+				ctx,
+				filepath.Join(er.targetDir, fi.Name()),
+				spec.OnlyMetadata(),
+				spec.WithoutEval(),
+				spec.SkipSchemaValidation(),
+			)
 			if err != nil {
 				logger.Error(ctx, "DAG load failed", "err", err, "name", fi.Name())
 				continue
@@ -177,7 +183,13 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 			er.lock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
 				filePath := filepath.Join(er.targetDir, filepath.Base(event.Name))
-				dag, err := spec.Load(ctx, filePath, spec.OnlyMetadata(), spec.WithoutEval())
+				dag, err := spec.Load(
+					ctx,
+					filePath,
+					spec.OnlyMetadata(),
+					spec.WithoutEval(),
+					spec.SkipSchemaValidation(),
+				)
 				if err != nil {
 					logger.Error(ctx, "DAG load failed", "err", err, "file", event.Name)
 				} else {

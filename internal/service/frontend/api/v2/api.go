@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -142,6 +143,10 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		APIToken:         authConfig.Token.Value,
 		BasicAuthEnabled: authConfig.Basic.Username != "" && authConfig.Basic.Password != "",
 		Creds:            map[string]string{authConfig.Basic.Username: authConfig.Basic.Password},
+		PublicPaths: []string{
+			pathutil.BuildPublicEndpointPath(basePath, "api/v2/health"),
+			pathutil.BuildPublicEndpointPath(basePath, "api/v2/metrics"),
+		},
 	}
 
 	// Initialize OIDC if enabled

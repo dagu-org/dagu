@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -17,4 +18,19 @@ func TestHealthCheck(t *testing.T) {
 	resp.Unmarshal(t, &healthResp)
 
 	require.Equal(t, api.HealthResponseStatusHealthy, healthResp.Status, "expected status 'ok'")
+}
+
+func TestHealthCheck_BypassesAuth(t *testing.T) {
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Basic.Username = "admin"
+		cfg.Server.Auth.Basic.Password = "secret"
+	}))
+
+	resp := server.Client().Get("/api/v2/health").ExpectStatus(http.StatusOK).Send(t)
+
+	var healthResp api.HealthResponse
+	resp.Unmarshal(t, &healthResp)
+	require.Equal(t, api.HealthResponseStatusHealthy, healthResp.Status)
+
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
 }

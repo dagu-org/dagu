@@ -1,18 +1,16 @@
 import logoDark from '@/assets/images/logo_dark.png';
-import { FeedbackDialog } from '@/components/FeedbackDialog';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
 import {
   Activity,
   BarChart2,
-  GitBranch,
   Github,
   Layers,
   List,
-  MessageSquare,
   PanelLeft,
   Search,
   Server,
+  Workflow,
 } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -70,8 +68,6 @@ export const mainListItems = React.forwardRef<
 
   // State for hover
   const [isHovered, setIsHovered] = React.useState(false);
-  // State for feedback dialog
-  const [feedbackOpen, setFeedbackOpen] = React.useState(false);
 
   return (
     <div ref={ref} className="flex flex-col h-full">
@@ -181,7 +177,7 @@ export const mainListItems = React.forwardRef<
           <NavItem
             to="/dags"
             text="DAG Definitions"
-            icon={<GitBranch size={18} />}
+            icon={<Workflow size={18} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
@@ -222,24 +218,6 @@ export const mainListItems = React.forwardRef<
           />
         </div>
       </nav>
-      {/* Feedback button */}
-      <div className="px-2 pb-1">
-        <button
-          onClick={() => setFeedbackOpen(true)}
-          className={cn(
-            'flex items-center transition-all duration-200',
-            isOpen
-              ? 'h-9 px-3 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground justify-start w-full'
-              : 'w-8 h-8 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground mx-auto justify-center'
-          )}
-          title="Send Feedback"
-        >
-          <MessageSquare size={18} />
-          {isOpen && (
-            <span className="ml-3 text-xs font-medium">Send Feedback</span>
-          )}
-        </button>
-      </div>
       {/* Discord Community link */}
       <div className="px-2 pb-1">
         <a
@@ -284,8 +262,6 @@ export const mainListItems = React.forwardRef<
           </div>
         </div>
       )}
-      {/* Feedback Dialog */}
-      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </div>
   );
 });

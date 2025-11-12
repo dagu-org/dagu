@@ -185,7 +185,7 @@
           "$ref": "#/definitions/step"
         }
       },
-      "description": "Lifecycle event hooks that define commands to execute when the DAG succeeds, fails, is cancelled, or exits. Useful for cleanup, notifications, or triggering dependent DAGs."
+      "description": "Lifecycle event hooks that define commands to execute when the DAG succeeds, fails, is aborted, or exits. Useful for cleanup, notifications, or triggering dependent DAGs."
     },
     "smtp": {
       "type": "object",

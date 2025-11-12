@@ -626,9 +626,9 @@ function DAGRuns() {
                   <StatusChip status={Status.Failed} size="sm">
                     failed
                   </StatusChip>
-                ) : status === String(Status.Cancelled) ? (
-                  <StatusChip status={Status.Cancelled} size="sm">
-                    canceled
+                ) : status === String(Status.Aborted) ? (
+                  <StatusChip status={Status.Aborted} size="sm">
+                    aborted
                   </StatusChip>
                 ) : status === String(Status.Success) ? (
                   <StatusChip status={Status.Success} size="sm">
@@ -666,9 +666,9 @@ function DAGRuns() {
                   failed
                 </StatusChip>
               </SelectItem>
-              <SelectItem value={String(Status.Cancelled)}>
-                <StatusChip status={Status.Cancelled} size="sm">
-                  canceled
+              <SelectItem value={String(Status.Aborted)}>
+                <StatusChip status={Status.Aborted} size="sm">
+                  aborted
                 </StatusChip>
               </SelectItem>
               <SelectItem value={String(Status.Success)}>

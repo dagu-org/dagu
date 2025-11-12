@@ -203,7 +203,7 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 	c.cancel = cancel
 	c.cancelMu.Unlock()
 
-	ctID, err := c.startNewContainer(ctx, c.cfg.ContainerName, c.cli, cmd)
+	ctID, err := c.startNewContainer(ctx, c.cfg.ContainerName, c.cli, cmd, true)
 	if err != nil {
 		return fmt.Errorf("failed to start a new container: %w", err)
 	}
@@ -371,7 +371,7 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 	// If container is not running, start a new one
 	// The container should be stopped and removed after run with autoRemove
 	// set to true.
-	ctID, err := c.startNewContainer(ctx, c.cfg.ContainerName, c.cli, cmd)
+	ctID, err := c.startNewContainer(ctx, c.cfg.ContainerName, c.cli, cmd, false)
 	if err != nil {
 		return errorExitCode, fmt.Errorf("failed to start a new container: %w", err)
 	}
@@ -445,7 +445,7 @@ func (c *Client) Stop(sig os.Signal) error {
 	return nil
 }
 
-func (c *Client) startNewContainer(ctx context.Context, name string, cli *client.Client, cmd []string) (string, error) {
+func (c *Client) startNewContainer(ctx context.Context, name string, cli *client.Client, cmd []string, clearEntrypoint bool) (string, error) {
 	pull, err := c.shouldPullImage(ctx, cli, &c.platform)
 	if err != nil {
 		return "", err
@@ -482,8 +482,10 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 
 	if len(cmd) > 0 {
 		ctCfg.Cmd = cmd
-		// Entrypoint should be empty slice to override image ENTRYPOINT
-		ctCfg.Entrypoint = []string{}
+		if clearEntrypoint {
+			// Entrypoint should be empty slice to override image ENTRYPOINT
+			ctCfg.Entrypoint = []string{}
+		}
 	}
 
 	resp, err := cli.ContainerCreate(

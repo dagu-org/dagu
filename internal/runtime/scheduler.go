@@ -208,7 +208,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 						continue ExecRepeat
 					}
 
-					if node.State().Status != core.NodeCanceled {
+					if node.State().Status != core.NodeAborted {
 						node.IncDoneCount()
 					}
 
@@ -266,7 +266,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	case core.Failed:
 		eventHandlers = append(eventHandlers, core.HandlerOnFailure)
 
-	case core.Canceled:
+	case core.Aborted:
 		eventHandlers = append(eventHandlers, core.HandlerOnCancel)
 
 	case core.NotStarted, core.Running, core.Queued:
@@ -471,7 +471,7 @@ func (sc *Scheduler) Cancel(g *ExecutionGraph) {
 // Status returns the status of the scheduler.
 func (sc *Scheduler) Status(ctx context.Context, g *ExecutionGraph) core.Status {
 	if sc.isCanceled() && !sc.isSucceed(g) {
-		return core.Canceled
+		return core.Aborted
 	}
 	if !g.IsStarted() {
 		return core.NotStarted
@@ -532,7 +532,7 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 				continue
 			}
 			ready = false
-			node.SetStatus(core.NodeCanceled)
+			node.SetStatus(core.NodeAborted)
 			node.SetError(ErrUpstreamFailed)
 
 		case core.NodeSkipped:
@@ -543,9 +543,9 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 			node.SetStatus(core.NodeSkipped)
 			node.SetError(ErrUpstreamSkipped)
 
-		case core.NodeCanceled:
+		case core.NodeAborted:
 			ready = false
-			node.SetStatus(core.NodeCanceled)
+			node.SetStatus(core.NodeAborted)
 
 		case core.NodeNotStarted, core.NodeRunning:
 			ready = false
@@ -678,7 +678,7 @@ func (sc *Scheduler) isPartialSuccess(ctx context.Context, g *ExecutionGraph) bo
 			// Partial success at node level contributes to overall partial success
 			hasFailuresWithContinueOn = true
 			hasSuccessfulNodes = true
-		case core.NodeNotStarted, core.NodeRunning, core.NodeCanceled, core.NodeSkipped:
+		case core.NodeNotStarted, core.NodeRunning, core.NodeAborted, core.NodeSkipped:
 			// These statuses don't affect partial success determination, but are needed for linter
 		}
 	}
@@ -804,7 +804,7 @@ func (sc *Scheduler) finishNode(node *Node, wg *sync.WaitGroup) {
 		sc.metrics.failedNodes++
 	case core.NodeSkipped:
 		sc.metrics.skippedNodes++
-	case core.NodeCanceled:
+	case core.NodeAborted:
 		sc.metrics.canceledNodes++
 	case core.NodePartiallySucceeded:
 		sc.metrics.completedNodes++ // Count partial success as completed
@@ -842,12 +842,12 @@ func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, graph *Execut
 
 	s := node.State().Status
 	switch {
-	case s == core.NodeSucceeded || s == core.NodeCanceled || s == core.NodePartiallySucceeded:
+	case s == core.NodeSucceeded || s == core.NodeAborted || s == core.NodePartiallySucceeded:
 		// do nothing
 
 	case sc.isTimeout(graph.startedAt):
 		logger.Info(ctx, "Step deadline exceeded", "step", node.Name(), "error", execErr)
-		node.SetStatus(core.NodeCanceled)
+		node.SetStatus(core.NodeAborted)
 		sc.setLastError(execErr)
 
 	case sc.isCanceled():
