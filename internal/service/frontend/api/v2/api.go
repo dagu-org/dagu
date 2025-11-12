@@ -145,6 +145,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		Creds:            map[string]string{authConfig.Basic.Username: authConfig.Basic.Password},
 		PublicPaths: []string{
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/health"),
+			pathutil.BuildPublicEndpointPath(basePath, "api/v2/metrics"),
 		},
 	}
 
