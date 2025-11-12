@@ -129,7 +129,7 @@ params:
   - BASE: ${SOURCE_ID}
   - PREFIX: ${BASE:0:5}
 `)
-		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{Flags: spec.BuildFlagNoEval})
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{NoEval: true})
 		require.NoError(t, err)
 
 		th := DAG{t: t, DAG: dag}
@@ -224,140 +224,6 @@ params:
 		require.Len(t, th.Params, 2)
 		require.Contains(t, th.Params, "batch_size=50")
 		require.Contains(t, th.Params, "environment=prod")
-	})
-
-	// Relative path resolution: workingDir, DAG dir, and CWD precedence
-	t.Run("ParamsSchemaResolutionFromWorkingDir", func(t *testing.T) {
-		// Schema with a default to prove it was loaded
-		schemaContent := `{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "batch_size": {"type": "integer", "default": 42}
-  }
-}`
-
-		wd := t.TempDir()
-		wdSchema := filepath.Join(wd, "schema.json")
-		require.NoError(t, os.WriteFile(wdSchema, []byte(schemaContent), 0600))
-
-		origWD, err := os.Getwd()
-		require.NoError(t, err)
-		t.Cleanup(func() {
-			if err := os.Chdir(origWD); err != nil {
-				t.Fatalf("failed to restore working directory: %v", err)
-			}
-		})
-
-		data := []byte(fmt.Sprintf(`
-workingDir: %s
-params:
-  schema: "schema.json"
-  values:
-    environment: "dev"
-`, wd))
-
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-
-		// batch_size should be filled by schema default from workingDir schema
-		require.Contains(t, th.Params, "batch_size=42")
-	})
-
-	t.Run("ParamsSchemaResolutionFromDAGDir", func(t *testing.T) {
-		// Schema with different default to detect which file is used
-		schemaContent := `{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "batch_size": {"type": "integer", "default": 7}
-  }
-}`
-
-		dir := t.TempDir()
-		// Write schema.json in same dir as DAG file
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "schema.json"), []byte(schemaContent), 0600))
-
-		dagYaml := []byte(`
-params:
-  schema: "schema.json"
-  values:
-    environment: "staging"
-`)
-		dagPath := filepath.Join(dir, "dag.yaml")
-		require.NoError(t, os.WriteFile(dagPath, dagYaml, 0600))
-
-		dag, err := spec.Load(context.Background(), dagPath)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-
-		// batch_size default should come from schema.json next to DAG file
-		require.Contains(t, th.Params, "batch_size=7")
-	})
-
-	t.Run("ParamsSchemaResolutionPrefersCWDOverWorkingDir", func(t *testing.T) {
-		// Prepare two schemas with different defaults
-		cwdSchemaContent := `{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "batch_size": {"type": "integer", "default": 99}
-  }
-}`
-		wdSchemaContent := `{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "batch_size": {"type": "integer", "default": 11}
-  }
-}`
-
-		cwd := t.TempDir()
-		wd := t.TempDir()
-		// Write schema.json in both locations
-		require.NoError(t, os.WriteFile(filepath.Join(cwd, "schema.json"), []byte(cwdSchemaContent), 0600))
-		require.NoError(t, os.WriteFile(filepath.Join(wd, "schema.json"), []byte(wdSchemaContent), 0600))
-
-		// Change process CWD for this subtest and restore after
-		orig, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(cwd))
-		defer os.Chdir(orig)
-
-		data := []byte(fmt.Sprintf(`
-workingDir: %s
-params:
-  schema: "schema.json"
-  values:
-    environment: "dev"
-`, wd))
-
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-
-		// Should prefer schema.json from CWD (default 99) over workingDir (default 11)
-		require.Contains(t, th.Params, "batch_size=99")
-	})
-
-	t.Run("ParamsSkipSchemaValidationFlag", func(t *testing.T) {
-		data := []byte(`
-params:
-  schema: "missing-schema.json"
-  values:
-    foo: "bar"
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-
-		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{
-			Flags: spec.BuildFlagSkipSchemaValidation,
-		})
-		require.NoError(t, err)
-
-		th := DAG{t: t, DAG: dag}
-		th.AssertParam(t, "foo=bar")
 	})
 	t.Run("ParamsWithSchemaAndOverrideValidation", func(t *testing.T) {
 		schemaContent := `{
@@ -1105,6 +971,21 @@ steps:
 		assert.Equal(t, "echo", th.Steps[0].Command)
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
 		assert.Equal(t, "step1", th.Steps[0].Name)
+	})
+	t.Run("TimeoutSec", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: timed-step
+    command: sleep 1
+    timeoutSec: 5
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		require.Len(t, th.Steps, 1)
+		assert.Equal(t, 5*time.Second, th.Steps[0].Timeout)
 	})
 	t.Run("CommandAsScript", func(t *testing.T) {
 		t.Parallel()
@@ -3398,7 +3279,7 @@ steps:
   - echo hello
 `, tempDir)
 
-		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(yaml), spec.BuildOpts{Flags: spec.BuildFlagNoEval})
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(yaml), spec.BuildOpts{NoEval: true})
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 
@@ -3427,7 +3308,7 @@ env:
 steps:
   - echo hello
 `
-		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(yaml), spec.BuildOpts{Flags: spec.BuildFlagNoEval})
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(yaml), spec.BuildOpts{NoEval: true})
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 

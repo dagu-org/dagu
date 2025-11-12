@@ -69,6 +69,9 @@ type Step struct {
 	Env []string `json:"env,omitempty"`
 	// Params contains parameters/inputs for the step (e.g., action inputs for GitHub Actions).
 	Params Params `json:"params,omitzero"`
+	// Timeout specifies the maximum execution time for the step.
+	// If set, this timeout takes precedence over the DAG-level timeout for this step.
+	Timeout time.Duration `json:"timeout,omitempty"`
 }
 
 // String returns a formatted string representation of the step

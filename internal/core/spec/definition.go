@@ -158,6 +158,8 @@ type stepDef struct {
 	WorkerSelector map[string]string `yaml:"workerSelector,omitempty"`
 	// Env specifies the environment variables for the step.
 	Env any `yaml:"env,omitempty"`
+	// TimeoutSec specifies the maximum runtime for the step in seconds.
+	TimeoutSec int `yaml:"timeoutSec,omitempty"`
 }
 
 // continueOnDef defines the conditions to continue on failure or skipped.

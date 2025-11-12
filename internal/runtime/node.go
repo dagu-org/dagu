@@ -137,7 +137,17 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 }
 
 func (n *Node) Execute(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
+	// Apply step-level timeout if set, otherwise use the parent context
+	var cancel context.CancelFunc
+	step := n.Step()
+	var stepTimeout time.Duration
+	if step.Timeout > 0 {
+		stepTimeout = step.Timeout
+		ctx, cancel = context.WithTimeout(ctx, stepTimeout)
+		logger.Info(ctx, "Step execution started with timeout", "step", step.Name, "timeout", stepTimeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
 	defer cancel()
 
 	cmd, err := n.setupExecutor(ctx)
@@ -163,18 +173,25 @@ func (n *Node) Execute(ctx context.Context) error {
 
 	var exitCode int
 	if err := cmd.Run(ctx); err != nil {
-		n.SetError(err)
-
-		// Set the exit code if the command implements ExitCoder
-		var exitErr *exec.ExitError
-		if cmd, ok := cmd.(executor.ExitCoder); ok {
-			exitCode = cmd.ExitCode()
-		} else if n.Error() != nil && errors.As(n.Error(), &exitErr) {
-			exitCode = exitErr.ExitCode()
-		} else if code, found := parseExitCodeFromError(n.Error().Error()); found {
-			exitCode = code
+		// Check if the error is due to step timeout
+		if errors.Is(err, context.DeadlineExceeded) && stepTimeout > 0 {
+			timeoutErr := fmt.Errorf("step timed out after %v (timeoutSec: %d)", stepTimeout, int(stepTimeout.Seconds()))
+			logger.Error(ctx, "Step execution timed out", "step", step.Name, "timeout", stepTimeout, "timeoutSec", int(stepTimeout.Seconds()))
+			n.SetError(timeoutErr)
+			exitCode = 124 // Standard timeout exit code
 		} else {
-			exitCode = 1
+			n.SetError(err)
+			// Set the exit code if the command implements ExitCoder
+			var exitErr *exec.ExitError
+			if cmd, ok := cmd.(executor.ExitCoder); ok {
+				exitCode = cmd.ExitCode()
+			} else if n.Error() != nil && errors.As(n.Error(), &exitErr) {
+				exitCode = exitErr.ExitCode()
+			} else if code, found := parseExitCodeFromError(n.Error().Error()); found {
+				exitCode = code
+			} else {
+				exitCode = 1
+			}
 		}
 	}
 

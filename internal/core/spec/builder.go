@@ -50,38 +50,27 @@ func (c BuildContext) WithFile(file string) BuildContext {
 	return copy
 }
 
-// BuildFlag represents a bitmask option that influences DAG building behaviour.
-type BuildFlag uint32
-
-const (
-	BuildFlagNone BuildFlag = 0
-
-	BuildFlagNoEval BuildFlag = 1 << iota
-	BuildFlagOnlyMetadata
-	BuildFlagAllowBuildErrors
-	BuildFlagSkipSchemaValidation
-)
-
 // BuildOpts is used to control the behavior of the builder.
 type BuildOpts struct {
 	// Base specifies the Base configuration file for the DAG.
 	Base string
+	// OnlyMetadata specifies whether to build only the metadata.
+	OnlyMetadata bool
 	// Parameters specifies the Parameters to the DAG.
 	// Parameters are used to override the default Parameters in the DAG.
 	Parameters string
 	// ParametersList specifies the parameters to the DAG.
 	ParametersList []string
+	// NoEval specifies whether to evaluate dynamic fields.
+	NoEval bool
+	// SkipSchemaValidation disables schema resolution/validation during build.
+	SkipSchemaValidation bool
 	// Name of the core.DAG if it's not defined in the spec
 	Name string
 	// DAGsDir is the directory containing the core.DAG files.
 	DAGsDir string
-	// Flags stores all boolean options controlling build behaviour.
-	Flags BuildFlag
-}
-
-// Has reports whether the flag is enabled on the current BuildOpts.
-func (o BuildOpts) Has(flag BuildFlag) bool {
-	return o.Flags&flag != 0
+	// AllowBuildErrors specifies whether to allow build errors.
+	AllowBuildErrors bool
 }
 
 var builderRegistry = []builderEntry{
@@ -124,6 +113,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "params", fn: buildStepParams},
+	{name: "timeout", fn: buildStepTimeout},
 	{name: "depends", fn: buildDepends},
 	{name: "parallel", fn: buildParallel}, // Must be before subDAG to set executor type correctly
 	{name: "subDAG", fn: buildSubDAG},
@@ -162,7 +152,7 @@ func build(ctx BuildContext, spec *definition) (*core.DAG, error) {
 
 	var errs core.ErrorList
 	for _, builder := range builderRegistry {
-		if !builder.metadata && ctx.opts.Has(BuildFlagOnlyMetadata) {
+		if !builder.metadata && ctx.opts.OnlyMetadata {
 			continue
 		}
 		if err := builder.fn(ctx, spec, dag); err != nil {
@@ -181,7 +171,7 @@ func build(ctx BuildContext, spec *definition) (*core.DAG, error) {
 	}
 
 	if len(errs) > 0 {
-		if ctx.opts.Has(BuildFlagAllowBuildErrors) {
+		if ctx.opts.AllowBuildErrors {
 			// If we are allowing build errors, return the core.DAG with the errors.
 			dag.BuildErrors = errs
 		} else {
@@ -375,7 +365,7 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *core.DAG) error
 	case string:
 		// Handle as a JSON string (e.g., from environment variable)
 		expandedJSON := v
-		if !ctx.opts.Has(BuildFlagNoEval) {
+		if !ctx.opts.NoEval {
 			expandedJSON = os.ExpandEnv(v)
 		}
 
@@ -393,7 +383,7 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *core.DAG) error
 			switch auth := authData.(type) {
 			case string:
 				// Simple string value - treat as JSON auth config
-				if !ctx.opts.Has(BuildFlagNoEval) {
+				if !ctx.opts.NoEval {
 					auth = os.ExpandEnv(auth)
 				}
 				authConfig.Auth = auth
@@ -402,21 +392,21 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *core.DAG) error
 				// Auth config object with username/password fields
 				if username, ok := auth["username"].(string); ok {
 					authConfig.Username = username
-					if !ctx.opts.Has(BuildFlagNoEval) {
+					if !ctx.opts.NoEval {
 						authConfig.Username = os.ExpandEnv(authConfig.Username)
 					}
 				}
 
 				if password, ok := auth["password"].(string); ok {
 					authConfig.Password = password
-					if !ctx.opts.Has(BuildFlagNoEval) {
+					if !ctx.opts.NoEval {
 						authConfig.Password = os.ExpandEnv(authConfig.Password)
 					}
 				}
 
 				if authStr, ok := auth["auth"].(string); ok {
 					authConfig.Auth = authStr
-					if !ctx.opts.Has(BuildFlagNoEval) {
+					if !ctx.opts.NoEval {
 						authConfig.Auth = os.ExpandEnv(authConfig.Auth)
 					}
 				}
@@ -438,7 +428,7 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *core.DAG) error
 			switch auth := authData.(type) {
 			case string:
 				// Simple string value - treat as JSON auth config
-				if !ctx.opts.Has(BuildFlagNoEval) {
+				if !ctx.opts.NoEval {
 					auth = os.ExpandEnv(auth)
 				}
 				authConfig.Auth = auth
@@ -447,21 +437,21 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *core.DAG) error
 				// Auth config object with username/password fields
 				if username, ok := auth["username"].(string); ok {
 					authConfig.Username = username
-					if !ctx.opts.Has(BuildFlagNoEval) {
+					if !ctx.opts.NoEval {
 						authConfig.Username = os.ExpandEnv(authConfig.Username)
 					}
 				}
 
 				if password, ok := auth["password"].(string); ok {
 					authConfig.Password = password
-					if !ctx.opts.Has(BuildFlagNoEval) {
+					if !ctx.opts.NoEval {
 						authConfig.Password = os.ExpandEnv(authConfig.Password)
 					}
 				}
 
 				if authStr, ok := auth["auth"].(string); ok {
 					authConfig.Auth = authStr
-					if !ctx.opts.Has(BuildFlagNoEval) {
+					if !ctx.opts.NoEval {
 						authConfig.Auth = os.ExpandEnv(authConfig.Auth)
 					}
 				}
@@ -470,21 +460,21 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *core.DAG) error
 				// Handle nested YAML map type
 				if username, ok := auth["username"].(string); ok {
 					authConfig.Username = username
-					if !ctx.opts.Has(BuildFlagNoEval) {
+					if !ctx.opts.NoEval {
 						authConfig.Username = os.ExpandEnv(authConfig.Username)
 					}
 				}
 
 				if password, ok := auth["password"].(string); ok {
 					authConfig.Password = password
-					if !ctx.opts.Has(BuildFlagNoEval) {
+					if !ctx.opts.NoEval {
 						authConfig.Password = os.ExpandEnv(authConfig.Password)
 					}
 				}
 
 				if authStr, ok := auth["auth"].(string); ok {
 					authConfig.Auth = authStr
-					if !ctx.opts.Has(BuildFlagNoEval) {
+					if !ctx.opts.NoEval {
 						authConfig.Auth = os.ExpandEnv(authConfig.Auth)
 					}
 				}
@@ -521,7 +511,7 @@ func buildDotenv(ctx BuildContext, spec *definition, dag *core.DAG) error {
 		return core.NewValidationError("dotenv", v, ErrDotEnvMustBeStringOrArray)
 	}
 
-	if !ctx.opts.Has(BuildFlagNoEval) {
+	if !ctx.opts.NoEval {
 		dag.LoadDotEnv(ctx.ctx)
 	}
 
@@ -571,7 +561,7 @@ func buildWorkingDir(ctx BuildContext, spec *definition, dag *core.DAG) error {
 	switch {
 	case spec.WorkingDir != "":
 		wd := spec.WorkingDir
-		if !ctx.opts.Has(BuildFlagNoEval) {
+		if !ctx.opts.NoEval {
 			wd = os.ExpandEnv(wd)
 			_ = os.MkdirAll(wd, 0755)
 			if err := os.Chdir(wd); err != nil {
@@ -1180,6 +1170,16 @@ func buildStep(ctx StepBuildContext, def stepDef) (*core.Step, error) {
 	return step, nil
 }
 
+func buildStepTimeout(_ StepBuildContext, def stepDef, step *core.Step) error {
+	if def.TimeoutSec < 0 {
+		return core.NewValidationError("timeoutSec", def.TimeoutSec, fmt.Errorf("timeoutSec must be greater than or equal to 0"))
+	}
+	if def.TimeoutSec > 0 {
+		step.Timeout = time.Second * time.Duration(def.TimeoutSec)
+	}
+	return nil
+}
+
 func buildContinueOn(_ StepBuildContext, def stepDef, step *core.Step) error {
 	if def.ContinueOn == nil {
 		return nil
@@ -1434,8 +1434,9 @@ func buildStepEnvs(ctx StepBuildContext, def stepDef, step *core.Step) error {
 	if def.Env == nil {
 		return nil
 	}
-	// For step environment variables, load without evaluation; runtime expands later.
-	ctx.opts.Flags |= BuildFlagNoEval
+	// For step environment variables, we load them without evaluation. They will
+	// be evaluated later when the step is executed.
+	ctx.opts.NoEval = true
 	vars, err := loadVariables(ctx.BuildContext, def.Env)
 	if err != nil {
 		return err
@@ -1498,7 +1499,7 @@ func buildSubDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 	if def.Params != nil {
 		// Parse the params to convert them to string format
 		ctxCopy := ctx
-		ctxCopy.opts.Flags |= BuildFlagNoEval // Disable evaluation for params parsing
+		ctxCopy.opts.NoEval = true // Disable evaluation for params parsing
 		paramPairs, err := parseParamValue(ctxCopy.BuildContext, def.Params)
 		if err != nil {
 			return core.NewValidationError("params", def.Params, err)

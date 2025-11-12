@@ -824,6 +824,11 @@
           "type": "string",
           "description": "Signal to send when stopping this step (e.g., SIGINT). If empty, uses same signal as parent process."
         },
+        "timeoutSec": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum execution time for the step in seconds. If set, this timeout takes precedence over the DAG-level timeout for this step."
+        },
         "call": {
           "type": "string",
           "description": "Name of a DAG to execute as a sub dag-run."
