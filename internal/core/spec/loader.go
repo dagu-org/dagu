@@ -31,10 +31,7 @@ type LoadOptions struct {
 	baseConfig string   // Path to the base core.DAG configuration file.
 	params     string   // Parameters to override default parameters in the DAG.
 	paramsList []string // List of parameters to override default parameters in the DAG.
-	noEval     bool
-	onlyMeta   bool
-	allowErrs  bool
-	skipSchema bool
+	flags      BuildFlag
 	dagsDir    string // Directory containing the core.DAG files.
 }
 
@@ -65,14 +62,14 @@ func WithParams(params any) LoadOption {
 // WithoutEval disables the evaluation of dynamic fields.
 func WithoutEval() LoadOption {
 	return func(o *LoadOptions) {
-		o.noEval = true
+		o.flags |= BuildFlagNoEval
 	}
 }
 
 // OnlyMetadata sets the flag to load only metadata.
 func OnlyMetadata() LoadOption {
 	return func(o *LoadOptions) {
-		o.onlyMeta = true
+		o.flags |= BuildFlagOnlyMetadata
 	}
 }
 
@@ -101,14 +98,14 @@ func WithDAGsDir(dagsDir string) LoadOption {
 // and will not fail the loading process.
 func WithAllowBuildErrors() LoadOption {
 	return func(o *LoadOptions) {
-		o.allowErrs = true
+		o.flags |= BuildFlagAllowBuildErrors
 	}
 }
 
 // SkipSchemaValidation disables schema resolution/validation during build.
 func SkipSchemaValidation() LoadOption {
 	return func(o *LoadOptions) {
-		o.skipSchema = true
+		o.flags |= BuildFlagSkipSchemaValidation
 	}
 }
 
@@ -138,15 +135,12 @@ func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*core.DAG
 	buildContext := BuildContext{
 		ctx: ctx,
 		opts: BuildOpts{
-			Base:                 options.baseConfig,
-			Parameters:           options.params,
-			ParametersList:       options.paramsList,
-			Name:                 options.name,
-			DAGsDir:              options.dagsDir,
-			NoEval:               options.noEval,
-			OnlyMetadata:         options.onlyMeta,
-			AllowBuildErrors:     options.allowErrs,
-			SkipSchemaValidation: options.skipSchema,
+			Base:           options.baseConfig,
+			Parameters:     options.params,
+			ParametersList: options.paramsList,
+			Name:           options.name,
+			DAGsDir:        options.dagsDir,
+			Flags:          options.flags,
 		},
 	}
 	return loadDAG(buildContext, nameOrPath)
@@ -159,15 +153,12 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*core.DAG, 
 		opt(&options)
 	}
 	return LoadYAMLWithOpts(ctx, data, BuildOpts{
-		Base:                 options.baseConfig,
-		Parameters:           options.params,
-		ParametersList:       options.paramsList,
-		Name:                 options.name,
-		DAGsDir:              options.dagsDir,
-		NoEval:               options.noEval,
-		OnlyMetadata:         options.onlyMeta,
-		AllowBuildErrors:     options.allowErrs,
-		SkipSchemaValidation: options.skipSchema,
+		Base:           options.baseConfig,
+		Parameters:     options.params,
+		ParametersList: options.paramsList,
+		Name:           options.name,
+		DAGsDir:        options.dagsDir,
+		Flags:          options.flags,
 	})
 }
 
@@ -175,7 +166,7 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*core.DAG, 
 func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
-		if opts.AllowBuildErrors {
+		if opts.Has(BuildFlagAllowBuildErrors) {
 			// Return a minimal core.DAG with the error recorded
 			return &core.DAG{
 				Name:        opts.Name,
@@ -187,7 +178,7 @@ func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.D
 
 	def, err := decode(raw)
 	if err != nil {
-		if opts.AllowBuildErrors {
+		if opts.Has(BuildFlagAllowBuildErrors) {
 			// Return a minimal core.DAG with the error recorded
 			return &core.DAG{
 				Name:        opts.Name,
@@ -221,10 +212,7 @@ func LoadBaseConfig(ctx BuildContext, file string) (*core.DAG, error) {
 	}
 
 	ctx = ctx.WithOpts(BuildOpts{
-		OnlyMetadata:         ctx.opts.OnlyMetadata,
-		NoEval:               ctx.opts.NoEval,
-		AllowBuildErrors:     ctx.opts.AllowBuildErrors,
-		SkipSchemaValidation: ctx.opts.SkipSchemaValidation,
+		Flags: ctx.opts.Flags,
 	}).WithFile(file)
 	dag, err := build(ctx, def)
 
@@ -245,7 +233,7 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 
 	// Load base config definition if specified
 	var baseDef *definition
-	if !ctx.opts.OnlyMetadata && ctx.opts.Base != "" && fileutil.FileExists(ctx.opts.Base) {
+	if !ctx.opts.Has(BuildFlagOnlyMetadata) && ctx.opts.Base != "" && fileutil.FileExists(ctx.opts.Base) {
 		raw, err := readYAMLFile(ctx.opts.Base)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read base config: %w", err)
@@ -259,7 +247,7 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 	// Load all DAGs from the file
 	dags, err := loadDAGsFromFile(ctx, filePath, baseDef)
 	if err != nil {
-		if ctx.opts.AllowBuildErrors {
+		if ctx.opts.Has(BuildFlagAllowBuildErrors) {
 			// Return a minimal core.DAG with the error recorded
 			dag := &core.DAG{
 				Name:        defaultName(filePath),

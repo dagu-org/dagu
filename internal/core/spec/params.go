@@ -64,7 +64,7 @@ func buildParams(ctx BuildContext, spec *definition, dag *core.DAG) error {
 	}
 
 	// Validate the parameters against a resolved schema (if declared)
-	if !ctx.opts.SkipSchemaValidation {
+	if !ctx.opts.Has(BuildFlagSkipSchemaValidation) {
 		if resolvedSchema, err := resolveSchemaFromParams(spec.Params, spec.WorkingDir, dag.Location); err != nil {
 			return fmt.Errorf("failed to get JSON schema: %w", err)
 		} else if resolvedSchema != nil {
@@ -295,7 +295,7 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 	accumulatedVars := make(map[string]string)
 
 	for index, paramPair := range paramPairs {
-		if !ctx.opts.NoEval {
+		if !ctx.opts.Has(BuildFlagNoEval) {
 			evaluated, err := evalParamValue(ctx, paramPair.Value, accumulatedVars)
 			if err != nil {
 				return core.NewValidationError("params", paramPair.Value, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
@@ -315,7 +315,7 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 			accumulatedVars[paramPair.Name] = paramPair.Value
 		}
 
-		if !ctx.opts.NoEval && paramPair.Name != "" {
+		if !ctx.opts.Has(BuildFlagNoEval) && paramPair.Name != "" {
 			*envs = append(*envs, paramString)
 		}
 
@@ -458,7 +458,7 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 				value = strings.ReplaceAll(value, `\"`, `"`)
 			}
 
-			if !ctx.opts.NoEval {
+			if !ctx.opts.Has(BuildFlagNoEval) {
 				// Perform backtick command substitution
 				backtickRegex := regexp.MustCompile("`[^`]*`")
 
