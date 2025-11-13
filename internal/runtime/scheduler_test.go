@@ -1202,6 +1202,85 @@ func withID(id string) stepOption {
 	}
 }
 
+func withStepTimeout(d time.Duration) stepOption {
+	return func(step *core.Step) {
+		step.Timeout = d
+	}
+}
+
+// Step-level timeout tests
+func TestScheduler_StepLevelTimeout(t *testing.T) {
+	t.Run("SingleStepTimeoutFailsStep", func(t *testing.T) {
+		sc := setupScheduler(t, withTimeout(2*time.Second)) // large DAG timeout to ensure step-level fires first
+		graph := sc.newGraph(t,
+			newStep("timeout_step",
+				withCommand("sleep 0.2"), // longer than step timeout
+				withStepTimeout(100*time.Millisecond),
+			),
+			successStep("after", "timeout_step"),
+		)
+
+		start := time.Now()
+		result := graph.Schedule(t, core.Failed)
+		elapsed := time.Since(start)
+
+		// Step should be aborted quickly (< 2s DAG timeout)
+		assert.Less(t, elapsed, 1500*time.Millisecond)
+		result.AssertNodeStatus(t, "timeout_step", core.NodeFailed)
+		// Downstream dependency is aborted since scheduler cancels remaining steps after failure
+		result.AssertNodeStatus(t, "after", core.NodeAborted)
+
+		node := result.Node(t, "timeout_step")
+		// Exit code should be 124 (standard timeout) and error message should mention timeout
+		assert.Equal(t, 124, node.State().ExitCode)
+		require.NotNil(t, node.State().Error)
+		assert.Contains(t, node.State().Error.Error(), "step timed out")
+	})
+
+	t.Run("TimeoutPreemptsRetriesAndMarksFailed", func(t *testing.T) {
+		sc := setupScheduler(t)
+		graph := sc.newGraph(t,
+			newStep("retry_timeout",
+				withCommand("sleep 0.15 && false"),
+				withRetryPolicy(5, 50*time.Millisecond), // would retry many times if not timed out
+				withStepTimeout(100*time.Millisecond),   // shorter than sleep
+			),
+		)
+
+		result := graph.Schedule(t, core.Failed)
+		result.AssertNodeStatus(t, "retry_timeout", core.NodeFailed)
+		node := result.Node(t, "retry_timeout")
+		// Should not have retried because first attempt exceeded timeout
+		assert.Equal(t, 0, node.State().RetryCount)
+		assert.Equal(t, 124, node.State().ExitCode)
+	})
+
+	t.Run("ParallelStepsTimeoutFailIndividually", func(t *testing.T) {
+		sc := setupScheduler(t, withMaxActiveRuns(3))
+		graph := sc.newGraph(t,
+			newStep("p1", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
+			newStep("p2", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
+			newStep("p3", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
+		)
+
+		result := graph.Schedule(t, core.Failed)
+		result.AssertNodeStatus(t, "p1", core.NodeFailed)
+		result.AssertNodeStatus(t, "p2", core.NodeFailed)
+		result.AssertNodeStatus(t, "p3", core.NodeFailed)
+	})
+
+	t.Run("StepLevelTimeoutOverridesLongDAGTimeoutAndFails", func(t *testing.T) {
+		sc := setupScheduler(t, withTimeout(5*time.Second))
+		graph := sc.newGraph(t,
+			newStep("short_timeout", withCommand("sleep 0.3"), withStepTimeout(120*time.Millisecond)),
+		)
+		result := graph.Schedule(t, core.Failed)
+		result.AssertNodeStatus(t, "short_timeout", core.NodeFailed)
+		node := result.Node(t, "short_timeout")
+		assert.Equal(t, 124, node.State().ExitCode)
+	})
+}
+
 func newStep(name string, opts ...stepOption) core.Step {
 	step := core.Step{Name: name}
 	for _, opt := range opts {

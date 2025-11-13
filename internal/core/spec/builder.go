@@ -1183,11 +1183,13 @@ func buildStep(ctx StepBuildContext, def stepDef) (*core.Step, error) {
 
 func buildStepTimeout(_ StepBuildContext, def stepDef, step *core.Step) error {
 	if def.TimeoutSec < 0 {
-		return core.NewValidationError("timeoutSec", def.TimeoutSec, fmt.Errorf("timeoutSec must be greater than or equal to 0"))
+		return core.NewValidationError("timeoutSec", def.TimeoutSec, ErrTimeoutSecMustBeNonNegative)
 	}
-	if def.TimeoutSec > 0 {
-		step.Timeout = time.Second * time.Duration(def.TimeoutSec)
+	if def.TimeoutSec == 0 {
+		// Zero means no timeout; leave unset.
+		return nil
 	}
+	step.Timeout = time.Second * time.Duration(def.TimeoutSec)
 	return nil
 }
 

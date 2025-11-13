@@ -24,4 +24,5 @@ var (
 	ErrInvalidParamValue                   = errors.New("invalid parameter value")
 	ErrStepCommandIsEmpty                  = errors.New("step command is empty")
 	ErrStepCommandMustBeArrayOrString      = errors.New("step command must be an array of strings or a string")
+	ErrTimeoutSecMustBeNonNegative         = errors.New("timeoutSec must be >= 0")
 )

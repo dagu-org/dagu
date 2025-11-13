@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -172,12 +173,17 @@ func (n *Node) Execute(ctx context.Context) error {
 	}()
 
 	var exitCode int
+	startTime := time.Now()
 	if err := cmd.Run(ctx); err != nil {
-		// Check if the error is due to step timeout
-		if errors.Is(err, context.DeadlineExceeded) && stepTimeout > 0 {
-			timeoutErr := fmt.Errorf("step timed out after %v (timeoutSec: %d)", stepTimeout, int(stepTimeout.Seconds()))
-			logger.Error(ctx, "Step execution timed out", "step", step.Name, "timeout", stepTimeout, "timeoutSec", int(stepTimeout.Seconds()))
+		elapsed := time.Since(startTime)
+		// Detect step-level timeout via context, or elapsed time >= timeout (executor may return a signal error)
+		if stepTimeout > 0 && (ctx.Err() == context.DeadlineExceeded || elapsed >= stepTimeout) {
+			// Wrap the deadline exceeded error so errors.Is(..., context.DeadlineExceeded) still works
+			timeoutErr := fmt.Errorf("step timed out after %v (timeoutSec: %d): %w", elapsed.Truncate(time.Millisecond), int(stepTimeout.Seconds()), context.DeadlineExceeded)
+			logger.Error(ctx, "Step execution timed out", "step", step.Name, "timeout", stepTimeout, "timeoutSec", int(stepTimeout.Seconds()), "elapsed", elapsed)
 			n.SetError(timeoutErr)
+			// Mark timeouts as failed so downstream dependent steps remain not started and match test semantics
+			n.SetStatus(core.NodeFailed)
 			exitCode = 124 // Standard timeout exit code
 		} else {
 			n.SetError(err)
@@ -189,6 +195,9 @@ func (n *Node) Execute(ctx context.Context) error {
 				exitCode = exitErr.ExitCode()
 			} else if code, found := parseExitCodeFromError(n.Error().Error()); found {
 				exitCode = code
+			} else if strings.Contains(err.Error(), "signal:") {
+				// Process killed by signal but not due to our timeout context
+				exitCode = -1
 			} else {
 				exitCode = 1
 			}
