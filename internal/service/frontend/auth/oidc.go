@@ -35,8 +35,9 @@ func InitVerifierAndConfig(i config.AuthOIDC) (_ *OIDCConfig, err error) {
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), oidcProviderInitTimeout)
-	defer cancel()
+	ctx := oidc.ClientContext(context.Background(), &http.Client{
+		Timeout: oidcProviderInitTimeout,
+	})
 
 	provider, err := oidcProviderFactory(ctx, i.Issuer)
 	if err != nil {
