@@ -13,31 +13,39 @@ import (
 
 // ExecutionGraph represents a graph of steps.
 type ExecutionGraph struct {
-	startedAt  time.Time
-	finishedAt time.Time
-	nodeByID   map[int]*Node
-	nodes      []*Node
-	From       map[int][]int
-	To         map[int][]int
-	lock       sync.RWMutex
+	startedAt   time.Time
+	finishedAt  time.Time
+	nodeByID    map[int]*Node
+	nodeByName  map[string]*Node // faster lookup by step name
+	nodes       []*Node
+	From        map[int][]int
+	To          map[int][]int
+	lock        sync.RWMutex
+}
+
+// newGraph allocates an empty execution graph. Construction helpers populate nodes then call buildEdges.
+func newGraph() *ExecutionGraph {
+	return &ExecutionGraph{
+		nodeByID:   make(map[int]*Node),
+		nodeByName: make(map[string]*Node),
+		From:       make(map[int][]int),
+		To:         make(map[int][]int),
+		nodes:      []*Node{},
+		startedAt:  time.Now(),
+	}
 }
 
 // NewExecutionGraph creates a new execution graph with the given steps.
 func NewExecutionGraph(steps ...core.Step) (*ExecutionGraph, error) {
-	graph := &ExecutionGraph{
-		nodeByID:  make(map[int]*Node),
-		From:      make(map[int][]int),
-		To:        make(map[int][]int),
-		nodes:     []*Node{},
-		startedAt: time.Now(),
-	}
+	graph := newGraph()
 	for _, step := range steps {
 		node := &Node{Data: newSafeData(NodeData{Step: step})}
 		node.Init()
 		graph.nodeByID[node.id] = node
+		graph.nodeByName[node.Name()] = node
 		graph.nodes = append(graph.nodes, node)
 	}
-	if err := graph.setup(); err != nil {
+	if err := graph.buildEdges(); err != nil {
 		return nil, err
 	}
 	return graph, nil
@@ -46,23 +54,15 @@ func NewExecutionGraph(steps ...core.Step) (*ExecutionGraph, error) {
 // CreateRetryExecutionGraph creates a new execution graph for retry with
 // given nodes.
 func CreateRetryExecutionGraph(ctx context.Context, dag *core.DAG, nodes ...*Node) (*ExecutionGraph, error) {
-	graph := &ExecutionGraph{
-		nodeByID:  make(map[int]*Node),
-		From:      make(map[int][]int),
-		To:        make(map[int][]int),
-		nodes:     []*Node{},
-		startedAt: time.Now(),
-	}
-	steps := make(map[string]core.Step)
-	for _, step := range dag.Steps {
-		steps[step.Name] = step
-	}
+	graph := newGraph()
+	steps := stepsByName(dag)
 	for _, node := range nodes {
 		node.Init()
 		graph.nodeByID[node.id] = node
+		graph.nodeByName[node.Name()] = node
 		graph.nodes = append(graph.nodes, node)
 	}
-	if err := graph.setup(); err != nil {
+	if err := graph.buildEdges(); err != nil {
 		return nil, err
 	}
 	if err := graph.setupRetry(ctx, steps); err != nil {
@@ -129,26 +129,21 @@ func (g *ExecutionGraph) Finish() {
 }
 
 func (g *ExecutionGraph) NodeData() []NodeData {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
+	g.lock.RLock() // graph itself is not mutated
+	defer g.lock.RUnlock()
 	var ret []NodeData
 	for _, node := range g.nodes {
 		node.mu.Lock()
 		ret = append(ret, node.NodeData())
 		node.mu.Unlock()
 	}
-
 	return ret
 }
 
 func (g *ExecutionGraph) NodeByName(name string) *Node {
-	for _, node := range g.nodes {
-		if node.Name() == name {
-			return node
-		}
-	}
-	return nil
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+	return g.nodeByName[name]
 }
 
 func (g *ExecutionGraph) setupRetry(ctx context.Context, steps map[string]core.Step) error {
@@ -190,7 +185,8 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context, steps map[string]core.S
 	return nil
 }
 
-func (g *ExecutionGraph) setup() error {
+// buildEdges populates dependency edges and validates acyclicity.
+func (g *ExecutionGraph) buildEdges() error {
 	for _, node := range g.nodes {
 		for _, dep := range node.Step().Depends {
 			depStep, err := g.findStep(dep)
@@ -200,11 +196,9 @@ func (g *ExecutionGraph) setup() error {
 			g.addEdge(depStep, node)
 		}
 	}
-
 	if g.hasCycle() {
 		return errCycleDetected
 	}
-
 	return nil
 }
 
@@ -250,11 +244,8 @@ func (g *ExecutionGraph) addEdge(from, to *Node) {
 }
 
 func (g *ExecutionGraph) findStep(name string) (*Node, error) {
-	// Dependencies are always resolved to step names during build phase
-	for _, n := range g.nodeByID {
-		if n.Name() == name {
-			return n, nil
-		}
+	if n, ok := g.nodeByName[name]; ok {
+		return n, nil
 	}
 	return nil, fmt.Errorf("%w: %s", errStepNotFound, name)
 }
@@ -282,48 +273,37 @@ func (g *ExecutionGraph) runningCount() int {
 // CreateStepRetryGraph creates a new execution graph for retrying a specific step.
 // Only the specified step will be reset for re-execution, leaving all downstream steps untouched.
 func CreateStepRetryGraph(dag *core.DAG, nodes []*Node, stepName string) (*ExecutionGraph, error) {
-	graph := &ExecutionGraph{
-		nodeByID:  make(map[int]*Node),
-		From:      make(map[int][]int),
-		To:        make(map[int][]int),
-		nodes:     []*Node{},
-		startedAt: time.Now(),
-	}
-	steps := make(map[string]core.Step)
-	for _, step := range dag.Steps {
-		steps[step.Name] = step
-	}
+	graph := newGraph()
+	steps := stepsByName(dag)
 	for _, node := range nodes {
 		node.Init()
 		graph.nodeByID[node.id] = node
+		graph.nodeByName[node.Name()] = node
 		graph.nodes = append(graph.nodes, node)
 	}
-	if err := graph.setup(); err != nil {
+	if err := graph.buildEdges(); err != nil {
 		return nil, err
 	}
-
-	// Find the node for the specified step name
-	var targetNode *Node
-	for _, node := range graph.nodes {
-		if node.Name() == stepName {
-			targetNode = node
-			break
-		}
-	}
+	targetNode := graph.NodeByName(stepName)
 	if targetNode == nil {
 		return nil, fmt.Errorf("%w: %s", errStepNotFound, stepName)
 	}
-
-	// Reset state and remove retry policy for only the specified step
 	step, ok := steps[targetNode.Name()]
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", errStepNotFound, targetNode.Name())
 	}
 	targetNode.ClearState(step)
-	// Remove retry policy to force the step to be retried
-	targetNode.retryPolicy = RetryPolicy{}
-
+	targetNode.retryPolicy = RetryPolicy{} // force a fresh retry without prior policy
 	return graph, nil
+}
+
+// stepsByName creates a name->step map for convenience.
+func stepsByName(dag *core.DAG) map[string]core.Step {
+	m := make(map[string]core.Step, len(dag.Steps))
+	for _, s := range dag.Steps {
+		m[s.Name] = s
+	}
+	return m
 }
 
 var (
