@@ -62,6 +62,12 @@ func toStep(obj core.Step) api.Step {
 		Script:        ptrOf(obj.Script),
 	}
 
+	// Convert timeout duration to seconds if set
+	if obj.Timeout > 0 {
+		timeoutSec := int(obj.Timeout.Seconds())
+		step.TimeoutSec = &timeoutSec
+	}
+
 	if obj.SubDAG != nil {
 		step.Call = ptrOf(obj.SubDAG.Name)
 		step.Params = ptrOf(obj.SubDAG.Params)

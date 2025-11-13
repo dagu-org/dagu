@@ -211,7 +211,9 @@ func LoadBaseConfig(ctx BuildContext, file string) (*core.DAG, error) {
 		return nil, core.ErrorList{err}
 	}
 
-	ctx = ctx.WithOpts(BuildOpts{Flags: ctx.opts.Flags}).WithFile(file)
+	ctx = ctx.WithOpts(BuildOpts{
+		Flags: ctx.opts.Flags,
+	}).WithFile(file)
 	dag, err := build(ctx, def)
 
 	if err != nil {

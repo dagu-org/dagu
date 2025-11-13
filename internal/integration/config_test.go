@@ -98,6 +98,23 @@ steps:
 		require.Contains(t, err.Error(), "second")
 	})
 
+	t.Run("StepTimeout", func(t *testing.T) {
+		t.Parallel()
+		dag := th.DAG(t, `steps:
+  - name: slow
+    command: sleep 2
+    timeoutSec: 1
+  - name: after
+    depends: slow
+    command: echo after
+`)
+		agent := dag.Agent()
+		err := agent.Run(agent.Context)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "step timed out")
+		dag.AssertLatestStatus(t, core.Failed)
+	})
+
 	t.Run("NamedParams", func(t *testing.T) {
 		t.Parallel()
 

@@ -124,6 +124,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "params", fn: buildStepParams},
+	{name: "timeout", fn: buildStepTimeout},
 	{name: "depends", fn: buildDepends},
 	{name: "parallel", fn: buildParallel}, // Must be before subDAG to set executor type correctly
 	{name: "subDAG", fn: buildSubDAG},
@@ -1180,6 +1181,18 @@ func buildStep(ctx StepBuildContext, def stepDef) (*core.Step, error) {
 	return step, nil
 }
 
+func buildStepTimeout(_ StepBuildContext, def stepDef, step *core.Step) error {
+	if def.TimeoutSec < 0 {
+		return core.NewValidationError("timeoutSec", def.TimeoutSec, ErrTimeoutSecMustBeNonNegative)
+	}
+	if def.TimeoutSec == 0 {
+		// Zero means no timeout; leave unset.
+		return nil
+	}
+	step.Timeout = time.Second * time.Duration(def.TimeoutSec)
+	return nil
+}
+
 func buildContinueOn(_ StepBuildContext, def stepDef, step *core.Step) error {
 	if def.ContinueOn == nil {
 		return nil
@@ -1434,7 +1447,8 @@ func buildStepEnvs(ctx StepBuildContext, def stepDef, step *core.Step) error {
 	if def.Env == nil {
 		return nil
 	}
-	// For step environment variables, load without evaluation; runtime expands later.
+	// For step environment variables, we load them without evaluation. They will
+	// be evaluated later when the step is executed.
 	ctx.opts.Flags |= BuildFlagNoEval
 	vars, err := loadVariables(ctx.BuildContext, def.Env)
 	if err != nil {

@@ -845,8 +845,29 @@ func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, graph *Execut
 	case s == core.NodeSucceeded || s == core.NodeAborted || s == core.NodePartiallySucceeded:
 		// do nothing
 
+	// Check for timeout errors first (both step-level and DAG-level)
+	case errors.Is(execErr, context.DeadlineExceeded):
+		step := node.Step()
+		if step.Timeout > 0 {
+			// Step-level timeout: Node.Execute already set status to failed and exitCode=124.
+			// Keep failed status and ensure we don't retry.
+			logger.Info(ctx, "Step timed out (step-level timeout)", "step", node.Name(), "timeout", step.Timeout, "timeoutSec", int(step.Timeout.Seconds()), "error", execErr)
+			// Ensure status is failed (in case earlier logic differed)
+			node.SetStatus(core.NodeFailed)
+		} else if sc.isTimeout(graph.startedAt) {
+			// DAG-level timeout -> treat as aborted (global cancellation semantics)
+			logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)", "step", node.Name(), "dagTimeout", sc.timeout, "dagTimeoutSec", int(sc.timeout.Seconds()), "error", execErr)
+			node.SetStatus(core.NodeAborted)
+		} else {
+			// Parent context canceled or other deadline; mark aborted for safety
+			logger.Info(ctx, "Step deadline exceeded", "step", node.Name(), "error", execErr)
+			node.SetStatus(core.NodeAborted)
+		}
+		sc.setLastError(execErr)
+
 	case sc.isTimeout(graph.startedAt):
-		logger.Info(ctx, "Step deadline exceeded", "step", node.Name(), "error", execErr)
+		// DAG-level timeout (non-context error case)
+		logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)", "step", node.Name(), "dagTimeout", sc.timeout, "dagTimeoutSec", int(sc.timeout.Seconds()), "error", execErr)
 		node.SetStatus(core.NodeAborted)
 		sc.setLastError(execErr)
 
