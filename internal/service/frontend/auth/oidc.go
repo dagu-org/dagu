@@ -22,13 +22,30 @@ type OIDCConfig struct {
 	Config   *oauth2.Config
 }
 
-const oidcProviderInitTimeout = 10 * time.Second
+// Tunable constants for OIDC auth behaviour.
+const (
+	oidcProviderInitTimeout = 10 * time.Second
+	stateCookieExpiry       = 120 // seconds for transient state/nonce/originalURL cookies
+	defaultTokenExpirySecs  = 60  // fallback when ID token expiry is invalid or already passed
+)
 
 var oidcProviderFactory = func(ctx context.Context, issuer string) (*oidc.Provider, error) {
 	return oidc.NewProvider(ctx, issuer)
 }
 
 func InitVerifierAndConfig(i config.AuthOIDC) (_ *OIDCConfig, err error) {
+	// Basic input validation to fail fast with clearer diagnostics.
+	if i.Issuer == "" {
+		return nil, errors.New("failed to init OIDC provider: issuer is empty")
+	}
+	if i.ClientId == "" {
+		return nil, errors.New("failed to init OIDC provider: client id is empty")
+	}
+	if i.ClientUrl == "" {
+		return nil, errors.New("failed to init OIDC provider: client url is empty")
+	}
+	// ClientSecret may be empty for public clients; don't enforce.
+
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("failed to init OIDC provider: %v", r)
@@ -94,16 +111,13 @@ func callbackHandler(provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
 			http.Error(w, "Failed to get userinfo: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		// default allow all oidc user, if whitelist is not empty only allow listed user.
+		// If a whitelist is provided, only allow listed users (email match).
 		if len(whitelist) > 0 {
-			allow := false
-			for _, item := range whitelist {
-				if item == userInfo.Email {
-					allow = true
-					break
-				}
+			allowedEmails := make(map[string]struct{}, len(whitelist))
+			for _, e := range whitelist {
+				allowedEmails[e] = struct{}{}
 			}
-			if !allow {
+			if _, ok := allowedEmails[userInfo.Email]; !ok {
 				http.Error(w, "No permissions", http.StatusForbidden)
 				return
 			}
@@ -131,9 +145,13 @@ func callbackHandler(provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
 		expireSeconds := int(time.Until(idToken.Expiry).Seconds())
 		if expireSeconds <= 0 {
 			// fall back to a short-lived cookie when token claims look off
-			expireSeconds = 60
+			expireSeconds = defaultTokenExpirySecs
 		}
 		setCookie(w, r, "oidcToken", rawIDToken, expireSeconds)
+		// Clear transient cookies once used successfully.
+		clearCookie(w, r, "state")
+		clearCookie(w, r, "nonce")
+		clearCookie(w, r, "originalURL")
 		http.Redirect(w, r, originalURL.Value, http.StatusFound)
 	}
 }
@@ -144,7 +162,8 @@ func checkOIDCAuth(next http.Handler, provider *oidc.Provider, verifier *oidc.ID
 	authorized, err := r.Cookie("oidcToken")
 	if err == nil && authorized.Value != "" && !strings.HasSuffix(config.RedirectURL, r.URL.Path) {
 		if verifier != nil {
-			if _, err := verifier.Verify(ctx, authorized.Value); err == nil {
+			// Use background context to avoid premature cancellation impacting verification.
+			if _, err := verifier.Verify(context.Background(), authorized.Value); err == nil {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -165,9 +184,9 @@ func checkOIDCAuth(next http.Handler, provider *oidc.Provider, verifier *oidc.ID
 	}
 	// redirect to oidc
 	state, nonce := stringutil.RandomString(16), stringutil.RandomString(16)
-	setCookie(w, r, "state", state, 120)
-	setCookie(w, r, "nonce", nonce, 120)
-	setCookie(w, r, "originalURL", r.URL.String(), 120)
+	setCookie(w, r, "state", state, stateCookieExpiry)
+	setCookie(w, r, "nonce", nonce, stateCookieExpiry)
+	setCookie(w, r, "originalURL", r.URL.String(), stateCookieExpiry)
 	http.Redirect(w, r, config.AuthCodeURL(state, oidc.Nonce(nonce)), http.StatusFound)
 }
 
@@ -193,7 +212,14 @@ func checkOIDCToken(next http.Handler, verifier *oidc.IDTokenVerifier, w http.Re
 		return
 	}
 
-	// Verify the token
+	// Verify the token (guard against misconfiguration where verifier is nil)
+	if verifier == nil {
+		logger.Warn(ctx, "OIDC authentication failed: verifier not configured",
+			"path", r.URL.Path,
+			"method", r.Method)
+		http.Error(w, "Authentication failed: verifier not configured", http.StatusUnauthorized)
+		return
+	}
 	if _, err := verifier.Verify(context.Background(), authorized.Value); err != nil {
 		logger.Warn(ctx, "OIDC authentication failed: token verification failed",
 			"path", r.URL.Path,
