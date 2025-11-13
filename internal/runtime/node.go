@@ -138,17 +138,7 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 }
 
 func (n *Node) Execute(ctx context.Context) error {
-	// Apply step-level timeout if set, otherwise use the parent context
-	var cancel context.CancelFunc
-	step := n.Step()
-	var stepTimeout time.Duration
-	if step.Timeout > 0 {
-		stepTimeout = step.Timeout
-		ctx, cancel = context.WithTimeout(ctx, stepTimeout)
-		logger.Info(ctx, "Step execution started with timeout", "step", step.Name, "timeout", stepTimeout)
-	} else {
-		ctx, cancel = context.WithCancel(ctx)
-	}
+	ctx, cancel, stepTimeout := n.setupContextWithTimeout(ctx)
 	defer cancel()
 
 	cmd, err := n.setupExecutor(ctx)
@@ -157,7 +147,43 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
-	// Periodically flush output buffers so logs appear while running
+	flushDone := n.startOutputFlusher()
+	defer func() {
+		n.stopOutputFlusher(flushDone)
+	}()
+
+	exitCode, err := n.runCommand(ctx, cmd, stepTimeout)
+	n.SetExitCode(exitCode)
+
+	if err := n.captureOutput(ctx); err != nil {
+		return err
+	}
+
+	if err := n.determineNodeStatus(cmd); err != nil {
+		return err
+	}
+
+	return n.Error()
+}
+
+// setupContextWithTimeout configures the execution context with step-level timeout if specified.
+func (n *Node) setupContextWithTimeout(ctx context.Context) (context.Context, context.CancelFunc, time.Duration) {
+	step := n.Step()
+	var stepTimeout time.Duration
+
+	if step.Timeout > 0 {
+		stepTimeout = step.Timeout
+		ctx, cancel := context.WithTimeout(ctx, stepTimeout)
+		logger.Info(ctx, "Step execution started with timeout", "step", step.Name, "timeout", stepTimeout)
+		return ctx, cancel, stepTimeout
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	return ctx, cancel, 0
+}
+
+// startOutputFlusher starts a goroutine that periodically flushes output buffers.
+func (n *Node) startOutputFlusher() chan struct{} {
 	flushDone := make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(500 * time.Millisecond)
@@ -171,70 +197,106 @@ func (n *Node) Execute(ctx context.Context) error {
 			}
 		}
 	}()
+	return flushDone
+}
 
-	var exitCode int
-	startTime := time.Now()
-	if err := cmd.Run(ctx); err != nil {
-		elapsed := time.Since(startTime)
-		// Detect step-level timeout via context, or elapsed time >= timeout (executor may return a signal error)
-		if stepTimeout > 0 && (ctx.Err() == context.DeadlineExceeded || elapsed >= stepTimeout) {
-			// Wrap the deadline exceeded error so errors.Is(..., context.DeadlineExceeded) still works
-			timeoutErr := fmt.Errorf("step timed out after %v (timeoutSec: %d): %w", elapsed.Truncate(time.Millisecond), int(stepTimeout.Seconds()), context.DeadlineExceeded)
-			logger.Error(ctx, "Step execution timed out", "step", step.Name, "timeout", stepTimeout, "timeoutSec", int(stepTimeout.Seconds()), "elapsed", elapsed)
-			n.SetError(timeoutErr)
-			// Mark timeouts as failed so downstream dependent steps remain not started and match test semantics
-			n.SetStatus(core.NodeFailed)
-			exitCode = 124 // Standard timeout exit code
-		} else {
-			n.SetError(err)
-			// Set the exit code if the command implements ExitCoder
-			var exitErr *exec.ExitError
-			if cmd, ok := cmd.(executor.ExitCoder); ok {
-				exitCode = cmd.ExitCode()
-			} else if n.Error() != nil && errors.As(n.Error(), &exitErr) {
-				exitCode = exitErr.ExitCode()
-			} else if code, found := parseExitCodeFromError(n.Error().Error()); found {
-				exitCode = code
-			} else if strings.Contains(err.Error(), "signal:") {
-				// Process killed by signal but not due to our timeout context
-				exitCode = -1
-			} else {
-				exitCode = 1
-			}
-		}
-	}
-
-	n.SetExitCode(exitCode)
-
-	// Stop periodic flushing and do a final flush
+// stopOutputFlusher stops the output flushing goroutine and performs a final flush.
+func (n *Node) stopOutputFlusher(flushDone chan struct{}) {
 	close(flushDone)
 	_ = n.outputs.flushWriters()
+}
 
-	// Flush all output writers to ensure data is written before capturing output
-	// This is especially important for buffered writers
-	_ = n.outputs.flushWriters()
+// runCommand executes the command and handles errors, timeouts, and exit codes.
+func (n *Node) runCommand(ctx context.Context, cmd executor.Executor, stepTimeout time.Duration) (int, error) {
+	startTime := time.Now()
+	err := cmd.Run(ctx)
 
+	if err != nil {
+		elapsed := time.Since(startTime)
+		step := n.Step()
+
+		// Check if this is a timeout error
+		if stepTimeout > 0 && (ctx.Err() == context.DeadlineExceeded || elapsed >= stepTimeout) {
+			return n.handleTimeout(ctx, step, stepTimeout, elapsed)
+		}
+
+		return n.handleCommandError(cmd, err)
+	}
+
+	return 0, nil
+}
+
+// handleTimeout handles step-level timeout errors.
+func (n *Node) handleTimeout(ctx context.Context, step core.Step, stepTimeout, elapsed time.Duration) (int, error) {
+	timeoutErr := fmt.Errorf("step timed out after %v (timeoutSec: %d): %w",
+		elapsed.Truncate(time.Millisecond), int(stepTimeout.Seconds()), context.DeadlineExceeded)
+	logger.Error(ctx, "Step execution timed out", "step", step.Name, "timeout", stepTimeout,
+		"timeoutSec", int(stepTimeout.Seconds()), "elapsed", elapsed)
+	n.SetError(timeoutErr)
+	n.SetStatus(core.NodeFailed)
+	return 124, timeoutErr // Standard timeout exit code
+}
+
+// handleCommandError determines the exit code from a command execution error.
+func (n *Node) handleCommandError(cmd executor.Executor, err error) (int, error) {
+	n.SetError(err)
+
+	// Try to get exit code from ExitCoder interface
+	if exitCoder, ok := cmd.(executor.ExitCoder); ok {
+		return exitCoder.ExitCode(), err
+	}
+
+	// Try to extract exit code from exec.ExitError
+	var exitErr *exec.ExitError
+	if n.Error() != nil && errors.As(n.Error(), &exitErr) {
+		return exitErr.ExitCode(), err
+	}
+
+	// Try to parse exit code from error message
+	if code, found := parseExitCodeFromError(n.Error().Error()); found {
+		return code, err
+	}
+
+	// Process killed by signal but not due to timeout
+	if strings.Contains(err.Error(), "signal:") {
+		return -1, err
+	}
+
+	// Default error exit code
+	return 1, err
+}
+
+// captureOutput captures and stores the command output to a variable if configured.
+func (n *Node) captureOutput(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// Capture output if configured
-	if output := n.Step().Output; output != "" {
-		value, err := n.outputs.capturedOutput(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to capture output: %w", err)
-		}
-		n.setVariable(output, value)
+	output := n.Step().Output
+	if output == "" {
+		return nil
 	}
 
-	if status, ok := cmd.(executor.NodeStatusDeterminer); ok {
-		nodeStatus, err := status.DetermineNodeStatus()
-		if err != nil {
-			return err
-		}
-		n.SetStatus(nodeStatus)
+	value, err := n.outputs.capturedOutput(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to capture output: %w", err)
+	}
+	n.setVariable(output, value)
+	return nil
+}
+
+// determineNodeStatus uses the executor to determine the final node status if supported.
+func (n *Node) determineNodeStatus(cmd executor.Executor) error {
+	statusDeterminer, ok := cmd.(executor.NodeStatusDeterminer)
+	if !ok {
+		return nil
 	}
 
-	return n.Error()
+	nodeStatus, err := statusDeterminer.DetermineNodeStatus()
+	if err != nil {
+		return err
+	}
+	n.SetStatus(nodeStatus)
+	return nil
 }
 
 func (n *Node) clearVariable(key string) {
