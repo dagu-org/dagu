@@ -156,7 +156,6 @@ func TestStepRetryExecutionGraph(t *testing.T) {
 		{name: "retry succeeded last", step: "7", wantStatus: map[string]core.NodeStatus{"1": core.NodeSucceeded, "2": core.NodeFailed, "3": core.NodeAborted, "4": core.NodeSkipped, "5": core.NodeFailed, "6": core.NodeSucceeded, "7": core.NodeNotStarted}},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// deep copy nodes (statuses) for isolation
 			nodes := make([]*runtime.Node, 0, len(baseNodes))
