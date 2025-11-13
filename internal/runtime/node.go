@@ -153,6 +153,7 @@ func (n *Node) Execute(ctx context.Context) error {
 	}()
 
 	exitCode, err := n.runCommand(ctx, cmd, stepTimeout)
+	n.SetError(err)
 	n.SetExitCode(exitCode)
 
 	if err := n.captureOutput(ctx); err != nil {
