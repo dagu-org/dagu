@@ -13,14 +13,14 @@ import (
 
 // ExecutionGraph represents a graph of steps.
 type ExecutionGraph struct {
-	startedAt   time.Time
-	finishedAt  time.Time
-	nodeByID    map[int]*Node
-	nodeByName  map[string]*Node // faster lookup by step name
-	nodes       []*Node
-	From        map[int][]int
-	To          map[int][]int
-	lock        sync.RWMutex
+	startedAt  time.Time
+	finishedAt time.Time
+	nodeByID   map[int]*Node
+	nodeByName map[string]*Node // faster lookup by step name
+	nodes      []*Node
+	From       map[int][]int
+	To         map[int][]int
+	lock       sync.RWMutex
 }
 
 // newGraph allocates an empty execution graph. Construction helpers populate nodes then call buildEdges.
