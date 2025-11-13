@@ -150,10 +150,58 @@ func TestStepRetryExecutionGraph(t *testing.T) {
 		step       string
 		wantStatus map[string]core.NodeStatus
 	}{
-		{name: "retry failed step", step: "2", wantStatus: map[string]core.NodeStatus{"1": core.NodeSucceeded, "2": core.NodeNotStarted, "3": core.NodeAborted, "4": core.NodeSkipped, "5": core.NodeFailed, "6": core.NodeSucceeded, "7": core.NodeSkipped}},
-		{name: "retry succeeded first", step: "1", wantStatus: map[string]core.NodeStatus{"1": core.NodeNotStarted, "2": core.NodeFailed, "3": core.NodeAborted, "4": core.NodeSkipped, "5": core.NodeFailed, "6": core.NodeSucceeded, "7": core.NodeSkipped}},
-		{name: "retry succeeded middle", step: "6", wantStatus: map[string]core.NodeStatus{"1": core.NodeSucceeded, "2": core.NodeFailed, "3": core.NodeAborted, "4": core.NodeSkipped, "5": core.NodeFailed, "6": core.NodeNotStarted, "7": core.NodeSkipped}},
-		{name: "retry succeeded last", step: "7", wantStatus: map[string]core.NodeStatus{"1": core.NodeSucceeded, "2": core.NodeFailed, "3": core.NodeAborted, "4": core.NodeSkipped, "5": core.NodeFailed, "6": core.NodeSucceeded, "7": core.NodeNotStarted}},
+		{
+			name: "retry failed step",
+			step: "2",
+			wantStatus: map[string]core.NodeStatus{
+				"1": core.NodeSucceeded,
+				"2": core.NodeNotStarted,
+				"3": core.NodeAborted,
+				"4": core.NodeSkipped,
+				"5": core.NodeFailed,
+				"6": core.NodeSucceeded,
+				"7": core.NodeSkipped,
+			},
+		},
+		{
+			name: "retry succeeded first",
+			step: "1",
+			wantStatus: map[string]core.NodeStatus{
+				"1": core.NodeNotStarted,
+				"2": core.NodeFailed,
+				"3": core.NodeAborted,
+				"4": core.NodeSkipped,
+				"5": core.NodeFailed,
+				"6": core.NodeSucceeded,
+				"7": core.NodeSkipped,
+			},
+		},
+		{
+			name: "retry succeeded middle",
+			step: "6",
+			wantStatus: map[string]core.NodeStatus{
+				"1": core.NodeSucceeded,
+				"2": core.NodeFailed,
+				"3": core.NodeAborted,
+				"4": core.NodeSkipped,
+				"5": core.NodeFailed,
+				"6": core.NodeNotStarted,
+				"7": core.NodeSkipped,
+			},
+		},
+		{
+			name: "retry succeeded last",
+			step: "7",
+			wantStatus: map[string]core.NodeStatus{
+				"1": core.NodeSucceeded,
+				"2": core.NodeFailed,
+				"3": core.NodeAborted,
+				"4": core.NodeSkipped,
+				"5": core.NodeFailed,
+				"6": core.NodeSucceeded,
+				"7": core.NodeNotStarted,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
