@@ -1105,6 +1105,8 @@ export interface components {
             mailOnError?: boolean;
             /** @description Conditions that must be met before the step can start */
             preconditions?: components["schemas"]["Condition"][];
+            /** @description Maximum execution time for the step in seconds. If set, this timeout takes precedence over the DAG-level timeout for this step. */
+            timeoutSec?: number;
         };
         /** @description Individual search result item for a DAG */
         SearchResultItem: {
