@@ -117,135 +117,94 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 		sc.Cancel(graph)
 	}
 
-	var wg = sync.WaitGroup{}
+	// Channels for event loop
+	// Buffer size = total nodes to avoid blocking
+	readyCh := make(chan *Node, len(graph.nodes))
+	doneCh := make(chan *Node, len(graph.nodes))
 
-	for !graph.isFinished() {
-		if sc.isCanceled() {
+	// Find initial ready nodes
+	for _, node := range graph.nodes {
+		if node.State().Status == core.NodeNotStarted && isReady(ctx, graph, node) {
+			readyCh <- node
+		}
+	}
+
+	var wg sync.WaitGroup
+	running := 0
+
+	// Event loop
+	ctxDoneCh := ctx.Done()
+	for {
+		if graph.isFinished() {
 			break
 		}
 
-	NodesIteration:
-		for _, node := range graph.nodes {
-			if node.State().Status != core.NodeNotStarted || !isReady(ctx, graph, node) {
-				continue NodesIteration
-			}
-			if sc.isCanceled() {
-				break NodesIteration
-			}
-			if sc.maxActiveRuns > 0 && graph.runningCount() >= sc.maxActiveRuns {
-				continue NodesIteration
+		// If canceled and no running nodes, we are done
+		if sc.isCanceled() && running == 0 {
+			break
+		}
+
+		var activeReadyCh chan *Node
+		// Only accept new nodes if:
+		// 1. Not canceled
+		// 2. maxActiveRuns is 0 (unlimited) OR running < maxActiveRuns
+		if !sc.isCanceled() && (sc.maxActiveRuns == 0 || running < sc.maxActiveRuns) {
+			activeReadyCh = readyCh
+		}
+
+		select {
+		case node := <-activeReadyCh:
+			// Double check status
+			if node.State().Status != core.NodeNotStarted {
+				continue
 			}
 
+			running++
 			wg.Add(1)
 
 			logger.Info(ctx, "Step started", "step", node.Name())
 
-			if err := sc.setupNode(ctx, node); err != nil {
-				sc.setLastError(err)
-				node.MarkError(err)
-				node.SetStatus(core.NodeFailed)
-				sc.finishNode(node, &wg)
-				continue NodesIteration
-			}
-
-			node.SetStatus(core.NodeRunning)
-			if progressCh != nil {
-				progressCh <- node
-			}
-
-			go func(ctx context.Context, node *Node) {
-				nodeCtx, nodeCancel := context.WithCancel(ctx)
-				defer nodeCancel()
-
-				// Recover from panics
-				defer sc.recoverNodePanic(ctx, node)
-
+			go func(n *Node) {
 				// Ensure node is finished and wg is decremented
-				defer sc.finishNode(node, &wg)
+				defer sc.finishNode(n, &wg)
+				// Recover from panics
+				defer sc.recoverNodePanic(ctx, n)
+				// Signal completion to scheduler loop
+				defer func() {
+					doneCh <- n
+				}()
 
-				// Create span for step execution
-				spanCtx := nodeCtx
-				parentSpan := trace.SpanFromContext(nodeCtx)
-				if parentSpan.SpanContext().IsValid() {
-					spanAttrs := []attribute.KeyValue{
-						attribute.String("step.name", node.Name()),
-					}
-					// Use the otel package to get the global tracer
-					tracer := otel.Tracer("github.com/dagu-org/dagu")
-					var span trace.Span
-					spanCtx, span = tracer.Start(
-						nodeCtx,
-						fmt.Sprintf("Step: %s", node.Name()),
-						trace.WithAttributes(spanAttrs...),
-					)
-					defer func() {
-						// Set final step attributes
-						nodeData := node.NodeData()
-						span.SetAttributes(
-							attribute.String("step.status", nodeData.State.Status.String()),
-						)
-						if nodeData.State.ExitCode != 0 {
-							span.SetAttributes(attribute.Int("step.exit_code", nodeData.State.ExitCode))
-						}
-						span.End()
-					}()
-				}
-
-				ctx = sc.setupEnviron(spanCtx, graph, node)
-
-				// Check preconditions
-				if !meetsPreconditions(ctx, node, progressCh) {
+				if err := sc.setupNode(ctx, n); err != nil {
+					sc.setLastError(err)
+					n.MarkError(err)
+					n.SetStatus(core.NodeFailed)
 					return
 				}
 
-				ctx = node.SetupContextBeforeExec(ctx)
-
-			ExecRepeat: // repeat execution
-				for !sc.isCanceled() {
-					execErr := sc.execNode(ctx, node)
-					isRetriable := sc.handleNodeExecutionError(ctx, graph, node, execErr)
-					if isRetriable {
-						continue ExecRepeat
-					}
-
-					if node.State().Status != core.NodeAborted {
-						node.IncDoneCount()
-					}
-
-					shouldRepeat := sc.shouldRepeatNode(ctx, node, execErr)
-					if shouldRepeat && !sc.isCanceled() {
-						sc.prepareNodeForRepeat(ctx, node, progressCh)
-						continue
-					}
-
-					if execErr != nil && progressCh != nil {
-						progressCh <- node
-						return
-					}
-
-					break ExecRepeat
-				}
-
-				// If node is still in running state by now, it means it was not canceled
-				// and it has completed its execution without errors.
-				if node.State().Status == core.NodeRunning {
-					node.SetStatus(core.NodeSucceeded)
-				}
-
-				if err := sc.teardownNode(node); err != nil {
-					sc.setLastError(err)
-					node.SetStatus(core.NodeFailed)
-				}
-
+				n.SetStatus(core.NodeRunning)
 				if progressCh != nil {
-					progressCh <- node
+					progressCh <- n
 				}
-			}(ctx, node)
 
-			time.Sleep(sc.delay) // TODO: check if this is necessary
+				sc.runNodeExecution(ctx, graph, n, progressCh)
+			}(node)
+
+			if sc.delay > 0 {
+				time.Sleep(sc.delay)
+			}
+
+		case node := <-doneCh:
+			running--
+			sc.processCompletedNode(ctx, graph, node, readyCh)
+
+		case <-ctxDoneCh:
+			sc.mu.Lock()
+			if sc.lastError == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				sc.lastError = ctx.Err()
+			}
+			sc.mu.Unlock()
+			ctxDoneCh = nil
 		}
-
-		time.Sleep(sc.pause) // avoid busy loop
 	}
 
 	wg.Wait()
@@ -300,6 +259,116 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	)
 
 	return sc.lastError
+}
+
+func (sc *Scheduler) processCompletedNode(ctx context.Context, graph *ExecutionGraph, node *Node, readyCh chan *Node) {
+	if sc.isCanceled() {
+		return
+	}
+
+	// Queue of nodes to process (nodes that just finished)
+	queue := []*Node{node}
+
+	for len(queue) > 0 {
+		curr := queue[0]
+		queue = queue[1:]
+
+		for _, childID := range graph.From[curr.id] {
+			child := graph.nodeByID[childID]
+			if child.State().Status == core.NodeNotStarted {
+				if isReady(ctx, graph, child) {
+					readyCh <- child
+				} else if child.State().Status != core.NodeNotStarted {
+					// Child was marked as Aborted/Skipped/Failed by isReady
+					// Add to queue to propagate to its children
+					queue = append(queue, child)
+				}
+			}
+		}
+	}
+}
+
+func (sc *Scheduler) runNodeExecution(ctx context.Context, graph *ExecutionGraph, node *Node, progressCh chan *Node) {
+	nodeCtx, nodeCancel := context.WithCancel(ctx)
+	defer nodeCancel()
+
+	// Create span for step execution
+	spanCtx := nodeCtx
+	parentSpan := trace.SpanFromContext(nodeCtx)
+	if parentSpan.SpanContext().IsValid() {
+		spanAttrs := []attribute.KeyValue{
+			attribute.String("step.name", node.Name()),
+		}
+		// Use the otel package to get the global tracer
+		tracer := otel.Tracer("github.com/dagu-org/dagu")
+		var span trace.Span
+		spanCtx, span = tracer.Start(
+			nodeCtx,
+			fmt.Sprintf("Step: %s", node.Name()),
+			trace.WithAttributes(spanAttrs...),
+		)
+		defer func() {
+			// Set final step attributes
+			nodeData := node.NodeData()
+			span.SetAttributes(
+				attribute.String("step.status", nodeData.State.Status.String()),
+			)
+			if nodeData.State.ExitCode != 0 {
+				span.SetAttributes(attribute.Int("step.exit_code", nodeData.State.ExitCode))
+			}
+			span.End()
+		}()
+	}
+
+	ctx = sc.setupEnviron(spanCtx, graph, node)
+
+	// Check preconditions
+	if !meetsPreconditions(ctx, node, progressCh) {
+		return
+	}
+
+	ctx = node.SetupContextBeforeExec(ctx)
+
+ExecRepeat: // repeat execution
+	for !sc.isCanceled() {
+		execErr := sc.execNode(ctx, node)
+		isRetriable := sc.handleNodeExecutionError(ctx, graph, node, execErr)
+		if isRetriable {
+			continue ExecRepeat
+		}
+
+		if node.State().Status != core.NodeAborted {
+			node.IncDoneCount()
+		}
+
+		shouldRepeat := sc.shouldRepeatNode(ctx, node, execErr)
+		if shouldRepeat && !sc.isCanceled() {
+			sc.prepareNodeForRepeat(ctx, node, progressCh)
+			continue
+		}
+
+		if execErr != nil && progressCh != nil {
+			progressCh <- node
+			return
+		}
+
+		break ExecRepeat
+	}
+
+	// If node is still in running state by now, it means it was not canceled
+	// and it has completed its execution without errors.
+	if node.State().Status == core.NodeRunning {
+		node.SetStatus(core.NodeSucceeded)
+	}
+
+	if err := sc.teardownNode(node); err != nil {
+		sc.setLastError(err)
+		node.SetStatus(core.NodeFailed)
+	}
+
+	if progressCh != nil {
+		progressCh <- node
+	}
 }
 
 func (sc *Scheduler) setLastError(err error) {
