@@ -260,16 +260,6 @@ func (g *ExecutionGraph) isFinished() bool {
 	return true
 }
 
-func (g *ExecutionGraph) runningCount() int {
-	count := 0
-	for _, node := range g.nodes {
-		if node.State().Status == core.NodeRunning {
-			count++
-		}
-	}
-	return count
-}
-
 // CreateStepRetryGraph creates a new execution graph for retrying a specific step.
 // Only the specified step will be reset for re-execution, leaving all downstream steps untouched.
 func CreateStepRetryGraph(dag *core.DAG, nodes []*Node, stepName string) (*ExecutionGraph, error) {
