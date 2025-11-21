@@ -73,7 +73,7 @@ type Agent struct {
 	scheduler *runtime.Scheduler
 
 	// plan is the execution plan for the DAG.
-	plan *runtime.ExecutionPlan
+	plan *runtime.Plan
 
 	// reporter is responsible for sending the report to the user.
 	reporter *reporter
@@ -887,7 +887,7 @@ func (a *Agent) setupPlan(ctx context.Context) error {
 	if a.retryTarget != nil {
 		return a.setupRetryPlan(ctx)
 	}
-	plan, err := runtime.NewExecutionPlan(a.dag.Steps...)
+	plan, err := runtime.NewPlan(a.dag.Steps...)
 	if err != nil {
 		return err
 	}
@@ -919,7 +919,7 @@ func (a *Agent) setupStepRetryPlan(ctx context.Context, nodes []*runtime.Node) e
 
 // setupDefaultRetryPlan sets up the plan for the default retry behavior (all failed/canceled nodes and downstreams).
 func (a *Agent) setupDefaultRetryPlan(ctx context.Context, nodes []*runtime.Node) error {
-	plan, err := runtime.CreateRetryExecutionPlan(ctx, a.dag, nodes...)
+	plan, err := runtime.CreateRetryPlan(ctx, a.dag, nodes...)
 	if err != nil {
 		return err
 	}

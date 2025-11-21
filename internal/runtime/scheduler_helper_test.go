@@ -180,18 +180,18 @@ func setupScheduler(t *testing.T, opts ...schedulerOption) testHelper {
 func (th testHelper) newPlan(t *testing.T, steps ...core.Step) planHelper {
 	t.Helper()
 
-	plan, err := runtime.NewExecutionPlan(steps...)
+	plan, err := runtime.NewPlan(steps...)
 	require.NoError(t, err)
 
 	return planHelper{
-		testHelper:    th,
-		ExecutionPlan: plan,
+		testHelper: th,
+		Plan:       plan,
 	}
 }
 
 type planHelper struct {
 	testHelper
-	*runtime.ExecutionPlan
+	*runtime.Plan
 }
 
 func (ph planHelper) Schedule(t *testing.T, expectedStatus core.Status) scheduleResult {
@@ -214,7 +214,7 @@ func (ph planHelper) Schedule(t *testing.T, expectedStatus core.Status) schedule
 		done <- struct{}{}
 	}()
 
-	err := ph.Scheduler.Schedule(ctx, ph.ExecutionPlan, progressCh)
+	err := ph.Scheduler.Schedule(ctx, ph.Plan, progressCh)
 
 	close(progressCh)
 
@@ -230,8 +230,8 @@ func (ph planHelper) Schedule(t *testing.T, expectedStatus core.Status) schedule
 
 	}
 
-	require.Equal(t, expectedStatus.String(), ph.Scheduler.Status(ctx, ph.ExecutionPlan).String(),
-		"expected status %s, got %s", expectedStatus, ph.Scheduler.Status(ctx, ph.ExecutionPlan))
+	require.Equal(t, expectedStatus.String(), ph.Scheduler.Status(ctx, ph.Plan).String(),
+		"expected status %s, got %s", expectedStatus, ph.Scheduler.Status(ctx, ph.Plan))
 
 	// wait for items of nodeCompletedChan to be processed
 	<-done
@@ -245,13 +245,13 @@ func (ph planHelper) Schedule(t *testing.T, expectedStatus core.Status) schedule
 }
 
 func (ph planHelper) Signal(sig syscall.Signal) {
-	ph.Scheduler.Signal(ph.Context, ph.ExecutionPlan, sig, nil, false)
+	ph.Scheduler.Signal(ph.Context, ph.Plan, sig, nil, false)
 }
 
 func (ph planHelper) Cancel(t *testing.T) {
 	t.Helper()
 
-	ph.Scheduler.Cancel(ph.ExecutionPlan)
+	ph.Scheduler.Cancel(ph.Plan)
 }
 
 type scheduleResult struct {

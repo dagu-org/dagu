@@ -92,7 +92,7 @@ type Config struct {
 }
 
 // Schedule runs the plan of steps.
-func (sc *Scheduler) Schedule(ctx context.Context, plan *ExecutionPlan, progressCh chan *Node) error {
+func (sc *Scheduler) Schedule(ctx context.Context, plan *Plan, progressCh chan *Node) error {
 	if err := sc.setup(ctx); err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, plan *ExecutionPlan, progress
 	return sc.lastError
 }
 
-func (sc *Scheduler) processCompletedNode(ctx context.Context, plan *ExecutionPlan, node *Node, readyCh chan *Node) {
+func (sc *Scheduler) processCompletedNode(ctx context.Context, plan *Plan, node *Node, readyCh chan *Node) {
 	if sc.isCanceled() {
 		return
 	}
@@ -288,7 +288,7 @@ func (sc *Scheduler) processCompletedNode(ctx context.Context, plan *ExecutionPl
 	}
 }
 
-func (sc *Scheduler) runNodeExecution(ctx context.Context, plan *ExecutionPlan, node *Node, progressCh chan *Node) {
+func (sc *Scheduler) runNodeExecution(ctx context.Context, plan *Plan, node *Node, progressCh chan *Node) {
 	logger.Debug(ctx, "Starting node execution", "step", node.Name())
 	nodeCtx, nodeCancel := context.WithCancel(ctx)
 	defer nodeCancel()
@@ -395,7 +395,7 @@ func (sc *Scheduler) teardownNode(node *Node) error {
 	return nil
 }
 
-func (sc *Scheduler) setupEnviron(ctx context.Context, plan *ExecutionPlan, node *Node) context.Context {
+func (sc *Scheduler) setupEnviron(ctx context.Context, plan *Plan, node *Node) context.Context {
 	env := execution.NewEnv(ctx, node.Step())
 
 	// Populate step information for all nodes with IDs
@@ -462,7 +462,7 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, plan *ExecutionPlan, node
 	return execution.WithEnv(ctx, env)
 }
 
-func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, plan *ExecutionPlan, node *Node) context.Context {
+func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, plan *Plan, node *Node) context.Context {
 	env := execution.NewEnv(ctx, node.Step())
 
 	env.Envs[execution.EnvKeyDAGRunStatus] = sc.Status(ctx, plan).String()
@@ -505,7 +505,7 @@ func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
 // for a node with repeat policy, it does not stop the node and
 // wait to finish current run.
 func (sc *Scheduler) Signal(
-	ctx context.Context, plan *ExecutionPlan, sig os.Signal, done chan bool, allowOverride bool,
+	ctx context.Context, plan *Plan, sig os.Signal, done chan bool, allowOverride bool,
 ) {
 	for _, node := range plan.Nodes() {
 		// for a repetitive task, we'll wait for the job to finish
@@ -533,7 +533,7 @@ func (sc *Scheduler) Signal(
 }
 
 // Cancel sends -1 signal to all nodes.
-func (sc *Scheduler) Cancel(p *ExecutionPlan) {
+func (sc *Scheduler) Cancel(p *Plan) {
 	sc.setCanceled()
 	for _, node := range p.Nodes() {
 		node.Cancel()
@@ -541,7 +541,7 @@ func (sc *Scheduler) Cancel(p *ExecutionPlan) {
 }
 
 // Status returns the status of the scheduler.
-func (sc *Scheduler) Status(ctx context.Context, p *ExecutionPlan) core.Status {
+func (sc *Scheduler) Status(ctx context.Context, p *Plan) core.Status {
 	if sc.isCanceled() && !sc.isSucceed(p) {
 		return core.Aborted
 	}
@@ -586,7 +586,7 @@ func (sc *Scheduler) isCanceled() bool {
 	return sc.canceled == 1
 }
 
-func isReady(ctx context.Context, plan *ExecutionPlan, node *Node) bool {
+func isReady(ctx context.Context, plan *Plan, node *Node) bool {
 	ready := true
 	for _, depID := range plan.Dependencies(node.id) {
 		dep := plan.GetNode(depID)
@@ -636,7 +636,7 @@ func isReady(ctx context.Context, plan *ExecutionPlan, node *Node) bool {
 	return ready
 }
 
-func (sc *Scheduler) runEventHandler(ctx context.Context, plan *ExecutionPlan, node *Node) error {
+func (sc *Scheduler) runEventHandler(ctx context.Context, plan *Plan, node *Node) error {
 	defer node.Finish()
 
 	if !sc.dry {
@@ -709,7 +709,7 @@ func (sc *Scheduler) setCanceled() {
 	sc.canceled = 1
 }
 
-func (sc *Scheduler) isSucceed(p *ExecutionPlan) bool {
+func (sc *Scheduler) isSucceed(p *Plan) bool {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 	for _, node := range p.Nodes() {
@@ -724,7 +724,7 @@ func (sc *Scheduler) isSucceed(p *ExecutionPlan) bool {
 
 // isPartialSuccess checks if the DAG completed with some failures that were allowed to continue.
 // This represents scenarios where execution continued despite failures due to continueOn conditions.
-func (sc *Scheduler) isPartialSuccess(ctx context.Context, p *ExecutionPlan) bool {
+func (sc *Scheduler) isPartialSuccess(ctx context.Context, p *Plan) bool {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 
@@ -913,7 +913,7 @@ func meetsPreconditions(ctx context.Context, node *Node, progressCh chan *Node) 
 
 // handleNodeExecutionError processes execution errors for a node and determines if execution should be retried.
 // handleNodeExecutionError handles the error from node execution and determines if it should be retried.
-func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, plan *ExecutionPlan, node *Node, execErr error) bool {
+func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, plan *Plan, node *Node, execErr error) bool {
 	if execErr == nil {
 		return false // no error, nothing to handle
 	}

@@ -12,13 +12,13 @@ import (
 )
 
 var (
-	ErrCycleDetected = errors.New("cycle detected")
-	ErrStepNotFound  = errors.New("step not found")
+	errCyclicGraph = errors.New("dependency graph has cycles")
+	errMissingNode = errors.New("missing node in execution plan")
 )
 
-// ExecutionPlan represents a plan of execution for a set of steps.
+// Plan represents a plan of execution for a set of steps.
 // It encapsulates the graph structure and ensures thread-safe access.
-type ExecutionPlan struct {
+type Plan struct {
 	startedAt  time.Time
 	finishedAt time.Time
 
@@ -32,10 +32,10 @@ type ExecutionPlan struct {
 	mu sync.RWMutex
 }
 
-// NewExecutionPlan creates a new execution plan from the given steps.
+// NewPlan creates a new execution plan from the given steps.
 // It builds the graph, validates it (checking for cycles), and returns the plan.
-func NewExecutionPlan(steps ...core.Step) (*ExecutionPlan, error) {
-	p := &ExecutionPlan{
+func NewPlan(steps ...core.Step) (*Plan, error) {
+	p := &Plan{
 		nodeByID:     make(map[int]*Node),
 		nodeByName:   make(map[string]*Node),
 		dependencies: make(map[int][]int),
@@ -59,9 +59,9 @@ func NewExecutionPlan(steps ...core.Step) (*ExecutionPlan, error) {
 	return p, nil
 }
 
-// CreateRetryExecutionPlan creates a new execution plan for retrying specific nodes.
-func CreateRetryExecutionPlan(ctx context.Context, dag *core.DAG, nodes ...*Node) (*ExecutionPlan, error) {
-	p := &ExecutionPlan{
+// CreateRetryPlan creates a new execution plan for retrying specific nodes.
+func CreateRetryPlan(ctx context.Context, dag *core.DAG, nodes ...*Node) (*Plan, error) {
+	p := &Plan{
 		nodeByID:     make(map[int]*Node),
 		nodeByName:   make(map[string]*Node),
 		dependencies: make(map[int][]int),
@@ -92,8 +92,8 @@ func CreateRetryExecutionPlan(ctx context.Context, dag *core.DAG, nodes ...*Node
 }
 
 // CreateStepRetryPlan creates a new execution plan for retrying a specific step.
-func CreateStepRetryPlan(dag *core.DAG, nodes []*Node, stepName string) (*ExecutionPlan, error) {
-	p := &ExecutionPlan{
+func CreateStepRetryPlan(dag *core.DAG, nodes []*Node, stepName string) (*Plan, error) {
+	p := &Plan{
 		nodeByID:     make(map[int]*Node),
 		nodeByName:   make(map[string]*Node),
 		dependencies: make(map[int][]int),
@@ -115,12 +115,12 @@ func CreateStepRetryPlan(dag *core.DAG, nodes []*Node, stepName string) (*Execut
 
 	targetNode := p.GetNodeByName(stepName)
 	if targetNode == nil {
-		return nil, fmt.Errorf("%w: %s", ErrStepNotFound, stepName)
+		return nil, fmt.Errorf("%w: %s", errMissingNode, stepName)
 	}
 
 	step, ok := steps[targetNode.Name()]
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrStepNotFound, targetNode.Name())
+		return nil, fmt.Errorf("%w: %s", errMissingNode, targetNode.Name())
 	}
 
 	targetNode.ClearState(step)
@@ -130,38 +130,38 @@ func CreateStepRetryPlan(dag *core.DAG, nodes []*Node, stepName string) (*Execut
 }
 
 // addNode adds a node to the plan structures.
-func (p *ExecutionPlan) addNode(node *Node) {
+func (p *Plan) addNode(node *Node) {
 	p.nodeByID[node.id] = node
 	p.nodeByName[node.Name()] = node
 	p.nodes = append(p.nodes, node)
 }
 
 // buildEdges populates dependency edges and validates acyclicity.
-func (p *ExecutionPlan) buildEdges() error {
+func (p *Plan) buildEdges() error {
 	for _, node := range p.nodes {
 		for _, depName := range node.Step().Depends {
 			depNode, ok := p.nodeByName[depName]
 			if !ok {
-				return fmt.Errorf("%w: %s", ErrStepNotFound, depName)
+				return fmt.Errorf("%w: %s", errMissingNode, depName)
 			}
 			p.addEdge(depNode, node)
 		}
 	}
 
-	if p.hasCycle() {
-		return ErrCycleDetected
+	if p.isCyclic() {
+		return errCyclicGraph
 	}
 	return nil
 }
 
 // addEdge adds a directed edge from 'from' to 'to'.
-func (p *ExecutionPlan) addEdge(from, to *Node) {
+func (p *Plan) addEdge(from, to *Node) {
 	p.dependents[from.id] = append(p.dependents[from.id], to.id)
 	p.dependencies[to.id] = append(p.dependencies[to.id], from.id)
 }
 
-// hasCycle checks for cycles in the graph using Kahn's algorithm.
-func (p *ExecutionPlan) hasCycle() bool {
+// isCyclic checks for cycles in the graph using Kahn's algorithm.
+func (p *Plan) isCyclic() bool {
 	inDegrees := make(map[int]int)
 	for id, deps := range p.dependencies {
 		inDegrees[id] = len(deps)
@@ -192,7 +192,7 @@ func (p *ExecutionPlan) hasCycle() bool {
 }
 
 // setupRetry resets the state of failed/aborted nodes and their dependents.
-func (p *ExecutionPlan) setupRetry(ctx context.Context, steps map[string]core.Step) error {
+func (p *Plan) setupRetry(ctx context.Context, steps map[string]core.Step) error {
 	// Identify nodes that need to be retried (failed or aborted)
 	toRetry := make(map[int]bool)
 	nodeStatus := make(map[int]core.NodeStatus)
@@ -221,7 +221,7 @@ func (p *ExecutionPlan) setupRetry(ctx context.Context, steps map[string]core.St
 				logger.Debug(ctx, "Clearing node state", "step", node.Name())
 				step, ok := steps[node.Name()]
 				if !ok {
-					return fmt.Errorf("%w: %s", ErrStepNotFound, node.Name())
+					return fmt.Errorf("%w: %s", errMissingNode, node.Name())
 				}
 				node.ClearState(step)
 				toRetry[u] = true
@@ -243,7 +243,7 @@ func (p *ExecutionPlan) setupRetry(ctx context.Context, steps map[string]core.St
 // --- Accessors ---
 
 // Nodes returns a slice of all nodes in the plan.
-func (p *ExecutionPlan) Nodes() []*Node {
+func (p *Plan) Nodes() []*Node {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	// Return a copy to prevent modification of the underlying slice
@@ -253,21 +253,21 @@ func (p *ExecutionPlan) Nodes() []*Node {
 }
 
 // GetNode returns the node with the given ID.
-func (p *ExecutionPlan) GetNode(id int) *Node {
+func (p *Plan) GetNode(id int) *Node {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.nodeByID[id]
 }
 
 // GetNodeByName returns the node with the given name.
-func (p *ExecutionPlan) GetNodeByName(name string) *Node {
+func (p *Plan) GetNodeByName(name string) *Node {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.nodeByName[name]
 }
 
 // Dependencies returns the IDs of the nodes that the given node depends on.
-func (p *ExecutionPlan) Dependencies(nodeID int) []int {
+func (p *Plan) Dependencies(nodeID int) []int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	deps := p.dependencies[nodeID]
@@ -277,7 +277,7 @@ func (p *ExecutionPlan) Dependencies(nodeID int) []int {
 }
 
 // Dependents returns the IDs of the nodes that depend on the given node.
-func (p *ExecutionPlan) Dependents(nodeID int) []int {
+func (p *Plan) Dependents(nodeID int) []int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	deps := p.dependents[nodeID]
@@ -288,19 +288,19 @@ func (p *ExecutionPlan) Dependents(nodeID int) []int {
 
 // --- Status & Time ---
 
-func (p *ExecutionPlan) StartAt() time.Time {
+func (p *Plan) StartAt() time.Time {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.startedAt
 }
 
-func (p *ExecutionPlan) FinishAt() time.Time {
+func (p *Plan) FinishAt() time.Time {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.finishedAt
 }
 
-func (p *ExecutionPlan) Duration() time.Duration {
+func (p *Plan) Duration() time.Duration {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	if p.finishedAt.IsZero() {
@@ -309,26 +309,26 @@ func (p *ExecutionPlan) Duration() time.Duration {
 	return p.finishedAt.Sub(p.startedAt)
 }
 
-func (p *ExecutionPlan) IsStarted() bool {
+func (p *Plan) IsStarted() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return !p.startedAt.IsZero()
 }
 
-func (p *ExecutionPlan) IsFinished() bool {
+func (p *Plan) IsFinished() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return !p.finishedAt.IsZero()
 }
 
-func (p *ExecutionPlan) Finish() {
+func (p *Plan) Finish() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.finishedAt = time.Now()
 }
 
 // IsRunning checks if any node is currently running or pending.
-func (p *ExecutionPlan) IsRunning() bool {
+func (p *Plan) IsRunning() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	for _, node := range p.nodes {
@@ -344,7 +344,7 @@ func (p *ExecutionPlan) IsRunning() bool {
 }
 
 // CheckFinished checks if all nodes have completed (successfully or otherwise).
-func (p *ExecutionPlan) CheckFinished() bool {
+func (p *Plan) CheckFinished() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	for _, node := range p.nodes {
@@ -357,7 +357,7 @@ func (p *ExecutionPlan) CheckFinished() bool {
 }
 
 // NodeData returns a snapshot of data for all nodes.
-func (p *ExecutionPlan) NodeData() []NodeData {
+func (p *Plan) NodeData() []NodeData {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	var ret []NodeData

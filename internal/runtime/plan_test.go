@@ -12,7 +12,7 @@ import (
 )
 
 // helper to count edges in the plan
-func totalEdges(p *runtime.ExecutionPlan) int {
+func totalEdges(p *runtime.Plan) int {
 	c := 0
 	for _, node := range p.Nodes() {
 		c += len(p.Dependents(node.ID()))
@@ -28,24 +28,24 @@ func makeNode(name string, status core.NodeStatus, depends ...string) *runtime.N
 	})
 }
 
-func TestExecutionPlan_CycleDetection(t *testing.T) {
+func TestPlan_CycleDetection(t *testing.T) {
 	step1 := core.Step{Name: "1", Depends: []string{"2"}}
 	step2 := core.Step{Name: "2", Depends: []string{"1"}}
-	_, err := runtime.NewExecutionPlan(step1, step2)
+	_, err := runtime.NewPlan(step1, step2)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "cycle detected"), "expected cycle detected error")
 }
 
-func TestExecutionPlan_NodeByName(t *testing.T) {
+func TestPlan_NodeByName(t *testing.T) {
 	steps := []core.Step{{Name: "a"}, {Name: "b", Depends: []string{"a"}}}
-	p, err := runtime.NewExecutionPlan(steps...)
+	p, err := runtime.NewPlan(steps...)
 	require.NoError(t, err)
 	require.NotNil(t, p.GetNodeByName("a"))
 	require.NotNil(t, p.GetNodeByName("b"))
 	require.Nil(t, p.GetNodeByName("c"))
 }
 
-func TestExecutionPlan_DependencyStructures(t *testing.T) {
+func TestPlan_DependencyStructures(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name              string
@@ -91,7 +91,7 @@ func TestExecutionPlan_DependencyStructures(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p, err := runtime.NewExecutionPlan(tt.steps...)
+			p, err := runtime.NewPlan(tt.steps...)
 			require.NoError(t, err)
 			require.Equal(t, tt.wantTotalEdges, totalEdges(p))
 
@@ -112,7 +112,7 @@ func TestExecutionPlan_DependencyStructures(t *testing.T) {
 	}
 }
 
-func TestRetryExecutionPlan(t *testing.T) {
+func TestRetryPlan(t *testing.T) {
 	ctx := context.Background()
 	dag := &core.DAG{Steps: []core.Step{
 		{Name: "1"}, {Name: "2", Depends: []string{"1"}}, {Name: "3", Depends: []string{"2"}},
@@ -129,7 +129,7 @@ func TestRetryExecutionPlan(t *testing.T) {
 		makeNode("7", core.NodeSkipped, "6"),
 		makeNode("8", core.NodeSkipped),
 	}
-	p, err := runtime.CreateRetryExecutionPlan(ctx, dag, nodes...)
+	p, err := runtime.CreateRetryPlan(ctx, dag, nodes...)
 	require.NoError(t, err)
 	require.NotNil(t, p)
 	// expectations based on upstream failures and aborted states triggering retry propagation
@@ -143,7 +143,7 @@ func TestRetryExecutionPlan(t *testing.T) {
 	require.Equal(t, core.NodeSkipped, nodes[7].State().Status)
 }
 
-func TestStepRetryExecutionPlan(t *testing.T) {
+func TestStepRetryPlan(t *testing.T) {
 	dag := &core.DAG{Steps: []core.Step{
 		{Name: "1"}, {Name: "2", Depends: []string{"1"}}, {Name: "3", Depends: []string{"2"}},
 		{Name: "4"}, {Name: "5", Depends: []string{"4"}}, {Name: "6", Depends: []string{"5"}}, {Name: "7", Depends: []string{"6"}},
@@ -232,9 +232,9 @@ func TestStepRetryExecutionPlan(t *testing.T) {
 	}
 }
 
-func TestExecutionPlan_Timing(t *testing.T) {
+func TestPlan_Timing(t *testing.T) {
 	steps := []core.Step{{Name: "a"}}
-	p, err := runtime.NewExecutionPlan(steps...)
+	p, err := runtime.NewPlan(steps...)
 	require.NoError(t, err)
 	require.True(t, p.IsStarted())
 	require.False(t, p.IsFinished())

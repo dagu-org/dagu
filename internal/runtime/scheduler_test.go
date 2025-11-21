@@ -1320,7 +1320,7 @@ func TestScheduler_ErrorHandling(t *testing.T) {
 
 		ctx := execution.SetupDAGContext(plan.Context, dag, nil, execution.DAGRunRef{}, sc.Config.DAGRunID, logFilePath, nil, nil, nil)
 
-		err := sc.Scheduler.Schedule(ctx, plan.ExecutionPlan, nil)
+		err := sc.Scheduler.Schedule(ctx, plan.Plan, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create log directory")
 	})
@@ -1396,11 +1396,11 @@ func TestScheduler_DAGPreconditions(t *testing.T) {
 
 		ctx := execution.SetupDAGContext(plan.Context, dag, nil, execution.DAGRunRef{}, sc.Config.DAGRunID, logFilePath, nil, nil, nil)
 
-		err := sc.Scheduler.Schedule(ctx, plan.ExecutionPlan, nil)
+		err := sc.Scheduler.Schedule(ctx, plan.Plan, nil)
 		require.NoError(t, err) // No error, but dag should be canceled
 
 		// Check that the scheduler was canceled
-		assert.Equal(t, core.Aborted, sc.Scheduler.Status(ctx, plan.ExecutionPlan))
+		assert.Equal(t, core.Aborted, sc.Scheduler.Status(ctx, plan.Plan))
 	})
 }
 
@@ -1417,7 +1417,7 @@ func TestScheduler_SignalHandling(t *testing.T) {
 
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			sc.Scheduler.Signal(sc.Context, plan.ExecutionPlan, syscall.SIGTERM, done, false)
+			sc.Scheduler.Signal(sc.Context, plan.Plan, syscall.SIGTERM, done, false)
 		}()
 
 		start := time.Now()
@@ -1447,7 +1447,7 @@ func TestScheduler_SignalHandling(t *testing.T) {
 
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			sc.Scheduler.Signal(sc.Context, plan.ExecutionPlan, syscall.SIGKILL, nil, true)
+			sc.Scheduler.Signal(sc.Context, plan.Plan, syscall.SIGKILL, nil, true)
 		}()
 
 		result := plan.Schedule(t, core.Aborted)
@@ -1623,7 +1623,7 @@ func TestScheduler_CancelDuringHandlerExecution(t *testing.T) {
 	go func() {
 		// Wait for main step to complete and handler to start
 		time.Sleep(200 * time.Millisecond)
-		sc.Scheduler.Cancel(plan.ExecutionPlan)
+		sc.Scheduler.Cancel(plan.Plan)
 	}()
 
 	// Since we cancel during handler execution, the final status depends on timing
@@ -1647,7 +1647,7 @@ func TestScheduler_RepeatPolicyWithCancel(t *testing.T) {
 
 	go func() {
 		time.Sleep(350 * time.Millisecond)
-		sc.Scheduler.Cancel(plan.ExecutionPlan)
+		sc.Scheduler.Cancel(plan.Plan)
 	}()
 
 	result := plan.Schedule(t, core.Aborted)
@@ -2297,7 +2297,7 @@ func TestScheduler_StepRetryExecution(t *testing.T) {
 		require.NoError(t, err)
 
 		// Schedule the retry
-		retryResult := planHelper{testHelper: sc, ExecutionPlan: retryPlan}.Schedule(t, core.Succeeded)
+		retryResult := planHelper{testHelper: sc, Plan: retryPlan}.Schedule(t, core.Succeeded)
 
 		// A and C should remain unchanged, only B should be re-executed
 		retryResult.AssertNodeStatus(t, "A", core.NodeSucceeded)
