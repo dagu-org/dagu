@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
@@ -240,6 +241,17 @@ func (d *Data) SetStatus(s core.NodeStatus) {
 	defer d.mu.Unlock()
 
 	d.inner.State.Status = s
+}
+
+func (d *Data) StepInfo() cmdutil.StepInfo {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	return cmdutil.StepInfo{
+		Stdout:   d.inner.State.Stdout,
+		Stderr:   d.inner.State.Stderr,
+		ExitCode: strconv.Itoa(d.inner.State.ExitCode),
+	}
 }
 
 func (d *Data) ContinueOn() core.ContinueOn {

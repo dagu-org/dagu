@@ -8,7 +8,6 @@ import (
 	"os"
 	"runtime/debug"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -403,8 +402,7 @@ func (r *Runner) teardownNode(node *Node) error {
 }
 
 func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) context.Context {
-	env := execution.NewEnv(ctx, node.Step())
-	populateStepInfoEnv(&env, plan)
+	env := NewEnv(ctx, node.Step(), plan)
 
 	// Load output variables from predecessor nodes (dependencies)
 	// This traverses backwards from the current node to find all nodes it depends on
@@ -459,9 +457,8 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 }
 
 func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node *Node) context.Context {
-	env := execution.NewEnv(ctx, node.Step())
+	env := NewEnv(ctx, node.Step(), plan)
 	env.Envs[execution.EnvKeyDAGRunStatus] = r.Status(ctx, plan).String()
-	populateStepInfoEnv(&env, plan)
 
 	// get all output variables
 	for _, node := range plan.Nodes() {
@@ -1024,15 +1021,12 @@ func calculateBackoffInterval(interval time.Duration, backoff float64, maxInterv
 	return interval
 }
 
-func populateStepInfoEnv(env *execution.Env, plan *Plan) {
+func NewEnv(ctx context.Context, step core.Step, plan *Plan) execution.Env {
+	env := execution.NewEnv(ctx, step)
 	for _, n := range plan.Nodes() {
 		if n.Step().ID != "" {
-			stepInfo := cmdutil.StepInfo{
-				Stdout:   n.GetStdout(),
-				Stderr:   n.GetStderr(),
-				ExitCode: strconv.Itoa(n.GetExitCode()),
-			}
-			env.StepMap[n.Step().ID] = stepInfo
+			env.StepMap[n.Step().ID] = n.StepInfo()
 		}
 	}
+	return env
 }

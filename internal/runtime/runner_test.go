@@ -2808,3 +2808,23 @@ func TestRunner_DeadlockDetection(t *testing.T) {
 	require.ErrorIs(t, err, runtime.ErrDeadlockDetected)
 	require.Equal(t, core.Failed, r.Status(ctx, plan))
 }
+
+func TestNewEnvWithStepInfo(t *testing.T) {
+	t.Parallel()
+
+	plan, err := runtime.NewPlan(
+		core.Step{ID: "s1", Name: "s1"},
+		core.Step{ID: "s2", Name: "s2"},
+		core.Step{Name: "no-id"},
+	)
+	require.NoError(t, err)
+
+	env := runtime.NewEnv(context.Background(), core.Step{Name: "current"}, plan)
+
+	require.Len(t, env.StepMap, 2)
+	require.Contains(t, env.StepMap, "s1")
+	require.Contains(t, env.StepMap, "s2")
+	require.Equal(t, "0", env.StepMap["s1"].ExitCode)
+	require.Equal(t, "0", env.StepMap["s2"].ExitCode)
+	require.NotContains(t, env.StepMap, "no-id")
+}
