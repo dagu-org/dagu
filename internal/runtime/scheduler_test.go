@@ -27,7 +27,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t, withMaxActiveRuns(1))
 
 		// 1 -> 2 -> 3
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			successStep("2", "1"),
 			successStep("3", "2"),
@@ -44,7 +44,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t, withMaxActiveRuns(1))
 
 		// 1 -> 2 -> 3 -> 4
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			successStep("2", "1"),
 			failStep("3", "2"),
@@ -64,7 +64,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t, withMaxActiveRuns(3))
 
 		// 1,2,3
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			successStep("2"),
 			successStep("3"),
@@ -80,7 +80,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 -> 3 -> 4, 2 (fail)
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			failStep("2"),
 			successStep("3", "1"),
@@ -98,7 +98,7 @@ func TestScheduler(t *testing.T) {
 		t.Parallel()
 		sc := setupScheduler(t, withMaxActiveRuns(1))
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("df / | awk 'NR==2 {exit $4 > 5000 ? 0 : 1}'"),
 			))
@@ -110,7 +110,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 -> 2 (fail) -> 3
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			newStep("2",
 				withDepends("1"),
@@ -133,7 +133,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 -> 2 (skip) -> 3
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			newStep("2",
 				withDepends("1"),
@@ -159,7 +159,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 (exit code 1) -> 2
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("false"),
 				withContinueOn(core.ContinueOn{
@@ -179,7 +179,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 (exit code 1) -> 2
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("echo test_output; false"), // stdout: test_output
 				withContinueOn(core.ContinueOn{
@@ -201,7 +201,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 (exit code 1) -> 2
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("echo test_output >&2; echo test_output; false"), // write to stderr and stdout
 				withContinueOn(core.ContinueOn{
@@ -228,7 +228,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 (exit code 1) -> 2
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("echo test_output; false"), // stdout: test_output
 				withContinueOn(core.ContinueOn{
@@ -250,7 +250,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 (exit code 1) -> 2
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("false"),
 				withContinueOn(core.ContinueOn{
@@ -271,7 +271,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 -> 2 (cancel when running) -> 3 (should not be executed)
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			newStep("2", withDepends("1"), withCommand("sleep 0.5")),
 			failStep("3", "2"),
@@ -292,7 +292,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t, withTimeout(time.Millisecond*500))
 
 		// 1 -> 2 (timeout) -> 3 (should not be executed)
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand("sleep 0.1")),
 			newStep("2", withCommand("sleep 0.5"), withDepends("1")),
 			successStep("3", "2"),
@@ -311,7 +311,7 @@ func TestScheduler(t *testing.T) {
 
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand(fmt.Sprintf("%s %s", testScript, file)),
 				withRetryPolicy(2, 0),
@@ -330,7 +330,7 @@ func TestScheduler(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFile := path.Join(tmpDir, "testfile.txt")
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withScript(`
 					if [ ! -f "`+testFile+`" ]; then
@@ -358,7 +358,7 @@ func TestScheduler(t *testing.T) {
 
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand(fmt.Sprintf("%s %s", testScript, file)),
 				withRetryPolicy(3, time.Millisecond*50),
@@ -396,7 +396,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 -> 2 (precondition match) -> 3
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
@@ -417,7 +417,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 -> 2 (precondition not match) -> 3
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
@@ -438,7 +438,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 -> 2 (precondition not match) -> 3
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
@@ -457,7 +457,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// 1 -> 2 (precondition not match) -> 3
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
@@ -476,7 +476,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("OnExitHandler", func(t *testing.T) {
 		sc := setupScheduler(t, withOnExit(successStep("onExit")))
 
-		graph := sc.newGraph(t, successStep("1"))
+		graph := sc.newPlan(t, successStep("1"))
 
 		result := graph.Schedule(t, core.Succeeded)
 
@@ -486,7 +486,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("OnExitHandlerFail", func(t *testing.T) {
 		sc := setupScheduler(t, withOnExit(failStep("onExit")))
 
-		graph := sc.newGraph(t, successStep("1"))
+		graph := sc.newPlan(t, successStep("1"))
 
 		// Overall status should be error because onExit failed
 		result := graph.Schedule(t, core.Failed)
@@ -497,7 +497,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("OnCancelHandler", func(t *testing.T) {
 		sc := setupScheduler(t, withOnCancel(successStep("onCancel")))
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
 		)
 
@@ -514,7 +514,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("OnSuccessHandler", func(t *testing.T) {
 		sc := setupScheduler(t, withOnSuccess(successStep("onSuccess")))
 
-		graph := sc.newGraph(t, successStep("1"))
+		graph := sc.newPlan(t, successStep("1"))
 
 		result := graph.Schedule(t, core.Succeeded)
 
@@ -524,7 +524,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("OnFailureHandler", func(t *testing.T) {
 		sc := setupScheduler(t, withOnFailure(successStep("onFailure")))
 
-		graph := sc.newGraph(t, failStep("1"))
+		graph := sc.newPlan(t, failStep("1"))
 
 		result := graph.Schedule(t, core.Failed)
 
@@ -534,7 +534,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("CancelOnSignal", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
 		)
 
@@ -550,7 +550,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("Repeat", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("sleep 0.1"),
 				withRepeatPolicy(true, time.Millisecond*100),
@@ -574,7 +574,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("RepeatFail", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("false"),
 				withRepeatPolicy(true, time.Millisecond*50),
@@ -592,7 +592,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("StopRepetitiveTaskGracefully", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("sleep 0.1"),
 				withRepeatPolicy(true, time.Millisecond*50),
@@ -614,7 +614,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("NodeSetupFailure", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withWorkingDir("/nonexistent"),
 				withScript("echo 1"),
 			),
@@ -632,7 +632,7 @@ func TestScheduler(t *testing.T) {
 
 		// 1: echo hello > OUT
 		// 2: echo $OUT > RESULT
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand("echo hello"), withOutput("OUT")),
 			newStep("2", withCommand("echo $OUT"), withDepends("1"), withOutput("RESULT")),
 		)
@@ -656,7 +656,7 @@ func TestScheduler(t *testing.T) {
 		// 2: echo world > OUT2 (depends on 1)
 		// 3: echo $OUT $OUT2 > RESULT (depends on 2)
 		// RESULT should be "hello world"
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand("echo hello"), withOutput("OUT")),
 			newStep("2", withCommand("echo world"), withOutput("OUT2"), withDepends("1")),
 			newStep("3", withCommand("echo $OUT $OUT2"), withDepends("2"), withOutput("RESULT")),
@@ -679,7 +679,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		jsonData := `{"key": "value"}`
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand(fmt.Sprintf("echo '%s'", jsonData)), withOutput("OUT")),
 			newStep("2", withCommand("echo ${OUT.key}"), withDepends("1"), withOutput("RESULT")),
 		)
@@ -696,7 +696,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		jsonData := `{\n\t"key": "value"\n}`
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand(fmt.Sprintf("echo '%s'", jsonData)), withOutput("OUT")),
 			newStep("2", withCommand("echo '${OUT.key}'"), withDepends("1"), withOutput("RESULT")),
 		)
@@ -712,7 +712,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("SpecialVarsDAGRUNLOGFILE", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand("echo $DAG_RUN_LOG_FILE"), withOutput("RESULT")),
 		)
 
@@ -726,7 +726,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("SpecialVarsDAGRUNSTEPSTDOUTFILE", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand("echo $DAG_RUN_STEP_STDOUT_FILE"), withOutput("RESULT")),
 		)
 
@@ -740,7 +740,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("SpecialVarsDAGRUNSTEPSTDERRFILE", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand("echo $DAG_RUN_STEP_STDERR_FILE"), withOutput("RESULT")),
 		)
 
@@ -754,7 +754,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("SpecialVarsDAGRUNID", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand("echo $DAG_RUN_ID"), withOutput("RESULT")),
 		)
 
@@ -768,7 +768,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("SpecialVarsDAGNAME", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand("echo $DAG_NAME"), withOutput("RESULT")),
 		)
 
@@ -782,7 +782,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("SpecialVarsDAGRUNSTEPNAME", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("step_test", withCommand("echo $DAG_RUN_STEP_NAME"), withOutput("RESULT")),
 		)
 
@@ -797,7 +797,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("DAGRunStatusNotAvailableToMainSteps", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withScript("if [ -z \"$DAG_RUN_STATUS\" ]; then echo unset; else echo set; fi"),
 				withOutput("RESULT"),
@@ -827,7 +827,7 @@ func TestScheduler(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}()
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand(fmt.Sprintf("cat %s || true", file)),
 				func(step *core.Step) {
@@ -868,7 +868,7 @@ func TestScheduler(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}()
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("echo hello"),
 				func(step *core.Step) {
@@ -909,7 +909,7 @@ func TestScheduler(t *testing.T) {
 		}()
 		// Script: fail with exit 42 until file exists, then exit 0
 		script := fmt.Sprintf(`if [ ! -f %[1]s ]; then exit 42; else exit 0; fi`, countFile)
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withScript(script),
 				func(step *core.Step) {
@@ -940,7 +940,7 @@ func TestScheduler(t *testing.T) {
 			err := os.Unsetenv("TEST_REPEAT_MATCH_EXPR")
 			require.NoError(t, err)
 		})
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("echo $TEST_REPEAT_MATCH_EXPR"),
 				func(step *core.Step) {
@@ -975,7 +975,7 @@ func TestScheduler(t *testing.T) {
 		// Write initial value
 		err = os.WriteFile(file, []byte("notyet"), 0600)
 		require.NoError(t, err)
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand(fmt.Sprintf("cat %s", file)),
 				withOutput("OUT"),
@@ -1009,7 +1009,7 @@ func TestScheduler(t *testing.T) {
 		}()
 
 		// Step that outputs different values on each retry and fails until 3rd attempt
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					COUNTER_FILE="%s"
@@ -1052,7 +1052,7 @@ func TestScheduler(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Step that outputs data but fails
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("echo 'error_output'; exit 1"),
 				withOutput("ERROR_MSG"),
@@ -1080,7 +1080,7 @@ func TestScheduler(t *testing.T) {
 		}()
 
 		// Step that outputs different values on each retry and always fails
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					COUNTER_FILE="%s"
@@ -1125,7 +1125,7 @@ func TestScheduler(t *testing.T) {
 func TestScheduler_StepLevelTimeout(t *testing.T) {
 	t.Run("SingleStepTimeoutFailsStep", func(t *testing.T) {
 		sc := setupScheduler(t, withTimeout(2*time.Second)) // large DAG timeout to ensure step-level fires first
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("timeout_step",
 				withCommand("sleep 0.2"), // longer than step timeout
 				withStepTimeout(100*time.Millisecond),
@@ -1152,7 +1152,7 @@ func TestScheduler_StepLevelTimeout(t *testing.T) {
 
 	t.Run("TimeoutPreemptsRetriesAndMarksFailed", func(t *testing.T) {
 		sc := setupScheduler(t)
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("retry_timeout",
 				withCommand("sleep 0.15 && false"),
 				withRetryPolicy(5, 50*time.Millisecond), // would retry many times if not timed out
@@ -1170,7 +1170,7 @@ func TestScheduler_StepLevelTimeout(t *testing.T) {
 
 	t.Run("ParallelStepsTimeoutFailIndividually", func(t *testing.T) {
 		sc := setupScheduler(t, withMaxActiveRuns(3))
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("p1", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
 			newStep("p2", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
 			newStep("p3", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
@@ -1184,7 +1184,7 @@ func TestScheduler_StepLevelTimeout(t *testing.T) {
 
 	t.Run("StepLevelTimeoutOverridesLongDAGTimeoutAndFails", func(t *testing.T) {
 		sc := setupScheduler(t, withTimeout(5*time.Second))
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("short_timeout", withCommand("sleep 0.3"), withStepTimeout(120*time.Millisecond)),
 		)
 		result := graph.Schedule(t, core.Failed)
@@ -1240,7 +1240,7 @@ func TestScheduler_DryRun(t *testing.T) {
 		cfg.Dry = true
 	})
 
-	graph := sc.newGraph(t,
+	graph := sc.newPlan(t,
 		successStep("1"),
 		successStep("2", "1"),
 		successStep("3", "2"),
@@ -1263,7 +1263,7 @@ func TestScheduler_DryRunWithHandlers(t *testing.T) {
 		withOnSuccess(successStep("onSuccess")),
 	)
 
-	graph := sc.newGraph(t, successStep("1"))
+	graph := sc.newPlan(t, successStep("1"))
 
 	result := graph.Schedule(t, core.Succeeded)
 
@@ -1282,7 +1282,7 @@ func TestScheduler_ConcurrentExecution(t *testing.T) {
 	}
 
 	sequential := setupScheduler(t, withMaxActiveRuns(1))
-	graphSequential := sequential.newGraph(t, steps()...)
+	graphSequential := sequential.newPlan(t, steps()...)
 	startSequential := time.Now()
 	resultSequential := graphSequential.Schedule(t, core.Succeeded)
 	elapsedSequential := time.Since(startSequential)
@@ -1291,7 +1291,7 @@ func TestScheduler_ConcurrentExecution(t *testing.T) {
 	resultSequential.AssertNodeStatus(t, "3", core.NodeSucceeded)
 
 	concurrent := setupScheduler(t, withMaxActiveRuns(3))
-	graphConcurrent := concurrent.newGraph(t, steps()...)
+	graphConcurrent := concurrent.newPlan(t, steps()...)
 	startConcurrent := time.Now()
 	resultConcurrent := graphConcurrent.Schedule(t, core.Succeeded)
 	elapsedConcurrent := time.Since(startConcurrent)
@@ -1311,7 +1311,7 @@ func TestScheduler_ErrorHandling(t *testing.T) {
 			cfg.LogDir = invalidLogDir
 		})
 
-		graph := sc.newGraph(t, successStep("1"))
+		graph := sc.newPlan(t, successStep("1"))
 
 		// Should fail during setup
 		dag := &core.DAG{Name: "test_dag"}
@@ -1320,7 +1320,7 @@ func TestScheduler_ErrorHandling(t *testing.T) {
 
 		ctx := execution.SetupDAGContext(graph.Context, dag, nil, execution.DAGRunRef{}, sc.Config.DAGRunID, logFilePath, nil, nil, nil)
 
-		err := sc.Scheduler.Schedule(ctx, graph.ExecutionGraph, nil)
+		err := sc.Scheduler.Schedule(ctx, graph.ExecutionPlan, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create log directory")
 	})
@@ -1335,7 +1335,7 @@ func TestScheduler_ErrorHandling(t *testing.T) {
 			kill -99 $$
 		`))
 
-		graph := sc.newGraph(t, panicStep)
+		graph := sc.newPlan(t, panicStep)
 
 		// The scheduler should recover from the panic and mark the step as error
 		result := graph.Schedule(t, core.Failed)
@@ -1346,7 +1346,7 @@ func TestScheduler_ErrorHandling(t *testing.T) {
 func TestScheduler_Metrics(t *testing.T) {
 	sc := setupScheduler(t)
 
-	graph := sc.newGraph(t,
+	graph := sc.newPlan(t,
 		successStep("1"),
 		failStep("2"),
 		newStep("3", withPrecondition(&core.Condition{
@@ -1388,7 +1388,7 @@ func TestScheduler_DAGPreconditions(t *testing.T) {
 			},
 		}
 
-		graph := sc.newGraph(t, successStep("1"))
+		graph := sc.newPlan(t, successStep("1"))
 
 		// Custom schedule with DAG preconditions
 		logFilename := fmt.Sprintf("%s_%s.log", dag.Name, sc.Config.DAGRunID)
@@ -1396,11 +1396,11 @@ func TestScheduler_DAGPreconditions(t *testing.T) {
 
 		ctx := execution.SetupDAGContext(graph.Context, dag, nil, execution.DAGRunRef{}, sc.Config.DAGRunID, logFilePath, nil, nil, nil)
 
-		err := sc.Scheduler.Schedule(ctx, graph.ExecutionGraph, nil)
+		err := sc.Scheduler.Schedule(ctx, graph.ExecutionPlan, nil)
 		require.NoError(t, err) // No error, but dag should be canceled
 
 		// Check that the scheduler was canceled
-		assert.Equal(t, core.Aborted, sc.Scheduler.Status(ctx, graph.ExecutionGraph))
+		assert.Equal(t, core.Aborted, sc.Scheduler.Status(ctx, graph.ExecutionPlan))
 	})
 }
 
@@ -1408,7 +1408,7 @@ func TestScheduler_SignalHandling(t *testing.T) {
 	t.Run("SignalWithDoneChannel", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
 			successStep("2", "1"),
 		)
@@ -1417,7 +1417,7 @@ func TestScheduler_SignalHandling(t *testing.T) {
 
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			sc.Scheduler.Signal(sc.Context, graph.ExecutionGraph, syscall.SIGTERM, done, false)
+			sc.Scheduler.Signal(sc.Context, graph.ExecutionPlan, syscall.SIGTERM, done, false)
 		}()
 
 		start := time.Now()
@@ -1441,13 +1441,13 @@ func TestScheduler_SignalHandling(t *testing.T) {
 	t.Run("SignalWithOverride", func(t *testing.T) {
 		sc := setupScheduler(t)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
 		)
 
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			sc.Scheduler.Signal(sc.Context, graph.ExecutionGraph, syscall.SIGKILL, nil, true)
+			sc.Scheduler.Signal(sc.Context, graph.ExecutionPlan, syscall.SIGKILL, nil, true)
 		}()
 
 		result := graph.Schedule(t, core.Aborted)
@@ -1460,7 +1460,7 @@ func TestScheduler_ComplexDependencyChains(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Create diamond dependency: 1 -> 2,3 -> 4
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			successStep("2", "1"),
 			successStep("3", "1"),
@@ -1480,7 +1480,7 @@ func TestScheduler_ComplexDependencyChains(t *testing.T) {
 
 		// 1 -> 2 (fail) -> 4
 		//   -> 3 -------->
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("1"),
 			failStep("2", "1"),
 			successStep("3", "1"),
@@ -1499,7 +1499,7 @@ func TestScheduler_ComplexDependencyChains(t *testing.T) {
 func TestScheduler_EdgeCases(t *testing.T) {
 	t.Run("EmptyGraph", func(t *testing.T) {
 		sc := setupScheduler(t)
-		graph := sc.newGraph(t) // No steps
+		graph := sc.newPlan(t) // No steps
 
 		result := graph.Schedule(t, core.Succeeded)
 		assert.NoError(t, result.Error)
@@ -1507,7 +1507,7 @@ func TestScheduler_EdgeCases(t *testing.T) {
 
 	t.Run("SingleNodeGraph", func(t *testing.T) {
 		sc := setupScheduler(t)
-		graph := sc.newGraph(t, successStep("single"))
+		graph := sc.newPlan(t, successStep("single"))
 
 		result := graph.Schedule(t, core.Succeeded)
 		result.AssertNodeStatus(t, "single", core.NodeSucceeded)
@@ -1515,7 +1515,7 @@ func TestScheduler_EdgeCases(t *testing.T) {
 
 	t.Run("AllNodesFail", func(t *testing.T) {
 		sc := setupScheduler(t)
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			failStep("1"),
 			failStep("2"),
 			failStep("3"),
@@ -1542,7 +1542,7 @@ func TestScheduler_HandlerNodeAccess(t *testing.T) {
 	)
 
 	// Run a simple graph to trigger setup
-	graph := sc.newGraph(t, successStep("1"))
+	graph := sc.newPlan(t, successStep("1"))
 	_ = graph.Schedule(t, core.Succeeded)
 
 	// Access handler nodes
@@ -1557,7 +1557,7 @@ func TestScheduler_PreconditionWithError(t *testing.T) {
 	sc := setupScheduler(t)
 
 	// Create a step with a precondition that will error (not just return false)
-	graph := sc.newGraph(t,
+	graph := sc.newPlan(t,
 		newStep("1",
 			withPrecondition(&core.Condition{
 				Condition: "exit 2", // Exit with non-zero code
@@ -1583,7 +1583,7 @@ func TestScheduler_MultipleHandlerExecution(t *testing.T) {
 		withOnFailure(recordHandler("onFailure")),
 	)
 
-	graph := sc.newGraph(t, failStep("1"))
+	graph := sc.newPlan(t, failStep("1"))
 
 	result := graph.Schedule(t, core.Failed)
 
@@ -1597,7 +1597,7 @@ func TestScheduler_TimeoutDuringRetry(t *testing.T) {
 	sc := setupScheduler(t, withTimeout(500*time.Millisecond))
 
 	// Step that will keep retrying until timeout
-	graph := sc.newGraph(t,
+	graph := sc.newPlan(t,
 		newStep("1",
 			withCommand("sleep 0.1 && false"),
 			withRetryPolicy(10, 50*time.Millisecond), // Many retries
@@ -1618,12 +1618,12 @@ func TestScheduler_CancelDuringHandlerExecution(t *testing.T) {
 		withOnExit(newStep("onExit", withScript("echo handler started && sleep 0.1 && echo handler done"))),
 	)
 
-	graph := sc.newGraph(t, successStep("1"))
+	graph := sc.newPlan(t, successStep("1"))
 
 	go func() {
 		// Wait for main step to complete and handler to start
 		time.Sleep(200 * time.Millisecond)
-		sc.Scheduler.Cancel(graph.ExecutionGraph)
+		sc.Scheduler.Cancel(graph.ExecutionPlan)
 	}()
 
 	// Since we cancel during handler execution, the final status depends on timing
@@ -1638,7 +1638,7 @@ func TestScheduler_CancelDuringHandlerExecution(t *testing.T) {
 func TestScheduler_RepeatPolicyWithCancel(t *testing.T) {
 	sc := setupScheduler(t)
 
-	graph := sc.newGraph(t,
+	graph := sc.newPlan(t,
 		newStep("1",
 			withCommand("echo repeat"),
 			withRepeatPolicy(true, 100*time.Millisecond),
@@ -1647,7 +1647,7 @@ func TestScheduler_RepeatPolicyWithCancel(t *testing.T) {
 
 	go func() {
 		time.Sleep(350 * time.Millisecond)
-		sc.Scheduler.Cancel(graph.ExecutionGraph)
+		sc.Scheduler.Cancel(graph.ExecutionPlan)
 	}()
 
 	result := graph.Schedule(t, core.Aborted)
@@ -1662,7 +1662,7 @@ func TestScheduler_RepeatPolicyWithLimit(t *testing.T) {
 	sc := setupScheduler(t)
 
 	// Test repeat with limit
-	graph := sc.newGraph(t,
+	graph := sc.newPlan(t,
 		newStep("1",
 			withCommand("echo repeat"),
 			withRepeatPolicy(true, 100*time.Millisecond),
@@ -1687,7 +1687,7 @@ func TestScheduler_RepeatPolicyWithLimitAndCondition(t *testing.T) {
 	defer func() { _ = os.Remove(counterFile) }()
 
 	// Test repeat with limit and condition
-	graph := sc.newGraph(t,
+	graph := sc.newPlan(t,
 		newStep("1",
 			withScript(fmt.Sprintf(`
 				COUNT=0
@@ -1727,7 +1727,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Create a script that will be terminated by signal
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withScript(`
 					trap 'exit 143' TERM
@@ -1753,7 +1753,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		defer func() { _ = os.Remove(counterFile) }()
 
 		// Step that returns different exit codes
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					if [ ! -f "%s" ]; then
@@ -1787,7 +1787,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Test repeat: true (boolean mode) - should repeat while step succeeds (no condition/exitCode)
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("echo boolean true mode"),
 				func(step *core.Step) {
@@ -1814,7 +1814,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_bool_fail_%s", uuid.Must(uuid.NewV7()).String()))
 		defer func() { _ = os.Remove(counterFile) }()
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					COUNT=0
@@ -1852,7 +1852,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_none_%s", uuid.Must(uuid.NewV7()).String()))
 		defer func() { _ = os.Remove(counterFile) }()
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					COUNT=0
@@ -1903,7 +1903,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}()
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("cat "+counterFile+" || echo notfound"),
 				func(step *core.Step) {
@@ -1941,7 +1941,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		err := os.WriteFile(counterFile, []byte("continue"), 0600)
 		require.NoError(t, err)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("echo while with expected"),
 				func(step *core.Step) {
@@ -1984,7 +1984,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}()
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("cat "+counterFile+" || echo notfound"),
 				func(step *core.Step) {
@@ -2022,7 +2022,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		err := os.WriteFile(counterFile, []byte("waiting"), 0600)
 		require.NoError(t, err)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("echo until with expected"),
 				func(step *core.Step) {
@@ -2057,7 +2057,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_exit_%s", uuid.Must(uuid.NewV7()).String()))
 		defer func() { _ = os.Remove(counterFile) }()
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					COUNT=0
@@ -2101,7 +2101,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 
 	t.Run("RepeatPolicyLimit", func(t *testing.T) {
 		sc := setupScheduler(t)
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withCommand("echo limit"),
 				func(step *core.Step) {
@@ -2131,7 +2131,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_output_var_%s", uuid.Must(uuid.NewV7()).String()))
 		defer func() { _ = os.Remove(counterFile) }()
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					# Read counter from file or start at 0
@@ -2174,7 +2174,7 @@ func TestScheduler_StepIDVariableExpansion(t *testing.T) {
 	sc := setupScheduler(t)
 
 	// Test step ID usage in environment setup
-	graph := sc.newGraph(t,
+	graph := sc.newPlan(t,
 		newStep("step1",
 			withCommand("echo output1"),
 			withOutput("OUT1"),
@@ -2217,7 +2217,7 @@ func TestScheduler_UnexpectedFinalStatus(t *testing.T) {
 	sc := setupScheduler(t)
 
 	// Create a graph with a step that might leave the scheduler in an unexpected state
-	graph := sc.newGraph(t,
+	graph := sc.newPlan(t,
 		newStep("1", withCommand("echo test")),
 	)
 
@@ -2233,7 +2233,7 @@ func TestScheduler_RetryPolicyDefaults(t *testing.T) {
 	sc := setupScheduler(t)
 
 	// Test retry with unhandled error type (not exec.ExitError)
-	graph := sc.newGraph(t,
+	graph := sc.newPlan(t,
 		newStep("1",
 			withScript(`
 				# This will cause a different type of error
@@ -2266,7 +2266,7 @@ func TestScheduler_StepRetryExecution(t *testing.T) {
 		}
 
 		// Initial run - all successful
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("A"),
 			successStep("B", "A"),
 			successStep("C", "B"),
@@ -2293,11 +2293,11 @@ func TestScheduler_StepRetryExecution(t *testing.T) {
 		}
 
 		// Retry step B
-		retryGraph, err := runtime.CreateStepRetryGraph(dag, nodes, "B")
+		retryGraph, err := runtime.CreateStepRetryPlan(dag, nodes, "B")
 		require.NoError(t, err)
 
 		// Schedule the retry
-		retryResult := graphHelper{testHelper: sc, ExecutionGraph: retryGraph}.Schedule(t, core.Succeeded)
+		retryResult := planHelper{testHelper: sc, ExecutionPlan: retryGraph}.Schedule(t, core.Succeeded)
 
 		// A and C should remain unchanged, only B should be re-executed
 		retryResult.AssertNodeStatus(t, "A", core.NodeSucceeded)
@@ -2312,7 +2312,7 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Create a DAG where step2 references step1's output
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("step1",
 				withID("first"),
 				withCommand("echo 'output from step1'"),
@@ -2340,7 +2340,7 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Create a DAG where some steps don't have IDs
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("step1",
 				// No ID
 				withCommand("echo 'no id'"),
@@ -2376,7 +2376,7 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Create a step that checks another step's exit code
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("check",
 				withID("checker"),
 				withCommand("exit 42"),
@@ -2414,7 +2414,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			}),
 		)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("main_step",
 				withID("main"),
 				withCommand("echo 'Main processing done'"),
@@ -2457,7 +2457,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			}),
 		)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("setup",
 				withID("setup_step"),
 				withCommand("echo 'Setup complete'"),
@@ -2500,7 +2500,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			}),
 		)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("first",
 				withID("step1"),
 				withCommand("echo 'First step output'"),
@@ -2551,7 +2551,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			}),
 		)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("main",
 				withID("main_step"),
 				withCommand("echo 'Main step'"),
@@ -2585,7 +2585,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			}),
 		)
 
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("main",
 				withID("main"),
 				withCommand("echo 'Processing' && exit 0"),
@@ -2627,7 +2627,7 @@ func TestScheduler_DAGRunStatusHandlerEnv(t *testing.T) {
 		}),
 	)
 
-	graph := sc.newGraph(t, successStep("main"))
+	graph := sc.newPlan(t, successStep("main"))
 	result := graph.Schedule(t, core.Succeeded)
 
 	handlerNode := result.Node(t, "exit_handler")
@@ -2645,7 +2645,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		// - step1 succeeds
 		// - step2 fails but has continueOn.failure = true
 		// - step3 depends on step2 and succeeds
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("step1"),
 			newStep("step2",
 				withDepends("step1"),
@@ -2673,7 +2673,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		// - step1 succeeds
 		// - step2 fails but has continueOn.failure = true and markSuccess = true
 		// - step3 depends on step2 and succeeds
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("step1"),
 			newStep("step2",
 				withDepends("step1"),
@@ -2699,7 +2699,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		sc := setupScheduler(t)
 
 		// Create a graph where multiple steps fail but have continueOn
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("step1",
 				withCommand("false"),
 				withContinueOn(core.ContinueOn{
@@ -2731,7 +2731,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		// Create a graph where all steps fail but have continueOn
 		// This should still be an error, not partial success,
 		// because partial success requires at least one successful step
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			newStep("step1",
 				withCommand("false"),
 				withContinueOn(core.ContinueOn{
@@ -2760,7 +2760,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 
 		// Create a graph where a step fails without continueOn
 		// This should result in an error status, not partial success
-		graph := sc.newGraph(t,
+		graph := sc.newPlan(t,
 			successStep("step1"),
 			failStep("step2", "step1"),    // This will fail without continueOn
 			successStep("step3", "step1"), // This depends on step1, not step2

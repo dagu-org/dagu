@@ -177,31 +177,31 @@ func setupScheduler(t *testing.T, opts ...schedulerOption) testHelper {
 	}
 }
 
-func (th testHelper) newGraph(t *testing.T, steps ...core.Step) graphHelper {
+func (th testHelper) newPlan(t *testing.T, steps ...core.Step) planHelper {
 	t.Helper()
 
-	graph, err := runtime.NewExecutionGraph(steps...)
+	plan, err := runtime.NewExecutionPlan(steps...)
 	require.NoError(t, err)
 
-	return graphHelper{
-		testHelper:     th,
-		ExecutionGraph: graph,
+	return planHelper{
+		testHelper:    th,
+		ExecutionPlan: plan,
 	}
 }
 
-type graphHelper struct {
+type planHelper struct {
 	testHelper
-	*runtime.ExecutionGraph
+	*runtime.ExecutionPlan
 }
 
-func (gh graphHelper) Schedule(t *testing.T, expectedStatus core.Status) scheduleResult {
+func (ph planHelper) Schedule(t *testing.T, expectedStatus core.Status) scheduleResult {
 	t.Helper()
 
 	dag := &core.DAG{Name: "test_dag"}
-	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, gh.Config.DAGRunID)
-	logFilePath := path.Join(gh.Config.LogDir, logFilename)
+	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, ph.Config.DAGRunID)
+	logFilePath := path.Join(ph.Config.LogDir, logFilename)
 
-	ctx := execution.SetupDAGContext(gh.Context, dag, nil, execution.DAGRunRef{}, gh.Config.DAGRunID, logFilePath, nil, nil, nil)
+	ctx := execution.SetupDAGContext(ph.Context, dag, nil, execution.DAGRunRef{}, ph.Config.DAGRunID, logFilePath, nil, nil, nil)
 
 	var doneNodes []*runtime.Node
 	progressCh := make(chan *runtime.Node)
@@ -214,7 +214,7 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus core.Status) schedul
 		done <- struct{}{}
 	}()
 
-	err := gh.Scheduler.Schedule(ctx, gh.ExecutionGraph, progressCh)
+	err := ph.Scheduler.Schedule(ctx, ph.ExecutionPlan, progressCh)
 
 	close(progressCh)
 
@@ -230,32 +230,32 @@ func (gh graphHelper) Schedule(t *testing.T, expectedStatus core.Status) schedul
 
 	}
 
-	require.Equal(t, expectedStatus.String(), gh.Scheduler.Status(ctx, gh.ExecutionGraph).String(),
-		"expected status %s, got %s", expectedStatus, gh.Scheduler.Status(ctx, gh.ExecutionGraph))
+	require.Equal(t, expectedStatus.String(), ph.Scheduler.Status(ctx, ph.ExecutionPlan).String(),
+		"expected status %s, got %s", expectedStatus, ph.Scheduler.Status(ctx, ph.ExecutionPlan))
 
 	// wait for items of nodeCompletedChan to be processed
 	<-done
 	close(done)
 
 	return scheduleResult{
-		graphHelper: gh,
-		Done:        doneNodes,
-		Error:       err,
+		planHelper: ph,
+		Done:       doneNodes,
+		Error:      err,
 	}
 }
 
-func (gh graphHelper) Signal(sig syscall.Signal) {
-	gh.Scheduler.Signal(gh.Context, gh.ExecutionGraph, sig, nil, false)
+func (ph planHelper) Signal(sig syscall.Signal) {
+	ph.Scheduler.Signal(ph.Context, ph.ExecutionPlan, sig, nil, false)
 }
 
-func (gh graphHelper) Cancel(t *testing.T) {
+func (ph planHelper) Cancel(t *testing.T) {
 	t.Helper()
 
-	gh.Scheduler.Cancel(gh.ExecutionGraph)
+	ph.Scheduler.Cancel(ph.ExecutionPlan)
 }
 
 type scheduleResult struct {
-	graphHelper
+	planHelper
 	Done  []*runtime.Node
 	Error error
 }
@@ -269,7 +269,7 @@ func (sr scheduleResult) AssertDoneCount(t *testing.T, expected int) {
 func (sr scheduleResult) AssertNodeStatus(t *testing.T, stepName string, expected core.NodeStatus) {
 	t.Helper()
 
-	target := sr.NodeByName(stepName)
+	target := sr.GetNodeByName(stepName)
 	if target == nil {
 		if sr.Config.OnExit != nil && sr.Config.OnExit.Name == stepName {
 			target = sr.Scheduler.HandlerNode(core.HandlerOnExit)
@@ -295,7 +295,7 @@ func (sr scheduleResult) AssertNodeStatus(t *testing.T, stepName string, expecte
 func (sr scheduleResult) Node(t *testing.T, stepName string) *runtime.Node {
 	t.Helper()
 
-	if node := sr.NodeByName(stepName); node != nil {
+	if node := sr.GetNodeByName(stepName); node != nil {
 		return node
 	}
 

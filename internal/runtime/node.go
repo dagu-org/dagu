@@ -56,6 +56,12 @@ func (n *Node) NodeData() NodeData {
 	return n.Data.Data()
 }
 
+func (n *Node) ID() int {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.id
+}
+
 func (n *Node) StdoutFile() string {
 	n.mu.RLock()
 	defer n.mu.RUnlock()

@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// helper to count edges in From map
-func totalEdges(from map[int][]int) int {
+// helper to count edges in the plan
+func totalEdges(p *runtime.ExecutionPlan) int {
 	c := 0
-	for _, targets := range from {
-		c += len(targets)
+	for _, node := range p.Nodes() {
+		c += len(p.Dependents(node.ID()))
 	}
 	return c
 }
@@ -28,31 +28,31 @@ func makeNode(name string, status core.NodeStatus, depends ...string) *runtime.N
 	})
 }
 
-func TestExecutionGraph_CycleDetection(t *testing.T) {
+func TestExecutionPlan_CycleDetection(t *testing.T) {
 	step1 := core.Step{Name: "1", Depends: []string{"2"}}
 	step2 := core.Step{Name: "2", Depends: []string{"1"}}
-	_, err := runtime.NewExecutionGraph(step1, step2)
+	_, err := runtime.NewExecutionPlan(step1, step2)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "cycle detected"), "expected cycle detected error")
 }
 
-func TestExecutionGraph_NodeByName(t *testing.T) {
+func TestExecutionPlan_NodeByName(t *testing.T) {
 	steps := []core.Step{{Name: "a"}, {Name: "b", Depends: []string{"a"}}}
-	g, err := runtime.NewExecutionGraph(steps...)
+	p, err := runtime.NewExecutionPlan(steps...)
 	require.NoError(t, err)
-	require.NotNil(t, g.NodeByName("a"))
-	require.NotNil(t, g.NodeByName("b"))
-	require.Nil(t, g.NodeByName("c"))
+	require.NotNil(t, p.GetNodeByName("a"))
+	require.NotNil(t, p.GetNodeByName("b"))
+	require.Nil(t, p.GetNodeByName("c"))
 }
 
-func TestExecutionGraph_DependencyStructures(t *testing.T) {
+func TestExecutionPlan_DependencyStructures(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name              string
 		steps             []core.Step
 		wantTotalEdges    int
-		wantOutgoingCount int // len(From)
-		wantIncomingCount int // len(To)
+		wantOutgoingCount int // nodes with dependents
+		wantIncomingCount int // nodes with dependencies
 	}{
 		{
 			name: "basic",
@@ -62,8 +62,8 @@ func TestExecutionGraph_DependencyStructures(t *testing.T) {
 				{Name: "step3", Command: "echo 3", Depends: []string{"step2", "step1"}},
 			},
 			wantTotalEdges:    3, // 1->2,1->3,2->3
-			wantOutgoingCount: 2, // step1, step2
-			wantIncomingCount: 2, // step2, step3
+			wantOutgoingCount: 2, // step1 (has 2,3), step2 (has 3)
+			wantIncomingCount: 2, // step2 (has 1), step3 (has 1,2)
 		},
 		{
 			name: "single chain",
@@ -91,16 +91,28 @@ func TestExecutionGraph_DependencyStructures(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g, err := runtime.NewExecutionGraph(tt.steps...)
+			p, err := runtime.NewExecutionPlan(tt.steps...)
 			require.NoError(t, err)
-			require.Equal(t, tt.wantTotalEdges, totalEdges(g.From))
-			require.Len(t, g.From, tt.wantOutgoingCount)
-			require.Len(t, g.To, tt.wantIncomingCount)
+			require.Equal(t, tt.wantTotalEdges, totalEdges(p))
+
+			outgoing := 0
+			incoming := 0
+			for _, n := range p.Nodes() {
+				if len(p.Dependents(n.ID())) > 0 {
+					outgoing++
+				}
+				if len(p.Dependencies(n.ID())) > 0 {
+					incoming++
+				}
+			}
+
+			require.Equal(t, tt.wantOutgoingCount, outgoing)
+			require.Equal(t, tt.wantIncomingCount, incoming)
 		})
 	}
 }
 
-func TestRetryExecutionGraph(t *testing.T) {
+func TestRetryExecutionPlan(t *testing.T) {
 	ctx := context.Background()
 	dag := &core.DAG{Steps: []core.Step{
 		{Name: "1"}, {Name: "2", Depends: []string{"1"}}, {Name: "3", Depends: []string{"2"}},
@@ -117,9 +129,9 @@ func TestRetryExecutionGraph(t *testing.T) {
 		makeNode("7", core.NodeSkipped, "6"),
 		makeNode("8", core.NodeSkipped),
 	}
-	g, err := runtime.CreateRetryExecutionGraph(ctx, dag, nodes...)
+	p, err := runtime.CreateRetryExecutionPlan(ctx, dag, nodes...)
 	require.NoError(t, err)
-	require.NotNil(t, g)
+	require.NotNil(t, p)
 	// expectations based on upstream failures and aborted states triggering retry propagation
 	require.Equal(t, core.NodeSucceeded, nodes[0].State().Status)
 	require.Equal(t, core.NodeNotStarted, nodes[1].State().Status)
@@ -131,7 +143,7 @@ func TestRetryExecutionGraph(t *testing.T) {
 	require.Equal(t, core.NodeSkipped, nodes[7].State().Status)
 }
 
-func TestStepRetryExecutionGraph(t *testing.T) {
+func TestStepRetryExecutionPlan(t *testing.T) {
 	dag := &core.DAG{Steps: []core.Step{
 		{Name: "1"}, {Name: "2", Depends: []string{"1"}}, {Name: "3", Depends: []string{"2"}},
 		{Name: "4"}, {Name: "5", Depends: []string{"4"}}, {Name: "6", Depends: []string{"5"}}, {Name: "7", Depends: []string{"6"}},
@@ -210,9 +222,9 @@ func TestStepRetryExecutionGraph(t *testing.T) {
 			for _, n := range baseNodes {
 				nodes = append(nodes, makeNode(n.Name(), n.State().Status, n.Step().Depends...))
 			}
-			g, err := runtime.CreateStepRetryGraph(dag, nodes, tt.step)
+			p, err := runtime.CreateStepRetryPlan(dag, nodes, tt.step)
 			require.NoError(t, err)
-			require.NotNil(t, g)
+			require.NotNil(t, p)
 			for _, n := range nodes {
 				require.Equal(t, tt.wantStatus[n.Name()], n.State().Status, "status mismatch for %s", n.Name())
 			}
@@ -220,15 +232,15 @@ func TestStepRetryExecutionGraph(t *testing.T) {
 	}
 }
 
-func TestExecutionGraph_Timing(t *testing.T) {
+func TestExecutionPlan_Timing(t *testing.T) {
 	steps := []core.Step{{Name: "a"}}
-	g, err := runtime.NewExecutionGraph(steps...)
+	p, err := runtime.NewExecutionPlan(steps...)
 	require.NoError(t, err)
-	require.True(t, g.IsStarted())
-	require.False(t, g.IsFinished())
-	require.True(t, g.Duration() >= 0)
-	g.Finish()
-	require.True(t, g.IsFinished())
-	finish := g.FinishAt()
+	require.True(t, p.IsStarted())
+	require.False(t, p.IsFinished())
+	require.True(t, p.Duration() >= 0)
+	p.Finish()
+	require.True(t, p.IsFinished())
+	finish := p.FinishAt()
 	require.WithinDuration(t, time.Now(), finish, time.Second)
 }

@@ -72,8 +72,8 @@ type Agent struct {
 	// scheduler is the scheduler instance to run the DAG.
 	scheduler *runtime.Scheduler
 
-	// graph is the execution graph for the DAG.
-	graph *runtime.ExecutionGraph
+	// graph is the execution plan for the DAG.
+	graph *runtime.ExecutionPlan
 
 	// reporter is responsible for sending the report to the user.
 	reporter *reporter
@@ -587,7 +587,7 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 
 	schedulerStatus := a.scheduler.Status(ctx, a.graph)
 	if schedulerStatus == core.NotStarted && a.graph.IsStarted() {
-		// Match the status to the execution graph.
+		// Match the status to the execution plan.
 		schedulerStatus = core.Running
 	}
 
@@ -883,11 +883,13 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 
 // setupGraph setups the DAG graph. If is retry execution, it loads nodes
 // from the retry node so that it runs the same DAG as the previous run.
+// setupGraph setups the DAG graph. If is retry execution, it loads nodes
+// from the retry node so that it runs the same DAG as the previous run.
 func (a *Agent) setupGraph(ctx context.Context) error {
 	if a.retryTarget != nil {
 		return a.setupGraphForRetry(ctx)
 	}
-	graph, err := runtime.NewExecutionGraph(a.dag.Steps...)
+	graph, err := runtime.NewExecutionPlan(a.dag.Steps...)
 	if err != nil {
 		return err
 	}
@@ -909,7 +911,7 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 
 // setupStepRetryGraph sets up the graph for retrying a specific step.
 func (a *Agent) setupStepRetryGraph(ctx context.Context, nodes []*runtime.Node) error {
-	graph, err := runtime.CreateStepRetryGraph(a.dag, nodes, a.stepRetry)
+	graph, err := runtime.CreateStepRetryPlan(a.dag, nodes, a.stepRetry)
 	if err != nil {
 		return err
 	}
@@ -919,7 +921,7 @@ func (a *Agent) setupStepRetryGraph(ctx context.Context, nodes []*runtime.Node) 
 
 // setupDefaultRetryGraph sets up the graph for the default retry behavior (all failed/canceled nodes and downstreams).
 func (a *Agent) setupDefaultRetryGraph(ctx context.Context, nodes []*runtime.Node) error {
-	graph, err := runtime.CreateRetryExecutionGraph(ctx, a.dag, nodes...)
+	graph, err := runtime.CreateRetryExecutionPlan(ctx, a.dag, nodes...)
 	if err != nil {
 		return err
 	}
