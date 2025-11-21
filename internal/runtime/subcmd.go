@@ -139,7 +139,7 @@ func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 
 // Retry creates a retry command spec.
 func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string, disableMaxActiveRuns bool) CmdSpec {
-	args := []string{"retry", fmt.Sprintf("--run-id=%s", dagRunID)}
+	args := []string{"retry", fmt.Sprintf("--run-id=%s", dagRunID), "-q"}
 
 	if stepName != "" {
 		args = append(args, fmt.Sprintf("--step=%s", stepName))
@@ -161,7 +161,7 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string, d
 
 // TaskStart creates a start command spec for coordinator tasks.
 func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
-	args := []string{"start"}
+	args := []string{"start", "-q"}
 
 	// Add hierarchy flags for sub DAGs
 	if task.RootDagRunId != "" {
@@ -191,7 +191,7 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 
 // TaskRetry creates a retry command spec for coordinator tasks.
 func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
-	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId), "--no-queue", "--disable-max-active-runs"}
+	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId), "--no-queue", "--disable-max-active-runs", "-q"}
 
 	if task.Step != "" {
 		args = append(args, fmt.Sprintf("--step=%s", task.Step))
@@ -251,24 +251,20 @@ func Run(ctx context.Context, spec CmdSpec) error {
 	cmdutil.SetupCommand(cmd)
 	cmd.Env = spec.Env
 
-	// If custom streams are provided, use them and call Run()
-	if spec.Stdout != nil || spec.Stderr != nil {
-		if spec.Stdout != nil {
-			cmd.Stdout = spec.Stdout
-		}
-		if spec.Stderr != nil {
-			cmd.Stderr = spec.Stderr
-		}
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("command failed: %w", err)
-		}
-		return nil
+	if spec.Stdout != nil {
+		cmd.Stdout = spec.Stdout
+	} else {
+		cmd.Stdout = os.Stdout
 	}
 
-	// Otherwise capture output with CombinedOutput()
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("command failed: %w\noutput: %s", err, output)
+	if spec.Stderr != nil {
+		cmd.Stderr = spec.Stderr
+	} else {
+		cmd.Stderr = os.Stderr
+	}
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("command failed: %w", err)
 	}
 	return nil
 }
