@@ -30,8 +30,8 @@ var (
 	ErrUpstreamSkipped = fmt.Errorf("upstream skipped")
 )
 
-// Scheduler is a scheduler that runs a graph of steps.
-type Scheduler struct {
+// Runner runs a plan of steps.
+type Runner struct {
 	logDir        string
 	maxActiveRuns int
 	timeout       time.Duration
@@ -62,8 +62,8 @@ type Scheduler struct {
 	}
 }
 
-func New(cfg *Config) *Scheduler {
-	return &Scheduler{
+func New(cfg *Config) *Runner {
+	return &Runner{
 		logDir:        cfg.LogDir,
 		maxActiveRuns: cfg.MaxActiveSteps,
 		timeout:       cfg.Timeout,
@@ -91,16 +91,16 @@ type Config struct {
 	DAGRunID       string
 }
 
-// Schedule runs the plan of steps.
-func (sc *Scheduler) Schedule(ctx context.Context, plan *Plan, progressCh chan *Node) error {
-	if err := sc.setup(ctx); err != nil {
+// Run runs the plan of steps.
+func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) error {
+	if err := r.setup(ctx); err != nil {
 		return err
 	}
 
 	// Create a cancellable context for the entire execution
 	var cancel context.CancelFunc
-	if sc.timeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, sc.timeout)
+	if r.timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
 	} else {
 		ctx, cancel = context.WithCancel(ctx)
 	}
@@ -109,13 +109,13 @@ func (sc *Scheduler) Schedule(ctx context.Context, plan *Plan, progressCh chan *
 
 	// Initialize node count metrics
 	nodes := plan.Nodes()
-	sc.metrics.totalNodes = len(nodes)
+	r.metrics.totalNodes = len(nodes)
 
 	// If one of the conditions does not met, cancel the execution.
 	env := execution.GetDAGContextFromContext(ctx)
 	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", "err", err)
-		sc.Cancel(plan)
+		r.Cancel(plan)
 	}
 
 	// Channels for event loop
@@ -139,7 +139,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, plan *Plan, progressCh chan *
 	for !plan.CheckFinished() {
 
 		// If canceled and no running nodes, we are done
-		if sc.isCanceled() && running == 0 {
+		if r.isCanceled() && running == 0 {
 			break
 		}
 
@@ -147,7 +147,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, plan *Plan, progressCh chan *
 		// Only accept new nodes if:
 		// 1. Not canceled
 		// 2. maxActiveRuns is 0 (unlimited) OR running < maxActiveRuns
-		if !sc.isCanceled() && (sc.maxActiveRuns == 0 || running < sc.maxActiveRuns) {
+		if !r.isCanceled() && (r.maxActiveRuns == 0 || running < r.maxActiveRuns) {
 			activeReadyCh = readyCh
 		}
 
@@ -166,16 +166,16 @@ func (sc *Scheduler) Schedule(ctx context.Context, plan *Plan, progressCh chan *
 
 			go func(n *Node) {
 				// Ensure node is finished and wg is decremented
-				defer sc.finishNode(n, &wg)
+				defer r.finishNode(n, &wg)
 				// Recover from panics
-				defer sc.recoverNodePanic(ctx, n)
-				// Signal completion to scheduler loop
+				defer r.recoverNodePanic(ctx, n)
+				// Signal completion to runner loop
 				defer func() {
 					doneCh <- n
 				}()
 
-				if err := sc.setupNode(ctx, n); err != nil {
-					sc.setLastError(err)
+				if err := r.setupNode(ctx, n); err != nil {
+					r.setLastError(err)
 					n.MarkError(err)
 					n.SetStatus(core.NodeFailed)
 					return
@@ -186,24 +186,24 @@ func (sc *Scheduler) Schedule(ctx context.Context, plan *Plan, progressCh chan *
 					progressCh <- n
 				}
 
-				sc.runNodeExecution(ctx, plan, n, progressCh)
+				r.runNodeExecution(ctx, plan, n, progressCh)
 			}(node)
 
-			if sc.delay > 0 {
-				time.Sleep(sc.delay)
+			if r.delay > 0 {
+				time.Sleep(r.delay)
 			}
 
 		case node := <-doneCh:
 			logger.Debug(ctx, "Node execution finished", "step", node.Name())
 			running--
-			sc.processCompletedNode(ctx, plan, node, readyCh)
+			r.processCompletedNode(ctx, plan, node, readyCh)
 
 		case <-ctxDoneCh:
-			sc.mu.Lock()
-			if sc.lastError == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				sc.lastError = ctx.Err()
+			r.mu.Lock()
+			if r.lastError == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				r.lastError = ctx.Err()
 			}
-			sc.mu.Unlock()
+			r.mu.Unlock()
 			ctxDoneCh = nil
 		}
 	}
@@ -211,10 +211,10 @@ func (sc *Scheduler) Schedule(ctx context.Context, plan *Plan, progressCh chan *
 	wg.Wait()
 
 	// Collect final metrics
-	sc.metrics.totalExecutionTime = time.Since(sc.metrics.startTime)
+	r.metrics.totalExecutionTime = time.Since(r.metrics.startTime)
 
 	var eventHandlers []core.HandlerType
-	switch sc.Status(ctx, plan) {
+	switch r.Status(ctx, plan) {
 	case core.Succeeded:
 		eventHandlers = append(eventHandlers, core.HandlerOnSuccess)
 
@@ -231,19 +231,19 @@ func (sc *Scheduler) Schedule(ctx context.Context, plan *Plan, progressCh chan *
 
 	case core.NotStarted, core.Running, core.Queued:
 		// These states should not occur at this point
-		logger.Warn(ctx, "Unexpected final status", "status", sc.Status(ctx, plan).String())
+		logger.Warn(ctx, "Unexpected final status", "status", r.Status(ctx, plan).String())
 	}
 
 	eventHandlers = append(eventHandlers, core.HandlerOnExit)
 
-	sc.handlerMu.RLock()
-	defer sc.handlerMu.RUnlock()
+	r.handlerMu.RLock()
+	defer r.handlerMu.RUnlock()
 
 	for _, handler := range eventHandlers {
-		if handlerNode := sc.handlers[handler]; handlerNode != nil {
+		if handlerNode := r.handlers[handler]; handlerNode != nil {
 			logger.Debug(ctx, "Handler execution started", "handler", handlerNode.Name())
-			if err := sc.runEventHandler(ctx, plan, handlerNode); err != nil {
-				sc.setLastError(err)
+			if err := r.runEventHandler(ctx, plan, handlerNode); err != nil {
+				r.setLastError(err)
 			}
 
 			if progressCh != nil {
@@ -252,16 +252,16 @@ func (sc *Scheduler) Schedule(ctx context.Context, plan *Plan, progressCh chan *
 		}
 	}
 
-	logger.Debug(ctx, "Scheduler execution complete",
-		"status", sc.Status(ctx, plan).String(),
-		"lastError", sc.lastError,
+	logger.Debug(ctx, "Runner execution complete",
+		"status", r.Status(ctx, plan).String(),
+		"lastError", r.lastError,
 	)
 
-	return sc.lastError
+	return r.lastError
 }
 
-func (sc *Scheduler) processCompletedNode(ctx context.Context, plan *Plan, node *Node, readyCh chan *Node) {
-	if sc.isCanceled() {
+func (r *Runner) processCompletedNode(ctx context.Context, plan *Plan, node *Node, readyCh chan *Node) {
+	if r.isCanceled() {
 		return
 	}
 
@@ -288,7 +288,7 @@ func (sc *Scheduler) processCompletedNode(ctx context.Context, plan *Plan, node 
 	}
 }
 
-func (sc *Scheduler) runNodeExecution(ctx context.Context, plan *Plan, node *Node, progressCh chan *Node) {
+func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, progressCh chan *Node) {
 	logger.Debug(ctx, "Starting node execution", "step", node.Name())
 	nodeCtx, nodeCancel := context.WithCancel(ctx)
 	defer nodeCancel()
@@ -321,7 +321,7 @@ func (sc *Scheduler) runNodeExecution(ctx context.Context, plan *Plan, node *Nod
 		}()
 	}
 
-	ctx = sc.setupEnviron(spanCtx, plan, node)
+	ctx = r.setupEnviron(spanCtx, plan, node)
 
 	// Check preconditions
 	logger.Debug(ctx, "Checking preconditions", "step", node.Name())
@@ -332,10 +332,10 @@ func (sc *Scheduler) runNodeExecution(ctx context.Context, plan *Plan, node *Nod
 	ctx = node.SetupContextBeforeExec(ctx)
 
 ExecRepeat: // repeat execution
-	for !sc.isCanceled() {
+	for !r.isCanceled() {
 		logger.Debug(ctx, "Executing node loop", "step", node.Name())
-		execErr := sc.execNode(ctx, node)
-		isRetriable := sc.handleNodeExecutionError(ctx, plan, node, execErr)
+		execErr := r.execNode(ctx, node)
+		isRetriable := r.handleNodeExecutionError(ctx, plan, node, execErr)
 		if isRetriable {
 			continue ExecRepeat
 		}
@@ -344,9 +344,9 @@ ExecRepeat: // repeat execution
 			node.IncDoneCount()
 		}
 
-		shouldRepeat := sc.shouldRepeatNode(ctx, node, execErr)
-		if shouldRepeat && !sc.isCanceled() {
-			sc.prepareNodeForRepeat(ctx, node, progressCh)
+		shouldRepeat := r.shouldRepeatNode(ctx, node, execErr)
+		if shouldRepeat && !r.isCanceled() {
+			r.prepareNodeForRepeat(ctx, node, progressCh)
 			continue
 		}
 
@@ -364,8 +364,8 @@ ExecRepeat: // repeat execution
 		node.SetStatus(core.NodeSucceeded)
 	}
 
-	if err := sc.teardownNode(node); err != nil {
-		sc.setLastError(err)
+	if err := r.teardownNode(node); err != nil {
+		r.setLastError(err)
 		node.SetStatus(core.NodeFailed)
 	}
 
@@ -374,28 +374,28 @@ ExecRepeat: // repeat execution
 	}
 }
 
-func (sc *Scheduler) setLastError(err error) {
-	sc.mu.Lock()
-	defer sc.mu.Unlock()
+func (r *Runner) setLastError(err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	sc.lastError = err
+	r.lastError = err
 }
 
-func (sc *Scheduler) setupNode(ctx context.Context, node *Node) error {
-	if !sc.dry {
-		return node.Setup(ctx, sc.logDir, sc.dagRunID)
+func (r *Runner) setupNode(ctx context.Context, node *Node) error {
+	if !r.dry {
+		return node.Setup(ctx, r.logDir, r.dagRunID)
 	}
 	return nil
 }
 
-func (sc *Scheduler) teardownNode(node *Node) error {
-	if !sc.dry {
+func (r *Runner) teardownNode(node *Node) error {
+	if !r.dry {
 		return node.Teardown()
 	}
 	return nil
 }
 
-func (sc *Scheduler) setupEnviron(ctx context.Context, plan *Plan, node *Node) context.Context {
+func (r *Runner) setupEnviron(ctx context.Context, plan *Plan, node *Node) context.Context {
 	env := execution.NewEnv(ctx, node.Step())
 
 	// Populate step information for all nodes with IDs
@@ -462,10 +462,10 @@ func (sc *Scheduler) setupEnviron(ctx context.Context, plan *Plan, node *Node) c
 	return execution.WithEnv(ctx, env)
 }
 
-func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, plan *Plan, node *Node) context.Context {
+func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node *Node) context.Context {
 	env := execution.NewEnv(ctx, node.Step())
 
-	env.Envs[execution.EnvKeyDAGRunStatus] = sc.Status(ctx, plan).String()
+	env.Envs[execution.EnvKeyDAGRunStatus] = r.Status(ctx, plan).String()
 
 	// Populate step information for all nodes with IDs
 	for _, n := range plan.Nodes() {
@@ -491,8 +491,8 @@ func (sc *Scheduler) setupEnvironEventHandler(ctx context.Context, plan *Plan, n
 	return execution.WithEnv(ctx, env)
 }
 
-func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
-	if !sc.dry {
+func (r *Runner) execNode(ctx context.Context, node *Node) error {
+	if !r.dry {
 		if err := node.Execute(ctx); err != nil {
 			return fmt.Errorf("failed to execute step %q: %w", node.Name(), err)
 		}
@@ -501,10 +501,10 @@ func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
 	return nil
 }
 
-// Signal sends a signal to the scheduler.
+// Signal sends a signal to the runner.
 // for a node with repeat policy, it does not stop the node and
 // wait to finish current run.
-func (sc *Scheduler) Signal(
+func (r *Runner) Signal(
 	ctx context.Context, plan *Plan, sig os.Signal, done chan bool, allowOverride bool,
 ) {
 	for _, node := range plan.Nodes() {
@@ -518,14 +518,14 @@ func (sc *Scheduler) Signal(
 	}
 
 	isTermination := signal.IsTerminationSignalOS(sig)
-	if !sc.isCanceled() && isTermination {
-		sc.setCanceled()
+	if !r.isCanceled() && isTermination {
+		r.setCanceled()
 	}
 
 	if done != nil && isTermination {
 		defer func() {
 			for plan.IsRunning() {
-				time.Sleep(sc.pause)
+				time.Sleep(r.pause)
 			}
 			done <- true
 		}()
@@ -533,16 +533,16 @@ func (sc *Scheduler) Signal(
 }
 
 // Cancel sends -1 signal to all nodes.
-func (sc *Scheduler) Cancel(p *Plan) {
-	sc.setCanceled()
+func (r *Runner) Cancel(p *Plan) {
+	r.setCanceled()
 	for _, node := range p.Nodes() {
 		node.Cancel()
 	}
 }
 
-// Status returns the status of the scheduler.
-func (sc *Scheduler) Status(ctx context.Context, p *Plan) core.Status {
-	if sc.isCanceled() && !sc.isSucceed(p) {
+// Status returns the status of the runner.
+func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
+	if r.isCanceled() && !r.isSucceed(p) {
 		return core.Aborted
 	}
 	if !p.IsStarted() {
@@ -552,38 +552,38 @@ func (sc *Scheduler) Status(ctx context.Context, p *Plan) core.Status {
 		return core.Running
 	}
 
-	if sc.isPartialSuccess(ctx, p) {
+	if r.isPartialSuccess(ctx, p) {
 		return core.PartiallySucceeded
 	}
 
-	if sc.isError() {
+	if r.isError() {
 		return core.Failed
 	}
 
 	return core.Succeeded
 }
 
-func (sc *Scheduler) isError() bool {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
-	return sc.lastError != nil
+func (r *Runner) isError() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.lastError != nil
 }
 
 // HandlerNode returns the handler node with the given name.
-func (sc *Scheduler) HandlerNode(name core.HandlerType) *Node {
-	sc.handlerMu.RLock()
-	defer sc.handlerMu.RUnlock()
-	if v, ok := sc.handlers[name]; ok {
+func (r *Runner) HandlerNode(name core.HandlerType) *Node {
+	r.handlerMu.RLock()
+	defer r.handlerMu.RUnlock()
+	if v, ok := r.handlers[name]; ok {
 		return v
 	}
 	return nil
 }
 
-// isCanceled returns true if the scheduler is canceled.
-func (sc *Scheduler) isCanceled() bool {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
-	return sc.canceled == 1
+// isCanceled returns true if the runner is canceled.
+func (r *Runner) isCanceled() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.canceled == 1
 }
 
 func isReady(ctx context.Context, plan *Plan, node *Node) bool {
@@ -636,11 +636,11 @@ func isReady(ctx context.Context, plan *Plan, node *Node) bool {
 	return ready
 }
 
-func (sc *Scheduler) runEventHandler(ctx context.Context, plan *Plan, node *Node) error {
+func (r *Runner) runEventHandler(ctx context.Context, plan *Plan, node *Node) error {
 	defer node.Finish()
 
-	if !sc.dry {
-		if err := node.Setup(ctx, sc.logDir, sc.dagRunID); err != nil {
+	if !r.dry {
+		if err := node.Setup(ctx, r.logDir, r.dagRunID); err != nil {
 			node.SetStatus(core.NodeFailed)
 			return nil
 		}
@@ -651,7 +651,7 @@ func (sc *Scheduler) runEventHandler(ctx context.Context, plan *Plan, node *Node
 
 		node.SetStatus(core.NodeRunning)
 
-		ctx = sc.setupEnvironEventHandler(ctx, plan, node)
+		ctx = r.setupEnvironEventHandler(ctx, plan, node)
 		if err := node.Execute(ctx); err != nil {
 			node.SetStatus(core.NodeFailed)
 			return err
@@ -665,53 +665,53 @@ func (sc *Scheduler) runEventHandler(ctx context.Context, plan *Plan, node *Node
 	return nil
 }
 
-func (sc *Scheduler) setup(ctx context.Context) (err error) {
-	if !sc.dry {
-		if err = os.MkdirAll(sc.logDir, 0750); err != nil {
+func (r *Runner) setup(ctx context.Context) (err error) {
+	if !r.dry {
+		if err = os.MkdirAll(r.logDir, 0750); err != nil {
 			err = fmt.Errorf("failed to create log directory: %w", err)
 			return err
 		}
 	}
 
 	// Initialize handlers
-	sc.handlerMu.Lock()
-	defer sc.handlerMu.Unlock()
-	sc.handlers = map[core.HandlerType]*Node{}
-	if sc.onExit != nil {
-		sc.handlers[core.HandlerOnExit] = &Node{Data: newSafeData(NodeData{Step: *sc.onExit})}
+	r.handlerMu.Lock()
+	defer r.handlerMu.Unlock()
+	r.handlers = map[core.HandlerType]*Node{}
+	if r.onExit != nil {
+		r.handlers[core.HandlerOnExit] = &Node{Data: newSafeData(NodeData{Step: *r.onExit})}
 	}
-	if sc.onSuccess != nil {
-		sc.handlers[core.HandlerOnSuccess] = &Node{Data: newSafeData(NodeData{Step: *sc.onSuccess})}
+	if r.onSuccess != nil {
+		r.handlers[core.HandlerOnSuccess] = &Node{Data: newSafeData(NodeData{Step: *r.onSuccess})}
 	}
-	if sc.onFailure != nil {
-		sc.handlers[core.HandlerOnFailure] = &Node{Data: newSafeData(NodeData{Step: *sc.onFailure})}
+	if r.onFailure != nil {
+		r.handlers[core.HandlerOnFailure] = &Node{Data: newSafeData(NodeData{Step: *r.onFailure})}
 	}
-	if sc.onCancel != nil {
-		sc.handlers[core.HandlerOnCancel] = &Node{Data: newSafeData(NodeData{Step: *sc.onCancel})}
+	if r.onCancel != nil {
+		r.handlers[core.HandlerOnCancel] = &Node{Data: newSafeData(NodeData{Step: *r.onCancel})}
 	}
 
 	// Initialize metrics
-	sc.metrics.startTime = time.Now()
+	r.metrics.startTime = time.Now()
 
-	// Log scheduler setup
-	logger.Debug(ctx, "Scheduler setup complete",
-		"dagRunId", sc.dagRunID,
-		"maxActiveRuns", sc.maxActiveRuns,
-		"timeout", sc.timeout,
-		"dry", sc.dry)
+	// Log runner setup
+	logger.Debug(ctx, "Runner setup complete",
+		"dagRunId", r.dagRunID,
+		"maxActiveRuns", r.maxActiveRuns,
+		"timeout", r.timeout,
+		"dry", r.dry)
 
 	return err
 }
 
-func (sc *Scheduler) setCanceled() {
-	sc.mu.Lock()
-	defer sc.mu.Unlock()
-	sc.canceled = 1
+func (r *Runner) setCanceled() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.canceled = 1
 }
 
-func (sc *Scheduler) isSucceed(p *Plan) bool {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
+func (r *Runner) isSucceed(p *Plan) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	for _, node := range p.Nodes() {
 		nodeStatus := node.State().Status
 		if nodeStatus == core.NodeSucceeded || nodeStatus == core.NodeSkipped || nodeStatus == core.NodePartiallySucceeded {
@@ -724,9 +724,9 @@ func (sc *Scheduler) isSucceed(p *Plan) bool {
 
 // isPartialSuccess checks if the DAG completed with some failures that were allowed to continue.
 // This represents scenarios where execution continued despite failures due to continueOn conditions.
-func (sc *Scheduler) isPartialSuccess(ctx context.Context, p *Plan) bool {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
+func (r *Runner) isPartialSuccess(ctx context.Context, p *Plan) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	hasFailuresWithContinueOn := false
 	hasSuccessfulNodes := false
@@ -768,29 +768,29 @@ func (sc *Scheduler) isPartialSuccess(ctx context.Context, p *Plan) bool {
 	return hasSuccessfulNodes && hasFailuresWithContinueOn
 }
 
-func (sc *Scheduler) isTimeout(startedAt time.Time) bool {
-	return sc.timeout > 0 && time.Since(startedAt) > sc.timeout
+func (r *Runner) isTimeout(startedAt time.Time) bool {
+	return r.timeout > 0 && time.Since(startedAt) > r.timeout
 }
 
-// GetMetrics returns the current metrics for the scheduler
-func (sc *Scheduler) GetMetrics() map[string]any {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
+// GetMetrics returns the current metrics for the runner
+func (r *Runner) GetMetrics() map[string]any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	metrics := map[string]any{
-		"totalNodes":         sc.metrics.totalNodes,
-		"completedNodes":     sc.metrics.completedNodes,
-		"failedNodes":        sc.metrics.failedNodes,
-		"skippedNodes":       sc.metrics.skippedNodes,
-		"canceledNodes":      sc.metrics.canceledNodes,
-		"totalExecutionTime": sc.metrics.totalExecutionTime.String(),
+		"totalNodes":         r.metrics.totalNodes,
+		"completedNodes":     r.metrics.completedNodes,
+		"failedNodes":        r.metrics.failedNodes,
+		"skippedNodes":       r.metrics.skippedNodes,
+		"canceledNodes":      r.metrics.canceledNodes,
+		"totalExecutionTime": r.metrics.totalExecutionTime.String(),
 	}
 
 	return metrics
 }
 
 // shouldRetryNode handles the retry logic for a node based on exit codes and retry policy
-func (sc *Scheduler) shouldRetryNode(ctx context.Context, node *Node, execErr error) (shouldRetry bool) {
+func (r *Runner) shouldRetryNode(ctx context.Context, node *Node, execErr error) (shouldRetry bool) {
 	var exitCode int
 	var exitCodeFound bool
 
@@ -830,7 +830,7 @@ func (sc *Scheduler) shouldRetryNode(ctx context.Context, node *Node, execErr er
 		// finish the node with error
 		node.SetStatus(core.NodeFailed)
 		node.MarkError(execErr)
-		sc.setLastError(execErr)
+		r.setLastError(execErr)
 		return false
 	}
 
@@ -851,7 +851,7 @@ func (sc *Scheduler) shouldRetryNode(ctx context.Context, node *Node, execErr er
 }
 
 // recoverNodePanic handles panic recovery for a node goroutine.
-func (sc *Scheduler) recoverNodePanic(ctx context.Context, node *Node) {
+func (r *Runner) recoverNodePanic(ctx context.Context, node *Node) {
 	if panicObj := recover(); panicObj != nil {
 		stack := string(debug.Stack())
 		err := fmt.Errorf("panic recovered in node %s: %v\n%s", node.Name(), panicObj, stack)
@@ -859,33 +859,33 @@ func (sc *Scheduler) recoverNodePanic(ctx context.Context, node *Node) {
 			"err", err,
 			"step", node.Name(),
 			"stack", stack,
-			"dagRunId", sc.dagRunID)
+			"dagRunId", r.dagRunID)
 		node.MarkError(err)
-		sc.setLastError(err)
+		r.setLastError(err)
 
 		// Update metrics for failed node
-		sc.mu.Lock()
-		sc.metrics.failedNodes++
-		sc.mu.Unlock()
+		r.mu.Lock()
+		r.metrics.failedNodes++
+		r.mu.Unlock()
 	}
 }
 
 // finishNode updates metrics and finalizes the node.
-func (sc *Scheduler) finishNode(node *Node, wg *sync.WaitGroup) {
-	sc.mu.Lock()
-	defer sc.mu.Unlock()
+func (r *Runner) finishNode(node *Node, wg *sync.WaitGroup) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	switch node.State().Status {
 	case core.NodeSucceeded:
-		sc.metrics.completedNodes++
+		r.metrics.completedNodes++
 	case core.NodeFailed:
-		sc.metrics.failedNodes++
+		r.metrics.failedNodes++
 	case core.NodeSkipped:
-		sc.metrics.skippedNodes++
+		r.metrics.skippedNodes++
 	case core.NodeAborted:
-		sc.metrics.canceledNodes++
+		r.metrics.canceledNodes++
 	case core.NodePartiallySucceeded:
-		sc.metrics.completedNodes++ // Count partial success as completed
+		r.metrics.completedNodes++ // Count partial success as completed
 	case core.NodeNotStarted, core.NodeRunning:
 		// Should not happen at this point
 	}
@@ -913,7 +913,7 @@ func meetsPreconditions(ctx context.Context, node *Node, progressCh chan *Node) 
 
 // handleNodeExecutionError processes execution errors for a node and determines if execution should be retried.
 // handleNodeExecutionError handles the error from node execution and determines if it should be retried.
-func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, plan *Plan, node *Node, execErr error) bool {
+func (r *Runner) handleNodeExecutionError(ctx context.Context, plan *Plan, node *Node, execErr error) bool {
 	if execErr == nil {
 		return false // no error, nothing to handle
 	}
@@ -932,28 +932,28 @@ func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, plan *Plan, n
 			logger.Info(ctx, "Step timed out (step-level timeout)", "step", node.Name(), "timeout", step.Timeout, "timeoutSec", int(step.Timeout.Seconds()), "error", execErr)
 			// Ensure status is failed (in case earlier logic differed)
 			node.SetStatus(core.NodeFailed)
-		} else if sc.isTimeout(plan.StartAt()) {
+		} else if r.isTimeout(plan.StartAt()) {
 			// DAG-level timeout -> treat as aborted (global cancellation semantics)
-			logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)", "step", node.Name(), "dagTimeout", sc.timeout, "dagTimeoutSec", int(sc.timeout.Seconds()), "error", execErr)
+			logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)", "step", node.Name(), "dagTimeout", r.timeout, "dagTimeoutSec", int(r.timeout.Seconds()), "error", execErr)
 			node.SetStatus(core.NodeAborted)
 		} else {
 			// Parent context canceled or other deadline; mark aborted for safety
 			logger.Info(ctx, "Step deadline exceeded", "step", node.Name(), "error", execErr)
 			node.SetStatus(core.NodeAborted)
 		}
-		sc.setLastError(execErr)
+		r.setLastError(execErr)
 
-	case sc.isTimeout(plan.StartAt()):
+	case r.isTimeout(plan.StartAt()):
 		// DAG-level timeout (non-context error case)
-		logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)", "step", node.Name(), "dagTimeout", sc.timeout, "dagTimeoutSec", int(sc.timeout.Seconds()), "error", execErr)
+		logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)", "step", node.Name(), "dagTimeout", r.timeout, "dagTimeoutSec", int(r.timeout.Seconds()), "error", execErr)
 		node.SetStatus(core.NodeAborted)
-		sc.setLastError(execErr)
+		r.setLastError(execErr)
 
-	case sc.isCanceled():
-		sc.setLastError(execErr)
+	case r.isCanceled():
+		r.setLastError(execErr)
 
 	case node.retryPolicy.Limit > node.GetRetryCount():
-		if sc.shouldRetryNode(ctx, node, execErr) {
+		if r.shouldRetryNode(ctx, node, execErr) {
 			return true
 		}
 
@@ -966,7 +966,7 @@ func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, plan *Plan, n
 			node.SetStatus(core.NodeSucceeded)
 		} else {
 			node.MarkError(execErr)
-			sc.setLastError(execErr)
+			r.setLastError(execErr)
 		}
 	}
 
@@ -974,7 +974,7 @@ func (sc *Scheduler) handleNodeExecutionError(ctx context.Context, plan *Plan, n
 }
 
 // shouldRepeatNode determines if a node should be repeated based on its repeat policy
-func (sc *Scheduler) shouldRepeatNode(ctx context.Context, node *Node, execErr error) bool {
+func (r *Runner) shouldRepeatNode(ctx context.Context, node *Node, execErr error) bool {
 	step := node.Step()
 	rp := step.RepeatPolicy
 
@@ -1030,12 +1030,12 @@ func (sc *Scheduler) shouldRepeatNode(ctx context.Context, node *Node, execErr e
 }
 
 // prepareNodeForRepeat sets up a node for repetition
-func (sc *Scheduler) prepareNodeForRepeat(ctx context.Context, node *Node, progressCh chan *Node) {
+func (r *Runner) prepareNodeForRepeat(ctx context.Context, node *Node, progressCh chan *Node) {
 	step := node.Step()
 
 	node.SetStatus(core.NodeRunning) // reset status to running for the repeat
-	if sc.lastError == node.Error() {
-		sc.setLastError(nil) // clear last error if we are repeating
+	if r.lastError == node.Error() {
+		r.setLastError(nil) // clear last error if we are repeating
 	}
 	logger.Info(ctx, "Step will be repeated", "step", node.Name(), "interval", step.RepeatPolicy.Interval)
 	interval := calculateBackoffInterval(

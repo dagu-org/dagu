@@ -114,49 +114,49 @@ func newStep(name string, opts ...stepOption) core.Step {
 type testHelper struct {
 	test.Helper
 
-	scheduler *runtime.Scheduler
-	cfg       *runtime.Config
+	runner *runtime.Runner
+	cfg    *runtime.Config
 }
 
-type schedulerOption func(*runtime.Config)
+type runnerOption func(*runtime.Config)
 
-func withTimeout(d time.Duration) schedulerOption {
+func withTimeout(d time.Duration) runnerOption {
 	return func(cfg *runtime.Config) {
 		cfg.Timeout = d
 	}
 }
 
-func withMaxActiveRuns(n int) schedulerOption {
+func withMaxActiveRuns(n int) runnerOption {
 	return func(cfg *runtime.Config) {
 		cfg.MaxActiveSteps = n
 	}
 }
 
-func withOnExit(step core.Step) schedulerOption {
+func withOnExit(step core.Step) runnerOption {
 	return func(cfg *runtime.Config) {
 		cfg.OnExit = &step
 	}
 }
 
-func withOnCancel(step core.Step) schedulerOption {
+func withOnCancel(step core.Step) runnerOption {
 	return func(cfg *runtime.Config) {
 		cfg.OnCancel = &step
 	}
 }
 
-func withOnSuccess(step core.Step) schedulerOption {
+func withOnSuccess(step core.Step) runnerOption {
 	return func(cfg *runtime.Config) {
 		cfg.OnSuccess = &step
 	}
 }
 
-func withOnFailure(step core.Step) schedulerOption {
+func withOnFailure(step core.Step) runnerOption {
 	return func(cfg *runtime.Config) {
 		cfg.OnFailure = &step
 	}
 }
 
-func setupScheduler(t *testing.T, opts ...schedulerOption) testHelper {
+func setupRunner(t *testing.T, opts ...runnerOption) testHelper {
 	t.Helper()
 
 	th := test.Setup(t)
@@ -168,12 +168,12 @@ func setupScheduler(t *testing.T, opts ...schedulerOption) testHelper {
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	sc := runtime.New(cfg)
+	r := runtime.New(cfg)
 
 	return testHelper{
-		Helper:    test.Setup(t),
-		scheduler: sc,
-		cfg:       cfg,
+		Helper: test.Setup(t),
+		runner: r,
+		cfg:    cfg,
 	}
 }
 
@@ -194,7 +194,7 @@ type planHelper struct {
 	*runtime.Plan
 }
 
-func (ph planHelper) assertSchedule(t *testing.T, expectedStatus core.Status) scheduleResult {
+func (ph planHelper) assertRun(t *testing.T, expectedStatus core.Status) runResult {
 	t.Helper()
 
 	dag := &core.DAG{Name: "test_dag"}
@@ -214,7 +214,7 @@ func (ph planHelper) assertSchedule(t *testing.T, expectedStatus core.Status) sc
 		done <- struct{}{}
 	}()
 
-	err := ph.scheduler.Schedule(ctx, ph.Plan, progressCh)
+	err := ph.runner.Run(ctx, ph.Plan, progressCh)
 
 	close(progressCh)
 
@@ -230,14 +230,14 @@ func (ph planHelper) assertSchedule(t *testing.T, expectedStatus core.Status) sc
 
 	}
 
-	require.Equal(t, expectedStatus.String(), ph.scheduler.Status(ctx, ph.Plan).String(),
-		"expected status %s, got %s", expectedStatus, ph.scheduler.Status(ctx, ph.Plan))
+	require.Equal(t, expectedStatus.String(), ph.runner.Status(ctx, ph.Plan).String(),
+		"expected status %s, got %s", expectedStatus, ph.runner.Status(ctx, ph.Plan))
 
 	// wait for items of nodeCompletedChan to be processed
 	<-done
 	close(done)
 
-	return scheduleResult{
+	return runResult{
 		planHelper: ph,
 		Done:       doneNodes,
 		Error:      err,
@@ -245,37 +245,37 @@ func (ph planHelper) assertSchedule(t *testing.T, expectedStatus core.Status) sc
 }
 
 func (ph planHelper) signal(sig syscall.Signal) {
-	ph.scheduler.Signal(ph.Context, ph.Plan, sig, nil, false)
+	ph.runner.Signal(ph.Context, ph.Plan, sig, nil, false)
 }
 
-func (ph planHelper) cancelSchedule(t *testing.T) {
+func (ph planHelper) cancel(t *testing.T) {
 	t.Helper()
 
-	ph.scheduler.Cancel(ph.Plan)
+	ph.runner.Cancel(ph.Plan)
 }
 
-type scheduleResult struct {
+type runResult struct {
 	planHelper
 	Done  []*runtime.Node
 	Error error
 }
 
-func (sr scheduleResult) assertNodeStatus(t *testing.T, stepName string, expected core.NodeStatus) {
+func (rr runResult) assertNodeStatus(t *testing.T, stepName string, expected core.NodeStatus) {
 	t.Helper()
 
-	target := sr.GetNodeByName(stepName)
+	target := rr.GetNodeByName(stepName)
 	if target == nil {
-		if sr.cfg.OnExit != nil && sr.cfg.OnExit.Name == stepName {
-			target = sr.scheduler.HandlerNode(core.HandlerOnExit)
+		if rr.cfg.OnExit != nil && rr.cfg.OnExit.Name == stepName {
+			target = rr.runner.HandlerNode(core.HandlerOnExit)
 		}
-		if sr.cfg.OnSuccess != nil && sr.cfg.OnSuccess.Name == stepName {
-			target = sr.scheduler.HandlerNode(core.HandlerOnSuccess)
+		if rr.cfg.OnSuccess != nil && rr.cfg.OnSuccess.Name == stepName {
+			target = rr.runner.HandlerNode(core.HandlerOnSuccess)
 		}
-		if sr.cfg.OnFailure != nil && sr.cfg.OnFailure.Name == stepName {
-			target = sr.scheduler.HandlerNode(core.HandlerOnFailure)
+		if rr.cfg.OnFailure != nil && rr.cfg.OnFailure.Name == stepName {
+			target = rr.runner.HandlerNode(core.HandlerOnFailure)
 		}
-		if sr.cfg.OnCancel != nil && sr.cfg.OnCancel.Name == stepName {
-			target = sr.scheduler.HandlerNode(core.HandlerOnCancel)
+		if rr.cfg.OnCancel != nil && rr.cfg.OnCancel.Name == stepName {
+			target = rr.runner.HandlerNode(core.HandlerOnCancel)
 		}
 	}
 
@@ -286,24 +286,24 @@ func (sr scheduleResult) assertNodeStatus(t *testing.T, stepName string, expecte
 	require.Equal(t, expected.String(), target.State().Status.String(), "expected status %q, got %q", expected.String(), target.State().Status.String())
 }
 
-func (sr scheduleResult) nodeByName(t *testing.T, stepName string) *runtime.Node {
+func (rr runResult) nodeByName(t *testing.T, stepName string) *runtime.Node {
 	t.Helper()
 
-	if node := sr.GetNodeByName(stepName); node != nil {
+	if node := rr.GetNodeByName(stepName); node != nil {
 		return node
 	}
 
-	if sr.cfg.OnExit != nil && sr.cfg.OnExit.Name == stepName {
-		return sr.scheduler.HandlerNode(core.HandlerOnExit)
+	if rr.cfg.OnExit != nil && rr.cfg.OnExit.Name == stepName {
+		return rr.runner.HandlerNode(core.HandlerOnExit)
 	}
-	if sr.cfg.OnSuccess != nil && sr.cfg.OnSuccess.Name == stepName {
-		return sr.scheduler.HandlerNode(core.HandlerOnSuccess)
+	if rr.cfg.OnSuccess != nil && rr.cfg.OnSuccess.Name == stepName {
+		return rr.runner.HandlerNode(core.HandlerOnSuccess)
 	}
-	if sr.cfg.OnFailure != nil && sr.cfg.OnFailure.Name == stepName {
-		return sr.scheduler.HandlerNode(core.HandlerOnFailure)
+	if rr.cfg.OnFailure != nil && rr.cfg.OnFailure.Name == stepName {
+		return rr.runner.HandlerNode(core.HandlerOnFailure)
 	}
-	if sr.cfg.OnCancel != nil && sr.cfg.OnCancel.Name == stepName {
-		return sr.scheduler.HandlerNode(core.HandlerOnCancel)
+	if rr.cfg.OnCancel != nil && rr.cfg.OnCancel.Name == stepName {
+		return rr.runner.HandlerNode(core.HandlerOnCancel)
 	}
 
 	t.Fatalf("step %s not found", stepName)

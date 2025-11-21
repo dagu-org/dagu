@@ -19,12 +19,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestScheduler(t *testing.T) {
+func TestRunner(t *testing.T) {
 	testScript := test.TestdataPath(t, filepath.Join("runtime", "scheduler", "testfile.sh"))
 
 	t.Run("SequentialStepsSuccess", func(t *testing.T) {
 		t.Parallel()
-		sc := setupScheduler(t, withMaxActiveRuns(1))
+		sc := setupRunner(t, withMaxActiveRuns(1))
 
 		// 1 -> 2 -> 3
 		plan := sc.newPlan(t,
@@ -33,7 +33,7 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
@@ -41,7 +41,7 @@ func TestScheduler(t *testing.T) {
 	})
 	t.Run("SequentialStepsWithFailure", func(t *testing.T) {
 		t.Parallel()
-		sc := setupScheduler(t, withMaxActiveRuns(1))
+		sc := setupRunner(t, withMaxActiveRuns(1))
 
 		// 1 -> 2 -> 3 -> 4
 		plan := sc.newPlan(t,
@@ -51,7 +51,7 @@ func TestScheduler(t *testing.T) {
 			successStep("4", "3"),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		// 1, 2, 3 should be executed and 4 should be canceled because 3 failed
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
@@ -61,7 +61,7 @@ func TestScheduler(t *testing.T) {
 	})
 	t.Run("ParallelSteps", func(t *testing.T) {
 		t.Parallel()
-		sc := setupScheduler(t, withMaxActiveRuns(3))
+		sc := setupRunner(t, withMaxActiveRuns(3))
 
 		// 1,2,3
 		plan := sc.newPlan(t,
@@ -70,14 +70,14 @@ func TestScheduler(t *testing.T) {
 			successStep("3"),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
 		result.assertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("ParallelStepsWithFailure", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 -> 3 -> 4, 2 (fail)
 		plan := sc.newPlan(t,
@@ -87,7 +87,7 @@ func TestScheduler(t *testing.T) {
 			successStep("4", "3"),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "2", core.NodeFailed)
@@ -96,18 +96,18 @@ func TestScheduler(t *testing.T) {
 	})
 	t.Run("ComplexCommand", func(t *testing.T) {
 		t.Parallel()
-		sc := setupScheduler(t, withMaxActiveRuns(1))
+		sc := setupRunner(t, withMaxActiveRuns(1))
 
 		plan := sc.newPlan(t,
 			newStep("1",
 				withCommand("df / | awk 'NR==2 {exit $4 > 5000 ? 0 : 1}'"),
 			))
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnFailure", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 -> 2 (fail) -> 3
 		plan := sc.newPlan(t,
@@ -122,7 +122,7 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := plan.assertSchedule(t, core.PartiallySucceeded)
+		result := plan.assertRun(t, core.PartiallySucceeded)
 
 		// 1, 2, 3 should be executed even though 2 failed
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
@@ -130,7 +130,7 @@ func TestScheduler(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnSkip", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 -> 2 (skip) -> 3
 		plan := sc.newPlan(t,
@@ -149,14 +149,14 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "2", core.NodeSkipped)
 		result.assertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnExitCode", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 (exit code 1) -> 2
 		plan := sc.newPlan(t,
@@ -169,14 +169,14 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := plan.assertSchedule(t, core.PartiallySucceeded)
+		result := plan.assertRun(t, core.PartiallySucceeded)
 
 		// 1, 2 should be executed even though 1 failed
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnOutputStdout", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 (exit code 1) -> 2
 		plan := sc.newPlan(t,
@@ -191,14 +191,14 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := plan.assertSchedule(t, core.PartiallySucceeded)
+		result := plan.assertRun(t, core.PartiallySucceeded)
 
 		// 1, 2 should be executed even though 1 failed
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnOutputStderr", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 (exit code 1) -> 2
 		plan := sc.newPlan(t,
@@ -213,7 +213,7 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := plan.assertSchedule(t, core.PartiallySucceeded)
+		result := plan.assertRun(t, core.PartiallySucceeded)
 
 		// Step 1 fails but matches continueOn output, allowing step 2 to run
 		result.assertNodeStatus(t, "1", core.NodeFailed)
@@ -225,7 +225,7 @@ func TestScheduler(t *testing.T) {
 		assert.Contains(t, string(stderrData), "test_output")
 	})
 	t.Run("ContinueOnOutputRegexp", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 (exit code 1) -> 2
 		plan := sc.newPlan(t,
@@ -240,14 +240,14 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := plan.assertSchedule(t, core.PartiallySucceeded)
+		result := plan.assertRun(t, core.PartiallySucceeded)
 
 		// 1, 2 should be executed even though 1 failed
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnMarkSuccess", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 (exit code 1) -> 2
 		plan := sc.newPlan(t,
@@ -261,14 +261,14 @@ func TestScheduler(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		// 1, 2 should be executed even though 1 failed
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
 	})
-	t.Run("CancelSchedule", func(t *testing.T) {
-		sc := setupScheduler(t)
+	t.Run("Cancel", func(t *testing.T) {
+		sc := setupRunner(t)
 
 		// 1 -> 2 (cancel when running) -> 3 (should not be executed)
 		plan := sc.newPlan(t,
@@ -279,17 +279,17 @@ func TestScheduler(t *testing.T) {
 
 		go func() {
 			time.Sleep(time.Millisecond * 200) // wait for step 2 to start
-			plan.cancelSchedule(t)
+			plan.cancel(t)
 		}()
 
-		result := plan.assertSchedule(t, core.Aborted)
+		result := plan.assertRun(t, core.Aborted)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "2", core.NodeAborted)
 		result.assertNodeStatus(t, "3", core.NodeNotStarted)
 	})
 	t.Run("Timeout", func(t *testing.T) {
-		sc := setupScheduler(t, withTimeout(time.Millisecond*500))
+		sc := setupRunner(t, withTimeout(time.Millisecond*500))
 
 		// 1 -> 2 (timeout) -> 3 (should not be executed)
 		plan := sc.newPlan(t,
@@ -298,7 +298,7 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		// 1 should be executed and 2 should be canceled because of timeout
 		// 3 should not be executed and should be canceled
@@ -309,7 +309,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("RetryPolicyFail", func(t *testing.T) {
 		const file = "flag_test_retry_fail"
 
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1",
@@ -318,7 +318,7 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 
@@ -326,7 +326,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, 2, node.State().RetryCount) // 2 retry
 	})
 	t.Run("RetryWithScript", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 		tmpDir := t.TempDir()
 		testFile := path.Join(tmpDir, "testfile.txt")
 
@@ -343,7 +343,7 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
@@ -356,7 +356,7 @@ func TestScheduler(t *testing.T) {
 			os.TempDir(), fmt.Sprintf("flag_test_retry_success_%s", uuid.Must(uuid.NewV7()).String()),
 		)
 
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1",
@@ -381,7 +381,7 @@ func TestScheduler(t *testing.T) {
 			})
 		}()
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		// Check if the retry is successful
 		state := result.nodeByName(t, "1").State()
@@ -393,7 +393,7 @@ func TestScheduler(t *testing.T) {
 	})
 	t.Run("PreconditionMatch", func(t *testing.T) {
 		t.Parallel()
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 -> 2 (precondition match) -> 3
 		plan := sc.newPlan(t,
@@ -407,14 +407,14 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
 		result.assertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("PreconditionNotMatch", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 -> 2 (precondition not match) -> 3
 		plan := sc.newPlan(t,
@@ -427,7 +427,7 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		// 1 should be executed and 2, 3 should be skipped
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
@@ -435,7 +435,7 @@ func TestScheduler(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeSkipped)
 	})
 	t.Run("PreconditionWithCommandMet", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 -> 2 (precondition not match) -> 3
 		plan := sc.newPlan(t,
@@ -447,14 +447,14 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
 		result.assertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("PreconditionWithCommandNotMet", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 -> 2 (precondition not match) -> 3
 		plan := sc.newPlan(t,
@@ -466,7 +466,7 @@ func TestScheduler(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		// 1 should be executed and 2, 3 should be skipped
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
@@ -474,28 +474,28 @@ func TestScheduler(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeSkipped)
 	})
 	t.Run("OnExitHandler", func(t *testing.T) {
-		sc := setupScheduler(t, withOnExit(successStep("onExit")))
+		sc := setupRunner(t, withOnExit(successStep("onExit")))
 
 		plan := sc.newPlan(t, successStep("1"))
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "onExit", core.NodeSucceeded)
 	})
 	t.Run("OnExitHandlerFail", func(t *testing.T) {
-		sc := setupScheduler(t, withOnExit(failStep("onExit")))
+		sc := setupRunner(t, withOnExit(failStep("onExit")))
 
 		plan := sc.newPlan(t, successStep("1"))
 
 		// Overall status should be error because onExit failed
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "onExit", core.NodeFailed)
 	})
 	t.Run("OnCancelHandler", func(t *testing.T) {
-		sc := setupScheduler(t, withOnCancel(successStep("onCancel")))
+		sc := setupRunner(t, withOnCancel(successStep("onCancel")))
 
 		plan := sc.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
@@ -506,33 +506,33 @@ func TestScheduler(t *testing.T) {
 			plan.signal(syscall.SIGTERM)
 		}()
 
-		result := plan.assertSchedule(t, core.Aborted)
+		result := plan.assertRun(t, core.Aborted)
 
 		result.assertNodeStatus(t, "1", core.NodeAborted)
 		result.assertNodeStatus(t, "onCancel", core.NodeSucceeded)
 	})
 	t.Run("OnSuccessHandler", func(t *testing.T) {
-		sc := setupScheduler(t, withOnSuccess(successStep("onSuccess")))
+		sc := setupRunner(t, withOnSuccess(successStep("onSuccess")))
 
 		plan := sc.newPlan(t, successStep("1"))
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "onSuccess", core.NodeSucceeded)
 	})
 	t.Run("OnFailureHandler", func(t *testing.T) {
-		sc := setupScheduler(t, withOnFailure(successStep("onFailure")))
+		sc := setupRunner(t, withOnFailure(successStep("onFailure")))
 
 		plan := sc.newPlan(t, failStep("1"))
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 		result.assertNodeStatus(t, "onFailure", core.NodeSucceeded)
 	})
 	t.Run("CancelOnSignal", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
@@ -543,12 +543,12 @@ func TestScheduler(t *testing.T) {
 			plan.signal(syscall.SIGTERM)
 		}()
 
-		result := plan.assertSchedule(t, core.Aborted)
+		result := plan.assertRun(t, core.Aborted)
 
 		result.assertNodeStatus(t, "1", core.NodeAborted)
 	})
 	t.Run("Repeat", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1",
@@ -559,10 +559,10 @@ func TestScheduler(t *testing.T) {
 
 		go func() {
 			time.Sleep(time.Millisecond * 250)
-			plan.cancelSchedule(t)
+			plan.cancel(t)
 		}()
 
-		result := plan.assertSchedule(t, core.Aborted)
+		result := plan.assertRun(t, core.Aborted)
 
 		// 1 should be repeated 2 times
 		result.assertNodeStatus(t, "1", core.NodeAborted)
@@ -572,7 +572,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, 1, node.State().DoneCount)
 	})
 	t.Run("RepeatFail", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1",
@@ -581,7 +581,7 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		// Done count should be 1 because it failed and not repeated
 		result.assertNodeStatus(t, "1", core.NodeFailed)
@@ -590,7 +590,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, 1, node.State().DoneCount)
 	})
 	t.Run("StopRepetitiveTaskGracefully", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1",
@@ -606,13 +606,13 @@ func TestScheduler(t *testing.T) {
 			close(done)
 		}()
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		<-done
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 	})
 	t.Run("NodeSetupFailure", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1", withWorkingDir("/nonexistent"),
@@ -620,7 +620,7 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 
@@ -628,7 +628,7 @@ func TestScheduler(t *testing.T) {
 	})
 	t.Run("OutputVariables", func(t *testing.T) {
 		t.Parallel()
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1: echo hello > OUT
 		// 2: echo $OUT > RESULT
@@ -637,7 +637,7 @@ func TestScheduler(t *testing.T) {
 			newStep("2", withCommand("echo $OUT"), withDepends("1"), withOutput("RESULT")),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
@@ -650,7 +650,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, "RESULT=hello", output, "expected output %q, got %q", "hello", output)
 	})
 	t.Run("OutputInheritance", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1: echo hello > OUT
 		// 2: echo world > OUT2 (depends on 1)
@@ -665,7 +665,7 @@ func TestScheduler(t *testing.T) {
 			newStep("5", withCommand("echo $OUT $OUT2"), withDepends("4"), withOutput("RESULT2")),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		node := result.nodeByName(t, "3")
 		output, _ := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -676,7 +676,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, "RESULT2=", output2, "expected output %q, got %q", "", output)
 	})
 	t.Run("OutputJSONReference", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		jsonData := `{"key": "value"}`
 		plan := sc.newPlan(t,
@@ -684,7 +684,7 @@ func TestScheduler(t *testing.T) {
 			newStep("2", withCommand("echo ${OUT.key}"), withDepends("1"), withOutput("RESULT")),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		// check if RESULT variable is set to "value"
 		node := result.nodeByName(t, "2")
@@ -693,7 +693,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
 	})
 	t.Run("HandlingJSONWithSpecialChars", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		jsonData := `{\n\t"key": "value"\n}`
 		plan := sc.newPlan(t,
@@ -701,7 +701,7 @@ func TestScheduler(t *testing.T) {
 			newStep("2", withCommand("echo '${OUT.key}'"), withDepends("1"), withOutput("RESULT")),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		// check if RESULT variable is set to "value"
 		node := result.nodeByName(t, "2")
@@ -710,13 +710,13 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
 	})
 	t.Run("SpecialVarsDAGRUNLOGFILE", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1", withCommand("echo $DAG_RUN_LOG_FILE"), withOutput("RESULT")),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "1")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -724,13 +724,13 @@ func TestScheduler(t *testing.T) {
 		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNSTEPSTDOUTFILE", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1", withCommand("echo $DAG_RUN_STEP_STDOUT_FILE"), withOutput("RESULT")),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "1")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -738,13 +738,13 @@ func TestScheduler(t *testing.T) {
 		require.Regexp(t, `^RESULT=/.*/.*\.out$`, output, "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNSTEPSTDERRFILE", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1", withCommand("echo $DAG_RUN_STEP_STDERR_FILE"), withOutput("RESULT")),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "1")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -752,13 +752,13 @@ func TestScheduler(t *testing.T) {
 		require.Regexp(t, `^RESULT=/.*/.*\.err$`, output, "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNID", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1", withCommand("echo $DAG_RUN_ID"), withOutput("RESULT")),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "1")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -766,13 +766,13 @@ func TestScheduler(t *testing.T) {
 		require.Regexp(t, `RESULT=[a-f0-9-]+`, output, "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGNAME", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1", withCommand("echo $DAG_NAME"), withOutput("RESULT")),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "1")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -780,13 +780,13 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, "RESULT=test_dag", output, "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNSTEPNAME", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("step_test", withCommand("echo $DAG_RUN_STEP_NAME"), withOutput("RESULT")),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "step_test")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -795,7 +795,7 @@ func TestScheduler(t *testing.T) {
 	})
 
 	t.Run("DAGRunStatusNotAvailableToMainSteps", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1",
@@ -804,7 +804,7 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "1")
 
 		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
@@ -813,7 +813,7 @@ func TestScheduler(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyRepeatsUntilCommandConditionMatchesExpected", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// This step will repeat until the file contains 'ready'
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_test_%s.txt", uuid.Must(uuid.NewV7()).String()))
@@ -847,7 +847,7 @@ func TestScheduler(t *testing.T) {
 			require.NoError(t, err, "failed to write to file")
 		}()
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		// Should have run at least twice (first: not ready, second: ready)
 		node := result.nodeByName(t, "1")
@@ -855,7 +855,7 @@ func TestScheduler(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyRepeatWhileConditionExits0", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 		// This step will repeat until the file exists
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exit0_%s", uuid.Must(uuid.NewV7()).String()))
 		err := os.Remove(file)
@@ -887,14 +887,14 @@ func TestScheduler(t *testing.T) {
 			err := f.Close()
 			require.NoError(t, err)
 		}()
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.nodeByName(t, "1")
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
 	t.Run("RepeatPolicyRepeatsWhileCommandExitCodeMatches", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 		// This step will repeat until exit code is not 42.
 		countFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exitcode_%s", uuid.Must(uuid.NewV7()).String()))
 		err := os.Remove(countFile)
@@ -925,14 +925,14 @@ func TestScheduler(t *testing.T) {
 			err := f.Close()
 			require.NoError(t, err)
 		}()
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.nodeByName(t, "1")
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
 	t.Run("RepeatPolicyRepeatsUntilEnvVarConditionMatchesExpected", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 		// This step will repeat until the environment variable TEST_REPEAT_MATCH_EXPR equals 'done'
 		err := os.Setenv("TEST_REPEAT_MATCH_EXPR", "notyet")
 		require.NoError(t, err)
@@ -958,14 +958,14 @@ func TestScheduler(t *testing.T) {
 			err := os.Setenv("TEST_REPEAT_MATCH_EXPR", "done")
 			require.NoError(t, err)
 		}()
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.nodeByName(t, "1")
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
 	t.Run("RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_outputvar_%s", uuid.Must(uuid.NewV7()).String()))
 		err := os.Remove(file)
 		if err != nil && !os.IsNotExist(err) {
@@ -994,13 +994,13 @@ func TestScheduler(t *testing.T) {
 			err := os.WriteFile(file, []byte("done"), 0600)
 			require.NoError(t, err)
 		}()
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.nodeByName(t, "1")
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 	t.Run("RetryPolicyWithOutputCapture", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create a counter file for tracking retry attempts
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_output_%s.txt", uuid.Must(uuid.NewV7()).String()))
@@ -1035,7 +1035,7 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
@@ -1049,7 +1049,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, "RESULT=output_attempt_3_success", output, "expected final output, got %q", output)
 	})
 	t.Run("FailedStepWithOutputCapture", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Step that outputs data but fails
 		plan := sc.newPlan(t,
@@ -1059,7 +1059,7 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 
@@ -1071,7 +1071,7 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, "ERROR_MSG=error_output", output, "expected output %q, got %q", "error_output", output)
 	})
 	t.Run("RetryPolicySubDAGRunWithOutputCapture", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create a counter file for tracking retry attempts
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_sub_output_%s.txt", uuid.Must(uuid.NewV7()).String()))
@@ -1106,7 +1106,7 @@ func TestScheduler(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 
@@ -1122,9 +1122,9 @@ func TestScheduler(t *testing.T) {
 }
 
 // Step-level timeout tests
-func TestScheduler_StepLevelTimeout(t *testing.T) {
+func TestRunner_StepLevelTimeout(t *testing.T) {
 	t.Run("SingleStepTimeoutFailsStep", func(t *testing.T) {
-		sc := setupScheduler(t, withTimeout(2*time.Second)) // large DAG timeout to ensure step-level fires first
+		sc := setupRunner(t, withTimeout(2*time.Second)) // large DAG timeout to ensure step-level fires first
 		plan := sc.newPlan(t,
 			newStep("timeout_step",
 				withCommand("sleep 0.2"), // longer than step timeout
@@ -1134,13 +1134,13 @@ func TestScheduler_StepLevelTimeout(t *testing.T) {
 		)
 
 		start := time.Now()
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 		elapsed := time.Since(start)
 
 		// Step should be aborted quickly (< 2s DAG timeout)
 		assert.Less(t, elapsed, 1500*time.Millisecond)
 		result.assertNodeStatus(t, "timeout_step", core.NodeFailed)
-		// Downstream dependency is aborted since scheduler cancels remaining steps after failure
+		// Downstream dependency is aborted since runner cancels remaining steps after failure
 		result.assertNodeStatus(t, "after", core.NodeAborted)
 
 		node := result.nodeByName(t, "timeout_step")
@@ -1151,7 +1151,7 @@ func TestScheduler_StepLevelTimeout(t *testing.T) {
 	})
 
 	t.Run("TimeoutPreemptsRetriesAndMarksFailed", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 		plan := sc.newPlan(t,
 			newStep("retry_timeout",
 				withCommand("sleep 0.15 && false"),
@@ -1160,7 +1160,7 @@ func TestScheduler_StepLevelTimeout(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 		result.assertNodeStatus(t, "retry_timeout", core.NodeFailed)
 		node := result.nodeByName(t, "retry_timeout")
 		// Should not have retried because first attempt exceeded timeout
@@ -1169,25 +1169,25 @@ func TestScheduler_StepLevelTimeout(t *testing.T) {
 	})
 
 	t.Run("ParallelStepsTimeoutFailIndividually", func(t *testing.T) {
-		sc := setupScheduler(t, withMaxActiveRuns(3))
+		sc := setupRunner(t, withMaxActiveRuns(3))
 		plan := sc.newPlan(t,
 			newStep("p1", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
 			newStep("p2", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
 			newStep("p3", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 		result.assertNodeStatus(t, "p1", core.NodeFailed)
 		result.assertNodeStatus(t, "p2", core.NodeFailed)
 		result.assertNodeStatus(t, "p3", core.NodeFailed)
 	})
 
 	t.Run("StepLevelTimeoutOverridesLongDAGTimeoutAndFails", func(t *testing.T) {
-		sc := setupScheduler(t, withTimeout(5*time.Second))
+		sc := setupRunner(t, withTimeout(5*time.Second))
 		plan := sc.newPlan(t,
 			newStep("short_timeout", withCommand("sleep 0.3"), withStepTimeout(120*time.Millisecond)),
 		)
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 		result.assertNodeStatus(t, "short_timeout", core.NodeFailed)
 		node := result.nodeByName(t, "short_timeout")
 		assert.Equal(t, 124, node.State().ExitCode)
@@ -1235,8 +1235,8 @@ func TestStatus_IsActive(t *testing.T) {
 	}
 }
 
-func TestScheduler_DryRun(t *testing.T) {
-	sc := setupScheduler(t, func(cfg *runtime.Config) {
+func TestRunner_DryRun(t *testing.T) {
+	sc := setupRunner(t, func(cfg *runtime.Config) {
 		cfg.Dry = true
 	})
 
@@ -1246,7 +1246,7 @@ func TestScheduler_DryRun(t *testing.T) {
 		successStep("3", "2"),
 	)
 
-	result := plan.assertSchedule(t, core.Succeeded)
+	result := plan.assertRun(t, core.Succeeded)
 
 	// In dry run, steps should be marked as success without actual execution
 	result.assertNodeStatus(t, "1", core.NodeSucceeded)
@@ -1254,8 +1254,8 @@ func TestScheduler_DryRun(t *testing.T) {
 	result.assertNodeStatus(t, "3", core.NodeSucceeded)
 }
 
-func TestScheduler_DryRunWithHandlers(t *testing.T) {
-	sc := setupScheduler(t,
+func TestRunner_DryRunWithHandlers(t *testing.T) {
+	sc := setupRunner(t,
 		func(cfg *runtime.Config) {
 			cfg.Dry = true
 		},
@@ -1265,14 +1265,14 @@ func TestScheduler_DryRunWithHandlers(t *testing.T) {
 
 	plan := sc.newPlan(t, successStep("1"))
 
-	result := plan.assertSchedule(t, core.Succeeded)
+	result := plan.assertRun(t, core.Succeeded)
 
 	result.assertNodeStatus(t, "1", core.NodeSucceeded)
 	result.assertNodeStatus(t, "onExit", core.NodeSucceeded)
 	result.assertNodeStatus(t, "onSuccess", core.NodeSucceeded)
 }
 
-func TestScheduler_ConcurrentExecution(t *testing.T) {
+func TestRunner_ConcurrentExecution(t *testing.T) {
 	steps := func() []core.Step {
 		return []core.Step{
 			newStep("1", withScript("sleep 0.3")),
@@ -1281,19 +1281,19 @@ func TestScheduler_ConcurrentExecution(t *testing.T) {
 		}
 	}
 
-	sequential := setupScheduler(t, withMaxActiveRuns(1))
+	sequential := setupRunner(t, withMaxActiveRuns(1))
 	planSequential := sequential.newPlan(t, steps()...)
 	startSequential := time.Now()
-	resultSequential := planSequential.assertSchedule(t, core.Succeeded)
+	resultSequential := planSequential.assertRun(t, core.Succeeded)
 	elapsedSequential := time.Since(startSequential)
 	resultSequential.assertNodeStatus(t, "1", core.NodeSucceeded)
 	resultSequential.assertNodeStatus(t, "2", core.NodeSucceeded)
 	resultSequential.assertNodeStatus(t, "3", core.NodeSucceeded)
 
-	concurrent := setupScheduler(t, withMaxActiveRuns(3))
+	concurrent := setupRunner(t, withMaxActiveRuns(3))
 	planConcurrent := concurrent.newPlan(t, steps()...)
 	startConcurrent := time.Now()
-	resultConcurrent := planConcurrent.assertSchedule(t, core.Succeeded)
+	resultConcurrent := planConcurrent.assertRun(t, core.Succeeded)
 	elapsedConcurrent := time.Since(startConcurrent)
 	resultConcurrent.assertNodeStatus(t, "1", core.NodeSucceeded)
 	resultConcurrent.assertNodeStatus(t, "2", core.NodeSucceeded)
@@ -1303,11 +1303,11 @@ func TestScheduler_ConcurrentExecution(t *testing.T) {
 	assert.Greater(t, elapsedSequential-elapsedConcurrent, 200*time.Millisecond)
 }
 
-func TestScheduler_ErrorHandling(t *testing.T) {
+func TestRunner_ErrorHandling(t *testing.T) {
 	t.Run("SetupError", func(t *testing.T) {
-		// Create a scheduler with invalid log directory
+		// Create a runner with invalid log directory
 		invalidLogDir := "/nonexistent/path/that/should/not/exist"
-		sc := setupScheduler(t, func(cfg *runtime.Config) {
+		sc := setupRunner(t, func(cfg *runtime.Config) {
 			cfg.LogDir = invalidLogDir
 		})
 
@@ -1320,13 +1320,13 @@ func TestScheduler_ErrorHandling(t *testing.T) {
 
 		ctx := execution.SetupDAGContext(plan.Context, dag, nil, execution.DAGRunRef{}, sc.cfg.DAGRunID, logFilePath, nil, nil, nil)
 
-		err := sc.scheduler.Schedule(ctx, plan.Plan, nil)
+		err := sc.runner.Run(ctx, plan.Plan, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create log directory")
 	})
 
 	t.Run("PanicRecovery", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create a step that will panic
 		panicStep := newStep("panic", withScript(`
@@ -1337,14 +1337,14 @@ func TestScheduler_ErrorHandling(t *testing.T) {
 
 		plan := sc.newPlan(t, panicStep)
 
-		// The scheduler should recover from the panic and mark the step as error
-		result := plan.assertSchedule(t, core.Failed)
+		// The runner should recover from the panic and mark the step as error
+		result := plan.assertRun(t, core.Failed)
 		result.assertNodeStatus(t, "panic", core.NodeFailed)
 	})
 }
 
-func TestScheduler_Metrics(t *testing.T) {
-	sc := setupScheduler(t)
+func TestRunner_Metrics(t *testing.T) {
+	sc := setupRunner(t)
 
 	plan := sc.newPlan(t,
 		successStep("1"),
@@ -1355,10 +1355,10 @@ func TestScheduler_Metrics(t *testing.T) {
 		successStep("4", "1"),
 	)
 
-	result := plan.assertSchedule(t, core.Failed)
+	result := plan.assertRun(t, core.Failed)
 
 	// Get metrics
-	metrics := sc.scheduler.GetMetrics()
+	metrics := sc.runner.GetMetrics()
 
 	assert.Equal(t, 4, metrics["totalNodes"])
 	assert.Equal(t, 2, metrics["completedNodes"]) // 1 and 4
@@ -1374,9 +1374,9 @@ func TestScheduler_Metrics(t *testing.T) {
 	result.assertNodeStatus(t, "4", core.NodeSucceeded)
 }
 
-func TestScheduler_DAGPreconditions(t *testing.T) {
+func TestRunner_DAGPreconditions(t *testing.T) {
 	t.Run("DAGPreconditionNotMet", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create DAG with precondition that will fail
 		dag := &core.DAG{
@@ -1396,17 +1396,17 @@ func TestScheduler_DAGPreconditions(t *testing.T) {
 
 		ctx := execution.SetupDAGContext(plan.Context, dag, nil, execution.DAGRunRef{}, sc.cfg.DAGRunID, logFilePath, nil, nil, nil)
 
-		err := sc.scheduler.Schedule(ctx, plan.Plan, nil)
+		err := sc.runner.Run(ctx, plan.Plan, nil)
 		require.NoError(t, err) // No error, but dag should be canceled
 
-		// Check that the scheduler was canceled
-		assert.Equal(t, core.Aborted, sc.scheduler.Status(ctx, plan.Plan))
+		// Check that the runner was canceled
+		assert.Equal(t, core.Aborted, sc.runner.Status(ctx, plan.Plan))
 	})
 }
 
-func TestScheduler_SignalHandling(t *testing.T) {
+func TestRunner_SignalHandling(t *testing.T) {
 	t.Run("SignalWithDoneChannel", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
@@ -1417,11 +1417,11 @@ func TestScheduler_SignalHandling(t *testing.T) {
 
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			sc.scheduler.Signal(sc.Context, plan.Plan, syscall.SIGTERM, done, false)
+			sc.runner.Signal(sc.Context, plan.Plan, syscall.SIGTERM, done, false)
 		}()
 
 		start := time.Now()
-		result := plan.assertSchedule(t, core.Aborted)
+		result := plan.assertRun(t, core.Aborted)
 
 		// Wait for signal completion
 		select {
@@ -1439,7 +1439,7 @@ func TestScheduler_SignalHandling(t *testing.T) {
 	})
 
 	t.Run("SignalWithOverride", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		plan := sc.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
@@ -1447,17 +1447,17 @@ func TestScheduler_SignalHandling(t *testing.T) {
 
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			sc.scheduler.Signal(sc.Context, plan.Plan, syscall.SIGKILL, nil, true)
+			sc.runner.Signal(sc.Context, plan.Plan, syscall.SIGKILL, nil, true)
 		}()
 
-		result := plan.assertSchedule(t, core.Aborted)
+		result := plan.assertRun(t, core.Aborted)
 		result.assertNodeStatus(t, "1", core.NodeAborted)
 	})
 }
 
-func TestScheduler_ComplexDependencyChains(t *testing.T) {
+func TestRunner_ComplexDependencyChains(t *testing.T) {
 	t.Run("DiamondDependency", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create diamond dependency: 1 -> 2,3 -> 4
 		plan := sc.newPlan(t,
@@ -1467,7 +1467,7 @@ func TestScheduler_ComplexDependencyChains(t *testing.T) {
 			successStep("4", "2", "3"),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
@@ -1476,7 +1476,7 @@ func TestScheduler_ComplexDependencyChains(t *testing.T) {
 	})
 
 	t.Run("ComplexFailurePropagation", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// 1 -> 2 (fail) -> 4
 		//   -> 3 -------->
@@ -1487,7 +1487,7 @@ func TestScheduler_ComplexDependencyChains(t *testing.T) {
 			successStep("4", "2", "3"),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "2", core.NodeFailed)
@@ -1496,45 +1496,45 @@ func TestScheduler_ComplexDependencyChains(t *testing.T) {
 	})
 }
 
-func TestScheduler_EdgeCases(t *testing.T) {
+func TestRunner_EdgeCases(t *testing.T) {
 	t.Run("EmptyPlan", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 		plan := sc.newPlan(t) // No steps
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		assert.NoError(t, result.Error)
 	})
 
 	t.Run("SingleNodePlan", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 		plan := sc.newPlan(t, successStep("single"))
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "single", core.NodeSucceeded)
 	})
 
 	t.Run("AllNodesFail", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 		plan := sc.newPlan(t,
 			failStep("1"),
 			failStep("2"),
 			failStep("3"),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 		result.assertNodeStatus(t, "2", core.NodeFailed)
 		result.assertNodeStatus(t, "3", core.NodeFailed)
 	})
 }
 
-func TestScheduler_HandlerNodeAccess(t *testing.T) {
+func TestRunner_HandlerNodeAccess(t *testing.T) {
 	exitStep := successStep("onExit")
 	successHandlerStep := successStep("onSuccess")
 	failureStep := successStep("onFailure")
 	cancelStep := successStep("onCancel")
 
-	sc := setupScheduler(t,
+	sc := setupRunner(t,
 		withOnExit(exitStep),
 		withOnSuccess(successHandlerStep),
 		withOnFailure(failureStep),
@@ -1543,18 +1543,18 @@ func TestScheduler_HandlerNodeAccess(t *testing.T) {
 
 	// Run a simple plan to trigger setup
 	plan := sc.newPlan(t, successStep("1"))
-	_ = plan.assertSchedule(t, core.Succeeded)
+	_ = plan.assertRun(t, core.Succeeded)
 
 	// Access handler nodes
-	assert.NotNil(t, sc.scheduler.HandlerNode(core.HandlerOnExit))
-	assert.NotNil(t, sc.scheduler.HandlerNode(core.HandlerOnSuccess))
-	assert.NotNil(t, sc.scheduler.HandlerNode(core.HandlerOnFailure))
-	assert.NotNil(t, sc.scheduler.HandlerNode(core.HandlerOnCancel))
-	assert.Nil(t, sc.scheduler.HandlerNode(core.HandlerType("unknown")))
+	assert.NotNil(t, sc.runner.HandlerNode(core.HandlerOnExit))
+	assert.NotNil(t, sc.runner.HandlerNode(core.HandlerOnSuccess))
+	assert.NotNil(t, sc.runner.HandlerNode(core.HandlerOnFailure))
+	assert.NotNil(t, sc.runner.HandlerNode(core.HandlerOnCancel))
+	assert.Nil(t, sc.runner.HandlerNode(core.HandlerType("unknown")))
 }
 
-func TestScheduler_PreconditionWithError(t *testing.T) {
-	sc := setupScheduler(t)
+func TestRunner_PreconditionWithError(t *testing.T) {
+	sc := setupRunner(t)
 
 	// Create a step with a precondition that will error (not just return false)
 	plan := sc.newPlan(t,
@@ -1566,26 +1566,26 @@ func TestScheduler_PreconditionWithError(t *testing.T) {
 		),
 	)
 
-	result := plan.assertSchedule(t, core.Succeeded)
+	result := plan.assertRun(t, core.Succeeded)
 
 	// The step should be skipped but no error should be set for condition not met
 	result.assertNodeStatus(t, "1", core.NodeSkipped)
 	// Conditions that exit with non-zero are just "not met", not errors
 }
 
-func TestScheduler_MultipleHandlerExecution(t *testing.T) {
+func TestRunner_MultipleHandlerExecution(t *testing.T) {
 	recordHandler := func(name string) core.Step {
 		return newStep(name, withScript(fmt.Sprintf(`echo "Handler %s executed"`, name)))
 	}
 
-	sc := setupScheduler(t,
+	sc := setupRunner(t,
 		withOnExit(recordHandler("onExit")),
 		withOnFailure(recordHandler("onFailure")),
 	)
 
 	plan := sc.newPlan(t, failStep("1"))
 
-	result := plan.assertSchedule(t, core.Failed)
+	result := plan.assertRun(t, core.Failed)
 
 	// Both onFailure and onExit should execute
 	result.assertNodeStatus(t, "1", core.NodeFailed)
@@ -1593,8 +1593,8 @@ func TestScheduler_MultipleHandlerExecution(t *testing.T) {
 	result.assertNodeStatus(t, "onExit", core.NodeSucceeded)
 }
 
-func TestScheduler_TimeoutDuringRetry(t *testing.T) {
-	sc := setupScheduler(t, withTimeout(500*time.Millisecond))
+func TestRunner_TimeoutDuringRetry(t *testing.T) {
+	sc := setupRunner(t, withTimeout(500*time.Millisecond))
 
 	// Step that will keep retrying until timeout
 	plan := sc.newPlan(t,
@@ -1605,7 +1605,7 @@ func TestScheduler_TimeoutDuringRetry(t *testing.T) {
 	)
 
 	start := time.Now()
-	result := plan.assertSchedule(t, core.Failed)
+	result := plan.assertRun(t, core.Failed)
 	elapsed := time.Since(start)
 
 	// Should timeout before completing all retries
@@ -1613,8 +1613,8 @@ func TestScheduler_TimeoutDuringRetry(t *testing.T) {
 	result.assertNodeStatus(t, "1", core.NodeAborted)
 }
 
-func TestScheduler_CancelDuringHandlerExecution(t *testing.T) {
-	sc := setupScheduler(t,
+func TestRunner_CancelDuringHandlerExecution(t *testing.T) {
+	sc := setupRunner(t,
 		withOnExit(newStep("onExit", withScript("echo handler started && sleep 0.1 && echo handler done"))),
 	)
 
@@ -1623,20 +1623,20 @@ func TestScheduler_CancelDuringHandlerExecution(t *testing.T) {
 	go func() {
 		// Wait for main step to complete and handler to start
 		time.Sleep(200 * time.Millisecond)
-		sc.scheduler.Cancel(plan.Plan)
+		sc.runner.Cancel(plan.Plan)
 	}()
 
 	// Since we cancel during handler execution, the final status depends on timing
 	// The plan completes successfully before cancel takes effect
-	result := plan.assertSchedule(t, core.Succeeded)
+	result := plan.assertRun(t, core.Succeeded)
 
 	result.assertNodeStatus(t, "1", core.NodeSucceeded)
 	// Handler should complete successfully
 	result.assertNodeStatus(t, "onExit", core.NodeSucceeded)
 }
 
-func TestScheduler_RepeatPolicyWithCancel(t *testing.T) {
-	sc := setupScheduler(t)
+func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
+	sc := setupRunner(t)
 
 	plan := sc.newPlan(t,
 		newStep("1",
@@ -1647,10 +1647,10 @@ func TestScheduler_RepeatPolicyWithCancel(t *testing.T) {
 
 	go func() {
 		time.Sleep(350 * time.Millisecond)
-		sc.scheduler.Cancel(plan.Plan)
+		sc.runner.Cancel(plan.Plan)
 	}()
 
-	result := plan.assertSchedule(t, core.Aborted)
+	result := plan.assertRun(t, core.Aborted)
 	result.assertNodeStatus(t, "1", core.NodeAborted)
 
 	node := result.nodeByName(t, "1")
@@ -1658,8 +1658,8 @@ func TestScheduler_RepeatPolicyWithCancel(t *testing.T) {
 	assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 }
 
-func TestScheduler_RepeatPolicyWithLimit(t *testing.T) {
-	sc := setupScheduler(t)
+func TestRunner_RepeatPolicyWithLimit(t *testing.T) {
+	sc := setupRunner(t)
 
 	// Test repeat with limit
 	plan := sc.newPlan(t,
@@ -1672,7 +1672,7 @@ func TestScheduler_RepeatPolicyWithLimit(t *testing.T) {
 		),
 	)
 
-	result := plan.assertSchedule(t, core.Succeeded)
+	result := plan.assertRun(t, core.Succeeded)
 	result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 	node := result.nodeByName(t, "1")
@@ -1680,8 +1680,8 @@ func TestScheduler_RepeatPolicyWithLimit(t *testing.T) {
 	assert.Equal(t, 3, node.State().DoneCount)
 }
 
-func TestScheduler_RepeatPolicyWithLimitAndCondition(t *testing.T) {
-	sc := setupScheduler(t)
+func TestRunner_RepeatPolicyWithLimitAndCondition(t *testing.T) {
+	sc := setupRunner(t)
 
 	counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_limit_%s", uuid.Must(uuid.NewV7()).String()))
 	defer func() { _ = os.Remove(counterFile) }()
@@ -1709,7 +1709,7 @@ func TestScheduler_RepeatPolicyWithLimitAndCondition(t *testing.T) {
 		),
 	)
 
-	result := plan.assertSchedule(t, core.Succeeded)
+	result := plan.assertRun(t, core.Succeeded)
 	result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 	node := result.nodeByName(t, "1")
@@ -1722,9 +1722,9 @@ func TestScheduler_RepeatPolicyWithLimitAndCondition(t *testing.T) {
 	assert.Equal(t, "5\n", string(content))
 }
 
-func TestScheduler_ComplexRetryScenarios(t *testing.T) {
+func TestRunner_ComplexRetryScenarios(t *testing.T) {
 	t.Run("RetryWithSignalTermination", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create a script that will be terminated by signal
 		plan := sc.newPlan(t,
@@ -1742,12 +1742,12 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			plan.signal(syscall.SIGTERM)
 		}()
 
-		result := plan.assertSchedule(t, core.Aborted)
+		result := plan.assertRun(t, core.Aborted)
 		result.assertNodeStatus(t, "1", core.NodeAborted)
 	})
 
 	t.Run("RetryWithSpecificExitCodes", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_codes_%s", uuid.Must(uuid.NewV7()).String()))
 		defer func() { _ = os.Remove(counterFile) }()
@@ -1774,7 +1774,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 
 		node := result.nodeByName(t, "1")
@@ -1784,7 +1784,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 
 	// Test cases for behaviors when neither condition nor exitCode are present
 	t.Run("RepeatPolicyBooleanTrueRepeatsWhileStepSucceeds", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Test repeat: true (boolean mode) - should repeat while step succeeds (no condition/exitCode)
 		plan := sc.newPlan(t,
@@ -1799,7 +1799,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.nodeByName(t, "1")
@@ -1808,7 +1808,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyBooleanTrueWithFailureStopsOnFailure", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Test repeat: true (boolean mode) with step that eventually fails
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_bool_fail_%s", uuid.Must(uuid.NewV7()).String()))
@@ -1837,7 +1837,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 
 		node := result.nodeByName(t, "1")
@@ -1846,7 +1846,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyUntilModeWithoutConditionRepeatsOnFailure", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Test explicit until mode without condition/exitCode (repeats until step succeeds)
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_none_%s", uuid.Must(uuid.NewV7()).String()))
@@ -1880,7 +1880,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.nodeByName(t, "1")
@@ -1889,7 +1889,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyWhileWithConditionRepeatsWhileConditionSucceeds", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Test explicit while mode with condition
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_cond_%s", uuid.Must(uuid.NewV7()).String()))
@@ -1922,7 +1922,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			_ = f.Close()
 		}()
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.nodeByName(t, "1")
@@ -1931,7 +1931,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyWhileWithConditionAndExpectedRepeatsWhileMatches", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Test explicit while mode with condition and expected value
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_exp_%s", uuid.Must(uuid.NewV7()).String()))
@@ -1961,7 +1961,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.nodeByName(t, "1")
@@ -1970,7 +1970,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyUntilWithConditionRepeatsUntilConditionSucceeds", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Test explicit until mode with condition (no expected)
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_cond_%s", uuid.Must(uuid.NewV7()).String()))
@@ -2003,7 +2003,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			_ = f.Close()
 		}()
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.nodeByName(t, "1")
@@ -2012,7 +2012,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyUntilWithConditionAndExpectedRepeatsUntilMatches", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Test explicit until mode with condition and expected value
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_exp_%s", uuid.Must(uuid.NewV7()).String()))
@@ -2042,7 +2042,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.nodeByName(t, "1")
@@ -2051,7 +2051,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyUntilWithExitCodeRepeatsUntilExitCodeMatches", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Test explicit until mode with exit codes
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_exit_%s", uuid.Must(uuid.NewV7()).String()))
@@ -2091,7 +2091,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			_ = f.Close()
 		}()
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.nodeByName(t, "1")
@@ -2100,7 +2100,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyLimit", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 		plan := sc.newPlan(t,
 			newStep("1",
 				withCommand("echo limit"),
@@ -2115,7 +2115,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.nodeByName(t, "1")
@@ -2124,7 +2124,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyOutputVariablesReloadedBeforeConditionEval", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Test that output variables are reloaded before evaluating repeat condition
 		// Use a file-based counter to track iterations properly
@@ -2156,7 +2156,7 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.nodeByName(t, "1")
@@ -2170,8 +2170,8 @@ func TestScheduler_ComplexRetryScenarios(t *testing.T) {
 	})
 }
 
-func TestScheduler_StepIDVariableExpansion(t *testing.T) {
-	sc := setupScheduler(t)
+func TestRunner_StepIDVariableExpansion(t *testing.T) {
+	sc := setupRunner(t)
 
 	// Test step ID usage in environment setup
 	plan := sc.newPlan(t,
@@ -2198,7 +2198,7 @@ func TestScheduler_StepIDVariableExpansion(t *testing.T) {
 		),
 	)
 
-	result := plan.assertSchedule(t, core.Succeeded)
+	result := plan.assertRun(t, core.Succeeded)
 
 	result.assertNodeStatus(t, "step1", core.NodeSucceeded)
 	result.assertNodeStatus(t, "step2", core.NodeSucceeded)
@@ -2210,11 +2210,11 @@ func TestScheduler_StepIDVariableExpansion(t *testing.T) {
 	assert.Equal(t, "COMBINED=output1 output2", output)
 }
 
-func TestScheduler_UnexpectedFinalStatus(t *testing.T) {
+func TestRunner_UnexpectedFinalStatus(t *testing.T) {
 	// This is a bit tricky to test as it requires the scheduler to be in an
 	// unexpected state at the end. We'll simulate this by creating a custom
 	// scenario that might trigger this edge case.
-	sc := setupScheduler(t)
+	sc := setupRunner(t)
 
 	// Create a plan with a step that might leave the scheduler in an unexpected state
 	plan := sc.newPlan(t,
@@ -2222,15 +2222,15 @@ func TestScheduler_UnexpectedFinalStatus(t *testing.T) {
 	)
 
 	// Schedule normally
-	result := plan.assertSchedule(t, core.Succeeded)
+	result := plan.assertRun(t, core.Succeeded)
 	result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 	// The warning log about unexpected final status would be logged internally
 	// but we can't easily test for it without mock logging
 }
 
-func TestScheduler_RetryPolicyDefaults(t *testing.T) {
-	sc := setupScheduler(t)
+func TestRunner_RetryPolicyDefaults(t *testing.T) {
+	sc := setupRunner(t)
 
 	// Test retry with unhandled error type (not exec.ExitError)
 	plan := sc.newPlan(t,
@@ -2244,7 +2244,7 @@ func TestScheduler_RetryPolicyDefaults(t *testing.T) {
 		),
 	)
 
-	result := plan.assertSchedule(t, core.Failed)
+	result := plan.assertRun(t, core.Failed)
 	result.assertNodeStatus(t, "1", core.NodeFailed)
 
 	node := result.nodeByName(t, "1")
@@ -2252,9 +2252,9 @@ func TestScheduler_RetryPolicyDefaults(t *testing.T) {
 	assert.Equal(t, 1, node.State().RetryCount)
 }
 
-func TestScheduler_StepRetryExecution(t *testing.T) {
+func TestRunner_StepRetryExecution(t *testing.T) {
 	t.Run("RetrySuccessfulStep", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// A -> B -> C, all successful
 		dag := &core.DAG{
@@ -2271,7 +2271,7 @@ func TestScheduler_StepRetryExecution(t *testing.T) {
 			successStep("B", "A"),
 			successStep("C", "B"),
 		)
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "A", core.NodeSucceeded)
 		result.assertNodeStatus(t, "B", core.NodeSucceeded)
 		result.assertNodeStatus(t, "C", core.NodeSucceeded)
@@ -2297,7 +2297,7 @@ func TestScheduler_StepRetryExecution(t *testing.T) {
 		require.NoError(t, err)
 
 		// Schedule the retry
-		retryResult := planHelper{testHelper: sc, Plan: retryPlan}.assertSchedule(t, core.Succeeded)
+		retryResult := planHelper{testHelper: sc, Plan: retryPlan}.assertRun(t, core.Succeeded)
 
 		// A and C should remain unchanged, only B should be re-executed
 		retryResult.assertNodeStatus(t, "A", core.NodeSucceeded)
@@ -2306,10 +2306,10 @@ func TestScheduler_StepRetryExecution(t *testing.T) {
 	})
 }
 
-// TestScheduler_StepIDAccess tests that step ID variables are expanded correctly
-func TestScheduler_StepIDAccess(t *testing.T) {
+// TestRunner_StepIDAccess tests that step ID variables are expanded correctly
+func TestRunner_StepIDAccess(t *testing.T) {
 	t.Run("StepReferenceInCommand", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create a DAG where step2 references step1's output
 		plan := sc.newPlan(t,
@@ -2325,7 +2325,7 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "step1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "step2", core.NodeSucceeded)
 
@@ -2337,7 +2337,7 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 		assert.Contains(t, string(stdoutContent), "Step 1 stdout:")
 	})
 	t.Run("StepWithoutID", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create a DAG where some steps don't have IDs
 		plan := sc.newPlan(t,
@@ -2358,7 +2358,7 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "step1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "step2", core.NodeSucceeded)
 		result.assertNodeStatus(t, "step3", core.NodeSucceeded)
@@ -2373,7 +2373,7 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 	})
 
 	t.Run("StepExitCodeReference", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create a step that checks another step's exit code
 		plan := sc.newPlan(t,
@@ -2391,7 +2391,7 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.PartiallySucceeded)
+		result := plan.assertRun(t, core.PartiallySucceeded)
 		result.assertNodeStatus(t, "check", core.NodeFailed)
 		result.assertNodeStatus(t, "verify", core.NodeSucceeded)
 
@@ -2403,10 +2403,10 @@ func TestScheduler_StepIDAccess(t *testing.T) {
 	})
 }
 
-// TestScheduler_EventHandlerStepIDAccess tests that step ID references work in event handlers
-func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
+// TestRunner_EventHandlerStepIDAccess tests that step ID references work in event handlers
+func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 	t.Run("OnSuccessHandlerWithStepReferences", func(t *testing.T) {
-		sc := setupScheduler(t,
+		sc := setupRunner(t,
 			withOnSuccess(core.Step{
 				Name:    "success_handler",
 				ID:      "on_success",
@@ -2426,7 +2426,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		// All steps should succeed
 		result.assertNodeStatus(t, "main_step", core.NodeSucceeded)
@@ -2449,7 +2449,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 	})
 
 	t.Run("OnFailureHandlerWithStepReferences", func(t *testing.T) {
-		sc := setupScheduler(t,
+		sc := setupRunner(t,
 			withOnFailure(core.Step{
 				Name:    "failure_handler",
 				ID:      "on_fail",
@@ -2469,7 +2469,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		// Check step statuses
 		result.assertNodeStatus(t, "setup", core.NodeSucceeded)
@@ -2492,7 +2492,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 	})
 
 	t.Run("OnExitHandlerWithMultipleStepReferences", func(t *testing.T) {
-		sc := setupScheduler(t,
+		sc := setupRunner(t,
 			withOnExit(core.Step{
 				Name:    "exit_handler",
 				ID:      "on_exit",
@@ -2517,7 +2517,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		// All main steps should succeed
 		result.assertNodeStatus(t, "first", core.NodeSucceeded)
@@ -2543,7 +2543,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 	})
 
 	t.Run("HandlerWithoutIDCannotBeReferenced", func(t *testing.T) {
-		sc := setupScheduler(t,
+		sc := setupRunner(t,
 			withOnExit(core.Step{
 				Name: "exit_handler_no_id",
 				// No ID field set
@@ -2558,7 +2558,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "main", core.NodeSucceeded)
 
 		// Handler should execute
@@ -2572,7 +2572,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 	t.Run("HandlersCanOnlyReferenceMainSteps", func(t *testing.T) {
 		// Test that handlers can reference main steps but not other handlers
 		// This is because handlers execute after all main steps are complete
-		sc := setupScheduler(t,
+		sc := setupRunner(t,
 			withOnSuccess(core.Step{
 				Name:    "first_handler",
 				ID:      "handler1",
@@ -2592,7 +2592,7 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 			),
 		)
 
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "main", core.NodeSucceeded)
 
 		// Both handlers should have executed
@@ -2619,8 +2619,8 @@ func TestScheduler_EventHandlerStepIDAccess(t *testing.T) {
 	})
 }
 
-func TestScheduler_DAGRunStatusHandlerEnv(t *testing.T) {
-	sc := setupScheduler(t,
+func TestRunner_DAGRunStatusHandlerEnv(t *testing.T) {
+	sc := setupRunner(t,
 		withOnExit(core.Step{
 			Name:    "exit_handler",
 			Command: "echo status=${DAG_RUN_STATUS}",
@@ -2628,7 +2628,7 @@ func TestScheduler_DAGRunStatusHandlerEnv(t *testing.T) {
 	)
 
 	plan := sc.newPlan(t, successStep("main"))
-	result := plan.assertSchedule(t, core.Succeeded)
+	result := plan.assertRun(t, core.Succeeded)
 
 	handlerNode := result.nodeByName(t, "exit_handler")
 	handlerOutput, err := os.ReadFile(handlerNode.GetStdout())
@@ -2637,9 +2637,9 @@ func TestScheduler_DAGRunStatusHandlerEnv(t *testing.T) {
 	assert.Equal(t, "status=succeeded", strings.TrimSpace(string(handlerOutput)))
 }
 
-func TestSchedulerPartialSuccess(t *testing.T) {
+func TestRunnerPartialSuccess(t *testing.T) {
 	t.Run("NodeStatusPartialSuccess", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create a plan where:
 		// - step1 succeeds
@@ -2658,7 +2658,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		)
 
 		// The overall DAG should complete with partial success
-		result := plan.assertSchedule(t, core.PartiallySucceeded)
+		result := plan.assertRun(t, core.PartiallySucceeded)
 
 		// Verify individual node statuses
 		result.assertNodeStatus(t, "step1", core.NodeSucceeded)
@@ -2667,7 +2667,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 	})
 
 	t.Run("NodeStatusPartialSuccessWithMarkSuccess", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create a plan where:
 		// - step1 succeeds
@@ -2687,7 +2687,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		)
 
 		// When markSuccess is true, the overall DAG should complete with success
-		result := plan.assertSchedule(t, core.Succeeded)
+		result := plan.assertRun(t, core.Succeeded)
 
 		// Verify individual node statuses
 		result.assertNodeStatus(t, "step1", core.NodeSucceeded)
@@ -2696,7 +2696,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 	})
 
 	t.Run("MultipleFailuresWithContinueOn", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create a plan where multiple steps fail but have continueOn
 		plan := sc.newPlan(t,
@@ -2717,7 +2717,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		)
 
 		// The overall DAG should complete with partial success
-		result := plan.assertSchedule(t, core.PartiallySucceeded)
+		result := plan.assertRun(t, core.PartiallySucceeded)
 
 		// Verify individual node statuses
 		result.assertNodeStatus(t, "step1", core.NodeFailed)
@@ -2726,7 +2726,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 	})
 
 	t.Run("NoSuccessfulStepsWithContinueOn", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create a plan where all steps fail but have continueOn
 		// This should still be an error, not partial success,
@@ -2748,7 +2748,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		)
 
 		// The overall DAG should complete with error since no steps succeeded
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		// Verify individual node statuses
 		result.assertNodeStatus(t, "step1", core.NodeFailed)
@@ -2756,7 +2756,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 	})
 
 	t.Run("FailureWithoutContinueOn", func(t *testing.T) {
-		sc := setupScheduler(t)
+		sc := setupRunner(t)
 
 		// Create a plan where a step fails without continueOn
 		// This should result in an error status, not partial success
@@ -2767,7 +2767,7 @@ func TestSchedulerPartialSuccess(t *testing.T) {
 		)
 
 		// The overall DAG should complete with error
-		result := plan.assertSchedule(t, core.Failed)
+		result := plan.assertRun(t, core.Failed)
 
 		// Verify individual node statuses
 		result.assertNodeStatus(t, "step1", core.NodeSucceeded)

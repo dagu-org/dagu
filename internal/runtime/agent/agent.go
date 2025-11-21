@@ -69,8 +69,8 @@ type Agent struct {
 	// dagRunMgr is the runstore dagRunMgr to communicate with the history.
 	dagRunMgr runtime1.Manager
 
-	// scheduler is the scheduler instance to run the DAG.
-	scheduler *runtime.Scheduler
+	// runner is the runner instance to run the DAG.
+	runner *runtime.Runner
 
 	// plan is the execution plan for the DAG.
 	plan *runtime.Plan
@@ -261,8 +261,8 @@ func (a *Agent) Run(ctx context.Context) error {
 		a.dagRunAttemptID = attempt.ID()
 	}
 
-	// Initialize the scheduler
-	a.scheduler = a.newScheduler()
+	// Initialize the runner
+	a.runner = a.newRunner()
 
 	// Setup the reporter to send the report to the user.
 	a.setupReporter(ctx)
@@ -493,7 +493,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		ctx = docker.WithRegistryAuth(ctx, a.dag.RegistryAuths)
 	}
 
-	lastErr := a.scheduler.Schedule(ctx, a.plan, progressCh)
+	lastErr := a.runner.Run(ctx, a.plan, progressCh)
 
 	if coordinatorCli != nil {
 		// Cleanup the coordinator client resources if it was created.
@@ -541,7 +541,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	return lastErr
 }
 
-// nodeToModelNode converts a scheduler NodeData to a models.Node
+// nodeToModelNode converts a runner NodeData to a models.Node
 func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *execution.Node {
 	subRuns := make([]execution.SubDAGRun, len(nodeData.State.SubRuns))
 	for i, child := range nodeData.State.SubRuns {
@@ -585,20 +585,20 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	schedulerStatus := a.scheduler.Status(ctx, a.plan)
-	if schedulerStatus == core.NotStarted && a.plan.IsStarted() {
+	runnerStatus := a.runner.Status(ctx, a.plan)
+	if runnerStatus == core.NotStarted && a.plan.IsStarted() {
 		// Match the status to the execution plan.
-		schedulerStatus = core.Running
+		runnerStatus = core.Running
 	}
 
 	opts := []transform.StatusOption{
 		transform.WithFinishedAt(a.plan.FinishAt()),
 		transform.WithNodes(a.plan.NodeData()),
 		transform.WithLogFilePath(a.logFile),
-		transform.WithOnExitNode(a.scheduler.HandlerNode(core.HandlerOnExit)),
-		transform.WithOnSuccessNode(a.scheduler.HandlerNode(core.HandlerOnSuccess)),
-		transform.WithOnFailureNode(a.scheduler.HandlerNode(core.HandlerOnFailure)),
-		transform.WithOnCancelNode(a.scheduler.HandlerNode(core.HandlerOnCancel)),
+		transform.WithOnExitNode(a.runner.HandlerNode(core.HandlerOnExit)),
+		transform.WithOnSuccessNode(a.runner.HandlerNode(core.HandlerOnSuccess)),
+		transform.WithOnFailureNode(a.runner.HandlerNode(core.HandlerOnFailure)),
+		transform.WithOnCancelNode(a.runner.HandlerNode(core.HandlerOnCancel)),
 		transform.WithAttemptID(a.dagRunAttemptID),
 		transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 		transform.WithPreconditions(a.dag.Preconditions),
@@ -615,7 +615,7 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	return transform.NewStatusBuilder(a.dag).
 		Create(
 			a.dagRunID,
-			schedulerStatus,
+			runnerStatus,
 			os.Getpid(),
 			a.plan.StartAt(),
 			opts...,
@@ -710,15 +710,15 @@ func (a *Agent) setupReporter(ctx context.Context) {
 	a.reporter = newReporter(senderFn)
 }
 
-// newScheduler creates a scheduler instance for the dag-run.
-func (a *Agent) newScheduler() *runtime.Scheduler {
-	// schedulerLogDir is the directory to store the log files for each node in the dag-run.
+// newRunner creates a runner instance for the dag-run.
+func (a *Agent) newRunner() *runtime.Runner {
+	// runnerLogDir is the directory to store the log files for each node in the dag-run.
 	const dateTimeFormatUTC = "20060102_150405Z"
 	ts := time.Now().UTC().Format(dateTimeFormatUTC)
-	schedulerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.dagRunAttemptID)
+	runnerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.dagRunAttemptID)
 
 	cfg := &runtime.Config{
-		LogDir:         schedulerLogDir,
+		LogDir:         runnerLogDir,
 		MaxActiveSteps: a.dag.MaxActiveSteps,
 		Timeout:        a.dag.Timeout,
 		Delay:          a.dag.Delay,
@@ -816,7 +816,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
 	dagCtx := execution.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil, nil)
-	lastErr := a.scheduler.Schedule(dagCtx, a.plan, progressCh)
+	lastErr := a.runner.Run(dagCtx, a.plan, progressCh)
 	a.lastErr = lastErr
 
 	logger.Info(ctx, "Dry-run completed", "params", a.dag.Params)
@@ -839,7 +839,7 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 
 	if !signal.IsTerminationSignalOS(sig) {
 		// For non-termination signals, just send the signal once and return.
-		a.scheduler.Signal(ctx, a.plan, sig, nil, allowOverride)
+		a.runner.Signal(ctx, a.plan, sig, nil, allowOverride)
 		return
 	}
 
@@ -848,7 +848,7 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 
 	done := make(chan bool, 1)
 	go func() {
-		a.scheduler.Signal(ctx, a.plan, sig, done, allowOverride)
+		a.runner.Signal(ctx, a.plan, sig, done, allowOverride)
 	}()
 
 	ticker := time.NewTicker(5 * time.Second)
@@ -863,13 +863,13 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 		case <-signalCtx.Done():
 			logger.Info(ctx, "Max cleanup time reached, sending SIGKILL to force termination")
 			// Force kill with SIGKILL and don't wait for completion
-			a.scheduler.Signal(ctx, a.plan, syscall.SIGKILL, nil, false)
+			a.runner.Signal(ctx, a.plan, syscall.SIGKILL, nil, false)
 			return
 
 		case <-ticker.C:
 			logger.Info(ctx, "Resending signal to processes that haven't terminated",
 				"signal", sig.String())
-			a.scheduler.Signal(ctx, a.plan, sig, nil, false)
+			a.runner.Signal(ctx, a.plan, sig, nil, false)
 
 		case <-time.After(500 * time.Millisecond):
 			// Quick check to avoid busy waiting, but still responsive
