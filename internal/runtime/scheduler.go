@@ -136,10 +136,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, plan *ExecutionPlan, progress
 
 	// Event loop
 	ctxDoneCh := ctx.Done()
-	for {
-		if plan.CheckFinished() {
-			break
-		}
+	for !plan.CheckFinished() {
 
 		// If canceled and no running nodes, we are done
 		if sc.isCanceled() && running == 0 {
