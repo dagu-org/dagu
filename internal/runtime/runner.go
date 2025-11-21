@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"os/exec"
 	"runtime/debug"
 	"slices"
 	"strconv"
@@ -405,18 +404,7 @@ func (r *Runner) teardownNode(node *Node) error {
 
 func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) context.Context {
 	env := execution.NewEnv(ctx, node.Step())
-
-	// Populate step information for all nodes with IDs
-	for _, n := range plan.Nodes() {
-		if n.Step().ID != "" {
-			stepInfo := cmdutil.StepInfo{
-				Stdout:   n.GetStdout(),
-				Stderr:   n.GetStderr(),
-				ExitCode: strconv.Itoa(n.GetExitCode()),
-			}
-			env.StepMap[n.Step().ID] = stepInfo
-		}
-	}
+	populateStepInfoEnv(&env, plan)
 
 	// Load output variables from predecessor nodes (dependencies)
 	// This traverses backwards from the current node to find all nodes it depends on
@@ -472,20 +460,8 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 
 func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node *Node) context.Context {
 	env := execution.NewEnv(ctx, node.Step())
-
 	env.Envs[execution.EnvKeyDAGRunStatus] = r.Status(ctx, plan).String()
-
-	// Populate step information for all nodes with IDs
-	for _, n := range plan.Nodes() {
-		if n.Step().ID != "" {
-			stepInfo := cmdutil.StepInfo{
-				Stdout:   n.GetStdout(),
-				Stderr:   n.GetStderr(),
-				ExitCode: strconv.Itoa(n.GetExitCode()),
-			}
-			env.StepMap[n.Step().ID] = stepInfo
-		}
-	}
+	populateStepInfoEnv(&env, plan)
 
 	// get all output variables
 	for _, node := range plan.Nodes() {
@@ -799,36 +775,12 @@ func (r *Runner) GetMetrics() map[string]any {
 
 // shouldRetryNode handles the retry logic for a node based on exit codes and retry policy
 func (r *Runner) shouldRetryNode(ctx context.Context, node *Node, execErr error) (shouldRetry bool) {
-	var exitCode int
-	var exitCodeFound bool
-
-	// Try to extract the exec.ExitError using errors.As
-	var exitErr *exec.ExitError
-	if errors.As(execErr, &exitErr) {
-		exitCode = exitErr.ExitCode()
-		exitCodeFound = true
-		logger.Debug(ctx, "Found exit error", "err", execErr, "exitCode", exitCode)
-	}
-
-	if !exitCodeFound {
-		// Try to parse exit code from error string
-		errStr := execErr.Error()
-		if code, found := parseExitCodeFromError(errStr); found {
-			exitCode = code
-			exitCodeFound = true
-			logger.Debug(ctx, "Parsed exit code from error string", "err", errStr, "exitCode", exitCode)
-		} else if strings.Contains(errStr, "signal:") {
-			// Handle signal termination
-			exitCode = -1
-			exitCodeFound = true
-			logger.Debug(ctx, "Process terminated by signal", "err", errStr)
-		}
-	}
-
-	if !exitCodeFound {
+	exitCode := 1
+	if code, found := exitCodeFromError(execErr); found {
+		exitCode = code
+		logger.Debug(ctx, "Resolved exit code from error", "err", execErr, "exitCode", exitCode)
+	} else {
 		logger.Debug(ctx, "Could not determine exit code", "err", execErr, "errorType", fmt.Sprintf("%T", execErr))
-		// Default to exit code 1 if we can't determine the actual code
-		exitCode = 1
 	}
 
 	shouldRetry = node.retryPolicy.ShouldRetry(exitCode)
@@ -1070,4 +1022,17 @@ func calculateBackoffInterval(interval time.Duration, backoff float64, maxInterv
 		return time.Duration(sleeptime)
 	}
 	return interval
+}
+
+func populateStepInfoEnv(env *execution.Env, plan *Plan) {
+	for _, n := range plan.Nodes() {
+		if n.Step().ID != "" {
+			stepInfo := cmdutil.StepInfo{
+				Stdout:   n.GetStdout(),
+				Stderr:   n.GetStderr(),
+				ExitCode: strconv.Itoa(n.GetExitCode()),
+			}
+			env.StepMap[n.Step().ID] = stepInfo
+		}
+	}
 }

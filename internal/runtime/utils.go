@@ -1,6 +1,8 @@
 package runtime
 
 import (
+	"errors"
+	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -42,4 +44,28 @@ func parseExitCodeFromError(errStr string) (int, bool) {
 	}
 
 	return code, true
+}
+
+// exitCodeFromError tries to extract an exit code from common error forms.
+// It understands exec.ExitError, "exit status N" strings, and "signal:" markers.
+func exitCodeFromError(execErr error) (int, bool) {
+	if execErr == nil {
+		return 0, false
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(execErr, &exitErr) {
+		return exitErr.ExitCode(), true
+	}
+
+	errStr := execErr.Error()
+	if code, found := parseExitCodeFromError(errStr); found {
+		return code, true
+	}
+
+	if strings.Contains(errStr, "signal:") {
+		return -1, true
+	}
+
+	return 0, false
 }

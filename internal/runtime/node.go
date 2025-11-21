@@ -4,12 +4,9 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -253,20 +250,8 @@ func (n *Node) handleCommandError(cmd executor.Executor, err error) (int, error)
 		return exitCoder.ExitCode(), err
 	}
 
-	// Try to extract exit code from exec.ExitError
-	var exitErr *exec.ExitError
-	if n.Error() != nil && errors.As(n.Error(), &exitErr) {
-		return exitErr.ExitCode(), err
-	}
-
-	// Try to parse exit code from error message
-	if code, found := parseExitCodeFromError(n.Error().Error()); found {
+	if code, found := exitCodeFromError(err); found {
 		return code, err
-	}
-
-	// Process killed by signal but not due to timeout
-	if strings.Contains(err.Error(), "signal:") {
-		return -1, err
 	}
 
 	// Default error exit code
@@ -574,7 +559,7 @@ func (n *Node) Prepare(ctx context.Context, logDir string, dagRunID string) erro
 	}
 
 	logFile := filepath.Join(logDir, logFilename)
-	if err := n.Data.Setup(ctx, logFile, startedAt); err != nil {
+	if err := n.Setup(ctx, logFile, startedAt); err != nil {
 		return fmt.Errorf("failed to setup node data: %w", err)
 	}
 	if err := n.outputs.setup(ctx, n.NodeData()); err != nil {
