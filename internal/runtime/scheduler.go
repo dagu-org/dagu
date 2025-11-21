@@ -125,6 +125,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 	// Find initial ready nodes
 	for _, node := range graph.nodes {
 		if node.State().Status == core.NodeNotStarted && isReady(ctx, graph, node) {
+			logger.Debug(ctx, "Initial node ready", "step", node.Name())
 			readyCh <- node
 		}
 	}
@@ -154,6 +155,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 		select {
 		case node := <-activeReadyCh:
+			logger.Debug(ctx, "Processing ready node", "step", node.Name())
 			// Double check status
 			if node.State().Status != core.NodeNotStarted {
 				continue
@@ -194,6 +196,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 			}
 
 		case node := <-doneCh:
+			logger.Debug(ctx, "Node execution finished", "step", node.Name())
 			running--
 			sc.processCompletedNode(ctx, graph, node, readyCh)
 
@@ -230,9 +233,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 	case core.NotStarted, core.Running, core.Queued:
 		// These states should not occur at this point
-		logger.Warn(ctx, "Unexpected final status",
-			"status", sc.Status(ctx, graph).String(),
-			"dagRunId", sc.dagRunID)
+		logger.Warn(ctx, "Unexpected final status", "status", sc.Status(ctx, graph).String())
 	}
 
 	eventHandlers = append(eventHandlers, core.HandlerOnExit)
@@ -242,7 +243,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, progre
 
 	for _, handler := range eventHandlers {
 		if handlerNode := sc.handlers[handler]; handlerNode != nil {
-			logger.Info(ctx, "Handler execution started", "handler", handlerNode.Name())
+			logger.Debug(ctx, "Handler execution started", "handler", handlerNode.Name())
 			if err := sc.runEventHandler(ctx, graph, handlerNode); err != nil {
 				sc.setLastError(err)
 			}
@@ -277,6 +278,7 @@ func (sc *Scheduler) processCompletedNode(ctx context.Context, graph *ExecutionG
 			child := graph.nodeByID[childID]
 			if child.State().Status == core.NodeNotStarted {
 				if isReady(ctx, graph, child) {
+					logger.Debug(ctx, "Dependency satisfied, node ready", "step", child.Name(), "parent", curr.Name())
 					readyCh <- child
 				} else if child.State().Status != core.NodeNotStarted {
 					// Child was marked as Aborted/Skipped/Failed by isReady
@@ -289,6 +291,7 @@ func (sc *Scheduler) processCompletedNode(ctx context.Context, graph *ExecutionG
 }
 
 func (sc *Scheduler) runNodeExecution(ctx context.Context, graph *ExecutionGraph, node *Node, progressCh chan *Node) {
+	logger.Debug(ctx, "Starting node execution", "step", node.Name())
 	nodeCtx, nodeCancel := context.WithCancel(ctx)
 	defer nodeCancel()
 
@@ -323,6 +326,7 @@ func (sc *Scheduler) runNodeExecution(ctx context.Context, graph *ExecutionGraph
 	ctx = sc.setupEnviron(spanCtx, graph, node)
 
 	// Check preconditions
+	logger.Debug(ctx, "Checking preconditions", "step", node.Name())
 	if !meetsPreconditions(ctx, node, progressCh) {
 		return
 	}
@@ -331,6 +335,7 @@ func (sc *Scheduler) runNodeExecution(ctx context.Context, graph *ExecutionGraph
 
 ExecRepeat: // repeat execution
 	for !sc.isCanceled() {
+		logger.Debug(ctx, "Executing node loop", "step", node.Name())
 		execErr := sc.execNode(ctx, node)
 		isRetriable := sc.handleNodeExecutionError(ctx, graph, node, execErr)
 		if isRetriable {
@@ -598,25 +603,31 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 
 		case core.NodeFailed:
 			if dep.ShouldContinue(ctx) {
+				logger.Debug(ctx, "Dependency failed but allowed to continue", "step", node.Name(), "dependency", dep.Name())
 				continue
 			}
+			logger.Debug(ctx, "Dependency failed", "step", node.Name(), "dependency", dep.Name())
 			ready = false
 			node.SetStatus(core.NodeAborted)
 			node.SetError(ErrUpstreamFailed)
 
 		case core.NodeSkipped:
 			if dep.ShouldContinue(ctx) {
+				logger.Debug(ctx, "Dependency skipped but allowed to continue", "step", node.Name(), "dependency", dep.Name())
 				continue
 			}
+			logger.Debug(ctx, "Dependency skipped", "step", node.Name(), "dependency", dep.Name())
 			ready = false
 			node.SetStatus(core.NodeSkipped)
 			node.SetError(ErrUpstreamSkipped)
 
 		case core.NodeAborted:
+			logger.Debug(ctx, "Dependency aborted", "step", node.Name(), "dependency", dep.Name())
 			ready = false
 			node.SetStatus(core.NodeAborted)
 
 		case core.NodeNotStarted, core.NodeRunning:
+			logger.Debug(ctx, "Dependency not finished", "step", node.Name(), "dependency", dep.Name(), "status", dep.State().Status)
 			ready = false
 
 		default:
