@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -2774,4 +2775,36 @@ func TestRunnerPartialSuccess(t *testing.T) {
 		result.assertNodeStatus(t, "step2", core.NodeFailed)
 		result.assertNodeStatus(t, "step3", core.NodeSucceeded)
 	})
+}
+
+func TestRunner_DeadlockDetection(t *testing.T) {
+	t.Parallel()
+
+	steps := []core.Step{
+		{Name: "a"},
+		{Name: "b", Depends: []string{"a"}},
+	}
+
+	plan, err := runtime.NewPlan(steps...)
+	require.NoError(t, err)
+
+	// Corrupt dependencies to create an unschedulable plan (self-dependency).
+	for _, n := range plan.Nodes() {
+		plan.DependencyMap[n.ID()] = []int{n.ID()}
+	}
+
+	cfg := &runtime.Config{
+		LogDir:   t.TempDir(),
+		DAGRunID: uuid.NewString(),
+	}
+	r := runtime.New(cfg)
+	dag := &core.DAG{Name: "deadlock_dag"}
+	logFile := filepath.Join(cfg.LogDir, dag.Name+".log")
+	ctx := execution.SetupDAGContext(context.Background(), dag, nil, execution.DAGRunRef{}, cfg.DAGRunID, logFile, nil, nil, nil)
+
+	progressCh := make(chan *runtime.Node, 2)
+	err = r.Run(ctx, plan, progressCh)
+
+	require.ErrorIs(t, err, runtime.ErrDeadlockDetected)
+	require.Equal(t, core.Failed, r.Status(ctx, plan))
 }

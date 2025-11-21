@@ -26,8 +26,9 @@ import (
 )
 
 var (
-	ErrUpstreamFailed  = fmt.Errorf("upstream failed")
-	ErrUpstreamSkipped = fmt.Errorf("upstream skipped")
+	ErrUpstreamFailed   = fmt.Errorf("upstream failed")
+	ErrUpstreamSkipped  = fmt.Errorf("upstream skipped")
+	ErrDeadlockDetected = errors.New("deadlock detected: no runnable nodes but DAG not finished")
 )
 
 // Runner runs a plan of steps.
@@ -137,7 +138,6 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 	// Event loop
 	ctxDoneCh := ctx.Done()
 	for !plan.CheckFinished() {
-
 		// If canceled and no running nodes, we are done
 		if r.isCanceled() && running == 0 {
 			break
@@ -149,6 +149,14 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		// 2. maxActiveRuns is 0 (unlimited) OR running < maxActiveRuns
 		if !r.isCanceled() && (r.maxActiveRuns == 0 || running < r.maxActiveRuns) {
 			activeReadyCh = readyCh
+		}
+
+		// Deadlock detection: if no nodes are running, no nodes are ready, and the graph is not finished,
+		// then we are stuck (nodes are waiting for dependencies that will never be satisfied).
+		if running == 0 && len(activeReadyCh) == 0 && !plan.CheckFinished() {
+			r.setLastError(ErrDeadlockDetected)
+			logger.Error(ctx, "Deadlock detected: no runnable nodes remaining")
+			break
 		}
 
 		select {

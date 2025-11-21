@@ -23,11 +23,13 @@ type Plan struct {
 	finishedAt time.Time
 
 	// Graph structure (immutable after construction)
-	nodes        []*Node
-	nodeByID     map[int]*Node
-	nodeByName   map[string]*Node
-	dependencies map[int][]int // node ID -> list of dependency node IDs (upstream)
-	dependents   map[int][]int // node ID -> list of dependent node IDs (downstream)
+	nodes      []*Node
+	nodeByID   map[int]*Node
+	nodeByName map[string]*Node
+
+	// Immutable adjacency lists (exposing for unit tests)
+	DependencyMap map[int][]int // node ID -> list of dependency node IDs (upstream)
+	DependantMap  map[int][]int // node ID -> list of dependent node IDs (downstream)
 
 	mu sync.RWMutex
 }
@@ -36,12 +38,12 @@ type Plan struct {
 // It builds the graph, validates it (checking for cycles), and returns the plan.
 func NewPlan(steps ...core.Step) (*Plan, error) {
 	p := &Plan{
-		nodeByID:     make(map[int]*Node),
-		nodeByName:   make(map[string]*Node),
-		dependencies: make(map[int][]int),
-		dependents:   make(map[int][]int),
-		nodes:        make([]*Node, 0, len(steps)),
-		startedAt:    time.Now(),
+		nodeByID:      make(map[int]*Node),
+		nodeByName:    make(map[string]*Node),
+		DependencyMap: make(map[int][]int),
+		DependantMap:  make(map[int][]int),
+		nodes:         make([]*Node, 0, len(steps)),
+		startedAt:     time.Now(),
 	}
 
 	// Initialize nodes
@@ -62,12 +64,12 @@ func NewPlan(steps ...core.Step) (*Plan, error) {
 // CreateRetryPlan creates a new execution plan for retrying specific nodes.
 func CreateRetryPlan(ctx context.Context, dag *core.DAG, nodes ...*Node) (*Plan, error) {
 	p := &Plan{
-		nodeByID:     make(map[int]*Node),
-		nodeByName:   make(map[string]*Node),
-		dependencies: make(map[int][]int),
-		dependents:   make(map[int][]int),
-		nodes:        make([]*Node, 0, len(nodes)),
-		startedAt:    time.Now(),
+		nodeByID:      make(map[int]*Node),
+		nodeByName:    make(map[string]*Node),
+		DependencyMap: make(map[int][]int),
+		DependantMap:  make(map[int][]int),
+		nodes:         make([]*Node, 0, len(nodes)),
+		startedAt:     time.Now(),
 	}
 
 	steps := stepsByName(dag)
@@ -94,12 +96,12 @@ func CreateRetryPlan(ctx context.Context, dag *core.DAG, nodes ...*Node) (*Plan,
 // CreateStepRetryPlan creates a new execution plan for retrying a specific step.
 func CreateStepRetryPlan(dag *core.DAG, nodes []*Node, stepName string) (*Plan, error) {
 	p := &Plan{
-		nodeByID:     make(map[int]*Node),
-		nodeByName:   make(map[string]*Node),
-		dependencies: make(map[int][]int),
-		dependents:   make(map[int][]int),
-		nodes:        make([]*Node, 0, len(nodes)),
-		startedAt:    time.Now(),
+		nodeByID:      make(map[int]*Node),
+		nodeByName:    make(map[string]*Node),
+		DependencyMap: make(map[int][]int),
+		DependantMap:  make(map[int][]int),
+		nodes:         make([]*Node, 0, len(nodes)),
+		startedAt:     time.Now(),
 	}
 
 	steps := stepsByName(dag)
@@ -156,14 +158,14 @@ func (p *Plan) buildEdges() error {
 
 // addEdge adds a directed edge from 'from' to 'to'.
 func (p *Plan) addEdge(from, to *Node) {
-	p.dependents[from.id] = append(p.dependents[from.id], to.id)
-	p.dependencies[to.id] = append(p.dependencies[to.id], from.id)
+	p.DependantMap[from.id] = append(p.DependantMap[from.id], to.id)
+	p.DependencyMap[to.id] = append(p.DependencyMap[to.id], from.id)
 }
 
 // isCyclic checks for cycles in the graph using Kahn's algorithm.
 func (p *Plan) isCyclic() bool {
 	inDegrees := make(map[int]int)
-	for id, deps := range p.dependencies {
+	for id, deps := range p.DependencyMap {
 		inDegrees[id] = len(deps)
 	}
 
@@ -180,7 +182,7 @@ func (p *Plan) isCyclic() bool {
 		queue = queue[1:]
 		processedCount++
 
-		for _, v := range p.dependents[u] {
+		for _, v := range p.DependantMap[u] {
 			inDegrees[v]--
 			if inDegrees[v] == 0 {
 				queue = append(queue, v)
@@ -204,7 +206,7 @@ func (p *Plan) setupRetry(ctx context.Context, steps map[string]core.Step) error
 
 	var frontier []int
 	for _, node := range p.nodes {
-		if len(p.dependencies[node.id]) == 0 {
+		if len(p.DependencyMap[node.id]) == 0 {
 			frontier = append(frontier, node.id)
 		}
 	}
@@ -227,7 +229,7 @@ func (p *Plan) setupRetry(ctx context.Context, steps map[string]core.Step) error
 				toRetry[u] = true
 			}
 
-			for _, v := range p.dependents[u] {
+			for _, v := range p.DependantMap[u] {
 				if toRetry[u] {
 					toRetry[v] = true
 				}
@@ -270,7 +272,7 @@ func (p *Plan) GetNodeByName(name string) *Node {
 func (p *Plan) Dependencies(nodeID int) []int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	deps := p.dependencies[nodeID]
+	deps := p.DependencyMap[nodeID]
 	result := make([]int, len(deps))
 	copy(result, deps)
 	return result
@@ -280,7 +282,7 @@ func (p *Plan) Dependencies(nodeID int) []int {
 func (p *Plan) Dependents(nodeID int) []int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	deps := p.dependents[nodeID]
+	deps := p.DependantMap[nodeID]
 	result := make([]int, len(deps))
 	copy(result, deps)
 	return result
