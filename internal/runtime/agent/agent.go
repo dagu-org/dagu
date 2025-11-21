@@ -69,11 +69,11 @@ type Agent struct {
 	// dagRunMgr is the runstore dagRunMgr to communicate with the history.
 	dagRunMgr runtime1.Manager
 
-	// scheduler is the scheduler instance to run the DAG.
-	scheduler *runtime.Scheduler
+	// runner is the runner instance to run the DAG.
+	runner *runtime.Runner
 
-	// graph is the execution graph for the DAG.
-	graph *runtime.ExecutionGraph
+	// plan is the execution plan for the DAG.
+	plan *runtime.Plan
 
 	// reporter is responsible for sending the report to the user.
 	reporter *reporter
@@ -85,7 +85,7 @@ type Agent struct {
 	// logDir is the directory to store the log files for each node in the DAG.
 	logDir string
 
-	// logFile is the file to write the scheduler log.
+	// logFile is the file to write the runner log.
 	logFile string
 
 	// dag is the DAG to run.
@@ -183,7 +183,7 @@ func New(
 	return a
 }
 
-// Run setups the scheduler and runs the DAG.
+// Run setups the runner and runs the DAG.
 func (a *Agent) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -261,15 +261,15 @@ func (a *Agent) Run(ctx context.Context) error {
 		a.dagRunAttemptID = attempt.ID()
 	}
 
-	// Initialize the scheduler
-	a.scheduler = a.newScheduler()
+	// Initialize the runner
+	a.runner = a.newRunner()
 
 	// Setup the reporter to send the report to the user.
 	a.setupReporter(ctx)
 
-	// Setup the execution graph for the DAG.
-	if err := a.setupGraph(ctx); err != nil {
-		return fmt.Errorf("failed to setup execution graph: %w", err)
+	// Setup the execution plan for the DAG.
+	if err := a.setupPlan(ctx); err != nil {
+		return fmt.Errorf("failed to setup execution plan: %w", err)
 	}
 
 	// Create a new environment for the dag-run.
@@ -338,7 +338,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Start the unix socket server for receiving HTTP requests from
-	// the local client (e.g., the frontend server, scheduler, etc).
+	// the local client (e.g., the frontend server, etc).
 	if err := a.setupSocketServer(ctx); err != nil {
 		return fmt.Errorf("failed to setup unix socket server: %w", err)
 	}
@@ -445,7 +445,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			}
 			// Update progress display if enabled
 			if a.progressDisplay != nil {
-				// Convert scheduler node to models node
+				// Convert runner node to models node
 				nodeData := node.NodeData()
 				modelNode := a.nodeToModelNode(nodeData)
 				a.progressDisplay.UpdateNode(modelNode)
@@ -493,7 +493,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		ctx = docker.WithRegistryAuth(ctx, a.dag.RegistryAuths)
 	}
 
-	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
+	lastErr := a.runner.Run(ctx, a.plan, progressCh)
 
 	if coordinatorCli != nil {
 		// Cleanup the coordinator client resources if it was created.
@@ -541,7 +541,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	return lastErr
 }
 
-// nodeToModelNode converts a scheduler NodeData to a models.Node
+// nodeToModelNode converts a runner NodeData to a models.Node
 func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *execution.Node {
 	subRuns := make([]execution.SubDAGRun, len(nodeData.State.SubRuns))
 	for i, child := range nodeData.State.SubRuns {
@@ -585,20 +585,20 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	schedulerStatus := a.scheduler.Status(ctx, a.graph)
-	if schedulerStatus == core.NotStarted && a.graph.IsStarted() {
-		// Match the status to the execution graph.
-		schedulerStatus = core.Running
+	runnerStatus := a.runner.Status(ctx, a.plan)
+	if runnerStatus == core.NotStarted && a.plan.IsStarted() {
+		// Match the status to the execution plan.
+		runnerStatus = core.Running
 	}
 
 	opts := []transform.StatusOption{
-		transform.WithFinishedAt(a.graph.FinishAt()),
-		transform.WithNodes(a.graph.NodeData()),
+		transform.WithFinishedAt(a.plan.FinishAt()),
+		transform.WithNodes(a.plan.NodeData()),
 		transform.WithLogFilePath(a.logFile),
-		transform.WithOnExitNode(a.scheduler.HandlerNode(core.HandlerOnExit)),
-		transform.WithOnSuccessNode(a.scheduler.HandlerNode(core.HandlerOnSuccess)),
-		transform.WithOnFailureNode(a.scheduler.HandlerNode(core.HandlerOnFailure)),
-		transform.WithOnCancelNode(a.scheduler.HandlerNode(core.HandlerOnCancel)),
+		transform.WithOnExitNode(a.runner.HandlerNode(core.HandlerOnExit)),
+		transform.WithOnSuccessNode(a.runner.HandlerNode(core.HandlerOnSuccess)),
+		transform.WithOnFailureNode(a.runner.HandlerNode(core.HandlerOnFailure)),
+		transform.WithOnCancelNode(a.runner.HandlerNode(core.HandlerOnCancel)),
 		transform.WithAttemptID(a.dagRunAttemptID),
 		transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 		transform.WithPreconditions(a.dag.Preconditions),
@@ -615,9 +615,9 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	return transform.NewStatusBuilder(a.dag).
 		Create(
 			a.dagRunID,
-			schedulerStatus,
+			runnerStatus,
 			os.Getpid(),
-			a.graph.StartAt(),
+			a.plan.StartAt(),
 			opts...,
 		)
 }
@@ -710,15 +710,15 @@ func (a *Agent) setupReporter(ctx context.Context) {
 	a.reporter = newReporter(senderFn)
 }
 
-// newScheduler creates a scheduler instance for the dag-run.
-func (a *Agent) newScheduler() *runtime.Scheduler {
-	// schedulerLogDir is the directory to store the log files for each node in the dag-run.
+// newRunner creates a runner instance for the dag-run.
+func (a *Agent) newRunner() *runtime.Runner {
+	// runnerLogDir is the directory to store the log files for each node in the dag-run.
 	const dateTimeFormatUTC = "20060102_150405Z"
 	ts := time.Now().UTC().Format(dateTimeFormatUTC)
-	schedulerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.dagRunAttemptID)
+	runnerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.dagRunAttemptID)
 
 	cfg := &runtime.Config{
-		LogDir:         schedulerLogDir,
+		LogDir:         runnerLogDir,
 		MaxActiveSteps: a.dag.MaxActiveSteps,
 		Timeout:        a.dag.Timeout,
 		Delay:          a.dag.Delay,
@@ -816,7 +816,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
 	dagCtx := execution.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil, nil)
-	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
+	lastErr := a.runner.Run(dagCtx, a.plan, progressCh)
 	a.lastErr = lastErr
 
 	logger.Info(ctx, "Dry-run completed", "params", a.dag.Params)
@@ -839,7 +839,7 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 
 	if !signal.IsTerminationSignalOS(sig) {
 		// For non-termination signals, just send the signal once and return.
-		a.scheduler.Signal(ctx, a.graph, sig, nil, allowOverride)
+		a.runner.Signal(ctx, a.plan, sig, nil, allowOverride)
 		return
 	}
 
@@ -848,7 +848,7 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 
 	done := make(chan bool, 1)
 	go func() {
-		a.scheduler.Signal(ctx, a.graph, sig, done, allowOverride)
+		a.runner.Signal(ctx, a.plan, sig, done, allowOverride)
 	}()
 
 	ticker := time.NewTicker(5 * time.Second)
@@ -863,17 +863,17 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 		case <-signalCtx.Done():
 			logger.Info(ctx, "Max cleanup time reached, sending SIGKILL to force termination")
 			// Force kill with SIGKILL and don't wait for completion
-			a.scheduler.Signal(ctx, a.graph, syscall.SIGKILL, nil, false)
+			a.runner.Signal(ctx, a.plan, syscall.SIGKILL, nil, false)
 			return
 
 		case <-ticker.C:
 			logger.Info(ctx, "Resending signal to processes that haven't terminated",
 				"signal", sig.String())
-			a.scheduler.Signal(ctx, a.graph, sig, nil, false)
+			a.runner.Signal(ctx, a.plan, sig, nil, false)
 
 		case <-time.After(500 * time.Millisecond):
 			// Quick check to avoid busy waiting, but still responsive
-			if a.graph != nil && !a.graph.IsRunning() {
+			if a.plan != nil && !a.plan.IsRunning() {
 				logger.Info(ctx, "No running processes detected, termination complete")
 				return
 			}
@@ -881,49 +881,49 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	}
 }
 
-// setupGraph setups the DAG graph. If is retry execution, it loads nodes
+// setupPlan setups the DAG plan. If is retry execution, it loads nodes
 // from the retry node so that it runs the same DAG as the previous run.
-func (a *Agent) setupGraph(ctx context.Context) error {
+func (a *Agent) setupPlan(ctx context.Context) error {
 	if a.retryTarget != nil {
-		return a.setupGraphForRetry(ctx)
+		return a.setupRetryPlan(ctx)
 	}
-	graph, err := runtime.NewExecutionGraph(a.dag.Steps...)
+	plan, err := runtime.NewPlan(a.dag.Steps...)
 	if err != nil {
 		return err
 	}
-	a.graph = graph
+	a.plan = plan
 	return nil
 }
 
-// setupGraphForRetry setsup the graph for retry.
-func (a *Agent) setupGraphForRetry(ctx context.Context) error {
+// setupRetryPlan sets up the plan for retry.
+func (a *Agent) setupRetryPlan(ctx context.Context) error {
 	nodes := make([]*runtime.Node, 0, len(a.retryTarget.Nodes))
 	for _, n := range a.retryTarget.Nodes {
 		nodes = append(nodes, transform.ToNode(n))
 	}
 	if a.stepRetry != "" {
-		return a.setupStepRetryGraph(ctx, nodes)
+		return a.setupStepRetryPlan(ctx, nodes)
 	}
-	return a.setupDefaultRetryGraph(ctx, nodes)
+	return a.setupDefaultRetryPlan(ctx, nodes)
 }
 
-// setupStepRetryGraph sets up the graph for retrying a specific step.
-func (a *Agent) setupStepRetryGraph(ctx context.Context, nodes []*runtime.Node) error {
-	graph, err := runtime.CreateStepRetryGraph(a.dag, nodes, a.stepRetry)
+// setupStepRetryPlan sets up the plan for retrying a specific step.
+func (a *Agent) setupStepRetryPlan(ctx context.Context, nodes []*runtime.Node) error {
+	plan, err := runtime.CreateStepRetryPlan(a.dag, nodes, a.stepRetry)
 	if err != nil {
 		return err
 	}
-	a.graph = graph
+	a.plan = plan
 	return nil
 }
 
-// setupDefaultRetryGraph sets up the graph for the default retry behavior (all failed/canceled nodes and downstreams).
-func (a *Agent) setupDefaultRetryGraph(ctx context.Context, nodes []*runtime.Node) error {
-	graph, err := runtime.CreateRetryExecutionGraph(ctx, a.dag, nodes...)
+// setupDefaultRetryPlan sets up the plan for the default retry behavior (all failed/canceled nodes and downstreams).
+func (a *Agent) setupDefaultRetryPlan(ctx context.Context, nodes []*runtime.Node) error {
+	plan, err := runtime.CreateRetryPlan(ctx, a.dag, nodes...)
 	if err != nil {
 		return err
 	}
-	a.graph = graph
+	a.plan = plan
 	return nil
 }
 

@@ -4,12 +4,9 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -54,6 +51,12 @@ func NodeWithData(data NodeData) *Node {
 
 func (n *Node) NodeData() NodeData {
 	return n.Data.Data()
+}
+
+func (n *Node) ID() int {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.id
 }
 
 func (n *Node) StdoutFile() string {
@@ -247,20 +250,8 @@ func (n *Node) handleCommandError(cmd executor.Executor, err error) (int, error)
 		return exitCoder.ExitCode(), err
 	}
 
-	// Try to extract exit code from exec.ExitError
-	var exitErr *exec.ExitError
-	if n.Error() != nil && errors.As(n.Error(), &exitErr) {
-		return exitErr.ExitCode(), err
-	}
-
-	// Try to parse exit code from error message
-	if code, found := parseExitCodeFromError(n.Error().Error()); found {
+	if code, found := exitCodeFromError(err); found {
 		return code, err
-	}
-
-	// Process killed by signal but not due to timeout
-	if strings.Contains(err.Error(), "signal:") {
-		return -1, err
 	}
 
 	// Default error exit code
@@ -539,7 +530,7 @@ func (n *Node) Cancel() {
 	}
 }
 
-func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
+func (n *Node) SetupEnv(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	env := execution.GetEnv(ctx)
@@ -551,7 +542,7 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	return execution.WithEnv(ctx, env)
 }
 
-func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error {
+func (n *Node) Prepare(ctx context.Context, logDir string, dagRunID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -568,7 +559,7 @@ func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error 
 	}
 
 	logFile := filepath.Join(logDir, logFilename)
-	if err := n.Data.Setup(ctx, logFile, startedAt); err != nil {
+	if err := n.Setup(ctx, logFile, startedAt); err != nil {
 		return fmt.Errorf("failed to setup node data: %w", err)
 	}
 	if err := n.outputs.setup(ctx, n.NodeData()); err != nil {
@@ -627,7 +618,7 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 
 	// Get maxOutputSize from DAG configuration
 	var maxOutputSize = 1024 * 1024 // Default 1MB
-	if env := execution.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+	if env := execution.GetDAGContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
 		maxOutputSize = env.DAG.MaxOutputSize
 	}
 

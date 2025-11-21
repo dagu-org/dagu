@@ -161,8 +161,8 @@ func SetupDAGContext(ctx context.Context, dag *core.DAG, db Database, rootDAGRun
 	})
 }
 
-// GetDAGContextFromContext retrieves the DAGContext from the context.
-func GetDAGContextFromContext(ctx context.Context) DAGContext {
+// GetDAGContext retrieves the DAGContext from the context.
+func GetDAGContext(ctx context.Context) DAGContext {
 	value := ctx.Value(dagCtxKey{})
 	if value == nil {
 		logger.Error(ctx, "failed to get the env")

@@ -130,7 +130,7 @@ func (e Env) UserEnvsMap() map[string]string {
 
 // NewEnv creates a new execution context with the given step.
 func NewEnv(ctx context.Context, step core.Step) Env {
-	parentEnv := GetDAGContextFromContext(ctx)
+	parentEnv := GetDAGContext(ctx)
 	parentDAG := parentEnv.DAG
 
 	var workingDir string
@@ -191,7 +191,7 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 	}
 
 	return Env{
-		DAGContext: GetDAGContextFromContext(ctx),
+		DAGContext: GetDAGContext(ctx),
 		Variables:  variables,
 		Step:       step,
 		Envs:       envs,
@@ -258,7 +258,7 @@ func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 
 // EvalString evaluates the given string with the variables within the execution context.
 func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
-	dagEnv := GetDAGContextFromContext(ctx)
+	dagEnv := GetDAGContext(ctx)
 
 	option := cmdutil.NewEvalOptions()
 	for _, opt := range opts {
