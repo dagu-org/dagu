@@ -37,7 +37,7 @@ DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v
 # Arguments for the tests
 GOTESTSUM_ARGS=--format=standard-quiet
 # Go test flags (see https://github.com/golang/go/issues/61229#issuecomment-1988965927)
-GO_TEST_FLAGS=-v --race -ldflags=-extldflags=-Wl,-ld_classic
+GO_TEST_FLAGS=-v --race -ldflags=-extldflags=-Wl
 
 # OpenAPI configuration
 OAPI_SPEC_DIR_V2=./api/v2
