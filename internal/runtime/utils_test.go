@@ -10,6 +10,8 @@ import (
 )
 
 func TestParseExitCodeFromError(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		errStr    string
@@ -150,6 +152,8 @@ func TestParseExitCodeFromError(t *testing.T) {
 }
 
 func TestParseExitCodeFromError_EdgeCases(t *testing.T) {
+	t.Parallel()
+
 	// Test with very long strings
 	t.Run("VeryLongErrorString", func(t *testing.T) {
 		longPrefix := strings.Repeat("error ", 1000)
@@ -177,6 +181,8 @@ func TestParseExitCodeFromError_EdgeCases(t *testing.T) {
 }
 
 func TestExitCodeFromError(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		err      error
