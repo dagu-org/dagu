@@ -545,7 +545,7 @@ func (n *Node) Cancel() {
 	}
 }
 
-func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
+func (n *Node) SetupEnv(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	env := execution.GetEnv(ctx)
@@ -557,7 +557,7 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	return execution.WithEnv(ctx, env)
 }
 
-func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error {
+func (n *Node) Prepare(ctx context.Context, logDir string, dagRunID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -633,7 +633,7 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 
 	// Get maxOutputSize from DAG configuration
 	var maxOutputSize = 1024 * 1024 // Default 1MB
-	if env := execution.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+	if env := execution.GetDAGContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
 		maxOutputSize = env.DAG.MaxOutputSize
 	}
 

@@ -113,7 +113,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 	r.metrics.totalNodes = len(nodes)
 
 	// If one of the conditions does not met, cancel the execution.
-	env := execution.GetDAGContextFromContext(ctx)
+	env := execution.GetDAGContext(ctx)
 	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", "err", err)
 		r.Cancel(plan)
@@ -182,7 +182,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 					doneCh <- n
 				}()
 
-				if err := r.setupNode(ctx, n); err != nil {
+				if err := r.prepareNode(ctx, n); err != nil {
 					r.setLastError(err)
 					n.MarkError(err)
 					n.SetStatus(core.NodeFailed)
@@ -329,7 +329,7 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 		}()
 	}
 
-	ctx = r.setupEnviron(spanCtx, plan, node)
+	ctx = r.setupVariables(spanCtx, plan, node)
 
 	// Check preconditions
 	logger.Debug(ctx, "Checking preconditions", "step", node.Name())
@@ -337,7 +337,7 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 		return
 	}
 
-	ctx = node.SetupContextBeforeExec(ctx)
+	ctx = node.SetupEnv(ctx)
 
 ExecRepeat: // repeat execution
 	for !r.isCanceled() {
@@ -389,9 +389,9 @@ func (r *Runner) setLastError(err error) {
 	r.lastError = err
 }
 
-func (r *Runner) setupNode(ctx context.Context, node *Node) error {
+func (r *Runner) prepareNode(ctx context.Context, node *Node) error {
 	if !r.dry {
-		return node.Setup(ctx, r.logDir, r.dagRunID)
+		return node.Prepare(ctx, r.logDir, r.dagRunID)
 	}
 	return nil
 }
@@ -403,7 +403,7 @@ func (r *Runner) teardownNode(node *Node) error {
 	return nil
 }
 
-func (r *Runner) setupEnviron(ctx context.Context, plan *Plan, node *Node) context.Context {
+func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) context.Context {
 	env := execution.NewEnv(ctx, node.Step())
 
 	// Populate step information for all nodes with IDs
@@ -648,7 +648,7 @@ func (r *Runner) runEventHandler(ctx context.Context, plan *Plan, node *Node) er
 	defer node.Finish()
 
 	if !r.dry {
-		if err := node.Setup(ctx, r.logDir, r.dagRunID); err != nil {
+		if err := node.Prepare(ctx, r.logDir, r.dagRunID); err != nil {
 			node.SetStatus(core.NodeFailed)
 			return nil
 		}
