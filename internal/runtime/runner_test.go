@@ -20,14 +20,14 @@ import (
 )
 
 func TestRunner(t *testing.T) {
-	testScript := test.TestdataPath(t, filepath.Join("runtime", "scheduler", "testfile.sh"))
+	testScript := test.TestdataPath(t, filepath.Join("runtime", "runner", "testfile.sh"))
 
 	t.Run("SequentialStepsSuccess", func(t *testing.T) {
 		t.Parallel()
-		sc := setupRunner(t, withMaxActiveRuns(1))
+		r := setupRunner(t, withMaxActiveRuns(1))
 
 		// 1 -> 2 -> 3
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			successStep("2", "1"),
 			successStep("3", "2"),
@@ -41,10 +41,10 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("SequentialStepsWithFailure", func(t *testing.T) {
 		t.Parallel()
-		sc := setupRunner(t, withMaxActiveRuns(1))
+		r := setupRunner(t, withMaxActiveRuns(1))
 
 		// 1 -> 2 -> 3 -> 4
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			successStep("2", "1"),
 			failStep("3", "2"),
@@ -61,10 +61,10 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("ParallelSteps", func(t *testing.T) {
 		t.Parallel()
-		sc := setupRunner(t, withMaxActiveRuns(3))
+		r := setupRunner(t, withMaxActiveRuns(3))
 
 		// 1,2,3
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			successStep("2"),
 			successStep("3"),
@@ -77,10 +77,10 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("ParallelStepsWithFailure", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 -> 3 -> 4, 2 (fail)
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			failStep("2"),
 			successStep("3", "1"),
@@ -96,9 +96,9 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("ComplexCommand", func(t *testing.T) {
 		t.Parallel()
-		sc := setupRunner(t, withMaxActiveRuns(1))
+		r := setupRunner(t, withMaxActiveRuns(1))
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("df / | awk 'NR==2 {exit $4 > 5000 ? 0 : 1}'"),
 			))
@@ -107,10 +107,10 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnFailure", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 -> 2 (fail) -> 3
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			newStep("2",
 				withDepends("1"),
@@ -130,10 +130,10 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnSkip", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 -> 2 (skip) -> 3
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			newStep("2",
 				withDepends("1"),
@@ -156,10 +156,10 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnExitCode", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 (exit code 1) -> 2
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("false"),
 				withContinueOn(core.ContinueOn{
@@ -176,10 +176,10 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnOutputStdout", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 (exit code 1) -> 2
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("echo test_output; false"), // stdout: test_output
 				withContinueOn(core.ContinueOn{
@@ -198,10 +198,10 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnOutputStderr", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 (exit code 1) -> 2
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("echo test_output >&2; echo test_output; false"), // write to stderr and stdout
 				withContinueOn(core.ContinueOn{
@@ -225,10 +225,10 @@ func TestRunner(t *testing.T) {
 		assert.Contains(t, string(stderrData), "test_output")
 	})
 	t.Run("ContinueOnOutputRegexp", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 (exit code 1) -> 2
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("echo test_output; false"), // stdout: test_output
 				withContinueOn(core.ContinueOn{
@@ -247,10 +247,10 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
 	})
 	t.Run("ContinueOnMarkSuccess", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 (exit code 1) -> 2
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("false"),
 				withContinueOn(core.ContinueOn{
@@ -268,10 +268,10 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
 	})
 	t.Run("Cancel", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 -> 2 (cancel when running) -> 3 (should not be executed)
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			newStep("2", withDepends("1"), withCommand("sleep 0.5")),
 			failStep("3", "2"),
@@ -289,10 +289,10 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeNotStarted)
 	})
 	t.Run("Timeout", func(t *testing.T) {
-		sc := setupRunner(t, withTimeout(time.Millisecond*500))
+		r := setupRunner(t, withTimeout(time.Millisecond*500))
 
 		// 1 -> 2 (timeout) -> 3 (should not be executed)
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand("sleep 0.1")),
 			newStep("2", withCommand("sleep 0.5"), withDepends("1")),
 			successStep("3", "2"),
@@ -309,9 +309,9 @@ func TestRunner(t *testing.T) {
 	t.Run("RetryPolicyFail", func(t *testing.T) {
 		const file = "flag_test_retry_fail"
 
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand(fmt.Sprintf("%s %s", testScript, file)),
 				withRetryPolicy(2, 0),
@@ -326,11 +326,11 @@ func TestRunner(t *testing.T) {
 		require.Equal(t, 2, node.State().RetryCount) // 2 retry
 	})
 	t.Run("RetryWithScript", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 		tmpDir := t.TempDir()
 		testFile := path.Join(tmpDir, "testfile.txt")
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withScript(`
 					if [ ! -f "`+testFile+`" ]; then
@@ -356,9 +356,9 @@ func TestRunner(t *testing.T) {
 			os.TempDir(), fmt.Sprintf("flag_test_retry_success_%s", uuid.Must(uuid.NewV7()).String()),
 		)
 
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand(fmt.Sprintf("%s %s", testScript, file)),
 				withRetryPolicy(3, time.Millisecond*50),
@@ -393,10 +393,10 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("PreconditionMatch", func(t *testing.T) {
 		t.Parallel()
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 -> 2 (precondition match) -> 3
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
@@ -414,10 +414,10 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("PreconditionNotMatch", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 -> 2 (precondition not match) -> 3
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
@@ -435,10 +435,10 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeSkipped)
 	})
 	t.Run("PreconditionWithCommandMet", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 -> 2 (precondition not match) -> 3
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
@@ -454,10 +454,10 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeSucceeded)
 	})
 	t.Run("PreconditionWithCommandNotMet", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 -> 2 (precondition not match) -> 3
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
@@ -474,9 +474,9 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeSkipped)
 	})
 	t.Run("OnExitHandler", func(t *testing.T) {
-		sc := setupRunner(t, withOnExit(successStep("onExit")))
+		r := setupRunner(t, withOnExit(successStep("onExit")))
 
-		plan := sc.newPlan(t, successStep("1"))
+		plan := r.newPlan(t, successStep("1"))
 
 		result := plan.assertRun(t, core.Succeeded)
 
@@ -484,9 +484,9 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "onExit", core.NodeSucceeded)
 	})
 	t.Run("OnExitHandlerFail", func(t *testing.T) {
-		sc := setupRunner(t, withOnExit(failStep("onExit")))
+		r := setupRunner(t, withOnExit(failStep("onExit")))
 
-		plan := sc.newPlan(t, successStep("1"))
+		plan := r.newPlan(t, successStep("1"))
 
 		// Overall status should be error because onExit failed
 		result := plan.assertRun(t, core.Failed)
@@ -495,9 +495,9 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "onExit", core.NodeFailed)
 	})
 	t.Run("OnCancelHandler", func(t *testing.T) {
-		sc := setupRunner(t, withOnCancel(successStep("onCancel")))
+		r := setupRunner(t, withOnCancel(successStep("onCancel")))
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
 		)
 
@@ -512,9 +512,9 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "onCancel", core.NodeSucceeded)
 	})
 	t.Run("OnSuccessHandler", func(t *testing.T) {
-		sc := setupRunner(t, withOnSuccess(successStep("onSuccess")))
+		r := setupRunner(t, withOnSuccess(successStep("onSuccess")))
 
-		plan := sc.newPlan(t, successStep("1"))
+		plan := r.newPlan(t, successStep("1"))
 
 		result := plan.assertRun(t, core.Succeeded)
 
@@ -522,9 +522,9 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "onSuccess", core.NodeSucceeded)
 	})
 	t.Run("OnFailureHandler", func(t *testing.T) {
-		sc := setupRunner(t, withOnFailure(successStep("onFailure")))
+		r := setupRunner(t, withOnFailure(successStep("onFailure")))
 
-		plan := sc.newPlan(t, failStep("1"))
+		plan := r.newPlan(t, failStep("1"))
 
 		result := plan.assertRun(t, core.Failed)
 
@@ -532,9 +532,9 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "onFailure", core.NodeSucceeded)
 	})
 	t.Run("CancelOnSignal", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
 		)
 
@@ -548,9 +548,9 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "1", core.NodeAborted)
 	})
 	t.Run("Repeat", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("sleep 0.1"),
 				withRepeatPolicy(true, time.Millisecond*100),
@@ -572,9 +572,9 @@ func TestRunner(t *testing.T) {
 		require.Equal(t, 1, node.State().DoneCount)
 	})
 	t.Run("RepeatFail", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("false"),
 				withRepeatPolicy(true, time.Millisecond*50),
@@ -590,9 +590,9 @@ func TestRunner(t *testing.T) {
 		require.Equal(t, 1, node.State().DoneCount)
 	})
 	t.Run("StopRepetitiveTaskGracefully", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("sleep 0.1"),
 				withRepeatPolicy(true, time.Millisecond*50),
@@ -612,9 +612,9 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 	})
 	t.Run("NodeSetupFailure", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withWorkingDir("/nonexistent"),
 				withScript("echo 1"),
 			),
@@ -628,11 +628,11 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("OutputVariables", func(t *testing.T) {
 		t.Parallel()
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1: echo hello > OUT
 		// 2: echo $OUT > RESULT
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand("echo hello"), withOutput("OUT")),
 			newStep("2", withCommand("echo $OUT"), withDepends("1"), withOutput("RESULT")),
 		)
@@ -650,13 +650,13 @@ func TestRunner(t *testing.T) {
 		require.Equal(t, "RESULT=hello", output, "expected output %q, got %q", "hello", output)
 	})
 	t.Run("OutputInheritance", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1: echo hello > OUT
 		// 2: echo world > OUT2 (depends on 1)
 		// 3: echo $OUT $OUT2 > RESULT (depends on 2)
 		// RESULT should be "hello world"
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand("echo hello"), withOutput("OUT")),
 			newStep("2", withCommand("echo world"), withOutput("OUT2"), withDepends("1")),
 			newStep("3", withCommand("echo $OUT $OUT2"), withDepends("2"), withOutput("RESULT")),
@@ -676,10 +676,10 @@ func TestRunner(t *testing.T) {
 		require.Equal(t, "RESULT2=", output2, "expected output %q, got %q", "", output)
 	})
 	t.Run("OutputJSONReference", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		jsonData := `{"key": "value"}`
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand(fmt.Sprintf("echo '%s'", jsonData)), withOutput("OUT")),
 			newStep("2", withCommand("echo ${OUT.key}"), withDepends("1"), withOutput("RESULT")),
 		)
@@ -693,10 +693,10 @@ func TestRunner(t *testing.T) {
 		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
 	})
 	t.Run("HandlingJSONWithSpecialChars", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		jsonData := `{\n\t"key": "value"\n}`
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand(fmt.Sprintf("echo '%s'", jsonData)), withOutput("OUT")),
 			newStep("2", withCommand("echo '${OUT.key}'"), withDepends("1"), withOutput("RESULT")),
 		)
@@ -710,9 +710,9 @@ func TestRunner(t *testing.T) {
 		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
 	})
 	t.Run("SpecialVarsDAGRUNLOGFILE", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand("echo $DAG_RUN_LOG_FILE"), withOutput("RESULT")),
 		)
 
@@ -724,9 +724,9 @@ func TestRunner(t *testing.T) {
 		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNSTEPSTDOUTFILE", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand("echo $DAG_RUN_STEP_STDOUT_FILE"), withOutput("RESULT")),
 		)
 
@@ -738,9 +738,9 @@ func TestRunner(t *testing.T) {
 		require.Regexp(t, `^RESULT=/.*/.*\.out$`, output, "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNSTEPSTDERRFILE", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand("echo $DAG_RUN_STEP_STDERR_FILE"), withOutput("RESULT")),
 		)
 
@@ -752,9 +752,9 @@ func TestRunner(t *testing.T) {
 		require.Regexp(t, `^RESULT=/.*/.*\.err$`, output, "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNID", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand("echo $DAG_RUN_ID"), withOutput("RESULT")),
 		)
 
@@ -766,9 +766,9 @@ func TestRunner(t *testing.T) {
 		require.Regexp(t, `RESULT=[a-f0-9-]+`, output, "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGNAME", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand("echo $DAG_NAME"), withOutput("RESULT")),
 		)
 
@@ -780,9 +780,9 @@ func TestRunner(t *testing.T) {
 		require.Equal(t, "RESULT=test_dag", output, "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNSTEPNAME", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("step_test", withCommand("echo $DAG_RUN_STEP_NAME"), withOutput("RESULT")),
 		)
 
@@ -795,9 +795,9 @@ func TestRunner(t *testing.T) {
 	})
 
 	t.Run("DAGRunStatusNotAvailableToMainSteps", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withScript("if [ -z \"$DAG_RUN_STATUS\" ]; then echo unset; else echo set; fi"),
 				withOutput("RESULT"),
@@ -813,7 +813,7 @@ func TestRunner(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyRepeatsUntilCommandConditionMatchesExpected", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// This step will repeat until the file contains 'ready'
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_test_%s.txt", uuid.Must(uuid.NewV7()).String()))
@@ -827,7 +827,7 @@ func TestRunner(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}()
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand(fmt.Sprintf("cat %s || true", file)),
 				func(step *core.Step) {
@@ -855,7 +855,7 @@ func TestRunner(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyRepeatWhileConditionExits0", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 		// This step will repeat until the file exists
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exit0_%s", uuid.Must(uuid.NewV7()).String()))
 		err := os.Remove(file)
@@ -868,7 +868,7 @@ func TestRunner(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}()
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("echo hello"),
 				func(step *core.Step) {
@@ -894,7 +894,7 @@ func TestRunner(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyRepeatsWhileCommandExitCodeMatches", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 		// This step will repeat until exit code is not 42.
 		countFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_exitcode_%s", uuid.Must(uuid.NewV7()).String()))
 		err := os.Remove(countFile)
@@ -909,7 +909,7 @@ func TestRunner(t *testing.T) {
 		}()
 		// Script: fail with exit 42 until file exists, then exit 0
 		script := fmt.Sprintf(`if [ ! -f %[1]s ]; then exit 42; else exit 0; fi`, countFile)
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withScript(script),
 				func(step *core.Step) {
@@ -932,7 +932,7 @@ func TestRunner(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyRepeatsUntilEnvVarConditionMatchesExpected", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 		// This step will repeat until the environment variable TEST_REPEAT_MATCH_EXPR equals 'done'
 		err := os.Setenv("TEST_REPEAT_MATCH_EXPR", "notyet")
 		require.NoError(t, err)
@@ -940,7 +940,7 @@ func TestRunner(t *testing.T) {
 			err := os.Unsetenv("TEST_REPEAT_MATCH_EXPR")
 			require.NoError(t, err)
 		})
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("echo $TEST_REPEAT_MATCH_EXPR"),
 				func(step *core.Step) {
@@ -965,7 +965,7 @@ func TestRunner(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_outputvar_%s", uuid.Must(uuid.NewV7()).String()))
 		err := os.Remove(file)
 		if err != nil && !os.IsNotExist(err) {
@@ -975,7 +975,7 @@ func TestRunner(t *testing.T) {
 		// Write initial value
 		err = os.WriteFile(file, []byte("notyet"), 0600)
 		require.NoError(t, err)
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand(fmt.Sprintf("cat %s", file)),
 				withOutput("OUT"),
@@ -1000,7 +1000,7 @@ func TestRunner(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 	t.Run("RetryPolicyWithOutputCapture", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create a counter file for tracking retry attempts
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_output_%s.txt", uuid.Must(uuid.NewV7()).String()))
@@ -1009,7 +1009,7 @@ func TestRunner(t *testing.T) {
 		}()
 
 		// Step that outputs different values on each retry and fails until 3rd attempt
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					COUNTER_FILE="%s"
@@ -1049,10 +1049,10 @@ func TestRunner(t *testing.T) {
 		require.Equal(t, "RESULT=output_attempt_3_success", output, "expected final output, got %q", output)
 	})
 	t.Run("FailedStepWithOutputCapture", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Step that outputs data but fails
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("echo 'error_output'; exit 1"),
 				withOutput("ERROR_MSG"),
@@ -1071,7 +1071,7 @@ func TestRunner(t *testing.T) {
 		require.Equal(t, "ERROR_MSG=error_output", output, "expected output %q, got %q", "error_output", output)
 	})
 	t.Run("RetryPolicySubDAGRunWithOutputCapture", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create a counter file for tracking retry attempts
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_sub_output_%s.txt", uuid.Must(uuid.NewV7()).String()))
@@ -1080,7 +1080,7 @@ func TestRunner(t *testing.T) {
 		}()
 
 		// Step that outputs different values on each retry and always fails
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					COUNTER_FILE="%s"
@@ -1124,8 +1124,8 @@ func TestRunner(t *testing.T) {
 // Step-level timeout tests
 func TestRunner_StepLevelTimeout(t *testing.T) {
 	t.Run("SingleStepTimeoutFailsStep", func(t *testing.T) {
-		sc := setupRunner(t, withTimeout(2*time.Second)) // large DAG timeout to ensure step-level fires first
-		plan := sc.newPlan(t,
+		r := setupRunner(t, withTimeout(2*time.Second)) // large DAG timeout to ensure step-level fires first
+		plan := r.newPlan(t,
 			newStep("timeout_step",
 				withCommand("sleep 0.2"), // longer than step timeout
 				withStepTimeout(100*time.Millisecond),
@@ -1151,8 +1151,8 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 	})
 
 	t.Run("TimeoutPreemptsRetriesAndMarksFailed", func(t *testing.T) {
-		sc := setupRunner(t)
-		plan := sc.newPlan(t,
+		r := setupRunner(t)
+		plan := r.newPlan(t,
 			newStep("retry_timeout",
 				withCommand("sleep 0.15 && false"),
 				withRetryPolicy(5, 50*time.Millisecond), // would retry many times if not timed out
@@ -1169,8 +1169,8 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 	})
 
 	t.Run("ParallelStepsTimeoutFailIndividually", func(t *testing.T) {
-		sc := setupRunner(t, withMaxActiveRuns(3))
-		plan := sc.newPlan(t,
+		r := setupRunner(t, withMaxActiveRuns(3))
+		plan := r.newPlan(t,
 			newStep("p1", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
 			newStep("p2", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
 			newStep("p3", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
@@ -1183,8 +1183,8 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 	})
 
 	t.Run("StepLevelTimeoutOverridesLongDAGTimeoutAndFails", func(t *testing.T) {
-		sc := setupRunner(t, withTimeout(5*time.Second))
-		plan := sc.newPlan(t,
+		r := setupRunner(t, withTimeout(5*time.Second))
+		plan := r.newPlan(t,
 			newStep("short_timeout", withCommand("sleep 0.3"), withStepTimeout(120*time.Millisecond)),
 		)
 		result := plan.assertRun(t, core.Failed)
@@ -1236,11 +1236,11 @@ func TestStatus_IsActive(t *testing.T) {
 }
 
 func TestRunner_DryRun(t *testing.T) {
-	sc := setupRunner(t, func(cfg *runtime.Config) {
+	r := setupRunner(t, func(cfg *runtime.Config) {
 		cfg.Dry = true
 	})
 
-	plan := sc.newPlan(t,
+	plan := r.newPlan(t,
 		successStep("1"),
 		successStep("2", "1"),
 		successStep("3", "2"),
@@ -1255,7 +1255,7 @@ func TestRunner_DryRun(t *testing.T) {
 }
 
 func TestRunner_DryRunWithHandlers(t *testing.T) {
-	sc := setupRunner(t,
+	r := setupRunner(t,
 		func(cfg *runtime.Config) {
 			cfg.Dry = true
 		},
@@ -1263,7 +1263,7 @@ func TestRunner_DryRunWithHandlers(t *testing.T) {
 		withOnSuccess(successStep("onSuccess")),
 	)
 
-	plan := sc.newPlan(t, successStep("1"))
+	plan := r.newPlan(t, successStep("1"))
 
 	result := plan.assertRun(t, core.Succeeded)
 
@@ -1307,26 +1307,26 @@ func TestRunner_ErrorHandling(t *testing.T) {
 	t.Run("SetupError", func(t *testing.T) {
 		// Create a runner with invalid log directory
 		invalidLogDir := "/nonexistent/path/that/should/not/exist"
-		sc := setupRunner(t, func(cfg *runtime.Config) {
+		r := setupRunner(t, func(cfg *runtime.Config) {
 			cfg.LogDir = invalidLogDir
 		})
 
-		plan := sc.newPlan(t, successStep("1"))
+		plan := r.newPlan(t, successStep("1"))
 
 		// Should fail during setup
 		dag := &core.DAG{Name: "test_dag"}
-		logFilename := fmt.Sprintf("%s_%s.log", dag.Name, sc.cfg.DAGRunID)
-		logFilePath := filepath.Join(sc.cfg.LogDir, logFilename)
+		logFilename := fmt.Sprintf("%s_%s.log", dag.Name, r.cfg.DAGRunID)
+		logFilePath := filepath.Join(r.cfg.LogDir, logFilename)
 
-		ctx := execution.SetupDAGContext(plan.Context, dag, nil, execution.DAGRunRef{}, sc.cfg.DAGRunID, logFilePath, nil, nil, nil)
+		ctx := execution.SetupDAGContext(plan.Context, dag, nil, execution.DAGRunRef{}, r.cfg.DAGRunID, logFilePath, nil, nil, nil)
 
-		err := sc.runner.Run(ctx, plan.Plan, nil)
+		err := r.runner.Run(ctx, plan.Plan, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create log directory")
 	})
 
 	t.Run("PanicRecovery", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create a step that will panic
 		panicStep := newStep("panic", withScript(`
@@ -1335,7 +1335,7 @@ func TestRunner_ErrorHandling(t *testing.T) {
 			kill -99 $$
 		`))
 
-		plan := sc.newPlan(t, panicStep)
+		plan := r.newPlan(t, panicStep)
 
 		// The runner should recover from the panic and mark the step as error
 		result := plan.assertRun(t, core.Failed)
@@ -1344,9 +1344,9 @@ func TestRunner_ErrorHandling(t *testing.T) {
 }
 
 func TestRunner_Metrics(t *testing.T) {
-	sc := setupRunner(t)
+	r := setupRunner(t)
 
-	plan := sc.newPlan(t,
+	plan := r.newPlan(t,
 		successStep("1"),
 		failStep("2"),
 		newStep("3", withPrecondition(&core.Condition{
@@ -1358,7 +1358,7 @@ func TestRunner_Metrics(t *testing.T) {
 	result := plan.assertRun(t, core.Failed)
 
 	// Get metrics
-	metrics := sc.runner.GetMetrics()
+	metrics := r.runner.GetMetrics()
 
 	assert.Equal(t, 4, metrics["totalNodes"])
 	assert.Equal(t, 2, metrics["completedNodes"]) // 1 and 4
@@ -1376,7 +1376,7 @@ func TestRunner_Metrics(t *testing.T) {
 
 func TestRunner_DAGPreconditions(t *testing.T) {
 	t.Run("DAGPreconditionNotMet", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create DAG with precondition that will fail
 		dag := &core.DAG{
@@ -1388,27 +1388,27 @@ func TestRunner_DAGPreconditions(t *testing.T) {
 			},
 		}
 
-		plan := sc.newPlan(t, successStep("1"))
+		plan := r.newPlan(t, successStep("1"))
 
 		// Custom schedule with DAG preconditions
-		logFilename := fmt.Sprintf("%s_%s.log", dag.Name, sc.cfg.DAGRunID)
-		logFilePath := filepath.Join(sc.cfg.LogDir, logFilename)
+		logFilename := fmt.Sprintf("%s_%s.log", dag.Name, r.cfg.DAGRunID)
+		logFilePath := filepath.Join(r.cfg.LogDir, logFilename)
 
-		ctx := execution.SetupDAGContext(plan.Context, dag, nil, execution.DAGRunRef{}, sc.cfg.DAGRunID, logFilePath, nil, nil, nil)
+		ctx := execution.SetupDAGContext(plan.Context, dag, nil, execution.DAGRunRef{}, r.cfg.DAGRunID, logFilePath, nil, nil, nil)
 
-		err := sc.runner.Run(ctx, plan.Plan, nil)
+		err := r.runner.Run(ctx, plan.Plan, nil)
 		require.NoError(t, err) // No error, but dag should be canceled
 
 		// Check that the runner was canceled
-		assert.Equal(t, core.Aborted, sc.runner.Status(ctx, plan.Plan))
+		assert.Equal(t, core.Aborted, r.runner.Status(ctx, plan.Plan))
 	})
 }
 
 func TestRunner_SignalHandling(t *testing.T) {
 	t.Run("SignalWithDoneChannel", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
 			successStep("2", "1"),
 		)
@@ -1417,7 +1417,7 @@ func TestRunner_SignalHandling(t *testing.T) {
 
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			sc.runner.Signal(sc.Context, plan.Plan, syscall.SIGTERM, done, false)
+			r.runner.Signal(r.Context, plan.Plan, syscall.SIGTERM, done, false)
 		}()
 
 		start := time.Now()
@@ -1439,15 +1439,15 @@ func TestRunner_SignalHandling(t *testing.T) {
 	})
 
 	t.Run("SignalWithOverride", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1", withCommand("sleep 0.5")),
 		)
 
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			sc.runner.Signal(sc.Context, plan.Plan, syscall.SIGKILL, nil, true)
+			r.runner.Signal(r.Context, plan.Plan, syscall.SIGKILL, nil, true)
 		}()
 
 		result := plan.assertRun(t, core.Aborted)
@@ -1457,10 +1457,10 @@ func TestRunner_SignalHandling(t *testing.T) {
 
 func TestRunner_ComplexDependencyChains(t *testing.T) {
 	t.Run("DiamondDependency", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create diamond dependency: 1 -> 2,3 -> 4
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			successStep("2", "1"),
 			successStep("3", "1"),
@@ -1476,11 +1476,11 @@ func TestRunner_ComplexDependencyChains(t *testing.T) {
 	})
 
 	t.Run("ComplexFailurePropagation", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// 1 -> 2 (fail) -> 4
 		//   -> 3 -------->
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("1"),
 			failStep("2", "1"),
 			successStep("3", "1"),
@@ -1498,24 +1498,24 @@ func TestRunner_ComplexDependencyChains(t *testing.T) {
 
 func TestRunner_EdgeCases(t *testing.T) {
 	t.Run("EmptyPlan", func(t *testing.T) {
-		sc := setupRunner(t)
-		plan := sc.newPlan(t) // No steps
+		r := setupRunner(t)
+		plan := r.newPlan(t) // No steps
 
 		result := plan.assertRun(t, core.Succeeded)
 		assert.NoError(t, result.Error)
 	})
 
 	t.Run("SingleNodePlan", func(t *testing.T) {
-		sc := setupRunner(t)
-		plan := sc.newPlan(t, successStep("single"))
+		r := setupRunner(t)
+		plan := r.newPlan(t, successStep("single"))
 
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "single", core.NodeSucceeded)
 	})
 
 	t.Run("AllNodesFail", func(t *testing.T) {
-		sc := setupRunner(t)
-		plan := sc.newPlan(t,
+		r := setupRunner(t)
+		plan := r.newPlan(t,
 			failStep("1"),
 			failStep("2"),
 			failStep("3"),
@@ -1534,7 +1534,7 @@ func TestRunner_HandlerNodeAccess(t *testing.T) {
 	failureStep := successStep("onFailure")
 	cancelStep := successStep("onCancel")
 
-	sc := setupRunner(t,
+	r := setupRunner(t,
 		withOnExit(exitStep),
 		withOnSuccess(successHandlerStep),
 		withOnFailure(failureStep),
@@ -1542,22 +1542,22 @@ func TestRunner_HandlerNodeAccess(t *testing.T) {
 	)
 
 	// Run a simple plan to trigger setup
-	plan := sc.newPlan(t, successStep("1"))
+	plan := r.newPlan(t, successStep("1"))
 	_ = plan.assertRun(t, core.Succeeded)
 
 	// Access handler nodes
-	assert.NotNil(t, sc.runner.HandlerNode(core.HandlerOnExit))
-	assert.NotNil(t, sc.runner.HandlerNode(core.HandlerOnSuccess))
-	assert.NotNil(t, sc.runner.HandlerNode(core.HandlerOnFailure))
-	assert.NotNil(t, sc.runner.HandlerNode(core.HandlerOnCancel))
-	assert.Nil(t, sc.runner.HandlerNode(core.HandlerType("unknown")))
+	assert.NotNil(t, r.runner.HandlerNode(core.HandlerOnExit))
+	assert.NotNil(t, r.runner.HandlerNode(core.HandlerOnSuccess))
+	assert.NotNil(t, r.runner.HandlerNode(core.HandlerOnFailure))
+	assert.NotNil(t, r.runner.HandlerNode(core.HandlerOnCancel))
+	assert.Nil(t, r.runner.HandlerNode(core.HandlerType("unknown")))
 }
 
 func TestRunner_PreconditionWithError(t *testing.T) {
-	sc := setupRunner(t)
+	r := setupRunner(t)
 
 	// Create a step with a precondition that will error (not just return false)
-	plan := sc.newPlan(t,
+	plan := r.newPlan(t,
 		newStep("1",
 			withPrecondition(&core.Condition{
 				Condition: "exit 2", // Exit with non-zero code
@@ -1578,12 +1578,12 @@ func TestRunner_MultipleHandlerExecution(t *testing.T) {
 		return newStep(name, withScript(fmt.Sprintf(`echo "Handler %s executed"`, name)))
 	}
 
-	sc := setupRunner(t,
+	r := setupRunner(t,
 		withOnExit(recordHandler("onExit")),
 		withOnFailure(recordHandler("onFailure")),
 	)
 
-	plan := sc.newPlan(t, failStep("1"))
+	plan := r.newPlan(t, failStep("1"))
 
 	result := plan.assertRun(t, core.Failed)
 
@@ -1594,10 +1594,10 @@ func TestRunner_MultipleHandlerExecution(t *testing.T) {
 }
 
 func TestRunner_TimeoutDuringRetry(t *testing.T) {
-	sc := setupRunner(t, withTimeout(500*time.Millisecond))
+	r := setupRunner(t, withTimeout(500*time.Millisecond))
 
 	// Step that will keep retrying until timeout
-	plan := sc.newPlan(t,
+	plan := r.newPlan(t,
 		newStep("1",
 			withCommand("sleep 0.1 && false"),
 			withRetryPolicy(10, 50*time.Millisecond), // Many retries
@@ -1614,16 +1614,16 @@ func TestRunner_TimeoutDuringRetry(t *testing.T) {
 }
 
 func TestRunner_CancelDuringHandlerExecution(t *testing.T) {
-	sc := setupRunner(t,
+	r := setupRunner(t,
 		withOnExit(newStep("onExit", withScript("echo handler started && sleep 0.1 && echo handler done"))),
 	)
 
-	plan := sc.newPlan(t, successStep("1"))
+	plan := r.newPlan(t, successStep("1"))
 
 	go func() {
 		// Wait for main step to complete and handler to start
 		time.Sleep(200 * time.Millisecond)
-		sc.runner.Cancel(plan.Plan)
+		r.runner.Cancel(plan.Plan)
 	}()
 
 	// Since we cancel during handler execution, the final status depends on timing
@@ -1636,9 +1636,9 @@ func TestRunner_CancelDuringHandlerExecution(t *testing.T) {
 }
 
 func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
-	sc := setupRunner(t)
+	r := setupRunner(t)
 
-	plan := sc.newPlan(t,
+	plan := r.newPlan(t,
 		newStep("1",
 			withCommand("echo repeat"),
 			withRepeatPolicy(true, 100*time.Millisecond),
@@ -1647,7 +1647,7 @@ func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 
 	go func() {
 		time.Sleep(350 * time.Millisecond)
-		sc.runner.Cancel(plan.Plan)
+		r.runner.Cancel(plan.Plan)
 	}()
 
 	result := plan.assertRun(t, core.Aborted)
@@ -1659,10 +1659,10 @@ func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 }
 
 func TestRunner_RepeatPolicyWithLimit(t *testing.T) {
-	sc := setupRunner(t)
+	r := setupRunner(t)
 
 	// Test repeat with limit
-	plan := sc.newPlan(t,
+	plan := r.newPlan(t,
 		newStep("1",
 			withCommand("echo repeat"),
 			withRepeatPolicy(true, 100*time.Millisecond),
@@ -1681,13 +1681,13 @@ func TestRunner_RepeatPolicyWithLimit(t *testing.T) {
 }
 
 func TestRunner_RepeatPolicyWithLimitAndCondition(t *testing.T) {
-	sc := setupRunner(t)
+	r := setupRunner(t)
 
 	counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_limit_%s", uuid.Must(uuid.NewV7()).String()))
 	defer func() { _ = os.Remove(counterFile) }()
 
 	// Test repeat with limit and condition
-	plan := sc.newPlan(t,
+	plan := r.newPlan(t,
 		newStep("1",
 			withScript(fmt.Sprintf(`
 				COUNT=0
@@ -1724,10 +1724,10 @@ func TestRunner_RepeatPolicyWithLimitAndCondition(t *testing.T) {
 
 func TestRunner_ComplexRetryScenarios(t *testing.T) {
 	t.Run("RetryWithSignalTermination", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create a script that will be terminated by signal
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withScript(`
 					trap 'exit 143' TERM
@@ -1747,13 +1747,13 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RetryWithSpecificExitCodes", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("retry_codes_%s", uuid.Must(uuid.NewV7()).String()))
 		defer func() { _ = os.Remove(counterFile) }()
 
 		// Step that returns different exit codes
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					if [ ! -f "%s" ]; then
@@ -1784,10 +1784,10 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 
 	// Test cases for behaviors when neither condition nor exitCode are present
 	t.Run("RepeatPolicyBooleanTrueRepeatsWhileStepSucceeds", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Test repeat: true (boolean mode) - should repeat while step succeeds (no condition/exitCode)
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("echo boolean true mode"),
 				func(step *core.Step) {
@@ -1808,13 +1808,13 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyBooleanTrueWithFailureStopsOnFailure", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Test repeat: true (boolean mode) with step that eventually fails
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_bool_fail_%s", uuid.Must(uuid.NewV7()).String()))
 		defer func() { _ = os.Remove(counterFile) }()
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					COUNT=0
@@ -1846,13 +1846,13 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyUntilModeWithoutConditionRepeatsOnFailure", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Test explicit until mode without condition/exitCode (repeats until step succeeds)
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_none_%s", uuid.Must(uuid.NewV7()).String()))
 		defer func() { _ = os.Remove(counterFile) }()
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					COUNT=0
@@ -1889,7 +1889,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyWhileWithConditionRepeatsWhileConditionSucceeds", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Test explicit while mode with condition
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_cond_%s", uuid.Must(uuid.NewV7()).String()))
@@ -1903,7 +1903,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}()
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("cat "+counterFile+" || echo notfound"),
 				func(step *core.Step) {
@@ -1931,7 +1931,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyWhileWithConditionAndExpectedRepeatsWhileMatches", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Test explicit while mode with condition and expected value
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_exp_%s", uuid.Must(uuid.NewV7()).String()))
@@ -1941,7 +1941,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		err := os.WriteFile(counterFile, []byte("continue"), 0600)
 		require.NoError(t, err)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("echo while with expected"),
 				func(step *core.Step) {
@@ -1970,7 +1970,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyUntilWithConditionRepeatsUntilConditionSucceeds", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Test explicit until mode with condition (no expected)
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_cond_%s", uuid.Must(uuid.NewV7()).String()))
@@ -1984,7 +1984,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}()
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("cat "+counterFile+" || echo notfound"),
 				func(step *core.Step) {
@@ -2012,7 +2012,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyUntilWithConditionAndExpectedRepeatsUntilMatches", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Test explicit until mode with condition and expected value
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_exp_%s", uuid.Must(uuid.NewV7()).String()))
@@ -2022,7 +2022,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		err := os.WriteFile(counterFile, []byte("waiting"), 0600)
 		require.NoError(t, err)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("echo until with expected"),
 				func(step *core.Step) {
@@ -2051,13 +2051,13 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyUntilWithExitCodeRepeatsUntilExitCodeMatches", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Test explicit until mode with exit codes
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_exit_%s", uuid.Must(uuid.NewV7()).String()))
 		defer func() { _ = os.Remove(counterFile) }()
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					COUNT=0
@@ -2100,8 +2100,8 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyLimit", func(t *testing.T) {
-		sc := setupRunner(t)
-		plan := sc.newPlan(t,
+		r := setupRunner(t)
+		plan := r.newPlan(t,
 			newStep("1",
 				withCommand("echo limit"),
 				func(step *core.Step) {
@@ -2124,14 +2124,14 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 	})
 
 	t.Run("RepeatPolicyOutputVariablesReloadedBeforeConditionEval", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Test that output variables are reloaded before evaluating repeat condition
 		// Use a file-based counter to track iterations properly
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_output_var_%s", uuid.Must(uuid.NewV7()).String()))
 		defer func() { _ = os.Remove(counterFile) }()
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					# Read counter from file or start at 0
@@ -2171,10 +2171,10 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 }
 
 func TestRunner_StepIDVariableExpansion(t *testing.T) {
-	sc := setupRunner(t)
+	r := setupRunner(t)
 
 	// Test step ID usage in environment setup
-	plan := sc.newPlan(t,
+	plan := r.newPlan(t,
 		newStep("step1",
 			withCommand("echo output1"),
 			withOutput("OUT1"),
@@ -2211,13 +2211,13 @@ func TestRunner_StepIDVariableExpansion(t *testing.T) {
 }
 
 func TestRunner_UnexpectedFinalStatus(t *testing.T) {
-	// This is a bit tricky to test as it requires the scheduler to be in an
+	// This is a bit tricky to test as it requires the runner to be in an
 	// unexpected state at the end. We'll simulate this by creating a custom
 	// scenario that might trigger this edge case.
-	sc := setupRunner(t)
+	r := setupRunner(t)
 
-	// Create a plan with a step that might leave the scheduler in an unexpected state
-	plan := sc.newPlan(t,
+	// Create a plan with a step that might leave the runner in an unexpected state
+	plan := r.newPlan(t,
 		newStep("1", withCommand("echo test")),
 	)
 
@@ -2230,10 +2230,10 @@ func TestRunner_UnexpectedFinalStatus(t *testing.T) {
 }
 
 func TestRunner_RetryPolicyDefaults(t *testing.T) {
-	sc := setupRunner(t)
+	r := setupRunner(t)
 
 	// Test retry with unhandled error type (not exec.ExitError)
-	plan := sc.newPlan(t,
+	plan := r.newPlan(t,
 		newStep("1",
 			withScript(`
 				# This will cause a different type of error
@@ -2254,7 +2254,7 @@ func TestRunner_RetryPolicyDefaults(t *testing.T) {
 
 func TestRunner_StepRetryExecution(t *testing.T) {
 	t.Run("RetrySuccessfulStep", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// A -> B -> C, all successful
 		dag := &core.DAG{
@@ -2266,7 +2266,7 @@ func TestRunner_StepRetryExecution(t *testing.T) {
 		}
 
 		// Initial run - all successful
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("A"),
 			successStep("B", "A"),
 			successStep("C", "B"),
@@ -2297,7 +2297,7 @@ func TestRunner_StepRetryExecution(t *testing.T) {
 		require.NoError(t, err)
 
 		// Schedule the retry
-		retryResult := planHelper{testHelper: sc, Plan: retryPlan}.assertRun(t, core.Succeeded)
+		retryResult := planHelper{testHelper: r, Plan: retryPlan}.assertRun(t, core.Succeeded)
 
 		// A and C should remain unchanged, only B should be re-executed
 		retryResult.assertNodeStatus(t, "A", core.NodeSucceeded)
@@ -2309,10 +2309,10 @@ func TestRunner_StepRetryExecution(t *testing.T) {
 // TestRunner_StepIDAccess tests that step ID variables are expanded correctly
 func TestRunner_StepIDAccess(t *testing.T) {
 	t.Run("StepReferenceInCommand", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create a DAG where step2 references step1's output
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("step1",
 				withID("first"),
 				withCommand("echo 'output from step1'"),
@@ -2337,10 +2337,10 @@ func TestRunner_StepIDAccess(t *testing.T) {
 		assert.Contains(t, string(stdoutContent), "Step 1 stdout:")
 	})
 	t.Run("StepWithoutID", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create a DAG where some steps don't have IDs
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("step1",
 				// No ID
 				withCommand("echo 'no id'"),
@@ -2373,10 +2373,10 @@ func TestRunner_StepIDAccess(t *testing.T) {
 	})
 
 	t.Run("StepExitCodeReference", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create a step that checks another step's exit code
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("check",
 				withID("checker"),
 				withCommand("exit 42"),
@@ -2406,7 +2406,7 @@ func TestRunner_StepIDAccess(t *testing.T) {
 // TestRunner_EventHandlerStepIDAccess tests that step ID references work in event handlers
 func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 	t.Run("OnSuccessHandlerWithStepReferences", func(t *testing.T) {
-		sc := setupRunner(t,
+		r := setupRunner(t,
 			withOnSuccess(core.Step{
 				Name:    "success_handler",
 				ID:      "on_success",
@@ -2414,7 +2414,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			}),
 		)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("main_step",
 				withID("main"),
 				withCommand("echo 'Main processing done'"),
@@ -2449,7 +2449,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 	})
 
 	t.Run("OnFailureHandlerWithStepReferences", func(t *testing.T) {
-		sc := setupRunner(t,
+		r := setupRunner(t,
 			withOnFailure(core.Step{
 				Name:    "failure_handler",
 				ID:      "on_fail",
@@ -2457,7 +2457,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			}),
 		)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("setup",
 				withID("setup_step"),
 				withCommand("echo 'Setup complete'"),
@@ -2492,7 +2492,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 	})
 
 	t.Run("OnExitHandlerWithMultipleStepReferences", func(t *testing.T) {
-		sc := setupRunner(t,
+		r := setupRunner(t,
 			withOnExit(core.Step{
 				Name:    "exit_handler",
 				ID:      "on_exit",
@@ -2500,7 +2500,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			}),
 		)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("first",
 				withID("step1"),
 				withCommand("echo 'First step output'"),
@@ -2543,7 +2543,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 	})
 
 	t.Run("HandlerWithoutIDCannotBeReferenced", func(t *testing.T) {
-		sc := setupRunner(t,
+		r := setupRunner(t,
 			withOnExit(core.Step{
 				Name: "exit_handler_no_id",
 				// No ID field set
@@ -2551,7 +2551,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			}),
 		)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("main",
 				withID("main_step"),
 				withCommand("echo 'Main step'"),
@@ -2572,7 +2572,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 	t.Run("HandlersCanOnlyReferenceMainSteps", func(t *testing.T) {
 		// Test that handlers can reference main steps but not other handlers
 		// This is because handlers execute after all main steps are complete
-		sc := setupRunner(t,
+		r := setupRunner(t,
 			withOnSuccess(core.Step{
 				Name:    "first_handler",
 				ID:      "handler1",
@@ -2585,7 +2585,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			}),
 		)
 
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("main",
 				withID("main"),
 				withCommand("echo 'Processing' && exit 0"),
@@ -2620,14 +2620,14 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 }
 
 func TestRunner_DAGRunStatusHandlerEnv(t *testing.T) {
-	sc := setupRunner(t,
+	r := setupRunner(t,
 		withOnExit(core.Step{
 			Name:    "exit_handler",
 			Command: "echo status=${DAG_RUN_STATUS}",
 		}),
 	)
 
-	plan := sc.newPlan(t, successStep("main"))
+	plan := r.newPlan(t, successStep("main"))
 	result := plan.assertRun(t, core.Succeeded)
 
 	handlerNode := result.nodeByName(t, "exit_handler")
@@ -2639,13 +2639,13 @@ func TestRunner_DAGRunStatusHandlerEnv(t *testing.T) {
 
 func TestRunnerPartialSuccess(t *testing.T) {
 	t.Run("NodeStatusPartialSuccess", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create a plan where:
 		// - step1 succeeds
 		// - step2 fails but has continueOn.failure = true
 		// - step3 depends on step2 and succeeds
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("step1"),
 			newStep("step2",
 				withDepends("step1"),
@@ -2667,13 +2667,13 @@ func TestRunnerPartialSuccess(t *testing.T) {
 	})
 
 	t.Run("NodeStatusPartialSuccessWithMarkSuccess", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create a plan where:
 		// - step1 succeeds
 		// - step2 fails but has continueOn.failure = true and markSuccess = true
 		// - step3 depends on step2 and succeeds
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("step1"),
 			newStep("step2",
 				withDepends("step1"),
@@ -2696,10 +2696,10 @@ func TestRunnerPartialSuccess(t *testing.T) {
 	})
 
 	t.Run("MultipleFailuresWithContinueOn", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create a plan where multiple steps fail but have continueOn
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("step1",
 				withCommand("false"),
 				withContinueOn(core.ContinueOn{
@@ -2726,12 +2726,12 @@ func TestRunnerPartialSuccess(t *testing.T) {
 	})
 
 	t.Run("NoSuccessfulStepsWithContinueOn", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create a plan where all steps fail but have continueOn
 		// This should still be an error, not partial success,
 		// because partial success requires at least one successful step
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			newStep("step1",
 				withCommand("false"),
 				withContinueOn(core.ContinueOn{
@@ -2756,11 +2756,11 @@ func TestRunnerPartialSuccess(t *testing.T) {
 	})
 
 	t.Run("FailureWithoutContinueOn", func(t *testing.T) {
-		sc := setupRunner(t)
+		r := setupRunner(t)
 
 		// Create a plan where a step fails without continueOn
 		// This should result in an error status, not partial success
-		plan := sc.newPlan(t,
+		plan := r.newPlan(t,
 			successStep("step1"),
 			failStep("step2", "step1"),    // This will fail without continueOn
 			successStep("step3", "step1"), // This depends on step1, not step2

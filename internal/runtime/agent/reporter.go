@@ -20,7 +20,7 @@ type Sender interface {
 // SenderFn is a function type for sending reports.
 type SenderFn func(ctx context.Context, from string, to []string, subject, body string, attachments []string) error
 
-// reporter is responsible for reporting the status of the scheduler
+// reporter is responsible for reporting the status of the runner
 // to the user.
 type reporter struct{ senderFn SenderFn }
 
@@ -44,7 +44,7 @@ func (r *reporter) reportStep(
 	return nil
 }
 
-// report is a function that reports the status of the scheduler.
+// report is a function that reports the status of the runner.
 func (r *reporter) getSummary(_ context.Context, dagStatus execution.DAGRunStatus, err error) string {
 	var buf bytes.Buffer
 	_, _ = buf.Write([]byte("\n"))

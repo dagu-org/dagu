@@ -85,7 +85,7 @@ type Agent struct {
 	// logDir is the directory to store the log files for each node in the DAG.
 	logDir string
 
-	// logFile is the file to write the scheduler log.
+	// logFile is the file to write the runner log.
 	logFile string
 
 	// dag is the DAG to run.
@@ -183,7 +183,7 @@ func New(
 	return a
 }
 
-// Run setups the scheduler and runs the DAG.
+// Run setups the runner and runs the DAG.
 func (a *Agent) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -338,7 +338,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Start the unix socket server for receiving HTTP requests from
-	// the local client (e.g., the frontend server, scheduler, etc).
+	// the local client (e.g., the frontend server, etc).
 	if err := a.setupSocketServer(ctx); err != nil {
 		return fmt.Errorf("failed to setup unix socket server: %w", err)
 	}
@@ -445,7 +445,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			}
 			// Update progress display if enabled
 			if a.progressDisplay != nil {
-				// Convert scheduler node to models node
+				// Convert runner node to models node
 				nodeData := node.NodeData()
 				modelNode := a.nodeToModelNode(nodeData)
 				a.progressDisplay.UpdateNode(modelNode)
