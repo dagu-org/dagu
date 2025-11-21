@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	errCyclicGraph = errors.New("dependency graph has cycles")
-	errMissingNode = errors.New("missing node in execution plan")
+	ErrCyclicPlan  = errors.New("cyclic plan detected")
+	ErrMissingNode = errors.New("missing node in execution plan")
 )
 
 // Plan represents a plan of execution for a set of steps.
@@ -115,12 +115,12 @@ func CreateStepRetryPlan(dag *core.DAG, nodes []*Node, stepName string) (*Plan, 
 
 	targetNode := p.GetNodeByName(stepName)
 	if targetNode == nil {
-		return nil, fmt.Errorf("%w: %s", errMissingNode, stepName)
+		return nil, fmt.Errorf("%w: %s", ErrMissingNode, stepName)
 	}
 
 	step, ok := steps[targetNode.Name()]
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", errMissingNode, targetNode.Name())
+		return nil, fmt.Errorf("%w: %s", ErrMissingNode, targetNode.Name())
 	}
 
 	targetNode.ClearState(step)
@@ -142,14 +142,14 @@ func (p *Plan) buildEdges() error {
 		for _, depName := range node.Step().Depends {
 			depNode, ok := p.nodeByName[depName]
 			if !ok {
-				return fmt.Errorf("%w: %s", errMissingNode, depName)
+				return fmt.Errorf("%w: %s", ErrMissingNode, depName)
 			}
 			p.addEdge(depNode, node)
 		}
 	}
 
 	if p.isCyclic() {
-		return errCyclicGraph
+		return ErrCyclicPlan
 	}
 	return nil
 }
@@ -221,7 +221,7 @@ func (p *Plan) setupRetry(ctx context.Context, steps map[string]core.Step) error
 				logger.Debug(ctx, "Clearing node state", "step", node.Name())
 				step, ok := steps[node.Name()]
 				if !ok {
-					return fmt.Errorf("%w: %s", errMissingNode, node.Name())
+					return fmt.Errorf("%w: %s", ErrMissingNode, node.Name())
 				}
 				node.ClearState(step)
 				toRetry[u] = true

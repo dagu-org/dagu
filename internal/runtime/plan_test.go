@@ -2,7 +2,6 @@ package runtime_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -11,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// helper to count edges in the plan
-func totalEdges(p *runtime.Plan) int {
+// helper to count total dependencies in a plan
+func totalDeps(p *runtime.Plan) int {
 	c := 0
 	for _, node := range p.Nodes() {
 		c += len(p.Dependents(node.ID()))
@@ -28,12 +27,12 @@ func makeNode(name string, status core.NodeStatus, depends ...string) *runtime.N
 	})
 }
 
-func TestPlan_CycleDetection(t *testing.T) {
+func TestPlan_Cyclic(t *testing.T) {
 	step1 := core.Step{Name: "1", Depends: []string{"2"}}
 	step2 := core.Step{Name: "2", Depends: []string{"1"}}
 	_, err := runtime.NewPlan(step1, step2)
 	require.Error(t, err)
-	require.True(t, strings.Contains(err.Error(), "cycle detected"), "expected cycle detected error")
+	require.ErrorIs(t, err, runtime.ErrCyclicPlan)
 }
 
 func TestPlan_NodeByName(t *testing.T) {
@@ -50,7 +49,7 @@ func TestPlan_DependencyStructures(t *testing.T) {
 	tests := []struct {
 		name              string
 		steps             []core.Step
-		wantTotalEdges    int
+		wantTotalDeps     int
 		wantOutgoingCount int // nodes with dependents
 		wantIncomingCount int // nodes with dependencies
 	}{
@@ -61,7 +60,7 @@ func TestPlan_DependencyStructures(t *testing.T) {
 				{Name: "step2", Command: "echo 2", Depends: []string{"step1"}},
 				{Name: "step3", Command: "echo 3", Depends: []string{"step2", "step1"}},
 			},
-			wantTotalEdges:    3, // 1->2,1->3,2->3
+			wantTotalDeps:     3, // 1->2,1->3,2->3
 			wantOutgoingCount: 2, // step1 (has 2,3), step2 (has 3)
 			wantIncomingCount: 2, // step2 (has 1), step3 (has 1,2)
 		},
@@ -72,7 +71,7 @@ func TestPlan_DependencyStructures(t *testing.T) {
 				{Name: "process", Depends: []string{"download"}},
 				{Name: "cleanup", Depends: []string{"process"}},
 			},
-			wantTotalEdges:    2,
+			wantTotalDeps:     2,
 			wantOutgoingCount: 2,
 			wantIncomingCount: 2,
 		},
@@ -84,7 +83,7 @@ func TestPlan_DependencyStructures(t *testing.T) {
 				{Name: "process", Depends: []string{"download", "extract"}},
 				{Name: "cleanup", Depends: []string{"process"}},
 			},
-			wantTotalEdges:    3, // dl->process, extract->process, process->cleanup
+			wantTotalDeps:     3, // dl->process, extract->process, process->cleanup
 			wantOutgoingCount: 3, // download, extract, process
 			wantIncomingCount: 2, // process, cleanup
 		},
@@ -93,7 +92,7 @@ func TestPlan_DependencyStructures(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p, err := runtime.NewPlan(tt.steps...)
 			require.NoError(t, err)
-			require.Equal(t, tt.wantTotalEdges, totalEdges(p))
+			require.Equal(t, tt.wantTotalDeps, totalDeps(p))
 
 			outgoing := 0
 			incoming := 0
