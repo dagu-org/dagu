@@ -63,6 +63,7 @@ func TestQueueShellConfig(t *testing.T) {
 		// Exact replication of user's DAG - NO workerSelector for local execution
 		dagYAML := `
 name: chained-steps-test
+workingDir: /tmp
 steps:
   - name: "1"
     command: "sleep 1"
