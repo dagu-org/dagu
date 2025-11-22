@@ -153,35 +153,32 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 		})
 
 		dir, err := fileutil.ResolvePath(expandedDir)
-		if err == nil && fileutil.FileExists(dir) {
-			workingDir = dir
-		} else {
+		if err != nil {
 			logger.Warn(ctx, "Failed to resolve working directory for step", "step", step.Name, "dir", expandedDir, "err", err)
-			workingDir = parentEnv.DAG.WorkingDir
 		}
+		workingDir = dir
 
 	case parentDAG != nil && parentDAG.WorkingDir != "":
-		if fileutil.FileExists(parentDAG.WorkingDir) {
-			workingDir = parentDAG.WorkingDir
-		} else {
-			logger.Warn(ctx, "Parent DAG working directory does not exist, falling back to current working directory", "dir", parentDAG.WorkingDir)
-		}
+		workingDir = parentDAG.WorkingDir
 
 	default:
 		// Use the current working directory if not specified
-		if wd, err := os.Getwd(); err == nil && fileutil.FileExists(wd) {
+		if wd, err := os.Getwd(); err == nil {
 			workingDir = wd
 		} else {
 			logger.Error(ctx, "Failed to get current working directory", "err", err)
+		}
+		// If still empty, fallback to home directory
+		if dir, err := os.UserHomeDir(); err == nil {
+			workingDir = dir
+		} else {
+			logger.Error(ctx, "Failed to get user home directory", "err", err)
 		}
 	}
 
 	envs := map[string]string{
 		EnvKeyDAGRunStepName: step.Name,
-	}
-
-	if workingDir != "" {
-		envs["PWD"] = workingDir
+		"PWD":                workingDir,
 	}
 
 	variables := &collections.SyncMap{}
