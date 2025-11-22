@@ -340,7 +340,14 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Start the unix socket server for receiving HTTP requests from
 	// the local client (e.g., the frontend server, etc).
 	if err := a.setupSocketServer(ctx); err != nil {
-		return fmt.Errorf("failed to setup unix socket server: %w", err)
+		initErr = fmt.Errorf("failed to setup unix socket server: %w", err)
+		return initErr
+	}
+
+	// Ensure working directory exists
+	if err := os.MkdirAll(a.dag.WorkingDir, 0o755); err != nil {
+		initErr = fmt.Errorf("failed to create working directory: %w", err)
+		return initErr
 	}
 
 	// Create a new container if the DAG has a container configuration.

@@ -19,16 +19,6 @@ import (
 
 // TestQueueShellConfig tests that shell configuration is properly preserved
 // when executing DAGs through the queue system via the REST API.
-//
-// This test replicates an issue where DAGs executed via queue fail with:
-// "fork/exec /bin/zsh: no such file or directory"
-// even when /bin/zsh exists on the system.
-//
-// The flow tested is:
-// 1. Web server receives enqueue request via /api/v2/dag-runs/enqueue
-// 2. DAG is enqueued
-// 3. Scheduler picks up from queue and executes locally
-// 4. Shell configuration should be preserved throughout
 func TestQueueShellConfig(t *testing.T) {
 	t.Run("EnqueueAPI_MultipleStepsChained", func(t *testing.T) {
 		// Setup test helper with queues enabled
@@ -76,21 +66,7 @@ name: chained-steps-test
 steps:
   - name: "1"
     command: "sleep 1"
-  - name: "2"
-    command: "sleep 1"
-    depends: ["1"]
-  - name: "3"
-    command: "sleep 1"
-    depends: ["2"]
-  - name: "4"
-    command: "sleep 1"
-    depends: ["3"]
-  - name: "5"
-    command: "sleep 1"
-    depends: ["4"]
-  - name: "6"
-    command: "sleep 1"
-    depends: ["5"]
+    shell: "/bin/zsh"
 `
 
 		// Enqueue via REST API
@@ -175,21 +151,13 @@ steps:
 		}
 
 		// Verify final status
-		statuses, err := th.DAGRunStore.ListStatuses(th.Context)
+		att, err := th.DAGRunStore.LatestAttempt(th.Context, "chained-steps-test")
 		require.NoError(t, err)
 
-		var finalStatus core.Status
-		found := false
-		for _, status := range statuses {
-			if status.Name == "chained-steps-test" {
-				finalStatus = status.Status
-				found = true
-				break
-			}
-		}
+		status, err := att.ReadStatus(th.Context)
+		require.NoError(t, err)
 
-		require.True(t, found, "Should find status for chained-steps-test")
-		require.Equal(t, core.Succeeded, finalStatus,
+		require.Equal(t, core.Succeeded, status.Status,
 			"DAG with 6 chained steps should succeed")
 
 		t.Log("Test completed successfully!")

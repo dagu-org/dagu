@@ -153,7 +153,7 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 		})
 
 		dir, err := fileutil.ResolvePath(expandedDir)
-		if err == nil {
+		if err == nil && fileutil.FileExists(dir) {
 			workingDir = dir
 		} else {
 			logger.Warn(ctx, "Failed to resolve working directory for step", "step", step.Name, "dir", expandedDir, "err", err)
@@ -161,11 +161,15 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 		}
 
 	case parentDAG != nil && parentDAG.WorkingDir != "":
-		workingDir = parentDAG.WorkingDir
+		if fileutil.FileExists(parentDAG.WorkingDir) {
+			workingDir = parentDAG.WorkingDir
+		} else {
+			logger.Warn(ctx, "Parent DAG working directory does not exist, falling back to current working directory", "dir", parentDAG.WorkingDir)
+		}
 
 	default:
 		// Use the current working directory if not specified
-		if wd, err := os.Getwd(); err == nil {
+		if wd, err := os.Getwd(); err == nil && fileutil.FileExists(wd) {
 			workingDir = wd
 		} else {
 			logger.Error(ctx, "Failed to get current working directory", "err", err)
