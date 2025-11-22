@@ -70,7 +70,7 @@ steps:
 `
 
 		// Enqueue via REST API
-		reqBody := map[string]interface{}{
+		reqBody := map[string]any{
 			"spec": dagYAML,
 		}
 
