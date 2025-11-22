@@ -50,28 +50,15 @@ const (
 	QueuePriorityLow
 )
 
-// QueuedItem is a wrapper for QueuedItem with additional fields
+// QueuedItem is a wrapper for QueuedItemData
 type QueuedItem struct {
 	QueuedItemData
-	Result chan QueuedItemProcessingResult
 }
-
-type QueuedItemProcessingResult int
-
-const (
-	// QueuedItemProcessingResultRetry indicates that the queued item needs to be retried
-	QueuedItemProcessingResultRetry QueuedItemProcessingResult = 0
-	// QueuedItemProcessingResultSuccess indicates that the queued item was processed successfully
-	QueuedItemProcessingResultSuccess QueuedItemProcessingResult = 1
-	// QueuedItemProcessingResultDiscard indicates that the queued item should be discarded due to unrecoverable error
-	QueuedItemProcessingResultDiscard QueuedItemProcessingResult = 2
-)
 
 // NewQueuedItem creates a new QueuedItem
 func NewQueuedItem(data QueuedItemData) *QueuedItem {
 	return &QueuedItem{
 		QueuedItemData: data,
-		Result:         make(chan QueuedItemProcessingResult, 1),
 	}
 }
 

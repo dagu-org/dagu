@@ -2,7 +2,6 @@ package filequeue
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,36 +19,23 @@ import (
 var _ execution.QueueReader = (*queueReaderImpl)(nil)
 
 type queueReaderImpl struct {
-	store          *Store
-	running        atomic.Bool
-	cancel         context.CancelFunc
-	mu             sync.RWMutex
-	items          []queuedItem
-	updated        atomic.Bool
-	done           chan struct{}
-	watcher        filenotify.FileWatcher
-	queueRetryTime sync.Map // map[queueName]time.Time - tracks retry times per queue
+	store   *Store
+	running atomic.Bool
+	cancel  context.CancelFunc
+	mu      sync.RWMutex
+	done    chan struct{}
+	watcher filenotify.FileWatcher
+	// inFlight tracks items that have been sent to the channel but not yet processed.
+	// This prevents re-sending the same item too frequently.
+	inFlight sync.Map // map[string]time.Time (key: dagName:runID, value: time sent)
 }
-
-type queuedItem struct {
-	*execution.QueuedItem
-	status int
-}
-
-const (
-	statusNone = iota
-	statusProcessing
-	statusDone
-)
 
 const (
 	// Longer intervals since we use file events as primary notification
-	reloadInterval    = 10 * time.Second // Backup polling interval
-	processingDelay   = 1 * time.Second  // Small delay to prevent busy loop
-	shutdownTimeout   = 5 * time.Second
-	pollingInterval   = 2 * time.Second // For filenotify poller fallback
-	processingTimeout = 8 * time.Second
-	queueRetryDelay   = 2 * time.Second // Delay before retrying items from the same queue
+	reloadInterval  = 2 * time.Second // Backup polling interval
+	shutdownTimeout = 5 * time.Second
+	pollingInterval = 2 * time.Second // For filenotify poller fallback
+	retryInterval   = 2 * time.Second
 )
 
 func newQueueReader(s *Store) *queueReaderImpl {
@@ -86,17 +72,6 @@ func (q *queueReaderImpl) Start(ctx context.Context, ch chan<- execution.QueuedI
 	q.watcher = watcher
 	q.mu.Unlock()
 
-	allItems, err := q.store.All(ctx)
-	if err != nil {
-		q.running.Store(false)
-		if watcher != nil {
-			_ = watcher.Close()
-		}
-		return fmt.Errorf("failed to read initial items: %w", err)
-	}
-
-	q.setItems(allItems)
-
 	go q.startWatch(ctx, ch)
 
 	return nil
@@ -111,7 +86,8 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- execution.Qu
 	reloadTicker := time.NewTicker(reloadInterval)
 	defer reloadTicker.Stop()
 
-	items := q.getItems()
+	// Initial load
+	q.processFiles(ctx, ch)
 
 	// Get watcher channels safely
 	var eventsCh <-chan fsnotify.Event
@@ -125,212 +101,75 @@ func (q *queueReaderImpl) startWatch(ctx context.Context, ch chan<- execution.Qu
 	q.mu.RUnlock()
 
 	for {
-		if eventsCh != nil && errorsCh != nil {
-			// Use file system events when watcher is available
-			select {
-			case <-ctx.Done():
-				logger.Info(ctx, "Stopping queue reader due to context cancellation")
-				return
-
-			case event := <-eventsCh:
-				// File system event occurred - handle it
-				logger.Debug(ctx, "File system event detected", "event", event.String())
-				if q.handleFileEvent(ctx, event) {
-					if err := q.reloadItems(ctx); err != nil {
-						logger.Error(ctx, "Failed to reload queue items after file event", "err", err)
-						continue
-					}
-					items = q.getItems()
-				}
-
-			case err := <-errorsCh:
-				// File watcher error
-				logger.Error(ctx, "File watcher error", "err", err)
-
-			case <-reloadTicker.C:
-				// Backup polling mechanism
-				logger.Debug(ctx, "Backup polling reload")
-				if err := q.reloadItems(ctx); err != nil {
-					logger.Error(ctx, "Failed to reload queue items", "err", err)
-					continue
-				}
-				items = q.getItems()
-
-			default:
-				items = q.processItems(ctx, ch, items)
-				select {
-				case <-ctx.Done():
-					logger.Info(ctx, "Stopping queue reader due to context cancellation")
-					return
-				case <-time.After(processingDelay):
-				}
-			}
-		} else {
-			// Fallback to polling only when no watcher is available
-			select {
-			case <-ctx.Done():
-				logger.Info(ctx, "Stopping queue reader due to context cancellation")
-				return
-
-			case <-reloadTicker.C:
-				// Polling mechanism
-				if err := q.reloadItems(ctx); err != nil {
-					logger.Error(ctx, "Failed to reload queue items", "err", err)
-					continue
-				}
-				items = q.getItems()
-
-			default:
-				items = q.processItems(ctx, ch, items)
-				select {
-				case <-ctx.Done():
-					logger.Info(ctx, "Stopping queue reader due to context cancellation")
-					return
-				case <-time.After(processingDelay):
-				}
-			}
-		}
-	}
-}
-
-func (q *queueReaderImpl) setItems(items []execution.QueuedItemData) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	// Clear the items slice and reset capacity if needed
-	if cap(q.items) < len(items) {
-		q.items = make([]queuedItem, 0, len(items))
-	} else {
-		q.items = q.items[:0]
-	}
-
-	// Add new items
-	for _, item := range items {
-		q.items = append(q.items, queuedItem{
-			QueuedItem: execution.NewQueuedItem(item),
-			status:     statusNone,
-		})
-	}
-
-	q.updated.Store(true)
-}
-
-func (q *queueReaderImpl) getItems() []queuedItem {
-	q.mu.RLock()
-	defer q.mu.RUnlock()
-
-	// Create a copy to avoid race conditions
-	items := make([]queuedItem, len(q.items))
-	copy(items, q.items)
-	return items
-}
-
-func (q *queueReaderImpl) reloadItems(ctx context.Context) error {
-	allItems, err := q.store.All(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to read queue items: %w", err)
-	}
-	q.setItems(allItems)
-	return nil
-}
-
-func (q *queueReaderImpl) processItems(ctx context.Context, ch chan<- execution.QueuedItem, items []queuedItem) []queuedItem {
-	// Check if items were updated while processing
-	if q.updated.Load() {
-		q.updated.Store(false)
-		return q.getItems()
-	}
-
-	processed := make(map[string]bool)
-
-	for i := range items {
-		if ctx.Err() != nil {
-			return items
-		}
-
-		item := &items[i]
-		if item.status != statusNone {
-			continue
-		}
-
-		data := item.Data()
-		if processed[data.Name] {
-			continue
-		}
-
-		// Check if this queue is in retry delay period
-		if retryTime, ok := q.queueRetryTime.Load(data.Name); ok {
-			if retryAfter, ok := retryTime.(time.Time); ok {
-				if time.Now().Before(retryAfter) {
-					// Skip this queue until retry time has passed
-					processed[data.Name] = true
-					continue
-				}
-			}
-		}
-
-		q.tryProcessItem(ctx, ch, item, data, processed)
-		processed[data.Name] = true
-
-		// Check for updates after each item
-		if q.updated.Load() {
-			break
-		}
-	}
-
-	return items
-}
-
-func (q *queueReaderImpl) tryProcessItem(ctx context.Context, ch chan<- execution.QueuedItem, item *queuedItem, data execution.DAGRunRef, _ map[string]bool) {
-	item.status = statusProcessing
-
-	select {
-	case ch <- *item.QueuedItem:
 		select {
-		case res := <-item.Result:
-			switch res {
-			case execution.QueuedItemProcessingResultRetry:
-				// Item was not processed successfully, set retry delay for this queue
-				item.status = statusNone
-				retryAfter := time.Now().Add(queueRetryDelay)
-				q.queueRetryTime.Store(data.Name, retryAfter)
-				logger.Info(ctx, "Max active runs is reached, delaying retry", "name", data.Name, "retryAfter", retryAfter.Format(time.RFC3339))
-			case execution.QueuedItemProcessingResultSuccess:
-				logger.Info(ctx, "Item processed successfully", "name", data.Name, "dagRunId", data.ID)
-				item.status = statusDone
-				q.removeProcessedItem(ctx, data)
-				// Clear retry delay for this queue since we successfully processed an item
-				q.queueRetryTime.Delete(data.Name)
-			case execution.QueuedItemProcessingResultDiscard:
-				logger.Info(ctx, "Item is invalid, discarding", "name", data.Name, "dagRunId", data.ID)
-				item.status = statusDone
-				q.removeProcessedItem(ctx, data)
+		case <-ctx.Done():
+			logger.Info(ctx, "Stopping queue reader due to context cancellation")
+			return
+
+		case event := <-eventsCh:
+			// File system event occurred - handle it
+			if q.handleFileEvent(ctx, event) {
+				q.processFiles(ctx, ch)
 			}
 
-		case <-time.After(processingTimeout):
-			// Timeout waiting for result
-			logger.Warn(ctx, "Timeout waiting for item processing result", "name", data.Name, "dagRunId", data.ID)
-			item.status = statusNone
+		case err := <-errorsCh:
+			// File watcher error
+			logger.Error(ctx, "File watcher error", "err", err)
 
-		case <-ctx.Done():
-			item.status = statusNone
+		case <-reloadTicker.C:
+			// Periodic reload to catch missed events or retry failed items
+			q.processFiles(ctx, ch)
 		}
-	default:
-		// Channel is full, reset status and set retry delay for this queue
-		item.status = statusNone
-		retryAfter := time.Now().Add(queueRetryDelay)
-		q.queueRetryTime.Store(data.Name, retryAfter)
-		logger.Info(ctx, "Channel full, delaying retry", "name", data.Name, "retryAfter", retryAfter.Format(time.RFC3339))
+	}
+}
+
+func (q *queueReaderImpl) processFiles(ctx context.Context, ch chan<- execution.QueuedItem) {
+	items, err := q.store.All(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to read queue items", "err", err)
 		return
 	}
-}
 
-func (q *queueReaderImpl) removeProcessedItem(ctx context.Context, data execution.DAGRunRef) {
-	if _, err := q.store.DequeueByDAGRunID(ctx, data.Name, data.ID); err != nil {
-		if !errors.Is(err, execution.ErrQueueItemNotFound) {
-			logger.Error(ctx, "Failed to dequeue item", "err", err, "name", data.Name, "dagRunId", data.ID)
+	now := time.Now()
+
+	for _, itemData := range items {
+		if ctx.Err() != nil {
+			return
+		}
+
+		key := fmt.Sprintf("%s:%s", itemData.Data().Name, itemData.Data().ID)
+
+		// Check if item is in flight and if retry interval has passed
+		if sentTime, ok := q.inFlight.Load(key); ok {
+			if now.Sub(sentTime.(time.Time)) < retryInterval {
+				continue
+			}
+		}
+
+		// Try to send to channel (non-blocking)
+		select {
+		case ch <- *execution.NewQueuedItem(itemData):
+			q.inFlight.Store(key, now)
+		default:
+			// Channel full, will retry on next tick
 		}
 	}
+
+	// Cleanup inFlight map for items that no longer exist
+	q.inFlight.Range(func(key, value any) bool {
+		k := key.(string)
+		found := false
+		for _, item := range items {
+			if fmt.Sprintf("%s:%s", item.Data().Name, item.Data().ID) == k {
+				found = true
+				break
+			}
+		}
+		if !found {
+			q.inFlight.Delete(key)
+		}
+		return true
+	})
 }
 
 // Stop implements models.QueueReader.
