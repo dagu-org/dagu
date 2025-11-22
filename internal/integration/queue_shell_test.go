@@ -66,8 +66,7 @@ name: chained-steps-test
 steps:
   - name: "1"
     command: "sleep 1"
-	workingDir: $HOME
-    shell: "/bin/zsh"
+    workingDir: "$HOME"
 `
 
 		// Enqueue via REST API
