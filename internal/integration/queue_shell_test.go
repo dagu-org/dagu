@@ -157,8 +157,7 @@ steps:
 		status, err := att.ReadStatus(th.Context)
 		require.NoError(t, err)
 
-		require.Equal(t, core.Succeeded, status.Status,
-			"DAG with 6 chained steps should succeed")
+		require.Equal(t, core.Succeeded, status.Status)
 
 		t.Log("Test completed successfully!")
 	})
