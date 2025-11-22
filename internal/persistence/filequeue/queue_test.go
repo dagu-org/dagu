@@ -1,6 +1,7 @@
 package filequeue_test
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -102,4 +103,30 @@ func TestQueue_FindByDAGRunID(t *testing.T) {
 	jobData = job.Data()
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
 	require.Equal(t, "low-priority-dag-run", jobData.ID, "expected job ID to be 'low-priority-dag-run'")
+}
+
+func TestQueue_OrderingHighFrequency(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	queueDir := filepath.Join(th.Config.Paths.QueueDir, "test-ordering")
+	queue := filequeue.NewDualQueue(queueDir, "test-ordering")
+
+	// Enqueue items very quickly
+	numItems := 10
+	for i := 0; i < numItems; i++ {
+		err := queue.Enqueue(th.Context, execution.QueuePriorityLow, execution.DAGRunRef{
+			Name: "test-ordering",
+			ID:   fmt.Sprintf("run-%d", i),
+		})
+		require.NoError(t, err)
+	}
+
+	// Dequeue and verify order
+	for i := 0; i < numItems; i++ {
+		item, err := queue.Dequeue(th.Context)
+		require.NoError(t, err)
+		require.Equal(t, fmt.Sprintf("run-%d", i), item.Data().ID, "expected items to be dequeued in order")
+	}
 }

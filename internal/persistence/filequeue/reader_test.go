@@ -2,6 +2,7 @@ package filequeue_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -136,6 +137,52 @@ func TestQueueReaderStartStop(t *testing.T) {
 	reader.Stop(ctx)
 
 	require.False(t, reader.IsRunning(), "expected reader to be not running after stop")
+}
+
+func TestQueueReaderChannelFullOrdering(t *testing.T) {
+	th := test.Setup(t)
+	ctx, cancel := context.WithTimeout(th.Context, 5*time.Second)
+	defer cancel()
+
+	// Create a new store
+	store := filequeue.New(th.Config.Paths.QueueDir)
+
+	// Add items to the queue
+	queueName := "test-ordering"
+	numItems := 5
+	for i := 0; i < numItems; i++ {
+		err := store.Enqueue(ctx, queueName, execution.QueuePriorityLow, execution.DAGRunRef{
+			Name: queueName,
+			ID:   fmt.Sprintf("run-%d", i),
+		})
+		require.NoError(t, err)
+	}
+
+	// Get a reader from the store
+	reader := store.Reader()
+
+	// Create a channel with buffer size 0 to simulate a full channel immediately
+	ch := make(chan execution.QueuedItem)
+
+	// Start the reader
+	err := reader.Start(ctx, ch)
+	require.NoError(t, err, "expected no error when starting reader")
+
+	// Read items and verify order
+	for i := 0; i < numItems; i++ {
+		select {
+		case item := <-ch:
+			require.Equal(t, fmt.Sprintf("run-%d", i), item.Data().ID, "expected items to be received in order")
+			// Simulate processing and dequeue
+			_, err := store.DequeueByDAGRunID(ctx, queueName, item.Data().ID)
+			require.NoError(t, err)
+		case <-time.After(3 * time.Second):
+			t.Fatalf("timeout waiting for item %d", i)
+		}
+	}
+
+	// Stop the reader
+	reader.Stop(ctx)
 }
 
 func TestQueueReaderContextCancellation(t *testing.T) {

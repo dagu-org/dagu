@@ -131,17 +131,30 @@ func (q *queueReaderImpl) processFiles(ctx context.Context, ch chan<- execution.
 	}
 
 	now := time.Now()
+	blockedQueues := make(map[string]bool)
 
 	for _, itemData := range items {
 		if ctx.Err() != nil {
 			return
 		}
 
-		key := fmt.Sprintf("%s:%s", itemData.Data().Name, itemData.Data().ID)
+		queueName := itemData.Data().Name
+		if blockedQueues[queueName] {
+			continue
+		}
+
+		key := fmt.Sprintf("%s:%s", queueName, itemData.Data().ID)
 
 		// Check if item is in flight and if retry interval has passed
 		if sentTime, ok := q.inFlight.Load(key); ok {
 			if now.Sub(sentTime.(time.Time)) < retryInterval {
+				// Item is in flight and not ready for retry.
+				// We must block this queue to preserve order, because this item (A1)
+				// is effectively "at the head" of the queue processing.
+				// If we skip it but process A2, we violate order if A1 needs to be retried.
+				// However, A1 is *already* in the channel (or being processed).
+				// Sending A2 is fine because A1 was sent *before* A2.
+				// So we do NOT block the queue here.
 				continue
 			}
 		}
@@ -151,7 +164,10 @@ func (q *queueReaderImpl) processFiles(ctx context.Context, ch chan<- execution.
 		case ch <- *execution.NewQueuedItem(itemData):
 			q.inFlight.Store(key, now)
 		default:
-			// Channel full, will retry on next tick
+			// Channel full, will retry on next tick.
+			// Mark this queue as blocked to prevent sending subsequent items (A2)
+			// before this item (A1) is sent.
+			blockedQueues[queueName] = true
 		}
 	}
 
