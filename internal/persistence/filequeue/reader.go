@@ -149,12 +149,10 @@ func (q *queueReaderImpl) processFiles(ctx context.Context, ch chan<- execution.
 		if sentTime, ok := q.inFlight.Load(key); ok {
 			if now.Sub(sentTime.(time.Time)) < retryInterval {
 				// Item is in flight and not ready for retry.
-				// We must block this queue to preserve order, because this item (A1)
-				// is effectively "at the head" of the queue processing.
-				// If we skip it but process A2, we violate order if A1 needs to be retried.
-				// However, A1 is *already* in the channel (or being processed).
-				// Sending A2 is fine because A1 was sent *before* A2.
-				// So we do NOT block the queue here.
+				// We must block this queue to preserve strict FIFO order.
+				// Even though this reduces concurrency (serializes dispatch),
+				// it prevents A2 from being processed while A1 is still pending/running.
+				blockedQueues[queueName] = true
 				continue
 			}
 		}
@@ -169,6 +167,13 @@ func (q *queueReaderImpl) processFiles(ctx context.Context, ch chan<- execution.
 			// before this item (A1) is sent.
 			blockedQueues[queueName] = true
 		}
+
+		// STRICT FIFO:
+		// We have processed the head of the queue (either sent it or it's in-flight/blocked).
+		// We must block the queue now to prevent any subsequent items (A2, A3...)
+		// from being processed in this tick.
+		// This ensures that A2 is never sent until A1 is dequeued (removed from store).
+		blockedQueues[queueName] = true
 	}
 
 	// Cleanup inFlight map for items that no longer exist

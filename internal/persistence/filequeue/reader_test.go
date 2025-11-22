@@ -185,6 +185,69 @@ func TestQueueReaderChannelFullOrdering(t *testing.T) {
 	reader.Stop(ctx)
 }
 
+func TestQueueReader_HeadOfLineBlocking(t *testing.T) {
+	th := test.Setup(t)
+	ctx, cancel := context.WithTimeout(th.Context, 10*time.Second)
+	defer cancel()
+
+	// Create a new store
+	store := filequeue.New(th.Config.Paths.QueueDir)
+	queueName := "test-hol-blocking"
+
+	// Enqueue Item A
+	err := store.Enqueue(ctx, queueName, execution.QueuePriorityLow, execution.DAGRunRef{
+		Name: queueName,
+		ID:   "run-A",
+	})
+	require.NoError(t, err)
+
+	// Enqueue Item B
+	err = store.Enqueue(ctx, queueName, execution.QueuePriorityLow, execution.DAGRunRef{
+		Name: queueName,
+		ID:   "run-B",
+	})
+	require.NoError(t, err)
+
+	// Get a reader
+	reader := store.Reader()
+	ch := make(chan execution.QueuedItem, 10)
+
+	// Start reader
+	err = reader.Start(ctx, ch)
+	require.NoError(t, err)
+
+	// 1. Receive Item A
+	select {
+	case item := <-ch:
+		require.Equal(t, "run-A", item.Data().ID)
+		// DO NOT dequeue A. Simulate failure.
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for run-A")
+	}
+
+	// 2. Wait for retry interval (2s) + buffer
+	time.Sleep(3 * time.Second)
+
+	// 3. Should receive Item A again (retry)
+	// Item B should NOT be received because A is still in queue (Head-of-Line blocking)
+	select {
+	case item := <-ch:
+		require.Equal(t, "run-A", item.Data().ID, "expected run-A to be retried")
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for run-A retry")
+	}
+
+	// 4. Verify channel is empty (Item B not sent)
+	select {
+	case item := <-ch:
+		t.Fatalf("received unexpected item %s. Strict ordering violated!", item.Data().ID)
+	default:
+		// OK
+	}
+
+	reader.Stop(ctx)
+}
+
 func TestQueueReaderContextCancellation(t *testing.T) {
 	th := test.Setup(t)
 	ctx, cancel := context.WithTimeout(th.Context, 2*time.Second)
