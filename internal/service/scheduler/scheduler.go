@@ -51,6 +51,7 @@ type Scheduler struct {
 	// queueProcessor is the processor for queued DAG runs
 	queueProcessor *QueueProcessor
 	stopOnce       sync.Once
+	lockReleased   atomic.Bool // Tracks if lock was released to prevent double unlock
 }
 
 // New creates a new Scheduler.
@@ -164,6 +165,9 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	// Ensure lock is always released
 	defer func() {
+		if s.lockReleased.Swap(true) {
+			return // Already released by Stop()
+		}
 		if err := s.dirLock.Unlock(); err != nil {
 			logger.Error(ctx, "Failed to release scheduler lock in defer", "err", err)
 		} else {
@@ -196,6 +200,8 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	}()
 
 	// Start zombie detector if enabled
+	// Note: Not added to WaitGroup since it only responds to ctx.Done(),
+	// which is cancelled after wg.Wait() returns. This is intentional.
 	if s.config.Scheduler.ZombieDetectionInterval > 0 {
 		s.zombieDetector = NewZombieDetector(
 			s.dagRunStore,
@@ -325,10 +331,12 @@ func (s *Scheduler) stopCron(ctx context.Context) {
 		s.dagExecutor.Close(ctx)
 	}
 
-	if err := s.dirLock.Unlock(); err != nil {
-		logger.Error(ctx, "Failed to release scheduler lock in Stop", "err", err)
-	} else {
-		logger.Info(ctx, "Released scheduler lock in Stop")
+	if !s.lockReleased.Swap(true) {
+		if err := s.dirLock.Unlock(); err != nil {
+			logger.Error(ctx, "Failed to release scheduler lock in Stop", "err", err)
+		} else {
+			logger.Info(ctx, "Released scheduler lock in Stop")
+		}
 	}
 
 	// Unregister from service registry
@@ -371,7 +379,7 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 			"jobType", job.Type.String(),
 			"scheduledTime", job.Next.Format(time.RFC3339))
 
-		// Launch job with bounded concurrency
+		// Launch job execution in goroutine
 		go func(ctx context.Context, job *ScheduledJob) {
 			if err := job.invoke(ctx); err != nil {
 				switch {
@@ -397,8 +405,7 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 // invoke invokes the job based on the schedule type.
 func (s *ScheduledJob) invoke(ctx context.Context) error {
 	if s.Job == nil {
-		logger.Error(ctx, "job is nil", "job", s.Job)
-		return nil
+		return fmt.Errorf("job is nil")
 	}
 
 	logger.Info(ctx, "starting operation", "type", s.Type.String(), "job", s.Job)
