@@ -252,7 +252,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 	cmd, err := executor.buildCommand(ctx, runParams, "/work/dir")
 	assert.Error(t, err)
 	assert.Nil(t, cmd)
-	assert.Contains(t, err.Error(), "dag run ID is not set")
+	assert.Contains(t, err.Error(), "DAG run ID is not set")
 }
 
 func TestBuildCommand_NoRootDAGRun(t *testing.T) {
@@ -283,7 +283,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 	cmd, err := executor.buildCommand(ctx, runParams, "/work/dir")
 	assert.Error(t, err)
 	assert.Nil(t, cmd)
-	assert.Contains(t, err.Error(), "root dag run ID is not set")
+	assert.Contains(t, err.Error(), "root DAG run ID is not set")
 }
 
 func TestCleanup_LocalDAG(t *testing.T) {
