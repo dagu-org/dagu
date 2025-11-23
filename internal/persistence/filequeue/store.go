@@ -182,7 +182,7 @@ func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]exec
 }
 
 // DequeueByDAGRunID implements models.QueueStore.
-func (s *Store) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([]execution.QueuedItemData, error) {
+func (s *Store) DequeueByDAGRunID(ctx context.Context, name string, dagRun execution.DAGRunRef) ([]execution.QueuedItemData, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -201,9 +201,9 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([
 	}()
 
 	q := s.queues[name]
-	item, err := q.DequeueByDAGRunID(ctx, dagRunID)
+	item, err := q.DequeueByDAGRunID(ctx, dagRun)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dequeue dag-run %s: %w", dagRunID, err)
+		return nil, fmt.Errorf("failed to dequeue dag-run %s: %w", dagRun.ID, err)
 	}
 	items = append(items, item...)
 

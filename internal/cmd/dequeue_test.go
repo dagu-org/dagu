@@ -29,7 +29,7 @@ func TestDequeueCommand(t *testing.T) {
 	// Now test the dequeue command
 	th.RunCommand(t, cmd.Dequeue(), test.CmdTest{
 		Name:        "Dequeue",
-		Args:        []string{"dequeue", "--dag-run", dag.Name + ":test-DAG"},
+		Args:        []string{"dequeue", dag.ProcGroup(), "--dag-run", dag.Name + ":test-DAG"},
 		ExpectedOut: []string{"Dequeued dag-run"},
 	})
 }
@@ -70,7 +70,7 @@ func TestDequeueCommand_PreservesState(t *testing.T) {
 	// Dequeue it
 	th.RunCommand(t, cmd.Dequeue(), test.CmdTest{
 		Name:        "Dequeue",
-		Args:        []string{"dequeue", "--dag-run", dag.Name + ":queued-run"},
+		Args:        []string{"dequeue", dag.ProcGroup(), "--dag-run", dag.Name + ":queued-run"},
 		ExpectedOut: []string{"Dequeued dag-run"},
 	})
 
@@ -81,4 +81,31 @@ func TestDequeueCommand_PreservesState(t *testing.T) {
 	latestStatus, err := latestAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, core.Succeeded, latestStatus.Status, "Latest visible status should be Success")
+}
+
+func TestDequeueCommand_DefaultsToFirstItem(t *testing.T) {
+	th := test.SetupCommand(t)
+
+	dag := th.DAG(t, `steps:
+  - name: "1"
+    command: "true"
+`)
+
+	// Enqueue the DAG first
+	th.RunCommand(t, cmd.Enqueue(), test.CmdTest{
+		Name: "Enqueue",
+		Args: []string{"enqueue", "--run-id", "test-DAG", dag.Location},
+	})
+
+	// Now test the dequeue command without --dag-run to pop the first item
+	th.RunCommand(t, cmd.Dequeue(), test.CmdTest{
+		Name:        "DequeueFirst",
+		Args:        []string{"dequeue", dag.ProcGroup()},
+		ExpectedOut: []string{"Dequeued dag-run"},
+	})
+
+	// Verify queue is empty
+	length, err := th.QueueStore.Len(th.Context, dag.ProcGroup())
+	require.NoError(t, err)
+	assert.Equal(t, 0, length)
 }

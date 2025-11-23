@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -153,14 +154,16 @@ steps:
 	require.Len(t, queueItems, 1, "DAG should be enqueued once")
 
 	var dagRunID string
+	var dagRun execution.DAGRunRef
 	if len(queueItems) > 0 {
 		data := queueItems[0].Data()
 		dagRunID = data.ID
+		dagRun = data
 		t.Logf("DAG enqueued: dag=%s runId=%s", data.Name, data.ID)
 	}
 
 	// Dequeue it to simulate processing
-	_, err = coord.QueueStore.DequeueByDAGRunID(coord.Context, dagWrapper.ProcGroup(), dagRunID)
+	_, err = coord.QueueStore.DequeueByDAGRunID(coord.Context, dagWrapper.ProcGroup(), dagRun)
 	require.NoError(t, err)
 
 	// Now retry the DAG - it should be enqueued again

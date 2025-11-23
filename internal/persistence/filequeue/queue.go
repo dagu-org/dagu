@@ -75,19 +75,19 @@ func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (execut
 }
 
 // DequeueByDAGRunID retrieves a dag-run from the queue by its dag-run ID
-func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRunID string) ([]execution.QueuedItemData, error) {
+func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRun execution.DAGRunRef) ([]execution.QueuedItemData, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	var items []execution.QueuedItemData
 	for _, priority := range priorities {
 		qf := q.files[priority]
-		popped, err := qf.PopByDAGRunID(ctx, dagRunID)
+		popped, err := qf.PopByDAGRunID(ctx, dagRun)
 		if errors.Is(err, ErrQueueFileEmpty) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to pop dag-run %s: %w", dagRunID, err)
+			return nil, fmt.Errorf("failed to pop dag-run %s: %w", dagRun.ID, err)
 		}
 		for _, item := range popped {
 			items = append(items, item)

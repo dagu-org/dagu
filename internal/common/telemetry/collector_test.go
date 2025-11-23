@@ -195,8 +195,8 @@ func (m *mockQueueStore) DequeueByName(ctx context.Context, name string) (execut
 	return args.Get(0).(execution.QueuedItemData), args.Error(1)
 }
 
-func (m *mockQueueStore) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([]execution.QueuedItemData, error) {
-	args := m.Called(ctx, name, dagRunID)
+func (m *mockQueueStore) DequeueByDAGRunID(ctx context.Context, name string, dagRun execution.DAGRunRef) ([]execution.QueuedItemData, error) {
+	args := m.Called(ctx, name, dagRun)
 	return args.Get(0).([]execution.QueuedItemData), args.Error(1)
 }
 

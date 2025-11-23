@@ -116,7 +116,7 @@ func (q *QueueFile) Push(_ context.Context, dagRun execution.DAGRunRef) error {
 }
 
 // PopByDAGRunID removes jobs from the queue by dag-run ID
-func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRunID string) ([]*Job, error) {
+func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun execution.DAGRunRef) ([]*Job, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -133,7 +133,7 @@ func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRunID string) ([]*Job,
 
 	var removedJobs []*Job
 	for _, item := range items {
-		if item.DAGRun.ID == dagRunID {
+		if item.DAGRun.Name == dagRun.Name && item.DAGRun.ID == dagRun.ID {
 			if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
 				// Log the error but continue processing other items
 				logger.Warn(ctx, "failed to remove queue file %s: %w", item.FileName, err)

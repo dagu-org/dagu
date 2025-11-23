@@ -253,16 +253,16 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 	var wg sync.WaitGroup
 	for _, item := range runnableItems {
 		wg.Add(1)
+		runCtx := logger.WithValues(ctx, "dagName", item.Data().Name, "runId", item.Data().ID)
 		go func(ctx context.Context, item execution.QueuedItemData) {
 			defer wg.Done()
-			ctx = logger.WithValues(ctx, "runId", item.Data().ID)
 			if p.processDAG(ctx, item, queueName) {
-				// Remove the item from the queue
-				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, item.Data().ID); err != nil {
-					logger.Error(ctx, "queue: Failed to dequeue item", "runId", item.Data().ID, "err", err)
+				runRef := item.Data()
+				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, runRef); err != nil {
+					logger.Error(ctx, "queue: Failed to dequeue item", "runId", runRef.ID, "err", err)
 				}
 			}
-		}(ctx, item)
+		}(runCtx, item)
 	}
 	wg.Wait()
 }
@@ -343,7 +343,7 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 
 	var started bool
 	operation := func(ctx context.Context) error {
-		started, err = p.monitorStartup(ctx, queueName, runRef, nil)
+		started, err = p.monitorStartup(ctx, queueName, runRef, errCh)
 		return err
 	}
 
