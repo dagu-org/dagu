@@ -1,9 +1,94 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { components, Status } from '../../../../api/v2/schema';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../components/ui/tooltip';
+import { useSimpleToast } from '../../../../components/ui/simple-toast';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import { DAGRunDetailsModal } from '../dag-run-details';
+
+// Component for step names with tooltip (desktop) and toast (mobile)
+function StepNamesDisplay({
+  stepNames,
+  label,
+  colorClass,
+  isMobile,
+  toastTimeout = 3000,
+}: {
+  stepNames: string[];
+  label: string;
+  colorClass: string;
+  isMobile: boolean;
+  toastTimeout?: number;
+}) {
+  const { showToast } = useSimpleToast();
+
+  if (!stepNames || stepNames.length === 0) {
+    return null;
+  }
+
+  const hasMultiple = stepNames.length > 1;
+
+  // Single step - just show it
+  if (!hasMultiple) {
+    return (
+      <div className={`text-[10px] ${colorClass}`}>
+        {label}: {stepNames[0]}
+      </div>
+    );
+  }
+
+  // Multiple steps - show "stepname +n" with tooltip/toast
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isMobile) {
+      // On mobile, show toast with all step names
+      const stepList = stepNames.map((name, idx) => `${idx + 1}. ${name}`).join('\n');
+      showToast(`${label} steps:\n${stepList}`, toastTimeout);
+    }
+  };
+
+  const stepListContent = (
+    <div className="space-y-1">
+      <div className="font-semibold text-xs mb-1">{label} steps:</div>
+      {stepNames.map((stepName, idx) => (
+        <div key={idx} className="text-xs">
+          {idx + 1}. {stepName}
+        </div>
+      ))}
+    </div>
+  );
+
+  if (isMobile) {
+    // Mobile: clickable to show toast
+    return (
+      <div className={`text-[10px] ${colorClass}`}>
+        <button
+          onClick={handleClick}
+          className="hover:underline cursor-pointer"
+        >
+          {label}: {stepNames[0]} +{stepNames.length - 1}
+        </button>
+      </div>
+    );
+  }
+
+  // Desktop: tooltip on hover
+  return (
+    <div className={`text-[10px] ${colorClass}`}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-help">
+            {label}: {stepNames[0]} +{stepNames.length - 1}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          {stepListContent}
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
 
 interface DAGRunGroupedViewProps {
   dagRuns: components['schemas']['DAGRunSummary'][];
@@ -15,10 +100,24 @@ interface GroupedDAGRuns {
 
 function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [isMobile, setIsMobile] = useState(false);
   const [selectedDAGRun, setSelectedDAGRun] = useState<{
     name: string;
     dagRunId: string;
   } | null>(null);
+
+  // Configurable toast timeout (default 3 seconds)
+  const toastTimeout = 3000;
+
+  // Check if mobile screen
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
 
   // Group DAG runs by name
   const groupedDAGRuns = useMemo(() => {
@@ -305,16 +404,20 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                               <StatusChip status={dagRun.status} size="xs">
                                 {dagRun.statusLabel}
                               </StatusChip>
-                              {(dagRun.runningStepNames && dagRun.runningStepNames.length > 0) && (
-                                <div className="text-[10px] text-muted-foreground text-right">
-                                  Running: {dagRun.runningStepNames.join(', ')}
-                                </div>
-                              )}
-                              {(dagRun.failedStepNames && dagRun.failedStepNames.length > 0) && (
-                                <div className="text-[10px] text-destructive text-right">
-                                  Failed: {dagRun.failedStepNames.join(', ')}
-                                </div>
-                              )}
+                              <StepNamesDisplay
+                                stepNames={dagRun.runningStepNames || []}
+                                label="Running"
+                                colorClass="text-muted-foreground text-right"
+                                isMobile={isMobile}
+                                toastTimeout={toastTimeout}
+                              />
+                              <StepNamesDisplay
+                                stepNames={dagRun.failedStepNames || []}
+                                label="Failed"
+                                colorClass="text-destructive text-right"
+                                isMobile={isMobile}
+                                toastTimeout={toastTimeout}
+                              />
                             </div>
                           </div>
                         </div>
