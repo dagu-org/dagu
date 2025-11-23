@@ -337,9 +337,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		if oc.outputWriter != nil {
 			logger.Debug(ctx, "Captured output: closing output writer")
 			if err := oc.outputWriter.Close(); err != nil {
-				logger.Error(ctx, "Failed to close pipe writer",
-					tag.Error(err),
-				)
+				logger.Error(ctx, "Failed to close pipe writer", tag.Error(err))
 			}
 			oc.outputWriter = nil // Mark as closed
 		}
@@ -367,9 +365,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		// Close the reader
 		if oc.outputReader != nil {
 			if err := oc.outputReader.Close(); err != nil {
-				logger.Error(ctx, "Failed to close pipe reader",
-					tag.Error(err),
-				)
+				logger.Error(ctx, "Failed to close pipe reader", tag.Error(err))
 			}
 			oc.outputReader = nil
 		}
@@ -387,9 +383,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	if oc.outputWriter != nil {
 		logger.Debug(ctx, "Captured output: closing output writer")
 		if err := oc.outputWriter.Close(); err != nil {
-			logger.Error(ctx, "Failed to close pipe writer",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Failed to close pipe writer", tag.Error(err))
 		}
 		oc.outputWriter = nil // Mark as closed
 	}
@@ -424,9 +418,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 
 	// Close the reader after reading
 	if err := oc.outputReader.Close(); err != nil {
-		logger.Error(ctx, "Failed to close pipe reader",
-			tag.Error(err),
-		)
+		logger.Error(ctx, "Failed to close pipe reader", tag.Error(err))
 	}
 	oc.outputReader = nil // Mark as closed
 

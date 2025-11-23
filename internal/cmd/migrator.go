@@ -117,9 +117,7 @@ func (m *historyMigrator) Migrate(ctx context.Context) (*migrationResult, error)
 		if err := m.migrateDAGHistory(dagCtx, entry.Name(), dagName, result); err != nil {
 			migrationErr := fmt.Sprintf("failed to migrate DAG %s: %s", dagName, err)
 			result.Errors = append(result.Errors, migrationErr)
-			logger.Error(dagCtx, "Failed to migrate DAG",
-				tag.Error(err),
-			)
+			logger.Error(dagCtx, "Failed to migrate DAG", tag.Error(err))
 		}
 	}
 
@@ -153,9 +151,7 @@ func (m *historyMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 				tag.File(file.Name()),
 				tag.Path(filePath),
 			)
-			logger.Error(fileCtx, "Failed to read legacy status file",
-				tag.Error(err),
-			)
+			logger.Error(fileCtx, "Failed to read legacy status file", tag.Error(err))
 			continue
 		}
 
@@ -185,9 +181,7 @@ func (m *historyMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 			result.FailedRuns++
 			migrationErr := fmt.Sprintf("failed to migrate run %s: %s", requestID, err)
 			result.Errors = append(result.Errors, migrationErr)
-			logger.Error(runCtx, "Failed to migrate run",
-				tag.Error(err),
-			)
+			logger.Error(runCtx, "Failed to migrate run", tag.Error(err))
 			continue
 		}
 
@@ -488,15 +482,10 @@ func (m *historyMigrator) MoveLegacyData(ctx context.Context) error {
 		// Move this legacy directory to archive
 		archivePath := filepath.Join(archiveDir, entry.Name())
 		if err := os.Rename(dirPath, archivePath); err != nil {
-			logger.Warn(ctx, "Failed to move legacy directory",
-				tag.Dir(entry.Name()),
-				tag.Error(err),
-			)
+			logger.Warn(ctx, "Failed to move legacy directory", tag.Dir(entry.Name()), tag.Error(err))
 		} else {
 			movedCount++
-			logger.Debug(ctx, "Moved legacy directory",
-				tag.Dir(entry.Name()),
-			)
+			logger.Debug(ctx, "Moved legacy directory", tag.Dir(entry.Name()))
 		}
 	}
 

@@ -810,7 +810,6 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	}
 
 	logger.Info(ctx, "Rescheduling dag-run",
-		tag.Action("reschedule"),
 		tag.DAG(dag.Name),
 		slog.String("from-dag-run-id", request.DagRunId),
 		tag.RunID(newDagRunID),

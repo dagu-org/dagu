@@ -319,11 +319,6 @@ func Handler(name string) slog.Attr {
 	return slog.String("handler", name)
 }
 
-// Action creates a tag for actions being performed.
-func Action(name string) slog.Attr {
-	return slog.String("action", name)
-}
-
 // Operation creates a tag for operations being performed.
 func Operation(name string) slog.Attr {
 	return slog.String("operation", name)

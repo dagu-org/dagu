@@ -296,9 +296,7 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 				)
 			}
 		}
-		logger.Info(ctx, "Loaded .env file",
-			tag.File(resolvedPath),
-		)
+		logger.Info(ctx, "Loaded .env file", tag.File(resolvedPath))
 
 		// Load the first found one
 		return

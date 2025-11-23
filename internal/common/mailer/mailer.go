@@ -60,9 +60,7 @@ func (m *Client) Send(
 	subject, body string,
 	attachments []string,
 ) error {
-	logger.Info(ctx, "Sending email",
-		slog.Any("to", to),
-		tag.Subject(subject))
+	logger.Info(ctx, "Sending email", slog.Any("to", to), tag.Subject(subject))
 	if m.username == "" && m.password == "" {
 		return m.sendWithNoAuth(from, to, subject, body, attachments)
 	}

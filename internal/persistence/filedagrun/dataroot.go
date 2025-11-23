@@ -121,8 +121,7 @@ func (dr *DataRoot) FindByDAGRunID(_ context.Context, dagRunID string) (*DAGRun,
 func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*DAGRun {
 	dagRuns, err := dr.listRecentDAGRuns(ctx, itemLimit)
 	if err != nil {
-		logger.Error(ctx, "Failed to list recent runs",
-			tag.Error(err))
+		logger.Error(ctx, "Failed to list recent runs", tag.Error(err))
 		return nil
 	}
 	return dagRuns
@@ -250,8 +249,7 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 
 		// Rename the file
 		if err := os.Rename(targetDir, newDir); err != nil {
-			logger.Error(dirCtx, "Failed to rename directory",
-				tag.Error(err))
+			logger.Error(dirCtx, "Failed to rename directory", tag.Error(err))
 			return fmt.Errorf("failed to rename %s to %s: %w", targetDir, newDir, err)
 		}
 

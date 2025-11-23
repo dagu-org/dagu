@@ -72,16 +72,12 @@ func runStop(ctx *Context, args []string) error {
 		dag = d
 	}
 
-	logger.Info(ctx, "Dag-run is stopping",
-		tag.DAG(dag.Name),
-	)
+	logger.Info(ctx, "Dag-run is stopping", tag.DAG(dag.Name))
 
 	if err := ctx.DAGRunMgr.Stop(ctx, dag, dagRunID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 
-	logger.Info(ctx, "Dag-run stopped",
-		tag.DAG(dag.Name),
-	)
+	logger.Info(ctx, "Dag-run stopped", tag.DAG(dag.Name))
 	return nil
 }

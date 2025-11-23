@@ -144,8 +144,7 @@ func matchPatternWithScanner(ctx context.Context, scanner *bufio.Scanner, patter
 
 	if err := scanner.Err(); err != nil {
 		if !errors.Is(err, bufio.ErrTooLong) {
-			logger.Error(ctx, "Scanner error",
-				tag.Error(err))
+			logger.Error(ctx, "Scanner error", tag.Error(err))
 		}
 		return false, err
 	}

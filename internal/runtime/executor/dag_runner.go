@@ -152,9 +152,7 @@ func (e *SubDAGExecutor) buildCommand(
 		tag.RunID(runParams.RunID),
 		tag.Target(e.DAG.Name),
 	)
-	logger.Info(runCtx, "Prepared sub DAG command",
-		slog.Any("args", args),
-	)
+	logger.Info(runCtx, "Prepared sub DAG command", slog.Any("args", args))
 
 	return cmd, nil
 }
@@ -220,9 +218,7 @@ func (e *SubDAGExecutor) Cleanup(ctx context.Context) error {
 	logger.Info(cleanupCtx, "Cleaning up temporary DAG file")
 
 	if err := os.Remove(e.tempFile); err != nil && !os.IsNotExist(err) {
-		logger.Error(cleanupCtx, "Failed to remove temporary DAG file",
-			tag.Error(err),
-		)
+		logger.Error(cleanupCtx, "Failed to remove temporary DAG file", tag.Error(err))
 		return fmt.Errorf("failed to remove temp file: %w", err)
 	}
 
@@ -326,9 +322,7 @@ func (e *SubDAGExecutor) executeDistributedWithResult(ctx context.Context, runPa
 	}
 
 	if err != nil {
-		logger.Error(distCtx, "Distributed sub DAG dispatch failed",
-			tag.Error(err),
-		)
+		logger.Error(distCtx, "Distributed sub DAG dispatch failed", tag.Error(err))
 		return nil, fmt.Errorf("distributed execution failed: %w", err)
 	}
 
@@ -495,9 +489,7 @@ func (e *SubDAGExecutor) Kill(sig os.Signal) error {
 				logger.Info(runCtx, "Sub DAG run not found; may have not started")
 				continue
 			}
-			logger.Error(runCtx, "Failed to request sub DAG cancellation",
-				tag.Error(err),
-			)
+			logger.Error(runCtx, "Failed to request sub DAG cancellation", tag.Error(err))
 			errs = append(errs, err)
 		}
 	}
@@ -514,9 +506,7 @@ func (e *SubDAGExecutor) Kill(sig os.Signal) error {
 				tag.Signal(sig.String()),
 			)
 			if err := cmdutil.KillProcessGroup(cmd, sig); err != nil {
-				logger.Error(procCtx, "Failed to kill process",
-					tag.Error(err),
-				)
+				logger.Error(procCtx, "Failed to kill process", tag.Error(err))
 				errs = append(errs, err)
 			}
 		}

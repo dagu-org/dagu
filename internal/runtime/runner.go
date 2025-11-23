@@ -115,9 +115,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 	// If one of the conditions does not met, cancel the execution.
 	env := execution.GetDAGContext(ctx)
 	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
-		logger.Info(ctx, "Preconditions are not met",
-			tag.Error(err),
-		)
+		logger.Info(ctx, "Preconditions are not met", tag.Error(err))
 		r.Cancel(plan)
 	}
 
@@ -129,9 +127,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 	// Find initial ready nodes
 	for _, node := range nodes {
 		if node.State().Status == core.NodeNotStarted && isReady(ctx, plan, node) {
-			logger.Debug(ctx, "Initial node ready",
-				tag.Step(node.Name()),
-			)
+			logger.Debug(ctx, "Initial node ready", tag.Step(node.Name()))
 			readyCh <- node
 		}
 	}
@@ -165,9 +161,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 		select {
 		case node := <-activeReadyCh:
-			logger.Debug(ctx, "Processing ready node",
-				tag.Step(node.Name()),
-			)
+			logger.Debug(ctx, "Processing ready node", tag.Step(node.Name()))
 			// Double check status
 			if node.State().Status != core.NodeNotStarted {
 				continue
@@ -176,9 +170,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 			running++
 			wg.Add(1)
 
-			logger.Info(ctx, "Step started",
-				tag.Step(node.Name()),
-			)
+			logger.Info(ctx, "Step started", tag.Step(node.Name()))
 
 			go func(n *Node) {
 				// Set step context for all logs in this goroutine
@@ -213,9 +205,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 			}
 
 		case node := <-doneCh:
-			logger.Debug(ctx, "Node execution finished",
-				tag.Step(node.Name()),
-			)
+			logger.Debug(ctx, "Node execution finished", tag.Step(node.Name()))
 			running--
 			r.processCompletedNode(ctx, plan, node, readyCh)
 
@@ -964,9 +954,7 @@ func (r *Runner) handleNodeExecutionError(ctx context.Context, plan *Plan, node 
 			node.SetStatus(core.NodeAborted)
 		} else {
 			// Parent context canceled or other deadline; mark aborted for safety
-			logger.Info(ctx, "Step deadline exceeded",
-				tag.Error(execErr),
-			)
+			logger.Info(ctx, "Step deadline exceeded", tag.Error(execErr))
 			node.SetStatus(core.NodeAborted)
 		}
 		r.setLastError(execErr)

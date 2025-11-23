@@ -204,9 +204,7 @@ func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG) error {
 func (e *DAGExecutor) Close(ctx context.Context) {
 	if e.coordinatorCli != nil {
 		if err := e.coordinatorCli.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup coordinator client",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Failed to cleanup coordinator client", tag.Error(err))
 		}
 		e.coordinatorCli = nil
 	}

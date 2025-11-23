@@ -210,17 +210,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize OpenTelemetry tracer
 	tracer, err := telemetry.NewTracer(ctx, a.dag)
 	if err != nil {
-		logger.Warn(ctx, "Failed to initialize OpenTelemetry tracer",
-			tag.Error(err),
-		)
+		logger.Warn(ctx, "Failed to initialize OpenTelemetry tracer", tag.Error(err))
 		// Continue without tracing
 	} else {
 		a.tracer = tracer
 		defer func() {
 			if err := tracer.Shutdown(ctx); err != nil {
-				logger.Warn(ctx, "Failed to shutdown OpenTelemetry tracer",
-					tag.Error(err),
-				)
+				logger.Warn(ctx, "Failed to shutdown OpenTelemetry tracer", tag.Error(err))
 			}
 		}()
 	}
@@ -333,28 +329,20 @@ func (a *Agent) Run(ctx context.Context) error {
 	st := a.Status(ctx)
 	st.Status = core.Running
 	if err := attempt.Write(ctx, st); err != nil {
-		logger.Error(ctx, "Status write failed",
-			tag.Error(err),
-		)
+		logger.Error(ctx, "Status write failed", tag.Error(err))
 	}
 
 	defer func() {
 		if initErr != nil {
-			logger.Error(ctx, "Failed to initialize DAG execution",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Failed to initialize DAG execution", tag.Error(err))
 			st := a.Status(ctx)
 			st.Status = core.Failed
 			if err := attempt.Write(ctx, st); err != nil {
-				logger.Error(ctx, "Status write failed",
-					tag.Error(err),
-				)
+				logger.Error(ctx, "Status write failed", tag.Error(err))
 			}
 		}
 		if err := attempt.Close(ctx); err != nil {
-			logger.Error(ctx, "Failed to close runstore store",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Failed to close runstore store", tag.Error(err))
 		}
 	}()
 
@@ -365,9 +353,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
-		logger.Error(ctx, "Failed to write status",
-			tag.Error(err),
-		)
+		logger.Error(ctx, "Failed to write status", tag.Error(err))
 	}
 
 	// Start the unix socket server for receiving HTTP requests from
@@ -436,18 +422,14 @@ func (a *Agent) Run(ctx context.Context) error {
 	go execWithRecovery(ctx, func() {
 		err := a.socketServer.Serve(ctx, listenerErrCh)
 		if err != nil && !errors.Is(err, sock.ErrServerRequestedShutdown) {
-			logger.Error(ctx, "Failed to start socket frontend",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Failed to start socket frontend", tag.Error(err))
 		}
 	})
 
 	// Stop the socket server when the dag-run is finished.
 	defer func() {
 		if err := a.socketServer.Shutdown(ctx); err != nil {
-			logger.Error(ctx, "Failed to shutdown socket frontend",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Failed to shutdown socket frontend", tag.Error(err))
 		}
 	}()
 
@@ -482,14 +464,10 @@ func (a *Agent) Run(ctx context.Context) error {
 		for node := range progressCh {
 			status := a.Status(ctx)
 			if err := attempt.Write(ctx, status); err != nil {
-				logger.Error(ctx, "Failed to write status",
-					tag.Error(err),
-				)
+				logger.Error(ctx, "Failed to write status", tag.Error(err))
 			}
 			if err := a.reporter.reportStep(ctx, a.dag, status, node); err != nil {
-				logger.Error(ctx, "Failed to report step",
-					tag.Error(err),
-				)
+				logger.Error(ctx, "Failed to report step", tag.Error(err))
 			}
 			// Update progress display if enabled
 			if a.progressDisplay != nil {
@@ -510,9 +488,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			return
 		}
 		if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
-			logger.Error(ctx, "Status write failed",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Status write failed", tag.Error(err))
 		}
 	})
 
@@ -522,9 +498,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			slog.String("retry-target-attempt-id", a.retryTarget.AttemptID),
 		)
 	} else {
-		logger.Info(ctx, "DAG run started",
-			slog.Any("params", a.dag.Params),
-		)
+		logger.Info(ctx, "DAG run started", slog.Any("params", a.dag.Params))
 	}
 
 	// Start watching for cancel requests
@@ -542,9 +516,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	if coordinatorCli != nil {
 		// Cleanup the coordinator client resources if it was created.
 		if err := coordinatorCli.Cleanup(ctx); err != nil {
-			logger.Warn(ctx, "Failed to cleanup coordinator client",
-				tag.Error(err),
-			)
+			logger.Warn(ctx, "Failed to cleanup coordinator client", tag.Error(err))
 		}
 	}
 
@@ -568,17 +540,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	)
 
 	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
-		logger.Error(ctx, "Status write failed",
-			tag.Error(err),
-		)
+		logger.Error(ctx, "Status write failed", tag.Error(err))
 	}
 
 	// Send the execution report if necessary.
 	a.lastErr = lastErr
 	if err := a.reporter.send(ctx, a.dag, finishedStatus, lastErr); err != nil {
-		logger.Error(ctx, "Mail notification failed",
-			tag.Error(err),
-		)
+		logger.Error(ctx, "Mail notification failed", tag.Error(err))
 	}
 
 	// Mark the agent finished.
@@ -750,8 +718,8 @@ func (a *Agent) setupReporter(ctx context.Context) {
 	} else {
 		senderFn = func(ctx context.Context, _ string, _ []string, subject, _ string, _ []string) error {
 			logger.Debug(ctx, "Mail notification is disabled",
-			slog.String("subject", subject),
-		)
+				slog.String("subject", subject),
+			)
 			return nil
 		}
 	}
@@ -987,9 +955,7 @@ func (a *Agent) setupDefaultRetryPlan(ctx context.Context, nodes []*runtime.Node
 func (a *Agent) setupDAGRunAttempt(ctx context.Context) (execution.DAGRunAttempt, error) {
 	retentionDays := a.dag.HistRetentionDays
 	if err := a.dagRunStore.RemoveOldDAGRuns(ctx, a.dag.Name, retentionDays); err != nil {
-		logger.Error(ctx, "DAG runs data cleanup failed",
-			tag.Error(err),
-		)
+		logger.Error(ctx, "DAG runs data cleanup failed", tag.Error(err))
 	}
 
 	opts := execution.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil}

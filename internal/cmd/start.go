@@ -183,7 +183,10 @@ func runStart(ctx *Context, args []string) error {
 
 	// Log root dag-run or reschedule action
 	if fromRunID != "" {
-		logger.Info(ctx, "Rescheduling dag-run", tag.Action("reschedule"), slog.String("from-dag-run-id", fromRunID), slog.String("params", params))
+		logger.Info(ctx, "Rescheduling dag-run",
+			slog.String("from-dag-run-id", fromRunID),
+			slog.String("params", params),
+		)
 	} else {
 		logger.Info(ctx, "Executing root dag-run", slog.String("params", params))
 	}
@@ -403,7 +406,11 @@ func determineRootDAGRun(isSubDAGRun bool, rootDAGRun string, dag *core.DAG, dag
 // handleSubDAGRun processes a sub dag-run, checking for previous runs
 func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root execution.DAGRunRef, parent execution.DAGRunRef) error {
 	// Log sub dag-run execution
-	logger.Info(ctx, "Executing sub dag-run", slog.String("params", params), slog.Any("root", root), slog.Any("parent", parent))
+	logger.Info(ctx, "Executing sub dag-run",
+		slog.String("params", params),
+		slog.Any("root", root),
+		slog.Any("parent", parent),
+	)
 
 	// Double-check dag-run ID is provided (should be caught earlier, but being defensive)
 	if dagRunID == "" {

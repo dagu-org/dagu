@@ -196,9 +196,7 @@ func (c *Context) NewCoordinatorClient() coordinator.Client {
 	coordinatorCliCfg.Insecure = c.Config.Global.Peer.Insecure
 
 	if err := coordinatorCliCfg.Validate(); err != nil {
-		logger.Error(c.Context, "Invalid coordinator client configuration",
-			tag.Error(err),
-		)
+		logger.Error(c.Context, "Invalid coordinator client configuration", tag.Error(err))
 		return nil
 	}
 	return coordinator.New(c.ServiceRegistry, coordinatorCliCfg)

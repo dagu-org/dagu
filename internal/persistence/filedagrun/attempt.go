@@ -274,8 +274,7 @@ func (att *Attempt) compactLocked(ctx context.Context) error {
 	defer func() {
 		if !success {
 			if removeErr := os.Remove(tempFilePath); removeErr != nil {
-				logger.Error(ctx, "Failed to remove temp file",
-					tag.Error(removeErr))
+				logger.Error(ctx, "Failed to remove temp file", tag.Error(removeErr))
 			}
 		}
 	}()

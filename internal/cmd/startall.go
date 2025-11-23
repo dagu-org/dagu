@@ -182,14 +182,10 @@ func runStartAll(ctx *Context, _ []string) error {
 	var firstErr error
 	select {
 	case <-signalCtx.Done():
-		logger.Info(ctx, "Received shutdown signal",
-			slog.Any("signal", signalCtx.Err()),
-		)
+		logger.Info(ctx, "Received shutdown signal", slog.Any("signal", signalCtx.Err()))
 	case err := <-errCh:
 		firstErr = err
-		logger.Error(ctx, "Service failed, shutting down",
-			tag.Error(err),
-		)
+		logger.Error(ctx, "Service failed, shutting down", tag.Error(err))
 		stop() // Cancel the signal context to trigger shutdown of other services
 	}
 

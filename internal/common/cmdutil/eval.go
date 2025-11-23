@@ -402,8 +402,7 @@ func ExpandReferences(ctx context.Context, input string, dataMap map[string]stri
 func resolveStepProperty(ctx context.Context, stepName, path string, stepMap map[string]StepInfo) (string, bool) {
 	stepInfo, ok := stepMap[stepName]
 	if !ok {
-		logger.Debug(ctx, "Step not found in stepMap",
-			tag.Step(stepName))
+		logger.Debug(ctx, "Step not found in stepMap", tag.Step(stepName))
 		return "", false
 	}
 

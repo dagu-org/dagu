@@ -203,9 +203,7 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun execution.DAGRunRef
 	// If the status is running, ensure if the process is still alive
 	if dagRun.ID == st.Root.ID && st.Status == core.Running {
 		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
-			logger.Error(ctx, "Failed to check and update stale running status",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Failed to check and update stale running status", tag.Error(err))
 		}
 	}
 
@@ -240,9 +238,7 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *core.DAG
 	// check if the process is actually alive before marking as error.
 	if st.Status == core.Running {
 		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
-			logger.Error(ctx, "Failed to check and update stale running status",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Failed to check and update stale running status", tag.Error(err))
 		}
 	}
 
@@ -320,9 +316,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (execution
 			if err == nil {
 				st = currentStatus
 			} else {
-				logger.Debug(ctx, "Failed to get current status from socket",
-					tag.Error(err),
-				)
+				logger.Debug(ctx, "Failed to get current status from socket", tag.Error(err))
 			}
 		}
 	}
@@ -404,9 +398,7 @@ func (m *Manager) checkAndUpdateStaleRunningStatus(
 	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), dagRun)
 	if err != nil {
 		// Log but don't fail - we can't determine if it's alive
-		logger.Error(ctx, "Failed to check if DAG run is alive",
-			tag.Error(err),
-		)
+		logger.Error(ctx, "Failed to check if DAG run is alive", tag.Error(err))
 		return nil
 	}
 	if alive {

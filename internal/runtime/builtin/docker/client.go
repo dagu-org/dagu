@@ -137,9 +137,7 @@ func (c *Client) Close(ctx context.Context) {
 	// If we have a running container and autoRemove is set, remove it
 	if c.cfg.AutoRemove && c.started.Load() && c.containerID != "" {
 		if err := c.cli.ContainerRemove(context.Background(), c.containerID, container.RemoveOptions{Force: true}); err != nil {
-			logger.Error(ctx, "Docker executor: remove container",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Docker executor: remove container", tag.Error(err))
 		}
 	}
 
@@ -263,9 +261,7 @@ func (c *Client) setupKeepaliveCommand(ctx context.Context) []string {
 	hostPath, err := GetKeepaliveFile(c.platform)
 	if err != nil {
 		// Fallback to sleep if keepalive binary fails
-		logger.Warn(ctx, "Failed to get keepalive binary; using sleep fallback",
-			tag.Error(err),
-		)
+		logger.Warn(ctx, "Failed to get keepalive binary; using sleep fallback", tag.Error(err))
 		return []string{"sh", "-c", keepAliveSleepCmd}
 	}
 
@@ -291,9 +287,7 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 	if c.containerID != "" {
 		// Stop the container
 		if err := c.cli.ContainerStop(ctx, c.containerID, container.StopOptions{}); err != nil {
-			logger.Error(ctx, "Docker executor: stop container",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Docker executor: stop container", tag.Error(err))
 		}
 	}
 
@@ -309,9 +303,7 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 				if errdefs.IsNotFound(err) {
 					return
 				}
-				logger.Error(ctx, "Docker executor: force stop container",
-					tag.Error(err),
-				)
+				logger.Error(ctx, "Docker executor: force stop container", tag.Error(err))
 			}
 		})
 
@@ -353,9 +345,7 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 	if c.keepAliveTmp != "" {
 		// Remove the temporary keep alive file if it exists
 		if err := os.Remove(c.keepAliveTmp); err != nil && !os.IsNotExist(err) {
-			logger.Error(ctx, "Docker executor: remove keep alive file",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Docker executor: remove keep alive file", tag.Error(err))
 		}
 	}
 	c.keepAliveTmp = ""
@@ -398,9 +388,7 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 
 		once.Do(func() {
 			if err := c.cli.ContainerRemove(context.Background(), c.containerID, container.RemoveOptions{Force: true}); err != nil {
-				logger.Error(ctx, "Docker executor: remove container",
-					tag.Error(err),
-				)
+				logger.Error(ctx, "Docker executor: remove container", tag.Error(err))
 			}
 		})
 	}()
@@ -585,9 +573,7 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 
 	go func() {
 		if _, err := stdcopy.StdCopy(stdout, stderr, resp.Reader); err != nil {
-			logger.Error(ctx, "Docker executor: stdcopy",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Docker executor: stdcopy", tag.Error(err))
 		}
 		wg.Done()
 	}()
@@ -638,9 +624,7 @@ func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containe
 	go func() {
 		defer wg.Done()
 		if _, err := stdcopy.StdCopy(stdout, stderr, out); err != nil {
-			logger.Error(ctx, "Docker executor: stdcopy",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Docker executor: stdcopy", tag.Error(err))
 		}
 	}()
 
@@ -877,9 +861,7 @@ func (c *Client) waitLogPattern(ctx context.Context, cli *client.Client, id stri
 	}
 	defer func() {
 		if cerr := reader.Close(); cerr != nil {
-			logger.Error(ctx, "Docker executor: close logs reader",
-				tag.Error(cerr),
-			)
+			logger.Error(ctx, "Docker executor: close logs reader", tag.Error(cerr))
 		}
 	}()
 
@@ -888,9 +870,7 @@ func (c *Client) waitLogPattern(ctx context.Context, cli *client.Client, id stri
 	go func() {
 		defer func() {
 			if cerr := pw.Close(); cerr != nil {
-				logger.Error(ctx, "Docker executor: close pipe writer",
-					tag.Error(cerr),
-				)
+				logger.Error(ctx, "Docker executor: close pipe writer", tag.Error(cerr))
 			}
 		}()
 		_, _ = stdcopy.StdCopy(pw, pw, reader)

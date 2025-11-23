@@ -95,8 +95,7 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 	if _, err := fd.WriteAt(buf, 0); err != nil {
 		_ = fd.Close()
 		if err := os.Remove(p.fileName); err != nil {
-			logger.Error(ctx, "Failed to remove heartbeat file",
-				tag.Error(err))
+			logger.Error(ctx, "Failed to remove heartbeat file", tag.Error(err))
 		}
 
 		// If the directory is empty after removing the file, remove the directory as well
@@ -165,8 +164,7 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 			case <-ticker.C:
 				binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix())) // nolint:gosec
 				if _, err := fd.WriteAt(buf, 0); err != nil {
-					logger.Error(ctx, "Failed to write heartbeat",
-						tag.Error(err))
+					logger.Error(ctx, "Failed to write heartbeat", tag.Error(err))
 				}
 
 			case <-flush.C:

@@ -75,8 +75,7 @@ func (w *watcher) loop(ctx context.Context) {
 				}
 			}
 		case err := <-errorsCh:
-			logger.Error(ctx, "File watcher error",
-				tag.Error(err))
+			logger.Error(ctx, "File watcher error", tag.Error(err))
 		}
 	}
 }
@@ -84,8 +83,7 @@ func (w *watcher) loop(ctx context.Context) {
 // Stop implements execution.QueueWatcher.
 func (w *watcher) Stop(ctx context.Context) {
 	if err := w.fileWatcher.Close(); err != nil {
-		logger.Error(ctx, "Failed to stop file watcher",
-			tag.Error(err))
+		logger.Error(ctx, "Failed to stop file watcher", tag.Error(err))
 	}
 	w.quit <- struct{}{}
 	w.wg.Wait()

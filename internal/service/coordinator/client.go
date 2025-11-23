@@ -344,9 +344,7 @@ func (cli *clientImpl) Cleanup(ctx context.Context) error {
 
 	for id, c := range cli.clients {
 		if err := c.conn.Close(); err != nil {
-			logger.Error(ctx, "Failed to close connection",
-				slog.String("coordinator-id", id),
-				tag.Error(err))
+			logger.Error(ctx, "Failed to close connection", slog.String("coordinator-id", id), tag.Error(err))
 		}
 	}
 

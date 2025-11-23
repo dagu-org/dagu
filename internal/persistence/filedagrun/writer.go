@@ -92,8 +92,7 @@ func (w *Writer) Open() error {
 func (w *Writer) Write(ctx context.Context, st execution.DAGRunStatus) error {
 	// Add context info to logs if write fails
 	if err := w.write(st); err != nil {
-		logger.Error(ctx, "Failed to write status",
-			tag.Error(err))
+		logger.Error(ctx, "Failed to write status", tag.Error(err))
 		return err
 	}
 
@@ -144,8 +143,7 @@ func (w *Writer) write(st execution.DAGRunStatus) error {
 func (w *Writer) Close(ctx context.Context) error {
 	// Add context info to logs if close fails
 	if err := w.close(); err != nil {
-		logger.Error(ctx, "Failed to close writer",
-			tag.Error(err))
+		logger.Error(ctx, "Failed to close writer", tag.Error(err))
 		return err
 	}
 

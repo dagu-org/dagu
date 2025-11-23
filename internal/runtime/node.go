@@ -130,9 +130,7 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 	if len(continueOn.Output) > 0 {
 		ok, err := n.LogContainsPattern(ctx, continueOn.Output)
 		if err != nil {
-			logger.Error(ctx, "Failed to check log for pattern",
-				tag.Error(err),
-			)
+			logger.Error(ctx, "Failed to check log for pattern", tag.Error(err))
 			return false
 		}
 		if ok {

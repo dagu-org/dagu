@@ -276,9 +276,7 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *core.DAG, timestamp 
 	}
 	defer func() {
 		if err := dataRoot.Unlock(); err != nil {
-			logger.Error(ctx, "Failed to unlock dag-run",
-				tag.RunID(dagRunID),
-				tag.Error(err))
+			logger.Error(ctx, "Failed to unlock dag-run", tag.RunID(dagRunID), tag.Error(err))
 		}
 	}()
 
@@ -338,8 +336,7 @@ func (b *Store) newChildRecord(ctx context.Context, dag *core.DAG, timestamp tim
 
 	record, err := run.CreateAttempt(ctx, ts, b.cache, WithDAG(dag))
 	if err != nil {
-		logger.Error(ctx, "Failed to create sub dag-run record",
-			tag.Error(err))
+		logger.Error(ctx, "Failed to create sub dag-run record", tag.Error(err))
 		return nil, err
 	}
 
@@ -363,8 +360,7 @@ func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimi
 	for _, item := range items {
 		record, err := item.LatestAttempt(ctx, store.cache)
 		if err != nil {
-			logger.Error(ctx, "Failed to get latest record",
-				tag.Error(err))
+			logger.Error(ctx, "Failed to get latest record", tag.Error(err))
 			continue
 		}
 		records = append(records, record)
@@ -471,9 +467,7 @@ func (store *Store) RemoveDAGRun(ctx context.Context, dagRun execution.DAGRunRef
 
 	defer func() {
 		if err := root.Unlock(); err != nil {
-			logger.Error(ctx, "Failed to unlock dag-run",
-				tag.RunID(dagRun.ID),
-				tag.Error(err))
+			logger.Error(ctx, "Failed to unlock dag-run", tag.RunID(dagRun.ID), tag.Error(err))
 		}
 	}()
 

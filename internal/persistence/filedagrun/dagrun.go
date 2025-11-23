@@ -173,8 +173,7 @@ func (dr DAGRun) LatestAttempt(ctx context.Context, cache *fileutil.Cache[*execu
 	for _, attDir := range attDirs {
 		att, err := NewAttempt(filepath.Join(dr.baseDir, attDir, JSONLStatusFile), cache)
 		if err != nil {
-			logger.Error(ctx, "Failed to read a run data",
-				tag.Error(err))
+			logger.Error(ctx, "Failed to read a run data", tag.Error(err))
 			continue
 		}
 		if att.Hidden() {
