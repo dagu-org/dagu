@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
@@ -29,9 +30,19 @@ func New(baseDir string) *Store {
 }
 
 // Lock locks process group
-func (s *Store) TryLock(_ context.Context, groupName string) error {
-	procGroup := s.newProcGroup(groupName)
-	return procGroup.TryLock()
+func (s *Store) Lock(ctx context.Context, groupName string) error {
+	basePolicy := backoff.NewExponentialBackoffPolicy(500 * time.Millisecond)
+	basePolicy.BackoffFactor = 2.0
+	basePolicy.MaxInterval = time.Second * 60
+	basePolicy.MaxRetries = 10
+
+	policy := backoff.WithJitter(basePolicy, backoff.Jitter)
+	return backoff.Retry(ctx, func(_ context.Context) error {
+		procGroup := s.newProcGroup(groupName)
+		return procGroup.TryLock()
+	}, policy, func(_ error) bool {
+		return ctx.Err() == nil
+	})
 }
 
 // Lock locks process group

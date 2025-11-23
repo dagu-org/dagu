@@ -68,7 +68,7 @@ func TestNode_LargeOutput(t *testing.T) {
 
 			// Setup node with a temporary directory
 			tmpDir := t.TempDir()
-			err := node.Setup(ctx, tmpDir, "test-run")
+			err := node.Prepare(ctx, tmpDir, "test-run")
 			require.NoError(t, err)
 
 			// Execute with timeout to detect hanging
@@ -135,7 +135,7 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "deadlock-test", "test.log", nil, nil, nil)
 
 	tmpDir := t.TempDir()
-	err := node.Setup(ctx, tmpDir, "deadlock-test")
+	err := node.Prepare(ctx, tmpDir, "deadlock-test")
 	require.NoError(t, err)
 
 	// This should complete without hanging
@@ -184,7 +184,7 @@ func TestNode_OutputExceedsLimit(t *testing.T) {
 	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "exceed-limit-test", "test.log", nil, nil, nil)
 
 	tmpDir := t.TempDir()
-	err := node.Setup(ctx, tmpDir, "exceed-limit-test")
+	err := node.Prepare(ctx, tmpDir, "exceed-limit-test")
 	require.NoError(t, err)
 
 	// Execute should fail with output limit error
@@ -220,7 +220,7 @@ func TestNode_CustomOutputLimit(t *testing.T) {
 	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "custom-limit-test", "test.log", nil, nil, nil)
 
 	tmpDir := t.TempDir()
-	err := node.Setup(ctx, tmpDir, "custom-limit-test")
+	err := node.Prepare(ctx, tmpDir, "custom-limit-test")
 	require.NoError(t, err)
 
 	// Execute should fail with output limit error
@@ -256,7 +256,7 @@ func TestNode_ConcurrentOutputCapture(t *testing.T) {
 	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "concurrent-test", "test.log", nil, nil, nil)
 
 	tmpDir := t.TempDir()
-	err := node.Setup(ctx, tmpDir, "concurrent-test")
+	err := node.Prepare(ctx, tmpDir, "concurrent-test")
 	require.NoError(t, err)
 
 	err = node.Execute(ctx)

@@ -64,7 +64,7 @@ func TestDAGContext_UserEnvsMap(t *testing.T) {
 
 			ctx := context.Background()
 			ctx = tt.setup(ctx)
-			dagCtx := execution.GetDAGContextFromContext(ctx)
+			dagCtx := execution.GetDAGContext(ctx)
 
 			result := dagCtx.UserEnvsMap()
 

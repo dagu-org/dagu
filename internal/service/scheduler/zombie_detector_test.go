@@ -418,6 +418,11 @@ type mockProcStore struct {
 	mock.Mock
 }
 
+// Lock implements execution.ProcStore.
+func (m *mockProcStore) Lock(_ context.Context, _ string) error {
+	return nil
+}
+
 // CountAliveByDAGName implements models.ProcStore.
 func (m *mockProcStore) CountAliveByDAGName(_ context.Context, _, _ string) (int, error) {
 	return 0, nil

@@ -130,7 +130,7 @@ func (e Env) UserEnvsMap() map[string]string {
 
 // NewEnv creates a new execution context with the given step.
 func NewEnv(ctx context.Context, step core.Step) Env {
-	parentEnv := GetDAGContextFromContext(ctx)
+	parentEnv := GetDAGContext(ctx)
 	parentDAG := parentEnv.DAG
 
 	var workingDir string
@@ -153,12 +153,10 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 		})
 
 		dir, err := fileutil.ResolvePath(expandedDir)
-		if err == nil {
-			workingDir = dir
-		} else {
+		if err != nil {
 			logger.Warn(ctx, "Failed to resolve working directory for step", "step", step.Name, "dir", expandedDir, "err", err)
-			workingDir = parentEnv.DAG.WorkingDir
 		}
+		workingDir = dir
 
 	case parentDAG != nil && parentDAG.WorkingDir != "":
 		workingDir = parentDAG.WorkingDir
@@ -170,14 +168,17 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 		} else {
 			logger.Error(ctx, "Failed to get current working directory", "err", err)
 		}
+		// If still empty, fallback to home directory
+		if dir, err := os.UserHomeDir(); err == nil {
+			workingDir = dir
+		} else {
+			logger.Error(ctx, "Failed to get user home directory", "err", err)
+		}
 	}
 
 	envs := map[string]string{
 		EnvKeyDAGRunStepName: step.Name,
-	}
-
-	if workingDir != "" {
-		envs["PWD"] = workingDir
+		"PWD":                workingDir,
 	}
 
 	variables := &collections.SyncMap{}
@@ -191,7 +192,7 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 	}
 
 	return Env{
-		DAGContext: GetDAGContextFromContext(ctx),
+		DAGContext: GetDAGContext(ctx),
 		Variables:  variables,
 		Step:       step,
 		Envs:       envs,
@@ -258,7 +259,7 @@ func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 
 // EvalString evaluates the given string with the variables within the execution context.
 func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
-	dagEnv := GetDAGContextFromContext(ctx)
+	dagEnv := GetDAGContext(ctx)
 
 	option := cmdutil.NewEvalOptions()
 	for _, opt := range opts {

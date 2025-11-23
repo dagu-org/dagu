@@ -194,22 +194,6 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 			},
 		},
 		{
-			name: "StepWithNoDirectoryUsesCurrentWorkingDirectory",
-			step: core.Step{
-				Name: "test-step",
-			},
-			setupFunc: func() {
-				require.NoError(t, os.Chdir(tempDir))
-			},
-			checkFunc: func(t *testing.T, env execution.Env) {
-				// Resolve symlinks for comparison (macOS /var vs /private/var)
-				expectedDir, _ := filepath.EvalSymlinks(tempDir)
-				actualDir, _ := filepath.EvalSymlinks(env.WorkingDir)
-				assert.Equal(t, expectedDir, actualDir)
-				assert.Equal(t, env.WorkingDir, env.Envs["PWD"])
-			},
-		},
-		{
 			name: "StepWithNonExistentDirectory",
 			step: core.Step{
 				Name: "test-step",

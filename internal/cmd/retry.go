@@ -93,7 +93,7 @@ func runRetry(ctx *Context, args []string) error {
 	}
 
 	// Try lock proc store to avoid race
-	if err := ctx.ProcStore.TryLock(ctx, dag.ProcGroup()); err != nil {
+	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
 		return fmt.Errorf("failed to lock process group: %w", err)
 	}
 	defer ctx.ProcStore.Unlock(ctx, dag.ProcGroup())

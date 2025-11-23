@@ -47,7 +47,7 @@ func NewQueueFile(baseDir, prefix string) *QueueFile {
 	return &QueueFile{
 		baseDir: baseDir,
 		prefix:  prefix,
-		match:   regexp.MustCompile(fmt.Sprintf(`^%s%s(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`, itemPrefix, prefix)),
+		match:   regexp.MustCompile(fmt.Sprintf(`^%s%s(\d{8}_\d{6})_(\d{9})Z_(.*)\.json$`, itemPrefix, prefix)),
 	}
 }
 
@@ -294,12 +294,12 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 		return ItemData{}, fmt.Errorf("failed to parse timestamp from file name %s: %w", fileName, err)
 	}
 
-	// Parse the milliseconds
-	millis, err := strconv.Atoi(matches[3])
+	// Parse the nanoseconds
+	nanos, err := strconv.Atoi(matches[3])
 	if err != nil {
-		return ItemData{}, fmt.Errorf("failed to parse milliseconds from file name %s: %w", fileName, err)
+		return ItemData{}, fmt.Errorf("failed to parse nanoseconds from file name %s: %w", fileName, err)
 	}
-	timestamp = timestamp.Add(time.Duration(millis) * time.Millisecond)
+	timestamp = timestamp.Add(time.Duration(nanos) * time.Nanosecond)
 
 	// Create the ItemData struct
 	item := ItemData{
@@ -315,11 +315,11 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 }
 
 // parseRegex is the regex used to parse the queue file name
-var parseRegex = regexp.MustCompile(`^item_(high|low)_(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`)
+var parseRegex = regexp.MustCompile(`^item_(high|low)_(\d{8}_\d{6})_(\d{9})Z_(.*)\.json$`)
 
 func queueFileName(priority, dagRunID string, t execution.TimeInUTC) string {
-	mill := t.UnixMilli()
-	timestamp := t.Format(dateTimeFormatUTC) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"
+	nanos := t.UnixNano()
+	timestamp := t.Format(dateTimeFormatUTC) + "_" + fmt.Sprintf("%09d", nanos%1e9) + "Z"
 	return itemPrefix + priority + timestamp + "_" + dagRunID + ".json"
 }
 

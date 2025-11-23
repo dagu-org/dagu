@@ -340,7 +340,7 @@ Line 5: Process completed
 
 			// Setup node properly with log file
 			node := runtime.NewNode(step, runtime.NodeState{})
-			err := node.Setup(ctx, tempDir, "test-run")
+			err := node.Prepare(ctx, tempDir, "test-run")
 			require.NoError(t, err)
 
 			// For non-existent log file test, we skip the log file write
@@ -681,7 +681,7 @@ func TestNodeSetupAndTeardown(t *testing.T) {
 
 	// Test Setup
 	dagRunID := "test-run-123"
-	err := node.Setup(ctx, tempDir, dagRunID)
+	err := node.Prepare(ctx, tempDir, dagRunID)
 	assert.NoError(t, err)
 
 	// Verify log files were created
@@ -757,7 +757,7 @@ func TestNodeSetupContextBeforeExec(t *testing.T) {
 	})
 
 	// Setup context
-	newCtx := node.SetupContextBeforeExec(ctx)
+	newCtx := node.SetupEnv(ctx)
 
 	// Verify environment variables were set
 	newEnv := execution.GetEnv(newCtx)
@@ -828,7 +828,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 			node.Init()
 
 			// Setup node
-			err := node.Setup(ctx, tempDir, "test-run-output")
+			err := node.Prepare(ctx, tempDir, "test-run-output")
 			require.NoError(t, err)
 
 			// Execute node
@@ -963,7 +963,7 @@ func TestNodeShouldContinue(t *testing.T) {
 			setupOutput: func(t *testing.T, node *runtime.Node) {
 				tempDir := t.TempDir()
 				ctx := context.Background()
-				err := node.Setup(ctx, tempDir, "test-run")
+				err := node.Prepare(ctx, tempDir, "test-run")
 				require.NoError(t, err)
 
 				// Write test output to stdout file
@@ -982,7 +982,7 @@ func TestNodeShouldContinue(t *testing.T) {
 			setupOutput: func(t *testing.T, node *runtime.Node) {
 				tempDir := t.TempDir()
 				ctx := context.Background()
-				err := node.Setup(ctx, tempDir, "test-run")
+				err := node.Prepare(ctx, tempDir, "test-run")
 				require.NoError(t, err)
 
 				// Write test output to stdout file
@@ -1100,7 +1100,7 @@ func (n nodeHelper) Execute(t *testing.T) {
 	t.Helper()
 
 	dagRunID := uuid.Must(uuid.NewV7()).String()
-	err := n.Setup(n.Context, n.Config.Paths.LogDir, dagRunID)
+	err := n.Prepare(n.Context, n.Config.Paths.LogDir, dagRunID)
 	require.NoError(t, err, "failed to setup node")
 
 	err = n.Node.Execute(n.execContext(dagRunID))
@@ -1171,7 +1171,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		ctx = execution.WithEnv(ctx, env)
 
 		// Setup and execute node
-		err = node.Setup(ctx, tempDir, "test-run")
+		err = node.Prepare(ctx, tempDir, "test-run")
 		require.NoError(t, err)
 
 		err = node.Execute(ctx)
@@ -1211,7 +1211,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		ctx = execution.WithEnv(ctx, env)
 
 		// Setup and execute node
-		err = node.Setup(ctx, tempDir, "test-run")
+		err = node.Prepare(ctx, tempDir, "test-run")
 		require.NoError(t, err)
 
 		err = node.Execute(ctx)
@@ -1256,7 +1256,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		ctx = execution.WithEnv(ctx, env)
 
 		// Setup and execute node
-		err = node.Setup(ctx, tempDir, "test-run")
+		err = node.Prepare(ctx, tempDir, "test-run")
 		require.NoError(t, err)
 
 		err = node.Execute(ctx)
@@ -1302,7 +1302,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		ctx = execution.WithEnv(ctx, env)
 
 		// Setup and execute node
-		err = node.Setup(ctx, tempDir, "test-run")
+		err = node.Prepare(ctx, tempDir, "test-run")
 		require.NoError(t, err)
 
 		err = node.Execute(ctx)

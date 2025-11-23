@@ -2,6 +2,8 @@ package backoff
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -15,11 +17,21 @@ type (
 	IsRetriableFunc func(err error) bool
 )
 
+var (
+	ErrPermanent = errors.New("permanent error")
+)
+
+func PermanentError(err error) error {
+	return fmt.Errorf("%w: %v", ErrPermanent, err)
+}
+
 // Retry executes the operation with retry logic based on the provided policy.
 // If isRetriable is nil, all errors are considered retriable.
 func Retry(ctx context.Context, op Operation, policy RetryPolicy, isRetriable IsRetriableFunc) error {
 	if isRetriable == nil {
-		isRetriable = func(_ error) bool { return true }
+		isRetriable = func(err error) bool {
+			return !errors.Is(err, ErrPermanent)
+		}
 	}
 
 	retrier := NewRetrier(policy)
