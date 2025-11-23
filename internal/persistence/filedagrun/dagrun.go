@@ -150,7 +150,10 @@ func (dr DAGRun) ListSubDAGRuns(ctx context.Context) ([]*DAGRun, error) {
 
 		subDAGRun, err := NewDAGRun(filepath.Join(subDir, entry.Name()))
 		if err != nil {
-			logger.Error(ctx, "Failed to read sub dag-run data", tag.Error, err, tag.RunID, dr.dagRunID, tag.Dir, entry.Name())
+			logger.Error(ctx, "Failed to read sub dag-run data",
+				tag.Error(err),
+				tag.RunID(dr.dagRunID),
+				tag.Dir(entry.Name()))
 			continue
 		}
 		dagRuns = append(dagRuns, subDAGRun)
@@ -170,7 +173,8 @@ func (dr DAGRun) LatestAttempt(ctx context.Context, cache *fileutil.Cache[*execu
 	for _, attDir := range attDirs {
 		att, err := NewAttempt(filepath.Join(dr.baseDir, attDir, JSONLStatusFile), cache)
 		if err != nil {
-			logger.Error(ctx, "Failed to read a run data", tag.Error, err)
+			logger.Error(ctx, "Failed to read a run data",
+				tag.Error(err))
 			continue
 		}
 		if att.Hidden() {
@@ -186,7 +190,9 @@ func (dr DAGRun) LatestAttempt(ctx context.Context, cache *fileutil.Cache[*execu
 // Remove deletes the entire dag-run directory and all its contents.
 func (dr DAGRun) Remove(ctx context.Context) error {
 	if err := dr.removeLogFiles(ctx); err != nil {
-		logger.Error(ctx, "Failed to remove log files", tag.Error, err, tag.RunID, dr.dagRunID)
+		logger.Error(ctx, "Failed to remove log files",
+			tag.Error(err),
+			tag.RunID(dr.dagRunID))
 	}
 	return os.RemoveAll(dr.baseDir)
 }
@@ -195,17 +201,23 @@ func (dr DAGRun) Remove(ctx context.Context) error {
 func (dr DAGRun) removeLogFiles(ctx context.Context) error {
 	deleteFiles, err := dr.listLogFiles(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to list log files to remove", tag.Error, err, tag.RunID, dr.dagRunID)
+		logger.Error(ctx, "Failed to list log files to remove",
+			tag.Error(err),
+			tag.RunID(dr.dagRunID))
 	}
 
 	children, err := dr.ListSubDAGRuns(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to list sub dag-runs", tag.Error, err, tag.RunID, dr.dagRunID)
+		logger.Error(ctx, "Failed to list sub dag-runs",
+			tag.Error(err),
+			tag.RunID(dr.dagRunID))
 	}
 	for _, child := range children {
 		subLogFiles, err := child.listLogFiles(ctx)
 		if err != nil {
-			logger.Error(ctx, "Failed to list log files for sub dag-run", tag.Error, err, tag.RunID, child.dagRunID)
+			logger.Error(ctx, "Failed to list log files for sub dag-run",
+				tag.Error(err),
+				tag.RunID(child.dagRunID))
 		}
 		deleteFiles = append(deleteFiles, subLogFiles...)
 	}
@@ -215,7 +227,10 @@ func (dr DAGRun) removeLogFiles(ctx context.Context) error {
 	// Remove all log files.
 	for _, file := range deleteFiles {
 		if err := os.Remove(file); err != nil {
-			logger.Error(ctx, "Failed to remove log file", tag.Error, err, tag.RunID, dr.dagRunID, tag.File, file)
+			logger.Error(ctx, "Failed to remove log file",
+				tag.Error(err),
+				tag.RunID(dr.dagRunID),
+				tag.File(file))
 		}
 		parentDirs[filepath.Dir(file)] = struct{}{}
 	}
@@ -276,7 +291,10 @@ func (dr DAGRun) listLogFiles(ctx context.Context) ([]string, error) {
 	for _, attDir := range attDirs {
 		attempt, err := NewAttempt(filepath.Join(dr.baseDir, attDir, JSONLStatusFile), nil)
 		if err != nil {
-			logger.Error(ctx, "Failed to read attempt data", tag.Error, err, tag.RunID, dr.dagRunID, tag.Dir, attDir)
+			logger.Error(ctx, "Failed to read attempt data",
+				tag.Error(err),
+				tag.RunID(dr.dagRunID),
+				tag.Dir(attDir))
 			continue
 		}
 		if !attempt.Exists() {
@@ -284,7 +302,10 @@ func (dr DAGRun) listLogFiles(ctx context.Context) ([]string, error) {
 		}
 		status, err := attempt.ReadStatus(ctx)
 		if err != nil {
-			logger.Error(ctx, "Failed to read status for attempt", tag.Error, err, tag.RunID, dr.dagRunID, tag.AttemptID, attempt.ID())
+			logger.Error(ctx, "Failed to read status for attempt",
+				tag.Error(err),
+				tag.RunID(dr.dagRunID),
+				tag.AttemptID(attempt.ID()))
 			continue
 		}
 		logFiles = append(logFiles, status.Log)

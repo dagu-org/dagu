@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,7 +155,8 @@ func (att *Attempt) Open(ctx context.Context) error {
 		}
 	}
 
-	logger.Debug(ctx, "Initializing status file", tag.File, att.file)
+	logger.Debug(ctx, "Initializing status file",
+		tag.File(att.file))
 
 	writer := NewWriter(att.file)
 
@@ -213,7 +215,8 @@ func (att *Attempt) Close(ctx context.Context) error {
 
 	// Attempt to compact the file
 	if compactErr := att.compactLocked(ctx); compactErr != nil {
-		logger.Warn(ctx, "Failed to compact file during close", tag.Error, compactErr)
+		logger.Warn(ctx, "Failed to compact file during close",
+			tag.Error(compactErr))
 		// Continue with close even if compaction fails
 	}
 
@@ -271,7 +274,8 @@ func (att *Attempt) compactLocked(ctx context.Context) error {
 	defer func() {
 		if !success {
 			if removeErr := os.Remove(tempFilePath); removeErr != nil {
-				logger.Error(ctx, "Failed to remove temp file", tag.Error, removeErr)
+				logger.Error(ctx, "Failed to remove temp file",
+					tag.Error(removeErr))
 			}
 		}
 	}()
@@ -409,7 +413,9 @@ func (att *Attempt) Abort(ctx context.Context) error {
 	if err := os.WriteFile(cancelFile, []byte{}, 0600); err != nil {
 		return fmt.Errorf("failed to create cancel request file: %w", err)
 	}
-	logger.Info(ctx, "Cancel request created for attempt", tag.AttemptID, att.id, tag.File, cancelFile)
+	logger.Info(ctx, "Cancel request created for attempt",
+		tag.AttemptID(att.id),
+		tag.File(cancelFile))
 	return nil
 }
 
@@ -423,7 +429,9 @@ func (att *Attempt) IsAborting(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to check cancel request file: %w", err)
 	}
 
-	logger.Info(ctx, "Cancel request found for attempt", tag.AttemptID, att.id, tag.File, cancelFile)
+	logger.Info(ctx, "Cancel request found for attempt",
+		tag.AttemptID(att.id),
+		tag.File(cancelFile))
 	return true, nil
 }
 
@@ -481,7 +489,10 @@ func (att *Attempt) Hide(ctx context.Context) error {
 	}
 
 	// Log the operation
-	logger.Info(ctx, "Hidden attempt", tag.AttemptID, att.id, "from", currentDir, "to", newDir)
+	logger.Info(ctx, "Hidden attempt",
+		tag.AttemptID(att.id),
+		slog.String("from", currentDir),
+		slog.String("to", newDir))
 
 	return nil
 }

@@ -14,11 +14,11 @@ import (
 )
 
 type Logger interface {
-	Debug(msg string, tags ...any)
-	Info(msg string, tags ...any)
-	Warn(msg string, tags ...any)
-	Error(msg string, tags ...any)
-	Fatal(msg string, tags ...any)
+	Debug(msg string, tags ...slog.Attr)
+	Info(msg string, tags ...slog.Attr)
+	Warn(msg string, tags ...slog.Attr)
+	Error(msg string, tags ...slog.Attr)
+	Fatal(msg string, tags ...slog.Attr)
 
 	Debugf(format string, v ...any)
 	Infof(format string, v ...any)
@@ -26,7 +26,7 @@ type Logger interface {
 	Errorf(format string, v ...any)
 	Fatalf(format string, v ...any)
 
-	With(attrs ...any) Logger
+	With(attrs ...slog.Attr) Logger
 	WithGroup(name string) Logger
 
 	// Write writes a message to the logger in free form.
@@ -79,15 +79,10 @@ func WithQuiet() Option {
 	}
 }
 
-// WithValues adds key-value pairs to the context for structured logging
-func WithValues(ctx context.Context, keyvals ...any) context.Context {
-	// Validate we have even number of key-value pairs
-	if len(keyvals)%2 != 0 {
-		keyvals = append(keyvals, "MISSING_VALUE")
-	}
-
+// WithValues adds attributes to the context for structured logging
+func WithValues(ctx context.Context, attrs ...slog.Attr) context.Context {
 	// Create a new logger with these attributes
-	logger := FromContext(ctx).With(keyvals...)
+	logger := FromContext(ctx).With(attrs...)
 
 	// Store the new logger in the context
 	return context.WithValue(ctx, loggerKey{}, logger)
@@ -245,53 +240,53 @@ func (a *appLogger) Warnf(format string, v ...any) {
 }
 
 // Debug implements logger.Logger.
-func (a *appLogger) Debug(msg string, tags ...any) {
+func (a *appLogger) Debug(msg string, tags ...slog.Attr) {
 	if a.debug {
 		a.logWithPC(slog.LevelDebug, msg, tags...)
 	} else {
-		a.logger.Debug(msg, tags...)
+		a.logger.LogAttrs(context.Background(), slog.LevelDebug, msg, tags...)
 	}
 }
 
 // Error implements logger.Logger.
-func (a *appLogger) Error(msg string, tags ...any) {
+func (a *appLogger) Error(msg string, tags ...slog.Attr) {
 	if a.debug {
 		a.logWithPC(slog.LevelError, msg, tags...)
 	} else {
-		a.logger.Error(msg, tags...)
+		a.logger.LogAttrs(context.Background(), slog.LevelError, msg, tags...)
 	}
 }
 
 // Fatal implements logger.Logger.
-func (a *appLogger) Fatal(msg string, tags ...any) {
+func (a *appLogger) Fatal(msg string, tags ...slog.Attr) {
 	if a.debug {
 		a.logWithPC(slog.LevelError, msg, tags...)
 	} else {
-		a.logger.Error(msg, tags...)
+		a.logger.LogAttrs(context.Background(), slog.LevelError, msg, tags...)
 	}
 	os.Exit(1)
 }
 
 // Info implements logger.Logger.
-func (a *appLogger) Info(msg string, tags ...any) {
+func (a *appLogger) Info(msg string, tags ...slog.Attr) {
 	if a.debug {
 		a.logWithPC(slog.LevelInfo, msg, tags...)
 	} else {
-		a.logger.Info(msg, tags...)
+		a.logger.LogAttrs(context.Background(), slog.LevelInfo, msg, tags...)
 	}
 }
 
 // Warn implements logger.Logger.
-func (a *appLogger) Warn(msg string, tags ...any) {
+func (a *appLogger) Warn(msg string, tags ...slog.Attr) {
 	if a.debug {
 		a.logWithPC(slog.LevelWarn, msg, tags...)
 	} else {
-		a.logger.Warn(msg, tags...)
+		a.logger.LogAttrs(context.Background(), slog.LevelWarn, msg, tags...)
 	}
 }
 
 // logWithPC logs with the correct program counter
-func (a *appLogger) logWithPC(level slog.Level, msg string, tags ...any) {
+func (a *appLogger) logWithPC(level slog.Level, msg string, tags ...slog.Attr) {
 	if !a.logger.Enabled(context.Background(), level) {
 		return
 	}
@@ -301,14 +296,19 @@ func (a *appLogger) logWithPC(level slog.Level, msg string, tags ...any) {
 	runtime.Callers(3, pcs[:]) // Skip runtime.Callers, logWithPC, and the logger method
 
 	record := slog.NewRecord(time.Now(), level, msg, pcs[0])
-	record.Add(tags...)
+	record.AddAttrs(tags...)
 	_ = a.logger.Handler().Handle(context.Background(), record)
 }
 
 // With implements logger.Logger.
-func (a *appLogger) With(attrs ...any) Logger {
+func (a *appLogger) With(attrs ...slog.Attr) Logger {
+	// Convert []slog.Attr to []any for slog.Logger.With
+	anyAttrs := make([]any, len(attrs))
+	for i, attr := range attrs {
+		anyAttrs[i] = attr
+	}
 	return &appLogger{
-		logger:         a.logger.With(attrs...),
+		logger:         a.logger.With(anyAttrs...),
 		guardedHandler: a.guardedHandler,
 		quiet:          a.quiet,
 		debug:          a.debug,

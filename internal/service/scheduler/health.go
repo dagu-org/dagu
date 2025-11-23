@@ -52,9 +52,9 @@ func (h *HealthServer) Start(ctx context.Context) error {
 
 	// Start server in a goroutine
 	go func() {
-		logger.Info(ctx, "Starting scheduler health check server", tag.Port, h.port)
+		logger.Info(ctx, "Starting scheduler health check server", tag.Port(h.port))
 		if err := h.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error(ctx, "Health check server error", tag.Error, err)
+			logger.Error(ctx, "Health check server error", tag.Error(err))
 		}
 	}()
 
@@ -86,6 +86,6 @@ func (h *HealthServer) healthHandler(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		// Log error but don't write anything else to avoid corrupting response
-		logger.Error(context.Background(), "Failed to encode health response", tag.Error, err)
+		logger.Error(context.Background(), "Failed to encode health response", tag.Error(err))
 	}
 }

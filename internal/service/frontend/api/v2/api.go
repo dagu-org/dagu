@@ -86,7 +86,9 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 
 	// Create a list of server URLs
 	if evaluatedBaseURL, err := cmdutil.EvalString(ctx, baseURL); err != nil {
-		logger.Warn(ctx, "Failed to evaluate API base URL", tag.URL, baseURL, tag.Error, err)
+		logger.Warn(ctx, "Failed to evaluate API base URL",
+			tag.URL(baseURL),
+			tag.Error(err))
 	} else {
 		baseURL = evaluatedBaseURL
 	}
@@ -101,7 +103,9 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	// Setup the API base path
 	basePath := a.config.Server.BasePath
 	if evaluatedBasePath, err := cmdutil.EvalString(ctx, basePath); err != nil {
-		logger.Warn(ctx, "Failed to evaluate server base path", tag.Path, basePath, tag.Error, err)
+		logger.Warn(ctx, "Failed to evaluate server base path",
+			tag.Path(basePath),
+			tag.Error(err))
 	} else {
 		basePath = evaluatedBasePath
 	}
@@ -134,7 +138,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	// Initialize auth configuration
 	authConfig := a.config.Server.Auth
 	if evaluatedAuth, err := cmdutil.EvalObject(ctx, authConfig, nil); err != nil {
-		logger.Warn(ctx, "Failed to evaluate auth configuration", tag.Error, err)
+		logger.Warn(ctx, "Failed to evaluate auth configuration", tag.Error(err))
 	} else {
 		authConfig = evaluatedAuth
 	}

@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"runtime/debug"
 
 	"github.com/dagu-org/dagu/internal/common/config"
@@ -38,7 +39,7 @@ type Manager struct {
 // If the DAG is not running, it logs a message and returns nil.
 func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) error {
 	// Set DAG name in context for all logs in this function
-	ctx = logger.WithValues(ctx, tag.Name, dag.Name)
+	ctx = logger.WithValues(ctx, tag.Name(dag.Name))
 	logger.Info(ctx, "Stopping DAG")
 
 	if dagRunID == "" {
@@ -61,21 +62,29 @@ func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) erro
 			// Find the attempt for this run
 			attempt, err := m.dagRunStore.FindAttempt(ctx, runRef)
 			if err != nil {
-				logger.Warn(ctx, "Failed to find attempt for running DAG", "run-ref", runRef, tag.Error, err)
+				logger.Warn(ctx, "Failed to find attempt for running DAG",
+					slog.String("run-ref", runRef.String()),
+					tag.Error(err),
+				)
 				continue
 			}
 
 			// Read the DAG to check if it matches
 			runDAG, err := attempt.ReadDAG(ctx)
 			if err != nil {
-				logger.Warn(ctx, "Failed to read DAG for running attempt", "run-ref", runRef, tag.Error, err)
+				logger.Warn(ctx, "Failed to read DAG for running attempt",
+					slog.String("run-ref", runRef.String()),
+					tag.Error(err),
+				)
 				continue
 			}
 
 			// Check if the DAG name matches
 			if runDAG.Name == dag.Name {
 				matchingRunIDs = append(matchingRunIDs, runRef.ID)
-				logger.Info(ctx, "Found matching DAG run to stop", tag.RunID, runRef.ID)
+				logger.Info(ctx, "Found matching DAG run to stop",
+					tag.RunID(runRef.ID),
+				)
 			}
 		}
 
@@ -108,7 +117,7 @@ func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) erro
 // stopSingleDAGRun stops a single DAG run by its ID
 func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID string) error {
 	// Set run ID in context for all logs in this function
-	ctx = logger.WithValues(ctx, tag.RunID, dagRunID)
+	ctx = logger.WithValues(ctx, tag.RunID(dagRunID))
 
 	// Check if the process is running using proc store
 	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
@@ -194,7 +203,9 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun execution.DAGRunRef
 	// If the status is running, ensure if the process is still alive
 	if dagRun.ID == st.Root.ID && st.Status == core.Running {
 		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
-			logger.Error(ctx, "Failed to check and update stale running status", tag.Error, err)
+			logger.Error(ctx, "Failed to check and update stale running status",
+				tag.Error(err),
+			)
 		}
 	}
 
@@ -229,7 +240,9 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *core.DAG
 	// check if the process is actually alive before marking as error.
 	if st.Status == core.Running {
 		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
-			logger.Error(ctx, "Failed to check and update stale running status", tag.Error, err)
+			logger.Error(ctx, "Failed to check and update stale running status",
+				tag.Error(err),
+			)
 		}
 	}
 
@@ -307,7 +320,9 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (execution
 			if err == nil {
 				st = currentStatus
 			} else {
-				logger.Debug(ctx, "Failed to get current status from socket", tag.Error, err)
+				logger.Debug(ctx, "Failed to get current status from socket",
+					tag.Error(err),
+				)
 			}
 		}
 	}
@@ -389,7 +404,9 @@ func (m *Manager) checkAndUpdateStaleRunningStatus(
 	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), dagRun)
 	if err != nil {
 		// Log but don't fail - we can't determine if it's alive
-		logger.Error(ctx, "Failed to check if DAG run is alive", tag.Error, err)
+		logger.Error(ctx, "Failed to check if DAG run is alive",
+			tag.Error(err),
+		)
 		return nil
 	}
 	if alive {
@@ -421,7 +438,11 @@ func execWithRecovery(ctx context.Context, fn func()) {
 			}
 
 			// Log with structured information
-			logger.Error(ctx, "Recovered from panic", tag.Error, err.Error(), "err-type", fmt.Sprintf("%T", panicObj), "stack-trace", string(stack))
+			logger.Error(ctx, "Recovered from panic",
+				slog.String("err", err.Error()),
+				slog.String("err-type", fmt.Sprintf("%T", panicObj)),
+				slog.String("stack-trace", string(stack)),
+			)
 		}
 	}()
 

@@ -57,7 +57,8 @@ func (srv *Server) Serve(ctx context.Context, listen chan error) error {
 	if listen != nil {
 		listen <- err
 	}
-	logger.Debug(ctx, "Unix socket is listening", tag.Addr, srv.addr)
+	logger.Debug(ctx, "Unix socket is listening",
+		tag.Addr(srv.addr))
 
 	defer func() {
 		_ = srv.Shutdown(ctx)
@@ -72,7 +73,8 @@ func (srv *Server) Serve(ctx context.Context, listen chan error) error {
 			go func() {
 				request, err := http.ReadRequest(bufio.NewReader(conn))
 				if err != nil {
-					logger.Error(ctx, "Failed to read request", tag.Error, err)
+					logger.Error(ctx, "Failed to read request",
+						tag.Error(err))
 				} else {
 					srv.handlerFunc(newHTTPResponseWriter(&conn), request)
 				}
@@ -91,7 +93,8 @@ func (srv *Server) Shutdown(ctx context.Context) error {
 		if srv.listener != nil {
 			err := srv.listener.Close()
 			if err != nil && !errors.Is(err, os.ErrClosed) {
-				logger.Error(ctx, "Failed to close listener", tag.Error, err)
+				logger.Error(ctx, "Failed to close listener",
+					tag.Error(err))
 			}
 			return err
 		}

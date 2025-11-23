@@ -221,7 +221,9 @@ func (p *Plan) setupRetry(ctx context.Context, steps map[string]core.Step) error
 
 			if shouldRetry {
 				node := p.nodeByID[u]
-				logger.Debug(ctx, "Clearing node state", tag.Step, node.Name())
+				logger.Debug(ctx, "Clearing node state",
+				tag.Step(node.Name()),
+			)
 				step, ok := steps[node.Name()]
 				if !ok {
 					return fmt.Errorf("%w: %s", ErrMissingNode, node.Name())

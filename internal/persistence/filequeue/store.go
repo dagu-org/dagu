@@ -47,7 +47,9 @@ func (s *Store) QueueList(ctx context.Context) ([]string, error) {
 	var names []string
 	entries, err := os.ReadDir(s.baseDir)
 	if err != nil {
-		logger.Error(ctx, "Failed to read base directory", tag.Dir, s.baseDir, tag.Error, err)
+		logger.Error(ctx, "Failed to read base directory",
+			tag.Dir(s.baseDir),
+			tag.Error(err))
 		return nil, fmt.Errorf("queue: failed to read base directory %s: %w", s.baseDir, err)
 	}
 
@@ -58,7 +60,9 @@ func (s *Store) QueueList(ctx context.Context) ([]string, error) {
 			queueDir := filepath.Join(s.baseDir, name)
 			subEntries, err := os.ReadDir(queueDir)
 			if err != nil {
-				logger.Error(ctx, "Failed to read queue directory", tag.Dir, queueDir, tag.Error, err)
+				logger.Error(ctx, "Failed to read queue directory",
+					tag.Dir(queueDir),
+					tag.Error(err))
 				continue
 			}
 			if len(subEntries) == 0 {
@@ -96,7 +100,9 @@ func (s *Store) All(ctx context.Context) ([]execution.QueuedItemData, error) {
 		for _, file := range files {
 			data, err := parseQueueFileName(file, filepath.Base(file))
 			if err != nil {
-				logger.Error(ctx, "Failed to parse queue file name", tag.File, file, tag.Error, err)
+				logger.Error(ctx, "Failed to parse queue file name",
+					tag.File(file),
+					tag.Error(err))
 				continue
 			}
 			items = append(items, NewJob(data))
@@ -120,7 +126,9 @@ func (s *Store) DequeueByName(ctx context.Context, name string) (execution.Queue
 	}
 	defer func() {
 		if err := s.queues[name].Unlock(); err != nil {
-			logger.Error(ctx, "Failed to unlock queue", tag.Queue, name, tag.Error, err)
+			logger.Error(ctx, "Failed to unlock queue",
+				tag.Queue(name),
+				tag.Error(err))
 		}
 	}()
 
@@ -197,7 +205,9 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([
 	}
 	defer func() {
 		if err := s.queues[name].Unlock(); err != nil {
-			logger.Error(ctx, "Failed to unlock queue", tag.Queue, name, tag.Error, err)
+			logger.Error(ctx, "Failed to unlock queue",
+				tag.Queue(name),
+				tag.Error(err))
 		}
 	}()
 

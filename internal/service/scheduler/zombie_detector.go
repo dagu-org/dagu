@@ -82,7 +82,7 @@ func (z *ZombieDetector) loop(ctx context.Context) {
 						default:
 							err = fmt.Errorf("%v", v)
 						}
-						logger.Error(ctx, "Zombie detection check panicked", tag.Error, err)
+						logger.Error(ctx, "Zombie detection check panicked", tag.Error(err))
 					}
 				}()
 				z.detectAndCleanZombies(ctx)
@@ -113,11 +113,11 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 	statuses, err := z.dagRunStore.ListStatuses(ctx,
 		execution.WithStatuses([]core.Status{core.Running}))
 	if err != nil {
-		logger.Error(ctx, "Failed to list running DAG runs", tag.Error, err)
+		logger.Error(ctx, "Failed to list running DAG runs", tag.Error(err))
 		return
 	}
 
-	logger.Debug(ctx, "Checking for zombie DAG runs", tag.Count, len(statuses))
+	logger.Debug(ctx, "Checking for zombie DAG runs", tag.Count(len(statuses)))
 
 	for _, st := range statuses {
 		// Check for quit signal
@@ -130,7 +130,10 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 		}
 
 		if err := z.checkAndCleanZombie(ctx, st); err != nil {
-			logger.Error(ctx, "Failed to check zombie status", tag.Name, st.Name, tag.RunID, st.DAGRunID, tag.Error, err)
+			logger.Error(ctx, "Failed to check zombie status",
+				tag.Name(st.Name),
+				tag.RunID(st.DAGRunID),
+				tag.Error(err))
 		}
 	}
 }
@@ -161,7 +164,9 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.
 	}
 
 	// Process is zombie, update status to error
-	logger.Info(ctx, "Found zombie DAG run, updating to error status", tag.Name, st.Name, tag.RunID, st.DAGRunID)
+	logger.Info(ctx, "Found zombie DAG run, updating to error status",
+		tag.Name(st.Name),
+		tag.RunID(st.DAGRunID))
 
 	// Update the status to error
 	st.Status = core.Failed
@@ -188,7 +193,7 @@ func (z *ZombieDetector) updateStatus(ctx context.Context,
 	}
 	defer func() {
 		if err := attempt.Close(ctx); err != nil {
-			logger.Error(ctx, "Failed to close attempt", tag.Error, err)
+			logger.Error(ctx, "Failed to close attempt", tag.Error(err))
 		}
 	}()
 

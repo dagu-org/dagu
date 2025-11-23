@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -125,7 +126,7 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 	er.lock.Lock()
 	defer er.lock.Unlock()
 
-	logger.Info(ctx, "Loading DAGs", tag.Dir, er.targetDir)
+	logger.Info(ctx, "Loading DAGs", tag.Dir(er.targetDir))
 	fis, err := os.ReadDir(er.targetDir)
 	if err != nil {
 		return err
@@ -142,7 +143,9 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 				spec.SkipSchemaValidation(),
 			)
 			if err != nil {
-				logger.Error(ctx, "DAG load failed", tag.Error, err, tag.Name, fi.Name())
+				logger.Error(ctx, "DAG load failed",
+					tag.Error(err),
+					tag.Name(fi.Name()))
 				continue
 			}
 			er.registry[fi.Name()] = dag
@@ -150,7 +153,7 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 		}
 	}
 
-	logger.Info(ctx, "DAGs loaded", "dags", strings.Join(dags, ","))
+	logger.Info(ctx, "DAGs loaded", slog.String("dags", strings.Join(dags, ",")))
 	return nil
 }
 
@@ -188,15 +191,17 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 					spec.SkipSchemaValidation(),
 				)
 				if err != nil {
-					logger.Error(ctx, "DAG load failed", tag.Error, err, tag.File, event.Name)
+					logger.Error(ctx, "DAG load failed",
+						tag.Error(err),
+						tag.File(event.Name))
 				} else {
 					er.registry[filepath.Base(event.Name)] = dag
-					logger.Info(ctx, "DAG added/updated", tag.Name, filepath.Base(event.Name))
+					logger.Info(ctx, "DAG added/updated", tag.Name(filepath.Base(event.Name)))
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.registry, filepath.Base(event.Name))
-				logger.Info(ctx, "DAG removed", tag.Name, filepath.Base(event.Name))
+				logger.Info(ctx, "DAG removed", tag.Name(filepath.Base(event.Name)))
 			}
 			er.lock.Unlock()
 
@@ -204,7 +209,7 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 			if !ok {
 				return
 			}
-			logger.Error(ctx, "Watcher error", tag.Error, err)
+			logger.Error(ctx, "Watcher error", tag.Error(err))
 
 		}
 	}

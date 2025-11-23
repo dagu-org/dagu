@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -82,27 +83,49 @@ func runMigration(ctx *Context) error {
 
 	// Report results
 	if len(result.Errors) > 0 {
-		logger.Warn(ctx.Context, "Migration completed with errors", "total-dags", result.TotalDAGs, "total-runs", result.TotalRuns, "migrated", result.MigratedRuns, "skipped", result.SkippedRuns, "failed", result.FailedRuns)
+		logger.Warn(ctx.Context, "Migration completed with errors",
+			slog.Int("total-dags", result.TotalDAGs),
+			slog.Int("total-runs", result.TotalRuns),
+			slog.Int("migrated", result.MigratedRuns),
+			slog.Int("skipped", result.SkippedRuns),
+			slog.Int("failed", result.FailedRuns),
+		)
 		for i, err := range result.Errors {
 			if i < 10 { // Limit error output
-				logger.Error(ctx.Context, "Migration error", tag.Error, err)
+				logger.Error(ctx.Context, "Migration error",
+					tag.Error(err),
+				)
 			}
 		}
 		if len(result.Errors) > 10 {
-			logger.Warn(ctx.Context, "Additional errors omitted", tag.Count, len(result.Errors)-10)
+			logger.Warn(ctx.Context, "Additional errors omitted",
+				tag.Count(len(result.Errors)-10),
+			)
 		}
 	} else {
-		logger.Info(ctx.Context, "Migration completed", "total-dags", result.TotalDAGs, "total-runs", result.TotalRuns, "migrated", result.MigratedRuns, "skipped", result.SkippedRuns, "failed", result.FailedRuns)
+		logger.Info(ctx.Context, "Migration completed",
+			slog.Int("total-dags", result.TotalDAGs),
+			slog.Int("total-runs", result.TotalRuns),
+			slog.Int("migrated", result.MigratedRuns),
+			slog.Int("skipped", result.SkippedRuns),
+			slog.Int("failed", result.FailedRuns),
+		)
 	}
 
 	// Move legacy data to archive if migration was successful
 	if result.FailedRuns == 0 {
 		if err := migrator.MoveLegacyData(ctx.Context); err != nil {
-			logger.Error(ctx.Context, "Failed to move legacy data to archive", tag.Error, err)
-			logger.Info(ctx.Context, "Legacy data remains in original location", tag.Path, filepath.Join(ctx.Config.Paths.DataDir, "history"))
+			logger.Error(ctx.Context, "Failed to move legacy data to archive",
+				tag.Error(err),
+			)
+			logger.Info(ctx.Context, "Legacy data remains in original location",
+				tag.Path(filepath.Join(ctx.Config.Paths.DataDir, "history")),
+			)
 		}
 	} else {
-		logger.Info(ctx.Context, "Legacy data not moved due to migration errors", tag.FailedRuns, result.FailedRuns)
+		logger.Info(ctx.Context, "Legacy data not moved due to migration errors",
+			tag.FailedRuns(result.FailedRuns),
+		)
 		logger.Info(ctx.Context, "Fix errors and run migration again to complete the process")
 	}
 

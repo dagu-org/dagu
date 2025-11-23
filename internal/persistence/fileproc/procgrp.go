@@ -73,7 +73,9 @@ func (pg *ProcGroup) CountByDAGName(ctx context.Context, dagName string) (int, e
 		}
 		// File is stale, remove it
 		if err := os.Remove(file); err != nil {
-			logger.Error(ctx, "Failed to remove stale file", tag.File, file, tag.Error, err)
+			logger.Error(ctx, "Failed to remove stale file",
+				tag.File(file),
+				tag.Error(err))
 		}
 		continue
 	}
@@ -109,7 +111,9 @@ func (pg *ProcGroup) Count(ctx context.Context) (int, error) {
 		}
 		// File is stale, remove it
 		if err := os.Remove(file); err != nil {
-			logger.Error(ctx, "Failed to remove stale file", tag.File, file, tag.Error, err)
+			logger.Error(ctx, "Failed to remove stale file",
+				tag.File(file),
+				tag.Error(err))
 		}
 		continue
 	}
@@ -132,14 +136,18 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 	// Check if the file is stale by checking its content (timestamp).
 	data, err := os.ReadFile(file) // nolint:gosec
 	if err != nil {
-		logger.Warn(ctx, "Failed to read file", tag.File, file, tag.Error, err)
+		logger.Warn(ctx, "Failed to read file",
+			tag.File(file),
+			tag.Error(err))
 		// If we can't read the file, consider it stale
 		return true
 	}
 
 	// It is assumed that the first 8 bytes of the file contain a timestamp in seconds (unix time).
 	if len(data) < 8 {
-		logger.Warn(ctx, "File is too short, considering it stale", tag.File, file, tag.Size, len(data))
+		logger.Warn(ctx, "File is too short, considering it stale",
+			tag.File(file),
+			tag.Size(len(data)))
 		return true
 	}
 
@@ -151,16 +159,24 @@ func (pg *ProcGroup) isStale(ctx context.Context, file string) bool {
 	parsedTime := time.Unix(unixTime, 0)
 
 	if parsedTime.After(now.Add(5 * time.Minute)) {
-		logger.Warn(ctx, "Proc file has timestamp in the future, considering it stale", tag.File, file, tag.Timestamp, parsedTime)
+		logger.Warn(ctx, "Proc file has timestamp in the future, considering it stale",
+			tag.File(file),
+			tag.Timestamp(parsedTime))
 		return true
 	}
 
 	duration := now.Sub(parsedTime)
 	if duration < pg.staleTime {
-		logger.Debug(ctx, "Proc file is not stale", tag.File, file, tag.Timestamp, parsedTime, tag.Duration, duration)
+		logger.Debug(ctx, "Proc file is not stale",
+			tag.File(file),
+			tag.Timestamp(parsedTime),
+			tag.Duration(duration))
 		return false
 	}
-	logger.Debug(ctx, "Proc file is stale", tag.File, file, tag.Timestamp, parsedTime, tag.Duration, duration)
+	logger.Debug(ctx, "Proc file is stale",
+		tag.File(file),
+		tag.Timestamp(parsedTime),
+		tag.Duration(duration))
 	return true
 }
 
@@ -212,7 +228,9 @@ func (pg *ProcGroup) IsRunAlive(ctx context.Context, dagRun execution.DAGRunRef)
 		}
 		// File is stale, remove it
 		if err := os.Remove(file); err != nil {
-			logger.Error(ctx, "Failed to remove stale file", tag.File, file, tag.Error, err)
+			logger.Error(ctx, "Failed to remove stale file",
+				tag.File(file),
+				tag.Error(err))
 		}
 		// Remove parent directory if it's empty
 		_ = os.Remove(filepath.Dir(file))
@@ -259,7 +277,9 @@ func (pg *ProcGroup) ListAlive(ctx context.Context) ([]execution.DAGRunRef, erro
 		}
 		// File is stale, remove it
 		if err := os.Remove(file); err != nil {
-			logger.Error(ctx, "Failed to remove stale file", tag.File, file, tag.Error, err)
+			logger.Error(ctx, "Failed to remove stale file",
+				tag.File(file),
+				tag.Error(err))
 		}
 	}
 

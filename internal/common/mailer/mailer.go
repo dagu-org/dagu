@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/smtp"
 	"os"
@@ -59,7 +60,9 @@ func (m *Client) Send(
 	subject, body string,
 	attachments []string,
 ) error {
-	logger.Info(ctx, "Sending email", tag.To, to, tag.Subject, subject)
+	logger.Info(ctx, "Sending email",
+		slog.Any("to", to),
+		tag.Subject(subject))
 	if m.username == "" && m.password == "" {
 		return m.sendWithNoAuth(from, to, subject, body, attachments)
 	}

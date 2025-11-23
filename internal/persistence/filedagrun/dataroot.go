@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -120,7 +121,8 @@ func (dr *DataRoot) FindByDAGRunID(_ context.Context, dagRunID string) (*DAGRun,
 func (dr *DataRoot) Latest(ctx context.Context, itemLimit int) []*DAGRun {
 	dagRuns, err := dr.listRecentDAGRuns(ctx, itemLimit)
 	if err != nil {
-		logger.Error(ctx, "Failed to list recent runs", tag.Error, err)
+		logger.Error(ctx, "Failed to list recent runs",
+			tag.Error(err))
 		return nil
 	}
 	return dagRuns
@@ -235,17 +237,21 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 		newDir := filepath.Join(newRoot.dagRunsDir, year, month, day, filepath.Base(targetDir))
 
 		// Enrich context with directory information for error logging
-		dirCtx := logger.WithValues(ctx, "oldDir", targetDir, "newDir", newDir)
+		dirCtx := logger.WithValues(ctx,
+			slog.String("oldDir", targetDir),
+			slog.String("newDir", newDir))
 
 		// Make sure the new directory exists
 		if err := os.MkdirAll(filepath.Dir(newDir), 0750); err != nil {
-			logger.Error(dirCtx, "Failed to create new directory", tag.Error, err)
+			logger.Error(dirCtx, "Failed to create new directory",
+				tag.Error(err))
 			return fmt.Errorf("failed to create directory %s: %w", newDir, err)
 		}
 
 		// Rename the file
 		if err := os.Rename(targetDir, newDir); err != nil {
-			logger.Error(dirCtx, "Failed to rename directory", tag.Error, err)
+			logger.Error(dirCtx, "Failed to rename directory",
+				tag.Error(err))
 			return fmt.Errorf("failed to rename %s to %s: %w", targetDir, newDir, err)
 		}
 
@@ -278,33 +284,38 @@ func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int) error {
 
 	for _, r := range dagRuns {
 		// Enrich context with run directory for all subsequent logs in this iteration
-		runCtx := logger.WithValues(ctx, tag.Dir, r.baseDir)
+		runCtx := logger.WithValues(ctx, tag.Dir(r.baseDir))
 
 		latestAttempt, err := r.LatestAttempt(ctx, nil)
 		if err != nil {
-			logger.Error(runCtx, "Failed to get latest attempt", tag.Error, err)
+			logger.Error(runCtx, "Failed to get latest attempt",
+				tag.Error(err))
 			continue
 		}
 		lastUpdate, err := latestAttempt.ModTime()
 		if err != nil {
-			logger.Error(runCtx, "Failed to get last modified time", tag.Error, err)
+			logger.Error(runCtx, "Failed to get last modified time",
+				tag.Error(err))
 			continue
 		}
 		latestStatus, err := latestAttempt.ReadStatus(ctx)
 		if err != nil {
-			logger.Error(runCtx, "Failed to read status", tag.Error, err)
+			logger.Error(runCtx, "Failed to read status",
+				tag.Error(err))
 			continue
 		}
 		if latestStatus.Status.IsActive() {
 			// If the run is still active, skip it
-			logger.Debug(runCtx, "Skipping active run", tag.Status, latestStatus.Status)
+			logger.Debug(runCtx, "Skipping active run",
+				tag.Status(latestStatus.Status.String()))
 			continue
 		}
 		if lastUpdate.After(keepTime.Time) {
 			continue
 		}
 		if err := r.Remove(ctx); err != nil {
-			logger.Error(runCtx, "Failed to remove run", tag.Error, err)
+			logger.Error(runCtx, "Failed to remove run",
+				tag.Error(err))
 		}
 		dr.removeEmptyDir(ctx, filepath.Dir(r.baseDir))
 	}
@@ -317,10 +328,11 @@ func (dr DataRoot) removeEmptyDir(ctx context.Context, dayDir string) {
 
 	// Helper function to remove directory with context-enriched logging
 	removeDir := func(dirPath, dirType string) {
-		dirCtx := logger.WithValues(ctx, tag.Dir, dirPath)
+		dirCtx := logger.WithValues(ctx, tag.Dir(dirPath))
 		if isDirEmpty(dirPath) {
 			if err := os.Remove(dirPath); err != nil {
-				logger.Error(dirCtx, fmt.Sprintf("Failed to remove %s directory", dirType), tag.Error, err)
+				logger.Error(dirCtx, fmt.Sprintf("Failed to remove %s directory", dirType),
+					tag.Error(err))
 			}
 		}
 	}
@@ -414,7 +426,9 @@ func (dr DataRoot) listDAGRunsInRange(ctx context.Context, start, end execution.
 				_ = processFilesParallel(files, func(filePath string) error {
 					run, err := NewDAGRun(filePath)
 					if err != nil {
-						logger.Debug(ctx, "Failed to create run from file", tag.File, filePath, tag.Error, err)
+						logger.Debug(ctx, "Failed to create run from file",
+							tag.File(filePath),
+							tag.Error(err))
 						return err
 					}
 					// Check if the timestamp is within the range

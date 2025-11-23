@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -57,7 +58,7 @@ func WithRemoteNode(remoteNodes map[string]config.RemoteNode, apiBasePath string
 				_, err = w.Write(resp)
 				if err != nil {
 					// If there was an error writing the response, log it
-					logger.Error(r.Context(), "Failed to write response", tag.Error, err)
+					logger.Error(r.Context(), "Failed to write response", tag.Error(err))
 				}
 			}
 		}
@@ -201,10 +202,10 @@ func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.Remot
 	}
 
 	logger.Debug(r.Context(), "Received response from remote node",
-		"status-code", resp.StatusCode,
-		"content-length", resp.ContentLength,
-		"content-type", resp.Header.Get("Content-Type"),
-		"data-length", len(respData))
+		slog.Int("status-code", resp.StatusCode),
+		slog.Int64("content-length", resp.ContentLength),
+		slog.String("content-type", resp.Header.Get("Content-Type")),
+		slog.Int("data-length", len(respData)))
 
 	// If not status 200, try to parse the error response
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {

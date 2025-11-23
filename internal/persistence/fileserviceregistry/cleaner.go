@@ -87,7 +87,9 @@ func (c *cleaner) cleanupQuarantinedFiles(ctx context.Context) {
 	entries, err := os.ReadDir(serviceDir)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			logger.Warn(ctx, "Failed to read service directory for cleanup", tag.Dir, serviceDir, tag.Error, err)
+			logger.Warn(ctx, "Failed to read service directory for cleanup",
+				tag.Dir(serviceDir),
+				tag.Error(err))
 		}
 		return
 	}
@@ -103,7 +105,9 @@ func (c *cleaner) cleanupQuarantinedFiles(ctx context.Context) {
 
 		filePath := filepath.Join(serviceDir, entry.Name())
 		if err := c.removeWithRetry(ctx, filePath, policy); err != nil {
-			logger.Warn(ctx, "Failed to cleanup quarantined file", tag.File, filePath, tag.Error, err)
+			logger.Warn(ctx, "Failed to cleanup quarantined file",
+				tag.File(filePath),
+				tag.Error(err))
 		}
 	}
 }
@@ -138,7 +142,9 @@ func (q *quarantine) markStaleFile(ctx context.Context, path string, observedMod
 	quarantinePath := q.generateQuarantinePath(path)
 	if err := os.Rename(path, quarantinePath); err != nil {
 		if !os.IsNotExist(err) {
-			logger.Warn(ctx, "Failed to quarantine stale file", tag.File, path, tag.Error, err)
+			logger.Warn(ctx, "Failed to quarantine stale file",
+				tag.File(path),
+				tag.Error(err))
 		}
 		return false
 	}
@@ -151,7 +157,9 @@ func (q *quarantine) shouldQuarantine(ctx context.Context, path string, observed
 	currentInfo, err := os.Stat(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			logger.Warn(ctx, "Failed to stat file before quarantine", tag.File, path, tag.Error, err)
+			logger.Warn(ctx, "Failed to stat file before quarantine",
+				tag.File(path),
+				tag.Error(err))
 		}
 		return false
 	}

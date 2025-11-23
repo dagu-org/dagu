@@ -152,7 +152,9 @@ func (p *QueueProcessor) loop(ctx context.Context) {
 		// Now process each queue
 		queueList, err := p.queueStore.QueueList(ctx)
 		if err != nil {
-			logger.Error(ctx, "Failed to get queue list", tag.Error, err)
+			logger.Error(ctx, "Failed to get queue list",
+				tag.Error(err),
+			)
 			continue
 		}
 
@@ -189,7 +191,7 @@ func (p *QueueProcessor) loop(ctx context.Context) {
 			wg.Add(1)
 			go func(name string) {
 				defer wg.Done()
-				ctx := logger.WithValues(ctx, tag.Queue, name)
+				ctx := logger.WithValues(ctx, tag.Queue(name))
 				p.ProcessQueueItems(ctx, name)
 			}(name)
 		}
@@ -223,7 +225,9 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 
 	items, err := p.queueStore.List(ctx, queueName)
 	if err != nil {
-		logger.Error(ctx, "Failed to get queued items", tag.Error, err)
+		logger.Error(ctx, "Failed to get queued items",
+			tag.Error(err),
+		)
 		return
 	}
 
@@ -236,31 +240,42 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 
 	alive, err := p.procStore.CountAlive(ctx, queueName)
 	if err != nil {
-		logger.Error(ctx, "Failed to count alive processes", tag.Error, err)
+		logger.Error(ctx, "Failed to count alive processes",
+			tag.Error(err),
+		)
 		return
 	}
 
 	maxConc := q.maxConc()
 	free := maxConc - alive
 	if free <= 0 {
-		logger.Debug(ctx, "Max concurrency reached", tag.MaxConcurrency, maxConc, tag.Alive, alive)
+		logger.Debug(ctx, "Max concurrency reached",
+			tag.MaxConcurrency(maxConc),
+			tag.Alive(alive),
+		)
 		return
 	}
 
 	cap := min(free, len(items))
 	runnableItems := items[:cap]
-	logger.Info(ctx, "Processing batch of items", tag.Count, len(runnableItems), tag.MaxConcurrency, maxConc, tag.Alive, alive)
+	logger.Info(ctx, "Processing batch of items",
+		tag.Count(len(runnableItems)),
+		tag.MaxConcurrency(maxConc),
+		tag.Alive(alive),
+	)
 
 	var wg sync.WaitGroup
 	for _, item := range runnableItems {
 		wg.Add(1)
 		go func(ctx context.Context, item execution.QueuedItemData) {
 			defer wg.Done()
-			ctx = logger.WithValues(ctx, tag.RunID, item.Data().ID)
+			ctx = logger.WithValues(ctx, tag.RunID(item.Data().ID))
 			if p.processDAG(ctx, item, queueName) {
 				// Remove the item from the queue
 				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, item.Data().ID); err != nil {
-					logger.Error(ctx, "Failed to dequeue item", tag.Error, err)
+					logger.Error(ctx, "Failed to dequeue item",
+						tag.Error(err),
+					)
 				}
 			}
 		}(ctx, item)
@@ -276,11 +291,15 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	runRef := item.Data()
 	runID := runRef.ID
 	_ = runID // used below
-	logger.Debug(ctx, "Processing queue item", tag.Name, runRef.Name)
+	logger.Debug(ctx, "Processing queue item",
+		tag.Name(runRef.Name),
+	)
 
 	// Check if the DAG run is already running
 	if running, err := p.procStore.IsRunAlive(ctx, queueName, runRef); err != nil {
-		logger.Error(ctx, "Failed to check if run is alive", tag.Error, err)
+		logger.Error(ctx, "Failed to check if run is alive",
+			tag.Error(err),
+		)
 		return false
 	} else if running {
 		logger.Warn(ctx, "DAG run is already running, discarding")
@@ -290,7 +309,9 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	// Fetch the DAG of the dag-run attempt first to get queue configuration
 	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
 	if err != nil {
-		logger.Error(ctx, "Failed to find run", tag.Error, err)
+		logger.Error(ctx, "Failed to find run",
+			tag.Error(err),
+		)
 		// If the attempt doesn't exist at all, mark as discard
 		if errors.Is(err, execution.ErrDAGRunIDNotFound) {
 			logger.Error(ctx, "DAG run not found, discarding")
@@ -307,22 +328,30 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	st, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		if errors.Is(err, execution.ErrCorruptedStatusFile) {
-			logger.Error(ctx, "Status file is corrupted, marking as invalid", tag.Error, err)
+			logger.Error(ctx, "Status file is corrupted, marking as invalid",
+				tag.Error(err),
+			)
 			return true
 		} else {
-			logger.Error(ctx, "Failed to read status", tag.Error, err)
+			logger.Error(ctx, "Failed to read status",
+				tag.Error(err),
+			)
 		}
 		return false
 	}
 
 	if st.Status != core.Queued {
-		logger.Info(ctx, "Status is not queued, skipping", tag.Status, st.Status)
+		logger.Info(ctx, "Status is not queued, skipping",
+			tag.Status(st.Status.String()),
+		)
 		return true
 	}
 
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG", tag.Error, err)
+		logger.Error(ctx, "Failed to read DAG",
+			tag.Error(err),
+		)
 		return false
 	}
 
@@ -333,7 +362,9 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 
 	errCh := make(chan error, 1)
 	if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID); err != nil {
-		logger.Error(ctx, "Failed to execute DAG", tag.Error, err)
+		logger.Error(ctx, "Failed to execute DAG",
+			tag.Error(err),
+		)
 		errCh <- err
 		return false
 	}
@@ -350,7 +381,9 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	}
 
 	if err := backoff.Retry(ctx, operation, policy, nil); err != nil {
-		logger.Error(ctx, "Failed to execute DAG after retries", tag.Error, err)
+		logger.Error(ctx, "Failed to execute DAG after retries",
+			tag.Error(err),
+		)
 	}
 
 	// Successfully dispatched/started, remove from queue
@@ -373,7 +406,9 @@ func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, r
 		logger.Info(ctx, "Processor is closed")
 		return false, backoff.PermanentError(errProcessorClosed)
 	case err := <-errCh:
-		logger.Info(ctx, "Failed to execute the DAG", tag.Error, err)
+		logger.Info(ctx, "Failed to execute the DAG",
+			tag.Error(err),
+		)
 		return false, backoff.PermanentError(err)
 	default:
 	}
@@ -399,7 +434,9 @@ func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, r
 	}
 
 	if status.Status != core.Queued && status.Status != core.Running {
-		logger.Info(ctx, "DAG execution started or finished", tag.Status, status.Status.String())
+		logger.Info(ctx, "DAG execution started or finished",
+			tag.Status(status.Status.String()),
+		)
 		return true, nil
 	}
 

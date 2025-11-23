@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -120,7 +121,10 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		if oc.outputReader, oc.outputWriter, err = os.Pipe(); err != nil {
 			return fmt.Errorf("failed to create pipe: %w", err)
 		}
-		logger.Debug(ctx, "Created new output pipes", tag.Step, data.Step.Name, tag.OutputVar, data.Step.Output)
+		logger.Debug(ctx, "Created new output pipes",
+			tag.Step(data.Step.Name),
+			tag.OutputVar(data.Step.Output),
+		)
 		// Reset the captured flag to allow new output capture for retry
 		oc.outputCaptured = false
 
@@ -316,7 +320,10 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	defer oc.mu.Unlock()
 
 	// Enrich context with output data for all logging in this function
-	ctx = logger.WithValues(ctx, tag.Output, oc.outputData, tag.Length, len(oc.outputData))
+	ctx = logger.WithValues(ctx,
+		tag.Output(oc.outputData),
+		tag.Length(len(oc.outputData)),
+	)
 
 	// Return cached result if already captured
 	if oc.outputCaptured {
@@ -330,7 +337,9 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		if oc.outputWriter != nil {
 			logger.Debug(ctx, "Captured output: closing output writer")
 			if err := oc.outputWriter.Close(); err != nil {
-				logger.Error(ctx, "Failed to close pipe writer", tag.Error, err)
+				logger.Error(ctx, "Failed to close pipe writer",
+					tag.Error(err),
+				)
 			}
 			oc.outputWriter = nil // Mark as closed
 		}
@@ -348,7 +357,9 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 			oc.outputData = strings.TrimSpace(output)
 		}
 
-		logger.Debug(ctx, "Captured output", tag.Length, len(oc.outputData))
+		logger.Debug(ctx, "Captured output",
+			tag.Length(len(oc.outputData)),
+		)
 
 		// Mark as captured for caching
 		oc.outputCaptured = true
@@ -356,7 +367,9 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		// Close the reader
 		if oc.outputReader != nil {
 			if err := oc.outputReader.Close(); err != nil {
-				logger.Error(ctx, "Failed to close pipe reader", tag.Error, err)
+				logger.Error(ctx, "Failed to close pipe reader",
+					tag.Error(err),
+				)
 			}
 			oc.outputReader = nil
 		}
@@ -374,7 +387,9 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	if oc.outputWriter != nil {
 		logger.Debug(ctx, "Captured output: closing output writer")
 		if err := oc.outputWriter.Close(); err != nil {
-			logger.Error(ctx, "Failed to close pipe writer", tag.Error, err)
+			logger.Error(ctx, "Failed to close pipe writer",
+				tag.Error(err),
+			)
 		}
 		oc.outputWriter = nil // Mark as closed
 	}
@@ -390,7 +405,9 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 
 	// Check if output was truncated
 	if buf.Len() == int(oc.maxOutputSize) {
-		logger.Warn(ctx, "Output truncated due to size limit", tag.MaxSize, oc.maxOutputSize)
+		logger.Warn(ctx, "Output truncated due to size limit",
+			slog.Int64("max-size", oc.maxOutputSize),
+		)
 		output += "\n[OUTPUT TRUNCATED]"
 	}
 
@@ -401,11 +418,15 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		oc.outputData = output
 	}
 
-	logger.Debug(ctx, "Captured output", tag.Length, len(oc.outputData))
+	logger.Debug(ctx, "Captured output",
+		tag.Length(len(oc.outputData)),
+	)
 
 	// Close the reader after reading
 	if err := oc.outputReader.Close(); err != nil {
-		logger.Error(ctx, "Failed to close pipe reader", tag.Error, err)
+		logger.Error(ctx, "Failed to close pipe reader",
+			tag.Error(err),
+		)
 	}
 	oc.outputReader = nil // Mark as closed
 
@@ -472,7 +493,9 @@ func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 					oc.mu.Lock()
 					oc.err = fmt.Errorf("failed to read output: %w", err)
 					oc.mu.Unlock()
-					logger.Error(ctx, "Failed to capture output", tag.Error, err)
+					logger.Error(ctx, "Failed to capture output",
+					tag.Error(err),
+				)
 				}
 				break
 			}

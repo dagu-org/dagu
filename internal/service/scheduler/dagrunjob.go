@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -72,7 +73,7 @@ func (j *DAGRunJob) Ready(ctx context.Context, latestStatus execution.DAGRunStat
 	latestStartedAt, err := stringutil.ParseTime(latestStatus.StartedAt)
 	if err != nil {
 		// If parsing fails, log and continue (don't skip).
-		logger.Error(ctx, "Failed to parse the last successful run time", tag.Error, err)
+		logger.Error(ctx, "Failed to parse the last successful run time", tag.Error(err))
 		return nil
 	}
 
@@ -97,7 +98,8 @@ func (j *DAGRunJob) skipIfSuccessful(ctx context.Context, latestStatus execution
 	prevExecTime := j.PrevExecTime(ctx)
 	if (latestStartedAt.After(prevExecTime) || latestStartedAt.Equal(prevExecTime)) &&
 		latestStartedAt.Before(j.Next) {
-		logger.Info(ctx, "Skipping job due to successful prior run", tag.StartTime, latestStartedAt.Format(time.RFC3339))
+		logger.Info(ctx, "Skipping job due to successful prior run",
+			slog.String("start-time", latestStartedAt.Format(time.RFC3339)))
 		return ErrJobSuccess
 	}
 	return nil

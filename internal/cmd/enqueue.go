@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -141,7 +142,11 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 		return fmt.Errorf("failed to enqueue dag-run: %w", err)
 	}
 
-	logger.Info(ctx.Context, "Enqueued dag-run", tag.DAG, dag.Name, tag.RunID, dagRunID, "params", dag.Params)
+	logger.Info(ctx.Context, "Enqueued dag-run",
+		tag.DAG(dag.Name),
+		tag.RunID(dagRunID),
+		slog.Any("params", dag.Params),
+	)
 
 	return nil
 }

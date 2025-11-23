@@ -3,6 +3,7 @@ package logger
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"strings"
 	"testing"
 )
@@ -256,7 +257,7 @@ func TestLogger_SourceLocationWithAttributes(t *testing.T) {
 	)
 
 	// Test with attributes
-	logger.With("key", "value").Info("with attributes")
+	logger.With(slog.String("key", "value")).Info("with attributes")
 
 	output := buf.String()
 

@@ -3,6 +3,7 @@ package fileserviceregistry
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -55,7 +56,12 @@ func (r *registry) Register(ctx context.Context, serviceName execution.ServiceNa
 		return fmt.Errorf("service %s already registered", serviceName)
 	}
 
-	logger.Info(ctx, "Starting service registry", tag.Service, serviceName, tag.ServiceID, hostInfo.ID, "host", hostInfo.Host, "port", hostInfo.Port, tag.Status, hostInfo.Status.String())
+	logger.Info(ctx, "Starting service registry",
+		tag.Service(serviceName),
+		tag.ServiceID(hostInfo.ID),
+		slog.String("host", hostInfo.Host),
+		slog.Int("port", hostInfo.Port),
+		tag.Status(hostInfo.Status.String()))
 
 	// Ensure base directory exists
 	if err := os.MkdirAll(r.baseDir, 0750); err != nil {
@@ -145,7 +151,11 @@ func (r *registry) Unregister(ctx context.Context) {
 
 	// Stop all registrations
 	for serviceName, reg := range registrations {
-		logger.Info(ctx, "Stopping service registry", tag.Service, serviceName, tag.ServiceID, reg.instanceInfo.ID, "host", reg.instanceInfo.Host, "port", reg.instanceInfo.Port)
+		logger.Info(ctx, "Stopping service registry",
+			tag.Service(serviceName),
+			tag.ServiceID(reg.instanceInfo.ID),
+			slog.String("host", reg.instanceInfo.Host),
+			slog.Int("port", reg.instanceInfo.Port))
 
 		// Cancel the context to stop background goroutines
 		if reg.cancel != nil {
@@ -154,7 +164,9 @@ func (r *registry) Unregister(ctx context.Context) {
 
 		// Remove instance file
 		if err := removeInstanceFile(reg.fileName); err != nil {
-			logger.Error(ctx, "Failed to remove instance file", tag.Error, err, tag.File, reg.instanceInfo.ID)
+			logger.Error(ctx, "Failed to remove instance file",
+				tag.Error(err),
+				tag.File(reg.instanceInfo.ID))
 		}
 
 		// Wait for background goroutines with timeout
@@ -169,7 +181,8 @@ func (r *registry) Unregister(ctx context.Context) {
 			// Clean shutdown
 		case <-time.After(5 * time.Second):
 			// Force shutdown after timeout
-			logger.Warn(ctx, "Timeout waiting for registry shutdown", tag.Service, serviceName)
+			logger.Warn(ctx, "Timeout waiting for registry shutdown",
+				tag.Service(serviceName))
 		}
 	}
 
@@ -223,7 +236,9 @@ func (r *registry) startHeartbeat(ctx context.Context, serviceName execution.Ser
 				if _, err := os.Stat(reg.fileName); os.IsNotExist(err) {
 					// File doesn't exist, recreate it
 					if err := writeInstanceFile(reg.fileName, reg.instanceInfo); err != nil {
-						logger.Error(ctx, "Failed to recreate instance file", tag.Error, err, tag.File, reg.fileName)
+						logger.Error(ctx, "Failed to recreate instance file",
+							tag.Error(err),
+							tag.File(reg.fileName))
 						continue
 					}
 				}
@@ -231,7 +246,9 @@ func (r *registry) startHeartbeat(ctx context.Context, serviceName execution.Ser
 				// Update modification time
 				now := time.Now()
 				if err := os.Chtimes(reg.fileName, now, now); err != nil {
-					logger.Error(ctx, "Failed to update heartbeat", tag.Error, err, tag.File, reg.fileName)
+					logger.Error(ctx, "Failed to update heartbeat",
+						tag.Error(err),
+						tag.File(reg.fileName))
 				}
 			}
 		}

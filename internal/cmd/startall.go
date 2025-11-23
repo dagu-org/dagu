@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -134,7 +135,9 @@ func runStartAll(ctx *Context, _ []string) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		logger.Info(serviceCtx, "Scheduler initialization", tag.Dir, serviceCtx.Config.Paths.DAGsDir)
+		logger.Info(serviceCtx, "Scheduler initialization",
+			tag.Dir(serviceCtx.Config.Paths.DAGsDir),
+		)
 		if err := scheduler.Start(serviceCtx); err != nil {
 			select {
 			case errCh <- fmt.Errorf("scheduler failed: %w", err):
@@ -163,7 +166,10 @@ func runStartAll(ctx *Context, _ []string) error {
 		defer wg.Done()
 		// Give scheduler and coordinator a moment to start
 		time.Sleep(100 * time.Millisecond)
-		logger.Info(serviceCtx, "Server initialization", tag.Host, serviceCtx.Config.Server.Host, tag.Port, serviceCtx.Config.Server.Port)
+		logger.Info(serviceCtx, "Server initialization",
+			tag.Host(serviceCtx.Config.Server.Host),
+			tag.Port(serviceCtx.Config.Server.Port),
+		)
 		if err := server.Serve(serviceCtx); err != nil {
 			select {
 			case errCh <- fmt.Errorf("server failed: %w", err):
@@ -176,10 +182,14 @@ func runStartAll(ctx *Context, _ []string) error {
 	var firstErr error
 	select {
 	case <-signalCtx.Done():
-		logger.Info(ctx, "Received shutdown signal", tag.Signal, signalCtx.Err())
+		logger.Info(ctx, "Received shutdown signal",
+			slog.Any("signal", signalCtx.Err()),
+		)
 	case err := <-errCh:
 		firstErr = err
-		logger.Error(ctx, "Service failed, shutting down", tag.Error, err)
+		logger.Error(ctx, "Service failed, shutting down",
+			tag.Error(err),
+		)
 		stop() // Cancel the signal context to trigger shutdown of other services
 	}
 
@@ -189,7 +199,9 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Stop coordinator first to unregister from service registry (if it was started)
 	if enableCoordinator && coordinator != nil {
 		if err := coordinator.Stop(ctx); err != nil {
-			logger.Error(ctx, "Failed to stop coordinator", tag.Error, err)
+			logger.Error(ctx, "Failed to stop coordinator",
+				tag.Error(err),
+			)
 		}
 	}
 

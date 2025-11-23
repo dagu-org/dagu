@@ -106,7 +106,8 @@ func (db *JSONDB) Open(ctx context.Context, key string, timestamp time.Time, req
 		return err
 	}
 
-	logger.Info(ctx, "Initializing status file", tag.File, filePath)
+	logger.Info(ctx, "Initializing status file",
+		tag.File(filePath))
 
 	writer := newWriter(filePath)
 	if err := writer.open(); err != nil {

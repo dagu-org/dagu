@@ -95,13 +95,13 @@ func handleRestartProcess(ctx *Context, d *core.DAG, dagRunID string) error {
 
 	// Wait before restart if configured
 	if d.RestartWait > 0 {
-		logger.Info(ctx, "Waiting for restart", tag.Duration, d.RestartWait)
+		logger.Info(ctx, "Waiting for restart", tag.Duration(d.RestartWait))
 		time.Sleep(d.RestartWait)
 	}
 
 	// Execute the exact same DAG with the same parameters but a new dag-run ID
 	if err := ctx.ProcStore.Lock(ctx, d.ProcGroup()); err != nil {
-		logger.Debug(ctx, "Failed to lock process group", tag.Error, err)
+		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
 		return errMaxRunReached
 	}
 	defer ctx.ProcStore.Unlock(ctx, d.ProcGroup())
@@ -109,7 +109,7 @@ func handleRestartProcess(ctx *Context, d *core.DAG, dagRunID string) error {
 	// Acquire process handle
 	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), execution.NewDAGRunRef(d.Name, dagRunID))
 	if err != nil {
-		logger.Debug(ctx, "Failed to acquire process handle", tag.Error, err)
+		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
 		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
 	}
 	defer func() {
@@ -138,9 +138,9 @@ func executeDAG(ctx *Context, cli runtime.Manager, dag *core.DAG) error {
 
 	ctx.LogToFile(logFile)
 
-	ctx.Context = logger.WithValues(ctx.Context, tag.DAG, dag.Name, tag.RunID, dagRunID)
+	ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
 
-	logger.Info(ctx, "Dag-run restart initiated", tag.File, logFile.Name())
+	logger.Info(ctx, "Dag-run restart initiated", tag.File(logFile.Name()))
 
 	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {
@@ -180,7 +180,7 @@ func stopDAGIfRunning(ctx context.Context, cli runtime.Manager, dag *core.DAG, d
 	}
 
 	if dagStatus.Status == core.Running {
-		logger.Info(ctx, "Stopping DAG", tag.DAG, dag.Name)
+		logger.Info(ctx, "Stopping DAG", tag.DAG(dag.Name))
 		if err := stopRunningDAG(ctx, cli, dag, dagRunID); err != nil {
 			return fmt.Errorf("failed to stop running DAG: %w", err)
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -130,10 +131,16 @@ func (s *Scheduler) Start(ctx context.Context) error {
 			StartedAt: time.Now(),
 		}
 		if err := s.serviceRegistry.Register(ctx, execution.ServiceNameScheduler, hostInfo); err != nil {
-			logger.Error(ctx, "Failed to register with service registry", tag.Error, err)
+			logger.Error(ctx, "Failed to register with service registry",
+				tag.Error(err),
+			)
 			// Continue anyway - service registry is not critical
 		} else {
-			logger.Info(ctx, "Registered with service registry as inactive", tag.ServiceID, s.instanceID, tag.Host, hostname, tag.Port, s.config.Scheduler.Port)
+			logger.Info(ctx, "Registered with service registry as inactive",
+				tag.ServiceID(s.instanceID),
+				tag.Host(hostname),
+				tag.Port(s.config.Scheduler.Port),
+			)
 		}
 	}
 
@@ -155,7 +162,9 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	// Update status to active after acquiring lock
 	if s.serviceRegistry != nil {
 		if err := s.serviceRegistry.UpdateStatus(ctx, execution.ServiceNameScheduler, execution.ServiceStatusActive); err != nil {
-			logger.Error(ctx, "Failed to update status to active", tag.Error, err)
+			logger.Error(ctx, "Failed to update status to active",
+				tag.Error(err),
+			)
 		} else {
 			logger.Info(ctx, "Updated scheduler status to active")
 		}
@@ -167,7 +176,9 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	queueWatcher := s.queueStore.QueueWatcher(ctx)
 	notifyCh, err := queueWatcher.Start(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to start queue watcher", tag.Error, err)
+		logger.Error(ctx, "Failed to start queue watcher",
+			tag.Error(err),
+		)
 		return err
 	}
 	s.queueProcessor.Start(ctx, notifyCh)
@@ -210,7 +221,9 @@ func (s *Scheduler) startZombieDetector(ctx context.Context) {
 		s.config.Scheduler.ZombieDetectionInterval,
 	)
 	s.zombieDetector.Start(ctx)
-	logger.Info(ctx, "Started zombie detector", tag.Interval, s.config.Scheduler.ZombieDetectionInterval)
+	logger.Info(ctx, "Started zombie detector",
+		tag.Interval(s.config.Scheduler.ZombieDetectionInterval),
+	)
 }
 
 func (s *Scheduler) startHeartbeat(ctx context.Context) {
@@ -225,7 +238,9 @@ func (s *Scheduler) startHeartbeat(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := s.dirLock.Heartbeat(ctx); err != nil {
-				logger.Error(ctx, "Failed to send heartbeat for scheduler lock", tag.Error, err)
+				logger.Error(ctx, "Failed to send heartbeat for scheduler lock",
+					tag.Error(err),
+				)
 			}
 		}
 	}
@@ -298,7 +313,9 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		}
 
 		if err := s.dirLock.Unlock(); err != nil {
-			logger.Error(ctx, "Failed to release scheduler lock in Stop", tag.Error, err)
+			logger.Error(ctx, "Failed to release scheduler lock in Stop",
+				tag.Error(err),
+			)
 		}
 
 		wg.Wait()
@@ -309,14 +326,18 @@ func (s *Scheduler) stopCron(ctx context.Context) {
 	// Update status to inactive before stopping
 	if s.serviceRegistry != nil {
 		if err := s.serviceRegistry.UpdateStatus(ctx, execution.ServiceNameScheduler, execution.ServiceStatusInactive); err != nil {
-			logger.Error(ctx, "Failed to update status to inactive", tag.Error, err)
+			logger.Error(ctx, "Failed to update status to inactive",
+				tag.Error(err),
+			)
 		}
 	}
 
 	// Stop health check server if it was started
 	if s.healthServer != nil && !s.disableHealthServer {
 		if err := s.healthServer.Stop(ctx); err != nil {
-			logger.Error(ctx, "Failed to stop health check server", tag.Error, err)
+			logger.Error(ctx, "Failed to stop health check server",
+				tag.Error(err),
+			)
 		}
 	}
 
@@ -346,7 +367,9 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 	// Subtract a small buffer to avoid edge cases with exact timing
 	jobs, err := s.entryReader.Next(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
-		logger.Error(ctx, "Failed to get next jobs", tag.Error, err)
+		logger.Error(ctx, "Failed to get next jobs",
+			tag.Error(err),
+		)
 		return
 	}
 
@@ -361,7 +384,11 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 		}
 
 		// Create a child context for this specific job execution
-		jobCtx := logger.WithValues(ctx, tag.Job, job.Job, "jobType", job.Type.String(), "scheduledTime", job.Next.Format(time.RFC3339))
+		jobCtx := logger.WithValues(ctx,
+			tag.Job(fmt.Sprintf("%v", job.Job)),
+			slog.String("jobType", job.Type.String()),
+			slog.String("scheduledTime", job.Next.Format(time.RFC3339)),
+		)
 
 		// Launch job execution in goroutine
 		go func(ctx context.Context, job *ScheduledJob) {
@@ -372,9 +399,14 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 				case errors.Is(err, ErrJobRunning):
 					logger.Info(ctx, "Job already in progress")
 				case errors.Is(err, ErrJobSkipped):
-					logger.Info(ctx, "Job execution skipped", tag.Reason, err.Error())
+					logger.Info(ctx, "Job execution skipped",
+						tag.Reason(err.Error()),
+					)
 				default:
-					logger.Error(ctx, "Job execution failed", tag.Error, err, tag.Type, fmt.Sprintf("%T", err))
+					logger.Error(ctx, "Job execution failed",
+						tag.Error(err),
+						tag.Type(fmt.Sprintf("%T", err)),
+					)
 				}
 			} else {
 				logger.Info(ctx, "Job completed successfully")
@@ -389,7 +421,10 @@ func (s *ScheduledJob) invoke(ctx context.Context) error {
 		return fmt.Errorf("job is nil")
 	}
 
-	logger.Info(ctx, "Starting operation", tag.Type, s.Type.String(), tag.Job, s.Job)
+	logger.Info(ctx, "Starting operation",
+		tag.Type(s.Type.String()),
+		tag.Job(fmt.Sprintf("%v", s.Job)),
+	)
 
 	switch s.Type {
 	case ScheduleTypeStart:

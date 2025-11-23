@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
@@ -38,7 +39,10 @@ func runScheduler(ctx *Context, _ []string) error {
 		ctx.Config.Paths.DAGsDir = dagsDir
 	}
 
-	logger.Info(ctx, "Scheduler initialization", tag.Dir, ctx.Config.Paths.DAGsDir, "log-format", ctx.Config.Global.LogFormat)
+	logger.Info(ctx, "Scheduler initialization",
+		tag.Dir(ctx.Config.Paths.DAGsDir),
+		slog.String("log-format", ctx.Config.Global.LogFormat),
+	)
 
 	scheduler, err := ctx.NewScheduler()
 	if err != nil {

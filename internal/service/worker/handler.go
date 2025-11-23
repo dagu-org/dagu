@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -31,13 +32,20 @@ type taskHandler struct{ subCmdBuilder *runtime.SubCmdBuilder }
 
 // Handle runs the task using the dagrun.Manager
 func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
-	logger.Info(ctx, "Executing task", "operation", task.Operation.String(), tag.Target, task.Target, tag.RunID, task.DagRunId, "root-dag-run-id", task.RootDagRunId, "parent-dag-run-id", task.ParentDagRunId)
+	logger.Info(ctx, "Executing task",
+		slog.String("operation", task.Operation.String()),
+		tag.Target(task.Target),
+		tag.RunID(task.DagRunId),
+		slog.String("root-dag-run-id", task.RootDagRunId),
+		slog.String("parent-dag-run-id", task.ParentDagRunId))
 
 	var tempFile string
 
 	// If definition is provided, create a temporary DAG file
 	if task.Definition != "" {
-		logger.Info(ctx, "Creating temporary DAG file from definition", tag.DAG, task.Target, tag.Size, len(task.Definition))
+		logger.Info(ctx, "Creating temporary DAG file from definition",
+			tag.DAG(task.Target),
+			tag.Size(len(task.Definition)))
 
 		tf, err := createTempDAGFile(task.Target, []byte(task.Definition))
 		if err != nil {
@@ -54,7 +62,9 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 		originalTarget := task.Target
 		task.Target = tempFile
 
-		logger.Info(ctx, "Created temporary DAG file", tag.File, tempFile, "original-target", originalTarget)
+		logger.Info(ctx, "Created temporary DAG file",
+			tag.File(tempFile),
+			slog.String("original-target", originalTarget))
 	}
 
 	// Build command spec based on operation
@@ -72,11 +82,18 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 	}
 
 	if err := runtime.Run(ctx, spec); err != nil {
-		logger.Error(ctx, "Distributed task execution failed", "operation", task.Operation.String(), tag.Target, task.Target, tag.RunID, task.DagRunId, tag.Error, err)
+		logger.Error(ctx, "Distributed task execution failed",
+			slog.String("operation", task.Operation.String()),
+			tag.Target(task.Target),
+			tag.RunID(task.DagRunId),
+			tag.Error(err))
 		return err
 	}
 
-	logger.Info(ctx, "Distributed task execution finished", "operation", task.Operation.String(), tag.Target, task.Target, tag.RunID, task.DagRunId)
+	logger.Info(ctx, "Distributed task execution finished",
+		slog.String("operation", task.Operation.String()),
+		tag.Target(task.Target),
+		tag.RunID(task.DagRunId))
 
 	return nil
 }

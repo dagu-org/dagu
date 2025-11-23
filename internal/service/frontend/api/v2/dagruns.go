@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -808,7 +809,12 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		return nil, err
 	}
 
-	logger.Info(ctx, "Rescheduling dag-run", tag.Action, "reschedule", tag.DAG, dag.Name, "from-dag-run-id", request.DagRunId, tag.RunID, newDagRunID, "singleton", singleton)
+	logger.Info(ctx, "Rescheduling dag-run",
+		tag.Action("reschedule"),
+		tag.DAG(dag.Name),
+		slog.String("from-dag-run-id", request.DagRunId),
+		tag.RunID(newDagRunID),
+		slog.Bool("singleton", singleton))
 
 	if err := a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
 		dagRunID:     newDagRunID,

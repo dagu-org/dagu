@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"sync"
@@ -77,7 +78,9 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Ensure cleanup happens even if there's an error
 	defer func() {
 		if err := e.child.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup sub DAG executor", tag.Error, err)
+			logger.Error(ctx, "Failed to cleanup sub DAG executor",
+				tag.Error(err),
+			)
 		}
 	}()
 
@@ -95,7 +98,11 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Channel to collect errors from goroutines
 	errChan := make(chan error, len(e.runParamsList))
 
-	logger.Info(ctx, "Starting parallel execution", "total", len(e.runParamsList), "max-concurrent", e.maxConcurrent, tag.DAG, e.child.DAG.Name)
+	logger.Info(ctx, "Starting parallel execution",
+		slog.Int("total", len(e.runParamsList)),
+		slog.Int("max-concurrent", e.maxConcurrent),
+		tag.DAG(e.child.DAG.Name),
+	)
 
 	// Launch all sub DAG executions
 	for _, params := range e.runParamsList {
@@ -114,7 +121,10 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 
 			// Execute sub DAG
 			if err := e.executeChild(ctx, runParams); err != nil {
-				logger.Error(ctx, "Sub DAG execution failed", tag.RunID, runParams.RunID, tag.Error, err)
+				logger.Error(ctx, "Sub DAG execution failed",
+					tag.RunID(runParams.RunID),
+					tag.Error(err),
+				)
 				errChan <- fmt.Errorf("sub DAG %s failed: %w", runParams.RunID, err)
 			}
 		}(params)
@@ -132,7 +142,9 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Always output aggregated results, even if some executions failed
 	if err := e.outputResults(); err != nil {
 		// Log the output error but don't fail the entire execution because of it
-		logger.Error(ctx, "Failed to output results", tag.Error, err)
+		logger.Error(ctx, "Failed to output results",
+			tag.Error(err),
+		)
 	}
 
 	// Check if any executions failed

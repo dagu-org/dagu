@@ -110,7 +110,9 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 
 	case core.NodeRunning:
 		// Unexpected state
-		logger.Error(ctx, "Unexpected node status", tag.Status, s.String())
+		logger.Error(ctx, "Unexpected node status",
+			tag.Status(s.String()),
+		)
 		return false
 
 	}
@@ -128,7 +130,9 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 	if len(continueOn.Output) > 0 {
 		ok, err := n.LogContainsPattern(ctx, continueOn.Output)
 		if err != nil {
-			logger.Error(ctx, "Failed to check log for pattern", tag.Error, err)
+			logger.Error(ctx, "Failed to check log for pattern",
+				tag.Error(err),
+			)
 			return false
 		}
 		if ok {
@@ -179,7 +183,9 @@ func (n *Node) setupContextWithTimeout(ctx context.Context) (context.Context, co
 	if step.Timeout > 0 {
 		stepTimeout = step.Timeout
 		ctx, cancel := context.WithTimeout(ctx, stepTimeout)
-		logger.Info(ctx, "Step execution started with timeout", tag.Timeout, stepTimeout)
+		logger.Info(ctx, "Step execution started with timeout",
+			tag.Timeout(stepTimeout),
+		)
 		return ctx, cancel, stepTimeout
 	}
 
@@ -235,7 +241,10 @@ func (n *Node) runCommand(ctx context.Context, cmd executor.Executor, stepTimeou
 func (n *Node) handleTimeout(ctx context.Context, _ core.Step, stepTimeout, elapsed time.Duration) (int, error) {
 	timeoutErr := fmt.Errorf("step timed out after %v (timeout: %v): %w",
 		elapsed.Truncate(time.Millisecond), stepTimeout, context.DeadlineExceeded)
-	logger.Error(ctx, "Step execution timed out", tag.Timeout, stepTimeout, tag.Duration, elapsed)
+	logger.Error(ctx, "Step execution timed out",
+		tag.Timeout(stepTimeout),
+		tag.Duration(elapsed),
+	)
 	n.SetError(timeoutErr)
 	n.SetStatus(core.NodeFailed)
 	return 124, timeoutErr // Standard timeout exit code
@@ -508,9 +517,15 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 		if allowOverride && n.SignalOnStop() != "" {
 			sigsig = syscall.Signal(signal.GetSignalNum(n.SignalOnStop()))
 		}
-		logger.Info(ctx, "Sending signal", tag.Signal, sigsig, tag.Step, n.Name())
+		logger.Info(ctx, "Sending signal",
+			tag.Signal(sigsig.String()),
+			tag.Step(n.Name()),
+		)
 		if err := n.cmd.Kill(sigsig); err != nil {
-			logger.Error(ctx, "Failed to send signal", tag.Error, err, tag.Step, n.Name())
+			logger.Error(ctx, "Failed to send signal",
+				tag.Error(err),
+				tag.Step(n.Name()),
+			)
 		}
 	}
 
@@ -538,7 +553,7 @@ func (n *Node) SetupEnv(ctx context.Context) context.Context {
 		execution.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
 		execution.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)
-	ctx = logger.WithValues(ctx, tag.Step, n.Name())
+	ctx = logger.WithValues(ctx, tag.Step(n.Name()))
 	return execution.WithEnv(ctx, env)
 }
 

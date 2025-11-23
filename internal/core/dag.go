@@ -260,7 +260,10 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 		}
 		filePath, err := cmdutil.EvalString(ctx, filePath)
 		if err != nil {
-			logger.Warn(ctx, "Failed to evaluate filepath", tag.File, filePath, tag.Error, err)
+			logger.Warn(ctx, "Failed to evaluate filepath",
+				tag.File(filePath),
+				tag.Error(err),
+			)
 			continue
 		}
 		resolvedPath, err := resolver.ResolveFilePath(filePath)
@@ -273,7 +276,10 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 		// Use godotenv.Read instead of godotenv.Load to avoid os.Setenv
 		vars, err := godotenv.Read(resolvedPath)
 		if err != nil {
-			logger.Warn(ctx, "Failed to load .env file", tag.File, resolvedPath, tag.Error, err)
+			logger.Warn(ctx, "Failed to load .env file",
+				tag.File(resolvedPath),
+				tag.Error(err),
+			)
 			continue
 		}
 		// Add dotenv vars to DAG.Env so they're included in AllEnvs()
@@ -283,10 +289,16 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 		// Set os environment variables for the current process
 		for k, v := range vars {
 			if err := os.Setenv(k, v); err != nil {
-				logger.Warn(ctx, "Failed to set env var from .env", tag.Key, k, tag.File, resolvedPath, tag.Error, err)
+				logger.Warn(ctx, "Failed to set env var from .env",
+					tag.Key(k),
+					tag.File(resolvedPath),
+					tag.Error(err),
+				)
 			}
 		}
-		logger.Info(ctx, "Loaded .env file", tag.File, resolvedPath)
+		logger.Info(ctx, "Loaded .env file",
+			tag.File(resolvedPath),
+		)
 
 		// Load the first found one
 		return

@@ -143,7 +143,9 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority execution.QueuePriorit
 	if err := qf.Push(ctx, dagRun); err != nil {
 		return err
 	}
-	logger.Debug(ctx, "Enqueued item", tag.RunID, dagRun.ID, tag.Priority, priority)
+	logger.Debug(ctx, "Enqueued item",
+		tag.RunID(dagRun.ID),
+		tag.Priority(int(priority)))
 	return nil
 }
 
@@ -163,7 +165,9 @@ func (q *DualQueue) Dequeue(ctx context.Context) (execution.QueuedItemData, erro
 			return nil, err
 		}
 		if item != nil {
-			logger.Debug(ctx, "Dequeued item", tag.RunID, item.ID(), tag.Priority, priority)
+			logger.Debug(ctx, "Dequeued item",
+				tag.RunID(item.ID()),
+				tag.Priority(int(priority)))
 			return item, nil
 		}
 	}
