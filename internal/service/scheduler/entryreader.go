@@ -154,11 +154,7 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 }
 
 func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
-	watcher, err := filenotify.New(time.Minute)
-	if err != nil {
-		logger.Error(ctx, "Watcher creation failed", "err", err)
-		return
-	}
+	watcher := filenotify.New(time.Minute)
 
 	defer func() {
 		_ = watcher.Close()

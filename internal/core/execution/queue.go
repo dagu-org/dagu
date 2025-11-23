@@ -28,18 +28,18 @@ type QueueStore interface {
 	All(ctx context.Context) ([]QueuedItemData, error)
 	// ListByDAGName returns all items that has a specific DAG name
 	ListByDAGName(ctx context.Context, name, dagName string) ([]QueuedItemData, error)
-	// Reader returns a QueueReader for reading from the queue
-	Reader() QueueReader
+	// QueueList lists all queue names that have at least one item in the queue
+	QueueList(ctx context.Context) ([]string, error)
+	// Watcher returns a QueueWatcher for the queue data
+	QueueWatcher(ctx context.Context) QueueWatcher
 }
 
-// QueueReader provides an interface for reading from the queue
-type QueueReader interface {
-	// Start starts the queue reader
-	Start(ctx context.Context, ch chan<- QueuedItem) error
-	// Stop stops the queue reader
+// QueueWatcher watches the queue state
+type QueueWatcher interface {
+	// Start start swatching queue data and signal when a queue state changed
+	Start(ctx context.Context) (<-chan struct{}, error)
+	// Stop stops watching queue data
 	Stop(ctx context.Context)
-	// IsRunning returns true if the queue reader is running
-	IsRunning() bool
 }
 
 // QueuePriority represents the priority of a queued item

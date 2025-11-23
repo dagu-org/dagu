@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -11,6 +12,13 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
+
+func New(baseDir string) execution.QueueStore {
+	return &Store{
+		baseDir: baseDir,
+		queues:  make(map[string]*DualQueue),
+	}
+}
 
 var _ execution.QueueStore = (*Store)(nil)
 
@@ -23,6 +31,43 @@ type Store struct {
 	// queues is a map of queues, where the key is the queue name (DAG name)
 	queues map[string]*DualQueue
 	mu     sync.Mutex
+}
+
+// QueueWatcher implements execution.QueueStore.
+func (s *Store) QueueWatcher(_ context.Context) execution.QueueWatcher {
+	return newWatcher(s.baseDir)
+}
+
+// QueueList lists all queue names that have at least one item in the queue.
+func (s *Store) QueueList(ctx context.Context) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var names []string
+	entries, err := os.ReadDir(s.baseDir)
+	if err != nil {
+		logger.Error(ctx, "queue: Failed to read base directory", "dir", s.baseDir, "err", err)
+		return nil, fmt.Errorf("queue: failed to read base directory %s: %w", s.baseDir, err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			name := entry.Name()
+			// Ensure the directory is not empty
+			queueDir := filepath.Join(s.baseDir, name)
+			subEntries, err := os.ReadDir(queueDir)
+			if err != nil {
+				logger.Error(ctx, "queue: Failed to read queue directory", "dir", queueDir, "err", err)
+				continue
+			}
+			if len(subEntries) == 0 {
+				continue
+			}
+			names = append(names, name)
+		}
+	}
+
+	return names, nil
 }
 
 // All implements models.QueueStore.
@@ -186,11 +231,6 @@ func (s *Store) Enqueue(ctx context.Context, name string, p execution.QueuePrior
 	return nil
 }
 
-// Reader implements models.QueueStore.
-func (s *Store) Reader() execution.QueueReader {
-	return newQueueReader(s)
-}
-
 // createDualQueue creates a new DualQueue for the given name.
 func (s *Store) createDualQueue(name string) *DualQueue {
 	queueBaseDir := filepath.Join(s.baseDir, name)
@@ -200,11 +240,4 @@ func (s *Store) createDualQueue(name string) *DualQueue {
 // BaseDir returns the base directory of the queue store
 func (s *Store) BaseDir() string {
 	return s.baseDir
-}
-
-func New(baseDir string) execution.QueueStore {
-	return &Store{
-		baseDir: baseDir,
-		queues:  make(map[string]*DualQueue),
-	}
 }
