@@ -262,10 +262,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		}
 	}
 
-	logger.Debug(ctx, "Runner execution complete",
-		tag.Status, r.Status(ctx, plan).String(),
-		tag.Error, r.lastError,
-	)
+	logger.Debug(ctx, "Runner execution complete", tag.Status, r.Status(ctx, plan).String(), tag.Error, r.lastError)
 
 	return r.lastError
 }
@@ -679,11 +676,7 @@ func (r *Runner) setup(ctx context.Context) (err error) {
 	r.metrics.startTime = time.Now()
 
 	// Log runner setup
-	logger.Debug(ctx, "Runner setup complete",
-		"dagRunId", r.dagRunID,
-		"maxActiveRuns", r.maxActiveRuns,
-		"timeout", r.timeout,
-		"dry", r.dry)
+	logger.Debug(ctx, "Runner setup complete", "dagRunId", r.dagRunID, "maxActiveRuns", r.maxActiveRuns, "timeout", r.timeout, "dry", r.dry)
 
 	return err
 }
@@ -816,10 +809,7 @@ func (r *Runner) recoverNodePanic(ctx context.Context, node *Node) {
 	if panicObj := recover(); panicObj != nil {
 		stack := string(debug.Stack())
 		err := fmt.Errorf("panic recovered in node %s: %v\n%s", node.Name(), panicObj, stack)
-		logger.Error(ctx, "Panic occurred",
-			tag.Error, err,
-			"stack", stack,
-			tag.RunID, r.dagRunID)
+		logger.Error(ctx, "Panic occurred", tag.Error, err, "stack", stack, tag.RunID, r.dagRunID)
 		node.MarkError(err)
 		r.setLastError(err)
 

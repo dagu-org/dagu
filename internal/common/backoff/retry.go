@@ -85,11 +85,7 @@ func logSuccessIfNeeded(ctx context.Context, attempt int, lastDebugLog *time.Tim
 
 func logRetryIfNeeded(ctx context.Context, attempt int, interval time.Duration, err error, lastDebugLog *time.Time) {
 	if time.Since(*lastDebugLog) >= 30*time.Second {
-		logger.Debug(ctx, "Retryable operation failed, scheduling retry",
-			tag.Attempt, attempt,
-			tag.Interval, interval,
-			tag.Error, err,
-		)
+		logger.Debug(ctx, "Retryable operation failed, scheduling retry", tag.Attempt, attempt, tag.Interval, interval, tag.Error, err)
 		*lastDebugLog = time.Now()
 	}
 }

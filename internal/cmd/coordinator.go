@@ -120,21 +120,14 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.
 			advertiseAddr = cfg.Coordinator.Host
 			// Warn if fallback address is potentially invalid
 			if advertiseAddr == "0.0.0.0" || advertiseAddr == "127.0.0.1" {
-				logger.Warn(ctx, "Coordinator advertise address fallback is potentially invalid for service discovery",
-					tag.Addr, advertiseAddr,
-					tag.Reason, "hostname detection failed and no explicit advertise address provided; workers may not be able to connect")
+				logger.Warn(ctx, "Coordinator advertise address fallback is potentially invalid for service discovery", tag.Addr, advertiseAddr, tag.Reason, "hostname detection failed and no explicit advertise address provided; workers may not be able to connect")
 			} else {
-				logger.Warn(ctx, "Coordinator advertise address fallback to configured host due to hostname detection failure",
-					tag.Addr, advertiseAddr)
+				logger.Warn(ctx, "Coordinator advertise address fallback to configured host due to hostname detection failure", tag.Addr, advertiseAddr)
 			}
 		}
 	}
 
-	logger.Info(ctx, "Coordinator initialization",
-		"bind-address", cfg.Coordinator.Host,
-		"advertise-address", advertiseAddr,
-		tag.Port, cfg.Coordinator.Port,
-		"instance-id", instanceID)
+	logger.Info(ctx, "Coordinator initialization", "bind-address", cfg.Coordinator.Host, "advertise-address", advertiseAddr, tag.Port, cfg.Coordinator.Port, "instance-id", instanceID)
 	// Create gRPC server options
 	var serverOpts []grpc.ServerOption
 

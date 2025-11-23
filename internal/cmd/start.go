@@ -183,15 +183,9 @@ func runStart(ctx *Context, args []string) error {
 
 	// Log root dag-run or reschedule action
 	if fromRunID != "" {
-		logger.Info(ctx, "Rescheduling dag-run",
-			tag.Action, "reschedule",
-			"from-dag-run-id", fromRunID,
-			"params", params,
-		)
+		logger.Info(ctx, "Rescheduling dag-run", tag.Action, "reschedule", "from-dag-run-id", fromRunID, "params", params)
 	} else {
-		logger.Info(ctx, "Executing root dag-run",
-			"params", params,
-		)
+		logger.Info(ctx, "Executing root dag-run", "params", params)
 	}
 
 	// Check if this DAG should be distributed to workers
@@ -200,8 +194,7 @@ func runStart(ctx *Context, args []string) error {
 	// The --no-queue flag acts as a circuit breaker to prevent infinite loops
 	// when the worker executes the dispatched task.
 	if !queueDisabled && len(dag.WorkerSelector) > 0 {
-		logger.Info(ctx, "DAG has workerSelector, enqueueing for distributed execution",
-			"worker-selector", dag.WorkerSelector)
+		logger.Info(ctx, "DAG has workerSelector, enqueueing for distributed execution", "worker-selector", dag.WorkerSelector)
 		dag.Location = "" // Queued dag-runs must not have a location
 		return enqueueDAGRun(ctx, dag, dagRunID)
 	}
@@ -410,11 +403,7 @@ func determineRootDAGRun(isSubDAGRun bool, rootDAGRun string, dag *core.DAG, dag
 // handleSubDAGRun processes a sub dag-run, checking for previous runs
 func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root execution.DAGRunRef, parent execution.DAGRunRef) error {
 	// Log sub dag-run execution
-	logger.Info(ctx, "Executing sub dag-run",
-		"params", params,
-		"root", root,
-		"parent", parent,
-	)
+	logger.Info(ctx, "Executing sub dag-run", "params", params, "root", root, "parent", parent)
 
 	// Double-check dag-run ID is provided (should be caught earlier, but being defensive)
 	if dagRunID == "" {

@@ -215,21 +215,13 @@ func runExec(ctx *Context, args []string) error {
 	dagRunRef := execution.NewDAGRunRef(dag.Name, runID)
 
 	if !queueDisabled && len(workerLabels) > 0 {
-		logger.Info(ctx, "Queueing inline dag-run for distributed execution",
-			tag.DAG, dag.Name,
-			tag.RunID, runID,
-			"worker-selector", workerLabels,
-			tag.Command, strings.Join(args, " "))
+		logger.Info(ctx, "Queueing inline dag-run for distributed execution", tag.DAG, dag.Name, tag.RunID, runID, "worker-selector", workerLabels, tag.Command, strings.Join(args, " "))
 		dag.Location = ""
 		return enqueueDAGRun(ctx, dag, runID)
 	}
 
 	if !queueDisabled && dag.Queue != "" {
-		logger.Info(ctx, "Queueing inline dag-run",
-			tag.DAG, dag.Name,
-			tag.Queue, dag.Queue,
-			tag.RunID, runID,
-			tag.Command, strings.Join(args, " "))
+		logger.Info(ctx, "Queueing inline dag-run", tag.DAG, dag.Name, tag.Queue, dag.Queue, tag.RunID, runID, tag.Command, strings.Join(args, " "))
 		dag.Location = ""
 		return enqueueDAGRun(ctx, dag, runID)
 	}
@@ -239,10 +231,7 @@ func runExec(ctx *Context, args []string) error {
 		return fmt.Errorf("dag-run ID %s already exists for DAG %s", runID, dag.Name)
 	}
 
-	logger.Info(ctx, "Executing inline dag-run",
-		tag.DAG, dag.Name,
-		tag.Command, strings.Join(args, " "),
-		tag.RunID, runID)
+	logger.Info(ctx, "Executing inline dag-run", tag.DAG, dag.Name, tag.Command, strings.Join(args, " "), tag.RunID, runID)
 
 	err = tryExecuteDAG(ctx, dag, runID, dagRunRef, false)
 	if errors.Is(err, errMaxRunReached) && !queueDisabled {

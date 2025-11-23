@@ -301,4 +301,34 @@ const (
 
 	// NextRun identifies next scheduled run time.
 	NextRun = "next-run"
+
+	// JobType identifies the type of scheduled job.
+	JobType = "job-type"
+
+	// ScheduledTime identifies when a job was scheduled.
+	ScheduledTime = "scheduled-time"
+)
+
+// Worker and poller tags
+const (
+	// PollerID identifies a poller instance.
+	PollerID = "poller-id"
+
+	// PollerIndex identifies a poller's index.
+	PollerIndex = "poller-index"
+
+	// Labels identifies worker labels.
+	Labels = "labels"
+)
+
+// Network binding tags
+const (
+	// BindAddress identifies the address to bind to.
+	BindAddress = "bind-address"
+
+	// AdvertiseAddress identifies the address to advertise.
+	AdvertiseAddress = "advertise-address"
+
+	// InstanceID identifies an instance ID.
+	InstanceID = "instance-id"
 )

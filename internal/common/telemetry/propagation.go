@@ -80,12 +80,7 @@ func InjectTraceContext(ctx context.Context) []string {
 	span := trace.SpanFromContext(ctx)
 	spanCtx := span.SpanContext()
 
-	logger.Debug(ctx, "InjectTraceContext called",
-		"has_active_span", spanCtx.IsValid(),
-		tag.TraceID, spanCtx.TraceID().String(),
-		tag.SpanID, spanCtx.SpanID().String(),
-		tag.TraceFlags, spanCtx.TraceFlags(),
-	)
+	logger.Debug(ctx, "InjectTraceContext called", "has_active_span", spanCtx.IsValid(), tag.TraceID, spanCtx.TraceID().String(), tag.SpanID, spanCtx.SpanID().String(), tag.TraceFlags, spanCtx.TraceFlags())
 
 	// Get the global propagator
 	prop := otel.GetTextMapPropagator()
@@ -98,9 +93,7 @@ func InjectTraceContext(ctx context.Context) []string {
 
 	// Log what was injected
 	envVars := carrier.ToEnv()
-	logger.Debug(ctx, "Trace context injected",
-		"env_vars", envVars,
-	)
+	logger.Debug(ctx, "Trace context injected", "env_vars", envVars)
 
 	// Convert to environment variables
 	return envVars
@@ -128,10 +121,7 @@ func ExtractTraceContext(ctx context.Context) context.Context {
 		carrier.Set("tracestate", tracestate)
 	}
 
-	logger.Debug(ctx, "ExtractTraceContext called",
-		"traceparent_env", os.Getenv("TRACEPARENT"),
-		"tracestate_env", os.Getenv("TRACESTATE"),
-	)
+	logger.Debug(ctx, "ExtractTraceContext called", "traceparent_env", os.Getenv("TRACEPARENT"), "tracestate_env", os.Getenv("TRACESTATE"))
 
 	// Extract the trace context from the carrier
 	newCtx := prop.Extract(ctx, carrier)
@@ -139,12 +129,7 @@ func ExtractTraceContext(ctx context.Context) context.Context {
 	// Check if extraction worked
 	span := trace.SpanFromContext(newCtx)
 	spanCtx := span.SpanContext()
-	logger.Debug(ctx, "Trace context extracted",
-		"has_active_span", spanCtx.IsValid(),
-		tag.TraceID, spanCtx.TraceID().String(),
-		tag.SpanID, spanCtx.SpanID().String(),
-		tag.TraceFlags, spanCtx.TraceFlags(),
-	)
+	logger.Debug(ctx, "Trace context extracted", "has_active_span", spanCtx.IsValid(), tag.TraceID, spanCtx.TraceID().String(), tag.SpanID, spanCtx.SpanID().String(), tag.TraceFlags, spanCtx.TraceFlags())
 
 	return newCtx
 }

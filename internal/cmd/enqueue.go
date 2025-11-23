@@ -141,11 +141,7 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 		return fmt.Errorf("failed to enqueue dag-run: %w", err)
 	}
 
-	logger.Info(ctx.Context, "Enqueued dag-run",
-		tag.DAG, dag.Name,
-		tag.RunID, dagRunID,
-		"params", dag.Params,
-	)
+	logger.Info(ctx.Context, "Enqueued dag-run", tag.DAG, dag.Name, tag.RunID, dagRunID, "params", dag.Params)
 
 	return nil
 }

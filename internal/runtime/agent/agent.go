@@ -484,13 +484,9 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Start the dag-run.
 	if a.retryTarget != nil {
-		logger.Info(ctx, "DAG run retry started",
-			"retry-target-attempt-id", a.retryTarget.AttemptID,
-		)
+		logger.Info(ctx, "DAG run retry started", "retry-target-attempt-id", a.retryTarget.AttemptID)
 	} else {
-		logger.Info(ctx, "DAG run started",
-			"params", a.dag.Params,
-		)
+		logger.Info(ctx, "DAG run started", "params", a.dag.Params)
 	}
 
 	// Start watching for cancel requests
@@ -525,11 +521,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Log execution summary
-	logger.Info(ctx, "DAG run finished",
-		tag.Status, finishedStatus.Status.String(),
-		tag.StartTime, finishedStatus.StartedAt,
-		tag.EndTime, finishedStatus.FinishedAt,
-	)
+	logger.Info(ctx, "DAG run finished", tag.Status, finishedStatus.Status.String(), tag.StartTime, finishedStatus.StartedAt, tag.EndTime, finishedStatus.FinishedAt)
 
 	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
 		logger.Error(ctx, "Status write failed", tag.Error, err)
@@ -839,10 +831,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 // process by sending a SIGKILL to force the process to be shutdown.
 // if processes do not terminate after MaxCleanUp time, it sends KILL signal.
 func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
-	logger.Info(ctx, "Sending signal to running child processes",
-		tag.Signal, sig.String(),
-		"allow-override", allowOverride,
-		"max-cleanup-time", a.dag.MaxCleanUpTime/time.Second)
+	logger.Info(ctx, "Sending signal to running child processes", tag.Signal, sig.String(), "allow-override", allowOverride, "max-cleanup-time", a.dag.MaxCleanUpTime/time.Second)
 
 	if !signal.IsTerminationSignalOS(sig) {
 		// For non-termination signals, just send the signal once and return.
@@ -874,8 +863,7 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 			return
 
 		case <-ticker.C:
-			logger.Info(ctx, "Resending signal to processes that haven't terminated",
-				tag.Signal, sig.String())
+			logger.Info(ctx, "Resending signal to processes that haven't terminated", tag.Signal, sig.String())
 			a.runner.Signal(ctx, a.plan, sig, nil, false)
 
 		case <-time.After(500 * time.Millisecond):
@@ -995,11 +983,7 @@ func execWithRecovery(ctx context.Context, fn func()) {
 			}
 
 			// Log with structured information
-			logger.Error(ctx, "Recovered from panic",
-				"err", err.Error(),
-				"errType", fmt.Sprintf("%T", panicObj),
-				"stackTrace", stack,
-				"fullStack", string(stack))
+			logger.Error(ctx, "Recovered from panic", "err", err.Error(), "errType", fmt.Sprintf("%T", panicObj), "stackTrace", stack, "fullStack", string(stack))
 		}
 	}()
 

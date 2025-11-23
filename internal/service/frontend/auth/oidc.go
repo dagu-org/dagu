@@ -184,9 +184,7 @@ func checkOIDCAuth(next http.Handler, provider *oidc.Provider, verifier *oidc.ID
 			next.ServeHTTP(w, r)
 			return
 		}
-		logger.Warn(ctx, "OIDC cookie rejected: token verification failed during UI access",
-			tag.Path, r.URL.Path,
-			"method", r.Method)
+		logger.Warn(ctx, "OIDC cookie rejected: token verification failed during UI access", tag.Path, r.URL.Path, "method", r.Method)
 		clearCookie(w, r, cookieOIDCToken)
 	}
 	// Callback handling.
@@ -206,25 +204,17 @@ func checkOIDCToken(next http.Handler, verifier *oidc.IDTokenVerifier, w http.Re
 	ctx := r.Context()
 	authorized, err := r.Cookie(cookieOIDCToken)
 	if err != nil {
-		logger.Warn(ctx, "OIDC authentication failed: oidcToken cookie not found",
-			tag.Path, r.URL.Path,
-			"method", r.Method,
-			tag.Error, err)
+		logger.Warn(ctx, "OIDC authentication failed: oidcToken cookie not found", tag.Path, r.URL.Path, "method", r.Method, tag.Error, err)
 		http.Error(w, "Authentication required: OIDC token cookie not found", http.StatusUnauthorized)
 		return
 	}
 	if authorized.Value == "" {
-		logger.Warn(ctx, "OIDC authentication failed: oidcToken cookie is empty",
-			tag.Path, r.URL.Path,
-			"method", r.Method)
+		logger.Warn(ctx, "OIDC authentication failed: oidcToken cookie is empty", tag.Path, r.URL.Path, "method", r.Method)
 		http.Error(w, "Authentication required: OIDC token is empty", http.StatusUnauthorized)
 		return
 	}
 	if err := verifyIDToken(verifier, authorized.Value); err != nil {
-		logger.Warn(ctx, "OIDC authentication failed: token verification failed",
-			tag.Path, r.URL.Path,
-			"method", r.Method,
-			tag.Error, err)
+		logger.Warn(ctx, "OIDC authentication failed: token verification failed", tag.Path, r.URL.Path, "method", r.Method, tag.Error, err)
 		clearCookie(w, r, cookieOIDCToken)
 		http.Error(w, "Authentication failed: invalid or expired OIDC token", http.StatusUnauthorized)
 		return

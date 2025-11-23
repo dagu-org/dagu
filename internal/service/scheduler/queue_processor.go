@@ -275,7 +275,8 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 
 	runRef := item.Data()
 	runID := runRef.ID
-	logger.Info(ctx, "Received item", tag.Name, runRef.Name)
+	_ = runID // used below
+	logger.Debug(ctx, "Processing queue item", tag.Name, runRef.Name)
 
 	// Check if the DAG run is already running
 	if running, err := p.procStore.IsRunAlive(ctx, queueName, runRef); err != nil {
@@ -366,7 +367,7 @@ func (p *QueueProcessor) wakeUp() {
 func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, runRef execution.DAGRunRef, errCh chan error) (bool, error) {
 	select {
 	case <-ctx.Done():
-		logger.Info(ctx, "Context canceled")
+		logger.Debug(ctx, "Context canceled")
 		return false, backoff.PermanentError(ctx.Err())
 	case <-p.quit:
 		logger.Info(ctx, "Processor is closed")

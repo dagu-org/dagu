@@ -79,8 +79,7 @@ func runRetry(ctx *Context, args []string) error {
 	// The --no-queue flag acts as a circuit breaker to prevent infinite loops
 	// when the worker executes the dispatched retry task.
 	if !queueDisabled && len(dag.WorkerSelector) > 0 {
-		logger.Info(ctx, "DAG has workerSelector, enqueueing retry for distributed execution",
-			"worker-selector", dag.WorkerSelector)
+		logger.Info(ctx, "DAG has workerSelector, enqueueing retry for distributed execution", "worker-selector", dag.WorkerSelector)
 
 		// Enqueue the retry - must create new attempt with status "Queued"
 		// so the scheduler will process it
@@ -243,8 +242,7 @@ func enqueueRetry(ctx *Context, dag *core.DAG, dagRunID string) error {
 		return fmt.Errorf("failed to enqueue: %w", err)
 	}
 
-	logger.Info(ctx, "Retry attempt created and enqueued",
-		tag.AttemptID, att.ID())
+	logger.Info(ctx, "Retry attempt created and enqueued", tag.AttemptID, att.ID())
 
 	return nil
 }

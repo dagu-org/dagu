@@ -107,10 +107,7 @@ func dequeueDAGRun(ctx *Context, dagRun execution.DAGRunRef) error {
 		}
 	}
 
-	logger.Info(ctx.Context, "Dequeued dag-run",
-		tag.DAG, dagRun.Name,
-		tag.RunID, dagRun.ID,
-	)
+	logger.Info(ctx.Context, "Dequeued dag-run", tag.DAG, dagRun.Name, tag.RunID, dagRun.ID)
 
 	return nil
 }

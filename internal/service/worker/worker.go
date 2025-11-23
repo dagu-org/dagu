@@ -58,9 +58,7 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 
 // Start begins the worker's operation, launching multiple polling goroutines.
 func (w *Worker) Start(ctx context.Context) error {
-	logger.Info(ctx, "Starting worker",
-		tag.WorkerID, w.id,
-		tag.MaxConcurrency, w.maxActiveRuns)
+	logger.Info(ctx, "Starting worker", tag.WorkerID, w.id, tag.MaxConcurrency, w.maxActiveRuns)
 
 	// Create a wait group to track all polling goroutines
 	var wg sync.WaitGroup
@@ -180,17 +178,10 @@ func (w *Worker) sendHeartbeats(ctx context.Context) {
 		if err := w.sendHeartbeat(ctx); err != nil {
 			nextInterval, nextErr := retrier.Next(err)
 			if nextErr != nil {
-				logger.Error(ctx, "Failed to compute heartbeat backoff interval",
-					tag.WorkerID, w.id,
-					tag.Error, err,
-				)
+				logger.Error(ctx, "Failed to compute heartbeat backoff interval", tag.WorkerID, w.id, tag.Error, err)
 				nextInterval = healthyInterval
 			} else {
-				logger.Warn(ctx, "Heartbeat send failed; will retry with backoff",
-					tag.WorkerID, w.id,
-					tag.Error, err,
-					tag.Interval, nextInterval,
-				)
+				logger.Warn(ctx, "Heartbeat send failed; will retry with backoff", tag.WorkerID, w.id, tag.Error, err, tag.Interval, nextInterval)
 			}
 
 			nextDelay = nextInterval

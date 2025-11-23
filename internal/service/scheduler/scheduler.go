@@ -133,10 +133,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 			logger.Error(ctx, "Failed to register with service registry", tag.Error, err)
 			// Continue anyway - service registry is not critical
 		} else {
-			logger.Info(ctx, "Registered with service registry as inactive",
-				tag.ServiceID, s.instanceID,
-				tag.Host, hostname,
-				tag.Port, s.config.Scheduler.Port)
+			logger.Info(ctx, "Registered with service registry as inactive", tag.ServiceID, s.instanceID, tag.Host, hostname, tag.Port, s.config.Scheduler.Port)
 		}
 	}
 
@@ -170,7 +167,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	queueWatcher := s.queueStore.QueueWatcher(ctx)
 	notifyCh, err := queueWatcher.Start(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to start queue watcher")
+		logger.Error(ctx, "Failed to start queue watcher", tag.Error, err)
 		return err
 	}
 	s.queueProcessor.Start(ctx, notifyCh)
@@ -364,10 +361,7 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 		}
 
 		// Create a child context for this specific job execution
-		jobCtx := logger.WithValues(ctx,
-			tag.Job, job.Job,
-			"jobType", job.Type.String(),
-			"scheduledTime", job.Next.Format(time.RFC3339))
+		jobCtx := logger.WithValues(ctx, tag.Job, job.Job, "jobType", job.Type.String(), "scheduledTime", job.Next.Format(time.RFC3339))
 
 		// Launch job execution in goroutine
 		go func(ctx context.Context, job *ScheduledJob) {
@@ -380,9 +374,7 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 				case errors.Is(err, ErrJobSkipped):
 					logger.Info(ctx, "Job execution skipped", tag.Reason, err.Error())
 				default:
-					logger.Error(ctx, "Job execution failed",
-						tag.Error, err,
-						tag.Type, fmt.Sprintf("%T", err))
+					logger.Error(ctx, "Job execution failed", tag.Error, err, tag.Type, fmt.Sprintf("%T", err))
 				}
 			} else {
 				logger.Info(ctx, "Job completed successfully")

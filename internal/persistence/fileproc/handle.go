@@ -123,7 +123,16 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 		// recovery
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error(ctx, "Heartbeat goroutine panicked", tag.Error, r)
+				var err error
+				switch v := r.(type) {
+				case error:
+					err = v
+				case string:
+					err = fmt.Errorf("%s", v)
+				default:
+					err = fmt.Errorf("%v", v)
+				}
+				logger.Error(ctx, "Heartbeat goroutine panicked", tag.Error, err)
 			}
 		}()
 

@@ -330,8 +330,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		if oc.outputWriter != nil {
 			logger.Debug(ctx, "Captured output: closing output writer")
 			if err := oc.outputWriter.Close(); err != nil {
-				ctxErr := logger.WithValues(ctx, tag.Error, err)
-				logger.Error(ctxErr, "Failed to close pipe writer")
+				logger.Error(ctx, "Failed to close pipe writer", tag.Error, err)
 			}
 			oc.outputWriter = nil // Mark as closed
 		}
@@ -349,10 +348,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 			oc.outputData = strings.TrimSpace(output)
 		}
 
-		// Update context with new output data
-		ctx = logger.WithValues(context.Background(), tag.Output, oc.outputData, tag.Length, len(oc.outputData))
-
-		logger.Debug(ctx, "Captured output")
+		logger.Debug(ctx, "Captured output", tag.Length, len(oc.outputData))
 
 		// Mark as captured for caching
 		oc.outputCaptured = true
@@ -360,8 +356,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		// Close the reader
 		if oc.outputReader != nil {
 			if err := oc.outputReader.Close(); err != nil {
-				ctxErr := logger.WithValues(ctx, tag.Error, err)
-				logger.Error(ctxErr, "Failed to close pipe reader")
+				logger.Error(ctx, "Failed to close pipe reader", tag.Error, err)
 			}
 			oc.outputReader = nil
 		}
@@ -379,8 +374,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	if oc.outputWriter != nil {
 		logger.Debug(ctx, "Captured output: closing output writer")
 		if err := oc.outputWriter.Close(); err != nil {
-			ctxErr := logger.WithValues(ctx, tag.Error, err)
-			logger.Error(ctxErr, "Failed to close pipe writer")
+			logger.Error(ctx, "Failed to close pipe writer", tag.Error, err)
 		}
 		oc.outputWriter = nil // Mark as closed
 	}
@@ -396,8 +390,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 
 	// Check if output was truncated
 	if buf.Len() == int(oc.maxOutputSize) {
-		ctxMaxSize := logger.WithValues(ctx, tag.MaxSize, oc.maxOutputSize)
-		logger.Warn(ctxMaxSize, "Output truncated due to size limit")
+		logger.Warn(ctx, "Output truncated due to size limit", tag.MaxSize, oc.maxOutputSize)
 		output += "\n[OUTPUT TRUNCATED]"
 	}
 
@@ -408,15 +401,11 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		oc.outputData = output
 	}
 
-	// Update context with final output data
-	ctx = logger.WithValues(context.Background(), tag.Output, oc.outputData, tag.Length, len(oc.outputData))
-
-	logger.Debug(ctx, "Captured output")
+	logger.Debug(ctx, "Captured output", tag.Length, len(oc.outputData))
 
 	// Close the reader after reading
 	if err := oc.outputReader.Close(); err != nil {
-		ctxErr := logger.WithValues(ctx, tag.Error, err)
-		logger.Error(ctxErr, "Failed to close pipe reader")
+		logger.Error(ctx, "Failed to close pipe reader", tag.Error, err)
 	}
 	oc.outputReader = nil // Mark as closed
 
@@ -483,8 +472,7 @@ func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 					oc.mu.Lock()
 					oc.err = fmt.Errorf("failed to read output: %w", err)
 					oc.mu.Unlock()
-					ctxErr := logger.WithValues(ctx, tag.Error, err)
-					logger.Error(ctxErr, "Failed to capture output")
+					logger.Error(ctx, "Failed to capture output", tag.Error, err)
 				}
 				break
 			}

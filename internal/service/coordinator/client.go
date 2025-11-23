@@ -127,22 +127,12 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 
 			// Try to dispatch
 			if _, err := client.client.Dispatch(dispatchCtx, req); err != nil {
-				logger.Warn(ctx, "Failed to dispatch task to coordinator",
-					tag.RunID, task.DagRunId,
-					tag.Target, task.Target,
-					"worker-selector", task.WorkerSelector,
-					"coordinator-id", member.ID,
-				)
+				logger.Warn(ctx, "Failed to dispatch task to coordinator", tag.RunID, task.DagRunId, tag.Target, task.Target, "worker-selector", task.WorkerSelector, "coordinator-id", member.ID)
 
 				return fmt.Errorf("failed to dispatch task to coordinator %s: %w", member.ID, err)
 			}
 
-			logger.Info(ctx, "Task dispatched successfully",
-				tag.RunID, task.DagRunId,
-				tag.Target, task.Target,
-				"worker-selector", task.WorkerSelector,
-				"coordinator-id", member.ID,
-			)
+			logger.Info(ctx, "Task dispatched successfully", tag.RunID, task.DagRunId, tag.Target, task.Target, "worker-selector", task.WorkerSelector, "coordinator-id", member.ID)
 
 			return nil
 		})
@@ -171,12 +161,7 @@ func (cli *clientImpl) Poll(ctx context.Context, policy backoff.RetryPolicy, req
 
 			if resp.Task != nil {
 				task = resp.Task
-				logger.Info(ctx, "Task polled successfully",
-					tag.RunID, task.DagRunId,
-					tag.Target, task.Target,
-					"worker-selector", task.WorkerSelector,
-					"coordinator-id", member.ID,
-				)
+				logger.Info(ctx, "Task polled successfully", tag.RunID, task.DagRunId, tag.Target, task.Target, "worker-selector", task.WorkerSelector, "coordinator-id", member.ID)
 			}
 
 			return nil
@@ -207,11 +192,7 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []execution.Host
 		// Get or create client for this coordinator
 		client, err := cli.getOrCreateClient(member)
 		if err != nil {
-			logger.Warn(ctx, "Failed to connect to coordinator",
-				"coordinator-id", member.ID,
-				tag.Host, member.Host,
-				tag.Port, member.Port,
-				tag.Error, err)
+			logger.Warn(ctx, "Failed to connect to coordinator", "coordinator-id", member.ID, tag.Host, member.Host, tag.Port, member.Port, tag.Error, err)
 			cli.removeClient(member.ID) // Remove failed client
 			cli.recordFailure(err)
 			continue
@@ -219,22 +200,14 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []execution.Host
 
 		// Check if the coordinator is healthy
 		if err := cli.isHealthy(ctx, member); err != nil {
-			logger.Warn(ctx, "Failed to check coordinator health",
-				"coordinator-id", member.ID,
-				tag.Host, member.Host,
-				tag.Port, member.Port,
-				tag.Error, err)
+			logger.Warn(ctx, "Failed to check coordinator health", "coordinator-id", member.ID, tag.Host, member.Host, tag.Port, member.Port, tag.Error, err)
 			cli.recordFailure(err)
 			continue
 		}
 
 		// Create request
 		if err := callback(ctx, member, client); err != nil {
-			logger.Debug(ctx, "Failed to dispatch to coordinator",
-				"coordinator-id", member.ID,
-				tag.Host, member.Host,
-				tag.Port, member.Port,
-				tag.Error, err)
+			logger.Debug(ctx, "Failed to dispatch to coordinator", "coordinator-id", member.ID, tag.Host, member.Host, tag.Port, member.Port, tag.Error, err)
 			lastErr = err
 			cli.recordFailure(err)
 		} else {
@@ -343,9 +316,7 @@ func (cli *clientImpl) Cleanup(ctx context.Context) error {
 
 	for id, c := range cli.clients {
 		if err := c.conn.Close(); err != nil {
-			logger.Error(ctx, "Failed to close connection",
-				"coordinator-id", id,
-				tag.Error, err)
+			logger.Error(ctx, "Failed to close connection", "coordinator-id", id, tag.Error, err)
 		}
 	}
 
@@ -372,8 +343,7 @@ func (cli *clientImpl) recordSuccess(ctx context.Context) {
 
 	// Log recovery if this was a disconnection
 	if !cli.state.IsConnected && cli.state.ConsecutiveFails > 0 {
-		logger.Info(ctx, "CoordinatorCli connection recovered",
-			"previous-consecutive-failures", cli.state.ConsecutiveFails)
+		logger.Info(ctx, "CoordinatorCli connection recovered", "previous-consecutive-failures", cli.state.ConsecutiveFails)
 	}
 
 	// Reset consecutive failures on success
@@ -398,11 +368,7 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 		// Get or create client for this member
 		c, err := cli.getOrCreateClient(member)
 		if err != nil {
-			logger.Warn(ctx, "Failed to connect to coordinator",
-				tag.ID, member.ID,
-				tag.Host, member.Host,
-				tag.Port, member.Port,
-				tag.Error, err)
+			logger.Warn(ctx, "Failed to connect to coordinator", tag.ID, member.ID, tag.Host, member.Host, tag.Port, member.Port, tag.Error, err)
 			lastErr = err
 			continue
 		}
@@ -410,11 +376,7 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 		// Try to get workers from this coordinator
 		resp, err := c.client.GetWorkers(ctx, &coordinatorv1.GetWorkersRequest{})
 		if err != nil {
-			logger.Warn(ctx, "Failed to get workers from coordinator",
-				tag.ID, member.ID,
-				tag.Host, member.Host,
-				tag.Port, member.Port,
-				tag.Error, err)
+			logger.Warn(ctx, "Failed to get workers from coordinator", tag.ID, member.ID, tag.Host, member.Host, tag.Port, member.Port, tag.Error, err)
 			lastErr = err
 
 			// If this is a connection error, remove the client from cache

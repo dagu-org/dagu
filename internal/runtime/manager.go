@@ -421,10 +421,7 @@ func execWithRecovery(ctx context.Context, fn func()) {
 			}
 
 			// Log with structured information
-			logger.Error(ctx, "Recovered from panic",
-				tag.Error, err.Error(),
-				"err-type", fmt.Sprintf("%T", panicObj),
-				"stack-trace", string(stack))
+			logger.Error(ctx, "Recovered from panic", tag.Error, err.Error(), "err-type", fmt.Sprintf("%T", panicObj), "stack-trace", string(stack))
 		}
 	}()
 

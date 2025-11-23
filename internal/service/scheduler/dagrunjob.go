@@ -97,7 +97,7 @@ func (j *DAGRunJob) skipIfSuccessful(ctx context.Context, latestStatus execution
 	prevExecTime := j.PrevExecTime(ctx)
 	if (latestStartedAt.After(prevExecTime) || latestStartedAt.Equal(prevExecTime)) &&
 		latestStartedAt.Before(j.Next) {
-		logger.Infof(ctx, "skipping the job because it has already run successfully at %s", latestStartedAt)
+		logger.Info(ctx, "Skipping job due to successful prior run", tag.StartTime, latestStartedAt.Format(time.RFC3339))
 		return ErrJobSuccess
 	}
 	return nil

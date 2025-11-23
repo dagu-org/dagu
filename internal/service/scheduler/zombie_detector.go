@@ -73,7 +73,16 @@ func (z *ZombieDetector) loop(ctx context.Context) {
 				defer wg.Done()
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error(ctx, "Zombie detection check panicked", tag.Error, r)
+						var err error
+						switch v := r.(type) {
+						case error:
+							err = v
+						case string:
+							err = fmt.Errorf("%s", v)
+						default:
+							err = fmt.Errorf("%v", v)
+						}
+						logger.Error(ctx, "Zombie detection check panicked", tag.Error, err)
 					}
 				}()
 				z.detectAndCleanZombies(ctx)
@@ -121,8 +130,7 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 		}
 
 		if err := z.checkAndCleanZombie(ctx, st); err != nil {
-			logger.Error(ctx, "Failed to check zombie status",
-				tag.Name, st.Name, tag.RunID, st.DAGRunID, tag.Error, err)
+			logger.Error(ctx, "Failed to check zombie status", tag.Name, st.Name, tag.RunID, st.DAGRunID, tag.Error, err)
 		}
 	}
 }
@@ -153,8 +161,7 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.
 	}
 
 	// Process is zombie, update status to error
-	logger.Info(ctx, "Found zombie DAG run, updating to error status",
-		tag.Name, st.Name, tag.RunID, st.DAGRunID)
+	logger.Info(ctx, "Found zombie DAG run, updating to error status", tag.Name, st.Name, tag.RunID, st.DAGRunID)
 
 	// Update the status to error
 	st.Status = core.Failed

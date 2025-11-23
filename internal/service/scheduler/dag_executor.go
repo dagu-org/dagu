@@ -85,8 +85,7 @@ func (e *DAGExecutor) HandleJob(
 		// Enrich context with DAG and RunID for all subsequent logging
 		ctx = logger.WithValues(ctx, tag.DAG, dag.Name, tag.RunID, runID)
 
-		logger.Info(ctx, "Enqueueing DAG for distributed execution",
-			"worker-selector", dag.WorkerSelector)
+		logger.Info(ctx, "Enqueueing DAG for distributed execution", "worker-selector", dag.WorkerSelector)
 
 		spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
 			DAGRunID: runID,
@@ -177,8 +176,7 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 	// Enrich context with task-related values for subsequent logging
 	ctx = logger.WithValues(ctx, tag.Target, task.Target, tag.RunID, task.DagRunId)
 
-	logger.Info(ctx, "Task dispatched to coordinator",
-		"operation", task.Operation.String())
+	logger.Info(ctx, "Task dispatched to coordinator", "operation", task.Operation.String())
 
 	return nil
 }

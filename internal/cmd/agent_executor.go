@@ -29,10 +29,7 @@ func ExecuteAgent(ctx *Context, agentInstance *agent.Agent, dag *core.DAG, dagRu
 
 	// Run the DAG
 	if err := agentInstance.Run(ctx); err != nil {
-		logger.Error(ctx, "Failed to execute dag-run",
-			tag.DAG, dag.Name,
-			tag.RunID, dagRunID,
-			tag.Error, err)
+		logger.Error(ctx, "Failed to execute dag-run", tag.DAG, dag.Name, tag.RunID, dagRunID, tag.Error, err)
 		if ctx.Proc != nil {
 			_ = ctx.Proc.Stop(ctx)
 		}

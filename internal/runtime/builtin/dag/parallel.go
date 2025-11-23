@@ -95,11 +95,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Channel to collect errors from goroutines
 	errChan := make(chan error, len(e.runParamsList))
 
-	logger.Info(ctx, "Starting parallel execution",
-		"total", len(e.runParamsList),
-		"max-concurrent", e.maxConcurrent,
-		tag.DAG, e.child.DAG.Name,
-	)
+	logger.Info(ctx, "Starting parallel execution", "total", len(e.runParamsList), "max-concurrent", e.maxConcurrent, tag.DAG, e.child.DAG.Name)
 
 	// Launch all sub DAG executions
 	for _, params := range e.runParamsList {
@@ -118,10 +114,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 
 			// Execute sub DAG
 			if err := e.executeChild(ctx, runParams); err != nil {
-				logger.Error(ctx, "Sub DAG execution failed",
-					tag.RunID, runParams.RunID,
-					tag.Error, err,
-				)
+				logger.Error(ctx, "Sub DAG execution failed", tag.RunID, runParams.RunID, tag.Error, err)
 				errChan <- fmt.Errorf("sub DAG %s failed: %w", runParams.RunID, err)
 			}
 		}(params)

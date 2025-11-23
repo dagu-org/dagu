@@ -235,8 +235,7 @@ func (n *Node) runCommand(ctx context.Context, cmd executor.Executor, stepTimeou
 func (n *Node) handleTimeout(ctx context.Context, _ core.Step, stepTimeout, elapsed time.Duration) (int, error) {
 	timeoutErr := fmt.Errorf("step timed out after %v (timeout: %v): %w",
 		elapsed.Truncate(time.Millisecond), stepTimeout, context.DeadlineExceeded)
-	logger.Error(ctx, "Step execution timed out", tag.Timeout, stepTimeout,
-		tag.Duration, elapsed)
+	logger.Error(ctx, "Step execution timed out", tag.Timeout, stepTimeout, tag.Duration, elapsed)
 	n.SetError(timeoutErr)
 	n.SetStatus(core.NodeFailed)
 	return 124, timeoutErr // Standard timeout exit code

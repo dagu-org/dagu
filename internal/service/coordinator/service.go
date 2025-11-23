@@ -77,16 +77,11 @@ func (srv *Service) Start(ctx context.Context) error {
 		if err := srv.registry.Register(ctx, execution.ServiceNameCoordinator, hostInfo); err != nil {
 			return fmt.Errorf("failed to register with service registry: %w", err)
 		}
-		logger.Info(ctx, "Registered with service registry",
-			tag.ServiceID, srv.instanceID,
-			"configured-host", srv.configuredHost,
-			tag.Port, port,
-			tag.Addr, srv.hostPort)
+		logger.Info(ctx, "Registered with service registry", tag.ServiceID, srv.instanceID, "configured-host", srv.configuredHost, tag.Port, port, tag.Addr, srv.hostPort)
 	}
 
 	go func() {
-		logger.Info(ctx, "Starting to serve on coordinator service",
-			tag.Addr, srv.hostPort)
+		logger.Info(ctx, "Starting to serve on coordinator service", tag.Addr, srv.hostPort)
 		if err := srv.server.Serve(srv.grpcListener); err != nil {
 			logger.Fatal(ctx, "Failed to serve on coordinator service listener")
 		}
@@ -103,8 +98,7 @@ func (srv *Service) Stop(ctx context.Context) error {
 	// Unregister from service registry if monitor is available
 	if srv.registry != nil {
 		srv.registry.Unregister(ctx)
-		logger.Info(ctx, "Unregistered from service registry",
-			tag.ServiceID, srv.instanceID)
+		logger.Info(ctx, "Unregistered from service registry", tag.ServiceID, srv.instanceID)
 	}
 
 	t := time.AfterFunc(2*time.Second, func() {

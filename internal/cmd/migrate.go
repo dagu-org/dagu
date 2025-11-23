@@ -82,13 +82,7 @@ func runMigration(ctx *Context) error {
 
 	// Report results
 	if len(result.Errors) > 0 {
-		logger.Warn(ctx.Context, "Migration completed with errors",
-			"total-dags", result.TotalDAGs,
-			"total-runs", result.TotalRuns,
-			"migrated", result.MigratedRuns,
-			"skipped", result.SkippedRuns,
-			"failed", result.FailedRuns,
-		)
+		logger.Warn(ctx.Context, "Migration completed with errors", "total-dags", result.TotalDAGs, "total-runs", result.TotalRuns, "migrated", result.MigratedRuns, "skipped", result.SkippedRuns, "failed", result.FailedRuns)
 		for i, err := range result.Errors {
 			if i < 10 { // Limit error output
 				logger.Error(ctx.Context, "Migration error", tag.Error, err)
@@ -98,13 +92,7 @@ func runMigration(ctx *Context) error {
 			logger.Warn(ctx.Context, "Additional errors omitted", tag.Count, len(result.Errors)-10)
 		}
 	} else {
-		logger.Info(ctx.Context, "Migration completed",
-			"total-dags", result.TotalDAGs,
-			"total-runs", result.TotalRuns,
-			"migrated", result.MigratedRuns,
-			"skipped", result.SkippedRuns,
-			"failed", result.FailedRuns,
-		)
+		logger.Info(ctx.Context, "Migration completed", "total-dags", result.TotalDAGs, "total-runs", result.TotalRuns, "migrated", result.MigratedRuns, "skipped", result.SkippedRuns, "failed", result.FailedRuns)
 	}
 
 	// Move legacy data to archive if migration was successful
