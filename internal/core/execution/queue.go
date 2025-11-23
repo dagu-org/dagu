@@ -18,8 +18,8 @@ type QueueStore interface {
 	Enqueue(ctx context.Context, name string, priority QueuePriority, dagRun DAGRunRef) error
 	// DequeueByName retrieves an item from the queue and removes it
 	DequeueByName(ctx context.Context, name string) (QueuedItemData, error)
-	// DequeueByDAGRunID retrieves items from the queue by dag-run ID and removes them
-	DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([]QueuedItemData, error)
+	// DequeueByDAGRunID retrieves items from the queue by dag-run reference and removes them
+	DequeueByDAGRunID(ctx context.Context, name string, dagRun DAGRunRef) ([]QueuedItemData, error)
 	// Len returns the number of items in the queue
 	Len(ctx context.Context, name string) (int, error)
 	// List returns all items in the queue with the given name
