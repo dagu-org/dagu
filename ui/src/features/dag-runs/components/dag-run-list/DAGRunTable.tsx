@@ -261,9 +261,21 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
             {/* Header with name and status */}
             <div className="flex justify-between items-start mb-2">
               <div className="font-normal text-sm">{dagRun.name}</div>
-              <StatusChip status={dagRun.status} size="xs">
-                {dagRun.statusLabel}
-              </StatusChip>
+              <div className="flex flex-col items-end gap-1">
+                <StatusChip status={dagRun.status} size="xs">
+                  {dagRun.statusLabel}
+                </StatusChip>
+                {(dagRun.runningStepNames && dagRun.runningStepNames.length > 0) && (
+                  <div className="text-[10px] text-muted-foreground text-right">
+                    Running: {dagRun.runningStepNames.join(', ')}
+                  </div>
+                )}
+                {(dagRun.failedStepNames && dagRun.failedStepNames.length > 0) && (
+                  <div className="text-[10px] text-destructive text-right">
+                    Failed: {dagRun.failedStepNames.join(', ')}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* DAG-run ID */}
@@ -367,10 +379,22 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
                 {dagRun.dagRunId}
               </TableCell>
               <TableCell className="py-1 px-2">
-                <div className="flex items-center">
-                  <StatusChip status={dagRun.status} size="xs">
-                    {dagRun.statusLabel}
-                  </StatusChip>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center">
+                    <StatusChip status={dagRun.status} size="xs">
+                      {dagRun.statusLabel}
+                    </StatusChip>
+                  </div>
+                  {(dagRun.runningStepNames && dagRun.runningStepNames.length > 0) && (
+                    <div className="text-[10px] text-muted-foreground">
+                      Running: {dagRun.runningStepNames.join(', ')}
+                    </div>
+                  )}
+                  {(dagRun.failedStepNames && dagRun.failedStepNames.length > 0) && (
+                    <div className="text-[10px] text-destructive">
+                      Failed: {dagRun.failedStepNames.join(', ')}
+                    </div>
+                  )}
                 </div>
               </TableCell>
               <TableCell className="py-1 px-2 text-left">

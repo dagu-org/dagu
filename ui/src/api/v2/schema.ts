@@ -1008,6 +1008,10 @@ export interface components {
             log: string;
             /** @description Runtime parameters passed to the DAG-run in JSON format */
             params?: string;
+            /** @description Names of steps currently running in this DAG-run */
+            runningStepNames?: string[];
+            /** @description Names of steps that have failed in this DAG-run */
+            failedStepNames?: string[];
         };
         /** @description Detailed status of a DAG-run including sub DAG-run nodes */
         DAGRunDetails: components["schemas"]["DAGRunSummary"] & {

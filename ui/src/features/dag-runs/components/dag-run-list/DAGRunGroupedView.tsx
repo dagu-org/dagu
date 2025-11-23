@@ -301,9 +301,21 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                             </div>
                           </div>
                           <div className="flex-shrink-0 mt-0.5">
-                            <StatusChip status={dagRun.status} size="xs">
-                              {dagRun.statusLabel}
-                            </StatusChip>
+                            <div className="flex flex-col items-end gap-1">
+                              <StatusChip status={dagRun.status} size="xs">
+                                {dagRun.statusLabel}
+                              </StatusChip>
+                              {(dagRun.runningStepNames && dagRun.runningStepNames.length > 0) && (
+                                <div className="text-[10px] text-muted-foreground text-right">
+                                  Running: {dagRun.runningStepNames.join(', ')}
+                                </div>
+                              )}
+                              {(dagRun.failedStepNames && dagRun.failedStepNames.length > 0) && (
+                                <div className="text-[10px] text-destructive text-right">
+                                  Failed: {dagRun.failedStepNames.join(', ')}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
