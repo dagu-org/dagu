@@ -252,17 +252,17 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 
 	var wg sync.WaitGroup
 	for _, item := range runnableItems {
-		ctx = logger.WithValues(ctx, "runId", item.Data().ID)
 		wg.Add(1)
-		go func(item execution.QueuedItemData) {
+		go func(ctx context.Context, item execution.QueuedItemData) {
 			defer wg.Done()
+			ctx = logger.WithValues(ctx, "runId", item.Data().ID)
 			if p.processDAG(ctx, item, queueName) {
 				// Remove the item from the queue
 				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, item.Data().ID); err != nil {
 					logger.Error(ctx, "queue: Failed to dequeue item", "runId", item.Data().ID, "err", err)
 				}
 			}
-		}(item)
+		}(ctx, item)
 	}
 	wg.Wait()
 }
@@ -329,7 +329,7 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	queue := queueVal.(*queue)
 	queue.setMaxConc(dag.MaxActiveRuns)
 
-	var errCh chan error
+	errCh := make(chan error, 1)
 	if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID); err != nil {
 		logger.Error(ctx, "queue: Failed to execute dag", "runId", runID, "err", err)
 		errCh <- err
