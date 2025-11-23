@@ -15,22 +15,29 @@ import (
 )
 
 var (
-	errNotStarted      = errors.New("not started")
-	errProcessorClosed = errors.New("processor closed")
+	InitialBackoffInterval = 500 * time.Millisecond
+	MaxBackoffInterval     = 60 * time.Second
+	MaxBackoffRetries      = 10
 )
 
-type queueProcessor struct {
-	queueStore   execution.QueueStore
-	dagRunStore  execution.DAGRunStore
-	procStore    execution.ProcStore
-	queuesConfig config.Queues
-	queues       sync.Map
-	dagExecutor  *DAGExecutor
-	quit         chan struct{}
-	done         chan struct{}
-	wg           sync.WaitGroup
-	wait         chan struct{}
-	previousTime time.Time
+var (
+	errProcessorClosed = errors.New("processor closed")
+	errNotStarted      = errors.New("execution not started")
+)
+
+// QueueProcessor is responsible for processing queued DAG runs.
+type QueueProcessor struct {
+	queueStore  execution.QueueStore
+	dagRunStore execution.DAGRunStore
+	procStore   execution.ProcStore
+	dagExecutor *DAGExecutor
+	queues      sync.Map // map[string]*queue
+	wakeUpCh    chan struct{}
+	quit        chan struct{}
+	wg          sync.WaitGroup
+	stopOnce    sync.Once
+	prevTime    time.Time
+	lock        sync.Mutex
 }
 
 type queue struct {
@@ -50,27 +57,27 @@ func (q *queue) setMaxConc(val int) {
 	q.maxConcurrency = max(val, 1)
 }
 
-func newQueueProcessor(
+// NewQueueProcessor creates a new QueueProcessor.
+func NewQueueProcessor(
 	queueStore execution.QueueStore,
 	dagRunStore execution.DAGRunStore,
 	procStore execution.ProcStore,
 	dagExecutor *DAGExecutor,
 	queuesConfig config.Queues,
-) *queueProcessor {
-	p := &queueProcessor{
-		queueStore:   queueStore,
-		dagRunStore:  dagRunStore,
-		procStore:    procStore,
-		dagExecutor:  dagExecutor,
-		queuesConfig: queuesConfig,
-		quit:         make(chan struct{}),
-		done:         make(chan struct{}),
-		wait:         make(chan struct{}, 1),
+) *QueueProcessor {
+	p := &QueueProcessor{
+		queueStore:  queueStore,
+		dagRunStore: dagRunStore,
+		procStore:   procStore,
+		dagExecutor: dagExecutor,
+		wakeUpCh:    make(chan struct{}, 1),
+		quit:        make(chan struct{}),
+		prevTime:    time.Now(),
 	}
 
-	for name, queueConfig := range queuesConfig.Config {
+	for _, queueConfig := range queuesConfig.Config {
 		conc := max(queueConfig.MaxActiveRuns, 1)
-		p.queues.Store(name, &queue{
+		p.queues.Store(queueConfig.Name, &queue{
 			maxConcurrency: conc,
 		})
 	}
@@ -78,19 +85,20 @@ func newQueueProcessor(
 	return p
 }
 
-func (p *queueProcessor) start(ctx context.Context, notifyCh <-chan struct{}) {
-	p.previousTime = time.Now()
+// Start starts the queue processor.
+func (p *QueueProcessor) Start(ctx context.Context, notifyCh <-chan struct{}) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
 	// Start the main loop of the processor
 	p.wg.Add(1)
-	go func(ctx context.Context) {
+	go func() {
 		defer p.wg.Done()
 		p.loop(ctx)
-	}(ctx)
+	}()
 
-	// Start a file watcher to wake up the processor loop when a new item added
 	p.wg.Add(1)
-	go func(ctx context.Context) {
+	go func() {
 		defer p.wg.Done()
 		for {
 			select {
@@ -98,48 +106,52 @@ func (p *queueProcessor) start(ctx context.Context, notifyCh <-chan struct{}) {
 				return
 			case <-p.quit:
 				return
-			case <-time.After(30 * time.Second):
-				// wake up the queue processor on interval in case event is missed
-				p.wakeUp()
 			case <-notifyCh:
 				p.wakeUp()
 			}
 		}
-	}(ctx)
+	}()
 
-	p.wait <- struct{}{} // initial execution
+	p.wakeUp() // initial execution
 }
 
-func (p *queueProcessor) stop() {
-	close(p.done)
-	p.quit <- struct{}{}
-	p.wg.Wait()
+// Stop stops the queue processor.
+func (p *QueueProcessor) Stop() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.stopOnce.Do(func() {
+		close(p.quit)
+		p.wg.Wait()
+	})
 }
 
-func (p *queueProcessor) loop(ctx context.Context) {
+func (p *QueueProcessor) loop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-p.quit:
 			return
-		case <-p.wait:
+		case <-p.wakeUpCh:
+		case <-time.After(30 * time.Second):
+			// wake up the queue processor on interval in case event is missed
 		}
 
-		// Wait for a few seconds to avoid busy loop
-		sincePrev := time.Since(p.previousTime)
+		// Prevent too frequent execution
 		select {
 		case <-ctx.Done():
 			return
 		case <-p.quit:
 			return
-		case <-time.After(max(0, time.Second*3-sincePrev)):
+		case <-time.After(time.Until(p.prevTime.Add(3 * time.Second))):
+			p.prevTime = time.Now()
 		}
-		p.previousTime = time.Now()
 
 		// Now process each queue
 		queueList, err := p.queueStore.QueueList(ctx)
 		if err != nil {
+			logger.Error(ctx, "queue: Failed to get queue list", "err", err)
 			continue
 		}
 
@@ -174,32 +186,52 @@ func (p *queueProcessor) loop(ctx context.Context) {
 		var wg sync.WaitGroup
 		for name := range activeQueues {
 			wg.Add(1)
-			go func(ctx context.Context, name string) {
+			go func(name string) {
 				defer wg.Done()
-				ctx = logger.WithValues(ctx, "name", name)
-				p.processQueueItems(ctx, name)
-			}(ctx, name)
+				ctx := logger.WithValues(ctx, "name", name)
+				p.ProcessQueueItems(ctx, name)
+			}(name)
 		}
 		wg.Wait()
 	}
 }
 
-func (p *queueProcessor) processQueueItems(ctx context.Context, queueName string) {
-	if p.isClosed(ctx) {
+func (p *QueueProcessor) isClosed() bool {
+	select {
+	case <-p.quit:
+		return true
+	default:
+		return false
+	}
+}
+
+// ProcessQueueItems processes items in the specified queue.
+// It returns true if there are more items to process in the queue.
+func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string) {
+	if p.isClosed() {
 		return
 	}
+
+	// Get the queue configuration
+	v, ok := p.queues.Load(queueName)
+	if !ok {
+		logger.Warn(ctx, "queue: Queue not found in processor config", "queue", queueName)
+		return
+	}
+	q := v.(*queue)
 
 	items, err := p.queueStore.List(ctx, queueName)
 	if err != nil {
 		logger.Error(ctx, "queue: Failed to get queued items", "queue", queueName, "err", err)
+		return
 	}
 
 	if len(items) == 0 {
 		logger.Debug(ctx, "queue: no item found")
+		return
 	}
 
-	v, _ := p.queues.Load(queueName) // must exist
-	queue := v.(*queue)
+	defer p.wakeUp()
 
 	alive, err := p.procStore.CountAlive(ctx, queueName)
 	if err != nil {
@@ -207,85 +239,88 @@ func (p *queueProcessor) processQueueItems(ctx context.Context, queueName string
 		return
 	}
 
-	maxConc := queue.maxConc()
+	maxConc := q.maxConc()
 	free := maxConc - alive
 	if free <= 0 {
-		logger.Debug(ctx, "queue: Max concurrency reached", "max", queue.maxConcurrency, "alive", alive)
-		p.wakeUp() // wake up later to process remaining items
+		logger.Debug(ctx, "queue: Max concurrency reached", "max", maxConc, "alive", alive)
 		return
 	}
 
-	var wg sync.WaitGroup
 	cap := min(free, len(items))
-	if cap < len(items) {
-		p.wakeUp() // wake up later to process remaining items
-	}
 	runnableItems := items[:cap]
 	logger.Info(ctx, "queue: Processing batch of items", "count", len(runnableItems), "maxConcurrency", maxConc, "alive", alive)
 
+	var wg sync.WaitGroup
 	for _, item := range runnableItems {
+		ctx = logger.WithValues(ctx, "runId", item.Data().ID)
 		wg.Add(1)
-		go func(ctx context.Context, runRef execution.DAGRunRef) {
+		go func(item execution.QueuedItemData) {
 			defer wg.Done()
-			ctx = logger.WithValues(ctx, "runId", runRef.ID)
-			ret := p.processDAG(ctx, queueName, runRef)
-			if !ret {
-				logger.Warn(ctx, "queue: Process DAG unfinished, keep the item in the queue")
-				return
+			if p.processDAG(ctx, item, queueName) {
+				// Remove the item from the queue
+				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, item.Data().ID); err != nil {
+					logger.Error(ctx, "queue: Failed to dequeue item", "runId", item.Data().ID, "err", err)
+				}
 			}
-			_, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, runRef.ID)
-			if err != nil && !errors.Is(err, execution.ErrQueueItemNotFound) {
-				logger.Error(ctx, "queue: Failed to dequeue item", "err", err)
-			}
-		}(ctx, item.Data())
+		}(item)
 	}
-
-	logger.Debug(ctx, "queue: Wait for the batch")
 	wg.Wait()
 }
 
-func (p *queueProcessor) processDAG(ctx context.Context, queueName string, runRef execution.DAGRunRef) bool {
-	if p.isClosed(ctx) {
+func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedItemData, queueName string) bool {
+	if p.isClosed() {
 		return false
 	}
 
-	logger.Info(ctx, "queue: Received item", "name", runRef.Name, "runId", runRef.ID)
+	runRef := item.Data()
+	runID := runRef.ID
+	logger.Info(ctx, "queue: Received item", "name", runRef.Name, "runId", runID)
+
+	// Check if the DAG run is already running
+	if running, err := p.procStore.IsRunAlive(ctx, queueName, runRef); err != nil {
+		logger.Error(ctx, "queue: Failed to check if run is alive", "runId", runID, "err", err)
+		return false
+	} else if running {
+		logger.Warn(ctx, "queue: DAG run is already running, discarding", "runId", runID)
+		return true // Discarded, so it's "processed" from the queue's perspective
+	}
+
 	// Fetch the DAG of the dag-run attempt first to get queue configuration
 	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
 	if err != nil {
 		logger.Error(ctx, "queue: Failed to find run", "err", err)
 		// If the attempt doesn't exist at all, mark as discard
 		if errors.Is(err, execution.ErrDAGRunIDNotFound) {
-			logger.Error(ctx, "queue: DAG run not found, discarding")
+			logger.Error(ctx, "queue: DAG run not found, discarding", "runId", runID)
 			return true
 		}
 		return false
 	}
 
 	if attempt.Hidden() {
-		logger.Info(ctx, "queue: DAG run is hidden, discarding")
+		logger.Info(ctx, "queue: DAG run is hidden, discarding", "runId", runID)
 		return true
 	}
 
 	st, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		if errors.Is(err, execution.ErrCorruptedStatusFile) {
-			logger.Error(ctx, "queue: Status file is corrupted, marking as invalid", "err", err)
+			logger.Error(ctx, "queue: Status file is corrupted, marking as invalid", "err", err, "runId", runID)
 			return true
 		} else {
-			logger.Error(ctx, "queue: Failed to read status", "err", err)
+			logger.Error(ctx, "queue: Failed to read status", "err", err, "runId", runID)
 		}
 		return false
 	}
 
 	if st.Status != core.Queued {
-		logger.Info(ctx, "queue: Status is not queued, skipping", "status", st.Status)
+		logger.Info(ctx, "queue: Status is not queued, skipping", "status", st.Status, "runId", runID)
 		return true
 	}
 
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "queue: Failed to read dag", "err", err)
+		logger.Error(ctx, "queue: Failed to read dag", "err", err, "runId", runID)
 		return false
 	}
 
@@ -294,63 +329,50 @@ func (p *queueProcessor) processDAG(ctx context.Context, queueName string, runRe
 	queue := queueVal.(*queue)
 	queue.setMaxConc(dag.MaxActiveRuns)
 
-	errCh := make(chan error)
-	defer close(errCh)
-
-	go func() {
-		defer func() {
-			err := recover()
-			logger.Error(ctx, "Panic recovered on executing a DAG", "err", err)
-		}()
-
-		err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runRef.ID)
-		if err != nil {
-			logger.Error(ctx, "queue: Failed to execute dag", "err", err)
-		}
-		select {
-		case <-errCh:
-		default:
-			select {
-			case errCh <- err:
-			default:
-			}
-		}
-	}()
-
-	// Successfully dispatched/started, remove from queue
-	logger.Info(ctx, "queue: Triggered execution")
-
-	// Wait for the DAG to be picked up by checking process heartbeat
-	// This is just for monitoring/logging, not critical for queue logic anymore
-	policy := backoff.NewExponentialBackoffPolicy(500 * time.Millisecond)
-	policy.MaxInterval = time.Second * 10
-	policy.MaxRetries = 7
-
-	var done bool
-	if err := backoff.Retry(ctx, func(ctx context.Context) error {
-		var err error
-		done, err = p.monitorStartup(ctx, queueName, runRef, errCh)
-		return err
-	}, policy, func(_ error) bool {
-		return !p.isClosed(ctx)
-	}); err != nil {
+	var errCh chan error
+	if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID); err != nil {
+		logger.Error(ctx, "queue: Failed to execute dag", "runId", runID, "err", err)
+		errCh <- err
 		return false
 	}
 
-	return done
+	// Use exponential backoff for retries for monitoring the execution start
+	policy := backoff.NewExponentialBackoffPolicy(InitialBackoffInterval)
+	policy.MaxInterval = MaxBackoffInterval
+	policy.MaxRetries = MaxBackoffRetries
+
+	var started bool
+	operation := func(ctx context.Context) error {
+		started, err = p.monitorStartup(ctx, queueName, runRef, nil)
+		return err
+	}
+
+	if err := backoff.Retry(ctx, operation, policy, nil); err != nil {
+		logger.Error(ctx, "queue: Failed to execute dag after retries", "runId", runID, "err", err)
+	}
+
+	// Successfully dispatched/started, remove from queue
+	return started
 }
 
-func (p *queueProcessor) monitorStartup(ctx context.Context, queueName string, runRef execution.DAGRunRef, errCh chan error) (bool, error) {
+func (p *QueueProcessor) wakeUp() {
+	select {
+	case p.wakeUpCh <- struct{}{}:
+	default:
+	}
+}
+
+func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, runRef execution.DAGRunRef, errCh chan error) (bool, error) {
 	select {
 	case <-ctx.Done():
 		logger.Info(ctx, "queue: Context canceled")
-		return false, ctx.Err()
-	case <-p.done:
+		return false, backoff.PermanentError(ctx.Err())
+	case <-p.quit:
 		logger.Info(ctx, "queue: Processor is closed")
-		return false, errProcessorClosed
+		return false, backoff.PermanentError(errProcessorClosed)
 	case err := <-errCh:
 		logger.Info(ctx, "queue: Failed to execute the DAG", "err", err)
-		return false, err
+		return false, backoff.PermanentError(err)
 	default:
 	}
 
@@ -376,26 +398,8 @@ func (p *queueProcessor) monitorStartup(ctx context.Context, queueName string, r
 
 	if status.Status != core.Queued && status.Status != core.Running {
 		logger.Info(ctx, "queue: DAG execution started or finished", "status", status.Status.String())
-		return true, err
+		return true, nil
 	}
 
 	return false, errNotStarted
-}
-
-func (p *queueProcessor) isClosed(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		return true
-	case <-p.done:
-		return true
-	default:
-		return false
-	}
-}
-
-func (p *queueProcessor) wakeUp() {
-	select {
-	case p.wait <- struct{}{}:
-	default:
-	}
 }

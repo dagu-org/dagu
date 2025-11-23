@@ -40,21 +40,20 @@ type Scheduler struct {
 	dagRunStore         execution.DAGRunStore
 	queueStore          execution.QueueStore
 	procStore           execution.ProcStore
-	cancel              context.CancelFunc
-	lock                sync.Mutex
 	config              *config.Config
 	dirLock             dirlock.DirLock // File-based lock to prevent multiple scheduler instances
 	dagExecutor         *DAGExecutor
 	healthServer        *HealthServer // Health check server for monitoring
 	serviceRegistry     execution.ServiceRegistry
-	disableHealthServer bool // Disable health server when running from start-all
-	heartbeatCancel     context.CancelFunc
-	heartbeatDone       chan struct{}
+	disableHealthServer bool            // Disable health server when running from start-all
 	zombieDetector      *ZombieDetector // Zombie DAG run detector
 	instanceID          string          // Unique instance identifier for service registry
-	queueProcessor      *queueProcessor
+	// queueProcessor is the processor for queued DAG runs
+	queueProcessor *QueueProcessor
+	stopOnce       sync.Once
 }
 
+// New creates a new Scheduler.
 func New(
 	cfg *config.Config,
 	er EntryReader,
@@ -78,7 +77,7 @@ func New(
 	subCmdBuilder := runtime.NewSubCmdBuilder(cfg)
 	dagExecutor := NewDAGExecutor(coordinatorCli, subCmdBuilder)
 	healthServer := NewHealthServer(cfg.Scheduler.Port)
-	processor := newQueueProcessor(
+	processor := NewQueueProcessor(
 		queueStore,
 		dagRunStore,
 		procStore,
@@ -110,7 +109,6 @@ func (s *Scheduler) DisableHealthServer() {
 
 func (s *Scheduler) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
-	s.cancel = cancel
 	defer cancel()
 
 	// Generate instance ID if not already set
@@ -182,21 +180,19 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		logger.Error(ctx, "Failed to start queue watcher")
 		return err
 	}
-	s.queueProcessor.start(ctx, notifyCh)
+	s.queueProcessor.Start(ctx, notifyCh)
 
 	// Handle OS signals for graceful shutdown
 	signal.Notify(
 		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
 	)
 
-	// Start heartbeat for the scheduler lock with its own context
-	heartbeatCtx, heartbeatCancel := context.WithCancel(ctx)
-	s.heartbeatCancel = heartbeatCancel
-	s.heartbeatDone = make(chan struct{})
+	var wg sync.WaitGroup
 
+	wg.Add(1)
 	go func() {
-		defer close(s.heartbeatDone)
-		s.startHeartbeat(heartbeatCtx)
+		defer wg.Done()
+		s.startHeartbeat(ctx)
 	}()
 
 	// Start zombie detector if enabled
@@ -222,12 +218,11 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	logger.Info(ctx, "Scheduler started")
 
 	// Start the scheduler loop (it blocks)
-	var wg sync.WaitGroup
 	wg.Add(1)
-	go func() {
+	go func(ctx context.Context) {
 		defer wg.Done()
-		s.startCron(ctx, sig)
-	}()
+		s.cronLoop(ctx, sig)
+	}(ctx)
 	wg.Wait()
 
 	return nil
@@ -239,42 +234,41 @@ func (s *Scheduler) startHeartbeat(ctx context.Context) {
 
 	for {
 		select {
+		case <-s.quit:
+			return
+		case <-ctx.Done():
+			return
 		case <-ticker.C:
 			if err := s.dirLock.Heartbeat(ctx); err != nil {
 				logger.Error(ctx, "Failed to send heartbeat for scheduler lock", "err", err)
 			}
-
-		case <-ctx.Done():
-			ticker.Stop()
-			logger.Info(ctx, "Stopping scheduler heartbeat due to context cancellation")
-			return
 		}
 	}
 }
 
-// startCron starts the scheduler.
-// It runs in a loop, checking for jobs to run every minute.
-func (s *Scheduler) startCron(ctx context.Context, sig chan os.Signal) {
+// cronLoop runs the main scheduler loop to invoke jobs at scheduled times.
+func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 	tickTime := Now().Truncate(time.Minute)
 
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
 	s.running.Store(true)
+	defer s.running.Store(false)
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
+		case <-sig:
+			return
+		case <-s.quit:
+			return
 		case <-timer.C:
 			_ = timer.Stop()
 			s.invokeJobs(ctx, tickTime)
 			tickTime = s.NextTick(tickTime)
 			timer.Reset(tickTime.Sub(Now()))
-		case <-sig:
-			s.Stop(ctx)
-			return
-		case <-s.quit:
-			s.Stop(ctx)
-			return
 		}
 	}
 }
@@ -291,40 +285,27 @@ func (s *Scheduler) IsRunning() bool {
 
 // Stop stops the scheduler.
 func (s *Scheduler) Stop(ctx context.Context) {
-	var wg sync.WaitGroup
+	s.stopOnce.Do(func() {
+		var wg sync.WaitGroup
+		wg.Add(2)
 
-	go func() {
-		defer wg.Done()
-		s.queueProcessor.stop()
-	}()
+		close(s.quit)
 
-	go func(ctx context.Context) {
-		defer wg.Done()
-		s.stopCron(ctx)
-	}(ctx)
+		go func() {
+			defer wg.Done()
+			s.queueProcessor.Stop()
+		}()
 
-	wg.Wait()
+		go func(ctx context.Context) {
+			defer wg.Done()
+			s.stopCron(ctx)
+		}(ctx)
+
+		wg.Wait()
+	})
 }
 
 func (s *Scheduler) stopCron(ctx context.Context) {
-	if !s.running.CompareAndSwap(true, false) {
-		return
-	}
-
-	close(s.quit)
-
-	s.lock.Lock()
-	if s.cancel != nil {
-		s.cancel()
-		s.cancel = nil
-	}
-	s.lock.Unlock()
-
-	if s.heartbeatCancel != nil {
-		logger.Info(ctx, "Stopping scheduler heartbeat")
-		s.heartbeatCancel()
-	}
-
 	// Update status to inactive before stopping
 	if s.serviceRegistry != nil {
 		if err := s.serviceRegistry.UpdateStatus(ctx, execution.ServiceNameScheduler, execution.ServiceStatusInactive); err != nil {

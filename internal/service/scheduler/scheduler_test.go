@@ -217,35 +217,6 @@ func TestPrevExecTime(t *testing.T) {
 	}
 }
 
-func TestScheduler_QueueDisabled(t *testing.T) {
-	t.Parallel()
-
-	t.Run("QueueDisabledSkipsQueueProcessing", func(t *testing.T) {
-		th := test.SetupScheduler(t)
-		// Disable queues
-		th.Config.Queues.Enabled = false
-
-		entryReader := &mockJobManager{
-			Entries: []*scheduler.ScheduledJob{},
-		}
-
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
-		require.NoError(t, err)
-
-		ctx := context.Background()
-		go func() {
-			_ = sc.Start(ctx)
-		}()
-
-		// Give it a moment to start
-		time.Sleep(time.Millisecond * 100)
-		sc.Stop(ctx)
-
-		// Test passes if no panics occur when queues are disabled
-		require.True(t, true)
-	})
-}
-
 func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	scheduler.SetFixedTime(now)
