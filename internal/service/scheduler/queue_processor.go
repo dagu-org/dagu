@@ -236,7 +236,10 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 
 	alive, err := p.procStore.CountAlive(ctx, queueName)
 	if err != nil {
-		logger.Error(ctx, "Failed to count alive processes", tag.Error(err))
+		logger.Error(ctx, "Failed to count alive processes",
+			tag.Error(err),
+			tag.Queue(queueName),
+		)
 		return
 	}
 
@@ -263,7 +266,6 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 		wg.Add(1)
 		go func(ctx context.Context, item execution.QueuedItemData) {
 			defer wg.Done()
-			ctx = logger.WithValues(ctx, tag.RunID(item.Data().ID))
 			if p.processDAG(ctx, item, queueName) {
 				// Remove the item from the queue
 				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, item.Data()); err != nil {
@@ -279,6 +281,8 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	if p.isClosed() {
 		return false
 	}
+
+	ctx = logger.WithValues(ctx, tag.RunID(item.Data().ID))
 
 	runRef := item.Data()
 	runID := runRef.ID
@@ -333,7 +337,10 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG", tag.Error(err))
+		logger.Error(ctx, "Failed to read DAG",
+			tag.Error(err),
+			tag.DAG(runRef.Name),
+		)
 		return false
 	}
 
@@ -392,6 +399,11 @@ func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, r
 	// Check if the process is alive (has heartbeat)
 	isAlive, err := p.procStore.IsRunAlive(ctx, queueName, runRef)
 	if err != nil {
+		logger.Warn(ctx, "Failed to check run liveness",
+			tag.Error(err),
+			tag.Queue(queueName),
+			tag.RunID(runRef.ID),
+		)
 		// Continue checking on error
 	} else if isAlive {
 		logger.Info(ctx, "DAG run has started (heartbeat detected)")

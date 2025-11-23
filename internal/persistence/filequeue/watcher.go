@@ -45,6 +45,7 @@ func (w *watcher) Start(ctx context.Context) (<-chan struct{}, error) {
 		// Initialize file watcher (optional - fallback to polling if it fails)
 		return w.setupWatcher(ctx)
 	}, backoff.NewConstantBackoffPolicy(2*time.Second), nil); err != nil {
+		logger.Error(ctx, "Failed to initialize queue watcher", tag.Error(err))
 		return nil, err
 	}
 
@@ -95,17 +96,29 @@ func (w *watcher) setupWatcher(ctx context.Context) error {
 
 	// Create base directory if it doesn't exist
 	if err := os.MkdirAll(baseDir, 0750); err != nil {
+		logger.Error(ctx, "Failed to create base queue directory",
+			tag.Dir(baseDir),
+			tag.Error(err),
+		)
 		return fmt.Errorf("failed to create base directory %s: %w", baseDir, err)
 	}
 
 	// Watch the base directory for new queue files and subdirectories
 	if err := w.fileWatcher.Add(baseDir); err != nil && !os.IsNotExist(err) {
+		logger.Error(ctx, "Failed to watch base queue directory",
+			tag.Dir(baseDir),
+			tag.Error(err),
+		)
 		return fmt.Errorf("failed to watch base directory %s: %w", baseDir, err)
 	}
 
 	// Watch existing
 	entries, err := os.ReadDir(baseDir)
 	if err != nil && !os.IsNotExist(err) {
+		logger.Error(ctx, "Failed to read base queue directory",
+			tag.Dir(baseDir),
+			tag.Error(err),
+		)
 		return fmt.Errorf("failed to read base directory %s: %w", baseDir, err)
 	}
 
@@ -123,6 +136,7 @@ func (w *watcher) setupWatcher(ctx context.Context) error {
 		}
 	}
 
+	logger.Info(ctx, "Queue watcher setup complete", tag.Dir(baseDir))
 	return nil
 }
 

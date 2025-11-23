@@ -91,6 +91,7 @@ func (s *Store) All(ctx context.Context) ([]execution.QueuedItemData, error) {
 		// Grep high priority items in the directory
 		files, err := filepath.Glob(pattern)
 		if err != nil {
+			logger.Error(ctx, "Failed to list queue files", tag.Error(err))
 			return nil, fmt.Errorf("failed to list high priority dag-runs: %w", err)
 		}
 
@@ -114,6 +115,7 @@ func (s *Store) All(ctx context.Context) ([]execution.QueuedItemData, error) {
 
 // DequeueByName implements models.QueueStore.
 func (s *Store) DequeueByName(ctx context.Context, name string) (execution.QueuedItemData, error) {
+	ctx = logger.WithValues(ctx, tag.Queue(name))
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -122,6 +124,7 @@ func (s *Store) DequeueByName(ctx context.Context, name string) (execution.Queue
 	}
 
 	if err := s.queues[name].Lock(ctx); err != nil {
+		logger.Error(ctx, "Failed to lock queue", tag.Error(err))
 		return nil, fmt.Errorf("failed to lock queue %s: %w", name, err)
 	}
 	defer func() {
@@ -139,6 +142,7 @@ func (s *Store) DequeueByName(ctx context.Context, name string) (execution.Queue
 	}
 
 	if err != nil {
+		logger.Error(ctx, "Failed to dequeue dag-run", tag.Error(err))
 		return nil, fmt.Errorf("failed to dequeue dag-run %s: %w", name, err)
 	}
 
@@ -160,6 +164,7 @@ func (s *Store) Len(ctx context.Context, name string) (int, error) {
 
 // List implements models.QueueStore.
 func (s *Store) List(ctx context.Context, name string) ([]execution.QueuedItemData, error) {
+	ctx = logger.WithValues(ctx, tag.Queue(name))
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -170,6 +175,7 @@ func (s *Store) List(ctx context.Context, name string) ([]execution.QueuedItemDa
 	q := s.queues[name]
 	items, err := q.List(ctx)
 	if err != nil {
+		logger.Error(ctx, "Failed to list dag-runs", tag.Error(err))
 		return nil, fmt.Errorf("failed to list dag-runs %s: %w", name, err)
 	}
 
@@ -192,6 +198,11 @@ func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]exec
 
 // DequeueByDAGRunID implements models.QueueStore.
 func (s *Store) DequeueByDAGRunID(ctx context.Context, name string, dagRun execution.DAGRunRef) ([]execution.QueuedItemData, error) {
+	ctx = logger.WithValues(ctx,
+		tag.Queue(name),
+		tag.DAG(dagRun.Name),
+		tag.RunID(dagRun.ID),
+	)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -201,6 +212,7 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name string, dagRun execu
 	}
 
 	if err := s.queues[name].Lock(ctx); err != nil {
+		logger.Error(ctx, "Failed to lock queue", tag.Error(err))
 		return nil, fmt.Errorf("failed to lock queue %s: %w", name, err)
 	}
 	defer func() {
@@ -214,6 +226,7 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name string, dagRun execu
 	q := s.queues[name]
 	item, err := q.DequeueByDAGRunID(ctx, dagRun)
 	if err != nil {
+		logger.Error(ctx, "Failed to dequeue dag-run by ID", tag.Error(err))
 		return nil, fmt.Errorf("failed to dequeue dag-run %s: %w", dagRun.ID, err)
 	}
 	items = append(items, item...)
@@ -227,6 +240,11 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name string, dagRun execu
 
 // Enqueue implements models.QueueStore.
 func (s *Store) Enqueue(ctx context.Context, name string, p execution.QueuePriority, dagRun execution.DAGRunRef) error {
+	ctx = logger.WithValues(ctx,
+		tag.Queue(name),
+		tag.DAG(dagRun.Name),
+		tag.RunID(dagRun.ID),
+	)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -236,9 +254,16 @@ func (s *Store) Enqueue(ctx context.Context, name string, p execution.QueuePrior
 
 	q := s.queues[name]
 	if err := q.Enqueue(ctx, p, dagRun); err != nil {
+		logger.Error(ctx, "Failed to enqueue dag-run",
+			tag.Error(err),
+			tag.Priority(int(p)),
+		)
 		return fmt.Errorf("failed to enqueue dag-run %s: %w", name, err)
 	}
 
+	logger.Info(ctx, "Enqueued dag-run",
+		tag.Priority(int(p)),
+	)
 	return nil
 }
 

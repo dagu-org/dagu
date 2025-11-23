@@ -140,6 +140,11 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 
 // checkAndCleanZombie checks if a single DAG run is a zombie and cleans it up
 func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.DAGRunStatus) error {
+	ctx = logger.WithValues(ctx,
+		tag.DAG(st.Name),
+		tag.RunID(st.DAGRunID),
+	)
+
 	// Find the attempt for this status
 	dagRunRef := execution.NewDAGRunRef(st.Name, st.DAGRunID)
 	attempt, err := z.dagRunStore.FindAttempt(ctx, dagRunRef)
@@ -156,17 +161,24 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.
 	// Check if process is alive
 	alive, err := z.procStore.IsRunAlive(ctx, dag.ProcGroup(), execution.DAGRunRef{Name: dag.Name, ID: st.DAGRunID})
 	if err != nil {
+		logger.Warn(ctx, "Failed to check process liveness for dag-run",
+			tag.Error(err),
+			tag.Queue(dag.ProcGroup()),
+		)
 		return fmt.Errorf("check alive: %w", err)
 	}
 
 	if alive {
+		logger.Debug(ctx, "Dag-run heartbeat detected; skipping zombie cleanup",
+			tag.Queue(dag.ProcGroup()),
+		)
 		return nil
 	}
 
 	// Process is zombie, update status to error
 	logger.Info(ctx, "Found zombie DAG run, updating to error status",
-		tag.Name(st.Name),
-		tag.RunID(st.DAGRunID))
+		tag.Queue(dag.ProcGroup()),
+	)
 
 	// Update the status to error
 	st.Status = core.Failed

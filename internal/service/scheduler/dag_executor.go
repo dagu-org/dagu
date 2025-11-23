@@ -175,15 +175,19 @@ func (e *DAGExecutor) shouldUseDistributedExecution(dag *core.DAG) bool {
 // 2. Forward the task to the selected worker
 // 3. Track the execution status
 func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinatorv1.Task) error {
-	if err := e.coordinatorCli.Dispatch(ctx, task); err != nil {
-		return fmt.Errorf("failed to dispatch task: %w", err)
-	}
-
 	// Enrich context with task-related values for subsequent logging
 	ctx = logger.WithValues(ctx,
 		tag.Target(task.Target),
 		tag.RunID(task.DagRunId),
 	)
+
+	if err := e.coordinatorCli.Dispatch(ctx, task); err != nil {
+		logger.Error(ctx, "Failed to dispatch task to coordinator",
+			tag.Error(err),
+			slog.String("operation", task.Operation.String()),
+		)
+		return fmt.Errorf("failed to dispatch task: %w", err)
+	}
 
 	logger.Info(ctx, "Task dispatched to coordinator",
 		slog.String("operation", task.Operation.String()),

@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 )
 
@@ -26,6 +28,11 @@ func NewExecutor(ctx context.Context, step core.Step) (Executor, error) {
 	if ok {
 		return factory(ctx, step)
 	}
+
+	logger.Error(ctx, "Executor type is not registered",
+		tag.Type(step.ExecutorConfig.Type),
+		tag.Step(step.Name),
+	)
 	return nil, fmt.Errorf("executor type %q is not registered", step.ExecutorConfig.Type)
 }
 

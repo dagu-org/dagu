@@ -34,6 +34,7 @@ func NewHealthServer(port int) *HealthServer {
 // Start starts the health check server
 func (h *HealthServer) Start(ctx context.Context) error {
 	if h.port == 0 {
+		logger.Info(ctx, "Scheduler health check server disabled (port=0)")
 		return nil // Health check server disabled
 	}
 
@@ -73,7 +74,11 @@ func (h *HealthServer) Stop(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	return h.server.Shutdown(shutdownCtx)
+	if err := h.server.Shutdown(shutdownCtx); err != nil {
+		logger.Error(ctx, "Failed to shutdown scheduler health check server", tag.Error(err))
+		return err
+	}
+	return nil
 }
 
 // healthHandler handles the /health endpoint

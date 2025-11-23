@@ -40,6 +40,10 @@ type DAGRunJob struct {
 func (j *DAGRunJob) Start(ctx context.Context) error {
 	latestStatus, err := j.Client.GetLatestStatus(ctx, j.DAG)
 	if err != nil {
+		logger.Error(ctx, "Failed to fetch latest DAG status",
+			tag.DAG(j.DAG.Name),
+			tag.Error(err),
+		)
 		return err
 	}
 
@@ -65,6 +69,9 @@ func (j *DAGRunJob) Start(ctx context.Context) error {
 
 // Ready checks whether the job can be safely started based on the latest status.
 func (j *DAGRunJob) Ready(ctx context.Context, latestStatus execution.DAGRunStatus) error {
+	ctx = logger.WithValues(ctx,
+		tag.DAG(j.DAG.Name),
+	)
 	// Prevent starting if it's already running.
 	if latestStatus.Status == core.Running {
 		return ErrJobRunning

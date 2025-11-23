@@ -334,8 +334,11 @@ func (s *Scheduler) stopCron(ctx context.Context) {
 
 	// Unregister from service registry
 	if s.serviceRegistry != nil {
-		s.serviceRegistry.Unregister(ctx)
-		logger.Info(ctx, "Unregistered from service registry")
+		if err := s.serviceRegistry.Unregister(ctx); err != nil {
+			logger.Error(ctx, "Failed to unregister from service registry", tag.Error(err))
+		} else {
+			logger.Info(ctx, "Unregistered from service registry")
+		}
 	}
 
 	logger.Info(ctx, "Scheduler stopped")

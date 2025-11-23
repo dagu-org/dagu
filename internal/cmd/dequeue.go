@@ -137,6 +137,7 @@ func dequeueDAGRun(ctx *Context, queueName string, dagRun execution.DAGRunRef, a
 	logger.Info(ctx.Context, "Dequeued dag-run",
 		tag.DAG(dagRun.Name),
 		tag.RunID(dagRun.ID),
+		tag.Queue(queueName),
 	)
 
 	return nil

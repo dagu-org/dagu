@@ -71,6 +71,7 @@ func NewEntryReader(dir string, dagCli execution.DAGStore, drm runtime.Manager, 
 
 func (er *entryReaderImpl) Start(ctx context.Context, done chan any) error {
 	if err := er.initialize(ctx); err != nil {
+		logger.Error(ctx, "Failed to initialize DAG registry", tag.Error(err))
 		return fmt.Errorf("failed to initialize DAGs: %w", err)
 	}
 
@@ -88,6 +89,7 @@ func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Schedule
 	for _, dag := range er.registry {
 		dagName := strings.TrimSuffix(filepath.Base(dag.Location), filepath.Ext(dag.Location))
 		if er.dagStore.IsSuspended(ctx, dagName) {
+			logger.Debug(ctx, "Skipping suspended DAG", tag.DAG(dagName))
 			continue
 		}
 
@@ -129,6 +131,10 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 	logger.Info(ctx, "Loading DAGs", tag.Dir(er.targetDir))
 	fis, err := os.ReadDir(er.targetDir)
 	if err != nil {
+		logger.Error(ctx, "Failed to read DAG directory",
+			tag.Dir(er.targetDir),
+			tag.Error(err),
+		)
 		return err
 	}
 
@@ -164,7 +170,12 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 		_ = watcher.Close()
 	}()
 
-	_ = watcher.Add(er.targetDir)
+	if err := watcher.Add(er.targetDir); err != nil {
+		logger.Warn(ctx, "Failed to watch DAG directory",
+			tag.Dir(er.targetDir),
+			tag.Error(err),
+		)
+	}
 
 	for {
 		select {

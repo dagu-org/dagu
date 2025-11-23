@@ -77,6 +77,11 @@ func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (execut
 
 // DequeueByDAGRunID retrieves a dag-run from the queue by its dag-run ID
 func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRun execution.DAGRunRef) ([]execution.QueuedItemData, error) {
+	ctx = logger.WithValues(ctx,
+		tag.Queue(q.name),
+		tag.DAG(dagRun.Name),
+		tag.RunID(dagRun.ID),
+	)
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -88,6 +93,7 @@ func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRun execution.DAGR
 			continue
 		}
 		if err != nil {
+			logger.Error(ctx, "Failed to pop dag-run from queue file", tag.Error(err))
 			return nil, fmt.Errorf("failed to pop dag-run %s: %w", dagRun.ID, err)
 		}
 		for _, item := range popped {
@@ -103,6 +109,7 @@ func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRun execution.DAGR
 
 // List returns all items in the queue
 func (q *DualQueue) List(ctx context.Context) ([]execution.QueuedItemData, error) {
+	ctx = logger.WithValues(ctx, tag.Queue(q.name))
 	var items []execution.QueuedItemData
 	for _, priority := range priorities {
 		qf := q.files[priority]
@@ -119,6 +126,7 @@ func (q *DualQueue) List(ctx context.Context) ([]execution.QueuedItemData, error
 
 // Len returns the total number of items in the queue
 func (q *DualQueue) Len(ctx context.Context) (int, error) {
+	ctx = logger.WithValues(ctx, tag.Queue(q.name))
 	var total int
 	for _, priority := range priorities {
 		qf := q.files[priority]
@@ -133,6 +141,11 @@ func (q *DualQueue) Len(ctx context.Context) (int, error) {
 
 // Enqueue adds a dag-run to the queue with the specified priority
 func (q *DualQueue) Enqueue(ctx context.Context, priority execution.QueuePriority, dagRun execution.DAGRunRef) error {
+	ctx = logger.WithValues(ctx,
+		tag.Queue(q.name),
+		tag.DAG(dagRun.Name),
+		tag.RunID(dagRun.ID),
+	)
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -141,6 +154,7 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority execution.QueuePriorit
 	}
 	qf := q.files[priority]
 	if err := qf.Push(ctx, dagRun); err != nil {
+		logger.Error(ctx, "Failed to enqueue dag-run to queue file", tag.Error(err))
 		return err
 	}
 	logger.Debug(ctx, "Enqueued item",
@@ -152,6 +166,7 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority execution.QueuePriorit
 // Dequeue retrieves a dag-run from the queue and removes it.
 // It checks the high-priority queue first, then the low-priority queue
 func (q *DualQueue) Dequeue(ctx context.Context) (execution.QueuedItemData, error) {
+	ctx = logger.WithValues(ctx, tag.Queue(q.name))
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -162,6 +177,7 @@ func (q *DualQueue) Dequeue(ctx context.Context) (execution.QueuedItemData, erro
 			continue
 		}
 		if err != nil {
+			logger.Error(ctx, "Failed to pop dag-run from queue file", tag.Error(err))
 			return nil, err
 		}
 		if item != nil {

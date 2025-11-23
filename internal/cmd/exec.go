@@ -250,6 +250,10 @@ func runExec(ctx *Context, args []string) error {
 
 	err = tryExecuteDAG(ctx, dag, runID, dagRunRef, false)
 	if errors.Is(err, errMaxRunReached) && !queueDisabled {
+		logger.Info(ctx, "Max active runs reached; enqueueing dag-run instead",
+			tag.DAG(dag.Name),
+			tag.RunID(runID),
+		)
 		dag.Location = ""
 		return enqueueDAGRun(ctx, dag, runID)
 	}

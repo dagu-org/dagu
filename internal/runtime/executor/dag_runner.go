@@ -455,14 +455,34 @@ func (e *SubDAGExecutor) Kill(sig os.Signal) error {
 				continue
 			}
 			errs = append(errs, err)
+			logger.Warn(ctx, "Failed to request child cancel",
+				tag.RunID(runID),
+				tag.DAG(e.DAG.Name),
+				tag.Error(err),
+			)
+		} else {
+			logger.Info(ctx, "Requested distributed sub DAG cancellation",
+				tag.RunID(runID),
+				tag.DAG(e.DAG.Name),
+			)
 		}
 	}
 
 	// Kill local processes
-	for _, cmd := range e.cmds {
+	for runID, cmd := range e.cmds {
 		if cmd != nil && cmd.Process != nil {
 			if err := cmdutil.KillProcessGroup(cmd, sig); err != nil {
 				errs = append(errs, err)
+				logger.Warn(ctx, "Failed to kill local sub DAG process",
+					tag.RunID(runID),
+					tag.DAG(e.DAG.Name),
+					tag.Error(err),
+				)
+			} else {
+				logger.Info(ctx, "Requested kill for local sub DAG process",
+					tag.RunID(runID),
+					tag.DAG(e.DAG.Name),
+				)
 			}
 		}
 	}
