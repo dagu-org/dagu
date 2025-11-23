@@ -122,8 +122,8 @@ func toDAGRunSummary(s execution.DAGRunStatus) api.DAGRunSummary {
 			runningStepNames = append(runningStepNames, node.Step.Name)
 		case core.NodeFailed:
 			failedStepNames = append(failedStepNames, node.Step.Name)
-		default:
-			//other statuses are not included
+		case core.NodeNotStarted, core.NodeAborted, core.NodeSucceeded, core.NodeSkipped, core.NodePartiallySucceeded:
+			// Other statuses are not included in the summary
 		}
 	}
 
