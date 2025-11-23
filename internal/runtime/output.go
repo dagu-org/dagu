@@ -485,9 +485,7 @@ func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 					oc.mu.Lock()
 					oc.err = fmt.Errorf("failed to read output: %w", err)
 					oc.mu.Unlock()
-					logger.Error(ctx, "Failed to capture output",
-					tag.Error(err),
-				)
+					logger.Error(ctx, "Failed to capture output", tag.Error(err))
 				}
 				break
 			}
