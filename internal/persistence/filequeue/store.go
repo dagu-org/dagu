@@ -261,9 +261,7 @@ func (s *Store) Enqueue(ctx context.Context, name string, p execution.QueuePrior
 		return fmt.Errorf("failed to enqueue dag-run %s: %w", name, err)
 	}
 
-	logger.Info(ctx, "Enqueued dag-run",
-		tag.Priority(int(p)),
-	)
+	logger.Info(ctx, "Enqueued dag-run", tag.Priority(int(p)))
 	return nil
 }
 
