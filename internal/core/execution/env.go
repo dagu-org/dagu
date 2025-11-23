@@ -153,12 +153,10 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 		})
 
 		dir, err := fileutil.ResolvePath(expandedDir)
-		if err == nil {
-			workingDir = dir
-		} else {
+		if err != nil {
 			logger.Warn(ctx, "Failed to resolve working directory for step", "step", step.Name, "dir", expandedDir, "err", err)
-			workingDir = parentEnv.DAG.WorkingDir
 		}
+		workingDir = dir
 
 	case parentDAG != nil && parentDAG.WorkingDir != "":
 		workingDir = parentDAG.WorkingDir
@@ -170,14 +168,17 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 		} else {
 			logger.Error(ctx, "Failed to get current working directory", "err", err)
 		}
+		// If still empty, fallback to home directory
+		if dir, err := os.UserHomeDir(); err == nil {
+			workingDir = dir
+		} else {
+			logger.Error(ctx, "Failed to get user home directory", "err", err)
+		}
 	}
 
 	envs := map[string]string{
 		EnvKeyDAGRunStepName: step.Name,
-	}
-
-	if workingDir != "" {
-		envs["PWD"] = workingDir
+		"PWD":                workingDir,
 	}
 
 	variables := &collections.SyncMap{}

@@ -99,7 +99,7 @@ func handleRestartProcess(ctx *Context, d *core.DAG, dagRunID string) error {
 	}
 
 	// Execute the exact same DAG with the same parameters but a new dag-run ID
-	if err := ctx.ProcStore.TryLock(ctx, d.ProcGroup()); err != nil {
+	if err := ctx.ProcStore.Lock(ctx, d.ProcGroup()); err != nil {
 		logger.Debug(ctx, "failed to lock process group", "err", err)
 		return errMaxRunReached
 	}

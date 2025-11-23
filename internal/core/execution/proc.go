@@ -7,7 +7,7 @@ import (
 // ProcStore is an interface for managing process storage.
 type ProcStore interface {
 	// Lock try to lock process group return error if it's held by another process
-	TryLock(ctx context.Context, groupName string) error
+	Lock(ctx context.Context, groupName string) error
 	// UnLock unlocks process group
 	Unlock(ctx context.Context, groupName string)
 	// Acquire creates a new process for a given group name and DAG-run reference.

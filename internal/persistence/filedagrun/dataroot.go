@@ -157,7 +157,7 @@ func (dr *DataRoot) CreateDAGRun(ts execution.TimeInUTC, dagRunID string) (*DAGR
 // GlobPatternWithDAGRunID returns a glob pattern for finding dag-run directories
 // that contain the specified dag-run ID in their name.
 func (dr DataRoot) GlobPatternWithDAGRunID(dagRunID string) string {
-	return filepath.Join(dr.dagRunsDir, "2*", "*", "*", DAGRunDirPrefix+"*"+dagRunID+"*")
+	return filepath.Join(dr.dagRunsDir, "2*", "*", "*", DAGRunDirPrefix+"*"+dagRunID)
 }
 
 // Exists checks if the dag-runs directory exists in the file system.

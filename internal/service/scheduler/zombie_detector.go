@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,6 +17,10 @@ type ZombieDetector struct {
 	dagRunStore execution.DAGRunStore
 	procStore   execution.ProcStore
 	interval    time.Duration
+	quit        chan struct{}
+	lock        sync.Mutex
+	closeOnce   sync.Once
+	wg          sync.WaitGroup
 }
 
 // NewZombieDetector creates a new zombie detector
@@ -31,15 +36,26 @@ func NewZombieDetector(
 		dagRunStore: dagRunStore,
 		procStore:   procStore,
 		interval:    interval,
+		quit:        make(chan struct{}),
 	}
 }
 
 // Start begins the zombie detection loop
 func (z *ZombieDetector) Start(ctx context.Context) {
+	z.lock.Lock()
+	defer z.lock.Unlock()
+
+	z.wg.Add(1)
+	go func(ctx context.Context) {
+		defer z.wg.Done()
+		z.loop(ctx)
+	}(ctx)
+}
+
+func (z *ZombieDetector) loop(ctx context.Context) {
+	var running atomic.Bool
 	ticker := time.NewTicker(z.interval)
 	defer ticker.Stop()
-
-	running := atomic.Bool{}
 
 	for {
 		select {
@@ -49,8 +65,11 @@ func (z *ZombieDetector) Start(ctx context.Context) {
 				continue
 			}
 
+			var wg sync.WaitGroup
+			wg.Add(1)
 			go func() {
 				defer running.Store(false)
+				defer wg.Done()
 				defer func() {
 					if r := recover(); r != nil {
 						logger.Error(ctx, "Zombie detection check panicked", "panic", r)
@@ -58,12 +77,24 @@ func (z *ZombieDetector) Start(ctx context.Context) {
 				}()
 				z.detectAndCleanZombies(ctx)
 			}()
+			wg.Wait()
 
+		case <-z.quit:
+			return
 		case <-ctx.Done():
-			logger.Info(ctx, "Stopping zombie detector")
 			return
 		}
 	}
+}
+
+func (z *ZombieDetector) Stop(ctx context.Context) {
+	logger.Info(ctx, "Stopping zombie detector")
+	z.lock.Lock()
+	defer z.lock.Unlock()
+	z.closeOnce.Do(func() {
+		close(z.quit)
+	})
+	z.wg.Wait()
 }
 
 // detectAndCleanZombies finds all running DAG runs and checks if they're actually alive
@@ -79,6 +110,15 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 	logger.Debug(ctx, "Checking for zombie DAG runs", "count", len(statuses))
 
 	for _, st := range statuses {
+		// Check for quit signal
+		select {
+		case <-ctx.Done():
+			return
+		case <-z.quit:
+			return
+		default:
+		}
+
 		if err := z.checkAndCleanZombie(ctx, st); err != nil {
 			logger.Error(ctx, "Failed to check zombie status",
 				"name", st.Name, "dagRunID", st.DAGRunID, "err", err)

@@ -23,12 +23,12 @@ type FileWatcher interface {
 }
 
 // New tries to use an fs-event watcher, and falls back to the poller if there is an error
-func New(interval time.Duration) (FileWatcher, error) {
+func New(interval time.Duration) FileWatcher {
 	if watcher, err := NewEventWatcher(); err == nil {
-		return watcher, nil
+		return watcher
 	}
 	log.Printf("filenotify init EventWatcher fail will fallback to PollingWatcher")
-	return NewPollingWatcher(interval), nil
+	return NewPollingWatcher(interval)
 }
 
 // NewPollingWatcher returns a poll-based file watcher

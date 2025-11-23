@@ -586,9 +586,14 @@ func buildWorkingDir(ctx BuildContext, spec *definition, dag *core.DAG) error {
 		dag.WorkingDir = wd
 
 	default:
-		dir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get working directory: %w", err)
+		dir, _ := os.Getwd()
+		if dir == "" {
+			// try to get home dir
+			var err error
+			dir, err = os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
 		}
 		dag.WorkingDir = dir
 	}

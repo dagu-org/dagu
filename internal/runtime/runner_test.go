@@ -612,7 +612,7 @@ func TestRunner(t *testing.T) {
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 	})
-	t.Run("NodeSetupFailure", func(t *testing.T) {
+	t.Run("WorkingDirNoExist", func(t *testing.T) {
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,

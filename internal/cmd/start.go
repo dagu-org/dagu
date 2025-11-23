@@ -236,7 +236,7 @@ var (
 
 // tryExecuteDAG tries to run the DAG within the max concurrent run config
 func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef, disableMaxActiveRuns bool) error {
-	if err := ctx.ProcStore.TryLock(ctx, dag.ProcGroup()); err != nil {
+	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
 		logger.Debug(ctx, "failed to lock process group", "err", err)
 		return errMaxRunReached
 	}
