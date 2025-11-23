@@ -52,6 +52,7 @@ type Scheduler struct {
 	queueProcessor *QueueProcessor
 	stopOnce       sync.Once
 	lockReleased   atomic.Bool // Tracks if lock was released to prevent double unlock
+	lock           sync.Mutex
 }
 
 // New creates a new Scheduler.
@@ -199,27 +200,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.startHeartbeat(ctx)
 	}()
 
-	// Start zombie detector if enabled
-	// Note: Not added to WaitGroup since it only responds to ctx.Done(),
-	// which is cancelled after wg.Wait() returns. This is intentional.
-	if s.config.Scheduler.ZombieDetectionInterval > 0 {
-		s.zombieDetector = NewZombieDetector(
-			s.dagRunStore,
-			s.procStore,
-			s.config.Scheduler.ZombieDetectionInterval,
-		)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error(ctx, "Zombie detector panicked", "panic", r)
-				}
-			}()
-			s.zombieDetector.Start(ctx)
-		}()
-		logger.Info(ctx, "Started zombie detector", "interval", s.config.Scheduler.ZombieDetectionInterval)
-	} else {
-		logger.Info(ctx, "Zombie detector disabled")
-	}
+	s.startZombieDetector(ctx)
 
 	logger.Info(ctx, "Scheduler started")
 
@@ -232,6 +213,21 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	wg.Wait()
 
 	return nil
+}
+
+func (s *Scheduler) startZombieDetector(ctx context.Context) {
+	if s.config.Scheduler.ZombieDetectionInterval <= 0 {
+		return
+	}
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.zombieDetector = NewZombieDetector(
+		s.dagRunStore,
+		s.procStore,
+		s.config.Scheduler.ZombieDetectionInterval,
+	)
+	s.zombieDetector.Start(ctx)
+	logger.Info(ctx, "Started zombie detector", "interval", s.config.Scheduler.ZombieDetectionInterval)
 }
 
 func (s *Scheduler) startHeartbeat(ctx context.Context) {
@@ -291,6 +287,9 @@ func (s *Scheduler) IsRunning() bool {
 
 // Stop stops the scheduler.
 func (s *Scheduler) Stop(ctx context.Context) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	s.stopOnce.Do(func() {
 		var wg sync.WaitGroup
 		wg.Add(2)
@@ -306,6 +305,14 @@ func (s *Scheduler) Stop(ctx context.Context) {
 			defer wg.Done()
 			s.stopCron(ctx)
 		}(ctx)
+
+		if s.zombieDetector != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				s.zombieDetector.Stop(ctx)
+			}()
+		}
 
 		wg.Wait()
 	})
