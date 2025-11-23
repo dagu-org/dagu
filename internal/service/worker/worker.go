@@ -181,14 +181,14 @@ func (w *Worker) sendHeartbeats(ctx context.Context) {
 			nextInterval, nextErr := retrier.Next(err)
 			if nextErr != nil {
 				logger.Error(ctx, "Failed to compute heartbeat backoff interval",
-				tag.WorkerID(w.id),
-				tag.Error(err))
+					tag.WorkerID(w.id),
+					tag.Error(err))
 				nextInterval = healthyInterval
 			} else {
 				logger.Warn(ctx, "Heartbeat send failed; will retry with backoff",
-				tag.WorkerID(w.id),
-				tag.Error(err),
-				tag.Interval(nextInterval))
+					tag.WorkerID(w.id),
+					tag.Error(err),
+					tag.Interval(nextInterval))
 			}
 
 			nextDelay = nextInterval

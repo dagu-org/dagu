@@ -77,15 +77,15 @@ func (p *Poller) Run(ctx context.Context) {
 						return
 					}
 					logger.Error(ctx, "Task execution failed",
-					tag.WorkerID(p.workerID),
-					tag.PollerIndex(p.index),
-					tag.RunID(task.DagRunId),
-					tag.Error(err))
+						tag.WorkerID(p.workerID),
+						tag.PollerIndex(p.index),
+						tag.RunID(task.DagRunId),
+						tag.Error(err))
 				} else {
 					logger.Info(ctx, "Task execution completed successfully",
-					tag.WorkerID(p.workerID),
-					tag.PollerIndex(p.index),
-					tag.RunID(task.DagRunId))
+						tag.WorkerID(p.workerID),
+						tag.PollerIndex(p.index),
+						tag.RunID(task.DagRunId))
 				}
 			}
 			// Continue polling for the next task
