@@ -69,7 +69,7 @@ func (e *dagExecutor) Run(ctx context.Context) error {
 		}
 	}()
 
-	result, execErr := e.child.ExecuteWithResult(ctx, e.runParams, e.workDir)
+	result, execErr := e.child.Execute(ctx, e.runParams, e.workDir)
 	if result != nil {
 		e.lock.Lock()
 		e.result = result
