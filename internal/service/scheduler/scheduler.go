@@ -51,7 +51,6 @@ type Scheduler struct {
 	// queueProcessor is the processor for queued DAG runs
 	queueProcessor *QueueProcessor
 	stopOnce       sync.Once
-	lockReleased   atomic.Bool // Tracks if lock was released to prevent double unlock
 	lock           sync.Mutex
 }
 
@@ -164,18 +163,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		}
 	}
 
-	// Ensure lock is always released
-	defer func() {
-		if s.lockReleased.Swap(true) {
-			return // Already released by Stop()
-		}
-		if err := s.dirLock.Unlock(); err != nil {
-			logger.Error(ctx, "Failed to release scheduler lock in defer", "err", err)
-		} else {
-			logger.Info(ctx, "Released scheduler lock in defer")
-		}
-	}()
-
 	sig := make(chan os.Signal, 1)
 
 	// Start the DAG file watcher
@@ -188,9 +175,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	s.queueProcessor.Start(ctx, notifyCh)
 
 	// Handle OS signals for graceful shutdown
-	signal.Notify(
-		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
-	)
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	var wg sync.WaitGroup
 
@@ -314,6 +299,10 @@ func (s *Scheduler) Stop(ctx context.Context) {
 			}()
 		}
 
+		if err := s.dirLock.Unlock(); err != nil {
+			logger.Error(ctx, "Failed to release scheduler lock in Stop", "err", err)
+		}
+
 		wg.Wait()
 	})
 }
@@ -336,14 +325,6 @@ func (s *Scheduler) stopCron(ctx context.Context) {
 	// Close DAG executor to release gRPC connections
 	if s.dagExecutor != nil {
 		s.dagExecutor.Close(ctx)
-	}
-
-	if !s.lockReleased.Swap(true) {
-		if err := s.dirLock.Unlock(); err != nil {
-			logger.Error(ctx, "Failed to release scheduler lock in Stop", "err", err)
-		} else {
-			logger.Info(ctx, "Released scheduler lock in Stop")
-		}
 	}
 
 	// Unregister from service registry
