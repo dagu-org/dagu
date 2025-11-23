@@ -216,14 +216,14 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 	// Get the queue configuration
 	v, ok := p.queues.Load(queueName)
 	if !ok {
-		logger.Warn(ctx, "Queue not found in processor config", tag.Queue, queueName)
+		logger.Warn(ctx, "Queue not found in processor config")
 		return
 	}
 	q := v.(*queue)
 
 	items, err := p.queueStore.List(ctx, queueName)
 	if err != nil {
-		logger.Error(ctx, "Failed to get queued items", tag.Queue, queueName, tag.Error, err)
+		logger.Error(ctx, "Failed to get queued items", tag.Error, err)
 		return
 	}
 
@@ -260,7 +260,7 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 			if p.processDAG(ctx, item, queueName) {
 				// Remove the item from the queue
 				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, item.Data().ID); err != nil {
-					logger.Error(ctx, "Failed to dequeue item", tag.RunID, item.Data().ID, tag.Error, err)
+					logger.Error(ctx, "Failed to dequeue item", tag.Error, err)
 				}
 			}
 		}(ctx, item)
@@ -275,14 +275,14 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 
 	runRef := item.Data()
 	runID := runRef.ID
-	logger.Info(ctx, "Received item", tag.Name, runRef.Name, tag.RunID, runID)
+	logger.Info(ctx, "Received item", tag.Name, runRef.Name)
 
 	// Check if the DAG run is already running
 	if running, err := p.procStore.IsRunAlive(ctx, queueName, runRef); err != nil {
-		logger.Error(ctx, "Failed to check if run is alive", tag.RunID, runID, tag.Error, err)
+		logger.Error(ctx, "Failed to check if run is alive", tag.Error, err)
 		return false
 	} else if running {
-		logger.Warn(ctx, "DAG run is already running, discarding", tag.RunID, runID)
+		logger.Warn(ctx, "DAG run is already running, discarding")
 		return true // Discarded, so it's "processed" from the queue's perspective
 	}
 
@@ -292,36 +292,36 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 		logger.Error(ctx, "Failed to find run", tag.Error, err)
 		// If the attempt doesn't exist at all, mark as discard
 		if errors.Is(err, execution.ErrDAGRunIDNotFound) {
-			logger.Error(ctx, "DAG run not found, discarding", tag.RunID, runID)
+			logger.Error(ctx, "DAG run not found, discarding")
 			return true
 		}
 		return false
 	}
 
 	if attempt.Hidden() {
-		logger.Info(ctx, "DAG run is hidden, discarding", tag.RunID, runID)
+		logger.Info(ctx, "DAG run is hidden, discarding")
 		return true
 	}
 
 	st, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		if errors.Is(err, execution.ErrCorruptedStatusFile) {
-			logger.Error(ctx, "Status file is corrupted, marking as invalid", tag.Error, err, tag.RunID, runID)
+			logger.Error(ctx, "Status file is corrupted, marking as invalid", tag.Error, err)
 			return true
 		} else {
-			logger.Error(ctx, "Failed to read status", tag.Error, err, tag.RunID, runID)
+			logger.Error(ctx, "Failed to read status", tag.Error, err)
 		}
 		return false
 	}
 
 	if st.Status != core.Queued {
-		logger.Info(ctx, "Status is not queued, skipping", tag.Status, st.Status, tag.RunID, runID)
+		logger.Info(ctx, "Status is not queued, skipping", tag.Status, st.Status)
 		return true
 	}
 
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG", tag.Error, err, tag.RunID, runID)
+		logger.Error(ctx, "Failed to read DAG", tag.Error, err)
 		return false
 	}
 
@@ -332,7 +332,7 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 
 	errCh := make(chan error, 1)
 	if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID); err != nil {
-		logger.Error(ctx, "Failed to execute DAG", tag.RunID, runID, tag.Error, err)
+		logger.Error(ctx, "Failed to execute DAG", tag.Error, err)
 		errCh <- err
 		return false
 	}
@@ -349,7 +349,7 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	}
 
 	if err := backoff.Retry(ctx, operation, policy, nil); err != nil {
-		logger.Error(ctx, "Failed to execute DAG after retries", tag.RunID, runID, tag.Error, err)
+		logger.Error(ctx, "Failed to execute DAG after retries", tag.Error, err)
 	}
 
 	// Successfully dispatched/started, remove from queue

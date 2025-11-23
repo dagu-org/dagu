@@ -67,6 +67,9 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}
 
+	// Set DAG context for all logs
+	ctx.Context = logger.WithValues(ctx.Context, tag.DAG, dag.Name, tag.RunID, dagRunID)
+
 	// Check if queue is disabled via config or flag
 	queueDisabled := !ctx.Config.Queues.Enabled || ctx.Command.Flags().Changed("no-queue")
 
@@ -77,8 +80,6 @@ func runRetry(ctx *Context, args []string) error {
 	// when the worker executes the dispatched retry task.
 	if !queueDisabled && len(dag.WorkerSelector) > 0 {
 		logger.Info(ctx, "DAG has workerSelector, enqueueing retry for distributed execution",
-			tag.DAG, dag.Name,
-			tag.RunID, dagRunID,
 			"worker-selector", dag.WorkerSelector)
 
 		// Enqueue the retry - must create new attempt with status "Queued"
@@ -87,9 +88,7 @@ func runRetry(ctx *Context, args []string) error {
 			return fmt.Errorf("failed to enqueue retry: %w", err)
 		}
 
-		logger.Info(ctx.Context, "Retry enqueued",
-			tag.DAG, dag.Name,
-			tag.RunID, dagRunID)
+		logger.Info(ctx.Context, "Retry enqueued")
 		return nil
 	}
 
@@ -139,7 +138,11 @@ func runRetry(ctx *Context, args []string) error {
 }
 
 func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, rootRun execution.DAGRunRef, stepName string) error {
-	logger.Debug(ctx, "Executing dag-run retry", tag.DAG, dag.Name, tag.RunID, status.DAGRunID, tag.Step, stepName)
+	// Set step context if specified
+	if stepName != "" {
+		ctx.Context = logger.WithValues(ctx.Context, tag.Step, stepName)
+	}
+	logger.Debug(ctx, "Executing dag-run retry")
 
 	// We use the same log file for the retry as the original run.
 	logFile, err := fileutil.OpenOrCreateFile(status.Log)
@@ -150,7 +153,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, r
 		_ = logFile.Close()
 	}()
 
-	logger.Info(ctx, "Dag-run retry initiated", tag.DAG, dag.Name, tag.RunID, status.DAGRunID, tag.File, logFile.Name(), tag.Step, stepName)
+	logger.Info(ctx, "Dag-run retry initiated", tag.File, logFile.Name())
 
 	// Load environment variable
 	dag.LoadDotEnv(ctx)
@@ -241,8 +244,6 @@ func enqueueRetry(ctx *Context, dag *core.DAG, dagRunID string) error {
 	}
 
 	logger.Info(ctx, "Retry attempt created and enqueued",
-		tag.DAG, dag.Name,
-		tag.RunID, dagRunID,
 		tag.AttemptID, att.ID())
 
 	return nil

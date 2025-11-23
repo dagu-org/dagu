@@ -365,6 +365,7 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 
 		// Create a child context for this specific job execution
 		jobCtx := logger.WithValues(ctx,
+			tag.Job, job.Job,
 			"jobType", job.Type.String(),
 			"scheduledTime", job.Next.Format(time.RFC3339))
 
@@ -373,19 +374,18 @@ func (s *Scheduler) invokeJobs(ctx context.Context, now time.Time) {
 			if err := job.invoke(ctx); err != nil {
 				switch {
 				case errors.Is(err, ErrJobFinished):
-					logger.Info(ctx, "Job already completed", tag.Job, job.Job)
+					logger.Info(ctx, "Job already completed")
 				case errors.Is(err, ErrJobRunning):
-					logger.Info(ctx, "Job already in progress", tag.Job, job.Job)
+					logger.Info(ctx, "Job already in progress")
 				case errors.Is(err, ErrJobSkipped):
-					logger.Info(ctx, "Job execution skipped", tag.Job, job.Job, tag.Reason, err.Error())
+					logger.Info(ctx, "Job execution skipped", tag.Reason, err.Error())
 				default:
 					logger.Error(ctx, "Job execution failed",
-						tag.Job, job.Job,
 						tag.Error, err,
 						tag.Type, fmt.Sprintf("%T", err))
 				}
 			} else {
-				logger.Info(ctx, "Job completed successfully", tag.Job, job.Job)
+				logger.Info(ctx, "Job completed successfully")
 			}
 		}(jobCtx, job)
 	}

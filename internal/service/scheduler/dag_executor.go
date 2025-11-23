@@ -82,9 +82,10 @@ func (e *DAGExecutor) HandleJob(
 ) error {
 	// For distributed execution with START operation, enqueue for persistence
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
+		// Enrich context with DAG and RunID for all subsequent logging
+		ctx = logger.WithValues(ctx, tag.DAG, dag.Name, tag.RunID, runID)
+
 		logger.Info(ctx, "Enqueueing DAG for distributed execution",
-			tag.DAG, dag.Name,
-			tag.RunID, runID,
 			"worker-selector", dag.WorkerSelector)
 
 		spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
@@ -173,9 +174,10 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 		return fmt.Errorf("failed to dispatch task: %w", err)
 	}
 
+	// Enrich context with task-related values for subsequent logging
+	ctx = logger.WithValues(ctx, tag.Target, task.Target, tag.RunID, task.DagRunId)
+
 	logger.Info(ctx, "Task dispatched to coordinator",
-		tag.Target, task.Target,
-		tag.RunID, task.DagRunId,
 		"operation", task.Operation.String())
 
 	return nil

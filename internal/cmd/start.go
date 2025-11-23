@@ -144,6 +144,9 @@ func runStart(ctx *Context, args []string) error {
 		return err
 	}
 
+	// Set DAG context for all logs
+	ctx.Context = logger.WithValues(ctx.Context, tag.DAG, dag.Name, tag.RunID, dagRunID)
+
 	// Handle sub dag-run if applicable
 	if isSubDAGRun {
 		// Parse parent execution reference
@@ -182,16 +185,12 @@ func runStart(ctx *Context, args []string) error {
 	if fromRunID != "" {
 		logger.Info(ctx, "Rescheduling dag-run",
 			tag.Action, "reschedule",
-			tag.DAG, dag.Name,
 			"from-dag-run-id", fromRunID,
-			tag.RunID, dagRunID,
 			"params", params,
 		)
 	} else {
 		logger.Info(ctx, "Executing root dag-run",
-			tag.DAG, dag.Name,
 			"params", params,
-			tag.RunID, dagRunID,
 		)
 	}
 
@@ -202,8 +201,6 @@ func runStart(ctx *Context, args []string) error {
 	// when the worker executes the dispatched task.
 	if !queueDisabled && len(dag.WorkerSelector) > 0 {
 		logger.Info(ctx, "DAG has workerSelector, enqueueing for distributed execution",
-			tag.DAG, dag.Name,
-			tag.RunID, dagRunID,
 			"worker-selector", dag.WorkerSelector)
 		dag.Location = "" // Queued dag-runs must not have a location
 		return enqueueDAGRun(ctx, dag, dagRunID)
@@ -414,9 +411,7 @@ func determineRootDAGRun(isSubDAGRun bool, rootDAGRun string, dag *core.DAG, dag
 func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root execution.DAGRunRef, parent execution.DAGRunRef) error {
 	// Log sub dag-run execution
 	logger.Info(ctx, "Executing sub dag-run",
-		tag.DAG, dag.Name,
 		"params", params,
-		tag.RunID, dagRunID,
 		"root", root,
 		"parent", parent,
 	)
@@ -427,7 +422,7 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 	}
 
 	// Check for previous sub dag-run with this ID
-	logger.Debug(ctx, "Checking for previous sub dag-run with the dag-run ID", tag.RunID, dagRunID)
+	logger.Debug(ctx, "Checking for previous sub dag-run with the dag-run ID")
 
 	// Look for existing execution subAttempt
 	subAttempt, err := ctx.DAGRunStore.FindSubAttempt(ctx, root, dagRunID)
@@ -461,7 +456,7 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRun
 		_ = logFile.Close()
 	}()
 
-	logger.Debug(ctx, "Dag-run initiated", tag.DAG, d.Name, tag.RunID, dagRunID, tag.File, logFile.Name())
+	logger.Debug(ctx, "Dag-run initiated", tag.File, logFile.Name())
 
 	// Initialize DAG repository with the DAG's directory in the search path
 	dr, err := ctx.dagStore(nil, []string{filepath.Dir(d.Location)})

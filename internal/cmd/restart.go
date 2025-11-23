@@ -138,7 +138,9 @@ func executeDAG(ctx *Context, cli runtime.Manager, dag *core.DAG) error {
 
 	ctx.LogToFile(logFile)
 
-	logger.Info(ctx, "Dag-run restart initiated", tag.DAG, dag.Name, tag.RunID, dagRunID, tag.File, logFile.Name())
+	ctx.Context = logger.WithValues(ctx.Context, tag.DAG, dag.Name, tag.RunID, dagRunID)
+
+	logger.Info(ctx, "Dag-run restart initiated", tag.File, logFile.Name())
 
 	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
 	if err != nil {

@@ -189,6 +189,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Set DAG context for all logs in this function
+	ctx = logger.WithValues(ctx,
+		tag.Name, a.dag.Name,
+		tag.RunID, a.dagRunID,
+		tag.AttemptID, a.dagRunAttemptID,
+	)
+
 	// Initialize propagators for W3C trace context before anything else
 	telemetry.InitializePropagators()
 
@@ -478,16 +485,10 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Start the dag-run.
 	if a.retryTarget != nil {
 		logger.Info(ctx, "DAG run retry started",
-			tag.Name, a.dag.Name,
-			tag.RunID, a.dagRunID,
-			tag.AttemptID, a.dagRunAttemptID,
 			"retry-target-attempt-id", a.retryTarget.AttemptID,
 		)
 	} else {
 		logger.Info(ctx, "DAG run started",
-			tag.Name, a.dag.Name,
-			tag.RunID, a.dagRunID,
-			tag.AttemptID, a.dagRunAttemptID,
 			"params", a.dag.Params,
 		)
 	}
@@ -525,9 +526,6 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Log execution summary
 	logger.Info(ctx, "DAG run finished",
-		tag.Name, a.dag.Name,
-		tag.RunID, a.dagRunID,
-		tag.AttemptID, a.dagRunAttemptID,
 		tag.Status, finishedStatus.Status.String(),
 		tag.StartTime, finishedStatus.StartedAt,
 		tag.EndTime, finishedStatus.FinishedAt,

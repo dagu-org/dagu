@@ -37,7 +37,9 @@ type Manager struct {
 // Stop stops a running DAG by sending a stop request to its socket.
 // If the DAG is not running, it logs a message and returns nil.
 func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) error {
-	logger.Info(ctx, "Stopping DAG", tag.Name, dag.Name)
+	// Set DAG name in context for all logs in this function
+	ctx = logger.WithValues(ctx, tag.Name, dag.Name)
+	logger.Info(ctx, "Stopping DAG")
 
 	if dagRunID == "" {
 		// If DAGRunID is not specified, stop all matching DAG runs
@@ -49,7 +51,7 @@ func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) erro
 
 		// If no runs are alive, nothing to stop
 		if len(aliveRuns) == 0 {
-			logger.Info(ctx, "No running DAG runs found", tag.Name, dag.Name)
+			logger.Info(ctx, "No running DAG runs found")
 			return nil
 		}
 
@@ -73,13 +75,13 @@ func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) erro
 			// Check if the DAG name matches
 			if runDAG.Name == dag.Name {
 				matchingRunIDs = append(matchingRunIDs, runRef.ID)
-				logger.Info(ctx, "Found matching DAG run to stop", tag.Name, dag.Name, tag.RunID, runRef.ID)
+				logger.Info(ctx, "Found matching DAG run to stop", tag.RunID, runRef.ID)
 			}
 		}
 
 		// If no matching DAGs were found
 		if len(matchingRunIDs) == 0 {
-			logger.Info(ctx, "No matching DAG run found to stop", tag.Name, dag.Name)
+			logger.Info(ctx, "No matching DAG run found to stop")
 			return nil
 		}
 
@@ -105,6 +107,9 @@ func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) erro
 
 // stopSingleDAGRun stops a single DAG run by its ID
 func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID string) error {
+	// Set run ID in context for all logs in this function
+	ctx = logger.WithValues(ctx, tag.RunID, dagRunID)
+
 	// Check if the process is running using proc store
 	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
 
@@ -112,7 +117,7 @@ func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID 
 		return fmt.Errorf("failed to retrieve status from proc store: %w", err)
 	}
 	if !alive {
-		logger.Info(ctx, "The DAG is not running", tag.Name, dag.Name, tag.RunID, dagRunID)
+		logger.Info(ctx, "The DAG is not running")
 		return nil
 	}
 
@@ -121,7 +126,7 @@ func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID 
 		// In case the socket exists, we try to send a stop request
 		client := sock.NewClient(addr)
 		if _, err := client.Request("POST", "/stop"); err == nil {
-			logger.Info(ctx, "Successfully stopped DAG via socket", tag.Name, dag.Name, tag.RunID, dagRunID)
+			logger.Info(ctx, "Successfully stopped DAG via socket")
 			return nil
 		}
 	}
@@ -133,7 +138,7 @@ func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID 
 		if err := run.Abort(ctx); err != nil {
 			return fmt.Errorf("failed to request cancel for dag-run %s: %w", dagRunID, err)
 		}
-		logger.Info(ctx, "Wrote stop file for running DAG", tag.Name, dag.Name, tag.RunID, dagRunID)
+		logger.Info(ctx, "Wrote stop file for running DAG")
 		return nil
 	}
 

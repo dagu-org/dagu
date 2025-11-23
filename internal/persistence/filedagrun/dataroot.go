@@ -234,15 +234,18 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 		year := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(targetDir))))
 		newDir := filepath.Join(newRoot.dagRunsDir, year, month, day, filepath.Base(targetDir))
 
+		// Enrich context with directory information for error logging
+		dirCtx := logger.WithValues(ctx, "oldDir", targetDir, "newDir", newDir)
+
 		// Make sure the new directory exists
 		if err := os.MkdirAll(filepath.Dir(newDir), 0750); err != nil {
-			logger.Error(ctx, "Failed to create new directory", tag.Error, err, tag.Dir, newDir)
+			logger.Error(dirCtx, "Failed to create new directory", tag.Error, err)
 			return fmt.Errorf("failed to create directory %s: %w", newDir, err)
 		}
 
 		// Rename the file
 		if err := os.Rename(targetDir, newDir); err != nil {
-			logger.Error(ctx, "Failed to rename directory", tag.Error, err, "old", targetDir, "new", newDir)
+			logger.Error(dirCtx, "Failed to rename directory", tag.Error, err)
 			return fmt.Errorf("failed to rename %s to %s: %w", targetDir, newDir, err)
 		}
 
@@ -274,31 +277,34 @@ func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int) error {
 	dagRuns := dr.listDAGRunsInRange(ctx, execution.TimeInUTC{}, keepTime, &listDAGRunsInRangeOpts{})
 
 	for _, r := range dagRuns {
+		// Enrich context with run directory for all subsequent logs in this iteration
+		runCtx := logger.WithValues(ctx, tag.Dir, r.baseDir)
+
 		latestAttempt, err := r.LatestAttempt(ctx, nil)
 		if err != nil {
-			logger.Error(ctx, "Failed to get latest attempt", tag.Dir, r.baseDir, tag.Error, err)
+			logger.Error(runCtx, "Failed to get latest attempt", tag.Error, err)
 			continue
 		}
 		lastUpdate, err := latestAttempt.ModTime()
 		if err != nil {
-			logger.Error(ctx, "Failed to get last modified time", tag.Dir, r.baseDir, tag.Error, err)
+			logger.Error(runCtx, "Failed to get last modified time", tag.Error, err)
 			continue
 		}
 		latestStatus, err := latestAttempt.ReadStatus(ctx)
 		if err != nil {
-			logger.Error(ctx, "Failed to read status", tag.Dir, r.baseDir, tag.Error, err)
+			logger.Error(runCtx, "Failed to read status", tag.Error, err)
 			continue
 		}
 		if latestStatus.Status.IsActive() {
 			// If the run is still active, skip it
-			logger.Debug(ctx, "Skipping active run", tag.Dir, r.baseDir, tag.Status, latestStatus.Status)
+			logger.Debug(runCtx, "Skipping active run", tag.Status, latestStatus.Status)
 			continue
 		}
 		if lastUpdate.After(keepTime.Time) {
 			continue
 		}
 		if err := r.Remove(ctx); err != nil {
-			logger.Error(ctx, "Failed to remove run", tag.Dir, r.baseDir, tag.Error, err)
+			logger.Error(runCtx, "Failed to remove run", tag.Error, err)
 		}
 		dr.removeEmptyDir(ctx, filepath.Dir(r.baseDir))
 	}
@@ -309,23 +315,19 @@ func (dr DataRoot) removeEmptyDir(ctx context.Context, dayDir string) {
 	monthDir := filepath.Dir(dayDir)
 	yearDir := filepath.Dir(monthDir)
 
-	if isDirEmpty(dayDir) {
-		if err := os.Remove(dayDir); err != nil {
-			logger.Error(ctx, "Failed to remove day directory", tag.Dir, dayDir, tag.Error, err)
+	// Helper function to remove directory with context-enriched logging
+	removeDir := func(dirPath, dirType string) {
+		dirCtx := logger.WithValues(ctx, tag.Dir, dirPath)
+		if isDirEmpty(dirPath) {
+			if err := os.Remove(dirPath); err != nil {
+				logger.Error(dirCtx, fmt.Sprintf("Failed to remove %s directory", dirType), tag.Error, err)
+			}
 		}
 	}
 
-	if isDirEmpty(monthDir) {
-		if err := os.Remove(monthDir); err != nil {
-			logger.Error(ctx, "Failed to remove month directory", tag.Dir, monthDir, tag.Error, err)
-		}
-	}
-
-	if isDirEmpty(yearDir) {
-		if err := os.Remove(yearDir); err != nil {
-			logger.Error(ctx, "Failed to remove year directory", tag.Dir, yearDir, tag.Error, err)
-		}
-	}
+	removeDir(dayDir, "day")
+	removeDir(monthDir, "month")
+	removeDir(yearDir, "year")
 }
 
 // listDAGRunsInRangeOpts contains options for listing dag-runs in a range

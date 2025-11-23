@@ -172,6 +172,9 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 			logger.Info(ctx, "Step started", tag.Step, node.Name())
 
 			go func(n *Node) {
+				// Set step context for all logs in this goroutine
+				ctx := logger.WithValues(ctx, tag.Step, n.Name())
+
 				// Ensure node is finished and wg is decremented
 				defer r.finishNode(n, &wg)
 				// Recover from panics
@@ -296,7 +299,7 @@ func (r *Runner) processCompletedNode(ctx context.Context, plan *Plan, node *Nod
 }
 
 func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, progressCh chan *Node) {
-	logger.Debug(ctx, "Starting node execution", tag.Step, node.Name())
+	logger.Debug(ctx, "Starting node execution")
 	nodeCtx, nodeCancel := context.WithCancel(ctx)
 	defer nodeCancel()
 
@@ -331,7 +334,7 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 	ctx = r.setupVariables(spanCtx, plan, node)
 
 	// Check preconditions
-	logger.Debug(ctx, "Checking preconditions", tag.Step, node.Name())
+	logger.Debug(ctx, "Checking preconditions")
 	if !meetsPreconditions(ctx, node, progressCh) {
 		return
 	}
@@ -340,7 +343,7 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 
 ExecRepeat: // repeat execution
 	for !r.isCanceled() {
-		logger.Debug(ctx, "Executing node loop", tag.Step, node.Name())
+		logger.Debug(ctx, "Executing node loop")
 		execErr := r.execNode(ctx, node)
 		isRetriable := r.handleNodeExecutionError(ctx, plan, node, execErr)
 		if isRetriable {
@@ -792,7 +795,7 @@ func (r *Runner) shouldRetryNode(ctx context.Context, node *Node, execErr error)
 		return false
 	}
 
-	logger.Info(ctx, "Step execution failed; retrying", tag.Step, node.Name(), tag.Error, execErr, "retry", node.GetRetryCount(), tag.ExitCode, exitCode)
+	logger.Info(ctx, "Step execution failed; retrying", tag.Error, execErr, "retry", node.GetRetryCount(), tag.ExitCode, exitCode)
 
 	// Set the node status to none so that it can be retried
 	node.IncRetryCount()
@@ -815,7 +818,6 @@ func (r *Runner) recoverNodePanic(ctx context.Context, node *Node) {
 		err := fmt.Errorf("panic recovered in node %s: %v\n%s", node.Name(), panicObj, stack)
 		logger.Error(ctx, "Panic occurred",
 			tag.Error, err,
-			tag.Step, node.Name(),
 			"stack", stack,
 			tag.RunID, r.dagRunID)
 		node.MarkError(err)
@@ -887,23 +889,23 @@ func (r *Runner) handleNodeExecutionError(ctx context.Context, plan *Plan, node 
 		if step.Timeout > 0 {
 			// Step-level timeout: Node.Execute already set status to failed and exitCode=124.
 			// Keep failed status and ensure we don't retry.
-			logger.Info(ctx, "Step timed out (step-level timeout)", tag.Step, node.Name(), tag.Timeout, step.Timeout, tag.Error, execErr)
+			logger.Info(ctx, "Step timed out (step-level timeout)", tag.Timeout, step.Timeout, tag.Error, execErr)
 			// Ensure status is failed (in case earlier logic differed)
 			node.SetStatus(core.NodeFailed)
 		} else if r.isTimeout(plan.StartAt()) {
 			// DAG-level timeout -> treat as aborted (global cancellation semantics)
-			logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)", tag.Step, node.Name(), tag.Timeout, r.timeout, tag.Error, execErr)
+			logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)", tag.Timeout, r.timeout, tag.Error, execErr)
 			node.SetStatus(core.NodeAborted)
 		} else {
 			// Parent context canceled or other deadline; mark aborted for safety
-			logger.Info(ctx, "Step deadline exceeded", tag.Step, node.Name(), tag.Error, execErr)
+			logger.Info(ctx, "Step deadline exceeded", tag.Error, execErr)
 			node.SetStatus(core.NodeAborted)
 		}
 		r.setLastError(execErr)
 
 	case r.isTimeout(plan.StartAt()):
 		// DAG-level timeout (non-context error case)
-		logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)", tag.Step, node.Name(), tag.Timeout, r.timeout, tag.Error, execErr)
+		logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)", tag.Timeout, r.timeout, tag.Error, execErr)
 		node.SetStatus(core.NodeAborted)
 		r.setLastError(execErr)
 
@@ -995,7 +997,7 @@ func (r *Runner) prepareNodeForRepeat(ctx context.Context, node *Node, progressC
 	if r.lastError == node.Error() {
 		r.setLastError(nil) // clear last error if we are repeating
 	}
-	logger.Info(ctx, "Step will be repeated", tag.Step, node.Name(), "interval", step.RepeatPolicy.Interval)
+	logger.Info(ctx, "Step will be repeated", "interval", step.RepeatPolicy.Interval)
 	interval := calculateBackoffInterval(
 		step.RepeatPolicy.Interval,
 		step.RepeatPolicy.Backoff,
@@ -1004,7 +1006,7 @@ func (r *Runner) prepareNodeForRepeat(ctx context.Context, node *Node, progressC
 	)
 	time.Sleep(interval)
 	node.SetRepeated(true) // mark as repeated
-	logger.Info(ctx, "Repeating step", tag.Step, node.Name())
+	logger.Info(ctx, "Repeating step")
 
 	if progressCh != nil {
 		progressCh <- node

@@ -315,9 +315,12 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
+	// Enrich context with output data for all logging in this function
+	ctx = logger.WithValues(ctx, tag.Output, oc.outputData, tag.Length, len(oc.outputData))
+
 	// Return cached result if already captured
 	if oc.outputCaptured {
-		logger.Debug(ctx, "Captured output: returning cached", tag.Output, oc.outputData, tag.Length, len(oc.outputData))
+		logger.Debug(ctx, "Captured output: returning cached")
 		return oc.outputData, nil
 	}
 
@@ -327,7 +330,8 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		if oc.outputWriter != nil {
 			logger.Debug(ctx, "Captured output: closing output writer")
 			if err := oc.outputWriter.Close(); err != nil {
-				logger.Error(ctx, "Failed to close pipe writer", tag.Error, err)
+				ctxErr := logger.WithValues(ctx, tag.Error, err)
+				logger.Error(ctxErr, "Failed to close pipe writer")
 			}
 			oc.outputWriter = nil // Mark as closed
 		}
@@ -345,7 +349,10 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 			oc.outputData = strings.TrimSpace(output)
 		}
 
-		logger.Debug(ctx, "Captured output", tag.Output, oc.outputData, tag.Length, len(oc.outputData))
+		// Update context with new output data
+		ctx = logger.WithValues(context.Background(), tag.Output, oc.outputData, tag.Length, len(oc.outputData))
+
+		logger.Debug(ctx, "Captured output")
 
 		// Mark as captured for caching
 		oc.outputCaptured = true
@@ -353,7 +360,8 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		// Close the reader
 		if oc.outputReader != nil {
 			if err := oc.outputReader.Close(); err != nil {
-				logger.Error(ctx, "Failed to close pipe reader", tag.Error, err)
+				ctxErr := logger.WithValues(ctx, tag.Error, err)
+				logger.Error(ctxErr, "Failed to close pipe reader")
 			}
 			oc.outputReader = nil
 		}
@@ -371,7 +379,8 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	if oc.outputWriter != nil {
 		logger.Debug(ctx, "Captured output: closing output writer")
 		if err := oc.outputWriter.Close(); err != nil {
-			logger.Error(ctx, "Failed to close pipe writer", tag.Error, err)
+			ctxErr := logger.WithValues(ctx, tag.Error, err)
+			logger.Error(ctxErr, "Failed to close pipe writer")
 		}
 		oc.outputWriter = nil // Mark as closed
 	}
@@ -387,7 +396,8 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 
 	// Check if output was truncated
 	if buf.Len() == int(oc.maxOutputSize) {
-		logger.Warn(ctx, "Output truncated due to size limit", tag.MaxSize, oc.maxOutputSize)
+		ctxMaxSize := logger.WithValues(ctx, tag.MaxSize, oc.maxOutputSize)
+		logger.Warn(ctxMaxSize, "Output truncated due to size limit")
 		output += "\n[OUTPUT TRUNCATED]"
 	}
 
@@ -398,11 +408,15 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		oc.outputData = output
 	}
 
-	logger.Debug(ctx, "Captured output", tag.Output, oc.outputData, tag.Length, len(oc.outputData))
+	// Update context with final output data
+	ctx = logger.WithValues(context.Background(), tag.Output, oc.outputData, tag.Length, len(oc.outputData))
+
+	logger.Debug(ctx, "Captured output")
 
 	// Close the reader after reading
 	if err := oc.outputReader.Close(); err != nil {
-		logger.Error(ctx, "Failed to close pipe reader", tag.Error, err)
+		ctxErr := logger.WithValues(ctx, tag.Error, err)
+		logger.Error(ctxErr, "Failed to close pipe reader")
 	}
 	oc.outputReader = nil // Mark as closed
 
@@ -437,6 +451,8 @@ func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 	go func() {
 		defer close(oc.done)
 
+		// Enrich context with error tag for all logging in this goroutine
+		// Note: error will be set later when needed
 		// Read in chunks to detect when we exceed the limit
 		buf := make([]byte, 8192) // 8KB chunks
 		for {
@@ -467,7 +483,8 @@ func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 					oc.mu.Lock()
 					oc.err = fmt.Errorf("failed to read output: %w", err)
 					oc.mu.Unlock()
-					logger.Error(ctx, "Failed to capture output", tag.Error, err)
+					ctxErr := logger.WithValues(ctx, tag.Error, err)
+					logger.Error(ctxErr, "Failed to capture output")
 				}
 				break
 			}

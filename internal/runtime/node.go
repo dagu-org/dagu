@@ -179,7 +179,7 @@ func (n *Node) setupContextWithTimeout(ctx context.Context) (context.Context, co
 	if step.Timeout > 0 {
 		stepTimeout = step.Timeout
 		ctx, cancel := context.WithTimeout(ctx, stepTimeout)
-		logger.Info(ctx, "Step execution started with timeout", tag.Step, step.Name, tag.Timeout, stepTimeout)
+		logger.Info(ctx, "Step execution started with timeout", tag.Timeout, stepTimeout)
 		return ctx, cancel, stepTimeout
 	}
 
@@ -232,10 +232,10 @@ func (n *Node) runCommand(ctx context.Context, cmd executor.Executor, stepTimeou
 }
 
 // handleTimeout handles step-level timeout errors.
-func (n *Node) handleTimeout(ctx context.Context, step core.Step, stepTimeout, elapsed time.Duration) (int, error) {
+func (n *Node) handleTimeout(ctx context.Context, _ core.Step, stepTimeout, elapsed time.Duration) (int, error) {
 	timeoutErr := fmt.Errorf("step timed out after %v (timeout: %v): %w",
 		elapsed.Truncate(time.Millisecond), stepTimeout, context.DeadlineExceeded)
-	logger.Error(ctx, "Step execution timed out", tag.Step, step.Name, tag.Timeout, stepTimeout,
+	logger.Error(ctx, "Step execution timed out", tag.Timeout, stepTimeout,
 		tag.Duration, elapsed)
 	n.SetError(timeoutErr)
 	n.SetStatus(core.NodeFailed)
@@ -539,7 +539,7 @@ func (n *Node) SetupEnv(ctx context.Context) context.Context {
 		execution.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
 		execution.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)
-	ctx = logger.WithValues(ctx, "step", n.Name())
+	ctx = logger.WithValues(ctx, tag.Step, n.Name())
 	return execution.WithEnv(ctx, env)
 }
 

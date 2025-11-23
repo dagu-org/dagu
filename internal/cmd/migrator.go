@@ -107,13 +107,16 @@ func (m *historyMigrator) Migrate(ctx context.Context) (*migrationResult, error)
 		dagName := m.extractDAGName(entry.Name())
 		result.TotalDAGs++
 
-		logger.Info(ctx, "Migrating DAG history", tag.DAG, dagName)
+		// Enrich context with DAG name for all logs in this iteration
+		dagCtx := logger.WithValues(ctx, tag.DAG, dagName)
+
+		logger.Info(dagCtx, "Migrating DAG history")
 
 		// Migrate all runs for this DAG
-		if err := m.migrateDAGHistory(ctx, entry.Name(), dagName, result); err != nil {
+		if err := m.migrateDAGHistory(dagCtx, entry.Name(), dagName, result); err != nil {
 			migrationErr := fmt.Sprintf("failed to migrate DAG %s: %s", dagName, err)
 			result.Errors = append(result.Errors, migrationErr)
-			logger.Error(ctx, "Failed to migrate DAG", tag.DAG, dagName, tag.Error, err)
+			logger.Error(dagCtx, "Failed to migrate DAG", tag.Error, err)
 		}
 	}
 
@@ -143,7 +146,8 @@ func (m *historyMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 			result.FailedRuns++
 			readErr := fmt.Sprintf("failed to read legacy status file %s: %s", file.Name(), err)
 			result.Errors = append(result.Errors, readErr)
-			logger.Error(ctx, "Failed to read legacy status file", tag.File, file.Name(), tag.Path, filePath, tag.Error, err)
+			fileCtx := logger.WithValues(ctx, tag.File, file.Name(), tag.Path, filePath)
+			logger.Error(fileCtx, "Failed to read legacy status file", tag.Error, err)
 			continue
 		}
 
@@ -151,16 +155,20 @@ func (m *historyMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 			result.SkippedRuns++
 			err := fmt.Sprintf("skipped invalid status file %s, RequestID=%s, Status=%s", file.Name(), statusFile.Status.RequestID, statusFile.Status.Status.String())
 			result.Errors = append(result.Errors, err)
-			logger.Debug(ctx, "Skipping file with no valid status", tag.File, file.Name())
+			fileCtx := logger.WithValues(ctx, tag.File, file.Name())
+			logger.Debug(fileCtx, "Skipping file with no valid status")
 			continue
 		}
 
 		requestID := statusFile.Status.RequestID
 
+		// Enrich context with run identifiers for all logs in this iteration
+		runCtx := logger.WithValues(ctx, tag.RequestID, requestID)
+
 		// Check if already migrated
 		if m.isAlreadyMigrated(ctx, statusFile.Status.Name, requestID) {
 			result.SkippedRuns++
-			logger.Debug(ctx, "Run already migrated", tag.DAG, statusFile.Status.Name, tag.RequestID, requestID)
+			logger.Debug(runCtx, "Run already migrated")
 			continue
 		}
 
@@ -169,7 +177,7 @@ func (m *historyMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 			result.FailedRuns++
 			migrationErr := fmt.Sprintf("failed to migrate run %s: %s", requestID, err)
 			result.Errors = append(result.Errors, migrationErr)
-			logger.Error(ctx, "Failed to migrate run", tag.DAG, statusFile.Status.Name, tag.RequestID, requestID, tag.Error, err)
+			logger.Error(runCtx, "Failed to migrate run", tag.Error, err)
 			continue
 		}
 
