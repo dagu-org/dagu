@@ -18,6 +18,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -161,7 +162,9 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 	// Serve assets with proper cache control
 	basePath := srv.config.Server.BasePath
 	if evaluatedBasePath, err := cmdutil.EvalString(ctx, basePath); err != nil {
-		logger.Warn(ctx, "Failed to evaluate server base path", "path", basePath, "err", err)
+		logger.Warn(ctx, "Failed to evaluate server base path",
+			tag.Path(basePath),
+			tag.Error(err))
 	} else {
 		basePath = evaluatedBasePath
 	}
@@ -192,7 +195,7 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 	// Initialize OIDC if enabled
 	authConfig := srv.config.Server.Auth
 	if evaluatedAuth, err := cmdutil.EvalObject(ctx, authConfig, nil); err != nil {
-		logger.Warn(ctx, "Failed to evaluate auth configuration", "err", err)
+		logger.Warn(ctx, "Failed to evaluate auth configuration", tag.Error(err))
 	} else {
 		authConfig = evaluatedAuth
 	}
@@ -231,7 +234,7 @@ func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath
 	r.Route(apiV1BasePath, func(r chi.Router) {
 		url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, apiV1BasePath)
 		if err := srv.apiV1.ConfigureRoutes(r, url); err != nil {
-			logger.Error(ctx, "Failed to configure v1 API routes", "err", err)
+			logger.Error(ctx, "Failed to configure v1 API routes", tag.Error(err))
 			setupErr = err
 		}
 	})
@@ -239,7 +242,7 @@ func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath
 	r.Route(apiV2BasePath, func(r chi.Router) {
 		url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, apiV2BasePath)
 		if err := srv.apiV2.ConfigureRoutes(ctx, r, url); err != nil {
-			logger.Error(ctx, "Failed to configure v2 API routes", "err", err)
+			logger.Error(ctx, "Failed to configure v2 API routes", tag.Error(err))
 			setupErr = err
 		}
 	})
@@ -249,12 +252,14 @@ func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath
 
 // startServer starts the HTTP server with or without TLS
 func (srv *Server) startServer(ctx context.Context, addr string) {
-	logger.Info(ctx, "Server is starting", "addr", addr)
+	logger.Info(ctx, "Server is starting", tag.Addr(addr))
 
 	var err error
 	if srv.config.Server.TLS != nil {
 		// Use TLS configuration
-		logger.Info(ctx, "Starting TLS server", "cert", srv.config.Server.TLS.CertFile, "key", srv.config.Server.TLS.KeyFile)
+		logger.Info(ctx, "Starting TLS server",
+			tag.Cert(srv.config.Server.TLS.CertFile),
+			slog.String("key", srv.config.Server.TLS.KeyFile))
 		err = srv.httpServer.ListenAndServeTLS(srv.config.Server.TLS.CertFile, srv.config.Server.TLS.KeyFile)
 	} else {
 		// Use standard HTTP
@@ -262,14 +267,14 @@ func (srv *Server) startServer(ctx context.Context, addr string) {
 	}
 
 	if err != nil && err != http.ErrServerClosed {
-		logger.Error(ctx, "Server failed to start or unexpected shutdown", "err", err)
+		logger.Error(ctx, "Server failed to start or unexpected shutdown", tag.Error(err))
 	}
 }
 
 // Shutdown gracefully shuts down the server
 func (srv *Server) Shutdown(ctx context.Context) error {
 	if srv.httpServer != nil {
-		logger.Info(ctx, "Server is shutting down", "addr", srv.httpServer.Addr)
+		logger.Info(ctx, "Server is shutting down", tag.Addr(srv.httpServer.Addr))
 
 		// Create a context with timeout for shutdown
 		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -293,7 +298,7 @@ func (srv *Server) setupGracefulShutdown(ctx context.Context) {
 	case <-ctx.Done():
 		logger.Info(ctx, "Context done, shutting down server")
 	case sig := <-quit:
-		logger.Info(ctx, "Received shutdown signal", "signal", sig.String())
+		logger.Info(ctx, "Received shutdown signal", slog.String("signal", sig.String()))
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -301,6 +306,6 @@ func (srv *Server) setupGracefulShutdown(ctx context.Context) {
 
 	srv.httpServer.SetKeepAlivesEnabled(false)
 	if err := srv.httpServer.Shutdown(shutdownCtx); err != nil {
-		logger.Error(ctx, "Failed to shutdown server gracefully", "err", err)
+		logger.Error(ctx, "Failed to shutdown server gracefully", tag.Error(err))
 	}
 }

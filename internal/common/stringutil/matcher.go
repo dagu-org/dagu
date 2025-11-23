@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 )
 
 const rePrefix = "re:"
@@ -55,7 +56,9 @@ func MatchPattern(ctx context.Context, content string, patterns []string, opts .
 
 	// If we got a "token too long" error, retry with larger buffer
 	if errors.Is(err, bufio.ErrTooLong) {
-		logger.Debug(ctx, "token too long, retrying with larger buffer", "contentSize", len(content), "maxBufferSize", options.maxBufferSize)
+		logger.Debug(ctx, "Token too long, retrying with larger buffer",
+			tag.Size(len(content)),
+			tag.MaxSize(options.maxBufferSize))
 		scanner = bufio.NewScanner(strings.NewReader(content))
 		// Use configured buffer size
 		buf := make([]byte, 0, 64*1024) // Start with 64KB buffer
@@ -93,7 +96,9 @@ func matchPatternWithScanner(ctx context.Context, scanner *bufio.Scanner, patter
 		case strings.HasPrefix(pattern, rePrefix):
 			re, err := regexp.Compile(strings.TrimPrefix(pattern, rePrefix))
 			if err != nil {
-				logger.Error(ctx, "invalid regexp pattern", "pattern", pattern, "err", err)
+				logger.Error(ctx, "Invalid regexp pattern",
+					tag.Pattern(pattern),
+					tag.Error(err))
 				continue
 			}
 			regexps = append(regexps, re)
@@ -139,7 +144,7 @@ func matchPatternWithScanner(ctx context.Context, scanner *bufio.Scanner, patter
 
 	if err := scanner.Err(); err != nil {
 		if !errors.Is(err, bufio.ErrTooLong) {
-			logger.Error(ctx, "scanner error", "err", err)
+			logger.Error(ctx, "Scanner error", tag.Error(err))
 		}
 		return false, err
 	}

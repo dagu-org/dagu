@@ -71,7 +71,7 @@ steps:
 
 			th.RunCommand(t, cmd.Start(), test.CmdTest{
 				Args:        args,
-				ExpectedOut: []string{"dag-run finished"},
+				ExpectedOut: []string{"DAG run finished"},
 			})
 		})
 	}

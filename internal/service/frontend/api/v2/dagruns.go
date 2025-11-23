@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -808,12 +810,10 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	}
 
 	logger.Info(ctx, "Rescheduling dag-run",
-		"action", "reschedule",
-		"dag", dag.Name,
-		"fromDagRunId", request.DagRunId,
-		"dagRunId", newDagRunID,
-		"singleton", singleton,
-	)
+		tag.DAG(dag.Name),
+		slog.String("from-dag-run-id", request.DagRunId),
+		tag.RunID(newDagRunID),
+		slog.Bool("singleton", singleton))
 
 	if err := a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
 		dagRunID:     newDagRunID,

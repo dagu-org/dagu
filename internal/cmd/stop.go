@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -71,12 +72,12 @@ func runStop(ctx *Context, args []string) error {
 		dag = d
 	}
 
-	logger.Info(ctx, "dag-run is stopping", "dag", dag.Name)
+	logger.Info(ctx, "Dag-run is stopping", tag.DAG(dag.Name))
 
 	if err := ctx.DAGRunMgr.Stop(ctx, dag, dagRunID); err != nil {
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 
-	logger.Info(ctx, "dag-run stopped", "dag", dag.Name)
+	logger.Info(ctx, "Dag-run stopped", tag.DAG(dag.Name))
 	return nil
 }

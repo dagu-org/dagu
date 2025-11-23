@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -33,6 +34,7 @@ func NewHealthServer(port int) *HealthServer {
 // Start starts the health check server
 func (h *HealthServer) Start(ctx context.Context) error {
 	if h.port == 0 {
+		logger.Info(ctx, "Scheduler health check server disabled (port=0)")
 		return nil // Health check server disabled
 	}
 
@@ -51,9 +53,9 @@ func (h *HealthServer) Start(ctx context.Context) error {
 
 	// Start server in a goroutine
 	go func() {
-		logger.Info(ctx, "Starting scheduler health check server", "port", h.port)
+		logger.Info(ctx, "Starting scheduler health check server", tag.Port(h.port))
 		if err := h.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error(ctx, "Health check server error", "err", err)
+			logger.Error(ctx, "Health check server error", tag.Error(err))
 		}
 	}()
 
@@ -72,7 +74,11 @@ func (h *HealthServer) Stop(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	return h.server.Shutdown(shutdownCtx)
+	if err := h.server.Shutdown(shutdownCtx); err != nil {
+		logger.Error(ctx, "Failed to shutdown scheduler health check server", tag.Error(err))
+		return err
+	}
+	return nil
 }
 
 // healthHandler handles the /health endpoint
@@ -85,6 +91,6 @@ func (h *HealthServer) healthHandler(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		// Log error but don't write anything else to avoid corrupting response
-		logger.Error(context.Background(), "Failed to encode health response", "err", err)
+		logger.Error(context.Background(), "Failed to encode health response", tag.Error(err))
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	oidc "github.com/coreos/go-oidc"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"golang.org/x/oauth2"
 )
@@ -184,8 +186,8 @@ func checkOIDCAuth(next http.Handler, provider *oidc.Provider, verifier *oidc.ID
 			return
 		}
 		logger.Warn(ctx, "OIDC cookie rejected: token verification failed during UI access",
-			"path", r.URL.Path,
-			"method", r.Method)
+			tag.Path(r.URL.Path),
+			slog.String("method", r.Method))
 		clearCookie(w, r, cookieOIDCToken)
 	}
 	// Callback handling.
@@ -206,24 +208,24 @@ func checkOIDCToken(next http.Handler, verifier *oidc.IDTokenVerifier, w http.Re
 	authorized, err := r.Cookie(cookieOIDCToken)
 	if err != nil {
 		logger.Warn(ctx, "OIDC authentication failed: oidcToken cookie not found",
-			"path", r.URL.Path,
-			"method", r.Method,
-			"error", err)
+			tag.Path(r.URL.Path),
+			slog.String("method", r.Method),
+			tag.Error(err))
 		http.Error(w, "Authentication required: OIDC token cookie not found", http.StatusUnauthorized)
 		return
 	}
 	if authorized.Value == "" {
 		logger.Warn(ctx, "OIDC authentication failed: oidcToken cookie is empty",
-			"path", r.URL.Path,
-			"method", r.Method)
+			tag.Path(r.URL.Path),
+			slog.String("method", r.Method))
 		http.Error(w, "Authentication required: OIDC token is empty", http.StatusUnauthorized)
 		return
 	}
 	if err := verifyIDToken(verifier, authorized.Value); err != nil {
 		logger.Warn(ctx, "OIDC authentication failed: token verification failed",
-			"path", r.URL.Path,
-			"method", r.Method,
-			"error", err)
+			tag.Path(r.URL.Path),
+			slog.String("method", r.Method),
+			tag.Error(err))
 		clearCookie(w, r, cookieOIDCToken)
 		http.Error(w, "Authentication failed: invalid or expired OIDC token", http.StatusUnauthorized)
 		return

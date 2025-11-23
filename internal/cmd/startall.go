@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/spf13/cobra"
 )
@@ -104,7 +106,7 @@ func runStartAll(ctx *Context, _ []string) error {
 			return fmt.Errorf("failed to initialize coordinator: %w", err)
 		}
 	} else {
-		logger.Info(ctx, "Coordinator disabled (bound to localhost). Set --coordinator.host and --coordinator.advertise to enable distributed mode.")
+		logger.Info(ctx, "Coordinator disabled (bound to localhost), set --coordinator.host and --coordinator.advertise to enable distributed mode")
 	}
 
 	// Create a new context with the signal context for services
@@ -133,7 +135,9 @@ func runStartAll(ctx *Context, _ []string) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		logger.Info(serviceCtx, "Scheduler initialization", "dags", serviceCtx.Config.Paths.DAGsDir)
+		logger.Info(serviceCtx, "Scheduler initialization",
+			tag.Dir(serviceCtx.Config.Paths.DAGsDir),
+		)
 		if err := scheduler.Start(serviceCtx); err != nil {
 			select {
 			case errCh <- fmt.Errorf("scheduler failed: %w", err):
@@ -162,7 +166,10 @@ func runStartAll(ctx *Context, _ []string) error {
 		defer wg.Done()
 		// Give scheduler and coordinator a moment to start
 		time.Sleep(100 * time.Millisecond)
-		logger.Info(serviceCtx, "Server initialization", "host", serviceCtx.Config.Server.Host, "port", serviceCtx.Config.Server.Port)
+		logger.Info(serviceCtx, "Server initialization",
+			tag.Host(serviceCtx.Config.Server.Host),
+			tag.Port(serviceCtx.Config.Server.Port),
+		)
 		if err := server.Serve(serviceCtx); err != nil {
 			select {
 			case errCh <- fmt.Errorf("server failed: %w", err):
@@ -175,20 +182,22 @@ func runStartAll(ctx *Context, _ []string) error {
 	var firstErr error
 	select {
 	case <-signalCtx.Done():
-		logger.Info(ctx, "Received shutdown signal", "signal", signalCtx.Err())
+		logger.Info(ctx, "Received shutdown signal", slog.Any("signal", signalCtx.Err()))
 	case err := <-errCh:
 		firstErr = err
-		logger.Error(ctx, "Service failed, shutting down", "err", err)
+		logger.Error(ctx, "Service failed, shutting down", tag.Error(err))
 		stop() // Cancel the signal context to trigger shutdown of other services
 	}
 
 	// Stop all services gracefully
-	logger.Info(ctx, "Stopping all services...")
+	logger.Info(ctx, "Stopping all services")
 
 	// Stop coordinator first to unregister from service registry (if it was started)
 	if enableCoordinator && coordinator != nil {
 		if err := coordinator.Stop(ctx); err != nil {
-			logger.Error(ctx, "Failed to stop coordinator", "err", err)
+			logger.Error(ctx, "Failed to stop coordinator",
+				tag.Error(err),
+			)
 		}
 	}
 

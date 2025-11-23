@@ -3,11 +3,13 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/spf13/cobra"
 )
@@ -215,20 +217,22 @@ func runExec(ctx *Context, args []string) error {
 
 	if !queueDisabled && len(workerLabels) > 0 {
 		logger.Info(ctx, "Queueing inline dag-run for distributed execution",
-			"dag", dag.Name,
-			"dagRunId", runID,
-			"workerSelector", workerLabels,
-			"command", strings.Join(args, " "))
+			tag.DAG(dag.Name),
+			tag.RunID(runID),
+			slog.Any("worker-selector", workerLabels),
+			tag.Command(strings.Join(args, " ")),
+		)
 		dag.Location = ""
 		return enqueueDAGRun(ctx, dag, runID)
 	}
 
 	if !queueDisabled && dag.Queue != "" {
 		logger.Info(ctx, "Queueing inline dag-run",
-			"dag", dag.Name,
-			"queue", dag.Queue,
-			"dagRunId", runID,
-			"command", strings.Join(args, " "))
+			tag.DAG(dag.Name),
+			tag.Queue(dag.Queue),
+			tag.RunID(runID),
+			tag.Command(strings.Join(args, " ")),
+		)
 		dag.Location = ""
 		return enqueueDAGRun(ctx, dag, runID)
 	}
@@ -239,12 +243,17 @@ func runExec(ctx *Context, args []string) error {
 	}
 
 	logger.Info(ctx, "Executing inline dag-run",
-		"dag", dag.Name,
-		"command", strings.Join(args, " "),
-		"dagRunId", runID)
+		tag.DAG(dag.Name),
+		tag.Command(strings.Join(args, " ")),
+		tag.RunID(runID),
+	)
 
 	err = tryExecuteDAG(ctx, dag, runID, dagRunRef, false)
 	if errors.Is(err, errMaxRunReached) && !queueDisabled {
+		logger.Info(ctx, "Max active runs reached; enqueueing dag-run instead",
+			tag.DAG(dag.Name),
+			tag.RunID(runID),
+		)
 		dag.Location = ""
 		return enqueueDAGRun(ctx, dag, runID)
 	}

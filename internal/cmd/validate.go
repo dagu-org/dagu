@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/spf13/cobra"
@@ -65,7 +66,10 @@ func runValidate(ctx *Context, args []string) error {
 	}
 
 	// Success
-	logger.Info(ctx, "DAG spec is valid", "file", args[0], "name", dag.GetName())
+	logger.Info(ctx, "DAG spec is valid",
+		tag.File(args[0]),
+		tag.Name(dag.GetName()),
+	)
 	return nil
 }
 

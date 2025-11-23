@@ -32,27 +32,27 @@ func FromContext(ctx context.Context) Logger {
 }
 
 // Debug logs a message with debug level.
-func Debug(ctx context.Context, msg string, tags ...any) {
+func Debug(ctx context.Context, msg string, tags ...slog.Attr) {
 	logWithContextPC(ctx, slog.LevelDebug, msg, tags...)
 }
 
 // Info logs a message with info level.
-func Info(ctx context.Context, msg string, tags ...any) {
+func Info(ctx context.Context, msg string, tags ...slog.Attr) {
 	logWithContextPC(ctx, slog.LevelInfo, msg, tags...)
 }
 
 // Warn logs a message with warn level.
-func Warn(ctx context.Context, msg string, tags ...any) {
+func Warn(ctx context.Context, msg string, tags ...slog.Attr) {
 	logWithContextPC(ctx, slog.LevelWarn, msg, tags...)
 }
 
 // Error logs a message with error level.
-func Error(ctx context.Context, msg string, tags ...any) {
+func Error(ctx context.Context, msg string, tags ...slog.Attr) {
 	logWithContextPC(ctx, slog.LevelError, msg, tags...)
 }
 
 // Fatal logs a message with fatal level and exits the program.
-func Fatal(ctx context.Context, msg string, tags ...any) {
+func Fatal(ctx context.Context, msg string, tags ...slog.Attr) {
 	logWithContextPC(ctx, slog.LevelError, msg, tags...)
 }
 
@@ -87,7 +87,7 @@ func Write(ctx context.Context, msg string) {
 }
 
 // logWithContextPC logs with the correct program counter, skipping context.go
-func logWithContextPC(ctx context.Context, level slog.Level, msg string, tags ...any) {
+func logWithContextPC(ctx context.Context, level slog.Level, msg string, tags ...slog.Attr) {
 	logger := FromContext(ctx)
 
 	// Check if this is an appLogger with debug mode
@@ -103,7 +103,7 @@ func logWithContextPC(ctx context.Context, level slog.Level, msg string, tags ..
 		// Create record with correct PC
 		record := slog.NewRecord(time.Now(), level, msg, pcs[0])
 		if len(tags) > 0 {
-			record.Add(tags...)
+			record.AddAttrs(tags...)
 		}
 
 		_ = appLog.logger.Handler().Handle(ctx, record)

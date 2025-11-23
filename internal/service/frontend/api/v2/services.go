@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
@@ -29,7 +30,7 @@ func (a *API) GetSchedulerStatus(ctx context.Context, _ api.GetSchedulerStatusRe
 	// Get all scheduler instances from service registry
 	members, err := a.serviceRegistry.GetServiceMembers(ctx, execution.ServiceNameScheduler)
 	if err != nil {
-		logger.Error(ctx, "Failed to get scheduler members from service registry", "err", err)
+		logger.Error(ctx, "Failed to get scheduler members from service registry", tag.Error(err))
 		return api.GetSchedulerStatusdefaultJSONResponse{
 			Body: api.Error{
 				Code:    api.ErrorCodeInternalError,
@@ -84,7 +85,7 @@ func (a *API) GetCoordinatorStatus(ctx context.Context, _ api.GetCoordinatorStat
 	// Get all coordinator instances from service registry
 	members, err := a.serviceRegistry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
 	if err != nil {
-		logger.Error(ctx, "Failed to get coordinator members from service registry", "err", err)
+		logger.Error(ctx, "Failed to get coordinator members from service registry", tag.Error(err))
 		return api.GetCoordinatorStatusdefaultJSONResponse{
 			Body: api.Error{
 				Code:    api.ErrorCodeInternalError,

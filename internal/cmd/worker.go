@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/spf13/cobra"
 )
@@ -79,10 +81,7 @@ func runWorker(ctx *Context, _ []string) error {
 	coordinatorCli := ctx.NewCoordinatorClient()
 	w := worker.NewWorker(workerID, maxActiveRuns, coordinatorCli, labels, ctx.Config)
 
-	logger.Info(ctx, "Starting worker",
-		"worker_id", workerID,
-		"max_active_runs", maxActiveRuns,
-		"labels", labels)
+	logger.Info(ctx, "Starting worker", tag.WorkerID(workerID), tag.MaxConcurrency(maxActiveRuns), slog.Any("labels", labels))
 
 	// Start the worker in a goroutine to allow for graceful shutdown
 	errCh := make(chan error, 1)

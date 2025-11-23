@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -69,6 +71,7 @@ func NewEntryReader(dir string, dagCli execution.DAGStore, drm runtime.Manager, 
 
 func (er *entryReaderImpl) Start(ctx context.Context, done chan any) error {
 	if err := er.initialize(ctx); err != nil {
+		logger.Error(ctx, "Failed to initialize DAG registry", tag.Error(err))
 		return fmt.Errorf("failed to initialize DAGs: %w", err)
 	}
 
@@ -86,6 +89,7 @@ func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Schedule
 	for _, dag := range er.registry {
 		dagName := strings.TrimSuffix(filepath.Base(dag.Location), filepath.Ext(dag.Location))
 		if er.dagStore.IsSuspended(ctx, dagName) {
+			logger.Debug(ctx, "Skipping suspended DAG", tag.DAG(dagName))
 			continue
 		}
 
@@ -124,9 +128,13 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 	er.lock.Lock()
 	defer er.lock.Unlock()
 
-	logger.Info(ctx, "Loading DAGs", "dir", er.targetDir)
+	logger.Info(ctx, "Loading DAGs", tag.Dir(er.targetDir))
 	fis, err := os.ReadDir(er.targetDir)
 	if err != nil {
+		logger.Error(ctx, "Failed to read DAG directory",
+			tag.Dir(er.targetDir),
+			tag.Error(err),
+		)
 		return err
 	}
 
@@ -141,7 +149,9 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 				spec.SkipSchemaValidation(),
 			)
 			if err != nil {
-				logger.Error(ctx, "DAG load failed", "err", err, "name", fi.Name())
+				logger.Error(ctx, "DAG load failed",
+					tag.Error(err),
+					tag.Name(fi.Name()))
 				continue
 			}
 			er.registry[fi.Name()] = dag
@@ -149,7 +159,7 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 		}
 	}
 
-	logger.Info(ctx, "DAGs loaded", "dags", strings.Join(dags, ","))
+	logger.Info(ctx, "DAGs loaded", slog.String("dags", strings.Join(dags, ",")))
 	return nil
 }
 
@@ -160,7 +170,12 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 		_ = watcher.Close()
 	}()
 
-	_ = watcher.Add(er.targetDir)
+	if err := watcher.Add(er.targetDir); err != nil {
+		logger.Warn(ctx, "Failed to watch DAG directory",
+			tag.Dir(er.targetDir),
+			tag.Error(err),
+		)
+	}
 
 	for {
 		select {
@@ -187,15 +202,17 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 					spec.SkipSchemaValidation(),
 				)
 				if err != nil {
-					logger.Error(ctx, "DAG load failed", "err", err, "file", event.Name)
+					logger.Error(ctx, "DAG load failed",
+						tag.Error(err),
+						tag.File(event.Name))
 				} else {
 					er.registry[filepath.Base(event.Name)] = dag
-					logger.Info(ctx, "DAG added/updated", "name", filepath.Base(event.Name))
+					logger.Info(ctx, "DAG added/updated", tag.Name(filepath.Base(event.Name)))
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.registry, filepath.Base(event.Name))
-				logger.Info(ctx, "DAG removed", "name", filepath.Base(event.Name))
+				logger.Info(ctx, "DAG removed", tag.Name(filepath.Base(event.Name)))
 			}
 			er.lock.Unlock()
 
@@ -203,7 +220,7 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 			if !ok {
 				return
 			}
-			logger.Error(ctx, "Watcher error", "err", err)
+			logger.Error(ctx, "Watcher error", tag.Error(err))
 
 		}
 	}
