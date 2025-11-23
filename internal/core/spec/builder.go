@@ -1499,7 +1499,7 @@ func buildSubDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 		// TODO: remove legacy support in future major version
 		if legacyName := strings.TrimSpace(def.Run); legacyName != "" {
 			name = legacyName
-			message := "Step field `run` is deprecated; use `call` instead"
+			message := "Step field 'run' is deprecated, use 'call' instead"
 			logger.Warn(ctx.ctx, message)
 			if ctx.dag != nil {
 				ctx.dag.BuildWarnings = append(ctx.dag.BuildWarnings, message)

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
@@ -136,7 +137,7 @@ func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRunID string) ([]*Job,
 		if item.DAGRun.ID == dagRunID {
 			if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
 				// Log the error but continue processing other items
-				logger.Warn(ctx, "failed to remove queue file %s: %w", item.FileName, err)
+				logger.Warn(ctx, "Failed to remove queue file", tag.File, item.FileName, tag.Error, err)
 			} else {
 				// Add the job to the removed jobs list
 				removedJobs = append(removedJobs, NewJob(item))
@@ -267,7 +268,7 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 		// Parse the file name to get the dag-run ID and timestamp
 		item, err := parseQueueFileName(file, fileName)
 		if err != nil {
-			logger.Error(ctx, "failed to parse queue file name %s: %w", fileName, err)
+			logger.Error(ctx, "Failed to parse queue file name", tag.File, fileName, tag.Error, err)
 			continue
 		}
 		items = append(items, item)

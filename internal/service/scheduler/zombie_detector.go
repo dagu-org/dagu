@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
@@ -72,7 +73,7 @@ func (z *ZombieDetector) loop(ctx context.Context) {
 				defer wg.Done()
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error(ctx, "Zombie detection check panicked", "panic", r)
+						logger.Error(ctx, "Zombie detection check panicked", tag.Error, r)
 					}
 				}()
 				z.detectAndCleanZombies(ctx)
@@ -103,11 +104,11 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 	statuses, err := z.dagRunStore.ListStatuses(ctx,
 		execution.WithStatuses([]core.Status{core.Running}))
 	if err != nil {
-		logger.Error(ctx, "Failed to list running DAG runs", "err", err)
+		logger.Error(ctx, "Failed to list running DAG runs", tag.Error, err)
 		return
 	}
 
-	logger.Debug(ctx, "Checking for zombie DAG runs", "count", len(statuses))
+	logger.Debug(ctx, "Checking for zombie DAG runs", tag.Count, len(statuses))
 
 	for _, st := range statuses {
 		// Check for quit signal
@@ -121,7 +122,7 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 
 		if err := z.checkAndCleanZombie(ctx, st); err != nil {
 			logger.Error(ctx, "Failed to check zombie status",
-				"name", st.Name, "dagRunID", st.DAGRunID, "err", err)
+				tag.Name, st.Name, tag.RunID, st.DAGRunID, tag.Error, err)
 		}
 	}
 }
@@ -153,7 +154,7 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.
 
 	// Process is zombie, update status to error
 	logger.Info(ctx, "Found zombie DAG run, updating to error status",
-		"name", st.Name, "dagRunID", st.DAGRunID)
+		tag.Name, st.Name, tag.RunID, st.DAGRunID)
 
 	// Update the status to error
 	st.Status = core.Failed
@@ -180,7 +181,7 @@ func (z *ZombieDetector) updateStatus(ctx context.Context,
 	}
 	defer func() {
 		if err := attempt.Close(ctx); err != nil {
-			logger.Error(ctx, "Failed to close attempt", "err", err)
+			logger.Error(ctx, "Failed to close attempt", tag.Error, err)
 		}
 	}()
 

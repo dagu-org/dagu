@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc"
@@ -77,15 +78,15 @@ func (srv *Service) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to register with service registry: %w", err)
 		}
 		logger.Info(ctx, "Registered with service registry",
-			"instance_id", srv.instanceID,
-			"configured_host", srv.configuredHost,
-			"port", port,
-			"address", srv.hostPort)
+			tag.ServiceID, srv.instanceID,
+			"configured-host", srv.configuredHost,
+			tag.Port, port,
+			tag.Addr, srv.hostPort)
 	}
 
 	go func() {
 		logger.Info(ctx, "Starting to serve on coordinator service",
-			"address", srv.hostPort)
+			tag.Addr, srv.hostPort)
 		if err := srv.server.Serve(srv.grpcListener); err != nil {
 			logger.Fatal(ctx, "Failed to serve on coordinator service listener")
 		}
@@ -103,7 +104,7 @@ func (srv *Service) Stop(ctx context.Context) error {
 	if srv.registry != nil {
 		srv.registry.Unregister(ctx)
 		logger.Info(ctx, "Unregistered from service registry",
-			"instance_id", srv.instanceID)
+			tag.ServiceID, srv.instanceID)
 	}
 
 	t := time.AfterFunc(2*time.Second, func() {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 )
 
 type (
@@ -42,7 +43,7 @@ func Retry(ctx context.Context, op Operation, policy RetryPolicy, isRetriable Is
 		attempt++
 
 		if err := ctx.Err(); err != nil {
-			logger.Warn(ctx, "Retry aborted due to context error", "attempt", attempt, "err", err)
+			logger.Warn(ctx, "Retry aborted due to context error", tag.Attempt, attempt, tag.Error, err)
 			return err
 		}
 
@@ -53,13 +54,13 @@ func Retry(ctx context.Context, op Operation, policy RetryPolicy, isRetriable Is
 		}
 
 		if !isRetriable(err) {
-			logger.Warn(ctx, "Retryable operation failed with non-retriable error", "attempt", attempt, "err", err)
+			logger.Warn(ctx, "Retryable operation failed with non-retriable error", tag.Attempt, attempt, tag.Error, err)
 			return err
 		}
 
 		interval, retryErr := retrier.Next(err)
 		if retryErr != nil {
-			logger.Warn(ctx, "Retry attempts exhausted", "attempt", attempt, "err", err)
+			logger.Warn(ctx, "Retry attempts exhausted", tag.Attempt, attempt, tag.Error, err)
 			return err
 		}
 
@@ -77,17 +78,17 @@ func Retry(ctx context.Context, op Operation, policy RetryPolicy, isRetriable Is
 
 func logSuccessIfNeeded(ctx context.Context, attempt int, lastDebugLog *time.Time) {
 	if attempt > 1 && time.Since(*lastDebugLog) >= 30*time.Second {
-		logger.Debug(ctx, "Retryable operation succeeded", "attempt", attempt)
+		logger.Debug(ctx, "Retryable operation succeeded", tag.Attempt, attempt)
 		*lastDebugLog = time.Now()
 	}
 }
 
 func logRetryIfNeeded(ctx context.Context, attempt int, interval time.Duration, err error, lastDebugLog *time.Time) {
 	if time.Since(*lastDebugLog) >= 30*time.Second {
-		logger.Debug(ctx, "Retryable operation failed; scheduling retry",
-			"attempt", attempt,
-			"next_attempt_in", interval,
-			"err", err,
+		logger.Debug(ctx, "Retryable operation failed, scheduling retry",
+			tag.Attempt, attempt,
+			tag.Interval, interval,
+			tag.Error, err,
 		)
 		*lastDebugLog = time.Now()
 	}
@@ -101,7 +102,7 @@ func waitWithContext(ctx context.Context, interval time.Duration, attempt int) e
 	case <-timer.C:
 		return nil
 	case <-ctx.Done():
-		logger.Warn(ctx, "Retry aborted during backoff wait", "attempt", attempt, "err", ctx.Err())
+		logger.Warn(ctx, "Retry aborted during backoff wait", tag.Attempt, attempt, tag.Error, ctx.Err())
 		return ctx.Err()
 	}
 }

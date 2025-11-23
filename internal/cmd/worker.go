@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/spf13/cobra"
 )
@@ -80,8 +81,8 @@ func runWorker(ctx *Context, _ []string) error {
 	w := worker.NewWorker(workerID, maxActiveRuns, coordinatorCli, labels, ctx.Config)
 
 	logger.Info(ctx, "Starting worker",
-		"worker_id", workerID,
-		"max_active_runs", maxActiveRuns,
+		tag.WorkerID, workerID,
+		tag.MaxConcurrency, maxActiveRuns,
 		"labels", labels)
 
 	// Start the worker in a goroutine to allow for graceful shutdown

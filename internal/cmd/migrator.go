@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
@@ -106,13 +107,13 @@ func (m *historyMigrator) Migrate(ctx context.Context) (*migrationResult, error)
 		dagName := m.extractDAGName(entry.Name())
 		result.TotalDAGs++
 
-		logger.Info(ctx, "Migrating DAG history", "dag", dagName)
+		logger.Info(ctx, "Migrating DAG history", tag.DAG, dagName)
 
 		// Migrate all runs for this DAG
 		if err := m.migrateDAGHistory(ctx, entry.Name(), dagName, result); err != nil {
 			migrationErr := fmt.Sprintf("failed to migrate DAG %s: %s", dagName, err)
 			result.Errors = append(result.Errors, migrationErr)
-			logger.Error(ctx, "Failed to migrate DAG", "dag", dagName, "error", err)
+			logger.Error(ctx, "Failed to migrate DAG", tag.DAG, dagName, tag.Error, err)
 		}
 	}
 
@@ -142,7 +143,7 @@ func (m *historyMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 			result.FailedRuns++
 			readErr := fmt.Sprintf("failed to read legacy status file %s: %s", file.Name(), err)
 			result.Errors = append(result.Errors, readErr)
-			logger.Error(ctx, "Failed to read legacy status file", "file", file.Name(), "path", filePath, "error", err)
+			logger.Error(ctx, "Failed to read legacy status file", tag.File, file.Name(), tag.Path, filePath, tag.Error, err)
 			continue
 		}
 
@@ -150,7 +151,7 @@ func (m *historyMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 			result.SkippedRuns++
 			err := fmt.Sprintf("skipped invalid status file %s, RequestID=%s, Status=%s", file.Name(), statusFile.Status.RequestID, statusFile.Status.Status.String())
 			result.Errors = append(result.Errors, err)
-			logger.Debug(ctx, "Skipping file with no valid status", "file", file.Name())
+			logger.Debug(ctx, "Skipping file with no valid status", tag.File, file.Name())
 			continue
 		}
 
@@ -159,7 +160,7 @@ func (m *historyMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 		// Check if already migrated
 		if m.isAlreadyMigrated(ctx, statusFile.Status.Name, requestID) {
 			result.SkippedRuns++
-			logger.Debug(ctx, "Run already migrated", "dag", statusFile.Status.Name, "request_id", requestID)
+			logger.Debug(ctx, "Run already migrated", tag.DAG, statusFile.Status.Name, tag.RequestID, requestID)
 			continue
 		}
 
@@ -168,7 +169,7 @@ func (m *historyMigrator) migrateDAGHistory(ctx context.Context, dirName, dagNam
 			result.FailedRuns++
 			migrationErr := fmt.Sprintf("failed to migrate run %s: %s", requestID, err)
 			result.Errors = append(result.Errors, migrationErr)
-			logger.Error(ctx, "Failed to migrate run", "dag", statusFile.Status.Name, "request_id", requestID, "error", err)
+			logger.Error(ctx, "Failed to migrate run", tag.DAG, statusFile.Status.Name, tag.RequestID, requestID, tag.Error, err)
 			continue
 		}
 
@@ -221,7 +222,7 @@ func (m *historyMigrator) migrateRun(ctx context.Context, legacyStatusFile *lega
 		return fmt.Errorf("failed to close attempt: %w", err)
 	}
 
-	logger.Debug(ctx, "Migrated run", "dag", legacyStatus.Name, "request_id", legacyStatus.RequestID)
+	logger.Debug(ctx, "Migrated run", tag.DAG, legacyStatus.Name, tag.RequestID, legacyStatus.RequestID)
 
 	return nil
 }
@@ -427,7 +428,7 @@ func (m *historyMigrator) MoveLegacyData(ctx context.Context) error {
 		return fmt.Errorf("failed to create archive directory: %w", err)
 	}
 
-	logger.Info(ctx, "Moving legacy history directories to archive", "archive_dir", archiveDir)
+	logger.Info(ctx, "Moving legacy history directories to archive", tag.ArchiveDir, archiveDir)
 
 	// Read data directory entries
 	entries, err := os.ReadDir(m.dataDir)
@@ -464,13 +465,13 @@ func (m *historyMigrator) MoveLegacyData(ctx context.Context) error {
 		// Move this legacy directory to archive
 		archivePath := filepath.Join(archiveDir, entry.Name())
 		if err := os.Rename(dirPath, archivePath); err != nil {
-			logger.Warn(ctx, "Failed to move legacy directory", "dir", entry.Name(), "err", err)
+			logger.Warn(ctx, "Failed to move legacy directory", tag.Dir, entry.Name(), tag.Error, err)
 		} else {
 			movedCount++
-			logger.Debug(ctx, "Moved legacy directory", "dir", entry.Name())
+			logger.Debug(ctx, "Moved legacy directory", tag.Dir, entry.Name())
 		}
 	}
 
-	logger.Info(ctx, "Legacy history data archived successfully", "location", archiveDir, "directories_moved", movedCount)
+	logger.Info(ctx, "Legacy history data archived successfully", "location", archiveDir, tag.DirsProcessed, movedCount)
 	return nil
 }

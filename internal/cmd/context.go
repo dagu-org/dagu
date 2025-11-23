@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/common/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
@@ -195,7 +196,7 @@ func (c *Context) NewCoordinatorClient() coordinator.Client {
 	coordinatorCliCfg.Insecure = c.Config.Global.Peer.Insecure
 
 	if err := coordinatorCliCfg.Validate(); err != nil {
-		logger.Error(c.Context, "Invalid coordinator client configuration", "err", err)
+		logger.Error(c.Context, "Invalid coordinator client configuration", tag.Error, err)
 		return nil
 	}
 	return coordinator.New(c.ServiceRegistry, coordinatorCliCfg)

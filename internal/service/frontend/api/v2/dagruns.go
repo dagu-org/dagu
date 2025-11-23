@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -808,10 +809,10 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	}
 
 	logger.Info(ctx, "Rescheduling dag-run",
-		"action", "reschedule",
-		"dag", dag.Name,
-		"fromDagRunId", request.DagRunId,
-		"dagRunId", newDagRunID,
+		tag.Action, "reschedule",
+		tag.DAG, dag.Name,
+		"from-dag-run-id", request.DagRunId,
+		tag.RunID, newDagRunID,
 		"singleton", singleton,
 	)
 

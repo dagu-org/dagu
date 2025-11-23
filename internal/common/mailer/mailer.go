@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 )
 
 // Client is a mailer that sends emails.
@@ -58,7 +59,7 @@ func (m *Client) Send(
 	subject, body string,
 	attachments []string,
 ) error {
-	logger.Info(ctx, "Sending an email", "to", to, "subject", subject)
+	logger.Info(ctx, "Sending email", tag.To, to, tag.Subject, subject)
 	if m.username == "" && m.password == "" {
 		return m.sendWithNoAuth(from, to, subject, body, attachments)
 	}

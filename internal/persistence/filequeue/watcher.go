@@ -11,6 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/service/scheduler/filenotify"
 	"github.com/fsnotify/fsnotify"
@@ -74,7 +75,7 @@ func (w *watcher) loop(ctx context.Context) {
 				}
 			}
 		case err := <-errorsCh:
-			logger.Error(ctx, "File watcher error", "err", err)
+			logger.Error(ctx, "File watcher error", tag.Error, err)
 		}
 	}
 }
@@ -82,7 +83,7 @@ func (w *watcher) loop(ctx context.Context) {
 // Stop implements execution.QueueWatcher.
 func (w *watcher) Stop(ctx context.Context) {
 	if err := w.fileWatcher.Close(); err != nil {
-		logger.Error(ctx, "Failed to stop file watcher", "err", err)
+		logger.Error(ctx, "Failed to stop file watcher", tag.Error, err)
 	}
 	w.quit <- struct{}{}
 	w.wg.Wait()
@@ -112,9 +113,9 @@ func (w *watcher) setupWatcher(ctx context.Context) error {
 		if entry.IsDir() {
 			subDir := filepath.Join(baseDir, entry.Name())
 			if err := w.fileWatcher.Add(subDir); err != nil {
-				logger.Warn(ctx, "Failed to watch queue directory", "dir", subDir, "err", err)
+				logger.Warn(ctx, "Failed to watch queue directory", tag.Dir, subDir, tag.Error, err)
 			} else {
-				logger.Debug(ctx, "Watching queue directory", "dir", subDir)
+				logger.Debug(ctx, "Watching queue directory", tag.Dir, subDir)
 			}
 		}
 	}
@@ -140,9 +141,9 @@ func (w *watcher) handleFileEvent(ctx context.Context, event fsnotify.Event) boo
 			// Check if it's a direct subdirectory of baseDir
 			if strings.Count(relPath, string(filepath.Separator)) == 0 {
 				if err := w.fileWatcher.Add(event.Name); err != nil {
-					logger.Warn(ctx, "Failed to watch new queue directory", "dir", event.Name, "err", err)
+					logger.Warn(ctx, "Failed to watch new queue directory", tag.Dir, event.Name, tag.Error, err)
 				} else {
-					logger.Debug(ctx, "Started watching new queue directory", "dir", event.Name)
+					logger.Debug(ctx, "Started watching new queue directory", tag.Dir, event.Name)
 				}
 				return true
 			}
@@ -155,7 +156,7 @@ func (w *watcher) handleFileEvent(ctx context.Context, event fsnotify.Event) boo
 			if strings.Count(relPath, string(filepath.Separator)) == 0 {
 				err := w.fileWatcher.Remove(event.Name)
 				if err != nil {
-					logger.Warn(ctx, "Failed to remove from file watcher", "err", err, "dir", event.Name)
+					logger.Warn(ctx, "Failed to remove from file watcher", tag.Error, err, tag.Dir, event.Name)
 				}
 			}
 		}
@@ -164,7 +165,7 @@ func (w *watcher) handleFileEvent(ctx context.Context, event fsnotify.Event) boo
 	// Check if it's a queue file (item_*.json)
 	filename := filepath.Base(event.Name)
 	if strings.HasPrefix(filename, "item_") && strings.HasSuffix(filename, ".json") {
-		logger.Debug(ctx, "Queue file event", "file", event.Name, "op", event.Op.String())
+		logger.Debug(ctx, "Queue file event", tag.File, event.Name, tag.Operation, event.Op.String())
 		return true
 	}
 

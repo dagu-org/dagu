@@ -15,6 +15,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -400,7 +401,7 @@ func (store *Storage) Grep(ctx context.Context, pattern string) (
 
 	entries, err := os.ReadDir(store.baseDir)
 	if err != nil {
-		logger.Error(ctx, "Failed to read directory", "dir", store.baseDir, "err", err)
+		logger.Error(ctx, "Failed to read directory", tag.Dir, store.baseDir, tag.Error, err)
 	}
 
 	for _, entry := range entries {
@@ -408,7 +409,7 @@ func (store *Storage) Grep(ctx context.Context, pattern string) (
 			filePath := filepath.Join(store.baseDir, entry.Name())
 			dat, err := os.ReadFile(filePath) //nolint:gosec
 			if err != nil {
-				logger.Error(ctx, "Failed to read DAG file", "file", entry.Name(), "err", err)
+				logger.Error(ctx, "Failed to read DAG file", tag.File, entry.Name(), tag.Error, err)
 				continue
 			}
 			matches, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), grep.DefaultGrepOptions)
@@ -638,13 +639,13 @@ func (store *Storage) createExampleDAGs() error {
 		return nil
 	}
 
-	logger.Info(context.Background(), "Creating example DAGs for first-time users", "dir", store.baseDir)
+	logger.Info(context.Background(), "Creating example DAGs for first-time users", tag.Dir, store.baseDir)
 
 	// Create each example DAG
 	for filename, content := range exampleDAGs {
 		filePath := filepath.Join(store.baseDir, filename)
 		if err := os.WriteFile(filePath, []byte(content), defaultPerm); err != nil {
-			logger.Error(context.Background(), "Failed to create example DAG", "file", filename, "err", err)
+			logger.Error(context.Background(), "Failed to create example DAG", tag.File, filename, tag.Error, err)
 			// Continue creating other examples even if one fails
 		}
 	}
@@ -653,7 +654,7 @@ func (store *Storage) createExampleDAGs() error {
 	markerFile := filepath.Join(store.baseDir, ".examples-created")
 	markerContent := []byte("# This file indicates that example DAGs have been created.\n# Delete this file to re-create examples on next startup.\n")
 	if err := os.WriteFile(markerFile, markerContent, defaultPerm); err != nil {
-		logger.Error(context.Background(), "Failed to create examples marker file", "err", err)
+		logger.Error(context.Background(), "Failed to create examples marker file", tag.Error, err)
 	}
 
 	logger.Info(context.Background(), "Example DAGs created successfully. Check the web UI to explore them!")

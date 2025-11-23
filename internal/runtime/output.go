@@ -12,6 +12,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/masking"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
@@ -119,7 +120,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		if oc.outputReader, oc.outputWriter, err = os.Pipe(); err != nil {
 			return fmt.Errorf("failed to create pipe: %w", err)
 		}
-		logger.Debug(ctx, "Created new output pipes", "step", data.Step.Name, "outputVar", data.Step.Output)
+		logger.Debug(ctx, "Created new output pipes", tag.Step, data.Step.Name, tag.OutputVar, data.Step.Output)
 		// Reset the captured flag to allow new output capture for retry
 		oc.outputCaptured = false
 
@@ -316,7 +317,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 
 	// Return cached result if already captured
 	if oc.outputCaptured {
-		logger.Debug(ctx, "capturedOutput: returning cached", "output", oc.outputData, "length", len(oc.outputData))
+		logger.Debug(ctx, "Captured output: returning cached", tag.Output, oc.outputData, tag.Length, len(oc.outputData))
 		return oc.outputData, nil
 	}
 
@@ -324,9 +325,9 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	if oc.outputCapture != nil {
 		// Close the writer to signal EOF to the reader
 		if oc.outputWriter != nil {
-			logger.Debug(ctx, "capturedOutput: closing output writer")
+			logger.Debug(ctx, "Captured output: closing output writer")
 			if err := oc.outputWriter.Close(); err != nil {
-				logger.Error(ctx, "failed to close pipe writer", "err", err)
+				logger.Error(ctx, "Failed to close pipe writer", tag.Error, err)
 			}
 			oc.outputWriter = nil // Mark as closed
 		}
@@ -344,7 +345,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 			oc.outputData = strings.TrimSpace(output)
 		}
 
-		logger.Debug(ctx, "capturedOutput: captured", "output", oc.outputData, "length", len(oc.outputData))
+		logger.Debug(ctx, "Captured output", tag.Output, oc.outputData, tag.Length, len(oc.outputData))
 
 		// Mark as captured for caching
 		oc.outputCaptured = true
@@ -352,7 +353,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		// Close the reader
 		if oc.outputReader != nil {
 			if err := oc.outputReader.Close(); err != nil {
-				logger.Error(ctx, "failed to close pipe reader", "err", err)
+				logger.Error(ctx, "Failed to close pipe reader", tag.Error, err)
 			}
 			oc.outputReader = nil
 		}
@@ -362,15 +363,15 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 
 	// Fallback to old behavior if concurrent capture not used (shouldn't happen)
 	if oc.outputReader == nil {
-		logger.Debug(ctx, "capturedOutput: no output reader")
+		logger.Debug(ctx, "Captured output: no output reader")
 		return "", nil
 	}
 
 	// Close the writer only if it hasn't been closed already
 	if oc.outputWriter != nil {
-		logger.Debug(ctx, "capturedOutput: closing output writer")
+		logger.Debug(ctx, "Captured output: closing output writer")
 		if err := oc.outputWriter.Close(); err != nil {
-			logger.Error(ctx, "failed to close pipe writer", "err", err)
+			logger.Error(ctx, "Failed to close pipe writer", tag.Error, err)
 		}
 		oc.outputWriter = nil // Mark as closed
 	}
@@ -386,7 +387,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 
 	// Check if output was truncated
 	if buf.Len() == int(oc.maxOutputSize) {
-		logger.Warn(ctx, "Output truncated due to size limit", "maxSize", oc.maxOutputSize)
+		logger.Warn(ctx, "Output truncated due to size limit", tag.MaxSize, oc.maxOutputSize)
 		output += "\n[OUTPUT TRUNCATED]"
 	}
 
@@ -397,11 +398,11 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		oc.outputData = output
 	}
 
-	logger.Debug(ctx, "capturedOutput: captured", "output", oc.outputData, "length", len(oc.outputData))
+	logger.Debug(ctx, "Captured output", tag.Output, oc.outputData, tag.Length, len(oc.outputData))
 
 	// Close the reader after reading
 	if err := oc.outputReader.Close(); err != nil {
-		logger.Error(ctx, "failed to close pipe reader", "err", err)
+		logger.Error(ctx, "Failed to close pipe reader", tag.Error, err)
 	}
 	oc.outputReader = nil // Mark as closed
 
@@ -466,7 +467,7 @@ func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 					oc.mu.Lock()
 					oc.err = fmt.Errorf("failed to read output: %w", err)
 					oc.mu.Unlock()
-					logger.Error(ctx, "Failed to capture output", "err", err)
+					logger.Error(ctx, "Failed to capture output", tag.Error, err)
 				}
 				break
 			}

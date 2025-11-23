@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
@@ -94,14 +95,14 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 	if _, err := fd.WriteAt(buf, 0); err != nil {
 		_ = fd.Close()
 		if err := os.Remove(p.fileName); err != nil {
-			logger.Error(ctx, "Failed to remove heartbeat file", "err", err)
+			logger.Error(ctx, "Failed to remove heartbeat file", tag.Error, err)
 		}
 
 		// If the directory is empty after removing the file, remove the directory as well
 		entries, err := os.ReadDir(dir)
 		if err == nil && len(entries) == 0 {
 			if err := os.Remove(dir); err != nil {
-				logger.Info(ctx, "Failed to remove empty heartbeat directory", "err", err)
+				logger.Info(ctx, "Failed to remove empty heartbeat directory", tag.Error, err)
 			}
 		}
 
@@ -122,14 +123,14 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 		// recovery
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error(ctx, "Heartbeat goroutine panicked", "err", r)
+				logger.Error(ctx, "Heartbeat goroutine panicked", tag.Error, r)
 			}
 		}()
 
 		defer func() {
 			_ = fd.Close()
 			if err := os.Remove(p.fileName); err != nil {
-				logger.Error(ctx, "Failed to remove heartbeat file", "err", err)
+				logger.Error(ctx, "Failed to remove heartbeat file", tag.Error, err)
 			}
 			p.cancel = nil
 			p.started.Store(false)
@@ -151,7 +152,7 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 			case <-ticker.C:
 				binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix())) // nolint:gosec
 				if _, err := fd.WriteAt(buf, 0); err != nil {
-					logger.Error(ctx, "Failed to write heartbeat", "err", err)
+					logger.Error(ctx, "Failed to write heartbeat", tag.Error, err)
 				}
 
 			case <-flush.C:

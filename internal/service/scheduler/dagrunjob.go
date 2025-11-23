@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
@@ -71,7 +72,7 @@ func (j *DAGRunJob) Ready(ctx context.Context, latestStatus execution.DAGRunStat
 	latestStartedAt, err := stringutil.ParseTime(latestStatus.StartedAt)
 	if err != nil {
 		// If parsing fails, log and continue (don't skip).
-		logger.Error(ctx, "failed to parse the last successful run time", "err", err)
+		logger.Error(ctx, "Failed to parse the last successful run time", tag.Error, err)
 		return nil
 	}
 

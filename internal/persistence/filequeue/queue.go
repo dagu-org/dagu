@@ -9,6 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/dirlock"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
@@ -142,7 +143,7 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority execution.QueuePriorit
 	if err := qf.Push(ctx, dagRun); err != nil {
 		return err
 	}
-	logger.Debug(ctx, "Enqueue", "dagRunId", dagRun.ID, "priority", priority)
+	logger.Debug(ctx, "Enqueued item", tag.RunID, dagRun.ID, tag.Priority, priority)
 	return nil
 }
 
@@ -162,7 +163,7 @@ func (q *DualQueue) Dequeue(ctx context.Context) (execution.QueuedItemData, erro
 			return nil, err
 		}
 		if item != nil {
-			logger.Debug(ctx, "Dequeue", "dagRunId", item.ID(), "priority", priority)
+			logger.Debug(ctx, "Dequeued item", tag.RunID, item.ID(), tag.Priority, priority)
 			return item, nil
 		}
 	}

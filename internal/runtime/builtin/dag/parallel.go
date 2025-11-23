@@ -12,6 +12,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
@@ -76,7 +77,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Ensure cleanup happens even if there's an error
 	defer func() {
 		if err := e.child.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup sub DAG executor", "err", err)
+			logger.Error(ctx, "Failed to cleanup sub DAG executor", tag.Error, err)
 		}
 	}()
 
@@ -96,8 +97,8 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 
 	logger.Info(ctx, "Starting parallel execution",
 		"total", len(e.runParamsList),
-		"maxConcurrent", e.maxConcurrent,
-		"dag", e.child.DAG.Name,
+		"max-concurrent", e.maxConcurrent,
+		tag.DAG, e.child.DAG.Name,
 	)
 
 	// Launch all sub DAG executions
@@ -118,8 +119,8 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 			// Execute sub DAG
 			if err := e.executeChild(ctx, runParams); err != nil {
 				logger.Error(ctx, "Sub DAG execution failed",
-					"runId", runParams.RunID,
-					"err", err,
+					tag.RunID, runParams.RunID,
+					tag.Error, err,
 				)
 				errChan <- fmt.Errorf("sub DAG %s failed: %w", runParams.RunID, err)
 			}
@@ -138,7 +139,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	// Always output aggregated results, even if some executions failed
 	if err := e.outputResults(); err != nil {
 		// Log the output error but don't fail the entire execution because of it
-		logger.Error(ctx, "Failed to output results", "err", err)
+		logger.Error(ctx, "Failed to output results", tag.Error, err)
 	}
 
 	// Check if any executions failed

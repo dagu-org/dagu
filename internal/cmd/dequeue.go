@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/spf13/cobra"
@@ -107,8 +108,8 @@ func dequeueDAGRun(ctx *Context, dagRun execution.DAGRunRef) error {
 	}
 
 	logger.Info(ctx.Context, "Dequeued dag-run",
-		"dag", dagRun.Name,
-		"runId", dagRun.ID,
+		tag.DAG, dagRun.Name,
+		tag.RunID, dagRun.ID,
 	)
 
 	return nil

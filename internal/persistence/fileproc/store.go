@@ -9,6 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
@@ -49,7 +50,7 @@ func (s *Store) Lock(ctx context.Context, groupName string) error {
 func (s *Store) Unlock(ctx context.Context, groupName string) {
 	procGroup := s.newProcGroup(groupName)
 	if err := procGroup.Unlock(); err != nil {
-		logger.Error(ctx, "Failed to unlock the proc group", "err", err)
+		logger.Error(ctx, "Failed to unlock the proc group", tag.Error, err)
 	}
 }
 
@@ -116,7 +117,7 @@ func (s *Store) ListAllAlive(ctx context.Context) (map[string][]execution.DAGRun
 		// Get all alive processes for this group
 		aliveRuns, err := procGroup.ListAlive(ctx)
 		if err != nil {
-			logger.Warn(ctx, "Failed to list alive processes for group", "group", groupName, "err", err)
+			logger.Warn(ctx, "Failed to list alive processes for group", tag.Name, groupName, tag.Error, err)
 			continue
 		}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/mailer"
 	"github.com/dagu-org/dagu/internal/core"
 )
@@ -154,7 +155,7 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 
 		dir, err := fileutil.ResolvePath(expandedDir)
 		if err != nil {
-			logger.Warn(ctx, "Failed to resolve working directory for step", "step", step.Name, "dir", expandedDir, "err", err)
+			logger.Warn(ctx, "Failed to resolve working directory for step", tag.Step, step.Name, tag.Dir, expandedDir, tag.Error, err)
 		}
 		workingDir = dir
 
@@ -166,13 +167,13 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 		if wd, err := os.Getwd(); err == nil {
 			workingDir = wd
 		} else {
-			logger.Error(ctx, "Failed to get current working directory", "err", err)
+			logger.Error(ctx, "Failed to get current working directory", tag.Error, err)
 		}
 		// If still empty, fallback to home directory
 		if dir, err := os.UserHomeDir(); err == nil {
 			workingDir = dir
 		} else {
-			logger.Error(ctx, "Failed to get user home directory", "err", err)
+			logger.Error(ctx, "Failed to get user home directory", tag.Error, err)
 		}
 	}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -58,8 +59,8 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 // Start begins the worker's operation, launching multiple polling goroutines.
 func (w *Worker) Start(ctx context.Context) error {
 	logger.Info(ctx, "Starting worker",
-		"worker_id", w.id,
-		"max_active_runs", w.maxActiveRuns)
+		tag.WorkerID, w.id,
+		tag.MaxConcurrency, w.maxActiveRuns)
 
 	// Create a wait group to track all polling goroutines
 	var wg sync.WaitGroup
@@ -95,7 +96,7 @@ func (w *Worker) Start(ctx context.Context) error {
 
 // Stop gracefully shuts down the worker.
 func (w *Worker) Stop(ctx context.Context) error {
-	logger.Info(ctx, "Worker stopping", "worker_id", w.id)
+	logger.Info(ctx, "Worker stopping", tag.WorkerID, w.id)
 
 	// Cleanup coordinator client connections
 	if err := w.coordinatorCli.Cleanup(ctx); err != nil {
@@ -180,15 +181,15 @@ func (w *Worker) sendHeartbeats(ctx context.Context) {
 			nextInterval, nextErr := retrier.Next(err)
 			if nextErr != nil {
 				logger.Error(ctx, "Failed to compute heartbeat backoff interval",
-					"worker_id", w.id,
-					"err", err,
+					tag.WorkerID, w.id,
+					tag.Error, err,
 				)
 				nextInterval = healthyInterval
 			} else {
 				logger.Warn(ctx, "Heartbeat send failed; will retry with backoff",
-					"worker_id", w.id,
-					"err", err,
-					"next_retry_in", nextInterval,
+					tag.WorkerID, w.id,
+					tag.Error, err,
+					tag.Interval, nextInterval,
 				)
 			}
 

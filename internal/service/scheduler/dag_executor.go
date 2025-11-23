@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -82,9 +83,9 @@ func (e *DAGExecutor) HandleJob(
 	// For distributed execution with START operation, enqueue for persistence
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
 		logger.Info(ctx, "Enqueueing DAG for distributed execution",
-			"dag", dag.Name,
-			"runId", runID,
-			"workerSelector", dag.WorkerSelector)
+			tag.DAG, dag.Name,
+			tag.RunID, runID,
+			"worker-selector", dag.WorkerSelector)
 
 		spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
 			DAGRunID: runID,
@@ -173,8 +174,8 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 	}
 
 	logger.Info(ctx, "Task dispatched to coordinator",
-		"target", task.Target,
-		"runID", task.DagRunId,
+		tag.Target, task.Target,
+		tag.RunID, task.DagRunId,
 		"operation", task.Operation.String())
 
 	return nil
@@ -192,7 +193,7 @@ func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG) error {
 func (e *DAGExecutor) Close(ctx context.Context) {
 	if e.coordinatorCli != nil {
 		if err := e.coordinatorCli.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup coordinator client", "err", err)
+			logger.Error(ctx, "Failed to cleanup coordinator client", tag.Error, err)
 		}
 		e.coordinatorCli = nil
 	}

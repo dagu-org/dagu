@@ -8,6 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/sock"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
@@ -36,7 +37,7 @@ type Manager struct {
 // Stop stops a running DAG by sending a stop request to its socket.
 // If the DAG is not running, it logs a message and returns nil.
 func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) error {
-	logger.Info(ctx, "Stopping", "name", dag.Name)
+	logger.Info(ctx, "Stopping DAG", tag.Name, dag.Name)
 
 	if dagRunID == "" {
 		// If DAGRunID is not specified, stop all matching DAG runs
@@ -48,7 +49,7 @@ func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) erro
 
 		// If no runs are alive, nothing to stop
 		if len(aliveRuns) == 0 {
-			logger.Info(ctx, "No running DAG runs found", "name", dag.Name)
+			logger.Info(ctx, "No running DAG runs found", tag.Name, dag.Name)
 			return nil
 		}
 
@@ -58,27 +59,27 @@ func (m *Manager) Stop(ctx context.Context, dag *core.DAG, dagRunID string) erro
 			// Find the attempt for this run
 			attempt, err := m.dagRunStore.FindAttempt(ctx, runRef)
 			if err != nil {
-				logger.Warn(ctx, "Failed to find attempt for running DAG", "runRef", runRef, "err", err)
+				logger.Warn(ctx, "Failed to find attempt for running DAG", "run-ref", runRef, tag.Error, err)
 				continue
 			}
 
 			// Read the DAG to check if it matches
 			runDAG, err := attempt.ReadDAG(ctx)
 			if err != nil {
-				logger.Warn(ctx, "Failed to read DAG for running attempt", "runRef", runRef, "err", err)
+				logger.Warn(ctx, "Failed to read DAG for running attempt", "run-ref", runRef, tag.Error, err)
 				continue
 			}
 
 			// Check if the DAG name matches
 			if runDAG.Name == dag.Name {
 				matchingRunIDs = append(matchingRunIDs, runRef.ID)
-				logger.Info(ctx, "Found matching DAG run to stop", "name", dag.Name, "runID", runRef.ID)
+				logger.Info(ctx, "Found matching DAG run to stop", tag.Name, dag.Name, tag.RunID, runRef.ID)
 			}
 		}
 
 		// If no matching DAGs were found
 		if len(matchingRunIDs) == 0 {
-			logger.Info(ctx, "No matching DAG run found to stop", "name", dag.Name)
+			logger.Info(ctx, "No matching DAG run found to stop", tag.Name, dag.Name)
 			return nil
 		}
 
@@ -111,7 +112,7 @@ func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID 
 		return fmt.Errorf("failed to retrieve status from proc store: %w", err)
 	}
 	if !alive {
-		logger.Info(ctx, "The DAG is not running", "name", dag.Name, "runID", dagRunID)
+		logger.Info(ctx, "The DAG is not running", tag.Name, dag.Name, tag.RunID, dagRunID)
 		return nil
 	}
 
@@ -120,7 +121,7 @@ func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID 
 		// In case the socket exists, we try to send a stop request
 		client := sock.NewClient(addr)
 		if _, err := client.Request("POST", "/stop"); err == nil {
-			logger.Info(ctx, "Successfully stopped DAG via socket", "name", dag.Name, "runID", dagRunID)
+			logger.Info(ctx, "Successfully stopped DAG via socket", tag.Name, dag.Name, tag.RunID, dagRunID)
 			return nil
 		}
 	}
@@ -132,7 +133,7 @@ func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID 
 		if err := run.Abort(ctx); err != nil {
 			return fmt.Errorf("failed to request cancel for dag-run %s: %w", dagRunID, err)
 		}
-		logger.Info(ctx, "Wrote stop file for running DAG", "name", dag.Name, "runID", dagRunID)
+		logger.Info(ctx, "Wrote stop file for running DAG", tag.Name, dag.Name, tag.RunID, dagRunID)
 		return nil
 	}
 
@@ -188,7 +189,7 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun execution.DAGRunRef
 	// If the status is running, ensure if the process is still alive
 	if dagRun.ID == st.Root.ID && st.Status == core.Running {
 		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
-			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
+			logger.Error(ctx, "Failed to check and update stale running status", tag.Error, err)
 		}
 	}
 
@@ -223,7 +224,7 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *core.DAG
 	// check if the process is actually alive before marking as error.
 	if st.Status == core.Running {
 		if err := m.checkAndUpdateStaleRunningStatus(ctx, attempt, st); err != nil {
-			logger.Error(ctx, "Failed to check and update stale running status", "err", err)
+			logger.Error(ctx, "Failed to check and update stale running status", tag.Error, err)
 		}
 	}
 
@@ -301,7 +302,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (execution
 			if err == nil {
 				st = currentStatus
 			} else {
-				logger.Debug(ctx, "Failed to get current status from socket", "err", err)
+				logger.Debug(ctx, "Failed to get current status from socket", tag.Error, err)
 			}
 		}
 	}
@@ -383,7 +384,7 @@ func (m *Manager) checkAndUpdateStaleRunningStatus(
 	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), dagRun)
 	if err != nil {
 		// Log but don't fail - we can't determine if it's alive
-		logger.Error(ctx, "Failed to check if DAG run is alive", "err", err)
+		logger.Error(ctx, "Failed to check if DAG run is alive", tag.Error, err)
 		return nil
 	}
 	if alive {
@@ -416,10 +417,9 @@ func execWithRecovery(ctx context.Context, fn func()) {
 
 			// Log with structured information
 			logger.Error(ctx, "Recovered from panic",
-				"err", err.Error(),
-				"errType", fmt.Sprintf("%T", panicObj),
-				"stackTrace", stack,
-				"fullStack", string(stack))
+				tag.Error, err.Error(),
+				"err-type", fmt.Sprintf("%T", panicObj),
+				"stack-trace", string(stack))
 		}
 	}()
 

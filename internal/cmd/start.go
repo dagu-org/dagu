@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmd/dagpicker"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -180,17 +181,17 @@ func runStart(ctx *Context, args []string) error {
 	// Log root dag-run or reschedule action
 	if fromRunID != "" {
 		logger.Info(ctx, "Rescheduling dag-run",
-			"action", "reschedule",
-			"dag", dag.Name,
-			"fromDagRunId", fromRunID,
-			"dagRunId", dagRunID,
+			tag.Action, "reschedule",
+			tag.DAG, dag.Name,
+			"from-dag-run-id", fromRunID,
+			tag.RunID, dagRunID,
 			"params", params,
 		)
 	} else {
 		logger.Info(ctx, "Executing root dag-run",
-			"dag", dag.Name,
+			tag.DAG, dag.Name,
 			"params", params,
-			"dagRunId", dagRunID,
+			tag.RunID, dagRunID,
 		)
 	}
 
@@ -201,9 +202,9 @@ func runStart(ctx *Context, args []string) error {
 	// when the worker executes the dispatched task.
 	if !queueDisabled && len(dag.WorkerSelector) > 0 {
 		logger.Info(ctx, "DAG has workerSelector, enqueueing for distributed execution",
-			"dag", dag.Name,
-			"dagRunId", dagRunID,
-			"workerSelector", dag.WorkerSelector)
+			tag.DAG, dag.Name,
+			tag.RunID, dagRunID,
+			"worker-selector", dag.WorkerSelector)
 		dag.Location = "" // Queued dag-runs must not have a location
 		return enqueueDAGRun(ctx, dag, dagRunID)
 	}
@@ -237,7 +238,7 @@ var (
 // tryExecuteDAG tries to run the DAG within the max concurrent run config
 func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef, disableMaxActiveRuns bool) error {
 	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
-		logger.Debug(ctx, "failed to lock process group", "err", err)
+		logger.Debug(ctx, "Failed to lock process group", tag.Error, err)
 		return errMaxRunReached
 	}
 	defer ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
@@ -245,7 +246,7 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.
 	if !disableMaxActiveRuns {
 		runningCount, err := ctx.ProcStore.CountAlive(ctx, dag.ProcGroup())
 		if err != nil {
-			logger.Debug(ctx, "failed to count live processes", "err", err)
+			logger.Debug(ctx, "Failed to count live processes", tag.Error, err)
 			return fmt.Errorf("failed to count live process for %s: %w", dag.ProcGroup(), errMaxRunReached)
 		}
 
@@ -260,7 +261,7 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.
 	// Acquire process handle
 	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
 	if err != nil {
-		logger.Debug(ctx, "failed to acquire process handle", "err", err)
+		logger.Debug(ctx, "Failed to acquire process handle", tag.Error, err)
 		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
 	}
 	defer func() {
@@ -321,7 +322,7 @@ func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
 		}
 
 		// Use interactive picker
-		logger.Info(ctx, "No DAG specified, opening interactive selector...")
+		logger.Info(ctx, "No DAG specified, opening interactive selector")
 
 		// Get DAG store
 		dagStore, err := ctx.dagStore(nil, nil)
@@ -413,9 +414,9 @@ func determineRootDAGRun(isSubDAGRun bool, rootDAGRun string, dag *core.DAG, dag
 func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root execution.DAGRunRef, parent execution.DAGRunRef) error {
 	// Log sub dag-run execution
 	logger.Info(ctx, "Executing sub dag-run",
-		"dag", dag.Name,
+		tag.DAG, dag.Name,
 		"params", params,
-		"dagRunId", dagRunID,
+		tag.RunID, dagRunID,
 		"root", root,
 		"parent", parent,
 	)
@@ -426,7 +427,7 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 	}
 
 	// Check for previous sub dag-run with this ID
-	logger.Debug(ctx, "Checking for previous sub dag-run with the dag-run ID", "dagRunId", dagRunID)
+	logger.Debug(ctx, "Checking for previous sub dag-run with the dag-run ID", tag.RunID, dagRunID)
 
 	// Look for existing execution subAttempt
 	subAttempt, err := ctx.DAGRunStore.FindSubAttempt(ctx, root, dagRunID)
@@ -460,7 +461,7 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRun
 		_ = logFile.Close()
 	}()
 
-	logger.Debug(ctx, "dag-run initiated", "DAG", d.Name, "dagRunId", dagRunID, "logFile", logFile.Name())
+	logger.Debug(ctx, "Dag-run initiated", tag.DAG, d.Name, tag.RunID, dagRunID, tag.File, logFile.Name())
 
 	// Initialize DAG repository with the DAG's directory in the search path
 	dr, err := ctx.dagStore(nil, []string{filepath.Dir(d.Location)})

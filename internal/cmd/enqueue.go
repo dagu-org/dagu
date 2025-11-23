@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
@@ -141,8 +142,8 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 	}
 
 	logger.Info(ctx.Context, "Enqueued dag-run",
-		"dag", dag.Name,
-		"dagRunId", dagRunID,
+		tag.DAG, dag.Name,
+		tag.RunID, dagRunID,
 		"params", dag.Params,
 	)
 

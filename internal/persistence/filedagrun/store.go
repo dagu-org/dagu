@@ -14,6 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
@@ -189,14 +190,14 @@ func (store *Store) collectStatusesFromRoots(
 				run, err := dagRun.LatestAttempt(ctx, store.cache)
 				if err != nil {
 					if !errors.Is(err, execution.ErrNoStatusData) {
-						logger.Error(ctx, "Failed to get latest run", "err", err)
+						logger.Error(ctx, "Failed to get latest run", tag.Error, err)
 					}
 					continue
 				}
 
 				status, err := run.ReadStatus(ctx)
 				if err != nil {
-					logger.Error(ctx, "Failed to read status", "err", err)
+					logger.Error(ctx, "Failed to read status", tag.Error, err)
 					continue
 				}
 				if !hasStatusFilter {
@@ -272,7 +273,7 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *core.DAG, timestamp 
 	}
 	defer func() {
 		if err := dataRoot.Unlock(); err != nil {
-			logger.Error(ctx, "Failed to unlock dag-run", "dagRunID", dagRunID, "err", err)
+			logger.Error(ctx, "Failed to unlock dag-run", tag.RunID, dagRunID, tag.Error, err)
 		}
 	}()
 
@@ -332,7 +333,7 @@ func (b *Store) newChildRecord(ctx context.Context, dag *core.DAG, timestamp tim
 
 	record, err := run.CreateAttempt(ctx, ts, b.cache, WithDAG(dag))
 	if err != nil {
-		logger.Error(ctx, "Failed to create sub dag-run record", "err", err)
+		logger.Error(ctx, "Failed to create sub dag-run record", tag.Error, err)
 		return nil, err
 	}
 
@@ -342,7 +343,7 @@ func (b *Store) newChildRecord(ctx context.Context, dag *core.DAG, timestamp tim
 // RecentAttempts returns the most recent history records for the specified DAG name.
 func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimit int) []execution.DAGRunAttempt {
 	if itemLimit <= 0 {
-		logger.Warnf(ctx, "Invalid itemLimit %d, using default of 10", itemLimit)
+		logger.Warn(ctx, "Invalid itemLimit, using default of 10", tag.Limit, itemLimit)
 		itemLimit = 10
 	}
 
@@ -355,7 +356,7 @@ func (store *Store) RecentAttempts(ctx context.Context, dagName string, itemLimi
 	for _, item := range items {
 		record, err := item.LatestAttempt(ctx, store.cache)
 		if err != nil {
-			logger.Error(ctx, "Failed to get latest record", "err", err)
+			logger.Error(ctx, "Failed to get latest record", tag.Error, err)
 			continue
 		}
 		records = append(records, record)
@@ -434,7 +435,7 @@ func (store *Store) FindSubAttempt(ctx context.Context, ref execution.DAGRunRef,
 // If retentionDays is positive, only files older than the specified number of days will be removed.
 func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retentionDays int) error {
 	if retentionDays < 0 {
-		logger.Warnf(ctx, "Negative retentionDays %d, no files will be removed", retentionDays)
+		logger.Warn(ctx, "Negative retentionDays, no files will be removed", "retention-days", retentionDays)
 		return nil
 	}
 
@@ -460,7 +461,7 @@ func (store *Store) RemoveDAGRun(ctx context.Context, dagRun execution.DAGRunRef
 
 	defer func() {
 		if err := root.Unlock(); err != nil {
-			logger.Error(ctx, "Failed to unlock dag-run", "dagRunID", dagRun.ID, "err", err)
+			logger.Error(ctx, "Failed to unlock dag-run", tag.RunID, dagRun.ID, tag.Error, err)
 		}
 	}()
 
