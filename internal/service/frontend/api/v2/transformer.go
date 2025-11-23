@@ -117,10 +117,13 @@ func toDAGRunSummary(s execution.DAGRunStatus) api.DAGRunSummary {
 
 	// Extract running and failed step names from nodes
 	for _, node := range s.Nodes {
-		if node.Status == core.NodeRunning {
+		switch node.Status {
+		case core.NodeRunning:
 			runningStepNames = append(runningStepNames, node.Step.Name)
-		} else if node.Status == core.NodeFailed {
+		case core.NodeFailed:
 			failedStepNames = append(failedStepNames, node.Step.Name)
+		default:
+			//other statuses are not included
 		}
 	}
 
