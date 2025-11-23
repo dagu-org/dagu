@@ -76,7 +76,10 @@ func TestStore_DequeueByDAGRunID(t *testing.T) {
 	require.NoError(t, err, "expected no error when adding job to store")
 
 	// Check if dequeue by dag-run ID returns the job
-	jobs, err := store.DequeueByDAGRunID(th.Context, "test-name", "test-dag-2")
+	jobs, err := store.DequeueByDAGRunID(th.Context, "test-name", execution.DAGRunRef{
+		Name: "test-name",
+		ID:   "test-dag-2",
+	})
 	require.NoError(t, err, "expected no error when dequeueing job by dag-run ID from store")
 	require.Len(t, jobs, 1, "expected to dequeue one job")
 	require.Contains(t, jobs[0].ID(), "test-dag-2", "expected job ID to contain 'test-dag-2'")

@@ -27,9 +27,19 @@ func DAG(name string) slog.Attr {
 	return slog.String("dag", name)
 }
 
+// SubDAG creates a tag for sub-DAG (sub-workflow) names.
+func SubDAG(name string) slog.Attr {
+	return slog.String("sub-dag", name)
+}
+
 // RunID creates a tag for DAG run execution IDs.
 func RunID(id string) slog.Attr {
 	return slog.String("run-id", id)
+}
+
+// SubRunID creates a tag for sub-DAG run execution IDs.
+func SubRunID(id string) slog.Attr {
+	return slog.String("sub-run-id", id)
 }
 
 // AttemptID creates a tag for specific execution attempt IDs.

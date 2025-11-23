@@ -19,6 +19,8 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
+var errParallelCancelled = errors.New("parallel execution cancelled")
+
 var _ executor.ParallelExecutor = (*parallelExecutor)(nil)
 var _ executor.NodeStatusDeterminer = (*parallelExecutor)(nil)
 
@@ -32,11 +34,12 @@ type parallelExecutor struct {
 	maxConcurrent int
 
 	// Runtime state
-	running    map[string]*exec.Cmd            // Maps DAG run ID to running command
-	results    map[string]*execution.RunStatus // Maps DAG run ID to result
-	errors     []error                         // Collects errors from failed executions
-	wg         sync.WaitGroup                  // Tracks running goroutines
-	cancelFunc context.CancelFunc              // For canceling all child executions
+	running map[string]*exec.Cmd            // Maps DAG run ID to running command
+	results map[string]*execution.RunStatus // Maps DAG run ID to result
+	errors  []error                         // Collects errors from failed executions
+
+	cancel     chan struct{}
+	cancelOnce sync.Once
 }
 
 func newParallelExecutor(
@@ -71,6 +74,7 @@ func newParallelExecutor(
 		running:       make(map[string]*exec.Cmd),
 		results:       make(map[string]*execution.RunStatus),
 		errors:        make([]error, 0),
+		cancel:        make(chan struct{}),
 	}, nil
 }
 
@@ -86,10 +90,6 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("no sub DAG runs to execute")
 	}
 
-	// Create a cancellable context for all child executions
-	ctx, e.cancelFunc = context.WithCancel(ctx)
-	defer e.cancelFunc()
-
 	// Create a semaphore channel to limit concurrent executions
 	semaphore := make(chan struct{}, e.maxConcurrent)
 
@@ -103,15 +103,18 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	)
 
 	// Launch all sub DAG executions
+	var wg sync.WaitGroup
 	for _, params := range e.runParamsList {
-		e.wg.Add(1)
+		wg.Add(1)
 		go func(runParams executor.RunParams) {
-			defer e.wg.Done()
+			defer wg.Done()
 
-			// Acquire semaphore
 			select {
 			case semaphore <- struct{}{}:
 				defer func() { <-semaphore }()
+			case <-e.cancel:
+				errChan <- errParallelCancelled
+				return
 			case <-ctx.Done():
 				errChan <- ctx.Err()
 				return
@@ -129,7 +132,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	}
 
 	// Wait for all executions to complete
-	e.wg.Wait()
+	wg.Wait()
 	close(errChan)
 
 	// Collect all errors
@@ -223,10 +226,8 @@ func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 
 // executeChild executes a single sub DAG with the given parameters
 func (e *parallelExecutor) executeChild(ctx context.Context, runParams executor.RunParams) error {
-	// Use the new ExecuteWithResult API
-	result, err := e.child.ExecuteWithResult(ctx, runParams, e.workDir)
+	result, err := e.child.Execute(ctx, runParams, e.workDir)
 
-	// Store the result
 	e.lock.Lock()
 	if result != nil {
 		e.results[runParams.RunID] = result
@@ -300,17 +301,12 @@ func (e *parallelExecutor) outputResults() error {
 func (e *parallelExecutor) Kill(sig os.Signal) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-
-	// Cancel the context to stop new executions
-	if e.cancelFunc != nil {
-		e.cancelFunc()
-	}
-
-	// Kill all child processes (both local and distributed)
+	e.cancelOnce.Do(func() {
+		close(e.cancel)
+	})
 	if e.child != nil {
 		return e.child.Kill(sig)
 	}
-
 	return nil
 }
 

@@ -266,7 +266,7 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 			ctx = logger.WithValues(ctx, tag.RunID(item.Data().ID))
 			if p.processDAG(ctx, item, queueName) {
 				// Remove the item from the queue
-				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, item.Data().ID); err != nil {
+				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, item.Data()); err != nil {
 					logger.Error(ctx, "Failed to dequeue item", tag.Error(err))
 				}
 			}
@@ -356,7 +356,7 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 
 	var started bool
 	operation := func(ctx context.Context) error {
-		started, err = p.monitorStartup(ctx, queueName, runRef, nil)
+		started, err = p.monitorStartup(ctx, queueName, runRef, errCh)
 		return err
 	}
 

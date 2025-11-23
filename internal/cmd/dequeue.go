@@ -14,31 +14,56 @@ import (
 func Dequeue() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
-			Use:   "dequeue [flags]",
-			Short: "Dequeue a DAG-run from the queue",
+			Use:   "dequeue [flags] <queue-name>",
+			Short: "Dequeue a DAG-run from the specified queue",
 			Long: `Dequeue a DAG-run from the queue.
 
 Example:
-	dagu dequeue --dag-run=dag_name:my_dag_run_id
+	dagu dequeue default --dag-run=dag_name:my_dag_run_id
+	dagu dequeue default
 `,
+			Args: cobra.ExactArgs(1),
 		}, dequeueFlags, runDequeue,
 	)
 }
 
 var dequeueFlags = []commandLineFlag{paramsFlag, dagRunFlagDequeue}
 
-func runDequeue(ctx *Context, _ []string) error {
+func runDequeue(ctx *Context, args []string) error {
+	queueName := args[0]
+
 	// Get dag-run reference from the context
 	dagRunRef, _ := ctx.StringParam("dag-run")
+	if dagRunRef == "" {
+		return dequeueFirst(ctx, queueName)
+	}
+
 	dagRun, err := execution.ParseDAGRunRef(dagRunRef)
 	if err != nil {
 		return fmt.Errorf("failed to parse dag-run reference %s: %w", dagRunRef, err)
 	}
-	return dequeueDAGRun(ctx, dagRun)
+	return dequeueDAGRun(ctx, queueName, dagRun, false)
+}
+
+// dequeueFirst dequeues the first dag-run from the given queue.
+func dequeueFirst(ctx *Context, queueName string) error {
+	// Check if queues are enabled
+	if !ctx.Config.Queues.Enabled {
+		return fmt.Errorf("queues are disabled in configuration")
+	}
+	item, err := ctx.QueueStore.DequeueByName(ctx.Context, queueName)
+	if err != nil {
+		return fmt.Errorf("failed to dequeue from queue %s: %w", queueName, err)
+	}
+	if item == nil {
+		return fmt.Errorf("no dag-run found in queue %s", queueName)
+	}
+
+	return dequeueDAGRun(ctx, queueName, item.Data(), true)
 }
 
 // dequeueDAGRun dequeues a dag-run from the queue.
-func dequeueDAGRun(ctx *Context, dagRun execution.DAGRunRef) error {
+func dequeueDAGRun(ctx *Context, queueName string, dagRun execution.DAGRunRef, alreadyDequeued bool) error {
 	// Check if queues are enabled
 	if !ctx.Config.Queues.Enabled {
 		return fmt.Errorf("queues are disabled in configuration")
@@ -72,9 +97,11 @@ func dequeueDAGRun(ctx *Context, dagRun execution.DAGRunRef) error {
 		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, latestStatus.Status)
 	}
 
-	// Dequeue the dag-run from the queue
-	if _, err = ctx.QueueStore.DequeueByDAGRunID(ctx.Context, dagRun.Name, dagRun.ID); err != nil {
-		return fmt.Errorf("failed to dequeue dag-run %s: %w", dagRun.ID, err)
+	// Dequeue the dag-run from the queue if we have not done so already
+	if !alreadyDequeued {
+		if _, err = ctx.QueueStore.DequeueByDAGRunID(ctx.Context, queueName, dagRun); err != nil {
+			return fmt.Errorf("failed to dequeue dag-run %s: %w", dagRun.ID, err)
+		}
 	}
 
 	// Mark the execution as aborted now that it is dequeued
