@@ -1,8 +1,5 @@
 import React from 'react';
-import {
-  components,
-  NodeStatus,
-} from '../../../../api/v2/schema';
+import { components, NodeStatus } from '../../../../api/v2/schema';
 import {
   Tooltip,
   TooltipContent,
@@ -23,11 +20,7 @@ function getStepName(node: Node, index: number) {
   return node.step?.name || `Step ${index + 1}`;
 }
 
-function renderStepList(
-  title: string,
-  nodes: Node[],
-  colorClass: string
-) {
+function renderStepList(title: string, nodes: Node[], colorClass: string) {
   if (nodes.length === 0) {
     return null;
   }
@@ -38,9 +31,7 @@ function renderStepList(
 
   return (
     <div className="space-y-1">
-      <div className={`text-[11px] font-semibold ${colorClass}`}>
-        {title}
-      </div>
+      <div className={`text-[11px] font-semibold ${colorClass}`}>{title}</div>
       <ul className="text-xs space-y-0.5">
         {visibleSteps.map((node, idx) => (
           <li key={`${node.step?.name || idx}-${idx}`}>
@@ -67,9 +58,10 @@ export function StepDetailsTooltip({
 
   const canRequestDetails = Boolean(dagRun.name && dagRun.dagRunId);
 
-  const queryKey = isOpen && canRequestDetails
-    ? '/dag-runs/{name}/{dagRunId}'
-    : ((undefined as unknown) as '/dag-runs/{name}/{dagRunId}');
+  const queryKey =
+    isOpen && canRequestDetails
+      ? '/dag-runs/{name}/{dagRunId}'
+      : (undefined as unknown as '/dag-runs/{name}/{dagRunId}');
 
   const { data, error, isLoading } = useQuery(
     queryKey,
@@ -97,12 +89,9 @@ export function StepDetailsTooltip({
   const runningSteps = nodes.filter(
     (node) => node.status === NodeStatus.Running
   );
-  const failedSteps = nodes.filter(
-    (node) => node.status === NodeStatus.Failed
-  );
+  const failedSteps = nodes.filter((node) => node.status === NodeStatus.Failed);
 
-  const hasStepData =
-    runningSteps.length > 0 || failedSteps.length > 0;
+  const hasStepData = runningSteps.length > 0 || failedSteps.length > 0;
 
   return (
     <Tooltip open={isOpen} onOpenChange={setIsOpen}>
@@ -132,11 +121,7 @@ export function StepDetailsTooltip({
                   runningSteps,
                   'text-emerald-500'
                 )}
-                {renderStepList(
-                  'Failed steps',
-                  failedSteps,
-                  'text-red-400'
-                )}
+                {renderStepList('Failed steps', failedSteps, 'text-red-400')}
               </>
             ) : (
               <div className="text-xs text-muted-foreground">
@@ -149,5 +134,3 @@ export function StepDetailsTooltip({
     </Tooltip>
   );
 }
-
-
