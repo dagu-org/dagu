@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/smtp"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 )
 
 // Client is a mailer that sends emails.
@@ -58,7 +60,7 @@ func (m *Client) Send(
 	subject, body string,
 	attachments []string,
 ) error {
-	logger.Info(ctx, "Sending an email", "to", to, "subject", subject)
+	logger.Info(ctx, "Sending email", slog.Any("to", to), tag.Subject(subject))
 	if m.username == "" && m.password == "" {
 		return m.sendWithNoAuth(from, to, subject, body, attachments)
 	}

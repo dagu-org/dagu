@@ -2,10 +2,12 @@ package worker
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
@@ -45,8 +47,8 @@ func (p *Poller) Run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			logger.Debug(ctx, "Poller stopping due to context cancellation",
-				"worker_id", p.workerID,
-				"poller_index", p.index)
+				tag.WorkerID(p.workerID),
+				tag.PollerIndex(p.index))
 			return
 		default:
 			// Poll for a task
@@ -63,9 +65,9 @@ func (p *Poller) Run(ctx context.Context) {
 			// If we got a task, execute it
 			if task != nil {
 				logger.Info(ctx, "Task received, starting execution",
-					"worker_id", p.workerID,
-					"poller_index", p.index,
-					"dag_run_id", task.DagRunId)
+					tag.WorkerID(p.workerID),
+					tag.PollerIndex(p.index),
+					tag.RunID(task.DagRunId))
 
 				// Execute the task using the TaskHandler
 				err := p.handler.Handle(ctx, task)
@@ -75,15 +77,15 @@ func (p *Poller) Run(ctx context.Context) {
 						return
 					}
 					logger.Error(ctx, "Task execution failed",
-						"worker_id", p.workerID,
-						"poller_index", p.index,
-						"dag_run_id", task.DagRunId,
-						"err", err)
+						tag.WorkerID(p.workerID),
+						tag.PollerIndex(p.index),
+						tag.RunID(task.DagRunId),
+						tag.Error(err))
 				} else {
 					logger.Info(ctx, "Task execution completed successfully",
-						"worker_id", p.workerID,
-						"poller_index", p.index,
-						"dag_run_id", task.DagRunId)
+						tag.WorkerID(p.workerID),
+						tag.PollerIndex(p.index),
+						tag.RunID(task.DagRunId))
 				}
 			}
 			// Continue polling for the next task
@@ -114,18 +116,18 @@ func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*
 		if beforeMetrics.IsConnected && !afterMetrics.IsConnected {
 			// First failure after being connected - log as ERROR
 			logger.Error(ctx, "Poll failed - lost connection to coordinator",
-				"err", err,
-				"worker_id", p.workerID,
-				"poller_id", pollerID,
-				"poller_index", p.index)
+				tag.Error(err),
+				tag.WorkerID(p.workerID),
+				tag.PollerID(pollerID),
+				tag.PollerIndex(p.index))
 		} else {
 			// Subsequent failures - log as DEBUG
 			logger.Debug(ctx, "Poll still failing",
-				"err", err,
-				"worker_id", p.workerID,
-				"poller_id", pollerID,
-				"poller_index", p.index,
-				"consecutive_failures", afterMetrics.ConsecutiveFails)
+				tag.Error(err),
+				tag.WorkerID(p.workerID),
+				tag.PollerID(pollerID),
+				tag.PollerIndex(p.index),
+				slog.Int("consecutive-failures", afterMetrics.ConsecutiveFails))
 		}
 		return nil, err
 	}
@@ -135,23 +137,23 @@ func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*
 	if !beforeMetrics.IsConnected && afterMetrics.IsConnected && beforeMetrics.ConsecutiveFails > 0 {
 		// Recovered from disconnection - log as INFO
 		logger.Info(ctx, "Poll succeeded - reconnected to coordinator",
-			"worker_id", p.workerID,
-			"poller_id", pollerID,
-			"poller_index", p.index,
-			"previous_consecutive_failures", beforeMetrics.ConsecutiveFails)
+			tag.WorkerID(p.workerID),
+			tag.PollerID(pollerID),
+			tag.PollerIndex(p.index),
+			slog.Int("previous-consecutive-failures", beforeMetrics.ConsecutiveFails))
 	}
 
 	// Handle the received task
 	if task != nil {
 		logger.Info(ctx, "Task received",
-			"worker_id", p.workerID,
-			"poller_id", pollerID,
-			"poller_index", p.index,
-			"root_dag_run_name", task.RootDagRunName,
-			"root_dag_run_id", task.RootDagRunId,
-			"parent_dag_run_name", task.ParentDagRunName,
-			"parent_dag_run_id", task.ParentDagRunId,
-			"dag_run_id", task.DagRunId)
+			tag.WorkerID(p.workerID),
+			tag.PollerID(pollerID),
+			tag.PollerIndex(p.index),
+			slog.String("root-dag-run-name", task.RootDagRunName),
+			slog.String("root-dag-run-id", task.RootDagRunId),
+			slog.String("parent-dag-run-name", task.ParentDagRunName),
+			slog.String("parent-dag-run-id", task.ParentDagRunId),
+			tag.RunID(task.DagRunId))
 	}
 
 	return task, nil

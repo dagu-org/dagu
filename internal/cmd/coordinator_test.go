@@ -99,7 +99,7 @@ func TestCoordinatorCommand(t *testing.T) {
 				"--coordinator.advertise=dagu-server",
 				fmt.Sprintf("--coordinator.port=%s", port),
 			},
-			ExpectedOut: []string{"Coordinator initialization", "bind_address=0.0.0.0", "advertise_address=dagu-server", port},
+			ExpectedOut: []string{"Coordinator initialization", "bind-address=0.0.0.0", "advertise-address=dagu-server", port},
 		})
 	})
 }

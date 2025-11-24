@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 )
 
 // WithRemoteNode is a middleware that checks if the request has a "remoteNode" query parameter.
@@ -86,11 +88,11 @@ func WithRemoteNode(remoteNodes map[string]config.RemoteNode, apiBasePath string
 				return
 			}
 
-			logger.Info(r.Context(), "received response from remote node",
-				"statusCode", resp.StatusCode,
-				"contentLength", resp.ContentLength,
-				"contentType", resp.Header.Get("Content-Type"),
-				"dataLength", len(respData))
+			logger.Info(r.Context(), "Received response from remote node",
+				slog.Int("status-code", resp.StatusCode),
+				slog.Int64("content-length", resp.ContentLength),
+				slog.String("content-type", resp.Header.Get("Content-Type")),
+				slog.Int("data-length", len(respData)))
 
 			// If not status 200, try to parse the error response
 			if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -122,7 +124,7 @@ func WithRemoteNode(remoteNodes map[string]config.RemoteNode, apiBasePath string
 				_, err = w.Write(respData)
 				if err != nil {
 					// If there was an error writing the response, log it
-					logger.Error(r.Context(), "failed to write response", "err", err)
+					logger.Error(r.Context(), "Failed to write response", tag.Error(err))
 				}
 			}
 		}

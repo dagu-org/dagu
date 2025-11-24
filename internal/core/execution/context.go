@@ -165,12 +165,12 @@ func SetupDAGContext(ctx context.Context, dag *core.DAG, db Database, rootDAGRun
 func GetDAGContext(ctx context.Context) DAGContext {
 	value := ctx.Value(dagCtxKey{})
 	if value == nil {
-		logger.Error(ctx, "failed to get the env")
+		logger.Error(ctx, "DAGContext not found in context")
 		return DAGContext{}
 	}
 	execEnv, ok := value.(DAGContext)
 	if !ok {
-		logger.Error(ctx, "failed to get the env")
+		logger.Error(ctx, "Invalid DAGContext type in context")
 		return DAGContext{}
 	}
 	return execEnv

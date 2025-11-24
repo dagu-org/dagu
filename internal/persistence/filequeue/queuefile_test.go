@@ -114,7 +114,10 @@ func TestQueueFile_Pop(t *testing.T) {
 	require.NoError(t, err, "expected no error when adding job to queue")
 
 	// Remove the job from the queue
-	removedJobs, err := qf.PopByDAGRunID(th.Context, "test-dag")
+	removedJobs, err := qf.PopByDAGRunID(th.Context, execution.DAGRunRef{
+		Name: "test-name",
+		ID:   "test-dag",
+	})
 	require.NoError(t, err, "expected no error when removing job from queue")
 	require.Len(t, removedJobs, 1, "expected one job to be removed")
 	require.Equal(t, "test-name", removedJobs[0].DAGRun.Name, "expected job name to be 'test-name'")

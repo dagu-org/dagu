@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"os"
 	"runtime/debug"
@@ -15,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
@@ -113,7 +115,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 	// If one of the conditions does not met, cancel the execution.
 	env := execution.GetDAGContext(ctx)
 	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
-		logger.Info(ctx, "Preconditions are not met", "err", err)
+		logger.Info(ctx, "Preconditions are not met", tag.Error(err))
 		r.Cancel(plan)
 	}
 
@@ -125,7 +127,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 	// Find initial ready nodes
 	for _, node := range nodes {
 		if node.State().Status == core.NodeNotStarted && isReady(ctx, plan, node) {
-			logger.Debug(ctx, "Initial node ready", "step", node.Name())
+			logger.Debug(ctx, "Initial node ready", tag.Step(node.Name()))
 			readyCh <- node
 		}
 	}
@@ -159,7 +161,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 		select {
 		case node := <-activeReadyCh:
-			logger.Debug(ctx, "Processing ready node", "step", node.Name())
+			logger.Debug(ctx, "Processing ready node", tag.Step(node.Name()))
 			// Double check status
 			if node.State().Status != core.NodeNotStarted {
 				continue
@@ -168,9 +170,12 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 			running++
 			wg.Add(1)
 
-			logger.Info(ctx, "Step started", "step", node.Name())
+			logger.Info(ctx, "Step started", tag.Step(node.Name()))
 
 			go func(n *Node) {
+				// Set step context for all logs in this goroutine
+				ctx := logger.WithValues(ctx, tag.Step(n.Name()))
+
 				// Ensure node is finished and wg is decremented
 				defer r.finishNode(n, &wg)
 				// Recover from panics
@@ -200,7 +205,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 			}
 
 		case node := <-doneCh:
-			logger.Debug(ctx, "Node execution finished", "step", node.Name())
+			logger.Debug(ctx, "Node execution finished", tag.Step(node.Name()))
 			running--
 			r.processCompletedNode(ctx, plan, node, readyCh)
 
@@ -237,7 +242,9 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 	case core.NotStarted, core.Running, core.Queued:
 		// These states should not occur at this point
-		logger.Warn(ctx, "Unexpected final status", "status", r.Status(ctx, plan).String())
+		logger.Warn(ctx, "Unexpected final status",
+			tag.Status(r.Status(ctx, plan).String()),
+		)
 	}
 
 	eventHandlers = append(eventHandlers, core.HandlerOnExit)
@@ -247,7 +254,9 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 	for _, handler := range eventHandlers {
 		if handlerNode := r.handlers[handler]; handlerNode != nil {
-			logger.Debug(ctx, "Handler execution started", "handler", handlerNode.Name())
+			logger.Debug(ctx, "Handler execution started",
+				tag.Handler(handlerNode.Name()),
+			)
 			if err := r.runEventHandler(ctx, plan, handlerNode); err != nil {
 				r.setLastError(err)
 			}
@@ -259,8 +268,8 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 	}
 
 	logger.Debug(ctx, "Runner execution complete",
-		"status", r.Status(ctx, plan).String(),
-		"lastError", r.lastError,
+		tag.Status(r.Status(ctx, plan).String()),
+		tag.Error(r.lastError),
 	)
 
 	return r.lastError
@@ -282,7 +291,10 @@ func (r *Runner) processCompletedNode(ctx context.Context, plan *Plan, node *Nod
 			child := plan.GetNode(childID)
 			if child.State().Status == core.NodeNotStarted {
 				if isReady(ctx, plan, child) {
-					logger.Debug(ctx, "Dependency satisfied, node ready", "step", child.Name(), "parent", curr.Name())
+					logger.Debug(ctx, "Dependency satisfied, node ready",
+						tag.Step(child.Name()),
+						tag.Parent(curr.Name()),
+					)
 					readyCh <- child
 				} else if child.State().Status != core.NodeNotStarted {
 					// Child was marked as Aborted/Skipped/Failed by isReady
@@ -295,7 +307,7 @@ func (r *Runner) processCompletedNode(ctx context.Context, plan *Plan, node *Nod
 }
 
 func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, progressCh chan *Node) {
-	logger.Debug(ctx, "Starting node execution", "step", node.Name())
+	logger.Debug(ctx, "Starting node execution")
 	nodeCtx, nodeCancel := context.WithCancel(ctx)
 	defer nodeCancel()
 
@@ -330,7 +342,7 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 	ctx = r.setupVariables(spanCtx, plan, node)
 
 	// Check preconditions
-	logger.Debug(ctx, "Checking preconditions", "step", node.Name())
+	logger.Debug(ctx, "Checking preconditions")
 	if !meetsPreconditions(ctx, node, progressCh) {
 		return
 	}
@@ -339,7 +351,7 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 
 ExecRepeat: // repeat execution
 	for !r.isCanceled() {
-		logger.Debug(ctx, "Executing node loop", "step", node.Name())
+		logger.Debug(ctx, "Executing node loop")
 		execErr := r.execNode(ctx, node)
 		isRetriable := r.handleNodeExecutionError(ctx, plan, node, execErr)
 		if isRetriable {
@@ -438,13 +450,18 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 	for _, v := range node.Step().Env {
 		parts := strings.SplitN(v, "=", 2)
 		if len(parts) != 2 {
-			logger.Error(ctx, "Invalid environment variable format", "var", v)
+			logger.Error(ctx, "Invalid environment variable format",
+				slog.String("var", v),
+			)
 			continue
 		}
 		// Evaluate only the value part (parts[1]), not the entire "KEY=value" string
 		evaluatedValue, err := env.EvalString(ctx, parts[1])
 		if err != nil {
-			logger.Error(ctx, "Failed to evaluate environment variable", "var", v, "err", err)
+			logger.Error(ctx, "Failed to evaluate environment variable",
+				slog.String("var", v),
+				tag.Error(err),
+			)
 			continue
 		}
 		// Store as "KEY=evaluatedValue" format
@@ -492,7 +509,9 @@ func (r *Runner) Signal(
 		// for a repetitive task, we'll wait for the job to finish
 		// until time reaches max wait time
 		if node.Step().RepeatPolicy.RepeatMode != "" {
-			logger.Info(ctx, "Waiting the repeat node finish", "step", node.Step().Name)
+			logger.Info(ctx, "Waiting for repeat node to finish",
+				tag.Step(node.Step().Name),
+			)
 			continue
 		}
 		node.Signal(ctx, sig, allowOverride)
@@ -582,31 +601,50 @@ func isReady(ctx context.Context, plan *Plan, node *Node) bool {
 
 		case core.NodeFailed:
 			if dep.ShouldContinue(ctx) {
-				logger.Debug(ctx, "Dependency failed but allowed to continue", "step", node.Name(), "dependency", dep.Name())
+				logger.Debug(ctx, "Dependency failed but allowed to continue",
+					tag.Step(node.Name()),
+					tag.Dependency(dep.Name()),
+				)
 				continue
 			}
-			logger.Debug(ctx, "Dependency failed", "step", node.Name(), "dependency", dep.Name())
+			logger.Debug(ctx, "Dependency failed",
+				tag.Step(node.Name()),
+				tag.Dependency(dep.Name()),
+			)
 			ready = false
 			node.SetStatus(core.NodeAborted)
 			node.SetError(ErrUpstreamFailed)
 
 		case core.NodeSkipped:
 			if dep.ShouldContinue(ctx) {
-				logger.Debug(ctx, "Dependency skipped but allowed to continue", "step", node.Name(), "dependency", dep.Name())
+				logger.Debug(ctx, "Dependency skipped but allowed to continue",
+					tag.Step(node.Name()),
+					tag.Dependency(dep.Name()),
+				)
 				continue
 			}
-			logger.Debug(ctx, "Dependency skipped", "step", node.Name(), "dependency", dep.Name())
+			logger.Debug(ctx, "Dependency skipped",
+				tag.Step(node.Name()),
+				tag.Dependency(dep.Name()),
+			)
 			ready = false
 			node.SetStatus(core.NodeSkipped)
 			node.SetError(ErrUpstreamSkipped)
 
 		case core.NodeAborted:
-			logger.Debug(ctx, "Dependency aborted", "step", node.Name(), "dependency", dep.Name())
+			logger.Debug(ctx, "Dependency aborted",
+				tag.Step(node.Name()),
+				tag.Dependency(dep.Name()),
+			)
 			ready = false
 			node.SetStatus(core.NodeAborted)
 
 		case core.NodeNotStarted, core.NodeRunning:
-			logger.Debug(ctx, "Dependency not finished", "step", node.Name(), "dependency", dep.Name(), "status", dep.State().Status)
+			logger.Debug(ctx, "Dependency not finished",
+				tag.Step(node.Name()),
+				tag.Dependency(dep.Name()),
+				tag.Status(dep.State().Status.String()),
+			)
 			ready = false
 
 		default:
@@ -676,10 +714,11 @@ func (r *Runner) setup(ctx context.Context) (err error) {
 
 	// Log runner setup
 	logger.Debug(ctx, "Runner setup complete",
-		"dagRunId", r.dagRunID,
-		"maxActiveRuns", r.maxActiveRuns,
-		"timeout", r.timeout,
-		"dry", r.dry)
+		slog.String("dagRunId", r.dagRunID),
+		slog.Int("maxActiveRuns", r.maxActiveRuns),
+		slog.Duration("timeout", r.timeout),
+		slog.Bool("dry", r.dry),
+	)
 
 	return err
 }
@@ -775,13 +814,23 @@ func (r *Runner) shouldRetryNode(ctx context.Context, node *Node, execErr error)
 	exitCode := 1
 	if code, found := exitCodeFromError(execErr); found {
 		exitCode = code
-		logger.Debug(ctx, "Resolved exit code from error", "err", execErr, "exitCode", exitCode)
+		logger.Debug(ctx, "Resolved exit code from error",
+			tag.Error(execErr),
+			tag.ExitCode(exitCode),
+		)
 	} else {
-		logger.Debug(ctx, "Could not determine exit code", "err", execErr, "errorType", fmt.Sprintf("%T", execErr))
+		logger.Debug(ctx, "Could not determine exit code",
+			tag.Error(execErr),
+			slog.String("error-type", fmt.Sprintf("%T", execErr)),
+		)
 	}
 
 	shouldRetry = node.retryPolicy.ShouldRetry(exitCode)
-	logger.Debug(ctx, "Checking retry policy", "exitCode", exitCode, "allowedCodes", node.retryPolicy.ExitCodes, "shouldRetry", shouldRetry)
+	logger.Debug(ctx, "Checking retry policy",
+		tag.ExitCode(exitCode),
+		slog.Any("allowed-codes", node.retryPolicy.ExitCodes),
+		slog.Bool("should-retry", shouldRetry),
+	)
 
 	if !shouldRetry {
 		// finish the node with error
@@ -791,7 +840,11 @@ func (r *Runner) shouldRetryNode(ctx context.Context, node *Node, execErr error)
 		return false
 	}
 
-	logger.Info(ctx, "Step execution failed. Retrying...", "step", node.Name(), "err", execErr, "retry", node.GetRetryCount(), "exitCode", exitCode)
+	logger.Info(ctx, "Step execution failed; retrying",
+		tag.Error(execErr),
+		slog.Int("retry", node.GetRetryCount()),
+		tag.ExitCode(exitCode),
+	)
 
 	// Set the node status to none so that it can be retried
 	node.IncRetryCount()
@@ -813,10 +866,10 @@ func (r *Runner) recoverNodePanic(ctx context.Context, node *Node) {
 		stack := string(debug.Stack())
 		err := fmt.Errorf("panic recovered in node %s: %v\n%s", node.Name(), panicObj, stack)
 		logger.Error(ctx, "Panic occurred",
-			"err", err,
-			"step", node.Name(),
-			"stack", stack,
-			"dagRunId", r.dagRunID)
+			tag.Error(err),
+			slog.String("stack", stack),
+			tag.RunID(r.dagRunID),
+		)
 		node.MarkError(err)
 		r.setLastError(err)
 
@@ -886,23 +939,32 @@ func (r *Runner) handleNodeExecutionError(ctx context.Context, plan *Plan, node 
 		if step.Timeout > 0 {
 			// Step-level timeout: Node.Execute already set status to failed and exitCode=124.
 			// Keep failed status and ensure we don't retry.
-			logger.Info(ctx, "Step timed out (step-level timeout)", "step", node.Name(), "timeout", step.Timeout, "timeoutSec", int(step.Timeout.Seconds()), "error", execErr)
+			logger.Info(ctx, "Step timed out (step-level timeout)",
+				tag.Timeout(step.Timeout),
+				tag.Error(execErr),
+			)
 			// Ensure status is failed (in case earlier logic differed)
 			node.SetStatus(core.NodeFailed)
 		} else if r.isTimeout(plan.StartAt()) {
 			// DAG-level timeout -> treat as aborted (global cancellation semantics)
-			logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)", "step", node.Name(), "dagTimeout", r.timeout, "dagTimeoutSec", int(r.timeout.Seconds()), "error", execErr)
+			logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)",
+				tag.Timeout(r.timeout),
+				tag.Error(execErr),
+			)
 			node.SetStatus(core.NodeAborted)
 		} else {
 			// Parent context canceled or other deadline; mark aborted for safety
-			logger.Info(ctx, "Step deadline exceeded", "step", node.Name(), "error", execErr)
+			logger.Info(ctx, "Step deadline exceeded", tag.Error(execErr))
 			node.SetStatus(core.NodeAborted)
 		}
 		r.setLastError(execErr)
 
 	case r.isTimeout(plan.StartAt()):
 		// DAG-level timeout (non-context error case)
-		logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)", "step", node.Name(), "dagTimeout", r.timeout, "dagTimeoutSec", int(r.timeout.Seconds()), "error", execErr)
+		logger.Info(ctx, "Step deadline exceeded (DAG-level timeout)",
+			tag.Timeout(r.timeout),
+			tag.Error(execErr),
+		)
 		node.SetStatus(core.NodeAborted)
 		r.setLastError(execErr)
 
@@ -994,7 +1056,9 @@ func (r *Runner) prepareNodeForRepeat(ctx context.Context, node *Node, progressC
 	if r.lastError == node.Error() {
 		r.setLastError(nil) // clear last error if we are repeating
 	}
-	logger.Info(ctx, "Step will be repeated", "step", node.Name(), "interval", step.RepeatPolicy.Interval)
+	logger.Info(ctx, "Step will be repeated",
+		slog.Duration("interval", step.RepeatPolicy.Interval),
+	)
 	interval := calculateBackoffInterval(
 		step.RepeatPolicy.Interval,
 		step.RepeatPolicy.Backoff,
@@ -1003,7 +1067,7 @@ func (r *Runner) prepareNodeForRepeat(ctx context.Context, node *Node, progressC
 	)
 	time.Sleep(interval)
 	node.SetRepeated(true) // mark as repeated
-	logger.Info(ctx, "Repeating step", "step", node.Name())
+	logger.Info(ctx, "Repeating step")
 
 	if progressCh != nil {
 		progressCh <- node

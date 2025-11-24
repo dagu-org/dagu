@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
@@ -72,7 +73,16 @@ func (z *ZombieDetector) loop(ctx context.Context) {
 				defer wg.Done()
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error(ctx, "Zombie detection check panicked", "panic", r)
+						var err error
+						switch v := r.(type) {
+						case error:
+							err = v
+						case string:
+							err = fmt.Errorf("%s", v)
+						default:
+							err = fmt.Errorf("%v", v)
+						}
+						logger.Error(ctx, "Zombie detection check panicked", tag.Error(err))
 					}
 				}()
 				z.detectAndCleanZombies(ctx)
@@ -103,11 +113,11 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 	statuses, err := z.dagRunStore.ListStatuses(ctx,
 		execution.WithStatuses([]core.Status{core.Running}))
 	if err != nil {
-		logger.Error(ctx, "Failed to list running DAG runs", "err", err)
+		logger.Error(ctx, "Failed to list running DAG runs", tag.Error(err))
 		return
 	}
 
-	logger.Debug(ctx, "Checking for zombie DAG runs", "count", len(statuses))
+	logger.Debug(ctx, "Checking for zombie DAG runs", tag.Count(len(statuses)))
 
 	for _, st := range statuses {
 		// Check for quit signal
@@ -121,13 +131,20 @@ func (z *ZombieDetector) detectAndCleanZombies(ctx context.Context) {
 
 		if err := z.checkAndCleanZombie(ctx, st); err != nil {
 			logger.Error(ctx, "Failed to check zombie status",
-				"name", st.Name, "dagRunID", st.DAGRunID, "err", err)
+				tag.Name(st.Name),
+				tag.RunID(st.DAGRunID),
+				tag.Error(err))
 		}
 	}
 }
 
 // checkAndCleanZombie checks if a single DAG run is a zombie and cleans it up
 func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.DAGRunStatus) error {
+	ctx = logger.WithValues(ctx,
+		tag.DAG(st.Name),
+		tag.RunID(st.DAGRunID),
+	)
+
 	// Find the attempt for this status
 	dagRunRef := execution.NewDAGRunRef(st.Name, st.DAGRunID)
 	attempt, err := z.dagRunStore.FindAttempt(ctx, dagRunRef)
@@ -144,16 +161,24 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.
 	// Check if process is alive
 	alive, err := z.procStore.IsRunAlive(ctx, dag.ProcGroup(), execution.DAGRunRef{Name: dag.Name, ID: st.DAGRunID})
 	if err != nil {
+		logger.Warn(ctx, "Failed to check process liveness for dag-run",
+			tag.Error(err),
+			tag.Queue(dag.ProcGroup()),
+		)
 		return fmt.Errorf("check alive: %w", err)
 	}
 
 	if alive {
+		logger.Debug(ctx, "Dag-run heartbeat detected; skipping zombie cleanup",
+			tag.Queue(dag.ProcGroup()),
+		)
 		return nil
 	}
 
 	// Process is zombie, update status to error
 	logger.Info(ctx, "Found zombie DAG run, updating to error status",
-		"name", st.Name, "dagRunID", st.DAGRunID)
+		tag.Queue(dag.ProcGroup()),
+	)
 
 	// Update the status to error
 	st.Status = core.Failed
@@ -180,7 +205,7 @@ func (z *ZombieDetector) updateStatus(ctx context.Context,
 	}
 	defer func() {
 		if err := attempt.Close(ctx); err != nil {
-			logger.Error(ctx, "Failed to close attempt", "err", err)
+			logger.Error(ctx, "Failed to close attempt", tag.Error(err))
 		}
 	}()
 

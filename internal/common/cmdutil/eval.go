@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"reflect"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/itchyny/gojq"
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/syntax"
@@ -177,7 +179,8 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 	if options.ExpandEnv {
 		expanded, err := expandWithShell(value, options)
 		if err != nil {
-			logger.Debug(ctx, "shell expansion failed, falling back to os.ExpandEnv", "err", err)
+			logger.Debug(ctx, "Shell expansion failed, falling back to os.ExpandEnv",
+				tag.Error(err))
 			value = os.ExpandEnv(value)
 		} else {
 			value = expanded
@@ -199,7 +202,8 @@ func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, 
 	if options.ExpandEnv {
 		expanded, err := expandWithShell(value, options)
 		if err != nil {
-			logger.Debug(ctx, "shell expansion failed, falling back to os.ExpandEnv", "err", err)
+			logger.Debug(ctx, "Shell expansion failed, falling back to os.ExpandEnv",
+				tag.Error(err))
 			value = os.ExpandEnv(value)
 		} else {
 			value = expanded
@@ -398,13 +402,16 @@ func ExpandReferences(ctx context.Context, input string, dataMap map[string]stri
 func resolveStepProperty(ctx context.Context, stepName, path string, stepMap map[string]StepInfo) (string, bool) {
 	stepInfo, ok := stepMap[stepName]
 	if !ok {
-		logger.Debug(ctx, "step not found in stepMap", "step", stepName)
+		logger.Debug(ctx, "Step not found in stepMap", tag.Step(stepName))
 		return "", false
 	}
 
 	property, sliceSpec, err := parseStepReference(path)
 	if err != nil {
-		logger.Warn(ctx, "invalid step reference slice", "step", stepName, "path", path, "err", err)
+		logger.Warn(ctx, "Invalid step reference slice",
+			tag.Step(stepName),
+			tag.Path(path),
+			tag.Error(err))
 		return "", false
 	}
 
@@ -412,13 +419,15 @@ func resolveStepProperty(ctx context.Context, stepName, path string, stepMap map
 	switch property {
 	case ".stdout":
 		if stepInfo.Stdout == "" {
-			logger.Debug(ctx, "step stdout is empty", "step", stepName)
+			logger.Debug(ctx, "Step stdout is empty",
+				tag.Step(stepName))
 			return "", false
 		}
 		value = stepInfo.Stdout
 	case ".stderr":
 		if stepInfo.Stderr == "" {
-			logger.Debug(ctx, "step stderr is empty", "step", stepName)
+			logger.Debug(ctx, "Step stderr is empty",
+				tag.Step(stepName))
 			return "", false
 		}
 		value = stepInfo.Stderr
@@ -439,13 +448,18 @@ func resolveStepProperty(ctx context.Context, stepName, path string, stepMap map
 func resolveJSONPath(ctx context.Context, varName, jsonStr, path string) (string, bool) {
 	var raw any
 	if err := json.Unmarshal([]byte(jsonStr), &raw); err != nil {
-		logger.Warn(ctx, "failed to parse JSON for %q: %v", varName, err)
+		logger.Warn(ctx, "Failed to parse JSON",
+			slog.String("var", varName),
+			tag.Error(err))
 		return "", false
 	}
 
 	query, err := gojq.Parse(path)
 	if err != nil {
-		logger.Warn(ctx, "failed to parse path %q in data %q: %v", path, varName, err)
+		logger.Warn(ctx, "Failed to parse path in data",
+			tag.Path(path),
+			slog.String("var", varName),
+			tag.Error(err))
 		return "", false
 	}
 
@@ -456,7 +470,10 @@ func resolveJSONPath(ctx context.Context, varName, jsonStr, path string) (string
 	}
 
 	if _, isErr := v.(error); isErr {
-		logger.Warn(ctx, "error evaluating path %q in data %q: %v", path, varName, v)
+		logger.Warn(ctx, "Error evaluating path in data",
+			tag.Path(path),
+			slog.String("var", varName),
+			tag.Error(v))
 		return "", false
 	}
 

@@ -44,7 +44,7 @@ steps:
 	args := []string{"start", "--run-id", dagRunID, "parent"}
 	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"dag-run finished"},
+		ExpectedOut: []string{"DAG run finished"},
 	})
 
 	// Update the sub_2 status to "failed" to simulate a retry
@@ -106,7 +106,7 @@ steps:
 	args = []string{"retry", "--run-id", dagRunID, "parent"}
 	th.RunCommand(t, cmd.Retry(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"dag-run finished"},
+		ExpectedOut: []string{"DAG run finished"},
 	})
 
 	// Check if the sub_2 status is now "success"
@@ -160,7 +160,7 @@ steps:
 	args := []string{"start", "--run-id", dagRunID, "parent_retry"}
 	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"dag-run finished"},
+		ExpectedOut: []string{"DAG run finished"},
 	})
 
 	// Verify parent DAG completed successfully
@@ -219,7 +219,7 @@ steps:
 	args := []string{"start", "--run-id", dagRunID, "parent_basic"}
 	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"dag-run finished"},
+		ExpectedOut: []string{"DAG run finished"},
 	})
 
 	// Verify parent DAG completed successfully
@@ -295,7 +295,7 @@ steps:
 	args := []string{"start", "--run-id", dagRunID, "basic_retry"}
 	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"dag-run finished"},
+		ExpectedOut: []string{"DAG run finished"},
 	})
 
 	// Verify DAG completed successfully
@@ -346,7 +346,7 @@ steps:
 	args := []string{"start", "--run-id", dagRunID, "no_retry"}
 	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"dag-run finished"},
+		ExpectedOut: []string{"DAG run finished"},
 	})
 
 	// Verify DAG completed successfully
