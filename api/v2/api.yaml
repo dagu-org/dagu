@@ -2275,16 +2275,6 @@ components:
         params:
           type: string
           description: "Runtime parameters passed to the DAG-run in JSON format"
-        runningStepNames:
-          type: array
-          items:
-            type: string
-          description: "Names of steps currently running in this DAG-run"
-        failedStepNames:
-          type: array
-          items:
-            type: string
-          description: "Names of steps that have failed in this DAG-run"
       required:
         - rootDAGRunName
         - rootDAGRunId

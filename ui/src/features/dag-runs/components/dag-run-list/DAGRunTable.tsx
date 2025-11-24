@@ -9,98 +9,14 @@ import {
   TableHeader,
   TableRow,
 } from '../../../../components/ui/table';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../components/ui/tooltip';
-import { useSimpleToast } from '../../../../components/ui/simple-toast';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import { DAGRunDetailsModal } from '../dag-run-details';
+import { StepDetailsTooltip } from './StepDetailsTooltip';
 
 interface DAGRunTableProps {
   dagRuns: components['schemas']['DAGRunSummary'][];
-}
-
-// Component for step names with tooltip (desktop) and toast (mobile)
-function StepNamesDisplay({
-  stepNames,
-  label,
-  colorClass,
-  isMobile,
-  toastTimeout = 3000,
-}: {
-  stepNames: string[];
-  label: string;
-  colorClass: string;
-  isMobile: boolean;
-  toastTimeout?: number;
-}) {
-  const { showToast } = useSimpleToast();
-
-  if (!stepNames || stepNames.length === 0) {
-    return null;
-  }
-
-  const hasMultiple = stepNames.length > 1;
-
-  // Single step - just show it
-  if (!hasMultiple) {
-    return (
-      <div className={`text-[10px] ${colorClass}`}>
-        {label}: {stepNames[0]}
-      </div>
-    );
-  }
-
-  // Multiple steps - show "stepname +n" with tooltip/toast
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isMobile) {
-      // On mobile, show toast with all step names
-      const stepList = stepNames.map((name, idx) => `${idx + 1}. ${name}`).join('\n');
-      showToast(`${label} steps:\n${stepList}`, toastTimeout);
-    }
-  };
-
-  const stepListContent = (
-    <div className="space-y-1">
-      <div className="font-semibold text-xs mb-1">{label} steps:</div>
-      {stepNames.map((stepName, idx) => (
-        <div key={idx} className="text-xs">
-          {idx + 1}. {stepName}
-        </div>
-      ))}
-    </div>
-  );
-
-  if (isMobile) {
-    // Mobile: clickable to show toast
-    return (
-      <div className={`text-[10px] ${colorClass}`}>
-        <button
-          onClick={handleClick}
-          className="hover:underline cursor-pointer"
-        >
-          {label}: {stepNames[0]} +{stepNames.length - 1}
-        </button>
-      </div>
-    );
-  }
-
-  // Desktop: tooltip on hover
-  return (
-    <div className={`text-[10px] ${colorClass}`}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="cursor-help">
-            {label}: {stepNames[0]} +{stepNames.length - 1}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-xs">
-          {stepListContent}
-        </TooltipContent>
-      </Tooltip>
-    </div>
-  );
 }
 
 function DAGRunTable({ dagRuns }: DAGRunTableProps) {
@@ -113,9 +29,6 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
     dagRunId: string;
   } | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
-  
-  // Configurable toast timeout (default 3 seconds)
-  const toastTimeout = 3000;
 
   // Check screen size on mount and when window resizes
   useEffect(() => {
@@ -349,25 +262,13 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
             {/* Header with name and status */}
             <div className="flex justify-between items-start mb-2">
               <div className="font-normal text-sm">{dagRun.name}</div>
-              <div className="flex flex-col items-end gap-1">
-                <StatusChip status={dagRun.status} size="xs">
-                  {dagRun.statusLabel}
-                </StatusChip>
-                <StepNamesDisplay
-                  stepNames={dagRun.runningStepNames || []}
-                  label="Running"
-                  colorClass="text-muted-foreground text-right"
-                  isMobile={isSmallScreen}
-                  toastTimeout={toastTimeout}
-                />
-                <StepNamesDisplay
-                  stepNames={dagRun.failedStepNames || []}
-                  label="Failed"
-                  colorClass="text-destructive text-right"
-                  isMobile={isSmallScreen}
-                  toastTimeout={toastTimeout}
-                />
-              </div>
+              <StepDetailsTooltip dagRun={dagRun}>
+                <div className="flex items-center">
+                  <StatusChip status={dagRun.status} size="xs">
+                    {dagRun.statusLabel}
+                  </StatusChip>
+                </div>
+              </StepDetailsTooltip>
             </div>
 
             {/* DAG-run ID */}
@@ -390,7 +291,11 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
               <div className="text-left flex items-center gap-1.5">
                 <span className="text-muted-foreground">Duration: </span>
                 <span className="flex items-center gap-1">
-                  {calculateDuration(dagRun.startedAt, dagRun.finishedAt, dagRun.status)}
+                  {calculateDuration(
+                    dagRun.startedAt,
+                    dagRun.finishedAt,
+                    dagRun.status
+                  )}
                   {dagRun.status === Status.Running && dagRun.startedAt && (
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-lime-500 animate-pulse" />
                   )}
@@ -453,7 +358,10 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
               onClick={(e) => {
                 if (e.ctrlKey || e.metaKey) {
                   // Open in new tab
-                  window.open(`/dag-runs/${dagRun.name}/${dagRun.dagRunId}`, '_blank');
+                  window.open(
+                    `/dag-runs/${dagRun.name}/${dagRun.dagRunId}`,
+                    '_blank'
+                  );
                 } else {
                   // Open modal
                   setSelectedIndex(index);
@@ -471,27 +379,13 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
                 {dagRun.dagRunId}
               </TableCell>
               <TableCell className="py-1 px-2">
-                <div className="flex flex-col gap-1">
+                <StepDetailsTooltip dagRun={dagRun}>
                   <div className="flex items-center">
                     <StatusChip status={dagRun.status} size="xs">
                       {dagRun.statusLabel}
                     </StatusChip>
                   </div>
-                  <StepNamesDisplay
-                    stepNames={dagRun.runningStepNames || []}
-                    label="Running"
-                    colorClass="text-muted-foreground"
-                    isMobile={false}
-                    toastTimeout={toastTimeout}
-                  />
-                  <StepNamesDisplay
-                    stepNames={dagRun.failedStepNames || []}
-                    label="Failed"
-                    colorClass="text-destructive"
-                    isMobile={false}
-                    toastTimeout={toastTimeout}
-                  />
-                </div>
+                </StepDetailsTooltip>
               </TableCell>
               <TableCell className="py-1 px-2 text-left">
                 {dagRun.queuedAt || '-'}
@@ -501,7 +395,11 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
               </TableCell>
               <TableCell className="py-1 px-2 text-left">
                 <div className="flex items-center gap-1">
-                  {calculateDuration(dagRun.startedAt, dagRun.finishedAt, dagRun.status)}
+                  {calculateDuration(
+                    dagRun.startedAt,
+                    dagRun.finishedAt,
+                    dagRun.status
+                  )}
                   {dagRun.status === Status.Running && dagRun.startedAt && (
                     <span className="inline-block w-2 h-2 rounded-full bg-lime-500 animate-pulse" />
                   )}

@@ -112,22 +112,7 @@ func toPrecondition(obj *core.Condition) api.Condition {
 }
 
 func toDAGRunSummary(s execution.DAGRunStatus) api.DAGRunSummary {
-	var runningStepNames []string
-	var failedStepNames []string
-
-	// Extract running and failed step names from nodes
-	for _, node := range s.Nodes {
-		switch node.Status {
-		case core.NodeRunning:
-			runningStepNames = append(runningStepNames, node.Step.Name)
-		case core.NodeFailed:
-			failedStepNames = append(failedStepNames, node.Step.Name)
-		case core.NodeNotStarted, core.NodeAborted, core.NodeSucceeded, core.NodeSkipped, core.NodePartiallySucceeded:
-			// Other statuses are not included in the summary
-		}
-	}
-
-	summary := api.DAGRunSummary{
+	return api.DAGRunSummary{
 		RootDAGRunName:   s.Root.Name,
 		RootDAGRunId:     s.Root.ID,
 		ParentDAGRunName: ptrOf(s.Parent.Name),
@@ -142,16 +127,6 @@ func toDAGRunSummary(s execution.DAGRunStatus) api.DAGRunSummary {
 		Status:           api.Status(s.Status),
 		StatusLabel:      api.StatusLabel(s.Status.String()),
 	}
-
-	// Only include step names if there are any
-	if len(runningStepNames) > 0 {
-		summary.RunningStepNames = &runningStepNames
-	}
-	if len(failedStepNames) > 0 {
-		summary.FailedStepNames = &failedStepNames
-	}
-
-	return summary
 }
 
 func toDAGRunDetails(s execution.DAGRunStatus) api.DAGRunDetails {
