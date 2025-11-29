@@ -30,7 +30,7 @@ func TestShellCommandBuilder_Build(t *testing.T) {
 		{
 			name: "BasicShellCommand",
 			builder: shellCommandBuilder{
-				ShellCommand:     "/bin/sh",
+				Shell:            []string{"/bin/sh"},
 				ShellCommandArgs: "echo hello",
 			},
 			expectedInArgs: []string{"-c", "echo hello"},
@@ -38,7 +38,7 @@ func TestShellCommandBuilder_Build(t *testing.T) {
 		{
 			name: "BashCommand",
 			builder: shellCommandBuilder{
-				ShellCommand:     "/bin/bash",
+				Shell:            []string{"/bin/bash"},
 				ShellCommandArgs: "echo hello",
 			},
 			expectedInArgs: []string{"-c", "echo hello"},
@@ -46,17 +46,17 @@ func TestShellCommandBuilder_Build(t *testing.T) {
 		{
 			name: "CommandWithScript",
 			builder: shellCommandBuilder{
-				Command:      "python",
-				Script:       "script.py",
-				Args:         []string{"-u"},
-				ShellCommand: "python", // Need to set this too
+				Command: "python",
+				Script:  "script.py",
+				Args:    []string{"-u"},
+				Shell:   []string{"python"},
 			},
 			expectedInArgs: []string{"-u", "script.py"},
 		},
 		{
 			name: "PowershellCommand",
 			builder: shellCommandBuilder{
-				ShellCommand:     "powershell",
+				Shell:            []string{"powershell"},
 				ShellCommandArgs: "Write-Host hello",
 			},
 			expectedInArgs:  []string{"-Command", "Write-Host hello"},
@@ -65,7 +65,7 @@ func TestShellCommandBuilder_Build(t *testing.T) {
 		{
 			name: "CmdExeCommand",
 			builder: shellCommandBuilder{
-				ShellCommand:     "cmd.exe",
+				Shell:            []string{"cmd.exe"},
 				ShellCommandArgs: "echo hello",
 			},
 			expectedInArgs:  []string{"/c", "echo hello"},
@@ -244,7 +244,7 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 			name: "ShellCommand",
 			config: commandConfig{
 				Ctx:              ctx,
-				ShellCommand:     "/bin/sh",
+				Shell:            []string{"/bin/sh"},
 				ShellCommandArgs: "echo hello",
 			},
 			checkPath: "/bin/sh",
@@ -252,8 +252,8 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 		{
 			name: "ScriptFile",
 			config: commandConfig{
-				Ctx:          ctx,
-				ShellCommand: "/bin/sh",
+				Ctx:   ctx,
+				Shell: []string{"/bin/sh"},
 			},
 			scriptFile: "/tmp/test.sh",
 			checkPath:  "/bin/sh",
@@ -907,34 +907,34 @@ func TestSetupScript(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	tests := []struct {
-		name         string
-		script       string
-		shellCommand string
-		expectedExt  string
+		name        string
+		script      string
+		shell       []string
+		expectedExt string
 	}{
 		{
-			name:         "basic script",
-			script:       "echo hello",
-			shellCommand: "/bin/sh",
-			expectedExt:  ".sh",
+			name:        "basic script",
+			script:      "echo hello",
+			shell:       []string{"/bin/sh"},
+			expectedExt: ".sh",
 		},
 		{
-			name:         "bash script",
-			script:       "echo hello",
-			shellCommand: "/bin/bash",
-			expectedExt:  ".sh",
+			name:        "bash script",
+			script:      "echo hello",
+			shell:       []string{"/bin/bash"},
+			expectedExt: ".sh",
 		},
 		{
-			name:         "no shell extension",
-			script:       "echo hello",
-			shellCommand: "/usr/bin/python",
-			expectedExt:  "",
+			name:        "no shell extension",
+			script:      "echo hello",
+			shell:       []string{"/usr/bin/python"},
+			expectedExt: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			scriptFile, err := setupScript(context.Background(), tmpDir, tt.script, tt.shellCommand)
+			scriptFile, err := setupScript(tmpDir, tt.script, tt.shell)
 			require.NoError(t, err)
 			defer func() { _ = os.Remove(scriptFile) }()
 
@@ -1182,7 +1182,8 @@ func TestNewCommandConfig(t *testing.T) {
 			cfg, err := NewCommandConfig(ctx, tt.step)
 			require.NoError(t, err)
 
-			assert.Contains(t, cfg.ShellCommand, tt.expectedShellContains)
+			require.NotEmpty(t, cfg.Shell)
+			assert.Contains(t, cfg.Shell[0], tt.expectedShellContains)
 		})
 	}
 }
@@ -1199,7 +1200,7 @@ func TestShellCommandBuilder_NixShell(t *testing.T) {
 		{
 			name: "nix-shell with packages",
 			builder: shellCommandBuilder{
-				ShellCommand:     "nix-shell",
+				Shell:            []string{"nix-shell"},
 				ShellCommandArgs: "echo hello",
 				ShellPackages:    []string{"bash", "coreutils"},
 			},
@@ -1208,7 +1209,7 @@ func TestShellCommandBuilder_NixShell(t *testing.T) {
 		{
 			name: "nix-shell with command and script",
 			builder: shellCommandBuilder{
-				ShellCommand:     "nix-shell",
+				Shell:            []string{"nix-shell"},
 				ShellCommandArgs: "set -e; ",
 				Command:          "python",
 				Args:             []string{"-u"},
@@ -1338,37 +1339,37 @@ func TestCommandConfig_NewCmd_AllBranches(t *testing.T) {
 				Ctx:              ctx,
 				Command:          "/bin/sh",
 				Args:             []string{},
-				ShellCommand:     "/bin/sh -e",
+				Shell:            []string{"/bin/sh", "-e"},
 				ShellCommandArgs: "",
 			},
 			scriptFile: scriptFile,
 			checkPath:  "/bin/sh",
 		},
 		{
-			name: "shellCommand + scriptFile with shebang",
+			name: "shell + scriptFile with shebang",
 			config: commandConfig{
 				Ctx:                ctx,
-				ShellCommand:       "/bin/sh",
+				Shell:              []string{"/bin/sh"},
 				UserSpecifiedShell: false,
 			},
 			scriptFile: shebangScript,
 			checkPath:  "/bin/bash", // Should use shebang interpreter
 		},
 		{
-			name: "shellCommand + scriptFile without shebang",
+			name: "shell + scriptFile without shebang",
 			config: commandConfig{
 				Ctx:                ctx,
-				ShellCommand:       "/bin/sh",
+				Shell:              []string{"/bin/sh"},
 				UserSpecifiedShell: false,
 			},
 			scriptFile: scriptFile,
 			checkPath:  "/bin/sh",
 		},
 		{
-			name: "shellCommand + shellCommandArgs (no script)",
+			name: "shell + shellCommandArgs (no script)",
 			config: commandConfig{
 				Ctx:              ctx,
-				ShellCommand:     "/bin/sh",
+				Shell:            []string{"/bin/sh"},
 				ShellCommandArgs: "echo hello",
 			},
 			checkPath: "/bin/sh",
@@ -1578,7 +1579,7 @@ func TestCreateDirectCommand(t *testing.T) {
 // TestSetupScript_Errors tests error paths in setupScript
 func TestSetupScript_Errors(t *testing.T) {
 	t.Run("invalid directory", func(t *testing.T) {
-		_, err := setupScript(context.Background(), "/nonexistent/dir/that/does/not/exist", "echo hello", "/bin/sh")
+		_, err := setupScript("/nonexistent/dir/that/does/not/exist", "echo hello", []string{"/bin/sh"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create script file")
 	})
@@ -1590,7 +1591,7 @@ func TestShellCommandBuilder_Build_Errors(t *testing.T) {
 
 	t.Run("empty shell command", func(t *testing.T) {
 		builder := shellCommandBuilder{
-			ShellCommand:     "",
+			Shell:            []string{},
 			ShellCommandArgs: "echo hello",
 		}
 		_, err := builder.Build(ctx)
@@ -1610,7 +1611,7 @@ func TestShellCommandBuilder_PwshCore(t *testing.T) {
 		{
 			name: "pwsh basic command",
 			builder: shellCommandBuilder{
-				ShellCommand:     "pwsh",
+				Shell:            []string{"pwsh"},
 				ShellCommandArgs: "Get-Date",
 			},
 			expectedInArgs: []string{"-Command", "Get-Date"},
@@ -1618,7 +1619,7 @@ func TestShellCommandBuilder_PwshCore(t *testing.T) {
 		{
 			name: "pwsh.exe basic command",
 			builder: shellCommandBuilder{
-				ShellCommand:     "pwsh.exe",
+				Shell:            []string{"pwsh.exe"},
 				ShellCommandArgs: "Get-Date",
 			},
 			expectedInArgs: []string{"-Command", "Get-Date"},
@@ -1626,7 +1627,7 @@ func TestShellCommandBuilder_PwshCore(t *testing.T) {
 		{
 			name: "cmd basic command",
 			builder: shellCommandBuilder{
-				ShellCommand:     "cmd",
+				Shell:            []string{"cmd"},
 				ShellCommandArgs: "dir",
 			},
 			expectedInArgs: []string{"/c", "dir"},
@@ -1634,7 +1635,7 @@ func TestShellCommandBuilder_PwshCore(t *testing.T) {
 		{
 			name: "cmd.exe basic command",
 			builder: shellCommandBuilder{
-				ShellCommand:     "cmd.exe",
+				Shell:            []string{"cmd.exe"},
 				ShellCommandArgs: "dir",
 			},
 			expectedInArgs: []string{"/c", "dir"},
@@ -1654,13 +1655,13 @@ func TestShellCommandBuilder_PwshCore(t *testing.T) {
 	}
 }
 
-// TestNewCommandConfig_NixShell tests nix-shell special handling in NewCommandConfig
+// TestNewCommandConfig_NixShell tests nix-shell configuration in NewCommandConfig
 func TestNewCommandConfig_NixShell(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
-	// Test nix-shell with ShellCmdArgs (should prepend set -e)
+	// Test nix-shell configuration
 	dag := &core.DAG{
 		Name:  "test-dag",
 		Shell: "nix-shell",
@@ -1677,8 +1678,21 @@ func TestNewCommandConfig_NixShell(t *testing.T) {
 	cfg, err := NewCommandConfig(ctx, step)
 	require.NoError(t, err)
 
-	// Should have prepended "set -e; " to the command args
-	assert.True(t, strings.HasPrefix(cfg.ShellCommandArgs, "set -e; "))
+	// NewCommandConfig should store the shell and command args
+	require.NotEmpty(t, cfg.Shell)
+	assert.Contains(t, cfg.Shell[0], "nix-shell")
+	assert.Equal(t, "echo hello", cfg.ShellCommandArgs)
+
+	// Build() should prepend "set -e; " when building the actual command
+	builder := &shellCommandBuilder{
+		Shell:              cfg.Shell,
+		ShellCommandArgs:   cfg.ShellCommandArgs,
+		UserSpecifiedShell: cfg.UserSpecifiedShell,
+	}
+	cmd, err := builder.Build(context.Background())
+	require.NoError(t, err)
+	// The last arg should contain "set -e; echo hello"
+	assert.Contains(t, cmd.Args[len(cmd.Args)-1], "set -e; ")
 }
 
 // TestNewCommandConfig_NixShell_AlreadyHasSetE tests nix-shell when set -e already present
@@ -1718,24 +1732,24 @@ func TestCommandConfig_NewCmd_Errors(t *testing.T) {
 
 	t.Run("shellCommandBuilder error with command and script", func(t *testing.T) {
 		config := commandConfig{
-			Ctx:          ctx,
-			Command:      "/bin/sh",
-			Script:       "echo test",
-			ShellCommand: "", // Empty shell command will cause error in Build
+			Ctx:     ctx,
+			Command: "/bin/sh",
+			Script:  "echo test",
+			Shell:   []string{}, // Empty shell will cause error in Build
 		}
 		_, err := config.newCmd(ctx, scriptFile)
 		assert.Error(t, err)
 	})
 
 	t.Run("shellCommandBuilder error with shell cmd args", func(t *testing.T) {
-		// Test the path where shellCommandBuilder fails due to empty ShellCommand
-		// when ShellCommandArgs is set (this hits the case cfg.ShellCommand != "" && cfg.ShellCommandArgs != "")
+		// Test the path where shellCommandBuilder fails due to empty Shell
+		// when ShellCommandArgs is set
 		config := commandConfig{
 			Ctx:              ctx,
-			ShellCommand:     "invalid shell with\ttabs",
+			Shell:            []string{"invalid shell with\ttabs"},
 			ShellCommandArgs: "echo hello",
 		}
-		// This should work since SplitCommand handles various inputs
+		// This should work since Shell is now a slice
 		cmd, err := config.newCmd(ctx, "")
 		// The command might succeed or fail depending on the shell parsing
 		if err == nil {
@@ -1747,7 +1761,7 @@ func TestCommandConfig_NewCmd_Errors(t *testing.T) {
 		// Create a config that will trigger detectShebang with non-existent file
 		config := commandConfig{
 			Ctx:                ctx,
-			ShellCommand:       "/bin/sh",
+			Shell:              []string{"/bin/sh"},
 			UserSpecifiedShell: false,
 		}
 		_, err := config.newCmd(ctx, "/nonexistent/script.sh")
@@ -1799,17 +1813,17 @@ func TestCommandExecutor_Run_NewCmdError(t *testing.T) {
 
 	// Create config that will cause newCmd to fail
 	cfg := &commandConfig{
-		Ctx:          ctx,
-		Dir:          t.TempDir(),
-		Command:      "/bin/sh",
-		Script:       "", // No script, so scriptFile will be empty
-		ShellCommand: "", // Empty shell command with Command set
+		Ctx:     ctx,
+		Dir:     t.TempDir(),
+		Command: "/bin/sh",
+		Script:  "",         // No script, so scriptFile will be empty
+		Shell:   []string{}, // Empty shell will cause shellCommandBuilder.Build to fail
 	}
 
 	// Create a script that will trigger the Command+Script path
 	cfg.Script = "echo test"
 	cfg.Command = "/bin/sh"
-	cfg.ShellCommand = "" // This will cause shellCommandBuilder.Build to fail
+	cfg.Shell = []string{} // This will cause shellCommandBuilder.Build to fail
 
 	executor := &commandExecutor{config: cfg}
 
@@ -1913,7 +1927,7 @@ func TestShellCommandBuilder_PowerShellExe(t *testing.T) {
 	ctx := context.Background()
 
 	builder := shellCommandBuilder{
-		ShellCommand:     "powershell.exe",
+		Shell:            []string{"powershell.exe"},
 		ShellCommandArgs: "Get-Date",
 	}
 
@@ -1933,7 +1947,7 @@ func TestCommandConfig_NewCmd_SplitCommandError(t *testing.T) {
 	scriptFile := filepath.Join(tmpDir, "test.sh")
 	require.NoError(t, os.WriteFile(scriptFile, []byte("echo hello"), 0o755))
 
-	t.Run("SplitCommand error in shell+script path", func(t *testing.T) {
+	t.Run("shell+script path with valid shell", func(t *testing.T) {
 		// Create a script without shebang
 		noShebangScript := filepath.Join(tmpDir, "noshebang.sh")
 		require.NoError(t, os.WriteFile(noShebangScript, []byte("echo no shebang"), 0o755))
@@ -1941,7 +1955,7 @@ func TestCommandConfig_NewCmd_SplitCommandError(t *testing.T) {
 		// Test the shell+script path with a valid shell
 		config := commandConfig{
 			Ctx:                ctx,
-			ShellCommand:       "/bin/sh",
+			Shell:              []string{"/bin/sh"},
 			UserSpecifiedShell: true, // Skip shebang detection
 		}
 		cmd, err := config.newCmd(ctx, noShebangScript)
@@ -1950,30 +1964,14 @@ func TestCommandConfig_NewCmd_SplitCommandError(t *testing.T) {
 	})
 }
 
-// TestCommandConfig_NewCmd_ShellCmdArgsError tests error path for ShellCommand+ShellCommandArgs
-func TestCommandConfig_NewCmd_ShellCmdArgsError(t *testing.T) {
+// TestCommandConfig_NewCmd_ShellCmdArgsPath tests Shell+ShellCommandArgs path
+func TestCommandConfig_NewCmd_ShellCmdArgsPath(t *testing.T) {
 	ctx := setupTestContext(t, nil, core.Step{})
 
-	// Test line 162-164: error from shellCommandBuilder.Build when ShellCommand + ShellCommandArgs
-	// This requires:
-	// - cfg.Command == "" (so we don't enter first case)
-	// - cfg.ShellCommand != "" && scriptFile == "" (so we don't enter second case)
-	// - cfg.ShellCommand != "" && cfg.ShellCommandArgs != ""
-	// But shellCommandBuilder needs to fail - which requires empty ShellCommand
-	// This is a contradiction - if ShellCommand is empty, we won't enter this case
-
-	// Actually, the Build function can fail if SplitCommand fails
-	// SplitCommand fails on empty string
-	// But we need non-empty ShellCommand to enter the case
-
-	// The only way to test this is if Build() fails for some other reason
-	// Looking at Build(), it calls cmdutil.SplitCommand(b.ShellCommand) which could fail
-	// But SplitCommand is pretty robust
-
-	// Let's just verify the path works with valid input
+	// Let's verify the path works with valid input
 	config := commandConfig{
 		Ctx:              ctx,
-		ShellCommand:     "/bin/sh",
+		Shell:            []string{"/bin/sh"},
 		ShellCommandArgs: "echo hello",
 	}
 	cmd, err := config.newCmd(ctx, "")
@@ -2039,7 +2037,7 @@ func TestCommandConfig_NewCmd_ShellScriptNoShebang(t *testing.T) {
 	// Test the shell+script path WITHOUT shebang - this should use the shell command
 	config := commandConfig{
 		Ctx:                ctx,
-		ShellCommand:       "/bin/sh",
+		Shell:              []string{"/bin/sh"},
 		UserSpecifiedShell: false, // Don't skip shebang detection
 	}
 	cmd, err := config.newCmd(ctx, noShebangScript)
@@ -2047,29 +2045,6 @@ func TestCommandConfig_NewCmd_ShellScriptNoShebang(t *testing.T) {
 	assert.NotNil(t, cmd)
 	// Should use /bin/sh to run the script
 	assert.Contains(t, cmd.Path, "sh")
-}
-
-// TestCommandConfig_NewCmd_ShellCmdArgsPath tests the ShellCommand+ShellCommandArgs path
-// (lines 155-165 in newCmd)
-func TestCommandConfig_NewCmd_ShellCmdArgsPath(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipping Unix-specific test on Windows")
-	}
-
-	ctx := setupTestContext(t, nil, core.Step{})
-
-	// Test the ShellCommand + ShellCommandArgs path (no script)
-	config := commandConfig{
-		Ctx:              ctx,
-		Command:          "", // Empty command
-		ShellCommand:     "/bin/bash",
-		ShellCommandArgs: "echo test",
-	}
-	cmd, err := config.newCmd(ctx, "")
-	require.NoError(t, err)
-	assert.NotNil(t, cmd)
-	assert.Contains(t, cmd.Args, "-c")
-	assert.Contains(t, cmd.Args, "echo test")
 }
 
 // TestSetupScript_WriteErrors tests write-related errors in setupScript
@@ -2083,7 +2058,7 @@ func TestSetupScript_WriteErrors(t *testing.T) {
 	if _, err := os.Stat("/dev/full"); err == nil {
 		t.Run("write to full device", func(t *testing.T) {
 			// /dev/full simulates a full disk
-			_, err := setupScript(context.Background(), "/dev", "echo hello", "/bin/sh")
+			_, err := setupScript("/dev", "echo hello", []string{"/bin/sh"})
 			// This might fail due to permission or other issues
 			if err != nil {
 				assert.Error(t, err)
