@@ -571,16 +571,67 @@ func findName(ctx BuildContext, spec *definition) string {
 }
 
 func buildShell(ctx BuildContext, spec *definition, dag *core.DAG) error {
-	if spec.Shell == "" {
+	if spec.Shell == nil {
+		// No shell specified, use system default
 		sh := cmdutil.GetShellCommand("")
 		dag.Shell = sh
 		return nil
 	}
-	if ctx.opts.Has(BuildFlagNoEval) {
-		dag.Shell = spec.Shell
-	} else {
-		dag.Shell = os.ExpandEnv(spec.Shell)
+
+	switch val := spec.Shell.(type) {
+	case string:
+		// Case 1: shell is a string like "bash" or "bash -e"
+		val = strings.TrimSpace(val)
+		if val == "" {
+			sh := cmdutil.GetShellCommand("")
+			dag.Shell = sh
+			return nil
+		}
+
+		if !ctx.opts.Has(BuildFlagNoEval) {
+			val = os.ExpandEnv(val)
+		}
+
+		// Split the string into command and args
+		cmd, args, err := cmdutil.SplitCommand(val)
+		if err != nil {
+			return core.NewValidationError("shell", val, fmt.Errorf("failed to parse shell command: %w", err))
+		}
+		dag.Shell = strings.TrimSpace(cmd)
+		dag.ShellArgs = args
+
+	case []any:
+		// Case 2: shell is an array like ["bash", "-e"]
+		if len(val) == 0 {
+			sh := cmdutil.GetShellCommand("")
+			dag.Shell = sh
+			return nil
+		}
+
+		var shell string
+		var args []string
+		for i, v := range val {
+			s, ok := v.(string)
+			if !ok {
+				s = fmt.Sprintf("%v", v)
+			}
+			s = strings.TrimSpace(s)
+			if !ctx.opts.Has(BuildFlagNoEval) {
+				s = os.ExpandEnv(s)
+			}
+			if i == 0 {
+				shell = s
+			} else {
+				args = append(args, s)
+			}
+		}
+		dag.Shell = shell
+		dag.ShellArgs = args
+
+	default:
+		return core.NewValidationError("shell", val, fmt.Errorf("shell must be a string or array, got %T", val))
 	}
+
 	return nil
 }
 

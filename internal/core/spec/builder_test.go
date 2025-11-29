@@ -3766,3 +3766,221 @@ steps:
 		assert.Equal(t, "42", params["count"])
 	})
 }
+
+func TestBuildShell(t *testing.T) {
+	t.Run("ShellAsSimpleString", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+shell: bash
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "bash", dag.Shell)
+		assert.Empty(t, dag.ShellArgs)
+	})
+
+	t.Run("ShellAsStringWithArgs", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+shell: bash -e
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "bash", dag.Shell)
+		assert.Equal(t, []string{"-e"}, dag.ShellArgs)
+	})
+
+	t.Run("ShellAsStringWithMultipleArgs", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+shell: bash -e -u -o pipefail
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "bash", dag.Shell)
+		assert.Equal(t, []string{"-e", "-u", "-o", "pipefail"}, dag.ShellArgs)
+	})
+
+	t.Run("ShellAsArray", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+shell:
+  - bash
+  - -e
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "bash", dag.Shell)
+		assert.Equal(t, []string{"-e"}, dag.ShellArgs)
+	})
+
+	t.Run("ShellAsArrayWithMultipleArgs", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+shell:
+  - bash
+  - -e
+  - -u
+  - -o
+  - pipefail
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "bash", dag.Shell)
+		assert.Equal(t, []string{"-e", "-u", "-o", "pipefail"}, dag.ShellArgs)
+	})
+
+	t.Run("ShellWithEnvVar", func(t *testing.T) {
+		t.Setenv("MY_SHELL", "/bin/zsh")
+		data := []byte(`
+shell: $MY_SHELL
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "/bin/zsh", dag.Shell)
+		assert.Empty(t, dag.ShellArgs)
+	})
+
+	t.Run("ShellArrayWithEnvVar", func(t *testing.T) {
+		t.Setenv("SHELL_ARG", "-x")
+		data := []byte(`
+shell:
+  - bash
+  - $SHELL_ARG
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "bash", dag.Shell)
+		assert.Equal(t, []string{"-x"}, dag.ShellArgs)
+	})
+
+	t.Run("ShellNotSpecified", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		// Should have default shell from cmdutil.GetShellCommand("")
+		assert.NotEmpty(t, dag.Shell)
+	})
+
+	t.Run("ShellEmptyString", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+shell: ""
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		// Should have default shell from cmdutil.GetShellCommand("")
+		assert.NotEmpty(t, dag.Shell)
+	})
+
+	t.Run("ShellEmptyArray", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+shell: []
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		// Should have default shell from cmdutil.GetShellCommand("")
+		assert.NotEmpty(t, dag.Shell)
+	})
+
+	t.Run("ShellPwsh", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+shell: pwsh
+steps:
+  - "Write-Output hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "pwsh", dag.Shell)
+		assert.Empty(t, dag.ShellArgs)
+	})
+
+	t.Run("ShellPwshWithArgs", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+shell: pwsh -NoProfile -NonInteractive
+steps:
+  - "Write-Output hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "pwsh", dag.Shell)
+		assert.Equal(t, []string{"-NoProfile", "-NonInteractive"}, dag.ShellArgs)
+	})
+
+	t.Run("ShellNoEvalPreservesRaw", func(t *testing.T) {
+		t.Setenv("MY_SHELL", "/bin/zsh")
+		data := []byte(`
+shell: $MY_SHELL -e
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{Flags: spec.BuildFlagNoEval})
+		require.NoError(t, err)
+		assert.Equal(t, "$MY_SHELL", dag.Shell)
+		assert.Equal(t, []string{"-e"}, dag.ShellArgs)
+	})
+
+	t.Run("ShellArrayNoEvalPreservesRaw", func(t *testing.T) {
+		t.Setenv("SHELL_ARG", "-x")
+		data := []byte(`
+shell:
+  - bash
+  - $SHELL_ARG
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{Flags: spec.BuildFlagNoEval})
+		require.NoError(t, err)
+		assert.Equal(t, "bash", dag.Shell)
+		assert.Equal(t, []string{"$SHELL_ARG"}, dag.ShellArgs)
+	})
+
+	t.Run("ShellWithQuotedArgs", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+shell: bash -c "set -e"
+steps:
+  - "echo hello"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "bash", dag.Shell)
+		assert.Equal(t, []string{"-c", "set -e"}, dag.ShellArgs)
+	})
+}

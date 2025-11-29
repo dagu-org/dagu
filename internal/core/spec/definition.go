@@ -18,7 +18,8 @@ type definition struct {
 	// Shell is the default shell to use for all steps in this DAG.
 	// If not specified, the system default shell is used.
 	// Can be overridden at the step level.
-	Shell string
+	// Can be a string (e.g., "bash -e") or an array (e.g., ["bash", "-e"]).
+	Shell any
 	// WorkingDir is working directory for DAG execution
 	WorkingDir string
 	// Dotenv is the path to the dotenv file (string or []string).
