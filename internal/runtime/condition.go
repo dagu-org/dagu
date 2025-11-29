@@ -95,7 +95,7 @@ func evalCommand(ctx context.Context, shell []string, c *core.Condition) error {
 
 func runShellCommand(ctx context.Context, shell []string, commandToRun string) error {
 	args := append(shell[1:], "-c", commandToRun)
-	cmd := exec.CommandContext(ctx, shell[0], args...)
+	cmd := exec.CommandContext(ctx, shell[0], args...) // nolint:gosec
 	_, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrConditionNotMet, err)
