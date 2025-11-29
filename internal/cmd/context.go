@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -144,6 +145,17 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	drm := runtime.NewManager(drs, ps, cfg)
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
+
+	// Log key configuration settings for debugging
+	logger.Debug(ctx, "Configuration loaded",
+		tag.Config(cfg.Global.ConfigFileUsed),
+		tag.Dir(cfg.Paths.DAGsDir),
+	)
+	logger.Debug(ctx, "Paths configuration",
+		slog.String("log-dir", cfg.Paths.LogDir),
+		slog.String("data-dir", cfg.Paths.DataDir),
+		slog.String("dag-runs-dir", cfg.Paths.DAGRunsDir),
+	)
 
 	return &Context{
 		Context:         ctx,
