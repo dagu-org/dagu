@@ -9,7 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/mailer"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/go-viper/mapstructure/v2"
 )
@@ -37,7 +37,7 @@ func newMail(ctx context.Context, step core.Step) (executor.Executor, error) {
 		return nil, fmt.Errorf("failed to decode mail config: %w", err)
 	}
 
-	env := execution.NewEnv(ctx, step)
+	env := runtime.NewEnvForStep(ctx, step)
 
 	exec := &mail{cfg: &cfg}
 	mailerConfig, err := env.MailerConfig(ctx)

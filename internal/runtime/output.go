@@ -302,7 +302,7 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 func (oc *OutputCoordinator) setupFile(ctx context.Context, filePath string, _ NodeData) (*os.File, error) {
 	absFilePath := filePath
 	if !filepath.IsAbs(absFilePath) {
-		dir := execution.GetEnv(ctx).WorkingDir
+		dir := GetEnv(ctx).WorkingDir
 		absFilePath = filepath.Join(dir, absFilePath)
 		absFilePath = filepath.Clean(absFilePath)
 	}

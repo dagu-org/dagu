@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 )
@@ -34,15 +35,21 @@ type XDGConfig struct {
 	ConfigHome string
 }
 
+// resolverLock ensures ResolvePaths is thread-safe.
+var resolverLock sync.Mutex
+
 // ResolvePaths determines application paths based on the provided application home environment variable,
 // a legacy path, and an XDGConfig. It chooses the configuration directory based on these inputs.
 //
 // Resolution logic:
-// 1. If the environment variable (appHomeEnv) is set, use its value and assume unified directory structure.
-//    The path is converted to an absolute path, and if different, the environment variable is updated.
-// 2. Else, if the legacyPath exists on disk, use it and emit a warning to update configuration paths.
-// 3. Otherwise, fall back to XDG-compliant defaults.
+//  1. If the environment variable (appHomeEnv) is set, use its value and assume unified directory structure.
+//     The path is converted to an absolute path, and if different, the environment variable is updated.
+//  2. Else, if the legacyPath exists on disk, use it and emit a warning to update configuration paths.
+//  3. Otherwise, fall back to XDG-compliant defaults.
 func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) (Paths, error) {
+	resolverLock.Lock()
+	defer resolverLock.Unlock()
+
 	switch {
 	// Use the directory from the environment variable if available.
 	case os.Getenv(appHomeEnv) != "":
@@ -52,13 +59,15 @@ func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) (Paths, error) {
 			return Paths{}, fmt.Errorf("failed to resolve absolute path for %s: %w", appHomeEnv, err)
 		}
 		if absConfigDir != configDir {
+			// Update the environment variable to the absolute path to ensure
+			// forked processes receive the correct path.
 			if err := os.Setenv(appHomeEnv, absConfigDir); err != nil {
 				return Paths{}, fmt.Errorf("failed to set environment variable %s: %w", appHomeEnv, err)
 			}
 		}
 		return setUnifiedPaths(absConfigDir), nil
 	// If the legacy path exists, warn and use it.
-	case fileutil.FileExists(legacyPath):
+	case legacyPath != "" && fileutil.FileExists(legacyPath):
 		paths := setUnifiedPaths(legacyPath)
 		warning := fmt.Sprintf("Warning: Dagu legacy directory (%s) structure detected. This is deprecated.", legacyPath)
 		paths.Warnings = append(paths.Warnings, warning)

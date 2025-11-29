@@ -6,13 +6,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,7 +76,7 @@ func TestShellCommandBuilder_Build(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.shouldSkipOnMac && runtime.GOOS == "darwin" {
+			if tt.shouldSkipOnMac && goruntime.GOOS == "darwin" {
 				t.Skip("Skipping Windows-specific test on macOS")
 			}
 
@@ -196,7 +197,7 @@ func TestBuildCmdCommand(t *testing.T) {
 }
 
 func TestCommandExecutor_Kill(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -221,9 +222,9 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 	// Setup the context with DAG environment
 	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "", nil, nil, nil)
 
-	env := execution.NewEnv(ctx, core.Step{})
+	env := runtime.NewEnvForStep(ctx, core.Step{})
 	env.WorkingDir = t.TempDir()
-	ctx = execution.WithEnv(ctx, env)
+	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
 		name       string
@@ -295,9 +296,9 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 	// Setup the context with DAG environment
 	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "", nil, nil, nil)
 
-	env := execution.NewEnv(ctx, core.Step{})
+	env := runtime.NewEnvForStep(ctx, core.Step{})
 	env.WorkingDir = t.TempDir()
-	ctx = execution.WithEnv(ctx, env)
+	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
 		name         string
@@ -400,14 +401,14 @@ func setupTestContext(t *testing.T, dag *core.DAG, step core.Step) context.Conte
 		}
 	}
 	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "", nil, nil, nil)
-	env := execution.NewEnv(ctx, step)
+	env := runtime.NewEnvForStep(ctx, step)
 	env.WorkingDir = t.TempDir()
-	return execution.WithEnv(ctx, env)
+	return runtime.WithEnv(ctx, env)
 }
 
 // TestCommandExecutor_SimpleCommand tests basic command execution
 func TestCommandExecutor_SimpleCommand(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -481,7 +482,7 @@ func TestCommandExecutor_SimpleCommand(t *testing.T) {
 
 // TestCommandExecutor_ScriptExecution tests script execution
 func TestCommandExecutor_ScriptExecution(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -559,7 +560,7 @@ func TestCommandExecutor_ScriptExecution(t *testing.T) {
 
 // TestCommandExecutor_ShellCmdArgs tests shell command with arguments (ShellCmdArgs)
 func TestCommandExecutor_ShellCmdArgs(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -625,7 +626,7 @@ func TestCommandExecutor_ShellCmdArgs(t *testing.T) {
 
 // TestCommandExecutor_CommandWithScript tests command + script combination (like perl script.pl)
 func TestCommandExecutor_CommandWithScript(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -698,7 +699,7 @@ func TestCommandExecutor_CommandWithScript(t *testing.T) {
 
 // TestCommandExecutor_DAGLevelShell tests DAG-level shell configuration
 func TestCommandExecutor_DAGLevelShell(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -728,7 +729,7 @@ func TestCommandExecutor_DAGLevelShell(t *testing.T) {
 
 // TestCommandExecutor_StepLevelShellOverride tests step shell overriding DAG shell
 func TestCommandExecutor_StepLevelShellOverride(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -759,7 +760,7 @@ func TestCommandExecutor_StepLevelShellOverride(t *testing.T) {
 
 // TestCommandExecutor_StderrCapture tests that stderr is captured
 func TestCommandExecutor_StderrCapture(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -785,7 +786,7 @@ func TestCommandExecutor_StderrCapture(t *testing.T) {
 
 // TestCommandExecutor_StderrInError tests that stderr is included in error messages
 func TestCommandExecutor_StderrInError(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -810,7 +811,7 @@ func TestCommandExecutor_StderrInError(t *testing.T) {
 
 // TestCommandExecutor_WorkingDirectory tests working directory is set correctly
 func TestCommandExecutor_WorkingDirectory(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -824,9 +825,9 @@ func TestCommandExecutor_WorkingDirectory(t *testing.T) {
 
 	ctx := setupTestContext(t, nil, step)
 	// Override the working dir in env
-	env := execution.GetEnv(ctx)
+	env := runtime.GetEnv(ctx)
 	env.WorkingDir = tmpDir
-	ctx = execution.WithEnv(ctx, env)
+	ctx = runtime.WithEnv(ctx, env)
 
 	exec, err := NewCommand(ctx, step)
 	require.NoError(t, err)
@@ -842,7 +843,7 @@ func TestCommandExecutor_WorkingDirectory(t *testing.T) {
 
 // TestCommandExecutor_EnvironmentVariables tests environment variable propagation
 func TestCommandExecutor_EnvironmentVariables(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -871,7 +872,7 @@ func TestCommandExecutor_EnvironmentVariables(t *testing.T) {
 
 // TestCommandExecutor_Errexit tests that errexit (-e) flag works
 func TestCommandExecutor_Errexit(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1140,7 +1141,7 @@ func TestDetectShebang(t *testing.T) {
 
 // TestNewCommandConfig tests configuration creation
 func TestNewCommandConfig(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1234,7 +1235,7 @@ func TestShellCommandBuilder_NixShell(t *testing.T) {
 
 // TestCommandExecutor_ConcurrentRun tests that the executor handles concurrent access properly
 func TestCommandExecutor_ConcurrentRun(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1276,7 +1277,7 @@ func TestCommandExecutor_ConcurrentRun(t *testing.T) {
 
 // TestCommandExecutor_ScriptCleanup tests that temporary script files are cleaned up
 func TestCommandExecutor_ScriptCleanup(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1289,9 +1290,9 @@ func TestCommandExecutor_ScriptCleanup(t *testing.T) {
 	}
 
 	ctx := setupTestContext(t, nil, step)
-	env := execution.GetEnv(ctx)
+	env := runtime.GetEnv(ctx)
 	env.WorkingDir = tmpDir
-	ctx = execution.WithEnv(ctx, env)
+	ctx = runtime.WithEnv(ctx, env)
 
 	exec, err := NewCommand(ctx, step)
 	require.NoError(t, err)
@@ -1311,7 +1312,7 @@ func TestCommandExecutor_ScriptCleanup(t *testing.T) {
 
 // TestCommandConfig_NewCmd_AllBranches tests all branches of newCmd
 func TestCommandConfig_NewCmd_AllBranches(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1404,7 +1405,7 @@ func TestCommandConfig_NewCmd_AllBranches(t *testing.T) {
 
 // TestCommandExecutor_ShellArgs tests step-level shell args
 func TestCommandExecutor_ShellArgs(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1422,7 +1423,7 @@ func TestCommandExecutor_ShellArgs(t *testing.T) {
 
 // TestCommandExecutor_UserSpecifiedShellSkipsShebang tests that user-specified shell skips shebang detection
 func TestCommandExecutor_UserSpecifiedShellSkipsShebang(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1449,7 +1450,7 @@ func TestCommandExecutor_UserSpecifiedShellSkipsShebang(t *testing.T) {
 
 // TestCommandExecutor_EmptyScript tests behavior with empty script
 func TestCommandExecutor_EmptyScript(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1477,7 +1478,7 @@ func TestCommandExecutor_EmptyScript(t *testing.T) {
 
 // TestCommandExecutor_ScriptWithSpecialChars tests scripts containing special characters
 func TestCommandExecutor_ScriptWithSpecialChars(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1657,7 +1658,7 @@ func TestShellCommandBuilder_PwshCore(t *testing.T) {
 
 // TestNewCommandConfig_NixShell tests nix-shell configuration in NewCommandConfig
 func TestNewCommandConfig_NixShell(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1697,7 +1698,7 @@ func TestNewCommandConfig_NixShell(t *testing.T) {
 
 // TestNewCommandConfig_NixShell_AlreadyHasSetE tests nix-shell when set -e already present
 func TestNewCommandConfig_NixShell_AlreadyHasSetE(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1772,7 +1773,7 @@ func TestCommandConfig_NewCmd_Errors(t *testing.T) {
 
 // TestCommandExecutor_Run_SetupScriptError tests Run when setupScript fails
 func TestCommandExecutor_Run_SetupScriptError(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1805,7 +1806,7 @@ func TestCommandExecutor_Run_SetupScriptError(t *testing.T) {
 
 // TestCommandExecutor_Run_NewCmdError tests Run when newCmd fails
 func TestCommandExecutor_Run_NewCmdError(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1834,7 +1835,7 @@ func TestCommandExecutor_Run_NewCmdError(t *testing.T) {
 
 // TestCommandExecutor_Run_StartError tests Run when cmd.Start fails
 func TestCommandExecutor_Run_StartError(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1860,7 +1861,7 @@ func TestCommandExecutor_Run_StartError(t *testing.T) {
 
 // TestCommandExecutor_Run_StartErrorWithStderr tests that stderr is included when Start fails
 func TestCommandExecutor_Run_StartErrorWithStderr(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1910,7 +1911,7 @@ func TestReadFirstLine_ScannerError(t *testing.T) {
 
 // TestExitCodeFromError_WithExitError tests exitCodeFromError with actual ExitError
 func TestExitCodeFromError_WithExitError(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -1981,7 +1982,7 @@ func TestCommandConfig_NewCmd_ShellCmdArgsPath(t *testing.T) {
 
 // TestCommandExecutor_Run_StartFailWithStderrTail tests the stderr tail path when Start fails
 func TestCommandExecutor_Run_StartFailWithStderrTail(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -2023,7 +2024,7 @@ func TestNewCommand_ErrorPath(t *testing.T) {
 // TestCommandConfig_NewCmd_ShellScriptNoShebang tests the path where shell+script
 // runs without shebang (lines 147-153 in newCmd)
 func TestCommandConfig_NewCmd_ShellScriptNoShebang(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 
@@ -2050,7 +2051,7 @@ func TestCommandConfig_NewCmd_ShellScriptNoShebang(t *testing.T) {
 // TestSetupScript_WriteErrors tests write-related errors in setupScript
 // Note: These tests may be skipped on some systems where the operations don't fail
 func TestSetupScript_WriteErrors(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
 

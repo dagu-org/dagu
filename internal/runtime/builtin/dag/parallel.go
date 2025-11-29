@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -57,7 +58,7 @@ func newParallelExecutor(
 		return nil, err
 	}
 
-	dir := execution.GetEnv(ctx).WorkingDir
+	dir := runtime.GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
 	}

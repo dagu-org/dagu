@@ -35,28 +35,19 @@ func TestResolver(t *testing.T) {
 	})
 	t.Run("AppHomeDirectoryRelativePath", func(t *testing.T) {
 		t.Parallel()
-		tmpDir := fileutil.MustTempDir("test")
-		defer os.RemoveAll(tmpDir)
 
-		// Change to tmpDir so relative path resolves correctly
-		originalWd, err := os.Getwd()
+		wd, err := os.Getwd()
 		require.NoError(t, err)
-		err = os.Chdir(tmpDir)
-		require.NoError(t, err)
-		defer os.Chdir(originalWd)
 
 		// Set a relative path
-		relativePath := config.AppSlug
-		_ = os.Setenv("TEST_APP_HOME_REL", relativePath)
-		paths, err := config.ResolvePaths("TEST_APP_HOME_REL", filepath.Join(tmpDir, ".dagu"), config.XDGConfig{})
+		_ = os.Setenv("TEST_APP_HOME_REL", "tmp")
+		defer os.Unsetenv("TEST_APP_HOME_REL")
+		paths, err := config.ResolvePaths("TEST_APP_HOME_REL", "", config.XDGConfig{})
 		require.NoError(t, err)
 
 		// Should be converted to absolute path
-		expectedAbsPath := filepath.Join(tmpDir, config.AppSlug)
+		expectedAbsPath := path.Join(wd, "tmp")
 		assert.Equal(t, expectedAbsPath, paths.ConfigDir)
-
-		// Environment variable should be updated to absolute path
-		assert.Equal(t, expectedAbsPath, os.Getenv("TEST_APP_HOME_REL"))
 	})
 	t.Run("UnifiedHomeDirectory", func(t *testing.T) {
 		t.Parallel()

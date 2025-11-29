@@ -14,7 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -171,14 +171,24 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 		cmd = c
 
 	default:
-		if cfg.Command == "" {
-			return nil, errNoCommandSpecified
+		command := cfg.Command
+		args := cfg.Args
+		if command == "" {
+			// No command specified, fallback to shell
+			env := runtime.GetEnv(ctx)
+			shell := env.Shell(ctx)
+			if len(shell) == 0 {
+				return nil, errNoCommandSpecified
+			}
+			command = shell[0]
+			tmp := make([]string, len(shell)-1)
+			copy(tmp, shell[1:])
+			args = append(tmp, args...)
 		}
-
-		cmd = createDirectCommand(cfg.Ctx, cfg.Command, cfg.Args, scriptFile)
+		cmd = createDirectCommand(cfg.Ctx, command, args, scriptFile)
 	}
 
-	cmd.Env = append(cmd.Env, execution.AllEnvs(ctx)...)
+	cmd.Env = append(cmd.Env, runtime.AllEnvs(ctx)...)
 	cmd.Dir = cfg.Dir
 	cmd.Stdout = cfg.Stdout
 	cmd.Stderr = cfg.Stderr
@@ -384,7 +394,7 @@ func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) 
 
 // NewCommandConfig creates a new commandConfig from the given step.
 func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, error) {
-	env := execution.GetEnv(ctx)
+	env := runtime.GetEnv(ctx)
 
 	return &commandConfig{
 		Ctx:                ctx,

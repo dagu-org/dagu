@@ -1,17 +1,18 @@
-package execution_test
+package runtime_test
 
 import (
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
+	goruntime "runtime"
 	"strings"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,12 +22,12 @@ func TestEnv_VariablesMap(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		setupEnv func(env execution.Env) execution.Env
+		setupEnv func(env runtime.Env) runtime.Env
 		expected map[string]string
 	}{
 		{
 			name: "CombinesVariablesAndEnvs",
-			setupEnv: func(env execution.Env) execution.Env {
+			setupEnv: func(env runtime.Env) runtime.Env {
 				env.Variables.Store("VAR1", "VAR1=value1")
 				env.Variables.Store("VAR2", "VAR2=value2")
 				env.Envs["ENV1"] = "env1"
@@ -43,7 +44,7 @@ func TestEnv_VariablesMap(t *testing.T) {
 		},
 		{
 			name: "EnvsOverrideVariables",
-			setupEnv: func(env execution.Env) execution.Env {
+			setupEnv: func(env runtime.Env) runtime.Env {
 				env.Variables.Store("SAME_KEY", "SAME_KEY=from_variables")
 				env.Envs["SAME_KEY"] = "from_envs"
 				return env
@@ -55,7 +56,7 @@ func TestEnv_VariablesMap(t *testing.T) {
 		},
 		{
 			name: "EmptyVariablesAndEnvs",
-			setupEnv: func(env execution.Env) execution.Env {
+			setupEnv: func(env runtime.Env) runtime.Env {
 				return env
 			},
 			expected: map[string]string{
@@ -64,7 +65,7 @@ func TestEnv_VariablesMap(t *testing.T) {
 		},
 		{
 			name: "OnlyVariables",
-			setupEnv: func(env execution.Env) execution.Env {
+			setupEnv: func(env runtime.Env) runtime.Env {
 				env.Variables.Store("VAR1", "VAR1=value1")
 				env.Variables.Store("VAR2", "VAR2=value2")
 				return env
@@ -77,7 +78,7 @@ func TestEnv_VariablesMap(t *testing.T) {
 		},
 		{
 			name: "OnlyEnvs",
-			setupEnv: func(env execution.Env) execution.Env {
+			setupEnv: func(env runtime.Env) runtime.Env {
 				env.Envs["ENV1"] = "env1"
 				env.Envs["ENV2"] = "env2"
 				return env
@@ -103,7 +104,7 @@ func TestEnv_VariablesMap(t *testing.T) {
 			require.NoError(t, os.Chdir(tempDir))
 
 			ctx := context.Background()
-			env := execution.NewEnv(ctx, core.Step{Name: "test-step"})
+			env := runtime.NewEnvForStep(ctx, core.Step{Name: "test-step"})
 			env = tt.setupEnv(env)
 
 			result := env.VariablesMap()
@@ -116,7 +117,7 @@ func TestEnv_VariablesMap(t *testing.T) {
 	}
 }
 
-func TestNewEnv_WorkingDirectory(t *testing.T) {
+func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 	// Don't run in parallel since we're changing working directory
 
 	// Save current working directory
@@ -133,7 +134,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 		name      string
 		step      core.Step
 		setupFunc func()
-		checkFunc func(t *testing.T, env execution.Env)
+		checkFunc func(t *testing.T, env runtime.Env)
 	}{
 		{
 			name: "StepWithAbsoluteDirectory",
@@ -142,7 +143,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 				Dir:  tempDir,
 			},
 			setupFunc: func() {},
-			checkFunc: func(t *testing.T, env execution.Env) {
+			checkFunc: func(t *testing.T, env runtime.Env) {
 				// Resolve symlinks for comparison (macOS /var vs /private/var)
 				expectedDir, _ := filepath.EvalSymlinks(tempDir)
 				actualDir, _ := filepath.EvalSymlinks(env.WorkingDir)
@@ -162,7 +163,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 				require.NoError(t, os.Chdir(tempDir))
 				require.NoError(t, os.Mkdir("subdir", 0755))
 			},
-			checkFunc: func(t *testing.T, env execution.Env) {
+			checkFunc: func(t *testing.T, env runtime.Env) {
 				expectedDir := filepath.Join(tempDir, "subdir")
 				// Resolve symlinks for comparison
 				expectedResolved, _ := filepath.EvalSymlinks(expectedDir)
@@ -183,7 +184,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 				testDir := filepath.Join(homeDir, "testdir")
 				require.NoError(t, os.MkdirAll(testDir, 0755))
 			},
-			checkFunc: func(t *testing.T, env execution.Env) {
+			checkFunc: func(t *testing.T, env runtime.Env) {
 				homeDir, _ := os.UserHomeDir()
 				expectedDir := filepath.Join(homeDir, "testdir")
 				// Resolve symlinks for comparison
@@ -202,10 +203,10 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 			setupFunc: func() {
 				require.NoError(t, os.Chdir(tempDir))
 			},
-			checkFunc: func(t *testing.T, env execution.Env) {
+			checkFunc: func(t *testing.T, env runtime.Env) {
 				// Non-existent directory gets resolved to absolute path
 				// On Windows, this will include drive letter
-				if runtime.GOOS == "windows" {
+				if goruntime.GOOS == "windows" {
 					assert.Contains(t, env.WorkingDir, "\\non\\existent\\directory")
 				} else {
 					assert.Equal(t, "/non/existent/directory", env.WorkingDir)
@@ -218,7 +219,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 			step: core.Step{
 				Name: "test-step",
 				Dir: func() string {
-					if runtime.GOOS == "windows" {
+					if goruntime.GOOS == "windows" {
 						return "$USERPROFILE/testdir"
 					}
 					return "$HOME/testdir"
@@ -230,7 +231,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 				testDir := filepath.Join(homeDir, "testdir")
 				require.NoError(t, os.MkdirAll(testDir, 0755))
 			},
-			checkFunc: func(t *testing.T, env execution.Env) {
+			checkFunc: func(t *testing.T, env runtime.Env) {
 				homeDir, _ := os.UserHomeDir()
 				expectedDir := filepath.Join(homeDir, "testdir")
 				// Resolve symlinks for comparison
@@ -249,7 +250,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 			tt.setupFunc()
 
 			ctx := context.Background()
-			env := execution.NewEnv(ctx, tt.step)
+			env := runtime.NewEnvForStep(ctx, tt.step)
 
 			// Check that DAG_RUN_STEP_NAME is always set
 			assert.Equal(t, tt.step.Name, env.Envs[execution.EnvKeyDAGRunStepName])
@@ -260,7 +261,7 @@ func TestNewEnv_WorkingDirectory(t *testing.T) {
 	}
 }
 
-func TestNewEnv_BasicFields(t *testing.T) {
+func TestNewEnvForStep_BasicFields(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -270,7 +271,7 @@ func TestNewEnv_BasicFields(t *testing.T) {
 		Args:    []string{"arg1", "arg2"},
 	}
 
-	env := execution.NewEnv(ctx, step)
+	env := runtime.NewEnvForStep(ctx, step)
 
 	// Check basic fields
 	assert.Equal(t, step, env.Step)
@@ -291,15 +292,15 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		setup    func(ctx context.Context) (context.Context, execution.Env)
+		setup    func(ctx context.Context) (context.Context, runtime.Env)
 		expected map[string]string
 	}{
 		{
 			name: "IncludesVariablesFromPreviousSteps",
-			setup: func(ctx context.Context) (context.Context, execution.Env) {
+			setup: func(ctx context.Context) (context.Context, runtime.Env) {
 				dag := &core.DAG{Env: []string{"DAG_VAR=dag_value"}}
 				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
-				env := execution.NewEnv(ctx, core.Step{Name: "test"})
+				env := runtime.NewEnvForStep(ctx, core.Step{Name: "test"})
 				env.Variables.Store("OUTPUT_VAR", "OUTPUT_VAR=output_value")
 				return ctx, env
 			},
@@ -310,16 +311,16 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 		},
 		{
 			name: "StepEnvOverridesAll",
-			setup: func(ctx context.Context) (context.Context, execution.Env) {
+			setup: func(ctx context.Context) (context.Context, runtime.Env) {
 				dag := &core.DAG{Env: []string{"KEY=dag"}}
 				secrets := []string{"KEY=secret"}
 				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, secrets)
 
 				step := core.Step{Name: "test", Env: []string{"KEY=step"}}
-				env := execution.NewEnv(ctx, step)
+				env := runtime.NewEnvForStep(ctx, step)
 				env.Variables.Store("KEY", "KEY=variable")
 
-				envCtx := execution.WithEnv(ctx, env)
+				envCtx := runtime.WithEnv(ctx, env)
 				parts := strings.SplitN(step.Env[0], "=", 2)
 				evaluated, err := env.EvalString(envCtx, parts[1])
 				if err != nil {
@@ -337,15 +338,15 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 		},
 		{
 			name: "StepEnvKeepsEvaluatedSecrets",
-			setup: func(ctx context.Context) (context.Context, execution.Env) {
+			setup: func(ctx context.Context) (context.Context, runtime.Env) {
 				dag := &core.DAG{}
 				secrets := []string{"MY_SECRET=super-secret"}
 				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, secrets)
 
 				step := core.Step{Name: "test", Env: []string{"GITHUB_TOKEN=${MY_SECRET}"}}
-				env := execution.NewEnv(ctx, step)
+				env := runtime.NewEnvForStep(ctx, step)
 
-				envCtx := execution.WithEnv(ctx, env)
+				envCtx := runtime.WithEnv(ctx, env)
 				parts := strings.SplitN(step.Env[0], "=", 2)
 				evaluated, err := env.EvalString(envCtx, parts[1])
 				if err != nil {
@@ -364,10 +365,10 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 		},
 		{
 			name: "ExcludesOSEnvironment",
-			setup: func(ctx context.Context) (context.Context, execution.Env) {
+			setup: func(ctx context.Context) (context.Context, runtime.Env) {
 				dag := &core.DAG{Env: []string{"USER_VAR=user"}}
 				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
-				env := execution.NewEnv(ctx, core.Step{Name: "test"})
+				env := runtime.NewEnvForStep(ctx, core.Step{Name: "test"})
 				return ctx, env
 			},
 			expected: map[string]string{
@@ -400,13 +401,13 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		setup    func(ctx context.Context) (context.Context, execution.Env)
+		setup    func(ctx context.Context) (context.Context, runtime.Env)
 		input    string
 		expected string
 	}{
 		{
 			name: "StepEnvOverridesOutputVariablesAndDAGEnv",
-			setup: func(ctx context.Context) (context.Context, execution.Env) {
+			setup: func(ctx context.Context) (context.Context, runtime.Env) {
 				// Create DAG with env variable
 				dag := &core.DAG{
 					Env: []string{"FOO=from_dag"},
@@ -414,7 +415,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
 
 				// Create executor env
-				env := execution.NewEnv(ctx, core.Step{Name: "test"})
+				env := runtime.NewEnvForStep(ctx, core.Step{Name: "test"})
 
 				// Set output variable
 				env.Variables.Store("FOO", "FOO=from_output")
@@ -429,7 +430,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 		},
 		{
 			name: "OutputVariablesOverrideDAGEnv",
-			setup: func(ctx context.Context) (context.Context, execution.Env) {
+			setup: func(ctx context.Context) (context.Context, runtime.Env) {
 				// Create DAG with env variable
 				dag := &core.DAG{
 					Env: []string{"BAR=from_dag"},
@@ -437,7 +438,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
 
 				// Create executor env
-				env := execution.NewEnv(ctx, core.Step{Name: "test"})
+				env := runtime.NewEnvForStep(ctx, core.Step{Name: "test"})
 
 				// Set output variable (higher precedence than DAG)
 				env.Variables.Store("BAR", "BAR=from_output")
@@ -449,7 +450,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 		},
 		{
 			name: "DAGEnvUsedWhenNoOverrideExists",
-			setup: func(ctx context.Context) (context.Context, execution.Env) {
+			setup: func(ctx context.Context) (context.Context, runtime.Env) {
 				// Create DAG with env variable
 				dag := &core.DAG{
 					Env: []string{"BAZ=from_dag"},
@@ -457,7 +458,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
 
 				// Create executor env
-				env := execution.NewEnv(ctx, core.Step{Name: "test"})
+				env := runtime.NewEnvForStep(ctx, core.Step{Name: "test"})
 
 				return ctx, env
 			},
@@ -466,7 +467,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 		},
 		{
 			name: "MultipleVariablesWithDifferentPrecedence",
-			setup: func(ctx context.Context) (context.Context, execution.Env) {
+			setup: func(ctx context.Context) (context.Context, runtime.Env) {
 				// Create DAG with multiple env variables
 				dag := &core.DAG{
 					Env: []string{"VAR1=dag1", "VAR2=dag2", "VAR3=dag3"},
@@ -474,7 +475,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
 
 				// Create executor env
-				env := execution.NewEnv(ctx, core.Step{Name: "test"})
+				env := runtime.NewEnvForStep(ctx, core.Step{Name: "test"})
 
 				// Set output variables
 				env.Variables.Store("VAR1", "VAR1=output1")
