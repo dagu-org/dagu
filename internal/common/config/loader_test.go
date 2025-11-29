@@ -697,6 +697,8 @@ func loadFromYAML(t *testing.T, yaml string) *Config {
 
 	cfg, err := Load(WithConfigFile(configFile))
 	require.NoError(t, err)
+
+	cfg.Global.ConfigFileUsed = ""
 	return cfg
 }
 
