@@ -436,9 +436,6 @@ scheduler:
 		},
 	}
 
-	require.NotEmpty(t, expected.Global.ConfigFileUsed)
-	expected.Global.ConfigFileUsed = ""
-
 	assert.Equal(t, expected, cfg)
 }
 
