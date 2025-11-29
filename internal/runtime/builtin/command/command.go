@@ -18,6 +18,8 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
+var errNoCommandSpecified = fmt.Errorf("no command specified")
+
 var _ executor.Executor = (*commandExecutor)(nil)
 var _ executor.ExitCoder = (*commandExecutor)(nil)
 
@@ -169,13 +171,11 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 		cmd = c
 
 	default:
-		command := cfg.Command
-		if command == "" {
-			// If no command is specified, use the default shell.
-			// Usually this should not happen.
-			command = cmdutil.GetShellCommand("")
+		if cfg.Command == "" {
+			return nil, errNoCommandSpecified
 		}
-		cmd = createDirectCommand(cfg.Ctx, command, cfg.Args, scriptFile)
+
+		cmd = createDirectCommand(cfg.Ctx, cfg.Command, cfg.Args, scriptFile)
 	}
 
 	cmd.Env = append(cmd.Env, execution.AllEnvs(ctx)...)
