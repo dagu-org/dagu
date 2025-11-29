@@ -339,9 +339,13 @@ func GetScriptExtension(shellCommand string) string {
 
 	case strings.HasSuffix(cmdLower, "bash.exe"),
 		strings.HasSuffix(cmdLower, "bash"),
-		strings.HasSuffix(cmdLower, "sh.exe"),
-		strings.HasSuffix(cmdLower, "sh"),
-		strings.HasSuffix(cmdLower, "zsh"):
+		strings.HasSuffix(cmdLower, "zsh"),
+		strings.HasSuffix(cmdLower, "/sh"),
+		strings.HasSuffix(cmdLower, "sh.exe"):
+		return ".sh"
+
+	// Exact match for "sh" only
+	case cmdLower == "sh":
 		return ".sh"
 
 	default:
