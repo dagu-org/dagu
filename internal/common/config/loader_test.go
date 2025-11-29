@@ -126,6 +126,9 @@ func TestLoad_Env(t *testing.T) {
 	berlinLoc, _ := time.LoadLocation("Europe/Berlin")
 	_, berlinOffset := time.Now().In(berlinLoc).Zone()
 
+	require.NotEmpty(t, cfg.Global.ConfigFileUsed)
+	cfg.Global.ConfigFileUsed = ""
+
 	expected := &Config{
 		Global: Global{
 			Debug:         true,
@@ -432,6 +435,9 @@ scheduler:
 			ZombieDetectionInterval: 60 * time.Second,
 		},
 	}
+
+	require.NotEmpty(t, expected.Global.ConfigFileUsed)
+	expected.Global.ConfigFileUsed = ""
 
 	assert.Equal(t, expected, cfg)
 }
