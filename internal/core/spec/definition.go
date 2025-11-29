@@ -116,7 +116,8 @@ type stepDef struct {
 	// Command is the command to run (on shell).
 	Command any `yaml:"command,omitempty"`
 	// Shell is the shell to run the command. Default is `$SHELL` or `sh`.
-	Shell string `yaml:"shell,omitempty"`
+	// Can be a string (e.g., "bash -e") or an array (e.g., ["bash", "-e"]).
+	Shell any `yaml:"shell,omitempty"`
 	// ShellPackages is the list of packages to install.
 	// This is used only when the shell is `nix-shell`.
 	ShellPackages []string `yaml:"shellPackages,omitempty"`

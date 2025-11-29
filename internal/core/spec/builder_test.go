@@ -3984,3 +3984,91 @@ steps:
 		assert.Equal(t, []string{"-c", "set -e"}, dag.ShellArgs)
 	})
 }
+
+func TestBuildStepShell(t *testing.T) {
+	t.Run("StepShellAsSimpleString", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    shell: zsh
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.Equal(t, "zsh", dag.Steps[0].Shell)
+		assert.Empty(t, dag.Steps[0].ShellArgs)
+	})
+
+	t.Run("StepShellAsStringWithArgs", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    shell: bash -e -u
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.Equal(t, "bash", dag.Steps[0].Shell)
+		assert.Equal(t, []string{"-e", "-u"}, dag.Steps[0].ShellArgs)
+	})
+
+	t.Run("StepShellAsArray", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    shell:
+      - bash
+      - -e
+      - -o
+      - pipefail
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.Equal(t, "bash", dag.Steps[0].Shell)
+		assert.Equal(t, []string{"-e", "-o", "pipefail"}, dag.Steps[0].ShellArgs)
+	})
+
+	t.Run("StepShellOverridesDAGShell", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+shell: bash -e
+steps:
+  - name: test
+    shell: zsh
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "bash", dag.Shell)
+		assert.Equal(t, []string{"-e"}, dag.ShellArgs)
+		require.Len(t, dag.Steps, 1)
+		assert.Equal(t, "zsh", dag.Steps[0].Shell)
+		assert.Empty(t, dag.Steps[0].ShellArgs)
+	})
+
+	t.Run("StepShellNotSpecified", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		// Step shell should be empty when not specified (DAG shell is used at runtime)
+		assert.Empty(t, dag.Steps[0].Shell)
+	})
+}

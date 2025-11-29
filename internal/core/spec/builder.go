@@ -122,6 +122,7 @@ type builderEntry struct {
 }
 
 var stepBuilderRegistry = []stepBuilderEntry{
+	{name: "shell", fn: buildStepShell},
 	{name: "workingDir", fn: buildStepWorkingDir},
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
@@ -570,53 +571,42 @@ func findName(ctx BuildContext, spec *definition) string {
 	return ""
 }
 
-func buildShell(ctx BuildContext, spec *definition, dag *core.DAG) error {
-	if spec.Shell == nil {
-		// No shell specified, use system default
-		sh := cmdutil.GetShellCommand("")
-		dag.Shell = sh
-		return nil
+// parseShellValue parses a shell value (string or array) into shell command and args.
+// If expandEnv is true, environment variables are expanded in the values.
+// Returns shell command, args, and error.
+func parseShellValue(val any, expandEnv bool) (string, []string, error) {
+	if val == nil {
+		return "", nil, nil
 	}
 
-	switch val := spec.Shell.(type) {
+	switch v := val.(type) {
 	case string:
-		// Case 1: shell is a string like "bash" or "bash -e"
-		val = strings.TrimSpace(val)
-		if val == "" {
-			sh := cmdutil.GetShellCommand("")
-			dag.Shell = sh
-			return nil
+		v = strings.TrimSpace(v)
+		if v == "" {
+			return "", nil, nil
 		}
-
-		if !ctx.opts.Has(BuildFlagNoEval) {
-			val = os.ExpandEnv(val)
+		if expandEnv {
+			v = os.ExpandEnv(v)
 		}
-
-		// Split the string into command and args
-		cmd, args, err := cmdutil.SplitCommand(val)
+		cmd, args, err := cmdutil.SplitCommand(v)
 		if err != nil {
-			return core.NewValidationError("shell", val, fmt.Errorf("failed to parse shell command: %w", err))
+			return "", nil, fmt.Errorf("failed to parse shell command: %w", err)
 		}
-		dag.Shell = strings.TrimSpace(cmd)
-		dag.ShellArgs = args
+		return strings.TrimSpace(cmd), args, nil
 
 	case []any:
-		// Case 2: shell is an array like ["bash", "-e"]
-		if len(val) == 0 {
-			sh := cmdutil.GetShellCommand("")
-			dag.Shell = sh
-			return nil
+		if len(v) == 0 {
+			return "", nil, nil
 		}
-
 		var shell string
 		var args []string
-		for i, v := range val {
-			s, ok := v.(string)
+		for i, item := range v {
+			s, ok := item.(string)
 			if !ok {
-				s = fmt.Sprintf("%v", v)
+				s = fmt.Sprintf("%v", item)
 			}
 			s = strings.TrimSpace(s)
-			if !ctx.opts.Has(BuildFlagNoEval) {
+			if expandEnv {
 				s = os.ExpandEnv(s)
 			}
 			if i == 0 {
@@ -625,13 +615,24 @@ func buildShell(ctx BuildContext, spec *definition, dag *core.DAG) error {
 				args = append(args, s)
 			}
 		}
-		dag.Shell = shell
-		dag.ShellArgs = args
+		return shell, args, nil
 
 	default:
-		return core.NewValidationError("shell", val, fmt.Errorf("shell must be a string or array, got %T", val))
+		return "", nil, fmt.Errorf("shell must be a string or array, got %T", val)
 	}
+}
 
+func buildShell(ctx BuildContext, spec *definition, dag *core.DAG) error {
+	shell, args, err := parseShellValue(spec.Shell, !ctx.opts.Has(BuildFlagNoEval))
+	if err != nil {
+		return core.NewValidationError("shell", spec.Shell, err)
+	}
+	if shell == "" {
+		dag.Shell = cmdutil.GetShellCommand("")
+	} else {
+		dag.Shell = shell
+		dag.ShellArgs = args
+	}
 	return nil
 }
 
@@ -1235,7 +1236,6 @@ func buildStep(ctx StepBuildContext, def stepDef) (*core.Step, error) {
 		Name:           strings.TrimSpace(def.Name),
 		ID:             strings.TrimSpace(def.ID),
 		Description:    strings.TrimSpace(def.Description),
-		Shell:          strings.TrimSpace(def.Shell),
 		ShellPackages:  def.ShellPackages,
 		Script:         strings.TrimSpace(def.Script),
 		Stdout:         strings.TrimSpace(def.Stdout),
@@ -1251,6 +1251,17 @@ func buildStep(ctx StepBuildContext, def stepDef) (*core.Step, error) {
 	}
 
 	return step, nil
+}
+
+func buildStepShell(_ StepBuildContext, def stepDef, step *core.Step) error {
+	// Step shell is NOT evaluated here - it's evaluated at runtime
+	shell, args, err := parseShellValue(def.Shell, false)
+	if err != nil {
+		return core.NewValidationError("shell", def.Shell, err)
+	}
+	step.Shell = shell
+	step.ShellArgs = args
+	return nil
 }
 
 func buildStepTimeout(_ StepBuildContext, def stepDef, step *core.Step) error {
