@@ -33,7 +33,10 @@ func TestRescheduleDAGRun(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		url := fmt.Sprintf("/api/v2/dags/reschedule_dag/dag-runs/%s", startBody.DagRunId)
-		statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
 
 		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
 		statusResp.Unmarshal(t, &dagRunStatus)

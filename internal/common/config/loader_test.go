@@ -126,6 +126,9 @@ func TestLoad_Env(t *testing.T) {
 	berlinLoc, _ := time.LoadLocation("Europe/Berlin")
 	_, berlinOffset := time.Now().In(berlinLoc).Zone()
 
+	require.NotEmpty(t, cfg.Global.ConfigFileUsed)
+	cfg.Global.ConfigFileUsed = ""
+
 	expected := &Config{
 		Global: Global{
 			Debug:         true,
@@ -694,5 +697,26 @@ func loadFromYAML(t *testing.T, yaml string) *Config {
 
 	cfg, err := Load(WithConfigFile(configFile))
 	require.NoError(t, err)
+
+	cfg.Global.ConfigFileUsed = ""
 	return cfg
+}
+
+func TestLoad_ConfigFileUsed(t *testing.T) {
+	// Reset viper
+	viper.Reset()
+	defer viper.Reset()
+
+	// Create a temp config file
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	err := os.WriteFile(configFile, []byte("host: 127.0.0.1"), 0600)
+	require.NoError(t, err)
+
+	// Load configuration
+	cfg, err := Load(WithConfigFile(configFile))
+	require.NoError(t, err)
+
+	// Verify ConfigFileUsed is set correctly
+	assert.Equal(t, configFile, cfg.Global.ConfigFileUsed)
 }
