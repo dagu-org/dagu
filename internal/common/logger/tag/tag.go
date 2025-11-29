@@ -12,6 +12,10 @@ import (
 
 // Core identification tags
 
+func String(key, value string) slog.Attr {
+	return slog.String(key, value)
+}
+
 // Error creates a tag for error objects.
 func Error(err any) slog.Attr {
 	return slog.Any("err", err)

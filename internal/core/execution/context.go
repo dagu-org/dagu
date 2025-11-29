@@ -22,6 +22,7 @@ type DAGContext struct {
 	Envs           map[string]string
 	SecretEnvs     map[string]string // Secret environment variables (highest priority)
 	CoordinatorCli Dispatcher
+	Shell          string // Default shell for this DAG (from DAG.Shell)
 }
 
 // UserEnvsMap returns only user-defined environment variables as a map,
@@ -158,6 +159,7 @@ func SetupDAGContext(ctx context.Context, dag *core.DAG, db Database, rootDAGRun
 		DAGRunID:       dagRunID,
 		BaseEnv:        config.GetBaseEnv(ctx),
 		CoordinatorCli: coordinatorCli,
+		Shell:          dag.Shell,
 	})
 }
 

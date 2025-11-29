@@ -413,7 +413,8 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 
 	var evalOptions []cmdutil.EvalOption
 
-	shellCommand := cmdutil.GetShellCommand(n.Step().Shell)
+	env := execution.GetEnv(ctx)
+	shellCommand := env.Shell(ctx)
 	if n.Step().ExecutorConfig.IsCommand() && shellCommand != "" {
 		// Command executor run commands on shell, so we don't need to expand env vars
 		evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
@@ -904,7 +905,8 @@ func (node *Node) evalPreconditions(ctx context.Context) error {
 		return nil
 	}
 	logger.Infof(ctx, "Checking preconditions for \"%s\"", node.Name())
-	shell := cmdutil.GetShellCommand(node.Step().Shell)
+	env := execution.GetEnv(ctx)
+	shell := env.Shell(ctx)
 	if err := EvalConditions(ctx, shell, node.Step().Preconditions); err != nil {
 		logger.Infof(ctx, "Preconditions failed for \"%s\"", node.Name())
 		return err

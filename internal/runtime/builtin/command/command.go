@@ -364,30 +364,24 @@ func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) 
 
 // NewCommandConfig creates a new commandConfig from the given step.
 func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, error) {
-	var shellCommand string
+	env := execution.GetEnv(ctx)
+
 	shellCmdArgs := step.ShellCmdArgs
 	userSpecifiedShell := step.Shell != ""
+	shellCommand := env.Shell(ctx)
 
-	if userSpecifiedShell {
-		// User explicitly set shell - respect their choice exactly
-		shellCommand = cmdutil.GetShellCommand(step.Shell)
-	} else {
-		// No shell specified - use default with errexit
-		defaultShell := cmdutil.GetShellCommand("")
-
+	// TODO: Move to env.Shell and DAG builder
+	if step.Shell == "" {
 		// Special handling for nix-shell - don't add -e to nix-shell itself
-		shellName := filepath.Base(defaultShell)
+		shellName := filepath.Base(shellCommand)
 		if shellName == "nix-shell" {
 			// For nix-shell, prepend set -e to the command
-			shellCommand = defaultShell
 			if shellCmdArgs != "" && !strings.HasPrefix(shellCmdArgs, "set -e") {
 				shellCmdArgs = "set -e; " + shellCmdArgs
 			}
-		} else if isUnixLikeShell(defaultShell) {
+		} else if isUnixLikeShell(shellCommand) {
 			// Add errexit flag for Unix-like shells
-			shellCommand = defaultShell + " -e"
-		} else {
-			shellCommand = defaultShell
+			shellCommand = shellCommand + " -e"
 		}
 	}
 

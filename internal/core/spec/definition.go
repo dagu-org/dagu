@@ -15,6 +15,10 @@ type definition struct {
 	// "chain" executes steps in the order they are defined.
 	// "agent" is reserved for future agent-based execution.
 	Type string
+	// Shell is the default shell to use for all steps in this DAG.
+	// If not specified, the system default shell is used.
+	// Can be overridden at the step level.
+	Shell string
 	// WorkingDir is working directory for DAG execution
 	WorkingDir string
 	// Dotenv is the path to the dotenv file (string or []string).

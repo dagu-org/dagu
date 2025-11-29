@@ -210,6 +210,37 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 	}
 }
 
+// Shell returns the shell command to use for this execution context.
+func (e Env) Shell(ctx context.Context) string {
+	// Shell precedence: Step shell -> DAG shell -> Global default
+	if e.Step.Shell != "" {
+		shell, err := e.EvalString(ctx, e.Step.Shell)
+		if err != nil {
+			logger.Error(ctx, "Failed to evaluate step shell",
+				tag.String("shell", e.Step.Shell),
+				tag.Error(err),
+			)
+			return ""
+		}
+		return shell
+	}
+
+	if e.DAG.Shell != "" {
+		shell, err := e.EvalString(ctx, e.DAG.Shell)
+		if err != nil {
+			logger.Error(ctx, "Failed to evaluate DAG shell",
+				tag.String("shell", e.DAG.Shell),
+				tag.Error(err),
+			)
+			return ""
+		}
+		return shell
+	}
+
+	logger.Debug(ctx, "Global default shell is not set or could not be determined")
+	return ""
+}
+
 // DAGRunRef returns the DAGRunRef for the current execution context.
 func (e Env) DAGRunRef() DAGRunRef {
 	return NewDAGRunRef(e.DAG.Name, e.DAGRunID)
@@ -268,8 +299,6 @@ func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 
 // EvalString evaluates the given string with the variables within the execution context.
 func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
-	dagEnv := GetDAGContext(ctx)
-
 	option := cmdutil.NewEvalOptions()
 	for _, opt := range opts {
 		opt(option)
@@ -289,11 +318,12 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOptio
 	// ${FOO} will be replaced with "step" in the first iteration,
 	// leaving no ${FOO} for the DAG env to replace.
 
+	dagCtx := GetDAGContext(ctx)
 	if option.ExpandEnv {
 		opts = append(opts, cmdutil.WithVariables(e.Envs))
 		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
-		opts = append(opts, cmdutil.WithVariables(dagEnv.SecretEnvs))
-		opts = append(opts, cmdutil.WithVariables(dagEnv.Envs))
+		opts = append(opts, cmdutil.WithVariables(dagCtx.SecretEnvs))
+		opts = append(opts, cmdutil.WithVariables(dagCtx.Envs))
 	} else {
 		opts = append(opts, cmdutil.WithVariables(e.Envs))
 		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))

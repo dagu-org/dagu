@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/signal"
@@ -94,6 +95,7 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "runConfig", fn: buildRunConfig},
 	{metadata: true, name: "maxActiveRuns", fn: buildMaxActiveRuns},
 	{metadata: true, name: "workerSelector", fn: buildWorkerSelector},
+	{name: "shell", fn: buildShell},
 	{name: "workingDir", fn: buildWorkingDir},
 	{name: "container", fn: buildContainer},
 	{name: "registryAuths", fn: buildRegistryAuths},
@@ -566,6 +568,20 @@ func findName(ctx BuildContext, spec *definition) string {
 		return strings.TrimSuffix(filename, filepath.Ext(filename))
 	}
 	return ""
+}
+
+func buildShell(ctx BuildContext, spec *definition, dag *core.DAG) error {
+	if spec.Shell == "" {
+		sh := cmdutil.GetShellCommand("")
+		dag.Shell = sh
+		return nil
+	}
+	if ctx.opts.Has(BuildFlagNoEval) {
+		dag.Shell = spec.Shell
+	} else {
+		dag.Shell = os.ExpandEnv(spec.Shell)
+	}
+	return nil
 }
 
 func buildWorkingDir(ctx BuildContext, spec *definition, dag *core.DAG) error {

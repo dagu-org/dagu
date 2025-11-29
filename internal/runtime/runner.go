@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
@@ -114,7 +113,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 	// If one of the conditions does not met, cancel the execution.
 	env := execution.GetDAGContext(ctx)
-	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
+	if err := EvalConditions(ctx, env.Shell, env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", tag.Error(err))
 		r.Cancel(plan)
 	}
@@ -1002,6 +1001,8 @@ func (r *Runner) shouldRepeatNode(ctx context.Context, node *Node, execErr error
 		return false
 	}
 
+	env := execution.GetEnv(ctx)
+	shell := env.Shell(ctx)
 	switch rp.RepeatMode {
 	case core.RepeatModeWhile:
 		// It's a 'while' loop. Repeat while a condition is true.
@@ -1012,7 +1013,6 @@ func (r *Runner) shouldRepeatNode(ctx context.Context, node *Node, execErr error
 				env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
 				ctx = execution.WithEnv(ctx, env)
 			}
-			shell := cmdutil.GetShellCommand(node.Step().Shell)
 			err := EvalCondition(ctx, shell, rp.Condition)
 			return (err == nil) // Repeat if condition is met (no error)
 		} else if len(rp.ExitCode) > 0 {
@@ -1032,7 +1032,6 @@ func (r *Runner) shouldRepeatNode(ctx context.Context, node *Node, execErr error
 				env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
 				ctx = execution.WithEnv(ctx, env)
 			}
-			shell := cmdutil.GetShellCommand(node.Step().Shell)
 			err := EvalCondition(ctx, shell, rp.Condition)
 			return (err != nil) // Repeat if condition is NOT met (error)
 		} else if len(rp.ExitCode) > 0 {
