@@ -11,7 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/docker/docker/api/types/container"
 	"github.com/goccy/go-yaml"
@@ -149,7 +149,7 @@ func (e *githubAction) Run(ctx context.Context) error {
 
 	// Determine the actual working directory where files should be checked out
 	// This is where the action will run and where files will persist
-	actualWorkDir := execution.GetEnv(ctx).WorkingDir
+	actualWorkDir := runtime.GetEnv(ctx).WorkingDir
 	if actualWorkDir == "" {
 		// If no dir specified, use current working directory
 		actualWorkDir, _ = os.Getwd()
@@ -212,7 +212,7 @@ func (e *githubAction) generateWorkflowYAML(ctx context.Context) (string, error)
 	}
 
 	action := strings.TrimSpace(e.step.Command)
-	env := execution.GetEnv(ctx)
+	env := runtime.GetEnv(ctx)
 
 	// Get action inputs from step.Params
 	paramsMap, err := e.step.Params.AsStringMap()
@@ -305,7 +305,7 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, tmpDir, workflow
 	}
 
 	// Get execution environment to access secrets and env vars
-	env := execution.GetEnv(ctx)
+	env := runtime.GetEnv(ctx)
 
 	// Get all user-defined environment variables (excludes OS env, includes Variables)
 	// Includes: DAG env + step env + variables from previous steps

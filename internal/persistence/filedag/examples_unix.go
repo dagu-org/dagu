@@ -1,3 +1,6 @@
+//go:build unix
+// +build unix
+
 package filedag
 
 // Example DAG templates for first-time users
@@ -22,7 +25,7 @@ type: graph # Explicitly define dependency graph
 steps:
   - name: setup
     command: echo "Setting up environment"
-    
+
   # These steps run in parallel after setup
   - name: task-a
     command: |
@@ -31,7 +34,7 @@ steps:
       echo "Task A complete"
     depends:
       - setup
-    
+
   - name: task-b
     command: |
       echo "Task B starting"
@@ -39,7 +42,7 @@ steps:
       echo "Task B complete"
     depends:
       - setup
-    
+
   - name: task-c
     command: |
       echo "Task C starting"
@@ -47,7 +50,7 @@ steps:
       echo "Task C complete"
     depends:
       - setup
-    
+
   # Wait for all parallel tasks to complete
   - name: merge-results
     command: echo "All parallel tasks completed"
@@ -97,7 +100,7 @@ name: sub-workflow
 description: Sub-workflow that gets called by main
 params:
   - TASK_ID: "000"
-  
+
 steps:
   - echo "Sub-workflow executing with TASK_ID=${TASK_ID}"
   - echo "Sub-workflow step 2"

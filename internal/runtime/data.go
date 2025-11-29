@@ -11,7 +11,6 @@ import (
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
 // Data is a thread-safe wrapper around NodeData.
@@ -203,7 +202,7 @@ func (d *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) e
 	d.inner.State.Stderr = logFile + ".err"
 	d.inner.State.StartedAt = startedAt
 
-	env := execution.GetEnv(ctx)
+	env := GetEnv(ctx)
 
 	// Evaluate the stdout field
 	stdout, err := env.EvalString(ctx, d.inner.Step.Stdout)

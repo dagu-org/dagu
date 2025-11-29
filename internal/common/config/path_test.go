@@ -20,7 +20,8 @@ func TestResolver(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		_ = os.Setenv("TEST_APP_HOME", filepath.Join(tmpDir, config.AppSlug))
-		paths := config.ResolvePaths("TEST_APP_HOME", filepath.Join(tmpDir, ".dagu"), config.XDGConfig{})
+		paths, err := config.ResolvePaths("TEST_APP_HOME", filepath.Join(tmpDir, ".dagu"), config.XDGConfig{})
+		require.NoError(t, err)
 
 		assert.Equal(t, config.Paths{
 			ConfigDir:       filepath.Join(tmpDir, config.AppSlug),
@@ -32,6 +33,22 @@ func TestResolver(t *testing.T) {
 			BaseConfigFile:  filepath.Join(tmpDir, config.AppSlug, "base.yaml"),
 		}, paths)
 	})
+	t.Run("AppHomeDirectoryRelativePath", func(t *testing.T) {
+		t.Parallel()
+
+		wd, err := os.Getwd()
+		require.NoError(t, err)
+
+		// Set a relative path
+		_ = os.Setenv("TEST_APP_HOME_REL", "tmp")
+		defer os.Unsetenv("TEST_APP_HOME_REL")
+		paths, err := config.ResolvePaths("TEST_APP_HOME_REL", "", config.XDGConfig{})
+		require.NoError(t, err)
+
+		// Should be converted to absolute path
+		expectedAbsPath := path.Join(wd, "tmp")
+		assert.Equal(t, expectedAbsPath, paths.ConfigDir)
+	})
 	t.Run("UnifiedHomeDirectory", func(t *testing.T) {
 		t.Parallel()
 		tmpDir := fileutil.MustTempDir("test")
@@ -42,7 +59,8 @@ func TestResolver(t *testing.T) {
 		err := os.MkdirAll(legacyPath, os.ModePerm)
 		require.NoError(t, err)
 
-		paths := config.ResolvePaths("UNSET_APP_HOME", legacyPath, config.XDGConfig{})
+		paths, err := config.ResolvePaths("UNSET_APP_HOME", legacyPath, config.XDGConfig{})
+		require.NoError(t, err)
 
 		assert.Equal(t, config.Paths{
 			ConfigDir:       filepath.Join(tmpDir, hiddenDir),
@@ -57,10 +75,11 @@ func TestResolver(t *testing.T) {
 	})
 	t.Run("XDGCONFIGHOME", func(t *testing.T) {
 		t.Parallel()
-		paths := config.ResolvePaths("UNSET_APP_HOME", ".test", config.XDGConfig{
+		paths, err := config.ResolvePaths("UNSET_APP_HOME", ".test", config.XDGConfig{
 			DataHome:   "/home/user/.local/share",
 			ConfigHome: "/home/user/.config",
 		})
+		require.NoError(t, err)
 		assert.Equal(t, config.Paths{
 			ConfigDir:       path.Join("/home/user/.config", config.AppSlug),
 			DAGsDir:         path.Join("/home/user/.config", config.AppSlug, "dags"),

@@ -2819,7 +2819,7 @@ func TestNewEnvWithStepInfo(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	env := runtime.NewEnv(context.Background(), core.Step{Name: "current"}, plan)
+	env := runtime.NewPlanEnv(context.Background(), core.Step{Name: "current"}, plan)
 
 	require.Len(t, env.StepMap, 2)
 	require.Contains(t, env.StepMap, "s1")

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -94,8 +93,19 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))
 
 	root := getProjectRoot(t)
-	executablePath := path.Join(root, ".local", "bin", "dagu")
+	executablePath := filepath.Join(root, ".local", "bin", "dagu")
+	if runtime.GOOS == "windows" {
+		executablePath += ".exe"
+	}
+
 	_ = os.Setenv("DAGU_EXECUTABLE", executablePath)
+
+	// on Windows, set SHELL to powershell
+	if runtime.GOOS == "windows" {
+		powershellPath, err := exec.LookPath("powershell")
+		require.NoError(t, err, "failed to find powershell in PATH")
+		require.NoError(t, os.Setenv("SHELL", powershellPath))
+	}
 
 	ctx := createDefaultContext()
 	cfg, err := config.Load()

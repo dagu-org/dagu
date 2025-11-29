@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
@@ -114,7 +113,11 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 	// If one of the conditions does not met, cancel the execution.
 	env := execution.GetDAGContext(ctx)
-	if err := EvalConditions(ctx, cmdutil.GetShellCommand(""), env.DAG.Preconditions); err != nil {
+	var shell []string
+	if env.DAG.Shell != "" {
+		shell = append([]string{env.DAG.Shell}, env.DAG.ShellArgs...)
+	}
+	if err := EvalConditions(ctx, shell, env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", tag.Error(err))
 		r.Cancel(plan)
 	}
@@ -414,7 +417,7 @@ func (r *Runner) teardownNode(node *Node) error {
 }
 
 func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) context.Context {
-	env := NewEnv(ctx, node.Step(), plan)
+	env := NewPlanEnv(ctx, node.Step(), plan)
 
 	// Load output variables from predecessor nodes (dependencies)
 	// This traverses backwards from the current node to find all nodes it depends on
@@ -470,11 +473,11 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 
 	env.ForceLoadOutputVariables(envVars)
 
-	return execution.WithEnv(ctx, env)
+	return WithEnv(ctx, env)
 }
 
 func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node *Node) context.Context {
-	env := NewEnv(ctx, node.Step(), plan)
+	env := NewPlanEnv(ctx, node.Step(), plan)
 	env.Envs[execution.EnvKeyDAGRunStatus] = r.Status(ctx, plan).String()
 
 	// get all output variables
@@ -486,7 +489,7 @@ func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node 
 		env.LoadOutputVariables(node.inner.State.OutputVariables)
 	}
 
-	return execution.WithEnv(ctx, env)
+	return WithEnv(ctx, env)
 }
 
 func (r *Runner) execNode(ctx context.Context, node *Node) error {
@@ -1002,17 +1005,18 @@ func (r *Runner) shouldRepeatNode(ctx context.Context, node *Node, execErr error
 		return false
 	}
 
+	env := GetEnv(ctx)
+	shell := env.Shell(ctx)
 	switch rp.RepeatMode {
 	case core.RepeatModeWhile:
 		// It's a 'while' loop. Repeat while a condition is true.
 		if rp.Condition != nil {
 			// Ensure node's own output variables are reloaded before evaluating the condition.
 			if node.inner.State.OutputVariables != nil {
-				env := execution.GetEnv(ctx)
+				env := GetEnv(ctx)
 				env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
-				ctx = execution.WithEnv(ctx, env)
+				ctx = WithEnv(ctx, env)
 			}
-			shell := cmdutil.GetShellCommand(node.Step().Shell)
 			err := EvalCondition(ctx, shell, rp.Condition)
 			return (err == nil) // Repeat if condition is met (no error)
 		} else if len(rp.ExitCode) > 0 {
@@ -1028,11 +1032,10 @@ func (r *Runner) shouldRepeatNode(ctx context.Context, node *Node, execErr error
 		if rp.Condition != nil {
 			// Ensure node's own output variables are reloaded before evaluating the condition.
 			if node.inner.State.OutputVariables != nil {
-				env := execution.GetEnv(ctx)
+				env := GetEnv(ctx)
 				env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
-				ctx = execution.WithEnv(ctx, env)
+				ctx = WithEnv(ctx, env)
 			}
-			shell := cmdutil.GetShellCommand(node.Step().Shell)
 			err := EvalCondition(ctx, shell, rp.Condition)
 			return (err != nil) // Repeat if condition is NOT met (error)
 		} else if len(rp.ExitCode) > 0 {
@@ -1085,8 +1088,8 @@ func calculateBackoffInterval(interval time.Duration, backoff float64, maxInterv
 	return interval
 }
 
-func NewEnv(ctx context.Context, step core.Step, plan *Plan) execution.Env {
-	env := execution.NewEnv(ctx, step)
+func NewPlanEnv(ctx context.Context, step core.Step, plan *Plan) Env {
+	env := NewEnvForStep(ctx, step)
 	for _, n := range plan.Nodes() {
 		if n.Step().ID != "" {
 			env.StepMap[n.Step().ID] = n.StepInfo()

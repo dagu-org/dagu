@@ -44,6 +44,14 @@ type DAG struct {
 	Name string `json:"name,omitempty"`
 	// Type is the execution type (graph, chain, or agent). Default is graph.
 	Type string `json:"type,omitempty"`
+	// Shell is the default shell to use for all steps in this DAG.
+	// If not specified, the system default shell is used.
+	// Can be overridden at the step level.
+	Shell string `json:"shell,omitempty"`
+	// ShellArgs contains additional arguments to pass to the shell.
+	// These are populated when Shell is specified as a string with arguments
+	// (e.g., "bash -e") or as an array (e.g., ["bash", "-e"]).
+	ShellArgs []string `json:"shellArgs,omitempty"`
 	// Dotenv is the path to the dotenv file. This is optional.
 	Dotenv []string `json:"dotenv,omitempty"`
 	// Tags contains the list of tags for the DAG. This is optional.

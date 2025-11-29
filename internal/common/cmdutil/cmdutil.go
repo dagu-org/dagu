@@ -60,22 +60,6 @@ func GetShellCommand(configuredShell string) string {
 	return ""
 }
 
-// GetShellCommandWithGlobal returns the shell to use for command execution,
-// optionally using a global default shell configuration
-func GetShellCommandWithGlobal(configuredShell, globalDefaultShell string) string {
-	if configuredShell != "" {
-		return configuredShell
-	}
-
-	// Check global configuration for default shell
-	if globalDefaultShell != "" {
-		return globalDefaultShell
-	}
-
-	// Fallback to regular logic
-	return GetShellCommand("")
-}
-
 // getWindowsDefaultShell returns the default shell for Windows systems
 func getWindowsDefaultShell() string {
 	// First check if SHELL environment variable is set (e.g., Git Bash, WSL)

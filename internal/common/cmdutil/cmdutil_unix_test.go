@@ -10,41 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetShellCommandWithGlobal(t *testing.T) {
-	tests := []struct {
-		name               string
-		configuredShell    string
-		globalDefaultShell string
-		expected           string
-	}{
-		{
-			name:               "ConfiguredShellTakesPrecedence",
-			configuredShell:    "/bin/zsh",
-			globalDefaultShell: "/bin/bash",
-			expected:           "/bin/zsh",
-		},
-		{
-			name:               "GlobalDefaultShellUsedWhenNoConfiguredShell",
-			configuredShell:    "",
-			globalDefaultShell: "/bin/bash",
-			expected:           "/bin/bash",
-		},
-		{
-			name:               "FallbackToGetShellCommandWhenBothEmpty",
-			configuredShell:    "",
-			globalDefaultShell: "",
-			expected:           GetShellCommand(""), // Should return system shell
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := GetShellCommandWithGlobal(tt.configuredShell, tt.globalDefaultShell)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestGetShellCommand_WithDAGUDefaultShell(t *testing.T) {
 	// Save original env var
 	originalShell := os.Getenv("DAGU_DEFAULT_SHELL")

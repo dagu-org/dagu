@@ -25,6 +25,10 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
+// systemVarPrefix is the prefix for temporary variables used internally by Dagu
+// to avoid conflicts with user-defined variables.
+const systemVarPrefix = "DAGU_"
+
 // Node is a node in a DAG. It executes a command.
 type Node struct {
 	Data
@@ -117,7 +121,7 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 
 	}
 
-	cacheKey := execution.SystemVariablePrefix + "CONTINUE_ON." + n.Name()
+	cacheKey := systemVarPrefix + "CONTINUE_ON." + n.Name()
 	if v, ok := n.getBoolVariable(cacheKey); ok {
 		return v
 	}
@@ -308,7 +312,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	defer n.mu.Unlock()
 
 	// Clear the cache
-	n.clearVariable(execution.SystemVariablePrefix + "CONTINUE_ON." + n.Name())
+	n.clearVariable(systemVarPrefix + "CONTINUE_ON." + n.Name())
 
 	// Reset the state
 	n.ResetError()
@@ -413,8 +417,9 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 
 	var evalOptions []cmdutil.EvalOption
 
-	shellCommand := cmdutil.GetShellCommand(n.Step().Shell)
-	if n.Step().ExecutorConfig.IsCommand() && shellCommand != "" {
+	env := GetEnv(ctx)
+	shellCommand := env.Shell(ctx)
+	if n.Step().ExecutorConfig.IsCommand() && len(shellCommand) > 0 {
 		// Command executor run commands on shell, so we don't need to expand env vars
 		evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
 	}
@@ -546,13 +551,13 @@ func (n *Node) Cancel() {
 func (n *Node) SetupEnv(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	env := execution.GetEnv(ctx)
+	env := GetEnv(ctx)
 	env = env.WithVariables(
 		execution.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
 		execution.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)
 	ctx = logger.WithValues(ctx, tag.Step(n.Name()))
-	return execution.WithEnv(ctx, env)
+	return WithEnv(ctx, env)
 }
 
 func (n *Node) Prepare(ctx context.Context, logDir string, dagRunID string) error {
@@ -904,7 +909,8 @@ func (node *Node) evalPreconditions(ctx context.Context) error {
 		return nil
 	}
 	logger.Infof(ctx, "Checking preconditions for \"%s\"", node.Name())
-	shell := cmdutil.GetShellCommand(node.Step().Shell)
+	env := GetEnv(ctx)
+	shell := env.Shell(ctx)
 	if err := EvalConditions(ctx, shell, node.Step().Preconditions); err != nil {
 		logger.Infof(ctx, "Preconditions failed for \"%s\"", node.Name())
 		return err
