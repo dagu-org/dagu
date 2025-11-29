@@ -88,6 +88,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
 	}
+	configFileUsed := viper.ConfigFileUsed()
 
 	// For backward compatibility, try merging in the "admin.yaml" config.
 	viper.SetConfigName("admin")
@@ -109,7 +110,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to build config: %w", err)
 	}
 
-	cfg.Global.ConfigFileUsed = viper.ConfigFileUsed()
+	cfg.Global.ConfigFileUsed = configFileUsed
 
 	// Attach any warnings collected during the resolution process.
 	cfg.Warnings = l.warnings
