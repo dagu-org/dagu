@@ -113,7 +113,11 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 	// If one of the conditions does not met, cancel the execution.
 	env := execution.GetDAGContext(ctx)
-	if err := EvalConditions(ctx, env.Shell, env.DAG.Preconditions); err != nil {
+	var shell []string
+	if env.DAG.Shell != "" {
+		shell = append([]string{env.DAG.Shell}, env.DAG.ShellArgs...)
+	}
+	if err := EvalConditions(ctx, shell, env.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", tag.Error(err))
 		r.Cancel(plan)
 	}

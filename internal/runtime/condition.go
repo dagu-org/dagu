@@ -21,7 +21,7 @@ const ErrMsgOtherConditionNotMet = "other condition was not met"
 
 // EvalConditions evaluates a list of conditions and checks the results.
 // It returns an error if any of the conditions were not met.
-func EvalConditions(ctx context.Context, shell string, cond []*core.Condition) error {
+func EvalConditions(ctx context.Context, shell []string, cond []*core.Condition) error {
 	var lastErr error
 
 	for i := range cond {
@@ -46,7 +46,7 @@ func EvalConditions(ctx context.Context, shell string, cond []*core.Condition) e
 
 // EvalCondition evaluates the condition and returns the actual value.
 // It returns an error if the evaluation failed or the condition is invalid.
-func EvalCondition(ctx context.Context, shell string, c *core.Condition) error {
+func EvalCondition(ctx context.Context, shell []string, c *core.Condition) error {
 	switch {
 	case c.Condition != "" && c.Expected != "":
 		return matchCondition(ctx, c)
@@ -82,19 +82,20 @@ func matchCondition(ctx context.Context, c *core.Condition) error {
 	return fmt.Errorf("%w: expected %q, got %q", ErrConditionNotMet, c.Expected, evaluatedVal)
 }
 
-func evalCommand(ctx context.Context, shell string, c *core.Condition) error {
+func evalCommand(ctx context.Context, shell []string, c *core.Condition) error {
 	commandToRun, err := EvalString(ctx, c.Condition, cmdutil.OnlyReplaceVars())
 	if err != nil {
 		return fmt.Errorf("failed to evaluate command: %w", err)
 	}
-	if shell != "" {
+	if len(shell) > 0 {
 		return runShellCommand(ctx, shell, commandToRun)
 	}
 	return runDirectCommand(ctx, commandToRun)
 }
 
-func runShellCommand(ctx context.Context, shell, commandToRun string) error {
-	cmd := exec.CommandContext(ctx, shell, "-c", commandToRun)
+func runShellCommand(ctx context.Context, shell []string, commandToRun string) error {
+	args := append(shell[1:], "-c", commandToRun)
+	cmd := exec.CommandContext(ctx, shell[0], args...)
 	_, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrConditionNotMet, err)

@@ -114,7 +114,7 @@ func TestCondition_Eval(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			ctx = execution.WithEnv(ctx, execution.NewEnv(ctx, core.Step{}))
-			err := runtime.EvalConditions(ctx, "sh", tt.condition)
+			err := runtime.EvalConditions(ctx, []string{"sh"}, tt.condition)
 			if tt.wantErr {
 				require.Error(t, err, "expected error but got nil")
 			} else {

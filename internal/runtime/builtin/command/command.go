@@ -385,21 +385,14 @@ func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) 
 // NewCommandConfig creates a new commandConfig from the given step.
 func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, error) {
 	env := execution.GetEnv(ctx)
-	shellStr := env.Shell(ctx)
-
-	// Build shell slice from shell string
-	var shell []string
-	if shellStr != "" {
-		shell = []string{shellStr}
-	}
 
 	return &commandConfig{
 		Ctx:                ctx,
-		Dir:                execution.GetEnv(ctx).WorkingDir,
+		Dir:                env.WorkingDir,
 		Command:            step.Command,
 		Args:               step.Args,
 		Script:             step.Script,
-		Shell:              shell,
+		Shell:              env.Shell(ctx),
 		ShellCommandArgs:   step.ShellCmdArgs,
 		ShellPackages:      step.ShellPackages,
 		UserSpecifiedShell: step.Shell != "",
