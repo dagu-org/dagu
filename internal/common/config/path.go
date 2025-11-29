@@ -39,24 +39,34 @@ type XDGConfig struct {
 //
 // Resolution logic:
 // 1. If the environment variable (appHomeEnv) is set, use its value and assume unified directory structure.
+//    The path is converted to an absolute path, and if different, the environment variable is updated.
 // 2. Else, if the legacyPath exists on disk, use it and emit a warning to update configuration paths.
 // 3. Otherwise, fall back to XDG-compliant defaults.
-func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) Paths {
+func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) (Paths, error) {
 	switch {
 	// Use the directory from the environment variable if available.
 	case os.Getenv(appHomeEnv) != "":
 		configDir := os.Getenv(appHomeEnv)
-		return setUnifiedPaths(configDir)
+		absConfigDir, err := filepath.Abs(configDir)
+		if err != nil {
+			return Paths{}, fmt.Errorf("failed to resolve absolute path for %s: %w", appHomeEnv, err)
+		}
+		if absConfigDir != configDir {
+			if err := os.Setenv(appHomeEnv, absConfigDir); err != nil {
+				return Paths{}, fmt.Errorf("failed to set environment variable %s: %w", appHomeEnv, err)
+			}
+		}
+		return setUnifiedPaths(absConfigDir), nil
 	// If the legacy path exists, warn and use it.
 	case fileutil.FileExists(legacyPath):
 		paths := setUnifiedPaths(legacyPath)
 		warning := fmt.Sprintf("Warning: Dagu legacy directory (%s) structure detected. This is deprecated.", legacyPath)
 		paths.Warnings = append(paths.Warnings, warning)
-		return paths
+		return paths, nil
 	// Fallback to default XDG-based paths.
 	default:
 		configDir := filepath.Join(xdg.ConfigHome, AppSlug)
-		return setXDGPaths(xdg, configDir)
+		return setXDGPaths(xdg, configDir), nil
 	}
 }
 

@@ -20,7 +20,8 @@ func TestResolver(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		_ = os.Setenv("TEST_APP_HOME", filepath.Join(tmpDir, config.AppSlug))
-		paths := config.ResolvePaths("TEST_APP_HOME", filepath.Join(tmpDir, ".dagu"), config.XDGConfig{})
+		paths, err := config.ResolvePaths("TEST_APP_HOME", filepath.Join(tmpDir, ".dagu"), config.XDGConfig{})
+		require.NoError(t, err)
 
 		assert.Equal(t, config.Paths{
 			ConfigDir:       filepath.Join(tmpDir, config.AppSlug),
@@ -32,6 +33,31 @@ func TestResolver(t *testing.T) {
 			BaseConfigFile:  filepath.Join(tmpDir, config.AppSlug, "base.yaml"),
 		}, paths)
 	})
+	t.Run("AppHomeDirectoryRelativePath", func(t *testing.T) {
+		t.Parallel()
+		tmpDir := fileutil.MustTempDir("test")
+		defer os.RemoveAll(tmpDir)
+
+		// Change to tmpDir so relative path resolves correctly
+		originalWd, err := os.Getwd()
+		require.NoError(t, err)
+		err = os.Chdir(tmpDir)
+		require.NoError(t, err)
+		defer os.Chdir(originalWd)
+
+		// Set a relative path
+		relativePath := config.AppSlug
+		_ = os.Setenv("TEST_APP_HOME_REL", relativePath)
+		paths, err := config.ResolvePaths("TEST_APP_HOME_REL", filepath.Join(tmpDir, ".dagu"), config.XDGConfig{})
+		require.NoError(t, err)
+
+		// Should be converted to absolute path
+		expectedAbsPath := filepath.Join(tmpDir, config.AppSlug)
+		assert.Equal(t, expectedAbsPath, paths.ConfigDir)
+
+		// Environment variable should be updated to absolute path
+		assert.Equal(t, expectedAbsPath, os.Getenv("TEST_APP_HOME_REL"))
+	})
 	t.Run("UnifiedHomeDirectory", func(t *testing.T) {
 		t.Parallel()
 		tmpDir := fileutil.MustTempDir("test")
@@ -42,7 +68,8 @@ func TestResolver(t *testing.T) {
 		err := os.MkdirAll(legacyPath, os.ModePerm)
 		require.NoError(t, err)
 
-		paths := config.ResolvePaths("UNSET_APP_HOME", legacyPath, config.XDGConfig{})
+		paths, err := config.ResolvePaths("UNSET_APP_HOME", legacyPath, config.XDGConfig{})
+		require.NoError(t, err)
 
 		assert.Equal(t, config.Paths{
 			ConfigDir:       filepath.Join(tmpDir, hiddenDir),
@@ -57,10 +84,11 @@ func TestResolver(t *testing.T) {
 	})
 	t.Run("XDGCONFIGHOME", func(t *testing.T) {
 		t.Parallel()
-		paths := config.ResolvePaths("UNSET_APP_HOME", ".test", config.XDGConfig{
+		paths, err := config.ResolvePaths("UNSET_APP_HOME", ".test", config.XDGConfig{
 			DataHome:   "/home/user/.local/share",
 			ConfigHome: "/home/user/.config",
 		})
+		require.NoError(t, err)
 		assert.Equal(t, config.Paths{
 			ConfigDir:       path.Join("/home/user/.config", config.AppSlug),
 			DAGsDir:         path.Join("/home/user/.config", config.AppSlug, "dags"),
