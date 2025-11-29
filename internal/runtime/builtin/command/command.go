@@ -40,7 +40,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	e.mu.Lock()
 
 	if e.config.Script != "" {
-		scriptFile, err := setupScript(ctx, e.config.Dir, e.config.Script)
+		scriptFile, err := setupScript(ctx, e.config.Dir, e.config.Script, e.config.ShellCommand)
 		if err != nil {
 			e.mu.Unlock()
 			return fmt.Errorf("failed to setup script: %w", err)
@@ -424,8 +424,12 @@ func isUnixLikeShell(shell string) bool {
 	}
 }
 
-func setupScript(_ context.Context, workDir, script string) (string, error) {
-	file, err := os.CreateTemp(workDir, "dagu_script-")
+func setupScript(_ context.Context, workDir, script, shellCommand string) (string, error) {
+	// Determine file extension based on shell
+	ext := cmdutil.GetScriptExtension(shellCommand)
+	pattern := "dagu_script-*" + ext
+
+	file, err := os.CreateTemp(workDir, pattern)
 	if err != nil {
 		return "", fmt.Errorf("failed to create script file: %w", err)
 	}

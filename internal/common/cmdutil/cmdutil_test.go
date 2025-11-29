@@ -619,3 +619,153 @@ func TestSplitCommandShellOperators(t *testing.T) {
 		})
 	}
 }
+
+// TestGetScriptExtension tests file extension detection for different shells
+func TestGetScriptExtension(t *testing.T) {
+	tests := []struct {
+		name         string
+		shellCommand string
+		want         string
+	}{
+		// PowerShell Core (pwsh)
+		{
+			name:         "PwshSimple",
+			shellCommand: "pwsh",
+			want:         ".ps1",
+		},
+		{
+			name:         "PwshWithArgs",
+			shellCommand: "pwsh -NoProfile",
+			want:         ".ps1",
+		},
+		{
+			name:         "PwshExe",
+			shellCommand: "pwsh.exe",
+			want:         ".ps1",
+		},
+		{
+			name:         "PwshFullPathNoSpaces",
+			shellCommand: "C:\\PowerShell\\pwsh.exe",
+			want:         ".ps1",
+		},
+		{
+			name:         "PwshUnixPath",
+			shellCommand: "/usr/bin/pwsh",
+			want:         ".ps1",
+		},
+		// Windows PowerShell
+		{
+			name:         "PowerShellSimple",
+			shellCommand: "powershell",
+			want:         ".ps1",
+		},
+		{
+			name:         "PowerShellExe",
+			shellCommand: "powershell.exe",
+			want:         ".ps1",
+		},
+		{
+			name:         "PowerShellWithArgs",
+			shellCommand: "powershell.exe -ExecutionPolicy Bypass",
+			want:         ".ps1",
+		},
+		{
+			name:         "PowerShellFullPath",
+			shellCommand: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+			want:         ".ps1",
+		},
+		// Windows cmd
+		{
+			name:         "CmdSimple",
+			shellCommand: "cmd",
+			want:         ".bat",
+		},
+		{
+			name:         "CmdExe",
+			shellCommand: "cmd.exe",
+			want:         ".bat",
+		},
+		{
+			name:         "CmdWithArgs",
+			shellCommand: "cmd.exe /Q",
+			want:         ".bat",
+		},
+		{
+			name:         "CmdFullPath",
+			shellCommand: "C:\\Windows\\System32\\cmd.exe",
+			want:         ".bat",
+		},
+		// Unix shells
+		{
+			name:         "BashSimple",
+			shellCommand: "bash",
+			want:         ".sh",
+		},
+		{
+			name:         "BashWithArgs",
+			shellCommand: "bash -e",
+			want:         ".sh",
+		},
+		{
+			name:         "ShSimple",
+			shellCommand: "sh",
+			want:         ".sh",
+		},
+		{
+			name:         "ZshSimple",
+			shellCommand: "zsh",
+			want:         ".sh",
+		},
+		{
+			name:         "BashFullPath",
+			shellCommand: "/bin/bash",
+			want:         ".sh",
+		},
+		{
+			name:         "FishShell",
+			shellCommand: "fish",
+			want:         "",
+		},
+		// Edge cases
+		{
+			name:         "EmptyString",
+			shellCommand: "",
+			want:         "",
+		},
+		{
+			name:         "NixShell",
+			shellCommand: "nix-shell",
+			want:         "",
+		},
+		{
+			name:         "PythonInterpreter",
+			shellCommand: "python",
+			want:         "",
+		},
+		// Case insensitivity
+		{
+			name:         "PwshUppercase",
+			shellCommand: "PWSH",
+			want:         ".ps1",
+		},
+		{
+			name:         "PowerShellMixedCase",
+			shellCommand: "PowerShell.EXE",
+			want:         ".ps1",
+		},
+		{
+			name:         "CmdUppercase",
+			shellCommand: "CMD.EXE",
+			want:         ".bat",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetScriptExtension(tt.shellCommand)
+			if got != tt.want {
+				t.Errorf("GetScriptExtension(%q) = %q, want %q", tt.shellCommand, got, tt.want)
+			}
+		})
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -315,6 +316,32 @@ func ParsePipedCommand(cmdString string) ([][]string, error) {
 	}
 
 	return pipeline, nil
+}
+
+// GetScriptExtension returns the appropriate file extension for the given shell.
+// This is needed because some shells (like PowerShell) require specific file extensions.
+func GetScriptExtension(shellCommand string) string {
+	if shellCommand == "" {
+		return ""
+	}
+
+	// Extract just the executable name (handle full paths and arguments like "pwsh -e")
+	parts := strings.Fields(shellCommand)
+	if len(parts) == 0 {
+		return ""
+	}
+	cmdName := strings.ToLower(filepath.Base(parts[0]))
+
+	switch cmdName {
+	case "powershell.exe", "powershell", "pwsh.exe", "pwsh":
+		return ".ps1"
+	case "cmd.exe", "cmd":
+		return ".bat"
+	case "bash.exe", "bash", "sh.exe", "sh", "zsh":
+		return ".sh"
+	default:
+		return ""
+	}
 }
 
 // DetectShebang checks if the given script starts with a shebang (#!) line.
