@@ -118,7 +118,7 @@ description: Run workflow steps in a Python container
 container:
   image: python:3.13
   volumes:
-    - C:\temp\data:/data
+    - C:/temp/data:/data
 
 steps:
   # write data to a file

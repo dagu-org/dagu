@@ -11,28 +11,32 @@ import (
 	"github.com/docker/go-connections/nat"
 )
 
+// volumeSpec represents a parsed volume specification
+type volumeSpec struct {
+	Source string
+	Target string
+	Mode   string // "ro", "rw", or empty (defaults to rw)
+}
+
 // parseVolumes parses volume specifications into bind mounts and volume mounts
 func parseVolumes(workDir string, volumes []string) ([]string, []mount.Mount, error) {
 	var binds []string
 	var mounts []mount.Mount
 
 	for _, vol := range volumes {
-		parts := strings.Split(vol, ":")
-		if len(parts) < 2 || len(parts) > 3 {
-			return nil, nil, fmt.Errorf("%w: %s", ErrInvalidVolumeFormat, vol)
+		spec, err := parseVolumeSpec(vol)
+		if err != nil {
+			return nil, nil, err
 		}
 
-		source := parts[0]
-		target := parts[1]
+		source := spec.Source
+		target := spec.Target
 		readOnly := false
 
-		// Check for read-only flag
-		if len(parts) == 3 {
-			if parts[2] == "ro" {
-				readOnly = true
-			} else if parts[2] != "rw" {
-				return nil, nil, fmt.Errorf("%w: invalid mode %s in %s", ErrInvalidVolumeFormat, parts[2], vol)
-			}
+		if spec.Mode == "ro" {
+			readOnly = true
+		} else if spec.Mode != "" && spec.Mode != "rw" {
+			return nil, nil, fmt.Errorf("%w: invalid mode %s in %s", ErrInvalidVolumeFormat, spec.Mode, vol)
 		}
 
 		// Determine if it's a bind mount or volume
