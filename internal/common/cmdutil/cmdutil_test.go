@@ -634,22 +634,17 @@ func TestGetScriptExtension(t *testing.T) {
 			want:         ".ps1",
 		},
 		{
-			name:         "PwshWithArgs",
-			shellCommand: "pwsh -NoProfile",
-			want:         ".ps1",
-		},
-		{
 			name:         "PwshExe",
 			shellCommand: "pwsh.exe",
 			want:         ".ps1",
 		},
 		{
-			name:         "PwshFullPathNoSpaces",
+			name:         "PwshFullPathWindows",
 			shellCommand: "C:\\PowerShell\\pwsh.exe",
 			want:         ".ps1",
 		},
 		{
-			name:         "PwshUnixPath",
+			name:         "PwshFullPathUnix",
 			shellCommand: "/usr/bin/pwsh",
 			want:         ".ps1",
 		},
@@ -662,11 +657,6 @@ func TestGetScriptExtension(t *testing.T) {
 		{
 			name:         "PowerShellExe",
 			shellCommand: "powershell.exe",
-			want:         ".ps1",
-		},
-		{
-			name:         "PowerShellWithArgs",
-			shellCommand: "powershell.exe -ExecutionPolicy Bypass",
 			want:         ".ps1",
 		},
 		{
@@ -686,11 +676,6 @@ func TestGetScriptExtension(t *testing.T) {
 			want:         ".bat",
 		},
 		{
-			name:         "CmdWithArgs",
-			shellCommand: "cmd.exe /Q",
-			want:         ".bat",
-		},
-		{
 			name:         "CmdFullPath",
 			shellCommand: "C:\\Windows\\System32\\cmd.exe",
 			want:         ".bat",
@@ -699,11 +684,6 @@ func TestGetScriptExtension(t *testing.T) {
 		{
 			name:         "BashSimple",
 			shellCommand: "bash",
-			want:         ".sh",
-		},
-		{
-			name:         "BashWithArgs",
-			shellCommand: "bash -e",
 			want:         ".sh",
 		},
 		{

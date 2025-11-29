@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -325,20 +324,26 @@ func GetScriptExtension(shellCommand string) string {
 		return ""
 	}
 
-	// Extract just the executable name (handle full paths and arguments like "pwsh -e")
-	parts := strings.Fields(shellCommand)
-	if len(parts) == 0 {
-		return ""
-	}
-	cmdName := strings.ToLower(filepath.Base(parts[0]))
+	cmdLower := strings.ToLower(shellCommand)
 
-	switch cmdName {
-	case "powershell.exe", "powershell", "pwsh.exe", "pwsh":
+	switch {
+	case strings.HasSuffix(cmdLower, "powershell.exe"),
+		strings.HasSuffix(cmdLower, "powershell"),
+		strings.HasSuffix(cmdLower, "pwsh.exe"),
+		strings.HasSuffix(cmdLower, "pwsh"):
 		return ".ps1"
-	case "cmd.exe", "cmd":
+
+	case strings.HasSuffix(cmdLower, "cmd.exe"),
+		strings.HasSuffix(cmdLower, "cmd"):
 		return ".bat"
-	case "bash.exe", "bash", "sh.exe", "sh", "zsh":
+
+	case strings.HasSuffix(cmdLower, "bash.exe"),
+		strings.HasSuffix(cmdLower, "bash"),
+		strings.HasSuffix(cmdLower, "sh.exe"),
+		strings.HasSuffix(cmdLower, "sh"),
+		strings.HasSuffix(cmdLower, "zsh"):
 		return ".sh"
+
 	default:
 		return ""
 	}
