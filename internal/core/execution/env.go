@@ -211,38 +211,41 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 }
 
 // Shell returns the shell command to use for this execution context.
-func (e Env) Shell(ctx context.Context) string {
+func (e Env) Shell(ctx context.Context) []string {
 	// Shell precedence: Step shell -> DAG shell -> Global default
 	if e.Step.Shell != "" {
-		shell, err := e.EvalString(ctx, e.Step.Shell)
+		shellCmd, err := e.EvalString(ctx, e.Step.Shell)
 		if err != nil {
 			logger.Error(ctx, "Failed to evaluate step shell",
 				tag.String("shell", e.Step.Shell),
 				tag.Error(err),
 			)
-			return ""
+			return nil
+		}
+		shell := []string{shellCmd}
+		for _, arg := range e.Step.ShellArgs {
+			evaluated, err := e.EvalString(ctx, arg)
+			if err != nil {
+				logger.Error(ctx, "Failed to evaluate step shell argument",
+					tag.String("arg", arg),
+					tag.Error(err),
+				)
+			}
+			shell = append(shell, evaluated)
 		}
 		return shell
 	}
 
 	if e.DAG.Shell != "" {
-		shell, err := e.EvalString(ctx, e.DAG.Shell)
-		if err != nil {
-			logger.Error(ctx, "Failed to evaluate DAG shell",
-				tag.String("shell", e.DAG.Shell),
-				tag.Error(err),
-			)
-			return ""
-		}
-		return shell
+		return append([]string{e.DAG.Shell}, e.DAG.ShellArgs...)
 	}
 
-	shell := cmdutil.GetShellCommand("")
-	if shell != "" {
-		return shell
+	shellCmd := cmdutil.GetShellCommand("")
+	if shellCmd != "" {
+		return []string{shellCmd}
 	}
 	logger.Debug(ctx, "Global default shell is not set or could not be determined")
-	return ""
+	return nil
 }
 
 // DAGRunRef returns the DAGRunRef for the current execution context.
