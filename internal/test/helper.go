@@ -97,6 +97,13 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	executablePath := path.Join(root, ".local", "bin", "dagu")
 	_ = os.Setenv("DAGU_EXECUTABLE", executablePath)
 
+	// on Windows, set SHELL to powershell
+	if runtime.GOOS == "windows" {
+		powershellPath, err := exec.LookPath("powershell")
+		require.NoError(t, err, "failed to find powershell in PATH")
+		require.NoError(t, os.Setenv("SHELL", powershellPath))
+	}
+
 	ctx := createDefaultContext()
 	cfg, err := config.Load()
 	require.NoError(t, err)

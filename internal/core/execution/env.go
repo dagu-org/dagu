@@ -237,6 +237,10 @@ func (e Env) Shell(ctx context.Context) string {
 		return shell
 	}
 
+	shell := cmdutil.GetShellCommand("")
+	if shell != "" {
+		return shell
+	}
 	logger.Debug(ctx, "Global default shell is not set or could not be determined")
 	return ""
 }
