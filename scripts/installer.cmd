@@ -7,39 +7,21 @@ REM This script downloads and installs the latest version of Dagu.
 REM For environments where PowerShell is not available.
 REM
 REM Usage:
-REM   installer.cmd [--version VERSION] [--install-dir PATH]
-REM
-REM Options:
-REM   --version VERSION       Install a specific version (e.g., --version v1.2.3)
-REM   --install-dir PATH      Install to a custom directory (default: %LOCALAPPDATA%\dagu)
+REM   installer.cmd [VERSION]
 REM
 REM Examples:
 REM   installer.cmd
-REM   installer.cmd --version v1.2.3
-REM   installer.cmd --install-dir "C:\tools\dagu"
+REM   installer.cmd v1.2.3
+REM   installer.cmd 1.2.3
 
 REM Default values
-set "VERSION="
+set "VERSION=%~1"
 set "INSTALL_DIR=%LOCALAPPDATA%\dagu"
 
-REM Parse command line arguments
-:parse_args
-if "%~1"=="" goto :args_done
-if /i "%~1"=="--version" (
-    set "VERSION=%~2"
-    shift
-    shift
-    goto :parse_args
+REM Add 'v' prefix if version specified without it
+if not "!VERSION!"=="" (
+    if not "!VERSION:~0,1!"=="v" set "VERSION=v!VERSION!"
 )
-if /i "%~1"=="--install-dir" (
-    set "INSTALL_DIR=%~2"
-    shift
-    shift
-    goto :parse_args
-)
-shift
-goto :parse_args
-:args_done
 
 REM Determine architecture
 set "ARCH=386"
@@ -115,8 +97,9 @@ if !ERRORLEVEL! neq 0 (
 )
 
 REM Extract archive using tar
+REM Use --force-local to prevent tar from interpreting C: as a remote host
 echo Extracting archive...
-tar -xzf "!TAR_PATH!" -C "!TEMP_DIR!"
+tar --force-local -xzf "!TAR_PATH!" -C "!TEMP_DIR!"
 if !ERRORLEVEL! neq 0 (
     echo Failed to extract the archive. >&2
     rd /s /q "!TEMP_DIR!" >nul 2>&1
