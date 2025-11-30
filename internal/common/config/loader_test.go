@@ -576,23 +576,26 @@ scheduler:
 }
 
 func TestLoad_LegacyEnv(t *testing.T) {
+	// Use temp directory for cross-platform compatibility
+	tempDir := t.TempDir()
+
 	cfg := loadWithEnv(t, "# empty", map[string]string{
 		"DAGU__ADMIN_PORT":         "1234",
 		"DAGU__ADMIN_HOST":         "0.0.0.0",
 		"DAGU__ADMIN_NAVBAR_TITLE": "LegacyTitle",
 		"DAGU__ADMIN_NAVBAR_COLOR": "#abc123",
-		"DAGU__DATA":               "/legacy/data",
-		"DAGU__SUSPEND_FLAGS_DIR":  "/legacy/suspend",
-		"DAGU__ADMIN_LOGS_DIR":     "/legacy/adminlogs",
+		"DAGU__DATA":               filepath.Join(tempDir, "legacy", "data"),
+		"DAGU__SUSPEND_FLAGS_DIR":  filepath.Join(tempDir, "legacy", "suspend"),
+		"DAGU__ADMIN_LOGS_DIR":     filepath.Join(tempDir, "legacy", "adminlogs"),
 	})
 
 	assert.Equal(t, 1234, cfg.Server.Port)
 	assert.Equal(t, "0.0.0.0", cfg.Server.Host)
 	assert.Equal(t, "LegacyTitle", cfg.UI.NavbarTitle)
 	assert.Equal(t, "#abc123", cfg.UI.NavbarColor)
-	assert.Equal(t, "/legacy/data", cfg.Paths.DataDir)
-	assert.Equal(t, "/legacy/suspend", cfg.Paths.SuspendFlagsDir)
-	assert.Equal(t, "/legacy/adminlogs", cfg.Paths.AdminLogsDir)
+	assert.Equal(t, filepath.Join(tempDir, "legacy", "data"), cfg.Paths.DataDir)
+	assert.Equal(t, filepath.Join(tempDir, "legacy", "suspend"), cfg.Paths.SuspendFlagsDir)
+	assert.Equal(t, filepath.Join(tempDir, "legacy", "adminlogs"), cfg.Paths.AdminLogsDir)
 }
 
 func TestLoad_LoadLegacyFields(t *testing.T) {
@@ -601,20 +604,24 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 
 	t.Run("AllFieldsSet", func(t *testing.T) {
 		t.Parallel()
+		// Use temp directory for cross-platform compatibility
+		tempDir := t.TempDir()
+		testPaths := filepath.Join(tempDir, "test")
+
 		def := Definition{
 			BasicAuthUsername:     "user",
 			BasicAuthPassword:     "pass",
 			APIBaseURL:            "/api/v1",
 			IsAuthToken:           true,
 			AuthToken:             "token123",
-			DAGs:                  "/legacy/dags",
-			DAGsDir:               "/new/dags", // Takes precedence over DAGs
-			Executable:            "/bin/dagu",
-			LogDir:                "/logs",
-			DataDir:               "/data",
-			SuspendFlagsDir:       "/suspend",
-			AdminLogsDir:          "/adminlogs",
-			BaseConfig:            "/base.yaml",
+			DAGs:                  filepath.Join(testPaths, "legacy", "dags"),
+			DAGsDir:               filepath.Join(testPaths, "new", "dags"), // Takes precedence over DAGs
+			Executable:            filepath.Join(testPaths, "bin", "dagu"),
+			LogDir:                filepath.Join(testPaths, "logs"),
+			DataDir:               filepath.Join(testPaths, "data"),
+			SuspendFlagsDir:       filepath.Join(testPaths, "suspend"),
+			AdminLogsDir:          filepath.Join(testPaths, "adminlogs"),
+			BaseConfig:            filepath.Join(testPaths, "base.yaml"),
 			LogEncodingCharset:    "iso-8859-1",
 			NavbarColor:           "#123456",
 			NavbarTitle:           "Title",
@@ -631,13 +638,13 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
 
 		// Paths - DAGsDir should take precedence over DAGs
-		assert.Equal(t, "/new/dags", cfg.Paths.DAGsDir)
-		assert.Equal(t, "/bin/dagu", cfg.Paths.Executable)
-		assert.Equal(t, "/logs", cfg.Paths.LogDir)
-		assert.Equal(t, "/data", cfg.Paths.DataDir)
-		assert.Equal(t, "/suspend", cfg.Paths.SuspendFlagsDir)
-		assert.Equal(t, "/adminlogs", cfg.Paths.AdminLogsDir)
-		assert.Equal(t, "/base.yaml", cfg.Paths.BaseConfig)
+		assert.Equal(t, filepath.Join(testPaths, "new", "dags"), cfg.Paths.DAGsDir)
+		assert.Equal(t, filepath.Join(testPaths, "bin", "dagu"), cfg.Paths.Executable)
+		assert.Equal(t, filepath.Join(testPaths, "logs"), cfg.Paths.LogDir)
+		assert.Equal(t, filepath.Join(testPaths, "data"), cfg.Paths.DataDir)
+		assert.Equal(t, filepath.Join(testPaths, "suspend"), cfg.Paths.SuspendFlagsDir)
+		assert.Equal(t, filepath.Join(testPaths, "adminlogs"), cfg.Paths.AdminLogsDir)
+		assert.Equal(t, filepath.Join(testPaths, "base.yaml"), cfg.Paths.BaseConfig)
 
 		// UI
 		assert.Equal(t, "iso-8859-1", cfg.UI.LogEncodingCharset)
@@ -648,22 +655,25 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 
 	t.Run("DAGsPrecedence", func(t *testing.T) {
 		t.Parallel()
+		// Use temp directory for cross-platform compatibility
+		tempDir := t.TempDir()
+
 		// Test that DAGsDir takes precedence over DAGs
 		def := Definition{
-			DAGs:    "/legacy/dags",
-			DAGsDir: "/new/dags",
+			DAGs:    filepath.Join(tempDir, "legacy", "dags"),
+			DAGsDir: filepath.Join(tempDir, "new", "dags"),
 		}
 		cfg := Config{}
 		loader.LoadLegacyFields(&cfg, def)
-		assert.Equal(t, "/new/dags", cfg.Paths.DAGsDir)
+		assert.Equal(t, filepath.Join(tempDir, "new", "dags"), cfg.Paths.DAGsDir)
 
 		// Test that DAGs is used when DAGsDir is not set
 		def2 := Definition{
-			DAGs: "/legacy/dags",
+			DAGs: filepath.Join(tempDir, "legacy", "dags"),
 		}
 		cfg2 := Config{}
 		loader.LoadLegacyFields(&cfg2, def2)
-		assert.Equal(t, "/legacy/dags", cfg2.Paths.DAGsDir)
+		assert.Equal(t, filepath.Join(tempDir, "legacy", "dags"), cfg2.Paths.DAGsDir)
 	})
 }
 
