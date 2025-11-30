@@ -261,4 +261,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 
 	// Check if second scheduler is running
 	require.True(t, sc2.IsRunning(), "Second scheduler should be running after first one stopped")
+
+	// Stop second scheduler to clean up
+	sc2.Stop(ctx)
 }

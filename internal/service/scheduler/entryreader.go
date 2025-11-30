@@ -207,9 +207,7 @@ func (er *entryReaderImpl) createJob(dag *core.DAG, next time.Time, schedule cro
 }
 
 func (er *entryReaderImpl) initialize(ctx context.Context) error {
-	er.lock.Lock()
-	defer er.lock.Unlock()
-
+	// Note: This method expects the caller to already hold er.lock
 	logger.Info(ctx, "Loading DAGs", tag.Dir(er.targetDir))
 	fis, err := os.ReadDir(er.targetDir)
 	if err != nil {

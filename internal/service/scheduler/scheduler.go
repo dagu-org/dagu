@@ -334,11 +334,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		}()
 
 		if s.zombieDetector != nil {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				s.zombieDetector.Stop(ctx)
-			}()
+			s.zombieDetector.Stop(ctx)
 		}
 
 		if err := s.dirLock.Unlock(); err != nil {
