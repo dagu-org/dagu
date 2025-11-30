@@ -77,7 +77,7 @@ export function StepDetailsTooltip({
             },
           },
         }
-      : {},
+      : null,
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
