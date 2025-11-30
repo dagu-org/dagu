@@ -19,8 +19,14 @@ func (er *mockJobManager) Next(_ context.Context, _ time.Time) ([]*scheduler.Sch
 	return er.Entries, nil
 }
 
-func (er *mockJobManager) Start(_ context.Context, _ chan any) error {
+func (er *mockJobManager) Init(_ context.Context) error {
 	return nil
+}
+
+func (er *mockJobManager) Start(_ context.Context) {
+}
+
+func (er *mockJobManager) Stop() {
 }
 
 var _ scheduler.Job = (*mockJob)(nil)

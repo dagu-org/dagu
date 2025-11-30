@@ -206,10 +206,16 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.startZombieDetector(ctx)
 	}()
 
-	if err := s.entryReader.Start(ctx, s.quit); err != nil {
-		logger.Error(ctx, "Failed to start entry reader", tag.Error(err))
+	if err := s.entryReader.Init(ctx); err != nil {
+		logger.Error(ctx, "Failed to initialize entry reader", tag.Error(err))
 		return err
 	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.entryReader.Start(ctx)
+	}()
 
 	logger.Info(ctx, "Scheduler started")
 
@@ -227,17 +233,23 @@ func (s *Scheduler) startZombieDetector(ctx context.Context) {
 	if s.config.Scheduler.ZombieDetectionInterval <= 0 {
 		return
 	}
+
+	// Create zombie detector while holding lock
 	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.zombieDetector = NewZombieDetector(
 		s.dagRunStore,
 		s.procStore,
 		s.config.Scheduler.ZombieDetectionInterval,
 	)
-	s.zombieDetector.Start(ctx)
+	zd := s.zombieDetector
+	s.lock.Unlock()
+
 	logger.Info(ctx, "Started zombie detector",
 		tag.Interval(s.config.Scheduler.ZombieDetectionInterval),
 	)
+
+	// Start blocks, so call it after releasing the lock
+	zd.Start(ctx)
 }
 
 func (s *Scheduler) startHeartbeat(ctx context.Context) {
@@ -302,7 +314,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 
 	s.stopOnce.Do(func() {
 		var wg sync.WaitGroup
-		wg.Add(2)
+		wg.Add(3)
 
 		close(s.quit)
 
@@ -315,6 +327,11 @@ func (s *Scheduler) Stop(ctx context.Context) {
 			defer wg.Done()
 			s.stopCron(ctx)
 		}(ctx)
+
+		go func() {
+			defer wg.Done()
+			s.entryReader.Stop()
+		}()
 
 		if s.zombieDetector != nil {
 			wg.Add(1)
