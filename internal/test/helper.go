@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
+
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -110,6 +112,10 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	}
 
 	ctx := createDefaultContext()
+	// Reset viper state to avoid leaking config file paths across tests.
+	config.WithViperLock(func() {
+		viper.Reset()
+	})
 	cfg, err := config.Load()
 	require.NoError(t, err)
 

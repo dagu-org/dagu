@@ -35,7 +35,7 @@ steps:
 		{
 			Name:        "StartDAGWithParamsAfterDash",
 			Args:        []string{"enqueue", dagEnqueueWithParams.Location, "--", "p5", "p6"},
-			ExpectedOut: []string{`1=p5 2=p6`},
+			ExpectedOut: []string{`params="[1=p5 2=p6`},
 		},
 		{
 			Name:        "EnqueueWithDAGRunID",
