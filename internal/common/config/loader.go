@@ -85,6 +85,10 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	}
 	l.warnings = append(l.warnings, warnings...)
 
+	// Resolve path environment variables to absolute paths and sync them.
+	// This ensures subprocesses see the same resolved paths.
+	syncPathEnvVars()
+
 	// Attempt to read the main config file. If not found, we proceed without error.
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -705,6 +709,45 @@ func parseWorkerLabels(labelsStr string) map[string]string {
 	}
 
 	return labels
+}
+
+// resolveAndSyncEnvPath resolves a path from an environment variable to an absolute path.
+// If the resolved path differs from the original, it updates the environment variable
+// using os.Setenv to ensure subprocesses use the same resolved path.
+func resolveAndSyncEnvPath(envKey string) string {
+	original := os.Getenv(envKey)
+	if original == "" {
+		return ""
+	}
+
+	resolved := fileutil.ResolvePathOrBlank(original)
+	if resolved != "" && resolved != original {
+		_ = os.Setenv(envKey, resolved)
+	}
+	return resolved
+}
+
+// syncPathEnvVars resolves all path-related environment variables to absolute paths
+// and updates them so subprocesses use the same resolved paths.
+// Note: DAGU_HOME is handled separately in ResolvePaths (path.go).
+func syncPathEnvVars() {
+	pathEnvVars := []string{
+		"DAGU_DAGS",
+		"DAGU_DAGS_DIR",
+		"DAGU_EXECUTABLE",
+		"DAGU_LOG_DIR",
+		"DAGU_DATA_DIR",
+		"DAGU_SUSPEND_FLAGS_DIR",
+		"DAGU_ADMIN_LOG_DIR",
+		"DAGU_BASE_CONFIG",
+		"DAGU_DAG_RUNS_DIR",
+		"DAGU_PROC_DIR",
+		"DAGU_QUEUE_DIR",
+		"DAGU_SERVICE_REGISTRY_DIR",
+	}
+	for _, envKey := range pathEnvVars {
+		resolveAndSyncEnvPath(envKey)
+	}
 }
 
 func cleanServerBasePath(s string) string {
