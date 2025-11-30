@@ -32,11 +32,15 @@ type Job interface {
 	Restart(ctx context.Context) error
 }
 
+// Clock is a function that returns the current time.
+// It can be replaced for testing purposes.
+type Clock func() time.Time
+
 type Scheduler struct {
 	runtimeManager      runtime.Manager
 	entryReader         EntryReader
 	logDir              string
-	quit                chan struct{}
+	quit                chan any
 	running             atomic.Bool
 	location            *time.Location
 	dagRunStore         execution.DAGRunStore
@@ -54,6 +58,7 @@ type Scheduler struct {
 	queueProcessor *QueueProcessor
 	stopOnce       sync.Once
 	lock           sync.Mutex
+	clock          Clock // Clock function for getting current time
 }
 
 // New creates a new Scheduler.
@@ -89,7 +94,7 @@ func New(
 	)
 	return &Scheduler{
 		logDir:          cfg.Paths.LogDir,
-		quit:            make(chan struct{}),
+		quit:            make(chan any),
 		location:        timeLoc,
 		entryReader:     er,
 		runtimeManager:  drm,
@@ -102,7 +107,14 @@ func New(
 		healthServer:    healthServer,
 		serviceRegistry: reg,
 		queueProcessor:  processor,
+		clock:           time.Now, // Default to real time
 	}, nil
+}
+
+// SetClock sets a custom clock function for testing purposes.
+// This must be called before Start().
+func (s *Scheduler) SetClock(clock Clock) {
+	s.clock = clock
 }
 
 // DisableHealthServer disables the health check server (used when running from start-all)
@@ -188,11 +200,25 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.startHeartbeat(ctx)
 	}()
 
-	s.startZombieDetector(ctx)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.startZombieDetector(ctx)
+	}()
+
+	if err := s.entryReader.Init(ctx); err != nil {
+		logger.Error(ctx, "Failed to initialize entry reader", tag.Error(err))
+		return err
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.entryReader.Start(ctx)
+	}()
 
 	logger.Info(ctx, "Scheduler started")
 
-	// Start the scheduler loop (it blocks)
 	wg.Add(1)
 	go func(ctx context.Context) {
 		defer wg.Done()
@@ -207,17 +233,23 @@ func (s *Scheduler) startZombieDetector(ctx context.Context) {
 	if s.config.Scheduler.ZombieDetectionInterval <= 0 {
 		return
 	}
+
+	// Create zombie detector while holding lock
 	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.zombieDetector = NewZombieDetector(
 		s.dagRunStore,
 		s.procStore,
 		s.config.Scheduler.ZombieDetectionInterval,
 	)
-	s.zombieDetector.Start(ctx)
+	zd := s.zombieDetector
+	s.lock.Unlock()
+
 	logger.Info(ctx, "Started zombie detector",
 		tag.Interval(s.config.Scheduler.ZombieDetectionInterval),
 	)
+
+	// Start blocks, so call it after releasing the lock
+	zd.Start(ctx)
 }
 
 func (s *Scheduler) startHeartbeat(ctx context.Context) {
@@ -240,7 +272,7 @@ func (s *Scheduler) startHeartbeat(ctx context.Context) {
 
 // cronLoop runs the main scheduler loop to invoke jobs at scheduled times.
 func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
-	tickTime := Now().Truncate(time.Minute)
+	tickTime := s.clock().Truncate(time.Minute)
 
 	timer := time.NewTimer(0)
 	defer timer.Stop()
@@ -260,7 +292,7 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 			_ = timer.Stop()
 			s.invokeJobs(ctx, tickTime)
 			tickTime = s.NextTick(tickTime)
-			timer.Reset(tickTime.Sub(Now()))
+			timer.Reset(tickTime.Sub(s.clock()))
 		}
 	}
 }
@@ -282,7 +314,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 
 	s.stopOnce.Do(func() {
 		var wg sync.WaitGroup
-		wg.Add(2)
+		wg.Add(3)
 
 		close(s.quit)
 
@@ -296,12 +328,13 @@ func (s *Scheduler) Stop(ctx context.Context) {
 			s.stopCron(ctx)
 		}(ctx)
 
+		go func() {
+			defer wg.Done()
+			s.entryReader.Stop()
+		}()
+
 		if s.zombieDetector != nil {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				s.zombieDetector.Stop(ctx)
-			}()
+			s.zombieDetector.Stop(ctx)
 		}
 
 		if err := s.dirLock.Unlock(); err != nil {
@@ -423,30 +456,4 @@ func (s *ScheduledJob) invoke(ctx context.Context) error {
 		return fmt.Errorf("unknown schedule type: %v", s.Type)
 
 	}
-}
-
-var (
-	// fixedTime is the fixed time used for testing.
-	fixedTime     time.Time
-	fixedTimeLock sync.RWMutex
-)
-
-// SetFixedTime sets the fixed time for testing.
-func SetFixedTime(t time.Time) {
-	fixedTimeLock.Lock()
-	defer fixedTimeLock.Unlock()
-
-	fixedTime = t
-}
-
-// Now returns the current time.
-func Now() time.Time {
-	fixedTimeLock.RLock()
-	defer fixedTimeLock.RUnlock()
-
-	if fixedTime.IsZero() {
-		return time.Now()
-	}
-
-	return fixedTime
 }

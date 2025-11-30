@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
+
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -30,6 +32,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 var setupLock sync.Mutex
@@ -87,6 +90,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	// Set the CI flag
 	_ = os.Setenv("CI", "true")
+	_ = os.Setenv("TZ", "UTC")
 
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
@@ -108,13 +112,26 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	}
 
 	ctx := createDefaultContext()
+	// Reset viper state to avoid leaking config file paths across tests.
+	config.WithViperLock(func() {
+		viper.Reset()
+	})
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	ctx = config.WithConfig(ctx, cfg)
-
+	cfg.Global.TZ = "UTC"
+	cfg.Global.Location = time.UTC
+	cfg.Global.TzOffsetInSec = 0
 	cfg.Paths.Executable = executablePath
 	cfg.Paths.LogDir = filepath.Join(tmpDir, "logs")
+	dataDir := filepath.Join(tmpDir, "data")
+	cfg.Paths.DataDir = dataDir
+	cfg.Paths.DAGRunsDir = filepath.Join(dataDir, "dag-runs")
+	cfg.Paths.QueueDir = filepath.Join(dataDir, "queue")
+	cfg.Paths.ProcDir = filepath.Join(dataDir, "proc")
+	cfg.Paths.ServiceRegistryDir = filepath.Join(dataDir, "service-registry")
+	cfg.Paths.SuspendFlagsDir = filepath.Join(tmpDir, "suspend-flags")
+	cfg.Paths.AdminLogsDir = filepath.Join(tmpDir, "admin-logs")
 	if options.DAGsDir != "" {
 		cfg.Paths.DAGsDir = options.DAGsDir
 	}
@@ -132,6 +149,13 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	if options.CoordinatorPort != 0 {
 		cfg.Coordinator.Port = options.CoordinatorPort
 	}
+
+	configFile := filepath.Join(tmpDir, "config.yaml")
+	writeHelperConfigFile(t, cfg, configFile)
+	cfg.Global.ConfigFileUsed = configFile
+	_ = os.Setenv("DAGU_CONFIG", configFile)
+
+	ctx = config.WithConfig(ctx, cfg)
 
 	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir), filedag.WithSkipExamples(true))
 	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
@@ -185,6 +209,114 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	t.Cleanup(helper.Cleanup)
 	return helper
+}
+
+// writeHelperConfigFile writes a minimal config file so subprocesses can rely on a stable --config path.
+func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) {
+	t.Helper()
+
+	configData := map[string]any{
+		"debug":        cfg.Global.Debug,
+		"logFormat":    cfg.Global.LogFormat,
+		"defaultShell": cfg.Global.DefaultShell,
+	}
+	if cfg.Global.TZ != "" {
+		configData["tz"] = cfg.Global.TZ
+	}
+
+	configData["paths"] = map[string]any{
+		"dagsDir":            cfg.Paths.DAGsDir,
+		"logDir":             cfg.Paths.LogDir,
+		"dataDir":            cfg.Paths.DataDir,
+		"suspendFlagsDir":    cfg.Paths.SuspendFlagsDir,
+		"adminLogsDir":       cfg.Paths.AdminLogsDir,
+		"baseConfig":         cfg.Paths.BaseConfig,
+		"dagRunsDir":         cfg.Paths.DAGRunsDir,
+		"queueDir":           cfg.Paths.QueueDir,
+		"procDir":            cfg.Paths.ProcDir,
+		"serviceRegistryDir": cfg.Paths.ServiceRegistryDir,
+		"executable":         cfg.Paths.Executable,
+	}
+
+	if cfg.Queues.Enabled || len(cfg.Queues.Config) > 0 {
+		qcfg := map[string]any{
+			"enabled": cfg.Queues.Enabled,
+		}
+		if len(cfg.Queues.Config) > 0 {
+			var configs []map[string]any
+			for _, q := range cfg.Queues.Config {
+				entry := map[string]any{"name": q.Name}
+				if q.MaxActiveRuns > 0 {
+					entry["maxActiveRuns"] = q.MaxActiveRuns
+				}
+				configs = append(configs, entry)
+			}
+			if len(configs) > 0 {
+				qcfg["config"] = configs
+			}
+		}
+		configData["queues"] = qcfg
+	}
+
+	scheduler := map[string]any{}
+	if cfg.Scheduler.Port != 0 {
+		scheduler["port"] = cfg.Scheduler.Port
+	}
+	if cfg.Scheduler.LockStaleThreshold > 0 {
+		scheduler["lockStaleThreshold"] = cfg.Scheduler.LockStaleThreshold.String()
+	}
+	if cfg.Scheduler.LockRetryInterval > 0 {
+		scheduler["lockRetryInterval"] = cfg.Scheduler.LockRetryInterval.String()
+	}
+	if cfg.Scheduler.ZombieDetectionInterval >= 0 {
+		scheduler["zombieDetectionInterval"] = cfg.Scheduler.ZombieDetectionInterval.String()
+	}
+	if len(scheduler) > 0 {
+		configData["scheduler"] = scheduler
+	}
+
+	if cfg.Coordinator.Host != "" || cfg.Coordinator.Advertise != "" || cfg.Coordinator.Port != 0 {
+		configData["coordinator"] = map[string]any{
+			"host":      cfg.Coordinator.Host,
+			"advertise": cfg.Coordinator.Advertise,
+			"port":      cfg.Coordinator.Port,
+		}
+	}
+
+	if cfg.Worker.ID != "" || cfg.Worker.MaxActiveRuns != 0 || len(cfg.Worker.Labels) > 0 {
+		configData["worker"] = map[string]any{
+			"id":            cfg.Worker.ID,
+			"maxActiveRuns": cfg.Worker.MaxActiveRuns,
+			"labels":        cfg.Worker.Labels,
+		}
+	}
+
+	ui := map[string]any{}
+	if cfg.UI.LogEncodingCharset != "" {
+		ui["logEncodingCharset"] = cfg.UI.LogEncodingCharset
+	}
+	if cfg.UI.NavbarColor != "" {
+		ui["navbarColor"] = cfg.UI.NavbarColor
+	}
+	if cfg.UI.NavbarTitle != "" {
+		ui["navbarTitle"] = cfg.UI.NavbarTitle
+	}
+	if cfg.UI.MaxDashboardPageLimit != 0 {
+		ui["maxDashboardPageLimit"] = cfg.UI.MaxDashboardPageLimit
+	}
+	if cfg.UI.DAGs.SortField != "" || cfg.UI.DAGs.SortOrder != "" {
+		ui["dags"] = map[string]any{
+			"sortField": cfg.UI.DAGs.SortField,
+			"sortOrder": cfg.UI.DAGs.SortOrder,
+		}
+	}
+	if len(ui) > 0 {
+		configData["ui"] = ui
+	}
+
+	content, err := yaml.Marshal(configData)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(configPath, content, 0600))
 }
 
 // Helper provides test utilities and configuration
