@@ -84,6 +84,14 @@ func (j *DAGRunJob) Ready(ctx context.Context, latestStatus execution.DAGRunStat
 		return nil
 	}
 
+	// Consider queued time as well, if available.
+	if latestStatus.QueuedAt != "" {
+		queuedAt, err := stringutil.ParseTime(latestStatus.QueuedAt)
+		if err == nil && queuedAt.Before(latestStartedAt) {
+			latestStartedAt = queuedAt
+		}
+	}
+
 	// Skip if the last successful run time is on or after the next scheduled time.
 	latestStartedAt = latestStartedAt.Truncate(time.Minute)
 	if latestStartedAt.After(j.Next) || j.Next.Equal(latestStartedAt) {

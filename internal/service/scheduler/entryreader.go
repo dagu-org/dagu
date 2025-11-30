@@ -26,7 +26,7 @@ import (
 // EntryReader is responsible for managing scheduled Jobs.
 type EntryReader interface {
 	// Start initializes and starts the process of managing scheduled Jobs.
-	Start(ctx context.Context, done chan any) error
+	Start(ctx context.Context, quit chan any) error
 	// Next returns the next scheduled jobs.
 	Next(ctx context.Context, now time.Time) ([]*ScheduledJob, error)
 }
@@ -69,13 +69,13 @@ func NewEntryReader(dir string, dagCli execution.DAGStore, drm runtime.Manager, 
 	}
 }
 
-func (er *entryReaderImpl) Start(ctx context.Context, done chan any) error {
+func (er *entryReaderImpl) Start(ctx context.Context, quit chan any) error {
 	if err := er.initialize(ctx); err != nil {
 		logger.Error(ctx, "Failed to initialize DAG registry", tag.Error(err))
 		return fmt.Errorf("failed to initialize DAGs: %w", err)
 	}
 
-	go er.watchDags(ctx, done)
+	go er.watchDags(ctx, quit)
 
 	return nil
 }
@@ -163,7 +163,7 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 	return nil
 }
 
-func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
+func (er *entryReaderImpl) watchDags(ctx context.Context, quit chan any) {
 	watcher := filenotify.New(time.Minute)
 
 	defer func() {
@@ -179,7 +179,7 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 
 	for {
 		select {
-		case <-done:
+		case <-quit:
 			return
 
 		case event, ok := <-watcher.Events():

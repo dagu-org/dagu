@@ -36,7 +36,7 @@ type Scheduler struct {
 	runtimeManager      runtime.Manager
 	entryReader         EntryReader
 	logDir              string
-	quit                chan struct{}
+	quit                chan any
 	running             atomic.Bool
 	location            *time.Location
 	dagRunStore         execution.DAGRunStore
@@ -89,7 +89,7 @@ func New(
 	)
 	return &Scheduler{
 		logDir:          cfg.Paths.LogDir,
-		quit:            make(chan struct{}),
+		quit:            make(chan any),
 		location:        timeLoc,
 		entryReader:     er,
 		runtimeManager:  drm,
@@ -189,6 +189,8 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	}()
 
 	s.startZombieDetector(ctx)
+
+	s.entryReader.Start(ctx, s.quit)
 
 	logger.Info(ctx, "Scheduler started")
 
