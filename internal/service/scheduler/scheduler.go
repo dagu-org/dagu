@@ -202,7 +202,10 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	s.startZombieDetector(ctx)
 
-	s.entryReader.Start(ctx, s.quit)
+	if err := s.entryReader.Start(ctx, s.quit); err != nil {
+		logger.Error(ctx, "Failed to start entry reader", tag.Error(err))
+		return err
+	}
 
 	logger.Info(ctx, "Scheduler started")
 
