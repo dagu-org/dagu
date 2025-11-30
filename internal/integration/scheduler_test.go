@@ -147,3 +147,64 @@ steps:
 	// Verify processing time is reasonable
 	require.Less(t, duration, 20*time.Second, "took too long: %v", duration)
 }
+
+// TestCronScheduleRunsTwice verifies that a DAG with */1 * * * * schedule
+// runs twice in two minutes.
+func TestCronScheduleRunsTwice(t *testing.T) {
+	t.Parallel()
+
+	// Create a temp directory for test DAGs
+	tmpDir, err := os.MkdirTemp("", "dagu-cron-test-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+
+	dagsDir := filepath.Join(tmpDir, "dags")
+	require.NoError(t, os.MkdirAll(dagsDir, 0755))
+
+	// Create a DAG with a cron schedule that runs every minute
+	dagContent := `name: cron-test
+schedule: "*/1 * * * *"
+steps:
+  - name: test-step
+    command: echo "hello"
+`
+	dagFile := filepath.Join(dagsDir, "cron-test.yaml")
+	require.NoError(t, os.WriteFile(dagFile, []byte(dagContent), 0644))
+
+	// Setup scheduler with the custom DAGs directory
+	th := test.SetupScheduler(t, test.WithDAGsDir(dagsDir))
+
+	// Create scheduler instance
+	schedulerInstance, err := th.NewSchedulerInstance(t)
+	require.NoError(t, err)
+
+	// Start the scheduler
+	ctx, cancel := context.WithCancel(th.Context)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- schedulerInstance.Start(ctx)
+	}()
+
+	// Wait for two minutes plus buffer for two cron ticks
+	time.Sleep(2*time.Minute + 3*time.Second)
+
+	// Stop the scheduler
+	schedulerInstance.Stop(ctx)
+	cancel()
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		// Timeout is acceptable for cleanup
+	}
+
+	// Verify the DAG ran at least twice
+	dag, err := spec.Load(th.Context, dagFile)
+	require.NoError(t, err)
+
+	runs := th.DAGRunMgr.ListRecentStatus(th.Context, dag.Name, 10)
+	require.GreaterOrEqual(t, len(runs), 2, "expected at least 2 DAG runs, got %d", len(runs))
+}

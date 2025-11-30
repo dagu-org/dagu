@@ -32,6 +32,10 @@ type Job interface {
 	Restart(ctx context.Context) error
 }
 
+// Clock is a function that returns the current time.
+// It can be replaced for testing purposes.
+type Clock func() time.Time
+
 type Scheduler struct {
 	runtimeManager      runtime.Manager
 	entryReader         EntryReader
@@ -54,6 +58,7 @@ type Scheduler struct {
 	queueProcessor *QueueProcessor
 	stopOnce       sync.Once
 	lock           sync.Mutex
+	clock          Clock // Clock function for getting current time
 }
 
 // New creates a new Scheduler.
@@ -102,7 +107,14 @@ func New(
 		healthServer:    healthServer,
 		serviceRegistry: reg,
 		queueProcessor:  processor,
+		clock:           time.Now, // Default to real time
 	}, nil
+}
+
+// SetClock sets a custom clock function for testing purposes.
+// This must be called before Start().
+func (s *Scheduler) SetClock(clock Clock) {
+	s.clock = clock
 }
 
 // DisableHealthServer disables the health check server (used when running from start-all)
@@ -242,7 +254,7 @@ func (s *Scheduler) startHeartbeat(ctx context.Context) {
 
 // cronLoop runs the main scheduler loop to invoke jobs at scheduled times.
 func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
-	tickTime := Now().Truncate(time.Minute)
+	tickTime := s.clock().Truncate(time.Minute)
 
 	timer := time.NewTimer(0)
 	defer timer.Stop()
@@ -262,7 +274,7 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 			_ = timer.Stop()
 			s.invokeJobs(ctx, tickTime)
 			tickTime = s.NextTick(tickTime)
-			timer.Reset(tickTime.Sub(Now()))
+			timer.Reset(tickTime.Sub(s.clock()))
 		}
 	}
 }
@@ -427,28 +439,3 @@ func (s *ScheduledJob) invoke(ctx context.Context) error {
 	}
 }
 
-var (
-	// fixedTime is the fixed time used for testing.
-	fixedTime     time.Time
-	fixedTimeLock sync.RWMutex
-)
-
-// SetFixedTime sets the fixed time for testing.
-func SetFixedTime(t time.Time) {
-	fixedTimeLock.Lock()
-	defer fixedTimeLock.Unlock()
-
-	fixedTime = t
-}
-
-// Now returns the current time.
-func Now() time.Time {
-	fixedTimeLock.RLock()
-	defer fixedTimeLock.RUnlock()
-
-	if fixedTime.IsZero() {
-		return time.Now()
-	}
-
-	return fixedTime
-}
