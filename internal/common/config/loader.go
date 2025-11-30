@@ -85,10 +85,6 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	}
 	l.warnings = append(l.warnings, warnings...)
 
-	// Resolve path environment variables to absolute paths and sync them.
-	// This ensures subprocesses see the same resolved paths.
-	syncPathEnvVars()
-
 	// Attempt to read the main config file. If not found, we proceed without error.
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -582,7 +578,7 @@ func bindEnvironmentVariables() {
 	bindEnv("headless", "HEADLESS")
 
 	// Global configurations
-	bindEnv("workDir", "WORK_DIR")
+	bindEnv("workDir", "WORK_DIR", asPath())
 	bindEnv("defaultShell", "DEFAULT_SHELL")
 	bindEnv("skipExamples", "SKIP_EXAMPLES")
 
@@ -628,18 +624,18 @@ func bindEnvironmentVariables() {
 	bindEnv("tls.keyFile", "KEY_FILE")
 
 	// File paths
-	bindEnv("paths.dagsDir", "DAGS")
-	bindEnv("paths.dagsDir", "DAGS_DIR")
-	bindEnv("paths.executable", "EXECUTABLE")
-	bindEnv("paths.logDir", "LOG_DIR")
-	bindEnv("paths.dataDir", "DATA_DIR")
-	bindEnv("paths.suspendFlagsDir", "SUSPEND_FLAGS_DIR")
-	bindEnv("paths.adminLogsDir", "ADMIN_LOG_DIR")
-	bindEnv("paths.baseConfig", "BASE_CONFIG")
-	bindEnv("paths.dagRunsDir", "DAG_RUNS_DIR")
-	bindEnv("paths.procDir", "PROC_DIR")
-	bindEnv("paths.queueDir", "QUEUE_DIR")
-	bindEnv("paths.serviceRegistryDir", "SERVICE_REGISTRY_DIR")
+	bindEnv("paths.dagsDir", "DAGS", asPath())
+	bindEnv("paths.dagsDir", "DAGS_DIR", asPath())
+	bindEnv("paths.executable", "EXECUTABLE", asPath())
+	bindEnv("paths.logDir", "LOG_DIR", asPath())
+	bindEnv("paths.dataDir", "DATA_DIR", asPath())
+	bindEnv("paths.suspendFlagsDir", "SUSPEND_FLAGS_DIR", asPath())
+	bindEnv("paths.adminLogsDir", "ADMIN_LOG_DIR", asPath())
+	bindEnv("paths.baseConfig", "BASE_CONFIG", asPath())
+	bindEnv("paths.dagRunsDir", "DAG_RUNS_DIR", asPath())
+	bindEnv("paths.procDir", "PROC_DIR", asPath())
+	bindEnv("paths.queueDir", "QUEUE_DIR", asPath())
+	bindEnv("paths.serviceRegistryDir", "SERVICE_REGISTRY_DIR", asPath())
 
 	// UI customization
 	bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")
@@ -667,9 +663,25 @@ func bindEnvironmentVariables() {
 	bindEnv("peer.insecure", "PEER_INSECURE")
 }
 
-func bindEnv(key, env string) {
+type bindEnvOption func(fullEnv string)
+
+func asPath() bindEnvOption {
+	return func(fullEnv string) {
+		if val := os.Getenv(fullEnv); val != "" {
+			if abs, err := filepath.Abs(val); err == nil && abs != val {
+				_ = os.Setenv(fullEnv, abs)
+			}
+		}
+	}
+}
+
+func bindEnv(key, env string, opts ...bindEnvOption) {
 	prefix := strings.ToUpper(AppSlug) + "_"
-	_ = viper.BindEnv(key, prefix+env)
+	fullEnv := prefix + env
+	for _, opt := range opts {
+		opt(fullEnv)
+	}
+	_ = viper.BindEnv(key, fullEnv)
 }
 
 func configureViper(configDir, configFile string) {
@@ -709,45 +721,6 @@ func parseWorkerLabels(labelsStr string) map[string]string {
 	}
 
 	return labels
-}
-
-// resolveAndSyncEnvPath resolves a path from an environment variable to an absolute path.
-// If the resolved path differs from the original, it updates the environment variable
-// using os.Setenv to ensure subprocesses use the same resolved path.
-func resolveAndSyncEnvPath(envKey string) string {
-	original := os.Getenv(envKey)
-	if original == "" {
-		return ""
-	}
-
-	resolved := fileutil.ResolvePathOrBlank(original)
-	if resolved != "" && resolved != original {
-		_ = os.Setenv(envKey, resolved)
-	}
-	return resolved
-}
-
-// syncPathEnvVars resolves all path-related environment variables to absolute paths
-// and updates them so subprocesses use the same resolved paths.
-// Note: DAGU_HOME is handled separately in ResolvePaths (path.go).
-func syncPathEnvVars() {
-	pathEnvVars := []string{
-		"DAGU_DAGS",
-		"DAGU_DAGS_DIR",
-		"DAGU_EXECUTABLE",
-		"DAGU_LOG_DIR",
-		"DAGU_DATA_DIR",
-		"DAGU_SUSPEND_FLAGS_DIR",
-		"DAGU_ADMIN_LOG_DIR",
-		"DAGU_BASE_CONFIG",
-		"DAGU_DAG_RUNS_DIR",
-		"DAGU_PROC_DIR",
-		"DAGU_QUEUE_DIR",
-		"DAGU_SERVICE_REGISTRY_DIR",
-	}
-	for _, envKey := range pathEnvVars {
-		resolveAndSyncEnvPath(envKey)
-	}
 }
 
 func cleanServerBasePath(s string) string {

@@ -720,3 +720,51 @@ func TestLoad_ConfigFileUsed(t *testing.T) {
 	// Verify ConfigFileUsed is set correctly
 	assert.Equal(t, configFile, cfg.Global.ConfigFileUsed)
 }
+
+func TestBindEnv_AsPath(t *testing.T) {
+	viper.Reset()
+	defer viper.Reset()
+
+	tests := []struct {
+		name     string
+		envValue string
+		wantAbs  bool
+	}{
+		{
+			name:     "relative path gets resolved to absolute",
+			envValue: "relative/path",
+			wantAbs:  true,
+		},
+		{
+			name:     "absolute path stays absolute",
+			envValue: filepath.Join(os.TempDir(), "absolute/path"),
+			wantAbs:  true,
+		},
+		{
+			name:     "empty value stays empty",
+			envValue: "",
+			wantAbs:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			envKey := "DAGU_TEST_PATH_VAR"
+			os.Unsetenv(envKey)
+			defer os.Unsetenv(envKey)
+
+			if tt.envValue != "" {
+				os.Setenv(envKey, tt.envValue)
+			}
+
+			bindEnv("test.pathVar", "TEST_PATH_VAR", asPath())
+
+			result := os.Getenv(envKey)
+			if tt.envValue == "" {
+				assert.Empty(t, result)
+			} else if tt.wantAbs {
+				assert.True(t, filepath.IsAbs(result), "expected absolute path, got: %s", result)
+			}
+		})
+	}
+}
