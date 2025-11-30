@@ -86,6 +86,13 @@ func withConfigFlag(args []string, cfg *config.Config) []string {
 		if arg == "--config" || arg == "-c" || hasConfigInline(arg) {
 			return args
 		}
+		if args[i] == "--" {
+			// Insert config flag before passthrough args so it isn't treated as a DAG param.
+			withFlag := append([]string{}, args[:i]...)
+			withFlag = append(withFlag, "--config", cfg.Global.ConfigFileUsed)
+			withFlag = append(withFlag, args[i:]...)
+			return withFlag
+		}
 	}
 	return append(args, "--config", cfg.Global.ConfigFileUsed)
 }
