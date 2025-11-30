@@ -24,6 +24,9 @@ func TestLoad_Env(t *testing.T) {
 	err := os.WriteFile(configFile, []byte("# minimal config"), 0600)
 	require.NoError(t, err)
 
+	// Use temp directory for path-related env vars to ensure cross-platform compatibility
+	testPaths := filepath.Join(tempDir, "test")
+
 	// Define all environment variables that should be bound according to bindEnvironmentVariables()
 	testEnvs := map[string]string{
 		// Server configurations
@@ -37,7 +40,7 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_HEADLESS":     "true",
 
 		// Global configurations
-		"DAGU_WORK_DIR":      "/test/work",
+		"DAGU_WORK_DIR":      filepath.Join(testPaths, "work"),
 		"DAGU_DEFAULT_SHELL": "/bin/zsh",
 
 		// UI configurations (new keys)
@@ -52,21 +55,21 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_AUTH_TOKEN":          "test-token-123",
 
 		// TLS configurations
-		"DAGU_CERT_FILE": "/test/cert.pem",
-		"DAGU_KEY_FILE":  "/test/key.pem",
+		"DAGU_CERT_FILE": filepath.Join(testPaths, "cert.pem"),
+		"DAGU_KEY_FILE":  filepath.Join(testPaths, "key.pem"),
 
 		// File paths
-		"DAGU_DAGS_DIR":             "/test/dags",
-		"DAGU_EXECUTABLE":           "/test/bin/dagu",
-		"DAGU_LOG_DIR":              "/test/logs",
-		"DAGU_DATA_DIR":             "/test/data",
-		"DAGU_SUSPEND_FLAGS_DIR":    "/test/suspend",
-		"DAGU_ADMIN_LOG_DIR":        "/test/admin",
-		"DAGU_BASE_CONFIG":          "/test/base.yaml",
-		"DAGU_DAG_RUNS_DIR":         "/test/runs",
-		"DAGU_PROC_DIR":             "/test/proc",
-		"DAGU_QUEUE_DIR":            "/test/queue",
-		"DAGU_SERVICE_REGISTRY_DIR": "/test/service-registry",
+		"DAGU_DAGS_DIR":             filepath.Join(testPaths, "dags"),
+		"DAGU_EXECUTABLE":           filepath.Join(testPaths, "bin", "dagu"),
+		"DAGU_LOG_DIR":              filepath.Join(testPaths, "logs"),
+		"DAGU_DATA_DIR":             filepath.Join(testPaths, "data"),
+		"DAGU_SUSPEND_FLAGS_DIR":    filepath.Join(testPaths, "suspend"),
+		"DAGU_ADMIN_LOG_DIR":        filepath.Join(testPaths, "admin"),
+		"DAGU_BASE_CONFIG":          filepath.Join(testPaths, "base.yaml"),
+		"DAGU_DAG_RUNS_DIR":         filepath.Join(testPaths, "runs"),
+		"DAGU_PROC_DIR":             filepath.Join(testPaths, "proc"),
+		"DAGU_QUEUE_DIR":            filepath.Join(testPaths, "queue"),
+		"DAGU_SERVICE_REGISTRY_DIR": filepath.Join(testPaths, "service-registry"),
 
 		// UI customization
 		"DAGU_LATEST_STATUS_TODAY": "true",
@@ -158,25 +161,25 @@ func TestLoad_Env(t *testing.T) {
 				},
 			},
 			TLS: &TLSConfig{
-				CertFile: "/test/cert.pem",
-				KeyFile:  "/test/key.pem",
+				CertFile: filepath.Join(testPaths, "cert.pem"),
+				KeyFile:  filepath.Join(testPaths, "key.pem"),
 			},
 			Permissions:       map[Permission]bool{PermissionWriteDAGs: true, PermissionRunDAGs: true},
 			LatestStatusToday: true,
 			StrictValidation:  false,
 		},
 		Paths: PathsConfig{
-			DAGsDir:            "/test/dags",
-			Executable:         "/test/bin/dagu",
-			LogDir:             "/test/logs",
-			DataDir:            "/test/data",
-			SuspendFlagsDir:    "/test/suspend",
-			AdminLogsDir:       "/test/admin",
-			BaseConfig:         "/test/base.yaml",
-			DAGRunsDir:         "/test/runs",
-			ProcDir:            "/test/proc",
-			QueueDir:           "/test/queue",
-			ServiceRegistryDir: "/test/service-registry",
+			DAGsDir:            filepath.Join(testPaths, "dags"),
+			Executable:         filepath.Join(testPaths, "bin", "dagu"),
+			LogDir:             filepath.Join(testPaths, "logs"),
+			DataDir:            filepath.Join(testPaths, "data"),
+			SuspendFlagsDir:    filepath.Join(testPaths, "suspend"),
+			AdminLogsDir:       filepath.Join(testPaths, "admin"),
+			BaseConfig:         filepath.Join(testPaths, "base.yaml"),
+			DAGRunsDir:         filepath.Join(testPaths, "runs"),
+			ProcDir:            filepath.Join(testPaths, "proc"),
+			QueueDir:           filepath.Join(testPaths, "queue"),
+			ServiceRegistryDir: filepath.Join(testPaths, "service-registry"),
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
