@@ -438,4 +438,3 @@ func (s *ScheduledJob) invoke(ctx context.Context) error {
 
 	}
 }
-
