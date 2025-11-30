@@ -5,18 +5,27 @@ REM Dagu Installer Script for Windows (CMD)
 REM
 REM This script downloads and installs the latest version of Dagu.
 REM For environments where PowerShell is not available.
+REM Note: Run as Administrator to install to the default location (%ProgramFiles%\dagu)
 REM
 REM Usage:
-REM   installer.cmd [VERSION]
+REM   installer.cmd [VERSION] [INSTALL_DIR]
 REM
 REM Examples:
 REM   installer.cmd
 REM   installer.cmd v1.2.3
 REM   installer.cmd 1.2.3
+REM   installer.cmd latest "C:\tools\dagu"
+REM   installer.cmd v1.2.3 "C:\tools\dagu"
 
 REM Default values
 set "VERSION=%~1"
-set "INSTALL_DIR=%LOCALAPPDATA%\dagu"
+set "INSTALL_DIR=%~2"
+
+REM Set default install directory if not specified
+if "!INSTALL_DIR!"=="" set "INSTALL_DIR=%ProgramFiles%\dagu"
+
+REM Handle "latest" keyword
+if /i "!VERSION!"=="latest" set "VERSION="
 
 REM Add 'v' prefix if version specified without it
 if not "!VERSION!"=="" (

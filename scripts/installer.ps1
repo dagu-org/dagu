@@ -2,6 +2,7 @@
 # Dagu Installer Script for Windows (PowerShell)
 #
 # This script downloads and installs the latest version of Dagu.
+# Note: Run as Administrator to install to the default location (%ProgramFiles%\dagu)
 #
 # Usage:
 #   irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1 | iex
@@ -9,27 +10,40 @@
 # Or with version:
 #   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1))) v1.2.3
 #
+# Or with version and install directory:
+#   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1))) v1.2.3 "C:\tools\dagu"
+#
 # Examples:
-#   # Install latest version to default location (%LOCALAPPDATA%\dagu)
+#   # Install latest version to default location (%ProgramFiles%\dagu)
 #   irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1 | iex
 #
 #   # Install specific version
 #   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1))) v1.2.3
 #
+#   # Install to custom directory
+#   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1))) latest "C:\tools\dagu"
+#
 #   # Run locally
 #   .\installer.ps1
 #   .\installer.ps1 v1.2.3
+#   .\installer.ps1 v1.2.3 "C:\tools\dagu"
 #
 
 param(
     [Parameter(Position = 0)]
-    [string]$Version = ""
+    [string]$Version = "",
+
+    [Parameter(Position = 1)]
+    [string]$InstallDir = ""
 )
 
 function Install-Dagu {
     param(
         [Parameter(Position = 0)]
-        [string]$Version = ""
+        [string]$Version = "",
+
+        [Parameter(Position = 1)]
+        [string]$InstallDir = ""
     )
 
     Set-StrictMode -Version Latest
@@ -42,7 +56,9 @@ function Install-Dagu {
     $FILE_BASENAME = "dagu"
 
     # Default installation directory
-    $InstallDir = Join-Path $env:LOCALAPPDATA "dagu"
+    if (-not $InstallDir) {
+        $InstallDir = Join-Path $env:ProgramFiles "dagu"
+    }
 
     # Determine architecture
     $arch = if ([Environment]::Is64BitOperatingSystem) {
@@ -57,8 +73,8 @@ function Install-Dagu {
         "386"
     }
 
-    # Get latest version if not specified
-    if (-not $Version) {
+    # Get latest version if not specified or if "latest" is specified
+    if (-not $Version -or $Version -eq "latest") {
         Write-Output "Fetching latest version..."
         try {
             $release = Invoke-RestMethod -Uri $API_URL -ErrorAction Stop
@@ -176,4 +192,4 @@ function Install-Dagu {
 }
 
 # Run the installer
-Install-Dagu $Version
+Install-Dagu $Version $InstallDir
