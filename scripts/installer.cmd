@@ -5,7 +5,7 @@ REM Dagu Installer Script for Windows (CMD)
 REM
 REM This script downloads and installs the latest version of Dagu.
 REM For environments where PowerShell is not available.
-REM Note: Run as Administrator to install to the default location (%ProgramFiles%\dagu)
+REM Default install location: %LOCALAPPDATA%\Programs\dagu
 REM
 REM Usage:
 REM   installer.cmd [VERSION] [INSTALL_DIR]
@@ -22,7 +22,7 @@ set "VERSION=%~1"
 set "INSTALL_DIR=%~2"
 
 REM Set default install directory if not specified
-if "!INSTALL_DIR!"=="" set "INSTALL_DIR=%ProgramFiles%\dagu"
+if "!INSTALL_DIR!"=="" set "INSTALL_DIR=%LOCALAPPDATA%\Programs\dagu"
 
 REM Handle "latest" keyword
 if /i "!VERSION!"=="latest" set "VERSION="
@@ -106,10 +106,12 @@ if !ERRORLEVEL! neq 0 (
 )
 
 REM Extract archive using tar
-REM Use --force-local to prevent tar from interpreting C: as a remote host
 echo Extracting archive...
-tar --force-local -xzf "!TAR_PATH!" -C "!TEMP_DIR!"
-if !ERRORLEVEL! neq 0 (
+pushd "!TEMP_DIR!"
+tar -xzf "!TAR_FILE!"
+set "TAR_ERROR=!ERRORLEVEL!"
+popd
+if !TAR_ERROR! neq 0 (
     echo Failed to extract the archive. >&2
     rd /s /q "!TEMP_DIR!" >nul 2>&1
     exit /b 1

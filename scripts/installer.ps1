@@ -2,7 +2,7 @@
 # Dagu Installer Script for Windows (PowerShell)
 #
 # This script downloads and installs the latest version of Dagu.
-# Note: Run as Administrator to install to the default location (%ProgramFiles%\dagu)
+# Default install location: %LOCALAPPDATA%\Programs\dagu
 #
 # Usage:
 #   irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1 | iex
@@ -14,7 +14,7 @@
 #   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1))) v1.2.3 "C:\tools\dagu"
 #
 # Examples:
-#   # Install latest version to default location (%ProgramFiles%\dagu)
+#   # Install latest version to default location (%LOCALAPPDATA%\Programs\dagu)
 #   irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1 | iex
 #
 #   # Install specific version
@@ -57,7 +57,7 @@ function Install-Dagu {
 
     # Default installation directory
     if (-not $InstallDir) {
-        $InstallDir = Join-Path $env:ProgramFiles "dagu"
+        $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\dagu"
     }
 
     # Determine architecture
@@ -120,15 +120,18 @@ function Install-Dagu {
         }
 
         # Extract archive using tar (available on Windows 10 1803+)
-        # Use --force-local to prevent tar from interpreting C: as a remote host
         Write-Output "Extracting archive..."
         try {
-            $tarOutput = & tar --force-local -xzf "$tarPath" -C "$tempDir" 2>&1
+            $originalDir = Get-Location
+            Set-Location $tempDir
+            $tarOutput = & tar -xzf $tarFileName 2>&1
+            Set-Location $originalDir
             if ($LASTEXITCODE -ne 0) {
                 throw "tar extraction failed: $tarOutput"
             }
         }
         catch {
+            Set-Location $originalDir -ErrorAction SilentlyContinue
             Write-Error "Failed to extract the archive: $_"
             return
         }

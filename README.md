@@ -94,10 +94,10 @@ curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.s
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --install-dir /usr/local/bin --working-dir /var/tmp
 ```
 
-**Windows (PowerShell)** (Run as Administrator):
+**Windows (PowerShell)**:
 
 ```powershell
-# Install latest version to default location (%ProgramFiles%\dagu)
+# Install latest version to default location (%LOCALAPPDATA%\Programs\dagu)
 irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1 | iex
 
 # Install specific version
@@ -107,10 +107,10 @@ irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1 |
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1))) latest "C:\tools\dagu"
 ```
 
-**Windows (CMD)** (Run as Administrator):
+**Windows (CMD)**:
 
 ```cmd
-REM Install latest version to default location (%ProgramFiles%\dagu)
+REM Install latest version to default location (%LOCALAPPDATA%\Programs\dagu)
 curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && installer.cmd && del installer.cmd
 
 REM Install specific version
