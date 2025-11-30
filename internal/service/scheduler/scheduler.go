@@ -200,7 +200,11 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.startHeartbeat(ctx)
 	}()
 
-	s.startZombieDetector(ctx)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.startZombieDetector(ctx)
+	}()
 
 	if err := s.entryReader.Start(ctx, s.quit); err != nil {
 		logger.Error(ctx, "Failed to start entry reader", tag.Error(err))
@@ -209,7 +213,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	logger.Info(ctx, "Scheduler started")
 
-	// Start the scheduler loop (it blocks)
 	wg.Add(1)
 	go func(ctx context.Context) {
 		defer wg.Done()

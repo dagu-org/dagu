@@ -19,9 +19,7 @@ type ZombieDetector struct {
 	procStore   execution.ProcStore
 	interval    time.Duration
 	quit        chan struct{}
-	lock        sync.Mutex
 	closeOnce   sync.Once
-	wg          sync.WaitGroup
 }
 
 // NewZombieDetector creates a new zombie detector
@@ -43,17 +41,6 @@ func NewZombieDetector(
 
 // Start begins the zombie detection loop
 func (z *ZombieDetector) Start(ctx context.Context) {
-	z.lock.Lock()
-	defer z.lock.Unlock()
-
-	z.wg.Add(1)
-	go func(ctx context.Context) {
-		defer z.wg.Done()
-		z.loop(ctx)
-	}(ctx)
-}
-
-func (z *ZombieDetector) loop(ctx context.Context) {
 	var running atomic.Bool
 	ticker := time.NewTicker(z.interval)
 	defer ticker.Stop()
@@ -99,12 +86,9 @@ func (z *ZombieDetector) loop(ctx context.Context) {
 
 func (z *ZombieDetector) Stop(ctx context.Context) {
 	logger.Info(ctx, "Stopping zombie detector")
-	z.lock.Lock()
-	defer z.lock.Unlock()
 	z.closeOnce.Do(func() {
 		close(z.quit)
 	})
-	z.wg.Wait()
 }
 
 // detectAndCleanZombies finds all running DAG runs and checks if they're actually alive
