@@ -36,7 +36,7 @@ steps:
 			{
 				Name:        "DryRunDAGWithParamsAfterDash",
 				Args:        []string{"dry", dagDryWithParams.Location, "--", "p5", "p6"},
-				ExpectedOut: []string{`[1=p5 2=p6]`},
+				ExpectedOut: []string{`1=p5 2=p6`},
 			},
 		}
 

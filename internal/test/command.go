@@ -3,8 +3,10 @@ package test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +30,7 @@ func (th Command) RunCommand(t *testing.T, cmd *cobra.Command, testCase CmdTest)
 	cmdRoot.AddCommand(cmd)
 
 	// Set arguments.
-	cmdRoot.SetArgs(testCase.Args)
+	cmdRoot.SetArgs(withConfigFlag(testCase.Args, th.Config))
 
 	// Run the command
 	err := cmdRoot.ExecuteContext(th.Context)
@@ -49,7 +51,7 @@ func (th Command) RunCommandWithError(t *testing.T, cmd *cobra.Command, testCase
 	cmdRoot.AddCommand(cmd)
 
 	// Set arguments.
-	cmdRoot.SetArgs(testCase.Args)
+	cmdRoot.SetArgs(withConfigFlag(testCase.Args, th.Config))
 
 	// Run the command
 	err := cmdRoot.ExecuteContext(th.Context)
@@ -72,6 +74,24 @@ func SetupCommand(t *testing.T, opts ...HelperOption) Command {
 
 	opts = append(opts, WithCaptureLoggingOutput())
 	return Command{Helper: Setup(t, opts...)}
+}
+
+// withConfigFlag appends --config <file> unless already present.
+func withConfigFlag(args []string, cfg *config.Config) []string {
+	if cfg == nil || cfg.Global.ConfigFileUsed == "" {
+		return args
+	}
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--config" || arg == "-c" || hasConfigInline(arg) {
+			return args
+		}
+	}
+	return append(args, "--config", cfg.Global.ConfigFileUsed)
+}
+
+func hasConfigInline(arg string) bool {
+	return strings.HasPrefix(arg, "--config=") || strings.HasPrefix(arg, "-c=")
 }
 
 // CreateDAGFile creates a DAG file in the DAGsDir for command tests
