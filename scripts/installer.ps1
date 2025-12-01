@@ -50,6 +50,9 @@ function Install-Dagu {
     $ErrorActionPreference = "Stop"
     $ProgressPreference = 'SilentlyContinue'
 
+    # Ensure TLS 1.2 is used (required for GitHub API)
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
     # Constants
     $RELEASES_URL = "https://github.com/dagu-org/dagu/releases"
     $API_URL = "https://api.github.com/repos/dagu-org/dagu/releases/latest"
