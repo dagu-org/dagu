@@ -107,17 +107,17 @@ irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1 |
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1))) latest "C:\tools\dagu"
 ```
 
-**Windows (CMD)**:
+**Windows (CMD/PowerShell)**:
 
 ```cmd
 REM Install latest version to default location (%LOCALAPPDATA%\Programs\dagu)
-curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && installer.cmd && del installer.cmd
+curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && .\installer.cmd && del installer.cmd
 
 REM Install specific version
-curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && installer.cmd v1.24.0 && del installer.cmd
+curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && .\installer.cmd v1.24.0 && del installer.cmd
 
 REM Install to custom directory
-curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && installer.cmd latest "C:\tools\dagu" && del installer.cmd
+curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && .\installer.cmd latest "C:\tools\dagu" && del installer.cmd
 ```
 
 **Docker**:
