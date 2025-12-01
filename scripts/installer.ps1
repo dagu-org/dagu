@@ -162,28 +162,17 @@ function Install-Dagu {
         # Check if install directory is in PATH
         $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
         if ($userPath -notlike "*$InstallDir*") {
+            # Add to PATH automatically (persistent for new terminals)
+            $newPath = if ($userPath) { "$userPath;$InstallDir" } else { $InstallDir }
+            [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
             Write-Output ""
-            Write-Output "Warning: $InstallDir is not in your PATH."
-            Write-Output ""
-            Write-Output "To add it to your PATH, run the following command:"
-            Write-Output ""
-            Write-Output "  `$env:Path += `";$InstallDir`""
-            Write-Output "  [Environment]::SetEnvironmentVariable('Path', `$env:Path + ';$InstallDir', 'User')"
-            Write-Output ""
-            Write-Output "Or add it manually via System Properties > Environment Variables."
-            Write-Output ""
+            Write-Output "Added $InstallDir to your PATH."
+        }
 
-            # Only prompt if running interactively (not piped)
-            if ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
-                $response = Read-Host "Would you like to add Dagu to your PATH automatically? (y/N)"
-                if ($response -eq 'y' -or $response -eq 'Y') {
-                    $newPath = $userPath + ";" + $InstallDir
-                    [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-                    $env:Path = $env:Path + ";" + $InstallDir
-                    Write-Output "Added $InstallDir to your PATH."
-                    Write-Output "Please restart your terminal for the changes to take effect."
-                }
-            }
+        # Update current session PATH
+        $currentPath = [Environment]::GetEnvironmentVariable("Path", "Process")
+        if ($currentPath -notlike "*$InstallDir*") {
+            [Environment]::SetEnvironmentVariable("Path", "$currentPath;$InstallDir", "Process")
         }
 
         Write-Output ""

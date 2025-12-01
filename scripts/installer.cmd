@@ -143,18 +143,19 @@ rd /s /q "!TEMP_DIR!" >nul 2>&1
 echo.
 echo Dagu !VERSION! has been installed to: !DEST_PATH!
 
-REM Check if install directory is in PATH
-echo !PATH! | findstr /i /c:"!INSTALL_DIR!" >nul
+REM Check if install directory is in PATH and add it
+set "USER_PATH="
+for /f "tokens=2*" %%a in ('reg query "HKCU\Environment" /v Path 2^>nul') do set "USER_PATH=%%b"
+echo !USER_PATH! | findstr /i /c:"!INSTALL_DIR!" >nul
 if !ERRORLEVEL! neq 0 (
+    if "!USER_PATH!"=="" (
+        setx PATH "!INSTALL_DIR!" >nul 2>&1
+    ) else (
+        setx PATH "!USER_PATH!;!INSTALL_DIR!" >nul 2>&1
+    )
+    set "PATH=!PATH!;!INSTALL_DIR!"
     echo.
-    echo Warning: !INSTALL_DIR! is not in your PATH.
-    echo.
-    echo To add it to your PATH permanently, run the following in an Administrator prompt:
-    echo.
-    echo   setx PATH "%%PATH%%;!INSTALL_DIR!"
-    echo.
-    echo Or add it manually via System Properties ^> Environment Variables.
-    echo.
+    echo Added !INSTALL_DIR! to your PATH.
 )
 
 echo.
