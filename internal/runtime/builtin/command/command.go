@@ -67,6 +67,14 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 
 	e.cmd = cmd
 
+	// Ensure the working directory exists
+	if cmd.Dir != "" {
+		if err := os.MkdirAll(cmd.Dir, 0755); err != nil {
+			e.mu.Unlock()
+			return fmt.Errorf("failed to create working directory: %w", err)
+		}
+	}
+
 	if err := e.cmd.Start(); err != nil {
 		e.exitCode = exitCodeFromError(err)
 		e.mu.Unlock()

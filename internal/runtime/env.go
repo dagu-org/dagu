@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -98,58 +99,7 @@ func (e Env) UserEnvsMap() map[string]string {
 // NewEnvForStep creates a new execution context with the given step.
 func NewEnvForStep(ctx context.Context, step core.Step) Env {
 	parentEnv := execution.GetDAGContext(ctx)
-	parentDAG := parentEnv.DAG
-
-	var workingDir string
-
-	switch {
-	case step.Dir != "":
-		// Expand environment variables in step.Dir using DAG env vars
-		// Since we no longer use os.Setenv, we need to manually expand using dag.Env
-		expandedDir := os.Expand(step.Dir, func(key string) string {
-			// Check DAG-level env vars
-			if parentDAG != nil {
-				for _, env := range parentDAG.Env {
-					if len(env) > len(key)+1 && env[:len(key)] == key && env[len(key)] == '=' {
-						return env[len(key)+1:]
-					}
-				}
-			}
-			// Fall back to process environment
-			return os.Getenv(key)
-		})
-
-		dir, err := fileutil.ResolvePath(expandedDir)
-		if err != nil {
-			logger.Warn(ctx, "Failed to resolve working directory for step",
-				tag.Step(step.Name),
-				tag.Dir(expandedDir),
-				tag.Error(err),
-			)
-		}
-		workingDir = dir
-
-	case parentDAG != nil && parentDAG.WorkingDir != "":
-		workingDir = parentDAG.WorkingDir
-
-	default:
-		// Use the current working directory if not specified
-		if wd, err := os.Getwd(); err == nil {
-			workingDir = wd
-		} else {
-			logger.Error(ctx, "Failed to get current working directory",
-				tag.Error(err),
-			)
-		}
-		// If still empty, fallback to home directory
-		if dir, err := os.UserHomeDir(); err == nil {
-			workingDir = dir
-		} else {
-			logger.Error(ctx, "Failed to get user home directory",
-				tag.Error(err),
-			)
-		}
-	}
+	workingDir := resolveStepWorkingDir(ctx, step, parentEnv)
 
 	envs := map[string]string{
 		execution.EnvKeyDAGRunStepName: step.Name,
@@ -174,6 +124,77 @@ func NewEnvForStep(ctx context.Context, step core.Step) Env {
 		StepMap:    make(map[string]cmdutil.StepInfo),
 		WorkingDir: workingDir,
 	}
+}
+
+func resolveStepWorkingDir(ctx context.Context, step core.Step, parentEnv execution.DAGContext) string {
+	parentDAG := parentEnv.DAG
+
+	if step.Dir != "" {
+		// Expand environment variables in step.Dir using DAG env vars
+		// Since we no longer use os.Setenv, we need to manually expand using dag.Env
+		expandedDir := os.Expand(step.Dir, func(key string) string {
+			// Check DAG-level env vars
+			if parentDAG != nil {
+				for _, env := range parentDAG.Env {
+					if len(env) > len(key)+1 && env[:len(key)] == key && env[len(key)] == '=' {
+						return env[len(key)+1:]
+					}
+				}
+			}
+			// Fall back to process environment
+			return os.Getenv(key)
+		})
+
+		if filepath.IsAbs(expandedDir) || strings.HasPrefix(expandedDir, "~") {
+			dir, err := fileutil.ResolvePath(expandedDir)
+			if err != nil {
+				logger.Warn(ctx, "Failed to resolve working directory for step",
+					tag.Step(step.Name),
+					tag.Dir(expandedDir),
+					tag.Error(err),
+				)
+			}
+			return dir
+		} else if parentDAG != nil && parentDAG.WorkingDir != "" {
+			// use relative path to the DAG's working dir
+			return filepath.Clean(filepath.Join(parentDAG.WorkingDir, expandedDir))
+		} else {
+			// This should not happen normally
+			logger.Warn(ctx, "Failed to resolve working directory for step",
+				tag.Step(step.Name),
+				tag.Dir(expandedDir),
+			)
+			return expandedDir
+		}
+
+	}
+
+	// Use the DAG level working directory if not specified
+	if parentDAG != nil && parentDAG.WorkingDir != "" {
+		return parentDAG.WorkingDir
+	}
+
+	// This should not occur on normal execution
+	logger.Warn(ctx, "Failed to resolve working directory for step",
+		tag.Step(step.Name),
+	)
+
+	if wd, err := os.Getwd(); err == nil {
+		return wd
+	} else {
+		logger.Error(ctx, "Failed to get current working directory",
+			tag.Error(err),
+		)
+	}
+
+	// If still empty, fallback to home directory
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		logger.Error(ctx, "Failed to get user home directory",
+			tag.Error(err),
+		)
+	}
+	return dir
 }
 
 // Shell returns the shell command to use for this execution context.
