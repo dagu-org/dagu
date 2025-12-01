@@ -4,19 +4,13 @@
  * @module features/dags/components/dag-details
  */
 import { CommandDisplay } from '@/components/ui/command-display';
+import { ScriptBadge } from '@/components/ui/script-dialog';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
-  ArrowRight,
-  FileText,
-  Folder,
-  GitBranch,
-  Mail,
-  RefreshCw,
-} from 'lucide-react';
+import { ArrowRight, Folder, GitBranch, Mail, RefreshCw } from 'lucide-react';
 import { components } from '../../../../api/v2/schema';
 import { Badge } from '../../../../components/ui/badge';
 import { TableCell, TableRow } from '../../../../components/ui/table';
@@ -99,12 +93,7 @@ function DAGStepTableRow({ step, index }: Props) {
 
           {/* Script */}
           {step.script && (
-            <div className="flex items-center gap-1.5 text-xs bg-amber-50 dark:bg-amber-900/10 rounded-md px-1.5 py-0.5 w-fit">
-              <FileText className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-              <span className="font-medium text-amber-600 dark:text-amber-400">
-                Script defined
-              </span>
-            </div>
+            <ScriptBadge script={step.script} stepName={step.name} />
           )}
 
           {/* Directory */}
