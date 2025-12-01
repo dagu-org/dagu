@@ -45,6 +45,7 @@ func init() {
 	rootCmd.AddCommand(cmd.Retry())
 	rootCmd.AddCommand(cmd.StartAll())
 	rootCmd.AddCommand(cmd.Migrate())
+	rootCmd.AddCommand(cmd.Mcp())
 
 	config.Version = version
 }
