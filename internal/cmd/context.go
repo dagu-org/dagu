@@ -29,6 +29,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/frontend"
+	"github.com/dagu-org/dagu/internal/service/mcpserver"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -229,6 +230,11 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	de := scheduler.NewDAGExecutor(coordinatorCli, runtime.NewSubCmdBuilder(c.Config))
 	m := scheduler.NewEntryReader(c.Config.Paths.DAGsDir, dr, c.DAGRunMgr, de, c.Config.Paths.Executable)
 	return scheduler.New(c.Config, m, c.DAGRunMgr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli)
+}
+
+// NewMcpServer creates a new NewMcpServer instance
+func (c *Context) NewMcpServer() (*mcpserver.MCPServer, error) {
+	return &mcpserver.MCPServer{}, nil
 }
 
 // StringParam retrieves a string parameter from the command line flags.
