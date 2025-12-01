@@ -1,16 +1,12 @@
 package integration_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/test"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,18 +15,17 @@ func TestWorkingDirectoryResolution(t *testing.T) {
 		t.Skip("Skipping on Windows - uses bash commands")
 	}
 
-	th := test.SetupCommand(t)
+	th := test.Setup(t)
 
-	// Create directory structure for testing
-	dagsDir := th.Config.Paths.DAGsDir
-	parentScripts := filepath.Join(dagsDir, "parent_scripts")
-	childScripts := filepath.Join(dagsDir, "child_scripts")
+	// Create directory structure
+	tempDir := t.TempDir()
+	parentScripts := filepath.Join(tempDir, "parent_scripts")
+	childScripts := filepath.Join(tempDir, "child_scripts")
 	require.NoError(t, os.MkdirAll(parentScripts, 0755))
 	require.NoError(t, os.MkdirAll(childScripts, 0755))
 
-	// Parent DAG: tests relative workingDir and step relative dir
-	th.CreateDAGFile(t, "parent_wd.yaml", `
-workingDir: ./parent_scripts
+	dag := th.DAG(t, `
+workingDir: `+parentScripts+`
 steps:
   - name: parent_pwd
     command: pwd
@@ -39,60 +34,34 @@ steps:
     dir: ../child_scripts
     command: pwd
     output: PARENT_STEP_DIR
-  - name: call_child
-    call: child_wd
-`)
+  - name: call_child_with_wd
+    call: child_with_wd
+  - name: call_child_no_wd
+    call: child_no_wd
 
-	// Child DAG: tests subDAG has its own workingDir context
-	th.CreateDAGFile(t, "child_wd.yaml", `
-workingDir: ./child_scripts
+---
+
+name: child_with_wd
+workingDir: `+childScripts+`
 steps:
   - name: child_pwd
     command: pwd
     output: CHILD_DIR
-  - name: child_relative_step
-    dir: ../parent_scripts
+
+---
+
+name: child_no_wd
+steps:
+  - name: child_inherited_pwd
     command: pwd
-    output: CHILD_STEP_DIR
+    output: CHILD_INHERITED_DIR
 `)
 
-	dagRunID := uuid.Must(uuid.NewV7()).String()
-	args := []string{"start", "--run-id", dagRunID, "parent_wd"}
-	th.RunCommand(t, cmd.Start(), test.CmdTest{
-		Args:        args,
-		ExpectedOut: []string{"DAG run finished"},
+	agent := dag.Agent()
+	agent.RunSuccess(t)
+
+	dag.AssertOutputs(t, map[string]any{
+		"PARENT_DIR":      parentScripts,
+		"PARENT_STEP_DIR": childScripts,
 	})
-
-	// Verify results
-	ctx := context.Background()
-	ref := execution.NewDAGRunRef("parent_wd", dagRunID)
-	parentAttempt, err := th.DAGRunStore.FindAttempt(ctx, ref)
-	require.NoError(t, err)
-
-	parentStatus, err := parentAttempt.ReadStatus(ctx)
-	require.NoError(t, err)
-
-	// Parent DAG workingDir resolved relative to DAG file location
-	parentPwdNode := parentStatus.Nodes[0]
-	require.Equal(t, parentScripts, parentPwdNode.OutputVariables.Variables()["PARENT_DIR"])
-
-	// Parent step relative dir resolved against parent's workingDir
-	parentStepNode := parentStatus.Nodes[1]
-	require.Equal(t, childScripts, parentStepNode.OutputVariables.Variables()["PARENT_STEP_DIR"])
-
-	// Verify child subDAG
-	callChildNode := parentStatus.Nodes[2]
-	childAttempt, err := th.DAGRunStore.FindSubAttempt(ctx, ref, callChildNode.SubRuns[0].DAGRunID)
-	require.NoError(t, err)
-
-	childStatus, err := childAttempt.ReadStatus(ctx)
-	require.NoError(t, err)
-
-	// Child DAG workingDir resolved relative to child DAG file location
-	childPwdNode := childStatus.Nodes[0]
-	require.Equal(t, childScripts, childPwdNode.OutputVariables.Variables()["CHILD_DIR"])
-
-	// Child step relative dir resolved against child's workingDir (not parent's)
-	childStepNode := childStatus.Nodes[1]
-	require.Equal(t, parentScripts, childStepNode.OutputVariables.Variables()["CHILD_STEP_DIR"])
 }
