@@ -136,7 +136,7 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 	require.NoError(t, err)
 	homeTempDir := filepath.Join(homeDir, "dagu_test_workdir")
 	require.NoError(t, os.MkdirAll(homeTempDir, 0755))
-	t.Cleanup(func() { os.RemoveAll(homeTempDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(homeTempDir) })
 
 	tests := []struct {
 		name        string
