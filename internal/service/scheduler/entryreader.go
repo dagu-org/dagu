@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -23,8 +25,14 @@ import (
 
 // EntryReader is responsible for managing scheduled Jobs.
 type EntryReader interface {
-	// Start initializes and starts the process of managing scheduled Jobs.
-	Start(ctx context.Context, done chan any) error
+	// Init initializes the DAG registry by loading all DAGs from the target directory.
+	// This must be called before Start or Next.
+	Init(ctx context.Context) error
+	// Start starts watching the DAG directory for changes.
+	// This method blocks until Stop is called or context is canceled.
+	Start(ctx context.Context)
+	// Stop stops watching the DAG directory.
+	Stop()
 	// Next returns the next scheduled jobs.
 	Next(ctx context.Context, now time.Time) ([]*ScheduledJob, error)
 }
@@ -52,6 +60,9 @@ type entryReaderImpl struct {
 	dagRunMgr   runtime.Manager
 	executable  string
 	dagExecutor *DAGExecutor
+	watcher     filenotify.FileWatcher
+	quit        chan struct{}
+	closeOnce   sync.Once
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
@@ -64,17 +75,91 @@ func NewEntryReader(dir string, dagCli execution.DAGStore, drm runtime.Manager, 
 		dagRunMgr:   drm,
 		executable:  executable,
 		dagExecutor: de,
+		quit:        make(chan struct{}),
 	}
 }
 
-func (er *entryReaderImpl) Start(ctx context.Context, done chan any) error {
+func (er *entryReaderImpl) Init(ctx context.Context) error {
+	er.lock.Lock()
+	defer er.lock.Unlock()
+
 	if err := er.initialize(ctx); err != nil {
+		logger.Error(ctx, "Failed to initialize DAG registry", tag.Error(err))
 		return fmt.Errorf("failed to initialize DAGs: %w", err)
 	}
 
-	go er.watchDags(ctx, done)
+	// Create and configure the file watcher
+	er.watcher = filenotify.New(time.Minute)
+	if err := er.watcher.Add(er.targetDir); err != nil {
+		_ = er.watcher.Close()
+		return fmt.Errorf("failed to watch DAG directory %s: %w", er.targetDir, err)
+	}
 
 	return nil
+}
+
+func (er *entryReaderImpl) Start(ctx context.Context) {
+	for {
+		select {
+		case <-er.quit:
+			return
+
+		case <-ctx.Done():
+			return
+
+		case event, ok := <-er.watcher.Events():
+			if !ok {
+				return
+			}
+
+			if !fileutil.IsYAMLFile(event.Name) {
+				continue
+			}
+
+			er.lock.Lock()
+			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
+				filePath := filepath.Join(er.targetDir, filepath.Base(event.Name))
+				dag, err := spec.Load(
+					ctx,
+					filePath,
+					spec.OnlyMetadata(),
+					spec.WithoutEval(),
+					spec.SkipSchemaValidation(),
+				)
+				if err != nil {
+					logger.Error(ctx, "DAG load failed",
+						tag.Error(err),
+						tag.File(event.Name))
+				} else {
+					er.registry[filepath.Base(event.Name)] = dag
+					logger.Info(ctx, "DAG added/updated", tag.Name(filepath.Base(event.Name)))
+				}
+			}
+			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
+				delete(er.registry, filepath.Base(event.Name))
+				logger.Info(ctx, "DAG removed", tag.Name(filepath.Base(event.Name)))
+			}
+			er.lock.Unlock()
+
+		case err, ok := <-er.watcher.Errors():
+			if !ok {
+				return
+			}
+			logger.Error(ctx, "Watcher error", tag.Error(err))
+		}
+	}
+}
+
+func (er *entryReaderImpl) Stop() {
+	er.lock.Lock()
+	defer er.lock.Unlock()
+
+	er.closeOnce.Do(func() {
+		close(er.quit)
+		if er.watcher != nil {
+			_ = er.watcher.Close()
+		}
+	})
 }
 
 func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*ScheduledJob, error) {
@@ -86,6 +171,7 @@ func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Schedule
 	for _, dag := range er.registry {
 		dagName := strings.TrimSuffix(filepath.Base(dag.Location), filepath.Ext(dag.Location))
 		if er.dagStore.IsSuspended(ctx, dagName) {
+			logger.Debug(ctx, "Skipping suspended DAG", tag.DAG(dagName))
 			continue
 		}
 
@@ -121,12 +207,14 @@ func (er *entryReaderImpl) createJob(dag *core.DAG, next time.Time, schedule cro
 }
 
 func (er *entryReaderImpl) initialize(ctx context.Context) error {
-	er.lock.Lock()
-	defer er.lock.Unlock()
-
-	logger.Info(ctx, "Loading DAGs", "dir", er.targetDir)
+	// Note: This method expects the caller to already hold er.lock
+	logger.Info(ctx, "Loading DAGs", tag.Dir(er.targetDir))
 	fis, err := os.ReadDir(er.targetDir)
 	if err != nil {
+		logger.Error(ctx, "Failed to read DAG directory",
+			tag.Dir(er.targetDir),
+			tag.Error(err),
+		)
 		return err
 	}
 
@@ -141,7 +229,9 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 				spec.SkipSchemaValidation(),
 			)
 			if err != nil {
-				logger.Error(ctx, "DAG load failed", "err", err, "name", fi.Name())
+				logger.Error(ctx, "DAG load failed",
+					tag.Error(err),
+					tag.Name(fi.Name()))
 				continue
 			}
 			er.registry[fi.Name()] = dag
@@ -149,66 +239,6 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 		}
 	}
 
-	logger.Info(ctx, "DAGs loaded", "dags", strings.Join(dags, ","))
+	logger.Info(ctx, "DAGs loaded", slog.String("dags", strings.Join(dags, ",")))
 	return nil
-}
-
-func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
-	watcher, err := filenotify.New(time.Minute)
-	if err != nil {
-		logger.Error(ctx, "Watcher creation failed", "err", err)
-		return
-	}
-
-	defer func() {
-		_ = watcher.Close()
-	}()
-
-	_ = watcher.Add(er.targetDir)
-
-	for {
-		select {
-		case <-done:
-			return
-
-		case event, ok := <-watcher.Events():
-			if !ok {
-				return
-			}
-
-			if !fileutil.IsYAMLFile(event.Name) {
-				continue
-			}
-
-			er.lock.Lock()
-			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				filePath := filepath.Join(er.targetDir, filepath.Base(event.Name))
-				dag, err := spec.Load(
-					ctx,
-					filePath,
-					spec.OnlyMetadata(),
-					spec.WithoutEval(),
-					spec.SkipSchemaValidation(),
-				)
-				if err != nil {
-					logger.Error(ctx, "DAG load failed", "err", err, "file", event.Name)
-				} else {
-					er.registry[filepath.Base(event.Name)] = dag
-					logger.Info(ctx, "DAG added/updated", "name", filepath.Base(event.Name))
-				}
-			}
-			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
-				delete(er.registry, filepath.Base(event.Name))
-				logger.Info(ctx, "DAG removed", "name", filepath.Base(event.Name))
-			}
-			er.lock.Unlock()
-
-		case err, ok := <-watcher.Errors():
-			if !ok {
-				return
-			}
-			logger.Error(ctx, "Watcher error", "err", err)
-
-		}
-	}
 }

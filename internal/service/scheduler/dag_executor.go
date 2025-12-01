@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -81,10 +83,15 @@ func (e *DAGExecutor) HandleJob(
 ) error {
 	// For distributed execution with START operation, enqueue for persistence
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
+		// Enrich context with DAG and RunID for all subsequent logging
+		ctx = logger.WithValues(ctx,
+			tag.DAG(dag.Name),
+			tag.RunID(runID),
+		)
+
 		logger.Info(ctx, "Enqueueing DAG for distributed execution",
-			"dag", dag.Name,
-			"runId", runID,
-			"workerSelector", dag.WorkerSelector)
+			slog.Any("worker-selector", dag.WorkerSelector),
+		)
 
 		spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
 			DAGRunID: runID,
@@ -168,14 +175,23 @@ func (e *DAGExecutor) shouldUseDistributedExecution(dag *core.DAG) bool {
 // 2. Forward the task to the selected worker
 // 3. Track the execution status
 func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinatorv1.Task) error {
+	// Enrich context with task-related values for subsequent logging
+	ctx = logger.WithValues(ctx,
+		tag.Target(task.Target),
+		tag.RunID(task.DagRunId),
+	)
+
 	if err := e.coordinatorCli.Dispatch(ctx, task); err != nil {
+		logger.Error(ctx, "Failed to dispatch task to coordinator",
+			tag.Error(err),
+			slog.String("operation", task.Operation.String()),
+		)
 		return fmt.Errorf("failed to dispatch task: %w", err)
 	}
 
 	logger.Info(ctx, "Task dispatched to coordinator",
-		"target", task.Target,
-		"runID", task.DagRunId,
-		"operation", task.Operation.String())
+		slog.String("operation", task.Operation.String()),
+	)
 
 	return nil
 }
@@ -192,7 +208,7 @@ func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG) error {
 func (e *DAGExecutor) Close(ctx context.Context) {
 	if e.coordinatorCli != nil {
 		if err := e.coordinatorCli.Cleanup(ctx); err != nil {
-			logger.Error(ctx, "Failed to cleanup coordinator client", "err", err)
+			logger.Error(ctx, "Failed to cleanup coordinator client", tag.Error(err))
 		}
 		e.coordinatorCli = nil
 	}

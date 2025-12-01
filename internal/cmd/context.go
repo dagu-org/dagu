@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/common/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
@@ -144,6 +146,17 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 
+	// Log key configuration settings for debugging
+	logger.Debug(ctx, "Configuration loaded",
+		tag.Config(cfg.Global.ConfigFileUsed),
+		tag.Dir(cfg.Paths.DAGsDir),
+	)
+	logger.Debug(ctx, "Paths configuration",
+		slog.String("log-dir", cfg.Paths.LogDir),
+		slog.String("data-dir", cfg.Paths.DataDir),
+		slog.String("dag-runs-dir", cfg.Paths.DAGRunsDir),
+	)
+
 	return &Context{
 		Context:         ctx,
 		Command:         cmd,
@@ -195,7 +208,7 @@ func (c *Context) NewCoordinatorClient() coordinator.Client {
 	coordinatorCliCfg.Insecure = c.Config.Global.Peer.Insecure
 
 	if err := coordinatorCliCfg.Validate(); err != nil {
-		logger.Error(c.Context, "Invalid coordinator client configuration", "err", err)
+		logger.Error(c.Context, "Invalid coordinator client configuration", tag.Error(err))
 		return nil
 	}
 	return coordinator.New(c.ServiceRegistry, coordinatorCliCfg)

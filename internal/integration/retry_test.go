@@ -43,7 +43,7 @@ func TestRetryDAGAfterManualStatusUpdate(t *testing.T) {
 	args := []string{"start", "--run-id", dagRunID, "test_retry"}
 	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
-		ExpectedOut: []string{"dag-run finished"},
+		ExpectedOut: []string{"DAG run finished"},
 	})
 
 	// Verify the initial run completed successfully
@@ -72,7 +72,7 @@ func TestRetryDAGAfterManualStatusUpdate(t *testing.T) {
 	retryArgs := []string{"retry", "--run-id", dagRunID, "test_retry"}
 	th.RunCommand(t, cmd.Retry(), test.CmdTest{
 		Args:        retryArgs,
-		ExpectedOut: []string{"dag-run finished"},
+		ExpectedOut: []string{"DAG run finished"},
 	})
 
 	// The bug: The retry does not succeed even though all commands are valid

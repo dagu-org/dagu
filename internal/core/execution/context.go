@@ -22,6 +22,7 @@ type DAGContext struct {
 	Envs           map[string]string
 	SecretEnvs     map[string]string // Secret environment variables (highest priority)
 	CoordinatorCli Dispatcher
+	Shell          string // Default shell for this DAG (from DAG.Shell)
 }
 
 // UserEnvsMap returns only user-defined environment variables as a map,
@@ -49,6 +50,11 @@ func (e DAGContext) UserEnvsMap() map[string]string {
 	}
 
 	return result
+}
+
+// DAGRunRef returns the DAGRunRef for the current DAG context.
+func (e DAGContext) DAGRunRef() DAGRunRef {
+	return NewDAGRunRef(e.DAG.Name, e.DAGRunID)
 }
 
 // AllEnvs returns all environment variables as a slice of strings in "key=value" format.
@@ -158,19 +164,26 @@ func SetupDAGContext(ctx context.Context, dag *core.DAG, db Database, rootDAGRun
 		DAGRunID:       dagRunID,
 		BaseEnv:        config.GetBaseEnv(ctx),
 		CoordinatorCli: coordinatorCli,
+		Shell:          dag.Shell,
 	})
 }
 
-// GetDAGContextFromContext retrieves the DAGContext from the context.
-func GetDAGContextFromContext(ctx context.Context) DAGContext {
+// WithDAGContext returns a new context with the given DAGContext.
+// This is useful for tests that need to set up a DAGContext directly.
+func WithDAGContext(ctx context.Context, dagCtx DAGContext) context.Context {
+	return context.WithValue(ctx, dagCtxKey{}, dagCtx)
+}
+
+// GetDAGContext retrieves the DAGContext from the context.
+func GetDAGContext(ctx context.Context) DAGContext {
 	value := ctx.Value(dagCtxKey{})
 	if value == nil {
-		logger.Error(ctx, "failed to get the env")
+		logger.Error(ctx, "DAGContext not found in context")
 		return DAGContext{}
 	}
 	execEnv, ok := value.(DAGContext)
 	if !ok {
-		logger.Error(ctx, "failed to get the env")
+		logger.Error(ctx, "Invalid DAGContext type in context")
 		return DAGContext{}
 	}
 	return execEnv

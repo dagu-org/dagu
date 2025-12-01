@@ -24,6 +24,9 @@ func TestLoad_Env(t *testing.T) {
 	err := os.WriteFile(configFile, []byte("# minimal config"), 0600)
 	require.NoError(t, err)
 
+	// Use temp directory for path-related env vars to ensure cross-platform compatibility
+	testPaths := filepath.Join(tempDir, "test")
+
 	// Define all environment variables that should be bound according to bindEnvironmentVariables()
 	testEnvs := map[string]string{
 		// Server configurations
@@ -37,7 +40,7 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_HEADLESS":     "true",
 
 		// Global configurations
-		"DAGU_WORK_DIR":      "/test/work",
+		"DAGU_WORK_DIR":      filepath.Join(testPaths, "work"),
 		"DAGU_DEFAULT_SHELL": "/bin/zsh",
 
 		// UI configurations (new keys)
@@ -52,21 +55,21 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_AUTH_TOKEN":          "test-token-123",
 
 		// TLS configurations
-		"DAGU_CERT_FILE": "/test/cert.pem",
-		"DAGU_KEY_FILE":  "/test/key.pem",
+		"DAGU_CERT_FILE": filepath.Join(testPaths, "cert.pem"),
+		"DAGU_KEY_FILE":  filepath.Join(testPaths, "key.pem"),
 
 		// File paths
-		"DAGU_DAGS_DIR":             "/test/dags",
-		"DAGU_EXECUTABLE":           "/test/bin/dagu",
-		"DAGU_LOG_DIR":              "/test/logs",
-		"DAGU_DATA_DIR":             "/test/data",
-		"DAGU_SUSPEND_FLAGS_DIR":    "/test/suspend",
-		"DAGU_ADMIN_LOG_DIR":        "/test/admin",
-		"DAGU_BASE_CONFIG":          "/test/base.yaml",
-		"DAGU_DAG_RUNS_DIR":         "/test/runs",
-		"DAGU_PROC_DIR":             "/test/proc",
-		"DAGU_QUEUE_DIR":            "/test/queue",
-		"DAGU_SERVICE_REGISTRY_DIR": "/test/service-registry",
+		"DAGU_DAGS_DIR":             filepath.Join(testPaths, "dags"),
+		"DAGU_EXECUTABLE":           filepath.Join(testPaths, "bin", "dagu"),
+		"DAGU_LOG_DIR":              filepath.Join(testPaths, "logs"),
+		"DAGU_DATA_DIR":             filepath.Join(testPaths, "data"),
+		"DAGU_SUSPEND_FLAGS_DIR":    filepath.Join(testPaths, "suspend"),
+		"DAGU_ADMIN_LOG_DIR":        filepath.Join(testPaths, "admin"),
+		"DAGU_BASE_CONFIG":          filepath.Join(testPaths, "base.yaml"),
+		"DAGU_DAG_RUNS_DIR":         filepath.Join(testPaths, "runs"),
+		"DAGU_PROC_DIR":             filepath.Join(testPaths, "proc"),
+		"DAGU_QUEUE_DIR":            filepath.Join(testPaths, "queue"),
+		"DAGU_SERVICE_REGISTRY_DIR": filepath.Join(testPaths, "service-registry"),
 
 		// UI customization
 		"DAGU_LATEST_STATUS_TODAY": "true",
@@ -126,6 +129,9 @@ func TestLoad_Env(t *testing.T) {
 	berlinLoc, _ := time.LoadLocation("Europe/Berlin")
 	_, berlinOffset := time.Now().In(berlinLoc).Zone()
 
+	require.NotEmpty(t, cfg.Global.ConfigFileUsed)
+	cfg.Global.ConfigFileUsed = ""
+
 	expected := &Config{
 		Global: Global{
 			Debug:         true,
@@ -155,25 +161,25 @@ func TestLoad_Env(t *testing.T) {
 				},
 			},
 			TLS: &TLSConfig{
-				CertFile: "/test/cert.pem",
-				KeyFile:  "/test/key.pem",
+				CertFile: filepath.Join(testPaths, "cert.pem"),
+				KeyFile:  filepath.Join(testPaths, "key.pem"),
 			},
 			Permissions:       map[Permission]bool{PermissionWriteDAGs: true, PermissionRunDAGs: true},
 			LatestStatusToday: true,
 			StrictValidation:  false,
 		},
 		Paths: PathsConfig{
-			DAGsDir:            "/test/dags",
-			Executable:         "/test/bin/dagu",
-			LogDir:             "/test/logs",
-			DataDir:            "/test/data",
-			SuspendFlagsDir:    "/test/suspend",
-			AdminLogsDir:       "/test/admin",
-			BaseConfig:         "/test/base.yaml",
-			DAGRunsDir:         "/test/runs",
-			ProcDir:            "/test/proc",
-			QueueDir:           "/test/queue",
-			ServiceRegistryDir: "/test/service-registry",
+			DAGsDir:            filepath.Join(testPaths, "dags"),
+			Executable:         filepath.Join(testPaths, "bin", "dagu"),
+			LogDir:             filepath.Join(testPaths, "logs"),
+			DataDir:            filepath.Join(testPaths, "data"),
+			SuspendFlagsDir:    filepath.Join(testPaths, "suspend"),
+			AdminLogsDir:       filepath.Join(testPaths, "admin"),
+			BaseConfig:         filepath.Join(testPaths, "base.yaml"),
+			DAGRunsDir:         filepath.Join(testPaths, "runs"),
+			ProcDir:            filepath.Join(testPaths, "proc"),
+			QueueDir:           filepath.Join(testPaths, "queue"),
+			ServiceRegistryDir: filepath.Join(testPaths, "service-registry"),
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -570,23 +576,26 @@ scheduler:
 }
 
 func TestLoad_LegacyEnv(t *testing.T) {
+	// Use temp directory for cross-platform compatibility
+	tempDir := t.TempDir()
+
 	cfg := loadWithEnv(t, "# empty", map[string]string{
 		"DAGU__ADMIN_PORT":         "1234",
 		"DAGU__ADMIN_HOST":         "0.0.0.0",
 		"DAGU__ADMIN_NAVBAR_TITLE": "LegacyTitle",
 		"DAGU__ADMIN_NAVBAR_COLOR": "#abc123",
-		"DAGU__DATA":               "/legacy/data",
-		"DAGU__SUSPEND_FLAGS_DIR":  "/legacy/suspend",
-		"DAGU__ADMIN_LOGS_DIR":     "/legacy/adminlogs",
+		"DAGU__DATA":               filepath.Join(tempDir, "legacy", "data"),
+		"DAGU__SUSPEND_FLAGS_DIR":  filepath.Join(tempDir, "legacy", "suspend"),
+		"DAGU__ADMIN_LOGS_DIR":     filepath.Join(tempDir, "legacy", "adminlogs"),
 	})
 
 	assert.Equal(t, 1234, cfg.Server.Port)
 	assert.Equal(t, "0.0.0.0", cfg.Server.Host)
 	assert.Equal(t, "LegacyTitle", cfg.UI.NavbarTitle)
 	assert.Equal(t, "#abc123", cfg.UI.NavbarColor)
-	assert.Equal(t, "/legacy/data", cfg.Paths.DataDir)
-	assert.Equal(t, "/legacy/suspend", cfg.Paths.SuspendFlagsDir)
-	assert.Equal(t, "/legacy/adminlogs", cfg.Paths.AdminLogsDir)
+	assert.Equal(t, filepath.Join(tempDir, "legacy", "data"), cfg.Paths.DataDir)
+	assert.Equal(t, filepath.Join(tempDir, "legacy", "suspend"), cfg.Paths.SuspendFlagsDir)
+	assert.Equal(t, filepath.Join(tempDir, "legacy", "adminlogs"), cfg.Paths.AdminLogsDir)
 }
 
 func TestLoad_LoadLegacyFields(t *testing.T) {
@@ -595,20 +604,24 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 
 	t.Run("AllFieldsSet", func(t *testing.T) {
 		t.Parallel()
+		// Use temp directory for cross-platform compatibility
+		tempDir := t.TempDir()
+		testPaths := filepath.Join(tempDir, "test")
+
 		def := Definition{
 			BasicAuthUsername:     "user",
 			BasicAuthPassword:     "pass",
 			APIBaseURL:            "/api/v1",
 			IsAuthToken:           true,
 			AuthToken:             "token123",
-			DAGs:                  "/legacy/dags",
-			DAGsDir:               "/new/dags", // Takes precedence over DAGs
-			Executable:            "/bin/dagu",
-			LogDir:                "/logs",
-			DataDir:               "/data",
-			SuspendFlagsDir:       "/suspend",
-			AdminLogsDir:          "/adminlogs",
-			BaseConfig:            "/base.yaml",
+			DAGs:                  filepath.Join(testPaths, "legacy", "dags"),
+			DAGsDir:               filepath.Join(testPaths, "new", "dags"), // Takes precedence over DAGs
+			Executable:            filepath.Join(testPaths, "bin", "dagu"),
+			LogDir:                filepath.Join(testPaths, "logs"),
+			DataDir:               filepath.Join(testPaths, "data"),
+			SuspendFlagsDir:       filepath.Join(testPaths, "suspend"),
+			AdminLogsDir:          filepath.Join(testPaths, "adminlogs"),
+			BaseConfig:            filepath.Join(testPaths, "base.yaml"),
 			LogEncodingCharset:    "iso-8859-1",
 			NavbarColor:           "#123456",
 			NavbarTitle:           "Title",
@@ -625,13 +638,13 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
 
 		// Paths - DAGsDir should take precedence over DAGs
-		assert.Equal(t, "/new/dags", cfg.Paths.DAGsDir)
-		assert.Equal(t, "/bin/dagu", cfg.Paths.Executable)
-		assert.Equal(t, "/logs", cfg.Paths.LogDir)
-		assert.Equal(t, "/data", cfg.Paths.DataDir)
-		assert.Equal(t, "/suspend", cfg.Paths.SuspendFlagsDir)
-		assert.Equal(t, "/adminlogs", cfg.Paths.AdminLogsDir)
-		assert.Equal(t, "/base.yaml", cfg.Paths.BaseConfig)
+		assert.Equal(t, filepath.Join(testPaths, "new", "dags"), cfg.Paths.DAGsDir)
+		assert.Equal(t, filepath.Join(testPaths, "bin", "dagu"), cfg.Paths.Executable)
+		assert.Equal(t, filepath.Join(testPaths, "logs"), cfg.Paths.LogDir)
+		assert.Equal(t, filepath.Join(testPaths, "data"), cfg.Paths.DataDir)
+		assert.Equal(t, filepath.Join(testPaths, "suspend"), cfg.Paths.SuspendFlagsDir)
+		assert.Equal(t, filepath.Join(testPaths, "adminlogs"), cfg.Paths.AdminLogsDir)
+		assert.Equal(t, filepath.Join(testPaths, "base.yaml"), cfg.Paths.BaseConfig)
 
 		// UI
 		assert.Equal(t, "iso-8859-1", cfg.UI.LogEncodingCharset)
@@ -642,22 +655,25 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 
 	t.Run("DAGsPrecedence", func(t *testing.T) {
 		t.Parallel()
+		// Use temp directory for cross-platform compatibility
+		tempDir := t.TempDir()
+
 		// Test that DAGsDir takes precedence over DAGs
 		def := Definition{
-			DAGs:    "/legacy/dags",
-			DAGsDir: "/new/dags",
+			DAGs:    filepath.Join(tempDir, "legacy", "dags"),
+			DAGsDir: filepath.Join(tempDir, "new", "dags"),
 		}
 		cfg := Config{}
 		loader.LoadLegacyFields(&cfg, def)
-		assert.Equal(t, "/new/dags", cfg.Paths.DAGsDir)
+		assert.Equal(t, filepath.Join(tempDir, "new", "dags"), cfg.Paths.DAGsDir)
 
 		// Test that DAGs is used when DAGsDir is not set
 		def2 := Definition{
-			DAGs: "/legacy/dags",
+			DAGs: filepath.Join(tempDir, "legacy", "dags"),
 		}
 		cfg2 := Config{}
 		loader.LoadLegacyFields(&cfg2, def2)
-		assert.Equal(t, "/legacy/dags", cfg2.Paths.DAGsDir)
+		assert.Equal(t, filepath.Join(tempDir, "legacy", "dags"), cfg2.Paths.DAGsDir)
 	})
 }
 
@@ -694,5 +710,74 @@ func loadFromYAML(t *testing.T, yaml string) *Config {
 
 	cfg, err := Load(WithConfigFile(configFile))
 	require.NoError(t, err)
+
+	cfg.Global.ConfigFileUsed = ""
 	return cfg
+}
+
+func TestLoad_ConfigFileUsed(t *testing.T) {
+	// Reset viper
+	viper.Reset()
+	defer viper.Reset()
+
+	// Create a temp config file
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	err := os.WriteFile(configFile, []byte("host: 127.0.0.1"), 0600)
+	require.NoError(t, err)
+
+	// Load configuration
+	cfg, err := Load(WithConfigFile(configFile))
+	require.NoError(t, err)
+
+	// Verify ConfigFileUsed is set correctly
+	assert.Equal(t, configFile, cfg.Global.ConfigFileUsed)
+}
+
+func TestBindEnv_AsPath(t *testing.T) {
+	viper.Reset()
+	defer viper.Reset()
+
+	tests := []struct {
+		name     string
+		envValue string
+		wantAbs  bool
+	}{
+		{
+			name:     "relative path gets resolved to absolute",
+			envValue: "relative/path",
+			wantAbs:  true,
+		},
+		{
+			name:     "absolute path stays absolute",
+			envValue: filepath.Join(os.TempDir(), "absolute/path"),
+			wantAbs:  true,
+		},
+		{
+			name:     "empty value stays empty",
+			envValue: "",
+			wantAbs:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			envKey := "DAGU_TEST_PATH_VAR"
+			os.Unsetenv(envKey)
+			defer os.Unsetenv(envKey)
+
+			if tt.envValue != "" {
+				os.Setenv(envKey, tt.envValue)
+			}
+
+			bindEnv("test.pathVar", "TEST_PATH_VAR", asPath())
+
+			result := os.Getenv(envKey)
+			if tt.envValue == "" {
+				assert.Empty(t, result)
+			} else if tt.wantAbs {
+				assert.True(t, filepath.IsAbs(result), "expected absolute path, got: %s", result)
+			}
+		})
+	}
 }

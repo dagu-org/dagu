@@ -18,8 +18,8 @@ type QueueStore interface {
 	Enqueue(ctx context.Context, name string, priority QueuePriority, dagRun DAGRunRef) error
 	// DequeueByName retrieves an item from the queue and removes it
 	DequeueByName(ctx context.Context, name string) (QueuedItemData, error)
-	// DequeueByDAGRunID retrieves items from the queue by dag-run ID and removes them
-	DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([]QueuedItemData, error)
+	// DequeueByDAGRunID retrieves items from the queue by dag-run reference and removes them
+	DequeueByDAGRunID(ctx context.Context, name string, dagRun DAGRunRef) ([]QueuedItemData, error)
 	// Len returns the number of items in the queue
 	Len(ctx context.Context, name string) (int, error)
 	// List returns all items in the queue with the given name
@@ -28,18 +28,18 @@ type QueueStore interface {
 	All(ctx context.Context) ([]QueuedItemData, error)
 	// ListByDAGName returns all items that has a specific DAG name
 	ListByDAGName(ctx context.Context, name, dagName string) ([]QueuedItemData, error)
-	// Reader returns a QueueReader for reading from the queue
-	Reader() QueueReader
+	// QueueList lists all queue names that have at least one item in the queue
+	QueueList(ctx context.Context) ([]string, error)
+	// Watcher returns a QueueWatcher for the queue data
+	QueueWatcher(ctx context.Context) QueueWatcher
 }
 
-// QueueReader provides an interface for reading from the queue
-type QueueReader interface {
-	// Start starts the queue reader
-	Start(ctx context.Context, ch chan<- QueuedItem) error
-	// Stop stops the queue reader
+// QueueWatcher watches the queue state
+type QueueWatcher interface {
+	// Start start swatching queue data and signal when a queue state changed
+	Start(ctx context.Context) (<-chan struct{}, error)
+	// Stop stops watching queue data
 	Stop(ctx context.Context)
-	// IsRunning returns true if the queue reader is running
-	IsRunning() bool
 }
 
 // QueuePriority represents the priority of a queued item
@@ -50,28 +50,15 @@ const (
 	QueuePriorityLow
 )
 
-// QueuedItem is a wrapper for QueuedItem with additional fields
+// QueuedItem is a wrapper for QueuedItemData
 type QueuedItem struct {
 	QueuedItemData
-	Result chan QueuedItemProcessingResult
 }
-
-type QueuedItemProcessingResult int
-
-const (
-	// QueuedItemProcessingResultRetry indicates that the queued item needs to be retried
-	QueuedItemProcessingResultRetry QueuedItemProcessingResult = 0
-	// QueuedItemProcessingResultSuccess indicates that the queued item was processed successfully
-	QueuedItemProcessingResultSuccess QueuedItemProcessingResult = 1
-	// QueuedItemProcessingResultDiscard indicates that the queued item should be discarded due to unrecoverable error
-	QueuedItemProcessingResultDiscard QueuedItemProcessingResult = 2
-)
 
 // NewQueuedItem creates a new QueuedItem
 func NewQueuedItem(data QueuedItemData) *QueuedItem {
 	return &QueuedItem{
 		QueuedItemData: data,
-		Result:         make(chan QueuedItemProcessingResult, 1),
 	}
 }
 

@@ -8,7 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 )
 
-// ToNode converts a persistence Node back to a scheduler Node
+// ToNode converts a persistence Node back to a runtime Node
 func ToNode(n *execution.Node) *runtime.Node {
 	startedAt, _ := stringutil.ParseTime(n.StartedAt)
 	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
@@ -42,7 +42,7 @@ func ToNode(n *execution.Node) *runtime.Node {
 	})
 }
 
-// newNode converts a single scheduler NodeData to a persistence Node
+// newNode converts a single runtime NodeData to a persistence Node
 func newNode(node runtime.NodeData) *execution.Node {
 	children := make([]execution.SubDAGRun, len(node.State.SubRuns))
 	for i, child := range node.State.SubRuns {

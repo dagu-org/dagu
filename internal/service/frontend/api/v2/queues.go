@@ -90,24 +90,18 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 	for _, queuedItem := range allQueued {
 		dagRunRef := queuedItem.Data()
 
-		// Determine queue name from the DAG
-		dag, err := a.dagStore.GetDetails(ctx, dagRunRef.Name)
-		if err != nil {
-			continue // Skip if we can't find the DAG
-		}
-
-		queueName := dag.Queue
-		if queueName == "" {
-			queueName = dag.Name
-		}
-
-		queue := getOrCreateQueue(queueMap, queueName, a.config, dag)
-
 		// Get the DAG run status to convert to summary
 		attempt, err := a.dagRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			continue // Skip if we can't find the attempt
 		}
+
+		dag, err := attempt.ReadDAG(ctx)
+		if err != nil {
+			continue // Skip if we can't read DAG
+		}
+
+		queue := getOrCreateQueue(queueMap, queuedItem.Data().Name, a.config, dag)
 
 		runStatus, err := attempt.ReadStatus(ctx)
 		if err != nil {

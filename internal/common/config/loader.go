@@ -79,7 +79,10 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	if l.appHomeDir != "" {
 		l.additionalBaseEnv = append(l.additionalBaseEnv, fmt.Sprintf("DAGU_HOME=%s", fileutil.ResolvePathOrBlank(l.appHomeDir)))
 	}
-	warnings := setupViper(xdgConfig, homeDir, l.configFile, l.appHomeDir)
+	warnings, err := setupViper(xdgConfig, homeDir, l.configFile, l.appHomeDir)
+	if err != nil {
+		return nil, err
+	}
 	l.warnings = append(l.warnings, warnings...)
 
 	// Attempt to read the main config file. If not found, we proceed without error.
@@ -88,6 +91,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
 	}
+	configFileUsed := viper.ConfigFileUsed()
 
 	// For backward compatibility, try merging in the "admin.yaml" config.
 	viper.SetConfigName("admin")
@@ -109,7 +113,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to build config: %w", err)
 	}
 
-	cfg.Global.ConfigFileUsed = viper.ConfigFileUsed()
+	cfg.Global.ConfigFileUsed = configFileUsed
 
 	// Attach any warnings collected during the resolution process.
 	cfg.Warnings = l.warnings
@@ -494,20 +498,23 @@ func (l *ConfigLoader) LoadLegacyEnv(cfg *Config) {
 	}
 }
 
-func setupViper(xdgConfig XDGConfig, homeDir, configFile, appHomeOverride string) (warnings []string) {
+func setupViper(xdgConfig XDGConfig, homeDir, configFile, appHomeOverride string) (warnings []string, err error) {
 	var paths Paths
 	if appHomeOverride != "" {
 		resolved := fileutil.ResolvePathOrBlank(appHomeOverride)
 		paths = setUnifiedPaths(resolved)
 	} else {
-		paths = ResolvePaths("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
+		paths, err = ResolvePaths("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	configureViper(paths.ConfigDir, configFile)
 	bindEnvironmentVariables()
 	setViperDefaultValues(paths)
 
-	return paths.Warnings
+	return paths.Warnings, nil
 }
 
 func setViperDefaultValues(paths Paths) {
@@ -571,7 +578,7 @@ func bindEnvironmentVariables() {
 	bindEnv("headless", "HEADLESS")
 
 	// Global configurations
-	bindEnv("workDir", "WORK_DIR")
+	bindEnv("workDir", "WORK_DIR", asPath())
 	bindEnv("defaultShell", "DEFAULT_SHELL")
 	bindEnv("skipExamples", "SKIP_EXAMPLES")
 
@@ -617,18 +624,18 @@ func bindEnvironmentVariables() {
 	bindEnv("tls.keyFile", "KEY_FILE")
 
 	// File paths
-	bindEnv("paths.dagsDir", "DAGS")
-	bindEnv("paths.dagsDir", "DAGS_DIR")
-	bindEnv("paths.executable", "EXECUTABLE")
-	bindEnv("paths.logDir", "LOG_DIR")
-	bindEnv("paths.dataDir", "DATA_DIR")
-	bindEnv("paths.suspendFlagsDir", "SUSPEND_FLAGS_DIR")
-	bindEnv("paths.adminLogsDir", "ADMIN_LOG_DIR")
-	bindEnv("paths.baseConfig", "BASE_CONFIG")
-	bindEnv("paths.dagRunsDir", "DAG_RUNS_DIR")
-	bindEnv("paths.procDir", "PROC_DIR")
-	bindEnv("paths.queueDir", "QUEUE_DIR")
-	bindEnv("paths.serviceRegistryDir", "SERVICE_REGISTRY_DIR")
+	bindEnv("paths.dagsDir", "DAGS", asPath())
+	bindEnv("paths.dagsDir", "DAGS_DIR", asPath())
+	bindEnv("paths.executable", "EXECUTABLE", asPath())
+	bindEnv("paths.logDir", "LOG_DIR", asPath())
+	bindEnv("paths.dataDir", "DATA_DIR", asPath())
+	bindEnv("paths.suspendFlagsDir", "SUSPEND_FLAGS_DIR", asPath())
+	bindEnv("paths.adminLogsDir", "ADMIN_LOG_DIR", asPath())
+	bindEnv("paths.baseConfig", "BASE_CONFIG", asPath())
+	bindEnv("paths.dagRunsDir", "DAG_RUNS_DIR", asPath())
+	bindEnv("paths.procDir", "PROC_DIR", asPath())
+	bindEnv("paths.queueDir", "QUEUE_DIR", asPath())
+	bindEnv("paths.serviceRegistryDir", "SERVICE_REGISTRY_DIR", asPath())
 
 	// UI customization
 	bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")
@@ -656,9 +663,25 @@ func bindEnvironmentVariables() {
 	bindEnv("peer.insecure", "PEER_INSECURE")
 }
 
-func bindEnv(key, env string) {
+type bindEnvOption func(fullEnv string)
+
+func asPath() bindEnvOption {
+	return func(fullEnv string) {
+		if val := os.Getenv(fullEnv); val != "" {
+			if abs, err := filepath.Abs(val); err == nil && abs != val {
+				_ = os.Setenv(fullEnv, abs)
+			}
+		}
+	}
+}
+
+func bindEnv(key, env string, opts ...bindEnvOption) {
 	prefix := strings.ToUpper(AppSlug) + "_"
-	_ = viper.BindEnv(key, prefix+env)
+	fullEnv := prefix + env
+	for _, opt := range opts {
+		opt(fullEnv)
+	}
+	_ = viper.BindEnv(key, fullEnv)
 }
 
 func configureViper(configDir, configFile string) {

@@ -13,6 +13,7 @@ import { useConfig } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import { DAGRunDetailsModal } from '../dag-run-details';
+import { StepDetailsTooltip } from './StepDetailsTooltip';
 
 interface DAGRunTableProps {
   dagRuns: components['schemas']['DAGRunSummary'][];
@@ -261,9 +262,13 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
             {/* Header with name and status */}
             <div className="flex justify-between items-start mb-2">
               <div className="font-normal text-sm">{dagRun.name}</div>
-              <StatusChip status={dagRun.status} size="xs">
-                {dagRun.statusLabel}
-              </StatusChip>
+              <StepDetailsTooltip dagRun={dagRun}>
+                <div className="flex items-center">
+                  <StatusChip status={dagRun.status} size="xs">
+                    {dagRun.statusLabel}
+                  </StatusChip>
+                </div>
+              </StepDetailsTooltip>
             </div>
 
             {/* DAG-run ID */}
@@ -286,7 +291,11 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
               <div className="text-left flex items-center gap-1.5">
                 <span className="text-muted-foreground">Duration: </span>
                 <span className="flex items-center gap-1">
-                  {calculateDuration(dagRun.startedAt, dagRun.finishedAt, dagRun.status)}
+                  {calculateDuration(
+                    dagRun.startedAt,
+                    dagRun.finishedAt,
+                    dagRun.status
+                  )}
                   {dagRun.status === Status.Running && dagRun.startedAt && (
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-lime-500 animate-pulse" />
                   )}
@@ -349,7 +358,10 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
               onClick={(e) => {
                 if (e.ctrlKey || e.metaKey) {
                   // Open in new tab
-                  window.open(`/dag-runs/${dagRun.name}/${dagRun.dagRunId}`, '_blank');
+                  window.open(
+                    `/dag-runs/${dagRun.name}/${dagRun.dagRunId}`,
+                    '_blank'
+                  );
                 } else {
                   // Open modal
                   setSelectedIndex(index);
@@ -367,11 +379,13 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
                 {dagRun.dagRunId}
               </TableCell>
               <TableCell className="py-1 px-2">
-                <div className="flex items-center">
-                  <StatusChip status={dagRun.status} size="xs">
-                    {dagRun.statusLabel}
-                  </StatusChip>
-                </div>
+                <StepDetailsTooltip dagRun={dagRun}>
+                  <div className="flex items-center">
+                    <StatusChip status={dagRun.status} size="xs">
+                      {dagRun.statusLabel}
+                    </StatusChip>
+                  </div>
+                </StepDetailsTooltip>
               </TableCell>
               <TableCell className="py-1 px-2 text-left">
                 {dagRun.queuedAt || '-'}
@@ -381,7 +395,11 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
               </TableCell>
               <TableCell className="py-1 px-2 text-left">
                 <div className="flex items-center gap-1">
-                  {calculateDuration(dagRun.startedAt, dagRun.finishedAt, dagRun.status)}
+                  {calculateDuration(
+                    dagRun.startedAt,
+                    dagRun.finishedAt,
+                    dagRun.status
+                  )}
                   {dagRun.status === Status.Running && dagRun.startedAt && (
                     <span className="inline-block w-2 h-2 rounded-full bg-lime-500 animate-pulse" />
                   )}

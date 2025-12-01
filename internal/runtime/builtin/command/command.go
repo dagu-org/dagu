@@ -14,9 +14,11 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
+
+var errNoCommandSpecified = fmt.Errorf("no command specified")
 
 var _ executor.Executor = (*commandExecutor)(nil)
 var _ executor.ExitCoder = (*commandExecutor)(nil)
@@ -40,7 +42,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	e.mu.Lock()
 
 	if e.config.Script != "" {
-		scriptFile, err := setupScript(ctx, e.config.Dir, e.config.Script)
+		scriptFile, err := setupScript(e.config.Dir, e.config.Script, e.config.Shell)
 		if err != nil {
 			e.mu.Unlock()
 			return fmt.Errorf("failed to setup script: %w", err)
@@ -107,9 +109,9 @@ type commandConfig struct {
 	Command            string
 	Args               []string
 	Script             string
-	ShellCommand       string
-	ShellCommandArgs   string
-	ShellPackages      []string
+	Shell              []string // Shell command and arguments, e.g., ["/bin/sh", "-e"]
+	ShellCommandArgs   string   // The command string to execute via shell -c
+	ShellPackages      []string // Packages for nix-shell
 	Stdout             io.Writer
 	Stderr             io.Writer
 	UserSpecifiedShell bool
@@ -120,12 +122,13 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	switch {
 	case cfg.Command != "" && scriptFile != "":
 		cmdBuilder := &shellCommandBuilder{
-			Command:          cfg.Command,
-			Args:             cfg.Args,
-			ShellCommand:     cfg.ShellCommand,
-			ShellCommandArgs: cfg.ShellCommandArgs,
-			ShellPackages:    cfg.ShellPackages,
-			Script:           scriptFile,
+			Command:            cfg.Command,
+			Args:               cfg.Args,
+			Shell:              cfg.Shell,
+			ShellCommandArgs:   cfg.ShellCommandArgs,
+			ShellPackages:      cfg.ShellPackages,
+			Script:             scriptFile,
+			UserSpecifiedShell: cfg.UserSpecifiedShell,
 		}
 		c, err := cmdBuilder.Build(ctx)
 		if err != nil {
@@ -133,7 +136,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 		}
 		cmd = c
 
-	case cfg.ShellCommand != "" && scriptFile != "":
+	case len(cfg.Shell) > 0 && scriptFile != "":
 		// Check if the script has shebang and user did not specify a shell
 		shebang, shebangArgs, err := cfg.detectShebang(scriptFile)
 		if err != nil {
@@ -145,18 +148,21 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 			break
 		}
 		// If no shebang, use the specified shell command
-		command, args, err := cmdutil.SplitCommand(cfg.ShellCommand)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse shell command: %w", err)
+		args := make([]string, 0, len(cfg.Shell)+1)
+		args = append(args, cfg.Shell[1:]...)
+		// Add errexit flag for Unix-like shells (unless user specified shell)
+		if !cfg.UserSpecifiedShell && isUnixLikeShell(cfg.Shell[0]) && !slices.Contains(args, "-e") {
+			args = append(args, "-e")
 		}
 		args = append(args, scriptFile)
-		cmd = exec.CommandContext(cfg.Ctx, command, args...) // nolint: gosec
+		cmd = exec.CommandContext(cfg.Ctx, cfg.Shell[0], args...) // nolint: gosec
 
-	case cfg.ShellCommand != "" && cfg.ShellCommandArgs != "":
+	case len(cfg.Shell) > 0 && cfg.ShellCommandArgs != "":
 		cmdBuilder := &shellCommandBuilder{
-			ShellCommand:     cfg.ShellCommand,
-			ShellCommandArgs: cfg.ShellCommandArgs,
-			ShellPackages:    cfg.ShellPackages,
+			Shell:              cfg.Shell,
+			ShellCommandArgs:   cfg.ShellCommandArgs,
+			ShellPackages:      cfg.ShellPackages,
+			UserSpecifiedShell: cfg.UserSpecifiedShell,
 		}
 		c, err := cmdBuilder.Build(ctx)
 		if err != nil {
@@ -166,15 +172,23 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 
 	default:
 		command := cfg.Command
+		args := cfg.Args
 		if command == "" {
-			// If no command is specified, use the default shell.
-			// Usually this should not happen.
-			command = cmdutil.GetShellCommand("")
+			// No command specified, fallback to shell
+			env := runtime.GetEnv(ctx)
+			shell := env.Shell(ctx)
+			if len(shell) == 0 {
+				return nil, errNoCommandSpecified
+			}
+			command = shell[0]
+			tmp := make([]string, len(shell)-1)
+			copy(tmp, shell[1:])
+			args = append(tmp, args...)
 		}
-		cmd = createDirectCommand(cfg.Ctx, command, cfg.Args, scriptFile)
+		cmd = createDirectCommand(cfg.Ctx, command, args, scriptFile)
 	}
 
-	cmd.Env = append(cmd.Env, execution.AllEnvs(ctx)...)
+	cmd.Env = append(cmd.Env, runtime.AllEnvs(ctx)...)
 	cmd.Dir = cfg.Dir
 	cmd.Stdout = cfg.Stdout
 	cmd.Stderr = cfg.Stderr
@@ -238,19 +252,23 @@ func exitCodeFromError(err error) int {
 }
 
 type shellCommandBuilder struct {
-	Command          string
-	Args             []string
-	ShellCommand     string
-	ShellCommandArgs string
-	ShellPackages    []string
-	Script           string
+	Command            string
+	Args               []string
+	Shell              []string // Shell command, e.g., ["/bin/sh"]
+	ShellCommandArgs   string
+	ShellPackages      []string
+	Script             string
+	UserSpecifiedShell bool // If true, don't auto-add -e flag
 }
 
 func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
-	cmd, args, err := cmdutil.SplitCommand(b.ShellCommand)
-	if err != nil {
-		return nil, err
+	if len(b.Shell) == 0 {
+		return nil, fmt.Errorf("shell command is required")
 	}
+
+	cmd := b.Shell[0]
+	args := make([]string, len(b.Shell)-1)
+	copy(args, b.Shell[1:])
 
 	// Extract just the executable name for comparison
 	cmdName := strings.ToLower(filepath.Base(cmd))
@@ -274,16 +292,22 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 			cmdParts = append(cmdParts, b.Script)
 			cmdStr := strings.Join(cmdParts, " ")
 
-			// If ShellCommandArgs contains "set -e", we need to apply it
-			if strings.HasPrefix(b.ShellCommandArgs, "set -e") {
-				cmdStr = b.ShellCommandArgs + " " + cmdStr
+			// Apply set -e if needed
+			if !b.UserSpecifiedShell && !strings.HasPrefix(cmdStr, "set -e") {
+				cmdStr = "set -e; " + cmdStr
 			}
 
 			return exec.CommandContext(ctx, cmd, append(args, cmdStr)...), nil // nolint: gosec
 		}
 
+		// For nix-shell, prepend "set -e;" to enable errexit (unless user specified shell)
+		shellCmdArgs := b.ShellCommandArgs
+		if !b.UserSpecifiedShell && shellCmdArgs != "" && !strings.HasPrefix(shellCmdArgs, "set -e") {
+			shellCmdArgs = "set -e; " + shellCmdArgs
+		}
+
 		// Construct the command with the shell command and the packages
-		return exec.CommandContext(ctx, b.ShellCommand, append(args, b.ShellCommandArgs)...), nil // nolint: gosec
+		return exec.CommandContext(ctx, cmd, append(args, shellCmdArgs)...), nil // nolint: gosec
 
 	case "powershell.exe", "powershell":
 		// PowerShell (Windows PowerShell)
@@ -304,6 +328,12 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 			// don't include shell arguments like -e
 			return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
 		}
+
+		// Add errexit flag for Unix-like shells (unless user specified shell)
+		if !b.UserSpecifiedShell && isUnixLikeShell(cmd) && !slices.Contains(args, "-e") {
+			args = append(args, "-e")
+		}
+
 		args = append(args, b.Args...)
 		if !slices.Contains(args, "-c") {
 			args = append(args, "-c")
@@ -364,43 +394,18 @@ func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) 
 
 // NewCommandConfig creates a new commandConfig from the given step.
 func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, error) {
-	var shellCommand string
-	shellCmdArgs := step.ShellCmdArgs
-	userSpecifiedShell := step.Shell != ""
-
-	if userSpecifiedShell {
-		// User explicitly set shell - respect their choice exactly
-		shellCommand = cmdutil.GetShellCommand(step.Shell)
-	} else {
-		// No shell specified - use default with errexit
-		defaultShell := cmdutil.GetShellCommand("")
-
-		// Special handling for nix-shell - don't add -e to nix-shell itself
-		shellName := filepath.Base(defaultShell)
-		if shellName == "nix-shell" {
-			// For nix-shell, prepend set -e to the command
-			shellCommand = defaultShell
-			if shellCmdArgs != "" && !strings.HasPrefix(shellCmdArgs, "set -e") {
-				shellCmdArgs = "set -e; " + shellCmdArgs
-			}
-		} else if isUnixLikeShell(defaultShell) {
-			// Add errexit flag for Unix-like shells
-			shellCommand = defaultShell + " -e"
-		} else {
-			shellCommand = defaultShell
-		}
-	}
+	env := runtime.GetEnv(ctx)
 
 	return &commandConfig{
 		Ctx:                ctx,
-		Dir:                execution.GetEnv(ctx).WorkingDir,
+		Dir:                env.WorkingDir,
 		Command:            step.Command,
 		Args:               step.Args,
 		Script:             step.Script,
-		ShellCommand:       shellCommand,
-		ShellCommandArgs:   shellCmdArgs,
+		Shell:              env.Shell(ctx),
+		ShellCommandArgs:   step.ShellCmdArgs,
 		ShellPackages:      step.ShellPackages,
-		UserSpecifiedShell: userSpecifiedShell,
+		UserSpecifiedShell: step.Shell != "",
 	}, nil
 }
 
@@ -424,8 +429,16 @@ func isUnixLikeShell(shell string) bool {
 	}
 }
 
-func setupScript(_ context.Context, workDir, script string) (string, error) {
-	file, err := os.CreateTemp(workDir, "dagu_script-")
+func setupScript(workDir, script string, shell []string) (string, error) {
+	// Determine file extension based on shell
+	shellCmd := ""
+	if len(shell) > 0 {
+		shellCmd = shell[0]
+	}
+	ext := cmdutil.GetScriptExtension(shellCmd)
+	pattern := "dagu_script-*" + ext
+
+	file, err := os.CreateTemp(workDir, pattern)
 	if err != nil {
 		return "", fmt.Errorf("failed to create script file: %w", err)
 	}

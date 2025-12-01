@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
@@ -66,6 +68,9 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}
 
+	// Set DAG context for all logs
+	ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
+
 	// Check if queue is disabled via config or flag
 	queueDisabled := !ctx.Config.Queues.Enabled || ctx.Command.Flags().Changed("no-queue")
 
@@ -75,10 +80,7 @@ func runRetry(ctx *Context, args []string) error {
 	// The --no-queue flag acts as a circuit breaker to prevent infinite loops
 	// when the worker executes the dispatched retry task.
 	if !queueDisabled && len(dag.WorkerSelector) > 0 {
-		logger.Info(ctx, "DAG has workerSelector, enqueueing retry for distributed execution",
-			"dag", dag.Name,
-			"dagRunId", dagRunID,
-			"workerSelector", dag.WorkerSelector)
+		logger.Info(ctx, "DAG has workerSelector, enqueueing retry for distributed execution", slog.Any("worker-selector", dag.WorkerSelector))
 
 		// Enqueue the retry - must create new attempt with status "Queued"
 		// so the scheduler will process it
@@ -86,14 +88,12 @@ func runRetry(ctx *Context, args []string) error {
 			return fmt.Errorf("failed to enqueue retry: %w", err)
 		}
 
-		logger.Info(ctx.Context, "Retry enqueued",
-			"dag", dag.Name,
-			"dagRunId", dagRunID)
+		logger.Info(ctx.Context, "Retry enqueued")
 		return nil
 	}
 
 	// Try lock proc store to avoid race
-	if err := ctx.ProcStore.TryLock(ctx, dag.ProcGroup()); err != nil {
+	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
 		return fmt.Errorf("failed to lock process group: %w", err)
 	}
 	defer ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
@@ -119,7 +119,7 @@ func runRetry(ctx *Context, args []string) error {
 	// Acquire process handle
 	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
 	if err != nil {
-		logger.Debug(ctx, "failed to acquire process handle", "err", err)
+		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
 		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
 	}
 	defer func() {
@@ -138,7 +138,11 @@ func runRetry(ctx *Context, args []string) error {
 }
 
 func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, rootRun execution.DAGRunRef, stepName string) error {
-	logger.Debug(ctx, "Executing dag-run retry", "dag", dag.Name, "runId", status.DAGRunID, "step", stepName)
+	// Set step context if specified
+	if stepName != "" {
+		ctx.Context = logger.WithValues(ctx.Context, tag.Step(stepName))
+	}
+	logger.Debug(ctx, "Executing dag-run retry")
 
 	// We use the same log file for the retry as the original run.
 	logFile, err := fileutil.OpenOrCreateFile(status.Log)
@@ -149,7 +153,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, r
 		_ = logFile.Close()
 	}()
 
-	logger.Info(ctx, "dag-run retry initiated", "DAG", dag.Name, "dagRunId", status.DAGRunID, "logFile", logFile.Name(), "step", stepName)
+	logger.Info(ctx, "Dag-run retry initiated", tag.File(logFile.Name()))
 
 	// Load environment variable
 	dag.LoadDotEnv(ctx)
@@ -239,10 +243,7 @@ func enqueueRetry(ctx *Context, dag *core.DAG, dagRunID string) error {
 		return fmt.Errorf("failed to enqueue: %w", err)
 	}
 
-	logger.Info(ctx, "Retry attempt created and enqueued",
-		"dag", dag.Name,
-		"dagRunId", dagRunID,
-		"attemptId", att.ID())
+	logger.Info(ctx, "Retry attempt created and enqueued", tag.AttemptID(att.ID()))
 
 	return nil
 }

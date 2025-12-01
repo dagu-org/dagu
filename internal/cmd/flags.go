@@ -136,7 +136,6 @@ var (
 		name:      "dag-run",
 		shorthand: "d",
 		usage:     "<DAG-name>:<run-id> to dequeue a dag-run",
-		required:  true,
 	}
 
 	// queueFlag is used to override the DAG-level queue definition.

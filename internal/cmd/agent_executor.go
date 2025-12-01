@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"golang.org/x/term"
@@ -29,9 +30,10 @@ func ExecuteAgent(ctx *Context, agentInstance *agent.Agent, dag *core.DAG, dagRu
 	// Run the DAG
 	if err := agentInstance.Run(ctx); err != nil {
 		logger.Error(ctx, "Failed to execute dag-run",
-			"dag", dag.Name,
-			"dagRunId", dagRunID,
-			"err", err)
+			tag.DAG(dag.Name),
+			tag.RunID(dagRunID),
+			tag.Error(err),
+		)
 		if ctx.Proc != nil {
 			_ = ctx.Proc.Stop(ctx)
 		}

@@ -60,22 +60,6 @@ func GetShellCommand(configuredShell string) string {
 	return ""
 }
 
-// GetShellCommandWithGlobal returns the shell to use for command execution,
-// optionally using a global default shell configuration
-func GetShellCommandWithGlobal(configuredShell, globalDefaultShell string) string {
-	if configuredShell != "" {
-		return configuredShell
-	}
-
-	// Check global configuration for default shell
-	if globalDefaultShell != "" {
-		return globalDefaultShell
-	}
-
-	// Fallback to regular logic
-	return GetShellCommand("")
-}
-
 // getWindowsDefaultShell returns the default shell for Windows systems
 func getWindowsDefaultShell() string {
 	// First check if SHELL environment variable is set (e.g., Git Bash, WSL)
@@ -315,6 +299,42 @@ func ParsePipedCommand(cmdString string) ([][]string, error) {
 	}
 
 	return pipeline, nil
+}
+
+// GetScriptExtension returns the appropriate file extension for the given shell.
+// This is needed because some shells (like PowerShell) require specific file extensions.
+func GetScriptExtension(shellCommand string) string {
+	if shellCommand == "" {
+		return ""
+	}
+
+	cmdLower := strings.ToLower(shellCommand)
+
+	switch {
+	case strings.HasSuffix(cmdLower, "powershell.exe"),
+		strings.HasSuffix(cmdLower, "powershell"),
+		strings.HasSuffix(cmdLower, "pwsh.exe"),
+		strings.HasSuffix(cmdLower, "pwsh"):
+		return ".ps1"
+
+	case strings.HasSuffix(cmdLower, "cmd.exe"),
+		strings.HasSuffix(cmdLower, "cmd"):
+		return ".bat"
+
+	case strings.HasSuffix(cmdLower, "bash.exe"),
+		strings.HasSuffix(cmdLower, "bash"),
+		strings.HasSuffix(cmdLower, "zsh"),
+		strings.HasSuffix(cmdLower, "/sh"),
+		strings.HasSuffix(cmdLower, "sh.exe"):
+		return ".sh"
+
+	// Exact match for "sh" only
+	case cmdLower == "sh":
+		return ".sh"
+
+	default:
+		return ""
+	}
 }
 
 // DetectShebang checks if the given script starts with a shebang (#!) line.

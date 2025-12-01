@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
 // Data is a thread-safe wrapper around NodeData.
@@ -202,7 +202,7 @@ func (d *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) e
 	d.inner.State.Stderr = logFile + ".err"
 	d.inner.State.StartedAt = startedAt
 
-	env := execution.GetEnv(ctx)
+	env := GetEnv(ctx)
 
 	// Evaluate the stdout field
 	stdout, err := env.EvalString(ctx, d.inner.Step.Stdout)
@@ -240,6 +240,17 @@ func (d *Data) SetStatus(s core.NodeStatus) {
 	defer d.mu.Unlock()
 
 	d.inner.State.Status = s
+}
+
+func (d *Data) StepInfo() cmdutil.StepInfo {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	return cmdutil.StepInfo{
+		Stdout:   d.inner.State.Stdout,
+		Stderr:   d.inner.State.Stderr,
+		ExitCode: strconv.Itoa(d.inner.State.ExitCode),
+	}
 }
 
 func (d *Data) ContinueOn() core.ContinueOn {

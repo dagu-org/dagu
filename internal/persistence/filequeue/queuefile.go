@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
@@ -47,7 +48,7 @@ func NewQueueFile(baseDir, prefix string) *QueueFile {
 	return &QueueFile{
 		baseDir: baseDir,
 		prefix:  prefix,
-		match:   regexp.MustCompile(fmt.Sprintf(`^%s%s(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`, itemPrefix, prefix)),
+		match:   regexp.MustCompile(fmt.Sprintf(`^%s%s(\d{8}_\d{6})_(\d{9})Z_(.*)\.json$`, itemPrefix, prefix)),
 	}
 }
 
@@ -60,7 +61,12 @@ type ItemData struct {
 
 // Push adds a job to the queue
 // Since it's a prototype, it just create a json file with the job ID and dag-run reference
-func (q *QueueFile) Push(_ context.Context, dagRun execution.DAGRunRef) error {
+func (q *QueueFile) Push(ctx context.Context, dagRun execution.DAGRunRef) error {
+	ctx = logger.WithValues(ctx,
+		tag.Queue(filepath.Base(q.baseDir)),
+		tag.DAG(dagRun.Name),
+		tag.RunID(dagRun.ID),
+	)
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -74,12 +80,20 @@ func (q *QueueFile) Push(_ context.Context, dagRun execution.DAGRunRef) error {
 
 	// Create the directory if it doesn't exist
 	if err := os.MkdirAll(q.baseDir, 0750); err != nil { // nolint: gosec
+		logger.Error(ctx, "Failed to create queue directory",
+			tag.Dir(q.baseDir),
+			tag.Error(err),
+		)
 		return fmt.Errorf("failed to create directory %s: %w", q.baseDir, err)
 	}
 
 	// Create the queue file in temporary directory
 	tmpFile, err := os.CreateTemp(q.baseDir, "queue_*")
 	if err != nil {
+		logger.Error(ctx, "Failed to create temporary queue file",
+			tag.Dir(q.baseDir),
+			tag.Error(err),
+		)
 		return fmt.Errorf("failed to create temporary file in %s: %w", q.baseDir, err)
 	}
 	defer func() {
@@ -94,29 +108,45 @@ func (q *QueueFile) Push(_ context.Context, dagRun execution.DAGRunRef) error {
 	})
 
 	if err != nil {
+		logger.Error(ctx, "Failed to marshal queue item", tag.Error(err))
 		return fmt.Errorf("failed to marshal item data: %w", err)
 	}
 
 	// Write the data to the file
 	if _, err := tmpFile.Write(data); err != nil {
+		logger.Error(ctx, "Failed to write queue item", tag.Error(err))
 		return fmt.Errorf("failed to write data to queue file %s: %w", fullPath, err)
 	}
 
 	// Close the temporary file
 	if err := tmpFile.Close(); err != nil {
+		logger.Error(ctx, "Failed to close temporary queue file",
+			tag.File(tmpFile.Name()),
+			tag.Error(err),
+		)
 		return fmt.Errorf("failed to close temporary file %s: %w", tmpFile.Name(), err)
 	}
 
 	// Rename the temporary file to the final name (this is atomic)
 	if err := os.Rename(tmpFile.Name(), fullPath); err != nil {
+		logger.Error(ctx, "Failed to rename queue file",
+			tag.File(tmpFile.Name()),
+			tag.Error(err),
+		)
 		return fmt.Errorf("failed to rename temporary file %s to %s: %w", tmpFile.Name(), fullPath, err)
 	}
 
+	logger.Debug(ctx, "Queued item file written")
 	return nil
 }
 
 // PopByDAGRunID removes jobs from the queue by dag-run ID
-func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRunID string) ([]*Job, error) {
+func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun execution.DAGRunRef) ([]*Job, error) {
+	ctx = logger.WithValues(ctx,
+		tag.Queue(filepath.Base(q.baseDir)),
+		tag.DAG(dagRun.Name),
+		tag.RunID(dagRun.ID),
+	)
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -133,10 +163,13 @@ func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRunID string) ([]*Job,
 
 	var removedJobs []*Job
 	for _, item := range items {
-		if item.DAGRun.ID == dagRunID {
+		if item.DAGRun.Name == dagRun.Name && item.DAGRun.ID == dagRun.ID {
 			if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
 				// Log the error but continue processing other items
-				logger.Warn(ctx, "failed to remove queue file %s: %w", item.FileName, err)
+				logger.Warn(ctx, "Failed to remove queue file",
+					tag.File(item.FileName),
+					tag.Error(err),
+				)
 			} else {
 				// Add the job to the removed jobs list
 				removedJobs = append(removedJobs, NewJob(item))
@@ -148,6 +181,7 @@ func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRunID string) ([]*Job,
 }
 
 func (q *QueueFile) List(ctx context.Context) ([]*Job, error) {
+	ctx = logger.WithValues(ctx, tag.Queue(filepath.Base(q.baseDir)))
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
@@ -167,10 +201,12 @@ func (q *QueueFile) List(ctx context.Context) ([]*Job, error) {
 		jobs = append(jobs, NewJob(item))
 	}
 
+	logger.Debug(ctx, "Listed queue file items", tag.Count(len(jobs)))
 	return jobs, nil
 }
 
 func (q *QueueFile) Pop(ctx context.Context) (*Job, error) {
+	ctx = logger.WithValues(ctx, tag.Queue(filepath.Base(q.baseDir)))
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -196,15 +232,24 @@ func (q *QueueFile) Pop(ctx context.Context) (*Job, error) {
 	// Currently, we don't need the content of the file, so we just remove it
 
 	if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
+		logger.Error(ctx, "Failed to remove queue file",
+			tag.File(item.FileName),
+			tag.Error(err),
+		)
 		return nil, fmt.Errorf("failed to remove queue file %s: %w", item.FileName, err)
 	}
 
+	logger.Debug(ctx, "Popped queue file item",
+		tag.RunID(item.DAGRun.ID),
+		tag.DAG(item.DAGRun.Name),
+	)
 	// Return the item data
 	return NewJob(item), nil
 }
 
 // FindByDAGRunID finds a job by its dag-run ID without removing it from the queue.
 func (q *QueueFile) FindByDAGRunID(ctx context.Context, dagRunID string) (*Job, error) {
+	ctx = logger.WithValues(ctx, tag.Queue(filepath.Base(q.baseDir)))
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
@@ -225,11 +270,13 @@ func (q *QueueFile) FindByDAGRunID(ctx context.Context, dagRunID string) (*Job, 
 		}
 	}
 
+	logger.Debug(ctx, "Dag-run not found in queue file", tag.RunID(dagRunID))
 	return nil, ErrQueueFileItemNotFound
 }
 
 // Len returns the number of items in the queue
 func (q *QueueFile) Len(ctx context.Context) (int, error) {
+	ctx = logger.WithValues(ctx, tag.Queue(filepath.Base(q.baseDir)))
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
@@ -244,6 +291,7 @@ func (q *QueueFile) Len(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("failed to list jobs: %w", err)
 	}
 
+	logger.Debug(ctx, "Queue file length computed", tag.Count(len(items)))
 	return len(items), nil
 }
 
@@ -254,6 +302,9 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 	pattern := filepath.Join(q.baseDir, itemPrefix+q.prefix+"*")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
+		logger.Error(ctx, "Failed to glob queue files",
+			tag.Dir(q.baseDir),
+			tag.Error(err))
 		return nil, fmt.Errorf("failed to list files in %s: %w", q.baseDir, err)
 	}
 
@@ -267,7 +318,9 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 		// Parse the file name to get the dag-run ID and timestamp
 		item, err := parseQueueFileName(file, fileName)
 		if err != nil {
-			logger.Error(ctx, "failed to parse queue file name %s: %w", fileName, err)
+			logger.Error(ctx, "Failed to parse queue file name",
+				tag.File(fileName),
+				tag.Error(err))
 			continue
 		}
 		items = append(items, item)
@@ -294,12 +347,12 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 		return ItemData{}, fmt.Errorf("failed to parse timestamp from file name %s: %w", fileName, err)
 	}
 
-	// Parse the milliseconds
-	millis, err := strconv.Atoi(matches[3])
+	// Parse the nanoseconds
+	nanos, err := strconv.Atoi(matches[3])
 	if err != nil {
-		return ItemData{}, fmt.Errorf("failed to parse milliseconds from file name %s: %w", fileName, err)
+		return ItemData{}, fmt.Errorf("failed to parse nanoseconds from file name %s: %w", fileName, err)
 	}
-	timestamp = timestamp.Add(time.Duration(millis) * time.Millisecond)
+	timestamp = timestamp.Add(time.Duration(nanos) * time.Nanosecond)
 
 	// Create the ItemData struct
 	item := ItemData{
@@ -315,11 +368,11 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 }
 
 // parseRegex is the regex used to parse the queue file name
-var parseRegex = regexp.MustCompile(`^item_(high|low)_(\d{8}_\d{6})_(\d{3})Z_(.*)\.json$`)
+var parseRegex = regexp.MustCompile(`^item_(high|low)_(\d{8}_\d{6})_(\d{9})Z_(.*)\.json$`)
 
 func queueFileName(priority, dagRunID string, t execution.TimeInUTC) string {
-	mill := t.UnixMilli()
-	timestamp := t.Format(dateTimeFormatUTC) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"
+	nanos := t.UnixNano()
+	timestamp := t.Format(dateTimeFormatUTC) + "_" + fmt.Sprintf("%09d", nanos%1e9) + "Z"
 	return itemPrefix + priority + timestamp + "_" + dagRunID + ".json"
 }
 

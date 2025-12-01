@@ -4,10 +4,8 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -19,12 +17,17 @@ import (
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
+
+// systemVarPrefix is the prefix for temporary variables used internally by Dagu
+// to avoid conflicts with user-defined variables.
+const systemVarPrefix = "DAGU_"
 
 // Node is a node in a DAG. It executes a command.
 type Node struct {
@@ -53,6 +56,12 @@ func NodeWithData(data NodeData) *Node {
 
 func (n *Node) NodeData() NodeData {
 	return n.Data.Data()
+}
+
+func (n *Node) ID() int {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.id
 }
 
 func (n *Node) StdoutFile() string {
@@ -105,12 +114,14 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 
 	case core.NodeRunning:
 		// Unexpected state
-		logger.Error(ctx, "Unexpected node status", "status", s.String())
+		logger.Error(ctx, "Unexpected node status",
+			tag.Status(s.String()),
+		)
 		return false
 
 	}
 
-	cacheKey := execution.SystemVariablePrefix + "CONTINUE_ON." + n.Name()
+	cacheKey := systemVarPrefix + "CONTINUE_ON." + n.Name()
 	if v, ok := n.getBoolVariable(cacheKey); ok {
 		return v
 	}
@@ -123,7 +134,7 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 	if len(continueOn.Output) > 0 {
 		ok, err := n.LogContainsPattern(ctx, continueOn.Output)
 		if err != nil {
-			logger.Error(ctx, "Failed to check log for pattern", "err", err)
+			logger.Error(ctx, "Failed to check log for pattern", tag.Error(err))
 			return false
 		}
 		if ok {
@@ -137,7 +148,7 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 }
 
 func (n *Node) Execute(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel, stepTimeout := n.setupContextWithTimeout(ctx)
 	defer cancel()
 
 	cmd, err := n.setupExecutor(ctx)
@@ -146,7 +157,46 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
-	// Periodically flush output buffers so logs appear while running
+	flushDone := n.startOutputFlusher()
+	defer func() {
+		n.stopOutputFlusher(flushDone)
+	}()
+
+	exitCode, err := n.runCommand(ctx, cmd, stepTimeout)
+	n.SetError(err)
+	n.SetExitCode(exitCode)
+
+	if err := n.captureOutput(ctx); err != nil {
+		return err
+	}
+
+	if err := n.determineNodeStatus(cmd); err != nil {
+		return err
+	}
+
+	return n.Error()
+}
+
+// setupContextWithTimeout configures the execution context with step-level timeout if specified.
+func (n *Node) setupContextWithTimeout(ctx context.Context) (context.Context, context.CancelFunc, time.Duration) {
+	step := n.Step()
+	var stepTimeout time.Duration
+
+	if step.Timeout > 0 {
+		stepTimeout = step.Timeout
+		ctx, cancel := context.WithTimeout(ctx, stepTimeout)
+		logger.Info(ctx, "Step execution started with timeout",
+			tag.Timeout(stepTimeout),
+		)
+		return ctx, cancel, stepTimeout
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	return ctx, cancel, 0
+}
+
+// startOutputFlusher starts a goroutine that periodically flushes output buffers.
+func (n *Node) startOutputFlusher() chan struct{} {
 	flushDone := make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(500 * time.Millisecond)
@@ -160,55 +210,96 @@ func (n *Node) Execute(ctx context.Context) error {
 			}
 		}
 	}()
+	return flushDone
+}
 
-	var exitCode int
-	if err := cmd.Run(ctx); err != nil {
-		n.SetError(err)
-
-		// Set the exit code if the command implements ExitCoder
-		var exitErr *exec.ExitError
-		if cmd, ok := cmd.(executor.ExitCoder); ok {
-			exitCode = cmd.ExitCode()
-		} else if n.Error() != nil && errors.As(n.Error(), &exitErr) {
-			exitCode = exitErr.ExitCode()
-		} else if code, found := parseExitCodeFromError(n.Error().Error()); found {
-			exitCode = code
-		} else {
-			exitCode = 1
-		}
-	}
-
-	n.SetExitCode(exitCode)
-
-	// Stop periodic flushing and do a final flush
+// stopOutputFlusher stops the output flushing goroutine and performs a final flush.
+func (n *Node) stopOutputFlusher(flushDone chan struct{}) {
 	close(flushDone)
 	_ = n.outputs.flushWriters()
+}
 
-	// Flush all output writers to ensure data is written before capturing output
-	// This is especially important for buffered writers
-	_ = n.outputs.flushWriters()
+// runCommand executes the command and handles errors, timeouts, and exit codes.
+func (n *Node) runCommand(ctx context.Context, cmd executor.Executor, stepTimeout time.Duration) (int, error) {
+	startTime := time.Now()
+	err := cmd.Run(ctx)
 
+	if err != nil {
+		elapsed := time.Since(startTime)
+		step := n.Step()
+
+		// Check if this is a timeout error
+		if stepTimeout > 0 && (ctx.Err() == context.DeadlineExceeded || elapsed >= stepTimeout) {
+			return n.handleTimeout(ctx, step, stepTimeout, elapsed)
+		}
+
+		return n.handleCommandError(cmd, err)
+	}
+
+	return 0, nil
+}
+
+// handleTimeout handles step-level timeout errors.
+func (n *Node) handleTimeout(ctx context.Context, _ core.Step, stepTimeout, elapsed time.Duration) (int, error) {
+	timeoutErr := fmt.Errorf("step timed out after %v (timeout: %v): %w",
+		elapsed.Truncate(time.Millisecond), stepTimeout, context.DeadlineExceeded)
+	logger.Error(ctx, "Step execution timed out",
+		tag.Timeout(stepTimeout),
+		tag.Duration(elapsed),
+	)
+	n.SetError(timeoutErr)
+	n.SetStatus(core.NodeFailed)
+	return 124, timeoutErr // Standard timeout exit code
+}
+
+// handleCommandError determines the exit code from a command execution error.
+func (n *Node) handleCommandError(cmd executor.Executor, err error) (int, error) {
+	n.SetError(err)
+
+	// Try to get exit code from ExitCoder interface
+	if exitCoder, ok := cmd.(executor.ExitCoder); ok {
+		return exitCoder.ExitCode(), err
+	}
+
+	if code, found := exitCodeFromError(err); found {
+		return code, err
+	}
+
+	// Default error exit code
+	return 1, err
+}
+
+// captureOutput captures and stores the command output to a variable if configured.
+func (n *Node) captureOutput(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// Capture output if configured
-	if output := n.Step().Output; output != "" {
-		value, err := n.outputs.capturedOutput(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to capture output: %w", err)
-		}
-		n.setVariable(output, value)
+	output := n.Step().Output
+	if output == "" {
+		return nil
 	}
 
-	if status, ok := cmd.(executor.NodeStatusDeterminer); ok {
-		nodeStatus, err := status.DetermineNodeStatus()
-		if err != nil {
-			return err
-		}
-		n.SetStatus(nodeStatus)
+	value, err := n.outputs.capturedOutput(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to capture output: %w", err)
+	}
+	n.setVariable(output, value)
+	return nil
+}
+
+// determineNodeStatus uses the executor to determine the final node status if supported.
+func (n *Node) determineNodeStatus(cmd executor.Executor) error {
+	statusDeterminer, ok := cmd.(executor.NodeStatusDeterminer)
+	if !ok {
+		return nil
 	}
 
-	return n.Error()
+	nodeStatus, err := statusDeterminer.DetermineNodeStatus()
+	if err != nil {
+		return err
+	}
+	n.SetStatus(nodeStatus)
+	return nil
 }
 
 func (n *Node) clearVariable(key string) {
@@ -221,7 +312,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	defer n.mu.Unlock()
 
 	// Clear the cache
-	n.clearVariable(execution.SystemVariablePrefix + "CONTINUE_ON." + n.Name())
+	n.clearVariable(systemVarPrefix + "CONTINUE_ON." + n.Name())
 
 	// Reset the state
 	n.ResetError()
@@ -326,8 +417,9 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 
 	var evalOptions []cmdutil.EvalOption
 
-	shellCommand := cmdutil.GetShellCommand(n.Step().Shell)
-	if n.Step().ExecutorConfig.IsCommand() && shellCommand != "" {
+	env := GetEnv(ctx)
+	shellCommand := env.Shell(ctx)
+	if n.Step().ExecutorConfig.IsCommand() && len(shellCommand) > 0 {
 		// Command executor run commands on shell, so we don't need to expand env vars
 		evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
 	}
@@ -428,9 +520,15 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 		if allowOverride && n.SignalOnStop() != "" {
 			sigsig = syscall.Signal(signal.GetSignalNum(n.SignalOnStop()))
 		}
-		logger.Info(ctx, "Sending signal", "signal", sigsig, "step", n.Name())
+		logger.Info(ctx, "Sending signal",
+			tag.Signal(sigsig.String()),
+			tag.Step(n.Name()),
+		)
 		if err := n.cmd.Kill(sigsig); err != nil {
-			logger.Error(ctx, "Failed to send signal", "err", err, "step", n.Name())
+			logger.Error(ctx, "Failed to send signal",
+				tag.Error(err),
+				tag.Step(n.Name()),
+			)
 		}
 	}
 
@@ -450,19 +548,19 @@ func (n *Node) Cancel() {
 	}
 }
 
-func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
+func (n *Node) SetupEnv(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	env := execution.GetEnv(ctx)
+	env := GetEnv(ctx)
 	env = env.WithVariables(
 		execution.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
 		execution.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)
-	ctx = logger.WithValues(ctx, "step", n.Name())
-	return execution.WithEnv(ctx, env)
+	ctx = logger.WithValues(ctx, tag.Step(n.Name()))
+	return WithEnv(ctx, env)
 }
 
-func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error {
+func (n *Node) Prepare(ctx context.Context, logDir string, dagRunID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -479,7 +577,7 @@ func (n *Node) Setup(ctx context.Context, logDir string, dagRunID string) error 
 	}
 
 	logFile := filepath.Join(logDir, logFilename)
-	if err := n.Data.Setup(ctx, logFile, startedAt); err != nil {
+	if err := n.Setup(ctx, logFile, startedAt); err != nil {
 		return fmt.Errorf("failed to setup node data: %w", err)
 	}
 	if err := n.outputs.setup(ctx, n.NodeData()); err != nil {
@@ -538,7 +636,7 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 
 	// Get maxOutputSize from DAG configuration
 	var maxOutputSize = 1024 * 1024 // Default 1MB
-	if env := execution.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+	if env := execution.GetDAGContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
 		maxOutputSize = env.DAG.MaxOutputSize
 	}
 
@@ -811,7 +909,8 @@ func (node *Node) evalPreconditions(ctx context.Context) error {
 		return nil
 	}
 	logger.Infof(ctx, "Checking preconditions for \"%s\"", node.Name())
-	shell := cmdutil.GetShellCommand(node.Step().Shell)
+	env := GetEnv(ctx)
+	shell := env.Shell(ctx)
 	if err := EvalConditions(ctx, shell, node.Step().Preconditions); err != nil {
 		logger.Infof(ctx, "Preconditions failed for \"%s\"", node.Name())
 		return err

@@ -167,6 +167,16 @@ type mockQueueStore struct {
 	mock.Mock
 }
 
+// QueueWatcher implements execution.QueueStore.
+func (m *mockQueueStore) QueueWatcher(_ context.Context) execution.QueueWatcher {
+	panic("unimplemented")
+}
+
+// QueueList implements execution.QueueStore.
+func (m *mockQueueStore) QueueList(_ context.Context) ([]string, error) {
+	panic("unimplemented")
+}
+
 // ListByDAGName implements models.QueueStore.
 func (m *mockQueueStore) ListByDAGName(_ context.Context, _, _ string) ([]execution.QueuedItemData, error) {
 	return nil, nil
@@ -185,8 +195,8 @@ func (m *mockQueueStore) DequeueByName(ctx context.Context, name string) (execut
 	return args.Get(0).(execution.QueuedItemData), args.Error(1)
 }
 
-func (m *mockQueueStore) DequeueByDAGRunID(ctx context.Context, name, dagRunID string) ([]execution.QueuedItemData, error) {
-	args := m.Called(ctx, name, dagRunID)
+func (m *mockQueueStore) DequeueByDAGRunID(ctx context.Context, name string, dagRun execution.DAGRunRef) ([]execution.QueuedItemData, error) {
+	args := m.Called(ctx, name, dagRun)
 	return args.Get(0).([]execution.QueuedItemData), args.Error(1)
 }
 
@@ -206,11 +216,6 @@ func (m *mockQueueStore) All(ctx context.Context) ([]execution.QueuedItemData, e
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]execution.QueuedItemData), args.Error(1)
-}
-
-func (m *mockQueueStore) Reader() execution.QueueReader {
-	args := m.Called()
-	return args.Get(0).(execution.QueueReader)
 }
 
 type mockServiceRegistry struct {

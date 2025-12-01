@@ -69,25 +69,25 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		// Mock attempt
 		attempt := &mockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
-		dagRunStore.On("FindAttempt", ctx, dagRunRef).Return(attempt, nil)
+		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 
 		// Mock DAG
 		dag := &core.DAG{Name: "test-dag"}
-		attempt.On("ReadDAG", ctx).Return(dag, nil)
+		attempt.On("ReadDAG", mock.Anything).Return(dag, nil)
 
 		// Process is alive
 		procRef := execution.DAGRunRef{
 			Name: dag.Name,
 			ID:   "run-123",
 		}
-		procStore.On("IsRunAlive", ctx, dag.ProcGroup(), procRef).Return(true, nil)
+		procStore.On("IsRunAlive", mock.Anything, dag.ProcGroup(), procRef).Return(true, nil)
 
 		detector.detectAndCleanZombies(ctx)
 
 		// Should not update status since process is alive
-		attempt.AssertNotCalled(t, "Open", ctx)
-		attempt.AssertNotCalled(t, "Write", ctx, mock.Anything)
-		attempt.AssertNotCalled(t, "Close", ctx)
+		attempt.AssertNotCalled(t, "Open", mock.Anything)
+		attempt.AssertNotCalled(t, "Write", mock.Anything, mock.Anything)
+		attempt.AssertNotCalled(t, "Close", mock.Anything)
 
 		dagRunStore.AssertExpectations(t)
 		procStore.AssertExpectations(t)
@@ -112,25 +112,25 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		// Mock attempt
 		attempt := &mockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
-		dagRunStore.On("FindAttempt", ctx, dagRunRef).Return(attempt, nil)
+		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 
 		// Mock DAG
 		dag := &core.DAG{Name: "test-dag"}
-		attempt.On("ReadDAG", ctx).Return(dag, nil)
+		attempt.On("ReadDAG", mock.Anything).Return(dag, nil)
 
 		// Process is NOT alive (zombie)
 		procRef := execution.DAGRunRef{
 			Name: dag.Name,
 			ID:   "run-123",
 		}
-		procStore.On("IsRunAlive", ctx, dag.ProcGroup(), procRef).Return(false, nil)
+		procStore.On("IsRunAlive", mock.Anything, dag.ProcGroup(), procRef).Return(false, nil)
 
 		// Expect status update
-		attempt.On("Open", ctx).Return(nil)
-		attempt.On("Write", ctx, mock.MatchedBy(func(s execution.DAGRunStatus) bool {
+		attempt.On("Open", mock.Anything).Return(nil)
+		attempt.On("Write", mock.Anything, mock.MatchedBy(func(s execution.DAGRunStatus) bool {
 			return s.Status == core.Failed && s.FinishedAt != ""
 		})).Return(nil)
-		attempt.On("Close", ctx).Return(nil)
+		attempt.On("Close", mock.Anything).Return(nil)
 
 		detector.detectAndCleanZombies(ctx)
 
@@ -207,7 +207,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		}
 
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
-		dagRunStore.On("FindAttempt", ctx, dagRunRef).Return((*mockDAGRunAttempt)(nil), errors.New("not found"))
+		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return((*mockDAGRunAttempt)(nil), errors.New("not found"))
 
 		err := detector.checkAndCleanZombie(ctx, status)
 		assert.Error(t, err)
@@ -231,8 +231,8 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 
 		attempt := &mockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
-		dagRunStore.On("FindAttempt", ctx, dagRunRef).Return(attempt, nil)
-		attempt.On("ReadDAG", ctx).Return((*core.DAG)(nil), errors.New("read error"))
+		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
+		attempt.On("ReadDAG", mock.Anything).Return((*core.DAG)(nil), errors.New("read error"))
 
 		err := detector.checkAndCleanZombie(ctx, status)
 		assert.Error(t, err)
@@ -257,16 +257,16 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 
 		attempt := &mockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
-		dagRunStore.On("FindAttempt", ctx, dagRunRef).Return(attempt, nil)
+		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 
 		dag := &core.DAG{Name: "test-dag"}
-		attempt.On("ReadDAG", ctx).Return(dag, nil)
+		attempt.On("ReadDAG", mock.Anything).Return(dag, nil)
 
 		procRef := execution.DAGRunRef{
 			Name: dag.Name,
 			ID:   "run-123",
 		}
-		procStore.On("IsRunAlive", ctx, dag.ProcGroup(), procRef).Return(false, errors.New("check error"))
+		procStore.On("IsRunAlive", mock.Anything, dag.ProcGroup(), procRef).Return(false, errors.New("check error"))
 
 		err := detector.checkAndCleanZombie(ctx, status)
 		assert.Error(t, err)
@@ -292,19 +292,19 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 
 		attempt := &mockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
-		dagRunStore.On("FindAttempt", ctx, dagRunRef).Return(attempt, nil)
+		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 
 		dag := &core.DAG{Name: "test-dag"}
-		attempt.On("ReadDAG", ctx).Return(dag, nil)
+		attempt.On("ReadDAG", mock.Anything).Return(dag, nil)
 
 		procRef := execution.DAGRunRef{
 			Name: dag.Name,
 			ID:   "run-123",
 		}
-		procStore.On("IsRunAlive", ctx, dag.ProcGroup(), procRef).Return(false, nil)
+		procStore.On("IsRunAlive", mock.Anything, dag.ProcGroup(), procRef).Return(false, nil)
 
 		// Fail to open attempt
-		attempt.On("Open", ctx).Return(errors.New("open error"))
+		attempt.On("Open", mock.Anything).Return(errors.New("open error"))
 
 		err := detector.checkAndCleanZombie(ctx, status)
 		assert.Error(t, err)
@@ -416,6 +416,11 @@ var _ execution.ProcStore = (*mockProcStore)(nil)
 // Mock ProcStore
 type mockProcStore struct {
 	mock.Mock
+}
+
+// Lock implements execution.ProcStore.
+func (m *mockProcStore) Lock(_ context.Context, _ string) error {
+	return nil
 }
 
 // CountAliveByDAGName implements models.ProcStore.

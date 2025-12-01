@@ -15,6 +15,11 @@ type definition struct {
 	// "chain" executes steps in the order they are defined.
 	// "agent" is reserved for future agent-based execution.
 	Type string
+	// Shell is the default shell to use for all steps in this DAG.
+	// If not specified, the system default shell is used.
+	// Can be overridden at the step level.
+	// Can be a string (e.g., "bash -e") or an array (e.g., ["bash", "-e"]).
+	Shell any
 	// WorkingDir is working directory for DAG execution
 	WorkingDir string
 	// Dotenv is the path to the dotenv file (string or []string).
@@ -111,7 +116,8 @@ type stepDef struct {
 	// Command is the command to run (on shell).
 	Command any `yaml:"command,omitempty"`
 	// Shell is the shell to run the command. Default is `$SHELL` or `sh`.
-	Shell string `yaml:"shell,omitempty"`
+	// Can be a string (e.g., "bash -e") or an array (e.g., ["bash", "-e"]).
+	Shell any `yaml:"shell,omitempty"`
 	// ShellPackages is the list of packages to install.
 	// This is used only when the shell is `nix-shell`.
 	ShellPackages []string `yaml:"shellPackages,omitempty"`
@@ -158,6 +164,8 @@ type stepDef struct {
 	WorkerSelector map[string]string `yaml:"workerSelector,omitempty"`
 	// Env specifies the environment variables for the step.
 	Env any `yaml:"env,omitempty"`
+	// TimeoutSec specifies the maximum runtime for the step in seconds.
+	TimeoutSec int `yaml:"timeoutSec,omitempty"`
 }
 
 // continueOnDef defines the conditions to continue on failure or skipped.

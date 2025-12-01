@@ -20,6 +20,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/persistence/legacy"
 	"github.com/dagu-org/dagu/internal/persistence/legacy/model"
@@ -105,7 +106,8 @@ func (db *JSONDB) Open(ctx context.Context, key string, timestamp time.Time, req
 		return err
 	}
 
-	logger.Infof(ctx, "Initializing status file: %s", filePath)
+	logger.Info(ctx, "Initializing status file",
+		tag.File(filePath))
 
 	writer := newWriter(filePath)
 	if err := writer.open(); err != nil {

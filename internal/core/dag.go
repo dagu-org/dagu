@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"
 )
@@ -43,6 +44,14 @@ type DAG struct {
 	Name string `json:"name,omitempty"`
 	// Type is the execution type (graph, chain, or agent). Default is graph.
 	Type string `json:"type,omitempty"`
+	// Shell is the default shell to use for all steps in this DAG.
+	// If not specified, the system default shell is used.
+	// Can be overridden at the step level.
+	Shell string `json:"shell,omitempty"`
+	// ShellArgs contains additional arguments to pass to the shell.
+	// These are populated when Shell is specified as a string with arguments
+	// (e.g., "bash -e") or as an array (e.g., ["bash", "-e"]).
+	ShellArgs []string `json:"shellArgs,omitempty"`
 	// Dotenv is the path to the dotenv file. This is optional.
 	Dotenv []string `json:"dotenv,omitempty"`
 	// Tags contains the list of tags for the DAG. This is optional.
@@ -97,7 +106,7 @@ type DAG struct {
 	// Queue is the name of the queue to assign this DAG to.
 	Queue string `json:"queue,omitempty"`
 	// WorkerSelector defines labels required for worker selection in distributed execution.
-	// If specified, the DAG will only run on workers with matching labels.
+	// If specified, the DAG will only run on workers with matching tag.
 	WorkerSelector map[string]string `json:"workerSelector,omitempty"`
 	// MaxOutputSize is the maximum size of step output to capture in bytes.
 	// Default is 1MB. Output exceeding this will return an error.
@@ -259,7 +268,10 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 		}
 		filePath, err := cmdutil.EvalString(ctx, filePath)
 		if err != nil {
-			logger.Warn(ctx, "Failed to eval filepath", "filePath", filePath, "err", err)
+			logger.Warn(ctx, "Failed to evaluate filepath",
+				tag.File(filePath),
+				tag.Error(err),
+			)
 			continue
 		}
 		resolvedPath, err := resolver.ResolveFilePath(filePath)
@@ -272,7 +284,10 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 		// Use godotenv.Read instead of godotenv.Load to avoid os.Setenv
 		vars, err := godotenv.Read(resolvedPath)
 		if err != nil {
-			logger.Warn(ctx, "Failed to load .env", "file", resolvedPath, "err", err)
+			logger.Warn(ctx, "Failed to load .env file",
+				tag.File(resolvedPath),
+				tag.Error(err),
+			)
 			continue
 		}
 		// Add dotenv vars to DAG.Env so they're included in AllEnvs()
@@ -282,10 +297,14 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 		// Set os environment variables for the current process
 		for k, v := range vars {
 			if err := os.Setenv(k, v); err != nil {
-				logger.Warn(ctx, "Failed to set env var from .env", "key", k, "file", resolvedPath, "err", err)
+				logger.Warn(ctx, "Failed to set env var from .env",
+					tag.Key(k),
+					tag.File(resolvedPath),
+					tag.Error(err),
+				)
 			}
 		}
-		logger.Info(ctx, "Loaded .env file", "file", resolvedPath)
+		logger.Info(ctx, "Loaded .env file", tag.File(resolvedPath))
 
 		// Load the first found one
 		return

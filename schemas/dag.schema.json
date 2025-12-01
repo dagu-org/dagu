@@ -445,6 +445,22 @@
         "type": "string"
       },
       "description": "Key-value pairs specifying worker label requirements for executing this DAG. The DAG will only run on workers that have all specified labels with matching values. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels. This setting applies to the entire DAG; individual steps can override this with their own workerSelector."
+    },
+    "shell": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Shell command with optional arguments (e.g., '/bin/bash -e', 'bash -eo pipefail')"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Shell command as array (e.g., ['/bin/bash', '-e', '-o', 'pipefail'])"
+        }
+      ],
+      "description": "Default shell to use for all steps in this DAG. Can be specified as a string with arguments (e.g., '/bin/bash -e') which will be automatically tokenized, or as an array for explicit argument separation. If not specified, the system default shell ($SHELL or /bin/sh) is used. Can be overridden at the step level."
     }
   },
   "definitions": {
@@ -584,8 +600,20 @@
           "description": "Command to execute. Can be a shell command, script interpreter, or executable."
         },
         "shell": {
-          "type": "string",
-          "description": "Specific shell to use for executing the command. Defaults to $SHELL or sh if not specified."
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Shell command with optional arguments (e.g., '/bin/bash -e', 'bash -eo pipefail')"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Shell command as array (e.g., ['/bin/bash', '-e', '-o', 'pipefail'])"
+            }
+          ],
+          "description": "Shell to use for executing the command. Can be specified as a string with arguments (e.g., '/bin/bash -e') which will be automatically tokenized, or as an array for explicit argument separation. Overrides DAG-level shell if specified. Defaults to DAG-level shell, or $SHELL/sh if not specified."
         },
         "shellPackages": {
           "type": "array",
@@ -823,6 +851,11 @@
         "signalOnStop": {
           "type": "string",
           "description": "Signal to send when stopping this step (e.g., SIGINT). If empty, uses same signal as parent process."
+        },
+        "timeoutSec": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum execution time for the step in seconds. If set, this timeout takes precedence over the DAG-level timeout for this step."
         },
         "call": {
           "type": "string",

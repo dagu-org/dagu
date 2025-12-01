@@ -4,6 +4,7 @@ import { components, Status } from '../../../../api/v2/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import { DAGRunDetailsModal } from '../dag-run-details';
+import { StepDetailsTooltip } from './StepDetailsTooltip';
 
 interface DAGRunGroupedViewProps {
   dagRuns: components['schemas']['DAGRunSummary'][];
@@ -301,9 +302,13 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                             </div>
                           </div>
                           <div className="flex-shrink-0 mt-0.5">
-                            <StatusChip status={dagRun.status} size="xs">
-                              {dagRun.statusLabel}
-                            </StatusChip>
+                            <StepDetailsTooltip dagRun={dagRun}>
+                              <div className="flex flex-col items-end gap-1">
+                                <StatusChip status={dagRun.status} size="xs">
+                                  {dagRun.statusLabel}
+                                </StatusChip>
+                              </div>
+                            </StepDetailsTooltip>
                           </div>
                         </div>
                       </div>

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/masking"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
@@ -66,7 +68,7 @@ func (oc *OutputCoordinator) setupMasker(ctx context.Context, _ NodeData) error 
 	defer oc.mu.Unlock()
 
 	// Get secrets from DAGContext
-	dagCtx := execution.GetDAGContextFromContext(ctx)
+	dagCtx := execution.GetDAGContext(ctx)
 
 	// Convert secret envs map to []string format for masker
 	var secretEnvs []string
@@ -119,13 +121,16 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		if oc.outputReader, oc.outputWriter, err = os.Pipe(); err != nil {
 			return fmt.Errorf("failed to create pipe: %w", err)
 		}
-		logger.Debug(ctx, "Created new output pipes", "step", data.Step.Name, "outputVar", data.Step.Output)
+		logger.Debug(ctx, "Created new output pipes",
+			tag.Step(data.Step.Name),
+			tag.OutputVar(data.Step.Output),
+		)
 		// Reset the captured flag to allow new output capture for retry
 		oc.outputCaptured = false
 
 		// Get max output size from DAG configuration, default to 1MB
 		oc.maxOutputSize = 1024 * 1024 // 1MB default
-		if env := execution.GetDAGContextFromContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
+		if env := execution.GetDAGContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
 			oc.maxOutputSize = int64(env.DAG.MaxOutputSize)
 		}
 
@@ -297,7 +302,7 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 func (oc *OutputCoordinator) setupFile(ctx context.Context, filePath string, _ NodeData) (*os.File, error) {
 	absFilePath := filePath
 	if !filepath.IsAbs(absFilePath) {
-		dir := execution.GetEnv(ctx).WorkingDir
+		dir := GetEnv(ctx).WorkingDir
 		absFilePath = filepath.Join(dir, absFilePath)
 		absFilePath = filepath.Clean(absFilePath)
 	}
@@ -314,9 +319,15 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
+	// Enrich context with output data for all logging in this function
+	ctx = logger.WithValues(ctx,
+		tag.Output(oc.outputData),
+		tag.Length(len(oc.outputData)),
+	)
+
 	// Return cached result if already captured
 	if oc.outputCaptured {
-		logger.Debug(ctx, "capturedOutput: returning cached", "output", oc.outputData, "length", len(oc.outputData))
+		logger.Debug(ctx, "Captured output: returning cached")
 		return oc.outputData, nil
 	}
 
@@ -324,9 +335,9 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	if oc.outputCapture != nil {
 		// Close the writer to signal EOF to the reader
 		if oc.outputWriter != nil {
-			logger.Debug(ctx, "capturedOutput: closing output writer")
+			logger.Debug(ctx, "Captured output: closing output writer")
 			if err := oc.outputWriter.Close(); err != nil {
-				logger.Error(ctx, "failed to close pipe writer", "err", err)
+				logger.Error(ctx, "Failed to close pipe writer", tag.Error(err))
 			}
 			oc.outputWriter = nil // Mark as closed
 		}
@@ -344,7 +355,9 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 			oc.outputData = strings.TrimSpace(output)
 		}
 
-		logger.Debug(ctx, "capturedOutput: captured", "output", oc.outputData, "length", len(oc.outputData))
+		logger.Debug(ctx, "Captured output",
+			tag.Length(len(oc.outputData)),
+		)
 
 		// Mark as captured for caching
 		oc.outputCaptured = true
@@ -352,7 +365,7 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		// Close the reader
 		if oc.outputReader != nil {
 			if err := oc.outputReader.Close(); err != nil {
-				logger.Error(ctx, "failed to close pipe reader", "err", err)
+				logger.Error(ctx, "Failed to close pipe reader", tag.Error(err))
 			}
 			oc.outputReader = nil
 		}
@@ -362,15 +375,15 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 
 	// Fallback to old behavior if concurrent capture not used (shouldn't happen)
 	if oc.outputReader == nil {
-		logger.Debug(ctx, "capturedOutput: no output reader")
+		logger.Debug(ctx, "Captured output: no output reader")
 		return "", nil
 	}
 
 	// Close the writer only if it hasn't been closed already
 	if oc.outputWriter != nil {
-		logger.Debug(ctx, "capturedOutput: closing output writer")
+		logger.Debug(ctx, "Captured output: closing output writer")
 		if err := oc.outputWriter.Close(); err != nil {
-			logger.Error(ctx, "failed to close pipe writer", "err", err)
+			logger.Error(ctx, "Failed to close pipe writer", tag.Error(err))
 		}
 		oc.outputWriter = nil // Mark as closed
 	}
@@ -386,7 +399,9 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 
 	// Check if output was truncated
 	if buf.Len() == int(oc.maxOutputSize) {
-		logger.Warn(ctx, "Output truncated due to size limit", "maxSize", oc.maxOutputSize)
+		logger.Warn(ctx, "Output truncated due to size limit",
+			slog.Int64("max-size", oc.maxOutputSize),
+		)
 		output += "\n[OUTPUT TRUNCATED]"
 	}
 
@@ -397,11 +412,13 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 		oc.outputData = output
 	}
 
-	logger.Debug(ctx, "capturedOutput: captured", "output", oc.outputData, "length", len(oc.outputData))
+	logger.Debug(ctx, "Captured output",
+		tag.Length(len(oc.outputData)),
+	)
 
 	// Close the reader after reading
 	if err := oc.outputReader.Close(); err != nil {
-		logger.Error(ctx, "failed to close pipe reader", "err", err)
+		logger.Error(ctx, "Failed to close pipe reader", tag.Error(err))
 	}
 	oc.outputReader = nil // Mark as closed
 
@@ -436,6 +453,8 @@ func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 	go func() {
 		defer close(oc.done)
 
+		// Enrich context with error tag for all logging in this goroutine
+		// Note: error will be set later when needed
 		// Read in chunks to detect when we exceed the limit
 		buf := make([]byte, 8192) // 8KB chunks
 		for {
@@ -466,7 +485,7 @@ func (oc *outputCapture) start(ctx context.Context, reader io.Reader) {
 					oc.mu.Lock()
 					oc.err = fmt.Errorf("failed to read output: %w", err)
 					oc.mu.Unlock()
-					logger.Error(ctx, "Failed to capture output", "err", err)
+					logger.Error(ctx, "Failed to capture output", tag.Error(err))
 				}
 				break
 			}

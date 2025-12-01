@@ -2480,6 +2480,10 @@ components:
           description: "Conditions that must be met before the step can start"
           items:
             $ref: "#/components/schemas/Condition"
+        timeoutSec:
+          type: integer
+          description: "Maximum execution time for the step in seconds. If set, this timeout takes precedence over the DAG-level timeout for this step."
+          minimum: 0
       required:
         - name
 

@@ -1,6 +1,8 @@
 package runtime
 
 import (
+	"errors"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -8,6 +10,8 @@ import (
 )
 
 func TestParseExitCodeFromError(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		errStr    string
@@ -148,6 +152,8 @@ func TestParseExitCodeFromError(t *testing.T) {
 }
 
 func TestParseExitCodeFromError_EdgeCases(t *testing.T) {
+	t.Parallel()
+
 	// Test with very long strings
 	t.Run("VeryLongErrorString", func(t *testing.T) {
 		longPrefix := strings.Repeat("error ", 1000)
@@ -172,4 +178,56 @@ func TestParseExitCodeFromError_EdgeCases(t *testing.T) {
 		assert.True(t, found)
 		assert.Equal(t, 128, code)
 	})
+}
+
+func TestExitCodeFromError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      error
+		wantCode int
+		wantOk   bool
+	}{
+		{
+			name:     "NilError",
+			err:      nil,
+			wantOk:   false,
+			wantCode: 0,
+		},
+		{
+			name:     "ExecExitError",
+			err:      exec.Command("sh", "-c", "exit 7").Run(),
+			wantOk:   true,
+			wantCode: 7,
+		},
+		{
+			name:     "ParseableStringError",
+			err:      errors.New("wrapped: exit status 9"),
+			wantOk:   true,
+			wantCode: 9,
+		},
+		{
+			name:     "NonMatchingError",
+			err:      assert.AnError,
+			wantOk:   false,
+			wantCode: 0,
+		},
+		{
+			name:     "SignalMessage",
+			err:      errors.New("signal: killed"),
+			wantOk:   true,
+			wantCode: -1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, ok := exitCodeFromError(tt.err)
+			assert.Equal(t, tt.wantOk, ok)
+			if ok {
+				assert.Equal(t, tt.wantCode, code)
+			}
+		})
+	}
 }

@@ -94,6 +94,32 @@ curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.s
 curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash -s -- --install-dir /usr/local/bin --working-dir /var/tmp
 ```
 
+**Windows (PowerShell)**:
+
+```powershell
+# Install latest version to default location (%LOCALAPPDATA%\Programs\dagu)
+irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1 | iex
+
+# Install specific version
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1))) v1.24.0
+
+# Install to custom directory
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1))) latest "C:\tools\dagu"
+```
+
+**Windows (CMD/PowerShell)**:
+
+```cmd
+REM Install latest version to default location (%LOCALAPPDATA%\Programs\dagu)
+curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && .\installer.cmd && del installer.cmd
+
+REM Install specific version
+curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && .\installer.cmd v1.24.0 && del installer.cmd
+
+REM Install to custom directory
+curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.cmd -o installer.cmd && .\installer.cmd latest "C:\tools\dagu" && del installer.cmd
+```
+
 **Docker**:
 
 ```bash
@@ -352,7 +378,9 @@ make make-coverage
 
 ## Roadmap
 
-**Legend:** 
+This section outlines the current capabilities and planned features for Dagu.
+
+**Legend:**
 - Status: ✅ Done / 🏗️ In Progress / 📋 Planned / 💭 Designing / ⛔ Blocked / 🏢 Enterprise
 - Priority: P0 = Must have / P1 = Should have / P2 = Could have
 
@@ -372,7 +400,7 @@ make make-coverage
 |                             | Shell support                   | Use shell features like pipes, redirects, globbing, etc. | ✅     |          | <a href="https://docs.dagu.cloud/features/executors/shell">Shell Executor</a> |
 |                             | Script support                  | Use scripts in Python, Bash, etc. as steps                                 | ✅     |          | <a href="https://docs.dagu.cloud/writing-workflows/examples#scripts-code">Script Execution</a> |
 |                             | Modular DAGs                   | Reusable DAGs with params                                            | ✅     |          | <a href="https://docs.dagu.cloud/writing-workflows/#base-configuration">Base Configuration</a>, <a href="https://docs.dagu.cloud/features/execution-control#parallel-execution">Parallel Execution</a> |
-|                             | Secrets management              | Reference-only secrets via KMS/Vault/OIDC                                | 💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/798">#798</a> |
+|                             | Secrets management              | Reference-only secrets via KMS/Vault/OIDC                                |  ✅   |        | <a href="https://docs.dagu.io/writing-workflows/secrets">Secrets</a> |
 |                             | Variables store                 | Env-scoped variables                                                    | 💭    | P1       | |
 |                             | Code-based SDK                  | Python / Go / TS SDK to build DAG programmatically                     | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/583">#583</a> |
 |                             | Go template support            | Use Go templates in DAG definitions                                     | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/738">#738</a> |
@@ -403,7 +431,7 @@ make make-coverage
 | Container Native Execution  | Step-level container config     | Run steps in Docker containers with granular control                     | ✅     |          | <a href="https://docs.dagu.cloud/features/executors/docker">Docker Executor</a> |
 |                             | DAG level container config      | Run all steps in a container with shared volumes and env vars            | ✅     |          | <a href="https://docs.dagu.cloud/features/executors/docker#container-field">Container Field</a> |
 |                             | On-the-fly image build          | Builds image on-the-fly during DAG execution                             | 📋    | P0       | |
-|                             | Authorized registry access      | Access private registries with credentials                                | ✅     |          | <a href="https://docs.dagu.cloud/features/executors/docker#registry-authentication">Registry Auth</a> |   
+|                             | Authorized registry access      | Access private registries with credentials                                | ✅     |          | <a href="https://docs.dagu.cloud/features/executors/docker#registry-authentication">Registry Auth</a> |
 |                             | Kubernetes native execution    | Run steps as Kubernetes jobs/pods                                   | 💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/837">#837</a> |
 | Resource Management         | Resource limits                 | CPU/Memory/IO requests & limits per-step                                 | 💭    | P0       | |
 |                             | Rate limiting                   | Token bucket per key/endpoint for external APIs                          | 💭    | P1       | |
@@ -411,7 +439,7 @@ make make-coverage
 | Data & Artifacts            | Passing data between steps      | Passing ephemeral data between steps in a DAG                           | ✅     |          | <a href="https://docs.dagu.cloud/features/data-flow">Data Flow</a> |
 |                             | JSON Schema validation          | Parameter validation with JSON Schema                                    |  💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/325">#325</a> |
 |                             | External storage                | Stream large logs/artifacts to S3/GCS/Azure                              | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/640">#640</a>, <a href="https://github.com/dagu-org/dagu/issues/548">#548</a>, <a href="https://github.com/dagu-org/dagu/issues/267">#267</a> |
-|                             | Secret redaction                | Auto-mask secrets in logs/events                                         | 📋    | P0       | |
+|                             | Secret redaction                | Auto-mask secrets in logs/events                                         | ✅    |        | |
 |                             | Inter DAG-run state management  | Manage state and data sharing between DAG-runs                          | 💭    | P0       | |
 |                             | Automatic log cleanup           | Automatic log cleanup based on retention policies                        |  ✅     |          | <a href="https://docs.dagu.cloud/configurations/operations#log-cleanup">Log Retention</a> |
 |                             | Database backend support       | Support for external databases (PostgreSQL, MySQL) instead of filesystem | 💭    | P1       | <a href="https://github.com/dagu-org/dagu/issues/539">#539</a>, <a href="https://github.com/dagu-org/dagu/issues/267">#267</a> |
@@ -423,7 +451,7 @@ make make-coverage
 |                             | Health monitoring               | Health check for scheduler & failover                                   | ✅     |          | <a href="https://docs.dagu.cloud/configurations/reference#health-check">Health Check</a> |
 |                             | Nested-DAG visualization        | Nested DAG visualization with drill down functionality                  | ✅     |          | <a href="https://docs.dagu.cloud/overview/web-ui#nested-dag-visualization">Nested DAG Visualization</a> |
 |                             | Resource usage monitoring      | CPU/Memory/IO usage per DAG/step with live graphs                        | 💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/546">#546</a> |
-| Security & Governance       | Secret injection                | Vault/KMS/OIDC ref-only; short-lived tokens                              | 💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/798">#798</a> |
+| Security & Governance       | Secret injection                | Vault/KMS/OIDC ref-only; short-lived tokens                              | ✅    |        | <a href="https://docs.dagu.cloud/writing-workflows/secrets">Secrets</a> |
 |                             | Authentication                  | Basic auth / OIDC support for Web UI and API                             | ✅     |        | <a href="https://docs.dagu.cloud/configurations/authentication">Authentication</a> |
 |                             | Authorization                    | User management & RBAC with fine-grained permissions                    | 🏢    |          | |
 |                             | Resource quotas                 | CPU time and memory limit                                                | 📋    | P0       | |
@@ -435,7 +463,7 @@ make make-coverage
 |                             | `docker`                        | Container-based task execution                                           | ✅     |        | <a href="https://docs.dagu.cloud/features/executors/docker">Docker Executor</a> |
 |                             | `http`                          | HTTP/REST API calls with retry                                           | ✅     |        | <a href="https://docs.dagu.cloud/features/executors/http">HTTP Executor</a> |
 |                             | `mail`                          | Send emails with template                                                | ✅     |        | <a href="https://docs.dagu.cloud/features/executors/mail">Mail Executor</a> |
-|                             | `archive`                       | Archive/unarchive operations (zip, tar, etc.)                            | 📋    | P1       | <a href="https://github.com/dagu-org/dagu/issues/1079">#1079</a> |
+|                             | `archive`                       | Archive/unarchive operations (zip, tar, etc.)                            | ✅    |        | <a href="https://docs.dagu.cloud/features/executors/archive">Archive Executor</a> |
 |                             | `database`                      | Direct database read/write operations                                   | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/789">#789</a> |
 |                             | `ftp`                           | File transfer protocol support                                          | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/1079">#1079</a> |
 |                             | Custom plugin system            | Custom executor types                                                    | 💭    | P1       | <a href="https://github.com/dagu-org/dagu/issues/583">#583</a> |
@@ -456,7 +484,7 @@ make make-coverage
 |                             | Scheduled DAG management        | Enable/disable schedule for a DAG                                   | ✅     |          | <a href="https://docs.dagu.cloud/overview/web-ui">Web UI</a> |
 |                             | Version control                 | Diff/compare/rollback DAG definitions                               | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/320">#320</a>, <a href="https://github.com/dagu-org/dagu/issues/374">#374</a> |
 |                             | UI organization                 | Logical DAG grouping                                               | ✅     |          | <a href="https://docs.dagu.cloud/overview/web-ui#dag-organization">DAG Organization</a> |
-| Others                      | Windows support                 | Windows support                                                     | 📋    | P1       | <a href="https://github.com/dagu-org/dagu/issues/749">#749</a>, <a href="https://github.com/dagu-org/dagu/issues/1061">#1061</a>, <a href="https://github.com/dagu-org/dagu/issues/859">#859</a> |
+| Others                      | Windows support                 | Windows support                                                     | ✅   |        |  |
 |                             | Snap packaging                  | Snap packaging                                                      | 📋    | P1       | <a href="https://github.com/dagu-org/dagu/issues/821">#821</a>, <a href="https://github.com/dagu-org/dagu/issues/871">#871</a> |
 
 ## Discussion
@@ -476,7 +504,7 @@ We welcome contributions of all kinds! Whether you're a developer, a designer, o
 - Join the discussion on our Discord server.
 - Contribute code: Check out our issues you can help with.
 
-For more details, see our [Contribution Guide](./CONTRIBUTING.md) and our [Roadmap](#roadmap) to see what's planned.
+For more details, see our [Contribution Guide](./CONTRIBUTING.md).
 
 ## Acknowledgements
 
@@ -490,6 +518,7 @@ Thanks to all the contributors who have helped make Dagu better! Your contributi
 
 ### Sponsors & Supporters
 
+<a href="https://github.com/disizmj"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fdisizmj.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@disizmj"></a>
 <a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a>
 <a href="https://github.com/yurivish"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyurivish.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yurivish"></a>
 <a href="https://github.com/jayjoshi64"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fjayjoshi64.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@jayjoshi64"></a>

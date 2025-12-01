@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/mailer"
 	"github.com/dagu-org/dagu/internal/common/secrets"
 	"github.com/dagu-org/dagu/internal/common/signal"
@@ -69,11 +71,11 @@ type Agent struct {
 	// dagRunMgr is the runstore dagRunMgr to communicate with the history.
 	dagRunMgr runtime1.Manager
 
-	// scheduler is the scheduler instance to run the DAG.
-	scheduler *runtime.Scheduler
+	// runner is the runner instance to run the DAG.
+	runner *runtime.Runner
 
-	// graph is the execution graph for the DAG.
-	graph *runtime.ExecutionGraph
+	// plan is the execution plan for the DAG.
+	plan *runtime.Plan
 
 	// reporter is responsible for sending the report to the user.
 	reporter *reporter
@@ -85,7 +87,7 @@ type Agent struct {
 	// logDir is the directory to store the log files for each node in the DAG.
 	logDir string
 
-	// logFile is the file to write the scheduler log.
+	// logFile is the file to write the runner log.
 	logFile string
 
 	// dag is the DAG to run.
@@ -183,10 +185,17 @@ func New(
 	return a
 }
 
-// Run setups the scheduler and runs the DAG.
+// Run setups the runner and runs the DAG.
 func (a *Agent) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	// Set DAG context for all logs in this function
+	ctx = logger.WithValues(ctx,
+		tag.Name(a.dag.Name),
+		tag.RunID(a.dagRunID),
+		tag.AttemptID(a.dagRunAttemptID),
+	)
 
 	// Initialize propagators for W3C trace context before anything else
 	telemetry.InitializePropagators()
@@ -201,13 +210,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize OpenTelemetry tracer
 	tracer, err := telemetry.NewTracer(ctx, a.dag)
 	if err != nil {
-		logger.Warn(ctx, "Failed to initialize OpenTelemetry tracer", "err", err)
+		logger.Warn(ctx, "Failed to initialize OpenTelemetry tracer", tag.Error(err))
 		// Continue without tracing
 	} else {
 		a.tracer = tracer
 		defer func() {
 			if err := tracer.Shutdown(ctx); err != nil {
-				logger.Warn(ctx, "Failed to shutdown OpenTelemetry tracer", "err", err)
+				logger.Warn(ctx, "Failed to shutdown OpenTelemetry tracer", tag.Error(err))
 			}
 		}()
 	}
@@ -236,7 +245,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	if a.rootDAGRun.ID != a.dagRunID {
-		logger.Debug(ctx, "Initiating a sub dag-run", "root-run", a.rootDAGRun.String(), "parent-run", a.parentDAGRun.String())
+		logger.Debug(ctx, "Initiating a sub dag-run",
+			slog.String("root-run", a.rootDAGRun.String()),
+			slog.String("parent-run", a.parentDAGRun.String()),
+		)
+
 		a.isSubDAGRun.Store(true)
 		if a.parentDAGRun.Zero() {
 			return fmt.Errorf("parent dag-run is not specified for the sub dag-run %s", a.dagRunID)
@@ -261,15 +274,15 @@ func (a *Agent) Run(ctx context.Context) error {
 		a.dagRunAttemptID = attempt.ID()
 	}
 
-	// Initialize the scheduler
-	a.scheduler = a.newScheduler()
+	// Initialize the runner
+	a.runner = a.newRunner()
 
 	// Setup the reporter to send the report to the user.
 	a.setupReporter(ctx)
 
-	// Setup the execution graph for the DAG.
-	if err := a.setupGraph(ctx); err != nil {
-		return fmt.Errorf("failed to setup execution graph: %w", err)
+	// Setup the execution plan for the DAG.
+	if err := a.setupPlan(ctx); err != nil {
+		return fmt.Errorf("failed to setup execution plan: %w", err)
 	}
 
 	// Create a new environment for the dag-run.
@@ -284,9 +297,15 @@ func (a *Agent) Run(ctx context.Context) error {
 	ctx = execution.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli, secretEnvs)
 
 	// Add structured logging context
-	logFields := []any{"dag", a.dag.Name, "dagRunId", a.dagRunID}
+	logFields := []slog.Attr{
+		tag.DAG(a.dag.Name),
+		tag.RunID(a.dagRunID),
+	}
 	if a.isSubDAGRun.Load() {
-		logFields = append(logFields, "root", a.rootDAGRun.String(), "parent", a.parentDAGRun.String())
+		logFields = append(logFields,
+			slog.String("root", a.rootDAGRun.String()),
+			slog.String("parent", a.parentDAGRun.String()),
+		)
 	}
 	ctx = logger.WithValues(ctx, logFields...)
 
@@ -310,20 +329,20 @@ func (a *Agent) Run(ctx context.Context) error {
 	st := a.Status(ctx)
 	st.Status = core.Running
 	if err := attempt.Write(ctx, st); err != nil {
-		logger.Error(ctx, "Status write failed", "err", err)
+		logger.Error(ctx, "Status write failed", tag.Error(err))
 	}
 
 	defer func() {
 		if initErr != nil {
-			logger.Error(ctx, "Failed to initialize DAG execution", "err", err)
+			logger.Error(ctx, "Failed to initialize DAG execution", tag.Error(err))
 			st := a.Status(ctx)
 			st.Status = core.Failed
 			if err := attempt.Write(ctx, st); err != nil {
-				logger.Error(ctx, "Status write failed", "err", err)
+				logger.Error(ctx, "Status write failed", tag.Error(err))
 			}
 		}
 		if err := attempt.Close(ctx); err != nil {
-			logger.Error(ctx, "Failed to close runstore store", "err", err)
+			logger.Error(ctx, "Failed to close runstore store", tag.Error(err))
 		}
 	}()
 
@@ -334,13 +353,20 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
-		logger.Error(ctx, "Failed to write status", "err", err)
+		logger.Error(ctx, "Failed to write status", tag.Error(err))
 	}
 
 	// Start the unix socket server for receiving HTTP requests from
-	// the local client (e.g., the frontend server, scheduler, etc).
+	// the local client (e.g., the frontend server, etc).
 	if err := a.setupSocketServer(ctx); err != nil {
-		return fmt.Errorf("failed to setup unix socket server: %w", err)
+		initErr = fmt.Errorf("failed to setup unix socket server: %w", err)
+		return initErr
+	}
+
+	// Ensure working directory exists
+	if err := os.MkdirAll(a.dag.WorkingDir, 0o755); err != nil {
+		initErr = fmt.Errorf("failed to create working directory: %w", err)
+		return initErr
 	}
 
 	// Create a new container if the DAG has a container configuration.
@@ -396,14 +422,14 @@ func (a *Agent) Run(ctx context.Context) error {
 	go execWithRecovery(ctx, func() {
 		err := a.socketServer.Serve(ctx, listenerErrCh)
 		if err != nil && !errors.Is(err, sock.ErrServerRequestedShutdown) {
-			logger.Error(ctx, "Failed to start socket frontend", "err", err)
+			logger.Error(ctx, "Failed to start socket frontend", tag.Error(err))
 		}
 	})
 
 	// Stop the socket server when the dag-run is finished.
 	defer func() {
 		if err := a.socketServer.Shutdown(ctx); err != nil {
-			logger.Error(ctx, "Failed to shutdown socket frontend", "err", err)
+			logger.Error(ctx, "Failed to shutdown socket frontend", tag.Error(err))
 		}
 	}()
 
@@ -438,14 +464,14 @@ func (a *Agent) Run(ctx context.Context) error {
 		for node := range progressCh {
 			status := a.Status(ctx)
 			if err := attempt.Write(ctx, status); err != nil {
-				logger.Error(ctx, "Failed to write status", "err", err)
+				logger.Error(ctx, "Failed to write status", tag.Error(err))
 			}
 			if err := a.reporter.reportStep(ctx, a.dag, status, node); err != nil {
-				logger.Error(ctx, "Failed to report step", "err", err)
+				logger.Error(ctx, "Failed to report step", tag.Error(err))
 			}
 			// Update progress display if enabled
 			if a.progressDisplay != nil {
-				// Convert scheduler node to models node
+				// Convert runner node to models node
 				nodeData := node.NodeData()
 				modelNode := a.nodeToModelNode(nodeData)
 				a.progressDisplay.UpdateNode(modelNode)
@@ -462,25 +488,17 @@ func (a *Agent) Run(ctx context.Context) error {
 			return
 		}
 		if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
-			logger.Error(ctx, "Status write failed", "err", err)
+			logger.Error(ctx, "Status write failed", tag.Error(err))
 		}
 	})
 
 	// Start the dag-run.
 	if a.retryTarget != nil {
-		logger.Info(ctx, "dag-run retry started",
-			"name", a.dag.Name,
-			"dagRunId", a.dagRunID,
-			"attemptID", a.dagRunAttemptID,
-			"retryTargetAttemptID", a.retryTarget.AttemptID,
+		logger.Info(ctx, "DAG run retry started",
+			slog.String("retry-target-attempt-id", a.retryTarget.AttemptID),
 		)
 	} else {
-		logger.Info(ctx, "dag-run started",
-			"name", a.dag.Name,
-			"dagRunId", a.dagRunID,
-			"attemptID", a.dagRunAttemptID,
-			"params", a.dag.Params,
-		)
+		logger.Info(ctx, "DAG run started", slog.Any("params", a.dag.Params))
 	}
 
 	// Start watching for cancel requests
@@ -493,12 +511,12 @@ func (a *Agent) Run(ctx context.Context) error {
 		ctx = docker.WithRegistryAuth(ctx, a.dag.RegistryAuths)
 	}
 
-	lastErr := a.scheduler.Schedule(ctx, a.graph, progressCh)
+	lastErr := a.runner.Run(ctx, a.plan, progressCh)
 
 	if coordinatorCli != nil {
 		// Cleanup the coordinator client resources if it was created.
 		if err := coordinatorCli.Cleanup(ctx); err != nil {
-			logger.Warn(ctx, "Failed to cleanup coordinator client", "err", err)
+			logger.Warn(ctx, "Failed to cleanup coordinator client", tag.Error(err))
 		}
 	}
 
@@ -515,23 +533,20 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Log execution summary
-	logger.Info(ctx, "dag-run finished",
-		"name", a.dag.Name,
-		"dagRunId", a.dagRunID,
-		"attemptID", a.dagRunAttemptID,
-		"status", finishedStatus.Status.String(),
-		"startedAt", finishedStatus.StartedAt,
-		"finishedAt", finishedStatus.FinishedAt,
+	logger.Info(ctx, "DAG run finished",
+		tag.Status(finishedStatus.Status.String()),
+		slog.String("started-at", finishedStatus.StartedAt),
+		slog.String("finished-at", finishedStatus.FinishedAt),
 	)
 
 	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
-		logger.Error(ctx, "Status write failed", "err", err)
+		logger.Error(ctx, "Status write failed", tag.Error(err))
 	}
 
 	// Send the execution report if necessary.
 	a.lastErr = lastErr
 	if err := a.reporter.send(ctx, a.dag, finishedStatus, lastErr); err != nil {
-		logger.Error(ctx, "Mail notification failed", "err", err)
+		logger.Error(ctx, "Mail notification failed", tag.Error(err))
 	}
 
 	// Mark the agent finished.
@@ -541,7 +556,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	return lastErr
 }
 
-// nodeToModelNode converts a scheduler NodeData to a models.Node
+// nodeToModelNode converts a runner NodeData to a models.Node
 func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *execution.Node {
 	subRuns := make([]execution.SubDAGRun, len(nodeData.State.SubRuns))
 	for i, child := range nodeData.State.SubRuns {
@@ -585,20 +600,20 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	schedulerStatus := a.scheduler.Status(ctx, a.graph)
-	if schedulerStatus == core.NotStarted && a.graph.IsStarted() {
-		// Match the status to the execution graph.
-		schedulerStatus = core.Running
+	runnerStatus := a.runner.Status(ctx, a.plan)
+	if runnerStatus == core.NotStarted && a.plan.IsStarted() {
+		// Match the status to the execution plan.
+		runnerStatus = core.Running
 	}
 
 	opts := []transform.StatusOption{
-		transform.WithFinishedAt(a.graph.FinishAt()),
-		transform.WithNodes(a.graph.NodeData()),
+		transform.WithFinishedAt(a.plan.FinishAt()),
+		transform.WithNodes(a.plan.NodeData()),
 		transform.WithLogFilePath(a.logFile),
-		transform.WithOnExitNode(a.scheduler.HandlerNode(core.HandlerOnExit)),
-		transform.WithOnSuccessNode(a.scheduler.HandlerNode(core.HandlerOnSuccess)),
-		transform.WithOnFailureNode(a.scheduler.HandlerNode(core.HandlerOnFailure)),
-		transform.WithOnCancelNode(a.scheduler.HandlerNode(core.HandlerOnCancel)),
+		transform.WithOnExitNode(a.runner.HandlerNode(core.HandlerOnExit)),
+		transform.WithOnSuccessNode(a.runner.HandlerNode(core.HandlerOnSuccess)),
+		transform.WithOnFailureNode(a.runner.HandlerNode(core.HandlerOnFailure)),
+		transform.WithOnCancelNode(a.runner.HandlerNode(core.HandlerOnCancel)),
 		transform.WithAttemptID(a.dagRunAttemptID),
 		transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 		transform.WithPreconditions(a.dag.Preconditions),
@@ -615,9 +630,9 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	return transform.NewStatusBuilder(a.dag).
 		Create(
 			a.dagRunID,
-			schedulerStatus,
+			runnerStatus,
 			os.Getpid(),
-			a.graph.StartAt(),
+			a.plan.StartAt(),
 			opts...,
 		)
 }
@@ -702,7 +717,9 @@ func (a *Agent) setupReporter(ctx context.Context) {
 		}).Send
 	} else {
 		senderFn = func(ctx context.Context, _ string, _ []string, subject, _ string, _ []string) error {
-			logger.Debug(ctx, "Mail notification is disabled", "subject", subject)
+			logger.Debug(ctx, "Mail notification is disabled",
+				slog.String("subject", subject),
+			)
 			return nil
 		}
 	}
@@ -710,15 +727,15 @@ func (a *Agent) setupReporter(ctx context.Context) {
 	a.reporter = newReporter(senderFn)
 }
 
-// newScheduler creates a scheduler instance for the dag-run.
-func (a *Agent) newScheduler() *runtime.Scheduler {
-	// schedulerLogDir is the directory to store the log files for each node in the dag-run.
+// newRunner creates a runner instance for the dag-run.
+func (a *Agent) newRunner() *runtime.Runner {
+	// runnerLogDir is the directory to store the log files for each node in the dag-run.
 	const dateTimeFormatUTC = "20060102_150405Z"
 	ts := time.Now().UTC().Format(dateTimeFormatUTC)
-	schedulerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.dagRunAttemptID)
+	runnerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.dagRunAttemptID)
 
 	cfg := &runtime.Config{
-		LogDir:         schedulerLogDir,
+		LogDir:         runnerLogDir,
 		MaxActiveSteps: a.dag.MaxActiveSteps,
 		Timeout:        a.dag.Timeout,
 		Delay:          a.dag.Delay,
@@ -748,7 +765,7 @@ func (a *Agent) newScheduler() *runtime.Scheduler {
 // createCoordinatorClient creates a coordinator client factory for distributed execution
 func (a *Agent) createCoordinatorClient(ctx context.Context) execution.Dispatcher {
 	if a.registry == nil {
-		logger.Debug(ctx, "Service monitor is not configured, skipping coordinator client creation")
+		logger.Debug(ctx, "Service monitor is not configured; skipping coordinator client creation")
 		return nil
 	}
 
@@ -774,7 +791,9 @@ func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 		return nil, nil
 	}
 
-	logger.Info(ctx, "Resolving secrets", "count", len(a.dag.Secrets))
+	logger.Info(ctx, "Resolving secrets",
+		tag.Count(len(a.dag.Secrets)),
+	)
 
 	// Create secret registry - all providers auto-registered via init()
 	// File provider tries base directories in order:
@@ -793,7 +812,9 @@ func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("failed to resolve secrets: %w", err)
 	}
 
-	logger.Debug(ctx, "Secrets resolved successfully", "count", len(resolvedSecrets))
+	logger.Debug(ctx, "Secrets resolved successfully",
+		tag.Count(len(resolvedSecrets)),
+	)
 	return resolvedSecrets, nil
 }
 
@@ -816,10 +837,12 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
 	dagCtx := execution.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil, nil)
-	lastErr := a.scheduler.Schedule(dagCtx, a.graph, progressCh)
+	lastErr := a.runner.Run(dagCtx, a.plan, progressCh)
 	a.lastErr = lastErr
 
-	logger.Info(ctx, "Dry-run completed", "params", a.dag.Params)
+	logger.Info(ctx, "Dry-run completed",
+		slog.Any("params", a.dag.Params),
+	)
 
 	return lastErr
 }
@@ -833,13 +856,14 @@ func (a *Agent) dryRun(ctx context.Context) error {
 // if processes do not terminate after MaxCleanUp time, it sends KILL signal.
 func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	logger.Info(ctx, "Sending signal to running child processes",
-		"signal", sig.String(),
-		"allowOverride", allowOverride,
-		"maxCleanupTime", a.dag.MaxCleanUpTime/time.Second)
+		tag.Signal(sig.String()),
+		slog.Bool("allow-override", allowOverride),
+		slog.Duration("max-cleanup-time", a.dag.MaxCleanUpTime),
+	)
 
 	if !signal.IsTerminationSignalOS(sig) {
 		// For non-termination signals, just send the signal once and return.
-		a.scheduler.Signal(ctx, a.graph, sig, nil, allowOverride)
+		a.runner.Signal(ctx, a.plan, sig, nil, allowOverride)
 		return
 	}
 
@@ -848,7 +872,7 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 
 	done := make(chan bool, 1)
 	go func() {
-		a.scheduler.Signal(ctx, a.graph, sig, done, allowOverride)
+		a.runner.Signal(ctx, a.plan, sig, done, allowOverride)
 	}()
 
 	ticker := time.NewTicker(5 * time.Second)
@@ -863,17 +887,18 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 		case <-signalCtx.Done():
 			logger.Info(ctx, "Max cleanup time reached, sending SIGKILL to force termination")
 			// Force kill with SIGKILL and don't wait for completion
-			a.scheduler.Signal(ctx, a.graph, syscall.SIGKILL, nil, false)
+			a.runner.Signal(ctx, a.plan, syscall.SIGKILL, nil, false)
 			return
 
 		case <-ticker.C:
 			logger.Info(ctx, "Resending signal to processes that haven't terminated",
-				"signal", sig.String())
-			a.scheduler.Signal(ctx, a.graph, sig, nil, false)
+				tag.Signal(sig.String()),
+			)
+			a.runner.Signal(ctx, a.plan, sig, nil, false)
 
 		case <-time.After(500 * time.Millisecond):
 			// Quick check to avoid busy waiting, but still responsive
-			if a.graph != nil && !a.graph.IsRunning() {
+			if a.plan != nil && !a.plan.IsRunning() {
 				logger.Info(ctx, "No running processes detected, termination complete")
 				return
 			}
@@ -881,56 +906,56 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	}
 }
 
-// setupGraph setups the DAG graph. If is retry execution, it loads nodes
+// setupPlan setups the DAG plan. If is retry execution, it loads nodes
 // from the retry node so that it runs the same DAG as the previous run.
-func (a *Agent) setupGraph(ctx context.Context) error {
+func (a *Agent) setupPlan(ctx context.Context) error {
 	if a.retryTarget != nil {
-		return a.setupGraphForRetry(ctx)
+		return a.setupRetryPlan(ctx)
 	}
-	graph, err := runtime.NewExecutionGraph(a.dag.Steps...)
+	plan, err := runtime.NewPlan(a.dag.Steps...)
 	if err != nil {
 		return err
 	}
-	a.graph = graph
+	a.plan = plan
 	return nil
 }
 
-// setupGraphForRetry setsup the graph for retry.
-func (a *Agent) setupGraphForRetry(ctx context.Context) error {
+// setupRetryPlan sets up the plan for retry.
+func (a *Agent) setupRetryPlan(ctx context.Context) error {
 	nodes := make([]*runtime.Node, 0, len(a.retryTarget.Nodes))
 	for _, n := range a.retryTarget.Nodes {
 		nodes = append(nodes, transform.ToNode(n))
 	}
 	if a.stepRetry != "" {
-		return a.setupStepRetryGraph(ctx, nodes)
+		return a.setupStepRetryPlan(ctx, nodes)
 	}
-	return a.setupDefaultRetryGraph(ctx, nodes)
+	return a.setupDefaultRetryPlan(ctx, nodes)
 }
 
-// setupStepRetryGraph sets up the graph for retrying a specific step.
-func (a *Agent) setupStepRetryGraph(ctx context.Context, nodes []*runtime.Node) error {
-	graph, err := runtime.CreateStepRetryGraph(a.dag, nodes, a.stepRetry)
+// setupStepRetryPlan sets up the plan for retrying a specific step.
+func (a *Agent) setupStepRetryPlan(ctx context.Context, nodes []*runtime.Node) error {
+	plan, err := runtime.CreateStepRetryPlan(a.dag, nodes, a.stepRetry)
 	if err != nil {
 		return err
 	}
-	a.graph = graph
+	a.plan = plan
 	return nil
 }
 
-// setupDefaultRetryGraph sets up the graph for the default retry behavior (all failed/canceled nodes and downstreams).
-func (a *Agent) setupDefaultRetryGraph(ctx context.Context, nodes []*runtime.Node) error {
-	graph, err := runtime.CreateRetryExecutionGraph(ctx, a.dag, nodes...)
+// setupDefaultRetryPlan sets up the plan for the default retry behavior (all failed/canceled nodes and downstreams).
+func (a *Agent) setupDefaultRetryPlan(ctx context.Context, nodes []*runtime.Node) error {
+	plan, err := runtime.CreateRetryPlan(ctx, a.dag, nodes...)
 	if err != nil {
 		return err
 	}
-	a.graph = graph
+	a.plan = plan
 	return nil
 }
 
 func (a *Agent) setupDAGRunAttempt(ctx context.Context) (execution.DAGRunAttempt, error) {
 	retentionDays := a.dag.HistRetentionDays
 	if err := a.dagRunStore.RemoveOldDAGRuns(ctx, a.dag.Name, retentionDays); err != nil {
-		logger.Error(ctx, "dag-runs data cleanup failed", "err", err)
+		logger.Error(ctx, "DAG runs data cleanup failed", tag.Error(err))
 	}
 
 	opts := execution.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil}
@@ -989,10 +1014,11 @@ func execWithRecovery(ctx context.Context, fn func()) {
 
 			// Log with structured information
 			logger.Error(ctx, "Recovered from panic",
-				"err", err.Error(),
-				"errType", fmt.Sprintf("%T", panicObj),
-				"stackTrace", stack,
-				"fullStack", string(stack))
+				slog.String("err", err.Error()),
+				slog.String("errType", fmt.Sprintf("%T", panicObj)),
+				slog.String("stackTrace", string(stack)),
+				slog.String("fullStack", string(stack)),
+			)
 		}
 	}()
 

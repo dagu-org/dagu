@@ -20,7 +20,6 @@ func TestScheduler(t *testing.T) {
 
 	t.Run("Start", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-		scheduler.SetFixedTime(now)
 
 		entryReader := &mockJobManager{
 			Entries: []*scheduler.ScheduledJob{
@@ -32,6 +31,7 @@ func TestScheduler(t *testing.T) {
 		th := test.SetupScheduler(t)
 		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
 		require.NoError(t, err)
+		sc.SetClock(func() time.Time { return now })
 
 		ctx := context.Background()
 		go func() {
@@ -47,7 +47,6 @@ func TestScheduler(t *testing.T) {
 
 	t.Run("Restart", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-		scheduler.SetFixedTime(now)
 
 		entryReader := &mockJobManager{
 			Entries: []*scheduler.ScheduledJob{
@@ -58,6 +57,7 @@ func TestScheduler(t *testing.T) {
 		th := test.SetupScheduler(t)
 		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
 		require.NoError(t, err)
+		sc.SetClock(func() time.Time { return now })
 
 		go func() {
 			_ = sc.Start(context.Background())
@@ -70,7 +70,6 @@ func TestScheduler(t *testing.T) {
 	})
 	t.Run("NextTick", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
-		scheduler.SetFixedTime(now)
 
 		th := test.SetupScheduler(t)
 		schedulerInstance, err := scheduler.New(th.Config, &mockJobManager{}, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
@@ -79,17 +78,6 @@ func TestScheduler(t *testing.T) {
 		next := schedulerInstance.NextTick(now)
 		require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 	})
-}
-
-func TestFixedTime(t *testing.T) {
-	fixedTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-
-	scheduler.SetFixedTime(fixedTime)
-	require.Equal(t, fixedTime, scheduler.Now())
-
-	// Reset
-	scheduler.SetFixedTime(time.Time{})
-	require.NotEqual(t, fixedTime, scheduler.Now())
 }
 
 func TestJobReady(t *testing.T) {
@@ -156,8 +144,6 @@ func TestJobReady(t *testing.T) {
 			schedule, err := cronParser.Parse(tt.schedule)
 			require.NoError(t, err)
 
-			scheduler.SetFixedTime(tt.now)
-
 			job := &scheduler.DAGRunJob{
 				DAG: &core.DAG{
 					SkipIfSuccessful: tt.skipSuccessful,
@@ -217,38 +203,9 @@ func TestPrevExecTime(t *testing.T) {
 	}
 }
 
-func TestScheduler_QueueDisabled(t *testing.T) {
-	t.Parallel()
-
-	t.Run("QueueDisabledSkipsQueueProcessing", func(t *testing.T) {
-		th := test.SetupScheduler(t)
-		// Disable queues
-		th.Config.Queues.Enabled = false
-
-		entryReader := &mockJobManager{
-			Entries: []*scheduler.ScheduledJob{},
-		}
-
-		sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
-		require.NoError(t, err)
-
-		ctx := context.Background()
-		go func() {
-			_ = sc.Start(ctx)
-		}()
-
-		// Give it a moment to start
-		time.Sleep(time.Millisecond * 100)
-		sc.Stop(ctx)
-
-		// Test passes if no panics occur when queues are disabled
-		require.True(t, true)
-	})
-}
-
 func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	scheduler.SetFixedTime(now)
+	clock := func() time.Time { return now }
 
 	entryReader := &mockJobManager{
 		Entries: []*scheduler.ScheduledJob{},
@@ -259,6 +216,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	// Create first scheduler instance
 	sc1, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
 	require.NoError(t, err)
+	sc1.SetClock(clock)
 
 	// Start first scheduler
 	ctx := context.Background()
@@ -273,6 +231,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 	// Create second scheduler instance with same config
 	sc2, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli)
 	require.NoError(t, err)
+	sc2.SetClock(clock)
 
 	// Try to start second scheduler - should wait for lock
 	go func() {
@@ -302,4 +261,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 
 	// Check if second scheduler is running
 	require.True(t, sc2.IsRunning(), "Second scheduler should be running after first one stopped")
+
+	// Stop second scheduler to clean up
+	sc2.Stop(ctx)
 }

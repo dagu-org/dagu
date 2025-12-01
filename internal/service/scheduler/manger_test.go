@@ -21,14 +21,11 @@ func TestReadEntries(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, jobs, 0)
 	})
-	t.Run("StartAndNext", func(t *testing.T) {
+	t.Run("InitAndNext", func(t *testing.T) {
 		th := test.SetupScheduler(t)
 		ctx := context.Background()
 
-		done := make(chan any)
-		defer close(done)
-
-		err := th.EntryReader.Start(ctx, done)
+		err := th.EntryReader.Init(ctx)
 		require.NoError(t, err)
 
 		jobs, err := th.EntryReader.Next(ctx, now)
@@ -43,10 +40,7 @@ func TestReadEntries(t *testing.T) {
 		th := test.SetupScheduler(t)
 		ctx := context.Background()
 
-		done := make(chan any)
-		defer close(done)
-
-		err := th.EntryReader.Start(ctx, done)
+		err := th.EntryReader.Init(ctx)
 		require.NoError(t, err)
 
 		beforeSuspend, err := th.EntryReader.Next(ctx, now)
