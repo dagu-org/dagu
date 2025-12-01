@@ -113,8 +113,9 @@ func (e *DAGExecutor) HandleJob(
 // For distributed execution: Creates a task and dispatches to coordinator
 // For local execution: Runs the DAG using the appropriate manager method
 //
-// Note: When called from the queue handler, operation is always OPERATION_RETRY,
-// which means "retry the dispatch", not "retry a failed execution".
+// Note: When called from the queue handler, operation is OPERATION_RETRY for both:
+// - Distributed execution: retry the dispatch to coordinator
+// - Local execution: execute from stored attempt (works for Queued or failed status)
 func (e *DAGExecutor) ExecuteDAG(
 	ctx context.Context,
 	dag *core.DAG,
@@ -143,6 +144,10 @@ func (e *DAGExecutor) ExecuteDAG(
 		return runtime.Start(ctx, spec)
 
 	case coordinatorv1.Operation_OPERATION_RETRY:
+		// For queued DAGs, use retry to execute from the stored attempt
+		// The retry command loads the DAG from the stored attempt, so it works
+		// even when Location is empty. It can handle Queued status (starting
+		// a queued DAG) as well as failed status (retrying a failed DAG).
 		spec := e.subCmdBuilder.Retry(dag, runID, "", true)
 		return runtime.Run(ctx, spec)
 

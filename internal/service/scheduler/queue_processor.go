@@ -349,8 +349,15 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	queue := queueVal.(*queue)
 	queue.setMaxConc(dag.MaxActiveRuns)
 
+	// Determine the operation based on execution type:
+	// - For distributed execution (with workerSelector): use OPERATION_RETRY to retry dispatch
+	// - For local execution (no workerSelector): use OPERATION_RETRY to execute from stored attempt
+	// Note: For queued DAGs, the attempt already exists, so we use RETRY to execute from it.
+	// This works for both Queued status (starting) and failed status (retrying).
+	op := coordinatorv1.Operation_OPERATION_RETRY
+
 	errCh := make(chan error, 1)
-	if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID); err != nil {
+	if err := p.dagExecutor.ExecuteDAG(ctx, dag, op, runID); err != nil {
 		logger.Error(ctx, "Failed to execute DAG", tag.Error(err))
 		errCh <- err
 		return false
