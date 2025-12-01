@@ -4,6 +4,7 @@
  * @module features/dags/components/dag-details
  */
 import { CommandDisplay } from '@/components/ui/command-display';
+import { ScriptBadge } from '@/components/ui/script-dialog';
 import { TableCell } from '@/components/ui/table';
 import {
   Tooltip,
@@ -14,7 +15,6 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient, useQuery } from '@/hooks/api';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
-import { SubDAGRunsList } from './SubDAGRunsList';
 import {
   Dialog,
   DialogContent,
@@ -37,6 +37,7 @@ import { components, NodeStatus, Stream } from '../../../../api/v2/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
 import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
+import { SubDAGRunsList } from './SubDAGRunsList';
 
 /**
  * Props for the NodeStatusTableRow component
@@ -249,10 +250,7 @@ function NodeStatusTableRow({
   const [showStatusModal, setShowStatusModal] = useState(false);
   // Check if this is a sub dagRun node
   // Include both regular and repeated sub runs
-  const allSubRuns = [
-    ...(node.subRuns || []),
-    ...(node.subRunsRepeated || []),
-  ];
+  const allSubRuns = [...(node.subRuns || []), ...(node.subRunsRepeated || [])];
   const subDagName = node.step.call;
   const hasSubDAGRun = !!subDagName && allSubRuns.length > 0;
 
@@ -521,9 +519,7 @@ function NodeStatusTableRow({
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <span className="text-xs">
-                        Sub DAG Run: {subDagName}
-                      </span>
+                      <span className="text-xs">Sub DAG Run: {subDagName}</span>
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -600,14 +596,22 @@ function NodeStatusTableRow({
 
           {/* Combined Command & Args */}
           <TableCell>
-            {(node.step.command || node.step.cmdWithArgs) && (
-              <CommandDisplay
-                command={node.step.command || node.step.cmdWithArgs || ''}
-                args={node.step.command ? node.step.args : undefined}
-                icon="code"
-                maxLength={50}
-              />
-            )}
+            <div className="space-y-1.5">
+              {(node.step.command || node.step.cmdWithArgs) && (
+                <CommandDisplay
+                  command={node.step.command || node.step.cmdWithArgs || ''}
+                  args={node.step.command ? node.step.args : undefined}
+                  icon="code"
+                  maxLength={50}
+                />
+              )}
+              {node.step.script && (
+                <ScriptBadge
+                  script={node.step.script}
+                  stepName={node.step.name}
+                />
+              )}
+            </div>
           </TableCell>
 
           {/* Last Run & Duration */}
@@ -997,6 +1001,10 @@ function NodeStatusTableRow({
                 </div>
               )}
             </div>
+          )}
+
+          {node.step.script && (
+            <ScriptBadge script={node.step.script} stepName={node.step.name} />
           )}
         </div>
       </div>
