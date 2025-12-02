@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
@@ -130,6 +131,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	switch {
 	case cfg.Command != "" && scriptFile != "":
 		cmdBuilder := &shellCommandBuilder{
+			Dir:                cfg.Dir,
 			Command:            cfg.Command,
 			Args:               cfg.Args,
 			Shell:              cfg.Shell,
@@ -167,6 +169,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 
 	case len(cfg.Shell) > 0 && cfg.ShellCommandArgs != "":
 		cmdBuilder := &shellCommandBuilder{
+			Dir:                cfg.Dir,
 			Shell:              cfg.Shell,
 			ShellCommandArgs:   cfg.ShellCommandArgs,
 			ShellPackages:      cfg.ShellPackages,
@@ -260,6 +263,7 @@ func exitCodeFromError(err error) int {
 }
 
 type shellCommandBuilder struct {
+	Dir                string
 	Command            string
 	Args               []string
 	Shell              []string // Shell command, e.g., ["/bin/sh"]
@@ -365,7 +369,8 @@ func (b *shellCommandBuilder) buildPowerShellCommand(ctx context.Context, cmd st
 	if !slices.Contains(args, "-Command") && !slices.Contains(args, "-C") {
 		args = append(args, "-Command")
 	}
-	args = append(args, b.ShellCommandArgs)
+
+	args = append(args, b.normalizeWindowsShellCommandArgs())
 
 	// nolint: gosec
 	return exec.CommandContext(ctx, cmd, args...), nil
@@ -384,10 +389,37 @@ func (b *shellCommandBuilder) buildCmdCommand(ctx context.Context, cmd string, a
 	if !slices.Contains(args, "/c") && !slices.Contains(args, "/C") {
 		args = append(args, "/c")
 	}
-	args = append(args, b.ShellCommandArgs)
+	args = append(args, b.normalizeWindowsShellCommandArgs())
 
 	// nolint: gosec
 	return exec.CommandContext(ctx, cmd, args...), nil
+}
+
+// normalizeWindowsShellCommandArgs adds ".\" prefix to scripts in the working directory
+// that lack a path prefix.
+//
+// This is Windows-specific: PowerShell and cmd.exe (when invoked programmatically)
+// don't search the current directory by default, unlike interactive cmd prompts.
+// On Unix systems, this behavior is intentional (users must explicitly use "./")
+// and doesn't need correction.
+func (b *shellCommandBuilder) normalizeWindowsShellCommandArgs() string {
+	if b.ShellCommandArgs == "" {
+		return ""
+	}
+	parts := strings.SplitN(b.ShellCommandArgs, " ", 2)
+	first := parts[0]
+
+	// Skip if already has a path component (absolute or relative)
+	if filepath.IsAbs(first) || strings.ContainsAny(first, `/\`) {
+		return b.ShellCommandArgs
+	}
+
+	// Check if the file exists in the working directory
+	file := filepath.Join(b.Dir, first)
+	if fileutil.IsFile(file) {
+		return ".\\" + b.ShellCommandArgs
+	}
+	return b.ShellCommandArgs
 }
 
 // NewCommand creates a new command executor.

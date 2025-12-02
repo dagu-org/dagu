@@ -45,6 +45,15 @@ func FileExists(file string) bool {
 	return !os.IsNotExist(err)
 }
 
+// IsFile returns true if path is a regular file.
+func IsFile(path string) bool {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return stat.Mode().IsRegular()
+}
+
 // OpenOrCreateFile opens (or creates) the log file with flags for creation, write-only access,
 // appending, and synchronous I/O. It sets file permissions to 0600.
 func OpenOrCreateFile(filepath string) (*os.File, error) {
