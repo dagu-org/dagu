@@ -95,15 +95,19 @@ func TestEnv_VariablesMap(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Create a temporary directory to ensure we have a valid working directory
+			// Create a temporary directory to use as DAG working directory
 			tempDir := t.TempDir()
-			originalWd, err := os.Getwd()
-			if err == nil {
-				defer func() { _ = os.Chdir(originalWd) }()
-			}
-			require.NoError(t, os.Chdir(tempDir))
 
-			ctx := context.Background()
+			// Set up DAG context with WorkingDir
+			dag := &core.DAG{
+				Name:       "test-dag",
+				WorkingDir: tempDir,
+			}
+			dagCtx := execution.DAGContext{
+				DAG: dag,
+			}
+			ctx := execution.WithDAGContext(context.Background(), dagCtx)
+
 			env := runtime.NewEnvForStep(ctx, core.Step{Name: "test-step"})
 			env = tt.setupEnv(env)
 
@@ -118,23 +122,27 @@ func TestEnv_VariablesMap(t *testing.T) {
 }
 
 func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
-	// Don't run in parallel since we're changing working directory
-
-	// Save current working directory
-	originalWd, err := os.Getwd()
-	require.NoError(t, err)
-	defer func() {
-		_ = os.Chdir(originalWd)
-	}()
+	t.Parallel()
 
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
+	// Create subdirectory for relative path tests
+	subDir := filepath.Join(tempDir, "subdir")
+	require.NoError(t, os.Mkdir(subDir, 0755))
+
+	// Create testdir in home for tilde tests
+	homeDir, err := os.UserHomeDir()
+	require.NoError(t, err)
+	homeTempDir := filepath.Join(homeDir, "dagu_test_workdir")
+	require.NoError(t, os.MkdirAll(homeTempDir, 0755))
+	t.Cleanup(func() { _ = os.RemoveAll(homeTempDir) })
+
 	tests := []struct {
-		name      string
-		step      core.Step
-		setupFunc func()
-		checkFunc func(t *testing.T, env runtime.Env)
+		name        string
+		step        core.Step
+		dagWorkDir  string // DAG's WorkingDir for context
+		expectedDir string
 	}{
 		{
 			name: "StepWithAbsoluteDirectory",
@@ -142,121 +150,115 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 				Name: "test-step",
 				Dir:  tempDir,
 			},
-			setupFunc: func() {},
-			checkFunc: func(t *testing.T, env runtime.Env) {
-				// Resolve symlinks for comparison (macOS /var vs /private/var)
-				expectedDir, _ := filepath.EvalSymlinks(tempDir)
-				actualDir, _ := filepath.EvalSymlinks(env.WorkingDir)
-				assert.Equal(t, expectedDir, actualDir)
-				// env.Envs["PWD"] should match env.WorkingDir
-				assert.Equal(t, env.WorkingDir, env.Envs["PWD"])
-			},
+			dagWorkDir:  "/some/dag/workdir",
+			expectedDir: tempDir,
 		},
 		{
-			name: "StepWithRelativeDirectory",
+			name: "StepWithRelativeDirectory_ResolvesAgainstDAGWorkDir",
 			step: core.Step{
 				Name: "test-step",
 				Dir:  "./subdir",
 			},
-			setupFunc: func() {
-				// Create the subdirectory
-				require.NoError(t, os.Chdir(tempDir))
-				require.NoError(t, os.Mkdir("subdir", 0755))
+			dagWorkDir:  tempDir,
+			expectedDir: subDir,
+		},
+		{
+			name: "StepWithRelativeDirectory_NoLeadingDot",
+			step: core.Step{
+				Name: "test-step",
+				Dir:  "subdir",
 			},
-			checkFunc: func(t *testing.T, env runtime.Env) {
-				expectedDir := filepath.Join(tempDir, "subdir")
-				// Resolve symlinks for comparison
-				expectedResolved, _ := filepath.EvalSymlinks(expectedDir)
-				actualResolved, _ := filepath.EvalSymlinks(env.WorkingDir)
-				assert.Equal(t, expectedResolved, actualResolved)
-				assert.Equal(t, env.WorkingDir, env.Envs["PWD"])
-			},
+			dagWorkDir:  tempDir,
+			expectedDir: subDir,
 		},
 		{
 			name: "StepWithHomeDirectoryNotation",
 			step: core.Step{
 				Name: "test-step",
-				Dir:  "~/testdir",
+				Dir:  "~/dagu_test_workdir",
 			},
-			setupFunc: func() {
-				// Create a directory in home
-				homeDir, _ := os.UserHomeDir()
-				testDir := filepath.Join(homeDir, "testdir")
-				require.NoError(t, os.MkdirAll(testDir, 0755))
-			},
-			checkFunc: func(t *testing.T, env runtime.Env) {
-				homeDir, _ := os.UserHomeDir()
-				expectedDir := filepath.Join(homeDir, "testdir")
-				// Resolve symlinks for comparison
-				expectedResolved, _ := filepath.EvalSymlinks(expectedDir)
-				actualResolved, _ := filepath.EvalSymlinks(env.WorkingDir)
-				assert.Equal(t, expectedResolved, actualResolved)
-				assert.Equal(t, env.WorkingDir, env.Envs["PWD"])
-			},
+			dagWorkDir:  tempDir,
+			expectedDir: homeTempDir,
 		},
 		{
-			name: "StepWithNonExistentDirectory",
-			step: core.Step{
-				Name: "test-step",
-				Dir:  "/non/existent/directory",
-			},
-			setupFunc: func() {
-				require.NoError(t, os.Chdir(tempDir))
-			},
-			checkFunc: func(t *testing.T, env runtime.Env) {
-				// Non-existent directory gets resolved to absolute path
-				// On Windows, this will include drive letter
-				if goruntime.GOOS == "windows" {
-					assert.Contains(t, env.WorkingDir, "\\non\\existent\\directory")
-				} else {
-					assert.Equal(t, "/non/existent/directory", env.WorkingDir)
-				}
-				assert.Equal(t, env.WorkingDir, env.Envs["PWD"])
-			},
-		},
-		{
-			name: "StepWithEnvironmentVariableInPath",
+			name: "StepWithNonExistentAbsoluteDirectory",
 			step: core.Step{
 				Name: "test-step",
 				Dir: func() string {
 					if goruntime.GOOS == "windows" {
-						return "$USERPROFILE/testdir"
+						return "C:\\non\\existent\\directory"
 					}
-					return "$HOME/testdir"
+					return "/non/existent/directory"
 				}(),
 			},
-			setupFunc: func() {
-				// Create a directory in home
-				homeDir, _ := os.UserHomeDir()
-				testDir := filepath.Join(homeDir, "testdir")
-				require.NoError(t, os.MkdirAll(testDir, 0755))
+			dagWorkDir: tempDir,
+			expectedDir: func() string {
+				if goruntime.GOOS == "windows" {
+					return "C:\\non\\existent\\directory"
+				}
+				return "/non/existent/directory"
+			}(),
+		},
+		{
+			name: "StepWithEnvironmentVariableInPath_Absolute",
+			step: core.Step{
+				Name: "test-step",
+				Dir: func() string {
+					if goruntime.GOOS == "windows" {
+						return "$USERPROFILE\\dagu_test_workdir"
+					}
+					return "$HOME/dagu_test_workdir"
+				}(),
 			},
-			checkFunc: func(t *testing.T, env runtime.Env) {
-				homeDir, _ := os.UserHomeDir()
-				expectedDir := filepath.Join(homeDir, "testdir")
-				// Resolve symlinks for comparison
-				expectedResolved, _ := filepath.EvalSymlinks(expectedDir)
-				actualResolved, _ := filepath.EvalSymlinks(env.WorkingDir)
-				assert.Equal(t, expectedResolved, actualResolved)
-				assert.Equal(t, env.WorkingDir, env.Envs["PWD"])
+			dagWorkDir:  tempDir,
+			expectedDir: homeTempDir,
+		},
+		{
+			name: "StepWithNoDir_InheritsDAGWorkDir",
+			step: core.Step{
+				Name: "test-step",
+				Dir:  "",
 			},
+			dagWorkDir:  tempDir,
+			expectedDir: tempDir,
+		},
+		{
+			name: "StepWithParentRelativeDirectory",
+			step: core.Step{
+				Name: "test-step",
+				Dir:  "../",
+			},
+			dagWorkDir:  subDir,
+			expectedDir: tempDir,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Don't run in parallel since we're changing working directory
+			t.Parallel()
 
-			tt.setupFunc()
+			// Set up DAG context with WorkingDir
+			dag := &core.DAG{
+				Name:       "test-dag",
+				WorkingDir: tt.dagWorkDir,
+			}
+			dagCtx := execution.DAGContext{
+				DAG: dag,
+			}
+			ctx := execution.WithDAGContext(context.Background(), dagCtx)
 
-			ctx := context.Background()
 			env := runtime.NewEnvForStep(ctx, tt.step)
 
 			// Check that DAG_RUN_STEP_NAME is always set
 			assert.Equal(t, tt.step.Name, env.Envs[execution.EnvKeyDAGRunStepName])
 
-			// Run test-specific checks
-			tt.checkFunc(t, env)
+			// Resolve symlinks for comparison (macOS /var vs /private/var)
+			expectedResolved, _ := filepath.EvalSymlinks(tt.expectedDir)
+			actualResolved, _ := filepath.EvalSymlinks(env.WorkingDir)
+			assert.Equal(t, expectedResolved, actualResolved)
+
+			// env.Envs["PWD"] should match env.WorkingDir
+			assert.Equal(t, env.WorkingDir, env.Envs["PWD"])
 		})
 	}
 }
@@ -264,7 +266,18 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 func TestNewEnvForStep_BasicFields(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	tempDir := t.TempDir()
+
+	// Set up DAG context with WorkingDir
+	dag := &core.DAG{
+		Name:       "test-dag",
+		WorkingDir: tempDir,
+	}
+	dagCtx := execution.DAGContext{
+		DAG: dag,
+	}
+	ctx := execution.WithDAGContext(context.Background(), dagCtx)
+
 	step := core.Step{
 		Name:    "test-step",
 		Command: "echo hello",
@@ -280,11 +293,42 @@ func TestNewEnvForStep_BasicFields(t *testing.T) {
 	assert.NotNil(t, env.StepMap)
 	assert.Equal(t, "test-step", env.Envs[execution.EnvKeyDAGRunStepName])
 
-	// Check that PWD is set
-	assert.NotEmpty(t, env.Envs["PWD"])
+	// Check that PWD is set to DAG's WorkingDir
+	assert.Equal(t, tempDir, env.Envs["PWD"])
 
-	// Check that WorkingDir is set
-	assert.NotEmpty(t, env.WorkingDir)
+	// Check that WorkingDir is set to DAG's WorkingDir
+	assert.Equal(t, tempDir, env.WorkingDir)
+}
+
+func TestNewEnvForStep_WorkingDirectory_DAGEnvExpansion(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	subDir := filepath.Join(tempDir, "subdir")
+	require.NoError(t, os.Mkdir(subDir, 0755))
+
+	// Set up DAG context with WorkingDir and env vars
+	dag := &core.DAG{
+		Name:       "test-dag",
+		WorkingDir: tempDir,
+		Env:        []string{"MY_SUBDIR=subdir"},
+	}
+	dagCtx := execution.DAGContext{
+		DAG: dag,
+	}
+	ctx := execution.WithDAGContext(context.Background(), dagCtx)
+
+	step := core.Step{
+		Name: "test-step",
+		Dir:  "./$MY_SUBDIR", // Uses DAG env var in relative path
+	}
+
+	env := runtime.NewEnvForStep(ctx, step)
+
+	// Resolve symlinks for comparison
+	expectedResolved, _ := filepath.EvalSymlinks(subDir)
+	actualResolved, _ := filepath.EvalSymlinks(env.WorkingDir)
+	assert.Equal(t, expectedResolved, actualResolved)
 }
 
 func TestEnv_UserEnvsMap(t *testing.T) {

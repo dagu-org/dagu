@@ -369,6 +369,12 @@ func (a *Agent) Run(ctx context.Context) error {
 		return initErr
 	}
 
+	// Move to the working directory
+	if err := os.Chdir(a.dag.WorkingDir); err != nil {
+		initErr = fmt.Errorf("failed to change working directory: %w", err)
+		return initErr
+	}
+
 	// Create a new container if the DAG has a container configuration.
 	if a.dag.Container != nil {
 		ctCfg, err := docker.LoadConfig(a.dag.WorkingDir, *a.dag.Container, a.dag.RegistryAuths)

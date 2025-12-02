@@ -12,6 +12,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/collections"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
@@ -122,8 +123,8 @@ type builderEntry struct {
 }
 
 var stepBuilderRegistry = []stepBuilderEntry{
-	{name: "shell", fn: buildStepShell},
 	{name: "workingDir", fn: buildStepWorkingDir},
+	{name: "shell", fn: buildStepShell},
 	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "params", fn: buildStepParams},
@@ -642,9 +643,13 @@ func buildWorkingDir(ctx BuildContext, spec *definition, dag *core.DAG) error {
 		wd := spec.WorkingDir
 		if !ctx.opts.Has(BuildFlagNoEval) {
 			wd = os.ExpandEnv(wd)
-			_ = os.MkdirAll(wd, 0755)
-			if err := os.Chdir(wd); err != nil {
-				return fmt.Errorf("failed to chdir to working directory: %w", err)
+			switch {
+			case filepath.IsAbs(wd) || strings.HasPrefix(wd, "~"):
+				wd = fileutil.ResolvePathOrBlank(wd)
+			case ctx.file != "":
+				wd = filepath.Join(filepath.Dir(ctx.file), wd)
+			default:
+				wd = fileutil.ResolvePathOrBlank(wd)
 			}
 		}
 		dag.WorkingDir = wd
@@ -1253,6 +1258,18 @@ func buildStep(ctx StepBuildContext, def stepDef) (*core.Step, error) {
 	return step, nil
 }
 
+func buildStepWorkingDir(_ StepBuildContext, def stepDef, step *core.Step) error {
+	switch {
+	case def.WorkingDir != "":
+		step.Dir = strings.TrimSpace(def.WorkingDir)
+	case def.Dir != "":
+		step.Dir = strings.TrimSpace(def.Dir)
+	default:
+		step.Dir = ""
+	}
+	return nil
+}
+
 func buildStepShell(_ StepBuildContext, def stepDef, step *core.Step) error {
 	// Step shell is NOT evaluated here - it's evaluated at runtime
 	shell, args, err := parseShellValue(def.Shell, false)
@@ -1637,17 +1654,6 @@ func buildDepends(_ StepBuildContext, def stepDef, step *core.Step) error {
 		step.ExplicitlyNoDeps = true
 	}
 
-	return nil
-}
-
-// buildStepWorkingDir builds working dir field
-func buildStepWorkingDir(ctx StepBuildContext, def stepDef, step *core.Step) error {
-	if def.Dir != "" {
-		step.Dir = def.Dir
-	}
-	if def.WorkingDir != "" {
-		step.Dir = def.WorkingDir
-	}
 	return nil
 }
 
