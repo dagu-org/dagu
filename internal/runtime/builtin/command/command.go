@@ -370,7 +370,7 @@ func (b *shellCommandBuilder) buildPowerShellCommand(ctx context.Context, cmd st
 		args = append(args, "-Command")
 	}
 
-	args = append(args, b.normalizeWindowsShellCommandArgs())
+	args = append(args, b.normalizeWindowsScriptPath())
 
 	// nolint: gosec
 	return exec.CommandContext(ctx, cmd, args...), nil
@@ -389,20 +389,20 @@ func (b *shellCommandBuilder) buildCmdCommand(ctx context.Context, cmd string, a
 	if !slices.Contains(args, "/c") && !slices.Contains(args, "/C") {
 		args = append(args, "/c")
 	}
-	args = append(args, b.normalizeWindowsShellCommandArgs())
+	args = append(args, b.normalizeWindowsScriptPath())
 
 	// nolint: gosec
 	return exec.CommandContext(ctx, cmd, args...), nil
 }
 
-// normalizeWindowsShellCommandArgs adds ".\" prefix to scripts in the working directory
+// normalizeWindowsScriptPath adds ".\" prefix to scripts in the working directory
 // that lack a path prefix.
 //
 // This is Windows-specific: PowerShell and cmd.exe (when invoked programmatically)
 // don't search the current directory by default, unlike interactive cmd prompts.
 // On Unix systems, this behavior is intentional (users must explicitly use "./")
 // and doesn't need correction.
-func (b *shellCommandBuilder) normalizeWindowsShellCommandArgs() string {
+func (b *shellCommandBuilder) normalizeWindowsScriptPath() string {
 	if b.ShellCommandArgs == "" {
 		return ""
 	}
@@ -414,12 +414,31 @@ func (b *shellCommandBuilder) normalizeWindowsShellCommandArgs() string {
 		return b.ShellCommandArgs
 	}
 
+	// Only add prefix for Windows script extensions to avoid incorrectly
+	// prefixing commands that happen to have a same-named file in the directory.
+	// For example, if user runs "python script.py" and there's a file called
+	// "python" in the directory, we shouldn't prefix it.
+	if !isWindowsScriptExtension(first) {
+		return b.ShellCommandArgs
+	}
+
 	// Check if the file exists in the working directory
 	file := filepath.Join(b.Dir, first)
 	if fileutil.IsFile(file) {
 		return ".\\" + b.ShellCommandArgs
 	}
 	return b.ShellCommandArgs
+}
+
+// isWindowsScriptExtension returns true if the filename has a Windows script extension.
+func isWindowsScriptExtension(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".bat", ".cmd", ".ps1":
+		return true
+	default:
+		return false
+	}
 }
 
 // NewCommand creates a new command executor.

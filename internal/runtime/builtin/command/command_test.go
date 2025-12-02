@@ -2088,21 +2088,24 @@ func TestReadFirstLine_LongLine(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to read file")
 }
 
-// TestNormalizeWindowsShellCommandArgs tests the Windows-specific path normalization.
+// TestNormalizeWindowsScriptPath tests the Windows-specific path normalization.
 // This function is used on Windows for PowerShell and cmd.exe, but the logic
 // itself is cross-platform testable.
-func TestNormalizeWindowsShellCommandArgs(t *testing.T) {
+func TestNormalizeWindowsScriptPath(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Create a test script file
-	scriptFile := filepath.Join(tmpDir, "test.bat")
-	require.NoError(t, os.WriteFile(scriptFile, []byte("echo hello"), 0o755))
+	// Create test script files with Windows script extensions
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "test.bat"), []byte("echo hello"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "test.cmd"), []byte("echo hello"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "test.ps1"), []byte("Write-Host hello"), 0o755))
+
+	// Create a file without script extension (simulating a command collision)
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "python"), []byte("fake python"), 0o755))
 
 	// Create a script in subdirectory
 	subDir := filepath.Join(tmpDir, "subdir")
 	require.NoError(t, os.MkdirAll(subDir, 0o755))
-	subScript := filepath.Join(subDir, "sub.bat")
-	require.NoError(t, os.WriteFile(subScript, []byte("echo sub"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(subDir, "sub.bat"), []byte("echo sub"), 0o755))
 
 	tests := []struct {
 		name             string
@@ -2117,10 +2120,22 @@ func TestNormalizeWindowsShellCommandArgs(t *testing.T) {
 			expected:         "",
 		},
 		{
-			name:             "script exists in dir - adds prefix",
+			name:             "bat script exists - adds prefix",
 			dir:              tmpDir,
 			shellCommandArgs: "test.bat",
 			expected:         ".\\test.bat",
+		},
+		{
+			name:             "cmd script exists - adds prefix",
+			dir:              tmpDir,
+			shellCommandArgs: "test.cmd",
+			expected:         ".\\test.cmd",
+		},
+		{
+			name:             "ps1 script exists - adds prefix",
+			dir:              tmpDir,
+			shellCommandArgs: "test.ps1",
+			expected:         ".\\test.ps1",
 		},
 		{
 			name:             "script with args - adds prefix",
@@ -2153,16 +2168,22 @@ func TestNormalizeWindowsShellCommandArgs(t *testing.T) {
 			expected:         "subdir/sub.bat",
 		},
 		{
-			name:             "command not a file - no change",
+			name:             "command without script extension - no change even if file exists",
 			dir:              tmpDir,
-			shellCommandArgs: "echo hello",
-			expected:         "echo hello",
+			shellCommandArgs: "python script.py",
+			expected:         "python script.py",
 		},
 		{
-			name:             "non-existent file - no change",
+			name:             "non-existent script - no change",
 			dir:              tmpDir,
 			shellCommandArgs: "nonexistent.bat",
 			expected:         "nonexistent.bat",
+		},
+		{
+			name:             "echo command - no change",
+			dir:              tmpDir,
+			shellCommandArgs: "echo hello",
+			expected:         "echo hello",
 		},
 	}
 
@@ -2199,7 +2220,35 @@ func TestNormalizeWindowsShellCommandArgs(t *testing.T) {
 				Dir:              tt.dir,
 				ShellCommandArgs: tt.shellCommandArgs,
 			}
-			result := builder.normalizeWindowsShellCommandArgs()
+			result := builder.normalizeWindowsScriptPath()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsWindowsScriptExtension tests the Windows script extension detection
+func TestIsWindowsScriptExtension(t *testing.T) {
+	tests := []struct {
+		filename string
+		expected bool
+	}{
+		{"test.bat", true},
+		{"test.BAT", true},
+		{"test.cmd", true},
+		{"test.CMD", true},
+		{"test.ps1", true},
+		{"test.PS1", true},
+		{"test.exe", false},
+		{"test.sh", false},
+		{"test.py", false},
+		{"test", false},
+		{"echo", false},
+		{"python", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			result := isWindowsScriptExtension(tt.filename)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
