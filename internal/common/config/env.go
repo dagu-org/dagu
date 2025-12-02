@@ -23,9 +23,17 @@ var defaultWhitelist = map[string]bool{
 	"TZ":              true,
 	"SHELL":           true,
 	"LD_LIBRARY_PATH": true,
-	"USERPROFILE":     true, // Windows Specifics equivalent of HOME
-	"PSModulePath":    true, // Windows Specifics, powershell modules path
-	"Path":            true, // Windows Specifics equivalent of PATH
+
+	// WWindows Specific Env Vars
+	"USERPROFILE":  true, // Windows Specifics equivalent of HOME
+	"PSModulePath": true, // Windows Specifics, powershell modules path
+	"Path":         true, // Windows Specifics equivalent of PATH
+	"SystemRoot":   true, // Required for powershell and cmd.exe
+	"WINDIR":       true, // Same as SystemRoot
+	"COMSPEC":      true, // Location of cmd.exe (required for shell invocation)
+	"PATHEXT":      true, // .COM;.EXE;.BAT etc. (required for extension resolution)
+	"TEMP":         true, // Temp directory
+	"TMP":          true, // Temp directory
 }
 
 // defaultPrefixes defines prefixes of env vars allowed to propagate.
