@@ -2087,3 +2087,120 @@ func TestReadFirstLine_LongLine(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to read file")
 }
+
+// TestNormalizeWindowsShellCommandArgs tests the Windows-specific path normalization.
+// This function is used on Windows for PowerShell and cmd.exe, but the logic
+// itself is cross-platform testable.
+func TestNormalizeWindowsShellCommandArgs(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a test script file
+	scriptFile := filepath.Join(tmpDir, "test.bat")
+	require.NoError(t, os.WriteFile(scriptFile, []byte("echo hello"), 0o755))
+
+	// Create a script in subdirectory
+	subDir := filepath.Join(tmpDir, "subdir")
+	require.NoError(t, os.MkdirAll(subDir, 0o755))
+	subScript := filepath.Join(subDir, "sub.bat")
+	require.NoError(t, os.WriteFile(subScript, []byte("echo sub"), 0o755))
+
+	tests := []struct {
+		name             string
+		dir              string
+		shellCommandArgs string
+		expected         string
+	}{
+		{
+			name:             "empty args",
+			dir:              tmpDir,
+			shellCommandArgs: "",
+			expected:         "",
+		},
+		{
+			name:             "script exists in dir - adds prefix",
+			dir:              tmpDir,
+			shellCommandArgs: "test.bat",
+			expected:         ".\\test.bat",
+		},
+		{
+			name:             "script with args - adds prefix",
+			dir:              tmpDir,
+			shellCommandArgs: "test.bat arg1 arg2",
+			expected:         ".\\test.bat arg1 arg2",
+		},
+		{
+			name:             "already has dot-backslash prefix",
+			dir:              tmpDir,
+			shellCommandArgs: ".\\test.bat",
+			expected:         ".\\test.bat",
+		},
+		{
+			name:             "already has dot-slash prefix",
+			dir:              tmpDir,
+			shellCommandArgs: "./test.bat",
+			expected:         "./test.bat",
+		},
+		{
+			name:             "relative path with subdir backslash - no change",
+			dir:              tmpDir,
+			shellCommandArgs: "subdir\\sub.bat",
+			expected:         "subdir\\sub.bat",
+		},
+		{
+			name:             "relative path with forward slash - no change",
+			dir:              tmpDir,
+			shellCommandArgs: "subdir/sub.bat",
+			expected:         "subdir/sub.bat",
+		},
+		{
+			name:             "command not a file - no change",
+			dir:              tmpDir,
+			shellCommandArgs: "echo hello",
+			expected:         "echo hello",
+		},
+		{
+			name:             "non-existent file - no change",
+			dir:              tmpDir,
+			shellCommandArgs: "nonexistent.bat",
+			expected:         "nonexistent.bat",
+		},
+	}
+
+	// Add platform-specific absolute path test
+	if goruntime.GOOS == "windows" {
+		tests = append(tests, struct {
+			name             string
+			dir              string
+			shellCommandArgs string
+			expected         string
+		}{
+			name:             "absolute path Windows - no change",
+			dir:              tmpDir,
+			shellCommandArgs: "C:\\Windows\\System32\\cmd.exe",
+			expected:         "C:\\Windows\\System32\\cmd.exe",
+		})
+	} else {
+		tests = append(tests, struct {
+			name             string
+			dir              string
+			shellCommandArgs string
+			expected         string
+		}{
+			name:             "absolute path Unix - no change",
+			dir:              tmpDir,
+			shellCommandArgs: "/usr/bin/echo",
+			expected:         "/usr/bin/echo",
+		})
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := &shellCommandBuilder{
+				Dir:              tt.dir,
+				ShellCommandArgs: tt.shellCommandArgs,
+			}
+			result := builder.normalizeWindowsShellCommandArgs()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
