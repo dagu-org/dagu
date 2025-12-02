@@ -142,7 +142,7 @@ const Graph: React.FC<Props> = ({
       status: NodeStatus,
       node?: components['schemas']['Node']
     ) => {
-      const id = step.name.replace(/[\s-]/g, 'dagutmp'); // Replace spaces and dashes with 'x'
+      const id = step.name.replace(/[\s-()]/g, 'dagutmp'); // Replace spaces, dashes and parentheses with 'x'
       const c = graphStatusMap[status] || '';
 
       // Check if this is a sub dagRun node (has a call property)
