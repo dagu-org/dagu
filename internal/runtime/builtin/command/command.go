@@ -505,6 +505,13 @@ func setupScript(workDir, script string, shell []string) (string, error) {
 		_ = file.Close()
 	}()
 
+	// For PowerShell scripts, prepend error handling settings
+	// $ErrorActionPreference = 'Stop' - stops on cmdlet errors
+	// $PSNativeCommandUseErrorActionPreference = $true - stops on non-zero exit codes (PowerShell 7.4+)
+	if ext == ".ps1" {
+		script = "$ErrorActionPreference = 'Stop'\n$PSNativeCommandUseErrorActionPreference = $true\n" + script
+	}
+
 	if _, err = file.WriteString(script); err != nil {
 		return "", fmt.Errorf("failed to write script to file: %w", err)
 	}
