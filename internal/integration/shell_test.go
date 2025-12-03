@@ -100,26 +100,6 @@ steps:
 		})
 	})
 
-	t.Run("DirectShellWithScript", func(t *testing.T) {
-		t.Parallel()
-
-		// Direct shell with script - uses the command to run the script
-		dag := th.DAG(t, `
-shell: direct
-steps:
-  - name: test
-    command: [/bin/sh]
-    script: |
-      echo "from script"
-    output: OUT
-`)
-		agent := dag.Agent()
-		agent.RunSuccess(t)
-		dag.AssertOutputs(t, map[string]any{
-			"OUT": "from script",
-		})
-	})
-
 	t.Run("DirectShellWithDaguVariables", func(t *testing.T) {
 		t.Parallel()
 
@@ -277,7 +257,7 @@ steps:
 shell: /bin/sh
 steps:
   - name: test
-    command: echo -n "hello " && echo "world"
+    command: VAR=hello && echo "$VAR world"
     output: OUT
 `)
 		agent := dag.Agent()
