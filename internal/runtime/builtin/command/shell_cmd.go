@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 )
 
@@ -38,7 +39,7 @@ func resolveCmdPath(shell string) string {
 
 	// Fallback to SystemRoot if Windows is installed on a different drive
 	if systemRoot := os.Getenv("SystemRoot"); systemRoot != "" {
-		systemRootCmd := systemRoot + `\System32\cmd.exe`
+		systemRootCmd := filepath.Join(systemRoot, `System32\cmd.exe`)
 		if _, err := os.Stat(systemRootCmd); err == nil {
 			return systemRootCmd
 		}
