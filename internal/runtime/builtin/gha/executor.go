@@ -156,7 +156,7 @@ func (e *githubAction) Run(ctx context.Context) error {
 	}
 
 	// Ensure the working directory exists
-	if err := os.MkdirAll(actualWorkDir, 0755); err != nil {
+	if err := os.MkdirAll(actualWorkDir, 0750); err != nil {
 		return fmt.Errorf("failed to create working directory: %w", err)
 	}
 
@@ -175,7 +175,7 @@ func (e *githubAction) Run(ctx context.Context) error {
 
 	// Write workflow file to temp directory
 	workflowDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowDir, 0750); err != nil {
 		return fmt.Errorf("failed to create workflow directory: %w", err)
 	}
 
