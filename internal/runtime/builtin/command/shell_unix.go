@@ -43,7 +43,8 @@ func (s *unixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cm
 	return exec.CommandContext(ctx, cmd, args...), nil // nolint: gosec
 }
 
-// isUnixLikeShell returns true if the shell supports the -e flag.
+// isUnixLikeShell reports whether the named shell is known to support the -e (errexit) flag.
+// It returns true for "sh", "bash", "zsh", "ksh", "ash", and "dash"; returns false for "fish", an empty string, or any unrecognized shell.
 func isUnixLikeShell(shell string) bool {
 	if shell == "" {
 		return false
@@ -61,7 +62,7 @@ func isUnixLikeShell(shell string) bool {
 	}
 }
 
-// cloneArgs creates a copy of the args slice to avoid mutation.
+// cloneArgs returns a shallow copy of the provided args slice so callers can modify the result without mutating the original.
 func cloneArgs(args []string) []string {
 	result := make([]string, len(args))
 	copy(result, args)

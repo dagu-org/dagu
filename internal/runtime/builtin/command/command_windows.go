@@ -42,7 +42,7 @@ func (b *shellCommandBuilder) normalizeScriptPath() string {
 	return b.ShellCommandArgs
 }
 
-// isWindowsScriptExtension returns true if the filename has a Windows script extension.
+// isWindowsScriptExtension reports whether filename has a Windows script extension (".bat", ".cmd", or ".ps1").
 func isWindowsScriptExtension(filename string) bool {
 	ext := strings.ToLower(filepath.Ext(filename))
 	switch ext {

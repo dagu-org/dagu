@@ -10,7 +10,8 @@ type BaseEnv struct {
 	variables []string
 }
 
-// NewBaseEnv creates a new BaseEnv with the provided variables.
+// NewBaseEnv constructs a BaseEnv containing the provided environment variable strings.
+// The slice is stored as-is (no copy); callers should pass a defensive copy if isolation is required.
 func NewBaseEnv(vars []string) BaseEnv {
 	return BaseEnv{variables: vars}
 }

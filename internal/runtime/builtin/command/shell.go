@@ -29,7 +29,9 @@ var shellRegistry = []Shell{
 	&unixShell{}, // default fallback - must be last
 }
 
-// findShell returns the Shell implementation that matches the given command.
+// findShell selects the first registered Shell implementation that matches the provided command.
+// It normalizes the executable by taking its base name and converting it to lowercase before matching.
+// If no registered shell matches (should not occur), it falls back to the unixShell implementation.
 func findShell(cmd string) Shell {
 	name := strings.ToLower(filepath.Base(cmd))
 	for _, shell := range shellRegistry {
