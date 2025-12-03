@@ -312,10 +312,16 @@ func estimateLineCount(filePath string) (int, bool, error) {
 	}
 
 	// Calculate average line length from samples
+	totalSampleLines := startLineCount + middleLineCount
+	if totalSampleLines == 0 {
+		// Avoid division by zero; assume 1 line
+		return 1, false, nil
+	}
+
 	var avgLineLength float64
 	if fileSize > sampleSize*2 {
 		// Average of start and middle samples
-		avgLineLength = float64(sampleSize*2) / float64(startLineCount+middleLineCount)
+		avgLineLength = float64(sampleSize*2) / float64(totalSampleLines)
 	} else {
 		// Just use start sample
 		avgLineLength = float64(sampleSize) / float64(startLineCount)
