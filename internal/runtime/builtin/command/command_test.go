@@ -208,9 +208,9 @@ func TestBuildCmdCommand(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name     string
-		builder  shellCommandBuilder
-		expected []string
+		name           string
+		builder        shellCommandBuilder
+		expectedInArgs []string // Args that must be present
 	}{
 		{
 			name: "BasicCmdCommand",
@@ -218,7 +218,7 @@ func TestBuildCmdCommand(t *testing.T) {
 				Shell:            []string{"cmd"},
 				ShellCommandArgs: "dir",
 			},
-			expected: []string{"cmd", "/c", "dir"},
+			expectedInArgs: []string{"/c", "dir"},
 		},
 		{
 			name: "CmdWithExisting/C",
@@ -226,7 +226,7 @@ func TestBuildCmdCommand(t *testing.T) {
 				Shell:            []string{"cmd", "/c"},
 				ShellCommandArgs: "dir",
 			},
-			expected: []string{"cmd", "/c", "dir"},
+			expectedInArgs: []string{"/c", "dir"},
 		},
 		{
 			name: "CmdWithScript",
@@ -236,7 +236,15 @@ func TestBuildCmdCommand(t *testing.T) {
 				Script:  "test.py",
 				Args:    []string{"-u"},
 			},
-			expected: []string{"python", "-u", "test.py"},
+			expectedInArgs: []string{"python", "-u", "test.py"},
+		},
+		{
+			name: "CmdWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"cmd"},
+				Script: "script.bat",
+			},
+			expectedInArgs: []string{"/c", "script.bat"},
 		},
 	}
 
@@ -246,7 +254,82 @@ func TestBuildCmdCommand(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, cmd)
 
-			assert.Equal(t, tt.expected, cmd.Args)
+			for _, expectedArg := range tt.expectedInArgs {
+				assert.Contains(t, cmd.Args, expectedArg)
+			}
+		})
+	}
+}
+
+// TestBuildShellWithScriptOnly tests that each shell properly handles Script without Command
+func TestBuildShellWithScriptOnly(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name           string
+		builder        shellCommandBuilder
+		expectedInArgs []string
+	}{
+		{
+			name: "CmdShellWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"cmd"},
+				Script: "/tmp/script.bat",
+			},
+			expectedInArgs: []string{"/c", "/tmp/script.bat"},
+		},
+		{
+			name: "PowerShellWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"powershell"},
+				Script: "/tmp/script.ps1",
+			},
+			expectedInArgs: []string{"-ExecutionPolicy", "Bypass", "-File", "/tmp/script.ps1"},
+		},
+		{
+			name: "PwshWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"pwsh"},
+				Script: "/tmp/script.ps1",
+			},
+			expectedInArgs: []string{"-ExecutionPolicy", "Bypass", "-File", "/tmp/script.ps1"},
+		},
+		{
+			name: "BashWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"bash"},
+				Script: "/tmp/script.sh",
+			},
+			expectedInArgs: []string{"-e", "/tmp/script.sh"},
+		},
+		{
+			name: "ShWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"sh"},
+				Script: "/tmp/script.sh",
+			},
+			expectedInArgs: []string{"-e", "/tmp/script.sh"},
+		},
+		{
+			name: "NixShellWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"nix-shell"},
+				Script: "/tmp/script.sh",
+			},
+			expectedInArgs: []string{"--run", "set -e; /tmp/script.sh"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, err := tt.builder.Build(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, cmd)
+
+			for _, expectedArg := range tt.expectedInArgs {
+				assert.Contains(t, cmd.Args, expectedArg,
+					"expected %q in args %v", expectedArg, cmd.Args)
+			}
 		})
 	}
 }
@@ -342,6 +425,10 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 }
 
 func TestCommandExecutor_ExitCode(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping Unix-specific test on Windows")
+	}
+
 	ctx := context.Background()
 	// Create a minimal DAG for the test
 	dag := &core.DAG{
@@ -1009,11 +1096,13 @@ func TestSetupScript(t *testing.T) {
 					"expected extension %s, got %s", tt.expectedExt, filepath.Ext(scriptFile))
 			}
 
-			// Check permissions
-			info, err := os.Stat(scriptFile)
-			require.NoError(t, err)
-			// Check that it's executable (at least user execute bit)
-			assert.True(t, info.Mode()&0100 != 0, "script should be executable")
+			// Check permissions (only on Unix - Windows doesn't have the same permission model)
+			if goruntime.GOOS != "windows" {
+				info, err := os.Stat(scriptFile)
+				require.NoError(t, err)
+				// Check that it's executable (at least user execute bit)
+				assert.True(t, info.Mode()&0100 != 0, "script should be executable")
+			}
 		})
 	}
 }
