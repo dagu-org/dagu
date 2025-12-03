@@ -2,6 +2,9 @@
 
 package config
 
+// init populates the package-level defaultWhitelist map with common Unix-like environment variable names.
+// It marks typical variables (paths, user, shell, temp dir, terminal, editor preferences, locale, timezone,
+// shared library path, and XDG config/data/cache locations) as allowed.
 func init() {
 	// Unix/Linux/macOS environment variables
 	for _, key := range []string{

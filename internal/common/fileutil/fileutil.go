@@ -39,13 +39,15 @@ func IsDir(path string) bool {
 	return stat.IsDir()
 }
 
-// FileExists returns true if file exists.
+// FileExists reports whether the named file exists.
+// It returns false if os.Stat reports the file does not exist and true otherwise (including when os.Stat returns a different error).
 func FileExists(file string) bool {
 	_, err := os.Stat(file)
 	return !os.IsNotExist(err)
 }
 
-// IsFile returns true if path is a regular file.
+// IsFile reports whether the named path exists and is a regular file.
+// It returns false if the path does not exist or if an error occurs while obtaining file info.
 func IsFile(path string) bool {
 	stat, err := os.Stat(path)
 	if err != nil {
@@ -55,7 +57,8 @@ func IsFile(path string) bool {
 }
 
 // OpenOrCreateFile opens (or creates) the log file with flags for creation, write-only access,
-// appending, and synchronous I/O. It sets file permissions to 0600.
+// OpenOrCreateFile opens or creates the named file for appending with synchronous I/O and sets permissions to 0600.
+// It returns the opened *os.File or a non-nil error if the operation fails.
 func OpenOrCreateFile(filepath string) (*os.File, error) {
 	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND | os.O_SYNC
 	file, err := os.OpenFile(filepath, flags, 0600) // nolint:gosec

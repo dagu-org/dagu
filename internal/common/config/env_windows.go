@@ -2,6 +2,8 @@
 
 package config
 
+// init populates the package's defaultWhitelist with common Windows environment
+// variable names so they are treated as whitelisted on Windows builds.
 func init() {
 	// Windows-specific environment variables
 	for _, key := range []string{

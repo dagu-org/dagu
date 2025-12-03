@@ -11,7 +11,11 @@ import (
 )
 
 // setupScript creates a temporary script file and returns its path.
-// It handles shell-specific preprocessing (e.g., PowerShell error handling).
+// setupScript creates a temporary executable script file in workDir containing
+// the provided script after applying shell-specific preprocessing (for example,
+// PowerShell error-handling directives). The file extension is chosen from the
+// supplied shell; the function returns the created file path or an error if file
+// creation, writing, syncing, or permission setting fails.
 func setupScript(workDir, script string, shell []string) (string, error) {
 	// Determine file extension based on shell
 	shellCmd := ""
@@ -48,7 +52,8 @@ func setupScript(workDir, script string, shell []string) (string, error) {
 	return file.Name(), nil
 }
 
-// preprocessScript applies shell-specific preprocessing to the script content.
+// preprocessScript returns the script content adjusted for the shell indicated by ext.
+// For ".ps1" it prepends PowerShell directives that make cmdlet errors and non-zero exit codes stop execution; for other extensions it returns the original script.
 func preprocessScript(script, ext string) string {
 	switch ext {
 	case ".ps1":
@@ -61,7 +66,9 @@ func preprocessScript(script, ext string) string {
 	}
 }
 
-// createDirectCommand creates a command that runs directly without a shell.
+// createDirectCommand returns an *exec.Cmd that invokes cmd with the provided args.
+// If scriptFile is non-empty it is appended to the argument list. The returned command
+// is bound to ctx.
 func createDirectCommand(ctx context.Context, cmd string, args []string, scriptFile string) *exec.Cmd {
 	if scriptFile != "" {
 		clonedArgs := cloneArgs(args)
@@ -71,7 +78,9 @@ func createDirectCommand(ctx context.Context, cmd string, args []string, scriptF
 	return exec.CommandContext(ctx, cmd, args...) // nolint: gosec
 }
 
-// validateCommandStep validates that a step has the required command configuration.
+// validateCommandStep checks that a Step has a valid command configuration.
+// It considers a step valid when it provides a Command, a Script, both, or a non-nil SubDAG.
+// Returns core.ErrStepCommandIsRequired when none of those are present.
 func validateCommandStep(step core.Step) error {
 	switch {
 	case step.Command != "" && step.Script != "":

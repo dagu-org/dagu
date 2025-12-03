@@ -249,6 +249,8 @@ func readFirstLine(filePath string) (string, error) {
 	return "", nil
 }
 
+// exitCodeFromError returns the process exit code represented by err.
+// 0 if err is nil; if err is an *exec.ExitError returns its ExitCode(); otherwise returns 1.
 func exitCodeFromError(err error) int {
 	if err == nil {
 		return 0
@@ -262,7 +264,8 @@ func exitCodeFromError(err error) int {
 	return exitCode
 }
 
-// NewCommand creates a new command executor.
+// NewCommand creates an executor that will run the provided step.
+// It returns an executor configured from the step, or an error if creating the command configuration fails.
 func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) {
 	cfg, err := NewCommandConfig(ctx, step)
 	if err != nil {
@@ -272,7 +275,11 @@ func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) 
 	return &commandExecutor{config: cfg}, nil
 }
 
-// NewCommandConfig creates a new commandConfig from the given step.
+// NewCommandConfig creates a commandConfig populated from the given context and step.
+// The returned config uses the environment from runtime.GetEnv(ctx) for Dir and Shell,
+// copies Command, Args, Script, ShellCmdArgs, and ShellPackages from the step, and sets
+// UserSpecifiedShell to true when the step explicitly provided a Shell.
+// It returns the constructed *commandConfig and a nil error.
 func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, error) {
 	env := runtime.GetEnv(ctx)
 
@@ -289,6 +296,8 @@ func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, erro
 	}, nil
 }
 
+// init registers command executors ("", "shell", "command") with the executor
+// framework, associating each with NewCommand and validateCommandStep.
 func init() {
 	executor.RegisterExecutor("", NewCommand, validateCommandStep)
 	executor.RegisterExecutor("shell", NewCommand, validateCommandStep)
