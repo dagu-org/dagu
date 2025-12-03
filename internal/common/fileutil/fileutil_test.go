@@ -187,3 +187,35 @@ func TestMustResolvePath(t *testing.T) {
 		}
 	})
 }
+
+func TestIsFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	t.Run("RegularFile", func(t *testing.T) {
+		t.Parallel()
+
+		filePath := filepath.Join(tmpDir, "testfile.txt")
+		err := os.WriteFile(filePath, []byte("test content"), 0644)
+		require.NoError(t, err)
+
+		require.True(t, IsFile(filePath))
+	})
+
+	t.Run("Directory", func(t *testing.T) {
+		t.Parallel()
+
+		dirPath := filepath.Join(tmpDir, "testdir")
+		err := os.Mkdir(dirPath, 0755)
+		require.NoError(t, err)
+
+		require.False(t, IsFile(dirPath))
+	})
+
+	t.Run("NonExistent", func(t *testing.T) {
+		t.Parallel()
+
+		require.False(t, IsFile(filepath.Join(tmpDir, "nonexistent")))
+	})
+}
