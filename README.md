@@ -454,7 +454,7 @@ Our roadmap is driven by community feedback and our mission to make Dagu the mos
 ### 🏗️ In Progress
 *Active development focus. These features are expected to land in the upcoming releases.*
 
-- [ ] **Windows Support**: Native support for Windows OS to ensure Dagu runs seamlessly across all major platforms.
+- [x] **Windows Support**: Native support for Windows OS to ensure Dagu runs seamlessly across all major platforms.
 - [ ] **JSON Schema Validation** ([#325](https://github.com/dagu-org/dagu/issues/325)): Strict validation for DAG parameters to catch configuration errors early.
 - [ ] **Resource Limits**: Configurable CPU and Memory limits per step to prevent resource exhaustion.
 
@@ -462,8 +462,9 @@ Our roadmap is driven by community feedback and our mission to make Dagu the mos
 *High-priority features selected for the near future.*
 
 **Core Engine**
-- [ ] **Human-in-the-loop** ([#978](https://github.com/dagu-org/dagu/issues/978)): Support for manual approval steps (blocking wait) within a workflow.
+- [ ] **Human-in-the-loop** ([#978](https://github.com/dagu-org/dagu/issues/978)): Support for manual approval steps (blocking wait) within a workflow—enabling human task integration for wizards and approval gates.
 - [ ] **File Watcher Trigger** ([#372](https://github.com/dagu-org/dagu/issues/372)): Event-driven triggers that start DAGs when specific files change.
+- [ ] **Webhook Triggers & Callbacks**: Outbound webhook notifications for workflow events.
 - [ ] **Inter-DAG State**: Mechanisms to explicitly share state and data artifacts between different DAG runs.
 - [ ] **External Database Backend** ([#539](https://github.com/dagu-org/dagu/issues/539)): Support for PostgreSQL/MySQL persistence for high-scale deployments (removing reliance on local disk).
 
@@ -473,14 +474,16 @@ Our roadmap is driven by community feedback and our mission to make Dagu the mos
 
 **Operations**
 - [ ] **Pause/Resume DAGs**: Global or per-DAG controls to pause scheduling without modifying YAML files.
-- [ ] **Project / Namespace**: logical grouping of DAGs and execution history per project/team.
+- [ ] **Project / Namespace**: Logical grouping of DAGs and execution history per project/team with data segregation for multi-tenant deployments.
 
 ### 🔮 Future (Long-term)
 *Strategic goals and complex features under consideration.*
 
 - [ ] **Kubernetes Native Execution** ([#837](https://github.com/dagu-org/dagu/issues/837)): Run steps as native K8s jobs/pods for massive scalability.
 - [ ] **Catch Up & Backfill** ([#695](https://github.com/dagu-org/dagu/issues/695)): Robust handling of missed schedule runs and historical data processing.
-- [ ] **RBAC & Multi-User Auth**: Fine-grained permissions, user roles, and resource quotas.
+- [ ] **RBAC & Multi-User Auth**: Fine-grained permissions, user roles, resource quotas, and tenant-scoped API access for SaaS deployments.
+- [ ] **Multi-Tenant Isolation**: Full tenant isolation with data segregation, separate execution contexts, and per-tenant resource limits.
+- [ ] **Real-time Notifications**: WebSocket-based live notifications for workflow status changes and step completions.
 - [ ] **Audit Logging**: Immutable records of all user actions and system events.
 - [ ] **SDK & Plugins** ([#583](https://github.com/dagu-org/dagu/issues/583)): Python/Go/TS SDKs for programmatic DAG generation and a plugin system for custom executors.
 
