@@ -143,19 +143,17 @@ rd /s /q "!TEMP_DIR!" >nul 2>&1
 echo.
 echo Dagu !VERSION! has been installed to: !DEST_PATH!
 
-REM Check if install directory is in PATH and add it
+REM Check if install directory is in PATH
 set "USER_PATH="
 for /f "tokens=2*" %%a in ('reg query "HKCU\Environment" /v Path 2^>nul') do set "USER_PATH=%%b"
 echo !USER_PATH! | findstr /i /c:"!INSTALL_DIR!" >nul
 if !ERRORLEVEL! neq 0 (
-    if "!USER_PATH!"=="" (
-        setx PATH "!INSTALL_DIR!" >nul 2>&1
-    ) else (
-        setx PATH "!USER_PATH!;!INSTALL_DIR!" >nul 2>&1
-    )
-    set "PATH=!PATH!;!INSTALL_DIR!"
     echo.
-    echo Added !INSTALL_DIR! to your PATH.
+    echo To use dagu from any terminal, add the install directory to your PATH:
+    echo.
+    echo   set PATH=%%PATH%%;!INSTALL_DIR!
+    echo.
+    echo Or add it permanently via System Properties ^> Environment Variables.
 )
 
 echo.

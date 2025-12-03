@@ -162,17 +162,12 @@ function Install-Dagu {
         # Check if install directory is in PATH
         $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
         if ($userPath -notlike "*$InstallDir*") {
-            # Add to PATH automatically (persistent for new terminals)
-            $newPath = if ($userPath) { "$userPath;$InstallDir" } else { $InstallDir }
-            [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
             Write-Output ""
-            Write-Output "Added $InstallDir to your PATH."
-        }
-
-        # Update current session PATH
-        $currentPath = [Environment]::GetEnvironmentVariable("Path", "Process")
-        if ($currentPath -notlike "*$InstallDir*") {
-            [Environment]::SetEnvironmentVariable("Path", "$currentPath;$InstallDir", "Process")
+            Write-Output "To use dagu from any terminal, add the install directory to your PATH:"
+            Write-Output ""
+            Write-Output "  `$env:Path += `";$InstallDir`""
+            Write-Output ""
+            Write-Output "Or add it permanently via System Properties > Environment Variables."
         }
 
         Write-Output ""

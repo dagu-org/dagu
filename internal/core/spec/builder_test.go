@@ -3338,20 +3338,22 @@ steps:
 }
 
 func TestBuildWorkingDir(t *testing.T) {
-	t.Run("ExplicitWorkingDir", func(t *testing.T) {
-		yaml := `
-workingDir: /tmp
+	t.Run("ExplicitAbsoluteWorkingDir", func(t *testing.T) {
+		tempDir := t.TempDir()
+		yaml := fmt.Sprintf(`
+workingDir: %s
 steps:
   - echo hello
-`
+`, tempDir)
 		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag)
-		assert.Equal(t, "/tmp", dag.WorkingDir)
+		assert.Equal(t, tempDir, dag.WorkingDir)
 	})
 
 	t.Run("WorkingDirWithEnvVarExpansion", func(t *testing.T) {
-		t.Setenv("TEST_DIR", "/tmp/dir")
+		tempDir := t.TempDir()
+		t.Setenv("TEST_DIR", tempDir)
 		yaml := `
 workingDir: ${TEST_DIR}/subdir
 steps:
@@ -3360,7 +3362,7 @@ steps:
 		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag)
-		assert.Equal(t, "/tmp/dir/subdir", dag.WorkingDir)
+		assert.Equal(t, filepath.Join(tempDir, "subdir"), dag.WorkingDir)
 	})
 
 	t.Run("DefaultWorkingDirWhenNoFile", func(t *testing.T) {
@@ -3372,10 +3374,106 @@ steps:
 		require.NoError(t, err)
 		require.NotNil(t, dag)
 
-		// Should be current working directory
+		// Should be current working directory when loaded from YAML (no file)
 		expectedDir, err := os.Getwd()
 		require.NoError(t, err)
 		assert.Equal(t, expectedDir, dag.WorkingDir)
+	})
+
+	t.Run("RelativeWorkingDirResolvesAgainstDAGFile", func(t *testing.T) {
+		// Create a temp directory with a DAG file
+		tempDir := t.TempDir()
+		dagFile := filepath.Join(tempDir, "dag.yaml")
+		subDir := filepath.Join(tempDir, "scripts")
+
+		yaml := `
+workingDir: ./scripts
+steps:
+  - echo hello
+`
+		require.NoError(t, os.WriteFile(dagFile, []byte(yaml), 0644))
+
+		dag, err := spec.Load(context.Background(), dagFile)
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// Relative path should resolve against DAG file directory
+		assert.Equal(t, subDir, dag.WorkingDir)
+	})
+
+	t.Run("RelativeWorkingDirWithoutDAGFile_ResolvesAgainstCWD", func(t *testing.T) {
+		yaml := `
+workingDir: ./subdir
+steps:
+  - echo hello
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// When no DAG file, relative path is resolved via fileutil.ResolvePathOrBlank
+		// which uses filepath.Abs (resolves against CWD)
+		cwd, err := os.Getwd()
+		require.NoError(t, err)
+		expectedDir := filepath.Join(cwd, "subdir")
+		assert.Equal(t, expectedDir, dag.WorkingDir)
+	})
+}
+
+func TestBuildStepWorkingDir(t *testing.T) {
+	t.Run("StepWithDirField", func(t *testing.T) {
+		yaml := `
+steps:
+  - name: step1
+    dir: /tmp/mydir
+    command: echo hello
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.Equal(t, "/tmp/mydir", dag.Steps[0].Dir)
+	})
+
+	t.Run("StepWithWorkingDirField", func(t *testing.T) {
+		yaml := `
+steps:
+  - name: step1
+    workingDir: /tmp/myworkdir
+    command: echo hello
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.Equal(t, "/tmp/myworkdir", dag.Steps[0].Dir)
+	})
+
+	t.Run("StepWorkingDirTakesPrecedenceOverDir", func(t *testing.T) {
+		yaml := `
+steps:
+  - name: step1
+    dir: /tmp/dir
+    workingDir: /tmp/workingdir
+    command: echo hello
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		// workingDir should take precedence over dir
+		assert.Equal(t, "/tmp/workingdir", dag.Steps[0].Dir)
+	})
+
+	t.Run("StepWithRelativeDir", func(t *testing.T) {
+		yaml := `
+steps:
+  - name: step1
+    dir: ./scripts
+    command: echo hello
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		// At build time, relative dir is stored as-is (resolved at runtime)
+		assert.Equal(t, "./scripts", dag.Steps[0].Dir)
 	})
 }
 

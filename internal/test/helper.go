@@ -80,6 +80,17 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	setupLock.Lock()
 	defer setupLock.Unlock()
 
+	// Save the original working directory and restore it after the test.
+	// This is important because some tests (via agent) may change the working
+	// directory to a temp directory that gets cleaned up, which would cause
+	// subsequent tests to fail when they call os.Getwd().
+	origWD, err := os.Getwd()
+	if err == nil {
+		t.Cleanup(func() {
+			_ = os.Chdir(origWD)
+		})
+	}
+
 	var options Options
 	for _, opt := range opts {
 		opt(&options)
