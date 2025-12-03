@@ -24,7 +24,11 @@ func (s *cmdShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cmd
 
 	// When running a command directly with a script, don't include cmd.exe arguments
 	if b.Command != "" && b.Script != "" {
-		return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
+		args := cloneArgs(b.Args)
+		if b.Script != "" {
+			args = append(args, b.Script)
+		}
+		return exec.CommandContext(ctx, b.Command, args...), nil // nolint: gosec
 	}
 
 	args = append(args, b.Args...)

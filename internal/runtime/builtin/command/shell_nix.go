@@ -23,8 +23,10 @@ func (s *nixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cmd
 		args = append(args, "-p", pkg)
 	}
 
-	// nix-shell runs in pure mode by default
-	args = append(args, "--pure")
+	// Add pure mode if not already specified
+	if !slices.Contains(args, "--pure") && !slices.Contains(args, "--impure") {
+		args = append(args, "--pure")
+	}
 
 	if !slices.Contains(args, "--run") {
 		args = append(args, "--run")

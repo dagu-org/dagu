@@ -3,6 +3,7 @@ package command
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -250,18 +251,16 @@ func readFirstLine(filePath string) (string, error) {
 }
 
 // exitCodeFromError returns the process exit code represented by err.
-// 0 if err is nil; if err is an *exec.ExitError returns its ExitCode(); otherwise returns 1.
+// 0 if err is nil; if err is an *exec.ExitError (or wraps one) returns its ExitCode(); otherwise returns 1.
 func exitCodeFromError(err error) int {
 	if err == nil {
 		return 0
 	}
-	var exitCode int
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		exitCode = exitErr.ExitCode()
-	} else {
-		exitCode = 1
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode()
 	}
-	return exitCode
+	return 1
 }
 
 // NewCommand creates an executor that will run the provided step.

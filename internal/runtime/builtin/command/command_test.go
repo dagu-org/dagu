@@ -1798,19 +1798,14 @@ func TestCommandConfig_NewCmd_Errors(t *testing.T) {
 	})
 
 	t.Run("shellCommandBuilder error with shell cmd args", func(t *testing.T) {
-		// Test the path where shellCommandBuilder fails due to empty Shell
-		// when ShellCommandArgs is set
 		config := commandConfig{
 			Ctx:              ctx,
-			Shell:            []string{"invalid shell with\ttabs"},
+			Shell:            []string{""}, // Empty shell should cause error
 			ShellCommandArgs: "echo hello",
 		}
-		// This should work since Shell is now a slice
 		cmd, err := config.newCmd(ctx, "")
-		// The command might succeed or fail depending on the shell parsing
-		if err == nil {
-			assert.NotNil(t, cmd)
-		}
+		assert.Error(t, err)
+		assert.Nil(t, cmd)
 	})
 
 	t.Run("detectShebang error", func(t *testing.T) {
@@ -2101,26 +2096,6 @@ func TestCommandConfig_NewCmd_ShellScriptNoShebang(t *testing.T) {
 	assert.NotNil(t, cmd)
 	// Should use /bin/sh to run the script
 	assert.Contains(t, cmd.Path, "sh")
-}
-
-// TestSetupScript_WriteErrors tests write-related errors in setupScript
-// Note: These tests may be skipped on some systems where the operations don't fail
-func TestSetupScript_WriteErrors(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		t.Skip("Skipping Unix-specific test on Windows")
-	}
-
-	// Test with /dev/full if available (Linux only) - causes write errors
-	if _, err := os.Stat("/dev/full"); err == nil {
-		t.Run("write to full device", func(t *testing.T) {
-			// /dev/full simulates a full disk
-			_, err := setupScript("/dev", "echo hello", []string{"/bin/sh"})
-			// This might fail due to permission or other issues
-			if err != nil {
-				assert.Error(t, err)
-			}
-		})
-	}
 }
 
 // TestReadFirstLine_LongLine tests readFirstLine with extremely long content

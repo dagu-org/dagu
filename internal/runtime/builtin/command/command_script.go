@@ -70,12 +70,11 @@ func preprocessScript(script, ext string) string {
 // If scriptFile is non-empty it is appended to the argument list. The returned command
 // is bound to ctx.
 func createDirectCommand(ctx context.Context, cmd string, args []string, scriptFile string) *exec.Cmd {
+	clonedArgs := cloneArgs(args)
 	if scriptFile != "" {
-		clonedArgs := cloneArgs(args)
 		clonedArgs = append(clonedArgs, scriptFile)
-		return exec.CommandContext(ctx, cmd, clonedArgs...) // nolint: gosec
 	}
-	return exec.CommandContext(ctx, cmd, args...) // nolint: gosec
+	return exec.CommandContext(ctx, cmd, clonedArgs...) // nolint: gosec
 }
 
 // validateCommandStep checks that a Step has a valid command configuration.
