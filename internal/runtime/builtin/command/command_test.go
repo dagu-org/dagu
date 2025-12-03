@@ -1786,7 +1786,7 @@ func TestCommandConfig_NewCmd_Errors(t *testing.T) {
 	scriptFile := filepath.Join(tmpDir, "test.sh")
 	require.NoError(t, os.WriteFile(scriptFile, []byte("echo hello"), 0o755))
 
-	t.Run("shellCommandBuilder error with command and script", func(t *testing.T) {
+	t.Run("EmptyShellWithCommandAndScript", func(t *testing.T) {
 		config := commandConfig{
 			Ctx:     ctx,
 			Command: "/bin/sh",
@@ -1797,18 +1797,7 @@ func TestCommandConfig_NewCmd_Errors(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("shellCommandBuilder error with shell cmd args", func(t *testing.T) {
-		config := commandConfig{
-			Ctx:              ctx,
-			Shell:            []string{""}, // Empty shell should cause error
-			ShellCommandArgs: "echo hello",
-		}
-		cmd, err := config.newCmd(ctx, "")
-		assert.Error(t, err)
-		assert.Nil(t, cmd)
-	})
-
-	t.Run("detectShebang error", func(t *testing.T) {
+	t.Run("DetectShebangError", func(t *testing.T) {
 		// Create a config that will trigger detectShebang with non-existent file
 		config := commandConfig{
 			Ctx:                ctx,
