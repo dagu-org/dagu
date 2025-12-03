@@ -547,7 +547,7 @@ func setViperDefaultValues(paths Paths) {
 	// UI settings
 	viper.SetDefault("ui.navbarTitle", AppName)
 	viper.SetDefault("ui.maxDashboardPageLimit", 100)
-	viper.SetDefault("ui.logEncodingCharset", "utf-8")
+	viper.SetDefault("ui.logEncodingCharset", getDefaultLogEncodingCharset())
 	viper.SetDefault("ui.dags.sortField", "name")
 	viper.SetDefault("ui.dags.sortOrder", "asc")
 
