@@ -1,6 +1,10 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
+
+	"github.com/spf13/cobra"
+)
 
 func Mcp() *cobra.Command {
 	return NewCommand(
@@ -18,5 +22,15 @@ var mcpFlags = []commandLineFlag{}
 
 // runMcp handles the execution of the mcp command
 func runMcp(ctx *Context, args []string) error {
+	mcpserver, err := ctx.NewMcpServer()
+	if err != nil {
+		return fmt.Errorf("failed to initialize scheduler: %w", err)
+	}
+
+	if err := mcpserver.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start scheduler in directory %s: %w",
+			ctx.Config.Paths.DAGsDir, err)
+	}
+
 	return nil
 }
