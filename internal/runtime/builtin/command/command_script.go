@@ -10,12 +10,12 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 )
 
-// setupScript creates a temporary script file and returns its path.
-// setupScript creates a temporary executable script file in workDir containing
-// the provided script after applying shell-specific preprocessing (for example,
-// PowerShell error-handling directives). The file extension is chosen from the
-// supplied shell; the function returns the created file path or an error if file
-// creation, writing, syncing, or permission setting fails.
+// setupScript creates a temporary executable script file containing the provided
+// script after applying shell-specific preprocessing (e.g., PowerShell error-handling
+// directives). If workDir is non-empty, the file is created there; otherwise it falls
+// back to the system temp directory. The file extension is chosen based on the shell.
+// Returns the created file path or an error if file creation, writing, syncing, or
+// permission setting fails.
 func setupScript(workDir, script string, shell []string) (string, error) {
 	// Determine file extension based on shell
 	shellCmd := ""
@@ -29,26 +29,33 @@ func setupScript(workDir, script string, shell []string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create script file: %w", err)
 	}
-	defer func() {
+
+	// cleanup removes the temp file on error
+	cleanup := func() {
 		_ = file.Close()
-	}()
+		_ = os.Remove(file.Name())
+	}
 
 	// Apply shell-specific preprocessing
 	script = preprocessScript(script, ext)
 
 	if _, err = file.WriteString(script); err != nil {
+		cleanup()
 		return "", fmt.Errorf("failed to write script to file: %w", err)
 	}
 
 	if err = file.Sync(); err != nil {
+		cleanup()
 		return "", fmt.Errorf("failed to sync script file: %w", err)
 	}
 
 	// Add execute permissions to the script file
 	if err = os.Chmod(file.Name(), 0750); err != nil { // nolint: gosec
+		cleanup()
 		return "", fmt.Errorf("failed to set execute permissions on script file: %w", err)
 	}
 
+	_ = file.Close()
 	return file.Name(), nil
 }
 

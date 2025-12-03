@@ -2,10 +2,10 @@
 
 package config
 
-// init populates the package's defaultWhitelist with common Windows environment
-// variable names so they are treated as whitelisted on Windows builds.
 import "strings"
 
+// init populates the package's defaultWhitelist with common Windows environment
+// variable names so they are treated as whitelisted on Windows builds.
 // normalizeEnvKey converts to uppercase on Windows for case-insensitive matching.
 // Windows environment variables are case-insensitive, but Go maps are not.
 func normalizeEnvKey(key string) string {
