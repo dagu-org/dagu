@@ -63,15 +63,12 @@ func preprocessScript(script, ext string) string {
 
 // createDirectCommand creates a command that runs directly without a shell.
 func createDirectCommand(ctx context.Context, cmd string, args []string, scriptFile string) *exec.Cmd {
-	arguments := make([]string, len(args))
-	copy(arguments, args)
-
 	if scriptFile != "" {
-		arguments = append(arguments, scriptFile)
+		clonedArgs := cloneArgs(args)
+		clonedArgs = append(clonedArgs, scriptFile)
+		return exec.CommandContext(ctx, cmd, clonedArgs...) // nolint: gosec
 	}
-
-	// nolint: gosec
-	return exec.CommandContext(ctx, cmd, arguments...)
+	return exec.CommandContext(ctx, cmd, args...) // nolint: gosec
 }
 
 // validateCommandStep validates that a step has the required command configuration.

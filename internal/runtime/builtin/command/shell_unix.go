@@ -31,7 +31,10 @@ func (s *unixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cm
 		args = append(args, "-e")
 	}
 
-	args = append(args, b.Args...)
+	// Add -c flag and the shell command string
+	// Note: We use ShellCommandArgs (the full command string) rather than Args
+	// because shell commands may contain pipes, redirections, etc. that need
+	// to be interpreted by the shell
 	if !slices.Contains(args, "-c") {
 		args = append(args, "-c")
 	}

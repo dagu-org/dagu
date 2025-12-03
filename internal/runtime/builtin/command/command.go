@@ -168,6 +168,8 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	case len(cfg.Shell) > 0 && cfg.ShellCommandArgs != "":
 		cmdBuilder := &shellCommandBuilder{
 			Dir:                cfg.Dir,
+			Command:            cfg.Command,
+			Args:               cfg.Args,
 			Shell:              cfg.Shell,
 			ShellCommandArgs:   cfg.ShellCommandArgs,
 			ShellPackages:      cfg.ShellPackages,

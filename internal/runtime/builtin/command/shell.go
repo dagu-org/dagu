@@ -22,6 +22,7 @@ type Shell interface {
 // shellRegistry holds all registered shell implementations.
 // Order matters: first match wins. The default Unix shell should be last.
 var shellRegistry = []Shell{
+	&directShell{}, // explicit no-shell execution
 	&nixShell{},
 	&powerShell{},
 	&cmdShell{},

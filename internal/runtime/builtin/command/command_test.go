@@ -19,6 +19,71 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestDirectShell(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("DirectWithCommandAndScript", func(t *testing.T) {
+		builder := shellCommandBuilder{
+			Shell:   []string{"direct"},
+			Command: "/usr/bin/python",
+			Script:  "script.py",
+			Args:    []string{"-u"},
+		}
+		cmd, err := builder.Build(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+		assert.Equal(t, []string{"/usr/bin/python", "-u", "script.py"}, cmd.Args)
+	})
+
+	t.Run("DirectWithCommandOnly", func(t *testing.T) {
+		builder := shellCommandBuilder{
+			Shell:   []string{"direct"},
+			Command: "/bin/echo",
+			Args:    []string{"hello", "world"},
+		}
+		cmd, err := builder.Build(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+		assert.Equal(t, []string{"/bin/echo", "hello", "world"}, cmd.Args)
+	})
+
+	t.Run("DirectWithCommandAndShellCmdArgs", func(t *testing.T) {
+		// When Command is set (from array syntax), ShellCmdArgs is ignored
+		// This is the normal case from runtime evaluation
+		builder := shellCommandBuilder{
+			Shell:            []string{"direct"},
+			Command:          "/bin/echo",
+			Args:             []string{"hello"},
+			ShellCommandArgs: "echo hello", // This gets set by runtime but should be ignored
+		}
+		cmd, err := builder.Build(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+		assert.Equal(t, []string{"/bin/echo", "hello"}, cmd.Args)
+	})
+
+	t.Run("DirectRejectsStringCommandOnly", func(t *testing.T) {
+		// When only ShellCommandArgs is set (string command without array),
+		// direct shell cannot parse it
+		builder := shellCommandBuilder{
+			Shell:            []string{"direct"},
+			ShellCommandArgs: "echo hello",
+		}
+		_, err := builder.Build(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "requires command array syntax")
+	})
+
+	t.Run("DirectRequiresCommand", func(t *testing.T) {
+		builder := shellCommandBuilder{
+			Shell: []string{"direct"},
+		}
+		_, err := builder.Build(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "requires 'command' field")
+	})
+}
+
 func TestShellCommandBuilder_Build(t *testing.T) {
 	ctx := context.Background()
 
