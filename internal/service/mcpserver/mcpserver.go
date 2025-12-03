@@ -83,24 +83,48 @@ func New(cfg *config.Config) (*MCPServer, error) {
 }
 
 func listDags(ctx context.Context, ctr *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	host := os.Getenv("DAGU_HOST")
-	port := os.Getenv("DAGU_PORT")
+	// host := os.Getenv("DAGU_HOST")
+	host := "localhost"
+	// port := os.Getenv("DAGU_PORT")
+	port := "8080"
 	api_base_url := os.Getenv("DAGU_API_BASE_URL")
 
-	_, err := http.Get(fmt.Sprintf("http://%s:%s/%s/dags", host, port, api_base_url))
+	resp, err := http.Get(fmt.Sprintf("http://%s:%s/%s/dags", host, port, api_base_url))
 
-	if err != nil {
-		return nil, err
-	}
-	return &mcp.CallToolResult{}, nil
+	return &mcp.CallToolResult{
+		StructuredContent: resp.Body,
+		IsError:           err == nil,
+	}, nil
 }
 
 func executeDag(ctx context.Context, ctr *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return &mcp.CallToolResult{}, nil
+	// host := os.Getenv("DAGU_HOST")
+	host := "localhost"
+	// port := os.Getenv("DAGU_PORT")
+	port := "8080"
+	api_base_url := os.Getenv("DAGU_API_BASE_URL")
+
+	resp, err := http.Get(fmt.Sprintf("http://%s:%s/%s/dags", host, port, api_base_url))
+
+	return &mcp.CallToolResult{
+		StructuredContent: resp.Body,
+		IsError:           err == nil,
+	}, nil
 }
 
 func createDag(ctx context.Context, ctr *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return &mcp.CallToolResult{}, nil
+	// host := os.Getenv("DAGU_HOST")
+	host := "localhost"
+	// port := os.Getenv("DAGU_PORT")
+	port := "8080"
+	api_base_url := os.Getenv("DAGU_API_BASE_URL")
+
+	resp, err := http.Get(fmt.Sprintf("http://%s:%s/%s/dags", host, port, api_base_url))
+
+	return &mcp.CallToolResult{
+		StructuredContent: resp.Body,
+		IsError:           err == nil,
+	}, nil
 }
 
 func (s *MCPServer) Start(ctx context.Context) error {
