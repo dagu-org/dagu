@@ -65,7 +65,7 @@ func getEncodingDecoder(charset string) *encoding.Decoder {
 
 	// Simplified Chinese encodings
 	case "gb2312", "gb-2312", "csgb2312":
-		return simplifiedchinese.HZGB2312.NewDecoder()
+		return simplifiedchinese.GBK.NewDecoder()
 	case "gbk", "cp936", "ms936", "windows-936":
 		return simplifiedchinese.GBK.NewDecoder()
 	case "gb18030":
@@ -164,8 +164,10 @@ func getEncodingDecoder(charset string) *encoding.Decoder {
 		return charmap.Macintosh.NewDecoder()
 
 	// Unicode variants
-	case "utf-16", "utf16", "utf-16le", "utf16le":
+	case "utf-16", "utf16":
 		return unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder()
+	case "utf-16le", "utf16le":
+		return unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
 	case "utf-16be", "utf16be":
 		return unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder()
 
