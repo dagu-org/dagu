@@ -234,7 +234,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 
 // NewMcpServer creates a new NewMcpServer instance
 func (c *Context) NewMcpServer() (*mcpserver.MCPServer, error) {
-	return &mcpserver.MCPServer{}, nil
+	return mcpserver.New(c.Config)
 }
 
 // StringParam retrieves a string parameter from the command line flags.
