@@ -22,12 +22,21 @@ func (s *powerShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.C
 	cmd := b.Shell[0]
 
 	// When running a command directly with a script, don't include PowerShell arguments
+	// e.g., python script.py
 	if b.Command != "" && b.Script != "" {
 		args := cloneArgs(b.Args)
 		args = append(args, b.Script)
 		return exec.CommandContext(ctx, b.Command, args...), nil // nolint: gosec
 	}
 
+	// When running just a script file with PowerShell (no explicit command)
+	// e.g., powershell -ExecutionPolicy Bypass -File script.ps1
+	if b.Script != "" {
+		args := []string{"-ExecutionPolicy", "Bypass", "-File", b.Script}
+		return exec.CommandContext(ctx, cmd, args...), nil // nolint: gosec
+	}
+
+	// Running a command string via PowerShell
 	args := cloneArgs(b.Shell[1:])
 	args = append(args, b.Args...)
 

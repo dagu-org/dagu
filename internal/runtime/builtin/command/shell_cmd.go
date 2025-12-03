@@ -61,12 +61,26 @@ func (s *cmdShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cmd
 	cmd := resolveCmdPath(b.Shell[0])
 
 	// When running a command directly with a script, don't include cmd.exe arguments
+	// e.g., python script.py
 	if b.Command != "" && b.Script != "" {
 		args := cloneArgs(b.Args)
 		args = append(args, b.Script)
 		return exec.CommandContext(ctx, b.Command, args...), nil // nolint: gosec
 	}
 
+	// When running just a script file with shell (no explicit command)
+	// e.g., cmd.exe /c script.bat
+	if b.Script != "" {
+		args := cloneArgs(b.Shell[1:])
+		args = append(args, b.Args...)
+		if !slices.Contains(args, "/c") && !slices.Contains(args, "/C") {
+			args = append(args, "/c")
+		}
+		args = append(args, b.Script)
+		return exec.CommandContext(ctx, cmd, args...), nil // nolint: gosec
+	}
+
+	// Running a command string via shell
 	args := cloneArgs(b.Shell[1:])
 	args = append(args, b.Args...)
 

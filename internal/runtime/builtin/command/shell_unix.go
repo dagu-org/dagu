@@ -32,6 +32,20 @@ func (s *unixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cm
 		return exec.CommandContext(ctx, b.Command, args...), nil // nolint: gosec
 	}
 
+	// When running just a script file with shell (no explicit command)
+	// e.g., sh -e script.sh
+	if b.Script != "" {
+		args := cloneArgs(b.Shell[1:])
+		args = append(args, b.Args...)
+		// Add errexit flag for Unix-like shells (unless user specified shell)
+		if !b.UserSpecifiedShell && isUnixLikeShell(cmd) && !slices.Contains(args, "-e") {
+			args = append(args, "-e")
+		}
+		args = append(args, b.Script)
+		return exec.CommandContext(ctx, cmd, args...), nil // nolint: gosec
+	}
+
+	// Running a command string via shell
 	args := cloneArgs(b.Shell[1:])
 
 	// Add errexit flag for Unix-like shells (unless user specified shell)

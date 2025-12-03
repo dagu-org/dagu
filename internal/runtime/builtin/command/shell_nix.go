@@ -34,6 +34,7 @@ func (s *nixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cmd
 
 	// When using nix-shell with a direct command and script,
 	// run the command inside nix-shell
+	// e.g., nix-shell -p python --run "python script.py"
 	if b.Command != "" && b.Script != "" {
 		cmdParts := []string{b.Command}
 		cmdParts = append(cmdParts, b.Args...)
@@ -46,6 +47,16 @@ func (s *nixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cmd
 		}
 
 		return exec.CommandContext(ctx, cmd, append(args, cmdStr)...), nil // nolint: gosec
+	}
+
+	// When running just a script file with nix-shell (no explicit command)
+	// e.g., nix-shell --run "set -e; ./script.sh"
+	if b.Script != "" {
+		scriptCmd := b.Script
+		if !b.UserSpecifiedShell && !strings.HasPrefix(scriptCmd, "set -e") {
+			scriptCmd = "set -e; " + scriptCmd
+		}
+		return exec.CommandContext(ctx, cmd, append(args, scriptCmd)...), nil // nolint: gosec
 	}
 
 	// For shell command args, prepend "set -e;" for errexit

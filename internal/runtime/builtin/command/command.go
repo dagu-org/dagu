@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
@@ -156,15 +155,19 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 			cmd = exec.CommandContext(cfg.Ctx, shebang, append(shebangArgs, scriptFile)...) // nolint: gosec
 			break
 		}
-		// If no shebang, use the specified shell command
-		args := make([]string, 0, len(cfg.Shell)+1)
-		args = append(args, cfg.Shell[1:]...)
-		// Add errexit flag for Unix-like shells (unless user specified shell)
-		if !cfg.UserSpecifiedShell && isUnixLikeShell(cfg.Shell[0]) && !slices.Contains(args, "-e") {
-			args = append(args, "-e")
+		// Use shell command builder to properly execute the script file
+		// This ensures each shell type uses the correct flags (e.g., cmd.exe /c, powershell -File)
+		cmdBuilder := &shellCommandBuilder{
+			Dir:                cfg.Dir,
+			Shell:              cfg.Shell,
+			Script:             scriptFile,
+			UserSpecifiedShell: cfg.UserSpecifiedShell,
 		}
-		args = append(args, scriptFile)
-		cmd = exec.CommandContext(cfg.Ctx, cfg.Shell[0], args...) // nolint: gosec
+		c, err := cmdBuilder.Build(ctx)
+		if err != nil {
+			return nil, err
+		}
+		cmd = c
 
 	case len(cfg.Shell) > 0 && cfg.ShellCommandArgs != "":
 		cmdBuilder := &shellCommandBuilder{
