@@ -541,13 +541,6 @@ func ReadLogContent(filePath string, options LogReadOptions) (string, int, int, 
 		return "", 0, 0, false, false, err
 	}
 
-	content := ""
-	for i, line := range result.Lines {
-		content += line
-		if i < len(result.Lines)-1 {
-			content += "\n"
-		}
-	}
-
+	content := strings.Join(result.Lines, "\n")
 	return content, result.LineCount, result.TotalLines, result.HasMore, result.IsEstimate, nil
 }
