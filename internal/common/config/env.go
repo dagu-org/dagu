@@ -46,7 +46,8 @@ func filterEnv(envs []string, allow map[string]bool, prefixes []string) []string
 			continue
 		}
 		key := parts[0]
-		if allow[key] || hasAllowedPrefix(key, prefixes) {
+		// normalizeEnvKey handles platform differences (case-insensitive on Windows)
+		if allow[normalizeEnvKey(key)] || hasAllowedPrefix(key, prefixes) {
 			filtered = append(filtered, e)
 		}
 	}

@@ -2,9 +2,14 @@
 
 package config
 
+func normalizeEnvKey(key string) string {
+	return key
+}
+
 // init populates the package-level defaultWhitelist map with common Unix-like environment variable names.
 // It marks typical variables (paths, user, shell, temp dir, terminal, editor preferences, locale, timezone,
 // shared library path, and XDG config/data/cache locations) as allowed.
+// normalizeEnvKey returns the key as-is on Unix (case-sensitive).
 func init() {
 	// Unix/Linux/macOS environment variables
 	for _, key := range []string{
