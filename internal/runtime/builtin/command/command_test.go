@@ -97,34 +97,29 @@ func TestBuildPowerShellCommand(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		cmd      string
-		args     []string
 		builder  shellCommandBuilder
 		expected []string
 	}{
 		{
 			name: "BasicPowershellCommand",
-			cmd:  "powershell",
-			args: []string{},
 			builder: shellCommandBuilder{
+				Shell:            []string{"powershell"},
 				ShellCommandArgs: "Get-Date",
 			},
 			expected: []string{"powershell", "-Command", "Get-Date"},
 		},
 		{
 			name: "PowershellWithExistingCommand",
-			cmd:  "powershell",
-			args: []string{"-Command"},
 			builder: shellCommandBuilder{
+				Shell:            []string{"powershell", "-Command"},
 				ShellCommandArgs: "Get-Date",
 			},
 			expected: []string{"powershell", "-Command", "Get-Date"},
 		},
 		{
 			name: "PowershellWithScript",
-			cmd:  "powershell",
-			args: []string{},
 			builder: shellCommandBuilder{
+				Shell:   []string{"powershell"},
 				Command: "python",
 				Script:  "test.py",
 				Args:    []string{"-u"},
@@ -135,7 +130,7 @@ func TestBuildPowerShellCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd, err := tt.builder.buildPowerShellCommand(ctx, tt.cmd, tt.args)
+			cmd, err := tt.builder.Build(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, cmd)
 
@@ -149,34 +144,29 @@ func TestBuildCmdCommand(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		cmd      string
-		args     []string
 		builder  shellCommandBuilder
 		expected []string
 	}{
 		{
 			name: "BasicCmdCommand",
-			cmd:  "cmd",
-			args: []string{},
 			builder: shellCommandBuilder{
+				Shell:            []string{"cmd"},
 				ShellCommandArgs: "dir",
 			},
 			expected: []string{"cmd", "/c", "dir"},
 		},
 		{
 			name: "CmdWithExisting/C",
-			cmd:  "cmd",
-			args: []string{"/c"},
 			builder: shellCommandBuilder{
+				Shell:            []string{"cmd", "/c"},
 				ShellCommandArgs: "dir",
 			},
 			expected: []string{"cmd", "/c", "dir"},
 		},
 		{
 			name: "CmdWithScript",
-			cmd:  "cmd",
-			args: []string{},
 			builder: shellCommandBuilder{
+				Shell:   []string{"cmd"},
 				Command: "python",
 				Script:  "test.py",
 				Args:    []string{"-u"},
@@ -187,7 +177,7 @@ func TestBuildCmdCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd, err := tt.builder.buildCmdCommand(ctx, tt.cmd, tt.args)
+			cmd, err := tt.builder.Build(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, cmd)
 
