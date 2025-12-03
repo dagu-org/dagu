@@ -54,5 +54,9 @@ func (s *nixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cmd
 		shellCmdArgs = "set -e; " + shellCmdArgs
 	}
 
-	return exec.CommandContext(ctx, cmd, append(args, shellCmdArgs)...), nil // nolint: gosec
+	if shellCmdArgs != "" {
+		args = append(args, shellCmdArgs)
+	}
+
+	return exec.CommandContext(ctx, cmd, args...), nil // nolint: gosec
 }

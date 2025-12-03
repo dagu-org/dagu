@@ -23,7 +23,6 @@ func (s *unixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cm
 	}
 
 	cmd := b.Shell[0]
-	args := cloneArgs(b.Shell[1:])
 
 	// When running a command directly with a script (e.g., perl script.pl),
 	// don't include shell arguments like -e
@@ -32,6 +31,8 @@ func (s *unixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cm
 		args = append(args, b.Script)
 		return exec.CommandContext(ctx, b.Command, args...), nil // nolint: gosec
 	}
+
+	args := cloneArgs(b.Shell[1:])
 
 	// Add errexit flag for Unix-like shells (unless user specified shell)
 	if !b.UserSpecifiedShell && isUnixLikeShell(cmd) && !slices.Contains(args, "-e") {

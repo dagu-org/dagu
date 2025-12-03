@@ -20,13 +20,15 @@ func (s *powerShell) Match(name string) bool {
 
 func (s *powerShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cmd, error) {
 	cmd := b.Shell[0]
-	args := cloneArgs(b.Shell[1:])
 
 	// When running a command directly with a script, don't include PowerShell arguments
 	if b.Command != "" && b.Script != "" {
-		return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
+		args := cloneArgs(b.Args)
+		args = append(args, b.Script)
+		return exec.CommandContext(ctx, b.Command, args...), nil // nolint: gosec
 	}
 
+	args := cloneArgs(b.Shell[1:])
 	args = append(args, b.Args...)
 
 	// PowerShell uses -Command instead of -c
@@ -34,7 +36,9 @@ func (s *powerShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.C
 		args = append(args, "-Command")
 	}
 
-	args = append(args, b.normalizeScriptPath())
+	if scriptPath := b.normalizeScriptPath(); scriptPath != "" {
+		args = append(args, scriptPath)
+	}
 
 	return exec.CommandContext(ctx, cmd, args...), nil // nolint: gosec
 }
