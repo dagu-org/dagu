@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -17,6 +18,10 @@ func (s *unixShell) Match(_ string) bool {
 }
 
 func (s *unixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cmd, error) {
+	if len(b.Shell) == 0 {
+		return nil, fmt.Errorf("shell command is required")
+	}
+
 	cmd := b.Shell[0]
 	args := cloneArgs(b.Shell[1:])
 
