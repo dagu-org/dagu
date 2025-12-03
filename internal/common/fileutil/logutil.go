@@ -315,7 +315,7 @@ func estimateLineCount(filePath string) (int, bool, error) {
 	totalSampleLines := startLineCount + middleLineCount
 	if totalSampleLines == 0 {
 		// Avoid division by zero; assume 1 line
-		return 1, false, nil
+		return 1, true, nil
 	}
 
 	var avgLineLength float64
@@ -521,6 +521,9 @@ func readLinesRange(filePath string, offset, limit int, totalLines int, decoder 
 	}
 
 	if err := scanner.Err(); err != nil {
+		if errors.Is(err, bufio.ErrTooLong) {
+			return &LogResult{Lines: []string{"Error: Line too long to read."}}, nil
+		}
 		return nil, err
 	}
 
