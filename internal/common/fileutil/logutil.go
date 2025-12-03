@@ -7,14 +7,25 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/japanese"
+	"golang.org/x/text/encoding/korean"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/encoding/traditionalchinese"
+	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/transform"
 )
 
 // LogReadOptions defines options for reading log files
 type LogReadOptions struct {
-	Head   int // Number of lines from the beginning
-	Tail   int // Number of lines from the end
-	Offset int // Line number to start from (1-based)
-	Limit  int // Maximum number of lines to return
+	Head     int    // Number of lines from the beginning
+	Tail     int    // Number of lines from the end
+	Offset   int    // Line number to start from (1-based)
+	Limit    int    // Maximum number of lines to return
+	Encoding string // Character encoding for the log file (e.g., "utf-8", "shift_jis", "euc-jp")
 }
 
 // LogResult represents the result of reading a log file
@@ -24,6 +35,144 @@ type LogResult struct {
 	TotalLines int      // Total number of lines in the file
 	HasMore    bool     // Whether there are more lines available
 	IsEstimate bool     // Whether the TotalLines count is an estimate
+}
+
+// getEncodingDecoder returns an encoding.Decoder for the given charset name.
+// Returns nil for UTF-8 or empty charset (no decoding needed).
+// Supports a wide range of encodings including Japanese, Chinese, Korean,
+// and various ISO-8859 and Windows code pages.
+func getEncodingDecoder(charset string) *encoding.Decoder {
+	if charset == "" {
+		return nil
+	}
+
+	// Normalize the charset name for comparison
+	normalized := strings.ToLower(strings.ReplaceAll(charset, "_", "-"))
+	normalized = strings.ReplaceAll(normalized, " ", "-")
+
+	switch normalized {
+	// UTF-8 (no decoder needed)
+	case "utf-8", "utf8":
+		return nil
+
+	// Japanese encodings
+	case "euc-jp", "eucjp":
+		return japanese.EUCJP.NewDecoder()
+	case "shift-jis", "shiftjis", "sjis", "s-jis", "x-sjis", "ms-kanji", "csshiftjis":
+		return japanese.ShiftJIS.NewDecoder()
+	case "iso-2022-jp", "iso2022jp", "csiso2022jp":
+		return japanese.ISO2022JP.NewDecoder()
+
+	// Simplified Chinese encodings
+	case "gb2312", "gb-2312", "csgb2312":
+		return simplifiedchinese.HZGB2312.NewDecoder()
+	case "gbk", "cp936", "ms936", "windows-936":
+		return simplifiedchinese.GBK.NewDecoder()
+	case "gb18030":
+		return simplifiedchinese.GB18030.NewDecoder()
+	case "hz-gb-2312", "hz":
+		return simplifiedchinese.HZGB2312.NewDecoder()
+
+	// Traditional Chinese encodings
+	case "big5", "big-5", "csbig5", "x-x-big5", "cn-big5":
+		return traditionalchinese.Big5.NewDecoder()
+
+	// Korean encodings
+	case "euc-kr", "euckr", "cseuckr", "ks-c-5601-1987", "ksc5601", "iso-ir-149", "korean":
+		return korean.EUCKR.NewDecoder()
+
+	// ISO-8859 encodings (Latin character sets)
+	case "iso-8859-1", "iso88591", "latin1", "latin-1", "l1", "csisolatin1", "iso-ir-100", "ibm819", "cp819":
+		return charmap.ISO8859_1.NewDecoder()
+	case "iso-8859-2", "iso88592", "latin2", "latin-2", "l2", "csisolatin2", "iso-ir-101":
+		return charmap.ISO8859_2.NewDecoder()
+	case "iso-8859-3", "iso88593", "latin3", "latin-3", "l3", "csisolatin3", "iso-ir-109":
+		return charmap.ISO8859_3.NewDecoder()
+	case "iso-8859-4", "iso88594", "latin4", "latin-4", "l4", "csisolatin4", "iso-ir-110":
+		return charmap.ISO8859_4.NewDecoder()
+	case "iso-8859-5", "iso88595", "cyrillic", "iso-ir-144", "csisolatincyrillic":
+		return charmap.ISO8859_5.NewDecoder()
+	case "iso-8859-6", "iso88596", "arabic", "iso-ir-127", "csisolatinarabic", "ecma-114", "asmo-708":
+		return charmap.ISO8859_6.NewDecoder()
+	case "iso-8859-7", "iso88597", "greek", "greek8", "iso-ir-126", "csisolatingreek", "ecma-118", "elot-928":
+		return charmap.ISO8859_7.NewDecoder()
+	case "iso-8859-8", "iso88598", "hebrew", "iso-ir-138", "csisolatinhebrew":
+		return charmap.ISO8859_8.NewDecoder()
+	case "iso-8859-9", "iso88599", "latin5", "latin-5", "l5", "iso-ir-148", "csisolatin5", "turkish":
+		return charmap.ISO8859_9.NewDecoder()
+	case "iso-8859-10", "iso885910", "latin6", "latin-6", "l6", "iso-ir-157", "csisolatin6":
+		return charmap.ISO8859_10.NewDecoder()
+	case "iso-8859-13", "iso885913", "latin7", "latin-7", "l7":
+		return charmap.ISO8859_13.NewDecoder()
+	case "iso-8859-14", "iso885914", "latin8", "latin-8", "l8", "iso-ir-199", "iso-celtic":
+		return charmap.ISO8859_14.NewDecoder()
+	case "iso-8859-15", "iso885915", "latin9", "latin-9", "l9", "latin0":
+		return charmap.ISO8859_15.NewDecoder()
+	case "iso-8859-16", "iso885916", "latin10", "latin-10", "l10", "iso-ir-226":
+		return charmap.ISO8859_16.NewDecoder()
+
+	// Windows code pages
+	case "windows-1250", "cp1250", "x-cp1250":
+		return charmap.Windows1250.NewDecoder()
+	case "windows-1251", "cp1251", "x-cp1251":
+		return charmap.Windows1251.NewDecoder()
+	case "windows-1252", "cp1252", "x-cp1252", "ansi":
+		return charmap.Windows1252.NewDecoder()
+	case "windows-1253", "cp1253", "x-cp1253":
+		return charmap.Windows1253.NewDecoder()
+	case "windows-1254", "cp1254", "x-cp1254":
+		return charmap.Windows1254.NewDecoder()
+	case "windows-1255", "cp1255", "x-cp1255":
+		return charmap.Windows1255.NewDecoder()
+	case "windows-1256", "cp1256", "x-cp1256":
+		return charmap.Windows1256.NewDecoder()
+	case "windows-1257", "cp1257", "x-cp1257":
+		return charmap.Windows1257.NewDecoder()
+	case "windows-1258", "cp1258", "x-cp1258":
+		return charmap.Windows1258.NewDecoder()
+
+	// Cyrillic encodings
+	case "koi8-r", "koi8r", "cskoi8r":
+		return charmap.KOI8R.NewDecoder()
+	case "koi8-u", "koi8u":
+		return charmap.KOI8U.NewDecoder()
+
+	// IBM code pages
+	case "ibm437", "cp437", "437", "cspc8codepage437":
+		return charmap.CodePage437.NewDecoder()
+	case "ibm850", "cp850", "850", "cspc850multilingual":
+		return charmap.CodePage850.NewDecoder()
+	case "ibm852", "cp852", "852":
+		return charmap.CodePage852.NewDecoder()
+	case "ibm855", "cp855", "855":
+		return charmap.CodePage855.NewDecoder()
+	case "ibm858", "cp858", "858":
+		return charmap.CodePage858.NewDecoder()
+	case "ibm860", "cp860", "860":
+		return charmap.CodePage860.NewDecoder()
+	case "ibm862", "cp862", "862":
+		return charmap.CodePage862.NewDecoder()
+	case "ibm863", "cp863", "863":
+		return charmap.CodePage863.NewDecoder()
+	case "ibm865", "cp865", "865":
+		return charmap.CodePage865.NewDecoder()
+	case "ibm866", "cp866", "866", "csibm866":
+		return charmap.CodePage866.NewDecoder()
+
+	// Mac encodings
+	case "macintosh", "mac", "macroman", "csmacintosh", "x-mac-roman":
+		return charmap.Macintosh.NewDecoder()
+
+	// Unicode variants
+	case "utf-16", "utf16", "utf-16le", "utf16le":
+		return unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder()
+	case "utf-16be", "utf16be":
+		return unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder()
+
+	default:
+		// Unknown encoding, return nil (treat as UTF-8)
+		return nil
+	}
 }
 
 // ReadLogLines reads a specific portion of a log file without loading the entire file into memory
@@ -50,6 +199,9 @@ func ReadLogLines(filePath string, options LogReadOptions) (*LogResult, error) {
 		}, nil
 	}
 
+	// Get the encoding decoder (nil for UTF-8 or empty)
+	decoder := getEncodingDecoder(options.Encoding)
+
 	// Estimate or count total lines in the file
 	totalLines, isEstimate, err := estimateLineCount(filePath)
 	if err != nil {
@@ -58,7 +210,7 @@ func ReadLogLines(filePath string, options LogReadOptions) (*LogResult, error) {
 
 	// If tail is specified, read from the end
 	if options.Tail > 0 {
-		result, err := readLastLines(filePath, options.Tail, totalLines)
+		result, err := readLastLines(filePath, options.Tail, totalLines, decoder)
 		if err != nil {
 			return nil, err
 		}
@@ -68,7 +220,7 @@ func ReadLogLines(filePath string, options LogReadOptions) (*LogResult, error) {
 
 	// If head is specified, read from the beginning
 	if options.Head > 0 {
-		result, err := readFirstLines(filePath, options.Head, totalLines)
+		result, err := readFirstLines(filePath, options.Head, totalLines, decoder)
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +234,7 @@ func ReadLogLines(filePath string, options LogReadOptions) (*LogResult, error) {
 		if limit <= 0 {
 			limit = 1000 // Default limit
 		}
-		result, err := readLinesRange(filePath, options.Offset, limit, totalLines)
+		result, err := readLinesRange(filePath, options.Offset, limit, totalLines, decoder)
 		if err != nil {
 			return nil, err
 		}
@@ -95,7 +247,7 @@ func ReadLogLines(filePath string, options LogReadOptions) (*LogResult, error) {
 	if limit <= 0 {
 		limit = 1000 // Default limit
 	}
-	result, err := readLinesRange(filePath, 1, limit, totalLines)
+	result, err := readLinesRange(filePath, 1, limit, totalLines, decoder)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +354,7 @@ func countLinesExact(filePath string) (int, error) {
 }
 
 // readFirstLines reads the first n lines from a file
-func readFirstLines(filePath string, n int, totalLines int) (*LogResult, error) {
+func readFirstLines(filePath string, n int, totalLines int, decoder *encoding.Decoder) (*LogResult, error) {
 	file, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
 		return nil, err
@@ -211,7 +363,13 @@ func readFirstLines(filePath string, n int, totalLines int) (*LogResult, error) 
 		_ = file.Close()
 	}()
 
-	scanner := bufio.NewScanner(file)
+	// Create a reader, optionally wrapping with decoder for non-UTF-8 encodings
+	var reader io.Reader = file
+	if decoder != nil {
+		reader = transform.NewReader(file, decoder)
+	}
+
+	scanner := bufio.NewScanner(reader)
 	lines := make([]string, 0, n)
 	lineCount := 0
 
@@ -239,7 +397,7 @@ func readFirstLines(filePath string, n int, totalLines int) (*LogResult, error) 
 }
 
 // readLastLines reads the last n lines from a file
-func readLastLines(filePath string, n int, totalLines int) (*LogResult, error) {
+func readLastLines(filePath string, n int, totalLines int, decoder *encoding.Decoder) (*LogResult, error) {
 	// If n is 0, return empty result
 	if n <= 0 {
 		return &LogResult{
@@ -261,12 +419,18 @@ func readLastLines(filePath string, n int, totalLines int) (*LogResult, error) {
 
 	// If n is greater than or equal to total lines, read all lines
 	if n >= totalLines {
-		return readFirstLines(filePath, totalLines, totalLines)
+		return readFirstLines(filePath, totalLines, totalLines, decoder)
+	}
+
+	// Create a reader, optionally wrapping with decoder for non-UTF-8 encodings
+	var reader io.Reader = file
+	if decoder != nil {
+		reader = transform.NewReader(file, decoder)
 	}
 
 	// Use a ring buffer to keep the last n lines
 	ring := make([]string, n)
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(reader)
 	lineCount := 0
 	ringIndex := 0
 
@@ -306,7 +470,7 @@ func readLastLines(filePath string, n int, totalLines int) (*LogResult, error) {
 }
 
 // readLinesRange reads a range of lines from a file
-func readLinesRange(filePath string, offset, limit int, totalLines int) (*LogResult, error) {
+func readLinesRange(filePath string, offset, limit int, totalLines int, decoder *encoding.Decoder) (*LogResult, error) {
 	file, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
 		return nil, err
@@ -329,7 +493,13 @@ func readLinesRange(filePath string, offset, limit int, totalLines int) (*LogRes
 		}, nil
 	}
 
-	scanner := bufio.NewScanner(file)
+	// Create a reader, optionally wrapping with decoder for non-UTF-8 encodings
+	var reader io.Reader = file
+	if decoder != nil {
+		reader = transform.NewReader(file, decoder)
+	}
+
+	scanner := bufio.NewScanner(reader)
 	lineNum := 1
 	lines := make([]string, 0, limit)
 

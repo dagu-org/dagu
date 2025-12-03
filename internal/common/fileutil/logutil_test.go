@@ -428,7 +428,7 @@ func TestReadFirstLines(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := readFirstLines(tt.filePath, tt.n, tt.totalLines)
+			result, err := readFirstLines(tt.filePath, tt.n, tt.totalLines, nil)
 
 			// Check error expectation
 			if (err != nil) != tt.expectError {
@@ -539,7 +539,7 @@ func TestReadLastLines(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := readLastLines(tt.filePath, tt.n, tt.totalLines)
+			result, err := readLastLines(tt.filePath, tt.n, tt.totalLines, nil)
 
 			// Check error expectation
 			if (err != nil) != tt.expectError {
@@ -677,7 +677,7 @@ func TestReadLinesRange(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := readLinesRange(tt.filePath, tt.offset, tt.limit, tt.totalLines)
+			result, err := readLinesRange(tt.filePath, tt.offset, tt.limit, tt.totalLines, nil)
 
 			// Check error expectation
 			if (err != nil) != tt.expectError {
