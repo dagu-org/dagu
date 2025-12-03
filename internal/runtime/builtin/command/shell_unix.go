@@ -28,7 +28,9 @@ func (s *unixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cm
 	// When running a command directly with a script (e.g., perl script.pl),
 	// don't include shell arguments like -e
 	if b.Command != "" && b.Script != "" {
-		return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
+		args := cloneArgs(b.Args)
+		args = append(args, b.Script)
+		return exec.CommandContext(ctx, b.Command, args...), nil // nolint: gosec
 	}
 
 	// Add errexit flag for Unix-like shells (unless user specified shell)
