@@ -16,25 +16,8 @@ func NewBaseEnv(vars []string) BaseEnv {
 }
 
 // defaultWhitelist defines which env vars to pass to child processes.
-var defaultWhitelist = map[string]bool{
-	"PATH":            true,
-	"HOME":            true,
-	"LANG":            true,
-	"TZ":              true,
-	"SHELL":           true,
-	"LD_LIBRARY_PATH": true,
-
-	// WWindows Specific Env Vars
-	"USERPROFILE":  true, // Windows Specifics equivalent of HOME
-	"PSModulePath": true, // Windows Specifics, powershell modules path
-	"Path":         true, // Windows Specifics equivalent of PATH
-	"SystemRoot":   true, // Required for powershell and cmd.exe
-	"WINDIR":       true, // Same as SystemRoot
-	"COMSPEC":      true, // Location of cmd.exe (required for shell invocation)
-	"PATHEXT":      true, // .COM;.EXE;.BAT etc. (required for extension resolution)
-	"TEMP":         true, // Temp directory
-	"TMP":          true, // Temp directory
-}
+// Platform-specific variables are added via init() in env_windows.go and env_unix.go.
+var defaultWhitelist = map[string]bool{}
 
 // defaultPrefixes defines prefixes of env vars allowed to propagate.
 var defaultPrefixes = []string{
