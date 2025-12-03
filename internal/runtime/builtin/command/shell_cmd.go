@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"slices"
 )
@@ -18,8 +19,36 @@ func (s *cmdShell) Match(name string) bool {
 	}
 }
 
+// defaultCmdExePath is the standard Windows cmd.exe location.
+const defaultCmdExePath = `C:\Windows\System32\cmd.exe`
+
+// resolveCmdPath returns the full path to cmd.exe if the shell is specified
+// as just "cmd" or "cmd.exe". It first tries the default path, then falls back
+// to using SystemRoot environment variable if Windows is installed elsewhere.
+// This ensures failing command execution due to golang security restrictions is avoided.
+func resolveCmdPath(shell string) string {
+	if shell != "cmd" && shell != "cmd.exe" {
+		return shell
+	}
+
+	// Try the default path first (most common case)
+	if _, err := os.Stat(defaultCmdExePath); err == nil {
+		return defaultCmdExePath
+	}
+
+	// Fallback to SystemRoot if Windows is installed on a different drive
+	if systemRoot := os.Getenv("SystemRoot"); systemRoot != "" {
+		systemRootCmd := systemRoot + `\System32\cmd.exe`
+		if _, err := os.Stat(systemRootCmd); err == nil {
+			return systemRootCmd
+		}
+	}
+
+	return shell
+}
+
 func (s *cmdShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cmd, error) {
-	cmd := b.Shell[0]
+	cmd := resolveCmdPath(b.Shell[0])
 	args := cloneArgs(b.Shell[1:])
 
 	// When running a command directly with a script, don't include cmd.exe arguments
