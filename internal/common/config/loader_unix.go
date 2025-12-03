@@ -5,54 +5,9 @@ package config
 import (
 	"os"
 	"strings"
+
+	"golang.org/x/text/encoding/ianaindex"
 )
-
-// unixEncodingCharsets maps normalized Unix encoding names to standard charset names.
-// Keys should be lowercase with hyphens and underscores removed.
-var unixEncodingCharsets = map[string]string{
-	// UTF-8 variants
-	"utf8": "utf-8",
-
-	// Japanese
-	"eucjp":     "euc-jp",
-	"ujis":      "euc-jp",
-	"shiftjis":  "shift_jis",
-	"sjis":      "shift_jis",
-	"cp932":     "shift_jis",
-	"ms932":     "shift_jis",
-	"iso2022jp": "iso-2022-jp",
-
-	// Chinese
-	"eucch":     "gbk",
-	"euccn":     "gbk",
-	"gb2312":    "gbk",
-	"gb18030":   "gbk",
-	"gbk":       "gbk",
-	"euctw":     "big5",
-	"big5":      "big5",
-	"big5hkscs": "big5",
-
-	// Korean
-	"euckr": "euc-kr",
-
-	// ISO-8859 variants
-	"iso88591":  "iso-8859-1",
-	"latin1":    "iso-8859-1",
-	"iso88592":  "iso-8859-2",
-	"latin2":    "iso-8859-2",
-	"iso88595":  "iso-8859-5",
-	"iso88596":  "iso-8859-6",
-	"iso88597":  "iso-8859-7",
-	"iso88598":  "iso-8859-8",
-	"iso88599":  "iso-8859-9",
-	"latin5":    "iso-8859-9",
-	"iso885915": "iso-8859-15",
-	"latin9":    "iso-8859-15",
-
-	// Cyrillic
-	"koi8r": "koi8-r",
-	"koi8u": "koi8-u",
-}
 
 // getDefaultLogEncodingCharset returns the default log encoding charset for Unix systems
 // by detecting the system locale from environment variables.
@@ -75,7 +30,7 @@ func getDefaultLogEncodingCharset() string {
 		if modIdx := strings.Index(encoding, "@"); modIdx != -1 {
 			encoding = encoding[:modIdx]
 		}
-		if charset := normalizeUnixEncoding(encoding); charset != "" {
+		if charset := normalizeEncoding(encoding); charset != "" {
 			return charset
 		}
 	}
@@ -84,14 +39,15 @@ func getDefaultLogEncodingCharset() string {
 	return "utf-8"
 }
 
-// normalizeUnixEncoding maps Unix encoding names to standard charset names.
-func normalizeUnixEncoding(encoding string) string {
-	encoding = strings.ToLower(encoding)
-	encoding = strings.ReplaceAll(encoding, "-", "")
-	encoding = strings.ReplaceAll(encoding, "_", "")
-
-	if charset, ok := unixEncodingCharsets[encoding]; ok {
-		return charset
+// normalizeEncoding uses IANA index to get the canonical encoding name.
+func normalizeEncoding(name string) string {
+	enc, err := ianaindex.IANA.Encoding(name)
+	if err != nil || enc == nil {
+		return ""
 	}
-	return ""
+	canonical, err := ianaindex.IANA.Name(enc)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(canonical)
 }

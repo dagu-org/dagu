@@ -3,27 +3,12 @@
 package config
 
 import (
-	"golang.org/x/sys/windows"
-)
+	"fmt"
+	"strings"
 
-// codePageCharsets maps Windows code page numbers to charset names.
-var codePageCharsets = map[uint32]string{
-	932:   "shift_jis",    // Japanese
-	936:   "gbk",          // Simplified Chinese
-	949:   "euc-kr",       // Korean
-	950:   "big5",         // Traditional Chinese
-	874:   "windows-874",  // Thai
-	1250:  "windows-1250", // Central European (Czech, Hungarian, Polish, etc.)
-	1251:  "windows-1251", // Cyrillic (Russian, Bulgarian, etc.)
-	1252:  "windows-1252", // Western European (English, German, French, Spanish, etc.)
-	1253:  "windows-1253", // Greek
-	1254:  "windows-1254", // Turkish
-	1255:  "windows-1255", // Hebrew
-	1256:  "windows-1256", // Arabic
-	1257:  "windows-1257", // Baltic (Estonian, Latvian, Lithuanian)
-	1258:  "windows-1258", // Vietnamese
-	65001: "utf-8",        // UTF-8 (Windows 10 1903+ can use UTF-8 as system locale)
-}
+	"golang.org/x/sys/windows"
+	"golang.org/x/text/encoding/ianaindex"
+)
 
 // getDefaultLogEncodingCharset returns the default log encoding charset for Windows
 // by detecting the system's ANSI code page.
@@ -32,10 +17,35 @@ func getDefaultLogEncodingCharset() string {
 	return codePageToCharset(acp)
 }
 
-// codePageToCharset maps Windows code page numbers to charset names.
+// codePageToCharset converts a Windows code page number to a canonical charset name
+// using the IANA index for normalization.
 func codePageToCharset(codePage uint32) string {
-	if charset, ok := codePageCharsets[codePage]; ok {
-		return charset
+	// Map code page number to a charset name that ianaindex can recognize
+	var name string
+	switch codePage {
+	case 65001:
+		return "utf-8"
+	case 932:
+		name = "shift_jis"
+	case 936:
+		name = "gbk"
+	case 949:
+		name = "euc-kr"
+	case 950:
+		name = "big5"
+	default:
+		// For Windows code pages (874, 1250-1258), use "windows-XXX" format
+		name = fmt.Sprintf("windows-%d", codePage)
 	}
-	return "utf-8"
+
+	// Normalize the name using IANA index
+	enc, err := ianaindex.IANA.Encoding(name)
+	if err != nil || enc == nil {
+		return "utf-8"
+	}
+	canonical, err := ianaindex.IANA.Name(enc)
+	if err != nil {
+		return "utf-8"
+	}
+	return strings.ToLower(canonical)
 }
