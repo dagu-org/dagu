@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useQuery } from '../../hooks/api';
 import ServiceCard from '../../features/system-status/components/ServiceCard';
+import PathsCard from '../../features/system-status/components/PathsCard';
 import { cn } from '../../lib/utils';
 import type { components } from '../../api/v2/schema';
 
@@ -53,12 +54,13 @@ function SystemStatus() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <PathsCard />
           <Button
             variant="outline"
             size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
             className={cn(
-              "h-8 px-3",
+              "h-7 px-2",
               autoRefresh && "bg-green-50 dark:bg-green-950 border-green-500"
             )}
           >
@@ -67,7 +69,7 @@ function SystemStatus() {
               autoRefresh && "text-green-500"
             )} />
             <span className="text-xs">
-              Auto-refresh: {autoRefresh ? 'ON' : 'OFF'}
+              Auto: {autoRefresh ? 'ON' : 'OFF'}
             </span>
           </Button>
           <Button
@@ -75,13 +77,12 @@ function SystemStatus() {
             size="sm"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="h-8 px-3"
+            className="h-7 px-2"
           >
             <RefreshCw className={cn(
-              "h-3 w-3 mr-1",
+              "h-3 w-3",
               isRefreshing && "animate-spin"
             )} />
-            <span className="text-xs">Refresh</span>
           </Button>
         </div>
       </div>

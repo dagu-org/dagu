@@ -163,7 +163,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	configFile := filepath.Join(tmpDir, "config.yaml")
 	writeHelperConfigFile(t, cfg, configFile)
-	cfg.Global.ConfigFileUsed = configFile
+	cfg.Paths.ConfigFileUsed = configFile
 	_ = os.Setenv("DAGU_CONFIG", configFile)
 
 	ctx = config.WithConfig(ctx, cfg)

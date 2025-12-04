@@ -129,8 +129,8 @@ func TestLoad_Env(t *testing.T) {
 	berlinLoc, _ := time.LoadLocation("Europe/Berlin")
 	_, berlinOffset := time.Now().In(berlinLoc).Zone()
 
-	require.NotEmpty(t, cfg.Global.ConfigFileUsed)
-	cfg.Global.ConfigFileUsed = ""
+	require.NotEmpty(t, cfg.Paths.ConfigFileUsed)
+	cfg.Paths.ConfigFileUsed = ""
 
 	expected := &Config{
 		Global: Global{
@@ -711,7 +711,7 @@ func loadFromYAML(t *testing.T, yaml string) *Config {
 	cfg, err := Load(WithConfigFile(configFile))
 	require.NoError(t, err)
 
-	cfg.Global.ConfigFileUsed = ""
+	cfg.Paths.ConfigFileUsed = ""
 	return cfg
 }
 
@@ -731,7 +731,7 @@ func TestLoad_ConfigFileUsed(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify ConfigFileUsed is set correctly
-	assert.Equal(t, configFile, cfg.Global.ConfigFileUsed)
+	assert.Equal(t, configFile, cfg.Paths.ConfigFileUsed)
 }
 
 func TestBindEnv_AsPath(t *testing.T) {

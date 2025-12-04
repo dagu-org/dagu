@@ -55,9 +55,6 @@ type Global struct {
 	// If not provided, platform-specific defaults are used (PowerShell on Windows, $SHELL on Unix).
 	DefaultShell string
 
-	// ConfigFileUsed is the path to the configuration file used to load settings.
-	ConfigFileUsed string
-
 	// SkipExamples disables the automatic creation of example DAGs when the DAGs directory is empty.
 	SkipExamples bool
 
@@ -156,6 +153,7 @@ type PathsConfig struct {
 	QueueDir           string
 	ProcDir            string
 	ServiceRegistryDir string // Directory for service registry files
+	ConfigFileUsed     string // Path to the configuration file used to load settings
 }
 
 type UI struct {
