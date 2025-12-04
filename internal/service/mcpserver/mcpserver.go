@@ -3,9 +3,9 @@ package mcpserver
 import (
 	"context"
 	"fmt"
-	"log"
+	"io"
+	"log/slog"
 	"net/http"
-	"os"
 	"path/filepath"
 	"sync/atomic"
 	"time"
@@ -42,7 +42,7 @@ func New(cfg *config.Config) (*MCPServer, error) {
 	s := mcp.NewServer(&mcp.Implementation{Name: "server", Version: "v0.0.1"}, nil)
 
 	s.AddTool(&mcp.Tool{
-		Name:        "List_DAGs",
+		Name:        "list_DAGs",
 		Description: "List all the Direct Acyclic Graphs in the server",
 		InputSchema: &jsonschema.Schema{
 			Type: "object",
@@ -51,19 +51,19 @@ func New(cfg *config.Config) (*MCPServer, error) {
 
 	/*
 		s.AddTool(&mcp.Tool{
-			Name:        "Execute DAG",
+			Name:        "execute_DAG",
 			Description: "Execute a specific Workflow",
 			InputSchema: &jsonschema.Schema{
 				Type: "object",
 				Properties: map[string]*jsonschema.Schema{
-					"name": {Type: "string", MaxLength: jsonschema.Ptr(10)},
+					"name": {Type: "string", MaxLength: jsonschema.Ptr(256)},
 				},
 			},
 		}, executeDag)
 
 
 		s.AddTool(&mcp.Tool{
-			Name:        "Create DAG",
+			Name:        "create_DAG",
 			Description: "Create a new workflow",
 			InputSchema: &jsonschema.Schema{
 				Type: "object",
@@ -90,43 +90,54 @@ func listDags(ctx context.Context, ctr *mcp.CallToolRequest) (*mcp.CallToolResul
 	api_base_url := "api/v2"
 
 	resp, err := http.Get(fmt.Sprintf("http://%s:%s/%s/dags", host, port, api_base_url))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
 
 	return &mcp.CallToolResult{
-		StructuredContent: resp.Body,
-		IsError:           err != nil,
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: string(body)},
+		},
+		IsError: err != nil,
 	}, nil
 }
 
-func executeDag(ctx context.Context, ctr *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// host := os.Getenv("DAGU_HOST")
-	host := "localhost"
-	// port := os.Getenv("DAGU_PORT")
-	port := "8080"
-	api_base_url := os.Getenv("DAGU_API_BASE_URL")
+/*
+	func executeDag(ctx context.Context, ctr *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// host := os.Getenv("DAGU_HOST")
+		host := "localhost"
+		// port := os.Getenv("DAGU_PORT")
+		port := "8080"
+		// api_base_url := os.Getenv("DAGU_API_BASE_URL")
+		api_base_url := "api/v2"
 
-	resp, err := http.Get(fmt.Sprintf("http://%s:%s/%s/dags", host, port, api_base_url))
+		resp, err := http.Get(fmt.Sprintf("http://%s:%s/%s/dags", host, port, api_base_url))
 
-	return &mcp.CallToolResult{
-		StructuredContent: resp.Body,
-		IsError:           err == nil,
-	}, nil
-}
+		return &mcp.CallToolResult{
+			StructuredContent: resp.Body,
+			IsError:           err != nil,
+		}, nil
+	}
 
-func createDag(ctx context.Context, ctr *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// host := os.Getenv("DAGU_HOST")
-	host := "localhost"
-	// port := os.Getenv("DAGU_PORT")
-	port := "8080"
-	api_base_url := os.Getenv("DAGU_API_BASE_URL")
+	func createDag(ctx context.Context, ctr *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// host := os.Getenv("DAGU_HOST")
+		host := "localhost"
+		// port := os.Getenv("DAGU_PORT")
+		port := "8080"
+		// api_base_url := os.Getenv("DAGU_API_BASE_URL")
+		api_base_url := "api/v2"
 
-	resp, err := http.Get(fmt.Sprintf("http://%s:%s/%s/dags", host, port, api_base_url))
+		resp, err := http.Post(fmt.Sprintf("http://%s:%s/%s/dags", host, port, api_base_url))
 
-	return &mcp.CallToolResult{
-		StructuredContent: resp.Body,
-		IsError:           err == nil,
-	}, nil
-}
-
+		return &mcp.CallToolResult{
+			StructuredContent: resp.Body,
+			IsError:           err != nil,
+		}, nil
+	}
+*/
 func (s *MCPServer) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -137,10 +148,10 @@ func (s *MCPServer) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to acquire mcp server lock: %w", err)
 	}
 
-	logger.Info(ctx, "Acquired scheduler lock")
+	logger.Info(ctx, "Acquired mcp server lock")
 
 	if err := s.server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
-		log.Printf("Server failed: %v", err)
+		logger.Error(ctx, "MCP server failed", slog.String("error", err.Error()))
 	}
 
 	return nil
