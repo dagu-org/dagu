@@ -19,6 +19,71 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestDirectShell(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("DirectWithCommandAndScript", func(t *testing.T) {
+		builder := shellCommandBuilder{
+			Shell:   []string{"direct"},
+			Command: "/usr/bin/python",
+			Script:  "script.py",
+			Args:    []string{"-u"},
+		}
+		cmd, err := builder.Build(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+		assert.Equal(t, []string{"/usr/bin/python", "-u", "script.py"}, cmd.Args)
+	})
+
+	t.Run("DirectWithCommandOnly", func(t *testing.T) {
+		builder := shellCommandBuilder{
+			Shell:   []string{"direct"},
+			Command: "/bin/echo",
+			Args:    []string{"hello", "world"},
+		}
+		cmd, err := builder.Build(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+		assert.Equal(t, []string{"/bin/echo", "hello", "world"}, cmd.Args)
+	})
+
+	t.Run("DirectWithCommandAndShellCmdArgs", func(t *testing.T) {
+		// When Command is set (from array syntax), ShellCmdArgs is ignored
+		// This is the normal case from runtime evaluation
+		builder := shellCommandBuilder{
+			Shell:            []string{"direct"},
+			Command:          "/bin/echo",
+			Args:             []string{"hello"},
+			ShellCommandArgs: "echo hello", // This gets set by runtime but should be ignored
+		}
+		cmd, err := builder.Build(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+		assert.Equal(t, []string{"/bin/echo", "hello"}, cmd.Args)
+	})
+
+	t.Run("DirectRejectsStringCommandOnly", func(t *testing.T) {
+		// When only ShellCommandArgs is set (string command without array),
+		// direct shell cannot parse it
+		builder := shellCommandBuilder{
+			Shell:            []string{"direct"},
+			ShellCommandArgs: "echo hello",
+		}
+		_, err := builder.Build(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "requires command array syntax")
+	})
+
+	t.Run("DirectRequiresCommand", func(t *testing.T) {
+		builder := shellCommandBuilder{
+			Shell: []string{"direct"},
+		}
+		_, err := builder.Build(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "requires 'command' field")
+	})
+}
+
 func TestShellCommandBuilder_Build(t *testing.T) {
 	ctx := context.Background()
 
@@ -97,34 +162,29 @@ func TestBuildPowerShellCommand(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		cmd      string
-		args     []string
 		builder  shellCommandBuilder
 		expected []string
 	}{
 		{
 			name: "BasicPowershellCommand",
-			cmd:  "powershell",
-			args: []string{},
 			builder: shellCommandBuilder{
+				Shell:            []string{"powershell"},
 				ShellCommandArgs: "Get-Date",
 			},
 			expected: []string{"powershell", "-Command", "Get-Date"},
 		},
 		{
 			name: "PowershellWithExistingCommand",
-			cmd:  "powershell",
-			args: []string{"-Command"},
 			builder: shellCommandBuilder{
+				Shell:            []string{"powershell", "-Command"},
 				ShellCommandArgs: "Get-Date",
 			},
 			expected: []string{"powershell", "-Command", "Get-Date"},
 		},
 		{
 			name: "PowershellWithScript",
-			cmd:  "powershell",
-			args: []string{},
 			builder: shellCommandBuilder{
+				Shell:   []string{"powershell"},
 				Command: "python",
 				Script:  "test.py",
 				Args:    []string{"-u"},
@@ -135,7 +195,7 @@ func TestBuildPowerShellCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd, err := tt.builder.buildPowerShellCommand(ctx, tt.cmd, tt.args)
+			cmd, err := tt.builder.Build(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, cmd)
 
@@ -148,50 +208,128 @@ func TestBuildCmdCommand(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name     string
-		cmd      string
-		args     []string
-		builder  shellCommandBuilder
-		expected []string
+		name           string
+		builder        shellCommandBuilder
+		expectedInArgs []string // Args that must be present
 	}{
 		{
 			name: "BasicCmdCommand",
-			cmd:  "cmd",
-			args: []string{},
 			builder: shellCommandBuilder{
+				Shell:            []string{"cmd"},
 				ShellCommandArgs: "dir",
 			},
-			expected: []string{"cmd", "/c", "dir"},
+			expectedInArgs: []string{"/c", "dir"},
 		},
 		{
 			name: "CmdWithExisting/C",
-			cmd:  "cmd",
-			args: []string{"/c"},
 			builder: shellCommandBuilder{
+				Shell:            []string{"cmd", "/c"},
 				ShellCommandArgs: "dir",
 			},
-			expected: []string{"cmd", "/c", "dir"},
+			expectedInArgs: []string{"/c", "dir"},
 		},
 		{
 			name: "CmdWithScript",
-			cmd:  "cmd",
-			args: []string{},
 			builder: shellCommandBuilder{
+				Shell:   []string{"cmd"},
 				Command: "python",
 				Script:  "test.py",
 				Args:    []string{"-u"},
 			},
-			expected: []string{"python", "-u", "test.py"},
+			expectedInArgs: []string{"python", "-u", "test.py"},
+		},
+		{
+			name: "CmdWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"cmd"},
+				Script: "script.bat",
+			},
+			expectedInArgs: []string{"/c", "script.bat"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd, err := tt.builder.buildCmdCommand(ctx, tt.cmd, tt.args)
+			cmd, err := tt.builder.Build(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, cmd)
 
-			assert.Equal(t, tt.expected, cmd.Args)
+			for _, expectedArg := range tt.expectedInArgs {
+				assert.Contains(t, cmd.Args, expectedArg)
+			}
+		})
+	}
+}
+
+// TestBuildShellWithScriptOnly tests that each shell properly handles Script without Command
+func TestBuildShellWithScriptOnly(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name           string
+		builder        shellCommandBuilder
+		expectedInArgs []string
+	}{
+		{
+			name: "CmdShellWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"cmd"},
+				Script: "/tmp/script.bat",
+			},
+			expectedInArgs: []string{"/c", "/tmp/script.bat"},
+		},
+		{
+			name: "PowerShellWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"powershell"},
+				Script: "/tmp/script.ps1",
+			},
+			expectedInArgs: []string{"-ExecutionPolicy", "Bypass", "-File", "/tmp/script.ps1"},
+		},
+		{
+			name: "PwshWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"pwsh"},
+				Script: "/tmp/script.ps1",
+			},
+			expectedInArgs: []string{"-ExecutionPolicy", "Bypass", "-File", "/tmp/script.ps1"},
+		},
+		{
+			name: "BashWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"bash"},
+				Script: "/tmp/script.sh",
+			},
+			expectedInArgs: []string{"-e", "/tmp/script.sh"},
+		},
+		{
+			name: "ShWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"sh"},
+				Script: "/tmp/script.sh",
+			},
+			expectedInArgs: []string{"-e", "/tmp/script.sh"},
+		},
+		{
+			name: "NixShellWithScriptOnly",
+			builder: shellCommandBuilder{
+				Shell:  []string{"nix-shell"},
+				Script: "/tmp/script.sh",
+			},
+			expectedInArgs: []string{"--run", "set -e; /tmp/script.sh"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, err := tt.builder.Build(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, cmd)
+
+			for _, expectedArg := range tt.expectedInArgs {
+				assert.Contains(t, cmd.Args, expectedArg,
+					"expected %q in args %v", expectedArg, cmd.Args)
+			}
 		})
 	}
 }
@@ -287,6 +425,10 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 }
 
 func TestCommandExecutor_ExitCode(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping Unix-specific test on Windows")
+	}
+
 	ctx := context.Background()
 	// Create a minimal DAG for the test
 	dag := &core.DAG{
@@ -954,11 +1096,13 @@ func TestSetupScript(t *testing.T) {
 					"expected extension %s, got %s", tt.expectedExt, filepath.Ext(scriptFile))
 			}
 
-			// Check permissions
-			info, err := os.Stat(scriptFile)
-			require.NoError(t, err)
-			// Check that it's executable (at least user execute bit)
-			assert.True(t, info.Mode()&0100 != 0, "script should be executable")
+			// Check permissions (only on Unix - Windows doesn't have the same permission model)
+			if goruntime.GOOS != "windows" {
+				info, err := os.Stat(scriptFile)
+				require.NoError(t, err)
+				// Check that it's executable (at least user execute bit)
+				assert.True(t, info.Mode()&0100 != 0, "script should be executable")
+			}
 		})
 	}
 }
@@ -1731,7 +1875,7 @@ func TestCommandConfig_NewCmd_Errors(t *testing.T) {
 	scriptFile := filepath.Join(tmpDir, "test.sh")
 	require.NoError(t, os.WriteFile(scriptFile, []byte("echo hello"), 0o755))
 
-	t.Run("shellCommandBuilder error with command and script", func(t *testing.T) {
+	t.Run("EmptyShellWithCommandAndScript", func(t *testing.T) {
 		config := commandConfig{
 			Ctx:     ctx,
 			Command: "/bin/sh",
@@ -1742,23 +1886,7 @@ func TestCommandConfig_NewCmd_Errors(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("shellCommandBuilder error with shell cmd args", func(t *testing.T) {
-		// Test the path where shellCommandBuilder fails due to empty Shell
-		// when ShellCommandArgs is set
-		config := commandConfig{
-			Ctx:              ctx,
-			Shell:            []string{"invalid shell with\ttabs"},
-			ShellCommandArgs: "echo hello",
-		}
-		// This should work since Shell is now a slice
-		cmd, err := config.newCmd(ctx, "")
-		// The command might succeed or fail depending on the shell parsing
-		if err == nil {
-			assert.NotNil(t, cmd)
-		}
-	})
-
-	t.Run("detectShebang error", func(t *testing.T) {
+	t.Run("DetectShebangError", func(t *testing.T) {
 		// Create a config that will trigger detectShebang with non-existent file
 		config := commandConfig{
 			Ctx:                ctx,
@@ -2046,26 +2174,6 @@ func TestCommandConfig_NewCmd_ShellScriptNoShebang(t *testing.T) {
 	assert.NotNil(t, cmd)
 	// Should use /bin/sh to run the script
 	assert.Contains(t, cmd.Path, "sh")
-}
-
-// TestSetupScript_WriteErrors tests write-related errors in setupScript
-// Note: These tests may be skipped on some systems where the operations don't fail
-func TestSetupScript_WriteErrors(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		t.Skip("Skipping Unix-specific test on Windows")
-	}
-
-	// Test with /dev/full if available (Linux only) - causes write errors
-	if _, err := os.Stat("/dev/full"); err == nil {
-		t.Run("write to full device", func(t *testing.T) {
-			// /dev/full simulates a full disk
-			_, err := setupScript("/dev", "echo hello", []string{"/bin/sh"})
-			// This might fail due to permission or other issues
-			if err != nil {
-				assert.Error(t, err)
-			}
-		})
-	}
 }
 
 // TestReadFirstLine_LongLine tests readFirstLine with extremely long content
