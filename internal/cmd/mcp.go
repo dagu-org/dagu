@@ -11,7 +11,7 @@ func Mcp() *cobra.Command {
 		&cobra.Command{
 			Use:   "mcp",
 			Short: "Start the MCP Server",
-			Long:  "Satrt the MCP Server",
+			Long:  "Start the MCP Server",
 			Args:  cobra.ArbitraryArgs,
 		}, mcpFlags, runMcp,
 	)
