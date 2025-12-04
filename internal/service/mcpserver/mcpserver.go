@@ -42,38 +42,37 @@ func New(cfg *config.Config) (*MCPServer, error) {
 	s := mcp.NewServer(&mcp.Implementation{Name: "server", Version: "v0.0.1"}, nil)
 
 	s.AddTool(&mcp.Tool{
-		Name:        "List DAGs",
+		Name:        "List_DAGs",
 		Description: "List all the Direct Acyclic Graphs in the server",
 		InputSchema: &jsonschema.Schema{
 			Type: "object",
-			Properties: map[string]*jsonschema.Schema{
-				"name": {Type: "string", MaxLength: jsonschema.Ptr(10)},
-			},
 		},
 	}, listDags)
 
-	s.AddTool(&mcp.Tool{
-		Name:        "Execute DAG",
-		Description: "Execute a specific Workflow",
-		InputSchema: &jsonschema.Schema{
-			Type: "object",
-			Properties: map[string]*jsonschema.Schema{
-				"name": {Type: "string", MaxLength: jsonschema.Ptr(10)},
+	/*
+		s.AddTool(&mcp.Tool{
+			Name:        "Execute DAG",
+			Description: "Execute a specific Workflow",
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"name": {Type: "string", MaxLength: jsonschema.Ptr(10)},
+				},
 			},
-		},
-	}, executeDag)
+		}, executeDag)
 
-	s.AddTool(&mcp.Tool{
-		Name:        "Create DAG",
-		Description: "Create a new workflow",
-		InputSchema: &jsonschema.Schema{
-			Type: "object",
-			Properties: map[string]*jsonschema.Schema{
-				"name": {Type: "string", MaxLength: jsonschema.Ptr(10)},
+
+		s.AddTool(&mcp.Tool{
+			Name:        "Create DAG",
+			Description: "Create a new workflow",
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"name": {Type: "string", MaxLength: jsonschema.Ptr(10)},
+				},
 			},
-		},
-	}, createDag)
-
+		}, createDag)
+	*/
 	return &MCPServer{
 		server:   s,
 		logDir:   cfg.Paths.LogDir,
@@ -87,13 +86,14 @@ func listDags(ctx context.Context, ctr *mcp.CallToolRequest) (*mcp.CallToolResul
 	host := "localhost"
 	// port := os.Getenv("DAGU_PORT")
 	port := "8080"
-	api_base_url := os.Getenv("DAGU_API_BASE_URL")
+	//api_base_url := os.Getenv("DAGU_API_BASE_URL")
+	api_base_url := "api/v2"
 
 	resp, err := http.Get(fmt.Sprintf("http://%s:%s/%s/dags", host, port, api_base_url))
 
 	return &mcp.CallToolResult{
 		StructuredContent: resp.Body,
-		IsError:           err == nil,
+		IsError:           err != nil,
 	}, nil
 }
 
