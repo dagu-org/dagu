@@ -36,6 +36,18 @@
             writeDags: true,
             runDags: true,
           },
+          paths: {
+            configFileUsed: '~/.config/dagu/config.yaml',
+            baseConfig: '~/.config/dagu/base.yaml',
+            dagsDir: '~/.config/dagu/dags',
+            logDir: '~/.local/share/dagu/logs',
+            suspendFlagsDir: '~/.local/share/dagu/suspend',
+            adminLogsDir: '~/.local/share/dagu/logs/admin',
+            dagRunsDir: '~/.local/share/dagu/data/dag-runs',
+            queueDir: '~/.local/share/dagu/data/queue',
+            procDir: '~/.local/share/dagu/data/proc',
+            serviceRegistryDir: '~/.local/share/dagu/data/services',
+          },
         };
       }
     </script>

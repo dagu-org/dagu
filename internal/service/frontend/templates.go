@@ -59,6 +59,7 @@ type funcsConfig struct {
 	MaxDashboardPageLimit int
 	RemoteNodes           []string
 	Permissions           map[config.Permission]bool
+	Paths                 config.PathsConfig
 }
 
 func defaultFunctions(cfg funcsConfig) template.FuncMap {
@@ -102,6 +103,36 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		},
 		"remoteNodes": func() string {
 			return strings.Join(cfg.RemoteNodes, ",")
+		},
+		"pathDAGsDir": func() string {
+			return cfg.Paths.DAGsDir
+		},
+		"pathLogDir": func() string {
+			return cfg.Paths.LogDir
+		},
+		"pathSuspendFlagsDir": func() string {
+			return cfg.Paths.SuspendFlagsDir
+		},
+		"pathAdminLogsDir": func() string {
+			return cfg.Paths.AdminLogsDir
+		},
+		"pathBaseConfig": func() string {
+			return cfg.Paths.BaseConfig
+		},
+		"pathDAGRunsDir": func() string {
+			return cfg.Paths.DAGRunsDir
+		},
+		"pathQueueDir": func() string {
+			return cfg.Paths.QueueDir
+		},
+		"pathProcDir": func() string {
+			return cfg.Paths.ProcDir
+		},
+		"pathServiceRegistryDir": func() string {
+			return cfg.Paths.ServiceRegistryDir
+		},
+		"pathConfigFileUsed": func() string {
+			return cfg.Paths.ConfigFileUsed
 		},
 	}
 }

@@ -25,7 +25,7 @@ type SubCmdBuilder struct {
 func NewSubCmdBuilder(cfg *config.Config) *SubCmdBuilder {
 	return &SubCmdBuilder{
 		executable: cfg.Paths.Executable,
-		configFile: cfg.Global.ConfigFileUsed,
+		configFile: cfg.Paths.ConfigFileUsed,
 		baseEnv:    cfg.Global.BaseEnv,
 	}
 }

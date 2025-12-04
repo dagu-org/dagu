@@ -78,7 +78,7 @@ func SetupCommand(t *testing.T, opts ...HelperOption) Command {
 
 // withConfigFlag appends --config <file> unless already present.
 func withConfigFlag(args []string, cfg *config.Config) []string {
-	if cfg == nil || cfg.Global.ConfigFileUsed == "" {
+	if cfg == nil || cfg.Paths.ConfigFileUsed == "" {
 		return args
 	}
 	for i := 0; i < len(args); i++ {
@@ -89,12 +89,12 @@ func withConfigFlag(args []string, cfg *config.Config) []string {
 		if args[i] == "--" {
 			// Insert config flag before passthrough args so it isn't treated as a DAG param.
 			withFlag := append([]string{}, args[:i]...)
-			withFlag = append(withFlag, "--config", cfg.Global.ConfigFileUsed)
+			withFlag = append(withFlag, "--config", cfg.Paths.ConfigFileUsed)
 			withFlag = append(withFlag, args[i:]...)
 			return withFlag
 		}
 	}
-	return append(args, "--config", cfg.Global.ConfigFileUsed)
+	return append(args, "--config", cfg.Paths.ConfigFileUsed)
 }
 
 func hasConfigInline(arg string) bool {

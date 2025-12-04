@@ -62,6 +62,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 			MaxDashboardPageLimit: cfg.UI.MaxDashboardPageLimit,
 			RemoteNodes:           remoteNodes,
 			Permissions:           cfg.Server.Permissions,
+			Paths:                 cfg.Paths,
 		},
 	}
 }

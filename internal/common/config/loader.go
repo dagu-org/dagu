@@ -113,7 +113,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to build config: %w", err)
 	}
 
-	cfg.Global.ConfigFileUsed = configFileUsed
+	cfg.Paths.ConfigFileUsed = configFileUsed
 
 	// Attach any warnings collected during the resolution process.
 	cfg.Warnings = l.warnings

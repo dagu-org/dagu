@@ -23,6 +23,18 @@
             writeDags: "{{ permissionsWriteDags }}" === "true",
             runDags: "{{ permissionsRunDags }}" === "true",
           },
+          paths: {
+            dagsDir: "{{ pathDAGsDir }}",
+            logDir: "{{ pathLogDir }}",
+            suspendFlagsDir: "{{ pathSuspendFlagsDir }}",
+            adminLogsDir: "{{ pathAdminLogsDir }}",
+            baseConfig: "{{ pathBaseConfig }}",
+            dagRunsDir: "{{ pathDAGRunsDir }}",
+            queueDir: "{{ pathQueueDir }}",
+            procDir: "{{ pathProcDir }}",
+            serviceRegistryDir: "{{ pathServiceRegistryDir }}",
+            configFileUsed: "{{ pathConfigFileUsed }}",
+          },
         };
       }
     </script>

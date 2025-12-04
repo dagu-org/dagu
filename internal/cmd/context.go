@@ -148,7 +148,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	// Log key configuration settings for debugging
 	logger.Debug(ctx, "Configuration loaded",
-		tag.Config(cfg.Global.ConfigFileUsed),
+		tag.Config(cfg.Paths.ConfigFileUsed),
 		tag.Dir(cfg.Paths.DAGsDir),
 	)
 	logger.Debug(ctx, "Paths configuration",
