@@ -4,6 +4,7 @@
  * @module features/dags/components/visualization
  */
 import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
+import { toMermaidNodeId } from '@/lib/utils';
 import { Maximize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useState } from 'react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
@@ -142,7 +143,7 @@ const Graph: React.FC<Props> = ({
       status: NodeStatus,
       node?: components['schemas']['Node']
     ) => {
-      const id = step.name.replace(/[\s-]/g, 'dagutmp'); // Replace spaces and dashes with 'x'
+      const id = toMermaidNodeId(step.name);
       const c = graphStatusMap[status] || '';
 
       // Check if this is a sub dagRun node (has a call property)
@@ -185,7 +186,7 @@ const Graph: React.FC<Props> = ({
       // Process dependencies and add connections
       if (step.depends) {
         step.depends.forEach((dep) => {
-          const depId = dep.replace(/[-\s]/g, 'dagutmp');
+          const depId = toMermaidNodeId(dep);
           if (status === NodeStatus.Failed) {
             // Dashed line for error state
             dat.push(`${depId} -.- ${id};`);
