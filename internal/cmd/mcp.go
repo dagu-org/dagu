@@ -24,11 +24,11 @@ var mcpFlags = []commandLineFlag{}
 func runMcp(ctx *Context, args []string) error {
 	mcpserver, err := ctx.NewMcpServer()
 	if err != nil {
-		return fmt.Errorf("failed to initialize scheduler: %w", err)
+		return fmt.Errorf("failed to initialize mcp server: %w", err)
 	}
 
 	if err := mcpserver.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start scheduler in directory %s: %w",
+		return fmt.Errorf("failed to start mcp server in directory %s: %w",
 			ctx.Config.Paths.DAGsDir, err)
 	}
 
