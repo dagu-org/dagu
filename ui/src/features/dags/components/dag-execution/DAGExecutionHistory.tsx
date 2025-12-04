@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { components, NodeStatus, Status } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
+import { toMermaidNodeId } from '../../../../lib/utils';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { getEventHandlers } from '../../lib/getEventHandlers';
@@ -274,7 +275,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
 
       // Find the clicked step
       const n = dagRun.nodes?.find(
-        (n) => n.step.name.replace(/[\s-()]/g, 'dagutmp') == id
+        (n) => toMermaidNodeId(n.step.name) == id
       );
 
       if (!n || !n.step.call) return;
@@ -314,7 +315,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
 
       // Find the right-clicked step
       const n = dagRun.nodes?.find(
-        (n) => n.step.name.replace(/[\s-()]/g, 'dagutmp') == id
+        (n) => toMermaidNodeId(n.step.name) == id
       );
 
       if (n) {
