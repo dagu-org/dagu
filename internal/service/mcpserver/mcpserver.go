@@ -62,16 +62,16 @@ func New(cfg *config.Config) (*MCPServer, error) {
 		}, executeDag)
 
 
-		s.AddTool(&mcp.Tool{
-			Name:        "create_DAG",
-			Description: "Create a new workflow",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"name": {Type: "string", MaxLength: jsonschema.Ptr(10)},
+			s.AddTool(&mcp.Tool{
+				Name:        "create_DAG",
+				Description: "Create a new workflow",
+				InputSchema: &jsonschema.Schema{
+					Type: "object",
+					Properties: map[string]*jsonschema.Schema{
+						"name": {Type: "string", MaxLength: jsonschema.Ptr(10)},
+					},
 				},
-			},
-		}, createDag)
+			}, createDag)
 	*/
 	return &MCPServer{
 		server:   s,
@@ -149,9 +149,11 @@ func (s *MCPServer) Start(ctx context.Context) error {
 	}
 
 	logger.Info(ctx, "Acquired mcp server lock")
+	defer s.dirLock.Unlock()
 
 	if err := s.server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		logger.Error(ctx, "MCP server failed", slog.String("error", err.Error()))
+		return fmt.Errorf("mcp server failed: %w", err)
 	}
 
 	return nil
