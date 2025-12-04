@@ -97,16 +97,13 @@ function DAGStatus({ dagRun, fileName }: Props) {
     async (id: string) => {
       // find the clicked step
       const n = dagRun.nodes?.find(
-        (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
+        (n) => n.step.name.replace(/[\s-()]/g, 'dagutmp') == id
       );
 
       const subDAGName = n?.step?.call;
       if (n && subDAGName) {
         // Combine both regular children and repeated children
-        const allSubRuns = [
-          ...(n.subRuns || []),
-          ...(n.subRunsRepeated || []),
-        ];
+        const allSubRuns = [...(n.subRuns || []), ...(n.subRunsRepeated || [])];
 
         // Check if there are multiple sub runs (parallel execution or repeated)
         if (allSubRuns.length > 1) {
@@ -197,7 +194,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
       if (status !== Status.Running && status !== Status.NotStarted) {
         // find the right-clicked step
         const n = dagRun.nodes?.find(
-          (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
+          (n) => n.step.name.replace(/[\s-()]/g, 'dagutmp') == id
         );
 
         if (n) {

@@ -185,7 +185,7 @@ const Graph: React.FC<Props> = ({
       // Process dependencies and add connections
       if (step.depends) {
         step.depends.forEach((dep) => {
-          const depId = dep.replace(/[-\s]/g, 'dagutmp');
+          const depId = dep.replace(/[\s-()]/g, 'dagutmp');
           if (status === NodeStatus.Failed) {
             // Dashed line for error state
             dat.push(`${depId} -.- ${id};`);

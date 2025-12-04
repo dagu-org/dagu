@@ -274,16 +274,13 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
 
       // Find the clicked step
       const n = dagRun.nodes?.find(
-        (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
+        (n) => n.step.name.replace(/[\s-()]/g, 'dagutmp') == id
       );
 
       if (!n || !n.step.call) return;
 
       // If it's a sub dagRun, navigate to its details
-      const subRuns = [
-        ...(n.subRuns ?? []),
-        ...(n.subRunsRepeated ?? []),
-      ];
+      const subRuns = [...(n.subRuns ?? []), ...(n.subRunsRepeated ?? [])];
       const subDAGRun = subRuns[0];
       if (subDAGRun && subDAGRun.dagRunId) {
         // Navigate to the sub dagRun details using React Router with search params
@@ -317,7 +314,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
 
       // Find the right-clicked step
       const n = dagRun.nodes?.find(
-        (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
+        (n) => n.step.name.replace(/[\s-()]/g, 'dagutmp') == id
       );
 
       if (n) {
