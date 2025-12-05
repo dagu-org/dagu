@@ -2067,84 +2067,87 @@ func TestShellCommandBuilder_PowerShellExe(t *testing.T) {
 	assert.Contains(t, cmd.Args, "Get-Date")
 }
 
-// TestCmdShell_ShellCommandArgs_DoesNotIncludeArgs verifies that when running
-// a command string via cmd.exe shell (ShellCommandArgs), the step-level Args
-// are NOT appended to the command. This was a bug fixed in commit e40711e.
-func TestCmdShell_ShellCommandArgs_DoesNotIncludeArgs(t *testing.T) {
+// TestShellCommandArgs_DoesNotIncludeArgs verifies that when running a command
+// string via shell (ShellCommandArgs), the step-level Args are NOT appended
+// to the command. This was a bug fixed in commit e40711e.
+func TestShellCommandArgs_DoesNotIncludeArgs(t *testing.T) {
 	ctx := context.Background()
 
-	// When using ShellCommandArgs (running command string via shell),
-	// the Args field should NOT be included in the final command
-	builder := shellCommandBuilder{
-		Shell:            []string{"cmd.exe"},
-		ShellCommandArgs: "echo hello",
-		Args:             []string{"--extra-arg", "should-not-appear"},
+	tests := []struct {
+		name             string
+		shell            []string
+		shellCommandArgs string
+		unwantedArgs     []string
+		expectedArgs     []string // Args that MUST be present
+	}{
+		{
+			name:             "cmd.exe",
+			shell:            []string{"cmd.exe"},
+			shellCommandArgs: "echo hello",
+			unwantedArgs:     []string{"--extra-arg", "should-not-appear"},
+			expectedArgs:     []string{"/c", "echo hello"},
+		},
+		{
+			name:             "cmd",
+			shell:            []string{"cmd"},
+			shellCommandArgs: "dir",
+			unwantedArgs:     []string{"--unwanted"},
+			expectedArgs:     []string{"/c", "dir"},
+		},
+		{
+			name:             "powershell",
+			shell:            []string{"powershell"},
+			shellCommandArgs: "Write-Host hello",
+			unwantedArgs:     []string{"-ExtraArg", "should-not-appear"},
+			expectedArgs:     []string{"-Command", "Write-Host hello"},
+		},
+		{
+			name:             "powershell.exe",
+			shell:            []string{"powershell.exe"},
+			shellCommandArgs: "Get-Date",
+			unwantedArgs:     []string{"-Unwanted"},
+			expectedArgs:     []string{"-Command", "Get-Date"},
+		},
+		{
+			name:             "pwsh",
+			shell:            []string{"pwsh"},
+			shellCommandArgs: "Get-Process",
+			unwantedArgs:     []string{"-Unwanted"},
+			expectedArgs:     []string{"-Command", "Get-Process"},
+		},
+		{
+			name:             "pwsh.exe",
+			shell:            []string{"pwsh.exe"},
+			shellCommandArgs: "Get-Host",
+			unwantedArgs:     []string{"--bad-arg"},
+			expectedArgs:     []string{"-Command", "Get-Host"},
+		},
 	}
 
-	cmd, err := builder.Build(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, cmd)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := shellCommandBuilder{
+				Shell:            tt.shell,
+				ShellCommandArgs: tt.shellCommandArgs,
+				Args:             tt.unwantedArgs,
+			}
 
-	// Args should NOT be in the command when using ShellCommandArgs
-	for _, arg := range builder.Args {
-		assert.NotContains(t, cmd.Args, arg,
-			"Args should not be included when running command string via shell")
+			cmd, err := builder.Build(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, cmd)
+
+			// Args should NOT be in the command when using ShellCommandArgs
+			for _, arg := range tt.unwantedArgs {
+				assert.NotContains(t, cmd.Args, arg,
+					"Args should not be included when running command string via shell")
+			}
+
+			// Expected args MUST be present
+			for _, arg := range tt.expectedArgs {
+				assert.Contains(t, cmd.Args, arg)
+			}
+		})
 	}
-
-	// The command should be: cmd.exe /c echo hello
-	assert.Contains(t, cmd.Args, "/c")
-	assert.Contains(t, cmd.Args, "echo hello")
-}
-
-// TestPowerShell_ShellCommandArgs_DoesNotIncludeArgs verifies that when running
-// a command string via PowerShell (ShellCommandArgs), the step-level Args
-// are NOT appended to the command. This was a bug fixed in commit e40711e.
-func TestPowerShell_ShellCommandArgs_DoesNotIncludeArgs(t *testing.T) {
-	ctx := context.Background()
-
-	// When using ShellCommandArgs (running command string via shell),
-	// the Args field should NOT be included in the final command
-	builder := shellCommandBuilder{
-		Shell:            []string{"powershell"},
-		ShellCommandArgs: "Write-Host hello",
-		Args:             []string{"-ExtraArg", "should-not-appear"},
-	}
-
-	cmd, err := builder.Build(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, cmd)
-
-	// Args should NOT be in the command when using ShellCommandArgs
-	for _, arg := range builder.Args {
-		assert.NotContains(t, cmd.Args, arg,
-			"Args should not be included when running command string via PowerShell")
-	}
-
-	// The command should be: powershell -Command Write-Host hello
-	assert.Contains(t, cmd.Args, "-Command")
-	assert.Contains(t, cmd.Args, "Write-Host hello")
-}
-
-// TestPwsh_ShellCommandArgs_DoesNotIncludeArgs verifies the same for pwsh
-func TestPwsh_ShellCommandArgs_DoesNotIncludeArgs(t *testing.T) {
-	ctx := context.Background()
-
-	builder := shellCommandBuilder{
-		Shell:            []string{"pwsh"},
-		ShellCommandArgs: "Get-Process",
-		Args:             []string{"-Unwanted"},
-	}
-
-	cmd, err := builder.Build(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, cmd)
-
-	// Args should NOT be in the command
-	assert.NotContains(t, cmd.Args, "-Unwanted")
-
-	// The command should be: pwsh -Command Get-Process
-	assert.Contains(t, cmd.Args, "-Command")
-	assert.Contains(t, cmd.Args, "Get-Process")
 }
 
 // TestCmdShell_ScriptOnly_IncludesArgs verifies that when running a script file
