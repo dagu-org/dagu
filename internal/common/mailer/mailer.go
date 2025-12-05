@@ -3,6 +3,7 @@ package mailer
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -138,14 +139,9 @@ func (m *Client) sendWithAuth(
 	}
 	resultChan := make(chan result, 1)
 
-	// Run SendMail in a goroutine
+	// Run the mail sending in a goroutine with proper STARTTLS and auth support
 	go func() {
-		auth := smtp.PlainAuth("", m.username, m.password, m.host)
-		body = processEmailBody(body)
-		err := smtp.SendMail(
-			m.host+":"+m.port, auth, from, to,
-			m.composeMail(to, from, subject, body, attachments),
-		)
+		err := m.sendWithSTARTTLS(from, to, subject, body, attachments)
 		resultChan <- result{err: err}
 	}()
 
@@ -155,6 +151,150 @@ func (m *Client) sendWithAuth(
 		return res.err
 	case <-time.After(mailTimeout):
 		return fmt.Errorf("mail sending timeout after %v", mailTimeout)
+	}
+}
+
+// sendWithSTARTTLS connects to the SMTP server, negotiates STARTTLS if available,
+// and authenticates using LOGIN auth (falling back to PLAIN if LOGIN is unavailable).
+func (m *Client) sendWithSTARTTLS(
+	from string,
+	to []string,
+	subject, body string,
+	attachments []string,
+) error {
+	addr := m.host + ":" + m.port
+
+	// Connect to the SMTP server
+	conn, err := net.DialTimeout("tcp", addr, mailTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to connect to SMTP server: %w", err)
+	}
+
+	// Set deadline for all operations
+	if err := conn.SetDeadline(time.Now().Add(mailTimeout)); err != nil {
+		_ = conn.Close()
+		return err
+	}
+
+	// Create SMTP client
+	c, err := smtp.NewClient(conn, m.host)
+	if err != nil {
+		_ = conn.Close()
+		return fmt.Errorf("failed to create SMTP client: %w", err)
+	}
+	defer func() {
+		_ = c.Close()
+	}()
+
+	// Send EHLO/HELO
+	if err = c.Hello("localhost"); err != nil {
+		return fmt.Errorf("HELO failed: %w", err)
+	}
+
+	// Check if STARTTLS is supported and upgrade connection
+	if ok, _ := c.Extension("STARTTLS"); ok {
+		tlsConfig := &tls.Config{
+			ServerName: m.host,
+		}
+		if err = c.StartTLS(tlsConfig); err != nil {
+			return fmt.Errorf("STARTTLS failed: %w", err)
+		}
+	}
+
+	// Authenticate using LOGIN auth (more widely supported than PLAIN for "basic auth")
+	if err = m.authenticate(c); err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Set sender
+	if err = c.Mail(replacer.Replace(from)); err != nil {
+		return fmt.Errorf("MAIL FROM failed: %w", err)
+	}
+
+	// Set recipients
+	for i := range to {
+		to[i] = replacer.Replace(to[i])
+		if err = c.Rcpt(to[i]); err != nil {
+			return fmt.Errorf("RCPT TO failed: %w", err)
+		}
+	}
+
+	// Send the email body
+	wc, err := c.Data()
+	if err != nil {
+		return fmt.Errorf("DATA command failed: %w", err)
+	}
+
+	body = processEmailBody(body)
+	_, err = wc.Write(m.composeMail(to, from, subject, body, attachments))
+	if err != nil {
+		return fmt.Errorf("failed to write email body: %w", err)
+	}
+
+	if err = wc.Close(); err != nil {
+		return fmt.Errorf("failed to close data writer: %w", err)
+	}
+
+	return c.Quit()
+}
+
+// authenticate tries LOGIN auth first, then falls back to PLAIN auth.
+// LOGIN auth is more commonly supported for "basic authentication" scenarios.
+func (m *Client) authenticate(c *smtp.Client) error {
+	// Try LOGIN auth first (more widely supported for "basic auth")
+	if ok, _ := c.Extension("AUTH"); ok {
+		// Try LOGIN auth
+		loginAuth := &loginAuth{
+			username: m.username,
+			password: m.password,
+			host:     m.host,
+		}
+		if err := c.Auth(loginAuth); err == nil {
+			return nil
+		}
+
+		// Fall back to PLAIN auth if LOGIN fails
+		plainAuth := smtp.PlainAuth("", m.username, m.password, m.host)
+		if err := c.Auth(plainAuth); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// loginAuth implements smtp.Auth interface for LOGIN authentication mechanism.
+// LOGIN auth is different from PLAIN auth - it sends username and password
+// in separate base64-encoded exchanges rather than combined.
+type loginAuth struct {
+	username string
+	password string
+	host     string
+}
+
+func (a *loginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	// LOGIN auth can work over TLS or on localhost
+	if !server.TLS {
+		// Check for localhost
+		if server.Name != "localhost" && server.Name != "127.0.0.1" && server.Name != "::1" {
+			return "", nil, errors.New("LOGIN auth requires TLS connection")
+		}
+	}
+	return "LOGIN", nil, nil
+}
+
+func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if !more {
+		return nil, nil
+	}
+
+	prompt := strings.ToLower(string(fromServer))
+	switch {
+	case strings.Contains(prompt, "username"):
+		return []byte(a.username), nil
+	case strings.Contains(prompt, "password"):
+		return []byte(a.password), nil
+	default:
+		return nil, fmt.Errorf("unexpected server prompt: %s", fromServer)
 	}
 }
 
