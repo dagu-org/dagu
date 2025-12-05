@@ -82,7 +82,6 @@ func (s *cmdShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cmd
 
 	// Running a command string via shell
 	args := cloneArgs(b.Shell[1:])
-	args = append(args, b.Args...)
 
 	// cmd.exe uses /c instead of -c
 	if !slices.Contains(args, "/c") && !slices.Contains(args, "/C") {

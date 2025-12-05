@@ -2067,6 +2067,110 @@ func TestShellCommandBuilder_PowerShellExe(t *testing.T) {
 	assert.Contains(t, cmd.Args, "Get-Date")
 }
 
+// TestShellCommandArgs_DoesNotIncludeArgs verifies that when running a command
+// string via shell (ShellCommandArgs), the step-level Args are NOT appended
+// to the command. This was a bug fixed in commit e40711e.
+func TestShellCommandArgs_DoesNotIncludeArgs(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name             string
+		shell            []string
+		shellCommandArgs string
+		unwantedArgs     []string
+		expectedArgs     []string // Args that MUST be present
+	}{
+		{
+			name:             "cmd.exe",
+			shell:            []string{"cmd.exe"},
+			shellCommandArgs: "echo hello",
+			unwantedArgs:     []string{"--extra-arg", "should-not-appear"},
+			expectedArgs:     []string{"/c", "echo hello"},
+		},
+		{
+			name:             "cmd",
+			shell:            []string{"cmd"},
+			shellCommandArgs: "dir",
+			unwantedArgs:     []string{"--unwanted"},
+			expectedArgs:     []string{"/c", "dir"},
+		},
+		{
+			name:             "powershell",
+			shell:            []string{"powershell"},
+			shellCommandArgs: "Write-Host hello",
+			unwantedArgs:     []string{"-ExtraArg", "should-not-appear"},
+			expectedArgs:     []string{"-Command", "Write-Host hello"},
+		},
+		{
+			name:             "powershell.exe",
+			shell:            []string{"powershell.exe"},
+			shellCommandArgs: "Get-Date",
+			unwantedArgs:     []string{"-Unwanted"},
+			expectedArgs:     []string{"-Command", "Get-Date"},
+		},
+		{
+			name:             "pwsh",
+			shell:            []string{"pwsh"},
+			shellCommandArgs: "Get-Process",
+			unwantedArgs:     []string{"-Unwanted"},
+			expectedArgs:     []string{"-Command", "Get-Process"},
+		},
+		{
+			name:             "pwsh.exe",
+			shell:            []string{"pwsh.exe"},
+			shellCommandArgs: "Get-Host",
+			unwantedArgs:     []string{"--bad-arg"},
+			expectedArgs:     []string{"-Command", "Get-Host"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := shellCommandBuilder{
+				Shell:            tt.shell,
+				ShellCommandArgs: tt.shellCommandArgs,
+				Args:             tt.unwantedArgs,
+			}
+
+			cmd, err := builder.Build(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, cmd)
+
+			// Args should NOT be in the command when using ShellCommandArgs
+			for _, arg := range tt.unwantedArgs {
+				assert.NotContains(t, cmd.Args, arg,
+					"Args should not be included when running command string via shell")
+			}
+
+			// Expected args MUST be present
+			for _, arg := range tt.expectedArgs {
+				assert.Contains(t, cmd.Args, arg)
+			}
+		})
+	}
+}
+
+// TestCmdShell_ScriptOnly_IncludesArgs verifies that when running a script file
+// via cmd.exe (Script without Command), the Args ARE correctly included.
+func TestCmdShell_ScriptOnly_IncludesArgs(t *testing.T) {
+	ctx := context.Background()
+
+	builder := shellCommandBuilder{
+		Shell:  []string{"cmd.exe"},
+		Script: "script.bat",
+		Args:   []string{"/V:ON"}, // cmd.exe flag that should be included
+	}
+
+	cmd, err := builder.Build(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, cmd)
+
+	// Args SHOULD be included when running a script file
+	assert.Contains(t, cmd.Args, "/V:ON")
+	assert.Contains(t, cmd.Args, "/c")
+	assert.Contains(t, cmd.Args, "script.bat")
+}
+
 // TestCommandConfig_NewCmd_SplitCommandError tests error when SplitCommand fails in newCmd
 func TestCommandConfig_NewCmd_SplitCommandError(t *testing.T) {
 	ctx := setupTestContext(t, nil, core.Step{})

@@ -38,7 +38,6 @@ func (s *powerShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.C
 
 	// Running a command string via PowerShell
 	args := cloneArgs(b.Shell[1:])
-	args = append(args, b.Args...)
 
 	// PowerShell uses -Command instead of -c
 	if !slices.Contains(args, "-Command") && !slices.Contains(args, "-C") {
