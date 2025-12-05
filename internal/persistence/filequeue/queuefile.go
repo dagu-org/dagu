@@ -356,7 +356,7 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 
 	// Read the JSON file to get the actual DAG name
 	var itemData ItemData
-	fileData, err := os.ReadFile(path)
+	fileData, err := os.ReadFile(path) // nolint: gosec
 	if err != nil {
 		return ItemData{}, fmt.Errorf("failed to read queue file %s: %w", path, err)
 	}
