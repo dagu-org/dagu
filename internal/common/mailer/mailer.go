@@ -195,6 +195,7 @@ func (m *Client) sendWithSTARTTLS(
 	if ok, _ := c.Extension("STARTTLS"); ok {
 		tlsConfig := &tls.Config{
 			ServerName: m.host,
+			MinVersion: tls.VersionTLS12,
 		}
 		if err = c.StartTLS(tlsConfig); err != nil {
 			return fmt.Errorf("STARTTLS failed: %w", err)
