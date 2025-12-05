@@ -133,6 +133,10 @@ func (m *Client) sendWithAuth(
 	subject, body string,
 	attachments []string,
 ) error {
+	// Create a context with timeout for cancellation support
+	ctx, cancel := context.WithTimeout(context.Background(), mailTimeout)
+	defer cancel()
+
 	// Create a channel to receive the result
 	type result struct {
 		err error
@@ -141,15 +145,15 @@ func (m *Client) sendWithAuth(
 
 	// Run the mail sending in a goroutine with proper STARTTLS and auth support
 	go func() {
-		err := m.sendWithSTARTTLS(from, to, subject, body, attachments)
+		err := m.sendWithSTARTTLS(ctx, from, to, subject, body, attachments)
 		resultChan <- result{err: err}
 	}()
 
-	// Wait for either completion or timeout
+	// Wait for either completion or context cancellation
 	select {
 	case res := <-resultChan:
 		return res.err
-	case <-time.After(mailTimeout):
+	case <-ctx.Done():
 		return fmt.Errorf("mail sending timeout after %v", mailTimeout)
 	}
 }
@@ -157,6 +161,7 @@ func (m *Client) sendWithAuth(
 // sendWithSTARTTLS connects to the SMTP server, negotiates STARTTLS if available,
 // and authenticates using LOGIN auth (falling back to PLAIN if LOGIN is unavailable).
 func (m *Client) sendWithSTARTTLS(
+	ctx context.Context,
 	from string,
 	to []string,
 	subject, body string,
@@ -164,16 +169,21 @@ func (m *Client) sendWithSTARTTLS(
 ) error {
 	addr := m.host + ":" + m.port
 
-	// Connect to the SMTP server
-	conn, err := net.DialTimeout("tcp", addr, mailTimeout)
+	// Use a dialer with context for cancellation support
+	dialer := &net.Dialer{
+		Timeout: mailTimeout,
+	}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to SMTP server: %w", err)
 	}
 
-	// Set deadline for all operations
-	if err := conn.SetDeadline(time.Now().Add(mailTimeout)); err != nil {
-		_ = conn.Close()
-		return err
+	// Set deadline based on context deadline for cleaner shutdown
+	if deadline, ok := ctx.Deadline(); ok {
+		if err := conn.SetDeadline(deadline); err != nil {
+			_ = conn.Close()
+			return err
+		}
 	}
 
 	// Create SMTP client
@@ -203,7 +213,7 @@ func (m *Client) sendWithSTARTTLS(
 	}
 
 	// Authenticate using LOGIN auth (more widely supported than PLAIN for "basic auth")
-	if err = m.authenticate(c); err != nil {
+	if err = m.authenticate(ctx, c); err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
 	}
 
@@ -241,11 +251,13 @@ func (m *Client) sendWithSTARTTLS(
 
 // authenticate tries LOGIN auth first, then falls back to PLAIN auth.
 // LOGIN auth is more commonly supported for "basic authentication" scenarios.
-func (m *Client) authenticate(c *smtp.Client) error {
+func (m *Client) authenticate(ctx context.Context, c *smtp.Client) error {
 	// Check if server advertises AUTH extension
 	if ok, _ := c.Extension("AUTH"); !ok {
 		// Server doesn't advertise AUTH - this is unusual for servers requiring auth
 		// but we'll let the mail commands fail naturally if auth was actually required
+		logger.Debug(ctx, "SMTP server does not advertise AUTH extension",
+			slog.String("host", m.host), slog.String("port", m.port))
 		return nil
 	}
 
@@ -253,7 +265,6 @@ func (m *Client) authenticate(c *smtp.Client) error {
 	loginAuth := &loginAuth{
 		username: m.username,
 		password: m.password,
-		host:     m.host,
 	}
 	loginErr := c.Auth(loginAuth)
 	if loginErr == nil {
@@ -277,7 +288,6 @@ func (m *Client) authenticate(c *smtp.Client) error {
 type loginAuth struct {
 	username string
 	password string
-	host     string
 }
 
 func (a *loginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
