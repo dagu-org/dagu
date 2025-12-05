@@ -241,25 +241,33 @@ func (m *Client) sendWithSTARTTLS(
 // authenticate tries LOGIN auth first, then falls back to PLAIN auth.
 // LOGIN auth is more commonly supported for "basic authentication" scenarios.
 func (m *Client) authenticate(c *smtp.Client) error {
-	// Try LOGIN auth first (more widely supported for "basic auth")
-	if ok, _ := c.Extension("AUTH"); ok {
-		// Try LOGIN auth
-		loginAuth := &loginAuth{
-			username: m.username,
-			password: m.password,
-			host:     m.host,
-		}
-		if err := c.Auth(loginAuth); err == nil {
-			return nil
-		}
-
-		// Fall back to PLAIN auth if LOGIN fails
-		plainAuth := smtp.PlainAuth("", m.username, m.password, m.host)
-		if err := c.Auth(plainAuth); err != nil {
-			return err
-		}
+	// Check if server advertises AUTH extension
+	if ok, _ := c.Extension("AUTH"); !ok {
+		// Server doesn't advertise AUTH - this is unusual for servers requiring auth
+		// but we'll let the mail commands fail naturally if auth was actually required
+		return nil
 	}
-	return nil
+
+	// Try LOGIN auth first (more widely supported for "basic auth")
+	loginAuth := &loginAuth{
+		username: m.username,
+		password: m.password,
+		host:     m.host,
+	}
+	loginErr := c.Auth(loginAuth)
+	if loginErr == nil {
+		return nil
+	}
+
+	// Fall back to PLAIN auth if LOGIN fails
+	plainAuth := smtp.PlainAuth("", m.username, m.password, m.host)
+	plainErr := c.Auth(plainAuth)
+	if plainErr == nil {
+		return nil
+	}
+
+	// Both failed - return a combined error message
+	return fmt.Errorf("LOGIN auth failed: %v; PLAIN auth failed: %v", loginErr, plainErr)
 }
 
 // loginAuth implements smtp.Auth interface for LOGIN authentication mechanism.
