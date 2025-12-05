@@ -354,11 +354,22 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 	}
 	timestamp = timestamp.Add(time.Duration(nanos) * time.Nanosecond)
 
-	// Create the ItemData struct
+	// Read the JSON file to get the actual DAG name
+	var itemData ItemData
+	fileData, err := os.ReadFile(path)
+	if err != nil {
+		return ItemData{}, fmt.Errorf("failed to read queue file %s: %w", path, err)
+	}
+
+	if err := json.Unmarshal(fileData, &itemData); err != nil {
+		return ItemData{}, fmt.Errorf("failed to unmarshal queue file %s: %w", path, err)
+	}
+
+	// Create the ItemData struct with the correct DAG name from the file
 	item := ItemData{
 		FileName: fileName,
 		DAGRun: execution.DAGRunRef{
-			Name: filepath.Base(filepath.Dir(path)),
+			Name: itemData.DAGRun.Name,
 			ID:   matches[4],
 		},
 		QueuedAt: timestamp,
