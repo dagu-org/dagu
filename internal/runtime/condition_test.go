@@ -196,11 +196,11 @@ func TestCondition_Eval(t *testing.T) {
 // TestNegateDoesNotSwallowEvaluationErrors verifies that when Negate is true,
 // evaluation/runtime errors are NOT swallowed - only ErrConditionNotMet is inverted.
 func TestNegateDoesNotSwallowEvaluationErrors(t *testing.T) {
-	t.Run("EvalStringError", func(t *testing.T) {
-		// Create a condition with an invalid command substitution that will cause an eval error
-		// Using an unclosed backtick to cause a parse error
+	t.Run("EvalStringErrorNotSwallowed", func(t *testing.T) {
+		// Use a command substitution that will definitely fail during evaluation.
+		// This tests that EvalString errors (which are NOT ErrConditionNotMet) are NOT inverted.
 		cond := &core.Condition{
-			Condition: "`nonexistent_command_that_does_not_exist_xyz123`",
+			Condition: "`/nonexistent_binary_xyz_123_456`",
 			Expected:  "anything",
 			Negate:    true,
 		}
@@ -210,14 +210,11 @@ func TestNegateDoesNotSwallowEvaluationErrors(t *testing.T) {
 		err := runtime.EvalCondition(ctx, []string{"sh"}, cond)
 
 		// The error should be returned even with Negate: true, because it's an evaluation error
-		// not a "condition not met" error
-		if err != nil {
-			// If there's an error, it should NOT be ErrConditionNotMet
-			// (command substitution failure is wrapped differently)
-			// The key point is that the error is not swallowed
-			require.Error(t, err)
-		}
-		// If the command happens to exist on the system (unlikely), this is still valid
+		// (failed to run command substitution), not a "condition not met" error.
+		require.Error(t, err)
+		// Crucially, this error should NOT be ErrConditionNotMet
+		require.False(t, errors.Is(err, runtime.ErrConditionNotMet),
+			"evaluation errors should not be wrapped as ErrConditionNotMet")
 	})
 
 	t.Run("CommandNotFound", func(t *testing.T) {
