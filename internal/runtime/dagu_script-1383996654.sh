@@ -1,1 +1,0 @@
-echo handler started && sleep 0.1 && echo handler done
