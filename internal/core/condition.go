@@ -15,6 +15,7 @@ type Condition struct {
 
 	Condition    string // Condition to evaluate
 	Expected     string // Expected value
+	Negate       bool   // Negate the condition result (run when condition does NOT match)
 	errorMessage string // Error message if the condition is not met
 }
 
@@ -24,10 +25,12 @@ func (c *Condition) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Condition    string `json:"condition,omitempty"`
 		Expected     string `json:"expected,omitempty"`
+		Negate       bool   `json:"negate,omitempty"`
 		ErrorMessage string `json:"error,omitempty"`
 	}{
 		Condition:    c.Condition,
 		Expected:     c.Expected,
+		Negate:       c.Negate,
 		ErrorMessage: c.errorMessage,
 	})
 }
@@ -38,6 +41,7 @@ func (c *Condition) UnmarshalJSON(data []byte) error {
 	var tmp struct {
 		Condition    string `json:"condition,omitempty"`
 		Expected     string `json:"expected,omitempty"`
+		Negate       bool   `json:"negate,omitempty"`
 		ErrorMessage string `json:"error,omitempty"`
 	}
 	if err := json.Unmarshal(data, &tmp); err != nil {
@@ -45,6 +49,7 @@ func (c *Condition) UnmarshalJSON(data []byte) error {
 	}
 	c.Condition = tmp.Condition
 	c.Expected = tmp.Expected
+	c.Negate = tmp.Negate
 	c.errorMessage = tmp.ErrorMessage
 	return nil
 }

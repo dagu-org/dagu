@@ -107,6 +107,7 @@ func toPrecondition(obj *core.Condition) api.Condition {
 	return api.Condition{
 		Condition: obj.Condition,
 		Expected:  ptrOf(obj.Expected),
+		Negate:    ptrOf(obj.Negate),
 		Error:     ptrOf(obj.GetErrorMessage()),
 	}
 }

@@ -2572,6 +2572,9 @@ components:
         expected:
           type: string
           description: "Expected result of the condition evaluation"
+        negate:
+          type: boolean
+          description: "If true, inverts the condition result (run when condition does NOT match)"
         error:
           type: string
           description: "Error message if the condition is not met"

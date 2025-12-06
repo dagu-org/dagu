@@ -756,3 +756,102 @@ steps:
 		"STEP_DIR": stepWorkDir,
 	})
 }
+
+// TestPreconditionNegate verifies that preconditions with negate:true work correctly.
+// When negate is true, the step runs when the condition does NOT match.
+func TestPreconditionNegate(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	t.Run("NegateSkipsWhenConditionMatches", func(t *testing.T) {
+		t.Parallel()
+
+		// When negate:true and condition matches expected, step should be skipped
+		dag := th.DAG(t, `type: graph
+env:
+  - STATUS: success
+steps:
+  - command: echo "always runs"
+    output: OUT1
+  - command: echo "should skip"
+    output: OUT2
+    preconditions:
+      - condition: "${STATUS}"
+        expected: "success"
+        negate: true
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+		dag.AssertOutputs(t, map[string]any{
+			"OUT1": "always runs",
+			"OUT2": "", // Should be empty because step was skipped
+		})
+	})
+
+	t.Run("NegateRunsWhenConditionDoesNotMatch", func(t *testing.T) {
+		t.Parallel()
+
+		// When negate:true and condition does NOT match expected, step should run
+		dag := th.DAG(t, `type: graph
+env:
+  - STATUS: failure
+steps:
+  - command: echo "always runs"
+    output: OUT1
+  - command: echo "should run"
+    output: OUT2
+    preconditions:
+      - condition: "${STATUS}"
+        expected: "success"
+        negate: true
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+		dag.AssertOutputs(t, map[string]any{
+			"OUT1": "always runs",
+			"OUT2": "should run",
+		})
+	})
+
+	t.Run("NegateWithCommandExitCode", func(t *testing.T) {
+		t.Parallel()
+
+		// When negate:true with a command, step runs when command fails (non-zero exit)
+		dag := th.DAG(t, `type: graph
+steps:
+  - command: echo "should run"
+    output: OUT1
+    preconditions:
+      - condition: "false"
+        negate: true
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+		dag.AssertOutputs(t, map[string]any{
+			"OUT1": "should run",
+		})
+	})
+
+	t.Run("DAGLevelNegate", func(t *testing.T) {
+		t.Parallel()
+
+		// DAG-level precondition with negate - should run when condition doesn't match
+		dag := th.DAG(t, `
+env:
+  - ENV_TYPE: development
+preconditions:
+  - condition: "${ENV_TYPE}"
+    expected: "production"
+    negate: true
+steps:
+  - command: echo "dag ran"
+    output: OUT1
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+		dag.AssertOutputs(t, map[string]any{
+			"OUT1": "dag ran",
+		})
+	})
+}

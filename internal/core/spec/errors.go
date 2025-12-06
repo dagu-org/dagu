@@ -8,6 +8,7 @@ var (
 	ErrInvalidScheduleType                 = errors.New("invalid schedule type")
 	ErrDotEnvMustBeStringOrArray           = errors.New("dotenv must be a string or an array of strings")
 	ErrPreconditionValueMustBeString       = errors.New("precondition value must be a string")
+	ErrPreconditionNegateMustBeBool        = errors.New("precondition negate must be a boolean")
 	ErrPreconditionHasInvalidKey           = errors.New("precondition has invalid key")
 	ErrPreconditionMustBeArrayOrString     = errors.New("precondition must be a string or an array of strings")
 	ErrInvalidStepData                     = errors.New("invalid step data")

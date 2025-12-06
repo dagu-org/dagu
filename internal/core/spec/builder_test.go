@@ -813,6 +813,19 @@ preconditions:
 		assert.Len(t, th.Preconditions, 1)
 		assert.Equal(t, &core.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
+	t.Run("PreconditionsWithNegate", func(t *testing.T) {
+		data := []byte(`
+preconditions:
+  - condition: "${STATUS}"
+    expected: "success"
+    negate: true
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		assert.Len(t, th.Preconditions, 1)
+		assert.Equal(t, &core.Condition{Condition: "${STATUS}", Expected: "success", Negate: true}, th.Preconditions[0])
+	})
 	t.Run("MaxActiveRuns", func(t *testing.T) {
 		data := []byte(`
 maxActiveRuns: 5
@@ -1610,6 +1623,25 @@ steps:
 		assert.Len(t, th.Steps, 1)
 		assert.Len(t, th.Steps[0].Preconditions, 1)
 		assert.Equal(t, &core.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
+	})
+	t.Run("StepPreconditionsWithNegate", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: "step_with_negate"
+    command: "echo hello"
+    preconditions:
+      - condition: "${STATUS}"
+        expected: "success"
+        negate: true
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		assert.Len(t, th.Steps, 1)
+		assert.Len(t, th.Steps[0].Preconditions, 1)
+		assert.Equal(t, &core.Condition{Condition: "${STATUS}", Expected: "success", Negate: true}, th.Steps[0].Preconditions[0])
 	})
 	t.Run("RepeatPolicyExitCode", func(t *testing.T) {
 		t.Parallel()
