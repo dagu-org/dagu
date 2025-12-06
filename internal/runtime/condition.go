@@ -8,7 +8,6 @@ import (
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
 // Errors for condition evaluation
@@ -66,8 +65,8 @@ func matchCondition(ctx context.Context, c *core.Condition) error {
 
 	// Get maxOutputSize from DAG configuration
 	var maxOutputSize = 1024 * 1024 // Default 1MB
-	if env := execution.GetDAGContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
-		maxOutputSize = env.DAG.MaxOutputSize
+	if rCtx := GetDAGContext(ctx); rCtx.DAG != nil && rCtx.DAG.MaxOutputSize > 0 {
+		maxOutputSize = rCtx.DAG.MaxOutputSize
 	}
 
 	matchOpts := []stringutil.MatchOption{

@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -201,7 +200,7 @@ func (ph planHelper) assertRun(t *testing.T, expectedStatus core.Status) runResu
 	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, ph.cfg.DAGRunID)
 	logFilePath := path.Join(ph.cfg.LogDir, logFilename)
 
-	ctx := execution.SetupDAGContext(ph.Context, dag, nil, execution.DAGRunRef{}, ph.cfg.DAGRunID, logFilePath, nil, nil, nil)
+	ctx := runtime.NewContext(ph.Context, dag, ph.cfg.DAGRunID, logFilePath)
 
 	var doneNodes []*runtime.Node
 	progressCh := make(chan *runtime.Node)

@@ -112,12 +112,12 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 	r.metrics.totalNodes = len(nodes)
 
 	// If one of the conditions does not met, cancel the execution.
-	env := execution.GetDAGContext(ctx)
+	rCtx := GetDAGContext(ctx)
 	var shell []string
-	if env.DAG.Shell != "" {
-		shell = append([]string{env.DAG.Shell}, env.DAG.ShellArgs...)
+	if rCtx.DAG.Shell != "" {
+		shell = append([]string{rCtx.DAG.Shell}, rCtx.DAG.ShellArgs...)
 	}
-	if err := EvalConditions(ctx, shell, env.DAG.Preconditions); err != nil {
+	if err := EvalConditions(ctx, shell, rCtx.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", tag.Error(err))
 		r.Cancel(plan)
 	}
@@ -1089,7 +1089,7 @@ func calculateBackoffInterval(interval time.Duration, backoff float64, maxInterv
 }
 
 func NewPlanEnv(ctx context.Context, step core.Step, plan *Plan) Env {
-	env := NewEnvForStep(ctx, step)
+	env := NewEnv(ctx, step)
 	for _, n := range plan.Nodes() {
 		if n.Step().ID != "" {
 			env.StepMap[n.Step().ID] = n.StepInfo()

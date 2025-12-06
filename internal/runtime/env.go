@@ -25,7 +25,7 @@ type Env struct {
 	// Embedded execution metadata from parent DAG run containing DAGRunID,
 	// RootDAGRun reference, DAG configuration, database interface,
 	// DAG-level environment variables, and coordinator dispatcher
-	execution.DAGContext
+	Context
 
 	// Thread-safe map storing output variables from previously executed steps
 	// in the format "key=value". These variables are populated when a step
@@ -55,7 +55,7 @@ type Env struct {
 
 // AllEnvs returns all environment variables that needs to be passed to the command.
 func (e Env) AllEnvs() []string {
-	envs := e.DAGContext.AllEnvs()
+	envs := e.Context.AllEnvs()
 	for k, v := range e.Envs {
 		envs = append(envs, k+"="+v)
 	}
@@ -70,7 +70,7 @@ func (e Env) AllEnvs() []string {
 // excluding OS environment (BaseEnv). Use this for isolated execution environments.
 // Precedence: Step.Env > Envs > Variables > SecretEnvs > DAGContext.Envs > DAG.Env
 func (e Env) UserEnvsMap() map[string]string {
-	result := e.DAGContext.UserEnvsMap() // DAG-level + secrets, no OS env
+	result := e.Context.UserEnvsMap() // DAG-level + secrets, no OS env
 
 	// Add variables from previous steps
 	e.Variables.Range(func(_, value any) bool {
@@ -101,10 +101,10 @@ func (e Env) UserEnvsMap() map[string]string {
 	return result
 }
 
-// NewEnvForStep creates a new execution context with the given step.
-func NewEnvForStep(ctx context.Context, step core.Step) Env {
-	parentEnv := execution.GetDAGContext(ctx)
-	workingDir := resolveStepWorkingDir(ctx, step, parentEnv)
+// NewEnv creates a new execution context with the given step.
+func NewEnv(ctx context.Context, step core.Step) Env {
+	rCtx := GetDAGContext(ctx)
+	workingDir := resolveWorkingDir(ctx, step, rCtx)
 
 	envs := map[string]string{
 		execution.EnvKeyDAGRunStepName: step.Name,
@@ -112,8 +112,8 @@ func NewEnvForStep(ctx context.Context, step core.Step) Env {
 	}
 
 	variables := &collections.SyncMap{}
-	if parentEnv.DAG != nil {
-		for _, param := range parentEnv.DAG.Params {
+	if rCtx.DAG != nil {
+		for _, param := range rCtx.DAG.Params {
 			parts := strings.SplitN(param, "=", 2)
 			if len(parts) == 2 {
 				variables.Store(parts[0], param)
@@ -122,7 +122,7 @@ func NewEnvForStep(ctx context.Context, step core.Step) Env {
 	}
 
 	return Env{
-		DAGContext: execution.GetDAGContext(ctx),
+		Context:    rCtx,
 		Variables:  variables,
 		Step:       step,
 		Envs:       envs,
@@ -131,16 +131,16 @@ func NewEnvForStep(ctx context.Context, step core.Step) Env {
 	}
 }
 
-func resolveStepWorkingDir(ctx context.Context, step core.Step, parentEnv execution.DAGContext) string {
-	parentDAG := parentEnv.DAG
+func resolveWorkingDir(ctx context.Context, step core.Step, rCtx Context) string {
+	dag := rCtx.DAG
 
 	if step.Dir != "" {
 		// Expand environment variables in step.Dir using DAG env vars
 		// Since we no longer use os.Setenv, we need to manually expand using dag.Env
 		expandedDir := os.Expand(step.Dir, func(key string) string {
 			// Check DAG-level env vars
-			if parentDAG != nil {
-				for _, env := range parentDAG.Env {
+			if dag != nil {
+				for _, env := range dag.Env {
 					if len(env) > len(key)+1 && env[:len(key)] == key && env[len(key)] == '=' {
 						return env[len(key)+1:]
 					}
@@ -160,9 +160,9 @@ func resolveStepWorkingDir(ctx context.Context, step core.Step, parentEnv execut
 				)
 			}
 			return dir
-		} else if parentDAG != nil && parentDAG.WorkingDir != "" {
+		} else if dag != nil && dag.WorkingDir != "" {
 			// use relative path to the DAG's working dir
-			return filepath.Clean(filepath.Join(parentDAG.WorkingDir, expandedDir))
+			return filepath.Clean(filepath.Join(dag.WorkingDir, expandedDir))
 		} else {
 			// This should not happen normally
 			logger.Warn(ctx, "Failed to resolve working directory for step",
@@ -175,8 +175,8 @@ func resolveStepWorkingDir(ctx context.Context, step core.Step, parentEnv execut
 	}
 
 	// Use the DAG level working directory if not specified
-	if parentDAG != nil && parentDAG.WorkingDir != "" {
-		return parentDAG.WorkingDir
+	if dag != nil && dag.WorkingDir != "" {
+		return dag.WorkingDir
 	}
 
 	// This should not occur on normal execution
@@ -304,12 +304,12 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOptio
 	// ${FOO} will be replaced with "step" in the first iteration,
 	// leaving no ${FOO} for the DAG env to replace.
 
-	dagCtx := execution.GetDAGContext(ctx)
+	rCtx := GetDAGContext(ctx)
 	if option.ExpandEnv {
 		opts = append(opts, cmdutil.WithVariables(e.Envs))
 		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
-		opts = append(opts, cmdutil.WithVariables(dagCtx.SecretEnvs))
-		opts = append(opts, cmdutil.WithVariables(dagCtx.Envs))
+		opts = append(opts, cmdutil.WithVariables(rCtx.SecretEnvs))
+		opts = append(opts, cmdutil.WithVariables(rCtx.Envs))
 	} else {
 		opts = append(opts, cmdutil.WithVariables(e.Envs))
 		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
@@ -371,7 +371,7 @@ func WithEnv(ctx context.Context, e Env) context.Context {
 func GetEnv(ctx context.Context) Env {
 	v, ok := ctx.Value(envCtxKey{}).(Env)
 	if !ok {
-		return NewEnvForStep(ctx, core.Step{})
+		return NewEnv(ctx, core.Step{})
 	}
 	return v
 }

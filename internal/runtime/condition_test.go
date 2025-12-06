@@ -112,7 +112,7 @@ func TestCondition_Eval(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			ctx = runtime.WithEnv(ctx, runtime.NewEnvForStep(ctx, core.Step{}))
+			ctx = runtime.WithEnv(ctx, runtime.NewEnv(ctx, core.Step{}))
 			err := runtime.EvalConditions(ctx, []string{"sh"}, tt.condition)
 			if tt.wantErr {
 				require.Error(t, err, "expected error but got nil")

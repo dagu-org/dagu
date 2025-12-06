@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/stretchr/testify/assert"
@@ -358,9 +357,9 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 		Env:  []string{},
 	}
 	// Setup the context with DAG environment
-	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "", nil, nil, nil)
+	ctx = runtime.NewContext(ctx, dag, "test-run", "")
 
-	env := runtime.NewEnvForStep(ctx, core.Step{})
+	env := runtime.NewEnv(ctx, core.Step{})
 	env.WorkingDir = t.TempDir()
 	ctx = runtime.WithEnv(ctx, env)
 
@@ -400,7 +399,6 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			scriptFile := tt.scriptFile
 			if scriptFile != "" {
@@ -436,9 +434,9 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 		Env:  []string{},
 	}
 	// Setup the context with DAG environment
-	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "", nil, nil, nil)
+	ctx = runtime.NewContext(ctx, dag, "test-run", "")
 
-	env := runtime.NewEnvForStep(ctx, core.Step{})
+	env := runtime.NewEnv(ctx, core.Step{})
 	env.WorkingDir = t.TempDir()
 	ctx = runtime.WithEnv(ctx, env)
 
@@ -542,8 +540,8 @@ func setupTestContext(t *testing.T, dag *core.DAG, step core.Step) context.Conte
 			Env:  []string{},
 		}
 	}
-	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "", nil, nil, nil)
-	env := runtime.NewEnvForStep(ctx, step)
+	ctx = runtime.NewContext(ctx, dag, "test-run", "")
+	env := runtime.NewEnv(ctx, step)
 	env.WorkingDir = t.TempDir()
 	return runtime.WithEnv(ctx, env)
 }
