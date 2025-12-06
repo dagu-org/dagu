@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/common/collections"
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -17,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestEnv_VariablesMap(t *testing.T) {
+func TestEnv_AllEnvsMap(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -43,14 +44,16 @@ func TestEnv_VariablesMap(t *testing.T) {
 			},
 		},
 		{
-			name: "EnvsOverrideVariables",
+			name: "VariablesOverrideEnvs",
 			setupEnv: func(env runtime.Env) runtime.Env {
 				env.Variables.Store("SAME_KEY", "SAME_KEY=from_variables")
 				env.Envs["SAME_KEY"] = "from_envs"
 				return env
 			},
 			expected: map[string]string{
-				"SAME_KEY":                     "from_envs",
+				// Variables (output from previous steps) are added last in AllEnvs(),
+				// so they override Envs when there's a key conflict
+				"SAME_KEY":                     "from_variables",
 				execution.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
@@ -98,20 +101,24 @@ func TestEnv_VariablesMap(t *testing.T) {
 			// Create a temporary directory to use as DAG working directory
 			tempDir := t.TempDir()
 
-			// Set up DAG context with WorkingDir
+			// Set up DAG context with WorkingDir and BaseEnv
 			dag := &core.DAG{
 				Name:       "test-dag",
 				WorkingDir: tempDir,
 			}
+			baseEnv := config.NewBaseEnv(nil)
 			dagCtx := execution.DAGContext{
-				DAG: dag,
+				DAG:     dag,
+				BaseEnv: &baseEnv,
 			}
 			ctx := execution.WithDAGContext(context.Background(), dagCtx)
 
 			env := runtime.NewEnvForStep(ctx, core.Step{Name: "test-step"})
 			env = tt.setupEnv(env)
 
-			result := env.VariablesMap()
+			// Use WithEnv to set the env in context, then call AllEnvsMap
+			ctx = runtime.WithEnv(ctx, env)
+			result := runtime.AllEnvsMap(ctx)
 
 			// Check that all expected keys exist with correct values
 			for key, expectedValue := range tt.expected {
