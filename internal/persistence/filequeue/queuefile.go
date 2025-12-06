@@ -52,6 +52,12 @@ func NewQueueFile(baseDir, prefix string) *QueueFile {
 	}
 }
 
+// Item represents a queued item in the queue file
+type Item struct {
+	File string
+	ItemData
+}
+
 // ItemData represents the data stored in the queue file
 type ItemData struct {
 	FileName string              `json:"fileName"`
@@ -163,8 +169,17 @@ func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun execution.DAGRunRe
 
 	var removedJobs []*Job
 	for _, item := range items {
-		if item.DAGRun.Name == dagRun.Name && item.DAGRun.ID == dagRun.ID {
-			if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
+		job := NewJob(item.File, item.ItemData)
+		data, err := job.Data()
+		if err != nil {
+			logger.Error(ctx, "Failed to get job data",
+				tag.File(item.FileName),
+				tag.Error(err),
+			)
+			continue
+		}
+		if data.Name == dagRun.Name && data.ID == dagRun.ID {
+			if err := os.Remove(item.File); err != nil {
 				// Log the error but continue processing other items
 				logger.Warn(ctx, "Failed to remove queue file",
 					tag.File(item.FileName),
@@ -172,7 +187,7 @@ func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun execution.DAGRunRe
 				)
 			} else {
 				// Add the job to the removed jobs list
-				removedJobs = append(removedJobs, NewJob(item))
+				removedJobs = append(removedJobs, job)
 			}
 		}
 	}
@@ -198,7 +213,7 @@ func (q *QueueFile) List(ctx context.Context) ([]*Job, error) {
 
 	var jobs []*Job
 	for _, item := range items {
-		jobs = append(jobs, NewJob(item))
+		jobs = append(jobs, NewJob(item.File, item.ItemData))
 	}
 
 	logger.Debug(ctx, "Listed queue file items", tag.Count(len(jobs)))
@@ -244,7 +259,7 @@ func (q *QueueFile) Pop(ctx context.Context) (*Job, error) {
 		tag.DAG(item.DAGRun.Name),
 	)
 	// Return the item data
-	return NewJob(item), nil
+	return NewJob(item.File, item.ItemData), nil
 }
 
 // FindByDAGRunID finds a job by its dag-run ID without removing it from the queue.
@@ -266,7 +281,7 @@ func (q *QueueFile) FindByDAGRunID(ctx context.Context, dagRunID string) (*Job, 
 
 	for _, item := range items {
 		if item.DAGRun.ID == dagRunID {
-			return NewJob(item), nil
+			return NewJob(item.File, item.ItemData), nil
 		}
 	}
 
@@ -298,7 +313,7 @@ func (q *QueueFile) Len(ctx context.Context) (int, error) {
 // listItems lists all items in the queue directory
 // It is not thread-safe and should be called with the mutex locked
 // to ensure that no other operations are modifying the queue at the same time.
-func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
+func (q *QueueFile) listItems(ctx context.Context) ([]Item, error) {
 	pattern := filepath.Join(q.baseDir, itemPrefix+q.prefix+"*")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
@@ -308,7 +323,7 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 		return nil, fmt.Errorf("failed to list files in %s: %w", q.baseDir, err)
 	}
 
-	var items []ItemData
+	var items []Item
 	for _, file := range files {
 		fileName := filepath.Base(file)
 		// Check the file name matches the expected pattern
@@ -323,7 +338,10 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 				tag.Error(err))
 			continue
 		}
-		items = append(items, item)
+		items = append(items, Item{
+			File:     file,
+			ItemData: item,
+		})
 	}
 
 	// Sort the items by queued time

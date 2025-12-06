@@ -59,7 +59,11 @@ func dequeueFirst(ctx *Context, queueName string) error {
 		return fmt.Errorf("no dag-run found in queue %s", queueName)
 	}
 
-	return dequeueDAGRun(ctx, queueName, item.Data(), true)
+	data, err := item.Data()
+	if err != nil {
+		return fmt.Errorf("failed to get dag-run data: %w", err)
+	}
+	return dequeueDAGRun(ctx, queueName, *data, true)
 }
 
 // dequeueDAGRun dequeues a dag-run from the queue.

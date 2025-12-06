@@ -88,10 +88,13 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 
 	// Process queued DAG runs
 	for _, queuedItem := range allQueued {
-		dagRunRef := queuedItem.Data()
+		dagRunRef, err := queuedItem.Data()
+		if err != nil {
+			continue // Skip if we can't get data
+		}
 
 		// Get the DAG run status to convert to summary
-		attempt, err := a.dagRunStore.FindAttempt(ctx, dagRunRef)
+		attempt, err := a.dagRunStore.FindAttempt(ctx, *dagRunRef)
 		if err != nil {
 			continue // Skip if we can't find the attempt
 		}
@@ -101,7 +104,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			continue // Skip if we can't read DAG
 		}
 
-		queue := getOrCreateQueue(queueMap, queuedItem.Data().Name, a.config, dag)
+		queue := getOrCreateQueue(queueMap, dag.ProcGroup(), a.config, dag)
 
 		runStatus, err := attempt.ReadStatus(ctx)
 		if err != nil {

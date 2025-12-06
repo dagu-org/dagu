@@ -106,7 +106,7 @@ func (s *Store) All(ctx context.Context) ([]execution.QueuedItemData, error) {
 					tag.Error(err))
 				continue
 			}
-			items = append(items, NewJob(data))
+			items = append(items, NewJob(file, data))
 		}
 	}
 
@@ -189,7 +189,12 @@ func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]exec
 	}
 	var ret []execution.QueuedItemData
 	for _, item := range items {
-		if item.Data().Name == dagName {
+		data, err := item.Data()
+		if err != nil {
+			logger.Error(ctx, "Failed to get item data", tag.Error(err))
+			continue
+		}
+		if data.Name == dagName {
 			ret = append(ret, item)
 		}
 	}
