@@ -101,6 +101,71 @@ func TestCondition_Eval(t *testing.T) {
 				},
 			},
 		},
+		// Negate tests
+		{
+			name: "NegateMatchingCondition",
+			condition: []*core.Condition{
+				{
+					Condition: "`echo success`",
+					Expected:  "success",
+					Negate:    true,
+				},
+			},
+			wantErr: true, // condition matches, but negate is true, so it should fail
+		},
+		{
+			name: "NegateNonMatchingCondition",
+			condition: []*core.Condition{
+				{
+					Condition: "`echo failure`",
+					Expected:  "success",
+					Negate:    true,
+				},
+			},
+			wantErr: false, // condition doesn't match, and negate is true, so it should pass
+		},
+		{
+			name: "NegateCommandSuccess",
+			condition: []*core.Condition{
+				{
+					Condition: "true",
+					Negate:    true,
+				},
+			},
+			wantErr: true, // command succeeds, but negate is true, so it should fail
+		},
+		{
+			name: "NegateCommandFailure",
+			condition: []*core.Condition{
+				{
+					Condition: "false",
+					Negate:    true,
+				},
+			},
+			wantErr: false, // command fails, and negate is true, so it should pass
+		},
+		{
+			name: "NegateEnvVar",
+			condition: []*core.Condition{
+				{
+					Condition: "${TEST_CONDITION}",
+					Expected:  "wrong_value",
+					Negate:    true,
+				},
+			},
+			wantErr: false, // env var is 100, not wrong_value, so with negate it should pass
+		},
+		{
+			name: "NegateEnvVarMatching",
+			condition: []*core.Condition{
+				{
+					Condition: "${TEST_CONDITION}",
+					Expected:  "100",
+					Negate:    true,
+				},
+			},
+			wantErr: true, // env var is 100, matches expected, so with negate it should fail
+		},
 	}
 
 	// Set environment variable for testing

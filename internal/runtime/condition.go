@@ -45,14 +45,28 @@ func EvalConditions(ctx context.Context, shell []string, cond []*core.Condition)
 
 // EvalCondition evaluates the condition and returns the actual value.
 // It returns an error if the evaluation failed or the condition is invalid.
+// If c.Negate is true, the result is inverted: the condition passes when it
+// would normally fail, and vice versa.
 func EvalCondition(ctx context.Context, shell []string, c *core.Condition) error {
+	var err error
 	switch {
 	case c.Condition != "" && c.Expected != "":
-		return matchCondition(ctx, c)
+		err = matchCondition(ctx, c)
 
 	default:
-		return evalCommand(ctx, shell, c)
+		err = evalCommand(ctx, shell, c)
 	}
+
+	// Apply negation if needed
+	if c.Negate {
+		if err == nil {
+			return fmt.Errorf("%w: condition matched but negate is true", ErrConditionNotMet)
+		}
+		// Condition failed as expected when negated, so it's a success
+		return nil
+	}
+
+	return err
 }
 
 // matchCondition evaluates the condition and checks if it matches the expected value.

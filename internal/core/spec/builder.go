@@ -808,6 +808,13 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]*core.Condition, e
 				}
 				ret.Condition = val
 
+			case "negate":
+				val, ok := vv.(bool)
+				if !ok {
+					return nil, core.NewValidationError("preconditions", vv, ErrPreconditionNegateMustBeBool)
+				}
+				ret.Negate = val
+
 			default:
 				return nil, core.NewValidationError("preconditions", key, fmt.Errorf("%w: %s", ErrPreconditionHasInvalidKey, key))
 

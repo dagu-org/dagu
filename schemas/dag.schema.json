@@ -1013,6 +1013,10 @@
         "expected": {
           "type": "string",
           "description": "Expected value or pattern to match against the condition result. Supports regex patterns with 're:' prefix (e.g., 're:0[1-9]' for matching numbers 01-09)."
+        },
+        "negate": {
+          "type": "boolean",
+          "description": "If true, inverts the condition result. The DAG/step will run when the condition does NOT match the expected value."
         }
       },
       "description": "Defines a condition that must be met before execution. Used in preconditions at both DAG and step levels."
