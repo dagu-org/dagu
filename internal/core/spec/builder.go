@@ -748,9 +748,21 @@ func buildHandlers(ctx BuildContext, spec *definition, dag *core.DAG) (err error
 		}
 	}
 
-	if spec.HandlerOn.Cancel != nil {
-		spec.HandlerOn.Cancel.Name = core.HandlerOnCancel.String()
-		if dag.HandlerOn.Cancel, err = buildStep(buildCtx, *spec.HandlerOn.Cancel); err != nil {
+	// Handle Abort (canonical) and Cancel (deprecated, for backward compatibility)
+	// Error if both are specified
+	if spec.HandlerOn.Abort != nil && spec.HandlerOn.Cancel != nil {
+		return fmt.Errorf("cannot specify both 'abort' and 'cancel' in handlerOn; use 'abort' (cancel is deprecated)")
+	}
+	var abortDef *stepDef
+	switch {
+	case spec.HandlerOn.Abort != nil:
+		abortDef = spec.HandlerOn.Abort
+	case spec.HandlerOn.Cancel != nil:
+		abortDef = spec.HandlerOn.Cancel
+	}
+	if abortDef != nil {
+		abortDef.Name = core.HandlerOnCancel.String()
+		if dag.HandlerOn.Cancel, err = buildStep(buildCtx, *abortDef); err != nil {
 			return
 		}
 	}

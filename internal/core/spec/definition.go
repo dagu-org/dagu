@@ -94,7 +94,8 @@ type definition struct {
 type handlerOnDef struct {
 	Failure *stepDef // Step to execute on failure
 	Success *stepDef // Step to execute on success
-	Cancel  *stepDef // Step to execute on cancel
+	Abort   *stepDef // Step to execute on abort (canonical field)
+	Cancel  *stepDef // Step to execute on cancel (deprecated: use Abort instead)
 	Exit    *stepDef // Step to execute on exit
 }
 
