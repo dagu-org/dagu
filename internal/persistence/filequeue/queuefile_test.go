@@ -86,11 +86,14 @@ func TestQueueFile_FindByDAGRunID(t *testing.T) {
 	job, err := qf.FindByDAGRunID(th.Context, "test-dag")
 	require.NoError(t, err, "expected no error when finding job by dag-run ID")
 	require.NotNil(t, job, "expected job to be not nil")
-	require.Equal(t, "test-name", job.DAGRun.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-dag", job.DAGRun.ID, "expected job ID to be 'test'")
 
-	// Check if the item has the correct prefix
-	require.Regexp(t, "^item_high_", job.FileName, "expected job file name to start with 'high_'")
+	data, err := job.Data()
+	require.NoError(t, err, "expected no error when getting job data")
+	require.Equal(t, "test-name", data.Name, "expected job name to be 'test-name'")
+	require.Equal(t, "test-dag", data.ID, "expected job ID to be 'test'")
+
+	// Check if the item has the correct prefix (ID is derived from filename)
+	require.Regexp(t, "^item_high_", job.ID(), "expected job ID to start with 'item_high_'")
 }
 
 func TestQueueFile_Pop(t *testing.T) {

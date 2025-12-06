@@ -99,14 +99,7 @@ func (s *Store) All(ctx context.Context) ([]execution.QueuedItemData, error) {
 		sort.Strings(files)
 
 		for _, file := range files {
-			data, err := parseQueueFileName(file, filepath.Base(file))
-			if err != nil {
-				logger.Error(ctx, "Failed to parse queue file name",
-					tag.File(file),
-					tag.Error(err))
-				continue
-			}
-			items = append(items, NewJob(file, data))
+			items = append(items, NewJob(file))
 		}
 	}
 
