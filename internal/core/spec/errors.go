@@ -17,6 +17,7 @@ var (
 	ErrContinueOnOutputMustBeStringOrArray = errors.New("continueOn.output must be a string or an array of strings")
 	ErrContinueOnMustBeStringOrMap         = errors.New("continueOn must be a string ('skipped' or 'failed') or an object")
 	ErrContinueOnInvalidStringValue        = errors.New("continueOn string value must be 'skipped' or 'failed'")
+	ErrContinueOnFieldMustBeBool           = errors.New("value must be a boolean")
 	ErrInvalidSignal                       = errors.New("invalid signal")
 	ErrDependsMustBeStringOrArray          = errors.New("depends must be a string or an array of strings")
 	ErrExecutorTypeMustBeString            = errors.New("executor.type value must be string")

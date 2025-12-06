@@ -1351,6 +1351,48 @@ steps:
 		assert.Equal(t, []int{1, 2, 3}, th.Steps[0].ContinueOn.ExitCode)
 		assert.True(t, th.Steps[0].ContinueOn.MarkSuccess)
 	})
+	t.Run("ContinueOnInvalidFailureType", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: "echo 1"
+    continueOn:
+      failure: "true"
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "continueOn.failure")
+		assert.Contains(t, err.Error(), "boolean")
+	})
+	t.Run("ContinueOnInvalidSkippedType", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: "echo 1"
+    continueOn:
+      skipped: 1
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "continueOn.skipped")
+		assert.Contains(t, err.Error(), "boolean")
+	})
+	t.Run("ContinueOnInvalidMarkSuccessType", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: "echo 1"
+    continueOn:
+      markSuccess: "yes"
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "continueOn.markSuccess")
+		assert.Contains(t, err.Error(), "boolean")
+	})
 	t.Run("RetryPolicy", func(t *testing.T) {
 		t.Parallel()
 

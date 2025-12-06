@@ -1319,14 +1319,26 @@ func buildContinueOn(_ StepBuildContext, def stepDef, step *core.Step) error {
 
 	case map[string]any:
 		// Object syntax with detailed configuration
-		if failure, ok := v["failure"].(bool); ok {
-			step.ContinueOn.Failure = failure
+		if val, exists := v["failure"]; exists {
+			b, ok := val.(bool)
+			if !ok {
+				return core.NewValidationError("continueOn.failure", val, ErrContinueOnFieldMustBeBool)
+			}
+			step.ContinueOn.Failure = b
 		}
-		if skipped, ok := v["skipped"].(bool); ok {
-			step.ContinueOn.Skipped = skipped
+		if val, exists := v["skipped"]; exists {
+			b, ok := val.(bool)
+			if !ok {
+				return core.NewValidationError("continueOn.skipped", val, ErrContinueOnFieldMustBeBool)
+			}
+			step.ContinueOn.Skipped = b
 		}
-		if markSuccess, ok := v["markSuccess"].(bool); ok {
-			step.ContinueOn.MarkSuccess = markSuccess
+		if val, exists := v["markSuccess"]; exists {
+			b, ok := val.(bool)
+			if !ok {
+				return core.NewValidationError("continueOn.markSuccess", val, ErrContinueOnFieldMustBeBool)
+			}
+			step.ContinueOn.MarkSuccess = b
 		}
 
 		exitCodes, err := parseIntOrArray(v["exitCode"])
