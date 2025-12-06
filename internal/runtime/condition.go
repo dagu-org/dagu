@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 
@@ -62,8 +63,12 @@ func EvalCondition(ctx context.Context, shell []string, c *core.Condition) error
 		if err == nil {
 			return fmt.Errorf("%w: condition matched but negate is true", ErrConditionNotMet)
 		}
-		// Condition failed as expected when negated, so it's a success
-		return nil
+		// Only invert logical "not met" failures; keep evaluation/runtime errors.
+		if errors.Is(err, ErrConditionNotMet) {
+			return nil
+		}
+		// Evaluation or runtime error - don't swallow it
+		return err
 	}
 
 	return err
