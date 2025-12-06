@@ -68,11 +68,11 @@ func (oc *OutputCoordinator) setupMasker(ctx context.Context, _ NodeData) error 
 	defer oc.mu.Unlock()
 
 	// Get secrets from DAGContext
-	execCtx := execution.GetContext(ctx)
+	rCtx := execution.GetContext(ctx)
 
 	// Convert secret envs map to []string format for masker
 	var secretEnvs []string
-	for k, v := range execCtx.SecretEnvs {
+	for k, v := range rCtx.SecretEnvs {
 		secretEnvs = append(secretEnvs, k+"="+v)
 	}
 
@@ -130,8 +130,8 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 
 		// Get max output size from DAG configuration, default to 1MB
 		oc.maxOutputSize = 1024 * 1024 // 1MB default
-		if execCtx := execution.GetContext(ctx); execCtx.DAG != nil && execCtx.DAG.MaxOutputSize > 0 {
-			oc.maxOutputSize = int64(execCtx.DAG.MaxOutputSize)
+		if rCtx := execution.GetContext(ctx); rCtx.DAG != nil && rCtx.DAG.MaxOutputSize > 0 {
+			oc.maxOutputSize = int64(rCtx.DAG.MaxOutputSize)
 		}
 
 		// Reset the output data to empty

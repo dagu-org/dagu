@@ -103,8 +103,8 @@ func (e Env) UserEnvsMap() map[string]string {
 
 // NewEnv creates a new execution context with the given step.
 func NewEnv(ctx context.Context, step core.Step) Env {
-	execCtx := execution.GetContext(ctx)
-	workingDir := resolveWorkingDir(ctx, step, execCtx)
+	rCtx := execution.GetContext(ctx)
+	workingDir := resolveWorkingDir(ctx, step, rCtx)
 
 	envs := map[string]string{
 		execution.EnvKeyDAGRunStepName: step.Name,
@@ -112,8 +112,8 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 	}
 
 	variables := &collections.SyncMap{}
-	if execCtx.DAG != nil {
-		for _, param := range execCtx.DAG.Params {
+	if rCtx.DAG != nil {
+		for _, param := range rCtx.DAG.Params {
 			parts := strings.SplitN(param, "=", 2)
 			if len(parts) == 2 {
 				variables.Store(parts[0], param)
@@ -122,7 +122,7 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 	}
 
 	return Env{
-		Context:    execCtx,
+		Context:    rCtx,
 		Variables:  variables,
 		Step:       step,
 		Envs:       envs,
@@ -131,8 +131,8 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 	}
 }
 
-func resolveWorkingDir(ctx context.Context, step core.Step, execCtx execution.Context) string {
-	dag := execCtx.DAG
+func resolveWorkingDir(ctx context.Context, step core.Step, rCtx execution.Context) string {
+	dag := rCtx.DAG
 
 	if step.Dir != "" {
 		// Expand environment variables in step.Dir using DAG env vars
@@ -304,12 +304,12 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOptio
 	// ${FOO} will be replaced with "step" in the first iteration,
 	// leaving no ${FOO} for the DAG env to replace.
 
-	execCtx := execution.GetContext(ctx)
+	rCtx := execution.GetContext(ctx)
 	if option.ExpandEnv {
 		opts = append(opts, cmdutil.WithVariables(e.Envs))
 		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
-		opts = append(opts, cmdutil.WithVariables(execCtx.SecretEnvs))
-		opts = append(opts, cmdutil.WithVariables(execCtx.Envs))
+		opts = append(opts, cmdutil.WithVariables(rCtx.SecretEnvs))
+		opts = append(opts, cmdutil.WithVariables(rCtx.Envs))
 	} else {
 		opts = append(opts, cmdutil.WithVariables(e.Envs))
 		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))

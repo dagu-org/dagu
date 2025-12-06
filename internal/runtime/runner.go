@@ -112,12 +112,12 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 	r.metrics.totalNodes = len(nodes)
 
 	// If one of the conditions does not met, cancel the execution.
-	execCtx := execution.GetContext(ctx)
+	rCtx := execution.GetContext(ctx)
 	var shell []string
-	if execCtx.DAG.Shell != "" {
-		shell = append([]string{execCtx.DAG.Shell}, execCtx.DAG.ShellArgs...)
+	if rCtx.DAG.Shell != "" {
+		shell = append([]string{rCtx.DAG.Shell}, rCtx.DAG.ShellArgs...)
 	}
-	if err := EvalConditions(ctx, shell, execCtx.DAG.Preconditions); err != nil {
+	if err := EvalConditions(ctx, shell, rCtx.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", tag.Error(err))
 		r.Cancel(plan)
 	}

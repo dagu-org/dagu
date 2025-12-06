@@ -68,9 +68,9 @@ func TestDAGContext_UserEnvsMap(t *testing.T) {
 
 			ctx := context.Background()
 			ctx = tt.setup(ctx)
-			execCtx := execution.GetContext(ctx)
+			rCtx := execution.GetContext(ctx)
 
-			result := execCtx.UserEnvsMap()
+			result := rCtx.UserEnvsMap()
 
 			for key, expectedValue := range tt.expected {
 				assert.Equal(t, expectedValue, result[key], "key %s should have value %s", key, expectedValue)

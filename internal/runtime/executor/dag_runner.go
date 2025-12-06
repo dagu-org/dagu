@@ -57,11 +57,11 @@ type SubDAGExecutor struct {
 // It handles the logic for finding the DAG - either from the database
 // or from local DAGs defined in the parent.
 func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, error) {
-	execCtx := execution.GetContext(ctx)
+	rCtx := execution.GetContext(ctx)
 
 	// First, check if it's a local DAG in the parent
-	if execCtx.DAG != nil && execCtx.DAG.LocalDAGs != nil {
-		if localDAG, ok := execCtx.DAG.LocalDAGs[childName]; ok {
+	if rCtx.DAG != nil && rCtx.DAG.LocalDAGs != nil {
+		if localDAG, ok := rCtx.DAG.LocalDAGs[childName]; ok {
 			// Create a temporary file for the local DAG
 			tempFile, err := createTempDAGFile(childName, localDAG.YamlData)
 			if err != nil {
@@ -75,27 +75,27 @@ func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, 
 			return &SubDAGExecutor{
 				DAG:             &dag,
 				tempFile:        tempFile,
-				coordinatorCli:  execCtx.CoordinatorCli,
+				coordinatorCli:  rCtx.CoordinatorCli,
 				cmds:            make(map[string]*exec.Cmd),
 				distributedRuns: make(map[string]bool),
-				dagCtx:          execCtx,
+				dagCtx:          rCtx,
 				killed:          make(chan struct{}),
 			}, nil
 		}
 	}
 
 	// If not found as local DAG, look it up in the database
-	dag, err := execCtx.DB.GetDAG(ctx, childName)
+	dag, err := rCtx.DB.GetDAG(ctx, childName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find DAG %q: %w", childName, err)
 	}
 
 	return &SubDAGExecutor{
 		DAG:             dag,
-		coordinatorCli:  execCtx.CoordinatorCli,
+		coordinatorCli:  rCtx.CoordinatorCli,
 		cmds:            make(map[string]*exec.Cmd),
 		distributedRuns: make(map[string]bool),
-		dagCtx:          execCtx,
+		dagCtx:          rCtx,
 		killed:          make(chan struct{}),
 	}, nil
 }
@@ -111,15 +111,15 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 		return nil, errDAGRunIDNotSet
 	}
 
-	execCtx := execution.GetContext(ctx)
-	if execCtx.RootDAGRun.Zero() {
+	rCtx := execution.GetContext(ctx)
+	if rCtx.RootDAGRun.Zero() {
 		return nil, errRootDAGRunNotSet
 	}
 
 	args := []string{
 		"start",
-		fmt.Sprintf("--root=%s", execCtx.RootDAGRun.String()),
-		fmt.Sprintf("--parent=%s", execCtx.DAGRunRef().String()),
+		fmt.Sprintf("--root=%s", rCtx.RootDAGRun.String()),
+		fmt.Sprintf("--parent=%s", rCtx.DAGRunRef().String()),
 		fmt.Sprintf("--run-id=%s", runParams.RunID),
 		"--no-queue",
 		"--disable-max-active-runs",
@@ -135,7 +135,7 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 
 	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
 	cmd.Dir = workDir
-	cmd.Env = append(cmd.Env, execCtx.AllEnvs()...)
+	cmd.Env = append(cmd.Env, rCtx.AllEnvs()...)
 
 	// Inject OpenTelemetry trace context into environment variables
 	logCtx := logger.WithValues(ctx, tag.DAG(e.DAG.Name))
@@ -155,13 +155,13 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 
 // BuildCoordinatorTask creates a coordinator task for distributed execution
 func (e *SubDAGExecutor) BuildCoordinatorTask(ctx context.Context, runParams RunParams) (*coordinatorv1.Task, error) {
-	execCtx := execution.GetContext(ctx)
+	rCtx := execution.GetContext(ctx)
 
 	if runParams.RunID == "" {
 		return nil, fmt.Errorf("dag-run ID is not set")
 	}
 
-	if execCtx.RootDAGRun.Zero() {
+	if rCtx.RootDAGRun.Zero() {
 		return nil, fmt.Errorf("root dag-run ID is not set")
 	}
 
@@ -171,10 +171,10 @@ func (e *SubDAGExecutor) BuildCoordinatorTask(ctx context.Context, runParams Run
 		string(e.DAG.YamlData),
 		coordinatorv1.Operation_OPERATION_START,
 		runParams.RunID,
-		WithRootDagRun(execCtx.RootDAGRun),
+		WithRootDagRun(rCtx.RootDAGRun),
 		WithParentDagRun(execution.DAGRunRef{
-			Name: execCtx.DAG.Name,
-			ID:   execCtx.DAGRunID,
+			Name: rCtx.DAG.Name,
+			ID:   rCtx.DAGRunID,
 		}),
 		WithTaskParams(runParams.Params),
 		WithWorkerSelector(e.DAG.WorkerSelector),
@@ -267,8 +267,8 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 	default:
 	}
 
-	execCtx := execution.GetContext(ctx)
-	result, resultErr := execCtx.DB.GetSubDAGRunStatus(ctx, runParams.RunID, execCtx.RootDAGRun)
+	rCtx := execution.GetContext(ctx)
+	result, resultErr := rCtx.DB.GetSubDAGRunStatus(ctx, runParams.RunID, rCtx.RootDAGRun)
 	if resultErr != nil {
 		return nil, fmt.Errorf("failed to find result for the sub dag-run %q: %w", runParams.RunID, resultErr)
 	}
@@ -334,7 +334,7 @@ func (e *SubDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams Ru
 }
 
 func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*execution.RunStatus, error) {
-	execCtx := execution.GetContext(ctx)
+	rCtx := execution.GetContext(ctx)
 	waitCtx := logger.WithValues(ctx,
 		tag.RunID(dagRunID),
 		tag.DAG(e.DAG.Name),
@@ -370,7 +370,7 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 
 			for {
 				var err error
-				status, err = execCtx.DB.GetSubDAGRunStatus(ctx, dagRunID, execCtx.RootDAGRun)
+				status, err = rCtx.DB.GetSubDAGRunStatus(ctx, dagRunID, rCtx.RootDAGRun)
 				if err != nil {
 					logger.Warn(waitCtx, "Failed to get sub DAG run status during cancellation wait",
 						tag.Error(err),
@@ -402,7 +402,7 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 
 		case <-ticker.C:
 			// Check if the sub DAG run has completed
-			isCompleted, err := execCtx.DB.IsSubDAGRunCompleted(ctx, dagRunID, execCtx.RootDAGRun)
+			isCompleted, err := rCtx.DB.IsSubDAGRunCompleted(ctx, dagRunID, rCtx.RootDAGRun)
 			if err != nil {
 				logger.Warn(waitCtx, "Failed to check sub DAG run completion",
 					tag.Error(err),
@@ -416,7 +416,7 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 			}
 
 			// Check the final status of the sub DAG run
-			result, err := execCtx.DB.GetSubDAGRunStatus(ctx, dagRunID, execCtx.RootDAGRun)
+			result, err := rCtx.DB.GetSubDAGRunStatus(ctx, dagRunID, rCtx.RootDAGRun)
 			if err != nil {
 				// Not found yet, continue polling
 				logger.Debug(waitCtx, "Sub DAG run status not available yet",
