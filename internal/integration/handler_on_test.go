@@ -35,7 +35,7 @@ steps:
 				require.NotNil(t, dag.HandlerOn.Init)
 				require.Equal(t, "onInit", dag.HandlerOn.Init.Name)
 			},
-			runFunc: func(t *testing.T, ctx context.Context, agent *test.Agent) {
+			runFunc: func(t *testing.T, _ context.Context, agent *test.Agent) {
 				agent.RunSuccess(t)
 			},
 			validateFunc: func(t *testing.T, status *execution.DAGRunStatus) {
@@ -57,7 +57,7 @@ steps:
   - name: step1
     command: "echo should-not-run"
 `,
-			runFunc: func(t *testing.T, ctx context.Context, agent *test.Agent) {
+			runFunc: func(_ *testing.T, ctx context.Context, agent *test.Agent) {
 				_ = agent.Run(ctx)
 			},
 			validateFunc: func(t *testing.T, status *execution.DAGRunStatus) {
@@ -87,7 +87,7 @@ steps:
   - name: step1
     command: "true"
 `,
-			runFunc: func(t *testing.T, ctx context.Context, agent *test.Agent) {
+			runFunc: func(t *testing.T, _ context.Context, agent *test.Agent) {
 				agent.RunSuccess(t)
 			},
 			validateFunc: func(t *testing.T, status *execution.DAGRunStatus) {
@@ -112,7 +112,7 @@ steps:
   - name: step1
     command: "true"
 `,
-			runFunc: func(t *testing.T, ctx context.Context, agent *test.Agent) {
+			runFunc: func(_ *testing.T, ctx context.Context, agent *test.Agent) {
 				_ = agent.Run(ctx)
 			},
 			validateFunc: func(t *testing.T, status *execution.DAGRunStatus) {
@@ -144,7 +144,7 @@ steps:
   - name: failing-step
     command: exit 1
 `,
-			runFunc: func(t *testing.T, ctx context.Context, agent *test.Agent) {
+			runFunc: func(t *testing.T, _ context.Context, agent *test.Agent) {
 				agent.RunError(t)
 			},
 			validateFunc: func(t *testing.T, status *execution.DAGRunStatus) {
@@ -164,7 +164,7 @@ steps:
   - name: passing-step
     command: "true"
 `,
-			runFunc: func(t *testing.T, ctx context.Context, agent *test.Agent) {
+			runFunc: func(t *testing.T, _ context.Context, agent *test.Agent) {
 				agent.RunSuccess(t)
 			},
 			validateFunc: func(t *testing.T, status *execution.DAGRunStatus) {
@@ -184,7 +184,7 @@ steps:
   - name: passing-step
     command: "true"
 `,
-			runFunc: func(t *testing.T, ctx context.Context, agent *test.Agent) {
+			runFunc: func(t *testing.T, _ context.Context, agent *test.Agent) {
 				agent.RunSuccess(t)
 			},
 			validateFunc: func(t *testing.T, status *execution.DAGRunStatus) {
