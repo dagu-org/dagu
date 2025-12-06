@@ -1308,7 +1308,7 @@ func buildContinueOn(_ StepBuildContext, def stepDef, step *core.Step) error {
 	switch v := def.ContinueOn.(type) {
 	case string:
 		// Shorthand syntax: "skipped" or "failed"
-		switch strings.ToLower(v) {
+		switch strings.ToLower(strings.TrimSpace(v)) {
 		case "skipped":
 			step.ContinueOn.Skipped = true
 		case "failed":
