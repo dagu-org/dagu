@@ -46,12 +46,12 @@ func TestQueueFile(t *testing.T) {
 	job, err := qf.Pop(th.Context)
 	require.NoError(t, err, "expected no error when popping job from queue")
 
-	require.NotNil(t, job, "expected job to be not nil")
-	require.Equal(t, "test-name", job.DAGRun.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-dag", job.DAGRun.ID, "expected job ID to be 'test'")
+	data, err := job.Data()
+	require.NoError(t, err, "expected no error when getting job data")
 
-	// Check if the item has the correct prefix
-	require.Regexp(t, "^item_high_", job.FileName, "expected job file name to start with 'item_priority_'")
+	require.NotNil(t, job, "expected job to be not nil")
+	require.Equal(t, "test-name", data.Name, "expected job name to be 'test-name'")
+	require.Equal(t, "test-dag", data.ID, "expected job ID to be 'test'")
 
 	// Check if the queue is empty again
 	_, err = qf.Len(th.Context)
@@ -120,8 +120,11 @@ func TestQueueFile_Pop(t *testing.T) {
 	})
 	require.NoError(t, err, "expected no error when removing job from queue")
 	require.Len(t, removedJobs, 1, "expected one job to be removed")
-	require.Equal(t, "test-name", removedJobs[0].DAGRun.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "test-dag", removedJobs[0].DAGRun.ID, "expected job ID to be 'test'")
+
+	data, err := removedJobs[0].Data()
+	require.NoError(t, err, "expected no error when getting job data")
+	require.Equal(t, "test-name", data.Name, "expected job name to be 'test-name'")
+	require.Equal(t, "test-dag", data.ID, "expected job ID to be 'test'")
 
 	// Check if the queue is empty
 	queueLen, err := qf.Len(th.Context)
