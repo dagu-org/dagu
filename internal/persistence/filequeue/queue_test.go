@@ -44,13 +44,12 @@ func TestQueue(t *testing.T) {
 	require.Equal(t, 2, queueLen, "expected queue length to be 2")
 
 	// Check if pop returns the high priority job
+	// Note: After dequeue, the file is removed, so we can't call Data() anymore.
+	// We verify using the ID() method which contains the run-id in the filename.
 	job, err := queue.Dequeue(th.Context)
 	require.NoError(t, err, "expected no error when popping job from queue")
 	require.NotNil(t, job, "expected job to be not nil")
-
-	jobData := job.Data()
-	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "high-priority-dag-run", jobData.ID, "expected job ID to be 'high-priority-dag-run'")
+	require.Contains(t, job.ID(), "high-priority-dag-run", "expected job ID to contain 'high-priority-dag-run'")
 
 	// Now the queue should have only one item left
 	queueLen, err = queue.Len(th.Context)
@@ -61,9 +60,7 @@ func TestQueue(t *testing.T) {
 	job, err = queue.Dequeue(th.Context)
 	require.NoError(t, err, "expected no error when popping job from queue")
 	require.NotNil(t, job, "expected job to be not nil")
-	jobData = job.Data()
-	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
-	require.Equal(t, "low-priority-dag-run", jobData.ID, "expected job ID to be 'low-priority-dag-run'")
+	require.Contains(t, job.ID(), "low-priority-dag-run", "expected job ID to contain 'low-priority-dag-run'")
 }
 
 func TestQueue_FindByDAGRunID(t *testing.T) {
@@ -92,7 +89,8 @@ func TestQueue_FindByDAGRunID(t *testing.T) {
 	job, err := queue.FindByDAGRunID(th.Context, "high-priority-dag-run")
 	require.NoError(t, err, "expected no error when finding job by dag-run ID")
 	require.NotNil(t, job, "expected job to be not nil")
-	jobData := job.Data()
+	jobData, err := job.Data()
+	require.NoError(t, err, "expected no error when getting job data")
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
 	require.Equal(t, "high-priority-dag-run", jobData.ID, "expected job ID to be 'high-priority-dag-run'")
 
@@ -100,7 +98,8 @@ func TestQueue_FindByDAGRunID(t *testing.T) {
 	job, err = queue.FindByDAGRunID(th.Context, "low-priority-dag-run")
 	require.NoError(t, err, "expected no error when finding job by dag-run ID")
 	require.NotNil(t, job, "expected job to be not nil")
-	jobData = job.Data()
+	jobData, err = job.Data()
+	require.NoError(t, err, "expected no error when getting job data")
 	require.Equal(t, "test-name", jobData.Name, "expected job name to be 'test-name'")
 	require.Equal(t, "low-priority-dag-run", jobData.ID, "expected job ID to be 'low-priority-dag-run'")
 }
@@ -124,9 +123,11 @@ func TestQueue_OrderingHighFrequency(t *testing.T) {
 	}
 
 	// Dequeue and verify order
+	// Note: After dequeue, the file is removed, so we can't call Data() anymore.
+	// We verify using the ID() method which contains the run-id in the filename.
 	for i := 0; i < numItems; i++ {
 		item, err := queue.Dequeue(th.Context)
 		require.NoError(t, err)
-		require.Equal(t, fmt.Sprintf("run-%d", i), item.Data().ID, "expected items to be dequeued in order")
+		require.Contains(t, item.ID(), fmt.Sprintf("run-%d", i), "expected items to be dequeued in order")
 	}
 }

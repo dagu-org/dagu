@@ -96,9 +96,7 @@ func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRun execution.DAGR
 			logger.Error(ctx, "Failed to pop dag-run from queue file", tag.Error(err))
 			return nil, fmt.Errorf("failed to pop dag-run %s: %w", dagRun.ID, err)
 		}
-		for _, item := range popped {
-			items = append(items, item)
-		}
+		items = append(items, popped...)
 	}
 
 	// Remove directory if it's empty

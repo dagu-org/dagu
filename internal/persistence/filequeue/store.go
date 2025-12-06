@@ -99,14 +99,7 @@ func (s *Store) All(ctx context.Context) ([]execution.QueuedItemData, error) {
 		sort.Strings(files)
 
 		for _, file := range files {
-			data, err := parseQueueFileName(file, filepath.Base(file))
-			if err != nil {
-				logger.Error(ctx, "Failed to parse queue file name",
-					tag.File(file),
-					tag.Error(err))
-				continue
-			}
-			items = append(items, NewJob(data))
+			items = append(items, NewQueuedFile(file))
 		}
 	}
 
@@ -189,7 +182,12 @@ func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]exec
 	}
 	var ret []execution.QueuedItemData
 	for _, item := range items {
-		if item.Data().Name == dagName {
+		data, err := item.Data()
+		if err != nil {
+			logger.Error(ctx, "Failed to get item data", tag.Error(err))
+			continue
+		}
+		if data.Name == dagName {
 			ret = append(ret, item)
 		}
 	}

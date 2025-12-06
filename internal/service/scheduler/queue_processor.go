@@ -268,7 +268,12 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 			defer wg.Done()
 			if p.processDAG(ctx, item, queueName) {
 				// Remove the item from the queue
-				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, item.Data()); err != nil {
+				data, err := item.Data()
+				if err != nil {
+					logger.Error(ctx, "Failed to get item data", tag.Error(err))
+					return
+				}
+				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, *data); err != nil {
 					logger.Error(ctx, "Failed to dequeue item", tag.Error(err))
 				}
 			}
@@ -282,9 +287,15 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 		return false
 	}
 
-	ctx = logger.WithValues(ctx, tag.RunID(item.Data().ID))
+	data, err := item.Data()
+	if err != nil {
+		logger.Error(ctx, "Failed to get item data", tag.Error(err))
+		return false
+	}
 
-	runRef := item.Data()
+	ctx = logger.WithValues(ctx, tag.RunID(data.ID))
+
+	runRef := *data
 	runID := runRef.ID
 	_ = runID // used below
 	logger.Debug(ctx, "Processing queue item",

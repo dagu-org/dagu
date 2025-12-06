@@ -52,6 +52,11 @@ func NewQueueFile(baseDir, prefix string) *QueueFile {
 	}
 }
 
+type queuedItem struct {
+	file string
+	data ItemData
+}
+
 // ItemData represents the data stored in the queue file
 type ItemData struct {
 	FileName string              `json:"fileName"`
@@ -141,7 +146,7 @@ func (q *QueueFile) Push(ctx context.Context, dagRun execution.DAGRunRef) error 
 }
 
 // PopByDAGRunID removes jobs from the queue by dag-run ID
-func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun execution.DAGRunRef) ([]*Job, error) {
+func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun execution.DAGRunRef) ([]execution.QueuedItemData, error) {
 	ctx = logger.WithValues(ctx,
 		tag.Queue(filepath.Base(q.baseDir)),
 		tag.DAG(dagRun.Name),
@@ -161,18 +166,36 @@ func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun execution.DAGRunRe
 		return nil, fmt.Errorf("failed to list jobs: %w", err)
 	}
 
-	var removedJobs []*Job
+	var removedJobs []execution.QueuedItemData
 	for _, item := range items {
-		if item.DAGRun.Name == dagRun.Name && item.DAGRun.ID == dagRun.ID {
-			if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
+		job := NewQueuedFile(item.file)
+		data, err := job.Data()
+		if err != nil {
+			logger.Error(ctx, "Failed to get job data",
+				tag.File(item.data.FileName),
+				tag.Error(err),
+			)
+			continue
+		}
+		if data.Name == dagRun.Name && data.ID == dagRun.ID {
+			unwrapped, err := job.ExtractJob()
+			if err != nil {
+				logger.Error(ctx, "Failed to unwrap job",
+					tag.File(item.data.FileName),
+					tag.Error(err),
+				)
+				continue
+			}
+
+			if err := os.Remove(item.file); err != nil {
 				// Log the error but continue processing other items
 				logger.Warn(ctx, "Failed to remove queue file",
-					tag.File(item.FileName),
+					tag.File(item.data.FileName),
 					tag.Error(err),
 				)
 			} else {
 				// Add the job to the removed jobs list
-				removedJobs = append(removedJobs, NewJob(item))
+				removedJobs = append(removedJobs, unwrapped)
 			}
 		}
 	}
@@ -180,7 +203,7 @@ func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun execution.DAGRunRe
 	return removedJobs, nil
 }
 
-func (q *QueueFile) List(ctx context.Context) ([]*Job, error) {
+func (q *QueueFile) List(ctx context.Context) ([]*QueuedFile, error) {
 	ctx = logger.WithValues(ctx, tag.Queue(filepath.Base(q.baseDir)))
 	q.mu.RLock()
 	defer q.mu.RUnlock()
@@ -196,16 +219,16 @@ func (q *QueueFile) List(ctx context.Context) ([]*Job, error) {
 		return nil, fmt.Errorf("failed to list jobs: %w", err)
 	}
 
-	var jobs []*Job
+	var jobs []*QueuedFile
 	for _, item := range items {
-		jobs = append(jobs, NewJob(item))
+		jobs = append(jobs, NewQueuedFile(item.file))
 	}
 
 	logger.Debug(ctx, "Listed queue file items", tag.Count(len(jobs)))
 	return jobs, nil
 }
 
-func (q *QueueFile) Pop(ctx context.Context) (*Job, error) {
+func (q *QueueFile) Pop(ctx context.Context) (execution.QueuedItemData, error) {
 	ctx = logger.WithValues(ctx, tag.Queue(filepath.Base(q.baseDir)))
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -228,27 +251,36 @@ func (q *QueueFile) Pop(ctx context.Context) (*Job, error) {
 
 	item := items[0]
 
+	unwrapped, err := NewQueuedFile(item.file).ExtractJob()
+	if err != nil {
+		logger.Error(ctx, "Failed to unwrap job",
+			tag.File(item.data.FileName),
+			tag.Error(err),
+		)
+		return nil, fmt.Errorf("failed to unwrap job from file %s: %w", item.data.FileName, err)
+	}
+
 	// Delete the file
 	// Currently, we don't need the content of the file, so we just remove it
 
-	if err := os.Remove(filepath.Join(q.baseDir, item.FileName)); err != nil {
+	if err := os.Remove(filepath.Join(q.baseDir, item.data.FileName)); err != nil {
 		logger.Error(ctx, "Failed to remove queue file",
-			tag.File(item.FileName),
+			tag.File(item.data.FileName),
 			tag.Error(err),
 		)
-		return nil, fmt.Errorf("failed to remove queue file %s: %w", item.FileName, err)
+		return nil, fmt.Errorf("failed to remove queue file %s: %w", item.data.FileName, err)
 	}
 
 	logger.Debug(ctx, "Popped queue file item",
-		tag.RunID(item.DAGRun.ID),
-		tag.DAG(item.DAGRun.Name),
+		tag.RunID(item.data.DAGRun.ID),
+		tag.DAG(item.data.DAGRun.Name),
 	)
 	// Return the item data
-	return NewJob(item), nil
+	return unwrapped, nil
 }
 
 // FindByDAGRunID finds a job by its dag-run ID without removing it from the queue.
-func (q *QueueFile) FindByDAGRunID(ctx context.Context, dagRunID string) (*Job, error) {
+func (q *QueueFile) FindByDAGRunID(ctx context.Context, dagRunID string) (*QueuedFile, error) {
 	ctx = logger.WithValues(ctx, tag.Queue(filepath.Base(q.baseDir)))
 	q.mu.RLock()
 	defer q.mu.RUnlock()
@@ -265,8 +297,8 @@ func (q *QueueFile) FindByDAGRunID(ctx context.Context, dagRunID string) (*Job, 
 	}
 
 	for _, item := range items {
-		if item.DAGRun.ID == dagRunID {
-			return NewJob(item), nil
+		if item.data.DAGRun.ID == dagRunID {
+			return NewQueuedFile(item.file), nil
 		}
 	}
 
@@ -298,7 +330,7 @@ func (q *QueueFile) Len(ctx context.Context) (int, error) {
 // listItems lists all items in the queue directory
 // It is not thread-safe and should be called with the mutex locked
 // to ensure that no other operations are modifying the queue at the same time.
-func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
+func (q *QueueFile) listItems(ctx context.Context) ([]queuedItem, error) {
 	pattern := filepath.Join(q.baseDir, itemPrefix+q.prefix+"*")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
@@ -308,7 +340,7 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 		return nil, fmt.Errorf("failed to list files in %s: %w", q.baseDir, err)
 	}
 
-	var items []ItemData
+	var items []queuedItem
 	for _, file := range files {
 		fileName := filepath.Base(file)
 		// Check the file name matches the expected pattern
@@ -323,12 +355,15 @@ func (q *QueueFile) listItems(ctx context.Context) ([]ItemData, error) {
 				tag.Error(err))
 			continue
 		}
-		items = append(items, item)
+		items = append(items, queuedItem{
+			file: file,
+			data: item,
+		})
 	}
 
 	// Sort the items by queued time
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].QueuedAt.Before(items[j].QueuedAt)
+		return items[i].data.QueuedAt.Before(items[j].data.QueuedAt)
 	})
 
 	return items, nil
@@ -355,7 +390,7 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 	timestamp = timestamp.Add(time.Duration(nanos) * time.Nanosecond)
 
 	// Create the ItemData struct
-	item := ItemData{
+	data := ItemData{
 		FileName: fileName,
 		DAGRun: execution.DAGRunRef{
 			Name: filepath.Base(filepath.Dir(path)),
@@ -364,7 +399,7 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 		QueuedAt: timestamp,
 	}
 
-	return item, nil
+	return data, nil
 }
 
 // parseRegex is the regex used to parse the queue file name

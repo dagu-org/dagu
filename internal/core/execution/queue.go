@@ -67,5 +67,5 @@ type QueuedItemData interface {
 	// ID returns the ID of the queued item
 	ID() string
 	// Data returns the data of the queued item
-	Data() DAGRunRef
+	Data() (*DAGRunRef, error)
 }
