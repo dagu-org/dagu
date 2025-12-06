@@ -1319,7 +1319,7 @@ func TestRunner_ErrorHandling(t *testing.T) {
 		logFilename := fmt.Sprintf("%s_%s.log", dag.Name, r.cfg.DAGRunID)
 		logFilePath := filepath.Join(r.cfg.LogDir, logFilename)
 
-		ctx := execution.SetupDAGContext(plan.Context, dag, nil, execution.DAGRunRef{}, r.cfg.DAGRunID, logFilePath, nil, nil, nil)
+		ctx := execution.NewContext(plan.Context, dag, r.cfg.DAGRunID, logFilePath)
 
 		err := r.runner.Run(ctx, plan.Plan, nil)
 		require.Error(t, err)
@@ -1395,7 +1395,7 @@ func TestRunner_DAGPreconditions(t *testing.T) {
 		logFilename := fmt.Sprintf("%s_%s.log", dag.Name, r.cfg.DAGRunID)
 		logFilePath := filepath.Join(r.cfg.LogDir, logFilename)
 
-		ctx := execution.SetupDAGContext(plan.Context, dag, nil, execution.DAGRunRef{}, r.cfg.DAGRunID, logFilePath, nil, nil, nil)
+		ctx := execution.NewContext(plan.Context, dag, r.cfg.DAGRunID, logFilePath)
 
 		err := r.runner.Run(ctx, plan.Plan, nil)
 		require.NoError(t, err) // No error, but dag should be canceled
@@ -2800,7 +2800,7 @@ func TestRunner_DeadlockDetection(t *testing.T) {
 	r := runtime.New(cfg)
 	dag := &core.DAG{Name: "deadlock_dag"}
 	logFile := filepath.Join(cfg.LogDir, dag.Name+".log")
-	ctx := execution.SetupDAGContext(context.Background(), dag, nil, execution.DAGRunRef{}, cfg.DAGRunID, logFile, nil, nil, nil)
+	ctx := execution.NewContext(context.Background(), dag, cfg.DAGRunID, logFile)
 
 	progressCh := make(chan *runtime.Node, 2)
 	err = r.Run(ctx, plan, progressCh)

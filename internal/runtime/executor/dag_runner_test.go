@@ -35,7 +35,7 @@ func TestNewSubDAGExecutor_LocalDAG(t *testing.T) {
 
 	// Set up the DAG context
 	mockDB := new(mockDatabase)
-	dagCtx := execution.DAGContext{
+	dagCtx := execution.Context{
 		DAG:        parentDAG,
 		DB:         mockDB,
 		RootDAGRun: execution.NewDAGRunRef("parent", "root-123"),
@@ -80,7 +80,7 @@ func TestNewSubDAGExecutor_RegularDAG(t *testing.T) {
 
 	// Set up the DAG context
 	mockDB := new(mockDatabase)
-	dagCtx := execution.DAGContext{
+	dagCtx := execution.Context{
 		DAG:        parentDAG,
 		DB:         mockDB,
 		RootDAGRun: execution.NewDAGRunRef("parent", "root-123"),
@@ -126,7 +126,7 @@ func TestNewSubDAGExecutor_NotFound(t *testing.T) {
 
 	// Set up the DAG context
 	mockDB := new(mockDatabase)
-	dagCtx := execution.DAGContext{
+	dagCtx := execution.Context{
 		DAG:        parentDAG,
 		DB:         mockDB,
 		RootDAGRun: execution.NewDAGRunRef("parent", "root-123"),
@@ -154,7 +154,7 @@ func TestBuildCommand(t *testing.T) {
 	// Set up the DAG context
 	mockDB := new(mockDatabase)
 	baseEnv := config.NewBaseEnv(nil)
-	dagCtx := execution.DAGContext{
+	dagCtx := execution.Context{
 		DAG:        &core.DAG{Name: "parent"},
 		DB:         mockDB,
 		RootDAGRun: execution.NewDAGRunRef("parent", "root-123"),
@@ -204,7 +204,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 
 	// Set up the DAG context
 	mockDB := new(mockDatabase)
-	dagCtx := execution.DAGContext{
+	dagCtx := execution.Context{
 		DAG:        &core.DAG{Name: "parent"},
 		DB:         mockDB,
 		RootDAGRun: execution.NewDAGRunRef("parent", "root-123"),
@@ -234,7 +234,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 
 	// Set up the DAG context without RootDAGRun
 	mockDB := new(mockDatabase)
-	dagCtx := execution.DAGContext{
+	dagCtx := execution.Context{
 		DAG: &core.DAG{Name: "parent"},
 		DB:  mockDB,
 		// RootDAGRun is zero value
@@ -341,7 +341,7 @@ func TestSubDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 	mockDB := new(mockDatabase)
 
 	// Create a DAG context
-	dagCtx := execution.DAGContext{
+	dagCtx := execution.Context{
 		DB:         mockDB,
 		RootDAGRun: execution.NewDAGRunRef("root-dag", "root-run-id"),
 		DAGRunID:   "parent-run-id",
@@ -387,7 +387,7 @@ func TestSubDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 	mockDB := new(mockDatabase)
 
 	// Create a DAG context
-	dagCtx := execution.DAGContext{
+	dagCtx := execution.Context{
 		DB:         mockDB,
 		RootDAGRun: execution.NewDAGRunRef("root-dag", "root-run-id"),
 		DAGRunID:   "parent-run-id",
@@ -429,7 +429,7 @@ func TestSubDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 	mockDB := new(mockDatabase)
 
 	// Create a DAG context
-	dagCtx := execution.DAGContext{
+	dagCtx := execution.Context{
 		DB:         mockDB,
 		RootDAGRun: execution.NewDAGRunRef("root-dag", "root-run-id"),
 		DAGRunID:   "parent-run-id",
@@ -466,7 +466,7 @@ func TestSubDAGExecutor_Kill_Empty(t *testing.T) {
 	mockDB := new(mockDatabase)
 
 	// Create a DAG context
-	dagCtx := execution.DAGContext{
+	dagCtx := execution.Context{
 		DB:         mockDB,
 		RootDAGRun: execution.NewDAGRunRef("root-dag", "root-run-id"),
 		DAGRunID:   "parent-run-id",

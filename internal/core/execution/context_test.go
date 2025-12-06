@@ -23,7 +23,7 @@ func TestDAGContext_UserEnvsMap(t *testing.T) {
 				dag := &core.DAG{
 					Env: []string{"USER_VAR=user_value"},
 				}
-				return execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
+				return execution.NewContext(ctx, dag, "test-run", "test.log")
 			},
 			expected: map[string]string{
 				"USER_VAR": "user_value",
@@ -36,7 +36,9 @@ func TestDAGContext_UserEnvsMap(t *testing.T) {
 					Env: []string{"KEY=from_dag"},
 				}
 				secrets := []string{"KEY=from_secret"}
-				return execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, secrets)
+				return execution.NewContext(ctx, dag, "test-run", "test.log",
+					execution.WithSecrets(secrets),
+				)
 			},
 			expected: map[string]string{
 				"KEY": "from_secret",
@@ -49,7 +51,9 @@ func TestDAGContext_UserEnvsMap(t *testing.T) {
 					Env: []string{"DAG_VAR=dag_value"},
 				}
 				secrets := []string{"SECRET_VAR=secret_value"}
-				return execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, secrets)
+				return execution.NewContext(ctx, dag, "test-run", "test.log",
+					execution.WithSecrets(secrets),
+				)
 			},
 			expected: map[string]string{
 				"DAG_VAR":    "dag_value",

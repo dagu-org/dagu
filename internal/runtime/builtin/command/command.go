@@ -54,7 +54,9 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	}
 	// Wrap stderr with a tailing writer so we can include recent
 	// stderr output (rolling, up to limit) in error messages.
-	tw := executor.NewTailWriter(e.config.Stderr, 0)
+	// Use encoding from DAGContext to properly decode non-UTF-8 output.
+	env := runtime.GetEnv(ctx)
+	tw := executor.NewTailWriterWithEncoding(e.config.Stderr, 0, env.LogEncodingCharset)
 	e.stderrTail = tw
 	e.config.Stderr = tw
 

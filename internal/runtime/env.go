@@ -25,7 +25,7 @@ type Env struct {
 	// Embedded execution metadata from parent DAG run containing DAGRunID,
 	// RootDAGRun reference, DAG configuration, database interface,
 	// DAG-level environment variables, and coordinator dispatcher
-	execution.DAGContext
+	execution.Context
 
 	// Thread-safe map storing output variables from previously executed steps
 	// in the format "key=value". These variables are populated when a step
@@ -55,7 +55,7 @@ type Env struct {
 
 // AllEnvs returns all environment variables that needs to be passed to the command.
 func (e Env) AllEnvs() []string {
-	envs := e.DAGContext.AllEnvs()
+	envs := e.Context.AllEnvs()
 	for k, v := range e.Envs {
 		envs = append(envs, k+"="+v)
 	}
@@ -70,7 +70,7 @@ func (e Env) AllEnvs() []string {
 // excluding OS environment (BaseEnv). Use this for isolated execution environments.
 // Precedence: Step.Env > Envs > Variables > SecretEnvs > DAGContext.Envs > DAG.Env
 func (e Env) UserEnvsMap() map[string]string {
-	result := e.DAGContext.UserEnvsMap() // DAG-level + secrets, no OS env
+	result := e.Context.UserEnvsMap() // DAG-level + secrets, no OS env
 
 	// Add variables from previous steps
 	e.Variables.Range(func(_, value any) bool {
@@ -122,7 +122,7 @@ func NewEnvForStep(ctx context.Context, step core.Step) Env {
 	}
 
 	return Env{
-		DAGContext: execution.GetDAGContext(ctx),
+		Context:    execution.GetDAGContext(ctx),
 		Variables:  variables,
 		Step:       step,
 		Envs:       envs,
@@ -131,7 +131,7 @@ func NewEnvForStep(ctx context.Context, step core.Step) Env {
 	}
 }
 
-func resolveStepWorkingDir(ctx context.Context, step core.Step, parentEnv execution.DAGContext) string {
+func resolveStepWorkingDir(ctx context.Context, step core.Step, parentEnv execution.Context) string {
 	parentDAG := parentEnv.DAG
 
 	if step.Dir != "" {

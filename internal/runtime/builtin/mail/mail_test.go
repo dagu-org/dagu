@@ -74,9 +74,9 @@ func TestMail(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				ctx := context.Background()
-				ctx = execution.SetupDAGContext(ctx, &core.DAG{
+				ctx = execution.NewContext(ctx, &core.DAG{
 					SMTP: &core.SMTPConfig{},
-				}, nil, execution.DAGRunRef{}, "", "", nil, nil, nil)
+				}, "", "")
 
 				exec, err := newMail(ctx, tt.step)
 
@@ -149,9 +149,9 @@ func TestMail(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				ctx = execution.SetupDAGContext(ctx, &core.DAG{
+				ctx = execution.NewContext(ctx, &core.DAG{
 					SMTP: &core.SMTPConfig{},
-				}, nil, execution.DAGRunRef{}, "", "", nil, nil, nil)
+				}, "", "")
 
 				exec, err := newMail(ctx, step)
 				assert.NoError(t, err)

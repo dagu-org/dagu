@@ -46,7 +46,7 @@ type SubDAGExecutor struct {
 	mu              sync.Mutex
 	cmds            map[string]*exec.Cmd // runID -> cmd for local processes
 	distributedRuns map[string]bool      // runID -> true for distributed runs
-	dagCtx          execution.DAGContext // for DB access when cancelling distributed runs
+	dagCtx          execution.Context    // for DB access when cancelling distributed runs
 
 	// killed should be closed when Kill is called
 	killed     chan struct{}

@@ -64,7 +64,7 @@ func TestNode_LargeOutput(t *testing.T) {
 			ctx := context.Background()
 			// Set up environment context with proper DAG
 			dag := &core.DAG{Name: "test"}
-			ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
+			ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
 
 			// Setup node with a temporary directory
 			tmpDir := t.TempDir()
@@ -132,7 +132,7 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 	ctx := context.Background()
 	// Set up environment context with proper DAG
 	dag := &core.DAG{Name: "test"}
-	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "deadlock-test", "test.log", nil, nil, nil)
+	ctx = execution.NewContext(ctx, dag, "deadlock-test", "test.log")
 
 	tmpDir := t.TempDir()
 	err := node.Prepare(ctx, tmpDir, "deadlock-test")
@@ -181,7 +181,7 @@ func TestNode_OutputExceedsLimit(t *testing.T) {
 	ctx := context.Background()
 	// Set up environment context with proper DAG
 	dag := &core.DAG{Name: "test"}
-	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "exceed-limit-test", "test.log", nil, nil, nil)
+	ctx = execution.NewContext(ctx, dag, "exceed-limit-test", "test.log")
 
 	tmpDir := t.TempDir()
 	err := node.Prepare(ctx, tmpDir, "exceed-limit-test")
@@ -217,7 +217,7 @@ func TestNode_CustomOutputLimit(t *testing.T) {
 		Name:          "test",
 		MaxOutputSize: 50 * 1024, // 50KB limit
 	}
-	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "custom-limit-test", "test.log", nil, nil, nil)
+	ctx = execution.NewContext(ctx, dag, "custom-limit-test", "test.log")
 
 	tmpDir := t.TempDir()
 	err := node.Prepare(ctx, tmpDir, "custom-limit-test")
@@ -253,7 +253,7 @@ func TestNode_ConcurrentOutputCapture(t *testing.T) {
 	ctx := context.Background()
 	// Set up environment context with proper DAG
 	dag := &core.DAG{Name: "test"}
-	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "concurrent-test", "test.log", nil, nil, nil)
+	ctx = execution.NewContext(ctx, dag, "concurrent-test", "test.log")
 
 	tmpDir := t.TempDir()
 	err := node.Prepare(ctx, tmpDir, "concurrent-test")

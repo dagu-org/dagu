@@ -294,7 +294,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Resolve secrets if defined
 	secretEnvs, secretErr := a.resolveSecrets(ctx)
 
-	ctx = execution.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli, secretEnvs)
+	ctx = execution.NewContext(ctx, a.dag, a.dagRunID, a.logFile,
+		execution.WithDatabase(dbClient),
+		execution.WithRootDAGRun(a.rootDAGRun),
+		execution.WithParams(a.dag.Params),
+		execution.WithCoordinator(coordinatorCli),
+		execution.WithSecrets(secretEnvs),
+	)
 
 	// Add structured logging context
 	logFields := []slog.Attr{
@@ -842,7 +848,11 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
-	dagCtx := execution.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil, nil)
+	dagCtx := execution.NewContext(ctx, a.dag, a.dagRunID, a.logFile,
+		execution.WithDatabase(db),
+		execution.WithRootDAGRun(a.rootDAGRun),
+		execution.WithParams(a.dag.Params),
+	)
 	lastErr := a.runner.Run(dagCtx, a.plan, progressCh)
 	a.lastErr = lastErr
 

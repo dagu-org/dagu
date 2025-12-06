@@ -201,7 +201,7 @@ func (ph planHelper) assertRun(t *testing.T, expectedStatus core.Status) runResu
 	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, ph.cfg.DAGRunID)
 	logFilePath := path.Join(ph.cfg.LogDir, logFilename)
 
-	ctx := execution.SetupDAGContext(ph.Context, dag, nil, execution.DAGRunRef{}, ph.cfg.DAGRunID, logFilePath, nil, nil, nil)
+	ctx := execution.NewContext(ph.Context, dag, ph.cfg.DAGRunID, logFilePath)
 
 	var doneNodes []*runtime.Node
 	progressCh := make(chan *runtime.Node)

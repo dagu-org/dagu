@@ -18,7 +18,7 @@ import (
 func setupTestContext() context.Context {
 	ctx := context.Background()
 	baseEnv := config.NewBaseEnv(nil)
-	dagCtx := execution.DAGContext{
+	dagCtx := execution.Context{
 		DAG:     &core.DAG{Name: "test-dag"},
 		BaseEnv: &baseEnv,
 	}
@@ -481,7 +481,7 @@ func TestEvalStringEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	// Create a test context with environment variables
-	ctx := execution.SetupDAGContext(context.Background(), &core.DAG{}, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
+	ctx := execution.NewContext(context.Background(), &core.DAG{}, "test-run", "test.log")
 	env := runtime.GetEnv(ctx)
 	env.Variables.Store("EMPTY", "EMPTY=")
 	env.Variables.Store("SPACES", "SPACES=  ")
@@ -631,7 +631,7 @@ func TestEvalBoolEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	// Create a test context with environment variables
-	ctx := execution.SetupDAGContext(context.Background(), &core.DAG{}, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
+	ctx := execution.NewContext(context.Background(), &core.DAG{}, "test-run", "test.log")
 
 	env := runtime.GetEnv(ctx)
 	env.Variables.Store("YES", "YES=yes")

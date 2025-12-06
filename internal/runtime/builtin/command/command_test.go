@@ -358,7 +358,7 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 		Env:  []string{},
 	}
 	// Setup the context with DAG environment
-	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "", nil, nil, nil)
+	ctx = execution.NewContext(ctx, dag, "test-run", "")
 
 	env := runtime.NewEnvForStep(ctx, core.Step{})
 	env.WorkingDir = t.TempDir()
@@ -436,7 +436,7 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 		Env:  []string{},
 	}
 	// Setup the context with DAG environment
-	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "", nil, nil, nil)
+	ctx = execution.NewContext(ctx, dag, "test-run", "")
 
 	env := runtime.NewEnvForStep(ctx, core.Step{})
 	env.WorkingDir = t.TempDir()
@@ -542,7 +542,7 @@ func setupTestContext(t *testing.T, dag *core.DAG, step core.Step) context.Conte
 			Env:  []string{},
 		}
 	}
-	ctx = execution.SetupDAGContext(ctx, dag, nil, execution.DAGRunRef{}, "test-run", "", nil, nil, nil)
+	ctx = execution.NewContext(ctx, dag, "test-run", "")
 	env := runtime.NewEnvForStep(ctx, step)
 	env.WorkingDir = t.TempDir()
 	return runtime.WithEnv(ctx, env)
