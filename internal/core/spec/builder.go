@@ -727,6 +727,13 @@ func buildLogDir(_ BuildContext, spec *definition, dag *core.DAG) (err error) {
 func buildHandlers(ctx BuildContext, spec *definition, dag *core.DAG) (err error) {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
 
+	if spec.HandlerOn.Init != nil {
+		spec.HandlerOn.Init.Name = core.HandlerOnInit.String()
+		if dag.HandlerOn.Init, err = buildStep(buildCtx, *spec.HandlerOn.Init); err != nil {
+			return err
+		}
+	}
+
 	if spec.HandlerOn.Exit != nil {
 		spec.HandlerOn.Exit.Name = core.HandlerOnExit.String()
 		if dag.HandlerOn.Exit, err = buildStep(buildCtx, *spec.HandlerOn.Exit); err != nil {
