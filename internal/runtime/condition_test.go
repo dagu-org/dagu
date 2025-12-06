@@ -197,11 +197,11 @@ func TestCondition_Eval(t *testing.T) {
 // evaluation/runtime errors are NOT swallowed - only ErrConditionNotMet is inverted.
 func TestNegateDoesNotSwallowEvaluationErrors(t *testing.T) {
 	tests := []struct {
-		name                 string
-		condition            *core.Condition
-		wantErr              bool
-		wantConditionNotMet  bool // true if error should be ErrConditionNotMet
-		notConditionNotMet   bool // true if error should NOT be ErrConditionNotMet
+		name                string
+		condition           *core.Condition
+		wantErr             bool
+		wantConditionNotMet bool // true if error should be ErrConditionNotMet
+		notConditionNotMet  bool // true if error should NOT be ErrConditionNotMet
 	}{
 		{
 			name: "EvalStringErrorNotSwallowed",
