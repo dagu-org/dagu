@@ -184,11 +184,7 @@
         },
         "abort": {
           "$ref": "#/definitions/step",
-          "description": "Step to execute when the DAG is aborted. This is the canonical field name matching the 'Aborted' status."
-        },
-        "cancel": {
-          "$ref": "#/definitions/step",
-          "description": "Deprecated: use 'abort' instead. Step to execute when the DAG is aborted. Kept for backward compatibility."
+          "description": "Step to execute when the DAG is aborted."
         },
         "exit": {
           "$ref": "#/definitions/step"
