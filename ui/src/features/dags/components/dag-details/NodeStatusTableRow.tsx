@@ -33,7 +33,12 @@ import {
 } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { components, NodeStatus, Stream } from '../../../../api/v2/schema';
+import {
+  components,
+  NodeStatus,
+  Status,
+  Stream,
+} from '../../../../api/v2/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
 import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
@@ -761,13 +766,13 @@ function NodeStatusTableRow({
           {dagRunId && (
             <TableCell className="text-center">
               <button
-                className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+                className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Retry from this step"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowDialog(true);
                 }}
-                disabled={loading}
+                disabled={loading || dagRun.status === Status.Running}
               >
                 <PlayCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
               </button>
@@ -1130,10 +1135,10 @@ function NodeStatusTableRow({
       {dagRunId && (
         <div className="flex justify-end mt-4">
           <button
-            className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700"
+            className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
             title="Retry from this step"
             onClick={() => setShowDialog(true)}
-            disabled={loading}
+            disabled={loading || dagRun.status === Status.Running}
           >
             <PlayCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
           </button>
