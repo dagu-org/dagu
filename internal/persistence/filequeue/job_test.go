@@ -31,7 +31,7 @@ func TestQueuedFile(t *testing.T) {
 	require.NoError(t, err, "expected no error when writing test file")
 
 	// Create a new QueuedFile
-	queuedFile := NewJob(testFilePath)
+	queuedFile := NewQueuedFile(testFilePath)
 
 	// Check if the ID is correct
 	require.Equal(t, "test-file", queuedFile.ID(), "expected job ID to be 'test-file'")
@@ -47,7 +47,7 @@ func TestQueuedFile_DataError(t *testing.T) {
 	t.Parallel()
 
 	// Create a QueuedFile with a non-existent file
-	queuedFile := NewJob("/nonexistent/path/test-file.json")
+	queuedFile := NewQueuedFile("/nonexistent/path/test-file.json")
 
 	// Check if Data() returns an error for non-existent file
 	_, err := queuedFile.Data()
@@ -75,7 +75,7 @@ func TestQueuedFile_ExtractJob(t *testing.T) {
 	require.NoError(t, err, "expected no error when writing test file")
 
 	// Create a QueuedFile and extract the Job
-	queuedFile := NewJob(testFilePath)
+	queuedFile := NewQueuedFile(testFilePath)
 	job, err := queuedFile.ExtractJob()
 	require.NoError(t, err, "expected no error when extracting job")
 
@@ -111,7 +111,7 @@ func TestQueuedFile_Caching(t *testing.T) {
 	require.NoError(t, err, "expected no error when writing test file")
 
 	// Create a QueuedFile
-	queuedFile := NewJob(testFilePath)
+	queuedFile := NewQueuedFile(testFilePath)
 
 	// First call to Data() should load from file
 	jobData1, err := queuedFile.Data()

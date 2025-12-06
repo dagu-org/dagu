@@ -168,7 +168,7 @@ func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun execution.DAGRunRe
 
 	var removedJobs []execution.QueuedItemData
 	for _, item := range items {
-		job := NewJob(item.file)
+		job := NewQueuedFile(item.file)
 		data, err := job.Data()
 		if err != nil {
 			logger.Error(ctx, "Failed to get job data",
@@ -221,7 +221,7 @@ func (q *QueueFile) List(ctx context.Context) ([]*QueuedFile, error) {
 
 	var jobs []*QueuedFile
 	for _, item := range items {
-		jobs = append(jobs, NewJob(item.file))
+		jobs = append(jobs, NewQueuedFile(item.file))
 	}
 
 	logger.Debug(ctx, "Listed queue file items", tag.Count(len(jobs)))
@@ -251,7 +251,7 @@ func (q *QueueFile) Pop(ctx context.Context) (execution.QueuedItemData, error) {
 
 	item := items[0]
 
-	unwrapped, err := NewJob(item.file).ExtractJob()
+	unwrapped, err := NewQueuedFile(item.file).ExtractJob()
 	if err != nil {
 		logger.Error(ctx, "Failed to unwrap job",
 			tag.File(item.data.FileName),
@@ -298,7 +298,7 @@ func (q *QueueFile) FindByDAGRunID(ctx context.Context, dagRunID string) (*Queue
 
 	for _, item := range items {
 		if item.data.DAGRun.ID == dagRunID {
-			return NewJob(item.file), nil
+			return NewQueuedFile(item.file), nil
 		}
 	}
 

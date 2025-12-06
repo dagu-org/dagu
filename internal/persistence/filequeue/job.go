@@ -20,7 +20,7 @@ type QueuedFile struct {
 	lock  sync.Mutex
 }
 
-func NewJob(file string) *QueuedFile {
+func NewQueuedFile(file string) *QueuedFile {
 	base := filepath.Base(file)
 	ext := filepath.Ext(base)
 	name := base[:len(base)-len(ext)]
@@ -30,12 +30,12 @@ func NewJob(file string) *QueuedFile {
 	}
 }
 
-// ID implements models.QueuedJob.
+// ID implements execution.QueuedItemData.
 func (j *QueuedFile) ID() string {
 	return j.id
 }
 
-// Data implements models.QueuedItem.
+// Data implements execution.QueuedItemData.
 func (j *QueuedFile) Data() (*execution.DAGRunRef, error) {
 	itemData, err := j.loadData()
 	if err != nil {
@@ -77,17 +77,15 @@ func (j *QueuedFile) ExtractJob() (*Job, error) {
 
 	return &Job{
 		id:       j.id,
-		file:     j.file,
 		ItemData: *data,
 	}, nil
 }
 
 var _ execution.QueuedItemData = (*Job)(nil)
 
-// Job wraps a Job and its underlying QueuedItemData.
+// Job implements execution.QueuedItemData for a job stored in a file.
 type Job struct {
-	id   string
-	file string
+	id string
 	ItemData
 }
 

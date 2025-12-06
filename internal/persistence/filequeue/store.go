@@ -99,7 +99,7 @@ func (s *Store) All(ctx context.Context) ([]execution.QueuedItemData, error) {
 		sort.Strings(files)
 
 		for _, file := range files {
-			items = append(items, NewJob(file))
+			items = append(items, NewQueuedFile(file))
 		}
 	}
 
