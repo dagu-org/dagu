@@ -25,7 +25,8 @@ type TailWriter struct {
 // NewTailWriter creates a tailWriter that keeps a rolling buffer
 // of recent output with a maximum size of `max` bytes. If max <= 0,
 // it falls back to defaultStderrTailLimit.
-// If out is nil, it defaults to os.Stderr to preserve exec's behavior.
+// NewTailWriter creates a TailWriter that forwards writes to the provided writer and retains a rolling tail of recent bytes.
+// If out is nil it defaults to os.Stderr. If max is less than or equal to zero it uses defaultStderrTailLimit.
 func NewTailWriter(out io.Writer, max int) *TailWriter {
 	if out == nil {
 		out = os.Stderr
@@ -38,7 +39,11 @@ func NewTailWriter(out io.Writer, max int) *TailWriter {
 
 // NewTailWriterWithEncoding creates a TailWriter with character encoding support.
 // The encoding parameter specifies the character encoding of the output
-// (e.g., "utf-8", "shift_jis", "euc-jp"). If empty, UTF-8 is assumed.
+// NewTailWriterWithEncoding creates a TailWriter that forwards writes to the given writer,
+// retains a rolling buffer limited to max bytes, and sets the character encoding used when
+// decoding the buffer returned by Tail().
+// If out is nil it defaults to os.Stderr, if max <= 0 the package default limit is used,
+// and if encoding is empty UTF-8 is assumed.
 func NewTailWriterWithEncoding(out io.Writer, max int, encoding string) *TailWriter {
 	tw := NewTailWriter(out, max)
 	tw.encoding = encoding

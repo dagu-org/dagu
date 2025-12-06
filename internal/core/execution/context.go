@@ -151,7 +151,8 @@ type contextOptions struct {
 // ContextOption configures optional parameters for NewContext.
 type ContextOption func(*contextOptions)
 
-// WithDatabase sets the database interface.
+// WithDatabase returns a ContextOption that sets the Database implementation to use
+// when creating a Context with NewContext.
 func WithDatabase(db Database) ContextOption {
 	return func(o *contextOptions) {
 		o.db = db
@@ -165,28 +166,30 @@ func WithRootDAGRun(ref DAGRunRef) ContextOption {
 	}
 }
 
-// WithParams sets runtime parameters.
+// WithParams returns a ContextOption that configures runtime parameters to be applied when creating a Context.
 func WithParams(params []string) ContextOption {
 	return func(o *contextOptions) {
 		o.params = params
 	}
 }
 
-// WithCoordinator sets the coordinator dispatcher for distributed execution.
+// The provided Dispatcher will be stored in the context options and used by NewContext when constructing the execution Context.
 func WithCoordinator(cli Dispatcher) ContextOption {
 	return func(o *contextOptions) {
 		o.coordinator = cli
 	}
 }
 
-// WithSecrets sets secret environment variables.
+// WithSecrets returns a ContextOption that sets secret environment variables for NewContext.
+// The provided slice should contain environment entries in "KEY=VALUE" form. These secret
+// variables take highest precedence when merging environment variables.
 func WithSecrets(secrets []string) ContextOption {
 	return func(o *contextOptions) {
 		o.secretEnvs = secrets
 	}
 }
 
-// WithLogEncoding sets the log file character encoding.
+// WithLogEncoding returns a ContextOption that sets the log file character encoding used when constructing a Context with NewContext.
 func WithLogEncoding(charset string) ContextOption {
 	return func(o *contextOptions) {
 		o.logEncodingCharset = charset
@@ -195,7 +198,9 @@ func WithLogEncoding(charset string) ContextOption {
 
 // NewContext creates a new context with DAG execution metadata.
 // Required: ctx, dag, dagRunID, logFile
-// Optional: use ContextOption functions (WithDatabase, WithParams, etc.)
+// NewContext creates a new context.Context that carries execution metadata for a DAG run.
+// It applies any provided ContextOption values, constructs the execution Context (including merged environment variables, secrets, database, coordinator, shell, root DAG run reference, and log encoding), and stores it in the returned context under dagCtxKey.
+// The returned context contains a Context value keyed by dagCtxKey for retrieval with GetDAGContext.
 func NewContext(
 	ctx context.Context,
 	dag *core.DAG,
@@ -237,12 +242,16 @@ func NewContext(
 }
 
 // WithDAGContext returns a new context with the given DAGContext.
-// This is useful for tests that need to set up a DAGContext directly.
+// WithDAGContext returns a copy of ctx that stores the provided Context value
+// under the package's dagCtxKey. This is useful for tests that need to inject a
+// DAG execution Context directly into a context.
 func WithDAGContext(ctx context.Context, dagCtx Context) context.Context {
 	return context.WithValue(ctx, dagCtxKey{}, dagCtx)
 }
 
-// GetDAGContext retrieves the DAGContext from the context.
+// GetDAGContext retrieves the execution Context stored in the provided context.
+// If no Context is present or the stored value has the wrong type, it logs an error
+// and returns an empty Context.
 func GetDAGContext(ctx context.Context) Context {
 	value := ctx.Value(dagCtxKey{})
 	if value == nil {

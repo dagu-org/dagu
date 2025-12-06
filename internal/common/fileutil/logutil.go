@@ -539,7 +539,8 @@ func readLinesRange(filePath string, offset, limit int, totalLines int, decoder 
 }
 
 // ReadLogContent reads a specific portion of a log file and returns it as a string
-// nolint:revive
+// ReadLogContent reads the specified portion of a log file according to options and returns the content as a single string along with line metadata.
+// The returned values are: content string, number of lines returned, total lines in the file, whether more lines are available, whether the total is an estimate, and an error if any.
 func ReadLogContent(filePath string, options LogReadOptions) (string, int, int, bool, bool, error) {
 	result, err := ReadLogLines(filePath, options)
 	if err != nil {
@@ -553,7 +554,9 @@ func ReadLogContent(filePath string, options LogReadOptions) (string, int, int, 
 // DecodeString decodes a byte slice using the specified character encoding.
 // If the encoding is empty, UTF-8, or unknown, the bytes are returned as-is.
 // This function is useful for converting log output from non-UTF-8 encodings
-// (such as Shift_JIS, EUC-JP, etc.) to UTF-8 strings.
+// DecodeString converts data from the given charset (for example "Shift_JIS" or "EUC-JP") to a UTF-8 string.
+// If data is empty, it returns an empty string. If the charset is empty or unrecognized, or if decoding fails,
+// the function returns the original bytes interpreted as a UTF-8 string.
 func DecodeString(charset string, data []byte) string {
 	if len(data) == 0 {
 		return ""

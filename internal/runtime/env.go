@@ -101,7 +101,13 @@ func (e Env) UserEnvsMap() map[string]string {
 	return result
 }
 
-// NewEnvForStep creates a new execution context with the given step.
+// NewEnvForStep creates a new Env configured for executing the provided step.
+//
+// The returned Env embeds the DAG execution context extracted from ctx, resolves
+// the step's working directory, and initializes per-step environment state.
+// It sets Envs with the DAG run step name and PWD, populates Variables with DAG
+// params present in the parent DAG (each stored as "key=full_value" for params
+// that contain an '='), and initializes an empty StepMap and the provided Step.
 func NewEnvForStep(ctx context.Context, step core.Step) Env {
 	parentEnv := execution.GetDAGContext(ctx)
 	workingDir := resolveStepWorkingDir(ctx, step, parentEnv)
@@ -131,6 +137,16 @@ func NewEnvForStep(ctx context.Context, step core.Step) Env {
 	}
 }
 
+// resolveStepWorkingDir determines the filesystem working directory to use for a step.
+// 
+// It uses the step's Dir when provided, expanding environment variables by first consulting
+// the parent DAG's env list and then the process environment. If the expanded path is
+// absolute or begins with '~', it is resolved to an absolute path. If the path is relative
+// and the parent DAG defines a WorkingDir, the result is interpreted relative to that DAG
+// working directory. When no step Dir is set, the parent DAG's WorkingDir is returned if present.
+// If resolution fails or no DAG working directory is available, the function falls back to the
+// current working directory and, if that cannot be obtained, the user's home directory.
+// Warning and error conditions are logged via the package logger when resolution cannot be completed.
 func resolveStepWorkingDir(ctx context.Context, step core.Step, parentEnv execution.Context) string {
 	parentDAG := parentEnv.DAG
 
