@@ -196,76 +196,77 @@ func TestCondition_Eval(t *testing.T) {
 // TestNegateDoesNotSwallowEvaluationErrors verifies that when Negate is true,
 // evaluation/runtime errors are NOT swallowed - only ErrConditionNotMet is inverted.
 func TestNegateDoesNotSwallowEvaluationErrors(t *testing.T) {
-	t.Run("EvalStringErrorNotSwallowed", func(t *testing.T) {
-		// Use a command substitution that will definitely fail during evaluation.
-		// This tests that EvalString errors (which are NOT ErrConditionNotMet) are NOT inverted.
-		cond := &core.Condition{
-			Condition: "`/nonexistent_binary_xyz_123_456`",
-			Expected:  "anything",
-			Negate:    true,
-		}
+	tests := []struct {
+		name                 string
+		condition            *core.Condition
+		wantErr              bool
+		wantConditionNotMet  bool // true if error should be ErrConditionNotMet
+		notConditionNotMet   bool // true if error should NOT be ErrConditionNotMet
+	}{
+		{
+			name: "EvalStringErrorNotSwallowed",
+			condition: &core.Condition{
+				// Command substitution with non-existent binary fails during evaluation
+				// This error is NOT ErrConditionNotMet, so it should NOT be inverted
+				Condition: "`/nonexistent_binary_xyz_123_456`",
+				Expected:  "anything",
+				Negate:    true,
+			},
+			wantErr:            true,
+			notConditionNotMet: true, // evaluation errors should not be ErrConditionNotMet
+		},
+		{
+			name: "CommandNotFoundInvertedToSuccess",
+			condition: &core.Condition{
+				// Command not found returns ErrConditionNotMet (wrapped around exec error)
+				// With Negate: true, ErrConditionNotMet is inverted to success
+				Condition: "/nonexistent/path/to/command_xyz_123_abc",
+				Negate:    true,
+			},
+			wantErr: false, // ErrConditionNotMet is inverted to success
+		},
+		{
+			name: "FalseCommandInvertedToSuccess",
+			condition: &core.Condition{
+				// "false" command exits with code 1, which wraps as ErrConditionNotMet
+				// With Negate: true, it should be inverted to success
+				Condition: "false",
+				Negate:    true,
+			},
+			wantErr: false, // ErrConditionNotMet is inverted to success
+		},
+		{
+			name: "MatchingConditionWithNegateFailsAsConditionNotMet",
+			condition: &core.Condition{
+				// When condition matches but negate is true, it should fail with ErrConditionNotMet
+				Condition: "hello",
+				Expected:  "hello",
+				Negate:    true,
+			},
+			wantErr:             true,
+			wantConditionNotMet: true,
+		},
+	}
 
-		ctx := context.Background()
-		ctx = runtime.WithEnv(ctx, runtime.NewEnv(ctx, core.Step{}))
-		err := runtime.EvalCondition(ctx, []string{"sh"}, cond)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			ctx = runtime.WithEnv(ctx, runtime.NewEnv(ctx, core.Step{}))
+			err := runtime.EvalCondition(ctx, []string{"sh"}, tt.condition)
 
-		// The error should be returned even with Negate: true, because it's an evaluation error
-		// (failed to run command substitution), not a "condition not met" error.
-		require.Error(t, err)
-		// Crucially, this error should NOT be ErrConditionNotMet
-		require.False(t, errors.Is(err, runtime.ErrConditionNotMet),
-			"evaluation errors should not be wrapped as ErrConditionNotMet")
-	})
-
-	t.Run("CommandNotFound", func(t *testing.T) {
-		// Test with a command that definitely won't exist
-		cond := &core.Condition{
-			Condition: "/nonexistent/path/to/command_xyz_123_abc",
-			Negate:    true,
-		}
-
-		ctx := context.Background()
-		ctx = runtime.WithEnv(ctx, runtime.NewEnv(ctx, core.Step{}))
-		err := runtime.EvalCondition(ctx, []string{"sh"}, cond)
-
-		// Command not found returns ErrConditionNotMet (wrapped around exec error)
-		// so with Negate: true, it should be inverted to success
-		// This is the expected behavior - command failures are "condition not met"
-		require.NoError(t, err)
-	})
-
-	t.Run("NegateOnlyInvertsConditionNotMet", func(t *testing.T) {
-		// This test verifies that only ErrConditionNotMet is inverted
-		// If matchCondition returns an error that is NOT ErrConditionNotMet,
-		// it should still be returned
-
-		// "false" command exits with code 1, which wraps as ErrConditionNotMet
-		cond := &core.Condition{
-			Condition: "false",
-			Negate:    true,
-		}
-
-		ctx := context.Background()
-		ctx = runtime.WithEnv(ctx, runtime.NewEnv(ctx, core.Step{}))
-		err := runtime.EvalCondition(ctx, []string{"sh"}, cond)
-
-		// With Negate: true, "false" (which returns ErrConditionNotMet) should be inverted to success
-		require.NoError(t, err)
-	})
-
-	t.Run("NegateWithMatchingConditionFails", func(t *testing.T) {
-		// When condition matches but negate is true, it should fail with ErrConditionNotMet
-		cond := &core.Condition{
-			Condition: "hello",
-			Expected:  "hello",
-			Negate:    true,
-		}
-
-		ctx := context.Background()
-		ctx = runtime.WithEnv(ctx, runtime.NewEnv(ctx, core.Step{}))
-		err := runtime.EvalCondition(ctx, []string{"sh"}, cond)
-
-		require.Error(t, err)
-		require.True(t, errors.Is(err, runtime.ErrConditionNotMet))
-	})
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.wantConditionNotMet {
+					require.True(t, errors.Is(err, runtime.ErrConditionNotMet),
+						"expected ErrConditionNotMet but got: %v", err)
+				}
+				if tt.notConditionNotMet {
+					require.False(t, errors.Is(err, runtime.ErrConditionNotMet),
+						"evaluation errors should not be wrapped as ErrConditionNotMet")
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
