@@ -112,7 +112,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 	r.metrics.totalNodes = len(nodes)
 
 	// If one of the conditions does not met, cancel the execution.
-	rCtx := execution.GetContext(ctx)
+	rCtx := GetDAGContext(ctx)
 	var shell []string
 	if rCtx.DAG.Shell != "" {
 		shell = append([]string{rCtx.DAG.Shell}, rCtx.DAG.ShellArgs...)

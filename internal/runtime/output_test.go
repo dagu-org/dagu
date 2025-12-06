@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,7 +63,7 @@ func TestNode_LargeOutput(t *testing.T) {
 			ctx := context.Background()
 			// Set up environment context with proper DAG
 			dag := &core.DAG{Name: "test"}
-			ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+			ctx = NewContext(ctx, dag, "test-run", "test.log")
 
 			// Setup node with a temporary directory
 			tmpDir := t.TempDir()
@@ -132,7 +131,7 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 	ctx := context.Background()
 	// Set up environment context with proper DAG
 	dag := &core.DAG{Name: "test"}
-	ctx = execution.NewContext(ctx, dag, "deadlock-test", "test.log")
+	ctx = NewContext(ctx, dag, "deadlock-test", "test.log")
 
 	tmpDir := t.TempDir()
 	err := node.Prepare(ctx, tmpDir, "deadlock-test")
@@ -181,7 +180,7 @@ func TestNode_OutputExceedsLimit(t *testing.T) {
 	ctx := context.Background()
 	// Set up environment context with proper DAG
 	dag := &core.DAG{Name: "test"}
-	ctx = execution.NewContext(ctx, dag, "exceed-limit-test", "test.log")
+	ctx = NewContext(ctx, dag, "exceed-limit-test", "test.log")
 
 	tmpDir := t.TempDir()
 	err := node.Prepare(ctx, tmpDir, "exceed-limit-test")
@@ -217,7 +216,7 @@ func TestNode_CustomOutputLimit(t *testing.T) {
 		Name:          "test",
 		MaxOutputSize: 50 * 1024, // 50KB limit
 	}
-	ctx = execution.NewContext(ctx, dag, "custom-limit-test", "test.log")
+	ctx = NewContext(ctx, dag, "custom-limit-test", "test.log")
 
 	tmpDir := t.TempDir()
 	err := node.Prepare(ctx, tmpDir, "custom-limit-test")
@@ -253,7 +252,7 @@ func TestNode_ConcurrentOutputCapture(t *testing.T) {
 	ctx := context.Background()
 	// Set up environment context with proper DAG
 	dag := &core.DAG{Name: "test"}
-	ctx = execution.NewContext(ctx, dag, "concurrent-test", "test.log")
+	ctx = NewContext(ctx, dag, "concurrent-test", "test.log")
 
 	tmpDir := t.TempDir()
 	err := node.Prepare(ctx, tmpDir, "concurrent-test")

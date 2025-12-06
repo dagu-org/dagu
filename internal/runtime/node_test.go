@@ -483,7 +483,7 @@ func TestNodeBuildSubDAGRuns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := execution.NewContext(context.Background(), &core.DAG{}, "test-run", "test.log")
+			ctx := runtime.NewContext(context.Background(), &core.DAG{}, "test-run", "test.log")
 
 			if tt.setupEnv != nil {
 				ctx = tt.setupEnv(ctx)
@@ -815,7 +815,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 			}
 
 			// Setup environment with DAG
-			ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+			ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 
 			step := core.Step{
 				Name:    "test-output-capture",
@@ -868,7 +868,7 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 					MaxOutputSize: size,
 				}
 
-				ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+				ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 				env := runtime.GetEnv(ctx)
 
 				// Verify the MaxOutputSize is properly set in the environment
@@ -1137,7 +1137,7 @@ func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 }
 
 func (n nodeHelper) execContext(dagRunID string) context.Context {
-	return execution.NewContext(n.Context, &core.DAG{}, dagRunID, "logFile")
+	return runtime.NewContext(n.Context, &core.DAG{}, dagRunID, "logFile")
 }
 
 func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
@@ -1165,7 +1165,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		// Setup context with working directory
 		ctx := context.Background()
 		dag := &core.DAG{}
-		ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+		ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 		env := runtime.GetEnv(ctx)
 		env.WorkingDir = workDir
 		ctx = runtime.WithEnv(ctx, env)
@@ -1205,7 +1205,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		// Setup context with working directory
 		ctx := context.Background()
 		dag := &core.DAG{}
-		ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+		ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 		env := runtime.GetEnv(ctx)
 		env.WorkingDir = workDir
 		ctx = runtime.WithEnv(ctx, env)
@@ -1250,7 +1250,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		// Setup context with working directory
 		ctx := context.Background()
 		dag := &core.DAG{}
-		ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+		ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 		env := runtime.GetEnv(ctx)
 		env.WorkingDir = workDir
 		ctx = runtime.WithEnv(ctx, env)
@@ -1296,7 +1296,7 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		// Setup context with working directory
 		ctx := context.Background()
 		dag := &core.DAG{}
-		ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+		ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 		env := runtime.GetEnv(ctx)
 		env.WorkingDir = workDir
 		ctx = runtime.WithEnv(ctx, env)

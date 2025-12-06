@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/common/collections"
-	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -106,12 +105,7 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 				Name:       "test-dag",
 				WorkingDir: tempDir,
 			}
-			baseEnv := config.NewBaseEnv(nil)
-			dagCtx := execution.Context{
-				DAG:     dag,
-				BaseEnv: &baseEnv,
-			}
-			ctx := execution.WithContext(context.Background(), dagCtx)
+			ctx := execution.NewContext(context.Background(), dag, "", "")
 
 			env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
 			env = tt.setupEnv(env)
@@ -252,7 +246,7 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 			dagCtx := execution.Context{
 				DAG: dag,
 			}
-			ctx := execution.WithContext(context.Background(), dagCtx)
+			ctx := runtime.WithDAGContext(context.Background(), dagCtx)
 
 			env := runtime.NewEnv(ctx, tt.step)
 
@@ -283,7 +277,7 @@ func TestNewEnvForStep_BasicFields(t *testing.T) {
 	dagCtx := execution.Context{
 		DAG: dag,
 	}
-	ctx := execution.WithContext(context.Background(), dagCtx)
+	ctx := runtime.WithDAGContext(context.Background(), dagCtx)
 
 	step := core.Step{
 		Name:    "test-step",
@@ -323,7 +317,7 @@ func TestNewEnvForStep_WorkingDirectory_DAGEnvExpansion(t *testing.T) {
 	dagCtx := execution.Context{
 		DAG: dag,
 	}
-	ctx := execution.WithContext(context.Background(), dagCtx)
+	ctx := runtime.WithDAGContext(context.Background(), dagCtx)
 
 	step := core.Step{
 		Name: "test-step",
@@ -350,7 +344,7 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 			name: "IncludesVariablesFromPreviousSteps",
 			setup: func(ctx context.Context) (context.Context, runtime.Env) {
 				dag := &core.DAG{Env: []string{"DAG_VAR=dag_value"}}
-				ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+				ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})
 				env.Variables.Store("OUTPUT_VAR", "OUTPUT_VAR=output_value")
 				return ctx, env
@@ -365,8 +359,8 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 			setup: func(ctx context.Context) (context.Context, runtime.Env) {
 				dag := &core.DAG{Env: []string{"KEY=dag"}}
 				secrets := []string{"KEY=secret"}
-				ctx = execution.NewContext(ctx, dag, "test-run", "test.log",
-					execution.WithSecrets(secrets),
+				ctx = runtime.NewContext(ctx, dag, "test-run", "test.log",
+					runtime.WithSecrets(secrets),
 				)
 
 				step := core.Step{Name: "test", Env: []string{"KEY=step"}}
@@ -394,8 +388,8 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 			setup: func(ctx context.Context) (context.Context, runtime.Env) {
 				dag := &core.DAG{}
 				secrets := []string{"MY_SECRET=super-secret"}
-				ctx = execution.NewContext(ctx, dag, "test-run", "test.log",
-					execution.WithSecrets(secrets),
+				ctx = runtime.NewContext(ctx, dag, "test-run", "test.log",
+					runtime.WithSecrets(secrets),
 				)
 
 				step := core.Step{Name: "test", Env: []string{"GITHUB_TOKEN=${MY_SECRET}"}}
@@ -422,7 +416,7 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 			name: "ExcludesOSEnvironment",
 			setup: func(ctx context.Context) (context.Context, runtime.Env) {
 				dag := &core.DAG{Env: []string{"USER_VAR=user"}}
-				ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+				ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})
 				return ctx, env
 			},
@@ -467,7 +461,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				dag := &core.DAG{
 					Env: []string{"FOO=from_dag"},
 				}
-				ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+				ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 
 				// Create executor env
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})
@@ -490,7 +484,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				dag := &core.DAG{
 					Env: []string{"BAR=from_dag"},
 				}
-				ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+				ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 
 				// Create executor env
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})
@@ -510,7 +504,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				dag := &core.DAG{
 					Env: []string{"BAZ=from_dag"},
 				}
-				ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+				ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 
 				// Create executor env
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})
@@ -527,7 +521,7 @@ func TestEnv_EvalString_Precedence(t *testing.T) {
 				dag := &core.DAG{
 					Env: []string{"VAR1=dag1", "VAR2=dag2", "VAR3=dag3"},
 				}
-				ctx = execution.NewContext(ctx, dag, "test-run", "test.log")
+				ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
 
 				// Create executor env
 				env := runtime.NewEnv(ctx, core.Step{Name: "test"})

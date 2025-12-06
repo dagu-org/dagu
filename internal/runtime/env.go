@@ -25,7 +25,7 @@ type Env struct {
 	// Embedded execution metadata from parent DAG run containing DAGRunID,
 	// RootDAGRun reference, DAG configuration, database interface,
 	// DAG-level environment variables, and coordinator dispatcher
-	execution.Context
+	Context
 
 	// Thread-safe map storing output variables from previously executed steps
 	// in the format "key=value". These variables are populated when a step
@@ -103,7 +103,7 @@ func (e Env) UserEnvsMap() map[string]string {
 
 // NewEnv creates a new execution context with the given step.
 func NewEnv(ctx context.Context, step core.Step) Env {
-	rCtx := execution.GetContext(ctx)
+	rCtx := GetDAGContext(ctx)
 	workingDir := resolveWorkingDir(ctx, step, rCtx)
 
 	envs := map[string]string{
@@ -131,7 +131,7 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 	}
 }
 
-func resolveWorkingDir(ctx context.Context, step core.Step, rCtx execution.Context) string {
+func resolveWorkingDir(ctx context.Context, step core.Step, rCtx Context) string {
 	dag := rCtx.DAG
 
 	if step.Dir != "" {
@@ -304,7 +304,7 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOptio
 	// ${FOO} will be replaced with "step" in the first iteration,
 	// leaving no ${FOO} for the DAG env to replace.
 
-	rCtx := execution.GetContext(ctx)
+	rCtx := GetDAGContext(ctx)
 	if option.ExpandEnv {
 		opts = append(opts, cmdutil.WithVariables(e.Envs))
 		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))

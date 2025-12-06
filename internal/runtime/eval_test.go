@@ -4,25 +4,19 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
 )
 
-// Note: These tests use execution.SetupDAGContext to set up the DAG context,
-// then use runtime.NewEnvForStep/GetEnv/WithEnv to manage the runtime Env.
-
-// setupTestContext creates a test context with properly initialized DAGContext
 func setupTestContext() context.Context {
-	ctx := context.Background()
-	baseEnv := config.NewBaseEnv(nil)
-	dagCtx := execution.Context{
-		DAG:     &core.DAG{Name: "test-dag"},
-		BaseEnv: &baseEnv,
-	}
-	return execution.WithContext(ctx, dagCtx)
+	return execution.NewContext(
+		context.Background(),
+		&core.DAG{Name: "test-dag"},
+		"", // dagRunID
+		"", // logFile
+	)
 }
 
 func TestEvalString(t *testing.T) {
@@ -481,7 +475,7 @@ func TestEvalStringEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	// Create a test context with environment variables
-	ctx := execution.NewContext(context.Background(), &core.DAG{}, "test-run", "test.log")
+	ctx := runtime.NewContext(context.Background(), &core.DAG{}, "test-run", "test.log")
 	env := runtime.GetEnv(ctx)
 	env.Variables.Store("EMPTY", "EMPTY=")
 	env.Variables.Store("SPACES", "SPACES=  ")
@@ -631,7 +625,7 @@ func TestEvalBoolEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	// Create a test context with environment variables
-	ctx := execution.NewContext(context.Background(), &core.DAG{}, "test-run", "test.log")
+	ctx := runtime.NewContext(context.Background(), &core.DAG{}, "test-run", "test.log")
 
 	env := runtime.GetEnv(ctx)
 	env.Variables.Store("YES", "YES=yes")
