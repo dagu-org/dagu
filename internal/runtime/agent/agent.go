@@ -622,6 +622,7 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 		transform.WithFinishedAt(a.plan.FinishAt()),
 		transform.WithNodes(a.plan.NodeData()),
 		transform.WithLogFilePath(a.logFile),
+		transform.WithOnInitNode(a.runner.HandlerNode(core.HandlerOnInit)),
 		transform.WithOnExitNode(a.runner.HandlerNode(core.HandlerOnExit)),
 		transform.WithOnSuccessNode(a.runner.HandlerNode(core.HandlerOnSuccess)),
 		transform.WithOnFailureNode(a.runner.HandlerNode(core.HandlerOnFailure)),
@@ -753,6 +754,10 @@ func (a *Agent) newRunner() *runtime.Runner {
 		Delay:          a.dag.Delay,
 		Dry:            a.dry,
 		DAGRunID:       a.dagRunID,
+	}
+
+	if a.dag.HandlerOn.Init != nil {
+		cfg.OnInit = a.dag.HandlerOn.Init
 	}
 
 	if a.dag.HandlerOn.Exit != nil {

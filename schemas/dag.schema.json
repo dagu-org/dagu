@@ -172,20 +172,25 @@
     "handlerOn": {
       "type": "object",
       "properties": {
+        "init": {
+          "$ref": "#/definitions/step",
+          "description": "Step to execute before any workflow steps run (after preconditions pass). If this fails, the DAG fails and no steps execute."
+        },
         "failure": {
           "$ref": "#/definitions/step"
         },
         "success": {
           "$ref": "#/definitions/step"
         },
-        "cancel": {
-          "$ref": "#/definitions/step"
+        "abort": {
+          "$ref": "#/definitions/step",
+          "description": "Step to execute when the DAG is aborted."
         },
         "exit": {
           "$ref": "#/definitions/step"
         }
       },
-      "description": "Lifecycle event hooks that define commands to execute when the DAG succeeds, fails, is aborted, or exits. Useful for cleanup, notifications, or triggering dependent DAGs."
+      "description": "Lifecycle event hooks that define commands to execute at various points in the DAG lifecycle: init (before steps), success, failure, abort, and exit (always runs last)."
     },
     "smtp": {
       "type": "object",

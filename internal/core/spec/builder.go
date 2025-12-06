@@ -62,6 +62,7 @@ const (
 	BuildFlagOnlyMetadata
 	BuildFlagAllowBuildErrors
 	BuildFlagSkipSchemaValidation
+	BuildFlagSkipBaseHandlers // Skip merging handlerOn from base config (for sub-DAG runs)
 )
 
 // BuildOpts is used to control the behavior of the builder.
@@ -727,6 +728,13 @@ func buildLogDir(_ BuildContext, spec *definition, dag *core.DAG) (err error) {
 func buildHandlers(ctx BuildContext, spec *definition, dag *core.DAG) (err error) {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
 
+	if spec.HandlerOn.Init != nil {
+		spec.HandlerOn.Init.Name = core.HandlerOnInit.String()
+		if dag.HandlerOn.Init, err = buildStep(buildCtx, *spec.HandlerOn.Init); err != nil {
+			return err
+		}
+	}
+
 	if spec.HandlerOn.Exit != nil {
 		spec.HandlerOn.Exit.Name = core.HandlerOnExit.String()
 		if dag.HandlerOn.Exit, err = buildStep(buildCtx, *spec.HandlerOn.Exit); err != nil {
@@ -748,9 +756,21 @@ func buildHandlers(ctx BuildContext, spec *definition, dag *core.DAG) (err error
 		}
 	}
 
-	if spec.HandlerOn.Cancel != nil {
-		spec.HandlerOn.Cancel.Name = core.HandlerOnCancel.String()
-		if dag.HandlerOn.Cancel, err = buildStep(buildCtx, *spec.HandlerOn.Cancel); err != nil {
+	// Handle Abort (canonical) and Cancel (deprecated, for backward compatibility)
+	// Error if both are specified
+	if spec.HandlerOn.Abort != nil && spec.HandlerOn.Cancel != nil {
+		return fmt.Errorf("cannot specify both 'abort' and 'cancel' in handlerOn; use 'abort' (cancel is deprecated)")
+	}
+	var abortDef *stepDef
+	switch {
+	case spec.HandlerOn.Abort != nil:
+		abortDef = spec.HandlerOn.Abort
+	case spec.HandlerOn.Cancel != nil:
+		abortDef = spec.HandlerOn.Cancel
+	}
+	if abortDef != nil {
+		abortDef.Name = core.HandlerOnCancel.String()
+		if dag.HandlerOn.Cancel, err = buildStep(buildCtx, *abortDef); err != nil {
 			return
 		}
 	}

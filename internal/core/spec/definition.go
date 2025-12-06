@@ -92,9 +92,11 @@ type definition struct {
 
 // handlerOnDef defines the steps to be executed on different events.
 type handlerOnDef struct {
+	Init    *stepDef // Step to execute before steps (after preconditions pass)
 	Failure *stepDef // Step to execute on failure
 	Success *stepDef // Step to execute on success
-	Cancel  *stepDef // Step to execute on cancel
+	Abort   *stepDef // Step to execute on abort (canonical field)
+	Cancel  *stepDef // Step to execute on cancel (deprecated: use Abort instead)
 	Exit    *stepDef // Step to execute on exit
 }
 

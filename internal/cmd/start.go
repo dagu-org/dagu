@@ -132,7 +132,7 @@ func runStart(ctx *Context, args []string) error {
 		}
 	} else {
 		// Load parameters and DAG
-		dag, params, err = loadDAGWithParams(ctx, args)
+		dag, params, err = loadDAGWithParams(ctx, args, isSubDAGRun)
 		if err != nil {
 			return err
 		}
@@ -302,8 +302,9 @@ func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isS
 	return dagRunID, rootDAGRun, parentDAGRun, isSubDAGRun, nil
 }
 
-// loadDAGWithParams loads the DAG and its parameters from command arguments
-func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
+// loadDAGWithParams loads the DAG and its parameters from command arguments.
+// When isSubDAGRun is true, handlers from base config are skipped to prevent inheritance.
+func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG, string, error) {
 	var dagPath string
 	var interactiveParams string
 
@@ -348,6 +349,12 @@ func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
 	loadOpts := []spec.LoadOption{
 		spec.WithBaseConfig(ctx.Config.Paths.BaseConfig),
 		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
+	}
+
+	// Skip base handlers for sub-DAG runs to prevent handler inheritance.
+	// Sub-DAGs should define their own handlers explicitly if needed.
+	if isSubDAGRun {
+		loadOpts = append(loadOpts, spec.WithSkipBaseHandlers())
 	}
 
 	// Get name override from flags if provided
