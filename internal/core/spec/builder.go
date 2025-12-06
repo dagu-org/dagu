@@ -62,6 +62,7 @@ const (
 	BuildFlagOnlyMetadata
 	BuildFlagAllowBuildErrors
 	BuildFlagSkipSchemaValidation
+	BuildFlagSkipBaseHandlers // Skip merging handlerOn from base config (for sub-DAG runs)
 )
 
 // BuildOpts is used to control the behavior of the builder.

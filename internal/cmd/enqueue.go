@@ -54,8 +54,8 @@ func runEnqueue(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to get queue override: %w", err)
 	}
 
-	// Load parameters and DAG
-	dag, _, err := loadDAGWithParams(ctx, args)
+	// Load parameters and DAG (enqueue is always for root DAGs, not sub-DAGs)
+	dag, _, err := loadDAGWithParams(ctx, args, false)
 	if err != nil {
 		return err
 	}
