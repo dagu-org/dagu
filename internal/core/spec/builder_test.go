@@ -1278,6 +1278,121 @@ steps:
 		assert.True(t, th.Steps[0].ContinueOn.Failure)
 		assert.True(t, th.Steps[0].ContinueOn.Skipped)
 	})
+	t.Run("ContinueOnStringSkipped", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: "echo 1"
+    continueOn: skipped
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		assert.Len(t, th.Steps, 1)
+		assert.True(t, th.Steps[0].ContinueOn.Skipped)
+		assert.False(t, th.Steps[0].ContinueOn.Failure)
+	})
+	t.Run("ContinueOnStringFailed", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: "echo 1"
+    continueOn: failed
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		assert.Len(t, th.Steps, 1)
+		assert.False(t, th.Steps[0].ContinueOn.Skipped)
+		assert.True(t, th.Steps[0].ContinueOn.Failure)
+	})
+	t.Run("ContinueOnStringCaseInsensitive", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: "echo 1"
+    continueOn: SKIPPED
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		assert.Len(t, th.Steps, 1)
+		assert.True(t, th.Steps[0].ContinueOn.Skipped)
+	})
+	t.Run("ContinueOnInvalidString", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: "echo 1"
+    continueOn: invalid
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "continueOn")
+	})
+	t.Run("ContinueOnObjectWithExitCode", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: "echo 1"
+    continueOn:
+      exitCode: [1, 2, 3]
+      markSuccess: true
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		assert.Len(t, th.Steps, 1)
+		assert.Equal(t, []int{1, 2, 3}, th.Steps[0].ContinueOn.ExitCode)
+		assert.True(t, th.Steps[0].ContinueOn.MarkSuccess)
+	})
+	t.Run("ContinueOnInvalidFailureType", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: "echo 1"
+    continueOn:
+      failure: "true"
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "continueOn.failure")
+		assert.Contains(t, err.Error(), "boolean")
+	})
+	t.Run("ContinueOnInvalidSkippedType", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: "echo 1"
+    continueOn:
+      skipped: 1
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "continueOn.skipped")
+		assert.Contains(t, err.Error(), "boolean")
+	})
+	t.Run("ContinueOnInvalidMarkSuccessType", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - command: "echo 1"
+    continueOn:
+      markSuccess: "yes"
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "continueOn.markSuccess")
+		assert.Contains(t, err.Error(), "boolean")
+	})
 	t.Run("RetryPolicy", func(t *testing.T) {
 		t.Parallel()
 

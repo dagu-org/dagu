@@ -132,7 +132,8 @@ type stepDef struct {
 	// Depends is the list of steps to depend on.
 	Depends any `yaml:"depends,omitempty"` // string or []string
 	// ContinueOn is the condition to continue on.
-	ContinueOn *continueOnDef `yaml:"continueOn,omitempty"`
+	// Can be a string ("skipped", "failed") or an object with detailed config.
+	ContinueOn any `yaml:"continueOn,omitempty"`
 	// RetryPolicy is the retry policy.
 	RetryPolicy *retryPolicyDef `yaml:"retryPolicy,omitempty"`
 	// RepeatPolicy is the repeat policy.
@@ -166,15 +167,6 @@ type stepDef struct {
 	Env any `yaml:"env,omitempty"`
 	// TimeoutSec specifies the maximum runtime for the step in seconds.
 	TimeoutSec int `yaml:"timeoutSec,omitempty"`
-}
-
-// continueOnDef defines the conditions to continue on failure or skipped.
-type continueOnDef struct {
-	Failure     bool // Continue on failure
-	Skipped     bool // Continue on skipped
-	ExitCode    any  // Continue on specific exit codes
-	Output      any  // Continue on specific output (string or []string)
-	MarkSuccess bool // Mark the step as success when the condition is met
 }
 
 // repeatPolicyDef defines the repeat policy for a step.

@@ -654,56 +654,65 @@
           ]
         },
         "continueOn": {
-          "type": "object",
-          "properties": {
-            "failure": {
-              "type": "boolean",
-              "description": "Continue dag-run even if this step fails"
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["skipped", "failed"],
+              "description": "Shorthand: 'skipped' to continue if step is skipped, 'failed' to continue if step fails"
             },
-            "skipped": {
-              "type": "boolean",
-              "description": "Continue dag-run even if this step is skipped due to preconditions"
-            },
-            "exitCode": {
-              "oneOf": [
-                {
-                  "type": "integer",
-                  "description": "Exit code that should be treated as successful"
+            {
+              "type": "object",
+              "properties": {
+                "failure": {
+                  "type": "boolean",
+                  "description": "Continue dag-run even if this step fails"
                 },
-                {
-                  "type": "string",
-                  "description": "Exit code represented as a string (parsed as integer at runtime)"
+                "skipped": {
+                  "type": "boolean",
+                  "description": "Continue dag-run even if this step is skipped due to preconditions"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "integer"
-                  },
-                  "description": "List of exit codes that should be treated as successful"
+                "exitCode": {
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "description": "Exit code that should be treated as successful"
+                    },
+                    {
+                      "type": "string",
+                      "description": "Exit code represented as a string (parsed as integer at runtime)"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "description": "List of exit codes that should be treated as successful"
+                    }
+                  ]
+                },
+                "output": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "description": "Output text or pattern that indicates success. Supports regex with 're:' prefix."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "Output text or patterns that indicate success. Supports regex with 're:' prefix."
+                      }
+                    }
+                  ]
+                },
+                "markSuccess": {
+                  "type": "boolean",
+                  "description": "Mark the step as successful even if it technically failed but met continue conditions"
                 }
-              ]
-            },
-            "output": {
-              "oneOf": [
-                {
-                  "type": "string",
-                  "description": "Output text or pattern that indicates success. Supports regex with 're:' prefix."
-                },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Output text or patterns that indicate success. Supports regex with 're:' prefix."
-                  }
-                }
-              ]
-            },
-            "markSuccess": {
-              "type": "boolean",
-              "description": "Mark the step as successful even if it technically failed but met continue conditions"
+              }
             }
-          },
-          "description": "Conditions under which the DAG should continue executing even if this step fails or is skipped."
+          ],
+          "description": "Conditions under which the DAG should continue executing even if this step fails or is skipped. Can be a string ('skipped' or 'failed') or an object with detailed configuration."
         },
         "retryPolicy": {
           "type": "object",

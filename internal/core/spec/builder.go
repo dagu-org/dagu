@@ -1304,21 +1304,58 @@ func buildContinueOn(_ StepBuildContext, def stepDef, step *core.Step) error {
 	if def.ContinueOn == nil {
 		return nil
 	}
-	step.ContinueOn.Skipped = def.ContinueOn.Skipped
-	step.ContinueOn.Failure = def.ContinueOn.Failure
-	step.ContinueOn.MarkSuccess = def.ContinueOn.MarkSuccess
 
-	exitCodes, err := parseIntOrArray(def.ContinueOn.ExitCode)
-	if err != nil {
-		return core.NewValidationError("continueOn.exitCode", def.ContinueOn.ExitCode, ErrContinueOnExitCodeMustBeIntOrArray)
-	}
-	step.ContinueOn.ExitCode = exitCodes
+	switch v := def.ContinueOn.(type) {
+	case string:
+		// Shorthand syntax: "skipped" or "failed"
+		switch strings.ToLower(strings.TrimSpace(v)) {
+		case "skipped":
+			step.ContinueOn.Skipped = true
+		case "failed":
+			step.ContinueOn.Failure = true
+		default:
+			return core.NewValidationError("continueOn", v, ErrContinueOnInvalidStringValue)
+		}
 
-	output, err := parseStringOrArray(def.ContinueOn.Output)
-	if err != nil {
-		return core.NewValidationError("continueOn.stdout", def.ContinueOn.Output, ErrContinueOnOutputMustBeStringOrArray)
+	case map[string]any:
+		// Object syntax with detailed configuration
+		if val, exists := v["failure"]; exists {
+			b, ok := val.(bool)
+			if !ok {
+				return core.NewValidationError("continueOn.failure", val, ErrContinueOnFieldMustBeBool)
+			}
+			step.ContinueOn.Failure = b
+		}
+		if val, exists := v["skipped"]; exists {
+			b, ok := val.(bool)
+			if !ok {
+				return core.NewValidationError("continueOn.skipped", val, ErrContinueOnFieldMustBeBool)
+			}
+			step.ContinueOn.Skipped = b
+		}
+		if val, exists := v["markSuccess"]; exists {
+			b, ok := val.(bool)
+			if !ok {
+				return core.NewValidationError("continueOn.markSuccess", val, ErrContinueOnFieldMustBeBool)
+			}
+			step.ContinueOn.MarkSuccess = b
+		}
+
+		exitCodes, err := parseIntOrArray(v["exitCode"])
+		if err != nil {
+			return core.NewValidationError("continueOn.exitCode", v["exitCode"], ErrContinueOnExitCodeMustBeIntOrArray)
+		}
+		step.ContinueOn.ExitCode = exitCodes
+
+		output, err := parseStringOrArray(v["output"])
+		if err != nil {
+			return core.NewValidationError("continueOn.output", v["output"], ErrContinueOnOutputMustBeStringOrArray)
+		}
+		step.ContinueOn.Output = output
+
+	default:
+		return core.NewValidationError("continueOn", def.ContinueOn, ErrContinueOnMustBeStringOrMap)
 	}
-	step.ContinueOn.Output = output
 
 	return nil
 }
