@@ -636,8 +636,8 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 
 	// Get maxOutputSize from DAG configuration
 	var maxOutputSize = 1024 * 1024 // Default 1MB
-	if env := execution.GetDAGContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
-		maxOutputSize = env.DAG.MaxOutputSize
+	if execCtx := execution.GetContext(ctx); execCtx.DAG != nil && execCtx.DAG.MaxOutputSize > 0 {
+		maxOutputSize = execCtx.DAG.MaxOutputSize
 	}
 
 	// Create scanner with default buffer, but configure max size based on DAG config

@@ -22,7 +22,7 @@ func setupTestContext() context.Context {
 		DAG:     &core.DAG{Name: "test-dag"},
 		BaseEnv: &baseEnv,
 	}
-	return execution.WithDAGContext(ctx, dagCtx)
+	return execution.WithContext(ctx, dagCtx)
 }
 
 func TestEvalString(t *testing.T) {
@@ -30,7 +30,7 @@ func TestEvalString(t *testing.T) {
 
 	// Create a test context with environment variables
 	ctx := context.Background()
-	env := runtime.NewEnvForStep(ctx, core.Step{Name: "test-step"})
+	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
 	env.Variables.Store("TEST_VAR", "TEST_VAR=hello")
 	env.Envs["ANOTHER_VAR"] = "world"
 	ctx = runtime.WithEnv(ctx, env)
@@ -79,7 +79,7 @@ func TestEvalString(t *testing.T) {
 func TestEvalBool(t *testing.T) {
 	// Create a test context with environment variables
 	ctx := context.Background()
-	env := runtime.NewEnvForStep(ctx, core.Step{Name: "test-step"})
+	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
 	env.Variables.Store("TRUE_VAR", "TRUE_VAR=true")
 	env.Variables.Store("FALSE_VAR", "FALSE_VAR=false")
 	env.Variables.Store("ONE_VAR", "ONE_VAR=1")
@@ -171,7 +171,7 @@ type NestedStruct struct {
 func TestEvalObject(t *testing.T) {
 	// Create a test context with DAGContext and environment variables
 	ctx := setupTestContext()
-	env := runtime.NewEnvForStep(ctx, core.Step{Name: "test-step"})
+	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
 	env.Variables.Store("NAME_VAR", "NAME_VAR=John")
 	env.Variables.Store("DESC_VAR", "DESC_VAR=Developer")
 	env.Variables.Store("NESTED_VAR", "NESTED_VAR=NestedValue")
@@ -213,7 +213,7 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 
 	// Create a test context with DAGContext and environment variables
 	ctx := setupTestContext()
-	env := runtime.NewEnvForStep(ctx, core.Step{Name: "test-step"})
+	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
 	env.Variables.Store("EXECUTOR_TYPE", "EXECUTOR_TYPE=docker")
 	env.Variables.Store("HOST_VAR", "HOST_VAR=localhost")
 	env.Variables.Store("PORT_VAR", "PORT_VAR=8080")
@@ -266,7 +266,7 @@ func TestGenerateSubDAGRunID(t *testing.T) {
 
 	// Create a test context with environment variables
 	ctx := context.Background()
-	env := runtime.NewEnvForStep(ctx, core.Step{Name: "test-step"})
+	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
 	env.DAGRunID = "parent-run-123"
 	env.Step.Name = "child-step"
 	ctx = runtime.WithEnv(ctx, env)
@@ -322,7 +322,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 
 	// Create a test context with DAGContext and environment variables
 	ctx := setupTestContext()
-	env := runtime.NewEnvForStep(ctx, core.Step{Name: "test-step"})
+	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
 	env.Variables.Store("VAR1", "VAR1=value1")
 	env.Variables.Store("VAR2", "VAR2=value2")
 	env.Variables.Store("NUM", "NUM=42")
@@ -548,7 +548,7 @@ func TestEvalStringEdgeCases(t *testing.T) {
 func TestEvalObjectWithDirectStringEvaluation(t *testing.T) {
 	// Create a test context with DAGContext and environment variables
 	ctx := setupTestContext()
-	env := runtime.NewEnvForStep(ctx, core.Step{Name: "test-step"})
+	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
 	env.Variables.Store("STRING_VAR", "STRING_VAR=evaluated_string")
 	env.Variables.Store("PATH_VAR", "PATH_VAR=/path/to/file")
 	env.Variables.Store("COMBINED", "COMBINED=prefix")

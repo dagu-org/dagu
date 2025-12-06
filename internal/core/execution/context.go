@@ -236,14 +236,14 @@ func NewContext(
 	})
 }
 
-// WithDAGContext returns a new context with the given DAGContext.
+// WithContext returns a new context with the given DAGContext.
 // This is useful for tests that need to set up a DAGContext directly.
-func WithDAGContext(ctx context.Context, dagCtx Context) context.Context {
+func WithContext(ctx context.Context, dagCtx Context) context.Context {
 	return context.WithValue(ctx, dagCtxKey{}, dagCtx)
 }
 
-// GetDAGContext retrieves the DAGContext from the context.
-func GetDAGContext(ctx context.Context) Context {
+// GetContext retrieves the DAGContext from the context.
+func GetContext(ctx context.Context) Context {
 	value := ctx.Value(dagCtxKey{})
 	if value == nil {
 		logger.Error(ctx, "DAGContext not found in context")

@@ -747,7 +747,7 @@ func TestNodeCancel(t *testing.T) {
 
 func TestNodeSetupContextBeforeExec(t *testing.T) {
 	ctx := context.Background()
-	env := runtime.NewEnvForStep(ctx, core.Step{Name: "test-step"})
+	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
 	ctx = runtime.WithEnv(ctx, env)
 
 	step := core.Step{Name: "test-step"}

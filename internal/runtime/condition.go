@@ -66,8 +66,8 @@ func matchCondition(ctx context.Context, c *core.Condition) error {
 
 	// Get maxOutputSize from DAG configuration
 	var maxOutputSize = 1024 * 1024 // Default 1MB
-	if env := execution.GetDAGContext(ctx); env.DAG != nil && env.DAG.MaxOutputSize > 0 {
-		maxOutputSize = env.DAG.MaxOutputSize
+	if execCtx := execution.GetContext(ctx); execCtx.DAG != nil && execCtx.DAG.MaxOutputSize > 0 {
+		maxOutputSize = execCtx.DAG.MaxOutputSize
 	}
 
 	matchOpts := []stringutil.MatchOption{

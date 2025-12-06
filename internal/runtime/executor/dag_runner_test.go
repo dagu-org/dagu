@@ -42,7 +42,7 @@ func TestNewSubDAGExecutor_LocalDAG(t *testing.T) {
 		DAGRunID:   "parent-456",
 		Envs:       make(map[string]string),
 	}
-	ctx = execution.WithDAGContext(ctx, dagCtx)
+	ctx = execution.WithContext(ctx, dagCtx)
 
 	// Test creating executor for local DAG
 	executor, err := NewSubDAGExecutor(ctx, "local-child")
@@ -87,7 +87,7 @@ func TestNewSubDAGExecutor_RegularDAG(t *testing.T) {
 		DAGRunID:   "parent-456",
 		Envs:       make(map[string]string),
 	}
-	ctx = execution.WithDAGContext(ctx, dagCtx)
+	ctx = execution.WithContext(ctx, dagCtx)
 
 	// Mock the database call
 	expectedDAG := &core.DAG{
@@ -133,7 +133,7 @@ func TestNewSubDAGExecutor_NotFound(t *testing.T) {
 		DAGRunID:   "parent-456",
 		Envs:       make(map[string]string),
 	}
-	ctx = execution.WithDAGContext(ctx, dagCtx)
+	ctx = execution.WithContext(ctx, dagCtx)
 
 	// Mock the database call to return not found
 	mockDB.On("GetDAG", ctx, "non-existent").Return(nil, assert.AnError)
@@ -162,7 +162,7 @@ func TestBuildCommand(t *testing.T) {
 		Envs:       map[string]string{"TEST_ENV": "value"},
 		BaseEnv:    &baseEnv,
 	}
-	ctx = execution.WithDAGContext(ctx, dagCtx)
+	ctx = execution.WithContext(ctx, dagCtx)
 
 	// Create executor
 	executor := &SubDAGExecutor{
@@ -211,7 +211,7 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 		DAGRunID:   "parent-456",
 		Envs:       make(map[string]string),
 	}
-	ctx = execution.WithDAGContext(ctx, dagCtx)
+	ctx = execution.WithContext(ctx, dagCtx)
 
 	executor := &SubDAGExecutor{
 		DAG:    &core.DAG{Name: "test-child"},
@@ -241,7 +241,7 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 		DAGRunID: "parent-456",
 		Envs:     make(map[string]string),
 	}
-	ctx = execution.WithDAGContext(ctx, dagCtx)
+	ctx = execution.WithContext(ctx, dagCtx)
 
 	executor := &SubDAGExecutor{
 		DAG: &core.DAG{Name: "test-child"},
