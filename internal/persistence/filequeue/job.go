@@ -20,6 +20,9 @@ type QueuedFile struct {
 	lock  sync.Mutex
 }
 
+// NewQueuedFile creates a QueuedFile for the given queue file path.
+// The returned QueuedFile's id is derived from the base filename (the filename without its extension)
+// and its file field is set to the provided path. It does not read or validate the file contents.
 func NewQueuedFile(file string) *QueuedFile {
 	base := filepath.Base(file)
 	ext := filepath.Ext(base)
