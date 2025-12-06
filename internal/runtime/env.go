@@ -53,12 +53,17 @@ type Env struct {
 	WorkingDir string
 }
 
-func (e Env) VariablesMap() map[string]string {
-	m := e.Variables.Variables()
+// AllEnvs returns all environment variables that needs to be passed to the command.
+func (e Env) AllEnvs() []string {
+	envs := e.DAGContext.AllEnvs()
 	for k, v := range e.Envs {
-		m[k] = v
+		envs = append(envs, k+"="+v)
 	}
-	return m
+	e.Variables.Range(func(_, value any) bool {
+		envs = append(envs, value.(string))
+		return true
+	})
+	return envs
 }
 
 // UserEnvsMap returns user-defined environment variables as a map,
@@ -240,19 +245,6 @@ func (e Env) DAGRunRef() execution.DAGRunRef {
 	return execution.NewDAGRunRef(e.DAG.Name, e.DAGRunID)
 }
 
-// AllEnvs returns all environment variables that needs to be passed to the command.
-func (e Env) AllEnvs() []string {
-	envs := e.DAGContext.AllEnvs()
-	for k, v := range e.Envs {
-		envs = append(envs, k+"="+v)
-	}
-	e.Variables.Range(func(_, value any) bool {
-		envs = append(envs, value.(string))
-		return true
-	})
-	return envs
-}
-
 // LoadOutputVariables loads the output variables from the given DAG into the
 func (e Env) LoadOutputVariables(vars *collections.SyncMap) {
 	e.loadOutputVariables(vars, false)
@@ -388,4 +380,17 @@ func GetEnv(ctx context.Context) Env {
 // Each element is in the form of "key=value".
 func AllEnvs(ctx context.Context) []string {
 	return GetEnv(ctx).AllEnvs()
+}
+
+// AllEnvsMap returns all environment variables as a map.
+func AllEnvsMap(ctx context.Context) map[string]string {
+	envs := GetEnv(ctx).AllEnvs()
+	var result = make(map[string]string)
+	for _, env := range envs {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			result[parts[0]] = parts[1]
+		}
+	}
+	return result
 }
