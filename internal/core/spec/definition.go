@@ -169,7 +169,6 @@ type stepDef struct {
 	TimeoutSec int `yaml:"timeoutSec,omitempty"`
 }
 
-
 // repeatPolicyDef defines the repeat policy for a step.
 type repeatPolicyDef struct {
 	Repeat         any    `yaml:"repeat,omitempty"`         // Flag to indicate if the step should be repeated, can be bool (legacy) or string ("while" or "until")
