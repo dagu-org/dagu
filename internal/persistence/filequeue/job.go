@@ -96,5 +96,5 @@ func (j *Job) ID() string {
 }
 
 func (j *Job) Data() (*execution.DAGRunRef, error) {
-	return &j.ItemData.DAGRun, nil
+	return &j.DAGRun, nil
 }
