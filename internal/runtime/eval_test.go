@@ -23,7 +23,7 @@ func TestEvalString(t *testing.T) {
 	t.Parallel()
 
 	// Create a test context with environment variables
-	ctx := context.Background()
+	ctx := runtime.NewContext(context.Background(), &core.DAG{Name: "test-dag"}, "", "")
 	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
 	env.Variables.Store("TEST_VAR", "TEST_VAR=hello")
 	env.Envs["ANOTHER_VAR"] = "world"
