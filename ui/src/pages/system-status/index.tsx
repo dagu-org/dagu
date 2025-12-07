@@ -78,8 +78,15 @@ function SystemStatus() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([mutateResource(), mutateScheduler(), mutateCoordinator()]);
-    setIsRefreshing(false);
+    try {
+      await Promise.all([
+        mutateResource(),
+        mutateScheduler(),
+        mutateCoordinator(),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   return (

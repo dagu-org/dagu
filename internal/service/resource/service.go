@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/config"
@@ -18,9 +19,13 @@ type Service struct {
 	store  Store
 	cancel context.CancelFunc
 	done   chan struct{}
+	mu     sync.Mutex
 }
 
 func NewService(cfg *config.Config) *Service {
+	if cfg == nil {
+		panic("config and config.Monitoring must not be nil")
+	}
 	return &Service{
 		config: cfg,
 		store:  NewMemoryStore(cfg.Monitoring.Retention),
@@ -29,6 +34,8 @@ func NewService(cfg *config.Config) *Service {
 }
 
 func (s *Service) Start(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.cancel != nil {
 		return nil // Already started
 	}
@@ -43,6 +50,8 @@ func (s *Service) Start(ctx context.Context) error {
 }
 
 func (s *Service) Stop(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.cancel != nil {
 		s.cancel()
 	}
@@ -78,7 +87,7 @@ func (s *Service) collect(ctx context.Context) {
 	var cpuVal, memVal, diskVal, loadVal float64
 
 	// CPU Usage
-	if cpuPercent, err := cpu.PercentWithContext(ctx, 0, false); err != nil {
+	if cpuPercent, err := cpu.PercentWithContext(ctx, 100*time.Millisecond, false); err != nil {
 		logger.Error(ctx, "Failed to get CPU usage", tag.Error(err))
 	} else if len(cpuPercent) > 0 {
 		cpuVal = cpuPercent[0]
