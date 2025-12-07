@@ -44,18 +44,18 @@ function SystemStatus() {
     }
   );
 
-  const { data: resourceData, error: resourceError } = useQuery(
-    '/services/resources/history',
-    undefined,
-    {
-      refreshInterval: autoRefresh ? 5000 : 0,
-    }
-  );
+  const {
+    data: resourceData,
+    error: resourceError,
+    mutate: mutateResource,
+  } = useQuery('/services/resources/history', undefined, {
+    refreshInterval: autoRefresh ? 5000 : 0,
+  });
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    // The SWR hooks will automatically revalidate when we change a dependency
-    setTimeout(() => setIsRefreshing(false), 500);
+    await Promise.all([mutateResource()]);
+    setIsRefreshing(false);
   };
 
   return (

@@ -25,19 +25,11 @@ func (a *API) GetResourceHistory(ctx context.Context, request api.GetResourceHis
 	maxDuration := a.config.Monitoring.Retention
 	duration := time.Hour
 	if request.Params.Duration != nil {
-		if d, err := time.ParseDuration(*request.Params.Duration); err == nil {
-			duration = d
-		} else {
+		if d, err := time.ParseDuration(*request.Params.Duration); err == nil && d > 0 {
+			duration = min(d, maxDuration)
+		} else if err != nil {
 			logger.Warn(ctx, "Invalid duration parameter", tag.String("duration", *request.Params.Duration))
 		}
-	}
-
-	// Validate bounds: must be positive and not exceed retention
-	if duration <= 0 {
-		duration = time.Hour
-	}
-	if duration > maxDuration {
-		duration = maxDuration
 	}
 
 	history := a.resourceService.GetHistory(duration)

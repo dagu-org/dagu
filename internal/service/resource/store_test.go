@@ -59,26 +59,34 @@ func TestMemoryStore_Retention(t *testing.T) {
 	assert.Equal(t, 2.0, historyShort.CPU[0].Value)
 }
 
-func TestMemoryStore_Prune(t *testing.T) {
-	store := NewMemoryStore(time.Millisecond)
+func TestFilterPoints(t *testing.T) {
+	now := time.Now().Unix()
+	points := []MetricPoint{
+		{Timestamp: now - 100, Value: 1.0},
+		{Timestamp: now - 50, Value: 2.0},
+		{Timestamp: now - 10, Value: 3.0},
+		{Timestamp: now, Value: 4.0},
+	}
 
-	// Force lastPruned to be old to trigger prune on next Add
-	store.lastPruned = time.Now().Add(-2 * time.Minute)
+	// Filter with cutoff that keeps all points
+	result := filterPoints(points, now-200, true)
+	assert.Len(t, result, 4)
 
-	store.Add(1.0, 1.0, 1.0, 1.0) // This is "old" relative to the retention we set?
-	// No, Add uses time.Now().
+	// Filter with cutoff that keeps last 2 points
+	result = filterPoints(points, now-30, true)
+	assert.Len(t, result, 2)
+	assert.Equal(t, 3.0, result[0].Value)
+	assert.Equal(t, 4.0, result[1].Value)
 
-	// We need to simulate old data.
-	// Since we can't easily inject time into the store without refactoring,
-	// we can inspect the private fields or just trust the logic.
-	// Or we can modify the store to accept a clock.
-	// For now, let's just test the prune function logic directly if it was exported,
-	// or rely on the fact that we can't easily test time-dependent internal logic without mocking time.
+	// Filter with cutoff that excludes all points
+	result = filterPoints(points, now+10, true)
+	assert.Nil(t, result)
 
-	// Let's stick to testing public behavior.
-	// If we set retention to 0, everything should be pruned immediately?
-	// Prune only runs if time.Since(lastPruned) > 1 minute.
+	// Empty slice
+	result = filterPoints(nil, now, true)
+	assert.Nil(t, result)
 
-	// Let's skip complex prune testing for now and focus on basic functionality.
-	// The logic is simple enough.
+	// No copy when idx == 0 and copySlice is false
+	result = filterPoints(points, now-200, false)
+	assert.Equal(t, points, result) // Should be same slice
 }

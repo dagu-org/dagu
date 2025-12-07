@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"sort"
 	"sync"
 	"time"
 )
@@ -59,10 +60,10 @@ func (s *MemoryStore) Add(cpu, memory, disk, load float64) {
 	// Prune old data every minute to avoid excessive locking/scanning
 	if now.Sub(s.lastPruned) > time.Minute {
 		cutoff := now.Add(-s.retention).Unix()
-		s.cpu = prune(s.cpu, cutoff)
-		s.memory = prune(s.memory, cutoff)
-		s.disk = prune(s.disk, cutoff)
-		s.load = prune(s.load, cutoff)
+		s.cpu = filterPoints(s.cpu, cutoff, false)
+		s.memory = filterPoints(s.memory, cutoff, false)
+		s.disk = filterPoints(s.disk, cutoff, false)
+		s.load = filterPoints(s.load, cutoff, false)
 		s.lastPruned = now
 	}
 }
@@ -75,37 +76,35 @@ func (s *MemoryStore) GetHistory(duration time.Duration) *ResourceHistory {
 	cutoff := time.Now().Add(-duration).Unix()
 
 	return &ResourceHistory{
-		CPU:    filter(s.cpu, cutoff),
-		Memory: filter(s.memory, cutoff),
-		Disk:   filter(s.disk, cutoff),
-		Load:   filter(s.load, cutoff),
+		CPU:    filterPoints(s.cpu, cutoff, true),
+		Memory: filterPoints(s.memory, cutoff, true),
+		Disk:   filterPoints(s.disk, cutoff, true),
+		Load:   filterPoints(s.load, cutoff, true),
 	}
 }
 
-func prune(points []MetricPoint, cutoff int64) []MetricPoint {
-	// Find the first index where timestamp >= cutoff
-	for i, p := range points {
-		if p.Timestamp >= cutoff {
-			// Create a new slice to allow GC of old backing array
-			result := make([]MetricPoint, len(points)-i)
-			copy(result, points[i:])
-			return result
-		}
+// filterPoints returns points with timestamp >= cutoff using binary search.
+// If copy is true, returns a new slice to decouple from the original.
+func filterPoints(points []MetricPoint, cutoff int64, copySlice bool) []MetricPoint {
+	if len(points) == 0 {
+		return nil
 	}
-	// All points are old, return empty slice
-	return []MetricPoint{}
-}
 
-func filter(points []MetricPoint, cutoff int64) []MetricPoint {
-	// Find the first index where timestamp >= cutoff
-	for i, p := range points {
-		if p.Timestamp >= cutoff {
-			// Return a copy to avoid race conditions and decouple from store's internal slice
-			result := make([]MetricPoint, len(points)-i)
-			copy(result, points[i:])
-			return result
-		}
+	// Binary search for first point >= cutoff
+	idx := sort.Search(len(points), func(i int) bool {
+		return points[i].Timestamp >= cutoff
+	})
+
+	if idx == len(points) {
+		return nil // All points are old
 	}
-	// All points are old, return empty slice
-	return []MetricPoint{}
+
+	if !copySlice && idx == 0 {
+		return points // No pruning needed, return original
+	}
+
+	// Return a copy to allow GC of old backing array or decouple from store
+	result := make([]MetricPoint, len(points)-idx)
+	copy(result, points[idx:])
+	return result
 }
