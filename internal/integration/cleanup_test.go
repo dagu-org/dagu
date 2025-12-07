@@ -37,7 +37,7 @@ steps:
   - name: test-step
     command: echo "hello"
 `
-	dagFile := th.CreateDAGFile(t, "my-workflow.yaml", dagContent)
+	dagFile := th.CreateDAGFile(t, "my_workflow.yaml", dagContent)
 
 	// Load the DAG to verify the name is set correctly
 	dag, err := spec.Load(th.Context, dagFile)
@@ -47,7 +47,7 @@ steps:
 	// Run the DAG multiple times to create history
 	for i := 0; i < 3; i++ {
 		dagRunID := uuid.Must(uuid.NewV7()).String()
-		args := []string{"start", "--run-id", dagRunID, "my-workflow"}
+		args := []string{"start", "--run-id", dagRunID, "my_workflow"}
 		th.RunCommand(t, cmd.Start(), test.CmdTest{
 			Args:        args,
 			ExpectedOut: []string{"DAG run finished"},
@@ -88,7 +88,7 @@ steps:
   - name: test-step
     command: echo "hello"
 `
-	dagFile := th.CreateDAGFile(t, "cleanup-test.yaml", dagContent)
+	dagFile := th.CreateDAGFile(t, "cleanup_test_dag.yaml", dagContent)
 
 	dag, err := spec.Load(th.Context, dagFile)
 	require.NoError(t, err)
@@ -119,7 +119,7 @@ steps:
 
 	// Now run the DAG - this should trigger cleanup of old runs
 	newRunID := uuid.Must(uuid.NewV7()).String()
-	args := []string{"start", "--run-id", newRunID, "cleanup-test"}
+	args := []string{"start", "--run-id", newRunID, "cleanup_test_dag"}
 	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG run finished"},
@@ -155,7 +155,7 @@ steps:
   - name: step1
     command: echo "test"
 `
-	dagFile := th.CreateDAGFile(t, "different-filename.yaml", dagContent)
+	dagFile := th.CreateDAGFile(t, "different_filename.yaml", dagContent)
 
 	dag, err := spec.Load(th.Context, dagFile)
 	require.NoError(t, err)
@@ -188,7 +188,7 @@ steps:
 
 	// Execute new run - should trigger cleanup
 	newRunID := uuid.Must(uuid.NewV7()).String()
-	args := []string{"start", "--run-id", newRunID, "different-filename"}
+	args := []string{"start", "--run-id", newRunID, "different_filename"}
 	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG run finished"},
@@ -214,14 +214,14 @@ steps:
   - name: test
     command: echo "hello"
 `
-	dagFile := th.CreateDAGFile(t, "special-dag-file.yaml", dagContent)
+	dagFile := th.CreateDAGFile(t, "special_dag_file.yaml", dagContent)
 
 	_, err := spec.Load(th.Context, dagFile)
 	require.NoError(t, err)
 
 	// Run the DAG
 	dagRunID := uuid.Must(uuid.NewV7()).String()
-	args := []string{"start", "--run-id", dagRunID, "special-dag-file"}
+	args := []string{"start", "--run-id", dagRunID, "special_dag_file"}
 	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG run finished"},
@@ -236,9 +236,9 @@ steps:
 	assert.NoError(t, err, "directory for DAG name 'MySpecialDAG' should exist")
 
 	// Check that directory does NOT exist for the filename
-	filenameDir := filepath.Join(dagRunsBaseDir, "special-dag-file")
+	filenameDir := filepath.Join(dagRunsBaseDir, "special_dag_file")
 	_, err = os.Stat(filenameDir)
-	assert.True(t, os.IsNotExist(err), "directory for filename 'special-dag-file' should NOT exist")
+	assert.True(t, os.IsNotExist(err), "directory for filename 'special_dag_file' should NOT exist")
 }
 
 // TestCleanupWorksWhenNameMatchesFilename verifies that cleanup works
@@ -255,12 +255,12 @@ steps:
   - name: test-step
     command: echo "hello"
 `
-	dagFile := th.CreateDAGFile(t, "baseline-test.yaml", dagContent)
+	dagFile := th.CreateDAGFile(t, "baseline_test.yaml", dagContent)
 
 	dag, err := spec.Load(th.Context, dagFile)
 	require.NoError(t, err)
 	// When no name: field, the name should come from filename
-	require.Equal(t, "baseline-test", dag.Name, "DAG name should come from filename when no name: field")
+	require.Equal(t, "baseline_test", dag.Name, "DAG name should come from filename when no name: field")
 
 	// Create an old run from 5 days ago
 	oldTimestamp := time.Now().AddDate(0, 0, -5)
@@ -285,7 +285,7 @@ steps:
 
 	// Execute new run - should trigger cleanup
 	newRunID := uuid.Must(uuid.NewV7()).String()
-	args := []string{"start", "--run-id", newRunID, "baseline-test"}
+	args := []string{"start", "--run-id", newRunID, "baseline_test"}
 	th.RunCommand(t, cmd.Start(), test.CmdTest{
 		Args:        args,
 		ExpectedOut: []string{"DAG run finished"},
