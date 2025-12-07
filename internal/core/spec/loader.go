@@ -123,7 +123,11 @@ func WithSkipBaseHandlers() LoadOption {
 // This is used for sub-DAG execution to inherit the parent's working directory.
 func WithDefaultWorkingDir(defaultWorkingDir string) LoadOption {
 	return func(o *LoadOptions) {
-		o.defaultWorkingDir = defaultWorkingDir
+		dir := strings.TrimSpace(defaultWorkingDir)
+		if dir == "" {
+			return
+		}
+		o.defaultWorkingDir = filepath.Clean(dir)
 	}
 }
 
