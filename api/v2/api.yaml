@@ -2865,6 +2865,9 @@ components:
         value:
           type: number
           format: double
+      required:
+        - timestamp
+        - value
 
 # Apply security requirements globally
 security:

@@ -46,10 +46,10 @@ function SystemStatus() {
 
   const { data: resourceData, error: resourceError } = useQuery(
     '/services/resources/history',
-    {},
+    undefined,
     {
       refreshInterval: autoRefresh ? 5000 : 0,
-    } as any
+    }
   );
 
   const handleRefresh = async () => {

@@ -84,40 +84,28 @@ func (s *MemoryStore) GetHistory(duration time.Duration) *ResourceHistory {
 
 func prune(points []MetricPoint, cutoff int64) []MetricPoint {
 	// Find the first index where timestamp >= cutoff
-	idx := 0
 	for i, p := range points {
 		if p.Timestamp >= cutoff {
-			idx = i
-			break
+			// Create a new slice to allow GC of old backing array
+			result := make([]MetricPoint, len(points)-i)
+			copy(result, points[i:])
+			return result
 		}
 	}
-	// If all points are old, return empty slice, but keep capacity if possible?
-	// Actually, just re-slicing is fine.
-	if idx >= len(points) {
-		return []MetricPoint{}
-	}
-	// Create new slice to allow GC of old array backing if it gets too large?
-	// For simplicity, just re-slice for now.
-	return points[idx:]
+	// All points are old, return empty slice
+	return []MetricPoint{}
 }
 
 func filter(points []MetricPoint, cutoff int64) []MetricPoint {
-	// Find start index
-	start := 0
+	// Find the first index where timestamp >= cutoff
 	for i, p := range points {
 		if p.Timestamp >= cutoff {
-			start = i
-			break
+			// Return a copy to avoid race conditions and decouple from store's internal slice
+			result := make([]MetricPoint, len(points)-i)
+			copy(result, points[i:])
+			return result
 		}
 	}
-
-	if start >= len(points) {
-		return []MetricPoint{}
-	}
-
-	// Return a copy to avoid race conditions if the caller modifies it (though they shouldn't)
-	// and to decouple from the store's internal slice
-	result := make([]MetricPoint, len(points)-start)
-	copy(result, points[start:])
-	return result
+	// All points are old, return empty slice
+	return []MetricPoint{}
 }

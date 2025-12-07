@@ -1295,9 +1295,9 @@ export interface components {
              * Format: int64
              * @description Unix timestamp
              */
-            timestamp?: number;
+            timestamp: number;
             /** Format: double */
-            value?: number;
+            value: number;
         };
     };
     responses: never;

@@ -351,9 +351,19 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 				l.warnings = append(l.warnings, fmt.Sprintf("Invalid monitoring.retention value: %s", def.Monitoring.Retention))
 			}
 		}
+		if def.Monitoring.Interval != "" {
+			if duration, err := time.ParseDuration(def.Monitoring.Interval); err == nil {
+				cfg.Monitoring.Interval = duration
+			} else {
+				l.warnings = append(l.warnings, fmt.Sprintf("Invalid monitoring.interval value: %s", def.Monitoring.Interval))
+			}
+		}
 	}
 	if cfg.Monitoring.Retention <= 0 {
-		cfg.Monitoring.Retention = time.Hour // Default to 1 hour if not set
+		cfg.Monitoring.Retention = 24 * time.Hour // Default to 1 day if not set
+	}
+	if cfg.Monitoring.Interval <= 0 {
+		cfg.Monitoring.Interval = 5 * time.Second // Default to 5 seconds if not set
 	}
 
 	if cfg.Scheduler.Port <= 0 {
@@ -579,7 +589,8 @@ func setViperDefaultValues(paths Paths) {
 	viper.SetDefault("peer.insecure", true) // Default to insecure (h2c)
 
 	// Monitoring settings
-	viper.SetDefault("monitoring.retention", "1h")
+	viper.SetDefault("monitoring.retention", "24h")
+	viper.SetDefault("monitoring.interval", "5s")
 }
 
 // bindEnvironmentVariables binds various configuration keys to environment variables.
@@ -681,6 +692,7 @@ func bindEnvironmentVariables() {
 
 	// Monitoring configuration
 	bindEnv("monitoring.retention", "MONITORING_RETENTION")
+	bindEnv("monitoring.interval", "MONITORING_INTERVAL")
 }
 
 type bindEnvOption func(fullEnv string)

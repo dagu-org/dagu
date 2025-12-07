@@ -54,8 +54,11 @@ func (s *Service) GetHistory(duration time.Duration) *ResourceHistory {
 func (s *Service) loop(ctx context.Context) {
 	defer close(s.done)
 
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(s.config.Monitoring.Interval)
 	defer ticker.Stop()
+
+	// Collect initial metrics immediately
+	s.collect(ctx)
 
 	for {
 		select {
@@ -68,37 +71,35 @@ func (s *Service) loop(ctx context.Context) {
 }
 
 func (s *Service) collect(ctx context.Context) {
+	var cpuVal, memVal, diskVal, loadVal float64
+
 	// CPU Usage
-	cpuPercent, err := cpu.PercentWithContext(ctx, 0, false)
-	if err != nil {
+	if cpuPercent, err := cpu.PercentWithContext(ctx, 0, false); err != nil {
 		logger.Error(ctx, "Failed to get CPU usage", tag.Error(err))
-		return
-	}
-	cpuVal := 0.0
-	if len(cpuPercent) > 0 {
+	} else if len(cpuPercent) > 0 {
 		cpuVal = cpuPercent[0]
 	}
 
 	// Memory Usage
-	memStat, err := mem.VirtualMemoryWithContext(ctx)
-	if err != nil {
+	if memStat, err := mem.VirtualMemoryWithContext(ctx); err != nil {
 		logger.Error(ctx, "Failed to get memory usage", tag.Error(err))
-		return
+	} else {
+		memVal = memStat.UsedPercent
 	}
 
 	// Disk Usage (for data directory)
-	diskStat, err := disk.UsageWithContext(ctx, s.config.Paths.DataDir)
-	if err != nil {
+	if diskStat, err := disk.UsageWithContext(ctx, s.config.Paths.DataDir); err != nil {
 		logger.Error(ctx, "Failed to get disk usage", tag.Error(err))
-		return
+	} else {
+		diskVal = diskStat.UsedPercent
 	}
 
 	// Load Average
-	loadStat, err := load.AvgWithContext(ctx)
-	if err != nil {
+	if loadStat, err := load.AvgWithContext(ctx); err != nil {
 		logger.Error(ctx, "Failed to get load average", tag.Error(err))
-		return
+	} else {
+		loadVal = loadStat.Load1
 	}
 
-	s.store.Add(cpuVal, memStat.UsedPercent, diskStat.UsedPercent, loadStat.Load1)
+	s.store.Add(cpuVal, memVal, diskVal, loadVal)
 }

@@ -268,8 +268,11 @@ type CoordinatorDef struct {
 // MonitoringDef holds the configuration for system monitoring.
 type MonitoringDef struct {
 	// Retention specifies how long to keep system resource history.
-	// Default is 1h.
+	// Default is 24h.
 	Retention string `mapstructure:"retention"`
+	// Interval specifies how often to collect resource metrics.
+	// Default is 5s.
+	Interval string `mapstructure:"interval"`
 }
 
 // WorkerDef holds the configuration for the worker.

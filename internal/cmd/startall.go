@@ -127,25 +127,18 @@ func runStartAll(ctx *Context, _ []string) error {
 		ServiceRegistry: ctx.ServiceRegistry,
 	}
 
+	// Start resource monitoring service (starts its own goroutine internally)
+	if err := resourceService.Start(serviceCtx); err != nil {
+		return fmt.Errorf("failed to start resource service: %w", err)
+	}
+
 	// WaitGroup to track all services
 	var wg sync.WaitGroup
-	serviceCount := 3 // scheduler + server + resource
+	serviceCount := 2 // scheduler + server
 	if enableCoordinator {
-		serviceCount = 4 // + coordinator
+		serviceCount = 3 // + coordinator
 	}
 	errCh := make(chan error, serviceCount)
-
-	// Start resource monitoring service
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := resourceService.Start(serviceCtx); err != nil {
-			select {
-			case errCh <- fmt.Errorf("resource service failed: %w", err):
-			default:
-			}
-		}
-	}()
 
 	// Start scheduler
 	wg.Add(1)
