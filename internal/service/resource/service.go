@@ -22,9 +22,15 @@ type Service struct {
 	mu     sync.Mutex
 }
 
+const defaultMonitoringInterval = 10 * time.Second
+
 func NewService(cfg *config.Config) *Service {
 	if cfg == nil {
-		panic("config and config.Monitoring must not be nil")
+		panic("config must not be nil")
+	}
+	// Guard against invalid interval to prevent ticker panic
+	if cfg.Monitoring.Interval <= 0 {
+		cfg.Monitoring.Interval = defaultMonitoringInterval
 	}
 	return &Service{
 		config: cfg,

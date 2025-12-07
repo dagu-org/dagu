@@ -121,6 +121,8 @@ function SystemStatus() {
             onClick={handleRefresh}
             disabled={isRefreshing}
             className="h-7 px-2"
+            aria-label="Refresh system status"
+            title="Refresh system status"
           >
             <RefreshCw
               className={cn('h-3 w-3', isRefreshing && 'animate-spin')}

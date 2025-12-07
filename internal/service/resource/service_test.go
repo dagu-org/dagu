@@ -28,6 +28,20 @@ func TestNewService(t *testing.T) {
 	assert.Equal(t, cfg, svc.config)
 }
 
+func TestNewService_DefaultInterval(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.Config{
+		Monitoring: config.MonitoringConfig{
+			Retention: time.Hour,
+			Interval:  0, // Invalid interval
+		},
+	}
+
+	svc := NewService(cfg)
+	assert.Equal(t, defaultMonitoringInterval, svc.config.Monitoring.Interval)
+}
+
 func TestService_Lifecycle(t *testing.T) {
 	t.Parallel()
 
@@ -52,13 +66,11 @@ func TestService_Lifecycle(t *testing.T) {
 	err = svc.Start(ctx)
 	require.NoError(t, err)
 
-	// Wait for collection
-	time.Sleep(150 * time.Millisecond)
-
-	// Verify data collected
-	history := svc.GetHistory(time.Hour)
-	require.NotNil(t, history)
-	assert.GreaterOrEqual(t, len(history.CPU), 1)
+	// Wait for collection using Eventually for CI resilience
+	require.Eventually(t, func() bool {
+		history := svc.GetHistory(time.Hour)
+		return history != nil && len(history.CPU) >= 1
+	}, time.Second, 50*time.Millisecond, "should collect at least one data point")
 
 	// Stop
 	err = svc.Stop(ctx)
@@ -95,9 +107,7 @@ func TestService_StopWithoutStart(t *testing.T) {
 	svc := NewService(cfg)
 	ctx := context.Background()
 
-	// Pre-close done channel to prevent blocking
-	close(svc.done)
-
+	// Stop handles nil cancel gracefully (no blocking)
 	err := svc.Stop(ctx)
 	require.NoError(t, err)
 }
