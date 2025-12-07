@@ -21,30 +21,42 @@ function SystemStatus() {
     appBarContext.setTitle('System Status');
   }, [appBarContext]);
 
-  // Fetch all data with remoteNode support
+  // Fetch all data with remoteNode support and auto-refresh
   const {
     data: schedulerData,
     error: schedulerError,
     mutate: mutateScheduler,
-  } = useQuery('/services/scheduler', {
-    params: {
-      query: {
-        remoteNode: appBarContext.selectedRemoteNode || 'local',
+  } = useQuery(
+    '/services/scheduler',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
       },
     },
-  });
+    {
+      refreshInterval: autoRefresh ? 5000 : 0,
+    }
+  );
 
   const {
     data: coordinatorData,
     error: coordinatorError,
     mutate: mutateCoordinator,
-  } = useQuery('/services/coordinator', {
-    params: {
-      query: {
-        remoteNode: appBarContext.selectedRemoteNode || 'local',
+  } = useQuery(
+    '/services/coordinator',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
       },
     },
-  });
+    {
+      refreshInterval: autoRefresh ? 5000 : 0,
+    }
+  );
 
   const {
     data: resourceData,
