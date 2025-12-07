@@ -14,6 +14,7 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
+// Service collects system resource metrics at regular intervals.
 type Service struct {
 	config *config.Config
 	store  Store
@@ -44,6 +45,7 @@ func NewService(cfg *config.Config) *Service {
 	}
 }
 
+// Start begins collecting metrics. Safe to call multiple times.
 func (s *Service) Start(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -60,6 +62,7 @@ func (s *Service) Start(ctx context.Context) error {
 	return nil
 }
 
+// Stop halts metric collection and waits for the loop to exit.
 func (s *Service) Stop(ctx context.Context) error {
 	s.mu.Lock()
 	if s.cancel != nil {
@@ -73,6 +76,7 @@ func (s *Service) Stop(ctx context.Context) error {
 	return nil
 }
 
+// GetHistory returns metrics collected within the given duration.
 func (s *Service) GetHistory(duration time.Duration) *ResourceHistory {
 	return s.store.GetHistory(duration)
 }
