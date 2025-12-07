@@ -26,19 +26,14 @@ type Store interface {
 	GetHistory(duration time.Duration) *ResourceHistory
 }
 
-// dataPoint stores all metrics for a single timestamp
-type dataPoint struct {
-	Timestamp int64
-	CPU       float64
-	Memory    float64
-	Disk      float64
-	Load      float64
-}
-
 // MemoryStore implements Store using in-memory storage
+// Data is stored in the same format as the output to avoid transformation overhead
 type MemoryStore struct {
 	mu         sync.RWMutex
-	points     []dataPoint
+	cpu        []MetricPoint
+	memory     []MetricPoint
+	disk       []MetricPoint
+	load       []MetricPoint
 	retention  time.Duration
 	lastPruned time.Time
 }
@@ -50,100 +45,89 @@ func NewMemoryStore(retention time.Duration) *MemoryStore {
 	}
 }
 
-// Add adds a new data point for all metrics
+// Add appends a new data point for all metrics
 func (s *MemoryStore) Add(cpu, memory, disk, load float64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	now := time.Now()
+	ts := now.Unix()
 
-	s.points = append(s.points, dataPoint{
-		Timestamp: now.Unix(),
-		CPU:       cpu,
-		Memory:    memory,
-		Disk:      disk,
-		Load:      load,
-	})
+	s.cpu = append(s.cpu, MetricPoint{Timestamp: ts, Value: cpu})
+	s.memory = append(s.memory, MetricPoint{Timestamp: ts, Value: memory})
+	s.disk = append(s.disk, MetricPoint{Timestamp: ts, Value: disk})
+	s.load = append(s.load, MetricPoint{Timestamp: ts, Value: load})
 
-	// Prune old data every minute to avoid excessive scanning
+	// Prune old data periodically to bound memory usage
 	if now.Sub(s.lastPruned) > time.Minute {
-		cutoff := now.Add(-s.retention).Unix()
-		s.points = prunePoints(s.points, cutoff)
+		s.prune(now.Add(-s.retention).Unix())
 		s.lastPruned = now
 	}
 }
 
-// GetHistory returns the history of metrics for the specified duration
+// prune removes data points older than cutoff
+func (s *MemoryStore) prune(cutoff int64) {
+	if len(s.cpu) == 0 {
+		return
+	}
+
+	// Single binary search - timestamps are identical across all slices
+	idx := sort.Search(len(s.cpu), func(i int) bool {
+		return s.cpu[i].Timestamp >= cutoff
+	})
+
+	if idx == 0 {
+		return // Nothing to prune
+	}
+
+	// Shift remaining data to front to allow GC of backing array space
+	s.cpu = shiftSlice(s.cpu, idx)
+	s.memory = shiftSlice(s.memory, idx)
+	s.disk = shiftSlice(s.disk, idx)
+	s.load = shiftSlice(s.load, idx)
+}
+
+// shiftSlice moves elements starting at idx to the front
+func shiftSlice(s []MetricPoint, idx int) []MetricPoint {
+	n := copy(s, s[idx:])
+	return s[:n]
+}
+
+// GetHistory returns metrics for the specified duration
 func (s *MemoryStore) GetHistory(duration time.Duration) *ResourceHistory {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	cutoff := time.Now().Add(-duration).Unix()
-	filtered := filterPoints(s.points, cutoff)
-
-	if len(filtered) == 0 {
+	if len(s.cpu) == 0 {
 		return &ResourceHistory{}
 	}
 
-	// Pre-allocate result slices
-	cpu := make([]MetricPoint, len(filtered))
-	memory := make([]MetricPoint, len(filtered))
-	disk := make([]MetricPoint, len(filtered))
-	load := make([]MetricPoint, len(filtered))
+	cutoff := time.Now().Add(-duration).Unix()
 
-	for i, p := range filtered {
-		cpu[i] = MetricPoint{Timestamp: p.Timestamp, Value: p.CPU}
-		memory[i] = MetricPoint{Timestamp: p.Timestamp, Value: p.Memory}
-		disk[i] = MetricPoint{Timestamp: p.Timestamp, Value: p.Disk}
-		load[i] = MetricPoint{Timestamp: p.Timestamp, Value: p.Load}
+	// Single binary search - timestamps are identical across all slices
+	idx := sort.Search(len(s.cpu), func(i int) bool {
+		return s.cpu[i].Timestamp >= cutoff
+	})
+
+	if idx >= len(s.cpu) {
+		return &ResourceHistory{}
 	}
+
+	n := len(s.cpu) - idx
+
+	// Single allocation for all 4 result slices - better cache locality
+	all := make([]MetricPoint, n*4)
+
+	// Use optimized builtin copy (SIMD on most platforms)
+	copy(all[:n], s.cpu[idx:])
+	copy(all[n:2*n], s.memory[idx:])
+	copy(all[2*n:3*n], s.disk[idx:])
+	copy(all[3*n:], s.load[idx:])
 
 	return &ResourceHistory{
-		CPU:    cpu,
-		Memory: memory,
-		Disk:   disk,
-		Load:   load,
+		CPU:    all[:n:n],           // cap=n prevents accidental append corruption
+		Memory: all[n : 2*n : 2*n],
+		Disk:   all[2*n : 3*n : 3*n],
+		Load:   all[3*n : 4*n : 4*n],
 	}
-}
-
-// prunePoints removes old points in-place by reslicing (no allocation)
-func prunePoints(points []dataPoint, cutoff int64) []dataPoint {
-	if len(points) == 0 {
-		return points
-	}
-
-	idx := sort.Search(len(points), func(i int) bool {
-		return points[i].Timestamp >= cutoff
-	})
-
-	if idx == 0 {
-		return points
-	}
-	if idx == len(points) {
-		return points[:0] // Keep capacity, clear content
-	}
-
-	// Shift remaining points to front to allow GC of old data
-	n := copy(points, points[idx:])
-	return points[:n]
-}
-
-// filterPoints returns points with timestamp >= cutoff (creates new slice for reads)
-func filterPoints(points []dataPoint, cutoff int64) []dataPoint {
-	if len(points) == 0 {
-		return nil
-	}
-
-	idx := sort.Search(len(points), func(i int) bool {
-		return points[i].Timestamp >= cutoff
-	})
-
-	if idx == len(points) {
-		return nil
-	}
-
-	// Copy to decouple from store
-	result := make([]dataPoint, len(points)-idx)
-	copy(result, points[idx:])
-	return result
 }

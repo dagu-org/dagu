@@ -79,10 +79,10 @@ func TestMemoryStore_Prune(t *testing.T) {
 		store.Add(2.0, 2.0, 2.0, 2.0)
 
 		store.mu.RLock()
-		pointsLen := len(store.points)
+		cpuLen := len(store.cpu)
 		store.mu.RUnlock()
 
-		assert.Equal(t, 1, pointsLen, "old data should be pruned")
+		assert.Equal(t, 1, cpuLen, "old data should be pruned")
 	})
 }
 
@@ -114,84 +114,36 @@ func TestMemoryStore_GetHistoryReturnsCopy(t *testing.T) {
 	assert.Equal(t, 1.0, history2.CPU[0].Value)
 }
 
-func TestPrunePoints(t *testing.T) {
+func TestShiftSlice(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().Unix()
-	points := []dataPoint{
-		{Timestamp: now - 100, CPU: 1.0},
-		{Timestamp: now - 50, CPU: 2.0},
-		{Timestamp: now - 10, CPU: 3.0},
-		{Timestamp: now, CPU: 4.0},
-	}
 
-	// No pruning needed
-	result := prunePoints(points, now-200)
-	assert.Len(t, result, 4)
-
-	// Prune first 2 points
-	points2 := []dataPoint{
-		{Timestamp: now - 100, CPU: 1.0},
-		{Timestamp: now - 50, CPU: 2.0},
-		{Timestamp: now - 10, CPU: 3.0},
-		{Timestamp: now, CPU: 4.0},
+	// Shift first 2 elements
+	points := []MetricPoint{
+		{Timestamp: now - 100, Value: 1.0},
+		{Timestamp: now - 50, Value: 2.0},
+		{Timestamp: now - 10, Value: 3.0},
+		{Timestamp: now, Value: 4.0},
 	}
-	result = prunePoints(points2, now-30)
+	result := shiftSlice(points, 2)
 	assert.Len(t, result, 2)
-	assert.Equal(t, 3.0, result[0].CPU)
+	assert.Equal(t, 3.0, result[0].Value)
+	assert.Equal(t, 4.0, result[1].Value)
 
-	// Prune all
-	points3 := []dataPoint{
-		{Timestamp: now - 100, CPU: 1.0},
+	// Shift all (idx = len)
+	points2 := []MetricPoint{
+		{Timestamp: now, Value: 1.0},
 	}
-	result = prunePoints(points3, now+10)
+	result = shiftSlice(points2, 1)
 	assert.Len(t, result, 0)
 
-	// Empty slice
-	result = prunePoints(nil, now)
-	assert.Nil(t, result)
-}
-
-func TestFilterPoints(t *testing.T) {
-	t.Parallel()
-
-	now := time.Now().Unix()
-	points := []dataPoint{
-		{Timestamp: now - 100, CPU: 1.0},
-		{Timestamp: now - 50, CPU: 2.0},
-		{Timestamp: now - 10, CPU: 3.0},
-		{Timestamp: now, CPU: 4.0},
+	// Shift none (idx = 0)
+	points3 := []MetricPoint{
+		{Timestamp: now - 10, Value: 1.0},
+		{Timestamp: now, Value: 2.0},
 	}
-
-	tests := []struct {
-		name      string
-		cutoff    int64
-		wantLen   int
-		wantFirst float64
-	}{
-		{"keeps all points", now - 200, 4, 1.0},
-		{"keeps last 2 points", now - 30, 2, 3.0},
-		{"exact cutoff includes boundary", now - 50, 3, 2.0},
-		{"excludes all points", now + 10, 0, 0},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := filterPoints(points, tt.cutoff)
-			if tt.wantLen == 0 {
-				assert.Nil(t, result)
-			} else {
-				assert.Len(t, result, tt.wantLen)
-				assert.Equal(t, tt.wantFirst, result[0].CPU)
-			}
-		})
-	}
-
-	// Empty slice
-	assert.Nil(t, filterPoints(nil, now))
-
-	// Verify filterPoints returns a copy (not alias)
-	result := filterPoints(points, now-200)
-	result[0].CPU = 999.0
-	assert.Equal(t, 1.0, points[0].CPU, "original should not be modified")
+	result = shiftSlice(points3, 0)
+	assert.Len(t, result, 2)
+	assert.Equal(t, 1.0, result[0].Value)
 }
