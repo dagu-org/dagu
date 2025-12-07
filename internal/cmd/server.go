@@ -5,6 +5,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +43,18 @@ func runServer(ctx *Context, _ []string) error {
 		tag.Port(ctx.Config.Server.Port),
 	)
 
-	server, err := ctx.NewServer()
+	// Initialize resource monitoring service
+	resourceService := resource.NewService(ctx.Config)
+	if err := resourceService.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start resource service: %w", err)
+	}
+	defer func() {
+		if err := resourceService.Stop(ctx); err != nil {
+			logger.Error(ctx, "Failed to stop resource service", tag.Error(err))
+		}
+	}()
+
+	server, err := ctx.NewServer(resourceService)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}

@@ -33,6 +33,15 @@ type Config struct {
 
 	// Warnings contains a list of warnings generated during the configuration loading process.
 	Warnings []string
+
+	// Monitoring contains configuration for system monitoring.
+	Monitoring MonitoringConfig
+}
+
+// MonitoringConfig holds the configuration for system monitoring.
+type MonitoringConfig struct {
+	// Retention specifies how long to keep system resource history.
+	Retention time.Duration
 }
 
 type Global struct {

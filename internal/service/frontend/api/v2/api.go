@@ -20,6 +20,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
+	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -43,6 +44,7 @@ type API struct {
 	coordinatorCli     coordinator.Client
 	serviceRegistry    execution.ServiceRegistry
 	subCmdBuilder      *runtime.SubCmdBuilder
+	resourceService    *resource.Service
 }
 
 func New(
@@ -55,6 +57,7 @@ func New(
 	cc coordinator.Client,
 	sr execution.ServiceRegistry,
 	mr *prometheus.Registry,
+	rs *resource.Service,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
 	for _, n := range cfg.Server.RemoteNodes {
@@ -75,6 +78,7 @@ func New(
 		coordinatorCli:     cc,
 		serviceRegistry:    sr,
 		metricsRegistry:    mr,
+		resourceService:    rs,
 	}
 }
 

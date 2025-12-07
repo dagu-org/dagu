@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/spf13/cobra"
 )
 
@@ -91,7 +92,10 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Disable health server when running from start-all
 	scheduler.DisableHealthServer()
 
-	server, err := ctx.NewServer()
+	// Initialize resource monitoring service
+	resourceService := resource.NewService(ctx.Config)
+
+	server, err := ctx.NewServer(resourceService)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
@@ -125,11 +129,23 @@ func runStartAll(ctx *Context, _ []string) error {
 
 	// WaitGroup to track all services
 	var wg sync.WaitGroup
-	serviceCount := 2 // scheduler + server
+	serviceCount := 3 // scheduler + server + resource
 	if enableCoordinator {
-		serviceCount = 3 // + coordinator
+		serviceCount = 4 // + coordinator
 	}
 	errCh := make(chan error, serviceCount)
+
+	// Start resource monitoring service
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := resourceService.Start(serviceCtx); err != nil {
+			select {
+			case errCh <- fmt.Errorf("resource service failed: %w", err):
+			default:
+			}
+		}
+	}()
 
 	// Start scheduler
 	wg.Add(1)
@@ -199,6 +215,11 @@ func runStartAll(ctx *Context, _ []string) error {
 				tag.Error(err),
 			)
 		}
+	}
+
+	// Stop resource service
+	if err := resourceService.Stop(ctx); err != nil {
+		logger.Error(ctx, "Failed to stop resource service", tag.Error(err))
 	}
 
 	// Wait for all services to finish with timeout

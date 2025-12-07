@@ -342,6 +342,20 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		}
 	}
 
+	// Set monitoring configuration
+	if def.Monitoring != nil {
+		if def.Monitoring.Retention != "" {
+			if duration, err := time.ParseDuration(def.Monitoring.Retention); err == nil {
+				cfg.Monitoring.Retention = duration
+			} else {
+				l.warnings = append(l.warnings, fmt.Sprintf("Invalid monitoring.retention value: %s", def.Monitoring.Retention))
+			}
+		}
+	}
+	if cfg.Monitoring.Retention <= 0 {
+		cfg.Monitoring.Retention = time.Hour // Default to 1 hour if not set
+	}
+
 	if cfg.Scheduler.Port <= 0 {
 		cfg.Scheduler.Port = 8090 // Default scheduler port
 	}
@@ -563,6 +577,9 @@ func setViperDefaultValues(paths Paths) {
 
 	// Peer settings
 	viper.SetDefault("peer.insecure", true) // Default to insecure (h2c)
+
+	// Monitoring settings
+	viper.SetDefault("monitoring.retention", "1h")
 }
 
 // bindEnvironmentVariables binds various configuration keys to environment variables.
@@ -661,6 +678,9 @@ func bindEnvironmentVariables() {
 	bindEnv("peer.clientCaFile", "PEER_CLIENT_CA_FILE")
 	bindEnv("peer.skipTlsVerify", "PEER_SKIP_TLS_VERIFY")
 	bindEnv("peer.insecure", "PEER_INSECURE")
+
+	// Monitoring configuration
+	bindEnv("monitoring.retention", "MONITORING_RETENTION")
 }
 
 type bindEnvOption func(fullEnv string)
