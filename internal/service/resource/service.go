@@ -51,11 +51,13 @@ func (s *Service) Start(ctx context.Context) error {
 
 func (s *Service) Stop(ctx context.Context) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.cancel != nil {
 		s.cancel()
+		s.mu.Unlock()
+		<-s.done
+	} else {
+		s.mu.Unlock()
 	}
-	<-s.done
 	logger.Info(ctx, "Resource monitoring service stopped")
 	return nil
 }
