@@ -27,12 +27,13 @@ var (
 
 // LoadOptions contains options for loading a DAG.
 type LoadOptions struct {
-	name       string   // Name of the DAG.
-	baseConfig string   // Path to the base core.DAG configuration file.
-	params     string   // Parameters to override default parameters in the DAG.
-	paramsList []string // List of parameters to override default parameters in the DAG.
-	flags      BuildFlag
-	dagsDir    string // Directory containing the core.DAG files.
+	name              string   // Name of the DAG.
+	baseConfig        string   // Path to the base core.DAG configuration file.
+	params            string   // Parameters to override default parameters in the DAG.
+	paramsList        []string // List of parameters to override default parameters in the DAG.
+	flags             BuildFlag
+	dagsDir           string // Directory containing the core.DAG files.
+	defaultWorkingDir string // Default working directory for DAGs without explicit workingDir.
 }
 
 // LoadOption is a function type for setting LoadOptions.
@@ -118,6 +119,18 @@ func WithSkipBaseHandlers() LoadOption {
 	}
 }
 
+// WithDefaultWorkingDir sets the default working directory for DAGs without explicit workingDir.
+// This is used for sub-DAG execution to inherit the parent's working directory.
+func WithDefaultWorkingDir(defaultWorkingDir string) LoadOption {
+	return func(o *LoadOptions) {
+		dir := strings.TrimSpace(defaultWorkingDir)
+		if dir == "" {
+			return
+		}
+		o.defaultWorkingDir = filepath.Clean(dir)
+	}
+}
+
 // Load loads a Directed Acyclic Graph (core.DAG) from a file path or name with the given options.
 //
 // The function handles different input formats:
@@ -144,12 +157,13 @@ func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*core.DAG
 	buildContext := BuildContext{
 		ctx: ctx,
 		opts: BuildOpts{
-			Base:           options.baseConfig,
-			Parameters:     options.params,
-			ParametersList: options.paramsList,
-			Name:           options.name,
-			DAGsDir:        options.dagsDir,
-			Flags:          options.flags,
+			Base:              options.baseConfig,
+			Parameters:        options.params,
+			ParametersList:    options.paramsList,
+			Name:              options.name,
+			DAGsDir:           options.dagsDir,
+			DefaultWorkingDir: options.defaultWorkingDir,
+			Flags:             options.flags,
 		},
 	}
 	return loadDAG(buildContext, nameOrPath)
@@ -162,12 +176,13 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*core.DAG, 
 		opt(&options)
 	}
 	return LoadYAMLWithOpts(ctx, data, BuildOpts{
-		Base:           options.baseConfig,
-		Parameters:     options.params,
-		ParametersList: options.paramsList,
-		Name:           options.name,
-		DAGsDir:        options.dagsDir,
-		Flags:          options.flags,
+		Base:              options.baseConfig,
+		Parameters:        options.params,
+		ParametersList:    options.paramsList,
+		Name:              options.name,
+		DAGsDir:           options.dagsDir,
+		DefaultWorkingDir: options.defaultWorkingDir,
+		Flags:             options.flags,
 	})
 }
 

@@ -29,7 +29,7 @@ Examples:
 	)
 }
 
-var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag}
+var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, defaultWorkingDirFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
 	// Get Run ID from the context or generate a new one

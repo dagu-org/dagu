@@ -3,6 +3,7 @@ package spec_test
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -542,5 +543,75 @@ steps:
 		assert.NotNil(t, dag.WorkerSelector)
 		assert.Equal(t, "true", dag.WorkerSelector["gpu"])
 		assert.Equal(t, "64G", dag.WorkerSelector["memory"])
+	})
+}
+
+func TestWithDefaultWorkingDir(t *testing.T) {
+	t.Parallel()
+
+	t.Run("DefaultUsedWhenNoFileContext", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a temporary directory to use as default working dir
+		tmpDir := t.TempDir()
+
+		// Load from YAML data (no file context) with WithDefaultWorkingDir option
+		dag, err := spec.LoadYAML(context.Background(), []byte(`steps:
+  - name: test
+    command: echo hello
+`), spec.WithDefaultWorkingDir(tmpDir))
+		require.NoError(t, err)
+
+		// The WorkingDir should be set to the provided default value
+		assert.Equal(t, tmpDir, dag.WorkingDir)
+	})
+
+	t.Run("DefaultTakesPrecedenceOverFileContext", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a temporary directory for default
+		defaultDir := t.TempDir()
+
+		// Create a DAG file without explicit workingDir
+		testDAG := createTempYAMLFile(t, `steps:
+  - name: test
+    command: echo hello
+`)
+		fileDir := filepath.Dir(testDAG)
+
+		// First, verify that without the option, file's directory is used
+		dagWithoutOption, err := spec.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+		assert.Equal(t, fileDir, dagWithoutOption.WorkingDir, "Without option, should use file's directory")
+
+		// Now load with WithDefaultWorkingDir option
+		// The default should take precedence over the file's directory
+		dag, err := spec.Load(context.Background(), testDAG, spec.WithDefaultWorkingDir(defaultDir))
+		require.NoError(t, err)
+
+		// The WorkingDir should be the default, not the DAG file's directory
+		assert.Equal(t, defaultDir, dag.WorkingDir)
+		assert.NotEqual(t, fileDir, dag.WorkingDir, "Default should take precedence over file's directory")
+	})
+
+	t.Run("ExplicitWorkingDirTakesPrecedence", func(t *testing.T) {
+		t.Parallel()
+
+		// Create temporary directories
+		explicitDir := t.TempDir()
+		defaultDir := t.TempDir()
+
+		// Create a DAG file with explicit workingDir
+		testDAG := createTempYAMLFile(t, `workingDir: `+explicitDir+`
+steps:
+  - name: test
+    command: echo hello
+`)
+		// Load with WithDefaultWorkingDir option (should be ignored since DAG has explicit workingDir)
+		dag, err := spec.Load(context.Background(), testDAG, spec.WithDefaultWorkingDir(defaultDir))
+		require.NoError(t, err)
+
+		// The explicit workingDir from the DAG should take precedence
+		assert.Equal(t, explicitDir, dag.WorkingDir)
 	})
 }

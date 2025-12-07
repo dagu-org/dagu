@@ -78,6 +78,9 @@ type BuildOpts struct {
 	Name string
 	// DAGsDir is the directory containing the core.DAG files.
 	DAGsDir string
+	// DefaultWorkingDir is the default working directory for DAGs without explicit workingDir.
+	// This is used for sub-DAG execution to inherit the parent's working directory.
+	DefaultWorkingDir string
 	// Flags stores all boolean options controlling build behaviour.
 	Flags BuildFlag
 }
@@ -654,6 +657,10 @@ func buildWorkingDir(ctx BuildContext, spec *definition, dag *core.DAG) error {
 			}
 		}
 		dag.WorkingDir = wd
+
+	case ctx.opts.DefaultWorkingDir != "":
+		// Use the default working directory (e.g., inherited from parent for sub-DAG execution)
+		dag.WorkingDir = ctx.opts.DefaultWorkingDir
 
 	case ctx.file != "":
 		wd := filepath.Dir(ctx.file)
