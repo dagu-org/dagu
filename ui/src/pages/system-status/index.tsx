@@ -118,6 +118,8 @@ function SystemStatus() {
               'h-7 px-2',
               autoRefresh && 'bg-green-50 dark:bg-green-950 border-green-500'
             )}
+            aria-label={`Auto-refresh ${autoRefresh ? 'enabled' : 'disabled'}`}
+            title={`Toggle auto-refresh (currently ${autoRefresh ? 'ON' : 'OFF'})`}
           >
             <Activity
               className={cn('h-3 w-3 mr-1', autoRefresh && 'text-green-500')}

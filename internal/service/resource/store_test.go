@@ -158,7 +158,8 @@ func TestFilterPoints(t *testing.T) {
 	result := filterPoints(points, now-200, false)
 	assert.Same(t, &points[0], &result[0], "should return same slice")
 
-	// Copy when idx > 0 even with copySlice=false
+	// Copy when idx > 0 even with copySlice=false: should not alias original slice
 	result = filterPoints(points, now-30, false)
 	assert.Len(t, result, 2)
+	assert.NotSame(t, &points[2], &result[0], "should return a copied slice when dropping prefix")
 }
