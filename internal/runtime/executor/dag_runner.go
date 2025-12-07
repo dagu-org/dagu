@@ -123,11 +123,14 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 		fmt.Sprintf("--run-id=%s", runParams.RunID),
 		"--no-queue",
 		"--disable-max-active-runs",
-		e.DAG.Location,
+	}
+	if workDir != "" {
+		args = append(args, fmt.Sprintf("--default-working-dir=%s", workDir))
 	}
 	if configFile := config.ConfigFileUsed(ctx); configFile != "" {
 		args = append(args, "--config", configFile)
 	}
+	args = append(args, e.DAG.Location)
 
 	if runParams.Params != "" {
 		args = append(args, "--", runParams.Params)

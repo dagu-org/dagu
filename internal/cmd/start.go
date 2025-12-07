@@ -57,7 +57,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag, disableMaxActiveRuns}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag, disableMaxActiveRuns, defaultWorkingDirFlag}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
@@ -364,6 +364,16 @@ func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG
 	}
 	if nameOverride != "" {
 		loadOpts = append(loadOpts, spec.WithName(nameOverride))
+	}
+
+	// Get default working directory from flags if provided
+	// This is used for sub-DAG execution to inherit the parent's working directory
+	defaultWorkingDir, err := ctx.StringParam("default-working-dir")
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get default-working-dir: %w", err)
+	}
+	if defaultWorkingDir != "" {
+		loadOpts = append(loadOpts, spec.WithDefaultWorkingDir(defaultWorkingDir))
 	}
 
 	// Load parameters from command line arguments

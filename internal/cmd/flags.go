@@ -157,6 +157,13 @@ var (
 		usage: "[only for sub dag-runs] reference for the parent dag-run",
 	}
 
+	// defaultWorkingDirFlag is the default working directory for DAGs without explicit workingDir.
+	// This is used for sub-DAG execution to inherit the parent's working directory.
+	defaultWorkingDirFlag = commandLineFlag{
+		name:  "default-working-dir",
+		usage: "Default working directory for DAGs without explicit workingDir",
+	}
+
 	// quietFlag is used to suppress output during command execution.
 	quietFlag = commandLineFlag{
 		name:      "quiet",
