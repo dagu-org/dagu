@@ -61,31 +61,6 @@ func TestMemoryStore_GetHistoryFiltering(t *testing.T) {
 	})
 }
 
-func TestMemoryStore_Prune(t *testing.T) {
-	t.Parallel()
-
-	synctest.Test(t, func(t *testing.T) {
-		store := NewMemoryStore(50 * time.Millisecond)
-
-		store.Add(1.0, 1.0, 1.0, 1.0)
-
-		// Wait for timestamp change
-		time.Sleep(1100 * time.Millisecond)
-
-		// Force prune by setting lastPruned to past
-		store.lastPruned = time.Now().Add(-2 * time.Minute)
-
-		// This Add triggers pruning
-		store.Add(2.0, 2.0, 2.0, 2.0)
-
-		store.mu.RLock()
-		cpuLen := len(store.cpu)
-		store.mu.RUnlock()
-
-		assert.Equal(t, 1, cpuLen, "old data should be pruned")
-	})
-}
-
 func TestMemoryStore_EmptyHistory(t *testing.T) {
 	t.Parallel()
 
@@ -114,36 +89,14 @@ func TestMemoryStore_GetHistoryReturnsCopy(t *testing.T) {
 	assert.Equal(t, 1.0, history2.CPU[0].Value)
 }
 
-func TestShiftSlice(t *testing.T) {
+func TestNewMemoryStoreWithInterval_Capacity(t *testing.T) {
 	t.Parallel()
 
-	now := time.Now().Unix()
+	// 1 hour retention with 10s interval = 360 points + 10 buffer = 370
+	store := NewMemoryStoreWithInterval(time.Hour, 10*time.Second)
+	assert.Equal(t, 370, len(store.buffer.buffer))
 
-	// Shift first 2 elements
-	points := []MetricPoint{
-		{Timestamp: now - 100, Value: 1.0},
-		{Timestamp: now - 50, Value: 2.0},
-		{Timestamp: now - 10, Value: 3.0},
-		{Timestamp: now, Value: 4.0},
-	}
-	result := shiftSlice(points, 2)
-	assert.Len(t, result, 2)
-	assert.Equal(t, 3.0, result[0].Value)
-	assert.Equal(t, 4.0, result[1].Value)
-
-	// Shift all (idx = len)
-	points2 := []MetricPoint{
-		{Timestamp: now, Value: 1.0},
-	}
-	result = shiftSlice(points2, 1)
-	assert.Len(t, result, 0)
-
-	// Shift none (idx = 0)
-	points3 := []MetricPoint{
-		{Timestamp: now - 10, Value: 1.0},
-		{Timestamp: now, Value: 2.0},
-	}
-	result = shiftSlice(points3, 0)
-	assert.Len(t, result, 2)
-	assert.Equal(t, 1.0, result[0].Value)
+	// Invalid interval defaults to 10s
+	store2 := NewMemoryStoreWithInterval(time.Hour, 0)
+	assert.Equal(t, 370, len(store2.buffer.buffer))
 }

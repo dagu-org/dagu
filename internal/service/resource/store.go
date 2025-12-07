@@ -1,7 +1,6 @@
 package resource
 
 import (
-	"sort"
 	"sync"
 	"time"
 )
@@ -26,71 +25,49 @@ type Store interface {
 	GetHistory(duration time.Duration) *ResourceHistory
 }
 
-// MemoryStore implements Store using in-memory storage
-// Data is stored in the same format as the output to avoid transformation overhead
-type MemoryStore struct {
-	mu         sync.RWMutex
-	cpu        []MetricPoint
-	memory     []MetricPoint
-	disk       []MetricPoint
-	load       []MetricPoint
-	retention  time.Duration
-	lastPruned time.Time
+// dataPoint stores all metrics for a single timestamp
+type dataPoint struct {
+	Timestamp int64
+	CPU       float64
+	Memory    float64
+	Disk      float64
+	Load      float64
 }
 
-// NewMemoryStore creates a new MemoryStore
+// MemoryStore implements Store using a generic ring buffer
+type MemoryStore struct {
+	mu     sync.RWMutex
+	buffer *RingBuffer[dataPoint]
+}
+
+// NewMemoryStore creates a new store with capacity based on retention
 func NewMemoryStore(retention time.Duration) *MemoryStore {
+	return NewMemoryStoreWithInterval(retention, 10*time.Second)
+}
+
+// NewMemoryStoreWithInterval creates a store with explicit interval for capacity calculation
+func NewMemoryStoreWithInterval(retention, interval time.Duration) *MemoryStore {
+	if interval <= 0 {
+		interval = 10 * time.Second
+	}
+	capacity := int(retention/interval) + 10
 	return &MemoryStore{
-		retention: retention,
+		buffer: NewRingBuffer[dataPoint](capacity),
 	}
 }
 
-// Add appends a new data point for all metrics
+// Add writes a new data point. Zero allocations, O(1).
 func (s *MemoryStore) Add(cpu, memory, disk, load float64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	now := time.Now()
-	ts := now.Unix()
-
-	s.cpu = append(s.cpu, MetricPoint{Timestamp: ts, Value: cpu})
-	s.memory = append(s.memory, MetricPoint{Timestamp: ts, Value: memory})
-	s.disk = append(s.disk, MetricPoint{Timestamp: ts, Value: disk})
-	s.load = append(s.load, MetricPoint{Timestamp: ts, Value: load})
-
-	// Prune old data periodically to bound memory usage
-	if now.Sub(s.lastPruned) > time.Minute {
-		s.prune(now.Add(-s.retention).Unix())
-		s.lastPruned = now
-	}
-}
-
-// prune removes data points older than cutoff
-func (s *MemoryStore) prune(cutoff int64) {
-	if len(s.cpu) == 0 {
-		return
-	}
-
-	// Single binary search - timestamps are identical across all slices
-	idx := sort.Search(len(s.cpu), func(i int) bool {
-		return s.cpu[i].Timestamp >= cutoff
+	s.buffer.Push(dataPoint{
+		Timestamp: time.Now().Unix(),
+		CPU:       cpu,
+		Memory:    memory,
+		Disk:      disk,
+		Load:      load,
 	})
-
-	if idx == 0 {
-		return // Nothing to prune
-	}
-
-	// Shift remaining data to front to allow GC of backing array space
-	s.cpu = shiftSlice(s.cpu, idx)
-	s.memory = shiftSlice(s.memory, idx)
-	s.disk = shiftSlice(s.disk, idx)
-	s.load = shiftSlice(s.load, idx)
-}
-
-// shiftSlice moves elements starting at idx to the front
-func shiftSlice(s []MetricPoint, idx int) []MetricPoint {
-	n := copy(s, s[idx:])
-	return s[:n]
 }
 
 // GetHistory returns metrics for the specified duration
@@ -98,36 +75,44 @@ func (s *MemoryStore) GetHistory(duration time.Duration) *ResourceHistory {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if len(s.cpu) == 0 {
+	if s.buffer.Len() == 0 {
 		return &ResourceHistory{}
 	}
 
 	cutoff := time.Now().Add(-duration).Unix()
 
-	// Single binary search - timestamps are identical across all slices
-	idx := sort.Search(len(s.cpu), func(i int) bool {
-		return s.cpu[i].Timestamp >= cutoff
+	// Count matching points for pre-allocation
+	n := 0
+	s.buffer.ForEach(func(p *dataPoint) bool {
+		if p.Timestamp >= cutoff {
+			n++
+		}
+		return true
 	})
 
-	if idx >= len(s.cpu) {
+	if n == 0 {
 		return &ResourceHistory{}
 	}
 
-	n := len(s.cpu) - idx
+	cpu := make([]MetricPoint, 0, n)
+	memory := make([]MetricPoint, 0, n)
+	disk := make([]MetricPoint, 0, n)
+	load := make([]MetricPoint, 0, n)
 
-	// Single allocation for all 4 result slices - better cache locality
-	all := make([]MetricPoint, n*4)
-
-	// Use optimized builtin copy (SIMD on most platforms)
-	copy(all[:n], s.cpu[idx:])
-	copy(all[n:2*n], s.memory[idx:])
-	copy(all[2*n:3*n], s.disk[idx:])
-	copy(all[3*n:], s.load[idx:])
+	s.buffer.ForEach(func(p *dataPoint) bool {
+		if p.Timestamp >= cutoff {
+			cpu = append(cpu, MetricPoint{Timestamp: p.Timestamp, Value: p.CPU})
+			memory = append(memory, MetricPoint{Timestamp: p.Timestamp, Value: p.Memory})
+			disk = append(disk, MetricPoint{Timestamp: p.Timestamp, Value: p.Disk})
+			load = append(load, MetricPoint{Timestamp: p.Timestamp, Value: p.Load})
+		}
+		return true
+	})
 
 	return &ResourceHistory{
-		CPU:    all[:n:n],           // cap=n prevents accidental append corruption
-		Memory: all[n : 2*n : 2*n],
-		Disk:   all[2*n : 3*n : 3*n],
-		Load:   all[3*n : 4*n : 4*n],
+		CPU:    cpu,
+		Memory: memory,
+		Disk:   disk,
+		Load:   load,
 	}
 }
