@@ -16,6 +16,7 @@ function SystemStatus() {
   const appBarContext = React.useContext(AppBarContext);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [autoRefresh, setAutoRefresh] = React.useState(true);
+  const [lastUpdateTime, setLastUpdateTime] = React.useState<Date>(new Date());
 
   React.useEffect(() => {
     appBarContext.setTitle('System Status');
@@ -84,10 +85,18 @@ function SystemStatus() {
         mutateScheduler(),
         mutateCoordinator(),
       ]);
+      setLastUpdateTime(new Date());
     } finally {
       setIsRefreshing(false);
     }
   };
+
+  // Update timestamp when data changes from auto-refresh
+  React.useEffect(() => {
+    if (resourceData) {
+      setLastUpdateTime(new Date());
+    }
+  }, [resourceData]);
 
   return (
     <div className="flex flex-col gap-4 p-4 max-w-7xl mx-auto">
@@ -203,7 +212,7 @@ function SystemStatus() {
 
       {/* Last Update */}
       <div className="text-xs text-muted-foreground text-center">
-        Last updated: {new Date().toLocaleTimeString()}
+        Last updated: {lastUpdateTime.toLocaleTimeString()}
         {autoRefresh && ' • Refreshing every 5 seconds'}
       </div>
     </div>
