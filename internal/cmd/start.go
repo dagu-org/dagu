@@ -368,15 +368,12 @@ func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG
 
 	// Get default working directory from flags if provided
 	// This is used for sub-DAG execution to inherit the parent's working directory
-	// Only check this flag if it's defined on the command (start command has it, enqueue doesn't)
-	if ctx.Command.Flags().Lookup("default-working-dir") != nil {
-		defaultWorkingDir, err := ctx.StringParam("default-working-dir")
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to get default-working-dir: %w", err)
-		}
-		if defaultWorkingDir != "" {
-			loadOpts = append(loadOpts, spec.WithDefaultWorkingDir(defaultWorkingDir))
-		}
+	defaultWorkingDir, err := ctx.StringParam("default-working-dir")
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get default-working-dir: %w", err)
+	}
+	if defaultWorkingDir != "" {
+		loadOpts = append(loadOpts, spec.WithDefaultWorkingDir(defaultWorkingDir))
 	}
 
 	// Load parameters from command line arguments
