@@ -1533,6 +1533,7 @@ paths:
       tags:
         - "system"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - name: duration
           in: query
           description: "Duration of history to retrieve (e.g., 30m, 1h)"

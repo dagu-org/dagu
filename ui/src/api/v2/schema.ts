@@ -3117,6 +3117,8 @@ export interface operations {
     getResourceHistory: {
         parameters: {
             query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Duration of history to retrieve (e.g., 30m, 1h) */
                 duration?: string;
             };

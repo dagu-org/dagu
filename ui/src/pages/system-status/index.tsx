@@ -48,9 +48,19 @@ function SystemStatus() {
     data: resourceData,
     error: resourceError,
     mutate: mutateResource,
-  } = useQuery('/services/resources/history', undefined, {
-    refreshInterval: autoRefresh ? 5000 : 0,
-  });
+  } = useQuery(
+    '/services/resources/history',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+      },
+    },
+    {
+      refreshInterval: autoRefresh ? 5000 : 0,
+    }
+  );
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
