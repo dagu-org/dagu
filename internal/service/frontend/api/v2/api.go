@@ -47,6 +47,10 @@ type API struct {
 	resourceService    *resource.Service
 }
 
+// New constructs an API instance wired with the provided DAG, DAG-run, queue and proc stores,
+// runtime manager, configuration, coordinator client, service registry, metrics registry, and resource service.
+// It also builds the internal remote node map from cfg.Server.RemoteNodes and initializes the sub-command
+// builder and API base path from the provided configuration.
 func New(
 	dr execution.DAGStore,
 	drs execution.DAGRunStore,

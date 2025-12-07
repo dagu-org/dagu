@@ -75,6 +75,8 @@ var startAllFlags = []commandLineFlag{
 	peerSkipTLSVerifyFlag,
 }
 
+// runStartAll starts the scheduler, web server, resource monitoring service, and optionally the coordinator in-process, then manages their lifecycles and graceful shutdown.
+// It creates a signal-aware context, decides whether to enable the coordinator based on coordinator host binding, waits for an error or termination signal, shuts down services in order, and returns the first service error encountered (if any).
 func runStartAll(ctx *Context, _ []string) error {
 	if dagsDir, _ := ctx.Command.Flags().GetString("dags"); dagsDir != "" {
 		ctx.Config.Paths.DAGsDir = dagsDir

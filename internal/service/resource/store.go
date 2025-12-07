@@ -40,12 +40,16 @@ type MemoryStore struct {
 	buffer *RingBuffer[dataPoint]
 }
 
-// NewMemoryStore creates a new store with capacity based on retention
+// NewMemoryStore creates a MemoryStore that retains metric samples for the given retention duration.
+// It uses a 10-second sampling interval to compute the internal buffer capacity.
+// The returned *MemoryStore is safe for concurrent use.
 func NewMemoryStore(retention time.Duration) *MemoryStore {
 	return NewMemoryStoreWithInterval(retention, 10*time.Second)
 }
 
-// NewMemoryStoreWithInterval creates a store with explicit interval for capacity calculation
+// NewMemoryStoreWithInterval creates a MemoryStore configured for the given retention and sampling interval.
+// If interval is less than or equal to zero, it defaults to 10 seconds.
+// The ring buffer capacity is computed as int(retention/interval) + 10 and used to back the store.
 func NewMemoryStoreWithInterval(retention, interval time.Duration) *MemoryStore {
 	if interval <= 0 {
 		interval = 10 * time.Second

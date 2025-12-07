@@ -541,6 +541,7 @@ func setupViper(xdgConfig XDGConfig, homeDir, configFile, appHomeOverride string
 	return paths.Warnings, nil
 }
 
+// interval).
 func setViperDefaultValues(paths Paths) {
 	// File paths
 	viper.SetDefault("workDir", "")         // Defaults to DAG location if empty.
@@ -593,7 +594,10 @@ func setViperDefaultValues(paths Paths) {
 	viper.SetDefault("monitoring.interval", "5s")
 }
 
-// bindEnvironmentVariables binds various configuration keys to environment variables.
+// bindEnvironmentVariables binds configuration keys to the environment variable names used by Viper.
+// It registers current and legacy environment names for server, global, scheduler, UI, authentication
+// (including OIDC and legacy keys), TLS, file paths (with path normalization where appropriate),
+// coordinator, worker, peer, queues, and monitoring settings.
 func bindEnvironmentVariables() {
 	// Server configurations
 	bindEnv("logFormat", "LOG_FORMAT")

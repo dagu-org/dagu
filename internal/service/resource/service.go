@@ -24,6 +24,11 @@ type Service struct {
 
 const defaultMonitoringInterval = 10 * time.Second
 
+// NewService creates a new resource Service configured with cfg.
+// It panics if cfg is nil. If cfg.Monitoring.Interval is not greater than zero,
+// it is set to defaultMonitoringInterval. The returned Service uses an in-memory
+// store with retention taken from cfg.Monitoring.Retention and has its done
+// channel initialized; the cancel function is not set.
 func NewService(cfg *config.Config) *Service {
 	if cfg == nil {
 		panic("config must not be nil")
