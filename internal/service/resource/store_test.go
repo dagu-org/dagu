@@ -65,7 +65,6 @@ func TestMemoryStore_Prune(t *testing.T) {
 	t.Parallel()
 
 	synctest.Test(t, func(t *testing.T) {
-
 		store := NewMemoryStore(50 * time.Millisecond)
 
 		store.Add(1.0, 1.0, 1.0, 1.0)
@@ -80,10 +79,10 @@ func TestMemoryStore_Prune(t *testing.T) {
 		store.Add(2.0, 2.0, 2.0, 2.0)
 
 		store.mu.RLock()
-		cpuLen := len(store.cpu)
+		pointsLen := len(store.points)
 		store.mu.RUnlock()
 
-		assert.Equal(t, 1, cpuLen, "old data should be pruned")
+		assert.Equal(t, 1, pointsLen, "old data should be pruned")
 	})
 }
 
@@ -93,10 +92,10 @@ func TestMemoryStore_EmptyHistory(t *testing.T) {
 	store := NewMemoryStore(time.Hour)
 	history := store.GetHistory(time.Hour)
 
-	assert.Nil(t, history.CPU)
-	assert.Nil(t, history.Memory)
-	assert.Nil(t, history.Disk)
-	assert.Nil(t, history.Load)
+	assert.Empty(t, history.CPU)
+	assert.Empty(t, history.Memory)
+	assert.Empty(t, history.Disk)
+	assert.Empty(t, history.Load)
 }
 
 func TestMemoryStore_GetHistoryReturnsCopy(t *testing.T) {
@@ -115,51 +114,84 @@ func TestMemoryStore_GetHistoryReturnsCopy(t *testing.T) {
 	assert.Equal(t, 1.0, history2.CPU[0].Value)
 }
 
+func TestPrunePoints(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().Unix()
+	points := []dataPoint{
+		{Timestamp: now - 100, CPU: 1.0},
+		{Timestamp: now - 50, CPU: 2.0},
+		{Timestamp: now - 10, CPU: 3.0},
+		{Timestamp: now, CPU: 4.0},
+	}
+
+	// No pruning needed
+	result := prunePoints(points, now-200)
+	assert.Len(t, result, 4)
+
+	// Prune first 2 points
+	points2 := []dataPoint{
+		{Timestamp: now - 100, CPU: 1.0},
+		{Timestamp: now - 50, CPU: 2.0},
+		{Timestamp: now - 10, CPU: 3.0},
+		{Timestamp: now, CPU: 4.0},
+	}
+	result = prunePoints(points2, now-30)
+	assert.Len(t, result, 2)
+	assert.Equal(t, 3.0, result[0].CPU)
+
+	// Prune all
+	points3 := []dataPoint{
+		{Timestamp: now - 100, CPU: 1.0},
+	}
+	result = prunePoints(points3, now+10)
+	assert.Len(t, result, 0)
+
+	// Empty slice
+	result = prunePoints(nil, now)
+	assert.Nil(t, result)
+}
+
 func TestFilterPoints(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().Unix()
-	points := []MetricPoint{
-		{Timestamp: now - 100, Value: 1.0},
-		{Timestamp: now - 50, Value: 2.0},
-		{Timestamp: now - 10, Value: 3.0},
-		{Timestamp: now, Value: 4.0},
+	points := []dataPoint{
+		{Timestamp: now - 100, CPU: 1.0},
+		{Timestamp: now - 50, CPU: 2.0},
+		{Timestamp: now - 10, CPU: 3.0},
+		{Timestamp: now, CPU: 4.0},
 	}
 
 	tests := []struct {
 		name      string
 		cutoff    int64
-		copySlice bool
 		wantLen   int
 		wantFirst float64
 	}{
-		{"keeps all points", now - 200, true, 4, 1.0},
-		{"keeps last 2 points", now - 30, true, 2, 3.0},
-		{"exact cutoff includes boundary", now - 50, true, 3, 2.0},
-		{"excludes all points", now + 10, true, 0, 0},
+		{"keeps all points", now - 200, 4, 1.0},
+		{"keeps last 2 points", now - 30, 2, 3.0},
+		{"exact cutoff includes boundary", now - 50, 3, 2.0},
+		{"excludes all points", now + 10, 0, 0},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := filterPoints(points, tt.cutoff, tt.copySlice)
+			result := filterPoints(points, tt.cutoff)
 			if tt.wantLen == 0 {
 				assert.Nil(t, result)
 			} else {
 				assert.Len(t, result, tt.wantLen)
-				assert.Equal(t, tt.wantFirst, result[0].Value)
+				assert.Equal(t, tt.wantFirst, result[0].CPU)
 			}
 		})
 	}
 
 	// Empty slice
-	assert.Nil(t, filterPoints(nil, now, true))
+	assert.Nil(t, filterPoints(nil, now))
 
-	// No copy when idx == 0 and copySlice is false
-	result := filterPoints(points, now-200, false)
-	assert.Same(t, &points[0], &result[0], "should return same slice")
-
-	// Copy when idx > 0 even with copySlice=false: should not alias original slice
-	result = filterPoints(points, now-30, false)
-	assert.Len(t, result, 2)
-	assert.NotSame(t, &points[2], &result[0], "should return a copied slice when dropping prefix")
+	// Verify filterPoints returns a copy (not alias)
+	result := filterPoints(points, now-200)
+	result[0].CPU = 999.0
+	assert.Equal(t, 1.0, points[0].CPU, "original should not be modified")
 }

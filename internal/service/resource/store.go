@@ -26,13 +26,19 @@ type Store interface {
 	GetHistory(duration time.Duration) *ResourceHistory
 }
 
-// MemoryStore implements Store using in-memory slices
+// dataPoint stores all metrics for a single timestamp
+type dataPoint struct {
+	Timestamp int64
+	CPU       float64
+	Memory    float64
+	Disk      float64
+	Load      float64
+}
+
+// MemoryStore implements Store using in-memory storage
 type MemoryStore struct {
 	mu         sync.RWMutex
-	cpu        []MetricPoint
-	memory     []MetricPoint
-	disk       []MetricPoint
-	load       []MetricPoint
+	points     []dataPoint
 	retention  time.Duration
 	lastPruned time.Time
 }
@@ -50,20 +56,19 @@ func (s *MemoryStore) Add(cpu, memory, disk, load float64) {
 	defer s.mu.Unlock()
 
 	now := time.Now()
-	ts := now.Unix()
 
-	s.cpu = append(s.cpu, MetricPoint{Timestamp: ts, Value: cpu})
-	s.memory = append(s.memory, MetricPoint{Timestamp: ts, Value: memory})
-	s.disk = append(s.disk, MetricPoint{Timestamp: ts, Value: disk})
-	s.load = append(s.load, MetricPoint{Timestamp: ts, Value: load})
+	s.points = append(s.points, dataPoint{
+		Timestamp: now.Unix(),
+		CPU:       cpu,
+		Memory:    memory,
+		Disk:      disk,
+		Load:      load,
+	})
 
-	// Prune old data every minute to avoid excessive locking/scanning
+	// Prune old data every minute to avoid excessive scanning
 	if now.Sub(s.lastPruned) > time.Minute {
 		cutoff := now.Add(-s.retention).Unix()
-		s.cpu = filterPoints(s.cpu, cutoff, false)
-		s.memory = filterPoints(s.memory, cutoff, false)
-		s.disk = filterPoints(s.disk, cutoff, false)
-		s.load = filterPoints(s.load, cutoff, false)
+		s.points = prunePoints(s.points, cutoff)
 		s.lastPruned = now
 	}
 }
@@ -74,37 +79,71 @@ func (s *MemoryStore) GetHistory(duration time.Duration) *ResourceHistory {
 	defer s.mu.RUnlock()
 
 	cutoff := time.Now().Add(-duration).Unix()
+	filtered := filterPoints(s.points, cutoff)
+
+	if len(filtered) == 0 {
+		return &ResourceHistory{}
+	}
+
+	// Pre-allocate result slices
+	cpu := make([]MetricPoint, len(filtered))
+	memory := make([]MetricPoint, len(filtered))
+	disk := make([]MetricPoint, len(filtered))
+	load := make([]MetricPoint, len(filtered))
+
+	for i, p := range filtered {
+		cpu[i] = MetricPoint{Timestamp: p.Timestamp, Value: p.CPU}
+		memory[i] = MetricPoint{Timestamp: p.Timestamp, Value: p.Memory}
+		disk[i] = MetricPoint{Timestamp: p.Timestamp, Value: p.Disk}
+		load[i] = MetricPoint{Timestamp: p.Timestamp, Value: p.Load}
+	}
 
 	return &ResourceHistory{
-		CPU:    filterPoints(s.cpu, cutoff, true),
-		Memory: filterPoints(s.memory, cutoff, true),
-		Disk:   filterPoints(s.disk, cutoff, true),
-		Load:   filterPoints(s.load, cutoff, true),
+		CPU:    cpu,
+		Memory: memory,
+		Disk:   disk,
+		Load:   load,
 	}
 }
 
-// filterPoints returns points with timestamp >= cutoff using binary search.
-// If copy is true, returns a new slice to decouple from the original.
-func filterPoints(points []MetricPoint, cutoff int64, copySlice bool) []MetricPoint {
+// prunePoints removes old points in-place by reslicing (no allocation)
+func prunePoints(points []dataPoint, cutoff int64) []dataPoint {
+	if len(points) == 0 {
+		return points
+	}
+
+	idx := sort.Search(len(points), func(i int) bool {
+		return points[i].Timestamp >= cutoff
+	})
+
+	if idx == 0 {
+		return points
+	}
+	if idx == len(points) {
+		return points[:0] // Keep capacity, clear content
+	}
+
+	// Shift remaining points to front to allow GC of old data
+	n := copy(points, points[idx:])
+	return points[:n]
+}
+
+// filterPoints returns points with timestamp >= cutoff (creates new slice for reads)
+func filterPoints(points []dataPoint, cutoff int64) []dataPoint {
 	if len(points) == 0 {
 		return nil
 	}
 
-	// Binary search for first point >= cutoff
 	idx := sort.Search(len(points), func(i int) bool {
 		return points[i].Timestamp >= cutoff
 	})
 
 	if idx == len(points) {
-		return nil // All points are old
+		return nil
 	}
 
-	if !copySlice && idx == 0 {
-		return points // No pruning needed, return original
-	}
-
-	// Return a copy to allow GC of old backing array or decouple from store
-	result := make([]MetricPoint, len(points)-idx)
+	// Copy to decouple from store
+	result := make([]dataPoint, len(points)-idx)
 	copy(result, points[idx:])
 	return result
 }
