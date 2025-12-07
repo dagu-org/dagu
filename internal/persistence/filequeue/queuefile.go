@@ -43,7 +43,9 @@ type QueueFile struct {
 	mu sync.RWMutex
 }
 
-// NewQueueFile creates a new queue file with the specified base directory and priority
+// NewQueueFile constructs a QueueFile configured to use baseDir for storage and prefix to identify queue item files.
+// The returned QueueFile includes a compiled regular expression that matches queue filenames of the form
+// item_<prefix><YYYYMMDD_HHMMSS>_<nanoseconds>Z_<dagRunID>.json.
 func NewQueueFile(baseDir, prefix string) *QueueFile {
 	return &QueueFile{
 		baseDir: baseDir,
@@ -369,6 +371,11 @@ func (q *QueueFile) listItems(ctx context.Context) ([]queuedItem, error) {
 	return items, nil
 }
 
+// parseQueueFileName parses a queue file's name and returns the corresponding ItemData.
+// It expects fileName to match the queue filename pattern (priority, timestamp, nanoseconds, dagRunID).
+// The returned ItemData has FileName set to fileName, DAGRun.Name set to the base name of the file's parent directory (from path),
+// DAGRun.ID extracted from the filename, and QueuedAt set to the parsed UTC timestamp including nanoseconds.
+// Returns an error if the filename does not match the expected pattern or if the timestamp/nanoseconds cannot be parsed.
 func parseQueueFileName(path, fileName string) (ItemData, error) {
 	// Extract the dag-run ID and timestamp from the file name
 	matches := parseRegex.FindStringSubmatch(fileName)
