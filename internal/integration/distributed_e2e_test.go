@@ -72,7 +72,8 @@ steps:
 		require.Len(t, queueItems, 1, "DAG should be enqueued once")
 
 		if len(queueItems) > 0 {
-			data := queueItems[0].Data()
+			data, err := queueItems[0].Data()
+			require.NoError(t, err, "Should be able to get queue item data")
 			t.Logf("DAG enqueued: dag=%s runId=%s", data.Name, data.ID)
 		}
 

@@ -98,10 +98,12 @@ func TestQueueProcessor_StrictFIFO(t *testing.T) {
 	foundRun1 := false
 	foundRun2 := false
 	for _, item := range items {
-		if item.Data().ID == "run-1" {
+		data, err := item.Data()
+		require.NoError(t, err, "expected no error when getting item data")
+		if data.ID == "run-1" {
 			foundRun1 = true
 		}
-		if item.Data().ID == "run-2" {
+		if data.ID == "run-2" {
 			foundRun2 = true
 		}
 	}
