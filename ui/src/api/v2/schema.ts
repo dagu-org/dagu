@@ -672,6 +672,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/services/resources/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get resource usage history
+         * @description Returns historical data for system resources
+         */
+        get: operations["getResourceHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/services/scheduler": {
         parameters: {
             query?: never;
@@ -1151,6 +1171,8 @@ export interface components {
             condition: string;
             /** @description Expected result of the condition evaluation */
             expected?: string;
+            /** @description If true, inverts the condition result (run when condition does NOT match) */
+            negate?: boolean;
             /** @description Error message if the condition is not met */
             error?: string;
             /** @description Whether the condition was met */
@@ -1261,6 +1283,21 @@ export interface components {
              * @description System-wide utilization (totalRunning / totalCapacity * 100)
              */
             utilizationPercentage: number;
+        };
+        ResourceHistory: {
+            cpu?: components["schemas"]["MetricPoint"][];
+            memory?: components["schemas"]["MetricPoint"][];
+            disk?: components["schemas"]["MetricPoint"][];
+            load?: components["schemas"]["MetricPoint"][];
+        };
+        MetricPoint: {
+            /**
+             * Format: int64
+             * @description Unix timestamp
+             */
+            timestamp: number;
+            /** Format: double */
+            value: number;
         };
     };
     responses: never;
@@ -3064,6 +3101,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueuesResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getResourceHistory: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Duration of history to retrieve (e.g., 30m, 1h) */
+                duration?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResourceHistory"];
                 };
             };
             /** @description Generic error response */

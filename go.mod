@@ -37,6 +37,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/samber/slog-multi v1.4.1
 	github.com/segmentio/golines v0.12.2
+	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.11.1
@@ -87,6 +88,7 @@ require (
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.6.2 // indirect
 	github.com/go-git/go-git/v5 v5.16.2 // indirect
+	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/godoc-lint/godoc-lint v0.10.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
@@ -103,6 +105,7 @@ require (
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
+	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/manuelarte/embeddedstructfieldcheck v0.4.0 // indirect
 	github.com/manuelarte/funcorder v0.5.0 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
@@ -122,14 +125,18 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	github.com/rhysd/actionlint v1.7.7 // indirect
 	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/samber/slog-common v0.19.0 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
+	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/sorairolake/lzip-go v0.3.8 // indirect
 	github.com/speakeasy-api/jsonpath v0.6.0 // indirect
+	github.com/tklauser/go-sysconf v0.3.15 // indirect
+	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/woodsbury/decimal128 v1.3.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
@@ -137,6 +144,7 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/yoheimuta/go-protoparser/v4 v4.14.2 // indirect
+	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.augendre.info/arangolint v0.2.0 // indirect
 	go.augendre.info/fatcontext v0.8.1 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.0 // indirect
@@ -372,5 +380,5 @@ require (
 	golang.org/x/crypto v0.42.0
 	golang.org/x/net v0.44.0 // indirect
 	golang.org/x/sys v0.36.0
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1
 )

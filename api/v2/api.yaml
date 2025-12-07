@@ -1525,6 +1525,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /services/resources/history:
+    get:
+      summary: "Get resource usage history"
+      description: "Returns historical data for system resources"
+      operationId: "getResourceHistory"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: duration
+          in: query
+          description: "Duration of history to retrieve (e.g., 30m, 1h)"
+          required: false
+          schema:
+            type: string
+            default: "1h"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceHistory"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /services/scheduler:
     get:
       summary: "Get scheduler service status"
@@ -2805,6 +2835,40 @@ components:
         - totalQueued
         - totalCapacity
         - utilizationPercentage
+
+    ResourceHistory:
+      type: object
+      properties:
+        cpu:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricPoint"
+        memory:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricPoint"
+        disk:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricPoint"
+        load:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricPoint"
+
+    MetricPoint:
+      type: object
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp
+        value:
+          type: number
+          format: double
+      required:
+        - timestamp
+        - value
 
 # Apply security requirements globally
 security:

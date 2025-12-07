@@ -33,6 +33,20 @@ type Config struct {
 
 	// Warnings contains a list of warnings generated during the configuration loading process.
 	Warnings []string
+
+	// Monitoring contains configuration for system monitoring.
+	Monitoring MonitoringConfig
+}
+
+// MonitoringConfig holds the configuration for system monitoring.
+// Memory estimation: Each metric point is ~16 bytes. With 4 metrics collected
+// every 5 seconds for 24 hours, that's ~1.1MB of memory usage.
+// Formula: 4 metrics × (retention / interval) × 16 bytes
+type MonitoringConfig struct {
+	// Retention specifies how long to keep system resource history.
+	Retention time.Duration
+	// Interval specifies how often to collect resource metrics.
+	Interval time.Duration
 }
 
 type Global struct {

@@ -207,6 +207,10 @@ func TestLoad_Env(t *testing.T) {
 			LockRetryInterval:       5 * time.Second,
 			ZombieDetectionInterval: 90 * time.Second,
 		},
+		Monitoring: MonitoringConfig{
+			Retention: 24 * time.Hour,
+			Interval:  5 * time.Second,
+		},
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -436,6 +440,10 @@ scheduler:
 			LockStaleThreshold:      50 * time.Second,
 			LockRetryInterval:       10 * time.Second,
 			ZombieDetectionInterval: 60 * time.Second,
+		},
+		Monitoring: MonitoringConfig{
+			Retention: 24 * time.Hour,
+			Interval:  5 * time.Second,
 		},
 	}
 
@@ -780,4 +788,31 @@ func TestBindEnv_AsPath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoad_Monitoring(t *testing.T) {
+	t.Run("FromYAML", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+monitoring:
+  retention: "24h"
+  interval: "10s"
+`)
+		assert.Equal(t, 24*time.Hour, cfg.Monitoring.Retention)
+		assert.Equal(t, 10*time.Second, cfg.Monitoring.Interval)
+	})
+
+	t.Run("FromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_MONITORING_RETENTION": "30m",
+			"DAGU_MONITORING_INTERVAL":  "15s",
+		})
+		assert.Equal(t, 30*time.Minute, cfg.Monitoring.Retention)
+		assert.Equal(t, 15*time.Second, cfg.Monitoring.Interval)
+	})
+
+	t.Run("Default", func(t *testing.T) {
+		cfg := loadFromYAML(t, "")
+		assert.Equal(t, 24*time.Hour, cfg.Monitoring.Retention)
+		assert.Equal(t, 5*time.Second, cfg.Monitoring.Interval)
+	})
 }

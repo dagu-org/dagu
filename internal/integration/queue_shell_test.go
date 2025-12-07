@@ -47,6 +47,7 @@ func TestQueueShellConfig(t *testing.T) {
 			nil, // no coordinator client for local execution
 			th.ServiceRegistry,
 			nil, // no metrics registry
+			nil, // no resource service
 		)
 
 		go func() {

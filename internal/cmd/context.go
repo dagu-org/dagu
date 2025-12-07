@@ -29,6 +29,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/frontend"
+	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -173,7 +174,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 // NewServer creates and returns a new web UI NewServer.
 // It initializes in-memory caches for DAGs and runstore, and uses them in the client.
-func (c *Context) NewServer() (*frontend.Server, error) {
+func (c *Context) NewServer(rs *resource.Service) (*frontend.Server, error) {
 	dc := fileutil.NewCache[*core.DAG](0, time.Hour*12)
 	dc.StartEviction(c)
 
@@ -195,7 +196,7 @@ func (c *Context) NewServer() (*frontend.Server, error) {
 
 	mr := telemetry.NewRegistry(collector)
 
-	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr), nil
+	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr, rs), nil
 }
 
 // NewCoordinatorClient creates a new coordinator client using the global peer configuration.
