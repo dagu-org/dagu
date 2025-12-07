@@ -2,6 +2,7 @@ package resource
 
 import (
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -37,48 +38,53 @@ func TestMemoryStore_AddAndGet(t *testing.T) {
 func TestMemoryStore_GetHistoryFiltering(t *testing.T) {
 	t.Parallel()
 
-	store := NewMemoryStore(time.Hour)
+	synctest.Test(t, func(t *testing.T) {
+		store := NewMemoryStore(time.Hour)
 
-	// Add old data
-	store.Add(1.0, 1.0, 1.0, 1.0)
+		// Add old data
+		store.Add(1.0, 1.0, 1.0, 1.0)
 
-	// Wait for timestamp change (Unix seconds granularity)
-	time.Sleep(1100 * time.Millisecond)
+		// Wait 2+ seconds so old point is at least 2 seconds in the past
+		time.Sleep(2100 * time.Millisecond)
 
-	// Add new data
-	store.Add(2.0, 2.0, 2.0, 2.0)
+		// Add new data
+		store.Add(2.0, 2.0, 2.0, 2.0)
 
-	// Long duration returns all points
-	history := store.GetHistory(time.Minute)
-	assert.Len(t, history.CPU, 2)
+		// Long duration returns all points
+		history := store.GetHistory(time.Minute)
+		assert.Len(t, history.CPU, 2)
 
-	// Short duration returns only recent data
-	historyShort := store.GetHistory(500 * time.Millisecond)
-	require.Len(t, historyShort.CPU, 1)
-	assert.Equal(t, 2.0, historyShort.CPU[0].Value)
+		// 1-second duration excludes old point (which is 2+ seconds old)
+		historyShort := store.GetHistory(time.Second)
+		require.Len(t, historyShort.CPU, 1)
+		assert.Equal(t, 2.0, historyShort.CPU[0].Value)
+	})
 }
 
 func TestMemoryStore_Prune(t *testing.T) {
 	t.Parallel()
 
-	store := NewMemoryStore(50 * time.Millisecond)
+	synctest.Test(t, func(t *testing.T) {
 
-	store.Add(1.0, 1.0, 1.0, 1.0)
+		store := NewMemoryStore(50 * time.Millisecond)
 
-	// Wait for timestamp change
-	time.Sleep(1100 * time.Millisecond)
+		store.Add(1.0, 1.0, 1.0, 1.0)
 
-	// Force prune by setting lastPruned to past
-	store.lastPruned = time.Now().Add(-2 * time.Minute)
+		// Wait for timestamp change
+		time.Sleep(1100 * time.Millisecond)
 
-	// This Add triggers pruning
-	store.Add(2.0, 2.0, 2.0, 2.0)
+		// Force prune by setting lastPruned to past
+		store.lastPruned = time.Now().Add(-2 * time.Minute)
 
-	store.mu.RLock()
-	cpuLen := len(store.cpu)
-	store.mu.RUnlock()
+		// This Add triggers pruning
+		store.Add(2.0, 2.0, 2.0, 2.0)
 
-	assert.Equal(t, 1, cpuLen, "old data should be pruned")
+		store.mu.RLock()
+		cpuLen := len(store.cpu)
+		store.mu.RUnlock()
+
+		assert.Equal(t, 1, cpuLen, "old data should be pruned")
+	})
 }
 
 func TestMemoryStore_EmptyHistory(t *testing.T) {
