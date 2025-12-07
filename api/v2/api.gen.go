@@ -4191,7 +4191,7 @@ func HandlerFromMuxWithBaseURL(si ServerInterface, r chi.Router, baseURL string)
 }
 
 // HandlerWithOptions creates an http.Handler configured with the provided ServerInterface and ChiServerOptions.
-// 
+//
 // If options.BaseRouter is nil a new chi.Router is created. If options.ErrorHandlerFunc is nil a default
 // error handler is installed which writes a 400 Bad Request with the error message. The returned handler
 // registers all API routes under options.BaseURL and applies any provided middlewares.
