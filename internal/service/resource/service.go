@@ -39,7 +39,7 @@ func NewService(cfg *config.Config) *Service {
 	}
 	return &Service{
 		config: cfg,
-		store:  NewMemoryStore(cfg.Monitoring.Retention),
+		store:  NewMemoryStore(cfg.Monitoring.Retention, cfg.Monitoring.Interval),
 		done:   make(chan struct{}),
 	}
 }

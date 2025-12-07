@@ -12,7 +12,7 @@ import (
 func TestMemoryStore_AddAndGet(t *testing.T) {
 	t.Parallel()
 
-	store := NewMemoryStore(time.Hour)
+	store := NewMemoryStore(time.Hour, 10*time.Second)
 
 	// Add distinct values to verify correct metric mapping
 	store.Add(10.0, 20.0, 30.0, 1.5)
@@ -39,7 +39,7 @@ func TestMemoryStore_GetHistoryFiltering(t *testing.T) {
 	t.Parallel()
 
 	synctest.Test(t, func(t *testing.T) {
-		store := NewMemoryStore(time.Hour)
+		store := NewMemoryStore(time.Hour, 10*time.Second)
 
 		// Add old data
 		store.Add(1.0, 1.0, 1.0, 1.0)
@@ -64,7 +64,7 @@ func TestMemoryStore_GetHistoryFiltering(t *testing.T) {
 func TestMemoryStore_EmptyHistory(t *testing.T) {
 	t.Parallel()
 
-	store := NewMemoryStore(time.Hour)
+	store := NewMemoryStore(time.Hour, 10*time.Second)
 	history := store.GetHistory(time.Hour)
 
 	assert.Empty(t, history.CPU)
@@ -76,7 +76,7 @@ func TestMemoryStore_EmptyHistory(t *testing.T) {
 func TestMemoryStore_GetHistoryReturnsCopy(t *testing.T) {
 	t.Parallel()
 
-	store := NewMemoryStore(time.Hour)
+	store := NewMemoryStore(time.Hour, 10*time.Second)
 	store.Add(1.0, 1.0, 1.0, 1.0)
 
 	history1 := store.GetHistory(time.Hour)
@@ -89,14 +89,18 @@ func TestMemoryStore_GetHistoryReturnsCopy(t *testing.T) {
 	assert.Equal(t, 1.0, history2.CPU[0].Value)
 }
 
-func TestNewMemoryStoreWithInterval_Capacity(t *testing.T) {
+func TestNewMemoryStore_Capacity(t *testing.T) {
 	t.Parallel()
 
 	// 1 hour retention with 10s interval = 360 points + 10 buffer = 370
-	store := NewMemoryStoreWithInterval(time.Hour, 10*time.Second)
+	store := NewMemoryStore(time.Hour, 10*time.Second)
 	assert.Equal(t, 370, len(store.buffer.buffer))
 
 	// Invalid interval defaults to 10s
-	store2 := NewMemoryStoreWithInterval(time.Hour, 0)
+	store2 := NewMemoryStore(time.Hour, 0)
 	assert.Equal(t, 370, len(store2.buffer.buffer))
+
+	// 1 hour retention with 5s interval = 720 points + 10 buffer = 730
+	store3 := NewMemoryStore(time.Hour, 5*time.Second)
+	assert.Equal(t, 730, len(store3.buffer.buffer))
 }
