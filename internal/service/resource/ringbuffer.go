@@ -8,7 +8,9 @@ type RingBuffer[T any] struct {
 	count  int // Valid entries (0 to cap)
 }
 
-// NewRingBuffer creates a ring buffer with the given capacity
+// NewRingBuffer creates a fixed-size ring buffer for values of type T with the specified capacity.
+// If capacity is less than or equal to zero, a capacity of 1 is used. The returned RingBuffer has
+// its underlying storage allocated and is ready for use.
 func NewRingBuffer[T any](capacity int) *RingBuffer[T] {
 	if capacity <= 0 {
 		capacity = 1

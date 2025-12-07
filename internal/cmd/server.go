@@ -37,6 +37,10 @@ Example:
 
 var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag}
 
+// runServer initializes and runs the web UI server and its resource monitoring service.
+// It logs startup info, starts the resource service (deferring its shutdown and logging any stop errors),
+// constructs the server with that resource service, and then begins serving.
+// It returns an error if the resource service fails to start, the server fails to initialize, or serving fails.
 func runServer(ctx *Context, _ []string) error {
 	logger.Info(ctx, "Server initialization",
 		tag.Host(ctx.Config.Server.Host),

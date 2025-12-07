@@ -47,6 +47,8 @@ func (a *API) GetResourceHistory(ctx context.Context, request api.GetResourceHis
 	}, nil
 }
 
+// convertMetrics converts a slice of resource.MetricPoint into a slice of api.MetricPoint by copying each point's Timestamp and Value.
+// The resulting slice preserves the input order and has the same length as the input.
 func convertMetrics(points []resource.MetricPoint) []api.MetricPoint {
 	result := make([]api.MetricPoint, len(points))
 	for i := range points {

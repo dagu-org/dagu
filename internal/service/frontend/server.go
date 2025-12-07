@@ -43,7 +43,8 @@ type Server struct {
 	funcsConfig funcsConfig
 }
 
-// NewServer creates a new Server instance with the given configuration and client
+// NewServer constructs a Server configured from cfg and the provided stores, managers, and services.
+// It extracts remote node names from cfg.Server.RemoteNodes, initializes apiV1 and apiV2 with the given dependencies, and populates the Server's funcsConfig fields from cfg.
 func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, rs *resource.Service) *Server {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {

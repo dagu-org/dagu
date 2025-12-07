@@ -12,6 +12,15 @@ import { cn } from '../../lib/utils';
 type SchedulerInstance = components['schemas']['SchedulerInstance'];
 type CoordinatorInstance = components['schemas']['CoordinatorInstance'];
 
+/**
+ * Render the System Status view showing service health, resource usage charts, and refresh controls.
+ *
+ * Displays Scheduler and Coordinator service cards, four resource usage charts (CPU, Memory, Disk, Load Average),
+ * and controls for toggling auto-refresh and triggering a manual refresh. Data is fetched for the currently
+ * selected remote node and the "last updated" timestamp reflects the most recent automatic or manual refresh.
+ *
+ * @returns The rendered System Status UI containing service cards, resource charts, and refresh controls.
+ */
 function SystemStatus() {
   const appBarContext = React.useContext(AppBarContext);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
