@@ -17,8 +17,8 @@ import (
 // TestWorkingDirectoryResolution verifies working directory resolution:
 //  1. DAG-level workingDir sets the working directory for steps
 //  2. Step-level relative dir resolves against DAG's workingDir
-//  3. SubDAG with explicit workingDir uses its own context
-//  4. SubDAG without workingDir uses its DAG file location (not parent's workingDir)
+//  3. SubDAG with explicit workingDir uses its own context (overrides inherited)
+//  4. SubDAG without workingDir inherits parent's workingDir (for local execution)
 func TestWorkingDirectoryResolution(t *testing.T) {
 	th := test.Setup(t)
 
@@ -97,10 +97,10 @@ steps:
 		switch node.Step.Name {
 		case "call_child_with_wd":
 			assert.Contains(t, subDir, childDir,
-				"SubDAG with explicit workingDir should run in childDir")
+				"SubDAG with explicit workingDir should run in childDir (overriding inherited)")
 		case "call_child_no_wd":
-			assert.NotEqual(t, parentDir, subDir,
-				"SubDAG without workingDir should NOT inherit parent's workingDir")
+			assert.Contains(t, subDir, parentDir,
+				"SubDAG without workingDir should inherit parent's workingDir")
 		}
 	}
 }
