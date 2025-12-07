@@ -22,27 +22,29 @@ function SystemStatus() {
   }, [appBarContext]);
 
   // Fetch all data with remoteNode support
-  const { data: schedulerData, error: schedulerError } = useQuery(
-    '/services/scheduler',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
+  const {
+    data: schedulerData,
+    error: schedulerError,
+    mutate: mutateScheduler,
+  } = useQuery('/services/scheduler', {
+    params: {
+      query: {
+        remoteNode: appBarContext.selectedRemoteNode || 'local',
       },
-    }
-  );
+    },
+  });
 
-  const { data: coordinatorData, error: coordinatorError } = useQuery(
-    '/services/coordinator',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
+  const {
+    data: coordinatorData,
+    error: coordinatorError,
+    mutate: mutateCoordinator,
+  } = useQuery('/services/coordinator', {
+    params: {
+      query: {
+        remoteNode: appBarContext.selectedRemoteNode || 'local',
       },
-    }
-  );
+    },
+  });
 
   const {
     data: resourceData,
@@ -64,7 +66,7 @@ function SystemStatus() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([mutateResource()]);
+    await Promise.all([mutateResource(), mutateScheduler(), mutateCoordinator()]);
     setIsRefreshing(false);
   };
 

@@ -29,6 +29,10 @@ func NewService(cfg *config.Config) *Service {
 }
 
 func (s *Service) Start(ctx context.Context) error {
+	if s.cancel != nil {
+		return nil // Already started
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 

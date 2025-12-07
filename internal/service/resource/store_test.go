@@ -24,7 +24,7 @@ func TestMemoryStore_AddAndGet(t *testing.T) {
 	assert.Equal(t, 15.0, history.CPU[1].Value)
 }
 
-func TestMemoryStore_Retention(t *testing.T) {
+func TestMemoryStore_GetHistoryFiltering(t *testing.T) {
 	// Short retention for testing
 	store := NewMemoryStore(100 * time.Millisecond)
 
