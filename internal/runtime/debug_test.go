@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 )
 
@@ -15,7 +14,7 @@ import (
 
 func TestDebugVariables(t *testing.T) {
 	// Create a test context with environment variables
-	ctx := execution.SetupDAGContext(context.Background(), &core.DAG{}, nil, execution.DAGRunRef{}, "test-run", "test.log", nil, nil, nil)
+	ctx := runtime.NewContext(context.Background(), &core.DAG{}, "test-run", "test.log")
 	env := runtime.GetEnv(ctx)
 
 	// Store variable with spaces

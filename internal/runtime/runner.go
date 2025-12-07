@@ -37,6 +37,7 @@ type Runner struct {
 	timeout       time.Duration
 	delay         time.Duration
 	dry           bool
+	onInit        *core.Step
 	onExit        *core.Step
 	onSuccess     *core.Step
 	onFailure     *core.Step
@@ -69,6 +70,7 @@ func New(cfg *Config) *Runner {
 		timeout:       cfg.Timeout,
 		delay:         cfg.Delay,
 		dry:           cfg.Dry,
+		onInit:        cfg.OnInit,
 		onExit:        cfg.OnExit,
 		onSuccess:     cfg.OnSuccess,
 		onFailure:     cfg.OnFailure,
@@ -84,6 +86,7 @@ type Config struct {
 	Timeout        time.Duration
 	Delay          time.Duration
 	Dry            bool
+	OnInit         *core.Step
 	OnExit         *core.Step
 	OnSuccess      *core.Step
 	OnFailure      *core.Step
@@ -112,14 +115,30 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 	r.metrics.totalNodes = len(nodes)
 
 	// If one of the conditions does not met, cancel the execution.
-	env := execution.GetDAGContext(ctx)
+	rCtx := GetDAGContext(ctx)
 	var shell []string
-	if env.DAG.Shell != "" {
-		shell = append([]string{env.DAG.Shell}, env.DAG.ShellArgs...)
+	if rCtx.DAG.Shell != "" {
+		shell = append([]string{rCtx.DAG.Shell}, rCtx.DAG.ShellArgs...)
 	}
-	if err := EvalConditions(ctx, shell, env.DAG.Preconditions); err != nil {
+	if err := EvalConditions(ctx, shell, rCtx.DAG.Preconditions); err != nil {
 		logger.Info(ctx, "Preconditions are not met", tag.Error(err))
 		r.Cancel(plan)
+	}
+
+	// Execute init handler after preconditions pass, before steps
+	if !r.isCanceled() {
+		if initNode := r.handlers[core.HandlerOnInit]; initNode != nil {
+			logger.Debug(ctx, "Init handler execution started",
+				tag.Handler(initNode.Name()),
+			)
+			if err := r.runEventHandler(ctx, plan, initNode); err != nil {
+				r.setLastError(err)
+				r.setCanceled() // Fail the DAG if init fails
+			}
+			if progressCh != nil {
+				progressCh <- initNode
+			}
+		}
 	}
 
 	// Channels for event loop
@@ -671,9 +690,16 @@ func (r *Runner) runEventHandler(ctx context.Context, plan *Plan, node *Node) er
 			_ = node.Teardown()
 		}()
 
+		// Evaluate preconditions for the handler
+		ctx = r.setupEnvironEventHandler(ctx, plan, node)
+		if err := node.evalPreconditions(ctx); err != nil {
+			// Handler precondition not met - skip the handler
+			node.SetStatus(core.NodeSkipped)
+			return nil
+		}
+
 		node.SetStatus(core.NodeRunning)
 
-		ctx = r.setupEnvironEventHandler(ctx, plan, node)
 		if err := node.Execute(ctx); err != nil {
 			node.SetStatus(core.NodeFailed)
 			return err
@@ -699,6 +725,9 @@ func (r *Runner) setup(ctx context.Context) (err error) {
 	r.handlerMu.Lock()
 	defer r.handlerMu.Unlock()
 	r.handlers = map[core.HandlerType]*Node{}
+	if r.onInit != nil {
+		r.handlers[core.HandlerOnInit] = &Node{Data: newSafeData(NodeData{Step: *r.onInit})}
+	}
 	if r.onExit != nil {
 		r.handlers[core.HandlerOnExit] = &Node{Data: newSafeData(NodeData{Step: *r.onExit})}
 	}
@@ -1089,7 +1118,7 @@ func calculateBackoffInterval(interval time.Duration, backoff float64, maxInterv
 }
 
 func NewPlanEnv(ctx context.Context, step core.Step, plan *Plan) Env {
-	env := NewEnvForStep(ctx, step)
+	env := NewEnv(ctx, step)
 	for _, n := range plan.Nodes() {
 		if n.Step().ID != "" {
 			env.StepMap[n.Step().ID] = n.StepInfo()

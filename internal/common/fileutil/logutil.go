@@ -549,3 +549,28 @@ func ReadLogContent(filePath string, options LogReadOptions) (string, int, int, 
 	content := strings.Join(result.Lines, "\n")
 	return content, result.LineCount, result.TotalLines, result.HasMore, result.IsEstimate, nil
 }
+
+// DecodeString decodes a byte slice using the specified character encoding.
+// If the encoding is empty, UTF-8, or unknown, the bytes are returned as-is.
+// This function is useful for converting log output from non-UTF-8 encodings
+// (such as Shift_JIS, EUC-JP, etc.) to UTF-8 strings.
+func DecodeString(charset string, data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+
+	decoder := getEncodingDecoder(charset)
+	if decoder == nil {
+		// No decoding needed (UTF-8 or unknown encoding)
+		return string(data)
+	}
+
+	// Decode the bytes using the specified encoding
+	decoded, err := decoder.Bytes(data)
+	if err != nil {
+		// If decoding fails, return the original bytes as string
+		return string(data)
+	}
+
+	return string(decoded)
+}

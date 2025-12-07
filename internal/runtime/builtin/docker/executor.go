@@ -138,8 +138,9 @@ func (e *docker) Run(ctx context.Context) error {
 	defer cancelFunc()
 
 	// Wrap stderr with a tail writer to capture recent output for inclusion in
-	// error messages.
-	tw := executor.NewTailWriter(e.stderr, 0)
+	// error messages. Use encoding from DAGContext to properly decode non-UTF-8 output.
+	env := runtime.GetEnv(ctx)
+	tw := executor.NewTailWriterWithEncoding(e.stderr, 0, env.LogEncodingCharset)
 	e.stderr = tw
 
 	cli := GetContainerClient(ctx)

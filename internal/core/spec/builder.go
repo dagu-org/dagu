@@ -62,6 +62,7 @@ const (
 	BuildFlagOnlyMetadata
 	BuildFlagAllowBuildErrors
 	BuildFlagSkipSchemaValidation
+	BuildFlagSkipBaseHandlers // Skip merging handlerOn from base config (for sub-DAG runs)
 )
 
 // BuildOpts is used to control the behavior of the builder.
@@ -727,6 +728,13 @@ func buildLogDir(_ BuildContext, spec *definition, dag *core.DAG) (err error) {
 func buildHandlers(ctx BuildContext, spec *definition, dag *core.DAG) (err error) {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: dag}
 
+	if spec.HandlerOn.Init != nil {
+		spec.HandlerOn.Init.Name = core.HandlerOnInit.String()
+		if dag.HandlerOn.Init, err = buildStep(buildCtx, *spec.HandlerOn.Init); err != nil {
+			return err
+		}
+	}
+
 	if spec.HandlerOn.Exit != nil {
 		spec.HandlerOn.Exit.Name = core.HandlerOnExit.String()
 		if dag.HandlerOn.Exit, err = buildStep(buildCtx, *spec.HandlerOn.Exit); err != nil {
@@ -748,9 +756,21 @@ func buildHandlers(ctx BuildContext, spec *definition, dag *core.DAG) (err error
 		}
 	}
 
-	if spec.HandlerOn.Cancel != nil {
-		spec.HandlerOn.Cancel.Name = core.HandlerOnCancel.String()
-		if dag.HandlerOn.Cancel, err = buildStep(buildCtx, *spec.HandlerOn.Cancel); err != nil {
+	// Handle Abort (canonical) and Cancel (deprecated, for backward compatibility)
+	// Error if both are specified
+	if spec.HandlerOn.Abort != nil && spec.HandlerOn.Cancel != nil {
+		return fmt.Errorf("cannot specify both 'abort' and 'cancel' in handlerOn; use 'abort' (cancel is deprecated)")
+	}
+	var abortDef *stepDef
+	switch {
+	case spec.HandlerOn.Abort != nil:
+		abortDef = spec.HandlerOn.Abort
+	case spec.HandlerOn.Cancel != nil:
+		abortDef = spec.HandlerOn.Cancel
+	}
+	if abortDef != nil {
+		abortDef.Name = core.HandlerOnCancel.String()
+		if dag.HandlerOn.Cancel, err = buildStep(buildCtx, *abortDef); err != nil {
 			return
 		}
 	}
@@ -807,6 +827,13 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]*core.Condition, e
 					return nil, core.NewValidationError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
 				ret.Condition = val
+
+			case "negate":
+				val, ok := vv.(bool)
+				if !ok {
+					return nil, core.NewValidationError("preconditions", vv, ErrPreconditionNegateMustBeBool)
+				}
+				ret.Negate = val
 
 			default:
 				return nil, core.NewValidationError("preconditions", key, fmt.Errorf("%w: %s", ErrPreconditionHasInvalidKey, key))
@@ -1297,21 +1324,58 @@ func buildContinueOn(_ StepBuildContext, def stepDef, step *core.Step) error {
 	if def.ContinueOn == nil {
 		return nil
 	}
-	step.ContinueOn.Skipped = def.ContinueOn.Skipped
-	step.ContinueOn.Failure = def.ContinueOn.Failure
-	step.ContinueOn.MarkSuccess = def.ContinueOn.MarkSuccess
 
-	exitCodes, err := parseIntOrArray(def.ContinueOn.ExitCode)
-	if err != nil {
-		return core.NewValidationError("continueOn.exitCode", def.ContinueOn.ExitCode, ErrContinueOnExitCodeMustBeIntOrArray)
-	}
-	step.ContinueOn.ExitCode = exitCodes
+	switch v := def.ContinueOn.(type) {
+	case string:
+		// Shorthand syntax: "skipped" or "failed"
+		switch strings.ToLower(strings.TrimSpace(v)) {
+		case "skipped":
+			step.ContinueOn.Skipped = true
+		case "failed":
+			step.ContinueOn.Failure = true
+		default:
+			return core.NewValidationError("continueOn", v, ErrContinueOnInvalidStringValue)
+		}
 
-	output, err := parseStringOrArray(def.ContinueOn.Output)
-	if err != nil {
-		return core.NewValidationError("continueOn.stdout", def.ContinueOn.Output, ErrContinueOnOutputMustBeStringOrArray)
+	case map[string]any:
+		// Object syntax with detailed configuration
+		if val, exists := v["failure"]; exists {
+			b, ok := val.(bool)
+			if !ok {
+				return core.NewValidationError("continueOn.failure", val, ErrContinueOnFieldMustBeBool)
+			}
+			step.ContinueOn.Failure = b
+		}
+		if val, exists := v["skipped"]; exists {
+			b, ok := val.(bool)
+			if !ok {
+				return core.NewValidationError("continueOn.skipped", val, ErrContinueOnFieldMustBeBool)
+			}
+			step.ContinueOn.Skipped = b
+		}
+		if val, exists := v["markSuccess"]; exists {
+			b, ok := val.(bool)
+			if !ok {
+				return core.NewValidationError("continueOn.markSuccess", val, ErrContinueOnFieldMustBeBool)
+			}
+			step.ContinueOn.MarkSuccess = b
+		}
+
+		exitCodes, err := parseIntOrArray(v["exitCode"])
+		if err != nil {
+			return core.NewValidationError("continueOn.exitCode", v["exitCode"], ErrContinueOnExitCodeMustBeIntOrArray)
+		}
+		step.ContinueOn.ExitCode = exitCodes
+
+		output, err := parseStringOrArray(v["output"])
+		if err != nil {
+			return core.NewValidationError("continueOn.output", v["output"], ErrContinueOnOutputMustBeStringOrArray)
+		}
+		step.ContinueOn.Output = output
+
+	default:
+		return core.NewValidationError("continueOn", def.ContinueOn, ErrContinueOnMustBeStringOrMap)
 	}
-	step.ContinueOn.Output = output
 
 	return nil
 }

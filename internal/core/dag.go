@@ -474,6 +474,7 @@ func (s *Schedule) UnmarshalJSON(data []byte) error {
 
 // HandlerOn contains the steps to be executed on different events in the DAG.
 type HandlerOn struct {
+	Init    *Step `json:"init,omitempty"`
 	Failure *Step `json:"failure,omitempty"`
 	Success *Step `json:"success,omitempty"`
 	Cancel  *Step `json:"cancel,omitempty"`
@@ -516,6 +517,7 @@ type OTelConfig struct {
 type HandlerType string
 
 const (
+	HandlerOnInit    HandlerType = "onInit"
 	HandlerOnSuccess HandlerType = "onSuccess"
 	HandlerOnFailure HandlerType = "onFailure"
 	HandlerOnCancel  HandlerType = "onCancel"

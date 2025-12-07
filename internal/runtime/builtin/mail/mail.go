@@ -37,7 +37,7 @@ func newMail(ctx context.Context, step core.Step) (executor.Executor, error) {
 		return nil, fmt.Errorf("failed to decode mail config: %w", err)
 	}
 
-	env := runtime.NewEnvForStep(ctx, step)
+	env := runtime.NewEnv(ctx, step)
 
 	exec := &mail{cfg: &cfg}
 	mailerConfig, err := env.MailerConfig(ctx)

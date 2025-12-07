@@ -12,23 +12,24 @@ import (
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
-// DAGContext contains the execution metadata for a dag-run.
-type DAGContext struct {
-	DAGRunID       string
-	RootDAGRun     DAGRunRef
-	DAG            *core.DAG
-	DB             Database
-	BaseEnv        *config.BaseEnv
-	Envs           map[string]string
-	SecretEnvs     map[string]string // Secret environment variables (highest priority)
-	CoordinatorCli Dispatcher
-	Shell          string // Default shell for this DAG (from DAG.Shell)
+// Context contains the execution metadata for a dag-run.
+type Context struct {
+	DAGRunID           string
+	RootDAGRun         DAGRunRef
+	DAG                *core.DAG
+	DB                 Database
+	BaseEnv            *config.BaseEnv
+	Envs               map[string]string
+	SecretEnvs         map[string]string // Secret environment variables (highest priority)
+	CoordinatorCli     Dispatcher
+	Shell              string // Default shell for this DAG (from DAG.Shell)
+	LogEncodingCharset string // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
 }
 
 // UserEnvsMap returns only user-defined environment variables as a map,
 // excluding OS environment (BaseEnv). Use this for isolated execution environments.
 // Precedence: SecretEnvs > Envs > DAG.Env
-func (e DAGContext) UserEnvsMap() map[string]string {
+func (e Context) UserEnvsMap() map[string]string {
 	result := make(map[string]string)
 
 	// Parse DAG.Env (lowest priority)
@@ -53,14 +54,14 @@ func (e DAGContext) UserEnvsMap() map[string]string {
 }
 
 // DAGRunRef returns the DAGRunRef for the current DAG context.
-func (e DAGContext) DAGRunRef() DAGRunRef {
+func (e Context) DAGRunRef() DAGRunRef {
 	return NewDAGRunRef(e.DAG.Name, e.DAGRunID)
 }
 
 // AllEnvs returns all environment variables as a slice of strings in "key=value" format.
 // Includes OS environment (BaseEnv). Use this for command executor and DAG runner.
 // Secrets have the highest priority and are appended last.
-func (e DAGContext) AllEnvs() []string {
+func (e Context) AllEnvs() []string {
 	distinctEntries := make(map[string]string)
 
 	for k, v := range stringutil.KeyValuesToMap(e.BaseEnv.AsSlice()) {
@@ -137,54 +138,121 @@ type Dispatcher interface {
 	Cleanup(ctx context.Context) error
 }
 
-// SetupDAGContext initializes and returns a new context with DAG execution metadata.
-func SetupDAGContext(ctx context.Context, dag *core.DAG, db Database, rootDAGRun DAGRunRef, dagRunID, logFile string, params []string, coordinatorCli Dispatcher, secretEnvs []string) context.Context {
-	var envs = map[string]string{
+// contextOptions holds optional configuration for NewContext.
+type contextOptions struct {
+	db                 Database
+	rootDAGRun         DAGRunRef
+	params             []string
+	coordinator        Dispatcher
+	secretEnvs         []string
+	logEncodingCharset string
+}
+
+// ContextOption configures optional parameters for NewContext.
+type ContextOption func(*contextOptions)
+
+// WithDatabase sets the database interface.
+func WithDatabase(db Database) ContextOption {
+	return func(o *contextOptions) {
+		o.db = db
+	}
+}
+
+// WithRootDAGRun sets the root DAG run reference for sub-DAG execution.
+func WithRootDAGRun(ref DAGRunRef) ContextOption {
+	return func(o *contextOptions) {
+		o.rootDAGRun = ref
+	}
+}
+
+// WithParams sets runtime parameters.
+func WithParams(params []string) ContextOption {
+	return func(o *contextOptions) {
+		o.params = params
+	}
+}
+
+// WithCoordinator sets the coordinator dispatcher for distributed execution.
+func WithCoordinator(cli Dispatcher) ContextOption {
+	return func(o *contextOptions) {
+		o.coordinator = cli
+	}
+}
+
+// WithSecrets sets secret environment variables.
+func WithSecrets(secrets []string) ContextOption {
+	return func(o *contextOptions) {
+		o.secretEnvs = secrets
+	}
+}
+
+// WithLogEncoding sets the log file character encoding.
+func WithLogEncoding(charset string) ContextOption {
+	return func(o *contextOptions) {
+		o.logEncodingCharset = charset
+	}
+}
+
+// NewContext creates a new context with DAG execution metadata.
+// Required: ctx, dag, dagRunID, logFile
+// Optional: use ContextOption functions (WithDatabase, WithParams, etc.)
+func NewContext(
+	ctx context.Context,
+	dag *core.DAG,
+	dagRunID string,
+	logFile string,
+	opts ...ContextOption,
+) context.Context {
+	// Apply options
+	options := &contextOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	// Build environment variables
+	envs := map[string]string{
 		EnvKeyDAGRunLogFile: logFile,
 		EnvKeyDAGRunID:      dagRunID,
 		EnvKeyDAGName:       dag.Name,
 	}
-
-	for k, v := range stringutil.KeyValuesToMap(params) {
+	for k, v := range stringutil.KeyValuesToMap(options.params) {
 		envs[k] = v
 	}
-
 	for k, v := range stringutil.KeyValuesToMap(dag.Env) {
 		envs[k] = v
 	}
 
-	secretEnvsMap := stringutil.KeyValuesToMap(secretEnvs)
-
-	return context.WithValue(ctx, dagCtxKey{}, DAGContext{
-		RootDAGRun:     rootDAGRun,
-		DAG:            dag,
-		DB:             db,
-		Envs:           envs,
-		SecretEnvs:     secretEnvsMap,
-		DAGRunID:       dagRunID,
-		BaseEnv:        config.GetBaseEnv(ctx),
-		CoordinatorCli: coordinatorCli,
-		Shell:          dag.Shell,
+	return context.WithValue(ctx, dagCtxKey{}, Context{
+		RootDAGRun:         options.rootDAGRun,
+		DAG:                dag,
+		DB:                 options.db,
+		Envs:               envs,
+		SecretEnvs:         stringutil.KeyValuesToMap(options.secretEnvs),
+		DAGRunID:           dagRunID,
+		BaseEnv:            config.GetBaseEnv(ctx),
+		CoordinatorCli:     options.coordinator,
+		Shell:              dag.Shell,
+		LogEncodingCharset: options.logEncodingCharset,
 	})
 }
 
-// WithDAGContext returns a new context with the given DAGContext.
+// WithContext returns a new context with the given DAGContext.
 // This is useful for tests that need to set up a DAGContext directly.
-func WithDAGContext(ctx context.Context, dagCtx DAGContext) context.Context {
-	return context.WithValue(ctx, dagCtxKey{}, dagCtx)
+func WithContext(ctx context.Context, rCtx Context) context.Context {
+	return context.WithValue(ctx, dagCtxKey{}, rCtx)
 }
 
-// GetDAGContext retrieves the DAGContext from the context.
-func GetDAGContext(ctx context.Context) DAGContext {
+// GetContext retrieves the DAGContext from the context.
+func GetContext(ctx context.Context) Context {
 	value := ctx.Value(dagCtxKey{})
 	if value == nil {
 		logger.Error(ctx, "DAGContext not found in context")
-		return DAGContext{}
+		return Context{}
 	}
-	execEnv, ok := value.(DAGContext)
+	execEnv, ok := value.(Context)
 	if !ok {
 		logger.Error(ctx, "Invalid DAGContext type in context")
-		return DAGContext{}
+		return Context{}
 	}
 	return execEnv
 }
