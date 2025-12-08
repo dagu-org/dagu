@@ -157,9 +157,30 @@ type PeerDef struct {
 
 // AuthDef holds the authentication configuration for the application.
 type AuthDef struct {
-	Basic *AuthBasicDef `mapstructure:"basic"`
-	Token *AuthTokenDef `mapstructure:"token"`
-	OIDC  *AuthOIDCDef  `mapstructure:"oidc"`
+	// Mode specifies the authentication mode: "none", "builtin", or "oidc"
+	Mode    string          `mapstructure:"mode"`
+	Basic   *AuthBasicDef   `mapstructure:"basic"`
+	Token   *AuthTokenDef   `mapstructure:"token"`
+	OIDC    *AuthOIDCDef    `mapstructure:"oidc"`
+	Builtin *AuthBuiltinDef `mapstructure:"builtin"`
+}
+
+// AuthBuiltinDef represents the builtin authentication configuration
+type AuthBuiltinDef struct {
+	DefaultAdmin *DefaultAdminDef `mapstructure:"defaultAdmin"`
+	Token        *TokenConfigDef  `mapstructure:"token"`
+}
+
+// DefaultAdminDef represents the default admin user configuration
+type DefaultAdminDef struct {
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+}
+
+// TokenConfigDef represents the JWT token configuration
+type TokenConfigDef struct {
+	Secret string `mapstructure:"secret"`
+	TTL    string `mapstructure:"ttl"`
 }
 
 // AuthBasicDef represents the basic authentication configuration

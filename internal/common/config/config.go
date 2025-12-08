@@ -127,11 +127,43 @@ const (
 	PermissionRunDAGs   Permission = "run_dags"
 )
 
+// AuthMode represents the authentication mode.
+type AuthMode string
+
+const (
+	// AuthModeNone disables authentication.
+	AuthModeNone AuthMode = "none"
+	// AuthModeBuiltin enables builtin user management with RBAC.
+	AuthModeBuiltin AuthMode = "builtin"
+	// AuthModeOIDC enables OIDC authentication.
+	AuthModeOIDC AuthMode = "oidc"
+)
+
 // Auth represents the authentication configuration
 type Auth struct {
-	Basic AuthBasic
-	Token AuthToken
-	OIDC  AuthOIDC
+	Mode    AuthMode
+	Basic   AuthBasic
+	Token   AuthToken
+	OIDC    AuthOIDC
+	Builtin AuthBuiltin
+}
+
+// AuthBuiltin represents the builtin authentication configuration
+type AuthBuiltin struct {
+	DefaultAdmin DefaultAdmin
+	Token        TokenConfig
+}
+
+// DefaultAdmin represents the default admin user configuration
+type DefaultAdmin struct {
+	Username string
+	Password string
+}
+
+// TokenConfig represents the JWT token configuration
+type TokenConfig struct {
+	Secret string
+	TTL    time.Duration
 }
 
 // AuthBasic represents the basic authentication configuration
