@@ -46,8 +46,9 @@ type Server struct {
 }
 
 // NewServer constructs a Server configured from cfg and the provided stores, managers, and services.
-// It extracts remote node names from the provided configuration, initializes API v1 and v2 with the supplied stores, managers, clients, metrics, and resources, and populates the server's funcsConfig from cfg. If cfg.Server.Auth.Mode is set to builtin, an attempt is made to initialize the builtin auth service; failures to initialize builtin auth are logged but do not abort server construction.
-func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, rs *resource.Service) *Server {
+// It extracts remote node names from cfg.Server.RemoteNodes, initializes apiV1 and apiV2 with the given dependencies, and populates the Server's funcsConfig fields from cfg.
+// Returns an error if a configured auth service fails to initialize (fail-fast behavior).
+func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, rs *resource.Service) (*Server, error) {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
@@ -60,11 +61,11 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
 		authSvc, err := initBuiltinAuthService(cfg)
 		if err != nil {
-			// Log error but don't fail - auth service will be nil and endpoints will return 401
-			logger.Error(context.Background(), "Failed to initialize builtin auth service", tag.Error(err))
-		} else {
-			apiOpts = append(apiOpts, apiv2.WithAuthService(authSvc))
+			// Fail fast: if auth is configured but fails to initialize, return error
+			// to prevent server from running without expected authentication
+			return nil, fmt.Errorf("failed to initialize builtin auth service: %w", err)
 		}
+		apiOpts = append(apiOpts, apiv2.WithAuthService(authSvc))
 	}
 
 	return &Server{
@@ -84,7 +85,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 			Paths:                 cfg.Paths,
 			AuthMode:              cfg.Server.Auth.Mode,
 		},
-	}
+	}, nil
 }
 
 // initBuiltinAuthService initializes the builtin authentication service.

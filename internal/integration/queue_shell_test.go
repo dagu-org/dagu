@@ -37,7 +37,7 @@ func TestQueueShellConfig(t *testing.T) {
 		}
 
 		// Start the frontend server
-		server := frontend.NewServer(
+		server, err := frontend.NewServer(
 			th.Config,
 			th.DAGStore,
 			th.DAGRunStore,
@@ -49,6 +49,7 @@ func TestQueueShellConfig(t *testing.T) {
 			nil, // no metrics registry
 			nil, // no resource service
 		)
+		require.NoError(t, err, "failed to create server")
 
 		go func() {
 			_ = server.Serve(th.Context)
