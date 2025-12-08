@@ -270,6 +270,9 @@ func (s *Store) Update(_ context.Context, user *auth.User) error {
 	if user.ID == "" {
 		return auth.ErrInvalidUserID
 	}
+	if user.Username == "" {
+		return auth.ErrInvalidUsername
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -336,6 +339,14 @@ func (s *Store) Delete(_ context.Context, id string) error {
 	delete(s.byID, id)
 	if user != nil {
 		delete(s.byUsername, user.Username)
+	} else {
+		// File was already gone; remove any username entry that still points to this ID.
+		for username, userID := range s.byUsername {
+			if userID == id {
+				delete(s.byUsername, username)
+				break
+			}
+		}
 	}
 
 	return nil

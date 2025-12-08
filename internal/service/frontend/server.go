@@ -120,7 +120,7 @@ func initBuiltinAuthService(cfg *config.Config) (*authservice.Service, error) {
 
 	if created {
 		if cfg.Server.Auth.Builtin.Admin.Password == "" {
-			// Password was auto-generated, print to stdout (not to structured logs
+			// Password was auto-generated, print to stdout (not to structured logs)
 			// which may be shipped to external systems)
 			fmt.Printf("\n"+
 				"================================================================================\n"+
@@ -306,7 +306,9 @@ func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath
 
 	r.Route(apiV1BasePath, func(r chi.Router) {
 		if srv.config.Server.Auth.Mode != config.AuthModeNone {
-			// v1 API is not available in auth mode
+			// v1 API is not available in auth mode - it doesn't support authentication
+			logger.Info(ctx, "Authentication enabled: V1 API is disabled, use V2 API instead",
+				slog.String("authMode", string(srv.config.Server.Auth.Mode)))
 			return
 		}
 		url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, apiV1BasePath)
