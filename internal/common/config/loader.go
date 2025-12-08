@@ -707,6 +707,7 @@ func bindEnvironmentVariables() {
 	bindEnv("paths.procDir", "PROC_DIR", asPath())
 	bindEnv("paths.queueDir", "QUEUE_DIR", asPath())
 	bindEnv("paths.serviceRegistryDir", "SERVICE_REGISTRY_DIR", asPath())
+	bindEnv("paths.usersDir", "USERS_DIR", asPath())
 
 	// UI customization
 	bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")

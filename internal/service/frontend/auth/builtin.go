@@ -50,14 +50,22 @@ func BuiltinAuthMiddleware(svc *authservice.Service, publicPaths []string) func(
 }
 
 // isPublicPath checks if the request path matches any public path.
+// Handles trailing slash normalization bidirectionally.
 func isPublicPath(path string, publicSet map[string]struct{}) bool {
 	// Exact match
 	if _, ok := publicSet[path]; ok {
 		return true
 	}
 	// Try with trailing slash removed
-	if _, ok := publicSet[strings.TrimSuffix(path, "/")]; ok {
+	withoutSlash := strings.TrimSuffix(path, "/")
+	if _, ok := publicSet[withoutSlash]; ok {
 		return true
+	}
+	// Try with trailing slash added
+	if path != "" && !strings.HasSuffix(path, "/") {
+		if _, ok := publicSet[path+"/"]; ok {
+			return true
+		}
 	}
 	return false
 }

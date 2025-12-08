@@ -78,7 +78,10 @@ func TestStore_CRUD(t *testing.T) {
 	if err := store.Update(ctx, user); err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
-	retrieved, _ = store.GetByID(ctx, user.ID)
+	retrieved, err = store.GetByID(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("GetByID() after Update error = %v", err)
+	}
 	if retrieved.Role != auth.RoleAdmin {
 		t.Errorf("Update() role = %v, want %v", retrieved.Role, auth.RoleAdmin)
 	}

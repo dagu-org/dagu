@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -96,6 +97,9 @@ func (s *Store) rebuildIndex() error {
 		user, err := s.loadUserFromFile(filePath)
 		if err != nil {
 			// Log warning but continue - don't fail entire index for one bad file
+			slog.Warn("Failed to load user file during index rebuild",
+				slog.String("file", filePath),
+				slog.String("error", err.Error()))
 			continue
 		}
 
@@ -203,7 +207,7 @@ func (s *Store) GetByID(_ context.Context, id string) (*auth.User, error) {
 	user, err := s.loadUserFromFile(filePath)
 	if err != nil {
 		// File might have been deleted externally
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil, auth.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("fileuser: failed to load user %s: %w", id, err)
@@ -315,12 +319,12 @@ func (s *Store) Delete(_ context.Context, id string) error {
 
 	// Load user to get username for index cleanup
 	user, err := s.loadUserFromFile(filePath)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("fileuser: failed to load user for deletion: %w", err)
 	}
 
 	// Remove file
-	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(filePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("fileuser: failed to delete user file: %w", err)
 	}
 

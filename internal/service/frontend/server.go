@@ -117,11 +117,16 @@ func initBuiltinAuthService(cfg *config.Config) (*authservice.Service, error) {
 
 	if created {
 		if cfg.Server.Auth.Builtin.Admin.Password == "" {
-			// Password was auto-generated, log it for the user
-			logger.Info(ctx, "Created admin user",
-				slog.String("username", cfg.Server.Auth.Builtin.Admin.Username),
-				slog.String("password", password),
-				slog.String("note", "Please change this password immediately"))
+			// Password was auto-generated, print to stdout (not to structured logs
+			// which may be shipped to external systems)
+			fmt.Printf("\n"+
+				"================================================================================\n"+
+				"  ADMIN USER CREATED\n"+
+				"  Username: %s\n"+
+				"  Password: %s\n"+
+				"  NOTE: Please change this password immediately!\n"+
+				"================================================================================\n\n",
+				cfg.Server.Auth.Builtin.Admin.Username, password)
 		} else {
 			logger.Info(ctx, "Created admin user",
 				slog.String("username", cfg.Server.Auth.Builtin.Admin.Username))

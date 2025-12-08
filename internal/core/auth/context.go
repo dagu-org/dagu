@@ -24,13 +24,3 @@ func UserFromContext(ctx context.Context) (*User, bool) {
 	user, ok := ctx.Value(userContextKey).(*User)
 	return user, ok
 }
-
-// MustUserFromContext retrieves the authenticated user from the context.
-// Panics if no user is found. Use only after RequireAuth middleware.
-func MustUserFromContext(ctx context.Context) *User {
-	user, ok := UserFromContext(ctx)
-	if !ok {
-		panic("auth: no user in context (did you forget RequireAuth middleware?)")
-	}
-	return user
-}
