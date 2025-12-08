@@ -2,6 +2,7 @@ package runtime_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -10,94 +11,140 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCondition_Eval(t *testing.T) {
+func newTestContext() context.Context {
+	ctx := context.Background()
+	return runtime.WithEnv(ctx, runtime.NewEnv(ctx, core.Step{}))
+}
+
+func TestEvalConditions(t *testing.T) {
 	tests := []struct {
-		name      string
-		condition []*core.Condition
-		wantErr   bool
+		name                string
+		conditions          []*core.Condition
+		wantErr             bool
+		wantConditionNotMet bool // true if error should be ErrConditionNotMet
+		notConditionNotMet  bool // true if error should NOT be ErrConditionNotMet
 	}{
 		{
-			name:      "CommandSubstitution",
-			condition: []*core.Condition{{Condition: "`echo 1`", Expected: "1"}},
+			name:       "CommandSubstitution",
+			conditions: []*core.Condition{{Condition: "`echo 1`", Expected: "1"}},
 		},
 		{
-			name:      "EnvVar",
-			condition: []*core.Condition{{Condition: "${TEST_CONDITION}", Expected: "100"}},
+			name:       "EnvVar",
+			conditions: []*core.Condition{{Condition: "${TEST_CONDITION}", Expected: "100"}},
 		},
 		{
 			name: "MultipleCond",
-			condition: []*core.Condition{
-				{
-					Condition: "`echo 1`",
-					Expected:  "1",
-				},
-				{
-					Condition: "`echo 100`",
-					Expected:  "100",
-				},
+			conditions: []*core.Condition{
+				{Condition: "`echo 1`", Expected: "1"},
+				{Condition: "`echo 100`", Expected: "100"},
 			},
 		},
 		{
 			name: "MultipleCondOneMet",
-			condition: []*core.Condition{
-				{
-					Condition: "`echo 1`",
-					Expected:  "1",
-				},
-				{
-					Condition: "`echo 100`",
-					Expected:  "1",
-				},
+			conditions: []*core.Condition{
+				{Condition: "`echo 1`", Expected: "1"},
+				{Condition: "`echo 100`", Expected: "1"},
 			},
-			wantErr: true,
+			wantErr:             true,
+			wantConditionNotMet: true,
 		},
 		{
-			name: "CommandResultMet",
-			condition: []*core.Condition{
+			name:       "CommandResultMet",
+			conditions: []*core.Condition{{Condition: "true"}},
+		},
+		{
+			name:                "CommandResultNotMet",
+			conditions:          []*core.Condition{{Condition: "false"}},
+			wantErr:             true,
+			wantConditionNotMet: true,
+		},
+		{
+			name:       "ComplexCommand",
+			conditions: []*core.Condition{{Condition: "test 1 -eq 1"}},
+		},
+		{
+			name:       "EvenMoreComplexCommand",
+			conditions: []*core.Condition{{Condition: "df / | awk 'NR==2 {exit $4 > 5000 ? 0 : 1}'"}},
+		},
+		{
+			name:       "CommandResultTest",
+			conditions: []*core.Condition{{Condition: "test 1 -eq 1"}},
+		},
+		{
+			name:       "RegexMatch",
+			conditions: []*core.Condition{{Condition: "test", Expected: "re:^test$"}},
+		},
+		// Negate tests
+		{
+			name: "NegateMatchingCondition",
+			conditions: []*core.Condition{
+				{Condition: "`echo success`", Expected: "success", Negate: true},
+			},
+			wantErr:             true,
+			wantConditionNotMet: true,
+		},
+		{
+			name: "NegateNonMatchingCondition",
+			conditions: []*core.Condition{
+				{Condition: "`echo failure`", Expected: "success", Negate: true},
+			},
+		},
+		{
+			name: "NegateCommandSuccess",
+			conditions: []*core.Condition{
+				{Condition: "true", Negate: true},
+			},
+			wantErr:             true,
+			wantConditionNotMet: true,
+		},
+		{
+			name: "NegateCommandFailure",
+			conditions: []*core.Condition{
+				{Condition: "false", Negate: true},
+			},
+		},
+		{
+			name: "NegateEnvVar",
+			conditions: []*core.Condition{
+				{Condition: "${TEST_CONDITION}", Expected: "wrong_value", Negate: true},
+			},
+		},
+		{
+			name: "NegateEnvVarMatching",
+			conditions: []*core.Condition{
+				{Condition: "${TEST_CONDITION}", Expected: "100", Negate: true},
+			},
+			wantErr:             true,
+			wantConditionNotMet: true,
+		},
+		// Error handling tests
+		{
+			name: "EvalStringErrorNotSwallowed",
+			conditions: []*core.Condition{
 				{
-					Condition: "true",
+					Condition: "`/nonexistent_binary_xyz_123_456`",
+					Expected:  "anything",
+					Negate:    true,
+				},
+			},
+			wantErr:            true,
+			notConditionNotMet: true,
+		},
+		{
+			name: "CommandNotFoundInvertedToSuccess",
+			conditions: []*core.Condition{
+				{
+					Condition: "/nonexistent/path/to/command_xyz_123_abc",
+					Negate:    true,
 				},
 			},
 		},
 		{
-			name: "CommandResultNotMet",
-			condition: []*core.Condition{
+			name: "FalseCommandInvertedToSuccess",
+			conditions: []*core.Condition{
 				{
 					Condition: "false",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "ComplexCommand",
-			condition: []*core.Condition{
-				{
-					Condition: "test 1 -eq 1",
-				},
-			},
-		},
-		{
-			name: "EvenMoreComplexCommand",
-			condition: []*core.Condition{
-				{
-					Condition: "df / | awk 'NR==2 {exit $4 > 5000 ? 0 : 1}'",
-				},
-			},
-		},
-		{
-			name: "CommandResultTest",
-			condition: []*core.Condition{
-				{
-					Condition: "test 1 -eq 1",
-				},
-			},
-		},
-		{
-			name: "RegexMatch",
-			condition: []*core.Condition{
-				{
-					Condition: "test",
-					Expected:  "re:^test$",
+					Negate:    true,
 				},
 			},
 		},
@@ -111,17 +158,21 @@ func TestCondition_Eval(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			ctx = runtime.WithEnv(ctx, runtime.NewEnvForStep(ctx, core.Step{}))
-			err := runtime.EvalConditions(ctx, []string{"sh"}, tt.condition)
+			ctx := newTestContext()
+			err := runtime.EvalConditions(ctx, []string{"sh"}, tt.conditions)
+
 			if tt.wantErr {
-				require.Error(t, err, "expected error but got nil")
+				require.Error(t, err)
+				if tt.wantConditionNotMet {
+					require.True(t, errors.Is(err, runtime.ErrConditionNotMet),
+						"expected ErrConditionNotMet but got: %v", err)
+				}
+				if tt.notConditionNotMet {
+					require.False(t, errors.Is(err, runtime.ErrConditionNotMet),
+						"evaluation errors should not be wrapped as ErrConditionNotMet")
+				}
 			} else {
-				require.NoError(t, err, "expected no error but got %v", err)
-			}
-			if err != nil {
-				require.ErrorIs(t, err, runtime.ErrConditionNotMet)
-				require.NotEmpty(t, tt.condition[0].GetErrorMessage())
+				require.NoError(t, err)
 			}
 		})
 	}

@@ -17,6 +17,7 @@ func InitialStatus(dag *core.DAG) DAGRunStatus {
 		Status:        core.NotStarted,
 		PID:           PID(0),
 		Nodes:         NewNodesFromSteps(dag.Steps),
+		OnInit:        NewNodeOrNil(dag.HandlerOn.Init),
 		OnExit:        NewNodeOrNil(dag.HandlerOn.Exit),
 		OnSuccess:     NewNodeOrNil(dag.HandlerOn.Success),
 		OnFailure:     NewNodeOrNil(dag.HandlerOn.Failure),
@@ -40,6 +41,7 @@ type DAGRunStatus struct {
 	Status        core.Status       `json:"status"`
 	PID           PID               `json:"pid,omitempty"`
 	Nodes         []*Node           `json:"nodes,omitempty"`
+	OnInit        *Node             `json:"onInit,omitempty"`
 	OnExit        *Node             `json:"onExit,omitempty"`
 	OnSuccess     *Node             `json:"onSuccess,omitempty"`
 	OnFailure     *Node             `json:"onFailure,omitempty"`
@@ -67,6 +69,9 @@ func (st *DAGRunStatus) Errors() []error {
 			errs = append(errs, fmt.Errorf("node %s: %s", node.Step.Name, node.Error))
 		}
 	}
+	if st.OnInit != nil && st.OnInit.Error != "" {
+		errs = append(errs, fmt.Errorf("onInit: %s", st.OnInit.Error))
+	}
 	if st.OnExit != nil && st.OnExit.Error != "" {
 		errs = append(errs, fmt.Errorf("onExit: %s", st.OnExit.Error))
 	}
@@ -88,6 +93,9 @@ func (st *DAGRunStatus) NodeByName(name string) (*Node, error) {
 		if node.Step.Name == name {
 			return node, nil
 		}
+	}
+	if st.OnInit != nil && st.OnInit.Step.Name == name {
+		return st.OnInit, nil
 	}
 	if st.OnExit != nil && st.OnExit.Step.Name == name {
 		return st.OnExit, nil

@@ -27,12 +27,13 @@ var (
 
 // LoadOptions contains options for loading a DAG.
 type LoadOptions struct {
-	name       string   // Name of the DAG.
-	baseConfig string   // Path to the base core.DAG configuration file.
-	params     string   // Parameters to override default parameters in the DAG.
-	paramsList []string // List of parameters to override default parameters in the DAG.
-	flags      BuildFlag
-	dagsDir    string // Directory containing the core.DAG files.
+	name              string   // Name of the DAG.
+	baseConfig        string   // Path to the base core.DAG configuration file.
+	params            string   // Parameters to override default parameters in the DAG.
+	paramsList        []string // List of parameters to override default parameters in the DAG.
+	flags             BuildFlag
+	dagsDir           string // Directory containing the core.DAG files.
+	defaultWorkingDir string // Default working directory for DAGs without explicit workingDir.
 }
 
 // LoadOption is a function type for setting LoadOptions.
@@ -109,6 +110,27 @@ func SkipSchemaValidation() LoadOption {
 	}
 }
 
+// WithSkipBaseHandlers skips merging handlerOn from base config.
+// This is used for sub-DAG runs to prevent handler inheritance from base config.
+// Sub-DAGs should have their own handlers defined explicitly if needed.
+func WithSkipBaseHandlers() LoadOption {
+	return func(o *LoadOptions) {
+		o.flags |= BuildFlagSkipBaseHandlers
+	}
+}
+
+// WithDefaultWorkingDir sets the default working directory for DAGs without explicit workingDir.
+// This is used for sub-DAG execution to inherit the parent's working directory.
+func WithDefaultWorkingDir(defaultWorkingDir string) LoadOption {
+	return func(o *LoadOptions) {
+		dir := strings.TrimSpace(defaultWorkingDir)
+		if dir == "" {
+			return
+		}
+		o.defaultWorkingDir = filepath.Clean(dir)
+	}
+}
+
 // Load loads a Directed Acyclic Graph (core.DAG) from a file path or name with the given options.
 //
 // The function handles different input formats:
@@ -135,12 +157,13 @@ func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*core.DAG
 	buildContext := BuildContext{
 		ctx: ctx,
 		opts: BuildOpts{
-			Base:           options.baseConfig,
-			Parameters:     options.params,
-			ParametersList: options.paramsList,
-			Name:           options.name,
-			DAGsDir:        options.dagsDir,
-			Flags:          options.flags,
+			Base:              options.baseConfig,
+			Parameters:        options.params,
+			ParametersList:    options.paramsList,
+			Name:              options.name,
+			DAGsDir:           options.dagsDir,
+			DefaultWorkingDir: options.defaultWorkingDir,
+			Flags:             options.flags,
 		},
 	}
 	return loadDAG(buildContext, nameOrPath)
@@ -153,12 +176,13 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*core.DAG, 
 		opt(&options)
 	}
 	return LoadYAMLWithOpts(ctx, data, BuildOpts{
-		Base:           options.baseConfig,
-		Parameters:     options.params,
-		ParametersList: options.paramsList,
-		Name:           options.name,
-		DAGsDir:        options.dagsDir,
-		Flags:          options.flags,
+		Base:              options.baseConfig,
+		Parameters:        options.params,
+		ParametersList:    options.paramsList,
+		Name:              options.name,
+		DAGsDir:           options.dagsDir,
+		DefaultWorkingDir: options.defaultWorkingDir,
+		Flags:             options.flags,
 	})
 }
 
@@ -343,6 +367,13 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 			if err != nil {
 				return nil, fmt.Errorf("failed to build base core.DAG for document %d: %w", docIndex, err)
 			}
+
+			// Skip handlers from base config for sub-DAG runs to prevent inheritance.
+			// Sub-DAGs should define their own handlers explicitly if needed.
+			if ctx.opts.Has(BuildFlagSkipBaseHandlers) {
+				baseDAG.HandlerOn = core.HandlerOn{}
+			}
+
 			dest = baseDAG
 		} else {
 			dest = new(core.DAG)

@@ -70,6 +70,15 @@ func WithFinishedAt(t time.Time) StatusOption {
 	}
 }
 
+// WithOnInitNode returns a StatusOption that sets the init handler node
+func WithOnInitNode(node *runtime.Node) StatusOption {
+	return func(s *execution.DAGRunStatus) {
+		if node != nil {
+			s.OnInit = newNode(node.NodeData())
+		}
+	}
+}
+
 // WithOnExitNode returns a StatusOption that sets the exit handler node
 func WithOnExitNode(node *runtime.Node) StatusOption {
 	return func(s *execution.DAGRunStatus) {

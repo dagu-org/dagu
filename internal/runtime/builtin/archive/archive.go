@@ -79,13 +79,13 @@ func newExecutor(ctx context.Context, step core.Step) (executor.Executor, error)
 		return nil, err
 	}
 
-	execCtx, cancel := context.WithCancel(ctx)
+	rCtx, cancel := context.WithCancel(ctx)
 
 	return &executorImpl{
 		stdout:    os.Stdout,
 		stderr:    os.Stderr,
 		cancel:    cancel,
-		ctx:       execCtx,
+		ctx:       rCtx,
 		cfg:       cfg,
 		operation: op,
 		stepName:  step.Name,

@@ -428,7 +428,7 @@ func TestReadFirstLines(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := readFirstLines(tt.filePath, tt.n, tt.totalLines)
+			result, err := readFirstLines(tt.filePath, tt.n, tt.totalLines, nil)
 
 			// Check error expectation
 			if (err != nil) != tt.expectError {
@@ -539,7 +539,7 @@ func TestReadLastLines(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := readLastLines(tt.filePath, tt.n, tt.totalLines)
+			result, err := readLastLines(tt.filePath, tt.n, tt.totalLines, nil)
 
 			// Check error expectation
 			if (err != nil) != tt.expectError {
@@ -677,7 +677,7 @@ func TestReadLinesRange(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := readLinesRange(tt.filePath, tt.offset, tt.limit, tt.totalLines)
+			result, err := readLinesRange(tt.filePath, tt.offset, tt.limit, tt.totalLines, nil)
 
 			// Check error expectation
 			if (err != nil) != tt.expectError {
@@ -834,4 +834,120 @@ func generateVaryingLineLengths(lineCount int) string {
 		builder.WriteString(line)
 	}
 	return builder.String()
+}
+
+func TestDecodeString(t *testing.T) {
+	tests := []struct {
+		name     string
+		charset  string
+		input    []byte
+		expected string
+	}{
+		{
+			name:     "EmptyInput",
+			charset:  "utf-8",
+			input:    []byte{},
+			expected: "",
+		},
+		{
+			name:     "UTF8NoDecoding",
+			charset:  "utf-8",
+			input:    []byte("Hello, World!"),
+			expected: "Hello, World!",
+		},
+		{
+			name:     "EmptyCharset",
+			charset:  "",
+			input:    []byte("Hello, World!"),
+			expected: "Hello, World!",
+		},
+		{
+			name:     "UnknownCharset",
+			charset:  "unknown-charset-xyz",
+			input:    []byte("Hello, World!"),
+			expected: "Hello, World!",
+		},
+		{
+			name:    "ShiftJIS",
+			charset: "shift_jis",
+			// "こんにちは" in Shift_JIS encoding
+			input:    []byte{0x82, 0xb1, 0x82, 0xf1, 0x82, 0xc9, 0x82, 0xbf, 0x82, 0xcd},
+			expected: "こんにちは",
+		},
+		{
+			name:    "EUCJP",
+			charset: "euc-jp",
+			// "日本語" in EUC-JP encoding
+			input:    []byte{0xc6, 0xfc, 0xcb, 0xdc, 0xb8, 0xec},
+			expected: "日本語",
+		},
+		{
+			name:    "ISO88591Latin1",
+			charset: "iso-8859-1",
+			// "café" with é as 0xe9 in ISO-8859-1
+			input:    []byte{0x63, 0x61, 0x66, 0xe9},
+			expected: "café",
+		},
+		{
+			name:    "Windows1252",
+			charset: "windows-1252",
+			// "naïve" with ï as 0xef in Windows-1252
+			input:    []byte{0x6e, 0x61, 0xef, 0x76, 0x65},
+			expected: "naïve",
+		},
+		{
+			name:    "GBK",
+			charset: "gbk",
+			// "中文" in GBK encoding
+			input:    []byte{0xd6, 0xd0, 0xce, 0xc4},
+			expected: "中文",
+		},
+		{
+			name:    "Big5",
+			charset: "big5",
+			// "台" in Big5 encoding
+			input:    []byte{0xa5, 0x78},
+			expected: "台",
+		},
+		{
+			name:    "EUCKR",
+			charset: "euc-kr",
+			// "한글" in EUC-KR encoding
+			input:    []byte{0xc7, 0xd1, 0xb1, 0xdb},
+			expected: "한글",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DecodeString(tt.charset, tt.input)
+			if result != tt.expected {
+				t.Errorf("DecodeString(%q, %v) = %q, want %q", tt.charset, tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDecodeStringCharsetNormalization(t *testing.T) {
+	// Test that charset names are properly normalized
+	// "こんにちは" in Shift_JIS encoding
+	shiftJISInput := []byte{0x82, 0xb1, 0x82, 0xf1, 0x82, 0xc9, 0x82, 0xbf, 0x82, 0xcd}
+	expected := "こんにちは"
+
+	charsetVariations := []string{
+		"shift_jis",
+		"shift-jis",
+		"shiftjis",
+		"sjis",
+		"s-jis",
+	}
+
+	for _, charset := range charsetVariations {
+		t.Run(charset, func(t *testing.T) {
+			result := DecodeString(charset, shiftJISInput)
+			if result != expected {
+				t.Errorf("DecodeString(%q, input) = %q, want %q", charset, result, expected)
+			}
+		})
+	}
 }

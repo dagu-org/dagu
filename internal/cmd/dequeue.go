@@ -45,7 +45,11 @@ func runDequeue(ctx *Context, args []string) error {
 	return dequeueDAGRun(ctx, queueName, dagRun, false)
 }
 
-// dequeueFirst dequeues the first dag-run from the given queue.
+// dequeueFirst dequeues the first DAG run from the named queue and processes that run as aborted.
+//
+// It returns an error if queues are disabled, if removing an item from the queue fails,
+// if the queue is empty, if retrieving the dequeued item's DAG-run data fails, or if
+// processing the dequeued DAG run fails.
 func dequeueFirst(ctx *Context, queueName string) error {
 	// Check if queues are enabled
 	if !ctx.Config.Queues.Enabled {
@@ -59,7 +63,11 @@ func dequeueFirst(ctx *Context, queueName string) error {
 		return fmt.Errorf("no dag-run found in queue %s", queueName)
 	}
 
-	return dequeueDAGRun(ctx, queueName, item.Data(), true)
+	data, err := item.Data()
+	if err != nil {
+		return fmt.Errorf("failed to get dag-run data: %w", err)
+	}
+	return dequeueDAGRun(ctx, queueName, *data, true)
 }
 
 // dequeueDAGRun dequeues a dag-run from the queue.

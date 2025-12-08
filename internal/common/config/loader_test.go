@@ -129,8 +129,8 @@ func TestLoad_Env(t *testing.T) {
 	berlinLoc, _ := time.LoadLocation("Europe/Berlin")
 	_, berlinOffset := time.Now().In(berlinLoc).Zone()
 
-	require.NotEmpty(t, cfg.Global.ConfigFileUsed)
-	cfg.Global.ConfigFileUsed = ""
+	require.NotEmpty(t, cfg.Paths.ConfigFileUsed)
+	cfg.Paths.ConfigFileUsed = ""
 
 	expected := &Config{
 		Global: Global{
@@ -206,6 +206,10 @@ func TestLoad_Env(t *testing.T) {
 			LockStaleThreshold:      30 * time.Second,
 			LockRetryInterval:       5 * time.Second,
 			ZombieDetectionInterval: 90 * time.Second,
+		},
+		Monitoring: MonitoringConfig{
+			Retention: 24 * time.Hour,
+			Interval:  5 * time.Second,
 		},
 	}
 
@@ -436,6 +440,10 @@ scheduler:
 			LockStaleThreshold:      50 * time.Second,
 			LockRetryInterval:       10 * time.Second,
 			ZombieDetectionInterval: 60 * time.Second,
+		},
+		Monitoring: MonitoringConfig{
+			Retention: 24 * time.Hour,
+			Interval:  5 * time.Second,
 		},
 	}
 
@@ -711,7 +719,7 @@ func loadFromYAML(t *testing.T, yaml string) *Config {
 	cfg, err := Load(WithConfigFile(configFile))
 	require.NoError(t, err)
 
-	cfg.Global.ConfigFileUsed = ""
+	cfg.Paths.ConfigFileUsed = ""
 	return cfg
 }
 
@@ -731,7 +739,7 @@ func TestLoad_ConfigFileUsed(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify ConfigFileUsed is set correctly
-	assert.Equal(t, configFile, cfg.Global.ConfigFileUsed)
+	assert.Equal(t, configFile, cfg.Paths.ConfigFileUsed)
 }
 
 func TestBindEnv_AsPath(t *testing.T) {
@@ -780,4 +788,31 @@ func TestBindEnv_AsPath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoad_Monitoring(t *testing.T) {
+	t.Run("FromYAML", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+monitoring:
+  retention: "24h"
+  interval: "10s"
+`)
+		assert.Equal(t, 24*time.Hour, cfg.Monitoring.Retention)
+		assert.Equal(t, 10*time.Second, cfg.Monitoring.Interval)
+	})
+
+	t.Run("FromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_MONITORING_RETENTION": "30m",
+			"DAGU_MONITORING_INTERVAL":  "15s",
+		})
+		assert.Equal(t, 30*time.Minute, cfg.Monitoring.Retention)
+		assert.Equal(t, 15*time.Second, cfg.Monitoring.Interval)
+	})
+
+	t.Run("Default", func(t *testing.T) {
+		cfg := loadFromYAML(t, "")
+		assert.Equal(t, 24*time.Hour, cfg.Monitoring.Retention)
+		assert.Equal(t, 5*time.Second, cfg.Monitoring.Interval)
+	})
 }

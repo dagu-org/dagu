@@ -3,13 +3,12 @@ package command
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
-	"strings"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
@@ -55,7 +54,9 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	}
 	// Wrap stderr with a tailing writer so we can include recent
 	// stderr output (rolling, up to limit) in error messages.
-	tw := executor.NewTailWriter(e.config.Stderr, 0)
+	// Use encoding from DAGContext to properly decode non-UTF-8 output.
+	env := runtime.GetEnv(ctx)
+	tw := executor.NewTailWriterWithEncoding(e.config.Stderr, 0, env.LogEncodingCharset)
 	e.stderrTail = tw
 	e.config.Stderr = tw
 
@@ -69,7 +70,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 
 	// Ensure the working directory exists
 	if cmd.Dir != "" {
-		if err := os.MkdirAll(cmd.Dir, 0755); err != nil {
+		if err := os.MkdirAll(cmd.Dir, 0750); err != nil {
 			e.mu.Unlock()
 			return fmt.Errorf("failed to create working directory: %w", err)
 		}
@@ -130,6 +131,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 	switch {
 	case cfg.Command != "" && scriptFile != "":
 		cmdBuilder := &shellCommandBuilder{
+			Dir:                cfg.Dir,
 			Command:            cfg.Command,
 			Args:               cfg.Args,
 			Shell:              cfg.Shell,
@@ -155,18 +157,25 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 			cmd = exec.CommandContext(cfg.Ctx, shebang, append(shebangArgs, scriptFile)...) // nolint: gosec
 			break
 		}
-		// If no shebang, use the specified shell command
-		args := make([]string, 0, len(cfg.Shell)+1)
-		args = append(args, cfg.Shell[1:]...)
-		// Add errexit flag for Unix-like shells (unless user specified shell)
-		if !cfg.UserSpecifiedShell && isUnixLikeShell(cfg.Shell[0]) && !slices.Contains(args, "-e") {
-			args = append(args, "-e")
+		// Use shell command builder to properly execute the script file
+		// This ensures each shell type uses the correct flags (e.g., cmd.exe /c, powershell -File)
+		cmdBuilder := &shellCommandBuilder{
+			Dir:                cfg.Dir,
+			Shell:              cfg.Shell,
+			Script:             scriptFile,
+			UserSpecifiedShell: cfg.UserSpecifiedShell,
 		}
-		args = append(args, scriptFile)
-		cmd = exec.CommandContext(cfg.Ctx, cfg.Shell[0], args...) // nolint: gosec
+		c, err := cmdBuilder.Build(ctx)
+		if err != nil {
+			return nil, err
+		}
+		cmd = c
 
 	case len(cfg.Shell) > 0 && cfg.ShellCommandArgs != "":
 		cmdBuilder := &shellCommandBuilder{
+			Dir:                cfg.Dir,
+			Command:            cfg.Command,
+			Args:               cfg.Args,
 			Shell:              cfg.Shell,
 			ShellCommandArgs:   cfg.ShellCommandArgs,
 			ShellPackages:      cfg.ShellPackages,
@@ -246,151 +255,21 @@ func readFirstLine(filePath string) (string, error) {
 	return "", nil
 }
 
+// exitCodeFromError returns the process exit code represented by err.
+// 0 if err is nil; if err is an *exec.ExitError (or wraps one) returns its ExitCode(); otherwise returns 1.
 func exitCodeFromError(err error) int {
 	if err == nil {
 		return 0
 	}
-	var exitCode int
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		exitCode = exitErr.ExitCode()
-	} else {
-		exitCode = 1
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode()
 	}
-	return exitCode
+	return 1
 }
 
-type shellCommandBuilder struct {
-	Command            string
-	Args               []string
-	Shell              []string // Shell command, e.g., ["/bin/sh"]
-	ShellCommandArgs   string
-	ShellPackages      []string
-	Script             string
-	UserSpecifiedShell bool // If true, don't auto-add -e flag
-}
-
-func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
-	if len(b.Shell) == 0 {
-		return nil, fmt.Errorf("shell command is required")
-	}
-
-	cmd := b.Shell[0]
-	args := make([]string, len(b.Shell)-1)
-	copy(args, b.Shell[1:])
-
-	// Extract just the executable name for comparison
-	cmdName := strings.ToLower(filepath.Base(cmd))
-
-	switch cmdName {
-	case "nix-shell":
-		// If the shell command is nix-shell, we need to pass the packages as arguments
-		for _, pkg := range b.ShellPackages {
-			args = append(args, "-p", pkg)
-		}
-		args = append(args, "--pure")
-		if !slices.Contains(args, "--run") {
-			args = append(args, "--run")
-		}
-
-		if b.Command != "" && b.Script != "" {
-			// When using nix-shell with a direct command and script,
-			// we need to run the command inside nix-shell, not pass nix-shell args to the command
-			cmdParts := []string{b.Command}
-			cmdParts = append(cmdParts, b.Args...)
-			cmdParts = append(cmdParts, b.Script)
-			cmdStr := strings.Join(cmdParts, " ")
-
-			// Apply set -e if needed
-			if !b.UserSpecifiedShell && !strings.HasPrefix(cmdStr, "set -e") {
-				cmdStr = "set -e; " + cmdStr
-			}
-
-			return exec.CommandContext(ctx, cmd, append(args, cmdStr)...), nil // nolint: gosec
-		}
-
-		// For nix-shell, prepend "set -e;" to enable errexit (unless user specified shell)
-		shellCmdArgs := b.ShellCommandArgs
-		if !b.UserSpecifiedShell && shellCmdArgs != "" && !strings.HasPrefix(shellCmdArgs, "set -e") {
-			shellCmdArgs = "set -e; " + shellCmdArgs
-		}
-
-		// Construct the command with the shell command and the packages
-		return exec.CommandContext(ctx, cmd, append(args, shellCmdArgs)...), nil // nolint: gosec
-
-	case "powershell.exe", "powershell":
-		// PowerShell (Windows PowerShell)
-		return b.buildPowerShellCommand(ctx, cmd, args)
-
-	case "pwsh.exe", "pwsh":
-		// PowerShell Core (cross-platform)
-		return b.buildPowerShellCommand(ctx, cmd, args)
-
-	case "cmd.exe", "cmd":
-		// Windows Command Prompt
-		return b.buildCmdCommand(ctx, cmd, args)
-
-	default:
-		// other shell (sh, bash, zsh, etc.)
-		if b.Command != "" && b.Script != "" {
-			// When running a command directly with a script (e.g., perl script.pl),
-			// don't include shell arguments like -e
-			return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
-		}
-
-		// Add errexit flag for Unix-like shells (unless user specified shell)
-		if !b.UserSpecifiedShell && isUnixLikeShell(cmd) && !slices.Contains(args, "-e") {
-			args = append(args, "-e")
-		}
-
-		args = append(args, b.Args...)
-		if !slices.Contains(args, "-c") {
-			args = append(args, "-c")
-		}
-		args = append(args, b.ShellCommandArgs)
-
-		// nolint: gosec
-		return exec.CommandContext(ctx, cmd, args...), nil
-	}
-}
-
-// buildPowerShellCommand builds a command for PowerShell (both Windows PowerShell and PowerShell Core)
-func (b *shellCommandBuilder) buildPowerShellCommand(ctx context.Context, cmd string, args []string) (*exec.Cmd, error) {
-	if b.Command != "" && b.Script != "" {
-		// When running a command directly with a script, don't include PowerShell arguments
-		return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
-	}
-
-	args = append(args, b.Args...)
-	// PowerShell uses -Command instead of -c
-	if !slices.Contains(args, "-Command") && !slices.Contains(args, "-C") {
-		args = append(args, "-Command")
-	}
-	args = append(args, b.ShellCommandArgs)
-
-	// nolint: gosec
-	return exec.CommandContext(ctx, cmd, args...), nil
-}
-
-// buildCmdCommand builds a command for Windows cmd.exe
-func (b *shellCommandBuilder) buildCmdCommand(ctx context.Context, cmd string, args []string) (*exec.Cmd, error) {
-	if b.Command != "" && b.Script != "" {
-		// When running a command directly with a script, don't include cmd.exe arguments
-		return exec.CommandContext(ctx, b.Command, append(b.Args, b.Script)...), nil // nolint: gosec
-	}
-
-	args = append(args, b.Args...)
-
-	// cmd.exe uses /c instead of -c
-	if !slices.Contains(args, "/c") && !slices.Contains(args, "/C") {
-		args = append(args, "/c")
-	}
-	args = append(args, b.ShellCommandArgs)
-
-	// nolint: gosec
-	return exec.CommandContext(ctx, cmd, args...), nil
-}
-
-// NewCommand creates a new command executor.
+// NewCommand creates an executor that will run the provided step.
+// It returns an executor configured from the step, or an error if creating the command configuration fails.
 func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) {
 	cfg, err := NewCommandConfig(ctx, step)
 	if err != nil {
@@ -400,7 +279,11 @@ func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) 
 	return &commandExecutor{config: cfg}, nil
 }
 
-// NewCommandConfig creates a new commandConfig from the given step.
+// NewCommandConfig creates a commandConfig populated from the given context and step.
+// The returned config uses the environment from runtime.GetEnv(ctx) for Dir and Shell,
+// copies Command, Args, Script, ShellCmdArgs, and ShellPackages from the step, and sets
+// UserSpecifiedShell to true when the step explicitly provided a Shell.
+// It returns the constructed *commandConfig and a nil error.
 func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, error) {
 	env := runtime.GetEnv(ctx)
 
@@ -417,89 +300,8 @@ func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, erro
 	}, nil
 }
 
-// isUnixLikeShell returns true if the shell supports -e flag
-func isUnixLikeShell(shell string) bool {
-	if shell == "" {
-		return false
-	}
-
-	// Extract just the executable name (handle full paths)
-	shellName := filepath.Base(shell)
-
-	switch shellName {
-	case "sh", "bash", "zsh", "ksh", "ash", "dash":
-		return true
-	case "fish":
-		// Fish shell doesn't support -e flag
-		return false
-	default:
-		return false
-	}
-}
-
-func setupScript(workDir, script string, shell []string) (string, error) {
-	// Determine file extension based on shell
-	shellCmd := ""
-	if len(shell) > 0 {
-		shellCmd = shell[0]
-	}
-	ext := cmdutil.GetScriptExtension(shellCmd)
-	pattern := "dagu_script-*" + ext
-
-	file, err := os.CreateTemp(workDir, pattern)
-	if err != nil {
-		return "", fmt.Errorf("failed to create script file: %w", err)
-	}
-	defer func() {
-		_ = file.Close()
-	}()
-
-	if _, err = file.WriteString(script); err != nil {
-		return "", fmt.Errorf("failed to write script to file: %w", err)
-	}
-
-	if err = file.Sync(); err != nil {
-		return "", fmt.Errorf("failed to sync script file: %w", err)
-	}
-
-	// Add execute permissions to the script file
-	if err = os.Chmod(file.Name(), 0750); err != nil { // nolint: gosec
-		return "", fmt.Errorf("failed to set execute permissions on script file: %w", err)
-	}
-
-	return file.Name(), nil
-}
-
-// createDirectCommand creates a command that runs directly without a shell
-func createDirectCommand(ctx context.Context, cmd string, args []string, scriptFile string) *exec.Cmd {
-	arguments := make([]string, len(args))
-	copy(arguments, args)
-
-	if scriptFile != "" {
-		arguments = append(arguments, scriptFile)
-	}
-
-	// nolint: gosec
-	return exec.CommandContext(ctx, cmd, arguments...)
-}
-
-func validateCommandStep(step core.Step) error {
-	switch {
-	case step.Command != "" && step.Script != "":
-		// Both command and script provided - valid
-	case step.Command != "" && step.Script == "":
-		// Command only - valid
-	case step.Command == "" && step.Script != "":
-		// Script only - valid
-	case step.SubDAG != nil:
-		// Sub DAG - valid
-	default:
-		return core.ErrStepCommandIsRequired
-	}
-
-	return nil
-}
-
+// init registers command executors ("", "shell", "command") with the executor
+// framework, associating each with NewCommand and validateCommandStep.
 func init() {
 	executor.RegisterExecutor("", NewCommand, validateCommandStep)
 	executor.RegisterExecutor("shell", NewCommand, validateCommandStep)

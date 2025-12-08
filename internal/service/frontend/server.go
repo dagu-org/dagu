@@ -26,6 +26,7 @@ import (
 	apiv2 "github.com/dagu-org/dagu/internal/service/frontend/api/v2"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/frontend/metrics"
+	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -42,15 +43,16 @@ type Server struct {
 	funcsConfig funcsConfig
 }
 
-// NewServer creates a new Server instance with the given configuration and client
-func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry) *Server {
+// NewServer constructs a Server configured from cfg and the provided stores, managers, and services.
+// It extracts remote node names from cfg.Server.RemoteNodes, initializes apiV1 and apiV2 with the given dependencies, and populates the Server's funcsConfig fields from cfg.
+func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, rs *resource.Service) *Server {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
 	}
 	return &Server{
 		apiV1:  apiv1.New(dr, drs, drm, cfg),
-		apiV2:  apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr),
+		apiV2:  apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs),
 		config: cfg,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
@@ -62,6 +64,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 			MaxDashboardPageLimit: cfg.UI.MaxDashboardPageLimit,
 			RemoteNodes:           remoteNodes,
 			Permissions:           cfg.Server.Permissions,
+			Paths:                 cfg.Paths,
 		},
 	}
 }

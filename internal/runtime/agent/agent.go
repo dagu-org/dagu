@@ -294,7 +294,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Resolve secrets if defined
 	secretEnvs, secretErr := a.resolveSecrets(ctx)
 
-	ctx = execution.SetupDAGContext(ctx, a.dag, dbClient, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, coordinatorCli, secretEnvs)
+	ctx = runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile,
+		runtime.WithDatabase(dbClient),
+		runtime.WithRootDAGRun(a.rootDAGRun),
+		runtime.WithParams(a.dag.Params),
+		runtime.WithCoordinator(coordinatorCli),
+		runtime.WithSecrets(secretEnvs),
+	)
 
 	// Add structured logging context
 	logFields := []slog.Attr{
@@ -616,6 +622,7 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 		transform.WithFinishedAt(a.plan.FinishAt()),
 		transform.WithNodes(a.plan.NodeData()),
 		transform.WithLogFilePath(a.logFile),
+		transform.WithOnInitNode(a.runner.HandlerNode(core.HandlerOnInit)),
 		transform.WithOnExitNode(a.runner.HandlerNode(core.HandlerOnExit)),
 		transform.WithOnSuccessNode(a.runner.HandlerNode(core.HandlerOnSuccess)),
 		transform.WithOnFailureNode(a.runner.HandlerNode(core.HandlerOnFailure)),
@@ -749,6 +756,10 @@ func (a *Agent) newRunner() *runtime.Runner {
 		DAGRunID:       a.dagRunID,
 	}
 
+	if a.dag.HandlerOn.Init != nil {
+		cfg.OnInit = a.dag.HandlerOn.Init
+	}
+
 	if a.dag.HandlerOn.Exit != nil {
 		cfg.OnExit = a.dag.HandlerOn.Exit
 	}
@@ -769,7 +780,7 @@ func (a *Agent) newRunner() *runtime.Runner {
 }
 
 // createCoordinatorClient creates a coordinator client factory for distributed execution
-func (a *Agent) createCoordinatorClient(ctx context.Context) execution.Dispatcher {
+func (a *Agent) createCoordinatorClient(ctx context.Context) runtime.Dispatcher {
 	if a.registry == nil {
 		logger.Debug(ctx, "Service monitor is not configured; skipping coordinator client creation")
 		return nil
@@ -842,7 +853,11 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
-	dagCtx := execution.SetupDAGContext(ctx, a.dag, db, a.rootDAGRun, a.dagRunID, a.logFile, a.dag.Params, nil, nil)
+	dagCtx := runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile,
+		runtime.WithDatabase(db),
+		runtime.WithRootDAGRun(a.rootDAGRun),
+		runtime.WithParams(a.dag.Params),
+	)
 	lastErr := a.runner.Run(dagCtx, a.plan, progressCh)
 	a.lastErr = lastErr
 

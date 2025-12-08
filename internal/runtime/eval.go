@@ -24,8 +24,7 @@ func EvalBool(ctx context.Context, value any) (bool, error) {
 // EvalObject recursively evaluates the string fields of the given object
 // with the variables within the execution context.
 func EvalObject[T any](ctx context.Context, obj T) (T, error) {
-	vars := GetEnv(ctx).VariablesMap()
-	return cmdutil.EvalObject(ctx, obj, vars)
+	return cmdutil.EvalObject(ctx, obj, AllEnvsMap(ctx))
 }
 
 // GenerateSubDAGRunID generates a unique run ID based on the current DAG run ID, step name, and parameters.

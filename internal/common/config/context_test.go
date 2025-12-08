@@ -57,7 +57,7 @@ func TestConfigFileUsed(t *testing.T) {
 	ctx := context.Background()
 	assert.Equal(t, "", config.ConfigFileUsed(ctx))
 	ctx = config.WithConfig(context.Background(), &config.Config{
-		Global: config.Global{ConfigFileUsed: "/path/to/config.yaml"},
+		Paths: config.PathsConfig{ConfigFileUsed: "/path/to/config.yaml"},
 	})
 	assert.Equal(t, "/path/to/config.yaml", config.ConfigFileUsed(ctx))
 }

@@ -25,7 +25,7 @@ func GetConfig(ctx context.Context) *Config {
 // ConfigFileUsed retrieves the path to the configuration file used
 func ConfigFileUsed(ctx context.Context) string {
 	if cfg := GetConfig(ctx); cfg != nil {
-		return cfg.Global.ConfigFileUsed
+		return cfg.Paths.ConfigFileUsed
 	}
 	return ""
 }

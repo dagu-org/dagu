@@ -113,7 +113,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to build config: %w", err)
 	}
 
-	cfg.Global.ConfigFileUsed = configFileUsed
+	cfg.Paths.ConfigFileUsed = configFileUsed
 
 	// Attach any warnings collected during the resolution process.
 	cfg.Warnings = l.warnings
@@ -342,6 +342,30 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		}
 	}
 
+	// Set monitoring configuration
+	if def.Monitoring != nil {
+		if def.Monitoring.Retention != "" {
+			if duration, err := time.ParseDuration(def.Monitoring.Retention); err == nil {
+				cfg.Monitoring.Retention = duration
+			} else {
+				l.warnings = append(l.warnings, fmt.Sprintf("Invalid monitoring.retention value: %s", def.Monitoring.Retention))
+			}
+		}
+		if def.Monitoring.Interval != "" {
+			if duration, err := time.ParseDuration(def.Monitoring.Interval); err == nil {
+				cfg.Monitoring.Interval = duration
+			} else {
+				l.warnings = append(l.warnings, fmt.Sprintf("Invalid monitoring.interval value: %s", def.Monitoring.Interval))
+			}
+		}
+	}
+	if cfg.Monitoring.Retention <= 0 {
+		cfg.Monitoring.Retention = 24 * time.Hour // Default to 1 day if not set
+	}
+	if cfg.Monitoring.Interval <= 0 {
+		cfg.Monitoring.Interval = 5 * time.Second // Default to 5 seconds if not set
+	}
+
 	if cfg.Scheduler.Port <= 0 {
 		cfg.Scheduler.Port = 8090 // Default scheduler port
 	}
@@ -517,6 +541,7 @@ func setupViper(xdgConfig XDGConfig, homeDir, configFile, appHomeOverride string
 	return paths.Warnings, nil
 }
 
+// interval).
 func setViperDefaultValues(paths Paths) {
 	// File paths
 	viper.SetDefault("workDir", "")         // Defaults to DAG location if empty.
@@ -547,7 +572,7 @@ func setViperDefaultValues(paths Paths) {
 	// UI settings
 	viper.SetDefault("ui.navbarTitle", AppName)
 	viper.SetDefault("ui.maxDashboardPageLimit", 100)
-	viper.SetDefault("ui.logEncodingCharset", "utf-8")
+	viper.SetDefault("ui.logEncodingCharset", getDefaultLogEncodingCharset())
 	viper.SetDefault("ui.dags.sortField", "name")
 	viper.SetDefault("ui.dags.sortOrder", "asc")
 
@@ -563,9 +588,16 @@ func setViperDefaultValues(paths Paths) {
 
 	// Peer settings
 	viper.SetDefault("peer.insecure", true) // Default to insecure (h2c)
+
+	// Monitoring settings
+	viper.SetDefault("monitoring.retention", "24h")
+	viper.SetDefault("monitoring.interval", "5s")
 }
 
-// bindEnvironmentVariables binds various configuration keys to environment variables.
+// bindEnvironmentVariables binds configuration keys to the environment variable names used by Viper.
+// It registers current and legacy environment names for server, global, scheduler, UI, authentication
+// (including OIDC and legacy keys), TLS, file paths (with path normalization where appropriate),
+// coordinator, worker, peer, queues, and monitoring settings.
 func bindEnvironmentVariables() {
 	// Server configurations
 	bindEnv("logFormat", "LOG_FORMAT")
@@ -661,6 +693,10 @@ func bindEnvironmentVariables() {
 	bindEnv("peer.clientCaFile", "PEER_CLIENT_CA_FILE")
 	bindEnv("peer.skipTlsVerify", "PEER_SKIP_TLS_VERIFY")
 	bindEnv("peer.insecure", "PEER_INSECURE")
+
+	// Monitoring configuration
+	bindEnv("monitoring.retention", "MONITORING_RETENTION")
+	bindEnv("monitoring.interval", "MONITORING_INTERVAL")
 }
 
 type bindEnvOption func(fullEnv string)

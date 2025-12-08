@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/spf13/cobra"
 )
 
@@ -74,6 +75,8 @@ var startAllFlags = []commandLineFlag{
 	peerSkipTLSVerifyFlag,
 }
 
+// runStartAll starts the scheduler, web server, resource monitoring service, and optionally the coordinator in-process, then manages their lifecycles and graceful shutdown.
+// It creates a signal-aware context, decides whether to enable the coordinator based on coordinator host binding, waits for an error or termination signal, shuts down services in order, and returns the first service error encountered (if any).
 func runStartAll(ctx *Context, _ []string) error {
 	if dagsDir, _ := ctx.Command.Flags().GetString("dags"); dagsDir != "" {
 		ctx.Config.Paths.DAGsDir = dagsDir
@@ -91,7 +94,10 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Disable health server when running from start-all
 	scheduler.DisableHealthServer()
 
-	server, err := ctx.NewServer()
+	// Initialize resource monitoring service
+	resourceService := resource.NewService(ctx.Config)
+
+	server, err := ctx.NewServer(resourceService)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
@@ -121,6 +127,11 @@ func runStartAll(ctx *Context, _ []string) error {
 		ProcStore:       ctx.ProcStore,
 		QueueStore:      ctx.QueueStore,
 		ServiceRegistry: ctx.ServiceRegistry,
+	}
+
+	// Start resource monitoring service (starts its own goroutine internally)
+	if err := resourceService.Start(serviceCtx); err != nil {
+		return fmt.Errorf("failed to start resource service: %w", err)
 	}
 
 	// WaitGroup to track all services
@@ -199,6 +210,11 @@ func runStartAll(ctx *Context, _ []string) error {
 				tag.Error(err),
 			)
 		}
+	}
+
+	// Stop resource service
+	if err := resourceService.Stop(ctx); err != nil {
+		logger.Error(ctx, "Failed to stop resource service", tag.Error(err))
 	}
 
 	// Wait for all services to finish with timeout

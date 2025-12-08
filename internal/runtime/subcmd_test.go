@@ -18,11 +18,11 @@ func TestNewSubCmdBuilder(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable: "/path/to/dagu",
+			Executable:     "/path/to/dagu",
+			ConfigFileUsed: "/path/to/config.yaml",
 		},
 		Global: config.Global{
-			ConfigFileUsed: "/path/to/config.yaml",
-			BaseEnv:        config.NewBaseEnv([]string{"TEST_ENV=value"}),
+			BaseEnv: config.NewBaseEnv([]string{"TEST_ENV=value"}),
 		},
 	}
 
@@ -34,9 +34,7 @@ func TestStart(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable: "/usr/bin/dagu",
-		},
-		Global: config.Global{
+			Executable:     "/usr/bin/dagu",
 			ConfigFileUsed: "/etc/dagu/config.yaml",
 		},
 	}
@@ -125,9 +123,7 @@ func TestStart(t *testing.T) {
 		t.Parallel()
 		cfgNoFile := &config.Config{
 			Paths: config.PathsConfig{
-				Executable: "/usr/bin/dagu",
-			},
-			Global: config.Global{
+				Executable:     "/usr/bin/dagu",
 				ConfigFileUsed: "",
 			},
 		}
@@ -143,9 +139,7 @@ func TestEnqueue(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable: "/usr/bin/dagu",
-		},
-		Global: config.Global{
+			Executable:     "/usr/bin/dagu",
 			ConfigFileUsed: "/etc/dagu/config.yaml",
 		},
 	}
@@ -238,9 +232,7 @@ func TestDequeue(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable: "/usr/bin/dagu",
-		},
-		Global: config.Global{
+			Executable:     "/usr/bin/dagu",
 			ConfigFileUsed: "/etc/dagu/config.yaml",
 		},
 	}
@@ -286,9 +278,7 @@ func TestRestart(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable: "/usr/bin/dagu",
-		},
-		Global: config.Global{
+			Executable:     "/usr/bin/dagu",
 			ConfigFileUsed: "/etc/dagu/config.yaml",
 		},
 	}
@@ -341,9 +331,7 @@ func TestRetry(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable: "/usr/bin/dagu",
-		},
-		Global: config.Global{
+			Executable:     "/usr/bin/dagu",
 			ConfigFileUsed: "/etc/dagu/config.yaml",
 		},
 	}
@@ -410,9 +398,7 @@ func TestTaskStart(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable: "/usr/bin/dagu",
-		},
-		Global: config.Global{
+			Executable:     "/usr/bin/dagu",
 			ConfigFileUsed: "/etc/dagu/config.yaml",
 		},
 	}
@@ -523,9 +509,7 @@ func TestTaskRetry(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
-			Executable: "/usr/bin/dagu",
-		},
-		Global: config.Global{
+			Executable:     "/usr/bin/dagu",
 			ConfigFileUsed: "/etc/dagu/config.yaml",
 		},
 	}

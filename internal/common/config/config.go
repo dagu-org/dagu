@@ -33,6 +33,20 @@ type Config struct {
 
 	// Warnings contains a list of warnings generated during the configuration loading process.
 	Warnings []string
+
+	// Monitoring contains configuration for system monitoring.
+	Monitoring MonitoringConfig
+}
+
+// MonitoringConfig holds the configuration for system monitoring.
+// Memory estimation: Each metric point is ~16 bytes. With 4 metrics collected
+// every 5 seconds for 24 hours, that's ~1.1MB of memory usage.
+// Formula: 4 metrics × (retention / interval) × 16 bytes
+type MonitoringConfig struct {
+	// Retention specifies how long to keep system resource history.
+	Retention time.Duration
+	// Interval specifies how often to collect resource metrics.
+	Interval time.Duration
 }
 
 type Global struct {
@@ -54,9 +68,6 @@ type Global struct {
 	// DefaultShell specifies the default shell to use for command execution.
 	// If not provided, platform-specific defaults are used (PowerShell on Windows, $SHELL on Unix).
 	DefaultShell string
-
-	// ConfigFileUsed is the path to the configuration file used to load settings.
-	ConfigFileUsed string
 
 	// SkipExamples disables the automatic creation of example DAGs when the DAGs directory is empty.
 	SkipExamples bool
@@ -156,6 +167,7 @@ type PathsConfig struct {
 	QueueDir           string
 	ProcDir            string
 	ServiceRegistryDir string // Directory for service registry files
+	ConfigFileUsed     string // Path to the configuration file used to load settings
 }
 
 type UI struct {

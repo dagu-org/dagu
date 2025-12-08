@@ -1,46 +1,111 @@
+import { Activity, Calendar, RefreshCw, Server } from 'lucide-react';
 import React from 'react';
-import { Calendar, Server, RefreshCw, Activity } from 'lucide-react';
+import type { components } from '../../api/v2/schema';
 import { Button } from '../../components/ui/button';
 import { AppBarContext } from '../../contexts/AppBarContext';
-import { useQuery } from '../../hooks/api';
+import PathsCard from '../../features/system-status/components/PathsCard';
+import ResourceChart from '../../features/system-status/components/ResourceChart';
 import ServiceCard from '../../features/system-status/components/ServiceCard';
+import { useQuery } from '../../hooks/api';
 import { cn } from '../../lib/utils';
-import type { components } from '../../api/v2/schema';
 
 type SchedulerInstance = components['schemas']['SchedulerInstance'];
 type CoordinatorInstance = components['schemas']['CoordinatorInstance'];
 
+/**
+ * Render the System Status view showing service health, resource usage charts, and refresh controls.
+ *
+ * Displays Scheduler and Coordinator service cards, four resource usage charts (CPU, Memory, Disk, Load Average),
+ * and controls for toggling auto-refresh and triggering a manual refresh. Data is fetched for the currently
+ * selected remote node and the "last updated" timestamp reflects the most recent automatic or manual refresh.
+ *
+ * @returns The rendered System Status UI containing service cards, resource charts, and refresh controls.
+ */
 function SystemStatus() {
   const appBarContext = React.useContext(AppBarContext);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [autoRefresh, setAutoRefresh] = React.useState(true);
+  const [lastUpdateTime, setLastUpdateTime] = React.useState<Date>(new Date());
 
   React.useEffect(() => {
     appBarContext.setTitle('System Status');
   }, [appBarContext]);
 
-  // Fetch all data with remoteNode support
-  const { data: schedulerData, error: schedulerError } = useQuery('/services/scheduler', {
-    params: {
-      query: {
-        remoteNode: appBarContext.selectedRemoteNode || 'local',
+  // Fetch all data with remoteNode support and auto-refresh
+  const {
+    data: schedulerData,
+    error: schedulerError,
+    mutate: mutateScheduler,
+  } = useQuery(
+    '/services/scheduler',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
       },
     },
-  });
+    {
+      refreshInterval: autoRefresh ? 5000 : 0,
+    }
+  );
 
-  const { data: coordinatorData, error: coordinatorError } = useQuery('/services/coordinator', {
-    params: {
-      query: {
-        remoteNode: appBarContext.selectedRemoteNode || 'local',
+  const {
+    data: coordinatorData,
+    error: coordinatorError,
+    mutate: mutateCoordinator,
+  } = useQuery(
+    '/services/coordinator',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
       },
     },
-  });
+    {
+      refreshInterval: autoRefresh ? 5000 : 0,
+    }
+  );
+
+  const {
+    data: resourceData,
+    error: resourceError,
+    mutate: mutateResource,
+  } = useQuery(
+    '/services/resources/history',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+      },
+    },
+    {
+      refreshInterval: autoRefresh ? 5000 : 0,
+    }
+  );
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    // The SWR hooks will automatically revalidate when we change a dependency
-    setTimeout(() => setIsRefreshing(false), 500);
+    try {
+      await Promise.all([
+        mutateResource(),
+        mutateScheduler(),
+        mutateCoordinator(),
+      ]);
+      setLastUpdateTime(new Date());
+    } finally {
+      setIsRefreshing(false);
+    }
   };
+
+  // Update timestamp when data changes from auto-refresh
+  React.useEffect(() => {
+    if (resourceData) {
+      setLastUpdateTime(new Date());
+    }
+  }, [resourceData]);
 
   return (
     <div className="flex flex-col gap-4 p-4 max-w-7xl mx-auto">
@@ -53,35 +118,35 @@ function SystemStatus() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <PathsCard />
           <Button
             variant="outline"
             size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
             className={cn(
-              "h-8 px-3",
-              autoRefresh && "bg-green-50 dark:bg-green-950 border-green-500"
+              'h-7 px-2',
+              autoRefresh && 'bg-green-50 dark:bg-green-950 border-green-500'
             )}
+            aria-label={`Auto-refresh ${autoRefresh ? 'enabled' : 'disabled'}`}
+            title={`Toggle auto-refresh (currently ${autoRefresh ? 'ON' : 'OFF'})`}
           >
-            <Activity className={cn(
-              "h-3 w-3 mr-1",
-              autoRefresh && "text-green-500"
-            )} />
-            <span className="text-xs">
-              Auto-refresh: {autoRefresh ? 'ON' : 'OFF'}
-            </span>
+            <Activity
+              className={cn('h-3 w-3 mr-1', autoRefresh && 'text-green-500')}
+            />
+            <span className="text-xs">Auto: {autoRefresh ? 'ON' : 'OFF'}</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="h-8 px-3"
+            className="h-7 px-2"
+            aria-label="Refresh system status"
+            title="Refresh system status"
           >
-            <RefreshCw className={cn(
-              "h-3 w-3 mr-1",
-              isRefreshing && "animate-spin"
-            )} />
-            <span className="text-xs">Refresh</span>
+            <RefreshCw
+              className={cn('h-3 w-3', isRefreshing && 'animate-spin')}
+            />
           </Button>
         </div>
       </div>
@@ -91,12 +156,14 @@ function SystemStatus() {
         {/* Scheduler Service */}
         <ServiceCard
           title="Scheduler Service"
-          instances={schedulerData?.schedulers?.map((s: SchedulerInstance) => ({
-            instanceId: s.instanceId,
-            host: s.host,
-            status: s.status,
-            startedAt: s.startedAt,
-          })) || []}
+          instances={
+            schedulerData?.schedulers?.map((s: SchedulerInstance) => ({
+              instanceId: s.instanceId,
+              host: s.host,
+              status: s.status,
+              startedAt: s.startedAt,
+            })) || []
+          }
           icon={<Calendar className="h-4 w-4" />}
           isLoading={!schedulerData && !schedulerError}
           error={schedulerError ? String(schedulerError) : undefined}
@@ -105,22 +172,58 @@ function SystemStatus() {
         {/* Coordinator Service */}
         <ServiceCard
           title="Coordinator Service"
-          instances={coordinatorData?.coordinators?.map((c: CoordinatorInstance) => ({
-            instanceId: c.instanceId,
-            host: c.host,
-            port: c.port,
-            status: c.status,
-            startedAt: c.startedAt,
-          })) || []}
+          instances={
+            coordinatorData?.coordinators?.map((c: CoordinatorInstance) => ({
+              instanceId: c.instanceId,
+              host: c.host,
+              port: c.port,
+              status: c.status,
+              startedAt: c.startedAt,
+            })) || []
+          }
           icon={<Server className="h-4 w-4" />}
           isLoading={!coordinatorData && !coordinatorError}
           error={coordinatorError ? String(coordinatorError) : undefined}
         />
       </div>
 
+      {/* Resource Usage */}
+      <h2 className="text-xl font-semibold mt-8 mb-4">Resource Usage</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <ResourceChart
+          title="CPU Usage"
+          data={resourceData?.cpu}
+          color="#3b82f6" // blue-500
+          isLoading={!resourceData && !resourceError}
+          error={resourceError ? String(resourceError) : undefined}
+        />
+        <ResourceChart
+          title="Memory Usage"
+          data={resourceData?.memory}
+          color="#8b5cf6" // violet-500
+          isLoading={!resourceData && !resourceError}
+          error={resourceError ? String(resourceError) : undefined}
+        />
+        <ResourceChart
+          title="Disk Usage"
+          data={resourceData?.disk}
+          color="#10b981" // emerald-500
+          isLoading={!resourceData && !resourceError}
+          error={resourceError ? String(resourceError) : undefined}
+        />
+        <ResourceChart
+          title="Load Average"
+          data={resourceData?.load}
+          color="#f59e0b" // amber-500
+          unit=""
+          isLoading={!resourceData && !resourceError}
+          error={resourceError ? String(resourceError) : undefined}
+        />
+      </div>
+
       {/* Last Update */}
       <div className="text-xs text-muted-foreground text-center">
-        Last updated: {new Date().toLocaleTimeString()}
+        Last updated: {lastUpdateTime.toLocaleTimeString()}
         {autoRefresh && ' • Refreshing every 5 seconds'}
       </div>
     </div>

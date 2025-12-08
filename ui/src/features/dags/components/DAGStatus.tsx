@@ -4,6 +4,7 @@ import { components, NodeStatus, Status } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { useConfig } from '../../../contexts/ConfigContext';
 import { useClient } from '../../../hooks/api';
+import { toMermaidNodeId } from '../../../lib/utils';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
 import { DAGStatusOverview, NodeStatusTable } from './dag-details';
@@ -97,16 +98,13 @@ function DAGStatus({ dagRun, fileName }: Props) {
     async (id: string) => {
       // find the clicked step
       const n = dagRun.nodes?.find(
-        (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
+        (n) => toMermaidNodeId(n.step.name) == id
       );
 
       const subDAGName = n?.step?.call;
       if (n && subDAGName) {
         // Combine both regular children and repeated children
-        const allSubRuns = [
-          ...(n.subRuns || []),
-          ...(n.subRunsRepeated || []),
-        ];
+        const allSubRuns = [...(n.subRuns || []), ...(n.subRunsRepeated || [])];
 
         // Check if there are multiple sub runs (parallel execution or repeated)
         if (allSubRuns.length > 1) {
@@ -197,7 +195,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
       if (status !== Status.Running && status !== Status.NotStarted) {
         // find the right-clicked step
         const n = dagRun.nodes?.find(
-          (n) => n.step.name.replace(/[-\s]/g, 'dagutmp') == id
+          (n) => toMermaidNodeId(n.step.name) == id
         );
 
         if (n) {

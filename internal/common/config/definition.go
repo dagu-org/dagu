@@ -132,6 +132,9 @@ type Definition struct {
 
 	// MaxDashboardPageLimit limits the number of dashboard pages that can be shown in the UI.
 	MaxDashboardPageLimit int `mapstructure:"maxDashboardPageLimit"`
+
+	// Monitoring contains configuration for system monitoring.
+	Monitoring *MonitoringDef `mapstructure:"monitoring"`
 }
 
 // PeerDef holds the certificate and TLS configuration for peer connections over gRPC.
@@ -260,6 +263,16 @@ type CoordinatorDef struct {
 
 	// Port is the port number for the coordinator service.
 	Port int `mapstructure:"port"`
+}
+
+// MonitoringDef holds the configuration for system monitoring.
+type MonitoringDef struct {
+	// Retention specifies how long to keep system resource history.
+	// Default is 24h.
+	Retention string `mapstructure:"retention"`
+	// Interval specifies how often to collect resource metrics.
+	// Default is 5s.
+	Interval string `mapstructure:"interval"`
 }
 
 // WorkerDef holds the configuration for the worker.

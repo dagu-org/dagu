@@ -308,10 +308,11 @@ func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestO
 
 	// Extract pagination parameters
 	options := fileutil.LogReadOptions{
-		Head:   valueOf(request.Params.Head),
-		Tail:   valueOf(request.Params.Tail),
-		Offset: valueOf(request.Params.Offset),
-		Limit:  valueOf(request.Params.Limit),
+		Head:     valueOf(request.Params.Head),
+		Tail:     valueOf(request.Params.Tail),
+		Offset:   valueOf(request.Params.Offset),
+		Limit:    valueOf(request.Params.Limit),
+		Encoding: a.logEncodingCharset,
 	}
 
 	// Use the new log utility function
@@ -352,10 +353,11 @@ func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLog
 
 	// Extract pagination parameters
 	options := fileutil.LogReadOptions{
-		Head:   valueOf(request.Params.Head),
-		Tail:   valueOf(request.Params.Tail),
-		Offset: valueOf(request.Params.Offset),
-		Limit:  valueOf(request.Params.Limit),
+		Head:     valueOf(request.Params.Head),
+		Tail:     valueOf(request.Params.Tail),
+		Offset:   valueOf(request.Params.Offset),
+		Limit:    valueOf(request.Params.Limit),
+		Encoding: a.logEncodingCharset,
 	}
 
 	var logFile = node.Stdout
@@ -486,10 +488,11 @@ func (a *API) GetSubDAGRunLog(ctx context.Context, request api.GetSubDAGRunLogRe
 
 	// Extract pagination parameters
 	options := fileutil.LogReadOptions{
-		Head:   valueOf(request.Params.Head),
-		Tail:   valueOf(request.Params.Tail),
-		Offset: valueOf(request.Params.Offset),
-		Limit:  valueOf(request.Params.Limit),
+		Head:     valueOf(request.Params.Head),
+		Tail:     valueOf(request.Params.Tail),
+		Offset:   valueOf(request.Params.Offset),
+		Limit:    valueOf(request.Params.Limit),
+		Encoding: a.logEncodingCharset,
 	}
 
 	// Use the new log utility function
@@ -528,10 +531,11 @@ func (a *API) GetSubDAGRunStepLog(ctx context.Context, request api.GetSubDAGRunS
 
 	// Extract pagination parameters
 	options := fileutil.LogReadOptions{
-		Head:   valueOf(request.Params.Head),
-		Tail:   valueOf(request.Params.Tail),
-		Offset: valueOf(request.Params.Offset),
-		Limit:  valueOf(request.Params.Limit),
+		Head:     valueOf(request.Params.Head),
+		Tail:     valueOf(request.Params.Tail),
+		Offset:   valueOf(request.Params.Offset),
+		Limit:    valueOf(request.Params.Limit),
+		Encoding: a.logEncodingCharset,
 	}
 
 	var logFile = node.Stdout

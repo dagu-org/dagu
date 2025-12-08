@@ -57,7 +57,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag, disableMaxActiveRuns}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag, disableMaxActiveRuns, defaultWorkingDirFlag}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
@@ -132,7 +132,7 @@ func runStart(ctx *Context, args []string) error {
 		}
 	} else {
 		// Load parameters and DAG
-		dag, params, err = loadDAGWithParams(ctx, args)
+		dag, params, err = loadDAGWithParams(ctx, args, isSubDAGRun)
 		if err != nil {
 			return err
 		}
@@ -302,8 +302,9 @@ func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isS
 	return dagRunID, rootDAGRun, parentDAGRun, isSubDAGRun, nil
 }
 
-// loadDAGWithParams loads the DAG and its parameters from command arguments
-func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
+// loadDAGWithParams loads the DAG and its parameters from command arguments.
+// When isSubDAGRun is true, handlers from base config are skipped to prevent inheritance.
+func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG, string, error) {
 	var dagPath string
 	var interactiveParams string
 
@@ -350,6 +351,12 @@ func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
 		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
 	}
 
+	// Skip base handlers for sub-DAG runs to prevent handler inheritance.
+	// Sub-DAGs should define their own handlers explicitly if needed.
+	if isSubDAGRun {
+		loadOpts = append(loadOpts, spec.WithSkipBaseHandlers())
+	}
+
 	// Get name override from flags if provided
 	nameOverride, err := ctx.StringParam("name")
 	if err != nil {
@@ -357,6 +364,16 @@ func loadDAGWithParams(ctx *Context, args []string) (*core.DAG, string, error) {
 	}
 	if nameOverride != "" {
 		loadOpts = append(loadOpts, spec.WithName(nameOverride))
+	}
+
+	// Get default working directory from flags if provided
+	// This is used for sub-DAG execution to inherit the parent's working directory
+	defaultWorkingDir, err := ctx.StringParam("default-working-dir")
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get default-working-dir: %w", err)
+	}
+	if defaultWorkingDir != "" {
+		loadOpts = append(loadOpts, spec.WithDefaultWorkingDir(defaultWorkingDir))
 	}
 
 	// Load parameters from command line arguments

@@ -238,23 +238,8 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 		}
 	}
 
-	old, err := a.dagStore.GetMetadata(ctx, request.FileName)
-	if err != nil {
-		return nil, fmt.Errorf("error getting the DAG metadata: %w", err)
-	}
-
 	if err := a.dagStore.Rename(ctx, request.FileName, request.Body.NewFileName); err != nil {
 		return nil, fmt.Errorf("failed to move DAG: %w", err)
-	}
-
-	renamed, err := a.dagStore.GetMetadata(ctx, request.Body.NewFileName)
-	if err != nil {
-		return nil, fmt.Errorf("error getting new DAG metadata: %w", err)
-	}
-
-	// Rename the history as well
-	if err := a.dagRunStore.RenameDAGRuns(ctx, old.Name, renamed.Name); err != nil {
-		return nil, fmt.Errorf("error renaming history: %w", err)
 	}
 
 	return api.RenameDAG200Response{}, nil

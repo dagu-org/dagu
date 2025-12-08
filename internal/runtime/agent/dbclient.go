@@ -7,9 +7,10 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/runtime"
 )
 
-var _ execution.Database = &dbClient{}
+var _ runtime.Database = &dbClient{}
 
 type dbClient struct {
 	ds  execution.DAGStore
@@ -25,7 +26,7 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*core.DAG, error) {
 	return o.ds.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetSubDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (*execution.RunStatus, error) {
+func (o *dbClient) GetSubDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (*runtime.RunStatus, error) {
 	subAttempt, err := o.drs.FindSubAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
@@ -49,7 +50,7 @@ func (o *dbClient) GetSubDAGRunStatus(ctx context.Context, dagRunID string, root
 		}
 	}
 
-	return &execution.RunStatus{
+	return &runtime.RunStatus{
 		Status:   status.Status,
 		Outputs:  outputVariables,
 		Name:     status.Name,
