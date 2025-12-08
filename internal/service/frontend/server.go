@@ -46,7 +46,7 @@ type Server struct {
 }
 
 // NewServer constructs a Server configured from cfg and the provided stores, managers, and services.
-// It extracts remote node names from cfg.Server.RemoteNodes, initializes apiV1 and apiV2 with the given dependencies, and populates the Server's funcsConfig fields from cfg.
+// It extracts remote node names from the provided configuration, initializes API v1 and v2 with the supplied stores, managers, clients, metrics, and resources, and populates the server's funcsConfig from cfg. If cfg.Server.Auth.Mode is set to builtin, an attempt is made to initialize the builtin auth service; failures to initialize builtin auth are logged but do not abort server construction.
 func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, rs *resource.Service) *Server {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
@@ -88,7 +88,10 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 }
 
 // initBuiltinAuthService initializes the builtin authentication service.
-// It creates the file-based user store, auth service, and ensures a default admin exists.
+// initBuiltinAuthService creates a file-based user store, constructs the builtin
+// authentication service, and ensures a default admin user exists.
+// If the admin password is auto-generated, the password is printed to stdout.
+// It returns the initialized auth service or an error if any step fails.
 func initBuiltinAuthService(cfg *config.Config) (*authservice.Service, error) {
 	ctx := context.Background()
 

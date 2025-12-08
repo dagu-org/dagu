@@ -26,7 +26,8 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// NewUser creates a new User with a generated UUID and timestamps.
+// NewUser creates a User with a new UUID and sets CreatedAt and UpdatedAt to the current UTC time.
+// The provided username, passwordHash, and role are assigned to the corresponding fields.
 func NewUser(username string, passwordHash string, role Role) *User {
 	now := time.Now().UTC()
 	return &User{

@@ -35,6 +35,15 @@ const ROLES = [
   { value: 'viewer', label: 'Viewer', description: 'Read-only access' },
 ] as const;
 
+/**
+ * Render a modal dialog that provides a form to create a new user or edit an existing one.
+ *
+ * @param props.open - Whether the modal is open.
+ * @param props.user - Existing user to edit; when undefined the form operates in create mode.
+ * @param props.onClose - Callback invoked when the modal is closed.
+ * @param props.onSuccess - Callback invoked after a successful create or update operation.
+ * @returns The modal JSX element containing the user form.
+ */
 export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalProps) {
   const config = useConfig();
   const isEditing = !!user;

@@ -26,6 +26,13 @@ import dayjs from '@/lib/dayjs';
 
 type User = components['schemas']['User'];
 
+/**
+ * Render the Users management page with a table of accounts and controls for creating, editing, resetting passwords, and deleting users.
+ *
+ * This component sets the application bar title to "User Management", fetches the user list from the configured API using a stored token, and manages loading and error states. It highlights the current user, formats created/updated timestamps, and exposes per-user actions that open the appropriate modals (create, edit, reset password, delete). Deletion performs an API DELETE request and refreshes the list on success.
+ *
+ * @returns The Users page component as a JSX.Element
+ */
 export default function UsersPage() {
   const config = useConfig();
   const { user: currentUser } = useAuth();

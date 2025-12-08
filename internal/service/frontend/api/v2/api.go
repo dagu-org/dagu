@@ -68,7 +68,8 @@ type AuthService interface {
 // APIOption is a functional option for configuring the API.
 type APIOption func(*API)
 
-// WithAuthService sets the authentication service for the API.
+// WithAuthService returns an APIOption that sets the API's AuthService.
+// When applied, the provided AuthService will be used by API methods and middleware; passing nil disables authentication.
 func WithAuthService(as AuthService) APIOption {
 	return func(a *API) {
 		a.authService = as
@@ -78,7 +79,13 @@ func WithAuthService(as AuthService) APIOption {
 // New constructs an API instance wired with the provided DAG, DAG-run, queue and proc stores,
 // runtime manager, configuration, coordinator client, service registry, metrics registry, and resource service.
 // It also builds the internal remote node map from cfg.Server.RemoteNodes and initializes the sub-command
-// builder and API base path from the provided configuration.
+// New constructs an *API configured with the provided stores, runtime manager,
+// configuration, coordinator client, service registry, Prometheus registry,
+// and resource service.
+//
+// It builds the API instance (including the remote node map and base path) and
+// applies any supplied APIOption functions to customize the instance before
+// returning it.
 func New(
 	dr execution.DAGStore,
 	drs execution.DAGRunStore,
@@ -359,6 +366,7 @@ func (a *API) requireExecute(ctx context.Context) error {
 	return nil
 }
 
+// ptrOf returns a pointer to v, or nil if v is the zero value for its type.
 func ptrOf[T any](v T) *T {
 	if reflect.ValueOf(v).IsZero() {
 		return nil

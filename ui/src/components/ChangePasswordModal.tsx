@@ -17,6 +17,15 @@ type ChangePasswordModalProps = {
   onClose: () => void;
 };
 
+/**
+ * Render a modal dialog that lets the current user change their password.
+ *
+ * Validates input (matching confirmation and minimum length), submits the change to the configured API, and displays error or success state. The modal resets its form when closed.
+ *
+ * @param open - Whether the modal is visible.
+ * @param onClose - Callback invoked when the modal is closed.
+ * @returns The Change Password modal React element.
+ */
 export function ChangePasswordModal({ open, onClose }: ChangePasswordModalProps) {
   const config = useConfig();
   const { token } = useAuth();

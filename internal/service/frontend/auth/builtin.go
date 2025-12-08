@@ -20,7 +20,10 @@ type TokenValidator interface {
 
 // BuiltinAuthMiddleware creates middleware that validates JWT tokens
 // and injects the authenticated user into the request context.
-// Public paths are excluded from authentication.
+// BuiltinAuthMiddleware returns an HTTP middleware that enforces authentication for requests
+// whose paths are not listed in publicPaths. For non-public requests it extracts a Bearer token,
+// validates it via the provided TokenValidator, and on success injects the authenticated user into
+// the request context; on failure it writes a 401 JSON error response.
 func BuiltinAuthMiddleware(svc TokenValidator, publicPaths []string) func(http.Handler) http.Handler {
 	// Build a set for O(1) lookup
 	publicSet := make(map[string]struct{}, len(publicPaths))
@@ -56,7 +59,7 @@ func BuiltinAuthMiddleware(svc TokenValidator, publicPaths []string) func(http.H
 }
 
 // isPublicPath checks if the request path matches any public path.
-// Handles trailing slash normalization bidirectionally.
+// plus variants with a trailing slash added or removed.
 func isPublicPath(path string, publicSet map[string]struct{}) bool {
 	// Exact match
 	if _, ok := publicSet[path]; ok {
@@ -77,7 +80,7 @@ func isPublicPath(path string, publicSet map[string]struct{}) bool {
 }
 
 // RequireRole creates middleware that checks if the authenticated user
-// has one of the required roles.
+// ("auth.forbidden").
 func RequireRole(roles ...auth.Role) func(http.Handler) http.Handler {
 	roleSet := make(map[auth.Role]struct{}, len(roles))
 	for _, r := range roles {
@@ -102,22 +105,23 @@ func RequireRole(roles ...auth.Role) func(http.Handler) http.Handler {
 	}
 }
 
-// RequireAdmin is a convenience middleware that requires admin role.
+// RequireAdmin returns a middleware that allows only authenticated users with the admin role.
 func RequireAdmin() func(http.Handler) http.Handler {
 	return RequireRole(auth.RoleAdmin)
 }
 
-// RequireWrite is a convenience middleware that requires write permissions (admin or manager).
+// RequireWrite returns middleware that permits requests only for users with the Admin or Manager role.
 func RequireWrite() func(http.Handler) http.Handler {
 	return RequireRole(auth.RoleAdmin, auth.RoleManager)
 }
 
-// RequireExecute is a convenience middleware that requires execute permissions (admin, manager, or operator).
+// RequireExecute is middleware that permits requests only from users with the Admin, Manager, or Operator role.
 func RequireExecute() func(http.Handler) http.Handler {
 	return RequireRole(auth.RoleAdmin, auth.RoleManager, auth.RoleOperator)
 }
 
-// extractBearerToken extracts the JWT token from the Authorization header.
+// extractBearerToken extracts the bearer token from the request's Authorization header.
+// It returns the token string without the "Bearer " prefix, or an empty string if the header is missing or not a Bearer token.
 func extractBearerToken(r *http.Request) string {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
@@ -143,7 +147,9 @@ type ErrorDetail struct {
 	Message string `json:"message"`
 }
 
-// writeAuthError writes a JSON error response.
+// writeAuthError writes an HTTP JSON error response with the provided status and error details.
+// It sets the Content-Type header to "application/json", writes the HTTP status, and encodes an
+// ErrorResponse containing the given code and message.
 func writeAuthError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

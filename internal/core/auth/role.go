@@ -66,7 +66,8 @@ func (r Role) IsAdmin() bool {
 }
 
 // ParseRole converts a string to a Role.
-// Returns an error if the string is not a valid role.
+// ParseRole converts the input string to a Role and verifies it is one of the known roles.
+// If the input is not "admin", "manager", "operator", or "viewer", it returns an error describing the valid options.
 func ParseRole(s string) (Role, error) {
 	role := Role(s)
 	if !role.Valid() {
