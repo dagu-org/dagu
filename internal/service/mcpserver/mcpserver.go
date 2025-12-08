@@ -228,7 +228,7 @@ func (s *MCPServer) Start(ctx context.Context) error {
 	logger.Info(ctx, "Acquired mcp server lock")
 	defer s.dirLock.Unlock()
 
-	if err := s.server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
+	if err := s.server.Run(ctx, &mcp.StdioTransport{}); err != nil {
 		logger.Error(ctx, "MCP server failed", slog.String("error", err.Error()))
 		return fmt.Errorf("mcp server failed: %w", err)
 	}
