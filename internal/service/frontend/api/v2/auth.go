@@ -39,19 +39,14 @@ func (a *API) Login(ctx context.Context, request api.LoginRequestObject) (api.Lo
 		return nil, err
 	}
 
-	token, err := a.authService.GenerateToken(user)
-	if err != nil {
-		return nil, err
-	}
-
-	claims, err := a.authService.ValidateToken(token)
+	tokenResult, err := a.authService.GenerateToken(user)
 	if err != nil {
 		return nil, err
 	}
 
 	return api.Login200JSONResponse{
-		Token:     token,
-		ExpiresAt: claims.ExpiresAt.Time,
+		Token:     tokenResult.Token,
+		ExpiresAt: tokenResult.ExpiresAt,
 		User:      toAPIUser(user),
 	}, nil
 }

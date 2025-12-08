@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,7 @@ type ChangePasswordModalProps = {
 
 export function ChangePasswordModal({ open, onClose }: ChangePasswordModalProps) {
   const config = useConfig();
+  const { token } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -55,7 +57,6 @@ export function ChangePasswordModal({ open, onClose }: ChangePasswordModalProps)
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem('dagu_auth_token');
       const response = await fetch(`${config.apiURL}/auth/change-password`, {
         method: 'POST',
         headers: {

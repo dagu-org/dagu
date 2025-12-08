@@ -5,6 +5,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -141,16 +142,19 @@ func TestService_GenerateAndValidateToken(t *testing.T) {
 	}
 
 	// Generate token
-	token, err := svc.GenerateToken(user)
+	tokenResult, err := svc.GenerateToken(user)
 	if err != nil {
 		t.Fatalf("GenerateToken() error = %v", err)
 	}
-	if token == "" {
+	if tokenResult.Token == "" {
 		t.Error("GenerateToken() returned empty token")
+	}
+	if tokenResult.ExpiresAt.IsZero() {
+		t.Error("GenerateToken() returned zero expiry time")
 	}
 
 	// Validate token
-	claims, err := svc.ValidateToken(token)
+	claims, err := svc.ValidateToken(tokenResult.Token)
 	if err != nil {
 		t.Fatalf("ValidateToken() error = %v", err)
 	}
@@ -193,13 +197,13 @@ func TestService_GetUserFromToken(t *testing.T) {
 	}
 
 	// Generate token
-	token, err := svc.GenerateToken(user)
+	tokenResult, err := svc.GenerateToken(user)
 	if err != nil {
 		t.Fatalf("GenerateToken() error = %v", err)
 	}
 
 	// Get user from token
-	retrieved, err := svc.GetUserFromToken(ctx, token)
+	retrieved, err := svc.GetUserFromToken(ctx, tokenResult.Token)
 	if err != nil {
 		t.Fatalf("GetUserFromToken() error = %v", err)
 	}
@@ -430,7 +434,7 @@ func TestService_ListUsers(t *testing.T) {
 	// Create multiple users
 	for i := 0; i < 3; i++ {
 		_, err := svc.CreateUser(ctx, CreateUserInput{
-			Username: "user" + string(rune('0'+i)),
+			Username: fmt.Sprintf("user%d", i),
 			Password: "password123",
 			Role:     auth.RoleViewer,
 		})

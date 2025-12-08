@@ -100,18 +100,26 @@ func (s *Service) Authenticate(ctx context.Context, username, password string) (
 	return user, nil
 }
 
+// TokenResult contains the generated token and its expiry time.
+type TokenResult struct {
+	Token     string
+	ExpiresAt time.Time
+}
+
 // GenerateToken creates a JWT token for the given user.
-func (s *Service) GenerateToken(user *auth.User) (string, error) {
+// Returns the token string and its expiry time.
+func (s *Service) GenerateToken(user *auth.User) (*TokenResult, error) {
 	if s.config.TokenSecret == "" {
-		return "", ErrMissingSecret
+		return nil, ErrMissingSecret
 	}
 
 	now := time.Now()
+	expiresAt := now.Add(s.config.TokenTTL)
 	claims := &Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.ID,
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(s.config.TokenTTL)),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
 		},
 		UserID:   user.ID,
 		Username: user.Username,
@@ -119,7 +127,15 @@ func (s *Service) GenerateToken(user *auth.User) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(s.config.TokenSecret))
+	signedToken, err := token.SignedString([]byte(s.config.TokenSecret))
+	if err != nil {
+		return nil, err
+	}
+
+	return &TokenResult{
+		Token:     signedToken,
+		ExpiresAt: expiresAt,
+	}, nil
 }
 
 // ValidateToken validates a JWT token and returns the claims.

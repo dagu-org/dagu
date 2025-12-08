@@ -54,8 +54,7 @@ type API struct {
 // This allows the API to work with or without auth service being configured.
 type AuthService interface {
 	Authenticate(ctx context.Context, username, password string) (*auth.User, error)
-	GenerateToken(user *auth.User) (string, error)
-	ValidateToken(tokenString string) (*authservice.Claims, error)
+	GenerateToken(user *auth.User) (*authservice.TokenResult, error)
 	GetUserFromToken(ctx context.Context, token string) (*auth.User, error)
 	CreateUser(ctx context.Context, input authservice.CreateUserInput) (*auth.User, error)
 	GetUser(ctx context.Context, id string) (*auth.User, error)
