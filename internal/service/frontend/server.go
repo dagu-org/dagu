@@ -89,7 +89,10 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 }
 
 // initBuiltinAuthService initializes the builtin authentication service.
-// It creates the file-based user store, auth service, and ensures a default admin exists.
+// initBuiltinAuthService creates a file-based user store, constructs the builtin
+// authentication service, and ensures a default admin user exists.
+// If the admin password is auto-generated, the password is printed to stdout.
+// It returns the initialized auth service or an error if any step fails.
 func initBuiltinAuthService(cfg *config.Config) (*authservice.Service, error) {
 	ctx := context.Background()
 

@@ -14,6 +14,13 @@ import { Button } from '@/components/ui/button';
 import { User, LogOut, Key, Shield } from 'lucide-react';
 import { ChangePasswordModal } from './ChangePasswordModal';
 
+/**
+ * Renders a user dropdown menu with profile info, a change-password action, and sign-out.
+ *
+ * The menu is rendered only when built-in authentication is enabled and a user is authenticated.
+ *
+ * @returns The user menu JSX element when shown, or `null` when authentication is not available.
+ */
 export function UserMenu() {
   const { user, logout, isAuthenticated } = useAuth();
   const config = useConfig();

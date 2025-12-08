@@ -112,7 +112,8 @@ func (a *API) ChangePassword(ctx context.Context, request api.ChangePasswordRequ
 	}, nil
 }
 
-// toAPIUser converts a core auth.User to an API User.
+// toAPIUser converts a core auth.User into its API representation.
+// The provided user must be non-nil.
 func toAPIUser(user *auth.User) api.User {
 	return api.User{
 		Id:        user.ID,
@@ -123,7 +124,7 @@ func toAPIUser(user *auth.User) api.User {
 	}
 }
 
-// toAPIUsers converts a slice of core auth.User to API Users.
+// preserving the input order.
 func toAPIUsers(users []*auth.User) []api.User {
 	result := make([]api.User, len(users))
 	for i, u := range users {

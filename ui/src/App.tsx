@@ -26,6 +26,15 @@ type Props = {
   config: Config;
 };
 
+/**
+ * Root application component that composes providers, routing, and global UI state.
+ *
+ * Initializes and persists the selected remote node, exposes app bar state and config
+ * via context providers, and mounts public (login) and protected routes inside the app layout.
+ *
+ * @param config - Application configuration (e.g., `basePath`, `remoteNodes`) used to configure routing and available remote nodes.
+ * @returns The top-level React element for the application.
+ */
 function App({ config }: Props) {
   const [title, setTitle] = React.useState<string>('');
 

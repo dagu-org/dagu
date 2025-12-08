@@ -44,7 +44,11 @@ type Store struct {
 type Option func(*Store)
 
 // New creates a new file-based user store.
-// The baseDir is created if it does not exist.
+// New creates a file-backed Store that persists users as per-user JSON files in baseDir.
+// The baseDir must be non-empty; provided Option functions are applied to the store.
+// If baseDir does not exist it is created with directory permissions 0750, and an initial
+// in-memory index is built from existing user files. Returns an error on invalid input,
+// failure to create the directory, or failure to build the initial index.
 func New(baseDir string, opts ...Option) (*Store, error) {
 	if baseDir == "" {
 		return nil, errors.New("fileuser: baseDir cannot be empty")

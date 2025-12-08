@@ -629,7 +629,7 @@ func setViperDefaultValues(paths Paths) {
 // bindEnvironmentVariables binds configuration keys to the environment variable names used by Viper.
 // It registers current and legacy environment names for server, global, scheduler, UI, authentication
 // (including OIDC and legacy keys), TLS, file paths (with path normalization where appropriate),
-// coordinator, worker, peer, queues, and monitoring settings.
+// (e.g., path normalization) so environment values override config settings.
 func bindEnvironmentVariables() {
 	// Server configurations
 	bindEnv("logFormat", "LOG_FORMAT")

@@ -61,7 +61,8 @@ type Service struct {
 	config Config
 }
 
-// New creates a new auth service.
+// New creates a new auth service using the provided user store and configuration.
+// If TokenTTL or BcryptCost are not set (<= 0) they are replaced with package defaults.
 func New(store auth.UserStore, config Config) *Service {
 	if config.TokenTTL <= 0 {
 		config.TokenTTL = defaultTokenTTL
@@ -372,7 +373,9 @@ func (s *Service) validatePassword(password string) error {
 	return nil
 }
 
-// generateSecurePassword generates a cryptographically secure random password.
+// generateSecurePassword returns a URL-safe base64-encoded string of the requested length
+// built from cryptographically secure random bytes. It returns an error if a secure random
+// source cannot be read.
 func generateSecurePassword(length int) (string, error) {
 	bytes := make([]byte, length)
 	if _, err := rand.Read(bytes); err != nil {

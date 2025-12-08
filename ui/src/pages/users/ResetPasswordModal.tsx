@@ -20,6 +20,18 @@ type ResetPasswordModalProps = {
   onClose: () => void;
 };
 
+/**
+ * Renders a modal dialog allowing an administrator to set a new password for a user.
+ *
+ * Validates that the new and confirm passwords match and are at least 8 characters, sends
+ * a PUT request to update the user's password using the auth token from localStorage, and
+ * shows inline error or success feedback. The dialog resets its form state when closed.
+ *
+ * @param open - Whether the dialog is visible
+ * @param user - The target user whose password will be reset
+ * @param onClose - Callback invoked when the dialog is closed
+ * @returns The Reset Password modal component
+ */
 export function ResetPasswordModal({ open, user, onClose }: ResetPasswordModalProps) {
   const config = useConfig();
   const [newPassword, setNewPassword] = useState('');

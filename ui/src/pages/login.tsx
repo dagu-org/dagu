@@ -7,6 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertCircle } from 'lucide-react';
 
+/**
+ * Renders the login page UI and handles authentication flow.
+ *
+ * The component shows username and password fields, displays an error banner when login fails,
+ * and redirects the user to the intended destination after successful authentication.
+ *
+ * @returns The rendered login page React element.
+ */
 export default function LoginPage() {
   const config = useConfig();
   const { login, isAuthenticated } = useAuth();

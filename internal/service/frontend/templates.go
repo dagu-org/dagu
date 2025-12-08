@@ -63,6 +63,7 @@ type funcsConfig struct {
 	AuthMode              config.AuthMode
 }
 
+// and simple utility helpers for use inside HTML templates.
 func defaultFunctions(cfg funcsConfig) template.FuncMap {
 	return template.FuncMap{
 		"defTitle": func(ip any) string {
