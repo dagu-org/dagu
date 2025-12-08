@@ -67,9 +67,14 @@ func RequireAdmin() func(http.Handler) http.Handler {
 	return RequireRole(auth.RoleAdmin)
 }
 
-// RequireWrite is a convenience middleware that requires write permissions (admin or editor).
+// RequireWrite is a convenience middleware that requires write permissions (admin or manager).
 func RequireWrite() func(http.Handler) http.Handler {
-	return RequireRole(auth.RoleAdmin, auth.RoleEditor)
+	return RequireRole(auth.RoleAdmin, auth.RoleManager)
+}
+
+// RequireExecute is a convenience middleware that requires execute permissions (admin, manager, or operator).
+func RequireExecute() func(http.Handler) http.Handler {
+	return RequireRole(auth.RoleAdmin, auth.RoleManager, auth.RoleOperator)
 }
 
 // extractBearerToken extracts the JWT token from the Authorization header.

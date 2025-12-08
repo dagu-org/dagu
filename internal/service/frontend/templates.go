@@ -135,6 +135,9 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		"pathConfigFileUsed": func() string {
 			return cfg.Paths.ConfigFileUsed
 		},
+		"pathUsersDir": func() string {
+			return cfg.Paths.UsersDir
+		},
 		"authMode": func() string {
 			return string(cfg.AuthMode)
 		},

@@ -50,7 +50,7 @@ func TestService_CreateUser(t *testing.T) {
 	user, err := svc.CreateUser(ctx, CreateUserInput{
 		Username: "testuser",
 		Password: "password123",
-		Role:     auth.RoleEditor,
+		Role:     auth.RoleManager,
 	})
 	if err != nil {
 		t.Fatalf("CreateUser() error = %v", err)
@@ -59,8 +59,8 @@ func TestService_CreateUser(t *testing.T) {
 	if user.Username != "testuser" {
 		t.Errorf("CreateUser() username = %v, want %v", user.Username, "testuser")
 	}
-	if user.Role != auth.RoleEditor {
-		t.Errorf("CreateUser() role = %v, want %v", user.Role, auth.RoleEditor)
+	if user.Role != auth.RoleManager {
+		t.Errorf("CreateUser() role = %v, want %v", user.Role, auth.RoleManager)
 	}
 	if user.PasswordHash == "" {
 		t.Error("CreateUser() password hash should not be empty")
@@ -134,7 +134,7 @@ func TestService_GenerateAndValidateToken(t *testing.T) {
 	user, err := svc.CreateUser(ctx, CreateUserInput{
 		Username: "testuser",
 		Password: "password123",
-		Role:     auth.RoleEditor,
+		Role:     auth.RoleManager,
 	})
 	if err != nil {
 		t.Fatalf("CreateUser() error = %v", err)
@@ -218,7 +218,7 @@ func TestService_ChangePassword(t *testing.T) {
 	user, err := svc.CreateUser(ctx, CreateUserInput{
 		Username: "testuser",
 		Password: "oldpassword1",
-		Role:     auth.RoleEditor,
+		Role:     auth.RoleManager,
 	})
 	if err != nil {
 		t.Fatalf("CreateUser() error = %v", err)
@@ -338,7 +338,7 @@ func TestService_DeleteUser(t *testing.T) {
 	user, err := svc.CreateUser(ctx, CreateUserInput{
 		Username: "testuser",
 		Password: "password123",
-		Role:     auth.RoleEditor,
+		Role:     auth.RoleManager,
 	})
 	if err != nil {
 		t.Fatalf("CreateUser() error = %v", err)
@@ -459,7 +459,7 @@ func TestService_ResetPassword(t *testing.T) {
 	user, err := svc.CreateUser(ctx, CreateUserInput{
 		Username: "testuser",
 		Password: "oldpassword1",
-		Role:     auth.RoleEditor,
+		Role:     auth.RoleManager,
 	})
 	if err != nil {
 		t.Fatalf("CreateUser() error = %v", err)

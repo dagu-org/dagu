@@ -29,7 +29,7 @@ func TestStore_CRUD(t *testing.T) {
 	ctx := context.Background()
 
 	// Test Create
-	user := auth.NewUser("testuser", "hashedpassword", auth.RoleEditor)
+	user := auth.NewUser("testuser", "hashedpassword", auth.RoleManager)
 	if err := store.Create(ctx, user); err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
@@ -114,7 +114,7 @@ func TestStore_DuplicateUsername(t *testing.T) {
 	}
 
 	// Try to create second user with same username
-	user2 := auth.NewUser("testuser", "hash2", auth.RoleEditor)
+	user2 := auth.NewUser("testuser", "hash2", auth.RoleManager)
 	err = store.Create(ctx, user2)
 	if err != auth.ErrUserAlreadyExists {
 		t.Errorf("Create() duplicate username error = %v, want %v", err, auth.ErrUserAlreadyExists)

@@ -7,19 +7,27 @@ import "fmt"
 
 // Role represents a user's role in the system.
 // Roles determine what actions a user can perform.
+//
+// Role hierarchy (most to least privileged):
+//   - admin: Full system access including user management
+//   - manager: Can create, edit, delete, run, and stop DAGs
+//   - operator: Can run and stop DAGs (execute only)
+//   - viewer: Read-only access to DAGs and status
 type Role string
 
 const (
-	// RoleAdmin has full access to all resources and system settings.
+	// RoleAdmin has full access to all resources including user management.
 	RoleAdmin Role = "admin"
-	// RoleEditor can create, edit, delete DAGs and run them.
-	RoleEditor Role = "editor"
+	// RoleManager can create, edit, delete, run, and stop DAGs.
+	RoleManager Role = "manager"
+	// RoleOperator can run and stop DAGs (execute only, no edit).
+	RoleOperator Role = "operator"
 	// RoleViewer can only view DAGs and execution history (read-only).
 	RoleViewer Role = "viewer"
 )
 
 // allRoles contains all valid roles for iteration and validation.
-var allRoles = []Role{RoleAdmin, RoleEditor, RoleViewer}
+var allRoles = []Role{RoleAdmin, RoleManager, RoleOperator, RoleViewer}
 
 // AllRoles returns a copy of all valid roles.
 func AllRoles() []Role {
@@ -31,7 +39,7 @@ func AllRoles() []Role {
 // Valid returns true if the role is a known valid role.
 func (r Role) Valid() bool {
 	switch r {
-	case RoleAdmin, RoleEditor, RoleViewer:
+	case RoleAdmin, RoleManager, RoleOperator, RoleViewer:
 		return true
 	}
 	return false
@@ -42,12 +50,17 @@ func (r Role) String() string {
 	return string(r)
 }
 
-// CanWrite returns true if the role can create, edit, or delete resources.
+// CanWrite returns true if the role can create, edit, or delete DAGs.
 func (r Role) CanWrite() bool {
-	return r == RoleAdmin || r == RoleEditor
+	return r == RoleAdmin || r == RoleManager
 }
 
-// IsAdmin returns true if the role has administrative privileges.
+// CanExecute returns true if the role can run or stop DAGs.
+func (r Role) CanExecute() bool {
+	return r == RoleAdmin || r == RoleManager || r == RoleOperator
+}
+
+// IsAdmin returns true if the role has administrative privileges (user management).
 func (r Role) IsAdmin() bool {
 	return r == RoleAdmin
 }
@@ -57,7 +70,7 @@ func (r Role) IsAdmin() bool {
 func ParseRole(s string) (Role, error) {
 	role := Role(s)
 	if !role.Valid() {
-		return "", fmt.Errorf("invalid role: %q, must be one of: admin, editor, viewer", s)
+		return "", fmt.Errorf("invalid role: %q, must be one of: admin, manager, operator, viewer", s)
 	}
 	return role, nil
 }

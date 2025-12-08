@@ -3268,10 +3268,11 @@ components:
 
     UserRole:
       type: string
-      description: "User role determining access permissions"
+      description: "User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only"
       enum:
         - admin
-        - editor
+        - manager
+        - operator
         - viewer
 
     LoginRequest:

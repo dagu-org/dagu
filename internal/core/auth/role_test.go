@@ -13,11 +13,13 @@ func TestRole_Valid(t *testing.T) {
 		valid bool
 	}{
 		{RoleAdmin, true},
-		{RoleEditor, true},
+		{RoleManager, true},
+		{RoleOperator, true},
 		{RoleViewer, true},
 		{Role("invalid"), false},
 		{Role(""), false},
 		{Role("ADMIN"), false}, // case sensitive
+		{Role("editor"), false}, // old role name
 	}
 
 	for _, tt := range tests {
@@ -35,7 +37,8 @@ func TestRole_CanWrite(t *testing.T) {
 		canWrite bool
 	}{
 		{RoleAdmin, true},
-		{RoleEditor, true},
+		{RoleManager, true},
+		{RoleOperator, false},
 		{RoleViewer, false},
 	}
 
@@ -48,13 +51,34 @@ func TestRole_CanWrite(t *testing.T) {
 	}
 }
 
+func TestRole_CanExecute(t *testing.T) {
+	tests := []struct {
+		role       Role
+		canExecute bool
+	}{
+		{RoleAdmin, true},
+		{RoleManager, true},
+		{RoleOperator, true},
+		{RoleViewer, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.role), func(t *testing.T) {
+			if got := tt.role.CanExecute(); got != tt.canExecute {
+				t.Errorf("Role(%q).CanExecute() = %v, want %v", tt.role, got, tt.canExecute)
+			}
+		})
+	}
+}
+
 func TestRole_IsAdmin(t *testing.T) {
 	tests := []struct {
 		role    Role
 		isAdmin bool
 	}{
 		{RoleAdmin, true},
-		{RoleEditor, false},
+		{RoleManager, false},
+		{RoleOperator, false},
 		{RoleViewer, false},
 	}
 
@@ -74,11 +98,13 @@ func TestParseRole(t *testing.T) {
 		wantErr bool
 	}{
 		{"admin", RoleAdmin, false},
-		{"editor", RoleEditor, false},
+		{"manager", RoleManager, false},
+		{"operator", RoleOperator, false},
 		{"viewer", RoleViewer, false},
 		{"invalid", "", true},
 		{"", "", true},
 		{"ADMIN", "", true},
+		{"editor", "", true}, // old role name
 	}
 
 	for _, tt := range tests {
@@ -97,8 +123,8 @@ func TestParseRole(t *testing.T) {
 
 func TestAllRoles(t *testing.T) {
 	roles := AllRoles()
-	if len(roles) != 3 {
-		t.Errorf("AllRoles() returned %d roles, want 3", len(roles))
+	if len(roles) != 4 {
+		t.Errorf("AllRoles() returned %d roles, want 4", len(roles))
 	}
 
 	// Ensure modifying returned slice doesn't affect internal state
