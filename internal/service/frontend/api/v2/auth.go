@@ -6,7 +6,6 @@ package api
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/core/auth"
@@ -136,9 +135,4 @@ func toAPIUsers(users []*auth.User) []api.User {
 		result[i] = toAPIUser(u)
 	}
 	return result
-}
-
-// formatTime formats a time for display.
-func formatTime(t time.Time) string {
-	return t.Format(time.RFC3339)
 }

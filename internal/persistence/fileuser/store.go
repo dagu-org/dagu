@@ -108,7 +108,7 @@ func (s *Store) rebuildIndex() error {
 
 // loadUserFromFile reads and parses a user from a JSON file.
 func (s *Store) loadUserFromFile(filePath string) (*auth.User, error) {
-	data, err := os.ReadFile(filePath)
+	data, err := os.ReadFile(filePath) //nolint:gosec // filePath is constructed internally from baseDir + userID
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
@@ -127,7 +127,7 @@ func (s *Store) userFilePath(userID string) string {
 }
 
 // Create stores a new user.
-func (s *Store) Create(ctx context.Context, user *auth.User) error {
+func (s *Store) Create(_ context.Context, user *auth.User) error {
 	if user == nil {
 		return errors.New("fileuser: user cannot be nil")
 	}
@@ -187,7 +187,7 @@ func (s *Store) writeUserToFile(filePath string, user *auth.User) error {
 }
 
 // GetByID retrieves a user by their unique ID.
-func (s *Store) GetByID(ctx context.Context, id string) (*auth.User, error) {
+func (s *Store) GetByID(_ context.Context, id string) (*auth.User, error) {
 	if id == "" {
 		return nil, auth.ErrInvalidUserID
 	}
@@ -255,7 +255,7 @@ func (s *Store) List(ctx context.Context) ([]*auth.User, error) {
 }
 
 // Update modifies an existing user.
-func (s *Store) Update(ctx context.Context, user *auth.User) error {
+func (s *Store) Update(_ context.Context, user *auth.User) error {
 	if user == nil {
 		return errors.New("fileuser: user cannot be nil")
 	}
@@ -300,7 +300,7 @@ func (s *Store) Update(ctx context.Context, user *auth.User) error {
 }
 
 // Delete removes a user by their ID.
-func (s *Store) Delete(ctx context.Context, id string) error {
+func (s *Store) Delete(_ context.Context, id string) error {
 	if id == "" {
 		return auth.ErrInvalidUserID
 	}
@@ -334,7 +334,7 @@ func (s *Store) Delete(ctx context.Context, id string) error {
 }
 
 // Count returns the total number of users.
-func (s *Store) Count(ctx context.Context) (int64, error) {
+func (s *Store) Count(_ context.Context) (int64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return int64(len(s.byID)), nil

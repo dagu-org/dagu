@@ -23,7 +23,7 @@ func setupTestService(t *testing.T) (*Service, func()) {
 
 	store, err := fileuser.New(tmpDir)
 	if err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("failed to create store: %v", err)
 	}
 
@@ -35,7 +35,7 @@ func setupTestService(t *testing.T) (*Service, func()) {
 
 	svc := New(store, config)
 	cleanup := func() {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 	}
 
 	return svc, cleanup
