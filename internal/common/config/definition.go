@@ -167,12 +167,12 @@ type AuthDef struct {
 
 // AuthBuiltinDef represents the builtin authentication configuration
 type AuthBuiltinDef struct {
-	DefaultAdmin *DefaultAdminDef `mapstructure:"defaultAdmin"`
-	Token        *TokenConfigDef  `mapstructure:"token"`
+	Admin *AdminConfigDef `mapstructure:"admin"`
+	Token *TokenConfigDef `mapstructure:"token"`
 }
 
-// DefaultAdminDef represents the default admin user configuration
-type DefaultAdminDef struct {
+// AdminConfigDef represents the initial admin user configuration
+type AdminConfigDef struct {
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 }

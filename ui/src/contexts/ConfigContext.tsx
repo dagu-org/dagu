@@ -13,6 +13,8 @@ export type PathsConfig = {
   configFileUsed: string;
 };
 
+export type AuthMode = 'none' | 'builtin' | 'oidc' | '';
+
 export type Config = {
   apiURL: string;
   basePath: string;
@@ -23,6 +25,7 @@ export type Config = {
   version: string;
   maxDashboardPageLimit: number;
   remoteNodes: string;
+  authMode: AuthMode;
   permissions: {
     writeDags: boolean;
     runDags: boolean;

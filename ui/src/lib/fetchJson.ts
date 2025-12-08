@@ -2,12 +2,19 @@ export default async function fetchJson<JSON = unknown>(
   input: RequestInfo,
   init?: RequestInit
 ): Promise<JSON> {
+  const token = localStorage.getItem('dagu_auth_token');
+  const headers: HeadersInit = {
+    ...(init?.headers || {}),
+    Accept: 'application/json',
+  };
+
+  if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${getConfig().apiURL}${input}`, {
     ...init,
-    headers: {
-      ...(init?.headers || {}),
-      Accept: 'application/json',
-    },
+    headers,
   });
   const data = await response.json();
 

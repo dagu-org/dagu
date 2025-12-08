@@ -160,7 +160,7 @@ func TestLoad_Env(t *testing.T) {
 					Scopes:       []string{"openid", "profile", "email"},
 				},
 				Builtin: AuthBuiltin{
-					DefaultAdmin: DefaultAdmin{Username: "admin"},
+					Admin: AdminConfig{Username: "admin"},
 					Token:        TokenConfig{TTL: 24 * time.Hour},
 				},
 			},
@@ -372,7 +372,7 @@ scheduler:
 					Whitelist:    []string{"user@example.com"},
 				},
 				Builtin: AuthBuiltin{
-					DefaultAdmin: DefaultAdmin{Username: "admin"},
+					Admin: AdminConfig{Username: "admin"},
 					Token:        TokenConfig{TTL: 24 * time.Hour},
 				},
 			},
@@ -842,7 +842,7 @@ auth:
 auth:
   mode: "builtin"
   builtin:
-    defaultAdmin:
+    admin:
       username: "admin"
       password: "secretpass123"
     token:
@@ -850,8 +850,8 @@ auth:
       ttl: "12h"
 `)
 		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
-		assert.Equal(t, "admin", cfg.Server.Auth.Builtin.DefaultAdmin.Username)
-		assert.Equal(t, "secretpass123", cfg.Server.Auth.Builtin.DefaultAdmin.Password)
+		assert.Equal(t, "admin", cfg.Server.Auth.Builtin.Admin.Username)
+		assert.Equal(t, "secretpass123", cfg.Server.Auth.Builtin.Admin.Password)
 		assert.Equal(t, "my-jwt-secret-key", cfg.Server.Auth.Builtin.Token.Secret)
 		assert.Equal(t, 12*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
 	})
@@ -877,7 +877,9 @@ auth:
 
 	t.Run("AuthModeFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_AUTH_MODE": "builtin",
+			"DAGU_AUTH_MODE":         "builtin",
+			"DAGU_AUTH_TOKEN_SECRET": "test-secret",
+			"DAGU_PATHS_USERS_DIR":   t.TempDir(),
 		})
 		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
 	})
@@ -894,7 +896,7 @@ func TestLoad_AuthBuiltin(t *testing.T) {
 auth:
   mode: "builtin"
   builtin:
-    defaultAdmin:
+    admin:
       username: "superadmin"
       password: "supersecret123"
     token:
@@ -902,23 +904,23 @@ auth:
       ttl: "24h"
 `)
 		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
-		assert.Equal(t, "superadmin", cfg.Server.Auth.Builtin.DefaultAdmin.Username)
-		assert.Equal(t, "supersecret123", cfg.Server.Auth.Builtin.DefaultAdmin.Password)
+		assert.Equal(t, "superadmin", cfg.Server.Auth.Builtin.Admin.Username)
+		assert.Equal(t, "supersecret123", cfg.Server.Auth.Builtin.Admin.Password)
 		assert.Equal(t, "jwt-signing-secret", cfg.Server.Auth.Builtin.Token.Secret)
 		assert.Equal(t, 24*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
 	})
 
 	t.Run("FromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_AUTH_MODE":                    "builtin",
-			"DAGU_AUTH_BUILTIN_ADMIN_USERNAME":  "envadmin",
-			"DAGU_AUTH_BUILTIN_ADMIN_PASSWORD":  "envpassword123",
-			"DAGU_AUTH_BUILTIN_TOKEN_SECRET":    "env-jwt-secret",
-			"DAGU_AUTH_BUILTIN_TOKEN_TTL":       "48h",
+			"DAGU_AUTH_MODE":         "builtin",
+			"DAGU_AUTH_ADMIN_USERNAME": "envadmin",
+			"DAGU_AUTH_ADMIN_PASSWORD": "envpassword123",
+			"DAGU_AUTH_TOKEN_SECRET":   "env-jwt-secret",
+			"DAGU_AUTH_TOKEN_TTL":      "48h",
 		})
 		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
-		assert.Equal(t, "envadmin", cfg.Server.Auth.Builtin.DefaultAdmin.Username)
-		assert.Equal(t, "envpassword123", cfg.Server.Auth.Builtin.DefaultAdmin.Password)
+		assert.Equal(t, "envadmin", cfg.Server.Auth.Builtin.Admin.Username)
+		assert.Equal(t, "envpassword123", cfg.Server.Auth.Builtin.Admin.Password)
 		assert.Equal(t, "env-jwt-secret", cfg.Server.Auth.Builtin.Token.Secret)
 		assert.Equal(t, 48*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
 	})
@@ -928,15 +930,15 @@ auth:
 auth:
   mode: "builtin"
   builtin:
-    defaultAdmin:
+    admin:
       username: "admin"
       password: ""
     token:
       secret: "secret"
       ttl: "1h"
 `)
-		assert.Equal(t, "admin", cfg.Server.Auth.Builtin.DefaultAdmin.Username)
-		assert.Equal(t, "", cfg.Server.Auth.Builtin.DefaultAdmin.Password)
+		assert.Equal(t, "admin", cfg.Server.Auth.Builtin.Admin.Username)
+		assert.Equal(t, "", cfg.Server.Auth.Builtin.Admin.Password)
 	})
 
 	t.Run("DefaultTTL", func(t *testing.T) {
@@ -944,7 +946,7 @@ auth:
 auth:
   mode: "builtin"
   builtin:
-    defaultAdmin:
+    admin:
       username: "admin"
     token:
       secret: "secret"

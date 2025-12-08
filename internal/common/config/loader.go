@@ -224,9 +224,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 			cfg.Server.Auth.OIDC.Whitelist = def.Auth.OIDC.Whitelist
 		}
 		if def.Auth.Builtin != nil {
-			if def.Auth.Builtin.DefaultAdmin != nil {
-				cfg.Server.Auth.Builtin.DefaultAdmin.Username = def.Auth.Builtin.DefaultAdmin.Username
-				cfg.Server.Auth.Builtin.DefaultAdmin.Password = def.Auth.Builtin.DefaultAdmin.Password
+			if def.Auth.Builtin.Admin != nil {
+				cfg.Server.Auth.Builtin.Admin.Username = def.Auth.Builtin.Admin.Username
+				cfg.Server.Auth.Builtin.Admin.Password = def.Auth.Builtin.Admin.Password
 			}
 			if def.Auth.Builtin.Token != nil {
 				cfg.Server.Auth.Builtin.Token.Secret = def.Auth.Builtin.Token.Secret
@@ -246,8 +246,8 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
 	}
 	// Set default admin username if not specified
-	if cfg.Server.Auth.Builtin.DefaultAdmin.Username == "" {
-		cfg.Server.Auth.Builtin.DefaultAdmin.Username = "admin"
+	if cfg.Server.Auth.Builtin.Admin.Username == "" {
+		cfg.Server.Auth.Builtin.Admin.Username = "admin"
 	}
 
 	// Normalize the BasePath value for proper URL construction.
@@ -685,10 +685,10 @@ func bindEnvironmentVariables() {
 
 	// Authentication configurations (builtin)
 	bindEnv("auth.mode", "AUTH_MODE")
-	bindEnv("auth.builtin.defaultAdmin.username", "AUTH_BUILTIN_ADMIN_USERNAME")
-	bindEnv("auth.builtin.defaultAdmin.password", "AUTH_BUILTIN_ADMIN_PASSWORD")
-	bindEnv("auth.builtin.token.secret", "AUTH_BUILTIN_TOKEN_SECRET")
-	bindEnv("auth.builtin.token.ttl", "AUTH_BUILTIN_TOKEN_TTL")
+	bindEnv("auth.builtin.admin.username", "AUTH_ADMIN_USERNAME")
+	bindEnv("auth.builtin.admin.password", "AUTH_ADMIN_PASSWORD")
+	bindEnv("auth.builtin.token.secret", "AUTH_TOKEN_SECRET")
+	bindEnv("auth.builtin.token.ttl", "AUTH_TOKEN_TTL")
 
 	// TLS configurations
 	bindEnv("tls.certFile", "CERT_FILE")

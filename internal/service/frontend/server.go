@@ -105,26 +105,26 @@ func initBuiltinAuthService(cfg *config.Config) (*authservice.Service, error) {
 	}
 	authSvc := authservice.New(userStore, authConfig)
 
-	// Ensure default admin user exists
-	password, created, err := authSvc.EnsureDefaultAdmin(
+	// Ensure admin user exists
+	password, created, err := authSvc.EnsureAdminUser(
 		ctx,
-		cfg.Server.Auth.Builtin.DefaultAdmin.Username,
-		cfg.Server.Auth.Builtin.DefaultAdmin.Password,
+		cfg.Server.Auth.Builtin.Admin.Username,
+		cfg.Server.Auth.Builtin.Admin.Password,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to ensure default admin: %w", err)
+		return nil, fmt.Errorf("failed to ensure admin user: %w", err)
 	}
 
 	if created {
-		if cfg.Server.Auth.Builtin.DefaultAdmin.Password == "" {
+		if cfg.Server.Auth.Builtin.Admin.Password == "" {
 			// Password was auto-generated, log it for the user
-			logger.Info(ctx, "Created default admin user",
-				slog.String("username", cfg.Server.Auth.Builtin.DefaultAdmin.Username),
+			logger.Info(ctx, "Created admin user",
+				slog.String("username", cfg.Server.Auth.Builtin.Admin.Username),
 				slog.String("password", password),
 				slog.String("note", "Please change this password immediately"))
 		} else {
-			logger.Info(ctx, "Created default admin user",
-				slog.String("username", cfg.Server.Auth.Builtin.DefaultAdmin.Username))
+			logger.Info(ctx, "Created admin user",
+				slog.String("username", cfg.Server.Auth.Builtin.Admin.Username))
 		}
 	}
 
@@ -297,6 +297,10 @@ func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath
 	var setupErr error
 
 	r.Route(apiV1BasePath, func(r chi.Router) {
+		if srv.config.Server.Auth.Mode != config.AuthModeNone {
+			// v1 API is not available in auth mode
+			return
+		}
 		url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, apiV1BasePath)
 		if err := srv.apiV1.ConfigureRoutes(r, url); err != nil {
 			logger.Error(ctx, "Failed to configure v1 API routes", tag.Error(err))

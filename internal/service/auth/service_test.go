@@ -266,22 +266,22 @@ func TestService_ChangePassword_WrongOldPassword(t *testing.T) {
 	}
 }
 
-func TestService_EnsureDefaultAdmin(t *testing.T) {
+func TestService_EnsureAdminUser(t *testing.T) {
 	svc, cleanup := setupTestService(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
 	// First call should create admin
-	password, created, err := svc.EnsureDefaultAdmin(ctx, "admin", "adminpass1")
+	password, created, err := svc.EnsureAdminUser(ctx, "admin", "adminpass1")
 	if err != nil {
-		t.Fatalf("EnsureDefaultAdmin() error = %v", err)
+		t.Fatalf("EnsureAdminUser() error = %v", err)
 	}
 	if !created {
-		t.Error("EnsureDefaultAdmin() should return created=true")
+		t.Error("EnsureAdminUser() should return created=true")
 	}
 	if password != "adminpass1" {
-		t.Errorf("EnsureDefaultAdmin() password = %v, want %v", password, "adminpass1")
+		t.Errorf("EnsureAdminUser() password = %v, want %v", password, "adminpass1")
 	}
 
 	// Verify admin can authenticate
@@ -291,31 +291,31 @@ func TestService_EnsureDefaultAdmin(t *testing.T) {
 	}
 
 	// Second call should not create
-	_, created, err = svc.EnsureDefaultAdmin(ctx, "admin2", "adminpass2")
+	_, created, err = svc.EnsureAdminUser(ctx, "admin2", "adminpass2")
 	if err != nil {
-		t.Fatalf("EnsureDefaultAdmin() second call error = %v", err)
+		t.Fatalf("EnsureAdminUser() second call error = %v", err)
 	}
 	if created {
-		t.Error("EnsureDefaultAdmin() should return created=false when users exist")
+		t.Error("EnsureAdminUser() should return created=false when users exist")
 	}
 }
 
-func TestService_EnsureDefaultAdmin_GeneratePassword(t *testing.T) {
+func TestService_EnsureAdminUser_GeneratePassword(t *testing.T) {
 	svc, cleanup := setupTestService(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
 	// Call with empty password should generate one
-	password, created, err := svc.EnsureDefaultAdmin(ctx, "admin", "")
+	password, created, err := svc.EnsureAdminUser(ctx, "admin", "")
 	if err != nil {
-		t.Fatalf("EnsureDefaultAdmin() error = %v", err)
+		t.Fatalf("EnsureAdminUser() error = %v", err)
 	}
 	if !created {
-		t.Error("EnsureDefaultAdmin() should return created=true")
+		t.Error("EnsureAdminUser() should return created=true")
 	}
 	if password == "" {
-		t.Error("EnsureDefaultAdmin() should generate a password")
+		t.Error("EnsureAdminUser() should generate a password")
 	}
 	if len(password) < 8 {
 		t.Error("Generated password should be at least 8 characters")

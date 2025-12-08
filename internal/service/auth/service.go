@@ -306,9 +306,9 @@ func (s *Service) ResetPassword(ctx context.Context, userID, newPassword string)
 	return s.store.Update(ctx, user)
 }
 
-// EnsureDefaultAdmin creates the default admin user if no users exist.
+// EnsureAdminUser creates the admin user if no users exist.
 // Returns the generated password if a new admin was created.
-func (s *Service) EnsureDefaultAdmin(ctx context.Context, username, password string) (string, bool, error) {
+func (s *Service) EnsureAdminUser(ctx context.Context, username, password string) (string, bool, error) {
 	count, err := s.store.Count(ctx)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to count users: %w", err)
@@ -333,7 +333,7 @@ func (s *Service) EnsureDefaultAdmin(ctx context.Context, username, password str
 		Role:     auth.RoleAdmin,
 	})
 	if err != nil {
-		return "", false, fmt.Errorf("failed to create default admin: %w", err)
+		return "", false, fmt.Errorf("failed to create admin user: %w", err)
 	}
 
 	return generatedPassword, true, nil

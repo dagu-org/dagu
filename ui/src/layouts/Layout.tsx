@@ -11,6 +11,7 @@ import * as React from 'react';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { mainListItems as MainListItems } from '../menu';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { UserMenu } from '@/components/UserMenu';
 
 // Utility: Get contrast color (black or white) for a given background color (hex, rgb, or named)
 function getContrastColor(input?: string): string {
@@ -257,6 +258,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                 }}
               </AppBarContext.Consumer>
               <ThemeToggle />
+              <UserMenu />
             </div>
           </div>
         </header>

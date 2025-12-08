@@ -150,12 +150,12 @@ type Auth struct {
 
 // AuthBuiltin represents the builtin authentication configuration
 type AuthBuiltin struct {
-	DefaultAdmin DefaultAdmin
-	Token        TokenConfig
+	Admin AdminConfig
+	Token TokenConfig
 }
 
-// DefaultAdmin represents the default admin user configuration
-type DefaultAdmin struct {
+// AdminConfig represents the initial admin user configuration
+type AdminConfig struct {
 	Username string
 	Password string
 }
@@ -314,6 +314,40 @@ func (c *Config) Validate() error {
 
 	if c.UI.MaxDashboardPageLimit < 1 {
 		return fmt.Errorf("invalid max dashboard page limit: %d", c.UI.MaxDashboardPageLimit)
+	}
+
+	// Validate builtin auth configuration
+	if err := c.validateBuiltinAuth(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateBuiltinAuth validates the builtin authentication configuration.
+func (c *Config) validateBuiltinAuth() error {
+	if c.Server.Auth.Mode != AuthModeBuiltin {
+		return nil
+	}
+
+	// When builtin auth is enabled, users directory must be set
+	if c.Paths.UsersDir == "" {
+		return fmt.Errorf("builtin auth requires paths.usersDir to be set")
+	}
+
+	// Admin username must be set (has default, but check anyway)
+	if c.Server.Auth.Builtin.Admin.Username == "" {
+		return fmt.Errorf("builtin auth requires admin username to be set")
+	}
+
+	// Token secret must be set for JWT signing
+	if c.Server.Auth.Builtin.Token.Secret == "" {
+		return fmt.Errorf("builtin auth requires token secret to be set (auth.builtin.token.secret or AUTH_TOKEN_SECRET env var)")
+	}
+
+	// Token TTL must be positive
+	if c.Server.Auth.Builtin.Token.TTL <= 0 {
+		return fmt.Errorf("builtin auth requires a positive token TTL")
 	}
 
 	return nil
