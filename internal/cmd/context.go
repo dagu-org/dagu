@@ -196,7 +196,7 @@ func (c *Context) NewServer(rs *resource.Service) (*frontend.Server, error) {
 
 	mr := telemetry.NewRegistry(collector)
 
-	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr, rs), nil
+	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr, rs)
 }
 
 // NewCoordinatorClient creates a new coordinator client using the global peer configuration.

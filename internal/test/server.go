@@ -64,8 +64,9 @@ func (srv *Server) runServer(t *testing.T) {
 	)
 	mr := telemetry.NewRegistry(collector)
 
-	server := frontend.NewServer(srv.Config, srv.DAGStore, srv.DAGRunStore, srv.QueueStore, srv.ProcStore, srv.DAGRunMgr, cc, srv.ServiceRegistry, mr, nil)
-	err := server.Serve(srv.Context)
+	server, err := frontend.NewServer(srv.Config, srv.DAGStore, srv.DAGRunStore, srv.QueueStore, srv.ProcStore, srv.DAGRunMgr, cc, srv.ServiceRegistry, mr, nil)
+	require.NoError(t, err, "failed to create server")
+	err = server.Serve(srv.Context)
 	require.NoError(t, err, "failed to start server")
 }
 
