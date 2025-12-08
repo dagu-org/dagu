@@ -218,7 +218,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		if authConfig.Mode == config.AuthModeBuiltin && a.authService != nil {
 			// For builtin auth, use JWT-based authentication
 			// The BuiltinAuthMiddleware validates JWT tokens and injects user into context
-			r.Use(frontendauth.BuiltinAuthMiddleware(a.authService.(*authservice.Service), authOptions.PublicPaths))
+			r.Use(frontendauth.BuiltinAuthMiddleware(a.authService, authOptions.PublicPaths))
 		} else {
 			// For other auth modes (basic, token, OIDC), use the legacy middleware
 			r.Use(frontendauth.Middleware(authOptions))
@@ -296,10 +296,18 @@ func (a *API) requireAdmin(ctx context.Context) error {
 	}
 	user, ok := auth.UserFromContext(ctx)
 	if !ok {
-		return errors.New("not authenticated")
+		return &Error{
+			Code:       api.ErrorCodeUnauthorized,
+			Message:    "Authentication required",
+			HTTPStatus: http.StatusUnauthorized,
+		}
 	}
 	if !user.Role.IsAdmin() {
-		return errors.New("admin role required")
+		return &Error{
+			Code:       api.ErrorCodeForbidden,
+			Message:    "Insufficient permissions",
+			HTTPStatus: http.StatusForbidden,
+		}
 	}
 	return nil
 }
@@ -312,10 +320,18 @@ func (a *API) requireWrite(ctx context.Context) error {
 	}
 	user, ok := auth.UserFromContext(ctx)
 	if !ok {
-		return errors.New("not authenticated")
+		return &Error{
+			Code:       api.ErrorCodeUnauthorized,
+			Message:    "Authentication required",
+			HTTPStatus: http.StatusUnauthorized,
+		}
 	}
 	if !user.Role.CanWrite() {
-		return errors.New("write permission required (admin or manager role)")
+		return &Error{
+			Code:       api.ErrorCodeForbidden,
+			Message:    "Insufficient permissions",
+			HTTPStatus: http.StatusForbidden,
+		}
 	}
 	return nil
 }
@@ -328,10 +344,18 @@ func (a *API) requireExecute(ctx context.Context) error {
 	}
 	user, ok := auth.UserFromContext(ctx)
 	if !ok {
-		return errors.New("not authenticated")
+		return &Error{
+			Code:       api.ErrorCodeUnauthorized,
+			Message:    "Authentication required",
+			HTTPStatus: http.StatusUnauthorized,
+		}
 	}
 	if !user.Role.CanExecute() {
-		return errors.New("execute permission required (admin, manager, or operator role)")
+		return &Error{
+			Code:       api.ErrorCodeForbidden,
+			Message:    "Insufficient permissions",
+			HTTPStatus: http.StatusForbidden,
+		}
 	}
 	return nil
 }

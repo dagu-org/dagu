@@ -73,7 +73,7 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 		return nil, err
 	}
 	if err := a.requireWrite(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	// Determine spec to create with: provided spec or default template
@@ -130,7 +130,7 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 		return nil, err
 	}
 	if err := a.requireWrite(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	_, err := a.dagStore.GetMetadata(ctx, request.FileName)
@@ -197,7 +197,7 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 		return nil, err
 	}
 	if err := a.requireWrite(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	err := a.dagStore.UpdateSpec(ctx, request.FileName, []byte(request.Body.Spec))
@@ -221,7 +221,7 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 		return nil, err
 	}
 	if err := a.requireWrite(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
@@ -536,7 +536,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	dag, err := a.dagStore.GetDetails(ctx, request.FileName)
@@ -750,7 +750,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	dag, err := a.dagStore.GetDetails(ctx, request.FileName, spec.WithoutEval())
@@ -882,7 +882,7 @@ func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDA
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	_, err := a.dagStore.GetMetadata(ctx, request.FileName)
@@ -936,7 +936,7 @@ func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequ
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	// Get the DAG metadata to ensure it exists

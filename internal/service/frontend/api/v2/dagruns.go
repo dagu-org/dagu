@@ -27,7 +27,7 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	if request.Body == nil || request.Body.Spec == "" {
@@ -87,7 +87,7 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	if request.Body == nil || request.Body.Spec == "" {
@@ -391,7 +391,7 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	ref := execution.NewDAGRunRef(request.Name, request.DagRunId)
@@ -573,7 +573,7 @@ func (a *API) UpdateSubDAGRunStepStatus(ctx context.Context, request api.UpdateS
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	root := execution.NewDAGRunRef(request.Name, request.DagRunId)
@@ -628,7 +628,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	attempt, err := a.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(request.Name, request.DagRunId))
@@ -687,7 +687,7 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	attempt, err := a.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(request.Name, request.DagRunId))
@@ -733,7 +733,7 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	dagRun := execution.NewDAGRunRef(request.Name, request.DagRunId)
@@ -777,7 +777,7 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
-		return nil, &Error{HTTPStatus: http.StatusForbidden, Code: api.ErrorCodeForbidden, Message: err.Error()}
+		return nil, err
 	}
 
 	attempt, err := a.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(request.Name, request.DagRunId))

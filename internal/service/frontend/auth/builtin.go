@@ -4,18 +4,24 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core/auth"
-	authservice "github.com/dagu-org/dagu/internal/service/auth"
 )
+
+// TokenValidator defines the interface for validating tokens and retrieving users.
+// This allows the middleware to work with any token validation implementation.
+type TokenValidator interface {
+	GetUserFromToken(ctx context.Context, token string) (*auth.User, error)
+}
 
 // BuiltinAuthMiddleware creates middleware that validates JWT tokens
 // and injects the authenticated user into the request context.
 // Public paths are excluded from authentication.
-func BuiltinAuthMiddleware(svc *authservice.Service, publicPaths []string) func(http.Handler) http.Handler {
+func BuiltinAuthMiddleware(svc TokenValidator, publicPaths []string) func(http.Handler) http.Handler {
 	// Build a set for O(1) lookup
 	publicSet := make(map[string]struct{}, len(publicPaths))
 	for _, p := range publicPaths {

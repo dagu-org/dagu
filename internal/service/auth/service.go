@@ -75,13 +75,19 @@ func New(store auth.UserStore, config Config) *Service {
 	}
 }
 
+// dummyHash is a valid bcrypt hash used for timing attack prevention.
+// When a user is not found, we still perform a bcrypt comparison against this
+// hash to ensure consistent response times regardless of user existence.
+var dummyHash = []byte("$2a$12$K8gHXqrFdFvMwJBG0VlJGuAGz3FwBmTm8xnNQblN2tCxrQgPLmwHa")
+
 // Authenticate verifies credentials and returns the user if valid.
 func (s *Service) Authenticate(ctx context.Context, username, password string) (*auth.User, error) {
 	user, err := s.store.GetByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, auth.ErrUserNotFound) {
-			// Use constant time comparison to prevent timing attacks
-			_ = bcrypt.CompareHashAndPassword([]byte("$2a$12$dummy"), []byte(password))
+			// Use constant time comparison to prevent timing attacks.
+			// Compare against a valid bcrypt hash to ensure similar timing.
+			_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 			return nil, ErrInvalidCredentials
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -200,6 +206,9 @@ func (s *Service) ListUsers(ctx context.Context) ([]*auth.User, error) {
 }
 
 // UpdateUserInput contains the input for updating a user.
+// Note: Password field is supported by the service for direct usage,
+// but the API handler intentionally omits it - password changes should
+// go through ChangePassword (user self-service) or ResetPassword (admin).
 type UpdateUserInput struct {
 	Username *string
 	Role     *auth.Role
