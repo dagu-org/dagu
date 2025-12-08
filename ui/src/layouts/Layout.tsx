@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { Menu, X } from 'lucide-react';
 import * as React from 'react';
 import { AppBarContext } from '../contexts/AppBarContext';
+import { useConfig } from '../contexts/ConfigContext';
 import { mainListItems as MainListItems } from '../menu';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { UserMenu } from '@/components/UserMenu';
@@ -78,6 +79,7 @@ type LayoutProps = {
 
 // Main Content component including Sidebar and AppBar logic
 function Content({ title, navbarColor, children }: LayoutProps) {
+  const config = useConfig();
   const [scrolled, setScrolled] = React.useState(false);
   // Sidebar state with localStorage persistence
   const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(() => {
@@ -228,7 +230,9 @@ function Content({ title, navbarColor, children }: LayoutProps) {
             <div className="flex items-center space-x-2">
               <AppBarContext.Consumer>
                 {(context) => {
+                  // Hide remote node selector when builtin auth is enabled (auth is local-only)
                   if (
+                    config.authMode === 'builtin' ||
                     !context.remoteNodes ||
                     context.remoteNodes.length === 0
                   ) {

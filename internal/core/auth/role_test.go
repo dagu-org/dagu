@@ -18,7 +18,7 @@ func TestRole_Valid(t *testing.T) {
 		{RoleViewer, true},
 		{Role("invalid"), false},
 		{Role(""), false},
-		{Role("ADMIN"), false}, // case sensitive
+		{Role("ADMIN"), false},  // case sensitive
 		{Role("editor"), false}, // old role name
 	}
 

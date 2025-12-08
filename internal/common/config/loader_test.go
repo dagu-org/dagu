@@ -161,7 +161,7 @@ func TestLoad_Env(t *testing.T) {
 				},
 				Builtin: AuthBuiltin{
 					Admin: AdminConfig{Username: "admin"},
-					Token:        TokenConfig{TTL: 24 * time.Hour},
+					Token: TokenConfig{TTL: 24 * time.Hour},
 				},
 			},
 			TLS: &TLSConfig{
@@ -373,7 +373,7 @@ scheduler:
 				},
 				Builtin: AuthBuiltin{
 					Admin: AdminConfig{Username: "admin"},
-					Token:        TokenConfig{TTL: 24 * time.Hour},
+					Token: TokenConfig{TTL: 24 * time.Hour},
 				},
 			},
 			TLS: &TLSConfig{
@@ -912,7 +912,7 @@ auth:
 
 	t.Run("FromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_AUTH_MODE":         "builtin",
+			"DAGU_AUTH_MODE":           "builtin",
 			"DAGU_AUTH_ADMIN_USERNAME": "envadmin",
 			"DAGU_AUTH_ADMIN_PASSWORD": "envpassword123",
 			"DAGU_AUTH_TOKEN_SECRET":   "env-jwt-secret",
