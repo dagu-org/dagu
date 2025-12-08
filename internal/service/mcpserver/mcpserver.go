@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -43,11 +44,31 @@ func New(cfg *config.Config) (*MCPServer, error) {
 
 	s.AddTool(&mcp.Tool{
 		Name:        "list_DAGs",
-		Description: "List all the Direct Acyclic Graphs in the server",
+		Description: "List all the Direct Acyclic Graphs (DAGs) in the server",
 		InputSchema: &jsonschema.Schema{
 			Type: "object",
 		},
 	}, listDags)
+
+	s.AddTool(&mcp.Tool{
+		Name:        "list_DAG_runs",
+		Description: "List all the Direct Acyclic Graphs (DAGs) runs in the server",
+		InputSchema: &jsonschema.Schema{
+			Type: "object",
+		},
+	}, listDagRuns)
+
+	s.AddTool(&mcp.Tool{
+		Name: "get_DAG",
+		Description: `Get the details and description of a Direct Acyclic Graph (DAG) from its name.
+		 It gives the workflows details, steps and configuration.`,
+		InputSchema: &jsonschema.Schema{
+			Type: "object",
+			Properties: map[string]*jsonschema.Schema{
+				"name": {Type: "string", Description: "Name of the DAG"},
+			},
+		},
+	}, getDag)
 
 	/*
 		s.AddTool(&mcp.Tool{
@@ -95,6 +116,62 @@ func listDags(ctx context.Context, ctr *mcp.CallToolRequest) (*mcp.CallToolResul
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: string(body)},
+		},
+		IsError: err != nil,
+	}, nil
+}
+
+func listDagRuns(ctx context.Context, ctr *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// host := os.Getenv("DAGU_HOST")
+	host := "localhost"
+	// port := os.Getenv("DAGU_PORT")
+	port := "8080"
+	//api_base_url := os.Getenv("DAGU_API_BASE_URL")
+	api_base_url := "api/v2"
+
+	resp, err := http.Get(fmt.Sprintf("http://%s:%s/%s/dag-runs", host, port, api_base_url))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: string(body)},
+		},
+		IsError: err != nil,
+	}, nil
+}
+
+func getDag(ctx context.Context, ctr *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	var arg struct {
+		Name string `json:"name"`
+	}
+
+	// host := os.Getenv("DAGU_HOST")
+	host := "localhost"
+	// port := os.Getenv("DAGU_PORT")
+	port := "8080"
+	//api_base_url := os.Getenv("DAGU_API_BASE_URL")
+	api_base_url := "api/v2"
+
+	if err := json.Unmarshal(ctr.Params.Arguments, &arg); err != nil {
+		return nil, err
+	}
+
+	resp, err := http.Get(fmt.Sprintf("http://%s:%s/%s/dags/%s", host, port, api_base_url, arg.Name))
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 
 	return &mcp.CallToolResult{
