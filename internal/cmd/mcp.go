@@ -21,7 +21,7 @@ func Mcp() *cobra.Command {
 var mcpFlags = []commandLineFlag{}
 
 // runMcp handles the execution of the mcp command
-func runMcp(ctx *Context, args []string) error {
+func runMcp(ctx *Context, _ []string) error {
 	mcpserver, err := ctx.NewMcpServer()
 	if err != nil {
 		return fmt.Errorf("failed to initialize mcp server: %w", err)
