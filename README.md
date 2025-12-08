@@ -252,6 +252,7 @@ Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
+| `DAGU_AUTH_MODE` | - | Authentication mode: `none`, `builtin`, or `oidc` |
 | `DAGU_AUTH_BASIC_USERNAME` | - | Basic auth username |
 | `DAGU_AUTH_BASIC_PASSWORD` | - | Basic auth password |
 | `DAGU_AUTH_OIDC_CLIENT_ID` | - | OIDC client ID |
@@ -260,6 +261,18 @@ Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
 | `DAGU_AUTH_OIDC_ISSUER` | - | OIDC issuer URL |
 | `DAGU_AUTH_OIDC_SCOPES` | - | OIDC scopes (comma-separated) |
 | `DAGU_AUTH_OIDC_WHITELIST` | - | OIDC email whitelist (comma-separated) |
+
+### Builtin Authentication (RBAC)
+
+When `DAGU_AUTH_MODE=builtin`, a file-based user management system with role-based access control is enabled. Roles: `admin`, `manager`, `operator`, `viewer`.
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `DAGU_AUTH_ADMIN_USERNAME` | `admin` | Initial admin username |
+| `DAGU_AUTH_ADMIN_PASSWORD` | (auto-generated) | Initial admin password |
+| `DAGU_AUTH_TOKEN_SECRET` | - | JWT token secret for signing (required) |
+| `DAGU_AUTH_TOKEN_TTL` | `24h` | JWT token time-to-live |
+| `DAGU_USERS_DIR` | `{dataDir}/users` | Directory for user data files |
 
 ### UI Configuration
 
