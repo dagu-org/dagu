@@ -276,15 +276,3 @@ func (a *API) ResetUserPassword(ctx context.Context, request api.ResetUserPasswo
 		Message: "Password reset successfully",
 	}, nil
 }
-
-// requireAdmin checks if the current user has admin role.
-func (a *API) requireAdmin(ctx context.Context) error {
-	user, ok := auth.UserFromContext(ctx)
-	if !ok {
-		return errors.New("not authenticated")
-	}
-	if !user.Role.IsAdmin() {
-		return errors.New("admin role required")
-	}
-	return nil
-}

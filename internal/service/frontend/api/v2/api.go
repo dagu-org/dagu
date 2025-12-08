@@ -214,7 +214,15 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Use(frontendauth.Middleware(authOptions))
+		// Apply authentication middleware based on auth mode
+		if authConfig.Mode == config.AuthModeBuiltin && a.authService != nil {
+			// For builtin auth, use JWT-based authentication
+			// The BuiltinAuthMiddleware validates JWT tokens and injects user into context
+			r.Use(frontendauth.BuiltinAuthMiddleware(a.authService.(*authservice.Service), authOptions.PublicPaths))
+		} else {
+			// For other auth modes (basic, token, OIDC), use the legacy middleware
+			r.Use(frontendauth.Middleware(authOptions))
+		}
 		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
 
 		handler := api.NewStrictHandlerWithOptions(a, nil, options)
@@ -276,6 +284,54 @@ func (a *API) isAllowed(perm config.Permission) error {
 			Message:    "Permission denied",
 			HTTPStatus: http.StatusForbidden,
 		}
+	}
+	return nil
+}
+
+// requireAdmin checks if the current user has admin role.
+// Returns nil if auth is not enabled (authService is nil).
+func (a *API) requireAdmin(ctx context.Context) error {
+	if a.authService == nil {
+		return nil // Auth not enabled, allow access
+	}
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return errors.New("not authenticated")
+	}
+	if !user.Role.IsAdmin() {
+		return errors.New("admin role required")
+	}
+	return nil
+}
+
+// requireWrite checks if the current user can write (create/edit/delete) DAGs.
+// Returns nil if auth is not enabled (authService is nil).
+func (a *API) requireWrite(ctx context.Context) error {
+	if a.authService == nil {
+		return nil // Auth not enabled, allow access
+	}
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return errors.New("not authenticated")
+	}
+	if !user.Role.CanWrite() {
+		return errors.New("write permission required (admin or manager role)")
+	}
+	return nil
+}
+
+// requireExecute checks if the current user can execute (run/stop) DAGs.
+// Returns nil if auth is not enabled (authService is nil).
+func (a *API) requireExecute(ctx context.Context) error {
+	if a.authService == nil {
+		return nil // Auth not enabled, allow access
+	}
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return errors.New("not authenticated")
+	}
+	if !user.Role.CanExecute() {
+		return errors.New("execute permission required (admin, manager, or operator role)")
 	}
 	return nil
 }
