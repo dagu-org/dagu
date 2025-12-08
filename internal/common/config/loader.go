@@ -266,6 +266,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.Paths.QueueDir = fileutil.ResolvePathOrBlank(def.Paths.QueueDir)
 		cfg.Paths.ProcDir = fileutil.ResolvePathOrBlank(def.Paths.ProcDir)
 		cfg.Paths.ServiceRegistryDir = fileutil.ResolvePathOrBlank(def.Paths.ServiceRegistryDir)
+		cfg.Paths.UsersDir = fileutil.ResolvePathOrBlank(def.Paths.UsersDir)
 	}
 
 	// Set UI configuration if provided.
@@ -427,6 +428,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 	if cfg.Paths.ServiceRegistryDir == "" {
 		cfg.Paths.ServiceRegistryDir = filepath.Join(cfg.Paths.DataDir, "service-registry")
+	}
+	if cfg.Paths.UsersDir == "" {
+		cfg.Paths.UsersDir = filepath.Join(cfg.Paths.DataDir, "users")
 	}
 
 	// Ensure the executable path is set.

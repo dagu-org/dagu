@@ -448,3 +448,61 @@ func TestService_ListUsers(t *testing.T) {
 		t.Errorf("ListUsers() returned %d users, want 3", len(users))
 	}
 }
+
+func TestService_ResetPassword(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create user
+	user, err := svc.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "oldpassword1",
+		Role:     auth.RoleEditor,
+	})
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+
+	// Reset password (admin action, doesn't require old password)
+	err = svc.ResetPassword(ctx, user.ID, "newpassword1")
+	if err != nil {
+		t.Fatalf("ResetPassword() error = %v", err)
+	}
+
+	// Verify old password no longer works
+	_, err = svc.Authenticate(ctx, "testuser", "oldpassword1")
+	if err != ErrInvalidCredentials {
+		t.Errorf("Authenticate() with old password should fail")
+	}
+
+	// Verify new password works
+	_, err = svc.Authenticate(ctx, "testuser", "newpassword1")
+	if err != nil {
+		t.Errorf("Authenticate() with new password error = %v", err)
+	}
+}
+
+func TestService_ResetPassword_WeakPassword(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create user
+	user, err := svc.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "password123",
+		Role:     auth.RoleViewer,
+	})
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+
+	// Try to reset with weak password
+	err = svc.ResetPassword(ctx, user.ID, "weak")
+	if err == nil {
+		t.Error("ResetPassword() with weak password should return error")
+	}
+}

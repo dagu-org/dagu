@@ -33,6 +33,10 @@ tags:
     description: "Prometheus-compatible metrics for monitoring Dagu operations"
   - name: "queues"
     description: "Operations for managing and monitoring execution queues"
+  - name: "auth"
+    description: "Authentication operations (login, logout, token management)"
+  - name: "users"
+    description: "User management operations (CRUD, password management)"
 
 paths:
   /health:
@@ -51,6 +55,385 @@ paths:
                 $ref: "#/components/schemas/HealthResponse"
         default:
           description: "Unexpected error"
+
+  # ============================================================================
+  # Authentication Endpoints
+  # ============================================================================
+
+  /auth/login:
+    post:
+      summary: "Authenticate user and obtain JWT token"
+      description: "Authenticates a user with username and password, returns a JWT token on success"
+      operationId: "login"
+      tags:
+        - "auth"
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: "Authentication successful"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: "Invalid credentials"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/me:
+    get:
+      summary: "Get current authenticated user"
+      description: "Returns information about the currently authenticated user"
+      operationId: "getCurrentUser"
+      tags:
+        - "auth"
+      responses:
+        "200":
+          description: "Current user information"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/change-password:
+    post:
+      summary: "Change current user's password"
+      description: "Allows the authenticated user to change their own password"
+      operationId: "changePassword"
+      tags:
+        - "auth"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: "Password changed successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: "Invalid request (e.g., weak password)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated or wrong current password"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ============================================================================
+  # User Management Endpoints (Admin only)
+  # ============================================================================
+
+  /users:
+    get:
+      summary: "List all users"
+      description: "Returns a list of all users. Requires admin role."
+      operationId: "listUsers"
+      tags:
+        - "users"
+      responses:
+        "200":
+          description: "List of users"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsersListResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create a new user"
+      description: "Creates a new user account. Requires admin role."
+      operationId: "createUser"
+      tags:
+        - "users"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: "User created successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          description: "Invalid request (e.g., weak password, invalid role)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict - username already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/{userId}:
+    get:
+      summary: "Get user by ID"
+      description: "Returns a specific user by their ID. Requires admin role."
+      operationId: "getUser"
+      tags:
+        - "users"
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: "User details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "User not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: "Update user"
+      description: "Updates a user's information. Requires admin role."
+      operationId: "updateUser"
+      tags:
+        - "users"
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: "User updated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "User not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict - username already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete user"
+      description: "Deletes a user account. Requires admin role. Cannot delete yourself."
+      operationId: "deleteUser"
+      tags:
+        - "users"
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: "User deleted successfully"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role or cannot delete self"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "User not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/{userId}/reset-password:
+    post:
+      summary: "Reset user's password"
+      description: "Resets a user's password to a new value. Requires admin role."
+      operationId: "resetUserPassword"
+      tags:
+        - "users"
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: "Password reset successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: "Invalid request (e.g., weak password)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "User not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /workers:
     get:
@@ -1673,6 +2056,15 @@ components:
         minimum: 1
         default: 1
 
+    UserId:
+      name: userId
+      in: path
+      description: unique identifier of the user
+      required: true
+      schema:
+        type: string
+        minLength: 1
+
     PerPage:
       name: perPage
       in: query
@@ -2869,6 +3261,168 @@ components:
       required:
         - timestamp
         - value
+
+    # ============================================================================
+    # Authentication & User Management Schemas
+    # ============================================================================
+
+    UserRole:
+      type: string
+      description: "User role determining access permissions"
+      enum:
+        - admin
+        - editor
+        - viewer
+
+    LoginRequest:
+      type: object
+      description: "Request body for user login"
+      properties:
+        username:
+          type: string
+          description: "User's username"
+          minLength: 1
+        password:
+          type: string
+          description: "User's password"
+          minLength: 1
+      required:
+        - username
+        - password
+
+    LoginResponse:
+      type: object
+      description: "Response containing authentication token"
+      properties:
+        token:
+          type: string
+          description: "JWT authentication token"
+        expiresAt:
+          type: string
+          format: date-time
+          description: "Token expiration timestamp"
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - token
+        - expiresAt
+        - user
+
+    ChangePasswordRequest:
+      type: object
+      description: "Request body for changing password"
+      properties:
+        currentPassword:
+          type: string
+          description: "Current password for verification"
+          minLength: 1
+        newPassword:
+          type: string
+          description: "New password to set"
+          minLength: 8
+      required:
+        - currentPassword
+        - newPassword
+
+    ResetPasswordRequest:
+      type: object
+      description: "Request body for admin password reset"
+      properties:
+        newPassword:
+          type: string
+          description: "New password to set for the user"
+          minLength: 8
+      required:
+        - newPassword
+
+    CreateUserRequest:
+      type: object
+      description: "Request body for creating a new user"
+      properties:
+        username:
+          type: string
+          description: "Unique username"
+          minLength: 1
+          maxLength: 64
+        password:
+          type: string
+          description: "User's password"
+          minLength: 8
+        role:
+          $ref: "#/components/schemas/UserRole"
+      required:
+        - username
+        - password
+        - role
+
+    UpdateUserRequest:
+      type: object
+      description: "Request body for updating a user"
+      properties:
+        username:
+          type: string
+          description: "New username (must be unique)"
+          minLength: 1
+          maxLength: 64
+        role:
+          $ref: "#/components/schemas/UserRole"
+
+    User:
+      type: object
+      description: "User information"
+      properties:
+        id:
+          type: string
+          description: "Unique user identifier"
+        username:
+          type: string
+          description: "User's username"
+        role:
+          $ref: "#/components/schemas/UserRole"
+        createdAt:
+          type: string
+          format: date-time
+          description: "Account creation timestamp"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "Last update timestamp"
+      required:
+        - id
+        - username
+        - role
+        - createdAt
+        - updatedAt
+
+    UserResponse:
+      type: object
+      description: "Response containing user information"
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - user
+
+    UsersListResponse:
+      type: object
+      description: "Response containing list of users"
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+      required:
+        - users
+
+    SuccessResponse:
+      type: object
+      description: "Generic success response"
+      properties:
+        message:
+          type: string
+          description: "Success message"
+      required:
+        - message
 
 # Apply security requirements globally
 security:

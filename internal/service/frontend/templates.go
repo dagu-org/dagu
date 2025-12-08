@@ -60,6 +60,7 @@ type funcsConfig struct {
 	RemoteNodes           []string
 	Permissions           map[config.Permission]bool
 	Paths                 config.PathsConfig
+	AuthMode              config.AuthMode
 }
 
 func defaultFunctions(cfg funcsConfig) template.FuncMap {
@@ -133,6 +134,9 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		},
 		"pathConfigFileUsed": func() string {
 			return cfg.Paths.ConfigFileUsed
+		},
+		"authMode": func() string {
+			return string(cfg.AuthMode)
 		},
 	}
 }

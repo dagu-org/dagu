@@ -20,7 +20,9 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/persistence/fileuser"
 	"github.com/dagu-org/dagu/internal/runtime"
+	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	apiv2 "github.com/dagu-org/dagu/internal/service/frontend/api/v2"
@@ -50,9 +52,24 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
 	}
+
+	// Build API options
+	var apiOpts []apiv2.APIOption
+
+	// Initialize auth service if builtin mode is enabled
+	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
+		authSvc, err := initBuiltinAuthService(cfg)
+		if err != nil {
+			// Log error but don't fail - auth service will be nil and endpoints will return 401
+			logger.Error(context.Background(), "Failed to initialize builtin auth service", tag.Error(err))
+		} else {
+			apiOpts = append(apiOpts, apiv2.WithAuthService(authSvc))
+		}
+	}
+
 	return &Server{
 		apiV1:  apiv1.New(dr, drs, drm, cfg),
-		apiV2:  apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs),
+		apiV2:  apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
 		config: cfg,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
@@ -65,8 +82,53 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 			RemoteNodes:           remoteNodes,
 			Permissions:           cfg.Server.Permissions,
 			Paths:                 cfg.Paths,
+			AuthMode:              cfg.Server.Auth.Mode,
 		},
 	}
+}
+
+// initBuiltinAuthService initializes the builtin authentication service.
+// It creates the file-based user store, auth service, and ensures a default admin exists.
+func initBuiltinAuthService(cfg *config.Config) (*authservice.Service, error) {
+	ctx := context.Background()
+
+	// Create file-based user store
+	userStore, err := fileuser.New(cfg.Paths.UsersDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user store: %w", err)
+	}
+
+	// Create auth service with configuration
+	authConfig := authservice.Config{
+		TokenSecret: cfg.Server.Auth.Builtin.Token.Secret,
+		TokenTTL:    cfg.Server.Auth.Builtin.Token.TTL,
+	}
+	authSvc := authservice.New(userStore, authConfig)
+
+	// Ensure default admin user exists
+	password, created, err := authSvc.EnsureDefaultAdmin(
+		ctx,
+		cfg.Server.Auth.Builtin.DefaultAdmin.Username,
+		cfg.Server.Auth.Builtin.DefaultAdmin.Password,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ensure default admin: %w", err)
+	}
+
+	if created {
+		if cfg.Server.Auth.Builtin.DefaultAdmin.Password == "" {
+			// Password was auto-generated, log it for the user
+			logger.Info(ctx, "Created default admin user",
+				slog.String("username", cfg.Server.Auth.Builtin.DefaultAdmin.Username),
+				slog.String("password", password),
+				slog.String("note", "Please change this password immediately"))
+		} else {
+			logger.Info(ctx, "Created default admin user",
+				slog.String("username", cfg.Server.Auth.Builtin.DefaultAdmin.Username))
+		}
+	}
+
+	return authSvc, nil
 }
 
 // Serve starts the HTTP server and configures routes

@@ -216,6 +216,7 @@ type PathsDef struct {
 	QueueDir           string `mapstructure:"queueDir"`
 	ProcDir            string `mapstructure:"procDir"`
 	ServiceRegistryDir string `mapstructure:"serviceRegistryDir"`
+	UsersDir           string `mapstructure:"usersDir"`
 }
 
 // UIDef holds the user interface configuration settings.

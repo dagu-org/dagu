@@ -184,6 +184,7 @@ func TestLoad_Env(t *testing.T) {
 			ProcDir:            filepath.Join(testPaths, "proc"),
 			QueueDir:           filepath.Join(testPaths, "queue"),
 			ServiceRegistryDir: filepath.Join(testPaths, "service-registry"),
+			UsersDir:           filepath.Join(testPaths, "data", "users"), // Derived from DataDir
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -413,6 +414,7 @@ scheduler:
 			ProcDir:            "/var/dagu/data/proc",
 			QueueDir:           "/var/dagu/data/queue",
 			ServiceRegistryDir: "/var/dagu/data/service-registry",
+			UsersDir:           "/var/dagu/data/users",
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -507,6 +509,7 @@ paths:
 	assert.Equal(t, "/custom/data/proc", cfg.Paths.ProcDir)
 	assert.Equal(t, "/custom/data/queue", cfg.Paths.QueueDir)
 	assert.Equal(t, "/custom/data/service-registry", cfg.Paths.ServiceRegistryDir)
+	assert.Equal(t, "/custom/data/users", cfg.Paths.UsersDir)
 }
 
 func TestLoad_EdgeCases_Errors(t *testing.T) {

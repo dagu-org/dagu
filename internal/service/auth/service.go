@@ -282,6 +282,30 @@ func (s *Service) ChangePassword(ctx context.Context, userID, oldPassword, newPa
 	return s.store.Update(ctx, user)
 }
 
+// ResetPassword allows an admin to reset a user's password without knowing the old password.
+func (s *Service) ResetPassword(ctx context.Context, userID, newPassword string) error {
+	user, err := s.store.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	// Validate new password
+	if err := s.validatePassword(newPassword); err != nil {
+		return err
+	}
+
+	// Hash new password
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), s.config.BcryptCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	user.PasswordHash = string(passwordHash)
+	user.UpdatedAt = time.Now().UTC()
+
+	return s.store.Update(ctx, user)
+}
+
 // EnsureDefaultAdmin creates the default admin user if no users exist.
 // Returns the generated password if a new admin was created.
 func (s *Service) EnsureDefaultAdmin(ctx context.Context, username, password string) (string, bool, error) {

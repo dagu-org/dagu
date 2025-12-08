@@ -15,11 +15,13 @@ import (
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/core/auth"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
+	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
-	"github.com/dagu-org/dagu/internal/service/frontend/auth"
+	frontendauth "github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -45,6 +47,33 @@ type API struct {
 	serviceRegistry    execution.ServiceRegistry
 	subCmdBuilder      *runtime.SubCmdBuilder
 	resourceService    *resource.Service
+	authService        AuthService
+}
+
+// AuthService defines the interface for authentication operations.
+// This allows the API to work with or without auth service being configured.
+type AuthService interface {
+	Authenticate(ctx context.Context, username, password string) (*auth.User, error)
+	GenerateToken(user *auth.User) (string, error)
+	ValidateToken(tokenString string) (*authservice.Claims, error)
+	GetUserFromToken(ctx context.Context, token string) (*auth.User, error)
+	CreateUser(ctx context.Context, input authservice.CreateUserInput) (*auth.User, error)
+	GetUser(ctx context.Context, id string) (*auth.User, error)
+	ListUsers(ctx context.Context) ([]*auth.User, error)
+	UpdateUser(ctx context.Context, id string, input authservice.UpdateUserInput) (*auth.User, error)
+	DeleteUser(ctx context.Context, id string, currentUserID string) error
+	ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error
+	ResetPassword(ctx context.Context, userID, newPassword string) error
+}
+
+// APIOption is a functional option for configuring the API.
+type APIOption func(*API)
+
+// WithAuthService sets the authentication service for the API.
+func WithAuthService(as AuthService) APIOption {
+	return func(a *API) {
+		a.authService = as
+	}
 }
 
 // New constructs an API instance wired with the provided DAG, DAG-run, queue and proc stores,
@@ -62,13 +91,14 @@ func New(
 	sr execution.ServiceRegistry,
 	mr *prometheus.Registry,
 	rs *resource.Service,
+	opts ...APIOption,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes[n.Name] = n
 	}
 
-	return &API{
+	a := &API{
 		dagStore:           dr,
 		dagRunStore:        drs,
 		queueStore:         qs,
@@ -84,6 +114,12 @@ func New(
 		metricsRegistry:    mr,
 		resourceService:    rs,
 	}
+
+	for _, opt := range opts {
+		opt(a)
+	}
+
+	return a
 }
 
 func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string) error {
@@ -150,7 +186,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	} else {
 		authConfig = evaluatedAuth
 	}
-	authOptions := auth.Options{
+	authOptions := frontendauth.Options{
 		Realm:            "restricted",
 		APITokenEnabled:  authConfig.Token.Value != "",
 		APIToken:         authConfig.Token.Value,
@@ -159,13 +195,14 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		PublicPaths: []string{
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/health"),
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/metrics"),
+			pathutil.BuildPublicEndpointPath(basePath, "api/v2/auth/login"),
 		},
 	}
 
 	// Initialize OIDC if enabled
 	authOIDC := authConfig.OIDC
 	if authOIDC.ClientId != "" && authOIDC.ClientSecret != "" && authOIDC.Issuer != "" {
-		oidcCfg, err := auth.InitVerifierAndConfig(authOIDC)
+		oidcCfg, err := frontendauth.InitVerifierAndConfig(authOIDC)
 		if err != nil {
 			return fmt.Errorf("failed to initialize OIDC: %w", err)
 		}
@@ -177,7 +214,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Use(auth.Middleware(authOptions))
+		r.Use(frontendauth.Middleware(authOptions))
 		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
 
 		handler := api.NewStrictHandlerWithOptions(a, nil, options)
