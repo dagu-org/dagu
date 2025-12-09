@@ -176,6 +176,10 @@ func (s *Service) GetUserFromToken(ctx context.Context, tokenString string) (*au
 
 	user, err := s.store.GetByID(ctx, claims.UserID)
 	if err != nil {
+		// If user was deleted after token was issued, treat as invalid token
+		if errors.Is(err, auth.ErrUserNotFound) || errors.Is(err, auth.ErrInvalidUserID) {
+			return nil, ErrInvalidToken
+		}
 		return nil, fmt.Errorf("failed to get user from token: %w", err)
 	}
 

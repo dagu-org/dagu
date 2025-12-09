@@ -81,6 +81,12 @@ func (a *API) CreateUser(ctx context.Context, request api.CreateUserRequestObjec
 				Message: "Username already exists",
 			}, nil
 		}
+		if errors.Is(err, auth.ErrInvalidUsername) {
+			return api.CreateUser400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: "Invalid username",
+			}, nil
+		}
 		if errors.Is(err, authservice.ErrWeakPassword) {
 			return api.CreateUser400JSONResponse{
 				Code:    api.ErrorCodeBadRequest,
