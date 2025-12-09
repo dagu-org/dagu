@@ -26,23 +26,23 @@ const (
 	ServiceNone Service = iota
 
 	// ServiceServer is the web UI server service.
-	// Requires: Global, Server, Paths, UI, Queues, Coordinator, Monitoring
+	// Requires: Core, Server, Paths, UI, Queues, Coordinator, Monitoring
 	ServiceServer
 
 	// ServiceScheduler is the scheduler service for automated DAG execution.
-	// Requires: Global, Paths, Scheduler, Queues, Coordinator
+	// Requires: Core, Paths, Scheduler, Queues, Coordinator
 	ServiceScheduler
 
 	// ServiceWorker is the worker service that polls the coordinator for tasks.
-	// Requires: Global, Paths, Worker, Coordinator (peer config)
+	// Requires: Core, Paths, Worker, Coordinator (peer config)
 	ServiceWorker
 
 	// ServiceCoordinator is the coordinator gRPC server for distributed execution.
-	// Requires: Global, Paths, Coordinator
+	// Requires: Core, Paths, Coordinator
 	ServiceCoordinator
 
 	// ServiceAgent is for the agent executor (runs DAGs).
-	// Requires: Global, Paths (minimal config)
+	// Requires: Core, Paths (minimal config)
 	ServiceAgent
 )
 
@@ -87,13 +87,13 @@ type ConfigSection uint16
 
 const (
 	SectionNone        ConfigSection = 0
-	SectionServer      ConfigSection = 1 << iota // 1
-	SectionScheduler                             // 2
-	SectionWorker                                // 4
-	SectionCoordinator                           // 8
-	SectionUI                                    // 16
-	SectionQueues                                // 32
-	SectionMonitoring                            // 64
+	SectionServer      ConfigSection = 1 << iota // 2
+	SectionScheduler                             // 4
+	SectionWorker                                // 8
+	SectionCoordinator                           // 16
+	SectionUI                                    // 32
+	SectionQueues                                // 64
+	SectionMonitoring                            // 128
 
 	// SectionAll combines all sections (useful for ServiceNone/CLI)
 	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring
@@ -415,15 +415,32 @@ func (l *ConfigLoader) validateServerConfig(cfg *Config) error {
 
 // loadUIConfig loads the UI configuration.
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
+	// Apply defaults from viper (these include the configured defaults)
+	cfg.UI.MaxDashboardPageLimit = l.v.GetInt("ui.maxDashboardPageLimit")
+	cfg.UI.NavbarTitle = l.v.GetString("ui.navbarTitle")
+	cfg.UI.LogEncodingCharset = l.v.GetString("ui.logEncodingCharset")
+	cfg.UI.DAGs.SortField = l.v.GetString("ui.dags.sortField")
+	cfg.UI.DAGs.SortOrder = l.v.GetString("ui.dags.sortOrder")
+
 	if def.UI != nil {
 		cfg.UI.NavbarColor = def.UI.NavbarColor
-		cfg.UI.NavbarTitle = def.UI.NavbarTitle
-		cfg.UI.MaxDashboardPageLimit = def.UI.MaxDashboardPageLimit
-		cfg.UI.LogEncodingCharset = def.UI.LogEncodingCharset
+		if def.UI.NavbarTitle != "" {
+			cfg.UI.NavbarTitle = def.UI.NavbarTitle
+		}
+		if def.UI.MaxDashboardPageLimit > 0 {
+			cfg.UI.MaxDashboardPageLimit = def.UI.MaxDashboardPageLimit
+		}
+		if def.UI.LogEncodingCharset != "" {
+			cfg.UI.LogEncodingCharset = def.UI.LogEncodingCharset
+		}
 
 		if def.UI.DAGs != nil {
-			cfg.UI.DAGs.SortField = def.UI.DAGs.SortField
-			cfg.UI.DAGs.SortOrder = def.UI.DAGs.SortOrder
+			if def.UI.DAGs.SortField != "" {
+				cfg.UI.DAGs.SortField = def.UI.DAGs.SortField
+			}
+			if def.UI.DAGs.SortOrder != "" {
+				cfg.UI.DAGs.SortOrder = def.UI.DAGs.SortOrder
+			}
 		}
 	}
 }

@@ -92,9 +92,6 @@ func (e Env) UserEnvsMap() map[string]string {
 		if !found {
 			continue
 		}
-		if _, exists := result[key]; exists {
-			continue
-		}
 		result[key] = value
 	}
 
