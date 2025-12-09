@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core/auth"
+	"github.com/dagu-org/dagu/internal/auth"
 )
 
 func TestStore_CRUD(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/core/auth"
+	"github.com/dagu-org/dagu/internal/auth"
 )
 
 // TokenValidator defines the interface for validating tokens and retrieving users.

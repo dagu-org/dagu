@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/core/auth"
+	"github.com/dagu-org/dagu/internal/auth"
 )
 
 const (

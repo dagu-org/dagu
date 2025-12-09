@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	"github.com/dagu-org/dagu/api/v2"
-	"github.com/dagu-org/dagu/internal/core/auth"
+	"github.com/dagu-org/dagu/internal/auth"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 )
 

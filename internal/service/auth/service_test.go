@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core/auth"
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/persistence/fileuser"
 )
 
