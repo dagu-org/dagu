@@ -66,6 +66,7 @@ func shouldEnableProgress(ctx *Context) bool {
 		isTerminal(os.Stderr)
 }
 
+// configureLoggerForProgress sets up the logger for progress display. It enables debug mode when ctx.Config.Core.Debug
 // is true, applies ctx.Config.Core.LogFormat when set, and directs output to logFile when provided.
 func configureLoggerForProgress(ctx *Context, logFile *os.File) {
 	var opts []logger.Option

@@ -9,7 +9,8 @@ import (
 type KeyValue string
 
 // NewKeyValue constructs a KeyValue by concatenating key and value with an '=' separator.
-// Neither key nor value are validated; an empty value produces a trailing '=' and any '=' characters in key or value are preserved.
+// The key must not contain '=' characters to ensure round-trip correctness with Key() and Value().
+// An empty value produces a trailing '=' (e.g., "KEY=").
 func NewKeyValue(key, value string) KeyValue {
 	return KeyValue(key + "=" + value)
 }
@@ -52,16 +53,14 @@ func (kv *KeyValue) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// KeyValuesToMap converts a slice of "KEY=VALUE" strings to a map.
-// Only entries with valid "KEY=VALUE" format (containing exactly one '=' with non-empty key) are included.
-// Values can be empty (e.g., "KEY=" results in map["KEY"] = "").
 // KeyValuesToMap converts a slice of "KEY=VALUE" strings into a map of keys to values.
-// It splits each entry at the first '='; entries without '=' are skipped and values may be empty (for example, "KEY=").
+// It splits each entry at the first '='; entries without '=' or with empty keys are skipped.
+// Values may be empty (for example, "KEY=" results in map["KEY"] = "").
 func KeyValuesToMap(kvSlice []string) map[string]string {
 	result := make(map[string]string, len(kvSlice))
 	for _, kv := range kvSlice {
 		key, value, found := strings.Cut(kv, "=")
-		if found {
+		if found && key != "" {
 			result[key] = value
 		}
 	}
