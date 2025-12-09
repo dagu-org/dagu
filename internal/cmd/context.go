@@ -105,6 +105,9 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		configLoaderOpts = append(configLoaderOpts, config.WithConfigFile(cfgPath))
 	}
 
+	// Set service type based on command to load only necessary config sections
+	configLoaderOpts = append(configLoaderOpts, config.WithService(serviceForCommand(cmd.Name())))
+
 	loader := config.NewConfigLoader(v, configLoaderOpts...)
 	cfg, err := loader.Load()
 	if err != nil {
@@ -173,6 +176,26 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		QueueStore:      qs,
 		ServiceRegistry: sm,
 	}, nil
+}
+
+// serviceForCommand returns the appropriate config.Service type for a given command name.
+// This enables loading only the necessary configuration sections for each command.
+func serviceForCommand(cmdName string) config.Service {
+	switch cmdName {
+	case "server":
+		return config.ServiceServer
+	case "scheduler":
+		return config.ServiceScheduler
+	case "worker":
+		return config.ServiceWorker
+	case "coordinator":
+		return config.ServiceCoordinator
+	case "start", "restart", "retry", "dry", "exec":
+		return config.ServiceAgent
+	default:
+		// For all other commands (status, stop, validate, etc.), load all config
+		return config.ServiceNone
+	}
 }
 
 // NewServer creates and returns a new web UI NewServer.
