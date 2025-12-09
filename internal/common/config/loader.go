@@ -250,6 +250,16 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.Server.Auth.Builtin.Admin.Username = "admin"
 	}
 
+	// Auto-detect auth mode if not explicitly set
+	// If OIDC is configured (clientId, clientSecret, and issuer are set), default to OIDC mode
+	if cfg.Server.Auth.Mode == "" {
+		oidc := cfg.Server.Auth.OIDC
+		if oidc.ClientId != "" && oidc.ClientSecret != "" && oidc.Issuer != "" {
+			cfg.Server.Auth.Mode = AuthModeOIDC
+			l.warnings = append(l.warnings, fmt.Sprintf("Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: %s)", oidc.Issuer))
+		}
+	}
+
 	// Normalize the BasePath value for proper URL construction.
 	cfg.Server.BasePath = cleanServerBasePath(cfg.Server.BasePath)
 

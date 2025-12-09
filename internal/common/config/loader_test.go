@@ -151,6 +151,7 @@ func TestLoad_Env(t *testing.T) {
 			APIBasePath: "/test/api",
 			Headless:    true,
 			Auth: Auth{
+				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
 				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
 				Token: AuthToken{Value: "test-token-123"},
 				OIDC: AuthOIDC{
@@ -216,6 +217,7 @@ func TestLoad_Env(t *testing.T) {
 			Retention: 24 * time.Hour,
 			Interval:  5 * time.Second,
 		},
+		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -361,6 +363,7 @@ scheduler:
 			Headless:          true,
 			LatestStatusToday: true,
 			Auth: Auth{
+				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
 				Basic: AuthBasic{Username: "admin", Password: "secret"},
 				Token: AuthToken{Value: "api-token"},
 				OIDC: AuthOIDC{
@@ -455,6 +458,7 @@ scheduler:
 			Retention: 24 * time.Hour,
 			Interval:  5 * time.Second,
 		},
+		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://accounts.example.com)"},
 	}
 
 	assert.Equal(t, expected, cfg)
