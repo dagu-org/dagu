@@ -82,47 +82,40 @@ func WithService(service Service) ConfigLoaderOption {
 	}
 }
 
-// configRequirements defines which configuration sections are needed by a service.
-type configRequirements struct {
-	server      bool
-	scheduler   bool
-	worker      bool
-	coordinator bool
-	ui          bool
-	queues      bool
-	monitoring  bool
+// ConfigSection represents a specific section of the configuration using bit flags.
+type ConfigSection uint16
+
+const (
+	SectionNone        ConfigSection = 0
+	SectionServer      ConfigSection = 1 << iota // 1
+	SectionScheduler                             // 2
+	SectionWorker                                // 4
+	SectionCoordinator                           // 8
+	SectionUI                                    // 16
+	SectionQueues                                // 32
+	SectionMonitoring                            // 64
+
+	// SectionAll combines all sections (useful for ServiceNone/CLI)
+	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring
+)
+
+// serviceRequirements maps services to their required config sections using bitwise OR.
+var serviceRequirements = map[Service]ConfigSection{
+	ServiceNone:        SectionAll,
+	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring,
+	ServiceScheduler:   SectionScheduler | SectionCoordinator | SectionQueues,
+	ServiceWorker:      SectionWorker | SectionCoordinator,
+	ServiceCoordinator: SectionCoordinator,
+	ServiceAgent:       SectionNone, // Only core/paths are loaded by default
 }
 
-// serviceRequirements maps each service type to its required configuration sections.
-// This provides a clear, declarative definition of what each service needs.
-var serviceRequirements = map[Service]configRequirements{
-	ServiceNone: {
-		server: true, scheduler: true, worker: true, coordinator: true,
-		ui: true, queues: true, monitoring: true,
-	},
-	ServiceServer: {
-		server: true, coordinator: true, ui: true, queues: true, monitoring: true,
-	},
-	ServiceScheduler: {
-		scheduler: true, coordinator: true, queues: true,
-	},
-	ServiceWorker: {
-		worker: true, coordinator: true,
-	},
-	ServiceCoordinator: {
-		coordinator: true,
-	},
-	ServiceAgent: {
-		// Minimal config
-	},
-}
-
-// requirements returns the configuration requirements for the loader's service type.
-func (l *ConfigLoader) requirements() configRequirements {
-	if req, ok := serviceRequirements[l.service]; ok {
-		return req
+// requires checks if the loader's service requires the given config section.
+func (l *ConfigLoader) requires(section ConfigSection) bool {
+	req, ok := serviceRequirements[l.service]
+	if !ok {
+		req = SectionAll
 	}
-	return serviceRequirements[ServiceNone]
+	return req&section != 0
 }
 
 // NewConfigLoader creates a new ConfigLoader instance with an isolated viper instance
@@ -196,7 +189,6 @@ func (l *ConfigLoader) Load() (*Config, error) {
 // It uses the service requirements to load only necessary configuration sections.
 func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	var cfg Config
-	req := l.requirements()
 
 	// Always load core and paths configuration
 	if err := l.loadCoreConfig(&cfg, def); err != nil {
@@ -204,43 +196,43 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 	l.loadPathsConfig(&cfg, def)
 
-	// Load service-specific configuration grouped by requirement
-	if req.server {
+	// Load service-specific configuration based on requirements
+	if l.requires(SectionServer) {
 		l.loadServerConfig(&cfg, def)
 	}
-	if req.ui {
+	if l.requires(SectionUI) {
 		l.loadUIConfig(&cfg, def)
 	}
-	if req.queues {
+	if l.requires(SectionQueues) {
 		l.loadQueuesConfig(&cfg, def)
 	}
-	if req.coordinator {
+	if l.requires(SectionCoordinator) {
 		l.loadCoordinatorConfig(&cfg, def)
 	}
-	if req.worker {
+	if l.requires(SectionWorker) {
 		l.loadWorkerConfig(&cfg, def)
 	}
-	if req.scheduler {
+	if l.requires(SectionScheduler) {
 		l.loadSchedulerConfig(&cfg, def)
 	}
-	if req.monitoring {
+	if l.requires(SectionMonitoring) {
 		l.loadMonitoringConfig(&cfg, def)
 	}
 
 	// Incorporate legacy field values and environment variable overrides
-	l.loadLegacyFields(&cfg, def, req)
-	l.loadLegacyEnv(&cfg, req)
+	l.LoadLegacyFields(&cfg, def)
+	l.loadLegacyEnv(&cfg)
 
 	// Finalize paths (set derived paths based on DataDir)
 	l.finalizePaths(&cfg)
 
 	// Validate configuration
-	if req.server {
+	if l.requires(SectionServer) {
 		if err := l.validateServerConfig(&cfg); err != nil {
 			return nil, err
 		}
 	}
-	if req.ui {
+	if l.requires(SectionUI) {
 		if err := l.validateUIConfig(&cfg); err != nil {
 			return nil, err
 		}
@@ -604,17 +596,10 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 
 // LoadLegacyFields copies values from legacy configuration fields into the current Config structure.
 // Legacy fields are only applied if they are non-empty or non-zero, and may override the new settings.
-// This public method loads all legacy fields without service filtering (for backward compatibility).
-func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
-	l.loadLegacyFields(cfg, def, serviceRequirements[ServiceNone])
-}
-
-// loadLegacyFields copies values from legacy configuration fields into the current Config structure.
-// Legacy fields are only applied if they are non-empty or non-zero, and may override the new settings.
 // It respects the service requirements to only apply relevant legacy fields.
-func (l *ConfigLoader) loadLegacyFields(cfg *Config, def Definition, req configRequirements) {
+func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
 	// Server-related legacy fields
-	if req.server {
+	if l.requires(SectionServer) {
 		if def.BasicAuthUsername != "" {
 			cfg.Server.Auth.Basic.Username = def.BasicAuthUsername
 		}
@@ -656,7 +641,7 @@ func (l *ConfigLoader) loadLegacyFields(cfg *Config, def Definition, req configR
 	}
 
 	// UI-related legacy fields
-	if req.ui {
+	if l.requires(SectionUI) {
 		if def.LogEncodingCharset != "" {
 			cfg.UI.LogEncodingCharset = def.LogEncodingCharset
 		}
@@ -675,24 +660,23 @@ func (l *ConfigLoader) loadLegacyFields(cfg *Config, def Definition, req configR
 // loadLegacyEnv maps legacy environment variables to their new counterparts in the configuration.
 // If a legacy env var is set, a warning is logged and the corresponding setter function is called.
 // It respects the service requirements to only apply relevant legacy environment variables.
-func (l *ConfigLoader) loadLegacyEnv(cfg *Config, req configRequirements) {
+func (l *ConfigLoader) loadLegacyEnv(cfg *Config) {
 	type legacyEnvMapping struct {
-		newKey     string
-		setter     func(*Config, string)
-		requiresUI bool
-		requiresSv bool
+		newKey   string
+		setter   func(*Config, string)
+		requires ConfigSection
 	}
 
 	legacyEnvs := map[string]legacyEnvMapping{
 		"DAGU__ADMIN_NAVBAR_COLOR": {
-			newKey:     "DAGU_NAVBAR_COLOR",
-			setter:     func(c *Config, v string) { c.UI.NavbarColor = v },
-			requiresUI: true,
+			newKey:   "DAGU_NAVBAR_COLOR",
+			setter:   func(c *Config, v string) { c.UI.NavbarColor = v },
+			requires: SectionUI,
 		},
 		"DAGU__ADMIN_NAVBAR_TITLE": {
-			newKey:     "DAGU_NAVBAR_TITLE",
-			setter:     func(c *Config, v string) { c.UI.NavbarTitle = v },
-			requiresUI: true,
+			newKey:   "DAGU_NAVBAR_TITLE",
+			setter:   func(c *Config, v string) { c.UI.NavbarTitle = v },
+			requires: SectionUI,
 		},
 		"DAGU__ADMIN_PORT": {
 			newKey: "DAGU_PORT",
@@ -701,34 +685,34 @@ func (l *ConfigLoader) loadLegacyEnv(cfg *Config, req configRequirements) {
 					c.Server.Port = i
 				}
 			},
-			requiresSv: true,
+			requires: SectionServer,
 		},
 		"DAGU__ADMIN_HOST": {
-			newKey:     "DAGU_HOST",
-			setter:     func(c *Config, v string) { c.Server.Host = v },
-			requiresSv: true,
+			newKey:   "DAGU_HOST",
+			setter:   func(c *Config, v string) { c.Server.Host = v },
+			requires: SectionServer,
 		},
 		"DAGU__DATA": {
-			newKey: "DAGU_DATA_DIR",
-			setter: func(c *Config, v string) { c.Paths.DataDir = v },
+			newKey:   "DAGU_DATA_DIR",
+			setter:   func(c *Config, v string) { c.Paths.DataDir = v },
+			requires: SectionNone, // Always applies
 		},
 		"DAGU__SUSPEND_FLAGS_DIR": {
-			newKey: "DAGU_SUSPEND_FLAGS_DIR",
-			setter: func(c *Config, v string) { c.Paths.SuspendFlagsDir = v },
+			newKey:   "DAGU_SUSPEND_FLAGS_DIR",
+			setter:   func(c *Config, v string) { c.Paths.SuspendFlagsDir = v },
+			requires: SectionNone, // Always applies
 		},
 		"DAGU__ADMIN_LOGS_DIR": {
-			newKey: "DAGU_ADMIN_LOG_DIR",
-			setter: func(c *Config, v string) { c.Paths.AdminLogsDir = v },
+			newKey:   "DAGU_ADMIN_LOG_DIR",
+			setter:   func(c *Config, v string) { c.Paths.AdminLogsDir = v },
+			requires: SectionNone, // Always applies
 		},
 	}
 
 	// For each legacy variable, if it is set and requirements are met, apply it.
 	for oldKey, mapping := range legacyEnvs {
-		// Skip if requirements not met
-		if mapping.requiresUI && !req.ui {
-			continue
-		}
-		if mapping.requiresSv && !req.server {
+		// Skip if requirements not met (SectionNone always passes)
+		if mapping.requires != SectionNone && !l.requires(mapping.requires) {
 			continue
 		}
 

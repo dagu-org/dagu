@@ -49,6 +49,7 @@ type MonitoringConfig struct {
 	Interval time.Duration
 }
 
+// Core contains global configuration settings.
 type Core struct {
 	// Debug toggles debug mode; when true, the application may output extra logs and error details.
 	Debug bool
