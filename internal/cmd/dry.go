@@ -35,6 +35,10 @@ Example:
 
 var dryFlags = []commandLineFlag{paramsFlag, nameFlag}
 
+// runDry executes a dry-run simulation of the DAG named by args[0] using ctx for configuration, logging, and services.
+// It loads the DAG with any name override or parameters provided via flags or arguments, generates a dag-run ID,
+// initializes a log file for the run, creates an agent configured for dry mode, runs the agent to simulate execution,
+// and prints a summary. Any error encountered during these steps is returned.
 func runDry(ctx *Context, args []string) error {
 	loadOpts := []spec.LoadOption{
 		spec.WithBaseConfig(ctx.Config.Paths.BaseConfig),
@@ -99,7 +103,7 @@ func runDry(ctx *Context, args []string) error {
 		ctx.DAGRunStore,
 		ctx.ServiceRegistry,
 		root,
-		ctx.Config.Global.Peer,
+		ctx.Config.Core.Peer,
 		agent.Options{Dry: true},
 	)
 

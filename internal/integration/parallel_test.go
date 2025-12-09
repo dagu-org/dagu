@@ -967,11 +967,11 @@ type parallelResultsPayload struct {
 
 func parseParallelResults(t *testing.T, raw string) parallelResultsPayload {
 	t.Helper()
-	parts := strings.SplitN(raw, "=", 2)
-	require.Len(t, parts, 2, "expected key=value output format")
+	_, value, found := strings.Cut(raw, "=")
+	require.True(t, found, "expected key=value output format")
 
 	var payload parallelResultsPayload
-	require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(parts[1])), &payload))
+	require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(value)), &payload))
 	return payload
 }
 

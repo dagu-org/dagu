@@ -41,9 +41,9 @@ func (o *dbClient) GetSubDAGRunStatus(ctx context.Context, dagRunID string, root
 		if node.OutputVariables != nil {
 			node.OutputVariables.Range(func(_, value any) bool {
 				// split the value by '=' to get the key and value
-				parts := strings.SplitN(value.(string), "=", 2)
-				if len(parts) == 2 {
-					outputVariables[parts[0]] = parts[1]
+				key, val, found := strings.Cut(value.(string), "=")
+				if found {
+					outputVariables[key] = val
 				}
 				return true
 			})

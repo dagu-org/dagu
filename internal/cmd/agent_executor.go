@@ -66,15 +66,16 @@ func shouldEnableProgress(ctx *Context) bool {
 		isTerminal(os.Stderr)
 }
 
-// configureLoggerForProgress temporarily suppresses stderr logging to prevent UI flicker
+// configureLoggerForProgress sets up the logger for progress display. It enables debug mode when ctx.Config.Core.Debug
+// is true, applies ctx.Config.Core.LogFormat when set, and directs output to logFile when provided.
 func configureLoggerForProgress(ctx *Context, logFile *os.File) {
 	var opts []logger.Option
-	if ctx.Config.Global.Debug {
+	if ctx.Config.Core.Debug {
 		opts = append(opts, logger.WithDebug())
 	}
 	opts = append(opts, logger.WithQuiet()) // Suppress stderr output
-	if ctx.Config.Global.LogFormat != "" {
-		opts = append(opts, logger.WithFormat(ctx.Config.Global.LogFormat))
+	if ctx.Config.Core.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(ctx.Config.Core.LogFormat))
 	}
 	if logFile != nil {
 		opts = append(opts, logger.WithWriter(logFile))

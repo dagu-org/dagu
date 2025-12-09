@@ -137,6 +137,10 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
+// executeRetry prepares and runs a retry of a DAG run by opening the original run's log,
+// loading the DAG environment, initializing the DAG store, creating an agent configured
+// for retry (including step-level retry if provided), and invoking the shared agent executor.
+// It returns an error if any setup step fails or if the agent execution fails.
 func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, rootRun execution.DAGRunRef, stepName string) error {
 	// Set step context if specified
 	if stepName != "" {
@@ -173,7 +177,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, r
 		ctx.DAGRunStore,
 		ctx.ServiceRegistry,
 		rootRun,
-		ctx.Config.Global.Peer,
+		ctx.Config.Core.Peer,
 		agent.Options{
 			RetryTarget:     status,
 			ParentDAGRun:    status.Parent,

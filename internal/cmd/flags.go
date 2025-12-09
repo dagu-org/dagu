@@ -276,6 +276,9 @@ type commandLineFlag struct {
 	bindViper                            bool
 }
 
+// initFlags registers a set of CLI flags on the provided Cobra command.
+// It always includes the base flags (config, dagu-home, quiet, cpu-profile) and then the provided additionalFlags.
+// Boolean flags are registered as boolean flags and others as string flags with their default values, and any flag marked required will be recorded as required.
 func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 	flags := append([]commandLineFlag{configFlag, daguHomeFlag, quietFlag, cpuProfileFlag}, additionalFlags...)
 
@@ -291,7 +294,11 @@ func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 	}
 }
 
-func bindFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
+// bindFlags binds command-line flags to the provided Viper instance for configuration lookup.
+// It binds only flags whose `bindViper` field is true, using the camel-cased key produced
+// from each flag's kebab-case name. Binding is performed while holding the config package's
+// Viper lock to ensure thread-safe registration.
+func bindFlags(viper *viper.Viper, cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 	flags := append([]commandLineFlag{configFlag}, additionalFlags...)
 
 	config.WithViperLock(func() {

@@ -8,10 +8,37 @@ import (
 )
 
 func TestKeyValue(t *testing.T) {
+	t.Parallel()
+
 	t.Run("NewKeyValue", func(t *testing.T) {
+		t.Parallel()
 		kv := stringutil.NewKeyValue("foo", "bar")
 		if kv.String() != "foo=bar" {
 			t.Errorf("NewKeyValue() = %v, want %v", kv.String(), "foo=bar")
+		}
+	})
+
+	t.Run("NewKeyValueWithValueContainingEquals", func(t *testing.T) {
+		t.Parallel()
+		kv := stringutil.NewKeyValue("key", "value=with=equals")
+		if kv.Key() != "key" {
+			t.Errorf("Key() = %v, want %v", kv.Key(), "key")
+		}
+		if kv.Value() != "value=with=equals" {
+			t.Errorf("Value() = %v, want %v", kv.Value(), "value=with=equals")
+		}
+	})
+
+	t.Run("RoundTrip", func(t *testing.T) {
+		t.Parallel()
+		key := "testkey"
+		value := "testvalue"
+		kv := stringutil.NewKeyValue(key, value)
+		if kv.Key() != key {
+			t.Errorf("Round-trip Key() = %v, want %v", kv.Key(), key)
+		}
+		if kv.Value() != value {
+			t.Errorf("Round-trip Value() = %v, want %v", kv.Value(), value)
 		}
 	})
 
@@ -89,6 +116,7 @@ func TestKeyValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tt.input.Key(); got != tt.wantKey {
 				t.Errorf("KeyValue.Key() = %v, want %v", got, tt.wantKey)
 			}
@@ -106,6 +134,8 @@ func TestKeyValue(t *testing.T) {
 }
 
 func TestKeyValueJSON(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		input   stringutil.KeyValue
@@ -140,6 +170,7 @@ func TestKeyValueJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Test MarshalJSON
 			got, err := json.Marshal(tt.input)
 			if (err != nil) != tt.wantErr {
@@ -165,6 +196,7 @@ func TestKeyValueJSON(t *testing.T) {
 
 	// Test UnmarshalJSON with invalid JSON
 	t.Run("InvalidJson", func(t *testing.T) {
+		t.Parallel()
 		var kv stringutil.KeyValue
 		err := json.Unmarshal([]byte(`{invalid`), &kv)
 		if err == nil {
@@ -174,6 +206,8 @@ func TestKeyValueJSON(t *testing.T) {
 }
 
 func TestKeyValuesToMap(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		input []string
@@ -256,6 +290,7 @@ func TestKeyValuesToMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := stringutil.KeyValuesToMap(tt.input)
 			if len(got) != len(tt.want) {
 				t.Errorf("KeyValuesToMap() length = %v, want %v", len(got), len(tt.want))

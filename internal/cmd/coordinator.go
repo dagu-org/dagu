@@ -100,7 +100,15 @@ func runCoordinator(ctx *Context, _ []string) error {
 }
 
 // newCoordinator creates a new Coordinator service instance.
-// It sets up a gRPC server and listener for distributed task coordination.
+// newCoordinator creates and configures a Coordinator service with its gRPC server,
+// health server, network listener, and handler, ready for registration in the service registry.
+// It derives an instance ID from the host name and configured port and determines an
+// advertise address (using cfg.Coordinator.Advertise, auto-detected hostname, or a
+// configured host fallback); a warning is logged when the fallback address may be
+// unsuitable for discovery. If peer TLS certificate and key files are provided in
+// cfg.Core.Peer, it loads TLS credentials for the gRPC server. It binds a TCP listener
+// to cfg.Coordinator.Host:cfg.Coordinator.Port and returns an initialized coordinator.Service.
+// It returns an error if any part of setup (TLS loading, listener binding, etc.) fails.
 func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.ServiceRegistry) (*coordinator.Service, error) {
 	// Generate instance ID
 	hostname, err := os.Hostname()
@@ -143,12 +151,12 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.
 	var serverOpts []grpc.ServerOption
 
 	// Configure TLS using global peer config
-	if cfg.Global.Peer.CertFile != "" && cfg.Global.Peer.KeyFile != "" {
+	if cfg.Core.Peer.CertFile != "" && cfg.Core.Peer.KeyFile != "" {
 		// Load server certificates
 		creds, err := loadCoordinatorTLSCredentials(&config.TLSConfig{
-			CertFile: cfg.Global.Peer.CertFile,
-			KeyFile:  cfg.Global.Peer.KeyFile,
-			CAFile:   cfg.Global.Peer.ClientCaFile,
+			CertFile: cfg.Core.Peer.CertFile,
+			KeyFile:  cfg.Core.Peer.KeyFile,
+			CAFile:   cfg.Core.Peer.ClientCaFile,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to load TLS credentials: %w", err)

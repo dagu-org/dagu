@@ -368,13 +368,13 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 				env.Variables.Store("KEY", "KEY=variable")
 
 				envCtx := runtime.WithEnv(ctx, env)
-				parts := strings.SplitN(step.Env[0], "=", 2)
-				evaluated, err := env.EvalString(envCtx, parts[1])
+				key, value, _ := strings.Cut(step.Env[0], "=")
+				evaluated, err := env.EvalString(envCtx, value)
 				if err != nil {
 					panic(fmt.Sprintf("failed to evaluate step env: %v", err))
 				}
 				vars := &collections.SyncMap{}
-				vars.Store(parts[0], fmt.Sprintf("%s=%s", parts[0], evaluated))
+				vars.Store(key, fmt.Sprintf("%s=%s", key, evaluated))
 				env.ForceLoadOutputVariables(vars)
 
 				return envCtx, env
@@ -396,14 +396,14 @@ func TestEnv_UserEnvsMap(t *testing.T) {
 				env := runtime.NewEnv(ctx, step)
 
 				envCtx := runtime.WithEnv(ctx, env)
-				parts := strings.SplitN(step.Env[0], "=", 2)
-				evaluated, err := env.EvalString(envCtx, parts[1])
+				key, value, _ := strings.Cut(step.Env[0], "=")
+				evaluated, err := env.EvalString(envCtx, value)
 				if err != nil {
 					panic(fmt.Sprintf("failed to evaluate step env: %v", err))
 				}
 
 				vars := &collections.SyncMap{}
-				vars.Store(parts[0], fmt.Sprintf("%s=%s", parts[0], evaluated))
+				vars.Store(key, fmt.Sprintf("%s=%s", key, evaluated))
 				env.ForceLoadOutputVariables(vars)
 
 				return envCtx, env

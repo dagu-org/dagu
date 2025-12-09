@@ -47,7 +47,13 @@ type Server struct {
 
 // NewServer constructs a Server configured from cfg and the provided stores, managers, and services.
 // It extracts remote node names from cfg.Server.RemoteNodes, initializes apiV1 and apiV2 with the given dependencies, and populates the Server's funcsConfig fields from cfg.
-// Returns an error if a configured auth service fails to initialize (fail-fast behavior).
+// NewServer constructs and returns a Server configured from the provided configuration,
+// stores, managers, and services.
+// It initializes API v1 and v2, populates the server configuration (including UI function
+// configuration), and wires an initialized builtin auth service into API v2 when
+// cfg.Server.Auth.Mode is set to builtin.
+// Returns the constructed *Server, or an error if initialization fails (for example,
+// when the configured builtin auth service fails to initialize).
 func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, rs *resource.Service) (*Server, error) {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
@@ -77,8 +83,8 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 			NavbarTitle:           cfg.UI.NavbarTitle,
 			BasePath:              cfg.Server.BasePath,
 			APIBasePath:           cfg.Server.APIBasePath,
-			TZ:                    cfg.Global.TZ,
-			TzOffsetInSec:         cfg.Global.TzOffsetInSec,
+			TZ:                    cfg.Core.TZ,
+			TzOffsetInSec:         cfg.Core.TzOffsetInSec,
 			MaxDashboardPageLimit: cfg.UI.MaxDashboardPageLimit,
 			RemoteNodes:           remoteNodes,
 			Permissions:           cfg.Server.Permissions,
@@ -149,7 +155,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 	// Setup logger for HTTP requests
 	requestLogger := httplog.NewLogger("http", httplog.Options{
 		LogLevel:         slog.LevelDebug,
-		JSON:             srv.config.Global.LogFormat == "json",
+		JSON:             srv.config.Core.LogFormat == "json",
 		Concise:          true,
 		RequestHeaders:   true,
 		MessageFieldName: "msg",

@@ -200,7 +200,7 @@ func TestTaskHandlerStartWithDefinition(t *testing.T) {
 		Paths: config.PathsConfig{
 			Executable: fakeExec,
 		},
-		Global: config.Global{
+		Core: config.Core{
 			BaseEnv: config.NewBaseEnv(nil),
 		},
 	}

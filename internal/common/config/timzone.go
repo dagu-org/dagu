@@ -6,7 +6,19 @@ import (
 	"time"
 )
 
-func setTimezone(cfg *Global) error {
+// setTimezone configures the timezone fields of cfg based on cfg.TZ or the local system timezone.
+//
+// If cfg.TZ is non-empty, it loads the corresponding time.Location, assigns it to cfg.Location,
+// updates cfg.TzOffsetInSec with the current offset for that location, and sets the process
+// TZ environment variable to cfg.TZ. It returns an error if loading the location or setting
+// the environment variable fails.
+//
+// If cfg.TZ is empty, it uses the system local timezone: cfg.Location is set to time.Local,
+// cfg.TzOffsetInSec is set to the current local offset in seconds, and cfg.TZ is populated with
+// "UTC" or "UTC±H" where H is the offset in hours (e.g., "UTC+2" or "UTC-5").
+//
+// Returns an error only when loading a specified timezone or setting the TZ environment variable fails.
+func setTimezone(cfg *Core) error {
 	if cfg.TZ != "" {
 		loc, err := time.LoadLocation(cfg.TZ)
 		if err != nil {

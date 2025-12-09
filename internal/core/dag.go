@@ -349,9 +349,9 @@ func InitializeDefaults(d *DAG) {
 func (d *DAG) ParamsMap() map[string]string {
 	params := make(map[string]string)
 	for _, p := range d.Params {
-		parts := strings.SplitN(p, "=", 2)
-		if len(parts) == 2 {
-			params[parts[0]] = parts[1]
+		key, value, found := strings.Cut(p, "=")
+		if found {
+			params[key] = value
 		}
 	}
 	return params

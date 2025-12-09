@@ -457,7 +457,16 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 	return executeRetry(ctx, dag, status, root, "")
 }
 
-// executeDAGRun handles the actual execution of a DAG
+// executeDAGRun initializes execution state for a DAG run, constructs an agent configured
+// with the provided run and topology references, and invokes the shared agent executor.
+//
+// The function opens (and persists) a log file for the DAG run, ensures the DAG's
+// directory is included in the DAG store search path, and creates an agent configured
+// with the given parent and root references and the configured peer settings. It then
+// calls ExecuteAgent to perform the actual run.
+//
+// It returns an error if log file initialization, DAG store setup, agent creation, or
+// execution fails.
 func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRunID string, root execution.DAGRunRef) error {
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/dag-run ID between attempts.
@@ -488,7 +497,7 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRun
 		ctx.DAGRunStore,
 		ctx.ServiceRegistry,
 		root,
-		ctx.Config.Global.Peer,
+		ctx.Config.Core.Peer,
 		agent.Options{
 			ParentDAGRun:    parent,
 			ProgressDisplay: shouldEnableProgress(ctx),
