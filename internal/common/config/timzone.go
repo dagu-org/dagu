@@ -7,7 +7,7 @@ import (
 )
 
 // setTimezone configures the timezone fields of cfg based on cfg.TZ or the local system timezone.
-// 
+//
 // If cfg.TZ is non-empty, it loads the corresponding time.Location, assigns it to cfg.Location,
 // updates cfg.TzOffsetInSec with the current offset for that location, and sets the process
 // TZ environment variable to cfg.TZ. It returns an error if loading the location or setting
