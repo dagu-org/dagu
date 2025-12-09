@@ -375,6 +375,18 @@ func (a *API) requireExecute(ctx context.Context) error {
 	return nil
 }
 
+// requireUserManagement checks if user management is enabled.
+func (a *API) requireUserManagement() error {
+	if a.authService == nil {
+		return &Error{
+			Code:       api.ErrorCodeUnauthorized,
+			Message:    "User management is not enabled",
+			HTTPStatus: http.StatusUnauthorized,
+		}
+	}
+	return nil
+}
+
 // ptrOf returns a pointer to v, or nil if v is the zero value for its type.
 func ptrOf[T any](v T) *T {
 	if reflect.ValueOf(v).IsZero() {

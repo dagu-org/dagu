@@ -363,6 +363,10 @@ func (s *Service) EnsureAdminUser(ctx context.Context, username, password string
 		Role:     auth.RoleAdmin,
 	})
 	if err != nil {
+		// Handle race condition: another process may have created the admin user
+		if errors.Is(err, auth.ErrUserAlreadyExists) {
+			return "", false, nil
+		}
 		return "", false, fmt.Errorf("failed to create admin user: %w", err)
 	}
 
