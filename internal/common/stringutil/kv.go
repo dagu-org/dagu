@@ -13,19 +13,16 @@ func NewKeyValue(key, value string) KeyValue {
 }
 
 func (kv KeyValue) Key() string {
-	parts := strings.SplitN(string(kv), "=", 2)
-	if len(parts) == 0 {
-		return ""
-	}
-	return parts[0]
+	key, _, _ := strings.Cut(string(kv), "=")
+	return key
 }
 
 func (kv KeyValue) Value() string {
-	parts := strings.SplitN(string(kv), "=", 2)
-	if len(parts) < 2 {
+	_, value, found := strings.Cut(string(kv), "=")
+	if !found {
 		return ""
 	}
-	return parts[1]
+	return value
 }
 
 func (kv KeyValue) Bool() bool {
@@ -60,9 +57,9 @@ func (kv *KeyValue) UnmarshalJSON(data []byte) error {
 func KeyValuesToMap(kvSlice []string) map[string]string {
 	result := make(map[string]string, len(kvSlice))
 	for _, kv := range kvSlice {
-		parts := strings.SplitN(kv, "=", 2)
-		if len(parts) == 2 {
-			result[parts[0]] = parts[1]
+		key, value, found := strings.Cut(kv, "=")
+		if found {
+			result[key] = value
 		}
 	}
 	return result

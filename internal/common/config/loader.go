@@ -46,27 +46,14 @@ const (
 	ServiceAgent
 )
 
-// Load creates a new configuration by instantiating a ConfigLoader with the provided options
-// and then invoking its Load method.
-func Load(opts ...ConfigLoaderOption) (*Config, error) {
-	lockViper()
-	defer unlockViper()
-
-	loader := NewConfigLoader(opts...)
-	cfg, err := loader.Load()
-	if err != nil {
-		return nil, err
-	}
-	return cfg, nil
-}
-
 // ConfigLoader is responsible for reading and merging configuration from various sources.
 type ConfigLoader struct {
-	configFile        string   // Optional explicit path to the configuration file.
-	warnings          []string // Collected warnings during configuration resolution.
-	additionalBaseEnv []string // Additional environment variables to append to the base environment.
-	appHomeDir        string   // Optional override for DAGU_HOME style directory.
-	service           Service  // The service type being configured (determines which config sections to load).
+	v                 *viper.Viper // Isolated viper instance for this loader
+	configFile        string       // Optional explicit path to the configuration file.
+	warnings          []string     // Collected warnings during configuration resolution.
+	additionalBaseEnv []string     // Additional environment variables to append to the base environment.
+	appHomeDir        string       // Optional override for DAGU_HOME style directory.
+	service           Service      // The service type being configured (determines which config sections to load).
 }
 
 // ConfigLoaderOption defines a functional option for configuring a ConfigLoader.
@@ -126,7 +113,7 @@ var serviceRequirements = map[Service]configRequirements{
 		coordinator: true,
 	},
 	ServiceAgent: {
-		// Minimal config - only Global and Paths (always loaded)
+		// Minimal config
 	},
 }
 
@@ -138,9 +125,10 @@ func (l *ConfigLoader) requirements() configRequirements {
 	return serviceRequirements[ServiceNone]
 }
 
-// NewConfigLoader creates a new ConfigLoader instance and applies all given options.
-func NewConfigLoader(options ...ConfigLoaderOption) *ConfigLoader {
-	loader := &ConfigLoader{}
+// NewConfigLoader creates a new ConfigLoader instance with an isolated viper instance
+// and applies all given options.
+func NewConfigLoader(viper *viper.Viper, options ...ConfigLoaderOption) *ConfigLoader {
+	loader := &ConfigLoader{v: viper}
 	for _, option := range options {
 		option(loader)
 	}
@@ -149,7 +137,6 @@ func NewConfigLoader(options ...ConfigLoaderOption) *ConfigLoader {
 
 // Load initializes viper, reads configuration files, handles legacy configuration,
 // and returns a fully built and validated Config instance.
-// Note: This method must be called while holding the global viper lock (via config.Load()).
 func (l *ConfigLoader) Load() (*Config, error) {
 	// Initialize viper with proper defaults, environment binding and warnings.
 	homeDir, err := getHomeDir()
@@ -163,23 +150,23 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	if l.appHomeDir != "" {
 		l.additionalBaseEnv = append(l.additionalBaseEnv, fmt.Sprintf("DAGU_HOME=%s", fileutil.ResolvePathOrBlank(l.appHomeDir)))
 	}
-	warnings, err := setupViper(xdgConfig, homeDir, l.configFile, l.appHomeDir)
+	warnings, err := l.setupViper(xdgConfig, homeDir, l.configFile, l.appHomeDir)
 	if err != nil {
 		return nil, err
 	}
 	l.warnings = append(l.warnings, warnings...)
 
 	// Attempt to read the main config file. If not found, we proceed without error.
-	if err := viper.ReadInConfig(); err != nil {
+	if err := l.v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
 	}
-	configFileUsed := viper.ConfigFileUsed()
+	configFileUsed := l.v.ConfigFileUsed()
 
 	// For backward compatibility, try merging in the "admin.yaml" config.
-	viper.SetConfigName("admin")
-	if err := viper.MergeInConfig(); err != nil {
+	l.v.SetConfigName("admin")
+	if err := l.v.MergeInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("failed to read admin config: %w", err)
 		}
@@ -187,7 +174,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 
 	// Unmarshal the merged configuration into our Definition structure.
 	var def Definition
-	if err := viper.Unmarshal(&def); err != nil {
+	if err := l.v.Unmarshal(&def); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
@@ -272,7 +259,7 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 		LogFormat:    def.LogFormat,
 		TZ:           def.TZ,
 		DefaultShell: def.DefaultShell,
-		SkipExamples: viper.GetBool("skipExamples"),
+		SkipExamples: l.v.GetBool("skipExamples"),
 		BaseEnv:      baseEnv,
 	}
 
@@ -557,7 +544,7 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 	if cfg.Scheduler.LockRetryInterval <= 0 {
 		cfg.Scheduler.LockRetryInterval = 5 * time.Second
 	}
-	if cfg.Scheduler.ZombieDetectionInterval == 0 && !viper.IsSet("scheduler.zombieDetectionInterval") {
+	if cfg.Scheduler.ZombieDetectionInterval == 0 && !l.v.IsSet("scheduler.zombieDetectionInterval") {
 		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second
 	}
 }
@@ -752,7 +739,7 @@ func (l *ConfigLoader) loadLegacyEnv(cfg *Config, req configRequirements) {
 	}
 }
 
-func setupViper(xdgConfig XDGConfig, homeDir, configFile, appHomeOverride string) (warnings []string, err error) {
+func (l *ConfigLoader) setupViper(xdgConfig XDGConfig, homeDir, configFile, appHomeOverride string) (warnings []string, err error) {
 	var paths Paths
 	if appHomeOverride != "" {
 		resolved := fileutil.ResolvePathOrBlank(appHomeOverride)
@@ -764,64 +751,64 @@ func setupViper(xdgConfig XDGConfig, homeDir, configFile, appHomeOverride string
 		}
 	}
 
-	configureViper(paths.ConfigDir, configFile)
-	bindEnvironmentVariables()
-	setViperDefaultValues(paths)
+	l.configureViper(paths.ConfigDir, configFile)
+	l.bindEnvironmentVariables()
+	l.setViperDefaultValues(paths)
 
 	return paths.Warnings, nil
 }
 
-// interval).
-func setViperDefaultValues(paths Paths) {
+// setViperDefaultValues sets the default configuration values for viper.
+func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// File paths
-	viper.SetDefault("workDir", "")         // Defaults to DAG location if empty.
-	viper.SetDefault("skipExamples", false) // Defaults to creating examples
-	viper.SetDefault("paths.dagsDir", paths.DAGsDir)
-	viper.SetDefault("paths.suspendFlagsDir", paths.SuspendFlagsDir)
-	viper.SetDefault("paths.dataDir", paths.DataDir)
-	viper.SetDefault("paths.logDir", paths.LogsDir)
-	viper.SetDefault("paths.adminLogsDir", paths.AdminLogsDir)
-	viper.SetDefault("paths.baseConfig", paths.BaseConfigFile)
+	l.v.SetDefault("workDir", "")         // Defaults to DAG location if empty.
+	l.v.SetDefault("skipExamples", false) // Defaults to creating examples
+	l.v.SetDefault("paths.dagsDir", paths.DAGsDir)
+	l.v.SetDefault("paths.suspendFlagsDir", paths.SuspendFlagsDir)
+	l.v.SetDefault("paths.dataDir", paths.DataDir)
+	l.v.SetDefault("paths.logDir", paths.LogsDir)
+	l.v.SetDefault("paths.adminLogsDir", paths.AdminLogsDir)
+	l.v.SetDefault("paths.baseConfig", paths.BaseConfigFile)
 
 	// Server settings
-	viper.SetDefault("host", "127.0.0.1")
-	viper.SetDefault("port", 8080)
-	viper.SetDefault("debug", false)
-	viper.SetDefault("basePath", "")
-	viper.SetDefault("apiBasePath", "/api/v2")
-	viper.SetDefault("latestStatusToday", false)
+	l.v.SetDefault("host", "127.0.0.1")
+	l.v.SetDefault("port", 8080)
+	l.v.SetDefault("debug", false)
+	l.v.SetDefault("basePath", "")
+	l.v.SetDefault("apiBasePath", "/api/v2")
+	l.v.SetDefault("latestStatusToday", false)
 
 	// Coordinator settings
-	viper.SetDefault("coordinator.host", "127.0.0.1")
-	viper.SetDefault("coordinator.advertise", "") // Empty means auto-detect hostname
-	viper.SetDefault("coordinator.port", 50055)
+	l.v.SetDefault("coordinator.host", "127.0.0.1")
+	l.v.SetDefault("coordinator.advertise", "") // Empty means auto-detect hostname
+	l.v.SetDefault("coordinator.port", 50055)
 
 	// Worker settings - nested structure
-	viper.SetDefault("worker.maxActiveRuns", 100)
+	l.v.SetDefault("worker.maxActiveRuns", 100)
 
 	// UI settings
-	viper.SetDefault("ui.navbarTitle", AppName)
-	viper.SetDefault("ui.maxDashboardPageLimit", 100)
-	viper.SetDefault("ui.logEncodingCharset", getDefaultLogEncodingCharset())
-	viper.SetDefault("ui.dags.sortField", "name")
-	viper.SetDefault("ui.dags.sortOrder", "asc")
+	l.v.SetDefault("ui.navbarTitle", AppName)
+	l.v.SetDefault("ui.maxDashboardPageLimit", 100)
+	l.v.SetDefault("ui.logEncodingCharset", getDefaultLogEncodingCharset())
+	l.v.SetDefault("ui.dags.sortField", "name")
+	l.v.SetDefault("ui.dags.sortOrder", "asc")
 
 	// Logging settings
-	viper.SetDefault("logFormat", "text")
+	l.v.SetDefault("logFormat", "text")
 
 	// Queue settings
-	viper.SetDefault("queues.enabled", true)
+	l.v.SetDefault("queues.enabled", true)
 
 	// Scheduler settings
-	viper.SetDefault("scheduler.lockStaleThreshold", "30s")
-	viper.SetDefault("scheduler.lockRetryInterval", "5s")
+	l.v.SetDefault("scheduler.lockStaleThreshold", "30s")
+	l.v.SetDefault("scheduler.lockRetryInterval", "5s")
 
 	// Peer settings
-	viper.SetDefault("peer.insecure", true) // Default to insecure (h2c)
+	l.v.SetDefault("peer.insecure", true) // Default to insecure (h2c)
 
 	// Monitoring settings
-	viper.SetDefault("monitoring.retention", "24h")
-	viper.SetDefault("monitoring.interval", "5s")
+	l.v.SetDefault("monitoring.retention", "24h")
+	l.v.SetDefault("monitoring.interval", "5s")
 }
 
 // envBinding defines a mapping between a config key and its environment variable.
@@ -939,8 +926,8 @@ var envBindings = []envBinding{
 	{key: "monitoring.interval", env: "MONITORING_INTERVAL"},
 }
 
-// bindEnvironmentVariables binds configuration keys to environment variables using Viper.
-func bindEnvironmentVariables() {
+// bindEnvironmentVariables binds configuration keys to environment variables using the loader's viper instance.
+func (l *ConfigLoader) bindEnvironmentVariables() {
 	prefix := strings.ToUpper(AppSlug) + "_"
 
 	for _, b := range envBindings {
@@ -955,21 +942,22 @@ func bindEnvironmentVariables() {
 			}
 		}
 
-		_ = viper.BindEnv(b.key, fullEnv)
+		_ = l.v.BindEnv(b.key, fullEnv)
 	}
 }
 
-func configureViper(configDir, configFile string) {
+// configureViper sets up the viper instance with config file paths and environment settings.
+func (l *ConfigLoader) configureViper(configDir, configFile string) {
 	if configFile == "" {
-		viper.AddConfigPath(configDir)
-		viper.SetConfigName("config")
+		l.v.AddConfigPath(configDir)
+		l.v.SetConfigName("config")
 	} else {
-		viper.SetConfigFile(configFile)
+		l.v.SetConfigFile(configFile)
 	}
-	viper.SetConfigType("yaml")
-	viper.SetEnvPrefix(strings.ToUpper(AppSlug))
-	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	viper.AutomaticEnv()
+	l.v.SetConfigType("yaml")
+	l.v.SetEnvPrefix(strings.ToUpper(AppSlug))
+	l.v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	l.v.AutomaticEnv()
 }
 
 func parseWorkerLabels(labelsStr string) map[string]string {
@@ -985,10 +973,10 @@ func parseWorkerLabels(labelsStr string) map[string]string {
 			continue
 		}
 
-		parts := strings.SplitN(pair, "=", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
+		key, value, found := strings.Cut(pair, "=")
+		if found {
+			key = strings.TrimSpace(key)
+			value = strings.TrimSpace(value)
 			if key != "" {
 				labels[key] = value
 			}

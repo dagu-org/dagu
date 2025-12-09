@@ -41,11 +41,10 @@ func (b BaseEnv) AsSlice() []string {
 func filterEnv(envs []string, allow map[string]bool, prefixes []string) []string {
 	var filtered []string
 	for _, e := range envs {
-		parts := strings.SplitN(e, "=", 2)
-		if len(parts) != 2 {
+		key, _, found := strings.Cut(e, "=")
+		if !found {
 			continue
 		}
-		key := parts[0]
 		// normalizeEnvKey handles platform differences (case-insensitive on Windows)
 		if allow[normalizeEnvKey(key)] || hasAllowedPrefix(key, prefixes) {
 			filtered = append(filtered, e)

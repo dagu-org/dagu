@@ -3654,9 +3654,9 @@ steps:
 		// Child processes will receive them via cmd.Env = AllEnvs()
 		envMap := make(map[string]string)
 		for _, env := range dag.Env {
-			parts := strings.SplitN(env, "=", 2)
-			if len(parts) == 2 {
-				envMap[parts[0]] = parts[1]
+			key, value, found := strings.Cut(env, "=")
+			if found {
+				envMap[key] = value
 			}
 		}
 		assert.Equal(t, "from_file", envMap["LOAD_ENV_DOTENV_VAR"])
@@ -3682,9 +3682,9 @@ steps:
 		// Environment variables from env should still be in dag.Env
 		envMap := make(map[string]string)
 		for _, env := range dag.Env {
-			parts := strings.SplitN(env, "=", 2)
-			if len(parts) == 2 {
-				envMap[parts[0]] = parts[1]
+			key, value, found := strings.Cut(env, "=")
+			if found {
+				envMap[key] = value
 			}
 		}
 		assert.Equal(t, "test_value", envMap["TEST_VAR_LOAD_ENV"])

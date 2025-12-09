@@ -470,15 +470,15 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 	// Add step-level environment variables
 	envVars := &collections.SyncMap{}
 	for _, v := range node.Step().Env {
-		parts := strings.SplitN(v, "=", 2)
-		if len(parts) != 2 {
+		key, value, found := strings.Cut(v, "=")
+		if !found {
 			logger.Error(ctx, "Invalid environment variable format",
 				slog.String("var", v),
 			)
 			continue
 		}
-		// Evaluate only the value part (parts[1]), not the entire "KEY=value" string
-		evaluatedValue, err := env.EvalString(ctx, parts[1])
+		// Evaluate only the value part, not the entire "KEY=value" string
+		evaluatedValue, err := env.EvalString(ctx, value)
 		if err != nil {
 			logger.Error(ctx, "Failed to evaluate environment variable",
 				slog.String("var", v),
@@ -487,7 +487,7 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 			continue
 		}
 		// Store as "KEY=evaluatedValue" format
-		envVars.Store(parts[0], parts[0]+"="+evaluatedValue)
+		envVars.Store(key, key+"="+evaluatedValue)
 	}
 
 	env.ForceLoadOutputVariables(envVars)

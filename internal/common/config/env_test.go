@@ -47,9 +47,9 @@ func TestBaseEnv_AsSlice(t *testing.T) {
 func parseEnvSlice(envSlice []string) map[string]string {
 	envMap := make(map[string]string)
 	for _, kv := range envSlice {
-		parts := strings.SplitN(kv, "=", 2)
-		if len(parts) == 2 {
-			envMap[parts[0]] = parts[1]
+		key, value, found := strings.Cut(kv, "=")
+		if found {
+			envMap[key] = value
 		}
 	}
 	return envMap

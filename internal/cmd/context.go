@@ -33,6 +33,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // Context holds the configuration for a command.
@@ -76,7 +77,8 @@ func (c *Context) LogToFile(f *os.File) {
 func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	ctx := cmd.Context()
 
-	bindFlags(cmd, flags...)
+	v := viper.New()
+	bindFlags(v, cmd, flags...)
 
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
@@ -103,7 +105,8 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		configLoaderOpts = append(configLoaderOpts, config.WithConfigFile(cfgPath))
 	}
 
-	cfg, err := config.Load(configLoaderOpts...)
+	loader := config.NewConfigLoader(v, configLoaderOpts...)
+	cfg, err := loader.Load()
 	if err != nil {
 		return nil, err
 	}

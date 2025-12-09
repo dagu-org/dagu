@@ -127,7 +127,9 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	config.WithViperLock(func() {
 		viper.Reset()
 	})
-	cfg, err := config.Load()
+	v := viper.New()
+	loader := config.NewConfigLoader(v)
+	cfg, err := loader.Load()
 	require.NoError(t, err)
 
 	cfg.Core.TZ = "UTC"
@@ -500,9 +502,9 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 				}
 
 			case NotEmpty:
-				parts := strings.SplitN(actual, "=", 2)
-				assert.Len(t, parts, 2, "expected output %q to be in the form key=value", key)
-				assert.NotEmpty(t, parts[1], "expected output %q to be not empty", key)
+				_, value, found := strings.Cut(actual, "=")
+				assert.True(t, found, "expected output %q to be in the form key=value", key)
+				assert.NotEmpty(t, value, "expected output %q to be not empty", key)
 
 			default:
 				t.Errorf("unsupported value matcher type %T", expected)

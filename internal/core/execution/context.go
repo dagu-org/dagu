@@ -34,9 +34,9 @@ func (e Context) UserEnvsMap() map[string]string {
 
 	// Parse DAG.Env (lowest priority)
 	for _, env := range e.DAG.Env {
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) == 2 {
-			result[parts[0]] = parts[1]
+		key, value, found := strings.Cut(env, "=")
+		if found {
+			result[key] = value
 		}
 	}
 

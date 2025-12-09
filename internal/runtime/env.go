@@ -74,9 +74,9 @@ func (e Env) UserEnvsMap() map[string]string {
 
 	// Add variables from previous steps
 	e.Variables.Range(func(_, value any) bool {
-		parts := strings.SplitN(value.(string), "=", 2)
-		if len(parts) == 2 {
-			result[parts[0]] = parts[1]
+		key, val, found := strings.Cut(value.(string), "=")
+		if found {
+			result[key] = val
 		}
 		return true
 	})
@@ -88,14 +88,14 @@ func (e Env) UserEnvsMap() map[string]string {
 
 	// Add step-defined env (highest precedence)
 	for _, env := range e.Step.Env {
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) != 2 {
+		key, value, found := strings.Cut(env, "=")
+		if !found {
 			continue
 		}
-		if _, exists := result[parts[0]]; exists {
+		if _, exists := result[key]; exists {
 			continue
 		}
-		result[parts[0]] = parts[1]
+		result[key] = value
 	}
 
 	return result
@@ -114,9 +114,9 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 	variables := &collections.SyncMap{}
 	if rCtx.DAG != nil {
 		for _, param := range rCtx.DAG.Params {
-			parts := strings.SplitN(param, "=", 2)
-			if len(parts) == 2 {
-				variables.Store(parts[0], param)
+			key, _, found := strings.Cut(param, "=")
+			if found {
+				variables.Store(key, param)
 			}
 		}
 	}
@@ -387,9 +387,9 @@ func AllEnvsMap(ctx context.Context) map[string]string {
 	envs := GetEnv(ctx).AllEnvs()
 	var result = make(map[string]string)
 	for _, env := range envs {
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) == 2 {
-			result[parts[0]] = parts[1]
+		key, value, found := strings.Cut(env, "=")
+		if found {
+			result[key] = value
 		}
 	}
 	return result

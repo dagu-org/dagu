@@ -26,9 +26,9 @@ func (m *SyncMap) Variables() map[string]string {
 	}
 	vars := make(map[string]string)
 	m.Range(func(_, value any) bool {
-		parts := strings.SplitN(value.(string), "=", 2)
-		if len(parts) == 2 {
-			vars[parts[0]] = parts[1]
+		key, val, found := strings.Cut(value.(string), "=")
+		if found {
+			vars[key] = val
 		}
 		return true
 	})

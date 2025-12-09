@@ -162,11 +162,11 @@ func runExec(ctx *Context, args []string) error {
 		if pair == "" {
 			continue
 		}
-		parts := strings.SplitN(pair, "=", 2)
-		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		key, value, found := strings.Cut(pair, "=")
+		if !found || key == "" || value == "" {
 			return fmt.Errorf("invalid worker label %q: expected key=value", pair)
 		}
-		workerLabels[parts[0]] = parts[1]
+		workerLabels[key] = value
 	}
 
 	queueName, err := ctx.Command.Flags().GetString("queue")

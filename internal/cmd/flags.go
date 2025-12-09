@@ -291,7 +291,7 @@ func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 	}
 }
 
-func bindFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
+func bindFlags(viper *viper.Viper, cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 	flags := append([]commandLineFlag{configFlag}, additionalFlags...)
 
 	config.WithViperLock(func() {

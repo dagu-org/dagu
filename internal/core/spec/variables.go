@@ -35,11 +35,11 @@ func loadVariables(ctx BuildContext, strVariables any) (
 				}
 			case string:
 				// parse key=value string
-				parts := strings.SplitN(vv, "=", 2)
-				if len(parts) != 2 {
+				key, val, found := strings.Cut(vv, "=")
+				if !found {
 					return nil, core.NewValidationError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
 				}
-				pairs = append(pairs, pair{key: parts[0], val: parts[1]})
+				pairs = append(pairs, pair{key: key, val: val})
 			default:
 				return nil, core.NewValidationError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
 			}

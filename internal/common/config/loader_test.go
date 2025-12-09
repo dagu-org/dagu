@@ -12,6 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testLoad is a helper function that creates a new ConfigLoader with a fresh viper instance
+// and loads the configuration. This replaces the old config.Load() function in tests.
+func testLoad(t *testing.T, opts ...ConfigLoaderOption) *Config {
+	t.Helper()
+	cfg, err := NewConfigLoader(viper.New(), opts...).Load()
+	require.NoError(t, err)
+	return cfg
+}
+
+// testLoadWithError is a helper for tests that expect loading to fail.
+func testLoadWithError(t *testing.T, opts ...ConfigLoaderOption) error {
+	t.Helper()
+	_, err := NewConfigLoader(viper.New(), opts...).Load()
+	return err
+}
+
 func TestLoad_Env(t *testing.T) {
 	// Reset viper to ensure clean state
 	viper.Reset()
@@ -123,8 +139,7 @@ func TestLoad_Env(t *testing.T) {
 		os.Setenv(key, val)
 	}
 
-	cfg, err := Load(WithConfigFile(configFile))
-	require.NoError(t, err)
+	cfg := testLoad(t, WithConfigFile(configFile))
 
 	berlinLoc, _ := time.LoadLocation("Europe/Berlin")
 	_, berlinOffset := time.Now().In(berlinLoc).Zone()
@@ -230,8 +245,7 @@ func TestLoad_WithAppHomeDir(t *testing.T) {
 
 	tempDir := t.TempDir()
 
-	cfg, err := Load(WithAppHomeDir(tempDir))
-	require.NoError(t, err)
+	cfg := testLoad(t, WithAppHomeDir(tempDir))
 
 	resolved := filepath.Clean(tempDir)
 	assert.Equal(t, filepath.Join(resolved, "dags"), cfg.Paths.DAGsDir)
@@ -518,19 +532,17 @@ paths:
 
 func TestLoad_EdgeCases_Errors(t *testing.T) {
 	t.Run("InvalidTimezone", func(t *testing.T) {
-		viper.Reset()
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		err := os.WriteFile(configFile, []byte(`tz: "Invalid/Timezone"`), 0600)
 		require.NoError(t, err)
 
-		_, err = Load(WithConfigFile(configFile))
+		err = testLoadWithError(t, WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to load timezone")
 	})
 
 	t.Run("IncompleteTLS", func(t *testing.T) {
-		viper.Reset()
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		err := os.WriteFile(configFile, []byte(`
@@ -540,33 +552,31 @@ tls:
 `), 0600)
 		require.NoError(t, err)
 
-		_, err = Load(WithConfigFile(configFile))
+		err = testLoadWithError(t, WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "TLS configuration incomplete")
 	})
 
 	t.Run("InvalidPort", func(t *testing.T) {
-		viper.Reset()
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 
 		// Test negative port
 		err := os.WriteFile(configFile, []byte(`port: -1`), 0600)
 		require.NoError(t, err)
-		_, err = Load(WithConfigFile(configFile))
+		err = testLoadWithError(t, WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid port number")
 
 		// Test port > 65535
 		err = os.WriteFile(configFile, []byte(`port: 99999`), 0600)
 		require.NoError(t, err)
-		_, err = Load(WithConfigFile(configFile))
+		err = testLoadWithError(t, WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid port number")
 	})
 
 	t.Run("InvalidMaxDashboardPageLimit", func(t *testing.T) {
-		viper.Reset()
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		err := os.WriteFile(configFile, []byte(`
@@ -575,7 +585,7 @@ ui:
 `), 0600)
 		require.NoError(t, err)
 
-		_, err = Load(WithConfigFile(configFile))
+		err = testLoadWithError(t, WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid max dashboard page limit")
 	})
@@ -731,18 +741,13 @@ func loadFromYAML(t *testing.T, yaml string) *Config {
 	err := os.WriteFile(configFile, []byte(yaml), 0600)
 	require.NoError(t, err)
 
-	cfg, err := Load(WithConfigFile(configFile))
-	require.NoError(t, err)
+	cfg := testLoad(t, WithConfigFile(configFile))
 
 	cfg.Paths.ConfigFileUsed = ""
 	return cfg
 }
 
 func TestLoad_ConfigFileUsed(t *testing.T) {
-	// Reset viper
-	viper.Reset()
-	defer viper.Reset()
-
 	// Create a temp config file
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "config.yaml")
@@ -750,17 +755,13 @@ func TestLoad_ConfigFileUsed(t *testing.T) {
 	require.NoError(t, err)
 
 	// Load configuration
-	cfg, err := Load(WithConfigFile(configFile))
-	require.NoError(t, err)
+	cfg := testLoad(t, WithConfigFile(configFile))
 
 	// Verify ConfigFileUsed is set correctly
 	assert.Equal(t, configFile, cfg.Paths.ConfigFileUsed)
 }
 
 func TestBindEnv_AsPath(t *testing.T) {
-	viper.Reset()
-	defer viper.Reset()
-
 	tests := []struct {
 		name     string
 		envValue string
@@ -794,8 +795,9 @@ func TestBindEnv_AsPath(t *testing.T) {
 				os.Setenv(envKey, tt.envValue)
 			}
 
-			// Call the actual bindEnvironmentVariables function
-			bindEnvironmentVariables()
+			// Create a ConfigLoader and call bindEnvironmentVariables on it
+			loader := NewConfigLoader(viper.New())
+			loader.bindEnvironmentVariables()
 
 			result := os.Getenv(envKey)
 			if tt.envValue == "" {

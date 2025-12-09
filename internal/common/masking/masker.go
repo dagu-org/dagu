@@ -73,9 +73,9 @@ func (m *Masker) MaskBytes(input []byte) []byte {
 
 // splitEnv splits "KEY=value" into (KEY, value)
 func splitEnv(env string) (string, string) {
-	parts := strings.SplitN(env, "=", 2)
-	if len(parts) != 2 {
+	key, value, found := strings.Cut(env, "=")
+	if !found {
 		return "", ""
 	}
-	return parts[0], parts[1]
+	return key, value
 }
