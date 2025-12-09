@@ -54,13 +54,14 @@ func (kv *KeyValue) UnmarshalJSON(data []byte) error {
 }
 
 // KeyValuesToMap converts a slice of "KEY=VALUE" strings into a map of keys to values.
-// It splits each entry at the first '='; entries without '=' or with empty keys are skipped.
+// It splits each entry at the first '='; entries without '=' are skipped.
 // Values may be empty (for example, "KEY=" results in map["KEY"] = "").
+// Empty keys are allowed (for example, "=value" results in map[""] = "value").
 func KeyValuesToMap(kvSlice []string) map[string]string {
 	result := make(map[string]string, len(kvSlice))
 	for _, kv := range kvSlice {
 		key, value, found := strings.Cut(kv, "=")
-		if found && key != "" {
+		if found {
 			result[key] = value
 		}
 	}
