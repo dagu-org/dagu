@@ -554,9 +554,9 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 	if cfg.Scheduler.LockRetryInterval <= 0 {
 		cfg.Scheduler.LockRetryInterval = 5 * time.Second
 	}
-	// Default ZombieDetectionInterval if not set or invalid.
-	// To intentionally disable zombie detection, set it to "0s" explicitly.
-	if cfg.Scheduler.ZombieDetectionInterval <= 0 {
+	// Default ZombieDetectionInterval only if not explicitly set.
+	// An invalid value logs a warning but falls back to 0 (disabled).
+	if cfg.Scheduler.ZombieDetectionInterval == 0 && !l.v.IsSet("scheduler.zombieDetectionInterval") {
 		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second
 	}
 }

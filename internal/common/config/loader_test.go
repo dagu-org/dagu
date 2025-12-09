@@ -599,7 +599,7 @@ scheduler:
 `)
 		assert.Equal(t, 30*time.Second, cfg.Scheduler.LockStaleThreshold)
 		assert.Equal(t, 5*time.Second, cfg.Scheduler.LockRetryInterval)
-		assert.Equal(t, 45*time.Second, cfg.Scheduler.ZombieDetectionInterval)
+		assert.Equal(t, time.Duration(0), cfg.Scheduler.ZombieDetectionInterval)
 
 		require.Len(t, cfg.Warnings, 3)
 		assert.Contains(t, cfg.Warnings[0], "Invalid scheduler.lockStaleThreshold")
