@@ -219,21 +219,30 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		authOptions.OIDCConfig = oidcCfg.Config
 	}
 
-	r.Group(func(r chi.Router) {
-		// Apply authentication middleware based on auth mode
-		if authConfig.Mode == config.AuthModeBuiltin && a.authService != nil {
+	// Apply authentication middleware based on auth mode
+	if authConfig.Mode == config.AuthModeBuiltin {
+		if a.authService == nil {
+			return fmt.Errorf("builtin auth mode configured but auth service not initialized")
+		}
+		r.Group(func(r chi.Router) {
 			// For builtin auth, use JWT-based authentication
 			// The BuiltinAuthMiddleware validates JWT tokens and injects user into context
 			r.Use(frontendauth.BuiltinAuthMiddleware(a.authService, authOptions.PublicPaths))
-		} else {
+			r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
+
+			handler := api.NewStrictHandlerWithOptions(a, nil, options)
+			r.Mount("/", api.Handler(handler))
+		})
+	} else {
+		r.Group(func(r chi.Router) {
 			// For other auth modes (basic, token, OIDC), use the legacy middleware
 			r.Use(frontendauth.Middleware(authOptions))
-		}
-		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
+			r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
 
-		handler := api.NewStrictHandlerWithOptions(a, nil, options)
-		r.Mount("/", api.Handler(handler))
-	})
+			handler := api.NewStrictHandlerWithOptions(a, nil, options)
+			r.Mount("/", api.Handler(handler))
+		})
+	}
 
 	return nil
 }
