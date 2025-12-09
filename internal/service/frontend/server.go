@@ -77,8 +77,8 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 			NavbarTitle:           cfg.UI.NavbarTitle,
 			BasePath:              cfg.Server.BasePath,
 			APIBasePath:           cfg.Server.APIBasePath,
-			TZ:                    cfg.Global.TZ,
-			TzOffsetInSec:         cfg.Global.TzOffsetInSec,
+			TZ:                    cfg.Core.TZ,
+			TzOffsetInSec:         cfg.Core.TzOffsetInSec,
 			MaxDashboardPageLimit: cfg.UI.MaxDashboardPageLimit,
 			RemoteNodes:           remoteNodes,
 			Permissions:           cfg.Server.Permissions,
@@ -149,7 +149,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 	// Setup logger for HTTP requests
 	requestLogger := httplog.NewLogger("http", httplog.Options{
 		LogLevel:         slog.LevelDebug,
-		JSON:             srv.config.Global.LogFormat == "json",
+		JSON:             srv.config.Core.LogFormat == "json",
 		Concise:          true,
 		RequestHeaders:   true,
 		MessageFieldName: "msg",

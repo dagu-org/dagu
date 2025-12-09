@@ -72,7 +72,7 @@ func New(
 	reg execution.ServiceRegistry,
 	coordinatorCli execution.Dispatcher,
 ) (*Scheduler, error) {
-	timeLoc := cfg.Global.Location
+	timeLoc := cfg.Core.Location
 	if timeLoc == nil {
 		timeLoc = time.Local
 	}

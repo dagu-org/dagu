@@ -143,12 +143,12 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.
 	var serverOpts []grpc.ServerOption
 
 	// Configure TLS using global peer config
-	if cfg.Global.Peer.CertFile != "" && cfg.Global.Peer.KeyFile != "" {
+	if cfg.Core.Peer.CertFile != "" && cfg.Core.Peer.KeyFile != "" {
 		// Load server certificates
 		creds, err := loadCoordinatorTLSCredentials(&config.TLSConfig{
-			CertFile: cfg.Global.Peer.CertFile,
-			KeyFile:  cfg.Global.Peer.KeyFile,
-			CAFile:   cfg.Global.Peer.ClientCaFile,
+			CertFile: cfg.Core.Peer.CertFile,
+			KeyFile:  cfg.Core.Peer.KeyFile,
+			CAFile:   cfg.Core.Peer.ClientCaFile,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to load TLS credentials: %w", err)

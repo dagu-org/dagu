@@ -41,7 +41,7 @@ func runScheduler(ctx *Context, _ []string) error {
 
 	logger.Info(ctx, "Scheduler initialization",
 		tag.Dir(ctx.Config.Paths.DAGsDir),
-		slog.String("log-format", ctx.Config.Global.LogFormat),
+		slog.String("log-format", ctx.Config.Core.LogFormat),
 	)
 
 	scheduler, err := ctx.NewScheduler()

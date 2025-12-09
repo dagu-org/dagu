@@ -7,8 +7,8 @@ import (
 
 // Config holds the overall configuration for the application.
 type Config struct {
-	// Global contains global configuration settings.
-	Global Global
+	// Core contains global configuration settings.
+	Core Core
 
 	// Server contains the API server configuration.
 	Server Server
@@ -49,7 +49,7 @@ type MonitoringConfig struct {
 	Interval time.Duration
 }
 
-type Global struct {
+type Core struct {
 	// Debug toggles debug mode; when true, the application may output extra logs and error details.
 	Debug bool
 

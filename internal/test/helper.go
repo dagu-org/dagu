@@ -130,9 +130,9 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	cfg.Global.TZ = "UTC"
-	cfg.Global.Location = time.UTC
-	cfg.Global.TzOffsetInSec = 0
+	cfg.Core.TZ = "UTC"
+	cfg.Core.Location = time.UTC
+	cfg.Core.TzOffsetInSec = 0
 	cfg.Paths.Executable = executablePath
 	cfg.Paths.LogDir = filepath.Join(tmpDir, "logs")
 	dataDir := filepath.Join(tmpDir, "data")
@@ -227,12 +227,12 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 	t.Helper()
 
 	configData := map[string]any{
-		"debug":        cfg.Global.Debug,
-		"logFormat":    cfg.Global.LogFormat,
-		"defaultShell": cfg.Global.DefaultShell,
+		"debug":        cfg.Core.Debug,
+		"logFormat":    cfg.Core.LogFormat,
+		"defaultShell": cfg.Core.DefaultShell,
 	}
-	if cfg.Global.TZ != "" {
-		configData["tz"] = cfg.Global.TZ
+	if cfg.Core.TZ != "" {
+		configData["tz"] = cfg.Core.TZ
 	}
 
 	configData["paths"] = map[string]any{
@@ -562,7 +562,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.DAGRunStore,
 		d.ServiceRegistry,
 		root,
-		d.Config.Global.Peer,
+		d.Config.Core.Peer,
 		helper.opts,
 	)
 

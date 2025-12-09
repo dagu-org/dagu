@@ -21,7 +21,7 @@ func TestNewSubCmdBuilder(t *testing.T) {
 			Executable:     "/path/to/dagu",
 			ConfigFileUsed: "/path/to/config.yaml",
 		},
-		Global: config.Global{
+		Core: config.Core{
 			BaseEnv: config.NewBaseEnv([]string{"TEST_ENV=value"}),
 		},
 	}

@@ -33,7 +33,7 @@ func ConfigFileUsed(ctx context.Context) string {
 // GetBaseEnv returns a map of base environment variables derived from the configuration.
 func GetBaseEnv(ctx context.Context) *BaseEnv {
 	if cfg := GetConfig(ctx); cfg != nil {
-		return &cfg.Global.BaseEnv
+		return &cfg.Core.BaseEnv
 	}
 	return nil
 }

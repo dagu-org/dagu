@@ -173,7 +173,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, r
 		ctx.DAGRunStore,
 		ctx.ServiceRegistry,
 		rootRun,
-		ctx.Config.Global.Peer,
+		ctx.Config.Core.Peer,
 		agent.Options{
 			RetryTarget:     status,
 			ParentDAGRun:    status.Parent,

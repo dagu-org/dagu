@@ -15,6 +15,37 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Service represents the type of service that is loading configuration.
+// This allows the loader to only load configuration sections relevant to
+// the specific service, improving performance and reducing unnecessary processing.
+type Service int
+
+const (
+	// ServiceNone indicates no specific service - loads all configuration.
+	// Use this for CLI commands or when full configuration is needed.
+	ServiceNone Service = iota
+
+	// ServiceServer is the web UI server service.
+	// Requires: Global, Server, Paths, UI, Queues, Coordinator, Monitoring
+	ServiceServer
+
+	// ServiceScheduler is the scheduler service for automated DAG execution.
+	// Requires: Global, Paths, Scheduler, Queues, Coordinator
+	ServiceScheduler
+
+	// ServiceWorker is the worker service that polls the coordinator for tasks.
+	// Requires: Global, Paths, Worker, Coordinator (peer config)
+	ServiceWorker
+
+	// ServiceCoordinator is the coordinator gRPC server for distributed execution.
+	// Requires: Global, Paths, Coordinator
+	ServiceCoordinator
+
+	// ServiceAgent is for the agent executor (runs DAGs).
+	// Requires: Global, Paths (minimal config)
+	ServiceAgent
+)
+
 // Load creates a new configuration by instantiating a ConfigLoader with the provided options
 // and then invoking its Load method.
 func Load(opts ...ConfigLoaderOption) (*Config, error) {
@@ -35,6 +66,7 @@ type ConfigLoader struct {
 	warnings          []string // Collected warnings during configuration resolution.
 	additionalBaseEnv []string // Additional environment variables to append to the base environment.
 	appHomeDir        string   // Optional override for DAGU_HOME style directory.
+	service           Service  // The service type being configured (determines which config sections to load).
 }
 
 // ConfigLoaderOption defines a functional option for configuring a ConfigLoader.
@@ -52,6 +84,58 @@ func WithAppHomeDir(dir string) ConfigLoaderOption {
 	return func(l *ConfigLoader) {
 		l.appHomeDir = dir
 	}
+}
+
+// WithService sets the service type for configuration loading.
+// This allows the loader to only process configuration sections
+// relevant to the specified service, improving load performance.
+func WithService(service Service) ConfigLoaderOption {
+	return func(l *ConfigLoader) {
+		l.service = service
+	}
+}
+
+// configRequirements defines which configuration sections are needed by a service.
+type configRequirements struct {
+	server      bool
+	scheduler   bool
+	worker      bool
+	coordinator bool
+	ui          bool
+	queues      bool
+	monitoring  bool
+}
+
+// serviceRequirements maps each service type to its required configuration sections.
+// This provides a clear, declarative definition of what each service needs.
+var serviceRequirements = map[Service]configRequirements{
+	ServiceNone: {
+		server: true, scheduler: true, worker: true, coordinator: true,
+		ui: true, queues: true, monitoring: true,
+	},
+	ServiceServer: {
+		server: true, coordinator: true, ui: true, queues: true, monitoring: true,
+	},
+	ServiceScheduler: {
+		scheduler: true, coordinator: true, queues: true,
+	},
+	ServiceWorker: {
+		worker: true, coordinator: true,
+	},
+	ServiceCoordinator: {
+		coordinator: true,
+	},
+	ServiceAgent: {
+		// Minimal config - only Global and Paths (always loaded)
+	},
+}
+
+// requirements returns the configuration requirements for the loader's service type.
+func (l *ConfigLoader) requirements() configRequirements {
+	if req, ok := serviceRequirements[l.service]; ok {
+		return req
+	}
+	return serviceRequirements[ServiceNone]
 }
 
 // NewConfigLoader creates a new ConfigLoader instance and applies all given options.
@@ -122,15 +206,68 @@ func (l *ConfigLoader) Load() (*Config, error) {
 }
 
 // buildConfig transforms the intermediate Definition (raw config data) into a final Config structure.
-// It also handles legacy fields, environment variable overrides, and validations.
+// It uses the service requirements to load only necessary configuration sections.
 func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	var cfg Config
+	req := l.requirements()
 
+	// Always load core and paths configuration
+	if err := l.loadCoreConfig(&cfg, def); err != nil {
+		return nil, err
+	}
+	l.loadPathsConfig(&cfg, def)
+
+	// Load service-specific configuration grouped by requirement
+	if req.server {
+		l.loadServerConfig(&cfg, def)
+	}
+	if req.ui {
+		l.loadUIConfig(&cfg, def)
+	}
+	if req.queues {
+		l.loadQueuesConfig(&cfg, def)
+	}
+	if req.coordinator {
+		l.loadCoordinatorConfig(&cfg, def)
+	}
+	if req.worker {
+		l.loadWorkerConfig(&cfg, def)
+	}
+	if req.scheduler {
+		l.loadSchedulerConfig(&cfg, def)
+	}
+	if req.monitoring {
+		l.loadMonitoringConfig(&cfg, def)
+	}
+
+	// Incorporate legacy field values and environment variable overrides
+	l.loadLegacyFields(&cfg, def, req)
+	l.loadLegacyEnv(&cfg, req)
+
+	// Finalize paths (set derived paths based on DataDir)
+	l.finalizePaths(&cfg)
+
+	// Validate configuration
+	if req.server {
+		if err := l.validateServerConfig(&cfg); err != nil {
+			return nil, err
+		}
+	}
+	if req.ui {
+		if err := l.validateUIConfig(&cfg); err != nil {
+			return nil, err
+		}
+	}
+
+	return &cfg, nil
+}
+
+// loadCoreConfig loads the core configuration settings.
+func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 	baseEnv := LoadBaseEnv()
 	baseEnv.variables = append(baseEnv.variables, l.additionalBaseEnv...)
 
-	// Set global configuration values.
-	cfg.Global = Global{
+	cfg.Core = Core{
 		Debug:        def.Debug,
 		LogFormat:    def.LogFormat,
 		TZ:           def.TZ,
@@ -141,7 +278,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Set Peer configuration if provided
 	if def.Peer.CertFile != "" || def.Peer.KeyFile != "" || def.Peer.ClientCaFile != "" || def.Peer.SkipTLSVerify || def.Peer.Insecure {
-		cfg.Global.Peer = Peer{
+		cfg.Core.Peer = Peer{
 			CertFile:      def.Peer.CertFile,
 			KeyFile:       def.Peer.KeyFile,
 			ClientCaFile:  def.Peer.ClientCaFile,
@@ -150,12 +287,34 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		}
 	}
 
-	// Initialize the timezone (loads the time.Location and sets the TZ environment variable).
-	if err := setTimezone(&cfg.Global); err != nil {
-		return nil, fmt.Errorf("failed to set timezone: %w", err)
+	// Initialize the timezone
+	if err := setTimezone(&cfg.Core); err != nil {
+		return fmt.Errorf("failed to set timezone: %w", err)
 	}
 
-	// Populate server configuration.
+	return nil
+}
+
+// loadPathsConfig loads the file system paths configuration.
+func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) {
+	if def.Paths != nil {
+		cfg.Paths.DAGsDir = fileutil.ResolvePathOrBlank(def.Paths.DAGsDir)
+		cfg.Paths.SuspendFlagsDir = fileutil.ResolvePathOrBlank(def.Paths.SuspendFlagsDir)
+		cfg.Paths.DataDir = fileutil.ResolvePathOrBlank(def.Paths.DataDir)
+		cfg.Paths.LogDir = fileutil.ResolvePathOrBlank(def.Paths.LogDir)
+		cfg.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(def.Paths.AdminLogsDir)
+		cfg.Paths.BaseConfig = fileutil.ResolvePathOrBlank(def.Paths.BaseConfig)
+		cfg.Paths.Executable = fileutil.ResolvePathOrBlank(def.Paths.Executable)
+		cfg.Paths.DAGRunsDir = fileutil.ResolvePathOrBlank(def.Paths.DAGRunsDir)
+		cfg.Paths.QueueDir = fileutil.ResolvePathOrBlank(def.Paths.QueueDir)
+		cfg.Paths.ProcDir = fileutil.ResolvePathOrBlank(def.Paths.ProcDir)
+		cfg.Paths.ServiceRegistryDir = fileutil.ResolvePathOrBlank(def.Paths.ServiceRegistryDir)
+		cfg.Paths.UsersDir = fileutil.ResolvePathOrBlank(def.Paths.UsersDir)
+	}
+}
+
+// loadServerConfig loads the server configuration.
+func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	cfg.Server = Server{
 		Host:        def.Host,
 		Port:        def.Port,
@@ -205,7 +364,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Process authentication settings.
 	if def.Auth != nil {
-		// Set auth mode
 		cfg.Server.Auth.Mode = AuthMode(def.Auth.Mode)
 
 		if def.Auth.Basic != nil {
@@ -251,7 +409,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 
 	// Auto-detect auth mode if not explicitly set
-	// If OIDC is configured (clientId, clientSecret, and issuer are set), default to OIDC mode
 	if cfg.Server.Auth.Mode == "" {
 		oidc := cfg.Server.Auth.OIDC
 		if oidc.ClientId != "" && oidc.ClientSecret != "" && oidc.Issuer != "" {
@@ -262,38 +419,46 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Normalize the BasePath value for proper URL construction.
 	cfg.Server.BasePath = cleanServerBasePath(cfg.Server.BasePath)
+}
 
-	// Set file system paths from the definition.
-	if def.Paths != nil {
-		cfg.Paths.DAGsDir = fileutil.ResolvePathOrBlank(def.Paths.DAGsDir)
-		cfg.Paths.SuspendFlagsDir = fileutil.ResolvePathOrBlank(def.Paths.SuspendFlagsDir)
-		cfg.Paths.DataDir = fileutil.ResolvePathOrBlank(def.Paths.DataDir)
-		cfg.Paths.LogDir = fileutil.ResolvePathOrBlank(def.Paths.LogDir)
-		cfg.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(def.Paths.AdminLogsDir)
-		cfg.Paths.BaseConfig = fileutil.ResolvePathOrBlank(def.Paths.BaseConfig)
-		cfg.Paths.Executable = fileutil.ResolvePathOrBlank(def.Paths.Executable)
-		cfg.Paths.DAGRunsDir = fileutil.ResolvePathOrBlank(def.Paths.DAGRunsDir)
-		cfg.Paths.QueueDir = fileutil.ResolvePathOrBlank(def.Paths.QueueDir)
-		cfg.Paths.ProcDir = fileutil.ResolvePathOrBlank(def.Paths.ProcDir)
-		cfg.Paths.ServiceRegistryDir = fileutil.ResolvePathOrBlank(def.Paths.ServiceRegistryDir)
-		cfg.Paths.UsersDir = fileutil.ResolvePathOrBlank(def.Paths.UsersDir)
+// validateServerConfig validates the server configuration.
+func (l *ConfigLoader) validateServerConfig(cfg *Config) error {
+	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
+		return fmt.Errorf("invalid port number: %d", cfg.Server.Port)
 	}
+	if cfg.Server.TLS != nil {
+		if cfg.Server.TLS.CertFile == "" || cfg.Server.TLS.KeyFile == "" {
+			return fmt.Errorf("TLS configuration incomplete: both cert and key files are required")
+		}
+	}
+	return cfg.validateBuiltinAuth()
+}
 
-	// Set UI configuration if provided.
+// loadUIConfig loads the UI configuration.
+func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
 	if def.UI != nil {
 		cfg.UI.NavbarColor = def.UI.NavbarColor
 		cfg.UI.NavbarTitle = def.UI.NavbarTitle
 		cfg.UI.MaxDashboardPageLimit = def.UI.MaxDashboardPageLimit
 		cfg.UI.LogEncodingCharset = def.UI.LogEncodingCharset
 
-		// Set DAGs configuration if provided
 		if def.UI.DAGs != nil {
 			cfg.UI.DAGs.SortField = def.UI.DAGs.SortField
 			cfg.UI.DAGs.SortOrder = def.UI.DAGs.SortOrder
 		}
 	}
+}
 
-	// Set queue configuration if provided, with default enabled=true.
+// validateUIConfig validates the UI configuration.
+func (l *ConfigLoader) validateUIConfig(cfg *Config) error {
+	if cfg.UI.MaxDashboardPageLimit < 1 {
+		return fmt.Errorf("invalid max dashboard page limit: %d", cfg.UI.MaxDashboardPageLimit)
+	}
+	return nil
+}
+
+// loadQueuesConfig loads the queue configuration.
+func (l *ConfigLoader) loadQueuesConfig(cfg *Config, def Definition) {
 	cfg.Queues.Enabled = true // Default to enabled
 	if def.Queues != nil {
 		cfg.Queues.Enabled = def.Queues.Enabled
@@ -302,27 +467,29 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 				Name:          queueDef.Name,
 				MaxActiveRuns: queueDef.MaxConcurrency,
 			}
-			// For backward compatibility
 			if queueDef.MaxActiveRuns != nil {
 				queueConfig.MaxActiveRuns = *queueDef.MaxActiveRuns
 			}
 			cfg.Queues.Config = append(cfg.Queues.Config, queueConfig)
 		}
 	}
+}
 
-	// Override with values from config file if provided
+// loadCoordinatorConfig loads the coordinator configuration.
+func (l *ConfigLoader) loadCoordinatorConfig(cfg *Config, def Definition) {
 	if def.Coordinator != nil {
 		cfg.Coordinator.Host = def.Coordinator.Host
 		cfg.Coordinator.Advertise = def.Coordinator.Advertise
 		cfg.Coordinator.Port = def.Coordinator.Port
 	}
+}
 
-	// Set worker configuration from nested structure
+// loadWorkerConfig loads the worker configuration.
+func (l *ConfigLoader) loadWorkerConfig(cfg *Config, def Definition) {
 	if def.Worker != nil {
 		cfg.Worker.ID = def.Worker.ID
 		cfg.Worker.MaxActiveRuns = def.Worker.MaxActiveRuns
 
-		// Parse worker labels - can be either string or map
 		if def.Worker.Labels != nil {
 			switch v := def.Worker.Labels.(type) {
 			case string:
@@ -348,12 +515,13 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 			}
 		}
 	}
+}
 
-	// Set scheduler configuration
+// loadSchedulerConfig loads the scheduler configuration.
+func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 	if def.Scheduler != nil {
 		cfg.Scheduler.Port = def.Scheduler.Port
 
-		// Parse scheduler lock stale threshold
 		if def.Scheduler.LockStaleThreshold != "" {
 			if duration, err := time.ParseDuration(def.Scheduler.LockStaleThreshold); err == nil {
 				cfg.Scheduler.LockStaleThreshold = duration
@@ -362,7 +530,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 			}
 		}
 
-		// Parse scheduler lock retry interval
 		if def.Scheduler.LockRetryInterval != "" {
 			if duration, err := time.ParseDuration(def.Scheduler.LockRetryInterval); err == nil {
 				cfg.Scheduler.LockRetryInterval = duration
@@ -371,7 +538,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 			}
 		}
 
-		// Parse scheduler zombie detection interval
 		if def.Scheduler.ZombieDetectionInterval != "" {
 			if duration, err := time.ParseDuration(def.Scheduler.ZombieDetectionInterval); err == nil {
 				cfg.Scheduler.ZombieDetectionInterval = duration
@@ -381,7 +547,23 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		}
 	}
 
-	// Set monitoring configuration
+	// Set defaults
+	if cfg.Scheduler.Port <= 0 {
+		cfg.Scheduler.Port = 8090
+	}
+	if cfg.Scheduler.LockStaleThreshold <= 0 {
+		cfg.Scheduler.LockStaleThreshold = 30 * time.Second
+	}
+	if cfg.Scheduler.LockRetryInterval <= 0 {
+		cfg.Scheduler.LockRetryInterval = 5 * time.Second
+	}
+	if cfg.Scheduler.ZombieDetectionInterval == 0 && !viper.IsSet("scheduler.zombieDetectionInterval") {
+		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second
+	}
+}
+
+// loadMonitoringConfig loads the monitoring configuration.
+func (l *ConfigLoader) loadMonitoringConfig(cfg *Config, def Definition) {
 	if def.Monitoring != nil {
 		if def.Monitoring.Retention != "" {
 			if duration, err := time.ParseDuration(def.Monitoring.Retention); err == nil {
@@ -398,35 +580,18 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 			}
 		}
 	}
+
+	// Set defaults
 	if cfg.Monitoring.Retention <= 0 {
-		cfg.Monitoring.Retention = 24 * time.Hour // Default to 1 day if not set
+		cfg.Monitoring.Retention = 24 * time.Hour
 	}
 	if cfg.Monitoring.Interval <= 0 {
-		cfg.Monitoring.Interval = 5 * time.Second // Default to 5 seconds if not set
+		cfg.Monitoring.Interval = 5 * time.Second
 	}
+}
 
-	if cfg.Scheduler.Port <= 0 {
-		cfg.Scheduler.Port = 8090 // Default scheduler port
-	}
-	if cfg.Scheduler.LockStaleThreshold <= 0 {
-		cfg.Scheduler.LockStaleThreshold = 30 * time.Second // Default to 30 seconds if not set
-	}
-	if cfg.Scheduler.LockRetryInterval <= 0 {
-		cfg.Scheduler.LockRetryInterval = 5 * time.Second // Default to 5 seconds if not set
-	}
-	// Only set default if not explicitly configured (including env vars)
-	// Check if the value is still zero after parsing, which means it wasn't set
-	if cfg.Scheduler.ZombieDetectionInterval == 0 && !viper.IsSet("scheduler.zombieDetectionInterval") {
-		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second // Default to 45 seconds if not set
-	}
-
-	// Incorporate legacy field values, which may override existing settings.
-	l.LoadLegacyFields(&cfg, def)
-
-	// Load legacy environment variable overrides.
-	l.LoadLegacyEnv(&cfg)
-
-	// Setup the directory inside the datadir.
+// finalizePaths sets up derived paths and ensures required paths are set.
+func (l *ConfigLoader) finalizePaths(cfg *Config) {
 	if cfg.Paths.DAGRunsDir == "" {
 		cfg.Paths.DAGRunsDir = filepath.Join(cfg.Paths.DataDir, "dag-runs")
 	}
@@ -443,39 +608,41 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.Paths.UsersDir = filepath.Join(cfg.Paths.DataDir, "users")
 	}
 
-	// Ensure the executable path is set.
 	if cfg.Paths.Executable == "" {
-		executable, err := os.Executable()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get executable path: %w", err)
+		if executable, err := os.Executable(); err == nil {
+			cfg.Paths.Executable = executable
 		}
-		cfg.Paths.Executable = executable
 	}
-
-	// Validate the final configuration.
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
-	}
-
-	return &cfg, nil
 }
 
 // LoadLegacyFields copies values from legacy configuration fields into the current Config structure.
 // Legacy fields are only applied if they are non-empty or non-zero, and may override the new settings.
+// This public method loads all legacy fields without service filtering (for backward compatibility).
 func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
-	if def.BasicAuthUsername != "" {
-		cfg.Server.Auth.Basic.Username = def.BasicAuthUsername
+	l.loadLegacyFields(cfg, def, serviceRequirements[ServiceNone])
+}
+
+// loadLegacyFields copies values from legacy configuration fields into the current Config structure.
+// Legacy fields are only applied if they are non-empty or non-zero, and may override the new settings.
+// It respects the service requirements to only apply relevant legacy fields.
+func (l *ConfigLoader) loadLegacyFields(cfg *Config, def Definition, req configRequirements) {
+	// Server-related legacy fields
+	if req.server {
+		if def.BasicAuthUsername != "" {
+			cfg.Server.Auth.Basic.Username = def.BasicAuthUsername
+		}
+		if def.BasicAuthPassword != "" {
+			cfg.Server.Auth.Basic.Password = def.BasicAuthPassword
+		}
+		if def.APIBaseURL != "" {
+			cfg.Server.APIBasePath = def.APIBaseURL
+		}
+		if def.IsAuthToken {
+			cfg.Server.Auth.Token.Value = def.AuthToken
+		}
 	}
-	if def.BasicAuthPassword != "" {
-		cfg.Server.Auth.Basic.Password = def.BasicAuthPassword
-	}
-	if def.APIBaseURL != "" {
-		cfg.Server.APIBasePath = def.APIBaseURL
-	}
-	if def.IsAuthToken {
-		cfg.Server.Auth.Token.Value = def.AuthToken
-	}
-	// For DAGs directory, if both legacy fields are present, def.DAGsDir takes precedence.
+
+	// Path-related legacy fields (always applied)
 	if def.DAGs != "" {
 		cfg.Paths.DAGsDir = fileutil.ResolvePathOrBlank(def.DAGs)
 	}
@@ -500,34 +667,45 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
 	if def.BaseConfig != "" {
 		cfg.Paths.BaseConfig = fileutil.ResolvePathOrBlank(def.BaseConfig)
 	}
-	if def.LogEncodingCharset != "" {
-		cfg.UI.LogEncodingCharset = def.LogEncodingCharset
-	}
-	if def.NavbarColor != "" {
-		cfg.UI.NavbarColor = def.NavbarColor
-	}
-	if def.NavbarTitle != "" {
-		cfg.UI.NavbarTitle = def.NavbarTitle
-	}
-	if def.MaxDashboardPageLimit > 0 {
-		cfg.UI.MaxDashboardPageLimit = def.MaxDashboardPageLimit
+
+	// UI-related legacy fields
+	if req.ui {
+		if def.LogEncodingCharset != "" {
+			cfg.UI.LogEncodingCharset = def.LogEncodingCharset
+		}
+		if def.NavbarColor != "" {
+			cfg.UI.NavbarColor = def.NavbarColor
+		}
+		if def.NavbarTitle != "" {
+			cfg.UI.NavbarTitle = def.NavbarTitle
+		}
+		if def.MaxDashboardPageLimit > 0 {
+			cfg.UI.MaxDashboardPageLimit = def.MaxDashboardPageLimit
+		}
 	}
 }
 
-// LoadLegacyEnv maps legacy environment variables to their new counterparts in the configuration.
+// loadLegacyEnv maps legacy environment variables to their new counterparts in the configuration.
 // If a legacy env var is set, a warning is logged and the corresponding setter function is called.
-func (l *ConfigLoader) LoadLegacyEnv(cfg *Config) {
-	legacyEnvs := map[string]struct {
-		newKey string
-		setter func(*Config, string)
-	}{
+// It respects the service requirements to only apply relevant legacy environment variables.
+func (l *ConfigLoader) loadLegacyEnv(cfg *Config, req configRequirements) {
+	type legacyEnvMapping struct {
+		newKey     string
+		setter     func(*Config, string)
+		requiresUI bool
+		requiresSv bool
+	}
+
+	legacyEnvs := map[string]legacyEnvMapping{
 		"DAGU__ADMIN_NAVBAR_COLOR": {
-			newKey: "DAGU_NAVBAR_COLOR",
-			setter: func(c *Config, v string) { c.UI.NavbarColor = v },
+			newKey:     "DAGU_NAVBAR_COLOR",
+			setter:     func(c *Config, v string) { c.UI.NavbarColor = v },
+			requiresUI: true,
 		},
 		"DAGU__ADMIN_NAVBAR_TITLE": {
-			newKey: "DAGU_NAVBAR_TITLE",
-			setter: func(c *Config, v string) { c.UI.NavbarTitle = v },
+			newKey:     "DAGU_NAVBAR_TITLE",
+			setter:     func(c *Config, v string) { c.UI.NavbarTitle = v },
+			requiresUI: true,
 		},
 		"DAGU__ADMIN_PORT": {
 			newKey: "DAGU_PORT",
@@ -536,10 +714,12 @@ func (l *ConfigLoader) LoadLegacyEnv(cfg *Config) {
 					c.Server.Port = i
 				}
 			},
+			requiresSv: true,
 		},
 		"DAGU__ADMIN_HOST": {
-			newKey: "DAGU_HOST",
-			setter: func(c *Config, v string) { c.Server.Host = v },
+			newKey:     "DAGU_HOST",
+			setter:     func(c *Config, v string) { c.Server.Host = v },
+			requiresSv: true,
 		},
 		"DAGU__DATA": {
 			newKey: "DAGU_DATA_DIR",
@@ -555,8 +735,16 @@ func (l *ConfigLoader) LoadLegacyEnv(cfg *Config) {
 		},
 	}
 
-	// For each legacy variable, if it is set, log a warning and update the configuration.
+	// For each legacy variable, if it is set and requirements are met, apply it.
 	for oldKey, mapping := range legacyEnvs {
+		// Skip if requirements not met
+		if mapping.requiresUI && !req.ui {
+			continue
+		}
+		if mapping.requiresSv && !req.server {
+			continue
+		}
+
 		if value := os.Getenv(oldKey); value != "" {
 			log.Printf("%s is deprecated. Use %s instead.", oldKey, mapping.newKey)
 			mapping.setter(cfg, value)
@@ -636,138 +824,139 @@ func setViperDefaultValues(paths Paths) {
 	viper.SetDefault("monitoring.interval", "5s")
 }
 
-// bindEnvironmentVariables binds configuration keys to the environment variable names used by Viper.
-// It registers current and legacy environment names for server, global, scheduler, UI, authentication
-// (including OIDC and legacy keys), TLS, file paths (with path normalization where appropriate),
-// (e.g., path normalization) so environment values override config settings.
-func bindEnvironmentVariables() {
-	// Server configurations
-	bindEnv("logFormat", "LOG_FORMAT")
-	bindEnv("basePath", "BASE_PATH")
-	bindEnv("apiBaseURL", "API_BASE_URL")
-	bindEnv("tz", "TZ")
-	bindEnv("host", "HOST")
-	bindEnv("port", "PORT")
-	bindEnv("debug", "DEBUG")
-	bindEnv("headless", "HEADLESS")
+// envBinding defines a mapping between a config key and its environment variable.
+type envBinding struct {
+	key    string // Viper config key
+	env    string // Environment variable suffix (without DAGU_ prefix)
+	isPath bool   // Whether to normalize as a file path
+}
 
-	// Global configurations
-	bindEnv("workDir", "WORK_DIR", asPath())
-	bindEnv("defaultShell", "DEFAULT_SHELL")
-	bindEnv("skipExamples", "SKIP_EXAMPLES")
+// envBindings defines all environment variable bindings for configuration.
+// This declarative approach makes it easy to see and maintain all bindings.
+var envBindings = []envBinding{
+	// Server configurations
+	{key: "logFormat", env: "LOG_FORMAT"},
+	{key: "basePath", env: "BASE_PATH"},
+	{key: "apiBaseURL", env: "API_BASE_URL"},
+	{key: "tz", env: "TZ"},
+	{key: "host", env: "HOST"},
+	{key: "port", env: "PORT"},
+	{key: "debug", env: "DEBUG"},
+	{key: "headless", env: "HEADLESS"},
+	{key: "latestStatusToday", env: "LATEST_STATUS_TODAY"},
+
+	// Core configurations
+	{key: "workDir", env: "WORK_DIR", isPath: true},
+	{key: "defaultShell", env: "DEFAULT_SHELL"},
+	{key: "skipExamples", env: "SKIP_EXAMPLES"},
 
 	// Scheduler configurations
-	bindEnv("scheduler.lockStaleThreshold", "SCHEDULER_LOCK_STALE_THRESHOLD")
-	bindEnv("scheduler.lockRetryInterval", "SCHEDULER_LOCK_RETRY_INTERVAL")
-	bindEnv("scheduler.zombieDetectionInterval", "SCHEDULER_ZOMBIE_DETECTION_INTERVAL")
+	{key: "scheduler.port", env: "SCHEDULER_PORT"},
+	{key: "scheduler.lockStaleThreshold", env: "SCHEDULER_LOCK_STALE_THRESHOLD"},
+	{key: "scheduler.lockRetryInterval", env: "SCHEDULER_LOCK_RETRY_INTERVAL"},
+	{key: "scheduler.zombieDetectionInterval", env: "SCHEDULER_ZOMBIE_DETECTION_INTERVAL"},
 
 	// UI configurations
-	bindEnv("ui.maxDashboardPageLimit", "UI_MAX_DASHBOARD_PAGE_LIMIT")
-	bindEnv("ui.logEncodingCharset", "UI_LOG_ENCODING_CHARSET")
-	bindEnv("ui.navbarColor", "UI_NAVBAR_COLOR")
-	bindEnv("ui.navbarTitle", "UI_NAVBAR_TITLE")
-	bindEnv("ui.dags.sortField", "UI_DAGS_SORT_FIELD")
-	bindEnv("ui.dags.sortOrder", "UI_DAGS_SORT_ORDER")
+	{key: "ui.maxDashboardPageLimit", env: "UI_MAX_DASHBOARD_PAGE_LIMIT"},
+	{key: "ui.logEncodingCharset", env: "UI_LOG_ENCODING_CHARSET"},
+	{key: "ui.navbarColor", env: "UI_NAVBAR_COLOR"},
+	{key: "ui.navbarTitle", env: "UI_NAVBAR_TITLE"},
+	{key: "ui.dags.sortField", env: "UI_DAGS_SORT_FIELD"},
+	{key: "ui.dags.sortOrder", env: "UI_DAGS_SORT_ORDER"},
 
 	// UI configurations (legacy keys)
-	bindEnv("ui.maxDashboardPageLimit", "MAX_DASHBOARD_PAGE_LIMIT")
-	bindEnv("ui.logEncodingCharset", "LOG_ENCODING_CHARSET")
-	bindEnv("ui.navbarColor", "NAVBAR_COLOR")
-	bindEnv("ui.navbarTitle", "NAVBAR_TITLE")
+	{key: "ui.maxDashboardPageLimit", env: "MAX_DASHBOARD_PAGE_LIMIT"},
+	{key: "ui.logEncodingCharset", env: "LOG_ENCODING_CHARSET"},
+	{key: "ui.navbarColor", env: "NAVBAR_COLOR"},
+	{key: "ui.navbarTitle", env: "NAVBAR_TITLE"},
 
 	// Authentication configurations
-	bindEnv("auth.basic.username", "AUTH_BASIC_USERNAME")
-	bindEnv("auth.basic.password", "AUTH_BASIC_PASSWORD")
-	bindEnv("auth.token.value", "AUTH_TOKEN")
+	{key: "auth.mode", env: "AUTH_MODE"},
+	{key: "auth.basic.username", env: "AUTH_BASIC_USERNAME"},
+	{key: "auth.basic.password", env: "AUTH_BASIC_PASSWORD"},
+	{key: "auth.token.value", env: "AUTH_TOKEN"},
 
 	// Authentication configurations (OIDC)
-	bindEnv("auth.oidc.clientId", "AUTH_OIDC_CLIENT_ID")
-	bindEnv("auth.oidc.clientSecret", "AUTH_OIDC_CLIENT_SECRET")
-	bindEnv("auth.oidc.clientUrl", "AUTH_OIDC_CLIENT_URL")
-	bindEnv("auth.oidc.issuer", "AUTH_OIDC_ISSUER")
-	bindEnv("auth.oidc.scopes", "AUTH_OIDC_SCOPES")
-	bindEnv("auth.oidc.whitelist", "AUTH_OIDC_WHITELIST")
+	{key: "auth.oidc.clientId", env: "AUTH_OIDC_CLIENT_ID"},
+	{key: "auth.oidc.clientSecret", env: "AUTH_OIDC_CLIENT_SECRET"},
+	{key: "auth.oidc.clientUrl", env: "AUTH_OIDC_CLIENT_URL"},
+	{key: "auth.oidc.issuer", env: "AUTH_OIDC_ISSUER"},
+	{key: "auth.oidc.scopes", env: "AUTH_OIDC_SCOPES"},
+	{key: "auth.oidc.whitelist", env: "AUTH_OIDC_WHITELIST"},
 
 	// Authentication configurations (legacy keys)
-	bindEnv("auth.basic.username", "BASICAUTH_USERNAME")
-	bindEnv("auth.basic.password", "BASICAUTH_PASSWORD")
-	bindEnv("auth.token.value", "AUTHTOKEN")
+	{key: "auth.basic.username", env: "BASICAUTH_USERNAME"},
+	{key: "auth.basic.password", env: "BASICAUTH_PASSWORD"},
+	{key: "auth.token.value", env: "AUTHTOKEN"},
 
 	// Authentication configurations (builtin)
-	bindEnv("auth.mode", "AUTH_MODE")
-	bindEnv("auth.builtin.admin.username", "AUTH_ADMIN_USERNAME")
-	bindEnv("auth.builtin.admin.password", "AUTH_ADMIN_PASSWORD")
-	bindEnv("auth.builtin.token.secret", "AUTH_TOKEN_SECRET")
-	bindEnv("auth.builtin.token.ttl", "AUTH_TOKEN_TTL")
+	{key: "auth.builtin.admin.username", env: "AUTH_ADMIN_USERNAME"},
+	{key: "auth.builtin.admin.password", env: "AUTH_ADMIN_PASSWORD"},
+	{key: "auth.builtin.token.secret", env: "AUTH_TOKEN_SECRET"},
+	{key: "auth.builtin.token.ttl", env: "AUTH_TOKEN_TTL"},
 
 	// TLS configurations
-	bindEnv("tls.certFile", "CERT_FILE")
-	bindEnv("tls.keyFile", "KEY_FILE")
+	{key: "tls.certFile", env: "CERT_FILE"},
+	{key: "tls.keyFile", env: "KEY_FILE"},
 
 	// File paths
-	bindEnv("paths.dagsDir", "DAGS", asPath())
-	bindEnv("paths.dagsDir", "DAGS_DIR", asPath())
-	bindEnv("paths.executable", "EXECUTABLE", asPath())
-	bindEnv("paths.logDir", "LOG_DIR", asPath())
-	bindEnv("paths.dataDir", "DATA_DIR", asPath())
-	bindEnv("paths.suspendFlagsDir", "SUSPEND_FLAGS_DIR", asPath())
-	bindEnv("paths.adminLogsDir", "ADMIN_LOG_DIR", asPath())
-	bindEnv("paths.baseConfig", "BASE_CONFIG", asPath())
-	bindEnv("paths.dagRunsDir", "DAG_RUNS_DIR", asPath())
-	bindEnv("paths.procDir", "PROC_DIR", asPath())
-	bindEnv("paths.queueDir", "QUEUE_DIR", asPath())
-	bindEnv("paths.serviceRegistryDir", "SERVICE_REGISTRY_DIR", asPath())
-	bindEnv("paths.usersDir", "USERS_DIR", asPath())
-
-	// UI customization
-	bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")
+	{key: "paths.dagsDir", env: "DAGS", isPath: true},
+	{key: "paths.dagsDir", env: "DAGS_DIR", isPath: true},
+	{key: "paths.executable", env: "EXECUTABLE", isPath: true},
+	{key: "paths.logDir", env: "LOG_DIR", isPath: true},
+	{key: "paths.dataDir", env: "DATA_DIR", isPath: true},
+	{key: "paths.suspendFlagsDir", env: "SUSPEND_FLAGS_DIR", isPath: true},
+	{key: "paths.adminLogsDir", env: "ADMIN_LOG_DIR", isPath: true},
+	{key: "paths.baseConfig", env: "BASE_CONFIG", isPath: true},
+	{key: "paths.dagRunsDir", env: "DAG_RUNS_DIR", isPath: true},
+	{key: "paths.procDir", env: "PROC_DIR", isPath: true},
+	{key: "paths.queueDir", env: "QUEUE_DIR", isPath: true},
+	{key: "paths.serviceRegistryDir", env: "SERVICE_REGISTRY_DIR", isPath: true},
+	{key: "paths.usersDir", env: "USERS_DIR", isPath: true},
 
 	// Queue configuration
-	bindEnv("queues.enabled", "QUEUE_ENABLED")
+	{key: "queues.enabled", env: "QUEUE_ENABLED"},
 
-	// Coordinator service configuration (flat structure)
-	bindEnv("coordinator.host", "COORDINATOR_HOST")
-	bindEnv("coordinator.advertise", "COORDINATOR_ADVERTISE")
-	bindEnv("coordinator.port", "COORDINATOR_PORT")
+	// Coordinator configuration
+	{key: "coordinator.host", env: "COORDINATOR_HOST"},
+	{key: "coordinator.advertise", env: "COORDINATOR_ADVERTISE"},
+	{key: "coordinator.port", env: "COORDINATOR_PORT"},
 
-	// Worker configuration (nested structure)
-	bindEnv("worker.id", "WORKER_ID")
-	bindEnv("worker.maxActiveRuns", "WORKER_MAX_ACTIVE_RUNS")
-	bindEnv("worker.labels", "WORKER_LABELS")
-	// Scheduler configuration
-	bindEnv("scheduler.port", "SCHEDULER_PORT")
+	// Worker configuration
+	{key: "worker.id", env: "WORKER_ID"},
+	{key: "worker.maxActiveRuns", env: "WORKER_MAX_ACTIVE_RUNS"},
+	{key: "worker.labels", env: "WORKER_LABELS"},
 
 	// Peer configuration
-	bindEnv("peer.certFile", "PEER_CERT_FILE")
-	bindEnv("peer.keyFile", "PEER_KEY_FILE")
-	bindEnv("peer.clientCaFile", "PEER_CLIENT_CA_FILE")
-	bindEnv("peer.skipTlsVerify", "PEER_SKIP_TLS_VERIFY")
-	bindEnv("peer.insecure", "PEER_INSECURE")
+	{key: "peer.certFile", env: "PEER_CERT_FILE"},
+	{key: "peer.keyFile", env: "PEER_KEY_FILE"},
+	{key: "peer.clientCaFile", env: "PEER_CLIENT_CA_FILE"},
+	{key: "peer.skipTlsVerify", env: "PEER_SKIP_TLS_VERIFY"},
+	{key: "peer.insecure", env: "PEER_INSECURE"},
 
 	// Monitoring configuration
-	bindEnv("monitoring.retention", "MONITORING_RETENTION")
-	bindEnv("monitoring.interval", "MONITORING_INTERVAL")
+	{key: "monitoring.retention", env: "MONITORING_RETENTION"},
+	{key: "monitoring.interval", env: "MONITORING_INTERVAL"},
 }
 
-type bindEnvOption func(fullEnv string)
+// bindEnvironmentVariables binds configuration keys to environment variables using Viper.
+func bindEnvironmentVariables() {
+	prefix := strings.ToUpper(AppSlug) + "_"
 
-func asPath() bindEnvOption {
-	return func(fullEnv string) {
-		if val := os.Getenv(fullEnv); val != "" {
-			if abs, err := filepath.Abs(val); err == nil && abs != val {
-				_ = os.Setenv(fullEnv, abs)
+	for _, b := range envBindings {
+		fullEnv := prefix + b.env
+
+		// Normalize path if needed
+		if b.isPath {
+			if val := os.Getenv(fullEnv); val != "" {
+				if abs, err := filepath.Abs(val); err == nil && abs != val {
+					_ = os.Setenv(fullEnv, abs)
+				}
 			}
 		}
-	}
-}
 
-func bindEnv(key, env string, opts ...bindEnvOption) {
-	prefix := strings.ToUpper(AppSlug) + "_"
-	fullEnv := prefix + env
-	for _, opt := range opts {
-		opt(fullEnv)
+		_ = viper.BindEnv(b.key, fullEnv)
 	}
-	_ = viper.BindEnv(key, fullEnv)
 }
 
 func configureViper(configDir, configFile string) {

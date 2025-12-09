@@ -26,7 +26,7 @@ func NewSubCmdBuilder(cfg *config.Config) *SubCmdBuilder {
 	return &SubCmdBuilder{
 		executable: cfg.Paths.Executable,
 		configFile: cfg.Paths.ConfigFileUsed,
-		baseEnv:    cfg.Global.BaseEnv,
+		baseEnv:    cfg.Core.BaseEnv,
 	}
 }
 

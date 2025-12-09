@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func setTimezone(cfg *Global) error {
+func setTimezone(cfg *Core) error {
 	if cfg.TZ != "" {
 		loc, err := time.LoadLocation(cfg.TZ)
 		if err != nil {

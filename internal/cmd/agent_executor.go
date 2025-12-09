@@ -69,12 +69,12 @@ func shouldEnableProgress(ctx *Context) bool {
 // configureLoggerForProgress temporarily suppresses stderr logging to prevent UI flicker
 func configureLoggerForProgress(ctx *Context, logFile *os.File) {
 	var opts []logger.Option
-	if ctx.Config.Global.Debug {
+	if ctx.Config.Core.Debug {
 		opts = append(opts, logger.WithDebug())
 	}
 	opts = append(opts, logger.WithQuiet()) // Suppress stderr output
-	if ctx.Config.Global.LogFormat != "" {
-		opts = append(opts, logger.WithFormat(ctx.Config.Global.LogFormat))
+	if ctx.Config.Core.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(ctx.Config.Core.LogFormat))
 	}
 	if logFile != nil {
 		opts = append(opts, logger.WithWriter(logFile))

@@ -133,7 +133,7 @@ func TestLoad_Env(t *testing.T) {
 	cfg.Paths.ConfigFileUsed = ""
 
 	expected := &Config{
-		Global: Global{
+		Core: Core{
 			Debug:         true,
 			LogFormat:     "json",
 			TZ:            "Europe/Berlin",
@@ -142,7 +142,7 @@ func TestLoad_Env(t *testing.T) {
 			DefaultShell:  "/bin/zsh",
 			SkipExamples:  false,
 			Peer:          Peer{Insecure: true}, // Default is true
-			BaseEnv:       cfg.Global.BaseEnv,   // Dynamic, copy from actual
+			BaseEnv:       cfg.Core.BaseEnv,     // Dynamic, copy from actual
 		},
 		Server: Server{
 			Host:        "test.example.com",
@@ -238,7 +238,7 @@ func TestLoad_WithAppHomeDir(t *testing.T) {
 	assert.Equal(t, filepath.Join(resolved, "data"), cfg.Paths.DataDir)
 	assert.Equal(t, filepath.Join(resolved, "logs"), cfg.Paths.LogDir)
 
-	baseEnv := cfg.Global.BaseEnv.AsSlice()
+	baseEnv := cfg.Core.BaseEnv.AsSlice()
 	require.Contains(t, baseEnv, fmt.Sprintf("DAGU_HOME=%s", resolved))
 }
 
@@ -338,7 +338,7 @@ scheduler:
 	utcLoc, _ := time.LoadLocation("UTC")
 
 	expected := &Config{
-		Global: Global{
+		Core: Core{
 			Debug:         true,
 			LogFormat:     "json",
 			TZ:            "UTC",
@@ -353,7 +353,7 @@ scheduler:
 				SkipTLSVerify: false,
 				Insecure:      false,
 			},
-			BaseEnv: cfg.Global.BaseEnv, // Dynamic, copy from actual
+			BaseEnv: cfg.Core.BaseEnv, // Dynamic, copy from actual
 		},
 		Server: Server{
 			Host:              "0.0.0.0",
@@ -785,7 +785,8 @@ func TestBindEnv_AsPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			envKey := "DAGU_TEST_PATH_VAR"
+			// Use DAGU_DAGS_DIR as a real path binding that uses isPath: true
+			envKey := "DAGU_DAGS_DIR"
 			os.Unsetenv(envKey)
 			defer os.Unsetenv(envKey)
 
@@ -793,7 +794,8 @@ func TestBindEnv_AsPath(t *testing.T) {
 				os.Setenv(envKey, tt.envValue)
 			}
 
-			bindEnv("test.pathVar", "TEST_PATH_VAR", asPath())
+			// Call the actual bindEnvironmentVariables function
+			bindEnvironmentVariables()
 
 			result := os.Getenv(envKey)
 			if tt.envValue == "" {
