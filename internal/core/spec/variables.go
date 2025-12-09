@@ -13,7 +13,17 @@ import (
 // Case 1: env is a map.
 // Case 2: env is an array of maps.
 // Case 3: is recommended because the order of the environment variables is
-// preserved.
+// loadVariables loads environment variables from strVariables into the process
+// environment and returns the resulting map of key→value.
+//
+// strVariables may be either a map[string]any or a []any containing maps and/or
+// "key=value" strings; entries are collected in input order. For each pair, the
+// value is optionally evaluated and expanded (including command substitution and
+// references to previously defined variables) unless the BuildFlagNoEval option
+// is set on ctx. Successfully evaluated values are written to the OS environment
+// via os.Setenv and recorded in the returned map. The function returns a
+// validation error if the input is malformed, a value fails to evaluate, or an
+// environment variable cannot be set.
 func loadVariables(ctx BuildContext, strVariables any) (
 	map[string]string, error,
 ) {

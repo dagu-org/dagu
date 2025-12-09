@@ -66,7 +66,8 @@ func WithConfigFile(configFile string) ConfigLoaderOption {
 	}
 }
 
-// WithAppHomeDir sets a custom application home directory (equivalent to DAGU_HOME).
+// WithAppHomeDir returns a ConfigLoaderOption that sets the application home directory
+// used by the ConfigLoader, overriding the default DAGU_HOME resolution.
 func WithAppHomeDir(dir string) ConfigLoaderOption {
 	return func(l *ConfigLoader) {
 		l.appHomeDir = dir
@@ -75,7 +76,7 @@ func WithAppHomeDir(dir string) ConfigLoaderOption {
 
 // WithService sets the service type for configuration loading.
 // This allows the loader to only process configuration sections
-// relevant to the specified service, improving load performance.
+// ConfigLoader to determine which configuration sections to load.
 func WithService(service Service) ConfigLoaderOption {
 	return func(l *ConfigLoader) {
 		l.service = service
@@ -119,7 +120,7 @@ func (l *ConfigLoader) requires(section ConfigSection) bool {
 }
 
 // NewConfigLoader creates a new ConfigLoader instance with an isolated viper instance
-// and applies all given options.
+// ConfigLoaderOption values (for example: service, config file path, or app home directory).
 func NewConfigLoader(viper *viper.Viper, options ...ConfigLoaderOption) *ConfigLoader {
 	loader := &ConfigLoader{v: viper}
 	for _, option := range options {
@@ -964,6 +965,8 @@ func (l *ConfigLoader) configureViper(configDir, configFile string) {
 	l.v.AutomaticEnv()
 }
 
+// parseWorkerLabels parses a comma-separated list of `key=value` pairs into a map[string]string.
+// Whitespace around keys and values is trimmed; empty entries and pairs with an empty key are ignored.
 func parseWorkerLabels(labelsStr string) map[string]string {
 	labels := make(map[string]string)
 	if labelsStr == "" {

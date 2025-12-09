@@ -122,6 +122,7 @@ func handleRestartProcess(ctx *Context, d *core.DAG, dagRunID string) error {
 	return executeDAG(ctx, ctx.DAGRunMgr, d)
 }
 
+// It returns an error if run ID generation, log or DAG store initialization, or agent execution fails.
 func executeDAG(ctx *Context, cli runtime.Manager, dag *core.DAG) error {
 	dagRunID, err := genRunID()
 	if err != nil {

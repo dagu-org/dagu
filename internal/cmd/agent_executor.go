@@ -66,7 +66,7 @@ func shouldEnableProgress(ctx *Context) bool {
 		isTerminal(os.Stderr)
 }
 
-// configureLoggerForProgress temporarily suppresses stderr logging to prevent UI flicker
+// is true, applies ctx.Config.Core.LogFormat when set, and directs output to logFile when provided.
 func configureLoggerForProgress(ctx *Context, logFile *os.File) {
 	var opts []logger.Option
 	if ctx.Config.Core.Debug {

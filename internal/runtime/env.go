@@ -104,7 +104,13 @@ func (e Env) UserEnvsMap() map[string]string {
 	return result
 }
 
-// NewEnv creates a new execution context with the given step.
+// NewEnv creates a new Env configured for executing the provided step.
+// It resolves the step's working directory and sets initial per-step environment
+// variables: PWD to the resolved working directory and the DAG run step name.
+// The returned Env embeds the DAG context from ctx, stores the provided step,
+// initializes an empty StepMap, and populates Variables from DAG.Params: for each
+// param containing "=", the text before the first "=" is used as the key and the
+// entire param string is stored as the value.
 func NewEnv(ctx context.Context, step core.Step) Env {
 	rCtx := GetDAGContext(ctx)
 	workingDir := resolveWorkingDir(ctx, step, rCtx)
@@ -385,7 +391,9 @@ func AllEnvs(ctx context.Context) []string {
 	return GetEnv(ctx).AllEnvs()
 }
 
-// AllEnvsMap returns all environment variables as a map.
+// AllEnvsMap builds a map of environment variables from the current Env.
+// It splits each "key=value" entry produced by AllEnvs and maps keys to values;
+// entries that do not contain an "=" separator are ignored.
 func AllEnvsMap(ctx context.Context) map[string]string {
 	envs := GetEnv(ctx).AllEnvs()
 	var result = make(map[string]string)
