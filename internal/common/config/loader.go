@@ -556,7 +556,8 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 	}
 	// Default ZombieDetectionInterval only if not explicitly set.
 	// An invalid value logs a warning but falls back to 0 (disabled).
-	if cfg.Scheduler.ZombieDetectionInterval == 0 && !l.v.IsSet("scheduler.zombieDetectionInterval") {
+	// Setting to 0 or negative disables zombie detection.
+	if cfg.Scheduler.ZombieDetectionInterval <= 0 && !l.v.IsSet("scheduler.zombieDetectionInterval") {
 		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second
 	}
 }
