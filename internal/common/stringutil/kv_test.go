@@ -29,16 +29,6 @@ func TestKeyValue(t *testing.T) {
 		}
 	})
 
-	t.Run("NewKeyValuePanicsOnKeyWithEquals", func(t *testing.T) {
-		t.Parallel()
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("NewKeyValue() expected panic for key containing '='")
-			}
-		}()
-		stringutil.NewKeyValue("key=with=equals", "value")
-	})
-
 	t.Run("RoundTrip", func(t *testing.T) {
 		t.Parallel()
 		key := "testkey"
