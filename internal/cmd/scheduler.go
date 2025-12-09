@@ -34,6 +34,9 @@ This process runs continuously in the foreground until terminated.
 
 var schedulerFlags = []commandLineFlag{dagsFlag}
 
+// runScheduler reads the "dags" flag (if present) to override the configured DAGs directory, initializes a scheduler, and starts it in the foreground.
+//
+// The context `ctx` supplies command flags, configuration, and creation of the scheduler. If scheduler initialization or startup fails, an error wrapping the underlying cause is returned.
 func runScheduler(ctx *Context, _ []string) error {
 	if dagsDir, _ := ctx.Command.Flags().GetString("dags"); dagsDir != "" {
 		ctx.Config.Paths.DAGsDir = dagsDir

@@ -21,7 +21,9 @@ type SubCmdBuilder struct {
 	baseEnv    config.BaseEnv
 }
 
-// NewSubCmdBuilder creates a new CmdBuilder instance.
+// NewSubCmdBuilder returns a new SubCmdBuilder initialized from cfg.
+// It sets Executable to cfg.Paths.Executable, ConfigFile to cfg.Paths.ConfigFileUsed,
+// and base environment to cfg.Core.BaseEnv.
 func NewSubCmdBuilder(cfg *config.Config) *SubCmdBuilder {
 	return &SubCmdBuilder{
 		executable: cfg.Paths.Executable,

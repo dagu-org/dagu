@@ -37,7 +37,7 @@ func (b BaseEnv) AsSlice() []string {
 	return append([]string{}, b.variables...)
 }
 
-// filterEnv filters the provided environment variables.
+// case-insensitive matching on Windows).
 func filterEnv(envs []string, allow map[string]bool, prefixes []string) []string {
 	var filtered []string
 	for _, e := range envs {

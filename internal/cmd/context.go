@@ -73,7 +73,9 @@ func (c *Context) LogToFile(f *os.File) {
 }
 
 // NewContext initializes the application setup by loading configuration,
-// setting up logger context, and logging any warnings.
+// NewContext creates and initializes an application Context for the given Cobra command.
+// It binds command flags, loads configuration scoped to the command, configures logging (respecting debug, quiet, and log format settings), logs any configuration warnings, and initializes history, DAG run, proc, queue, and service registry stores and managers used by the application.
+// NewContext returns an initialized Context or an error if flag retrieval, configuration loading, or other initialization steps fail.
 func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	ctx := cmd.Context()
 
@@ -179,7 +181,10 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 }
 
 // serviceForCommand returns the appropriate config.Service type for a given command name.
-// This enables loading only the necessary configuration sections for each command.
+// serviceForCommand determines which config.Service to load for a given command name.
+// "server" -> ServiceServer, "scheduler" -> ServiceScheduler, "worker" -> ServiceWorker,
+// "coordinator" -> ServiceCoordinator, and "start", "restart", "retry", "dry", "exec" -> ServiceAgent.
+// For any other command it returns ServiceNone so all configuration sections are loaded.
 func serviceForCommand(cmdName string) config.Service {
 	switch cmdName {
 	case "server":

@@ -75,7 +75,9 @@ func WithConfigMutator(mutator func(*config.Config)) HelperOption {
 	}
 }
 
-// Setup creates a new Helper instance for testing
+// Setup creates and returns a Helper preconfigured for tests.
+// 
+// Setup prepares an isolated test environment: it creates a temporary DAGU_HOME, writes a minimal config file, initializes stores and a runtime manager, sets key environment variables (e.g. DEBUG, CI, TZ, DAGU_EXECUTABLE, DAGU_CONFIG, SHELL), installs a cancellable context, and registers cleanup to restore the working directory and remove the temp directory. Use the returned Helper to interact with the test runtime and stores.
 func Setup(t *testing.T, opts ...HelperOption) Helper {
 	setupLock.Lock()
 	defer setupLock.Unlock()
@@ -224,7 +226,10 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	return helper
 }
 
-// writeHelperConfigFile writes a minimal config file so subprocesses can rely on a stable --config path.
+// writeHelperConfigFile writes a minimal YAML configuration to configPath so subprocesses can rely on a stable --config file.
+// The written file contains core settings (debug, log format, default shell, and tz if set), paths, and any enabled or configured
+// queues, scheduler, coordinator, worker, and ui sections derived from cfg.
+// The function fails the test if YAML marshaling or writing the file returns an error.
 func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) {
 	t.Helper()
 

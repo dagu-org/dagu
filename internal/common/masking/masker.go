@@ -71,7 +71,8 @@ func (m *Masker) MaskBytes(input []byte) []byte {
 	return []byte(m.MaskString(string(input)))
 }
 
-// splitEnv splits "KEY=value" into (KEY, value)
+// splitEnv splits an environment variable string of the form "KEY=value" into its key and value.
+// If the input does not contain an '=', it returns two empty strings.
 func splitEnv(env string) (string, string) {
 	key, value, found := strings.Cut(env, "=")
 	if !found {
