@@ -127,11 +127,43 @@ const (
 	PermissionRunDAGs   Permission = "run_dags"
 )
 
+// AuthMode represents the authentication mode.
+type AuthMode string
+
+const (
+	// AuthModeNone disables authentication.
+	AuthModeNone AuthMode = "none"
+	// AuthModeBuiltin enables builtin user management with RBAC.
+	AuthModeBuiltin AuthMode = "builtin"
+	// AuthModeOIDC enables OIDC authentication.
+	AuthModeOIDC AuthMode = "oidc"
+)
+
 // Auth represents the authentication configuration
 type Auth struct {
-	Basic AuthBasic
-	Token AuthToken
-	OIDC  AuthOIDC
+	Mode    AuthMode
+	Basic   AuthBasic
+	Token   AuthToken
+	OIDC    AuthOIDC
+	Builtin AuthBuiltin
+}
+
+// AuthBuiltin represents the builtin authentication configuration
+type AuthBuiltin struct {
+	Admin AdminConfig
+	Token TokenConfig
+}
+
+// AdminConfig represents the initial admin user configuration
+type AdminConfig struct {
+	Username string
+	Password string
+}
+
+// TokenConfig represents the JWT token configuration
+type TokenConfig struct {
+	Secret string
+	TTL    time.Duration
 }
 
 // AuthBasic represents the basic authentication configuration
@@ -167,6 +199,7 @@ type PathsConfig struct {
 	QueueDir           string
 	ProcDir            string
 	ServiceRegistryDir string // Directory for service registry files
+	UsersDir           string // Directory for user data (builtin auth)
 	ConfigFileUsed     string // Path to the configuration file used to load settings
 }
 
@@ -281,6 +314,40 @@ func (c *Config) Validate() error {
 
 	if c.UI.MaxDashboardPageLimit < 1 {
 		return fmt.Errorf("invalid max dashboard page limit: %d", c.UI.MaxDashboardPageLimit)
+	}
+
+	// Validate builtin auth configuration
+	if err := c.validateBuiltinAuth(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateBuiltinAuth validates the builtin authentication configuration.
+func (c *Config) validateBuiltinAuth() error {
+	if c.Server.Auth.Mode != AuthModeBuiltin {
+		return nil
+	}
+
+	// When builtin auth is enabled, users directory must be set
+	if c.Paths.UsersDir == "" {
+		return fmt.Errorf("builtin auth requires paths.usersDir to be set")
+	}
+
+	// Admin username must be set (has default, but check anyway)
+	if c.Server.Auth.Builtin.Admin.Username == "" {
+		return fmt.Errorf("builtin auth requires admin username to be set")
+	}
+
+	// Token secret must be set for JWT signing
+	if c.Server.Auth.Builtin.Token.Secret == "" {
+		return fmt.Errorf("builtin auth requires token secret to be set (auth.builtin.token.secret or AUTH_TOKEN_SECRET env var)")
+	}
+
+	// Token TTL must be positive
+	if c.Server.Auth.Builtin.Token.TTL <= 0 {
+		return fmt.Errorf("builtin auth requires a positive token TTL")
 	}
 
 	return nil

@@ -6,6 +6,8 @@ import { AppBarContext } from './contexts/AppBarContext';
 import { Config, ConfigContext } from './contexts/ConfigContext';
 import { SearchStateProvider } from './contexts/SearchStateContext';
 import { UserPreferencesProvider } from './contexts/UserPreference';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
 import Dashboard from './pages';
@@ -17,11 +19,22 @@ import DAGRunDetails from './pages/dag-runs/dag-run';
 import Queues from './pages/queues';
 import Workers from './pages/workers';
 import SystemStatus from './pages/system-status';
+import LoginPage from './pages/login';
+import UsersPage from './pages/users';
 
 type Props = {
   config: Config;
 };
 
+/**
+ * Root application component that composes providers, routing, and global UI state.
+ *
+ * Initializes and persists the selected remote node, exposes app bar state and config
+ * via context providers, and mounts public (login) and protected routes inside the app layout.
+ *
+ * @param config - Application configuration (e.g., `basePath`, `remoteNodes`) used to configure routing and available remote nodes.
+ * @returns The top-level React element for the application.
+ */
 function App({ config }: Props) {
   const [title, setTitle] = React.useState<string>('');
 
@@ -90,33 +103,57 @@ function App({ config }: Props) {
       >
         <ConfigContext.Provider value={config}>
           <UserPreferencesProvider>
-            <SearchStateProvider>
-              <ToastProvider>
-                <BrowserRouter basename={config.basePath}>
-                  <Layout {...config}>
+            <AuthProvider>
+              <SearchStateProvider>
+                <ToastProvider>
+                  <BrowserRouter basename={config.basePath}>
                     <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/system-status" element={<SystemStatus />} />
-                      <Route path="/dags/" element={<DAGs />} />
+                      {/* Public route - Login page */}
+                      <Route path="/login" element={<LoginPage />} />
+
+                      {/* Protected routes */}
                       <Route
-                        path="/dags/:fileName/:tab"
-                        element={<DAGDetails />}
+                        path="/*"
+                        element={
+                          <ProtectedRoute>
+                            <Layout {...config}>
+                              <Routes>
+                                <Route path="/" element={<Dashboard />} />
+                                <Route path="/dashboard" element={<Dashboard />} />
+                                <Route path="/system-status" element={<SystemStatus />} />
+                                <Route path="/dags/" element={<DAGs />} />
+                                <Route
+                                  path="/dags/:fileName/:tab"
+                                  element={<DAGDetails />}
+                                />
+                                <Route path="/dags/:fileName/" element={<DAGDetails />} />
+                                <Route path="/search/" element={<Search />} />
+                                <Route path="/queues" element={<Queues />} />
+                                <Route path="/dag-runs" element={<DAGRuns />} />
+                                <Route
+                                  path="/dag-runs/:name/:dagRunId"
+                                  element={<DAGRunDetails />}
+                                />
+                                <Route path="/workers" element={<Workers />} />
+                                {/* Admin-only route */}
+                                <Route
+                                  path="/users"
+                                  element={
+                                    <ProtectedRoute requiredRole="admin">
+                                      <UsersPage />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                              </Routes>
+                            </Layout>
+                          </ProtectedRoute>
+                        }
                       />
-                      <Route path="/dags/:fileName/" element={<DAGDetails />} />
-                      <Route path="/search/" element={<Search />} />
-                      <Route path="/queues" element={<Queues />} />
-                      <Route path="/dag-runs" element={<DAGRuns />} />
-                      <Route
-                        path="/dag-runs/:name/:dagRunId"
-                        element={<DAGRunDetails />}
-                      />
-                      <Route path="/workers" element={<Workers />} />
                     </Routes>
-                  </Layout>
-                </BrowserRouter>
-              </ToastProvider>
-            </SearchStateProvider>
+                  </BrowserRouter>
+                </ToastProvider>
+              </SearchStateProvider>
+            </AuthProvider>
           </UserPreferencesProvider>
         </ConfigContext.Provider>
       </AppBarContext.Provider>

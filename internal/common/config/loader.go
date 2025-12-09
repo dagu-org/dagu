@@ -205,6 +205,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Process authentication settings.
 	if def.Auth != nil {
+		// Set auth mode
+		cfg.Server.Auth.Mode = AuthMode(def.Auth.Mode)
+
 		if def.Auth.Basic != nil {
 			cfg.Server.Auth.Basic.Username = def.Auth.Basic.Username
 			cfg.Server.Auth.Basic.Password = def.Auth.Basic.Password
@@ -219,6 +222,41 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 			cfg.Server.Auth.OIDC.Issuer = def.Auth.OIDC.Issuer
 			cfg.Server.Auth.OIDC.Scopes = def.Auth.OIDC.Scopes
 			cfg.Server.Auth.OIDC.Whitelist = def.Auth.OIDC.Whitelist
+		}
+		if def.Auth.Builtin != nil {
+			if def.Auth.Builtin.Admin != nil {
+				cfg.Server.Auth.Builtin.Admin.Username = def.Auth.Builtin.Admin.Username
+				cfg.Server.Auth.Builtin.Admin.Password = def.Auth.Builtin.Admin.Password
+			}
+			if def.Auth.Builtin.Token != nil {
+				cfg.Server.Auth.Builtin.Token.Secret = def.Auth.Builtin.Token.Secret
+				if def.Auth.Builtin.Token.TTL != "" {
+					if duration, err := time.ParseDuration(def.Auth.Builtin.Token.TTL); err == nil {
+						cfg.Server.Auth.Builtin.Token.TTL = duration
+					} else {
+						l.warnings = append(l.warnings, fmt.Sprintf("Invalid auth.builtin.token.ttl value: %s", def.Auth.Builtin.Token.TTL))
+					}
+				}
+			}
+		}
+	}
+
+	// Set default token TTL if not specified
+	if cfg.Server.Auth.Builtin.Token.TTL <= 0 {
+		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+	}
+	// Set default admin username if not specified
+	if cfg.Server.Auth.Builtin.Admin.Username == "" {
+		cfg.Server.Auth.Builtin.Admin.Username = "admin"
+	}
+
+	// Auto-detect auth mode if not explicitly set
+	// If OIDC is configured (clientId, clientSecret, and issuer are set), default to OIDC mode
+	if cfg.Server.Auth.Mode == "" {
+		oidc := cfg.Server.Auth.OIDC
+		if oidc.ClientId != "" && oidc.ClientSecret != "" && oidc.Issuer != "" {
+			cfg.Server.Auth.Mode = AuthModeOIDC
+			l.warnings = append(l.warnings, fmt.Sprintf("Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: %s)", oidc.Issuer))
 		}
 	}
 
@@ -238,6 +276,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		cfg.Paths.QueueDir = fileutil.ResolvePathOrBlank(def.Paths.QueueDir)
 		cfg.Paths.ProcDir = fileutil.ResolvePathOrBlank(def.Paths.ProcDir)
 		cfg.Paths.ServiceRegistryDir = fileutil.ResolvePathOrBlank(def.Paths.ServiceRegistryDir)
+		cfg.Paths.UsersDir = fileutil.ResolvePathOrBlank(def.Paths.UsersDir)
 	}
 
 	// Set UI configuration if provided.
@@ -399,6 +438,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 	if cfg.Paths.ServiceRegistryDir == "" {
 		cfg.Paths.ServiceRegistryDir = filepath.Join(cfg.Paths.DataDir, "service-registry")
+	}
+	if cfg.Paths.UsersDir == "" {
+		cfg.Paths.UsersDir = filepath.Join(cfg.Paths.DataDir, "users")
 	}
 
 	// Ensure the executable path is set.
@@ -597,7 +639,7 @@ func setViperDefaultValues(paths Paths) {
 // bindEnvironmentVariables binds configuration keys to the environment variable names used by Viper.
 // It registers current and legacy environment names for server, global, scheduler, UI, authentication
 // (including OIDC and legacy keys), TLS, file paths (with path normalization where appropriate),
-// coordinator, worker, peer, queues, and monitoring settings.
+// (e.g., path normalization) so environment values override config settings.
 func bindEnvironmentVariables() {
 	// Server configurations
 	bindEnv("logFormat", "LOG_FORMAT")
@@ -651,6 +693,13 @@ func bindEnvironmentVariables() {
 	bindEnv("auth.basic.password", "BASICAUTH_PASSWORD")
 	bindEnv("auth.token.value", "AUTHTOKEN")
 
+	// Authentication configurations (builtin)
+	bindEnv("auth.mode", "AUTH_MODE")
+	bindEnv("auth.builtin.admin.username", "AUTH_ADMIN_USERNAME")
+	bindEnv("auth.builtin.admin.password", "AUTH_ADMIN_PASSWORD")
+	bindEnv("auth.builtin.token.secret", "AUTH_TOKEN_SECRET")
+	bindEnv("auth.builtin.token.ttl", "AUTH_TOKEN_TTL")
+
 	// TLS configurations
 	bindEnv("tls.certFile", "CERT_FILE")
 	bindEnv("tls.keyFile", "KEY_FILE")
@@ -668,6 +717,7 @@ func bindEnvironmentVariables() {
 	bindEnv("paths.procDir", "PROC_DIR", asPath())
 	bindEnv("paths.queueDir", "QUEUE_DIR", asPath())
 	bindEnv("paths.serviceRegistryDir", "SERVICE_REGISTRY_DIR", asPath())
+	bindEnv("paths.usersDir", "USERS_DIR", asPath())
 
 	// UI customization
 	bindEnv("latestStatusToday", "LATEST_STATUS_TODAY")

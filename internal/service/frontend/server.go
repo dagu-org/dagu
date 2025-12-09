@@ -20,7 +20,9 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/persistence/fileuser"
 	"github.com/dagu-org/dagu/internal/runtime"
+	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	apiv2 "github.com/dagu-org/dagu/internal/service/frontend/api/v2"
@@ -45,14 +47,30 @@ type Server struct {
 
 // NewServer constructs a Server configured from cfg and the provided stores, managers, and services.
 // It extracts remote node names from cfg.Server.RemoteNodes, initializes apiV1 and apiV2 with the given dependencies, and populates the Server's funcsConfig fields from cfg.
-func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, rs *resource.Service) *Server {
+// Returns an error if a configured auth service fails to initialize (fail-fast behavior).
+func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, rs *resource.Service) (*Server, error) {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
 	}
+
+	// Build API options
+	var apiOpts []apiv2.APIOption
+
+	// Initialize auth service if builtin mode is enabled
+	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
+		authSvc, err := initBuiltinAuthService(cfg)
+		if err != nil {
+			// Fail fast: if auth is configured but fails to initialize, return error
+			// to prevent server from running without expected authentication
+			return nil, fmt.Errorf("failed to initialize builtin auth service: %w", err)
+		}
+		apiOpts = append(apiOpts, apiv2.WithAuthService(authSvc))
+	}
+
 	return &Server{
 		apiV1:  apiv1.New(dr, drs, drm, cfg),
-		apiV2:  apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs),
+		apiV2:  apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
 		config: cfg,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
@@ -65,8 +83,65 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 			RemoteNodes:           remoteNodes,
 			Permissions:           cfg.Server.Permissions,
 			Paths:                 cfg.Paths,
+			AuthMode:              cfg.Server.Auth.Mode,
 		},
+	}, nil
+}
+
+// initBuiltinAuthService creates a file-based user store, constructs the builtin
+// authentication service, and ensures a default admin user exists.
+// If the admin password is auto-generated, the password is printed to stdout.
+// It returns the initialized auth service or an error if any step fails.
+func initBuiltinAuthService(cfg *config.Config) (*authservice.Service, error) {
+	ctx := context.Background()
+
+	// Validate token secret is configured
+	if cfg.Server.Auth.Builtin.Token.Secret == "" {
+		return nil, fmt.Errorf("builtin auth requires a non-empty token secret (set DAGU_AUTH_TOKEN_SECRET or server.auth.builtin.token.secret)")
 	}
+
+	// Create file-based user store
+	userStore, err := fileuser.New(cfg.Paths.UsersDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user store: %w", err)
+	}
+
+	// Create auth service with configuration
+	authConfig := authservice.Config{
+		TokenSecret: cfg.Server.Auth.Builtin.Token.Secret,
+		TokenTTL:    cfg.Server.Auth.Builtin.Token.TTL,
+	}
+	authSvc := authservice.New(userStore, authConfig)
+
+	// Ensure admin user exists
+	password, created, err := authSvc.EnsureAdminUser(
+		ctx,
+		cfg.Server.Auth.Builtin.Admin.Username,
+		cfg.Server.Auth.Builtin.Admin.Password,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ensure admin user: %w", err)
+	}
+
+	if created {
+		if cfg.Server.Auth.Builtin.Admin.Password == "" {
+			// Password was auto-generated, print to stdout (not to structured logs)
+			// which may be shipped to external systems)
+			fmt.Printf("\n"+
+				"================================================================================\n"+
+				"  ADMIN USER CREATED\n"+
+				"  Username: %s\n"+
+				"  Password: %s\n"+
+				"  NOTE: Please change this password immediately!\n"+
+				"================================================================================\n\n",
+				cfg.Server.Auth.Builtin.Admin.Username, password)
+		} else {
+			logger.Info(ctx, "Created admin user",
+				slog.String("username", cfg.Server.Auth.Builtin.Admin.Username))
+		}
+	}
+
+	return authSvc, nil
 }
 
 // Serve starts the HTTP server and configures routes
@@ -235,6 +310,12 @@ func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath
 	var setupErr error
 
 	r.Route(apiV1BasePath, func(r chi.Router) {
+		if srv.config.Server.Auth.Mode != config.AuthModeNone {
+			// v1 API is not available in auth mode - it doesn't support authentication
+			logger.Info(ctx, "Authentication enabled: V1 API is disabled, use V2 API instead",
+				slog.String("authMode", string(srv.config.Server.Auth.Mode)))
+			return
+		}
 		url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, apiV1BasePath)
 		if err := srv.apiV1.ConfigureRoutes(r, url); err != nil {
 			logger.Error(ctx, "Failed to configure v1 API routes", tag.Error(err))

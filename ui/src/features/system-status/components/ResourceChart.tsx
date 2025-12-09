@@ -73,6 +73,7 @@ const ResourceChart: React.FC<ResourceChartProps> = ({
 
   const lastPoint = formattedData[formattedData.length - 1];
   const currentValue = lastPoint ? lastPoint.value : 0;
+  const gradientId = `gradient-${title.replace(/\s+/g, '-')}`;
 
   return (
     <Card>
@@ -96,15 +97,9 @@ const ResourceChart: React.FC<ResourceChartProps> = ({
               }}
             >
               <defs>
-                <linearGradient
-                  id={`color-${title}`}
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={color} stopOpacity={0} />
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0.05} />
                 </linearGradient>
               </defs>
               <CartesianGrid
@@ -127,8 +122,8 @@ const ResourceChart: React.FC<ResourceChartProps> = ({
                 type="monotone"
                 dataKey="value"
                 stroke={color}
-                fillOpacity={1}
-                fill={`url(#color-${title})`}
+                strokeWidth={2}
+                fill={`url(#${gradientId})`}
               />
             </AreaChart>
           </ResponsiveContainer>

@@ -72,6 +72,9 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireWrite(ctx); err != nil {
+		return nil, err
+	}
 
 	// Determine spec to create with: provided spec or default template
 	var yamlSpec []byte
@@ -124,6 +127,9 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
 	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireWrite(ctx); err != nil {
 		return nil, err
 	}
 
@@ -190,6 +196,9 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireWrite(ctx); err != nil {
+		return nil, err
+	}
 
 	err := a.dagStore.UpdateSpec(ctx, request.FileName, []byte(request.Body.Spec))
 
@@ -209,6 +218,9 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 
 func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject) (api.RenameDAGResponseObject, error) {
 	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireWrite(ctx); err != nil {
 		return nil, err
 	}
 
@@ -523,6 +535,9 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
 
 	dag, err := a.dagStore.GetDetails(ctx, request.FileName)
 	if err != nil {
@@ -734,6 +749,9 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
 
 	dag, err := a.dagStore.GetDetails(ctx, request.FileName, spec.WithoutEval())
 	if err != nil {
@@ -863,6 +881,9 @@ func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDA
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
 
 	_, err := a.dagStore.GetMetadata(ctx, request.FileName)
 	if err != nil {
@@ -912,6 +933,9 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 
 func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequestObject) (api.StopAllDAGRunsResponseObject, error) {
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
 		return nil, err
 	}
 

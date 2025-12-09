@@ -151,6 +151,7 @@ func TestLoad_Env(t *testing.T) {
 			APIBasePath: "/test/api",
 			Headless:    true,
 			Auth: Auth{
+				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
 				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
 				Token: AuthToken{Value: "test-token-123"},
 				OIDC: AuthOIDC{
@@ -158,6 +159,10 @@ func TestLoad_Env(t *testing.T) {
 					ClientSecret: "test-secret",
 					Issuer:       "https://auth.example.com",
 					Scopes:       []string{"openid", "profile", "email"},
+				},
+				Builtin: AuthBuiltin{
+					Admin: AdminConfig{Username: "admin"},
+					Token: TokenConfig{TTL: 24 * time.Hour},
 				},
 			},
 			TLS: &TLSConfig{
@@ -180,6 +185,7 @@ func TestLoad_Env(t *testing.T) {
 			ProcDir:            filepath.Join(testPaths, "proc"),
 			QueueDir:           filepath.Join(testPaths, "queue"),
 			ServiceRegistryDir: filepath.Join(testPaths, "service-registry"),
+			UsersDir:           filepath.Join(testPaths, "data", "users"), // Derived from DataDir
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -211,6 +217,7 @@ func TestLoad_Env(t *testing.T) {
 			Retention: 24 * time.Hour,
 			Interval:  5 * time.Second,
 		},
+		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -356,6 +363,7 @@ scheduler:
 			Headless:          true,
 			LatestStatusToday: true,
 			Auth: Auth{
+				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
 				Basic: AuthBasic{Username: "admin", Password: "secret"},
 				Token: AuthToken{Value: "api-token"},
 				OIDC: AuthOIDC{
@@ -365,6 +373,10 @@ scheduler:
 					Issuer:       "https://accounts.example.com",
 					Scopes:       []string{"openid", "profile", "email"},
 					Whitelist:    []string{"user@example.com"},
+				},
+				Builtin: AuthBuiltin{
+					Admin: AdminConfig{Username: "admin"},
+					Token: TokenConfig{TTL: 24 * time.Hour},
 				},
 			},
 			TLS: &TLSConfig{
@@ -405,6 +417,7 @@ scheduler:
 			ProcDir:            "/var/dagu/data/proc",
 			QueueDir:           "/var/dagu/data/queue",
 			ServiceRegistryDir: "/var/dagu/data/service-registry",
+			UsersDir:           "/var/dagu/data/users",
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -445,6 +458,7 @@ scheduler:
 			Retention: 24 * time.Hour,
 			Interval:  5 * time.Second,
 		},
+		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://accounts.example.com)"},
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -499,6 +513,7 @@ paths:
 	assert.Equal(t, "/custom/data/proc", cfg.Paths.ProcDir)
 	assert.Equal(t, "/custom/data/queue", cfg.Paths.QueueDir)
 	assert.Equal(t, "/custom/data/service-registry", cfg.Paths.ServiceRegistryDir)
+	assert.Equal(t, "/custom/data/users", cfg.Paths.UsersDir)
 }
 
 func TestLoad_EdgeCases_Errors(t *testing.T) {
@@ -814,5 +829,133 @@ monitoring:
 		cfg := loadFromYAML(t, "")
 		assert.Equal(t, 24*time.Hour, cfg.Monitoring.Retention)
 		assert.Equal(t, 5*time.Second, cfg.Monitoring.Interval)
+	})
+}
+
+func TestLoad_AuthMode(t *testing.T) {
+	t.Run("AuthModeNone", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "none"
+`)
+		assert.Equal(t, AuthModeNone, cfg.Server.Auth.Mode)
+	})
+
+	t.Run("AuthModeBuiltin", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "builtin"
+  builtin:
+    admin:
+      username: "admin"
+      password: "secretpass123"
+    token:
+      secret: "my-jwt-secret-key"
+      ttl: "12h"
+`)
+		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
+		assert.Equal(t, "admin", cfg.Server.Auth.Builtin.Admin.Username)
+		assert.Equal(t, "secretpass123", cfg.Server.Auth.Builtin.Admin.Password)
+		assert.Equal(t, "my-jwt-secret-key", cfg.Server.Auth.Builtin.Token.Secret)
+		assert.Equal(t, 12*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
+	})
+
+	t.Run("AuthModeOIDC", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "oidc"
+  oidc:
+    clientId: "my-client-id"
+    clientSecret: "my-client-secret"
+    issuer: "https://auth.example.com"
+    scopes:
+      - "openid"
+      - "profile"
+`)
+		assert.Equal(t, AuthModeOIDC, cfg.Server.Auth.Mode)
+		assert.Equal(t, "my-client-id", cfg.Server.Auth.OIDC.ClientId)
+		assert.Equal(t, "my-client-secret", cfg.Server.Auth.OIDC.ClientSecret)
+		assert.Equal(t, "https://auth.example.com", cfg.Server.Auth.OIDC.Issuer)
+		assert.Equal(t, []string{"openid", "profile"}, cfg.Server.Auth.OIDC.Scopes)
+	})
+
+	t.Run("AuthModeFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_AUTH_MODE":         "builtin",
+			"DAGU_AUTH_TOKEN_SECRET": "test-secret",
+			"DAGU_PATHS_USERS_DIR":   t.TempDir(),
+		})
+		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
+	})
+
+	t.Run("AuthModeDefaultEmpty", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.Equal(t, AuthMode(""), cfg.Server.Auth.Mode)
+	})
+}
+
+func TestLoad_AuthBuiltin(t *testing.T) {
+	t.Run("FromYAML", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "builtin"
+  builtin:
+    admin:
+      username: "superadmin"
+      password: "supersecret123"
+    token:
+      secret: "jwt-signing-secret"
+      ttl: "24h"
+`)
+		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
+		assert.Equal(t, "superadmin", cfg.Server.Auth.Builtin.Admin.Username)
+		assert.Equal(t, "supersecret123", cfg.Server.Auth.Builtin.Admin.Password)
+		assert.Equal(t, "jwt-signing-secret", cfg.Server.Auth.Builtin.Token.Secret)
+		assert.Equal(t, 24*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
+	})
+
+	t.Run("FromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_AUTH_MODE":           "builtin",
+			"DAGU_AUTH_ADMIN_USERNAME": "envadmin",
+			"DAGU_AUTH_ADMIN_PASSWORD": "envpassword123",
+			"DAGU_AUTH_TOKEN_SECRET":   "env-jwt-secret",
+			"DAGU_AUTH_TOKEN_TTL":      "48h",
+		})
+		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
+		assert.Equal(t, "envadmin", cfg.Server.Auth.Builtin.Admin.Username)
+		assert.Equal(t, "envpassword123", cfg.Server.Auth.Builtin.Admin.Password)
+		assert.Equal(t, "env-jwt-secret", cfg.Server.Auth.Builtin.Token.Secret)
+		assert.Equal(t, 48*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
+	})
+
+	t.Run("EmptyPasswordAllowed", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "builtin"
+  builtin:
+    admin:
+      username: "admin"
+      password: ""
+    token:
+      secret: "secret"
+      ttl: "1h"
+`)
+		assert.Equal(t, "admin", cfg.Server.Auth.Builtin.Admin.Username)
+		assert.Equal(t, "", cfg.Server.Auth.Builtin.Admin.Password)
+	})
+
+	t.Run("DefaultTTL", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "builtin"
+  builtin:
+    admin:
+      username: "admin"
+    token:
+      secret: "secret"
+`)
+		// TTL defaults to 24 hours when not specified
+		assert.Equal(t, 24*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
 	})
 }

@@ -1,5 +1,6 @@
 import logoDark from '@/assets/images/logo_dark.png';
 import { useConfig } from '@/contexts/ConfigContext';
+import { useIsAdmin } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
 import {
   Activity,
@@ -10,6 +11,7 @@ import {
   PanelLeft,
   Search,
   Server,
+  Users,
   Workflow,
 } from 'lucide-react';
 import * as React from 'react';
@@ -65,6 +67,7 @@ export const mainListItems = React.forwardRef<
 >(({ isOpen = false, onNavItemClick, onToggle }, ref) => {
   // Get version from config at the top level of the component
   const config = useConfig();
+  const isAdmin = useIsAdmin();
 
   // State for hover
   const [isHovered, setIsHovered] = React.useState(false);
@@ -216,6 +219,15 @@ export const mainListItems = React.forwardRef<
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
+          {isAdmin && (
+            <NavItem
+              to="/users"
+              text="User Management"
+              icon={<Users size={18} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+            />
+          )}
         </div>
       </nav>
       {/* Discord Community link */}
