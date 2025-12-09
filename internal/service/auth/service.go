@@ -85,8 +85,8 @@ var dummyHash = []byte("$2a$12$K8gHXqrFdFvMwJBG0VlJGuAGz3FwBmTm8xnNQblN2tCxrQgPL
 func (s *Service) Authenticate(ctx context.Context, username, password string) (*auth.User, error) {
 	user, err := s.store.GetByUsername(ctx, username)
 	if err != nil {
-		if errors.Is(err, auth.ErrUserNotFound) {
-			// Use constant time comparison to prevent timing attacks.
+		if errors.Is(err, auth.ErrUserNotFound) || errors.Is(err, auth.ErrInvalidUsername) {
+			// Use constant-time comparison to prevent timing attacks.
 			// Compare against a valid bcrypt hash to ensure similar timing.
 			_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 			return nil, ErrInvalidCredentials

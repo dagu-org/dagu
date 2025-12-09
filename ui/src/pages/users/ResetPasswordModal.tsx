@@ -78,7 +78,7 @@ export function ResetPasswordModal({ open, user, onClose }: ResetPasswordModalPr
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ password: newPassword }),
+        body: JSON.stringify({ newPassword }),
       });
 
       if (!response.ok) {

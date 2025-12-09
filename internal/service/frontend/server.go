@@ -95,6 +95,11 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 func initBuiltinAuthService(cfg *config.Config) (*authservice.Service, error) {
 	ctx := context.Background()
 
+	// Validate token secret is configured
+	if cfg.Server.Auth.Builtin.Token.Secret == "" {
+		return nil, fmt.Errorf("builtin auth requires a non-empty token secret (set DAGU_AUTH_TOKEN_SECRET or server.auth.builtin.token.secret)")
+	}
+
 	// Create file-based user store
 	userStore, err := fileuser.New(cfg.Paths.UsersDir)
 	if err != nil {
