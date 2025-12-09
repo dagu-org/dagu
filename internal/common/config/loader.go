@@ -42,7 +42,7 @@ const (
 	ServiceCoordinator
 
 	// ServiceAgent is for the agent executor (runs DAGs).
-	// Requires: Core, Paths (minimal config)
+	// Requires: Core, Paths, Queues (to check if distributed execution is enabled)
 	ServiceAgent
 )
 
@@ -106,7 +106,7 @@ var serviceRequirements = map[Service]ConfigSection{
 	ServiceScheduler:   SectionScheduler | SectionCoordinator | SectionQueues,
 	ServiceWorker:      SectionWorker | SectionCoordinator,
 	ServiceCoordinator: SectionCoordinator,
-	ServiceAgent:       SectionNone, // Only core/paths are loaded by default
+	ServiceAgent:       SectionQueues,
 }
 
 // requires checks if the loader's service requires the given config section.
