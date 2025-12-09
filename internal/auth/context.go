@@ -19,7 +19,6 @@ func WithUser(ctx context.Context, user *User) context.Context {
 }
 
 // UserFromContext retrieves the authenticated user from the context.
-// UserFromContext retrieves the authenticated *User stored in ctx.
 // It returns the user and true if a *User value is present for the package's userContextKey, or nil and false otherwise.
 func UserFromContext(ctx context.Context) (*User, bool) {
 	user, ok := ctx.Value(userContextKey).(*User)
