@@ -86,10 +86,16 @@ func (e Env) UserEnvsMap() map[string]string {
 		result[k] = v
 	}
 
-	// Add step-defined env (highest precedence)
+	// Add step-defined env only if not already set by evaluated Variables.
+	// Variables contains evaluated values (e.g., secrets expanded), while Step.Env
+	// contains raw values (e.g., "${MY_SECRET}"). We don't want to overwrite
+	// the evaluated values with raw placeholders.
 	for _, env := range e.Step.Env {
 		key, value, found := strings.Cut(env, "=")
 		if !found {
+			continue
+		}
+		if _, exists := result[key]; exists {
 			continue
 		}
 		result[key] = value

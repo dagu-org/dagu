@@ -553,6 +553,9 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 	if cfg.Scheduler.LockRetryInterval <= 0 {
 		cfg.Scheduler.LockRetryInterval = 5 * time.Second
 	}
+	// ZombieDetectionInterval is only defaulted if not explicitly set.
+	// If an invalid value is provided, it stays at 0 (disabling zombie detection)
+	// and a warning is generated. This allows users to intentionally disable it.
 	if cfg.Scheduler.ZombieDetectionInterval == 0 && !l.v.IsSet("scheduler.zombieDetectionInterval") {
 		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second
 	}
@@ -711,17 +714,17 @@ func (l *ConfigLoader) loadLegacyEnv(cfg *Config) {
 		},
 		"DAGU__DATA": {
 			newKey:   "DAGU_DATA_DIR",
-			setter:   func(c *Config, v string) { c.Paths.DataDir = v },
+			setter:   func(c *Config, v string) { c.Paths.DataDir = fileutil.ResolvePathOrBlank(v) },
 			requires: SectionNone, // Always applies
 		},
 		"DAGU__SUSPEND_FLAGS_DIR": {
 			newKey:   "DAGU_SUSPEND_FLAGS_DIR",
-			setter:   func(c *Config, v string) { c.Paths.SuspendFlagsDir = v },
+			setter:   func(c *Config, v string) { c.Paths.SuspendFlagsDir = fileutil.ResolvePathOrBlank(v) },
 			requires: SectionNone, // Always applies
 		},
 		"DAGU__ADMIN_LOGS_DIR": {
 			newKey:   "DAGU_ADMIN_LOG_DIR",
-			setter:   func(c *Config, v string) { c.Paths.AdminLogsDir = v },
+			setter:   func(c *Config, v string) { c.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(v) },
 			requires: SectionNone, // Always applies
 		},
 	}
