@@ -252,7 +252,7 @@ Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
-| `DAGU_AUTH_MODE` | - | Authentication mode: `none`, `builtin`, or `oidc` |
+| `DAGU_AUTH_MODE` | `none` | Authentication mode: `none`, `builtin`, or `oidc` |
 | `DAGU_AUTH_BASIC_USERNAME` | - | Basic auth username |
 | `DAGU_AUTH_BASIC_PASSWORD` | - | Basic auth password |
 | `DAGU_AUTH_OIDC_CLIENT_ID` | - | OIDC client ID |

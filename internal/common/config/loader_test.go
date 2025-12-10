@@ -892,9 +892,9 @@ auth:
 		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
 	})
 
-	t.Run("AuthModeDefaultEmpty", func(t *testing.T) {
+	t.Run("AuthModeDefaultNone", func(t *testing.T) {
 		cfg := loadFromYAML(t, "# empty")
-		assert.Equal(t, AuthMode(""), cfg.Server.Auth.Mode)
+		assert.Equal(t, AuthModeNone, cfg.Server.Auth.Mode)
 	})
 }
 

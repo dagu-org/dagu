@@ -782,6 +782,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("basePath", "")
 	l.v.SetDefault("apiBasePath", "/api/v2")
 	l.v.SetDefault("latestStatusToday", false)
+	l.v.SetDefault("auth.mode", string(AuthModeNone))
 
 	// Coordinator settings
 	l.v.SetDefault("coordinator.host", "127.0.0.1")
