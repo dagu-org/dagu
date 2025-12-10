@@ -20,6 +20,7 @@ require (
 	github.com/go-resty/resty/v2 v2.16.5
 	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/goccy/go-yaml v1.18.0
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/golangci/golangci-lint/v2 v2.5.0
 	github.com/google/addlicense v1.1.1
 	github.com/google/jsonschema-go v0.3.0
@@ -37,7 +38,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/samber/slog-multi v1.4.1
 	github.com/segmentio/golines v0.12.2
-	github.com/shirou/gopsutil/v3 v3.24.5
+	github.com/shirou/gopsutil/v4 v4.25.11
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.11.1
@@ -82,6 +83,7 @@ require (
 	github.com/docker/cli v28.4.0+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.8.2 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
+	github.com/ebitengine/purego v0.9.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/gertd/go-pluralize v0.2.1 // indirect
@@ -90,7 +92,6 @@ require (
 	github.com/go-git/go-git/v5 v5.16.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/godoc-lint/godoc-lint v0.10.0 // indirect
-	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golangci/asciicheck v0.5.0 // indirect
@@ -131,12 +132,11 @@ require (
 	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/samber/slog-common v0.19.0 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
-	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/sorairolake/lzip-go v0.3.8 // indirect
 	github.com/speakeasy-api/jsonpath v0.6.0 // indirect
-	github.com/tklauser/go-sysconf v0.3.15 // indirect
-	github.com/tklauser/numcpus v0.10.0 // indirect
+	github.com/tklauser/go-sysconf v0.3.16 // indirect
+	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/woodsbury/decimal128 v1.3.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
@@ -379,6 +379,6 @@ require (
 	github.com/samber/lo v1.51.0
 	golang.org/x/crypto v0.42.0
 	golang.org/x/net v0.44.0 // indirect
-	golang.org/x/sys v0.36.0
+	golang.org/x/sys v0.38.0
 	gopkg.in/yaml.v3 v3.0.1
 )
