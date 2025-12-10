@@ -343,15 +343,15 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	}
 
 	// Process authentication settings.
-	if def.Auth != nil {
-		var explicitAuthMode bool
-		if def.Auth.Mode != nil {
-			cfg.Server.Auth.Mode = AuthMode(*def.Auth.Mode)
-			explicitAuthMode = true
-		} else {
-			cfg.Server.Auth.Mode = AuthModeNone
-		}
+	var explicitAuthMode bool
+	if def.Auth != nil && def.Auth.Mode != nil {
+		cfg.Server.Auth.Mode = AuthMode(*def.Auth.Mode)
+		explicitAuthMode = true
+	} else {
+		cfg.Server.Auth.Mode = AuthModeNone
+	}
 
+	if def.Auth != nil {
 		if def.Auth.Basic != nil {
 			cfg.Server.Auth.Basic.Username = def.Auth.Basic.Username
 			cfg.Server.Auth.Basic.Password = def.Auth.Basic.Password
