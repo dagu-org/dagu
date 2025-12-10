@@ -317,6 +317,14 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid max dashboard page limit: %d", c.UI.MaxDashboardPageLimit)
 	}
 
+	// Validate auth mode
+	switch c.Server.Auth.Mode {
+	case AuthModeNone, AuthModeBuiltin, AuthModeOIDC:
+		// Valid modes
+	default:
+		return fmt.Errorf("invalid auth mode: %q (must be one of: none, builtin, oidc)", c.Server.Auth.Mode)
+	}
+
 	// Validate builtin auth configuration
 	if err := c.validateBuiltinAuth(); err != nil {
 		return err

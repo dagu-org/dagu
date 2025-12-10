@@ -224,6 +224,14 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 		return nil, err
 	}
 
+	if err := core.ValidateDAGName(request.Body.NewFileName); err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
+	}
+
 	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{

@@ -13,6 +13,9 @@ func TestConfig_Validate(t *testing.T) {
 		t.Parallel()
 		cfg := &Config{
 			Server: Server{
+				Auth: Auth{
+					Mode: AuthModeNone,
+				},
 				Port: 8080,
 			},
 			UI: UI{
@@ -72,6 +75,9 @@ func TestConfig_Validate(t *testing.T) {
 		t.Parallel()
 		cfg := &Config{
 			Server: Server{
+				Auth: Auth{
+					Mode: AuthModeNone,
+				},
 				Port: 0,
 			},
 			UI: UI{
@@ -86,6 +92,9 @@ func TestConfig_Validate(t *testing.T) {
 		t.Parallel()
 		cfg := &Config{
 			Server: Server{
+				Auth: Auth{
+					Mode: AuthModeNone,
+				},
 				Port: 65535,
 			},
 			UI: UI{
@@ -100,6 +109,9 @@ func TestConfig_Validate(t *testing.T) {
 		t.Parallel()
 		cfg := &Config{
 			Server: Server{
+				Auth: Auth{
+					Mode: AuthModeNone,
+				},
 				Port: 8080,
 				TLS: &TLSConfig{
 					KeyFile: "/path/to/key.pem",
@@ -118,6 +130,9 @@ func TestConfig_Validate(t *testing.T) {
 		t.Parallel()
 		cfg := &Config{
 			Server: Server{
+				Auth: Auth{
+					Mode: AuthModeNone,
+				},
 				Port: 8080,
 				TLS: &TLSConfig{
 					CertFile: "/path/to/cert.pem",
@@ -141,6 +156,9 @@ func TestConfig_Validate(t *testing.T) {
 					CertFile: "/path/to/cert.pem",
 					KeyFile:  "/path/to/key.pem",
 				},
+				Auth: Auth{
+					Mode: AuthModeNone,
+				},
 			},
 			UI: UI{
 				MaxDashboardPageLimit: 100,
@@ -155,6 +173,9 @@ func TestConfig_Validate(t *testing.T) {
 		cfg := &Config{
 			Server: Server{
 				Port: 8080,
+				Auth: Auth{
+					Mode: AuthModeNone,
+				},
 			},
 			UI: UI{
 				MaxDashboardPageLimit: 0,
@@ -170,6 +191,9 @@ func TestConfig_Validate(t *testing.T) {
 		cfg := &Config{
 			Server: Server{
 				Port: 8080,
+				Auth: Auth{
+					Mode: AuthModeNone,
+				},
 			},
 			UI: UI{
 				MaxDashboardPageLimit: -1,
@@ -185,6 +209,9 @@ func TestConfig_Validate(t *testing.T) {
 		cfg := &Config{
 			Server: Server{
 				Port: 8080,
+				Auth: Auth{
+					Mode: AuthModeNone,
+				},
 			},
 			UI: UI{
 				MaxDashboardPageLimit: 1,
