@@ -107,37 +107,37 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 			return strings.Join(cfg.RemoteNodes, ",")
 		},
 		"pathDAGsDir": func() string {
-			return cfg.Paths.DAGsDir
+			return escapeJSString(cfg.Paths.DAGsDir)
 		},
 		"pathLogDir": func() string {
-			return cfg.Paths.LogDir
+			return escapeJSString(cfg.Paths.LogDir)
 		},
 		"pathSuspendFlagsDir": func() string {
-			return cfg.Paths.SuspendFlagsDir
+			return escapeJSString(cfg.Paths.SuspendFlagsDir)
 		},
 		"pathAdminLogsDir": func() string {
-			return cfg.Paths.AdminLogsDir
+			return escapeJSString(cfg.Paths.AdminLogsDir)
 		},
 		"pathBaseConfig": func() string {
-			return cfg.Paths.BaseConfig
+			return escapeJSString(cfg.Paths.BaseConfig)
 		},
 		"pathDAGRunsDir": func() string {
-			return cfg.Paths.DAGRunsDir
+			return escapeJSString(cfg.Paths.DAGRunsDir)
 		},
 		"pathQueueDir": func() string {
-			return cfg.Paths.QueueDir
+			return escapeJSString(cfg.Paths.QueueDir)
 		},
 		"pathProcDir": func() string {
-			return cfg.Paths.ProcDir
+			return escapeJSString(cfg.Paths.ProcDir)
 		},
 		"pathServiceRegistryDir": func() string {
-			return cfg.Paths.ServiceRegistryDir
+			return escapeJSString(cfg.Paths.ServiceRegistryDir)
 		},
 		"pathConfigFileUsed": func() string {
-			return cfg.Paths.ConfigFileUsed
+			return escapeJSString(cfg.Paths.ConfigFileUsed)
 		},
 		"pathUsersDir": func() string {
-			return cfg.Paths.UsersDir
+			return escapeJSString(cfg.Paths.UsersDir)
 		},
 		"authMode": func() string {
 			return string(cfg.AuthMode)
@@ -150,6 +150,13 @@ func convertBooleanToString(b bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+// escapeJSString escapes backslashes in a string for use in JavaScript.
+// This is needed for Windows paths which contain backslashes that would
+// otherwise be interpreted as escape sequences in JavaScript strings.
+func escapeJSString(s string) string {
+	return strings.ReplaceAll(s, `\`, `\\`)
 }
 
 func baseTemplates() []string {
