@@ -1,6 +1,11 @@
 /**
  * DAG name validation utilities
+ *
+ * These rules must match the backend validation in internal/core/names.go
  */
+
+// Maximum allowed length for a DAG name (must match core.DAGNameMaxLen)
+export const DAG_NAME_MAX_LEN = 40;
 
 // Regex pattern for valid DAG names
 export const DAG_NAME_PATTERN = /^[a-zA-Z0-9_.-]+$/;
@@ -11,6 +16,7 @@ export const DAG_NAME_PATTERN_STRING = '^[a-zA-Z0-9_.-]+$';
 // Error messages
 export const DAG_NAME_ERROR_MESSAGES = {
   empty: 'DAG name cannot be empty',
+  tooLong: `DAG name must be ${DAG_NAME_MAX_LEN} characters or less`,
   invalid: 'DAG name can only contain letters, numbers, underscores, dots, and hyphens',
   space: 'DAG name cannot contain spaces',
 } as const;
@@ -22,11 +28,15 @@ export const DAG_NAME_ERROR_MESSAGES = {
  */
 export function validateDAGName(name: string): { isValid: boolean; error?: string } {
   const trimmedName = name.trim();
-  
+
   if (!trimmedName) {
     return { isValid: false, error: DAG_NAME_ERROR_MESSAGES.empty };
   }
-  
+
+  if (trimmedName.length > DAG_NAME_MAX_LEN) {
+    return { isValid: false, error: DAG_NAME_ERROR_MESSAGES.tooLong };
+  }
+
   if (!DAG_NAME_PATTERN.test(trimmedName)) {
     // Check for spaces specifically to provide better error message
     if (name.includes(' ')) {
@@ -34,7 +44,7 @@ export function validateDAGName(name: string): { isValid: boolean; error?: strin
     }
     return { isValid: false, error: DAG_NAME_ERROR_MESSAGES.invalid };
   }
-  
+
   return { isValid: true };
 }
 
