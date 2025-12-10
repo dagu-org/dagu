@@ -344,7 +344,13 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 
 	// Process authentication settings.
 	if def.Auth != nil {
-		cfg.Server.Auth.Mode = AuthMode(def.Auth.Mode)
+		var explicitAuthMode bool
+		if def.Auth.Mode != nil {
+			cfg.Server.Auth.Mode = AuthMode(*def.Auth.Mode)
+			explicitAuthMode = true
+		} else {
+			cfg.Server.Auth.Mode = AuthModeNone
+		}
 
 		if def.Auth.Basic != nil {
 			cfg.Server.Auth.Basic.Username = def.Auth.Basic.Username
@@ -377,6 +383,15 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 				}
 			}
 		}
+
+		// Auto-detect auth mode if not explicitly set
+		if !explicitAuthMode {
+			oidc := cfg.Server.Auth.OIDC
+			if oidc.ClientId != "" && oidc.ClientSecret != "" && oidc.Issuer != "" {
+				cfg.Server.Auth.Mode = AuthModeOIDC
+				l.warnings = append(l.warnings, fmt.Sprintf("Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: %s)", oidc.Issuer))
+			}
+		}
 	}
 
 	// Set default token TTL if not specified
@@ -386,15 +401,6 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	// Set default admin username if not specified
 	if cfg.Server.Auth.Builtin.Admin.Username == "" {
 		cfg.Server.Auth.Builtin.Admin.Username = "admin"
-	}
-
-	// Auto-detect auth mode if not explicitly set
-	if cfg.Server.Auth.Mode == "" {
-		oidc := cfg.Server.Auth.OIDC
-		if oidc.ClientId != "" && oidc.ClientSecret != "" && oidc.Issuer != "" {
-			cfg.Server.Auth.Mode = AuthModeOIDC
-			l.warnings = append(l.warnings, fmt.Sprintf("Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: %s)", oidc.Issuer))
-		}
 	}
 
 	// Normalize the BasePath value for proper URL construction.
@@ -782,7 +788,6 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("basePath", "")
 	l.v.SetDefault("apiBasePath", "/api/v2")
 	l.v.SetDefault("latestStatusToday", false)
-	l.v.SetDefault("auth.mode", string(AuthModeNone))
 
 	// Coordinator settings
 	l.v.SetDefault("coordinator.host", "127.0.0.1")

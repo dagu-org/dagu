@@ -158,7 +158,7 @@ type PeerDef struct {
 // AuthDef holds the authentication configuration for the application.
 type AuthDef struct {
 	// Mode specifies the authentication mode: "none", "builtin", or "oidc"
-	Mode    string          `mapstructure:"mode"`
+	Mode    *string         `mapstructure:"mode"`
 	Basic   *AuthBasicDef   `mapstructure:"basic"`
 	Token   *AuthTokenDef   `mapstructure:"token"`
 	OIDC    *AuthOIDCDef    `mapstructure:"oidc"`
