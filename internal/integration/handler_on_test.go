@@ -263,15 +263,15 @@ steps:
 //
 // Environment variables availability by handler:
 //
-// | Variable                   | Init   | Success   | Failure | Cancel  | Exit      |
-// |----------------------------|--------|-----------|---------|---------|-----------|
-// | DAG_NAME                   | ✓      | ✓         | ✓       | ✓       | ✓         |
-// | DAG_RUN_ID                 | ✓      | ✓         | ✓       | ✓       | ✓         |
-// | DAG_RUN_LOG_FILE           | ✓      | ✓         | ✓       | ✓       | ✓         |
-// | DAG_RUN_STEP_NAME          | onInit | onSuccess | onFail  | onCancel| onExit    |
-// | DAG_RUN_STATUS             | running| succeeded | failed  | aborted | succeeded/failed |
-// | DAG_RUN_STEP_STDOUT_FILE   | ✗      | ✗         | ✗       | ✗       | ✗         |
-// | DAG_RUN_STEP_STDERR_FILE   | ✗      | ✗         | ✗       | ✗       | ✗         |
+// | Variable                   | Init   | Success   | Failure    | Cancel  | Exit      |
+// |----------------------------|--------|-----------|------------|---------|-----------|
+// | DAG_NAME                   | ✓      | ✓         | ✓          | ✓       | ✓         |
+// | DAG_RUN_ID                 | ✓      | ✓         | ✓          | ✓       | ✓         |
+// | DAG_RUN_LOG_FILE           | ✓      | ✓         | ✓          | ✓       | ✓         |
+// | DAG_RUN_STEP_NAME          | onInit | onSuccess | onFailure  | onCancel| onExit    |
+// | DAG_RUN_STATUS             | running| succeeded | failed     | aborted | succeeded/failed |
+// | DAG_RUN_STEP_STDOUT_FILE   | ✗      | ✗         | ✗          | ✗       | ✗         |
+// | DAG_RUN_STEP_STDERR_FILE   | ✗      | ✗         | ✗          | ✗       | ✗         |
 //
 // Note: DAG_RUN_STATUS in init handler is "running" because the DAG run has started
 // but steps haven't executed yet. DAG_RUN_STEP_STDOUT_FILE and DAG_RUN_STEP_STDERR_FILE
