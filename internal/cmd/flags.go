@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -296,16 +295,13 @@ func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 
 // bindFlags binds command-line flags to the provided Viper instance for configuration lookup.
 // It binds only flags whose `bindViper` field is true, using the camel-cased key produced
-// from each flag's kebab-case name. Binding is performed while holding the config package's
-// Viper lock to ensure thread-safe registration.
+// from each flag's kebab-case name.
 func bindFlags(viper *viper.Viper, cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 	flags := append([]commandLineFlag{configFlag}, additionalFlags...)
 
-	config.WithViperLock(func() {
-		for _, flag := range flags {
-			if flag.bindViper {
-				_ = viper.BindPFlag(stringutil.KebabToCamel(flag.name), cmd.Flags().Lookup(flag.name))
-			}
+	for _, flag := range flags {
+		if flag.bindViper {
+			_ = viper.BindPFlag(stringutil.KebabToCamel(flag.name), cmd.Flags().Lookup(flag.name))
 		}
-	})
+	}
 }
