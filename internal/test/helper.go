@@ -125,14 +125,11 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	}
 
 	ctx := createDefaultContext()
-	// Reset viper state to avoid leaking config file paths across tests.
-	config.WithViperLock(func() {
-		viper.Reset()
-	})
+	// Use a fresh viper instance to avoid any global state issues between tests.
 	v := viper.New()
 	loader := config.NewConfigLoader(v)
-	cfg, err := loader.Load()
-	require.NoError(t, err)
+	cfg, loadErr := loader.Load()
+	require.NoError(t, loadErr)
 
 	cfg.Core.TZ = "UTC"
 	cfg.Core.Location = time.UTC

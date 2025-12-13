@@ -355,9 +355,7 @@ func (c *Context) GenLogFileName(dag *core.DAG, dagRunID string) (string, error)
 
 // NewCommand creates a new command instance with the given cobra command and run function.
 func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *Context, args []string) error) *cobra.Command {
-	config.WithViperLock(func() {
-		initFlags(cmd, flags...)
-	})
+	initFlags(cmd, flags...)
 
 	cmd.SilenceUsage = true
 
