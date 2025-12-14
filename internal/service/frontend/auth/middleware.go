@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	oidc "github.com/coreos/go-oidc"
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	"golang.org/x/oauth2"
 )
@@ -24,6 +25,9 @@ type Options struct {
 	OIDCWhitelist    []string
 	Creds            map[string]string
 	PublicPaths      []string
+	// JWTValidator validates JWT tokens for builtin auth mode.
+	// When set, JWT Bearer tokens are accepted as an authentication method.
+	JWTValidator TokenValidator
 }
 
 // DefaultOptions provides sensible defaults for the middleware.
@@ -37,11 +41,21 @@ func DefaultOptions() Options {
 }
 
 // Middleware creates an HTTP middleware for authentication.
+// It supports multiple authentication methods simultaneously:
+// - JWT Bearer tokens (if JWTValidator is set)
+// - Static API tokens (if APITokenEnabled)
+// - HTTP Basic Auth (if BasicAuthEnabled)
+// - OIDC (if OIDCAuthEnabled)
+// All configured methods work at the same time.
 func Middleware(opts Options) func(next http.Handler) http.Handler {
 	publicPaths := make(map[string]struct{}, len(opts.PublicPaths))
 	for _, p := range opts.PublicPaths {
 		publicPaths[pathutil.NormalizePath(p)] = struct{}{}
 	}
+
+	jwtEnabled := opts.JWTValidator != nil
+	anyAuthEnabled := opts.BasicAuthEnabled || opts.APITokenEnabled || opts.OIDCAuthEnabled || jwtEnabled
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Allow unauthenticated access to explicitly configured public paths.
@@ -51,12 +65,26 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 			}
 
 			// If no auth is enabled, skip authentication
-			if !opts.BasicAuthEnabled && !opts.APITokenEnabled && !opts.OIDCAuthEnabled {
+			if !anyAuthEnabled {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Try API token authentication first if enabled
+			// Try JWT token authentication if enabled (for builtin auth mode)
+			if jwtEnabled {
+				if token := extractBearerToken(r); token != "" {
+					user, err := opts.JWTValidator.GetUserFromToken(r.Context(), token)
+					if err == nil {
+						// JWT token valid - inject user into context
+						ctx := auth.WithUser(r.Context(), user)
+						next.ServeHTTP(w, r.WithContext(ctx))
+						return
+					}
+					// JWT validation failed, continue to try other methods
+				}
+			}
+
+			// Try API token authentication if enabled
 			if opts.APITokenEnabled && checkAPIToken(r, opts.APIToken) {
 				next.ServeHTTP(w, r)
 				return
@@ -70,10 +98,6 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 						return
 					}
 				}
-
-				// Unauthorized: require basic auth
-				requireBasicAuth(w, opts.Realm)
-				return
 			}
 
 			// Try OIDC Auth if enabled
@@ -82,7 +106,11 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 				return
 			}
 
-			// If API token auth was tried and failed, and basic auth is not enabled
+			// No valid authentication found - send appropriate challenge
+			if opts.BasicAuthEnabled {
+				requireBasicAuth(w, opts.Realm)
+				return
+			}
 			requireBearerAuth(w, opts.Realm)
 		})
 	}

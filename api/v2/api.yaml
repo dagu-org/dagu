@@ -2233,6 +2233,9 @@ components:
         - "max_run_reached"
         - "not_running"
         - "already_exists"
+        - "auth.unauthorized"
+        - "auth.token_invalid"
+        - "auth.forbidden"
 
     Stream:
       type: string

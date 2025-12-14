@@ -14,6 +14,12 @@ declare global {
 const container = document.getElementById('root');
 const root = createRoot(container!);
 const config = getConfig();
+
+// Clear stale JWT token when not using builtin auth
+if (config.authMode !== 'builtin') {
+  localStorage.removeItem('dagu_auth_token');
+}
+
 root.render(
   <CookiesProvider>
     <App config={config} />

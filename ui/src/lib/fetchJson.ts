@@ -14,12 +14,12 @@ export default async function fetchJson<JSON = unknown>(
   input: RequestInfo,
   init?: RequestInit
 ): Promise<JSON> {
-  const token = localStorage.getItem('dagu_auth_token');
   const headers: HeadersInit = {
     ...(init?.headers || {}),
     Accept: 'application/json',
   };
 
+  const token = localStorage.getItem('dagu_auth_token');
   if (token) {
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
