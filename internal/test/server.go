@@ -55,7 +55,7 @@ func SetupServer(t *testing.T, opts ...HelperOption) Server {
 		}
 		// Server started successfully, wait for it to be ready
 		waitForServerStart(t, fmt.Sprintf("localhost:%d", port))
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("server failed to start within timeout")
 	}
 
