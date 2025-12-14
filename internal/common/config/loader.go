@@ -392,6 +392,13 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 				l.warnings = append(l.warnings, fmt.Sprintf("Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: %s)", oidc.Issuer))
 			}
 		}
+
+		// Warn if basic auth is configured with builtin auth mode (it will be ignored)
+		if cfg.Server.Auth.Mode == AuthModeBuiltin {
+			if cfg.Server.Auth.Basic.Username != "" || cfg.Server.Auth.Basic.Password != "" {
+				l.warnings = append(l.warnings, "Basic auth configuration is ignored when auth mode is 'builtin'; use builtin auth's admin credentials instead")
+			}
+		}
 	}
 
 	// Set default token TTL if not specified

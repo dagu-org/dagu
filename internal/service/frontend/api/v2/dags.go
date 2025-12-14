@@ -674,6 +674,35 @@ func isSingletonExecution(dag *core.DAG, singleton bool) bool {
 	return singleton || dag.MaxActiveRuns == 1
 }
 
+// ensureSingletonEnqueue checks that no instance of the DAG is running or queued.
+func (a *API) ensureSingletonEnqueue(ctx context.Context, dag *core.DAG) error {
+	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return fmt.Errorf("failed to access proc store: %w", err)
+	}
+	if liveCount > 0 {
+		return &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeMaxRunReached,
+			Message:    fmt.Sprintf("DAG %s is already running, cannot enqueue", dag.Name),
+		}
+	}
+
+	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return fmt.Errorf("failed to read queue: %w", err)
+	}
+	if len(queuedRuns) > 0 {
+		return &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeMaxRunReached,
+			Message:    fmt.Sprintf("DAG %s is already queued, cannot enqueue", dag.Name),
+		}
+	}
+
+	return nil
+}
+
 type startDAGRunOptions struct {
 	params       string
 	dagRunID     string
@@ -799,27 +828,9 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		}
 	}
 
-	// Get count of running DAGs to check against maxActiveRuns (best effort)
-	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to access proc store: %w", err)
-	}
-
-	// Check queued DAG-runs
-	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read queue: %w", err)
-	}
-
-	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
-	// of active runs in the queue does not exceed this limit.
-	// The scheduler only enforces maxActiveRuns at the global queue level.
-	if dag.Queue != "" && dag.MaxActiveRuns > 1 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
-		// The same DAG is already in the queue
-		return nil, &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeMaxRunReached,
-			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot enqueue", dag.Name, dag.MaxActiveRuns),
+	if valueOf(request.Body.Singleton) {
+		if err := a.ensureSingletonEnqueue(ctx, dag); err != nil {
+			return nil, err
 		}
 	}
 

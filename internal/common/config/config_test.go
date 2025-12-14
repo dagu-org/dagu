@@ -337,4 +337,5 @@ func TestConfig_Validate(t *testing.T) {
 		err := cfg.Validate()
 		require.NoError(t, err)
 	})
+
 }

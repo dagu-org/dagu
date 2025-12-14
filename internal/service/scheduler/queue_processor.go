@@ -16,33 +16,45 @@ import (
 )
 
 var (
-	InitialBackoffInterval = 500 * time.Millisecond
-	MaxBackoffInterval     = 60 * time.Second
-	MaxBackoffRetries      = 10
-)
-
-var (
 	errProcessorClosed = errors.New("processor closed")
 	errNotStarted      = errors.New("execution not started")
 )
 
+// BackoffConfig holds configuration for exponential backoff retry logic.
+type BackoffConfig struct {
+	InitialInterval time.Duration
+	MaxInterval     time.Duration
+	MaxRetries      int
+}
+
+// DefaultBackoffConfig returns the default backoff configuration.
+func DefaultBackoffConfig() BackoffConfig {
+	return BackoffConfig{
+		InitialInterval: 500 * time.Millisecond,
+		MaxInterval:     60 * time.Second,
+		MaxRetries:      10,
+	}
+}
+
 // QueueProcessor is responsible for processing queued DAG runs.
 type QueueProcessor struct {
-	queueStore  execution.QueueStore
-	dagRunStore execution.DAGRunStore
-	procStore   execution.ProcStore
-	dagExecutor *DAGExecutor
-	queues      sync.Map // map[string]*queue
-	wakeUpCh    chan struct{}
-	quit        chan struct{}
-	wg          sync.WaitGroup
-	stopOnce    sync.Once
-	prevTime    time.Time
-	lock        sync.Mutex
+	queueStore    execution.QueueStore
+	dagRunStore   execution.DAGRunStore
+	procStore     execution.ProcStore
+	dagExecutor   *DAGExecutor
+	queues        sync.Map // map[string]*queue
+	wakeUpCh      chan struct{}
+	quit          chan struct{}
+	wg            sync.WaitGroup
+	stopOnce      sync.Once
+	prevTime      time.Time
+	lock          sync.Mutex
+	backoffConfig BackoffConfig
 }
 
 type queue struct {
 	maxConcurrency int
+	isGlobal       bool // true if this queue is defined in config (global queue)
 	mu             sync.Mutex
 }
 
@@ -58,6 +70,22 @@ func (q *queue) setMaxConc(val int) {
 	q.maxConcurrency = max(val, 1)
 }
 
+func (q *queue) isGlobalQueue() bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.isGlobal
+}
+
+// QueueProcessorOption is a functional option for configuring QueueProcessor.
+type QueueProcessorOption func(*QueueProcessor)
+
+// WithBackoffConfig sets a custom backoff configuration for the processor.
+func WithBackoffConfig(cfg BackoffConfig) QueueProcessorOption {
+	return func(p *QueueProcessor) {
+		p.backoffConfig = cfg
+	}
+}
+
 // NewQueueProcessor creates a new QueueProcessor.
 func NewQueueProcessor(
 	queueStore execution.QueueStore,
@@ -65,21 +93,28 @@ func NewQueueProcessor(
 	procStore execution.ProcStore,
 	dagExecutor *DAGExecutor,
 	queuesConfig config.Queues,
+	opts ...QueueProcessorOption,
 ) *QueueProcessor {
 	p := &QueueProcessor{
-		queueStore:  queueStore,
-		dagRunStore: dagRunStore,
-		procStore:   procStore,
-		dagExecutor: dagExecutor,
-		wakeUpCh:    make(chan struct{}, 1),
-		quit:        make(chan struct{}),
-		prevTime:    time.Now(),
+		queueStore:    queueStore,
+		dagRunStore:   dagRunStore,
+		procStore:     procStore,
+		dagExecutor:   dagExecutor,
+		wakeUpCh:      make(chan struct{}, 1),
+		quit:          make(chan struct{}),
+		prevTime:      time.Now(),
+		backoffConfig: DefaultBackoffConfig(),
+	}
+
+	for _, opt := range opts {
+		opt(p)
 	}
 
 	for _, queueConfig := range queuesConfig.Config {
 		conc := max(queueConfig.MaxActiveRuns, 1)
 		p.queues.Store(queueConfig.Name, &queue{
 			maxConcurrency: conc,
+			isGlobal:       true, // Queues from config are global queues
 		})
 	}
 
@@ -162,16 +197,25 @@ func (p *QueueProcessor) loop(ctx context.Context) {
 			if _, ok := p.queues.Load(queueName); !ok {
 				p.queues.Store(queueName, &queue{
 					maxConcurrency: 1,
+					isGlobal:       false, // Dynamically created queues are DAG-based (not global)
 				})
 			}
 			activeQueues[queueName] = struct{}{}
 		}
 
-		// clean up non active queues
+		// clean up non active queues (but keep global queues from config)
 		nonActive := make(map[string]struct{})
-		p.queues.Range(func(key, _ any) bool {
+		p.queues.Range(func(key, value any) bool {
 			name, ok := key.(string)
 			if !ok {
+				return true
+			}
+			q, ok := value.(*queue)
+			if !ok {
+				return true
+			}
+			// Don't delete global queues - they should persist even when empty
+			if q.isGlobalQueue() {
 				return true
 			}
 			if _, ok := activeQueues[name]; !ok {
@@ -233,6 +277,18 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 	}
 
 	defer p.wakeUp()
+
+	// For non-global queues, update maxConcurrency from the first queued item's DAG
+	// before calculating available slots. This ensures we use the DAG's configured
+	// maxActiveRuns instead of the default value of 1.
+	if !q.isGlobalQueue() {
+		if err := p.updateQueueMaxConcurrency(ctx, q, items[0]); err != nil {
+			logger.Warn(ctx, "Failed to update queue max concurrency from DAG",
+				tag.Error(err),
+			)
+			// Continue with current maxConcurrency value
+		}
+	}
 
 	alive, err := p.procStore.CountAlive(ctx, queueName)
 	if err != nil {
@@ -356,9 +412,13 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	}
 
 	// Update the queue configuration with the latest execution
+	// Only update maxConcurrency for DAG-based queues, not for global queues
+	// Global queues have their maxConcurrency set from config and should not be overridden
 	queueVal, _ := p.queues.Load(queueName)
 	queue := queueVal.(*queue)
-	queue.setMaxConc(dag.MaxActiveRuns)
+	if !queue.isGlobalQueue() {
+		queue.setMaxConc(dag.MaxActiveRuns)
+	}
 
 	errCh := make(chan error, 1)
 	if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID); err != nil {
@@ -368,9 +428,9 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	}
 
 	// Use exponential backoff for retries for monitoring the execution start
-	policy := backoff.NewExponentialBackoffPolicy(InitialBackoffInterval)
-	policy.MaxInterval = MaxBackoffInterval
-	policy.MaxRetries = MaxBackoffRetries
+	policy := backoff.NewExponentialBackoffPolicy(p.backoffConfig.InitialInterval)
+	policy.MaxInterval = p.backoffConfig.MaxInterval
+	policy.MaxRetries = p.backoffConfig.MaxRetries
 
 	var started bool
 	operation := func(ctx context.Context) error {
@@ -440,4 +500,29 @@ func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, r
 	}
 
 	return false, errNotStarted
+}
+
+// updateQueueMaxConcurrency reads the DAG from a queued item and updates
+// the queue's maxConcurrency based on the DAG's MaxActiveRuns setting.
+// This is used to initialize non-global queues with the correct concurrency
+// before calculating how many items to process.
+func (p *QueueProcessor) updateQueueMaxConcurrency(ctx context.Context, q *queue, item execution.QueuedItemData) error {
+	data, err := item.Data()
+	if err != nil {
+		return err
+	}
+
+	runRef := *data
+	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
+	if err != nil {
+		return err
+	}
+
+	dag, err := attempt.ReadDAG(ctx)
+	if err != nil {
+		return err
+	}
+
+	q.setMaxConc(dag.MaxActiveRuns)
+	return nil
 }

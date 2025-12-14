@@ -606,6 +606,26 @@ scheduler:
 		assert.Contains(t, cfg.Warnings[1], "Invalid scheduler.lockRetryInterval")
 		assert.Contains(t, cfg.Warnings[2], "Invalid scheduler.zombieDetectionInterval")
 	})
+
+	t.Run("BuiltinAuthWithBasicAuthWarning", func(t *testing.T) {
+		t.Parallel()
+		cfg := loadWithEnv(t, `
+auth:
+  mode: builtin
+  builtin:
+    admin:
+      username: admin
+    token:
+      secret: test-secret
+  basic:
+    username: basicuser
+    password: basicpass
+paths:
+  usersDir: /tmp/users
+`, nil)
+		require.Len(t, cfg.Warnings, 1)
+		assert.Contains(t, cfg.Warnings[0], "Basic auth configuration is ignored when auth mode is 'builtin'")
+	})
 }
 
 func TestLoad_LegacyEnv(t *testing.T) {

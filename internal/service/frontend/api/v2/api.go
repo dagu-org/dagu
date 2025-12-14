@@ -187,16 +187,13 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 
 	// Initialize auth configuration
 	authConfig := a.config.Server.Auth
-	if evaluatedAuth, err := cmdutil.EvalObject(ctx, authConfig, nil); err != nil {
-		logger.Warn(ctx, "Failed to evaluate auth configuration", tag.Error(err))
-	} else {
-		authConfig = evaluatedAuth
-	}
+	// Basic auth is disabled when builtin mode is enabled (users should use builtin auth instead)
+	basicAuthEnabled := authConfig.Basic.Username != "" && authConfig.Basic.Password != "" && authConfig.Mode != config.AuthModeBuiltin
 	authOptions := frontendauth.Options{
 		Realm:            "restricted",
 		APITokenEnabled:  authConfig.Token.Value != "",
 		APIToken:         authConfig.Token.Value,
-		BasicAuthEnabled: authConfig.Basic.Username != "" && authConfig.Basic.Password != "",
+		BasicAuthEnabled: basicAuthEnabled,
 		Creds:            map[string]string{authConfig.Basic.Username: authConfig.Basic.Password},
 		PublicPaths: []string{
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/health"),
@@ -219,30 +216,28 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		authOptions.OIDCConfig = oidcCfg.Config
 	}
 
-	// Apply authentication middleware based on auth mode
+	// Apply authentication middleware
+	// For builtin mode, we need to add JWT validation in addition to other auth methods
 	if authConfig.Mode == config.AuthModeBuiltin {
 		if a.authService == nil {
 			return fmt.Errorf("builtin auth mode configured but auth service not initialized")
 		}
-		r.Group(func(r chi.Router) {
-			// For builtin auth, use JWT-based authentication
-			// The BuiltinAuthMiddleware validates JWT tokens and injects user into context
-			r.Use(frontendauth.BuiltinAuthMiddleware(a.authService, authOptions.PublicPaths))
-			r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
-
-			handler := api.NewStrictHandlerWithOptions(a, nil, options)
-			r.Mount("/", api.Handler(handler))
-		})
-	} else {
-		r.Group(func(r chi.Router) {
-			// For other auth modes (basic, token, OIDC), use the legacy middleware
-			r.Use(frontendauth.Middleware(authOptions))
-			r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
-
-			handler := api.NewStrictHandlerWithOptions(a, nil, options)
-			r.Mount("/", api.Handler(handler))
-		})
+		// Add JWT as an additional auth method for builtin mode
+		authOptions.JWTValidator = a.authService
 	}
+
+	r.Group(func(r chi.Router) {
+		// Use the unified middleware that handles all auth methods:
+		// - Basic auth (if configured)
+		// - API token (if configured)
+		// - OIDC (if configured)
+		// - JWT tokens (if builtin mode with JWTValidator)
+		r.Use(frontendauth.Middleware(authOptions))
+		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
+
+		handler := api.NewStrictHandlerWithOptions(a, nil, options)
+		r.Mount("/", api.Handler(handler))
+	})
 
 	return nil
 }
