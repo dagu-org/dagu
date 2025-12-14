@@ -51,6 +51,24 @@ func TestAuth_BasicAuth(t *testing.T) {
 		ExpectStatus(http.StatusOK).Send(t)
 }
 
+// TestAuth_BasicAuthSpecialChars tests that passwords with special characters work
+func TestAuth_BasicAuthSpecialChars(t *testing.T) {
+	// Password with special characters: $, &, @, `, etc.
+	specialPassword := "p@ss$word&with`special"
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Basic.Username = "admin"
+		cfg.Server.Auth.Basic.Password = specialPassword
+	}))
+
+	// Without auth - should fail
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
+
+	// With correct credentials including special chars - should succeed
+	server.Client().Get("/api/v2/dag-runs").
+		WithBasicAuth("admin", specialPassword).
+		ExpectStatus(http.StatusOK).Send(t)
+}
+
 // TestAuth_APIToken tests that API token auth works
 func TestAuth_APIToken(t *testing.T) {
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {

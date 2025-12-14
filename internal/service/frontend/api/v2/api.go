@@ -187,11 +187,6 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 
 	// Initialize auth configuration
 	authConfig := a.config.Server.Auth
-	if evaluatedAuth, err := cmdutil.EvalObject(ctx, authConfig, nil); err != nil {
-		logger.Warn(ctx, "Failed to evaluate auth configuration", tag.Error(err))
-	} else {
-		authConfig = evaluatedAuth
-	}
 	// Basic auth is disabled when builtin mode is enabled (users should use builtin auth instead)
 	basicAuthEnabled := authConfig.Basic.Username != "" && authConfig.Basic.Password != "" && authConfig.Mode != config.AuthModeBuiltin
 	authOptions := frontendauth.Options{
