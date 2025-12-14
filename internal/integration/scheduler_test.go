@@ -250,9 +250,9 @@ steps:
 		require.NoError(t, err)
 
 		startedAt, err := stringutil.ParseTime(status.StartedAt)
-		if err == nil && !startedAt.IsZero() {
-			startTimes = append(startTimes, startedAt)
-		}
+		require.NoError(t, err, "Failed to parse start time for run %s", runID)
+		require.False(t, startedAt.IsZero(), "Start time is zero for run %s", runID)
+		startTimes = append(startTimes, startedAt)
 	}
 
 	// All 3 DAGs should have started
