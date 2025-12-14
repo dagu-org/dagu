@@ -496,6 +496,37 @@ For discussions, support, and sharing ideas, join our community on [Discord](htt
 
 Changelog of recent updates can be found in the [Changelog](https://docs.dagu.cloud/reference/changelog) section of the documentation.
 
+## Acknowledgements
+
+### Sponsors & Supporters
+
+<div align="center">
+  <h3>💜 Premium Sponsors</h3>
+  <a href="https://github.com/slashbinlabs">
+    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fslashbinlabs.png&w=150&h=150&fit=cover&mask=circle" width="100" height="100" alt="@slashbinlabs">
+  </a>
+
+  <h3>✨ Supporters</h3>
+  <a href="https://github.com/disizmj">
+    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fdisizmj.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@disizmj" style="margin: 5px;">
+  </a>
+  <a href="https://github.com/Arvintian">
+    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@Arvintian" style="margin: 5px;">
+  </a>
+  <a href="https://github.com/yurivish">
+    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyurivish.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@yurivish" style="margin: 5px;">
+  </a>
+  <a href="https://github.com/jayjoshi64">
+    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fjayjoshi64.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@jayjoshi64" style="margin: 5px;">
+  </a>
+
+  <br/><br/>
+  
+  <a href="https://github.com/sponsors/dagu-org">
+    <img src="https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86" width="150" alt="Sponsor">
+  </a>
+</div>
+
 ## Contributing
 
 We welcome contributions of all kinds! Whether you're a developer, a designer, or a user, your help is valued. Here are a few ways to get involved:
@@ -507,8 +538,6 @@ We welcome contributions of all kinds! Whether you're a developer, a designer, o
 
 For more details, see our [Contribution Guide](./CONTRIBUTING.md).
 
-## Acknowledgements
-
 ### Contributors
 
 <a href="https://github.com/dagu-org/dagu/graphs/contributors">
@@ -516,15 +545,6 @@ For more details, see our [Contribution Guide](./CONTRIBUTING.md).
 </a>
 
 Thanks to all the contributors who have helped make Dagu better! Your contributions, whether through code, documentation, or feedback, are invaluable to the project.
-
-### Sponsors & Supporters
-
-<a href="https://github.com/disizmj"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fdisizmj.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@disizmj"></a>
-<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a>
-<a href="https://github.com/yurivish"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyurivish.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yurivish"></a>
-<a href="https://github.com/jayjoshi64"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fjayjoshi64.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@jayjoshi64"></a>
-
-Thanks for supporting Dagu’s development! Join our supporters: [GitHub Sponsors](https://github.com/sponsors/dagu-org)
 
 ## License
 
