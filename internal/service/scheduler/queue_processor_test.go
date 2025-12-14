@@ -117,4 +117,3 @@ func TestQueueProcessor_StrictFIFO(t *testing.T) {
 	require.True(t, foundRun1, "run-1 should still be in queue")
 	require.True(t, foundRun2, "run-2 should still be in queue (strict FIFO - not processed)")
 }
-
