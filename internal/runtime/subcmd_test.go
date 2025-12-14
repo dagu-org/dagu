@@ -251,6 +251,8 @@ func TestDequeue(t *testing.T) {
 
 		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
 		assert.Contains(t, spec.Args, "dequeue")
+		// Queue name should be the first argument after "dequeue"
+		assert.Equal(t, "test-dag", spec.Args[1])
 		assert.Contains(t, spec.Args, "--dag-run=test-dag:run-123")
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
@@ -270,7 +272,25 @@ func TestDequeue(t *testing.T) {
 		spec := builderNoFile.Dequeue(dag, dagRun)
 
 		assert.NotContains(t, spec.Args, "--config")
+		// Queue name should be the first argument after "dequeue"
+		assert.Equal(t, "test-dag", spec.Args[1])
 		assert.Contains(t, spec.Args, "--dag-run=test-dag:run-456")
+	})
+
+	t.Run("DequeueWithCustomQueue", func(t *testing.T) {
+		t.Parallel()
+		dagWithQueue := &core.DAG{
+			Name:       "test-dag",
+			Queue:      "custom-queue",
+			Location:   "/path/to/dag.yaml",
+			WorkingDir: "/path/to",
+		}
+		dagRun := execution.NewDAGRunRef("test-dag", "run-789")
+		spec := builder.Dequeue(dagWithQueue, dagRun)
+
+		// Queue name should be the custom queue, not the DAG name
+		assert.Equal(t, "custom-queue", spec.Args[1])
+		assert.Contains(t, spec.Args, "--dag-run=test-dag:run-789")
 	})
 }
 
