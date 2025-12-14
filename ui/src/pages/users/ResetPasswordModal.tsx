@@ -72,8 +72,8 @@ export function ResetPasswordModal({ open, user, onClose }: ResetPasswordModalPr
 
     try {
       const token = localStorage.getItem('dagu_auth_token');
-      const response = await fetch(`${config.apiURL}/users/${user.id}/password`, {
-        method: 'PUT',
+      const response = await fetch(`${config.apiURL}/users/${user.id}/reset-password`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,

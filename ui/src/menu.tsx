@@ -219,7 +219,7 @@ export const mainListItems = React.forwardRef<
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
-          {isAdmin && (
+          {isAdmin && config.authMode === 'builtin' && (
             <NavItem
               to="/users"
               text="User Management"
