@@ -11,6 +11,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestAuth_NoAuthConfigured tests that without any auth configured, requests are allowed
+func TestAuth_NoAuthConfigured(t *testing.T) {
+	server := test.SetupServer(t)
+
+	// Without any auth configured, requests should be allowed
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusOK).Send(t)
+}
+
+// TestAuth_BasicAuthRequired tests that with basic auth configured, requests without auth fail
+func TestAuth_BasicAuthRequired(t *testing.T) {
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Basic.Username = "admin"
+		cfg.Server.Auth.Basic.Password = "secret"
+	}))
+
+	// Without auth - should fail with 401
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
+}
+
 // TestAuth_BasicAuth tests that basic auth works
 func TestAuth_BasicAuth(t *testing.T) {
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
@@ -139,15 +158,15 @@ func TestAuth_BuiltinModeWithAPIToken(t *testing.T) {
 		ExpectStatus(http.StatusOK).Send(t)
 }
 
-// TestAuth_BuiltinModeWithBasicAuth tests that builtin mode works with both JWT and basic auth
-func TestAuth_BuiltinModeWithBasicAuth(t *testing.T) {
+// TestAuth_BuiltinModeIgnoresBasicAuth tests that basic auth is ignored in builtin mode
+func TestAuth_BuiltinModeIgnoresBasicAuth(t *testing.T) {
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Mode = config.AuthModeBuiltin
 		cfg.Server.Auth.Builtin.Admin.Username = "admin"
 		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
 		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
 		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
-		// Also configure basic auth
+		// Configure basic auth (should be ignored in builtin mode)
 		cfg.Server.Auth.Basic.Username = "basicuser"
 		cfg.Server.Auth.Basic.Password = "basicpass"
 	}))
@@ -155,54 +174,12 @@ func TestAuth_BuiltinModeWithBasicAuth(t *testing.T) {
 	// Without auth - should fail
 	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
 
-	// With basic auth - should succeed
+	// With basic auth - should fail because basic auth is ignored in builtin mode
 	server.Client().Get("/api/v2/dag-runs").
 		WithBasicAuth("basicuser", "basicpass").
-		ExpectStatus(http.StatusOK).Send(t)
+		ExpectStatus(http.StatusUnauthorized).Send(t)
 
-	// Login to get JWT token
-	loginResp := server.Client().Post("/api/v2/auth/login", api.LoginRequest{
-		Username: "admin",
-		Password: "adminpass",
-	}).ExpectStatus(http.StatusOK).Send(t)
-
-	var loginResult api.LoginResponse
-	loginResp.Unmarshal(t, &loginResult)
-
-	// With JWT token - should also succeed
-	server.Client().Get("/api/v2/dag-runs").
-		WithBearerToken(loginResult.Token).
-		ExpectStatus(http.StatusOK).Send(t)
-}
-
-// TestAuth_BuiltinModeAllMethods tests that all auth methods work simultaneously in builtin mode
-func TestAuth_BuiltinModeAllMethods(t *testing.T) {
-	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
-		cfg.Server.Auth.Mode = config.AuthModeBuiltin
-		cfg.Server.Auth.Builtin.Admin.Username = "admin"
-		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
-		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
-		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
-		// Configure all auth methods
-		cfg.Server.Auth.Token.Value = "my-api-token"
-		cfg.Server.Auth.Basic.Username = "basicuser"
-		cfg.Server.Auth.Basic.Password = "basicpass"
-	}))
-
-	// Without auth - should fail
-	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
-
-	// With API token - should succeed
-	server.Client().Get("/api/v2/dag-runs").
-		WithBearerToken("my-api-token").
-		ExpectStatus(http.StatusOK).Send(t)
-
-	// With basic auth - should succeed
-	server.Client().Get("/api/v2/dag-runs").
-		WithBasicAuth("basicuser", "basicpass").
-		ExpectStatus(http.StatusOK).Send(t)
-
-	// Login to get JWT token
+	// Login to get JWT token - this should work
 	loginResp := server.Client().Post("/api/v2/auth/login", api.LoginRequest{
 		Username: "admin",
 		Password: "adminpass",
