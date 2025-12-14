@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useContext } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
-import { useAuth, TOKEN_KEY } from '@/contexts/AuthContext';
+import { useAuth, useIsAdmin, TOKEN_KEY } from '@/contexts/AuthContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { components } from '@/api/v2/schema';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,7 @@ type User = components['schemas']['User'];
 export default function UsersPage() {
   const config = useConfig();
   const { user: currentUser } = useAuth();
+  const isAdmin = useIsAdmin();
   const appBarContext = useContext(AppBarContext);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -202,10 +203,12 @@ export default function UsersPage() {
                           <Pencil className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setResetPasswordUser(user)}>
-                          <Key className="h-4 w-4 mr-2" />
-                          Reset Password
-                        </DropdownMenuItem>
+                        {isAdmin && (
+                          <DropdownMenuItem onClick={() => setResetPasswordUser(user)}>
+                            <Key className="h-4 w-4 mr-2" />
+                            Reset Password
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={() => setDeletingUser(user)}
                           className="text-destructive"
