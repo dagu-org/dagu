@@ -43,6 +43,7 @@ type QueueProcessor struct {
 
 type queue struct {
 	maxConcurrency int
+	isGlobal       bool // true if this queue is defined in config (global queue)
 	mu             sync.Mutex
 }
 
@@ -56,6 +57,12 @@ func (q *queue) setMaxConc(val int) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.maxConcurrency = max(val, 1)
+}
+
+func (q *queue) isGlobalQueue() bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.isGlobal
 }
 
 // NewQueueProcessor creates a new QueueProcessor.
@@ -80,6 +87,7 @@ func NewQueueProcessor(
 		conc := max(queueConfig.MaxActiveRuns, 1)
 		p.queues.Store(queueConfig.Name, &queue{
 			maxConcurrency: conc,
+			isGlobal:       true, // Queues from config are global queues
 		})
 	}
 
@@ -162,16 +170,25 @@ func (p *QueueProcessor) loop(ctx context.Context) {
 			if _, ok := p.queues.Load(queueName); !ok {
 				p.queues.Store(queueName, &queue{
 					maxConcurrency: 1,
+					isGlobal:       false, // Dynamically created queues are DAG-based (not global)
 				})
 			}
 			activeQueues[queueName] = struct{}{}
 		}
 
-		// clean up non active queues
+		// clean up non active queues (but keep global queues from config)
 		nonActive := make(map[string]struct{})
-		p.queues.Range(func(key, _ any) bool {
+		p.queues.Range(func(key, value any) bool {
 			name, ok := key.(string)
 			if !ok {
+				return true
+			}
+			q, ok := value.(*queue)
+			if !ok {
+				return true
+			}
+			// Don't delete global queues - they should persist even when empty
+			if q.isGlobalQueue() {
 				return true
 			}
 			if _, ok := activeQueues[name]; !ok {
@@ -356,9 +373,13 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	}
 
 	// Update the queue configuration with the latest execution
+	// Only update maxConcurrency for DAG-based queues, not for global queues
+	// Global queues have their maxConcurrency set from config and should not be overridden
 	queueVal, _ := p.queues.Load(queueName)
 	queue := queueVal.(*queue)
-	queue.setMaxConc(dag.MaxActiveRuns)
+	if !queue.isGlobalQueue() {
+		queue.setMaxConc(dag.MaxActiveRuns)
+	}
 
 	errCh := make(chan error, 1)
 	if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID); err != nil {
