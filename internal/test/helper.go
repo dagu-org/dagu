@@ -145,6 +145,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	cfg.Paths.QueueDir = filepath.Join(dataDir, "queue")
 	cfg.Paths.ProcDir = filepath.Join(dataDir, "proc")
 	cfg.Paths.ServiceRegistryDir = filepath.Join(dataDir, "service-registry")
+	cfg.Paths.UsersDir = filepath.Join(dataDir, "users")
 	cfg.Paths.SuspendFlagsDir = filepath.Join(tmpDir, "suspend-flags")
 	cfg.Paths.AdminLogsDir = filepath.Join(tmpDir, "admin-logs")
 	if options.DAGsDir != "" {
@@ -253,6 +254,7 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 		"queueDir":           cfg.Paths.QueueDir,
 		"procDir":            cfg.Paths.ProcDir,
 		"serviceRegistryDir": cfg.Paths.ServiceRegistryDir,
+		"usersDir":           cfg.Paths.UsersDir,
 		"executable":         cfg.Paths.Executable,
 	}
 
