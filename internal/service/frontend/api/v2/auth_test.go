@@ -13,6 +13,7 @@ import (
 
 // TestAuth_NoAuthConfigured tests that without any auth configured, requests are allowed
 func TestAuth_NoAuthConfigured(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t)
 
 	// Without any auth configured, requests should be allowed
@@ -21,6 +22,7 @@ func TestAuth_NoAuthConfigured(t *testing.T) {
 
 // TestAuth_BasicAuthRequired tests that with basic auth configured, requests without auth fail
 func TestAuth_BasicAuthRequired(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Basic.Username = "admin"
 		cfg.Server.Auth.Basic.Password = "secret"
@@ -32,6 +34,7 @@ func TestAuth_BasicAuthRequired(t *testing.T) {
 
 // TestAuth_BasicAuth tests that basic auth works
 func TestAuth_BasicAuth(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Basic.Username = "admin"
 		cfg.Server.Auth.Basic.Password = "secret"
@@ -53,6 +56,7 @@ func TestAuth_BasicAuth(t *testing.T) {
 
 // TestAuth_BasicAuthSpecialChars tests that passwords with special characters work
 func TestAuth_BasicAuthSpecialChars(t *testing.T) {
+	t.Parallel()
 	// Password with special characters: $, &, @, `, etc.
 	specialPassword := "p@ss$word&with`special"
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
@@ -71,6 +75,7 @@ func TestAuth_BasicAuthSpecialChars(t *testing.T) {
 
 // TestAuth_APIToken tests that API token auth works
 func TestAuth_APIToken(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Token.Value = "my-secret-token"
 	}))
@@ -91,6 +96,7 @@ func TestAuth_APIToken(t *testing.T) {
 
 // TestAuth_BasicAuthAndAPIToken tests that both basic auth and API token work simultaneously
 func TestAuth_BasicAuthAndAPIToken(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Basic.Username = "admin"
 		cfg.Server.Auth.Basic.Password = "secret"
@@ -113,6 +119,7 @@ func TestAuth_BasicAuthAndAPIToken(t *testing.T) {
 
 // TestAuth_BuiltinMode tests that builtin auth mode works with JWT login
 func TestAuth_BuiltinMode(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Mode = config.AuthModeBuiltin
 		cfg.Server.Auth.Builtin.Admin.Username = "admin"
@@ -143,6 +150,7 @@ func TestAuth_BuiltinMode(t *testing.T) {
 // TestAuth_BuiltinModeWithAPIToken tests that builtin mode works with both JWT and API token
 // This is the key test for issue #1478 - API token should work alongside builtin auth
 func TestAuth_BuiltinModeWithAPIToken(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Mode = config.AuthModeBuiltin
 		cfg.Server.Auth.Builtin.Admin.Username = "admin"
@@ -178,6 +186,7 @@ func TestAuth_BuiltinModeWithAPIToken(t *testing.T) {
 
 // TestAuth_BuiltinModeIgnoresBasicAuth tests that basic auth is ignored in builtin mode
 func TestAuth_BuiltinModeIgnoresBasicAuth(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Mode = config.AuthModeBuiltin
 		cfg.Server.Auth.Builtin.Admin.Username = "admin"
@@ -214,6 +223,7 @@ func TestAuth_BuiltinModeIgnoresBasicAuth(t *testing.T) {
 
 // TestAuth_PublicPaths tests that public paths bypass authentication
 func TestAuth_PublicPaths(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Mode = config.AuthModeBuiltin
 		cfg.Server.Auth.Builtin.Admin.Username = "admin"
