@@ -278,11 +278,6 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 
 	// Initialize OIDC if enabled
 	authConfig := srv.config.Server.Auth
-	if evaluatedAuth, err := cmdutil.EvalObject(ctx, authConfig, nil); err != nil {
-		logger.Warn(ctx, "Failed to evaluate auth configuration", tag.Error(err))
-	} else {
-		authConfig = evaluatedAuth
-	}
 	authOIDC := authConfig.OIDC
 
 	var oidcAuthOptions *auth.Options
