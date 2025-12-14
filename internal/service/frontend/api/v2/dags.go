@@ -674,6 +674,35 @@ func isSingletonExecution(dag *core.DAG, singleton bool) bool {
 	return singleton || dag.MaxActiveRuns == 1
 }
 
+// ensureSingletonEnqueue checks that no instance of the DAG is running or queued.
+func (a *API) ensureSingletonEnqueue(ctx context.Context, dag *core.DAG) error {
+	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return fmt.Errorf("failed to access proc store: %w", err)
+	}
+	if liveCount > 0 {
+		return &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeMaxRunReached,
+			Message:    fmt.Sprintf("DAG %s is already running, cannot enqueue", dag.Name),
+		}
+	}
+
+	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return fmt.Errorf("failed to read queue: %w", err)
+	}
+	if len(queuedRuns) > 0 {
+		return &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeMaxRunReached,
+			Message:    fmt.Sprintf("DAG %s is already queued, cannot enqueue", dag.Name),
+		}
+	}
+
+	return nil
+}
+
 type startDAGRunOptions struct {
 	params       string
 	dagRunID     string
@@ -796,6 +825,12 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		dagRunId, err = a.dagRunMgr.GenDAGRunID(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error generating dag-run ID: %w", err)
+		}
+	}
+
+	if valueOf(request.Body.Singleton) {
+		if err := a.ensureSingletonEnqueue(ctx, dag); err != nil {
+			return nil, err
 		}
 	}
 

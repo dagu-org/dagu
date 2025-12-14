@@ -2466,6 +2466,11 @@ export interface operations {
                     dagName?: string;
                     /** @description Override the DAG-level queue definition */
                     queue?: string;
+                    /**
+                     * @description If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)
+                     * @default false
+                     */
+                    singleton?: boolean;
                 };
             };
         };
@@ -2480,6 +2485,15 @@ export interface operations {
                         /** @description ID of the created DAG-run */
                         dagRunId: string;
                     };
+                };
+            };
+            /** @description DAG is already running or queued (singleton mode) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Generic error response */
@@ -3990,7 +4004,10 @@ export enum ErrorCode {
     remote_node_error = "remote_node_error",
     max_run_reached = "max_run_reached",
     not_running = "not_running",
-    already_exists = "already_exists"
+    already_exists = "already_exists",
+    auth_unauthorized = "auth.unauthorized",
+    auth_token_invalid = "auth.token_invalid",
+    auth_forbidden = "auth.forbidden"
 }
 export enum Stream {
     stdout = "stdout",
