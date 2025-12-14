@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -135,6 +137,148 @@ steps:
 
 	// Verify processing time is reasonable
 	require.Less(t, duration, 20*time.Second, "took too long: %v", duration)
+}
+
+// TestGlobalQueueMaxConcurrency verifies that a global queue with maxConcurrency > 1
+// processes multiple DAGs concurrently, and that the DAG's maxActiveRuns doesn't
+// override the global queue's maxConcurrency setting.
+func TestGlobalQueueMaxConcurrency(t *testing.T) {
+	t.Parallel()
+
+	// Configure a global queue with maxConcurrency = 3 BEFORE setup
+	// so it gets written to the config file
+	th := test.SetupCommand(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Queues.Enabled = true
+		cfg.Queues.Config = []config.QueueConfig{
+			{Name: "global-queue", MaxActiveRuns: 3},
+		}
+	}))
+
+	// Create a DAG with maxActiveRuns = 1 that uses the global queue
+	// Each DAG sleeps for 1 second to ensure we can detect concurrent vs sequential execution
+	dagContent := `name: concurrent-test
+queue: global-queue
+maxActiveRuns: 1
+steps:
+  - name: sleep-step
+    command: sleep 1
+`
+	require.NoError(t, os.MkdirAll(th.Config.Paths.DAGsDir, 0755))
+	dagFile := filepath.Join(th.Config.Paths.DAGsDir, "concurrent-test.yaml")
+	require.NoError(t, os.WriteFile(dagFile, []byte(dagContent), 0644))
+
+	dag, err := spec.Load(th.Context, dagFile)
+	require.NoError(t, err)
+
+	// Enqueue 3 items
+	runIDs := make([]string, 3)
+	for i := 0; i < 3; i++ {
+		dagRunID := uuid.New().String()
+		runIDs[i] = dagRunID
+
+		att, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), dagRunID, execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		logFile := filepath.Join(th.Config.Paths.LogDir, dag.Name, dagRunID+".log")
+		require.NoError(t, os.MkdirAll(filepath.Dir(logFile), 0755))
+
+		dagStatus := transform.NewStatusBuilder(dag).Create(dagRunID, core.Queued, 0, time.Time{},
+			transform.WithLogFilePath(logFile),
+			transform.WithAttemptID(att.ID()),
+			transform.WithHierarchyRefs(
+				execution.NewDAGRunRef(dag.Name, dagRunID),
+				execution.DAGRunRef{},
+			),
+		)
+
+		require.NoError(t, att.Open(th.Context))
+		require.NoError(t, att.Write(th.Context, dagStatus))
+		require.NoError(t, att.Close(th.Context))
+
+		err = th.QueueStore.Enqueue(th.Context, "global-queue", execution.QueuePriorityLow, execution.NewDAGRunRef(dag.Name, dagRunID))
+		require.NoError(t, err)
+	}
+
+	// Verify queue has 3 items
+	queuedItems, err := th.QueueStore.List(th.Context, "global-queue")
+	require.NoError(t, err)
+	require.Len(t, queuedItems, 3)
+
+	// Start scheduler
+	schedulerDone := make(chan error, 1)
+	daguHome := filepath.Dir(th.Config.Paths.DAGsDir)
+	go func() {
+		ctx, cancel := context.WithTimeout(th.Context, 30*time.Second)
+		defer cancel()
+
+		thCopy := th
+		thCopy.Context = ctx
+
+		schedulerDone <- thCopy.RunCommandWithError(t, cmd.Scheduler(), test.CmdTest{
+			Args: []string{
+				"scheduler",
+				"--dagu-home", daguHome,
+			},
+			ExpectedOut: []string{"Scheduler started"},
+		})
+	}()
+
+	// Wait until all DAGs complete
+	require.Eventually(t, func() bool {
+		remaining, err := th.QueueStore.List(th.Context, "global-queue")
+		if err != nil {
+			return false
+		}
+		t.Logf("Queue: %d/3 items remaining", len(remaining))
+		return len(remaining) == 0
+	}, 15*time.Second, 200*time.Millisecond, "Queue items should be processed")
+
+	th.Cancel()
+
+	select {
+	case <-schedulerDone:
+	case <-time.After(5 * time.Second):
+	}
+
+	// Collect start times from all DAG runs
+	var startTimes []time.Time
+	for _, runID := range runIDs {
+		attempt, err := th.DAGRunStore.FindAttempt(th.Context, execution.NewDAGRunRef(dag.Name, runID))
+		require.NoError(t, err)
+
+		status, err := attempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+
+		startedAt, err := stringutil.ParseTime(status.StartedAt)
+		if err == nil && !startedAt.IsZero() {
+			startTimes = append(startTimes, startedAt)
+		}
+	}
+
+	// All 3 DAGs should have started
+	require.Len(t, startTimes, 3, "All 3 DAGs should have started")
+
+	// Find the max difference between start times
+	// If they ran concurrently, all should start within ~500ms
+	// If they ran sequentially (maxConcurrency=1), they'd be ~1s apart
+	var maxDiff time.Duration
+	for i := 0; i < len(startTimes); i++ {
+		for j := i + 1; j < len(startTimes); j++ {
+			diff := startTimes[i].Sub(startTimes[j]).Abs()
+			if diff > maxDiff {
+				maxDiff = diff
+			}
+		}
+	}
+
+	t.Logf("Start times: %v", startTimes)
+	t.Logf("Max difference between start times: %v", maxDiff)
+
+	// All DAGs should start within 2 seconds of each other (concurrent execution)
+	// If maxConcurrency was incorrectly set to 1, they would start ~3+ seconds apart
+	// (due to 1 second sleep in each DAG + processing overhead)
+	require.Less(t, maxDiff, 2*time.Second,
+		"All 3 DAGs should start concurrently (within 2s), but max diff was %v", maxDiff)
 }
 
 // TestCronScheduleRunsTwice verifies that a DAG with */1 * * * * schedule
