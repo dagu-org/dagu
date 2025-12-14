@@ -281,6 +281,162 @@ steps:
 		"All 3 DAGs should start concurrently (within 2s), but max diff was %v", maxDiff)
 }
 
+// TestDAGQueueMaxActiveRunsFirstBatch verifies that when a DAG-based (non-global)
+// queue is first encountered, all items up to maxActiveRuns are processed in the
+// first batch, not just 1.
+//
+// This test covers the bug where dynamically created queues were initialized with
+// maxConcurrency=1, causing only 1 DAG to start initially even when maxActiveRuns > 1.
+// The fix reads the DAG's maxActiveRuns before selecting items for the first batch.
+func TestDAGQueueMaxActiveRunsFirstBatch(t *testing.T) {
+	t.Parallel()
+
+	th := test.SetupCommand(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Queues.Enabled = true
+		// No global queues configured - we want to test DAG-based queues
+	}))
+
+	// Create a DAG with maxActiveRuns = 3 (no queue: field, so it uses DAG-based queue)
+	// Each DAG sleeps for 2 seconds to ensure we can detect concurrent vs sequential execution
+	dagContent := `name: dag-queue-test
+maxActiveRuns: 3
+steps:
+  - name: sleep-step
+    command: sleep 2
+`
+	require.NoError(t, os.MkdirAll(th.Config.Paths.DAGsDir, 0755))
+	dagFile := filepath.Join(th.Config.Paths.DAGsDir, "dag-queue-test.yaml")
+	require.NoError(t, os.WriteFile(dagFile, []byte(dagContent), 0644))
+
+	dag, err := spec.Load(th.Context, dagFile)
+	require.NoError(t, err)
+
+	// Verify queue name is the DAG name (DAG-based queue)
+	queueName := dag.ProcGroup()
+	require.Equal(t, "dag-queue-test", queueName, "DAG should use its name as queue")
+
+	// Enqueue 3 items
+	runIDs := make([]string, 3)
+	for i := 0; i < 3; i++ {
+		dagRunID := uuid.New().String()
+		runIDs[i] = dagRunID
+
+		att, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), dagRunID, execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		logFile := filepath.Join(th.Config.Paths.LogDir, dag.Name, dagRunID+".log")
+		require.NoError(t, os.MkdirAll(filepath.Dir(logFile), 0755))
+
+		dagStatus := transform.NewStatusBuilder(dag).Create(dagRunID, core.Queued, 0, time.Time{},
+			transform.WithLogFilePath(logFile),
+			transform.WithAttemptID(att.ID()),
+			transform.WithHierarchyRefs(
+				execution.NewDAGRunRef(dag.Name, dagRunID),
+				execution.DAGRunRef{},
+			),
+		)
+
+		require.NoError(t, att.Open(th.Context))
+		require.NoError(t, att.Write(th.Context, dagStatus))
+		require.NoError(t, att.Close(th.Context))
+
+		err = th.QueueStore.Enqueue(th.Context, queueName, execution.QueuePriorityLow, execution.NewDAGRunRef(dag.Name, dagRunID))
+		require.NoError(t, err)
+	}
+
+	// Verify queue has 3 items
+	queuedItems, err := th.QueueStore.List(th.Context, queueName)
+	require.NoError(t, err)
+	require.Len(t, queuedItems, 3)
+	t.Logf("Enqueued 3 items to DAG-based queue %q", queueName)
+
+	// Start scheduler
+	schedulerDone := make(chan error, 1)
+	daguHome := filepath.Dir(th.Config.Paths.DAGsDir)
+	go func() {
+		ctx, cancel := context.WithTimeout(th.Context, 30*time.Second)
+		defer cancel()
+
+		thCopy := th
+		thCopy.Context = ctx
+
+		schedulerDone <- thCopy.RunCommandWithError(t, cmd.Scheduler(), test.CmdTest{
+			Args: []string{
+				"scheduler",
+				"--dagu-home", daguHome,
+			},
+			ExpectedOut: []string{"Scheduler started"},
+		})
+	}()
+
+	// Wait until all DAGs complete
+	startTime := time.Now()
+	require.Eventually(t, func() bool {
+		remaining, err := th.QueueStore.List(th.Context, queueName)
+		if err != nil {
+			return false
+		}
+		t.Logf("Queue: %d/3 items remaining", len(remaining))
+		return len(remaining) == 0
+	}, 20*time.Second, 200*time.Millisecond, "Queue items should be processed")
+
+	totalDuration := time.Since(startTime)
+	t.Logf("All items processed in %v", totalDuration)
+
+	th.Cancel()
+
+	select {
+	case <-schedulerDone:
+	case <-time.After(5 * time.Second):
+	}
+
+	// Collect start times from all DAG runs
+	var startTimes []time.Time
+	for _, runID := range runIDs {
+		attempt, err := th.DAGRunStore.FindAttempt(th.Context, execution.NewDAGRunRef(dag.Name, runID))
+		require.NoError(t, err)
+
+		status, err := attempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+
+		startedAt, err := stringutil.ParseTime(status.StartedAt)
+		require.NoError(t, err, "Failed to parse start time for run %s", runID)
+		require.False(t, startedAt.IsZero(), "Start time is zero for run %s", runID)
+		startTimes = append(startTimes, startedAt)
+	}
+
+	// All 3 DAGs should have started
+	require.Len(t, startTimes, 3, "All 3 DAGs should have started")
+
+	// Find the max difference between start times
+	var maxDiff time.Duration
+	for i := 0; i < len(startTimes); i++ {
+		for j := i + 1; j < len(startTimes); j++ {
+			diff := startTimes[i].Sub(startTimes[j]).Abs()
+			if diff > maxDiff {
+				maxDiff = diff
+			}
+		}
+	}
+
+	t.Logf("Start times: %v", startTimes)
+	t.Logf("Max difference between start times: %v", maxDiff)
+
+	// KEY ASSERTION: All 3 DAGs should start in the FIRST batch (concurrently)
+	// If the bug exists (queue initialized with maxConcurrency=1), they would start
+	// sequentially: first at 0s, second at ~2s, third at ~4s (total ~6s+)
+	// With the fix, all 3 start within the first batch, so max diff < 2s
+	require.Less(t, maxDiff, 2*time.Second,
+		"All 3 DAGs should start in first batch (within 2s), but max diff was %v. "+
+			"This suggests maxActiveRuns was not applied to the first batch.", maxDiff)
+
+	// Also verify total time is reasonable
+	// - Concurrent execution: ~2s sleep + scheduler overhead (~4-6s total)
+	// - Sequential execution (bug): ~6s sleep + overhead (~8-10s total)
+	require.Less(t, totalDuration, 8*time.Second,
+		"Total processing time should be under 8s for concurrent execution, but was %v", totalDuration)
+}
+
 // TestCronScheduleRunsTwice verifies that a DAG with */1 * * * * schedule
 // runs twice in two minutes.
 func TestCronScheduleRunsTwice(t *testing.T) {

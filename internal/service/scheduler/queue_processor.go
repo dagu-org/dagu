@@ -278,6 +278,18 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 
 	defer p.wakeUp()
 
+	// For non-global queues, update maxConcurrency from the first queued item's DAG
+	// before calculating available slots. This ensures we use the DAG's configured
+	// maxActiveRuns instead of the default value of 1.
+	if !q.isGlobalQueue() {
+		if err := p.updateQueueMaxConcurrency(ctx, q, items[0]); err != nil {
+			logger.Warn(ctx, "Failed to update queue max concurrency from DAG",
+				tag.Error(err),
+			)
+			// Continue with current maxConcurrency value
+		}
+	}
+
 	alive, err := p.procStore.CountAlive(ctx, queueName)
 	if err != nil {
 		logger.Error(ctx, "Failed to count alive processes",
@@ -488,4 +500,29 @@ func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, r
 	}
 
 	return false, errNotStarted
+}
+
+// updateQueueMaxConcurrency reads the DAG from a queued item and updates
+// the queue's maxConcurrency based on the DAG's MaxActiveRuns setting.
+// This is used to initialize non-global queues with the correct concurrency
+// before calculating how many items to process.
+func (p *QueueProcessor) updateQueueMaxConcurrency(ctx context.Context, q *queue, item execution.QueuedItemData) error {
+	data, err := item.Data()
+	if err != nil {
+		return err
+	}
+
+	runRef := *data
+	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
+	if err != nil {
+		return err
+	}
+
+	dag, err := attempt.ReadDAG(ctx)
+	if err != nil {
+		return err
+	}
+
+	q.setMaxConc(dag.MaxActiveRuns)
+	return nil
 }

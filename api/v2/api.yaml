@@ -797,6 +797,10 @@ paths:
                 queue:
                   type: string
                   description: "Override the DAG-level queue definition"
+                singleton:
+                  type: boolean
+                  description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
+                  default: false
       responses:
         "200":
           description: "A successful response"
@@ -810,6 +814,12 @@ paths:
                     description: "ID of the created DAG-run"
                 required:
                   - dagRunId
+        "409":
+          description: "DAG is already running or queued (singleton mode)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           description: "Generic error response"
           content:
