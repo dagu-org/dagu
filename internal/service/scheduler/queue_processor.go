@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -42,7 +43,8 @@ type QueueProcessor struct {
 	dagRunStore   execution.DAGRunStore
 	procStore     execution.ProcStore
 	dagExecutor   *DAGExecutor
-	queues        sync.Map // map[string]*queue
+	queues        sync.Map      // map[string]*queue
+	queuesConfig  config.Queues // Store config to check for global queues when auto-creating
 	wakeUpCh      chan struct{}
 	quit          chan struct{}
 	wg            sync.WaitGroup
@@ -54,7 +56,7 @@ type QueueProcessor struct {
 
 type queue struct {
 	maxConcurrency int
-	isGlobal       bool // true if this queue is defined in config (global queue)
+	isGlobal       bool // true if this is a global queue from config, false if DAG-based
 	mu             sync.Mutex
 }
 
@@ -100,6 +102,7 @@ func NewQueueProcessor(
 		dagRunStore:   dagRunStore,
 		procStore:     procStore,
 		dagExecutor:   dagExecutor,
+		queuesConfig:  queuesConfig, // Store config for later use
 		wakeUpCh:      make(chan struct{}, 1),
 		quit:          make(chan struct{}),
 		prevTime:      time.Now(),
@@ -114,7 +117,7 @@ func NewQueueProcessor(
 		conc := max(queueConfig.MaxActiveRuns, 1)
 		p.queues.Store(queueConfig.Name, &queue{
 			maxConcurrency: conc,
-			isGlobal:       true, // Queues from config are global queues
+			isGlobal:       true, // Mark as global queue from config
 		})
 	}
 
@@ -194,11 +197,57 @@ func (p *QueueProcessor) loop(ctx context.Context) {
 		// init the queues
 		activeQueues := make(map[string]struct{})
 		for _, queueName := range queueList {
-			if _, ok := p.queues.Load(queueName); !ok {
+			existingQueue, exists := p.queues.Load(queueName)
+			if !exists {
+				// Check if this is a global queue from config
+				isGlobal := false
+				maxConc := 1
+				for _, queueConfig := range p.queuesConfig.Config {
+					if queueConfig.Name == queueName {
+						isGlobal = true
+						maxConc = max(queueConfig.MaxActiveRuns, 1)
+						logger.Info(ctx, "Initializing global queue from config",
+							tag.Queue(queueName),
+							tag.MaxConcurrency(maxConc),
+						)
+						break
+					}
+				}
+				if !isGlobal {
+					logger.Info(ctx, "Initializing DAG-based queue (not in config)",
+						tag.Queue(queueName),
+						tag.MaxConcurrency(maxConc),
+					)
+				}
 				p.queues.Store(queueName, &queue{
-					maxConcurrency: 1,
-					isGlobal:       false, // Dynamically created queues are DAG-based (not global)
+					maxConcurrency: maxConc,
+					isGlobal:       isGlobal,
 				})
+			} else {
+				// Queue exists, but check if config has been updated
+				existingQ := existingQueue.(*queue)
+				existingQ.mu.Lock()
+				existingIsGlobal := existingQ.isGlobal
+				existingQ.mu.Unlock()
+
+				// If it's not a global queue, check if it should be now
+				if !existingIsGlobal {
+					for _, queueConfig := range p.queuesConfig.Config {
+						if queueConfig.Name == queueName {
+							// Update to global queue with config value
+							newMaxConc := max(queueConfig.MaxActiveRuns, 1)
+							existingQ.mu.Lock()
+							existingQ.isGlobal = true
+							existingQ.maxConcurrency = newMaxConc
+							existingQ.mu.Unlock()
+							logger.Info(ctx, "Updated queue to global queue from config",
+								tag.Queue(queueName),
+								tag.MaxConcurrency(newMaxConc),
+							)
+							break
+						}
+					}
+				}
 			}
 			activeQueues[queueName] = struct{}{}
 		}
@@ -260,10 +309,17 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 	// Get the queue configuration
 	v, ok := p.queues.Load(queueName)
 	if !ok {
-		logger.Warn(ctx, "Queue not found in processor config")
+		logger.Warn(ctx, "Queue not found in processor config",
+			tag.Queue(queueName),
+		)
 		return
 	}
 	q := v.(*queue)
+
+	// Log queue configuration for debugging
+	q.mu.Lock()
+	isGlobal := q.isGlobal
+	q.mu.Unlock()
 
 	items, err := p.queueStore.List(ctx, queueName)
 	if err != nil {
@@ -300,7 +356,19 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 	}
 
 	maxConc := q.maxConc()
+	logger.Debug(ctx, "Queue configuration",
+		tag.Queue(queueName),
+		tag.MaxConcurrency(maxConc),
+		slog.Bool("isGlobal", isGlobal),
+	)
 	free := maxConc - alive
+	logger.Debug(ctx, "Queue capacity check",
+		tag.Queue(queueName),
+		tag.MaxConcurrency(maxConc),
+		tag.Alive(alive),
+		slog.Int("free", free),
+		slog.Int("queued", len(items)),
+	)
 	if free <= 0 {
 		logger.Debug(ctx, "Max concurrency reached",
 			tag.MaxConcurrency(maxConc),
@@ -309,12 +377,15 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 		return
 	}
 
+	// Select up to 'free' items from the queue to run concurrently
+	// This ensures queue-level concurrency: maxConcurrency=n means n DAGs can run at once
 	cap := min(free, len(items))
 	runnableItems := items[:cap]
 	logger.Info(ctx, "Processing batch of items",
 		tag.Count(len(runnableItems)),
 		tag.MaxConcurrency(maxConc),
 		tag.Alive(alive),
+		slog.Int("free", free),
 	)
 
 	var wg sync.WaitGroup
@@ -412,13 +483,23 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	}
 
 	// Update the queue configuration with the latest execution
-	// Only update maxConcurrency for DAG-based queues, not for global queues
-	// Global queues have their maxConcurrency set from config and should not be overridden
+	// Only update maxConcurrency for DAG-based queues, not global queues
+	// Global queues preserve their configured maxConcurrency value
 	queueVal, _ := p.queues.Load(queueName)
 	queue := queueVal.(*queue)
-	if !queue.isGlobalQueue() {
-		queue.setMaxConc(dag.MaxActiveRuns)
+	queue.mu.Lock()
+	isGlobal := queue.isGlobal
+	if !isGlobal {
+		// For DAG-based queues, update maxConcurrency based on DAG's MaxActiveRuns
+		// Use the maximum value to ensure we don't decrease concurrency
+		currentMax := queue.maxConcurrency
+		newMax := max(dag.MaxActiveRuns, 1)
+		if newMax > currentMax {
+			queue.maxConcurrency = newMax
+		}
 	}
+	queue.mu.Unlock()
+	// For global queues, preserve the configured maxConcurrency - don't update it
 
 	errCh := make(chan error, 1)
 	if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID); err != nil {
