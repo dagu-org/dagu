@@ -16,29 +16,40 @@ import (
 )
 
 var (
-	InitialBackoffInterval = 500 * time.Millisecond
-	MaxBackoffInterval     = 60 * time.Second
-	MaxBackoffRetries      = 10
-)
-
-var (
 	errProcessorClosed = errors.New("processor closed")
 	errNotStarted      = errors.New("execution not started")
 )
 
+// BackoffConfig holds configuration for exponential backoff retry logic.
+type BackoffConfig struct {
+	InitialInterval time.Duration
+	MaxInterval     time.Duration
+	MaxRetries      int
+}
+
+// DefaultBackoffConfig returns the default backoff configuration.
+func DefaultBackoffConfig() BackoffConfig {
+	return BackoffConfig{
+		InitialInterval: 500 * time.Millisecond,
+		MaxInterval:     60 * time.Second,
+		MaxRetries:      10,
+	}
+}
+
 // QueueProcessor is responsible for processing queued DAG runs.
 type QueueProcessor struct {
-	queueStore  execution.QueueStore
-	dagRunStore execution.DAGRunStore
-	procStore   execution.ProcStore
-	dagExecutor *DAGExecutor
-	queues      sync.Map // map[string]*queue
-	wakeUpCh    chan struct{}
-	quit        chan struct{}
-	wg          sync.WaitGroup
-	stopOnce    sync.Once
-	prevTime    time.Time
-	lock        sync.Mutex
+	queueStore    execution.QueueStore
+	dagRunStore   execution.DAGRunStore
+	procStore     execution.ProcStore
+	dagExecutor   *DAGExecutor
+	queues        sync.Map // map[string]*queue
+	wakeUpCh      chan struct{}
+	quit          chan struct{}
+	wg            sync.WaitGroup
+	stopOnce      sync.Once
+	prevTime      time.Time
+	lock          sync.Mutex
+	backoffConfig BackoffConfig
 }
 
 type queue struct {
@@ -65,6 +76,16 @@ func (q *queue) isGlobalQueue() bool {
 	return q.isGlobal
 }
 
+// QueueProcessorOption is a functional option for configuring QueueProcessor.
+type QueueProcessorOption func(*QueueProcessor)
+
+// WithBackoffConfig sets a custom backoff configuration for the processor.
+func WithBackoffConfig(cfg BackoffConfig) QueueProcessorOption {
+	return func(p *QueueProcessor) {
+		p.backoffConfig = cfg
+	}
+}
+
 // NewQueueProcessor creates a new QueueProcessor.
 func NewQueueProcessor(
 	queueStore execution.QueueStore,
@@ -72,15 +93,21 @@ func NewQueueProcessor(
 	procStore execution.ProcStore,
 	dagExecutor *DAGExecutor,
 	queuesConfig config.Queues,
+	opts ...QueueProcessorOption,
 ) *QueueProcessor {
 	p := &QueueProcessor{
-		queueStore:  queueStore,
-		dagRunStore: dagRunStore,
-		procStore:   procStore,
-		dagExecutor: dagExecutor,
-		wakeUpCh:    make(chan struct{}, 1),
-		quit:        make(chan struct{}),
-		prevTime:    time.Now(),
+		queueStore:    queueStore,
+		dagRunStore:   dagRunStore,
+		procStore:     procStore,
+		dagExecutor:   dagExecutor,
+		wakeUpCh:      make(chan struct{}, 1),
+		quit:          make(chan struct{}),
+		prevTime:      time.Now(),
+		backoffConfig: DefaultBackoffConfig(),
+	}
+
+	for _, opt := range opts {
+		opt(p)
 	}
 
 	for _, queueConfig := range queuesConfig.Config {
@@ -389,9 +416,9 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	}
 
 	// Use exponential backoff for retries for monitoring the execution start
-	policy := backoff.NewExponentialBackoffPolicy(InitialBackoffInterval)
-	policy.MaxInterval = MaxBackoffInterval
-	policy.MaxRetries = MaxBackoffRetries
+	policy := backoff.NewExponentialBackoffPolicy(p.backoffConfig.InitialInterval)
+	policy.MaxInterval = p.backoffConfig.MaxInterval
+	policy.MaxRetries = p.backoffConfig.MaxRetries
 
 	var started bool
 	operation := func(ctx context.Context) error {
