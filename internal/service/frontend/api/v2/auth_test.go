@@ -204,6 +204,12 @@ steps:
     command: echo hello
 `
 
+	// Without auth - write should fail
+	server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "api_token_test_dag",
+		Spec: &spec,
+	}).ExpectStatus(http.StatusUnauthorized).Send(t)
+
 	// Test write operation (create DAG) with API token - this was failing before the fix
 	server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "api_token_test_dag",
