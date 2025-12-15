@@ -86,7 +86,16 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 
 			// Try API token authentication if enabled
 			if opts.APITokenEnabled && checkAPIToken(r, opts.APIToken) {
-				next.ServeHTTP(w, r)
+				// API token grants full admin access
+				// Inject a synthetic admin user so that permission checks (requireWrite,
+				// requireExecute, requireAdmin) work correctly in builtin auth mode
+				adminUser := &auth.User{
+					ID:       "api-token",
+					Username: "api-token",
+					Role:     auth.RoleAdmin,
+				}
+				ctx := auth.WithUser(r.Context(), adminUser)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
