@@ -184,6 +184,43 @@ func TestAuth_BuiltinModeWithAPIToken(t *testing.T) {
 		ExpectStatus(http.StatusOK).Send(t)
 }
 
+// TestAuth_BuiltinModeWithAPIToken_WriteExecute tests that API token can perform
+// write and execute operations in builtin mode (regression test for issue #1478)
+func TestAuth_BuiltinModeWithAPIToken_WriteExecute(t *testing.T) {
+	t.Parallel()
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeBuiltin
+		cfg.Server.Auth.Builtin.Admin.Username = "admin"
+		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
+		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
+		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+		// Also configure API token
+		cfg.Server.Auth.Token.Value = "my-api-token"
+	}))
+
+	spec := `
+steps:
+  - name: test
+    command: echo hello
+`
+
+	// Test write operation (create DAG) with API token - this was failing before the fix
+	server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "api_token_test_dag",
+		Spec: &spec,
+	}).WithBearerToken("my-api-token").ExpectStatus(http.StatusCreated).Send(t)
+
+	// Test execute operation (start DAG) with API token - this was also failing
+	server.Client().Post("/api/v2/dags/api_token_test_dag/start", api.ExecuteDAGJSONRequestBody{}).
+		WithBearerToken("my-api-token").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	// Test delete operation with API token
+	server.Client().Delete("/api/v2/dags/api_token_test_dag").
+		WithBearerToken("my-api-token").
+		ExpectStatus(http.StatusNoContent).Send(t)
+}
+
 // TestAuth_BuiltinModeIgnoresBasicAuth tests that basic auth is ignored in builtin mode
 func TestAuth_BuiltinModeIgnoresBasicAuth(t *testing.T) {
 	t.Parallel()
