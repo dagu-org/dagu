@@ -129,8 +129,10 @@ npm install -g --ignore-scripts=false @dagu-org/dagu
 ```bash
 cat > ./hello.yaml << 'EOF'
 steps:
-  - echo "Hello from Dagu!"
-  - echo "Running step 2"
+  - name: Step 1
+    command: echo "Hello from Dagu!"
+  - name: Step 2
+    command: echo "Running step 2"
 EOF
 ```
 
