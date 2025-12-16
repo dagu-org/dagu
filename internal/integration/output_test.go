@@ -43,3 +43,61 @@ func TestLargeOutput_128KB(t *testing.T) {
 	assert.Equal(t, core.NodeSucceeded, dagRunStatus.Nodes[0].Status)
 	assert.Equal(t, "read-128kb-file", dagRunStatus.Nodes[0].Step.Name)
 }
+
+func TestResult_StringType(t *testing.T) {
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `
+result: "${OUTPUT_VAR}"
+steps:
+  - name: step1
+    command: echo hello
+    output: OUTPUT_VAR
+`)
+	agent := dag.Agent()
+	agent.RunSuccess(t)
+
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, dagRunStatus.Result)
+	assert.Equal(t, "hello", dagRunStatus.Result.Value)
+	assert.Equal(t, core.ResultTypeString, dagRunStatus.Result.Type)
+}
+
+func TestResult_ObjectType(t *testing.T) {
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `
+result:
+  count: "${COUNT}"
+  status: "done"
+steps:
+  - name: step1
+    command: echo 42
+    output: COUNT
+`)
+	agent := dag.Agent()
+	agent.RunSuccess(t)
+
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, dagRunStatus.Result)
+	assert.Equal(t, `{"count":"42","status":"done"}`, dagRunStatus.Result.Value)
+	assert.Equal(t, core.ResultTypeObject, dagRunStatus.Result.Type)
+}
+
+func TestResult_NotDefined(t *testing.T) {
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `
+steps:
+  - name: step1
+    command: echo hello
+`)
+	agent := dag.Agent()
+	agent.RunSuccess(t)
+
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	assert.Nil(t, dagRunStatus.Result)
+}
