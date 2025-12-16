@@ -33,11 +33,12 @@ type DAGRunStore interface {
 	FindAttempt(ctx context.Context, dagRun DAGRunRef) (DAGRunAttempt, error)
 	// FindSubAttempt finds a sub dag-run record by dag-run ID.
 	FindSubAttempt(ctx context.Context, dagRun DAGRunRef, subDAGRunID string) (DAGRunAttempt, error)
-	// RemoveOldDAGRuns delete dag-run records older than retentionDays
+	// RemoveOldDAGRuns deletes dag-run records older than retentionDays.
 	// If retentionDays is negative, it won't delete any records.
 	// If retentionDays is zero, it will delete all records for the DAG name.
 	// But it will not delete the records with non-final statuses (e.g., running, queued).
-	RemoveOldDAGRuns(ctx context.Context, name string, retentionDays int) error
+	// Returns a list of dag-run IDs that were removed (or would be removed in dry-run mode).
+	RemoveOldDAGRuns(ctx context.Context, name string, retentionDays int, opts ...RemoveOldDAGRunsOption) ([]string, error)
 	// RenameDAGRuns renames all run data from oldName to newName
 	// The name means the DAG name, renaming it will allow user to manage those runs
 	// with the new DAG name.
@@ -99,6 +100,22 @@ func WithName(name string) ListDAGRunStatusesOption {
 func WithDAGRunID(dagRunID string) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.DAGRunID = dagRunID
+	}
+}
+
+// RemoveOldDAGRunsOptions contains options for removing old dag-runs
+type RemoveOldDAGRunsOptions struct {
+	// DryRun if true, only returns the paths that would be removed without actually deleting
+	DryRun bool
+}
+
+// RemoveOldDAGRunsOption is a functional option for configuring RemoveOldDAGRunsOptions
+type RemoveOldDAGRunsOption func(*RemoveOldDAGRunsOptions)
+
+// WithDryRun sets the dry-run mode for removing old dag-runs
+func WithDryRun() RemoveOldDAGRunsOption {
+	return func(o *RemoveOldDAGRunsOptions) {
+		o.DryRun = true
 	}
 }
 

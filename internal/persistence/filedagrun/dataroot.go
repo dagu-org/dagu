@@ -276,9 +276,13 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 // If retentionDays is zero, all files will be removed.
 // If retentionDays is positive, only files older than the specified number of days will be removed.
 // It also removes empty directories in the hierarchy.
-func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int) error {
+// If dryRun is true, it returns the run IDs that would be removed without actually deleting them.
+// Returns a list of dag-run IDs that were removed (or would be removed in dry-run mode).
+func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int, dryRun bool) ([]string, error) {
 	keepTime := execution.NewUTC(time.Now().AddDate(0, 0, -retentionDays))
 	dagRuns := dr.listDAGRunsInRange(ctx, execution.TimeInUTC{}, keepTime, &listDAGRunsInRangeOpts{})
+
+	var removedRunIDs []string
 
 	for _, r := range dagRuns {
 		// Enrich context with run directory for all subsequent logs in this iteration
@@ -311,13 +315,22 @@ func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int) error {
 		if lastUpdate.After(keepTime.Time) {
 			continue
 		}
+
+		// Add run ID to removed list
+		removedRunIDs = append(removedRunIDs, r.dagRunID)
+
+		// In dry-run mode, skip actual deletion
+		if dryRun {
+			continue
+		}
+
 		if err := r.Remove(ctx); err != nil {
 			logger.Error(runCtx, "Failed to remove run",
 				tag.Error(err))
 		}
 		dr.removeEmptyDir(ctx, filepath.Dir(r.baseDir))
 	}
-	return nil
+	return removedRunIDs, nil
 }
 
 func (dr DataRoot) removeEmptyDir(ctx context.Context, dayDir string) {

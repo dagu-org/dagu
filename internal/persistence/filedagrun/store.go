@@ -437,16 +437,22 @@ func (store *Store) FindSubAttempt(ctx context.Context, ref execution.DAGRunRef,
 // If retentionDays is negative, no files will be removed.
 // If retentionDays is zero, all files will be removed.
 // If retentionDays is positive, only files older than the specified number of days will be removed.
-func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retentionDays int) error {
+// Returns a list of file paths that were removed (or would be removed in dry-run mode).
+func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retentionDays int, opts ...execution.RemoveOldDAGRunsOption) ([]string, error) {
 	if retentionDays < 0 {
 		logger.Warn(ctx, "Negative retentionDays, no files will be removed",
 			slog.Int("retention-days", retentionDays),
 		)
-		return nil
+		return nil, nil
+	}
+
+	var options execution.RemoveOldDAGRunsOptions
+	for _, opt := range opts {
+		opt(&options)
 	}
 
 	root := NewDataRoot(store.baseDir, dagName)
-	return root.RemoveOld(ctx, retentionDays)
+	return root.RemoveOld(ctx, retentionDays, options.DryRun)
 }
 
 // RemoveDAGRun implements models.DAGRunStore.

@@ -266,6 +266,30 @@ var (
 		isBool:    true,
 		bindViper: true,
 	}
+
+	// retentionDaysFlag specifies the number of days to retain history.
+	// Records older than this will be deleted.
+	// If set to 0, all records (except active) will be deleted.
+	retentionDaysFlag = commandLineFlag{
+		name:         "retention-days",
+		defaultValue: "0",
+		usage:        "Number of days to retain history (0 = delete all, except active runs)",
+	}
+
+	// dryRunFlag enables preview mode without actual deletion.
+	dryRunFlag = commandLineFlag{
+		name:   "dry-run",
+		usage:  "Preview what would be deleted without actually deleting",
+		isBool: true,
+	}
+
+	// yesFlag skips the confirmation prompt.
+	yesFlag = commandLineFlag{
+		name:      "yes",
+		shorthand: "y",
+		usage:     "Skip confirmation prompt",
+		isBool:    true,
+	}
 )
 
 type commandLineFlag struct {

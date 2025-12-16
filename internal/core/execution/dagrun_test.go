@@ -67,9 +67,12 @@ func (m *mockDAGRunStore) FindSubAttempt(ctx context.Context, dagRun execution.D
 	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) RemoveOldDAGRuns(ctx context.Context, name string, retentionDays int) error {
-	args := m.Called(ctx, name, retentionDays)
-	return args.Error(0)
+func (m *mockDAGRunStore) RemoveOldDAGRuns(ctx context.Context, name string, retentionDays int, opts ...execution.RemoveOldDAGRunsOption) ([]string, error) {
+	args := m.Called(ctx, name, retentionDays, opts)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
 }
 
 func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName string) error {
@@ -242,10 +245,11 @@ func TestDAGRunStoreInterface(t *testing.T) {
 	assert.Equal(t, mockAttempt, childFound)
 
 	// Test RemoveOldDAGRuns
-	store.On("RemoveOldDAGRuns", ctx, "test-dag", 30).Return(nil)
+	store.On("RemoveOldDAGRuns", ctx, "test-dag", 30, mock.Anything).Return([]string{"run-1", "run-2"}, nil)
 
-	err = store.RemoveOldDAGRuns(ctx, "test-dag", 30)
+	removedIDs, err := store.RemoveOldDAGRuns(ctx, "test-dag", 30)
 	assert.NoError(t, err)
+	assert.Equal(t, []string{"run-1", "run-2"}, removedIDs)
 
 	// Test RenameDAGRuns
 	store.On("RenameDAGRuns", ctx, "old-name", "new-name").Return(nil)
@@ -383,19 +387,22 @@ func TestRemoveOldDAGRunsEdgeCases(t *testing.T) {
 	store := &mockDAGRunStore{}
 
 	// Test with negative retention days (should not delete anything)
-	store.On("RemoveOldDAGRuns", ctx, "test-dag", -1).Return(nil)
-	err := store.RemoveOldDAGRuns(ctx, "test-dag", -1)
+	store.On("RemoveOldDAGRuns", ctx, "test-dag", -1, mock.Anything).Return([]string(nil), nil)
+	removedIDs, err := store.RemoveOldDAGRuns(ctx, "test-dag", -1)
 	assert.NoError(t, err)
+	assert.Nil(t, removedIDs)
 
 	// Test with zero retention days (should delete all except non-final statuses)
-	store.On("RemoveOldDAGRuns", ctx, "test-dag", 0).Return(nil)
-	err = store.RemoveOldDAGRuns(ctx, "test-dag", 0)
+	store.On("RemoveOldDAGRuns", ctx, "test-dag", 0, mock.Anything).Return([]string{"run-1", "run-2"}, nil)
+	removedIDs, err = store.RemoveOldDAGRuns(ctx, "test-dag", 0)
 	assert.NoError(t, err)
+	assert.Equal(t, []string{"run-1", "run-2"}, removedIDs)
 
 	// Test with positive retention days
-	store.On("RemoveOldDAGRuns", ctx, "test-dag", 30).Return(nil)
-	err = store.RemoveOldDAGRuns(ctx, "test-dag", 30)
+	store.On("RemoveOldDAGRuns", ctx, "test-dag", 30, mock.Anything).Return([]string{"run-old"}, nil)
+	removedIDs, err = store.RemoveOldDAGRuns(ctx, "test-dag", 30)
 	assert.NoError(t, err)
+	assert.Equal(t, []string{"run-old"}, removedIDs)
 
 	store.AssertExpectations(t)
 }
