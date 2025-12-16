@@ -133,10 +133,27 @@ type DAG struct {
 	// Secrets contains references to external secrets to be resolved at runtime.
 	Secrets []SecretRef `json:"secrets,omitempty"`
 	// Result defines the output value template computed at DAG completion.
-	// If the YAML specifies a string, it's stored as-is.
-	// If the YAML specifies an object, it's JSON-marshaled to a string.
-	// Templates are evaluated using captured step outputs after execution completes.
-	Result string `json:"result,omitempty"`
+	Result *Result `json:"result,omitempty"`
+}
+
+// ResultType represents the type of result (string or object).
+type ResultType int
+
+const (
+	// ResultTypeString indicates the result was specified as a plain string in YAML.
+	ResultTypeString ResultType = iota
+	// ResultTypeObject indicates the result was specified as an object in YAML.
+	ResultTypeObject
+)
+
+// Result defines the output value template computed at DAG completion.
+type Result struct {
+	// Val contains the template string.
+	// If Type is ResultTypeString, this is the raw string template.
+	// If Type is ResultTypeObject, this is the JSON-marshaled object template.
+	Val string `json:"val"`
+	// Type indicates whether the original YAML was a string or object.
+	Type ResultType `json:"type"`
 }
 
 // SecretRef represents a reference to an external secret.

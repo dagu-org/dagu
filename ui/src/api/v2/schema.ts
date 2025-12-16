@@ -1009,6 +1009,20 @@ export interface components {
          * @enum {string}
          */
         StatusLabel: StatusLabel;
+        /** @description Evaluated result computed at DAG completion */
+        Result: {
+            /** @description The evaluated result value. For string results, this is the evaluated template. For object results, this is the JSON-stringified object. */
+            value: string;
+            type: components["schemas"]["ResultType"];
+        };
+        /**
+         * @description Type of the result value:
+         *     0: "String" - Result was defined as a plain string template in YAML
+         *     1: "Object" - Result was defined as an object in YAML (JSON-stringified)
+         *
+         * @enum {integer}
+         */
+        ResultType: ResultType;
         /**
          * @description Numeric status code indicating current node state:
          *     0: "Not started"
@@ -1160,6 +1174,7 @@ export interface components {
             log: string;
             /** @description Runtime parameters passed to the DAG-run in JSON format */
             params?: string;
+            result?: components["schemas"]["Result"];
         };
         /** @description Detailed status of a DAG-run including sub DAG-run nodes */
         DAGRunDetails: components["schemas"]["DAGRunSummary"] & {
@@ -4034,6 +4049,10 @@ export enum StatusLabel {
     succeeded = "succeeded",
     queued = "queued",
     partially_succeeded = "partially_succeeded"
+}
+export enum ResultType {
+    String = 0,
+    Object = 1
 }
 export enum NodeStatus {
     NotStarted = 0,

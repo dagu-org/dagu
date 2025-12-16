@@ -55,9 +55,18 @@ type DAGRunStatus struct {
 	ParamsList    []string          `json:"paramsList,omitempty"`
 	Preconditions []*core.Condition `json:"preconditions,omitempty"`
 	// Result contains the evaluated result computed at DAG completion.
-	// If DAG.Result was a string, this is the evaluated string.
-	// If DAG.Result was an object, this is the JSON-marshaled string.
-	Result string `json:"result,omitempty"`
+	// Nil if no result was defined in the DAG.
+	Result *EvaluatedResult `json:"result,omitempty"`
+}
+
+// EvaluatedResult contains the evaluated result computed at DAG completion.
+type EvaluatedResult struct {
+	// Value is the evaluated result string.
+	// For string results, this is the evaluated template.
+	// For object results, this is the JSON-stringified object.
+	Value string `json:"value"`
+	// Type indicates how the result was defined in YAML (string or object).
+	Type core.ResultType `json:"type"`
 }
 
 // DAGRun returns a reference to the dag-run associated with this status

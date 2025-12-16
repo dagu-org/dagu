@@ -112,6 +112,16 @@ func toPrecondition(obj *core.Condition) api.Condition {
 	}
 }
 
+func toResult(result *execution.EvaluatedResult) *api.Result {
+	if result == nil {
+		return nil
+	}
+	return &api.Result{
+		Value: result.Value,
+		Type:  api.ResultType(result.Type),
+	}
+}
+
 func toDAGRunSummary(s execution.DAGRunStatus) api.DAGRunSummary {
 	return api.DAGRunSummary{
 		RootDAGRunName:   s.Root.Name,
@@ -127,6 +137,7 @@ func toDAGRunSummary(s execution.DAGRunStatus) api.DAGRunSummary {
 		FinishedAt:       s.FinishedAt,
 		Status:           api.Status(s.Status),
 		StatusLabel:      api.StatusLabel(s.Status.String()),
+		Result:           toResult(s.Result),
 	}
 }
 
@@ -152,6 +163,7 @@ func toDAGRunDetails(s execution.DAGRunStatus) api.DAGRunDetails {
 		FinishedAt:       s.FinishedAt,
 		Status:           api.Status(s.Status),
 		StatusLabel:      api.StatusLabel(s.Status.String()),
+		Result:           toResult(s.Result),
 		Preconditions:    ptrOf(preconditions),
 		Nodes:            nodes,
 		OnSuccess:        ptrOf(toNode(s.OnSuccess)),

@@ -495,3 +495,151 @@ func (h *mockResponseWriter) Write(body []byte) (int, error) {
 func (h *mockResponseWriter) WriteHeader(statusCode int) {
 	h.status = statusCode
 }
+
+func TestAgent_Result(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ResultAsString", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+result: "${OUTPUT_VAR}"
+steps:
+  - name: "step1"
+    command: "echo hello"
+    output: OUTPUT_VAR
+`)
+		dagAgent := dag.Agent()
+		dagAgent.RunSuccess(t)
+
+		status := dagAgent.Status(th.Context)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.NotNil(t, status.Result)
+		require.Equal(t, "hello", status.Result.Value)
+		require.Equal(t, core.ResultTypeString, status.Result.Type)
+	})
+
+	t.Run("ResultAsStringTemplate", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+result: "count=${COUNT}"
+steps:
+  - name: "step1"
+    command: "echo 100"
+    output: COUNT
+`)
+		dagAgent := dag.Agent()
+		dagAgent.RunSuccess(t)
+
+		status := dagAgent.Status(th.Context)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.NotNil(t, status.Result)
+		require.Equal(t, "count=100", status.Result.Value)
+		require.Equal(t, core.ResultTypeString, status.Result.Type)
+	})
+
+	t.Run("ResultAsObject", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+result:
+  count: "${COUNT}"
+  status: "completed"
+steps:
+  - name: "step1"
+    command: "echo 100"
+    output: COUNT
+`)
+		dagAgent := dag.Agent()
+		dagAgent.RunSuccess(t)
+
+		status := dagAgent.Status(th.Context)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.NotNil(t, status.Result)
+		// JSON keys are sorted alphabetically when marshaled
+		require.Equal(t, `{"count":"100","status":"completed"}`, status.Result.Value)
+		require.Equal(t, core.ResultTypeObject, status.Result.Type)
+	})
+
+	t.Run("ResultAsNestedObject", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+result:
+  meta:
+    count: "${NUM}"
+steps:
+  - name: "step1"
+    command: "echo 42"
+    output: NUM
+`)
+		dagAgent := dag.Agent()
+		dagAgent.RunSuccess(t)
+
+		status := dagAgent.Status(th.Context)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.NotNil(t, status.Result)
+		require.Equal(t, `{"meta":{"count":"42"}}`, status.Result.Value)
+		require.Equal(t, core.ResultTypeObject, status.Result.Type)
+	})
+
+	t.Run("ResultNotSpecified", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+steps:
+  - name: "step1"
+    command: "echo hello"
+    output: OUTPUT_VAR
+`)
+		dagAgent := dag.Agent()
+		dagAgent.RunSuccess(t)
+
+		status := dagAgent.Status(th.Context)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.Nil(t, status.Result)
+	})
+
+	t.Run("ResultOnFailedDAG", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+result: "${OUTPUT_VAR}"
+steps:
+  - name: "step1"
+    command: "echo hello"
+    output: OUTPUT_VAR
+  - name: "step2"
+    command: "false"
+    depends: ["step1"]
+`)
+		dagAgent := dag.Agent()
+		dagAgent.RunError(t)
+
+		status := dagAgent.Status(th.Context)
+		require.Equal(t, core.Failed, status.Status)
+		// Result should still be evaluated even on failed DAG
+		require.NotNil(t, status.Result)
+		require.Equal(t, "hello", status.Result.Value)
+		require.Equal(t, core.ResultTypeString, status.Result.Type)
+	})
+
+	t.Run("ResultWithMultipleOutputs", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, `
+result:
+  first: "${VAR1}"
+  second: "${VAR2}"
+steps:
+  - name: "step1"
+    command: "echo one"
+    output: VAR1
+  - name: "step2"
+    command: "echo two"
+    output: VAR2
+`)
+		dagAgent := dag.Agent()
+		dagAgent.RunSuccess(t)
+
+		status := dagAgent.Status(th.Context)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.NotNil(t, status.Result)
+		require.Equal(t, `{"first":"one","second":"two"}`, status.Result.Value)
+		require.Equal(t, core.ResultTypeObject, status.Result.Type)
+	})
+}

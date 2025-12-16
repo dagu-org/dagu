@@ -337,3 +337,62 @@ func TestWithCreatedAtDefaultTime(t *testing.T) {
 	assert.GreaterOrEqual(t, dagRunStatus.CreatedAt, beforeTime)
 	assert.LessOrEqual(t, dagRunStatus.CreatedAt, afterTime)
 }
+
+func TestWithResult(t *testing.T) {
+	dag := &core.DAG{Name: "test"}
+	builder := transform.NewStatusBuilder(dag)
+
+	t.Run("WithResultString", func(t *testing.T) {
+		result := builder.Create(
+			"run-123",
+			core.Succeeded,
+			1234,
+			time.Now(),
+			transform.WithResult(&execution.EvaluatedResult{
+				Value: "hello world",
+				Type:  core.ResultTypeString,
+			}),
+		)
+		require.NotNil(t, result.Result)
+		assert.Equal(t, "hello world", result.Result.Value)
+		assert.Equal(t, core.ResultTypeString, result.Result.Type)
+	})
+
+	t.Run("WithResultObject", func(t *testing.T) {
+		jsonResult := `{"count":"100","status":"success"}`
+		result := builder.Create(
+			"run-456",
+			core.Succeeded,
+			1234,
+			time.Now(),
+			transform.WithResult(&execution.EvaluatedResult{
+				Value: jsonResult,
+				Type:  core.ResultTypeObject,
+			}),
+		)
+		require.NotNil(t, result.Result)
+		assert.Equal(t, jsonResult, result.Result.Value)
+		assert.Equal(t, core.ResultTypeObject, result.Result.Type)
+	})
+
+	t.Run("WithNilResult", func(t *testing.T) {
+		result := builder.Create(
+			"run-789",
+			core.Succeeded,
+			1234,
+			time.Now(),
+			transform.WithResult(nil),
+		)
+		assert.Nil(t, result.Result)
+	})
+
+	t.Run("WithoutResult", func(t *testing.T) {
+		result := builder.Create(
+			"run-abc",
+			core.Succeeded,
+			1234,
+			time.Now(),
+		)
+		assert.Nil(t, result.Result)
+	})
+}

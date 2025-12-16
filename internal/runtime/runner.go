@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -48,6 +49,7 @@ type Runner struct {
 	mu        sync.RWMutex
 	pause     time.Duration
 	lastError error
+	result    *execution.EvaluatedResult // Evaluated result computed after steps complete
 
 	handlerMu sync.RWMutex
 	handlers  map[core.HandlerType]*Node
@@ -245,6 +247,9 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 	// Collect final metrics
 	r.metrics.totalExecutionTime = time.Since(r.metrics.startTime)
+
+	// Evaluate result after all steps complete, before event handlers
+	r.evaluateResult(ctx, plan)
 
 	var eventHandlers []core.HandlerType
 	switch r.Status(ctx, plan) {
@@ -599,6 +604,131 @@ func (r *Runner) HandlerNode(name core.HandlerType) *Node {
 		return v
 	}
 	return nil
+}
+
+// Result returns the evaluated result computed after steps complete.
+// Returns nil if no result was defined in the DAG.
+func (r *Runner) Result() *execution.EvaluatedResult {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.result
+}
+
+// evaluateResult evaluates the DAG result template with output variables from all nodes.
+// It sets the result field.
+func (r *Runner) evaluateResult(ctx context.Context, plan *Plan) {
+	dag := GetDAGContext(ctx).DAG
+	if dag == nil || dag.Result == nil {
+		return
+	}
+
+	// Build environment with all output variables from completed nodes
+	env := NewPlanEnv(ctx, core.Step{}, plan)
+
+	// Load output variables from all nodes
+	for _, node := range plan.Nodes() {
+		nodeData := node.NodeData()
+		if nodeData.State.OutputVariables != nil {
+			env.LoadOutputVariables(nodeData.State.OutputVariables)
+		}
+	}
+
+	// Create context with the environment
+	evalCtx := WithEnv(ctx, env)
+
+	var value string
+	var err error
+
+	// Evaluate based on result type
+	switch dag.Result.Type {
+	case core.ResultTypeString:
+		// Simple string template - evaluate and return
+		value, err = EvalString(evalCtx, dag.Result.Val)
+		if err != nil {
+			logger.Warn(ctx, "Failed to evaluate result template",
+				tag.Error(err),
+				slog.String("template", dag.Result.Val),
+			)
+			return
+		}
+
+	case core.ResultTypeObject:
+		// Object type - parse JSON, evaluate each string field, re-marshal
+		value, err = r.evaluateJSONResult(evalCtx, dag.Result.Val)
+		if err != nil {
+			logger.Warn(ctx, "Failed to evaluate result object",
+				tag.Error(err),
+				slog.String("template", dag.Result.Val),
+			)
+			return
+		}
+
+	default:
+		return
+	}
+
+	// Store the result
+	r.mu.Lock()
+	r.result = &execution.EvaluatedResult{
+		Value: value,
+		Type:  dag.Result.Type,
+	}
+	r.mu.Unlock()
+}
+
+// evaluateJSONResult parses a JSON string, evaluates all string values as templates,
+// and returns the re-marshaled JSON string.
+func (r *Runner) evaluateJSONResult(ctx context.Context, jsonStr string) (string, error) {
+	var data any
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		return "", fmt.Errorf("failed to parse result JSON: %w", err)
+	}
+
+	evaluated, err := r.evaluateJSONValue(ctx, data)
+	if err != nil {
+		return "", err
+	}
+
+	result, err := json.Marshal(evaluated)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal evaluated result: %w", err)
+	}
+
+	return string(result), nil
+}
+
+// evaluateJSONValue recursively evaluates all string values in a JSON structure.
+func (r *Runner) evaluateJSONValue(ctx context.Context, value any) (any, error) {
+	switch v := value.(type) {
+	case string:
+		// Evaluate string as template
+		return EvalString(ctx, v)
+	case map[string]any:
+		// Recursively evaluate object
+		result := make(map[string]any, len(v))
+		for key, val := range v {
+			evaluated, err := r.evaluateJSONValue(ctx, val)
+			if err != nil {
+				return nil, err
+			}
+			result[key] = evaluated
+		}
+		return result, nil
+	case []any:
+		// Recursively evaluate array
+		result := make([]any, len(v))
+		for i, val := range v {
+			evaluated, err := r.evaluateJSONValue(ctx, val)
+			if err != nil {
+				return nil, err
+			}
+			result[i] = evaluated
+		}
+		return result, nil
+	default:
+		// Non-string primitives (numbers, booleans, null) - return as-is
+		return v, nil
+	}
 }
 
 // isCanceled returns true if the runner is canceled.

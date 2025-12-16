@@ -2137,8 +2137,8 @@ func buildOTel(_ BuildContext, spec *definition, dag *core.DAG) error {
 }
 
 // buildResult parses the result field from the DAG specification.
-// If result is a string, it's stored as-is.
-// If result is an object, it's JSON-marshaled to a string.
+// If result is a string, it's stored with ResultTypeString.
+// If result is an object, it's JSON-marshaled and stored with ResultTypeObject.
 func buildResult(_ BuildContext, spec *definition, dag *core.DAG) error {
 	if spec.Result == nil {
 		return nil
@@ -2146,14 +2146,20 @@ func buildResult(_ BuildContext, spec *definition, dag *core.DAG) error {
 
 	switch v := spec.Result.(type) {
 	case string:
-		dag.Result = v
+		dag.Result = &core.Result{
+			Val:  v,
+			Type: core.ResultTypeString,
+		}
 	default:
 		// Marshal object to JSON string
 		jsonBytes, err := json.Marshal(v)
 		if err != nil {
 			return core.NewValidationError("result", v, fmt.Errorf("failed to marshal result to JSON: %w", err))
 		}
-		dag.Result = string(jsonBytes)
+		dag.Result = &core.Result{
+			Val:  string(jsonBytes),
+			Type: core.ResultTypeObject,
+		}
 	}
 
 	return nil

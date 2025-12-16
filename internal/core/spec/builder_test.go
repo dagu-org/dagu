@@ -4331,7 +4331,7 @@ steps:
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
-		assert.Empty(t, dag.Result)
+		assert.Nil(t, dag.Result)
 	})
 
 	t.Run("ResultAsString", func(t *testing.T) {
@@ -4346,7 +4346,9 @@ result: "${greeting}"
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
-		assert.Equal(t, "${greeting}", dag.Result)
+		require.NotNil(t, dag.Result)
+		assert.Equal(t, "${greeting}", dag.Result.Val)
+		assert.Equal(t, core.ResultTypeString, dag.Result.Type)
 	})
 
 	t.Run("ResultAsSimpleString", func(t *testing.T) {
@@ -4360,7 +4362,9 @@ result: "hello-world"
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
-		assert.Equal(t, "hello-world", dag.Result)
+		require.NotNil(t, dag.Result)
+		assert.Equal(t, "hello-world", dag.Result.Val)
+		assert.Equal(t, core.ResultTypeString, dag.Result.Type)
 	})
 
 	t.Run("ResultAsObject", func(t *testing.T) {
@@ -4377,10 +4381,12 @@ result:
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
+		require.NotNil(t, dag.Result)
 
 		// Object is JSON-marshaled to string
-		assert.Contains(t, dag.Result, `"message":"${greeting}"`)
-		assert.Contains(t, dag.Result, `"status":"success"`)
+		assert.Contains(t, dag.Result.Val, `"message":"${greeting}"`)
+		assert.Contains(t, dag.Result.Val, `"status":"success"`)
+		assert.Equal(t, core.ResultTypeObject, dag.Result.Type)
 	})
 
 	t.Run("ResultAsNestedObject", func(t *testing.T) {
@@ -4399,11 +4405,13 @@ result:
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
+		require.NotNil(t, dag.Result)
 
 		// Object is JSON-marshaled to string
-		assert.Contains(t, dag.Result, `"metadata"`)
-		assert.Contains(t, dag.Result, `"source":"test"`)
-		assert.Contains(t, dag.Result, `"data"`)
-		assert.Contains(t, dag.Result, `"message":"${greeting}"`)
+		assert.Contains(t, dag.Result.Val, `"metadata"`)
+		assert.Contains(t, dag.Result.Val, `"source":"test"`)
+		assert.Contains(t, dag.Result.Val, `"data"`)
+		assert.Contains(t, dag.Result.Val, `"message":"${greeting}"`)
+		assert.Equal(t, core.ResultTypeObject, dag.Result.Type)
 	})
 }

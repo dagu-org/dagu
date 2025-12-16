@@ -639,6 +639,11 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 		opts = append(opts, transform.WithCreatedAt(a.retryTarget.CreatedAt))
 	}
 
+	// Add result if available (evaluated by runner after steps complete)
+	if result := a.runner.Result(); result != nil {
+		opts = append(opts, transform.WithResult(result))
+	}
+
 	// Create the status object to record the current status.
 	return transform.NewStatusBuilder(a.dag).
 		Create(

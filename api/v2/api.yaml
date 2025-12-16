@@ -2439,6 +2439,30 @@ components:
         - "queued"
         - "partially_succeeded"
 
+    Result:
+      type: object
+      description: "Evaluated result computed at DAG completion"
+      properties:
+        value:
+          type: string
+          description: "The evaluated result value. For string results, this is the evaluated template. For object results, this is the JSON-stringified object."
+        type:
+          $ref: "#/components/schemas/ResultType"
+      required:
+        - value
+        - type
+
+    ResultType:
+      type: integer
+      enum: [0, 1]
+      x-enum-varnames:
+        - "String"
+        - "Object"
+      description: |
+        Type of the result value:
+        0: "String" - Result was defined as a plain string template in YAML
+        1: "Object" - Result was defined as an object in YAML (JSON-stringified)
+
     NodeStatus:
       type: integer
       enum: [0, 1, 2, 3, 4, 5, 6]
@@ -2710,6 +2734,8 @@ components:
         params:
           type: string
           description: "Runtime parameters passed to the DAG-run in JSON format"
+        result:
+          $ref: "#/components/schemas/Result"
       required:
         - rootDAGRunName
         - rootDAGRunId

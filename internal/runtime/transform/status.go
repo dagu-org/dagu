@@ -129,6 +129,13 @@ func WithPreconditions(conditions []*core.Condition) StatusOption {
 	}
 }
 
+// WithResult returns a StatusOption that sets the evaluated result
+func WithResult(result *execution.EvaluatedResult) StatusOption {
+	return func(s *execution.DAGRunStatus) {
+		s.Result = result
+	}
+}
+
 // Create builds a Status object for a dag-run with the specified parameters
 func (f *StatusBuilder) Create(
 	dagRunID string,
