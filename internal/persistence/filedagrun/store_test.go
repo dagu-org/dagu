@@ -314,6 +314,22 @@ func TestListRoot(t *testing.T) {
 	}
 }
 
+// TestListRootExactMatch verifies that listRoot does exact matching, not substring matching.
+// Regression test for issue #1473.
+func TestListRootExactMatch(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "go"), 0750))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "go_fasthttp"), 0750))
+
+	store := &Store{baseDir: tmpDir}
+	roots, err := store.listRoot(context.Background(), "go")
+	require.NoError(t, err)
+	require.Len(t, roots, 1, "should only match 'go', not 'go_fasthttp'")
+	assert.Equal(t, "go", roots[0].prefix)
+}
+
 func TestListRootEmptyDirectory(t *testing.T) {
 	t.Parallel()
 
