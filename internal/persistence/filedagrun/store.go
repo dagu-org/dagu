@@ -500,7 +500,7 @@ func (store *Store) listRoot(_ context.Context, include string) ([]DataRoot, err
 
 	var roots []DataRoot
 	for _, dir := range rootDirs {
-		if include != "" && !strings.Contains(dir, include) {
+		if include != "" && dir != include {
 			continue
 		}
 		if fileutil.IsDir(filepath.Join(store.baseDir, dir)) {
