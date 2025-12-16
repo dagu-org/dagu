@@ -123,8 +123,9 @@ func TestJSONDB(t *testing.T) {
 
 		// Remove records older than 0 days
 		// It should remove all records
-		err := th.Store.RemoveOldDAGRuns(th.Context, "test_DAG", 0)
+		removedIDs, err := th.Store.RemoveOldDAGRuns(th.Context, "test_DAG", 0)
 		require.NoError(t, err)
+		assert.Len(t, removedIDs, 2) // 2 non-active runs should be removed
 
 		// Verify non active attempts are removed
 		attempts = th.Store.RecentAttempts(th.Context, "test_DAG", 3)

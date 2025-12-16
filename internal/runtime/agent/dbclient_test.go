@@ -297,9 +297,12 @@ func (m *mockDAGRunStore) FindSubAttempt(ctx context.Context, rootDAGRun executi
 	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) RemoveOldDAGRuns(ctx context.Context, name string, retentionDays int) error {
-	args := m.Called(ctx, name, retentionDays)
-	return args.Error(0)
+func (m *mockDAGRunStore) RemoveOldDAGRuns(ctx context.Context, name string, retentionDays int, opts ...execution.RemoveOldDAGRunsOption) ([]string, error) {
+	args := m.Called(ctx, name, retentionDays, opts)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
 }
 
 func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName string) error {
