@@ -54,6 +54,10 @@ type DAGRunStatus struct {
 	Params        string            `json:"params,omitempty"`
 	ParamsList    []string          `json:"paramsList,omitempty"`
 	Preconditions []*core.Condition `json:"preconditions,omitempty"`
+	// Result contains the evaluated result computed at DAG completion.
+	// If DAG.Result was a string, this is the evaluated string.
+	// If DAG.Result was an object, this is the JSON-marshaled string.
+	Result string `json:"result,omitempty"`
 }
 
 // DAGRun returns a reference to the dag-run associated with this status

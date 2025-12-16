@@ -2,6 +2,7 @@ package spec
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -118,6 +119,7 @@ var builderRegistry = []builderEntry{
 	{name: "preconditions", fn: buildPrecondition},
 	{name: "otel", fn: buildOTel},
 	{name: "steps", fn: buildSteps},
+	{name: "result", fn: buildResult},
 }
 
 type builderEntry struct {
@@ -2132,4 +2134,27 @@ func buildOTel(_ BuildContext, spec *definition, dag *core.DAG) error {
 	default:
 		return core.NewValidationError("otel", v, fmt.Errorf("otel must be a map"))
 	}
+}
+
+// buildResult parses the result field from the DAG specification.
+// If result is a string, it's stored as-is.
+// If result is an object, it's JSON-marshaled to a string.
+func buildResult(_ BuildContext, spec *definition, dag *core.DAG) error {
+	if spec.Result == nil {
+		return nil
+	}
+
+	switch v := spec.Result.(type) {
+	case string:
+		dag.Result = v
+	default:
+		// Marshal object to JSON string
+		jsonBytes, err := json.Marshal(v)
+		if err != nil {
+			return core.NewValidationError("result", v, fmt.Errorf("failed to marshal result to JSON: %w", err))
+		}
+		dag.Result = string(jsonBytes)
+	}
+
+	return nil
 }

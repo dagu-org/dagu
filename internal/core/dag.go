@@ -132,6 +132,11 @@ type DAG struct {
 	SSH *SSHConfig `json:"ssh,omitempty"`
 	// Secrets contains references to external secrets to be resolved at runtime.
 	Secrets []SecretRef `json:"secrets,omitempty"`
+	// Result defines the output value template computed at DAG completion.
+	// If the YAML specifies a string, it's stored as-is.
+	// If the YAML specifies an object, it's JSON-marshaled to a string.
+	// Templates are evaluated using captured step outputs after execution completes.
+	Result string `json:"result,omitempty"`
 }
 
 // SecretRef represents a reference to an external secret.

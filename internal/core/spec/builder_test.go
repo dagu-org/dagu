@@ -4317,3 +4317,93 @@ steps:
 		assert.Empty(t, dag.Steps[0].Shell)
 	})
 }
+
+func TestBuildResult(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ResultNotSpecified", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Empty(t, dag.Result)
+	})
+
+	t.Run("ResultAsString", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    command: echo hello
+    output: greeting
+result: "${greeting}"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "${greeting}", dag.Result)
+	})
+
+	t.Run("ResultAsSimpleString", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    command: echo hello
+result: "hello-world"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, "hello-world", dag.Result)
+	})
+
+	t.Run("ResultAsObject", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    command: echo hello
+    output: greeting
+result:
+  message: "${greeting}"
+  status: "success"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+
+		// Object is JSON-marshaled to string
+		assert.Contains(t, dag.Result, `"message":"${greeting}"`)
+		assert.Contains(t, dag.Result, `"status":"success"`)
+	})
+
+	t.Run("ResultAsNestedObject", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: test
+    command: echo hello
+    output: greeting
+result:
+  metadata:
+    source: "test"
+  data:
+    message: "${greeting}"
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+
+		// Object is JSON-marshaled to string
+		assert.Contains(t, dag.Result, `"metadata"`)
+		assert.Contains(t, dag.Result, `"source":"test"`)
+		assert.Contains(t, dag.Result, `"data"`)
+		assert.Contains(t, dag.Result, `"message":"${greeting}"`)
+	})
+}

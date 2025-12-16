@@ -88,6 +88,11 @@ type definition struct {
 	SSH *sshDef
 	// Secrets contains references to external secrets.
 	Secrets []secretRefDef
+	// Result defines the output value computed at DAG completion.
+	// Can be a string (evaluated as template) or an object (marshaled to JSON string).
+	// String example: result: "${count}"
+	// Object example: result: {foo: "${count}", bar: "static"}
+	Result any
 }
 
 // handlerOnDef defines the steps to be executed on different events.
