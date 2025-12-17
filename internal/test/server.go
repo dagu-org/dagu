@@ -1,6 +1,7 @@
 package test
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -41,16 +42,28 @@ func SetupServer(t *testing.T, opts ...HelperOption) Server {
 	helper := Setup(t, opts...)
 
 	srv := Server{Helper: helper}
-	go srv.runServer(t)
 
-	// Wait for the server to start
-	waitForServerStart(t, fmt.Sprintf("localhost:%d", port))
+	// Use error channel to detect server startup failures
+	errChan := make(chan error, 1)
+	go srv.runServer(t, errChan)
+
+	// Wait for the server to start or fail
+	select {
+	case err := <-errChan:
+		if err != nil {
+			t.Fatalf("server failed to start: %v", err)
+		}
+		// Server started successfully, wait for it to be ready
+		waitForServerStart(t, fmt.Sprintf("localhost:%d", port))
+	case <-time.After(10 * time.Second):
+		t.Fatal("server failed to start within timeout")
+	}
 
 	return srv
 }
 
 // runServer starts the HTTP server
-func (srv *Server) runServer(t *testing.T) {
+func (srv *Server) runServer(t *testing.T, errChan chan<- error) {
 	t.Helper()
 
 	cc := coordinator.New(srv.ServiceRegistry, coordinator.DefaultConfig())
@@ -64,9 +77,17 @@ func (srv *Server) runServer(t *testing.T) {
 	)
 	mr := telemetry.NewRegistry(collector)
 
-	server := frontend.NewServer(srv.Config, srv.DAGStore, srv.DAGRunStore, srv.QueueStore, srv.ProcStore, srv.DAGRunMgr, cc, srv.ServiceRegistry, mr, nil)
-	err := server.Serve(srv.Context)
-	require.NoError(t, err, "failed to start server")
+	server, err := frontend.NewServer(srv.Config, srv.DAGStore, srv.DAGRunStore, srv.QueueStore, srv.ProcStore, srv.DAGRunMgr, cc, srv.ServiceRegistry, mr, nil)
+	if err != nil {
+		errChan <- fmt.Errorf("failed to create server: %w", err)
+		return
+	}
+	close(errChan) // Signal that server started successfully
+	err = server.Serve(srv.Context)
+	if err != nil {
+		// Log but don't fail - context cancellation is expected
+		t.Logf("server.Serve returned: %v", err)
+	}
 }
 
 // Client returns an HTTP client for the server
@@ -95,6 +116,7 @@ type Request struct {
 	path           string
 	body           any
 	expectedStatus int
+	headers        map[string]string
 }
 
 // Get prepares a GET request
@@ -131,12 +153,42 @@ func (r *Request) ExpectStatus(code int) *Request {
 	return r
 }
 
+// WithHeader adds a header to the request
+func (r *Request) WithHeader(key, value string) *Request {
+	if r.headers == nil {
+		r.headers = make(map[string]string)
+	}
+	r.headers[key] = value
+	return r
+}
+
+// WithBearerToken adds a Bearer token to the Authorization header
+func (r *Request) WithBearerToken(token string) *Request {
+	return r.WithHeader("Authorization", "Bearer "+token)
+}
+
+// WithBasicAuth adds Basic authentication to the request
+func (r *Request) WithBasicAuth(username, password string) *Request {
+	return r.WithHeader("Authorization", "Basic "+basicAuth(username, password))
+}
+
+// basicAuth returns the base64 encoded basic auth string
+func basicAuth(username, password string) string {
+	auth := username + ":" + password
+	return base64.StdEncoding.EncodeToString([]byte(auth))
+}
+
 // Send executes the request and returns the response
 func (r *Request) Send(t *testing.T) *Response {
 	t.Helper()
 
 	req := r.client.client.R()
 	url := r.client.baseURL() + r.path
+
+	// Apply custom headers
+	for key, value := range r.headers {
+		req.SetHeader(key, value)
+	}
 
 	var res *resty.Response
 	var err error

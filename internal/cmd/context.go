@@ -34,6 +34,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // Context holds the configuration for a command.
@@ -57,14 +58,14 @@ type Context struct {
 // LogToFile creates a new logger context with a file writer.
 func (c *Context) LogToFile(f *os.File) {
 	var opts []logger.Option
-	if c.Config.Global.Debug {
+	if c.Config.Core.Debug {
 		opts = append(opts, logger.WithDebug())
 	}
 	if c.Quiet {
 		opts = append(opts, logger.WithQuiet())
 	}
-	if c.Config.Global.LogFormat != "" {
-		opts = append(opts, logger.WithFormat(c.Config.Global.LogFormat))
+	if c.Config.Core.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(c.Config.Core.LogFormat))
 	}
 	if f != nil {
 		opts = append(opts, logger.WithWriter(f))
@@ -73,11 +74,14 @@ func (c *Context) LogToFile(f *os.File) {
 }
 
 // NewContext initializes the application setup by loading configuration,
-// setting up logger context, and logging any warnings.
+// NewContext creates and initializes an application Context for the given Cobra command.
+// It binds command flags, loads configuration scoped to the command, configures logging (respecting debug, quiet, and log format settings), logs any configuration warnings, and initializes history, DAG run, proc, queue, and service registry stores and managers used by the application.
+// NewContext returns an initialized Context or an error if flag retrieval, configuration loading, or other initialization steps fail.
 func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	ctx := cmd.Context()
 
-	bindFlags(cmd, flags...)
+	v := viper.New()
+	bindFlags(v, cmd, flags...)
 
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
@@ -104,7 +108,11 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		configLoaderOpts = append(configLoaderOpts, config.WithConfigFile(cfgPath))
 	}
 
-	cfg, err := config.Load(configLoaderOpts...)
+	// Set service type based on command to load only necessary config sections
+	configLoaderOpts = append(configLoaderOpts, config.WithService(serviceForCommand(cmd.Name())))
+
+	loader := config.NewConfigLoader(v, configLoaderOpts...)
+	cfg, err := loader.Load()
 	if err != nil {
 		return nil, err
 	}
@@ -112,14 +120,14 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	// Create a logger context based on config and quiet mode
 	var opts []logger.Option
-	if cfg.Global.Debug || os.Getenv("DEBUG") != "" {
+	if cfg.Core.Debug || os.Getenv("DEBUG") != "" {
 		opts = append(opts, logger.WithDebug())
 	}
 	if quiet {
 		opts = append(opts, logger.WithQuiet())
 	}
-	if cfg.Global.LogFormat != "" {
-		opts = append(opts, logger.WithFormat(cfg.Global.LogFormat))
+	if cfg.Core.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(cfg.Core.LogFormat))
 	}
 	ctx = logger.WithLogger(ctx, logger.NewLogger(opts...))
 
@@ -131,7 +139,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	// Initialize history repository and history manager
 	hrOpts := []filedagrun.DAGRunStoreOption{
 		filedagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
-		filedagrun.WithLocation(cfg.Global.Location),
+		filedagrun.WithLocation(cfg.Core.Location),
 	}
 
 	switch cmd.Name() {
@@ -173,6 +181,29 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}, nil
 }
 
+// serviceForCommand returns the appropriate config.Service type for a given command name.
+// serviceForCommand determines which config.Service to load for a given command name.
+// "server" -> ServiceServer, "scheduler" -> ServiceScheduler, "worker" -> ServiceWorker,
+// "coordinator" -> ServiceCoordinator, and "start", "restart", "retry", "dry", "exec" -> ServiceAgent.
+// For any other command it returns ServiceNone so all configuration sections are loaded.
+func serviceForCommand(cmdName string) config.Service {
+	switch cmdName {
+	case "server":
+		return config.ServiceServer
+	case "scheduler":
+		return config.ServiceScheduler
+	case "worker":
+		return config.ServiceWorker
+	case "coordinator":
+		return config.ServiceCoordinator
+	case "start", "restart", "retry", "dry", "exec":
+		return config.ServiceAgent
+	default:
+		// For all other commands (status, stop, validate, etc.), load all config
+		return config.ServiceNone
+	}
+}
+
 // NewServer creates and returns a new web UI NewServer.
 // It initializes in-memory caches for DAGs and runstore, and uses them in the client.
 func (c *Context) NewServer(rs *resource.Service) (*frontend.Server, error) {
@@ -197,17 +228,17 @@ func (c *Context) NewServer(rs *resource.Service) (*frontend.Server, error) {
 
 	mr := telemetry.NewRegistry(collector)
 
-	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr, rs), nil
+	return frontend.NewServer(c.Config, dr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr, rs)
 }
 
 // NewCoordinatorClient creates a new coordinator client using the global peer configuration.
 func (c *Context) NewCoordinatorClient() coordinator.Client {
 	coordinatorCliCfg := coordinator.DefaultConfig()
-	coordinatorCliCfg.CAFile = c.Config.Global.Peer.ClientCaFile
-	coordinatorCliCfg.CertFile = c.Config.Global.Peer.CertFile
-	coordinatorCliCfg.KeyFile = c.Config.Global.Peer.KeyFile
-	coordinatorCliCfg.SkipTLSVerify = c.Config.Global.Peer.SkipTLSVerify
-	coordinatorCliCfg.Insecure = c.Config.Global.Peer.Insecure
+	coordinatorCliCfg.CAFile = c.Config.Core.Peer.ClientCaFile
+	coordinatorCliCfg.CertFile = c.Config.Core.Peer.CertFile
+	coordinatorCliCfg.KeyFile = c.Config.Core.Peer.KeyFile
+	coordinatorCliCfg.SkipTLSVerify = c.Config.Core.Peer.SkipTLSVerify
+	coordinatorCliCfg.Insecure = c.Config.Core.Peer.Insecure
 
 	if err := coordinatorCliCfg.Validate(); err != nil {
 		logger.Error(c.Context, "Invalid coordinator client configuration", tag.Error(err))
@@ -268,7 +299,7 @@ func (c *Context) dagStore(cache *fileutil.Cache[*core.DAG], searchPaths []strin
 		filedag.WithFlagsBaseDir(c.Config.Paths.SuspendFlagsDir),
 		filedag.WithSearchPaths(searchPaths),
 		filedag.WithFileCache(cache),
-		filedag.WithSkipExamples(c.Config.Global.SkipExamples),
+		filedag.WithSkipExamples(c.Config.Core.SkipExamples),
 	)
 
 	// Initialize the store (creates example DAGs if needed)
@@ -330,9 +361,7 @@ func (c *Context) GenLogFileName(dag *core.DAG, dagRunID string) (string, error)
 
 // NewCommand creates a new command instance with the given cobra command and run function.
 func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *Context, args []string) error) *cobra.Command {
-	config.WithViperLock(func() {
-		initFlags(cmd, flags...)
-	})
+	initFlags(cmd, flags...)
 
 	cmd.SilenceUsage = true
 

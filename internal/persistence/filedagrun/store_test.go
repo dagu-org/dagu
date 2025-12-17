@@ -123,8 +123,9 @@ func TestJSONDB(t *testing.T) {
 
 		// Remove records older than 0 days
 		// It should remove all records
-		err := th.Store.RemoveOldDAGRuns(th.Context, "test_DAG", 0)
+		removedIDs, err := th.Store.RemoveOldDAGRuns(th.Context, "test_DAG", 0)
 		require.NoError(t, err)
+		assert.Len(t, removedIDs, 2) // 2 non-active runs should be removed
 
 		// Verify non active attempts are removed
 		attempts = th.Store.RecentAttempts(th.Context, "test_DAG", 3)
@@ -311,6 +312,22 @@ func TestListRoot(t *testing.T) {
 	for _, dir := range testDirs {
 		assert.True(t, foundDirs[dir], "listRoot should include directory %s", dir)
 	}
+}
+
+// TestListRootExactMatch verifies that listRoot does exact matching, not substring matching.
+// Regression test for issue #1473.
+func TestListRootExactMatch(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "go"), 0750))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "go_fasthttp"), 0750))
+
+	store := &Store{baseDir: tmpDir}
+	roots, err := store.listRoot(context.Background(), "go")
+	require.NoError(t, err)
+	require.Len(t, roots, 1, "should only match 'go', not 'go_fasthttp'")
+	assert.Equal(t, "go", roots[0].prefix)
 }
 
 func TestListRootEmptyDirectory(t *testing.T) {

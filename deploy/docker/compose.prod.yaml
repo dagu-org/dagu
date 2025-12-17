@@ -82,6 +82,13 @@ services:
       - DAGU_HOST=0.0.0.0
       - DAGU_PORT=8080
       - DAGU_DAGS_DIR=/var/lib/dagu/dags
+      # Builtin authentication (RBAC) - CHANGE TOKEN_SECRET IN PRODUCTION
+      - DAGU_AUTH_MODE=builtin
+      - DAGU_AUTH_TOKEN_SECRET=CHANGE_ME_TO_A_SECURE_RANDOM_STRING
+      # Admin credentials: password auto-generated on first run, printed to stdout
+      # - DAGU_AUTH_ADMIN_USERNAME=admin # default is 'admin'
+      # - DAGU_AUTH_ADMIN_PASSWORD=      # set to use a specific password
+      # - DAGU_AUTH_TOKEN_TTL=24h        # default is 24h
       # If behind a proxy, set base path
       # - DAGU_BASE_PATH=/dagu
     depends_on:

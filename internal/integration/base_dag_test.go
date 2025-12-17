@@ -69,7 +69,7 @@ func TestBaseDAGSpecialEnvVarsInHandler(t *testing.T) {
 		th.DAGRunStore,
 		th.ServiceRegistry,
 		root,
-		th.Config.Global.Peer,
+		th.Config.Core.Peer,
 		agent.Options{},
 	)
 
@@ -183,7 +183,7 @@ steps:
 		th.DAGRunStore,
 		th.ServiceRegistry,
 		root,
-		th.Config.Global.Peer,
+		th.Config.Core.Peer,
 		agent.Options{},
 	)
 

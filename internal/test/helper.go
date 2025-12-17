@@ -75,7 +75,9 @@ func WithConfigMutator(mutator func(*config.Config)) HelperOption {
 	}
 }
 
-// Setup creates a new Helper instance for testing
+// Setup creates and returns a Helper preconfigured for tests.
+//
+// Setup prepares an isolated test environment: it creates a temporary DAGU_HOME, writes a minimal config file, initializes stores and a runtime manager, sets key environment variables (e.g. DEBUG, CI, TZ, DAGU_EXECUTABLE, DAGU_CONFIG, SHELL), installs a cancellable context, and registers cleanup to restore the working directory and remove the temp directory. Use the returned Helper to interact with the test runtime and stores.
 func Setup(t *testing.T, opts ...HelperOption) Helper {
 	setupLock.Lock()
 	defer setupLock.Unlock()
@@ -123,16 +125,15 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	}
 
 	ctx := createDefaultContext()
-	// Reset viper state to avoid leaking config file paths across tests.
-	config.WithViperLock(func() {
-		viper.Reset()
-	})
-	cfg, err := config.Load()
-	require.NoError(t, err)
+	// Use a fresh viper instance to avoid any global state issues between tests.
+	v := viper.New()
+	loader := config.NewConfigLoader(v)
+	cfg, loadErr := loader.Load()
+	require.NoError(t, loadErr)
 
-	cfg.Global.TZ = "UTC"
-	cfg.Global.Location = time.UTC
-	cfg.Global.TzOffsetInSec = 0
+	cfg.Core.TZ = "UTC"
+	cfg.Core.Location = time.UTC
+	cfg.Core.TzOffsetInSec = 0
 	cfg.Paths.Executable = executablePath
 	cfg.Paths.LogDir = filepath.Join(tmpDir, "logs")
 	dataDir := filepath.Join(tmpDir, "data")
@@ -141,6 +142,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	cfg.Paths.QueueDir = filepath.Join(dataDir, "queue")
 	cfg.Paths.ProcDir = filepath.Join(dataDir, "proc")
 	cfg.Paths.ServiceRegistryDir = filepath.Join(dataDir, "service-registry")
+	cfg.Paths.UsersDir = filepath.Join(dataDir, "users")
 	cfg.Paths.SuspendFlagsDir = filepath.Join(tmpDir, "suspend-flags")
 	cfg.Paths.AdminLogsDir = filepath.Join(tmpDir, "admin-logs")
 	if options.DAGsDir != "" {
@@ -222,17 +224,20 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	return helper
 }
 
-// writeHelperConfigFile writes a minimal config file so subprocesses can rely on a stable --config path.
+// writeHelperConfigFile writes a minimal YAML configuration to configPath so subprocesses can rely on a stable --config file.
+// The written file contains core settings (debug, log format, default shell, and tz if set), paths, and any enabled or configured
+// queues, scheduler, coordinator, worker, and ui sections derived from cfg.
+// The function fails the test if YAML marshaling or writing the file returns an error.
 func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) {
 	t.Helper()
 
 	configData := map[string]any{
-		"debug":        cfg.Global.Debug,
-		"logFormat":    cfg.Global.LogFormat,
-		"defaultShell": cfg.Global.DefaultShell,
+		"debug":        cfg.Core.Debug,
+		"logFormat":    cfg.Core.LogFormat,
+		"defaultShell": cfg.Core.DefaultShell,
 	}
-	if cfg.Global.TZ != "" {
-		configData["tz"] = cfg.Global.TZ
+	if cfg.Core.TZ != "" {
+		configData["tz"] = cfg.Core.TZ
 	}
 
 	configData["paths"] = map[string]any{
@@ -246,6 +251,7 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 		"queueDir":           cfg.Paths.QueueDir,
 		"procDir":            cfg.Paths.ProcDir,
 		"serviceRegistryDir": cfg.Paths.ServiceRegistryDir,
+		"usersDir":           cfg.Paths.UsersDir,
 		"executable":         cfg.Paths.Executable,
 	}
 
@@ -500,9 +506,9 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 				}
 
 			case NotEmpty:
-				parts := strings.SplitN(actual, "=", 2)
-				assert.Len(t, parts, 2, "expected output %q to be in the form key=value", key)
-				assert.NotEmpty(t, parts[1], "expected output %q to be not empty", key)
+				_, value, found := strings.Cut(actual, "=")
+				assert.True(t, found, "expected output %q to be in the form key=value", key)
+				assert.NotEmpty(t, value, "expected output %q to be not empty", key)
 
 			default:
 				t.Errorf("unsupported value matcher type %T", expected)
@@ -562,7 +568,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		d.DAGRunStore,
 		d.ServiceRegistry,
 		root,
-		d.Config.Global.Peer,
+		d.Config.Core.Peer,
 		helper.opts,
 	)
 

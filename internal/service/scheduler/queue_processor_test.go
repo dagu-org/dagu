@@ -14,7 +14,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testBackoffConfig returns a fast backoff configuration for testing.
+func testBackoffConfig() scheduler.BackoffConfig {
+	return scheduler.BackoffConfig{
+		InitialInterval: 10 * time.Millisecond,
+		MaxInterval:     50 * time.Millisecond,
+		MaxRetries:      2,
+	}
+}
+
 func TestQueueProcessor_StrictFIFO(t *testing.T) {
+	t.Parallel()
+
 	th := test.Setup(t)
 
 	// Enable queues
@@ -22,11 +33,6 @@ func TestQueueProcessor_StrictFIFO(t *testing.T) {
 	th.Config.Queues.Config = []config.QueueConfig{
 		{Name: "test-dag", MaxActiveRuns: 1},
 	}
-
-	// Reduce backoff for testing
-	scheduler.InitialBackoffInterval = 10 * time.Millisecond
-	scheduler.MaxBackoffInterval = 50 * time.Millisecond
-	scheduler.MaxBackoffRetries = 2
 
 	// Create a simple DAG (local execution, no dispatcher needed)
 	dagYaml := []byte("name: test-dag\nsteps:\n  - name: fail\n    command: exit 1")
@@ -70,13 +76,14 @@ func TestQueueProcessor_StrictFIFO(t *testing.T) {
 	// Create DAGExecutor (no dispatcher, so it will use local execution)
 	dagExecutor := scheduler.NewDAGExecutor(nil, runtime.NewSubCmdBuilder(th.Config))
 
-	// Create QueueProcessor
+	// Create QueueProcessor with fast backoff for testing
 	processor := scheduler.NewQueueProcessor(
 		th.QueueStore,
 		th.DAGRunStore,
 		th.ProcStore,
 		dagExecutor,
 		th.Config.Queues,
+		scheduler.WithBackoffConfig(testBackoffConfig()),
 	)
 
 	// Process the queue

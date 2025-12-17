@@ -12,6 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testLoad is a helper function that creates a new ConfigLoader with a fresh viper instance
+// and loads the configuration. This replaces the old config.Load() function in tests.
+func testLoad(t *testing.T, opts ...ConfigLoaderOption) *Config {
+	t.Helper()
+	cfg, err := NewConfigLoader(viper.New(), opts...).Load()
+	require.NoError(t, err)
+	return cfg
+}
+
+// testLoadWithError is a helper for tests that expect loading to fail.
+func testLoadWithError(t *testing.T, opts ...ConfigLoaderOption) error {
+	t.Helper()
+	_, err := NewConfigLoader(viper.New(), opts...).Load()
+	return err
+}
+
 func TestLoad_Env(t *testing.T) {
 	// Reset viper to ensure clean state
 	viper.Reset()
@@ -123,8 +139,7 @@ func TestLoad_Env(t *testing.T) {
 		os.Setenv(key, val)
 	}
 
-	cfg, err := Load(WithConfigFile(configFile))
-	require.NoError(t, err)
+	cfg := testLoad(t, WithConfigFile(configFile))
 
 	berlinLoc, _ := time.LoadLocation("Europe/Berlin")
 	_, berlinOffset := time.Now().In(berlinLoc).Zone()
@@ -133,7 +148,7 @@ func TestLoad_Env(t *testing.T) {
 	cfg.Paths.ConfigFileUsed = ""
 
 	expected := &Config{
-		Global: Global{
+		Core: Core{
 			Debug:         true,
 			LogFormat:     "json",
 			TZ:            "Europe/Berlin",
@@ -142,7 +157,7 @@ func TestLoad_Env(t *testing.T) {
 			DefaultShell:  "/bin/zsh",
 			SkipExamples:  false,
 			Peer:          Peer{Insecure: true}, // Default is true
-			BaseEnv:       cfg.Global.BaseEnv,   // Dynamic, copy from actual
+			BaseEnv:       cfg.Core.BaseEnv,     // Dynamic, copy from actual
 		},
 		Server: Server{
 			Host:        "test.example.com",
@@ -151,6 +166,7 @@ func TestLoad_Env(t *testing.T) {
 			APIBasePath: "/test/api",
 			Headless:    true,
 			Auth: Auth{
+				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
 				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
 				Token: AuthToken{Value: "test-token-123"},
 				OIDC: AuthOIDC{
@@ -158,6 +174,10 @@ func TestLoad_Env(t *testing.T) {
 					ClientSecret: "test-secret",
 					Issuer:       "https://auth.example.com",
 					Scopes:       []string{"openid", "profile", "email"},
+				},
+				Builtin: AuthBuiltin{
+					Admin: AdminConfig{Username: "admin"},
+					Token: TokenConfig{TTL: 24 * time.Hour},
 				},
 			},
 			TLS: &TLSConfig{
@@ -180,6 +200,7 @@ func TestLoad_Env(t *testing.T) {
 			ProcDir:            filepath.Join(testPaths, "proc"),
 			QueueDir:           filepath.Join(testPaths, "queue"),
 			ServiceRegistryDir: filepath.Join(testPaths, "service-registry"),
+			UsersDir:           filepath.Join(testPaths, "data", "users"), // Derived from DataDir
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -211,6 +232,7 @@ func TestLoad_Env(t *testing.T) {
 			Retention: 24 * time.Hour,
 			Interval:  5 * time.Second,
 		},
+		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -223,15 +245,14 @@ func TestLoad_WithAppHomeDir(t *testing.T) {
 
 	tempDir := t.TempDir()
 
-	cfg, err := Load(WithAppHomeDir(tempDir))
-	require.NoError(t, err)
+	cfg := testLoad(t, WithAppHomeDir(tempDir))
 
 	resolved := filepath.Clean(tempDir)
 	assert.Equal(t, filepath.Join(resolved, "dags"), cfg.Paths.DAGsDir)
 	assert.Equal(t, filepath.Join(resolved, "data"), cfg.Paths.DataDir)
 	assert.Equal(t, filepath.Join(resolved, "logs"), cfg.Paths.LogDir)
 
-	baseEnv := cfg.Global.BaseEnv.AsSlice()
+	baseEnv := cfg.Core.BaseEnv.AsSlice()
 	require.Contains(t, baseEnv, fmt.Sprintf("DAGU_HOME=%s", resolved))
 }
 
@@ -331,7 +352,7 @@ scheduler:
 	utcLoc, _ := time.LoadLocation("UTC")
 
 	expected := &Config{
-		Global: Global{
+		Core: Core{
 			Debug:         true,
 			LogFormat:     "json",
 			TZ:            "UTC",
@@ -346,7 +367,7 @@ scheduler:
 				SkipTLSVerify: false,
 				Insecure:      false,
 			},
-			BaseEnv: cfg.Global.BaseEnv, // Dynamic, copy from actual
+			BaseEnv: cfg.Core.BaseEnv, // Dynamic, copy from actual
 		},
 		Server: Server{
 			Host:              "0.0.0.0",
@@ -356,6 +377,7 @@ scheduler:
 			Headless:          true,
 			LatestStatusToday: true,
 			Auth: Auth{
+				Mode:  AuthModeOIDC, // Auto-detected from OIDC config
 				Basic: AuthBasic{Username: "admin", Password: "secret"},
 				Token: AuthToken{Value: "api-token"},
 				OIDC: AuthOIDC{
@@ -365,6 +387,10 @@ scheduler:
 					Issuer:       "https://accounts.example.com",
 					Scopes:       []string{"openid", "profile", "email"},
 					Whitelist:    []string{"user@example.com"},
+				},
+				Builtin: AuthBuiltin{
+					Admin: AdminConfig{Username: "admin"},
+					Token: TokenConfig{TTL: 24 * time.Hour},
 				},
 			},
 			TLS: &TLSConfig{
@@ -405,6 +431,7 @@ scheduler:
 			ProcDir:            "/var/dagu/data/proc",
 			QueueDir:           "/var/dagu/data/queue",
 			ServiceRegistryDir: "/var/dagu/data/service-registry",
+			UsersDir:           "/var/dagu/data/users",
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -445,6 +472,7 @@ scheduler:
 			Retention: 24 * time.Hour,
 			Interval:  5 * time.Second,
 		},
+		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://accounts.example.com)"},
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -499,23 +527,22 @@ paths:
 	assert.Equal(t, "/custom/data/proc", cfg.Paths.ProcDir)
 	assert.Equal(t, "/custom/data/queue", cfg.Paths.QueueDir)
 	assert.Equal(t, "/custom/data/service-registry", cfg.Paths.ServiceRegistryDir)
+	assert.Equal(t, "/custom/data/users", cfg.Paths.UsersDir)
 }
 
 func TestLoad_EdgeCases_Errors(t *testing.T) {
 	t.Run("InvalidTimezone", func(t *testing.T) {
-		viper.Reset()
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		err := os.WriteFile(configFile, []byte(`tz: "Invalid/Timezone"`), 0600)
 		require.NoError(t, err)
 
-		_, err = Load(WithConfigFile(configFile))
+		err = testLoadWithError(t, WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to load timezone")
 	})
 
 	t.Run("IncompleteTLS", func(t *testing.T) {
-		viper.Reset()
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		err := os.WriteFile(configFile, []byte(`
@@ -525,33 +552,31 @@ tls:
 `), 0600)
 		require.NoError(t, err)
 
-		_, err = Load(WithConfigFile(configFile))
+		err = testLoadWithError(t, WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "TLS configuration incomplete")
 	})
 
 	t.Run("InvalidPort", func(t *testing.T) {
-		viper.Reset()
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 
 		// Test negative port
 		err := os.WriteFile(configFile, []byte(`port: -1`), 0600)
 		require.NoError(t, err)
-		_, err = Load(WithConfigFile(configFile))
+		err = testLoadWithError(t, WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid port number")
 
 		// Test port > 65535
 		err = os.WriteFile(configFile, []byte(`port: 99999`), 0600)
 		require.NoError(t, err)
-		_, err = Load(WithConfigFile(configFile))
+		err = testLoadWithError(t, WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid port number")
 	})
 
 	t.Run("InvalidMaxDashboardPageLimit", func(t *testing.T) {
-		viper.Reset()
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "config.yaml")
 		err := os.WriteFile(configFile, []byte(`
@@ -560,7 +585,7 @@ ui:
 `), 0600)
 		require.NoError(t, err)
 
-		_, err = Load(WithConfigFile(configFile))
+		err = testLoadWithError(t, WithConfigFile(configFile))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid max dashboard page limit")
 	})
@@ -580,6 +605,26 @@ scheduler:
 		assert.Contains(t, cfg.Warnings[0], "Invalid scheduler.lockStaleThreshold")
 		assert.Contains(t, cfg.Warnings[1], "Invalid scheduler.lockRetryInterval")
 		assert.Contains(t, cfg.Warnings[2], "Invalid scheduler.zombieDetectionInterval")
+	})
+
+	t.Run("BuiltinAuthWithBasicAuthWarning", func(t *testing.T) {
+		t.Parallel()
+		cfg := loadWithEnv(t, `
+auth:
+  mode: builtin
+  builtin:
+    admin:
+      username: admin
+    token:
+      secret: test-secret
+  basic:
+    username: basicuser
+    password: basicpass
+paths:
+  usersDir: /tmp/users
+`, nil)
+		require.Len(t, cfg.Warnings, 1)
+		assert.Contains(t, cfg.Warnings[0], "Basic auth configuration is ignored when auth mode is 'builtin'")
 	})
 }
 
@@ -716,18 +761,13 @@ func loadFromYAML(t *testing.T, yaml string) *Config {
 	err := os.WriteFile(configFile, []byte(yaml), 0600)
 	require.NoError(t, err)
 
-	cfg, err := Load(WithConfigFile(configFile))
-	require.NoError(t, err)
+	cfg := testLoad(t, WithConfigFile(configFile))
 
 	cfg.Paths.ConfigFileUsed = ""
 	return cfg
 }
 
 func TestLoad_ConfigFileUsed(t *testing.T) {
-	// Reset viper
-	viper.Reset()
-	defer viper.Reset()
-
 	// Create a temp config file
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "config.yaml")
@@ -735,17 +775,13 @@ func TestLoad_ConfigFileUsed(t *testing.T) {
 	require.NoError(t, err)
 
 	// Load configuration
-	cfg, err := Load(WithConfigFile(configFile))
-	require.NoError(t, err)
+	cfg := testLoad(t, WithConfigFile(configFile))
 
 	// Verify ConfigFileUsed is set correctly
 	assert.Equal(t, configFile, cfg.Paths.ConfigFileUsed)
 }
 
 func TestBindEnv_AsPath(t *testing.T) {
-	viper.Reset()
-	defer viper.Reset()
-
 	tests := []struct {
 		name     string
 		envValue string
@@ -770,7 +806,8 @@ func TestBindEnv_AsPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			envKey := "DAGU_TEST_PATH_VAR"
+			// Use DAGU_DAGS_DIR as a real path binding that uses isPath: true
+			envKey := "DAGU_DAGS_DIR"
 			os.Unsetenv(envKey)
 			defer os.Unsetenv(envKey)
 
@@ -778,7 +815,9 @@ func TestBindEnv_AsPath(t *testing.T) {
 				os.Setenv(envKey, tt.envValue)
 			}
 
-			bindEnv("test.pathVar", "TEST_PATH_VAR", asPath())
+			// Create a ConfigLoader and call bindEnvironmentVariables on it
+			loader := NewConfigLoader(viper.New())
+			loader.bindEnvironmentVariables()
 
 			result := os.Getenv(envKey)
 			if tt.envValue == "" {
@@ -814,5 +853,133 @@ monitoring:
 		cfg := loadFromYAML(t, "")
 		assert.Equal(t, 24*time.Hour, cfg.Monitoring.Retention)
 		assert.Equal(t, 5*time.Second, cfg.Monitoring.Interval)
+	})
+}
+
+func TestLoad_AuthMode(t *testing.T) {
+	t.Run("AuthModeNone", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "none"
+`)
+		assert.Equal(t, AuthModeNone, cfg.Server.Auth.Mode)
+	})
+
+	t.Run("AuthModeBuiltin", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "builtin"
+  builtin:
+    admin:
+      username: "admin"
+      password: "secretpass123"
+    token:
+      secret: "my-jwt-secret-key"
+      ttl: "12h"
+`)
+		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
+		assert.Equal(t, "admin", cfg.Server.Auth.Builtin.Admin.Username)
+		assert.Equal(t, "secretpass123", cfg.Server.Auth.Builtin.Admin.Password)
+		assert.Equal(t, "my-jwt-secret-key", cfg.Server.Auth.Builtin.Token.Secret)
+		assert.Equal(t, 12*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
+	})
+
+	t.Run("AuthModeOIDC", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "oidc"
+  oidc:
+    clientId: "my-client-id"
+    clientSecret: "my-client-secret"
+    issuer: "https://auth.example.com"
+    scopes:
+      - "openid"
+      - "profile"
+`)
+		assert.Equal(t, AuthModeOIDC, cfg.Server.Auth.Mode)
+		assert.Equal(t, "my-client-id", cfg.Server.Auth.OIDC.ClientId)
+		assert.Equal(t, "my-client-secret", cfg.Server.Auth.OIDC.ClientSecret)
+		assert.Equal(t, "https://auth.example.com", cfg.Server.Auth.OIDC.Issuer)
+		assert.Equal(t, []string{"openid", "profile"}, cfg.Server.Auth.OIDC.Scopes)
+	})
+
+	t.Run("AuthModeFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_AUTH_MODE":         "builtin",
+			"DAGU_AUTH_TOKEN_SECRET": "test-secret",
+			"DAGU_PATHS_USERS_DIR":   t.TempDir(),
+		})
+		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
+	})
+
+	t.Run("AuthModeDefaultNone", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.Equal(t, AuthModeNone, cfg.Server.Auth.Mode)
+	})
+}
+
+func TestLoad_AuthBuiltin(t *testing.T) {
+	t.Run("FromYAML", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "builtin"
+  builtin:
+    admin:
+      username: "superadmin"
+      password: "supersecret123"
+    token:
+      secret: "jwt-signing-secret"
+      ttl: "24h"
+`)
+		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
+		assert.Equal(t, "superadmin", cfg.Server.Auth.Builtin.Admin.Username)
+		assert.Equal(t, "supersecret123", cfg.Server.Auth.Builtin.Admin.Password)
+		assert.Equal(t, "jwt-signing-secret", cfg.Server.Auth.Builtin.Token.Secret)
+		assert.Equal(t, 24*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
+	})
+
+	t.Run("FromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_AUTH_MODE":           "builtin",
+			"DAGU_AUTH_ADMIN_USERNAME": "envadmin",
+			"DAGU_AUTH_ADMIN_PASSWORD": "envpassword123",
+			"DAGU_AUTH_TOKEN_SECRET":   "env-jwt-secret",
+			"DAGU_AUTH_TOKEN_TTL":      "48h",
+		})
+		assert.Equal(t, AuthModeBuiltin, cfg.Server.Auth.Mode)
+		assert.Equal(t, "envadmin", cfg.Server.Auth.Builtin.Admin.Username)
+		assert.Equal(t, "envpassword123", cfg.Server.Auth.Builtin.Admin.Password)
+		assert.Equal(t, "env-jwt-secret", cfg.Server.Auth.Builtin.Token.Secret)
+		assert.Equal(t, 48*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
+	})
+
+	t.Run("EmptyPasswordAllowed", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "builtin"
+  builtin:
+    admin:
+      username: "admin"
+      password: ""
+    token:
+      secret: "secret"
+      ttl: "1h"
+`)
+		assert.Equal(t, "admin", cfg.Server.Auth.Builtin.Admin.Username)
+		assert.Equal(t, "", cfg.Server.Auth.Builtin.Admin.Password)
+	})
+
+	t.Run("DefaultTTL", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "builtin"
+  builtin:
+    admin:
+      username: "admin"
+    token:
+      secret: "secret"
+`)
+		// TTL defaults to 24 hours when not specified
+		assert.Equal(t, 24*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
 	})
 }

@@ -98,21 +98,13 @@ func runRetry(ctx *Context, args []string) error {
 	}
 	defer ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
-	if !disableMaxActiveRuns {
+	if !disableMaxActiveRuns && dag.MaxActiveRuns == 1 {
 		liveCount, err := ctx.ProcStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
 		if err != nil {
 			return fmt.Errorf("failed to access proc store: %w", err)
 		}
-		// Count queued DAG-runs and return error if the total of a new run plus
-		// active runs will exceed the maxActiveRuns.
-		queuedRuns, err := ctx.QueueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
-		if err != nil {
-			return fmt.Errorf("failed to read queue: %w", err)
-		}
-		// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
-		// of active runs in the queue does not exceed this limit.
-		if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
-			return fmt.Errorf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns)
+		if liveCount > 0 {
+			return fmt.Errorf("DAG %s is already running, cannot retry", dag.Name)
 		}
 	}
 
@@ -137,6 +129,10 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
+// executeRetry prepares and runs a retry of a DAG run by opening the original run's log,
+// loading the DAG environment, initializing the DAG store, creating an agent configured
+// for retry (including step-level retry if provided), and invoking the shared agent executor.
+// It returns an error if any setup step fails or if the agent execution fails.
 func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, rootRun execution.DAGRunRef, stepName string) error {
 	// Set step context if specified
 	if stepName != "" {
@@ -173,7 +169,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, r
 		ctx.DAGRunStore,
 		ctx.ServiceRegistry,
 		rootRun,
-		ctx.Config.Global.Peer,
+		ctx.Config.Core.Peer,
 		agent.Options{
 			RetryTarget:     status,
 			ParentDAGRun:    status.Parent,

@@ -72,6 +72,9 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireWrite(ctx); err != nil {
+		return nil, err
+	}
 
 	// Determine spec to create with: provided spec or default template
 	var yamlSpec []byte
@@ -124,6 +127,9 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
 	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireWrite(ctx); err != nil {
 		return nil, err
 	}
 
@@ -190,6 +196,9 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireWrite(ctx); err != nil {
+		return nil, err
+	}
 
 	err := a.dagStore.UpdateSpec(ctx, request.FileName, []byte(request.Body.Spec))
 
@@ -210,6 +219,17 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject) (api.RenameDAGResponseObject, error) {
 	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
 		return nil, err
+	}
+	if err := a.requireWrite(ctx); err != nil {
+		return nil, err
+	}
+
+	if err := core.ValidateDAGName(request.Body.NewFileName); err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
 	}
 
 	dag, err := a.dagStore.GetMetadata(ctx, request.FileName)
@@ -523,6 +543,9 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
 
 	dag, err := a.dagStore.GetDetails(ctx, request.FileName)
 	if err != nil {
@@ -651,6 +674,35 @@ func isSingletonExecution(dag *core.DAG, singleton bool) bool {
 	return singleton || dag.MaxActiveRuns == 1
 }
 
+// ensureSingletonEnqueue checks that no instance of the DAG is running or queued.
+func (a *API) ensureSingletonEnqueue(ctx context.Context, dag *core.DAG) error {
+	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return fmt.Errorf("failed to access proc store: %w", err)
+	}
+	if liveCount > 0 {
+		return &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeMaxRunReached,
+			Message:    fmt.Sprintf("DAG %s is already running, cannot enqueue", dag.Name),
+		}
+	}
+
+	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+	if err != nil {
+		return fmt.Errorf("failed to read queue: %w", err)
+	}
+	if len(queuedRuns) > 0 {
+		return &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeMaxRunReached,
+			Message:    fmt.Sprintf("DAG %s is already queued, cannot enqueue", dag.Name),
+		}
+	}
+
+	return nil
+}
+
 type startDAGRunOptions struct {
 	params       string
 	dagRunID     string
@@ -734,6 +786,9 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
 
 	dag, err := a.dagStore.GetDetails(ctx, request.FileName, spec.WithoutEval())
 	if err != nil {
@@ -773,27 +828,9 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		}
 	}
 
-	// Get count of running DAGs to check against maxActiveRuns (best effort)
-	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to access proc store: %w", err)
-	}
-
-	// Check queued DAG-runs
-	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read queue: %w", err)
-	}
-
-	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
-	// of active runs in the queue does not exceed this limit.
-	// The scheduler only enforces maxActiveRuns at the global queue level.
-	if dag.Queue != "" && dag.MaxActiveRuns > 1 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
-		// The same DAG is already in the queue
-		return nil, &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeMaxRunReached,
-			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot enqueue", dag.Name, dag.MaxActiveRuns),
+	if valueOf(request.Body.Singleton) {
+		if err := a.ensureSingletonEnqueue(ctx, dag); err != nil {
+			return nil, err
 		}
 	}
 
@@ -863,6 +900,9 @@ func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDA
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
 
 	_, err := a.dagStore.GetMetadata(ctx, request.FileName)
 	if err != nil {
@@ -912,6 +952,9 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 
 func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequestObject) (api.StopAllDAGRunsResponseObject, error) {
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
 		return nil, err
 	}
 

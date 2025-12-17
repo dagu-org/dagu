@@ -9,10 +9,20 @@ import { cn } from '@/lib/utils';
 import { Menu, X } from 'lucide-react';
 import * as React from 'react';
 import { AppBarContext } from '../contexts/AppBarContext';
+import { useConfig } from '../contexts/ConfigContext';
 import { mainListItems as MainListItems } from '../menu';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { UserMenu } from '@/components/UserMenu';
 
-// Utility: Get contrast color (black or white) for a given background color (hex, rgb, or named)
+/**
+ * Choose a readable foreground color (black or white) that contrasts with the given background color.
+ *
+ * Accepts CSS color inputs such as hex (#rgb or #rrggbb), named colors, or rgb/rgba strings. When the input
+ * cannot be parsed or when executed outside a browser environment, a conservative fallback is used.
+ *
+ * @param input - Background color value to evaluate (hex string, named color, or rgb/rgba). If omitted or empty, black is assumed.
+ * @returns `'#000'` for a dark foreground (black) when the background is light, `'#fff'` for a light foreground (white) when the background is dark.
+ */
 function getContrastColor(input?: string): string {
   if (!input) return '#000'; // Default to black if undefined or empty
 
@@ -75,8 +85,19 @@ type LayoutProps = {
   children?: React.ReactElement | React.ReactElement[];
 };
 
-// Main Content component including Sidebar and AppBar logic
+/**
+ * Render the application's main layout including a responsive sidebar, app bar, and scrollable content area.
+ *
+ * The header uses `navbarColor` when provided and computes an appropriate contrast color for its text.
+ * The desktop sidebar expansion state is persisted to `localStorage` under `sidebarExpanded`.
+ *
+ * @param title - Text displayed in the app bar as the primary title
+ * @param navbarColor - Optional CSS color used as the app bar background; contrast text color is derived automatically
+ * @param children - Content rendered in the main scrollable area of the layout
+ * @returns The JSX element for the full layout (sidebar, app bar, and main content)
+ */
 function Content({ title, navbarColor, children }: LayoutProps) {
+  const config = useConfig();
   const [scrolled, setScrolled] = React.useState(false);
   // Sidebar state with localStorage persistence
   const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(() => {
@@ -227,7 +248,9 @@ function Content({ title, navbarColor, children }: LayoutProps) {
             <div className="flex items-center space-x-2">
               <AppBarContext.Consumer>
                 {(context) => {
+                  // Hide remote node selector when builtin auth is enabled (auth is local-only)
                   if (
+                    config.authMode === 'builtin' ||
                     !context.remoteNodes ||
                     context.remoteNodes.length === 0
                   ) {
@@ -257,6 +280,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                 }}
               </AppBarContext.Consumer>
               <ThemeToggle />
+              <UserMenu />
             </div>
           </div>
         </header>

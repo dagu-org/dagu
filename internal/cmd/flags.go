@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -267,6 +266,30 @@ var (
 		isBool:    true,
 		bindViper: true,
 	}
+
+	// retentionDaysFlag specifies the number of days to retain history.
+	// Records older than this will be deleted.
+	// If set to 0, all records (except active) will be deleted.
+	retentionDaysFlag = commandLineFlag{
+		name:         "retention-days",
+		defaultValue: "0",
+		usage:        "Number of days to retain history (0 = delete all, except active runs)",
+	}
+
+	// dryRunFlag enables preview mode without actual deletion.
+	dryRunFlag = commandLineFlag{
+		name:   "dry-run",
+		usage:  "Preview what would be deleted without actually deleting",
+		isBool: true,
+	}
+
+	// yesFlag skips the confirmation prompt.
+	yesFlag = commandLineFlag{
+		name:      "yes",
+		shorthand: "y",
+		usage:     "Skip confirmation prompt",
+		isBool:    true,
+	}
 )
 
 type commandLineFlag struct {
@@ -276,6 +299,9 @@ type commandLineFlag struct {
 	bindViper                            bool
 }
 
+// initFlags registers a set of CLI flags on the provided Cobra command.
+// It always includes the base flags (config, dagu-home, quiet, cpu-profile) and then the provided additionalFlags.
+// Boolean flags are registered as boolean flags and others as string flags with their default values, and any flag marked required will be recorded as required.
 func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 	flags := append([]commandLineFlag{configFlag, daguHomeFlag, quietFlag, cpuProfileFlag}, additionalFlags...)
 
@@ -291,14 +317,15 @@ func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 	}
 }
 
-func bindFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
+// bindFlags binds command-line flags to the provided Viper instance for configuration lookup.
+// It binds only flags whose `bindViper` field is true, using the camel-cased key produced
+// from each flag's kebab-case name.
+func bindFlags(viper *viper.Viper, cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 	flags := append([]commandLineFlag{configFlag}, additionalFlags...)
 
-	config.WithViperLock(func() {
-		for _, flag := range flags {
-			if flag.bindViper {
-				_ = viper.BindPFlag(stringutil.KebabToCamel(flag.name), cmd.Flags().Lookup(flag.name))
-			}
+	for _, flag := range flags {
+		if flag.bindViper {
+			_ = viper.BindPFlag(stringutil.KebabToCamel(flag.name), cmd.Flags().Lookup(flag.name))
 		}
-	})
+	}
 }

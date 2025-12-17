@@ -44,7 +44,7 @@ Built for developers who want powerful workflow orchestration without the operat
 **Built-in queue system with intelligent task routing.** Route tasks to workers based on labels (GPU, region, compliance requirements). Automatic service registry and health monitoring included—no external coordination service needed.
 
 ### 🎯 Production Ready
-**Not a toy.** Battle-tested error handling with exponential backoff retries, lifecycle hooks (onSuccess, onFailure, onExit), real-time log streaming, email notifications, Prometheus metrics, and OpenTelemetry tracing out of the box.
+**Not a toy.** Battle-tested error handling with exponential backoff retries, lifecycle hooks (onSuccess, onFailure, onExit), real-time log streaming, email notifications, Prometheus metrics, and OpenTelemetry tracing out of the box. Built-in user management with role-based access control (RBAC) for team environments.
 
 ### 🎨 Modern Web UI
 **Beautiful UI that actually helps you debug.** Live log tailing, DAG visualization with Gantt charts, execution history with full lineage, and drill-down into nested sub-workflows. Dark mode included.
@@ -252,6 +252,7 @@ Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
+| `DAGU_AUTH_MODE` | `none` | Authentication mode: `none`, `builtin`, or `oidc` |
 | `DAGU_AUTH_BASIC_USERNAME` | - | Basic auth username |
 | `DAGU_AUTH_BASIC_PASSWORD` | - | Basic auth password |
 | `DAGU_AUTH_OIDC_CLIENT_ID` | - | OIDC client ID |
@@ -260,6 +261,18 @@ Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
 | `DAGU_AUTH_OIDC_ISSUER` | - | OIDC issuer URL |
 | `DAGU_AUTH_OIDC_SCOPES` | - | OIDC scopes (comma-separated) |
 | `DAGU_AUTH_OIDC_WHITELIST` | - | OIDC email whitelist (comma-separated) |
+
+### Builtin Authentication (RBAC)
+
+When `DAGU_AUTH_MODE=builtin`, a file-based user management system with role-based access control is enabled. Roles: `admin`, `manager`, `operator`, `viewer`.
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `DAGU_AUTH_ADMIN_USERNAME` | `admin` | Initial admin username |
+| `DAGU_AUTH_ADMIN_PASSWORD` | (auto-generated) | Initial admin password |
+| `DAGU_AUTH_TOKEN_SECRET` | - | JWT token secret for signing (required) |
+| `DAGU_AUTH_TOKEN_TTL` | `24h` | JWT token time-to-live |
+| `DAGU_USERS_DIR` | `{dataDir}/users` | Directory for user data files |
 
 ### UI Configuration
 
@@ -404,7 +417,9 @@ This section outlines the current capabilities of Dagu.
 |                             | Health monitoring               | Health check for scheduler & failover                                   | <a href="https://docs.dagu.cloud/configurations/reference#health-check">Health Check</a> |
 |                             | Nested-DAG visualization        | Nested DAG visualization with drill down functionality                  | <a href="https://docs.dagu.cloud/overview/web-ui#nested-dag-visualization">Nested DAG Visualization</a> |
 | Security & Governance       | Secret injection                | Vault/KMS/OIDC ref-only; short-lived tokens                              | <a href="https://docs.dagu.cloud/writing-workflows/secrets">Secrets</a> |
-|                             | Authentication                  | Basic auth / OIDC support for Web UI and API                             | <a href="https://docs.dagu.cloud/configurations/authentication">Authentication</a> |
+|                             | Authentication                  | Basic auth / OIDC / Builtin (JWT) support for Web UI and API             | <a href="https://docs.dagu.cloud/configurations/authentication">Authentication</a> |
+|                             | Role-based access control       | Builtin RBAC with admin, manager, operator, viewer roles                 | |
+|                             | User management                 | Create, update, delete users with role assignment                        | |
 |                             | HA (High availability) mode     | Control-plane with failover for scheduler / Web UI / Coordinator         | <a href="https://docs.dagu.cloud/features/scheduling#high-availability">High Availability</a> |
 | Executor types              | `jq`                            | JSON processing with jq queries                                          | <a href="https://docs.dagu.cloud/features/executors/jq">JQ Executor</a> |
 |                             | `ssh`                           | Remote command execution via SSH                                         | <a href="https://docs.dagu.cloud/features/executors/ssh">SSH Executor</a> |
@@ -457,7 +472,7 @@ This section outlines the planned features for Dagu.
 |                             | Inter DAG-run state management  | Manage state and data sharing between DAG-runs                          | 💭    | P0       | |
 |                             | Database backend support       | Support for external databases (PostgreSQL, MySQL) instead of filesystem | 💭    | P1       | <a href="https://github.com/dagu-org/dagu/issues/539">#539</a>, <a href="https://github.com/dagu-org/dagu/issues/267">#267</a> |
 | Observability               | Resource usage monitoring      | CPU/Memory/IO usage per DAG/step with live graphs                        | 💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/546">#546</a> |
-| Security & Governance       | Authorization                    | User management & RBAC with fine-grained permissions                    | 🏢    |          | |
+| Security & Governance       | Fine-grained permissions        | DAG-level and resource-level permissions                                | 🏢    |          | |
 |                             | Resource quotas                 | CPU time and memory limit                                                | 📋    | P0       | |
 |                             | Audit trail                     | Immutable events for all manual actions                                  | 🏢    |          | |
 |                             | Audit logging                   | Immutable who/what/when records (WORM)                                   | 🏢    |          | |
@@ -481,6 +496,37 @@ For discussions, support, and sharing ideas, join our community on [Discord](htt
 
 Changelog of recent updates can be found in the [Changelog](https://docs.dagu.cloud/reference/changelog) section of the documentation.
 
+## Acknowledgements
+
+### Sponsors & Supporters
+
+<div align="center">
+  <h3>💜 Premium Sponsors</h3>
+  <a href="https://github.com/slashbinlabs">
+    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fslashbinlabs.png&w=150&h=150&fit=cover&mask=circle" width="100" height="100" alt="@slashbinlabs">
+  </a>
+
+  <h3>✨ Supporters</h3>
+  <a href="https://github.com/disizmj">
+    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fdisizmj.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@disizmj" style="margin: 5px;">
+  </a>
+  <a href="https://github.com/Arvintian">
+    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@Arvintian" style="margin: 5px;">
+  </a>
+  <a href="https://github.com/yurivish">
+    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyurivish.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@yurivish" style="margin: 5px;">
+  </a>
+  <a href="https://github.com/jayjoshi64">
+    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fjayjoshi64.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@jayjoshi64" style="margin: 5px;">
+  </a>
+
+  <br/><br/>
+  
+  <a href="https://github.com/sponsors/dagu-org">
+    <img src="https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86" width="150" alt="Sponsor">
+  </a>
+</div>
+
 ## Contributing
 
 We welcome contributions of all kinds! Whether you're a developer, a designer, or a user, your help is valued. Here are a few ways to get involved:
@@ -492,8 +538,6 @@ We welcome contributions of all kinds! Whether you're a developer, a designer, o
 
 For more details, see our [Contribution Guide](./CONTRIBUTING.md).
 
-## Acknowledgements
-
 ### Contributors
 
 <a href="https://github.com/dagu-org/dagu/graphs/contributors">
@@ -501,15 +545,6 @@ For more details, see our [Contribution Guide](./CONTRIBUTING.md).
 </a>
 
 Thanks to all the contributors who have helped make Dagu better! Your contributions, whether through code, documentation, or feedback, are invaluable to the project.
-
-### Sponsors & Supporters
-
-<a href="https://github.com/disizmj"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fdisizmj.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@disizmj"></a>
-<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a>
-<a href="https://github.com/yurivish"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyurivish.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yurivish"></a>
-<a href="https://github.com/jayjoshi64"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fjayjoshi64.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@jayjoshi64"></a>
-
-Thanks for supporting Dagu’s development! Join our supporters: [GitHub Sponsors](https://github.com/sponsors/dagu-org)
 
 ## License
 

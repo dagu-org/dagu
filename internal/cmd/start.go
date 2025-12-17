@@ -205,19 +205,6 @@ func runStart(ctx *Context, args []string) error {
 	err = tryExecuteDAG(ctx, dag, dagRunID, root, disableMaxActiveRuns)
 	if errors.Is(err, errMaxRunReached) && !queueDisabled && !disableMaxActiveRuns {
 		dag.Location = "" // Queued dag-runs must not have a location
-
-		// If the DAG has a queue configured and maxActiveRuns > 1, ensure the number
-		// of active runs in the queue does not exceed this limit.
-		// The scheduler only enforces maxActiveRuns at the global queue level.
-		queuedRuns, err := ctx.QueueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
-		if err != nil {
-			return fmt.Errorf("failed to read queue: %w", err)
-		}
-		if dag.Queue != "" && dag.MaxActiveRuns > 1 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
-			return fmt.Errorf("DAG %s is already in the queue (maxActiveRuns=%d), cannot start", dag.Name, dag.MaxActiveRuns)
-		}
-
-		// Enqueue the DAG-run for execution
 		return enqueueDAGRun(ctx, dag, dagRunID)
 	}
 
@@ -457,7 +444,16 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 	return executeRetry(ctx, dag, status, root, "")
 }
 
-// executeDAGRun handles the actual execution of a DAG
+// executeDAGRun initializes execution state for a DAG run, constructs an agent configured
+// with the provided run and topology references, and invokes the shared agent executor.
+//
+// The function opens (and persists) a log file for the DAG run, ensures the DAG's
+// directory is included in the DAG store search path, and creates an agent configured
+// with the given parent and root references and the configured peer settings. It then
+// calls ExecuteAgent to perform the actual run.
+//
+// It returns an error if log file initialization, DAG store setup, agent creation, or
+// execution fails.
 func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRunID string, root execution.DAGRunRef) error {
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/dag-run ID between attempts.
@@ -488,7 +484,7 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRun
 		ctx.DAGRunStore,
 		ctx.ServiceRegistry,
 		root,
-		ctx.Config.Global.Peer,
+		ctx.Config.Core.Peer,
 		agent.Options{
 			ParentDAGRun:    parent,
 			ProgressDisplay: shouldEnableProgress(ctx),

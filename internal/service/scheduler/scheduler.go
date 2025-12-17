@@ -61,7 +61,15 @@ type Scheduler struct {
 	clock          Clock // Clock function for getting current time
 }
 
-// New creates a new Scheduler.
+// New constructs a Scheduler configured with the provided stores, runtime manager,
+// service registry, and dispatcher.
+//
+// It determines the scheduler time location from cfg.Core.Location (falls back to
+// time.Local), creates a directory lock, DAG executor, health server, and queue
+// processor, and sets the default clock to the real-time clock.
+//
+// The returned Scheduler is ready for startup; any initialization errors are
+// returned.
 func New(
 	cfg *config.Config,
 	er EntryReader,
@@ -72,7 +80,7 @@ func New(
 	reg execution.ServiceRegistry,
 	coordinatorCli execution.Dispatcher,
 ) (*Scheduler, error) {
-	timeLoc := cfg.Global.Location
+	timeLoc := cfg.Core.Location
 	if timeLoc == nil {
 		timeLoc = time.Local
 	}

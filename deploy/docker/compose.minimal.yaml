@@ -23,6 +23,13 @@ services:
       - DAGU_DEBUG=true # More verbose logs during dev
       # Paths
       - DAGU_DAGS_DIR=/var/lib/dagu/dags
+      # Builtin authentication (RBAC) - CHANGE TOKEN_SECRET IN PRODUCTION
+      - DAGU_AUTH_MODE=builtin
+      - DAGU_AUTH_TOKEN_SECRET=CHANGE_ME_TO_A_SECURE_RANDOM_STRING
+      # Admin credentials: password auto-generated on first run, printed to stdout
+      # - DAGU_AUTH_ADMIN_USERNAME=admin # default is 'admin'
+      # - DAGU_AUTH_ADMIN_PASSWORD=      # set to use a specific password
+      # - DAGU_AUTH_TOKEN_TTL=24h        # default is 24h
       # Timezone / base path (optional)
       # - DAGU_TZ=UTC
       # - DAGU_BASE_PATH=/dagu
@@ -43,7 +50,9 @@ services:
     # command: ["dagu", "coordinator"]
     # command: ["dagu", "worker"]
 
-    # Example: enable basic auth in dev (uncomment and set values)
+    # Alternative: basic auth (simpler, no user management)
+    # To use basic auth instead of builtin auth, comment out
+    # DAGU_AUTH_MODE and DAGU_AUTH_TOKEN_SECRET above, then uncomment:
     # environment:
     #   - DAGU_AUTH_BASIC_USERNAME=dev
     #   - DAGU_AUTH_BASIC_PASSWORD=devpass

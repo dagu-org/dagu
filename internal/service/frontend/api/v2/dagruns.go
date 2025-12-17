@@ -26,6 +26,9 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
 
 	if request.Body == nil || request.Body.Spec == "" {
 		return nil, &Error{
@@ -83,6 +86,9 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
 
 	if request.Body == nil || request.Body.Spec == "" {
 		return nil, &Error{
@@ -122,24 +128,6 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 			HTTPStatus: http.StatusConflict,
 			Code:       api.ErrorCodeAlreadyExists,
 			Message:    fmt.Sprintf("dag-run ID %s already exists for DAG %s", dagRunId, dag.Name),
-		}
-	}
-
-	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to access proc store: %w", err)
-	}
-
-	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read queue: %w", err)
-	}
-
-	if dag.Queue != "" && dag.MaxActiveRuns > 1 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
-		return nil, &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeMaxRunReached,
-			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot enqueue", dag.Name, dag.MaxActiveRuns),
 		}
 	}
 
@@ -384,6 +372,9 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
 
 	ref := execution.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
@@ -563,6 +554,9 @@ func (a *API) UpdateSubDAGRunStepStatus(ctx context.Context, request api.UpdateS
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
 
 	root := execution.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, root, request.SubDAGRunId)
@@ -615,6 +609,9 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
 
 	attempt, err := a.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(request.Name, request.DagRunId))
 	if err != nil {
@@ -628,27 +625,6 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error reading DAG: %w", err)
-	}
-
-	// Get count of running DAGs to check against maxActiveRuns (best effort)
-	liveCount, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to access proc store: %w", err)
-	}
-	// Count queued DAG-runs and check against maxActiveRuns
-	queuedRuns, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read queue: %w", err)
-	}
-	// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
-	// of active runs in the queue does not exceed this limit.
-	if dag.MaxActiveRuns > 0 && len(queuedRuns)+liveCount >= dag.MaxActiveRuns {
-		// The same DAG is already in the queue
-		return nil, &Error{
-			HTTPStatus: http.StatusConflict,
-			Code:       api.ErrorCodeMaxRunReached,
-			Message:    fmt.Sprintf("DAG %s is already in the queue (maxActiveRuns=%d), cannot retry", dag.Name, dag.MaxActiveRuns),
-		}
 	}
 
 	if request.Body.StepName != nil && *request.Body.StepName != "" {
@@ -669,6 +645,9 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 
 func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRequestObject) (api.TerminateDAGRunResponseObject, error) {
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
 		return nil, err
 	}
 
@@ -714,6 +693,9 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
 
 	dagRun := execution.NewDAGRunRef(request.Name, request.DagRunId)
 	attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
@@ -753,6 +735,9 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 
 func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRunRequestObject) (api.RescheduleDAGRunResponseObject, error) {
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
 		return nil, err
 	}
 

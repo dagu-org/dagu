@@ -62,6 +62,14 @@ Examples:
 	return command
 }
 
+// runExec parses flags and arguments and executes the provided command as an inline DAG run,
+// either enqueueing it for distributed execution or running it immediately in-process.
+// It validates inputs (run-id, working directory, base and dotenv files, env vars, worker labels,
+// queue/singleton flags), builds the DAG for the inline command, and chooses between enqueueing
+// (when queues/worker labels require it or when max runs are reached) or direct execution.
+// ctx provides CLI and application context; args are the command and its arguments.
+// Returns an error for validation failures, when a dag-run with the same run-id already exists,
+// or if enqueueing/execution fails.
 func runExec(ctx *Context, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("command is required (try: dagu exec -- <command>)")
@@ -162,11 +170,11 @@ func runExec(ctx *Context, args []string) error {
 		if pair == "" {
 			continue
 		}
-		parts := strings.SplitN(pair, "=", 2)
-		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		key, value, found := strings.Cut(pair, "=")
+		if !found || key == "" || value == "" {
 			return fmt.Errorf("invalid worker label %q: expected key=value", pair)
 		}
-		workerLabels[parts[0]] = parts[1]
+		workerLabels[key] = value
 	}
 
 	queueName, err := ctx.Command.Flags().GetString("queue")

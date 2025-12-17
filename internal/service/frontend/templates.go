@@ -60,8 +60,10 @@ type funcsConfig struct {
 	RemoteNodes           []string
 	Permissions           map[config.Permission]bool
 	Paths                 config.PathsConfig
+	AuthMode              config.AuthMode
 }
 
+// and simple utility helpers for use inside HTML templates.
 func defaultFunctions(cfg funcsConfig) template.FuncMap {
 	return template.FuncMap{
 		"defTitle": func(ip any) string {
@@ -133,6 +135,12 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		},
 		"pathConfigFileUsed": func() string {
 			return cfg.Paths.ConfigFileUsed
+		},
+		"pathUsersDir": func() string {
+			return cfg.Paths.UsersDir
+		},
+		"authMode": func() string {
+			return string(cfg.AuthMode)
 		},
 	}
 }

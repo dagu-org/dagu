@@ -157,9 +157,30 @@ type PeerDef struct {
 
 // AuthDef holds the authentication configuration for the application.
 type AuthDef struct {
-	Basic *AuthBasicDef `mapstructure:"basic"`
-	Token *AuthTokenDef `mapstructure:"token"`
-	OIDC  *AuthOIDCDef  `mapstructure:"oidc"`
+	// Mode specifies the authentication mode: "none", "builtin", or "oidc"
+	Mode    *string         `mapstructure:"mode"`
+	Basic   *AuthBasicDef   `mapstructure:"basic"`
+	Token   *AuthTokenDef   `mapstructure:"token"`
+	OIDC    *AuthOIDCDef    `mapstructure:"oidc"`
+	Builtin *AuthBuiltinDef `mapstructure:"builtin"`
+}
+
+// AuthBuiltinDef represents the builtin authentication configuration
+type AuthBuiltinDef struct {
+	Admin *AdminConfigDef `mapstructure:"admin"`
+	Token *TokenConfigDef `mapstructure:"token"`
+}
+
+// AdminConfigDef represents the initial admin user configuration
+type AdminConfigDef struct {
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+}
+
+// TokenConfigDef represents the JWT token configuration
+type TokenConfigDef struct {
+	Secret string `mapstructure:"secret"`
+	TTL    string `mapstructure:"ttl"`
 }
 
 // AuthBasicDef represents the basic authentication configuration
@@ -195,6 +216,7 @@ type PathsDef struct {
 	QueueDir           string `mapstructure:"queueDir"`
 	ProcDir            string `mapstructure:"procDir"`
 	ServiceRegistryDir string `mapstructure:"serviceRegistryDir"`
+	UsersDir           string `mapstructure:"usersDir"`
 }
 
 // UIDef holds the user interface configuration settings.

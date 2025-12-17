@@ -16,7 +16,6 @@ builds:
       - darwin
       - freebsd
       - openbsd
-      - netbsd
       - windows
     goarch:
       - "amd64"

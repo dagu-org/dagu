@@ -2,11 +2,13 @@ package integration_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -254,4 +256,406 @@ steps:
 	require.Equal(t, core.Aborted, status.Status)
 	require.NotNil(t, status.OnCancel, "abort handler should have been executed")
 	require.Equal(t, core.NodeSucceeded, status.OnCancel.Status)
+}
+
+// TestHandlerOn_EnvironmentVariables tests that special environment variables
+// are accessible from each handler type.
+//
+// Environment variables availability by handler:
+//
+// | Variable                   | Init   | Success   | Failure    | Cancel  | Exit      |
+// |----------------------------|--------|-----------|------------|---------|-----------|
+// | DAG_NAME                   | ✓      | ✓         | ✓          | ✓       | ✓         |
+// | DAG_RUN_ID                 | ✓      | ✓         | ✓          | ✓       | ✓         |
+// | DAG_RUN_LOG_FILE           | ✓      | ✓         | ✓          | ✓       | ✓         |
+// | DAG_RUN_STEP_NAME          | onInit | onSuccess | onFailure  | onCancel| onExit    |
+// | DAG_RUN_STATUS             | running| succeeded | failed     | aborted | succeeded/failed |
+// | DAG_RUN_STEP_STDOUT_FILE   | ✗      | ✗         | ✗          | ✗       | ✗         |
+// | DAG_RUN_STEP_STDERR_FILE   | ✗      | ✗         | ✗          | ✗       | ✗         |
+//
+// Note: DAG_RUN_STATUS in init handler is "running" because the DAG run has started
+// but steps haven't executed yet. DAG_RUN_STEP_STDOUT_FILE and DAG_RUN_STEP_STDERR_FILE
+// are not set for handlers because node.SetupEnv is not called during handler execution.
+func TestHandlerOn_EnvironmentVariables(t *testing.T) {
+	t.Parallel()
+
+	// Helper to extract value from "KEY=value" format
+	extractValue := func(output string) string {
+		if idx := strings.Index(output, "="); idx != -1 {
+			return output[idx+1:]
+		}
+		return output
+	}
+
+	t.Run("InitHandler_BaseEnvVars", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		// Test that basic env vars (DAG_NAME, DAG_RUN_ID, DAG_RUN_LOG_FILE, DAG_RUN_STEP_NAME)
+		// are available in the init handler
+		dag := th.DAG(t, `
+handlerOn:
+  init:
+    command: |
+      echo "name:${DAG_NAME}|runid:${DAG_RUN_ID}|logfile:${DAG_RUN_LOG_FILE}|stepname:${DAG_RUN_STEP_NAME}"
+    output: INIT_ENV_OUTPUT
+
+steps:
+  - name: step1
+    command: "true"
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		status := agent.Status(th.Context)
+		require.NotNil(t, status.OnInit, "init handler should have been executed")
+		require.Equal(t, core.NodeSucceeded, status.OnInit.Status)
+		require.NotNil(t, status.OnInit.OutputVariables, "init handler should have output variables")
+
+		output, ok := status.OnInit.OutputVariables.Load("INIT_ENV_OUTPUT")
+		require.True(t, ok, "INIT_ENV_OUTPUT should be set")
+
+		outputStr := extractValue(output.(string))
+
+		// Verify DAG_NAME is set and non-empty
+		assert.Contains(t, outputStr, "name:", "output should contain name prefix")
+		assert.NotContains(t, outputStr, "name:|", "DAG_NAME should not be empty")
+
+		// Verify DAG_RUN_ID is set (UUID format)
+		assert.Contains(t, outputStr, "runid:", "output should contain runid prefix")
+		assert.NotContains(t, outputStr, "runid:|", "DAG_RUN_ID should not be empty")
+
+		// Verify DAG_RUN_LOG_FILE is set and contains .log
+		assert.Contains(t, outputStr, "logfile:", "output should contain logfile prefix")
+		assert.Contains(t, outputStr, ".log", "DAG_RUN_LOG_FILE should contain .log")
+
+		// Verify DAG_RUN_STEP_NAME is set to "onInit"
+		assert.Contains(t, outputStr, "stepname:onInit", "DAG_RUN_STEP_NAME should be 'onInit'")
+	})
+
+	t.Run("InitHandler_DAGRunStatus_IsRunning", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		// DAG_RUN_STATUS in init handler is "running" because the DAG run has started
+		// but steps haven't completed yet. This value is technically correct but not
+		// as useful as having the final status (which isn't known yet).
+		dag := th.DAG(t, `
+handlerOn:
+  init:
+    command: echo "${DAG_RUN_STATUS}"
+    output: INIT_STATUS
+
+steps:
+  - name: step1
+    command: "true"
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		status := agent.Status(th.Context)
+		require.NotNil(t, status.OnInit)
+		require.NotNil(t, status.OnInit.OutputVariables)
+
+		output, ok := status.OnInit.OutputVariables.Load("INIT_STATUS")
+		require.True(t, ok)
+
+		// DAG_RUN_STATUS is "running" for init handler because steps haven't completed
+		outputStr := extractValue(output.(string))
+		assert.Equal(t, "running", outputStr, "DAG_RUN_STATUS should be 'running' in init handler")
+	})
+
+	t.Run("SuccessHandler_AllEnvVars", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		dag := th.DAG(t, `
+handlerOn:
+  success:
+    command: |
+      echo "name:${DAG_NAME}|status:${DAG_RUN_STATUS}|stepname:${DAG_RUN_STEP_NAME}"
+    output: SUCCESS_ENV_OUTPUT
+
+steps:
+  - name: step1
+    command: "true"
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		status := agent.Status(th.Context)
+		require.NotNil(t, status.OnSuccess, "success handler should have been executed")
+		require.Equal(t, core.NodeSucceeded, status.OnSuccess.Status)
+		require.NotNil(t, status.OnSuccess.OutputVariables)
+
+		output, ok := status.OnSuccess.OutputVariables.Load("SUCCESS_ENV_OUTPUT")
+		require.True(t, ok)
+
+		outputStr := extractValue(output.(string))
+
+		// Verify DAG_NAME is set
+		assert.NotContains(t, outputStr, "name:|", "DAG_NAME should not be empty")
+
+		// Verify DAG_RUN_STATUS is "succeeded"
+		assert.Contains(t, outputStr, "status:succeeded", "DAG_RUN_STATUS should be 'succeeded'")
+
+		// Verify DAG_RUN_STEP_NAME is "onSuccess"
+		assert.Contains(t, outputStr, "stepname:onSuccess", "DAG_RUN_STEP_NAME should be 'onSuccess'")
+	})
+
+	t.Run("FailureHandler_AllEnvVars", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		dag := th.DAG(t, `
+handlerOn:
+  failure:
+    command: |
+      echo "name:${DAG_NAME}|status:${DAG_RUN_STATUS}|stepname:${DAG_RUN_STEP_NAME}"
+    output: FAILURE_ENV_OUTPUT
+
+steps:
+  - name: failing-step
+    command: exit 1
+`)
+		agent := dag.Agent()
+		agent.RunError(t)
+
+		status := agent.Status(th.Context)
+		require.NotNil(t, status.OnFailure, "failure handler should have been executed")
+		require.Equal(t, core.NodeSucceeded, status.OnFailure.Status)
+		require.NotNil(t, status.OnFailure.OutputVariables)
+
+		output, ok := status.OnFailure.OutputVariables.Load("FAILURE_ENV_OUTPUT")
+		require.True(t, ok)
+
+		outputStr := extractValue(output.(string))
+
+		// Verify DAG_NAME is set
+		assert.NotContains(t, outputStr, "name:|", "DAG_NAME should not be empty")
+
+		// Verify DAG_RUN_STATUS is "failed"
+		assert.Contains(t, outputStr, "status:failed", "DAG_RUN_STATUS should be 'failed'")
+
+		// Verify DAG_RUN_STEP_NAME is "onFailure"
+		assert.Contains(t, outputStr, "stepname:onFailure", "DAG_RUN_STEP_NAME should be 'onFailure'")
+	})
+
+	t.Run("ExitHandler_AllEnvVars_OnSuccess", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		dag := th.DAG(t, `
+handlerOn:
+  exit:
+    command: |
+      echo "name:${DAG_NAME}|status:${DAG_RUN_STATUS}|stepname:${DAG_RUN_STEP_NAME}"
+    output: EXIT_ENV_OUTPUT
+
+steps:
+  - name: step1
+    command: "true"
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		status := agent.Status(th.Context)
+		require.NotNil(t, status.OnExit, "exit handler should have been executed")
+		require.Equal(t, core.NodeSucceeded, status.OnExit.Status)
+		require.NotNil(t, status.OnExit.OutputVariables)
+
+		output, ok := status.OnExit.OutputVariables.Load("EXIT_ENV_OUTPUT")
+		require.True(t, ok)
+
+		outputStr := extractValue(output.(string))
+
+		// Verify DAG_NAME is set
+		assert.NotContains(t, outputStr, "name:|", "DAG_NAME should not be empty")
+
+		// Verify DAG_RUN_STATUS is "succeeded" (exit runs after success)
+		assert.Contains(t, outputStr, "status:succeeded", "DAG_RUN_STATUS should be 'succeeded'")
+
+		// Verify DAG_RUN_STEP_NAME is "onExit"
+		assert.Contains(t, outputStr, "stepname:onExit", "DAG_RUN_STEP_NAME should be 'onExit'")
+	})
+
+	t.Run("ExitHandler_AllEnvVars_OnFailure", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		dag := th.DAG(t, `
+handlerOn:
+  exit:
+    command: |
+      echo "status:${DAG_RUN_STATUS}"
+    output: EXIT_ENV_OUTPUT
+
+steps:
+  - name: failing-step
+    command: exit 1
+`)
+		agent := dag.Agent()
+		agent.RunError(t)
+
+		status := agent.Status(th.Context)
+		require.NotNil(t, status.OnExit, "exit handler should have been executed")
+		require.Equal(t, core.NodeSucceeded, status.OnExit.Status)
+		require.NotNil(t, status.OnExit.OutputVariables)
+
+		output, ok := status.OnExit.OutputVariables.Load("EXIT_ENV_OUTPUT")
+		require.True(t, ok)
+
+		outputStr := extractValue(output.(string))
+
+		// Verify DAG_RUN_STATUS is "failed" (exit runs after failure)
+		assert.Contains(t, outputStr, "status:failed", "DAG_RUN_STATUS should be 'failed'")
+	})
+
+	t.Run("CancelHandler_AllEnvVars", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		dag := th.DAG(t, `
+handlerOn:
+  abort:
+    command: |
+      echo "name:${DAG_NAME}|status:${DAG_RUN_STATUS}|stepname:${DAG_RUN_STEP_NAME}"
+    output: CANCEL_ENV_OUTPUT
+
+steps:
+  - name: long-running
+    command: sleep 10
+`)
+		dagAgent := dag.Agent()
+
+		done := make(chan struct{})
+		go func() {
+			_ = dagAgent.Run(th.Context)
+			close(done)
+		}()
+
+		dag.AssertLatestStatus(t, core.Running)
+		dagAgent.Abort()
+		<-done
+
+		status := dagAgent.Status(th.Context)
+		require.NotNil(t, status.OnCancel, "cancel handler should have been executed")
+		require.Equal(t, core.NodeSucceeded, status.OnCancel.Status)
+		require.NotNil(t, status.OnCancel.OutputVariables)
+
+		output, ok := status.OnCancel.OutputVariables.Load("CANCEL_ENV_OUTPUT")
+		require.True(t, ok)
+
+		outputStr := extractValue(output.(string))
+
+		// Verify DAG_NAME is set
+		assert.NotContains(t, outputStr, "name:|", "DAG_NAME should not be empty")
+
+		// Verify DAG_RUN_STATUS is "aborted"
+		assert.Contains(t, outputStr, "status:aborted", "DAG_RUN_STATUS should be 'aborted'")
+
+		// Verify DAG_RUN_STEP_NAME is "onCancel"
+		assert.Contains(t, outputStr, "stepname:onCancel", "DAG_RUN_STEP_NAME should be 'onCancel'")
+	})
+
+	t.Run("StepOutputVars_NotAvailableInHandlers", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		// DAG_RUN_STEP_STDOUT_FILE and DAG_RUN_STEP_STDERR_FILE are NOT set
+		// for handlers because node.SetupEnv is not called for handler execution
+		dag := th.DAG(t, `
+handlerOn:
+  success:
+    command: |
+      echo "stdout:${DAG_RUN_STEP_STDOUT_FILE:-UNSET}|stderr:${DAG_RUN_STEP_STDERR_FILE:-UNSET}"
+    output: HANDLER_STEP_FILES
+
+steps:
+  - name: step1
+    command: "true"
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		status := agent.Status(th.Context)
+		require.NotNil(t, status.OnSuccess)
+		require.NotNil(t, status.OnSuccess.OutputVariables)
+
+		output, ok := status.OnSuccess.OutputVariables.Load("HANDLER_STEP_FILES")
+		require.True(t, ok)
+
+		outputStr := extractValue(output.(string))
+
+		// These should be unset/empty in handlers
+		assert.Contains(t, outputStr, "stdout:UNSET", "DAG_RUN_STEP_STDOUT_FILE should not be set in handler")
+		assert.Contains(t, outputStr, "stderr:UNSET", "DAG_RUN_STEP_STDERR_FILE should not be set in handler")
+	})
+
+	t.Run("Handlers_CanAccessStepOutputVariables", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		// Handlers can access output variables from steps that have completed
+		dag := th.DAG(t, `
+handlerOn:
+  success:
+    command: |
+      echo "step_output:${STEP_OUTPUT}"
+    output: SUCCESS_WITH_STEP_OUTPUT
+
+steps:
+  - name: producer
+    command: echo "produced_value"
+    output: STEP_OUTPUT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		status := agent.Status(th.Context)
+		require.NotNil(t, status.OnSuccess)
+		require.NotNil(t, status.OnSuccess.OutputVariables)
+
+		output, ok := status.OnSuccess.OutputVariables.Load("SUCCESS_WITH_STEP_OUTPUT")
+		require.True(t, ok)
+
+		outputStr := extractValue(output.(string))
+
+		// Success handler should be able to access step output
+		assert.Contains(t, outputStr, "step_output:produced_value", "handler should access step output")
+	})
+
+	t.Run("InitHandler_CannotAccessStepOutputVariables", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		// Init handler runs BEFORE steps, so it cannot access step outputs
+		dag := th.DAG(t, `
+handlerOn:
+  init:
+    command: |
+      echo "step_output:${STEP_OUTPUT:-NOT_YET_AVAILABLE}"
+    output: INIT_STEP_ACCESS
+
+steps:
+  - name: producer
+    command: echo "produced_value"
+    output: STEP_OUTPUT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		status := agent.Status(th.Context)
+		require.NotNil(t, status.OnInit)
+		require.NotNil(t, status.OnInit.OutputVariables)
+
+		output, ok := status.OnInit.OutputVariables.Load("INIT_STEP_ACCESS")
+		require.True(t, ok)
+
+		outputStr := extractValue(output.(string))
+
+		// Init handler cannot access step output (steps haven't run yet)
+		assert.Contains(t, outputStr, "step_output:NOT_YET_AVAILABLE",
+			"init handler should not access step outputs")
+	})
 }

@@ -106,7 +106,7 @@ func TestConfigureLoggerForProgress(t *testing.T) {
 			ctx := &Context{
 				Context: context.Background(),
 				Config: &config.Config{
-					Global: config.Global{
+					Core: config.Core{
 						Debug:     tt.debug,
 						LogFormat: tt.logFormat,
 					},
