@@ -7,11 +7,11 @@ import {
   Github,
   Layers,
   List,
+  Network,
   PanelLeft,
   Search,
   Server,
   Users,
-  Workflow,
 } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -170,7 +170,7 @@ export const mainListItems = React.forwardRef<
           <NavItem
             to="/dags"
             text="DAG Definitions"
-            icon={<Workflow size={16} />}
+            icon={<Network size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
