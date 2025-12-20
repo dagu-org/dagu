@@ -1,4 +1,3 @@
-import logoDark from '@/assets/images/logo_dark.png';
 import { useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
@@ -76,7 +75,7 @@ export const mainListItems = React.forwardRef<
     <div ref={ref} className="flex flex-col h-full">
       {/* Fixed height header with menu toggle button */}
       <div className="h-12 relative mb-2">
-        {/* When collapsed: Show Dagu icon, switch to panel icon on hover */}
+        {/* When collapsed: Show first letter of title, switch to panel icon on hover */}
         {!isOpen && (
           <button
             onClick={() => {
@@ -94,28 +93,19 @@ export const mainListItems = React.forwardRef<
                 className="text-primary-foreground hover:text-primary-foreground/70"
               />
             ) : (
-              <img
-                src={logoDark}
-                alt="Dagu Logo"
-                className="w-6 h-6 object-contain"
-              />
+              <span className="text-lg font-bold text-primary-foreground">
+                {(config.title || 'Dagu').charAt(0).toUpperCase()}
+              </span>
             )}
           </button>
         )}
 
-        {/* When expanded: Dagu logo on left, panel icon on right */}
+        {/* When expanded: Title and panel icon on right */}
         {isOpen && (
           <>
-            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center z-10">
-              <img
-                src={logoDark}
-                alt="Dagu Logo"
-                className="w-6 h-6 object-contain"
-              />
-            </div>
-            <div className="absolute inset-0 flex items-center pl-12">
+            <div className="absolute inset-0 flex items-center pl-3">
               <span className="font-bold tracking-wide select-none text-xl text-primary-foreground">
-                Dagu
+                {config.title || 'Dagu'}
               </span>
             </div>
             <button
