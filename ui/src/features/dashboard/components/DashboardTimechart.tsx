@@ -1,4 +1,9 @@
 import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Clock, Maximize, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { DataSet } from 'vis-data';
@@ -421,55 +426,103 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
   };
 
   return (
-    <TimelineWrapper>
-      <div className="flex justify-between items-center gap-2 px-3 py-2 border-b border-border bg-card flex-shrink-0">
-        <span className="text-xs font-medium text-muted-foreground">
+    <div className="w-full h-full flex flex-col bg-card overflow-hidden">
+      {/* Toolbar */}
+      <div className="flex justify-between items-center gap-2 px-3 py-1.5 bg-muted/30 flex-shrink-0">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Timeline
         </span>
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleCurrent}
-            title="Go to current time"
-          >
-            <Clock className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleFit}
-            title="Fit all items in view"
-          >
-            <Maximize className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleZoomIn}
-            title="Zoom in"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleZoomOut}
-            title="Zoom out"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleReset}
-            title="Reset view to initial state"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-0.5 rounded-md border border-border bg-card p-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCurrent}
+                className="h-7 w-7 rounded-sm"
+              >
+                <Clock className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Current time</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleFit}
+                className="h-7 w-7 rounded-sm"
+              >
+                <Maximize className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Fit all</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <div className="w-px h-4 bg-border mx-0.5" />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleZoomIn}
+                className="h-7 w-7 rounded-sm"
+              >
+                <ZoomIn className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Zoom in</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleZoomOut}
+                className="h-7 w-7 rounded-sm"
+              >
+                <ZoomOut className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Zoom out</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <div className="w-px h-4 bg-border mx-0.5" />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleReset}
+                className="h-7 w-7 rounded-sm"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Reset view</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
+
+      {/* Timeline content */}
       <div ref={timelineRef} className="flex-1 min-h-0 overflow-auto" />
+
+      {/* DAG Run details modal */}
       {selectedDAGRun && (
         <DAGRunDetailsModal
           name={selectedDAGRun.name}
@@ -621,14 +674,6 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           )
           .join('\n')}
       `}</style>
-    </TimelineWrapper>
-  );
-}
-
-function TimelineWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="w-full h-full flex flex-col bg-card overflow-hidden">
-      {children}
     </div>
   );
 }

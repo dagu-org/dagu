@@ -1,16 +1,6 @@
-import React from 'react';
-import {
-  CheckCircle,
-  Filter,
-  ListChecks,
-  Play,
-  XCircle,
-  StopCircle,
-  Clock,
-  Loader2,
-  Calendar,
-  Server,
-} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { RefreshButton } from '@/components/ui/refresh-button';
 import {
   Select,
   SelectContent,
@@ -18,21 +8,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { RefreshButton } from '@/components/ui/refresh-button';
+import {
+  Calendar,
+  CheckCircle,
+  Clock,
+  Filter,
+  ListChecks,
+  Loader2,
+  Play,
+  Server,
+  StopCircle,
+  XCircle,
+} from 'lucide-react';
+import React from 'react';
+import type { components } from '../api/v2/schema';
+import { Status } from '../api/v2/schema';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { useSearchState } from '../contexts/SearchStateContext';
+import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-details';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import MiniResourceChart from '../features/dashboard/components/MiniResourceChart';
 import MiniServiceCard from '../features/dashboard/components/MiniServiceCard';
 import WorkersSummary from '../features/dashboard/components/WorkersSummary';
 import PathsCard from '../features/system-status/components/PathsCard';
-import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-details';
 import { useQuery } from '../hooks/api';
-import type { components } from '../api/v2/schema';
-import { Status } from '../api/v2/schema';
 import dayjs from '../lib/dayjs';
 import Title from '../ui/Title';
 
@@ -137,8 +137,7 @@ function Dashboard(): React.ReactElement | null {
       ? {
           selectedDAGRun: stored.selectedDAGRun || base.selectedDAGRun,
           dateRange: {
-            startDate:
-              stored.dateRange?.startDate ?? base.dateRange.startDate,
+            startDate: stored.dateRange?.startDate ?? base.dateRange.startDate,
             endDate:
               stored.dateRange?.endDate === undefined
                 ? base.dateRange.endDate
@@ -272,25 +271,32 @@ function Dashboard(): React.ReactElement | null {
   };
 
   // Handle task click from workers
-  const handleTaskClick = React.useCallback((task: components['schemas']['RunningTask']) => {
-    if (task.parentDagRunName && task.parentDagRunId) {
-      const searchParams = new URLSearchParams();
-      searchParams.set('subDAGRunId', task.dagRunId);
-      searchParams.set('dagRunId', task.parentDagRunId);
-      searchParams.set('dagRunName', task.parentDagRunName);
-      window.history.pushState({}, '', `${window.location.pathname}?${searchParams.toString()}`);
+  const handleTaskClick = React.useCallback(
+    (task: components['schemas']['RunningTask']) => {
+      if (task.parentDagRunName && task.parentDagRunId) {
+        const searchParams = new URLSearchParams();
+        searchParams.set('subDAGRunId', task.dagRunId);
+        searchParams.set('dagRunId', task.parentDagRunId);
+        searchParams.set('dagRunName', task.parentDagRunName);
+        window.history.pushState(
+          {},
+          '',
+          `${window.location.pathname}?${searchParams.toString()}`
+        );
 
-      setModalDAGRun({
-        name: task.parentDagRunName,
-        dagRunId: task.parentDagRunId,
-      });
-    } else {
-      setModalDAGRun({
-        name: task.dagName,
-        dagRunId: task.dagRunId,
-      });
-    }
-  }, []);
+        setModalDAGRun({
+          name: task.parentDagRunName,
+          dagRunId: task.parentDagRunId,
+        });
+      } else {
+        setModalDAGRun({
+          name: task.dagName,
+          dagRunId: task.dagRunId,
+        });
+      }
+    },
+    []
+  );
 
   const dagRunsList: DAGRunSummary[] = data?.dagRuns || [];
 
@@ -395,10 +401,14 @@ function Dashboard(): React.ReactElement | null {
                 disabled={isLoading}
               >
                 <SelectTrigger className="h-7 w-[160px] text-xs">
-                  <SelectValue placeholder={isLoading ? 'Loading...' : 'All DAGs'} />
+                  <SelectValue
+                    placeholder={isLoading ? 'Loading...' : 'All DAGs'}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-xs">All DAGs</SelectItem>
+                  <SelectItem value="all" className="text-xs">
+                    All DAGs
+                  </SelectItem>
                   {uniqueDAGRunNames.map((name) => (
                     <SelectItem key={name} value={name} className="text-xs">
                       {name}
@@ -419,7 +429,9 @@ function Dashboard(): React.ReactElement | null {
                     if (!date.isValid()) return;
                     const startOfDay =
                       config.tzOffsetInSec !== undefined
-                        ? date.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+                        ? date
+                            .utcOffset(config.tzOffsetInSec / 60)
+                            .startOf('day')
                         : date.startOf('day');
                     const endOfDay =
                       config.tzOffsetInSec !== undefined
@@ -465,12 +477,11 @@ function Dashboard(): React.ReactElement | null {
         {/* Metrics Row */}
         <div className="flex flex-wrap items-center border-t px-2 py-1.5 gap-x-4 gap-y-1">
           {metricCards.map((card) => (
-            <div
-              key={card.title}
-              className="flex items-center gap-1.5"
-            >
+            <div key={card.title} className="flex items-center gap-1.5">
               {card.icon}
-              <span className="text-xs text-muted-foreground">{card.title}</span>
+              <span className="text-xs text-muted-foreground">
+                {card.title}
+              </span>
               <span className="text-sm font-semibold">{card.value}</span>
             </div>
           ))}
@@ -479,9 +490,6 @@ function Dashboard(): React.ReactElement | null {
 
       {/* Timeline Chart - fixed height */}
       <div className="border rounded bg-card flex-shrink-0">
-        <div className="flex items-center justify-between px-3 py-2 border-b">
-          <span className="text-sm font-medium">{timelineTitle}</span>
-        </div>
         <div className="h-64">
           <DashboardTimeChart
             data={dagRunsList}
@@ -529,13 +537,15 @@ function Dashboard(): React.ReactElement | null {
             <MiniServiceCard
               title="Coordinator"
               instances={
-                coordinatorData?.coordinators?.map((c: CoordinatorInstance) => ({
-                  instanceId: c.instanceId,
-                  host: c.host,
-                  port: c.port,
-                  status: c.status,
-                  startedAt: c.startedAt,
-                })) || []
+                coordinatorData?.coordinators?.map(
+                  (c: CoordinatorInstance) => ({
+                    instanceId: c.instanceId,
+                    host: c.host,
+                    port: c.port,
+                    status: c.status,
+                    startedAt: c.startedAt,
+                  })
+                ) || []
               }
               icon={<Server className="h-3.5 w-3.5" />}
               isLoading={!coordinatorData && !coordinatorError}
