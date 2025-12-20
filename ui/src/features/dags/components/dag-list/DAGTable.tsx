@@ -1004,7 +1004,7 @@ function DAGTable({
                 placeholder="Search definitions..."
                 value={searchText}
                 onChange={(e) => handleSearchTextChange(e.target.value)}
-                className="pl-10 h-9 border border-input rounded-md w-full"
+                className="pl-10 h-9 border border-border rounded-md w-full"
               />
               {searchText && (
                 <button
@@ -1037,7 +1037,7 @@ function DAGTable({
                 handleSearchTagChange(value === 'all' ? '' : value)
               }
             >
-              <SelectTrigger className="w-auto min-w-[120px] sm:min-w-[160px] h-9 border border-input rounded-md">
+              <SelectTrigger className="w-auto min-w-[120px] sm:min-w-[160px] h-9 border border-border rounded-md">
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-muted-foreground" />
                   <SelectValue placeholder="Filter by tag" />
@@ -1157,7 +1157,7 @@ function DAGTable({
                             'dag' in row.original &&
                             selectedDAG ===
                               (row.original as DAGRow).dag.fileName
-                          ? 'cursor-pointer bg-primary/10 hover:bg-primary/15 border-l-4 border-primary border-b-0' // Highlight selected DAG
+                          ? 'cursor-pointer bg-accent-surface hover:bg-accent-surface/80 border-l-4 border-muted-foreground border-b-0' // Highlight selected DAG
                           : 'cursor-pointer hover:bg-muted/50'
                     }
                     style={{ fontSize: '0.8125rem' }} // Smaller font size for more density
