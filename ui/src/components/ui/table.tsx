@@ -71,7 +71,7 @@ function TableHead({
   return (
     <RadixTable.ColumnHeaderCell
       data-slot="table-head"
-      className={cn('text-foreground font-medium whitespace-nowrap', className)}
+      className={cn('text-foreground font-medium', className)}
       {...props}
     />
   );

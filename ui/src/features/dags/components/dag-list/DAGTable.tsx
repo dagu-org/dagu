@@ -1046,22 +1046,25 @@ function DAGTable({
 
       {/* Desktop Table View - Hidden on mobile */}
       <div className="hidden md:block w-full overflow-hidden">
-        <Table className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}>
+        <Table
+          className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}
+          style={{ tableLayout: 'fixed' }}
+        >
+          <colgroup>
+            <col style={{ width: '5%' }} /> {/* Expand */}
+            <col style={{ width: '37%' }} /> {/* Name */}
+            <col style={{ width: '10%' }} /> {/* Status */}
+            <col style={{ width: '18%' }} /> {/* LastRun */}
+            <col style={{ width: '20%' }} /> {/* ScheduleAndNextRun */}
+            <col style={{ width: '10%' }} /> {/* Actions */}
+          </colgroup>
           <TableHeader>
             {instance.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className={`py-1 px-2 text-muted-foreground text-xs ${
-                      header.column.id === 'Expand'
-                        ? 'w-10'
-                        : header.column.id === 'Actions'
-                          ? 'w-14'
-                          : header.column.id === 'Status'
-                            ? 'w-20'
-                            : ''
-                    }`}
+                    className="py-1 px-2 text-muted-foreground text-xs overflow-hidden"
                   >
                     {header.isPlaceholder ? null : (
                       <div>
@@ -1140,17 +1143,7 @@ function DAGTable({
                     {row.getVisibleCells().map((cell) => (
                       <TableCell
                         key={cell.id}
-                        className={`py-1 px-2 overflow-hidden align-middle ${
-                          cell.column.id === 'Expand'
-                            ? 'w-10'
-                            : cell.column.id === 'Actions'
-                              ? 'w-14'
-                              : cell.column.id === 'Status'
-                                ? 'w-20'
-                                : cell.column.id === 'Name'
-                                  ? 'max-w-0'
-                                  : ''
-                        }`}
+                        className="py-1 px-2 overflow-hidden align-middle truncate"
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
