@@ -5,17 +5,43 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { useQuery } from '@/hooks/api';
 import { ExternalLink, Layers } from 'lucide-react';
-import React from 'react';
-import { components } from '../../../../api/v2/schema';
+import React, { useContext, useMemo, useState } from 'react';
+import { components, StatusLabel } from '../../../../api/v2/schema';
+import { StatusDot } from '../common';
+
+type SubDAGRun = components['schemas']['SubDAGRun'];
+type SubDAGRunDetail = components['schemas']['SubDAGRunDetail'];
+
+// "all" is a special filter that shows everything
+type StatusFilterValue = 'all' | StatusLabel;
+
+// Display labels for status values
+const STATUS_DISPLAY_LABELS: Record<StatusLabel, string> = {
+  [StatusLabel.not_started]: 'Not Started',
+  [StatusLabel.running]: 'Running',
+  [StatusLabel.failed]: 'Failed',
+  [StatusLabel.aborted]: 'Aborted',
+  [StatusLabel.succeeded]: 'Succeeded',
+  [StatusLabel.queued]: 'Queued',
+  [StatusLabel.partially_succeeded]: 'Partial',
+};
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   stepName: string;
   subDAGName: string;
-  subRuns: components['schemas']['SubDAGRun'][];
+  subRuns: SubDAGRun[];
   onSelectSubRun: (subRunIndex: number, openInNewTab?: boolean) => void;
+  /** Root DAG name for API calls */
+  rootDagName: string;
+  /** Root DAG run ID for API calls */
+  rootDagRunId: string;
+  /** Current DAG run ID (parent of sub-runs) - for multi-level nested DAGs */
+  parentDagRunId?: string;
 };
 
 export function ParallelExecutionModal({
@@ -24,10 +50,114 @@ export function ParallelExecutionModal({
   subDAGName,
   subRuns,
   onSelectSubRun,
+  rootDagName,
+  rootDagRunId,
+  parentDagRunId,
 }: Props) {
   const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-  const [selectedIndex, setSelectedIndex] = React.useState<number | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('all');
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const appBarContext = useContext(AppBarContext);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+
+  // Determine if this is a nested sub-DAG
+  const isNestedSubDAG = parentDagRunId && parentDagRunId !== rootDagRunId;
+
+  // Fetch sub DAG run details with status information
+  const { data: subRunsData } = useQuery(
+    '/dag-runs/{name}/{dagRunId}/sub-dag-runs',
+    {
+      params: {
+        path: {
+          name: rootDagName,
+          dagRunId: rootDagRunId,
+        },
+        query: {
+          remoteNode,
+          parentSubDAGRunId: isNestedSubDAG ? parentDagRunId : undefined,
+        },
+      },
+    },
+    {
+      isPaused: () => !isOpen,
+      refreshInterval: isOpen ? 3000 : 0,
+    }
+  );
+
+  // Create a map of dagRunId to status details
+  const statusMap = useMemo(() => {
+    const map = new Map<string, SubDAGRunDetail>();
+    if (subRunsData?.subRuns) {
+      for (const detail of subRunsData.subRuns) {
+        map.set(detail.dagRunId, detail);
+      }
+    }
+    return map;
+  }, [subRunsData]);
+
+  // Count sub runs by statusLabel - dynamically build from actual data
+  const statusCounts = useMemo(() => {
+    const counts = new Map<StatusFilterValue, number>();
+    counts.set('all', subRuns.length);
+
+    for (const subRun of subRuns) {
+      const detail = statusMap.get(subRun.dagRunId);
+      if (!detail) continue;
+
+      const statusLabel = detail.statusLabel;
+      counts.set(statusLabel, (counts.get(statusLabel) || 0) + 1);
+    }
+
+    return counts;
+  }, [subRuns, statusMap]);
+
+  // Filter sub runs based on status filter
+  // Keep track of original index for navigation
+  const filteredSubRuns = useMemo(() => {
+    if (statusFilter === 'all') {
+      return subRuns.map((subRun, index) => ({ subRun, originalIndex: index }));
+    }
+
+    return subRuns
+      .map((subRun, index) => ({ subRun, originalIndex: index }))
+      .filter(({ subRun }) => {
+        const detail = statusMap.get(subRun.dagRunId);
+        if (!detail) return false;
+        return detail.statusLabel === statusFilter;
+      });
+  }, [subRuns, statusFilter, statusMap]);
+
+  // Get available filters (only show filters that have items)
+  const availableFilters = useMemo(() => {
+    const filters: { value: StatusFilterValue; label: string; count: number }[] = [
+      { value: 'all', label: 'All', count: statusCounts.get('all') || 0 },
+    ];
+
+    // Add filters for each status that has items, in a consistent order
+    const statusOrder: StatusLabel[] = [
+      StatusLabel.running,
+      StatusLabel.queued,
+      StatusLabel.succeeded,
+      StatusLabel.partially_succeeded,
+      StatusLabel.failed,
+      StatusLabel.aborted,
+      StatusLabel.not_started,
+    ];
+
+    for (const status of statusOrder) {
+      const count = statusCounts.get(status);
+      if (count && count > 0) {
+        filters.push({
+          value: status,
+          label: STATUS_DISPLAY_LABELS[status],
+          count,
+        });
+      }
+    }
+
+    return filters;
+  }, [statusCounts]);
 
   // Handle keyboard navigation
   React.useEffect(() => {
@@ -37,17 +167,17 @@ export function ParallelExecutionModal({
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          setSelectedIndex((prev) => prev === null ? 0 : (prev + 1) % subRuns.length);
+          setSelectedIndex((prev) => prev === null ? 0 : (prev + 1) % filteredSubRuns.length);
           break;
         case 'ArrowUp':
           e.preventDefault();
-          setSelectedIndex((prev) => prev === null ? subRuns.length - 1 : (prev - 1 + subRuns.length) % subRuns.length);
+          setSelectedIndex((prev) => prev === null ? filteredSubRuns.length - 1 : (prev - 1 + filteredSubRuns.length) % filteredSubRuns.length);
           break;
         case 'Enter':
           e.preventDefault();
-          if (selectedIndex !== null) {
+          if (selectedIndex !== null && filteredSubRuns[selectedIndex]) {
             const openInNewTab = e.metaKey || e.ctrlKey;
-            onSelectSubRun(selectedIndex, openInNewTab);
+            onSelectSubRun(filteredSubRuns[selectedIndex].originalIndex, openInNewTab);
             if (!openInNewTab) {
               onClose();
             }
@@ -58,7 +188,12 @@ export function ParallelExecutionModal({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, selectedIndex, subRuns.length, onSelectSubRun, onClose]);
+  }, [isOpen, selectedIndex, filteredSubRuns, onSelectSubRun, onClose]);
+
+  // Reset selected index when filter changes
+  React.useEffect(() => {
+    setSelectedIndex(null);
+  }, [statusFilter]);
 
   // Auto-scroll to selected item
   React.useEffect(() => {
@@ -78,7 +213,7 @@ export function ParallelExecutionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] overflow-hidden p-0">
+      <DialogContent className="sm:max-w-[800px] overflow-hidden p-0">
         <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-mono">
@@ -86,62 +221,108 @@ export function ParallelExecutionModal({
               {subDAGName}
             </DialogTitle>
             <DialogDescription className="text-xs mt-1 font-mono text-muted-foreground">
-              {subRuns.length} sub DAG-runs
+              {filteredSubRuns.length === subRuns.length
+                ? `${subRuns.length} sub DAG-runs`
+                : `${filteredSubRuns.length} of ${subRuns.length} sub DAG-runs`}
             </DialogDescription>
           </DialogHeader>
+
+          {/* Status filter buttons - only show when there's more than one status */}
+          {availableFilters.length > 2 && (
+            <div className="flex items-center gap-1 mt-3 flex-wrap">
+              {availableFilters.map((filter) => {
+                const isActive = statusFilter === filter.value;
+
+                return (
+                  <button
+                    key={filter.value}
+                    onClick={() => setStatusFilter(filter.value)}
+                    className={`
+                      px-2 py-1 text-xs font-medium rounded transition-colors
+                      ${isActive
+                        ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
+                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                      }
+                    `}
+                  >
+                    {filter.label}
+                    <span className={`ml-1 ${isActive ? 'text-violet-500 dark:text-violet-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                      {filter.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
-        
+
         <div className="p-3">
-          <div 
+          <div
             ref={scrollContainerRef}
             className="space-y-1 max-h-[400px] overflow-y-auto"
           >
-            {subRuns.map((subRun, index) => (
-              <div 
-                key={subRun.dagRunId} 
-                className="group relative flex items-center gap-2"
-                onMouseEnter={() => setSelectedIndex(index)}
-              >
-                <button
-                  className={`
-                    flex-1 text-left transition-all duration-150 border rounded px-3 py-2 flex items-center gap-3 focus:outline-none
-                    ${selectedIndex === index 
-                      ? 'border-violet-500 dark:border-violet-500 bg-violet-50 dark:bg-violet-950/20' 
-                      : 'border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                    }
-                  `}
-                  onClick={(e) => {
-                    const openInNewTab = e.metaKey || e.ctrlKey;
-                    onSelectSubRun(index, openInNewTab);
-                    if (!openInNewTab) {
-                      onClose();
-                    }
-                  }}
-                >
-                  <span className="font-mono text-xs text-zinc-500 dark:text-zinc-600 min-w-[24px]">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  {subRun.params ? (
-                    <code className="text-sm font-mono text-zinc-700 dark:text-zinc-300">
-                      {subRun.params}
-                    </code>
-                  ) : (
-                    <span className="text-sm text-zinc-400 dark:text-zinc-600 italic">
-                      No parameters
-                    </span>
-                  )}
-                </button>
-                <button
-                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 focus:outline-none"
-                  onClick={() => {
-                    onSelectSubRun(index, true);
-                  }}
-                  title="Open in new tab"
-                >
-                  <ExternalLink className="h-3 w-3 text-zinc-500 dark:text-zinc-500" />
-                </button>
+            {filteredSubRuns.length === 0 ? (
+              <div className="text-center py-8 text-sm text-zinc-500 dark:text-zinc-400">
+                No sub DAG-runs match the selected filter
               </div>
-            ))}
+            ) : (
+              filteredSubRuns.map(({ subRun, originalIndex }, displayIndex) => {
+                const detail = statusMap.get(subRun.dagRunId);
+                return (
+                  <div
+                    key={subRun.dagRunId}
+                    className="group relative flex items-center gap-2"
+                    onMouseEnter={() => setSelectedIndex(displayIndex)}
+                  >
+                    <button
+                      className={`
+                        flex-1 text-left transition-all duration-150 border rounded px-3 py-2 flex items-center gap-3 focus:outline-none
+                        ${selectedIndex === displayIndex
+                          ? 'border-violet-500 dark:border-violet-500 bg-violet-50 dark:bg-violet-950/20'
+                          : 'border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                        }
+                      `}
+                      onClick={(e) => {
+                        const openInNewTab = e.metaKey || e.ctrlKey;
+                        onSelectSubRun(originalIndex, openInNewTab);
+                        if (!openInNewTab) {
+                          onClose();
+                        }
+                      }}
+                    >
+                      <span className="font-mono text-xs text-zinc-500 dark:text-zinc-600 min-w-[24px] flex-shrink-0">
+                        {String(originalIndex + 1).padStart(2, '0')}
+                      </span>
+                      {detail && (
+                        <span className="flex-shrink-0">
+                          <StatusDot status={detail.status} statusLabel={detail.statusLabel} />
+                        </span>
+                      )}
+                      <div className="flex-1 min-w-0 overflow-x-auto">
+                        {subRun.params ? (
+                          <code className="text-sm font-mono text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+                            {subRun.params}
+                          </code>
+                        ) : (
+                          <span className="text-sm text-zinc-400 dark:text-zinc-600 italic">
+                            No parameters
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 focus:outline-none"
+                      onClick={() => {
+                        onSelectSubRun(originalIndex, true);
+                      }}
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="h-3 w-3 text-zinc-500 dark:text-zinc-500" />
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
         

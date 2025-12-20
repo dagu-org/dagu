@@ -147,7 +147,6 @@ function DAGStatusOverview({
           <StatusChip status={status.status} size="md">
             {status.statusLabel}
           </StatusChip>
-
         </div>
 
         {status.dagRunId && (
@@ -183,7 +182,6 @@ function DAGStatusOverview({
             {status.statusLabel}
           </StatusChip>
         </div>
-
 
         {status.dagRunId && (
           <div className="space-y-1">
@@ -435,7 +433,6 @@ function DAGStatusOverview({
           </div>
         </div>
       )}
-
     </div>
   );
 }

@@ -825,19 +825,38 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	}, nil
 }
 
-// GetSubDAGRuns returns timing and status information for all sub DAG runs
+// GetSubDAGRuns returns timing and status information for all sub DAG runs.
+// When parentSubDAGRunId is provided, it returns sub-runs of that specific sub DAG run
+// (for multi-level nested DAGs).
 func (a *API) GetSubDAGRuns(ctx context.Context, request api.GetSubDAGRunsRequestObject) (api.GetSubDAGRunsResponseObject, error) {
 	dagName := request.Name
 	dagRunId := request.DagRunId
+	parentSubDAGRunId := request.Params.ParentSubDAGRunId
 
-	// Get the parent DAG run status
-	parentRef := execution.NewDAGRunRef(dagName, dagRunId)
-	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, parentRef)
-	if err != nil {
-		return &api.GetSubDAGRuns404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
-		}, nil
+	// The root reference is always used for storage lookups
+	rootRef := execution.NewDAGRunRef(dagName, dagRunId)
+
+	var dagStatus *execution.DAGRunStatus
+	var err error
+
+	if parentSubDAGRunId != nil && *parentSubDAGRunId != "" {
+		// For multi-level nested DAGs: get the status of the parent sub DAG run
+		dagStatus, err = a.dagRunMgr.FindSubDAGRunStatus(ctx, rootRef, *parentSubDAGRunId)
+		if err != nil {
+			return &api.GetSubDAGRuns404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("sub dag-run ID %s not found for root DAG %s/%s", *parentSubDAGRunId, dagName, dagRunId),
+			}, nil
+		}
+	} else {
+		// Default: get the root DAG run status
+		dagStatus, err = a.dagRunMgr.GetSavedStatus(ctx, rootRef)
+		if err != nil {
+			return &api.GetSubDAGRuns404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+			}, nil
+		}
 	}
 
 	subRuns := make([]api.SubDAGRunDetail, 0)
@@ -851,7 +870,7 @@ func (a *API) GetSubDAGRuns(ctx context.Context, request api.GetSubDAGRunsReques
 
 		// Collect regular sub runs
 		for _, subRun := range node.SubRuns {
-			detail, err := a.getSubDAGRunDetail(ctx, parentRef, subRun.DAGRunID, subRun.Params)
+			detail, err := a.getSubDAGRunDetail(ctx, rootRef, subRun.DAGRunID, subRun.Params)
 			if err != nil {
 				// Skip if we can't fetch details
 				continue
@@ -861,7 +880,7 @@ func (a *API) GetSubDAGRuns(ctx context.Context, request api.GetSubDAGRunsReques
 
 		// Collect repeated sub runs
 		for _, subRun := range node.SubRunsRepeated {
-			detail, err := a.getSubDAGRunDetail(ctx, parentRef, subRun.DAGRunID, subRun.Params)
+			detail, err := a.getSubDAGRunDetail(ctx, rootRef, subRun.DAGRunID, subRun.Params)
 			if err != nil {
 				// Skip if we can't fetch details
 				continue
