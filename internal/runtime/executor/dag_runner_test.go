@@ -303,7 +303,8 @@ func TestCreateTempDAGFile(t *testing.T) {
 	dagName := "test-dag"
 	yamlData := []byte("name: test-dag\nsteps:\n  - name: step1\n    command: echo test")
 
-	tempFile, err := createTempDAGFile(dagName, yamlData)
+	// Pass nil for localDAGs since we're testing with a single DAG
+	tempFile, err := createTempDAGFile(dagName, yamlData, nil)
 	require.NoError(t, err)
 	require.NotEmpty(t, tempFile)
 	defer func() { _ = os.Remove(tempFile) }()
@@ -316,6 +317,46 @@ func TestCreateTempDAGFile(t *testing.T) {
 
 	// Verify file name pattern
 	assert.Contains(t, tempFile, "test-dag")
+	assert.Contains(t, tempFile, ".yaml")
+}
+
+func TestCreateTempDAGFile_WithLocalDAGs(t *testing.T) {
+	dagName := "parent-dag"
+	yamlData := []byte("name: parent-dag\nsteps:\n  - name: step1\n    call: child-dag")
+
+	// Create local DAGs map with additional DAGs
+	localDAGs := map[string]*core.DAG{
+		"parent-dag": {
+			Name:     "parent-dag",
+			YamlData: yamlData,
+		},
+		"child-dag": {
+			Name:     "child-dag",
+			YamlData: []byte("name: child-dag\nsteps:\n  - name: step1\n    command: echo child"),
+		},
+	}
+
+	tempFile, err := createTempDAGFile(dagName, yamlData, localDAGs)
+	require.NoError(t, err)
+	require.NotEmpty(t, tempFile)
+	defer func() { _ = os.Remove(tempFile) }()
+
+	// Verify file exists
+	assert.FileExists(t, tempFile)
+
+	// Read content and verify it contains both DAGs separated by ---
+	content, err := os.ReadFile(tempFile)
+	require.NoError(t, err)
+
+	contentStr := string(content)
+	// Should contain the parent DAG data
+	assert.Contains(t, contentStr, "name: parent-dag")
+	// Should contain separator and child DAG data
+	assert.Contains(t, contentStr, "---")
+	assert.Contains(t, contentStr, "name: child-dag")
+
+	// Verify file name pattern
+	assert.Contains(t, tempFile, "parent-dag")
 	assert.Contains(t, tempFile, ".yaml")
 }
 

@@ -63,7 +63,7 @@ func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, 
 	if rCtx.DAG != nil && rCtx.DAG.LocalDAGs != nil {
 		if localDAG, ok := rCtx.DAG.LocalDAGs[childName]; ok {
 			// Create a temporary file for the local DAG
-			tempFile, err := createTempDAGFile(childName, localDAG.YamlData)
+			tempFile, err := createTempDAGFile(childName, localDAG.YamlData, rCtx.DAG.LocalDAGs)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create temp file for local DAG: %w", err)
 			}
@@ -501,7 +501,7 @@ func (e *SubDAGExecutor) Kill(sig os.Signal) error {
 }
 
 // createTempDAGFile creates a temporary file with the DAG YAML content.
-func createTempDAGFile(dagName string, yamlData []byte) (string, error) {
+func createTempDAGFile(dagName string, yamlData []byte, localDAGs map[string]*core.DAG) (string, error) {
 	// Create a temporary directory if it doesn't exist
 	tempDir := filepath.Join(os.TempDir(), "dagu", "local-dags")
 	if err := os.MkdirAll(tempDir, 0750); err != nil {
@@ -519,12 +519,32 @@ func createTempDAGFile(dagName string, yamlData []byte) (string, error) {
 	}()
 
 	// Write the YAML data
+	var writeErr error
 	if _, err := tempFile.Write(yamlData); err != nil {
-		_ = os.Remove(tempFile.Name())
-		return "", fmt.Errorf("failed to write YAML data: %w", err)
+		writeErr = err
+		goto Fail
+	}
+
+	// Add other local DAG data to the temporary file
+	for _, localDAG := range localDAGs {
+		if localDAG.Name == dagName {
+			continue
+		}
+		if _, err := tempFile.WriteString("---\n"); err != nil {
+			writeErr = err
+			goto Fail
+		}
+		if _, err := tempFile.Write(localDAG.YamlData); err != nil {
+			writeErr = err
+			goto Fail
+		}
 	}
 
 	return tempFile.Name(), nil
+
+Fail:
+	_ = os.Remove(tempFile.Name())
+	return "", fmt.Errorf("failed to write YAML data: %w", writeErr)
 }
 
 // executablePath returns the path to the dagu executable.

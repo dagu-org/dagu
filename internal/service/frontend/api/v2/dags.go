@@ -531,6 +531,13 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 
 	dagStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunId)
 	if err != nil {
+		if errors.Is(err, execution.ErrNoStatusData) {
+			return nil, &Error{
+				HTTPStatus: http.StatusNotFound,
+				Code:       api.ErrorCodeNotFound,
+				Message:    fmt.Sprintf("DAG run %s not found", dagRunId),
+			}
+		}
 		return nil, fmt.Errorf("error getting status by dag-run ID: %w", err)
 	}
 

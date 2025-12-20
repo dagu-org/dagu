@@ -1,9 +1,9 @@
-import { components } from '@/api/v2/schema';
+import { components, StatusLabel } from '@/api/v2/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
 import dayjs from '@/lib/dayjs';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { useContext, useEffect } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { StatusDot } from '../common';
 
 type SubDAGRun = components['schemas']['SubDAGRun'];
@@ -12,9 +12,29 @@ type IndexedSubRun = SubDAGRun & { originalIndex: number };
 type IndexedSubRunDetail = SubDAGRunDetail & { originalIndex: number };
 type SubRunListItem = IndexedSubRun | IndexedSubRunDetail;
 
+// "all" is a special filter that shows everything
+type StatusFilterValue = 'all' | StatusLabel;
+
+// Display labels for status values
+const STATUS_DISPLAY_LABELS: Record<StatusLabel, string> = {
+  [StatusLabel.not_started]: 'Not Started',
+  [StatusLabel.running]: 'Running',
+  [StatusLabel.failed]: 'Failed',
+  [StatusLabel.aborted]: 'Aborted',
+  [StatusLabel.succeeded]: 'Succeeded',
+  [StatusLabel.queued]: 'Queued',
+  [StatusLabel.partially_succeeded]: 'Partial',
+};
+
 type Props = {
+  /** Current DAG name (the parent of sub-runs) - used for display */
   dagName: string;
+  /** Current DAG run ID (the parent of sub-runs) - used for filtering */
   dagRunId: string;
+  /** Root DAG name - used for API calls */
+  rootDagName: string;
+  /** Root DAG run ID - used for API calls */
+  rootDagRunId: string;
   subDagName: string;
   allSubRuns: SubDAGRun[];
   isExpanded: boolean;
@@ -25,6 +45,8 @@ type Props = {
 export function SubDAGRunsList({
   dagName,
   dagRunId,
+  rootDagName,
+  rootDagRunId,
   subDagName,
   allSubRuns,
   isExpanded,
@@ -34,20 +56,26 @@ export function SubDAGRunsList({
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const dagRunIdsKey = allSubRuns.map((sr) => sr.dagRunId).join('|');
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('all');
 
   // Fetch sub DAG run details with timing information
   // Only fetch if we have multiple sub runs AND expanded
+  // Always use root DAG's name and ID for the API call since all sub-runs are stored under the root
+  // For multi-level nested DAGs, pass the current DAG's run ID as parentSubDAGRunId
   const shouldFetch = allSubRuns.length > 1 && isExpanded;
+  const isNestedSubDAG = dagRunId !== rootDagRunId;
   const { data: subRunsData, mutate: refetchSubRuns } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs',
     {
       params: {
         path: {
-          name: dagName,
-          dagRunId,
+          name: rootDagName,
+          dagRunId: rootDagRunId,
         },
         query: {
           remoteNode,
+          // For multi-level nested DAGs, pass the parent sub DAG run ID
+          parentSubDAGRunId: isNestedSubDAG ? dagRunId : undefined,
         },
       },
     },
@@ -100,6 +128,77 @@ export function SubDAGRunsList({
   const subRunsWithTiming: SubRunListItem[] =
     subRunsFromApi.length > 0 ? subRunsFromApi : subRunsWithIndex;
 
+  // Create a map of dagRunId to statusLabel for filtering
+  const statusLabelMap = useMemo(() => {
+    const map = new Map<string, StatusLabel>();
+    if (subRunsData?.subRuns) {
+      for (const detail of subRunsData.subRuns) {
+        if (nodeSubRunIds.has(detail.dagRunId)) {
+          map.set(detail.dagRunId, detail.statusLabel);
+        }
+      }
+    }
+    return map;
+  }, [subRunsData, nodeSubRunIds]);
+
+  // Count sub runs by statusLabel - dynamically build from actual data
+  const statusCounts = useMemo(() => {
+    const counts = new Map<StatusFilterValue, number>();
+    counts.set('all', subRunsWithTiming.length);
+
+    for (const subRun of subRunsWithTiming) {
+      const statusLabel = 'statusLabel' in subRun ? subRun.statusLabel : statusLabelMap.get(subRun.dagRunId);
+      if (!statusLabel) continue;
+
+      counts.set(statusLabel, (counts.get(statusLabel) || 0) + 1);
+    }
+
+    return counts;
+  }, [subRunsWithTiming, statusLabelMap]);
+
+  // Filter sub runs based on status filter
+  const filteredSubRuns = useMemo(() => {
+    if (statusFilter === 'all') {
+      return subRunsWithTiming;
+    }
+
+    return subRunsWithTiming.filter((subRun) => {
+      const statusLabel = 'statusLabel' in subRun ? subRun.statusLabel : statusLabelMap.get(subRun.dagRunId);
+      return statusLabel === statusFilter;
+    });
+  }, [subRunsWithTiming, statusFilter, statusLabelMap]);
+
+  // Get available filters (only show filters that have items)
+  const availableFilters = useMemo(() => {
+    const filters: { value: StatusFilterValue; label: string; count: number }[] = [
+      { value: 'all', label: 'All', count: statusCounts.get('all') || 0 },
+    ];
+
+    // Add filters for each status that has items, in a consistent order
+    const statusOrder: StatusLabel[] = [
+      StatusLabel.running,
+      StatusLabel.queued,
+      StatusLabel.succeeded,
+      StatusLabel.partially_succeeded,
+      StatusLabel.failed,
+      StatusLabel.aborted,
+      StatusLabel.not_started,
+    ];
+
+    for (const status of statusOrder) {
+      const count = statusCounts.get(status);
+      if (count && count > 0) {
+        filters.push({
+          value: status,
+          label: STATUS_DISPLAY_LABELS[status],
+          count,
+        });
+      }
+    }
+
+    return filters;
+  }, [statusCounts]);
+
   if (allSubRuns.length === 1) {
     // Single sub DAG run
     return (
@@ -127,7 +226,7 @@ export function SubDAGRunsList({
   // Multiple sub DAG runs
   return (
     <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -140,48 +239,89 @@ export function SubDAGRunsList({
           ) : (
             <ChevronRight className="h-3 w-3" />
           )}
-          Multiple executions: {allSubRuns.length} sub DAG runs
+          Multiple executions:{' '}
+          {filteredSubRuns.length === allSubRuns.length
+            ? `${allSubRuns.length} sub DAG runs`
+            : `${filteredSubRuns.length} of ${allSubRuns.length} sub DAG runs`}
         </button>
       </div>
-      {isExpanded && (
-        <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
-          {subRunsWithTiming.map((subRun, displayIndex) => {
-            const startedAt =
-              'startedAt' in subRun ? subRun.startedAt : null;
-            const status = 'status' in subRun ? subRun.status : null;
-            const statusLabel =
-              'statusLabel' in subRun ? subRun.statusLabel : undefined;
-            // Display number: when sorted newest first, show descending numbers
-            // So if we have 40 items, displayIndex 0 -> #40, displayIndex 1 -> #39, etc.
-            const displayNumber = allSubRuns.length - displayIndex;
+
+      {/* Status filter buttons - only show when expanded and there's more than one status */}
+      {isExpanded && availableFilters.length > 2 && (
+        <div className="flex items-center gap-1 mt-2 ml-4 flex-wrap">
+          {availableFilters.map((filter) => {
+            const isActive = statusFilter === filter.value;
+
             return (
-              <div key={subRun.dagRunId} className="py-1">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onNavigate(subRun.originalIndex, e);
-                    }}
-                    title="Click to view sub DAG run (Cmd/Ctrl+Click to open in new tab)"
-                  >
-                    #{displayNumber}: {subDagName}
-                  </div>
-                  {startedAt && (
-                    <div className="text-xs text-slate-500 dark:text-slate-400">
-                      {dayjs(startedAt).format('MMM D, HH:mm:ss')}
-                    </div>
-                  )}
-                  {status && <StatusDot status={status} statusLabel={statusLabel} />}
-                </div>
-                {subRun.params && (
-                  <div className="text-xs text-slate-500 dark:text-slate-400 ml-0 mt-1 font-mono">
-                    {subRun.params}
-                  </div>
-                )}
-              </div>
+              <button
+                key={filter.value}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setStatusFilter(filter.value);
+                }}
+                className={`
+                  px-1.5 py-0.5 text-xs rounded transition-colors
+                  ${isActive
+                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }
+                `}
+              >
+                {filter.label}
+                <span className={`ml-1 ${isActive ? 'text-blue-500 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                  {filter.count}
+                </span>
+              </button>
             );
           })}
+        </div>
+      )}
+
+      {isExpanded && (
+        <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
+          {filteredSubRuns.length === 0 ? (
+            <div className="py-2 text-slate-500 dark:text-slate-400 italic">
+              No sub DAG runs match the selected filter
+            </div>
+          ) : (
+            filteredSubRuns.map((subRun) => {
+              const startedAt = 'startedAt' in subRun ? subRun.startedAt : null;
+              const status = 'status' in subRun ? subRun.status : null;
+              const statusLabel =
+                'statusLabel' in subRun ? subRun.statusLabel : undefined;
+              // Use original index for display number
+              const displayNumber = subRun.originalIndex + 1;
+              return (
+                <div key={subRun.dagRunId} className="py-1">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigate(subRun.originalIndex, e);
+                      }}
+                      title="Click to view sub DAG run (Cmd/Ctrl+Click to open in new tab)"
+                    >
+                      #{String(displayNumber).padStart(2, '0')}: {subDagName}
+                    </div>
+                    {startedAt && (
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {dayjs(startedAt).format('MMM D, HH:mm:ss')}
+                      </div>
+                    )}
+                    {status && (
+                      <StatusDot status={status} statusLabel={statusLabel} />
+                    )}
+                  </div>
+                  {subRun.params && (
+                    <div className="text-xs text-slate-500 dark:text-slate-400 ml-0 mt-1 font-mono">
+                      {subRun.params}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       )}
     </div>

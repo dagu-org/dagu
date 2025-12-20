@@ -31,23 +31,17 @@ Built for developers who want powerful workflow orchestration without the operat
 
 ## Why Dagu?
 
-### 🚀 Zero Dependencies
-**Single binary. No database, no message broker.** Deploy anywhere in seconds—from your laptop to bare metal servers to Kubernetes. Everything is stored in plain files (XDG compliant), making it transparent, portable, and easy to backup.
+Many workflow orchestrators already exist, and Apache Airflow is a well known example. In Airflow, DAGs are loaded from Python source files, so defining workflows typically means writing and maintaining Python code. In real deployments, Airflow commonly involves multiple running components (for example, scheduler, webserver, metadata database, and workers) and DAG files often need to be synchronized across them, which can increase operational complexity. 
 
-### 🧩 Composable Nested Workflows
-**Build complex pipelines from reusable building blocks.** Define sub-workflows that can be called with parameters, executed in parallel, and fully monitored in the UI. See execution traces for every nested level—no black boxes.
+Dagu is a self-contained workflow engine where workflows are defined in simple YAML and executed with a single binary. It is designed to run without requiring external databases or message brokers, using local files for definitions, logs, and metadata. Because it orchestrates commands rather than forcing you into a specific programming model, it is easy to integrate existing shell scripts and operational commands as they are. Our goal is to make Dagu an ideal workflow engine for small teams that want orchestration power with minimal setup and operational overhead.
 
-### 🌐 Language Agnostic
-**Use your existing scripts without modification.** No need to wrap everything in Python decorators or rewrite logic. Dagu orchestrates shell commands, Docker containers, SSH commands, or HTTP calls—whatever you already have.
-
-### ⚡ Distributed Execution
-**Built-in queue system with intelligent task routing.** Route tasks to workers based on labels (GPU, region, compliance requirements). Automatic service registry and health monitoring included—no external coordination service needed.
-
-### 🎯 Production Ready
-**Not a toy.** Battle-tested error handling with exponential backoff retries, lifecycle hooks (onSuccess, onFailure, onExit), real-time log streaming, email notifications, Prometheus metrics, and OpenTelemetry tracing out of the box. Built-in user management with role-based access control (RBAC) for team environments.
-
-### 🎨 Modern Web UI
-**Beautiful UI that actually helps you debug.** Live log tailing, DAG visualization with Gantt charts, execution history with full lineage, and drill-down into nested sub-workflows. Dark mode included.
+## Highlights
+ 
+- Single binary file installation
+- Declarative YAML format for defining DAGs
+- Web UI for visually managing, rerunning, and monitoring pipelines
+- Use existing programs without any modification
+- Self-contained, with no need for a DBMS
 
 ## Quick Start
 
