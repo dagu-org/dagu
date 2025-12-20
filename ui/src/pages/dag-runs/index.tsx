@@ -598,17 +598,17 @@ function DAGRuns() {
             value={searchText}
             onChange={handleNameInputChange}
             onKeyDown={handleInputKeyPress}
-            className="w-[220px] bg-background"
+            className="w-[220px]"
           />
           <Input
             placeholder="Filter by Run ID..."
             value={dagRunId}
             onChange={handleDagRunIdInputChange}
             onKeyDown={handleInputKeyPress}
-            className="w-[200px] bg-background"
+            className="w-[200px]"
           />
           <Select value={status} onValueChange={handleStatusChange}>
-            <SelectTrigger className="w-[160px] bg-background">
+            <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Status">
                 {status === 'all' ? (
                   <div className="inline-flex items-center rounded-full border bg-muted border-border text-foreground py-0.5 px-2 text-xs font-medium">
@@ -732,7 +732,7 @@ function DAGRuns() {
           </ToggleGroup>
           {dateRangeMode === 'preset' ? (
             <Select value={datePreset} onValueChange={handleDatePresetChange}>
-              <SelectTrigger className="w-[180px] bg-background">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Select period" />
               </SelectTrigger>
               <SelectContent>
@@ -771,7 +771,7 @@ function DAGRuns() {
                   handleSpecificPeriodChange(newValue, newPeriod);
                 }}
               >
-                <SelectTrigger className="w-[120px] bg-background">
+                <SelectTrigger className="w-[120px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -787,7 +787,7 @@ function DAGRuns() {
                 placeholder={specificPeriod === 'year' ? 'YYYY' : undefined}
                 min={specificPeriod === 'year' ? '2000' : undefined}
                 max={specificPeriod === 'year' ? '2100' : undefined}
-                className="w-[160px] bg-background h-10"
+                className="w-[160px] h-10"
               />
             </>
           ) : (

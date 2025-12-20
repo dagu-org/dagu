@@ -238,7 +238,7 @@ function Queues() {
               <select
                 value={selectedQueueType}
                 onChange={(e) => setSelectedQueueType(e.target.value)}
-                className="h-7 px-2 text-xs border rounded bg-background"
+                className="h-7 px-2 text-xs border border-border rounded bg-input"
               >
                 <option value="all">All Types</option>
                 <option value="global">Global</option>
