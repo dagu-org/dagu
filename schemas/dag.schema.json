@@ -1135,6 +1135,10 @@
         }
       ],
       "properties": {
+        "name": {
+          "type": "string",
+          "description": "Custom container name. If empty, Docker generates a random name. Must be unique - if a container with this name already exists (running or stopped), the DAG will fail."
+        },
         "image": {
           "type": "string",
           "description": "Container image to use (e.g., 'python:3.11', 'node:20'). Required when using container configuration."
