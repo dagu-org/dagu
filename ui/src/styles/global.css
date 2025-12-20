@@ -65,74 +65,76 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #222222;
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  /* Warm sepia-toned light theme */
+  --background: #f5f0e8;
+  --foreground: #3d3833;
+  --card: #faf8f5;
+  --card-foreground: #3d3833;
+  --popover: #faf8f5;
+  --popover-foreground: #3d3833;
+  --primary: #c4956a;
+  --primary-foreground: #ffffff;
+  --secondary: #f0ebe3;
+  --secondary-foreground: #3d3833;
+  --muted: #f0ebe3;
+  --muted-foreground: #6b635a;
+  --accent: #f0ebe3;
+  --accent-foreground: #3d3833;
+  --destructive: #c4726a;
+  --destructive-foreground: #ffffff;
+  --border: #c8bfb0;
+  --input: #ffffff;
+  --ring: #c4956a;
+  --chart-1: #c4956a;
+  --chart-2: #7da87d;
+  --chart-3: #8a9fc4;
+  --chart-4: #d4a574;
+  --chart-5: #d4847a;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #faf8f5;
+  --sidebar-foreground: #3d3833;
+  --sidebar-primary: #c4956a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0ebe3;
+  --sidebar-accent-foreground: #3d3833;
+  --sidebar-border: #c8bfb0;
+  --sidebar-ring: #c4956a;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: #222222;
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  /* Warm sepia-toned dark theme */
+  --background: #1a1816;
+  --foreground: #e8e0d4;
+  --card: #242120;
+  --card-foreground: #e8e0d4;
+  --popover: #242120;
+  --popover-foreground: #e8e0d4;
+  --primary: #c4956a;
+  --primary-foreground: #ffffff;
+  --secondary: #2d2a27;
+  --secondary-foreground: #e8e0d4;
+  --muted: #2d2a27;
+  --muted-foreground: #a8a098;
+  --accent: #2d2a27;
+  --accent-foreground: #e8e0d4;
+  --destructive: #c4726a;
+  --destructive-foreground: #ffffff;
+  --border: #3d3833;
+  --input: #2d2a27;
+  --ring: #c4956a;
+  --chart-1: #d4a574;
+  --chart-2: #8ac48a;
+  --chart-3: #9aafda;
+  --chart-4: #d4946a;
+  --chart-5: #d4847a;
+  --sidebar: #1a1816;
+  --sidebar-foreground: #e8e0d4;
+  --sidebar-primary: #c4956a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #2d2a27;
+  --sidebar-accent-foreground: #e8e0d4;
+  --sidebar-border: #3d3833;
+  --sidebar-ring: #c4956a;
 }
 
 @theme inline {
@@ -230,10 +232,10 @@
 
 /* Mermaid dark mode support */
 .dark .mermaid {
-  /* Timeline/Gantt chart tooltip styles */
-  --mermaid-tooltip-background: rgb(39 39 42); /* zinc-800 */
-  --mermaid-tooltip-color: rgb(244 244 245); /* zinc-100 */
-  --mermaid-tooltip-border: rgb(63 63 70); /* zinc-700 */
+  /* Timeline/Gantt chart tooltip styles - warm sepia tones */
+  --mermaid-tooltip-background: #2d2a27;
+  --mermaid-tooltip-color: #e8e0d4;
+  --mermaid-tooltip-border: #3d3833;
 }
 
 /* Override Mermaid's default tooltip styles for dark mode */
@@ -245,22 +247,22 @@
 
 /* Mermaid gantt chart text elements for dark mode */
 .dark .mermaid .gantt text {
-  fill: rgb(244 244 245) !important; /* zinc-100 */
+  fill: #e8e0d4 !important;
 }
 
 /* Mermaid gantt chart axis labels for dark mode */
 .dark .mermaid .gantt .axisLabel {
-  fill: rgb(244 244 245) !important; /* zinc-100 */
+  fill: #e8e0d4 !important;
 }
 
 /* Mermaid gantt chart grid lines for dark mode */
 .dark .mermaid .gantt .grid .tick {
-  stroke: rgb(63 63 70) !important; /* zinc-700 */
+  stroke: #3d3833 !important;
 }
 
 /* Mermaid gantt chart section labels for dark mode */
 .dark .mermaid .gantt .sectionTitle {
-  fill: rgb(244 244 245) !important; /* zinc-100 */
+  fill: #e8e0d4 !important;
 }
 
 /* Native date picker dark mode support */
@@ -270,15 +272,15 @@
 
 /* Style the date picker popup for Webkit browsers (Chrome, Safari, Edge) */
 .dark input[type="datetime-local"]::-webkit-datetime-edit {
-  color: rgb(244 244 245); /* zinc-100 */
+  color: #e8e0d4;
 }
 
 .dark input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
-  background-color: rgb(24 24 27); /* zinc-900 */
+  background-color: #1a1816;
 }
 
 .dark input[type="datetime-local"]::-webkit-datetime-edit-text {
-  color: rgb(161 161 170); /* zinc-400 */
+  color: #a8a098;
 }
 
 .dark input[type="datetime-local"]::-webkit-datetime-edit-month-field,
@@ -288,7 +290,7 @@
 .dark input[type="datetime-local"]::-webkit-datetime-edit-minute-field,
 .dark input[type="datetime-local"]::-webkit-datetime-edit-second-field,
 .dark input[type="datetime-local"]::-webkit-datetime-edit-ampm-field {
-  color: rgb(244 244 245); /* zinc-100 */
+  color: #e8e0d4;
 }
 
 .dark input[type="datetime-local"]::-webkit-datetime-edit-month-field:focus,
@@ -298,14 +300,14 @@
 .dark input[type="datetime-local"]::-webkit-datetime-edit-minute-field:focus,
 .dark input[type="datetime-local"]::-webkit-datetime-edit-second-field:focus,
 .dark input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
-  background-color: rgb(39 39 42); /* zinc-800 */
-  color: rgb(244 244 245); /* zinc-100 */
+  background-color: #2d2a27;
+  color: #e8e0d4;
   outline: none;
 }
 
 /* Attempt to style the calendar popup (limited browser support) */
 .dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  background-color: rgb(24 24 27); /* zinc-900 */
+  background-color: #1a1816;
   border-radius: 4px;
 }
 
@@ -346,20 +348,20 @@
 
 /* Style any grid/pattern elements in the graph */
 .dark .mermaid pattern#grid line {
-  stroke: rgb(39 39 42) !important; /* zinc-800 - very subtle grid */
+  stroke: #2d2a27 !important; /* warm sepia dark - very subtle grid */
   stroke-opacity: 0.3 !important;
 }
 
 /* Enhanced line highlighting for search results and code displays */
 .line-highlight {
-  background: rgba(255, 255, 0, 0.15) !important; /* Light yellow background */
-  background: linear-gradient(to right, rgba(255, 255, 0, 0.2) 70%, rgba(255, 255, 0, 0.05)) !important;
+  background: rgba(196, 149, 106, 0.15) !important; /* Warm sepia highlight */
+  background: linear-gradient(to right, rgba(196, 149, 106, 0.2) 70%, rgba(196, 149, 106, 0.05)) !important;
 }
 
 /* Dark mode line highlighting */
 .dark .line-highlight {
-  background: rgba(255, 255, 100, 0.15) !important; /* Slightly different yellow for dark mode */
-  background: linear-gradient(to right, rgba(255, 255, 100, 0.2) 70%, rgba(255, 255, 100, 0.05)) !important;
+  background: rgba(212, 165, 116, 0.2) !important; /* Warm sepia highlight for dark mode */
+  background: linear-gradient(to right, rgba(212, 165, 116, 0.25) 70%, rgba(212, 165, 116, 0.05)) !important;
 }
 
 /* Alternative: completely hide the grid in dark mode */
@@ -386,6 +388,6 @@
 .dark .mermaid line[stroke="white"],
 .dark .mermaid line[stroke="#ffffff"],
 .dark .mermaid line[stroke="#FFFFFF"] {
-  stroke: rgb(63 63 70) !important; /* zinc-700 */
+  stroke: #3d3833 !important; /* warm sepia border */
   stroke-opacity: 0.2 !important;
 }

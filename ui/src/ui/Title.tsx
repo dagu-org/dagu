@@ -10,7 +10,7 @@ export default function Title({ children, className }: TitleProps) {
   return (
     <h2
       className={cn(
-        'text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4',
+        'text-2xl font-bold text-foreground mb-4',
         className
       )}
     >

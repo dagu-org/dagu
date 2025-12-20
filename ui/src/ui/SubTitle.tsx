@@ -10,7 +10,7 @@ export default function SubTitle({ children, className }: SubTitleProps) {
   return (
     <h3
       className={cn(
-        'text-xl font-semibold text-slate-700 dark:text-slate-300 mb-3',
+        'text-xl font-semibold text-foreground/90 mb-3',
         className
       )}
     >
