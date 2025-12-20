@@ -1482,7 +1482,7 @@ paths:
   /dag-runs/{name}/{dagRunId}/sub-dag-runs:
     get:
       summary: "Get sub DAG runs with timing info"
-      description: "Retrieves timing and status information for all sub DAG runs (including repeated executions) of a specific step"
+      description: "Retrieves timing and status information for all sub DAG runs (including repeated executions) of a specific step. When parentSubDAGRunId is provided, returns sub-runs of that specific sub DAG run (for multi-level nested DAGs)."
       operationId: "getSubDAGRuns"
       tags:
         - "dag-runs"
@@ -1490,6 +1490,12 @@ paths:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
+        - name: "parentSubDAGRunId"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Optional parent sub DAG run ID. When provided, returns sub-runs of this specific sub DAG run instead of the root DAG run. Used for multi-level nested DAGs."
       responses:
         "200":
           description: "A successful response"

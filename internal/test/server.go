@@ -213,6 +213,7 @@ func (r *Request) Send(t *testing.T) *Response {
 	require.NoError(t, err, "failed to make %s request", r.method)
 
 	if r.expectedStatus != 0 {
+		t.Logf("expected status code: %d, actual status code: %d", r.expectedStatus, res.StatusCode())
 		require.Equal(t, r.expectedStatus, res.StatusCode(), "unexpected status code")
 	}
 

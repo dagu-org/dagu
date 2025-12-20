@@ -587,8 +587,10 @@ function NodeStatusTableRow({
 
               {hasSubDAGRun && (
                 <SubDAGRunsList
-                  dagName={dagName}
-                  dagRunId={dagRunId || ''}
+                  dagName={dagRun.name}
+                  dagRunId={dagRun.dagRunId}
+                  rootDagName={dagRun.rootDAGRunName}
+                  rootDagRunId={dagRun.rootDAGRunId || ''}
                   subDagName={subDagName || ''}
                   allSubRuns={allSubRuns}
                   isExpanded={isExpanded}
@@ -959,8 +961,10 @@ function NodeStatusTableRow({
             // Multiple sub DAG runs (parallel execution or repeated)
             <div className="mb-3">
               <SubDAGRunsList
-                dagName={dagName}
-                dagRunId={dagRunId || ''}
+                dagName={dagRun.name}
+                dagRunId={dagRun.dagRunId}
+                rootDagName={dagRun.rootDAGRunName}
+                rootDagRunId={dagRun.rootDAGRunId || ''}
                 subDagName={subDagName || ''}
                 allSubRuns={allSubRuns}
                 isExpanded={isExpanded}

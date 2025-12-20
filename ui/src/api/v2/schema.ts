@@ -573,7 +573,7 @@ export interface paths {
         };
         /**
          * Get sub DAG runs with timing info
-         * @description Retrieves timing and status information for all sub DAG runs (including repeated executions) of a specific step
+         * @description Retrieves timing and status information for all sub DAG runs (including repeated executions) of a specific step. When parentSubDAGRunId is provided, returns sub-runs of that specific sub DAG run (for multi-level nested DAGs).
          */
         get: operations["getSubDAGRuns"];
         put?: never;
@@ -3258,6 +3258,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Optional parent sub DAG run ID. When provided, returns sub-runs of this specific sub DAG run instead of the root DAG run. Used for multi-level nested DAGs. */
+                parentSubDAGRunId?: string;
             };
             header?: never;
             path: {

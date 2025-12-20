@@ -398,6 +398,9 @@ function DAGStatus({ dagRun, fileName }: Props) {
             ...(parallelExecutionModal.node.subRuns || []),
             ...(parallelExecutionModal.node.subRunsRepeated || []),
           ]}
+          rootDagName={dagRun.rootDAGRunName}
+          rootDagRunId={dagRun.rootDAGRunId}
+          parentDagRunId={dagRun.dagRunId}
           onSelectSubRun={(subRunIndex, openInNewTab) => {
             navigateToSubDagRun(
               parallelExecutionModal.node!,
