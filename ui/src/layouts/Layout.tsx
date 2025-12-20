@@ -186,7 +186,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
         {/* AppBar */}
         <header
           className={cn(
-            'relative w-full px-6',
+            'relative w-full px-3',
             scrolled
               ? ' border-b border-border'
               : 'border-b border-transparent',
@@ -204,7 +204,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
               : undefined
           }
         >
-          <div className="flex items-center justify-between w-full h-10">
+          <div className="flex items-center justify-between w-full h-8">
             {/* Left side content: Hamburger menu for mobile + Title */}
             <div className="flex items-center space-x-2">
               {/* Hamburger menu - only visible on mobile */}

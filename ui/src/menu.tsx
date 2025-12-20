@@ -21,8 +21,8 @@ function DiscordIcon({ className }: { className?: string }) {
   return (
     <svg
       className={className}
-      width="18"
-      height="18"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="currentColor"
       xmlns="http://www.w3.org/2000/svg"
@@ -43,7 +43,7 @@ function Icon({
   return (
     <span
       className={cn(
-        'flex items-center justify-center w-5 h-5 transform-none text-sidebar-foreground',
+        'flex items-center justify-center w-4 h-4 transform-none text-sidebar-foreground',
         isActive ? 'text-sidebar-foreground' : 'text-sidebar-foreground'
       )}
     >
@@ -74,7 +74,7 @@ export const mainListItems = React.forwardRef<
   return (
     <div ref={ref} className="flex flex-col h-full">
       {/* Fixed height header with menu toggle button */}
-      <div className="h-12 relative mb-2">
+      <div className="h-8 relative mb-1">
         {/* When collapsed: Show first letter of title, switch to panel icon on hover */}
         {!isOpen && (
           <button
@@ -122,12 +122,12 @@ export const mainListItems = React.forwardRef<
         )}
       </div>
       {/* Navigation */}
-      <nav className="flex-1 flex flex-col py-2 px-2">
+      <nav className="flex-1 flex flex-col py-1 px-1">
         {/* Overview Section */}
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {isOpen && (
-            <div className="px-3 py-1">
-              <span className="text-[10px] uppercase text-sidebar-foreground/40 font-medium">
+            <div className="px-2 py-0.5">
+              <span className="text-[11px] text-sidebar-foreground/70 font-medium">
                 Overview
               </span>
             </div>
@@ -135,20 +135,20 @@ export const mainListItems = React.forwardRef<
           <NavItem
             to="/dashboard"
             text="Dashboard"
-            icon={<BarChart2 size={18} />}
+            icon={<BarChart2 size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
         </div>
 
         {/* Workflows Section */}
-        <div className="space-y-1 mt-4">
+        <div className="space-y-0.5 mt-2">
           {!isOpen && (
-            <div className="mx-auto w-4 border-t border-sidebar-foreground/30 mb-2" />
+            <div className="mx-auto w-4 border-t border-sidebar-foreground/30 mb-1" />
           )}
           {isOpen && (
-            <div className="px-3 py-1">
-              <span className="text-[10px] uppercase text-sidebar-foreground/40 font-medium">
+            <div className="px-2 py-0.5">
+              <span className="text-[11px] text-sidebar-foreground/70 font-medium">
                 Workflows
               </span>
             </div>
@@ -156,41 +156,41 @@ export const mainListItems = React.forwardRef<
           <NavItem
             to="/queues"
             text="Queues"
-            icon={<Layers size={18} />}
+            icon={<Layers size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
           <NavItem
             to="/dag-runs"
             text="DAG Runs"
-            icon={<List size={18} />}
+            icon={<List size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
           <NavItem
             to="/dags"
             text="DAG Definitions"
-            icon={<Workflow size={18} />}
+            icon={<Workflow size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
           <NavItem
             to="/search"
             text="Search DAG Definitions"
-            icon={<Search size={18} />}
+            icon={<Search size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
         </div>
 
         {/* System Section */}
-        <div className="space-y-1 mt-4">
+        <div className="space-y-0.5 mt-2">
           {!isOpen && (
-            <div className="mx-auto w-4 border-t border-sidebar-foreground/30 mb-2" />
+            <div className="mx-auto w-4 border-t border-sidebar-foreground/30 mb-1" />
           )}
           {isOpen && (
-            <div className="px-3 py-1">
-              <span className="text-[10px] uppercase text-sidebar-foreground/40 font-medium">
+            <div className="px-2 py-0.5">
+              <span className="text-[11px] text-sidebar-foreground/70 font-medium">
                 System
               </span>
             </div>
@@ -198,14 +198,14 @@ export const mainListItems = React.forwardRef<
           <NavItem
             to="/workers"
             text="Workers"
-            icon={<Server size={18} />}
+            icon={<Server size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
           <NavItem
             to="/system-status"
             text="System Status"
-            icon={<Activity size={18} />}
+            icon={<Activity size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
@@ -213,7 +213,7 @@ export const mainListItems = React.forwardRef<
             <NavItem
               to="/users"
               text="User Management"
-              icon={<Users size={18} />}
+              icon={<Users size={16} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
             />
@@ -221,7 +221,7 @@ export const mainListItems = React.forwardRef<
         </div>
       </nav>
       {/* Discord Community link */}
-      <div className="px-2 pb-1">
+      <div className="px-1 pb-0.5">
         <a
           href="https://discord.gg/gpahPUjGRk"
           target="_blank"
@@ -229,17 +229,17 @@ export const mainListItems = React.forwardRef<
           className={cn(
             'flex items-center transition-all duration-200',
             isOpen
-              ? 'h-9 px-3 rounded-lg hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-start'
-              : 'w-8 h-8 rounded-lg hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-center'
+              ? 'h-7 px-2 rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-start'
+              : 'w-7 h-7 rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-center'
           )}
           title="Discord Community"
         >
           <DiscordIcon />
-          {isOpen && <span className="ml-3 text-xs font-medium">Discord</span>}
+          {isOpen && <span className="ml-2 text-xs font-medium">Discord</span>}
         </a>
       </div>
       {/* GitHub link */}
-      <div className="px-2 pb-6 md:pb-1">
+      <div className="px-1 pb-4 md:pb-1">
         <a
           href="https://github.com/dagu-org/dagu"
           target="_blank"
@@ -247,20 +247,20 @@ export const mainListItems = React.forwardRef<
           className={cn(
             'flex items-center transition-all duration-200',
             isOpen
-              ? 'h-9 px-3 rounded-lg hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-start'
-              : 'w-8 h-8 rounded-lg hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-center'
+              ? 'h-7 px-2 rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-start'
+              : 'w-7 h-7 rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-center'
           )}
           title="GitHub Repository"
         >
-          <Github size={18} />
-          {isOpen && <span className="ml-3 text-xs font-medium">GitHub</span>}
+          <Github size={16} />
+          {isOpen && <span className="ml-2 text-xs font-medium">GitHub</span>}
         </a>
       </div>
       {/* Version display - only shown when sidebar is expanded */}
       {isOpen && (
-        <div className="px-3 py-2 text-xs text-sidebar-foreground/60">
-          <div className="border-t border-sidebar-foreground/10 pt-2">
-            Version: {config.version}
+        <div className="px-2 py-1 text-[10px] text-sidebar-foreground/50">
+          <div className="border-t border-sidebar-foreground/10 pt-1">
+            v{config.version}
           </div>
         </div>
       )}
@@ -285,30 +285,23 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
   // Use different layouts for expanded and collapsed states
   if (isOpen) {
     return (
-      <div className="relative h-9">
-        <Link
-          to={to}
-          onClick={onClick}
-          className={cn(
-            'block h-9 flex items-center text-xs font-medium rounded-lg transition-all duration-200 ease-in-out pl-10 pr-3',
-            isActive
-              ? 'text-sidebar-foreground bg-sidebar-foreground/10' // Active: subtle background
-              : 'text-sidebar-foreground hover:text-sidebar-foreground hover:bg-sidebar-foreground/5' // Inactive: lighter green for better contrast
-          )}
-          aria-current={isActive ? 'page' : undefined}
-          title={text}
-        >
-          {/* Icon with fixed position */}
-          <div className="flex items-center justify-center absolute left-3 top-1/2 transform -translate-y-1/2">
-            <Icon isActive={isActive}>{icon}</Icon>
-          </div>
-
-          {/* Text with fade-in animation */}
-          <span className="font-medium text-sidebar-foreground text-xs ml-3">
-            {text}
-          </span>
-        </Link>
-      </div>
+      <Link
+        to={to}
+        onClick={onClick}
+        className={cn(
+          'flex items-center h-7 text-xs font-medium rounded transition-all duration-200 ease-in-out px-2 gap-2',
+          isActive
+            ? 'text-sidebar-foreground bg-sidebar-foreground/10'
+            : 'text-sidebar-foreground hover:bg-sidebar-foreground/5'
+        )}
+        aria-current={isActive ? 'page' : undefined}
+        title={text}
+      >
+        <Icon isActive={isActive}>{icon}</Icon>
+        <span className="font-medium text-sidebar-foreground text-xs">
+          {text}
+        </span>
+      </Link>
     );
   } else {
     return (
@@ -317,10 +310,10 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           to={to}
           onClick={onClick}
           className={cn(
-            'flex items-center justify-center w-8 h-8 text-xs font-medium rounded-lg transition-all duration-200 ease-in-out',
+            'flex items-center justify-center w-7 h-7 text-xs font-medium rounded transition-all duration-200 ease-in-out',
             isActive
-              ? 'text-sidebar-foreground bg-sidebar-foreground/10' // Active: subtle background
-              : 'text-sidebar-foreground hover:text-sidebar-foreground hover:bg-sidebar-foreground/5'
+              ? 'text-sidebar-foreground bg-sidebar-foreground/10'
+              : 'text-sidebar-foreground hover:bg-sidebar-foreground/5'
           )}
           aria-current={isActive ? 'page' : undefined}
           title={text}
