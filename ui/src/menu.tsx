@@ -5,8 +5,8 @@ import {
   Activity,
   BarChart2,
   Github,
-  Layers,
-  List,
+  History,
+  Inbox,
   Network,
   PanelLeft,
   Search,
@@ -156,14 +156,14 @@ export const mainListItems = React.forwardRef<
           <NavItem
             to="/queues"
             text="Queues"
-            icon={<Layers size={16} />}
+            icon={<Inbox size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
           <NavItem
             to="/dag-runs"
             text="DAG Runs"
-            icon={<List size={16} />}
+            icon={<History size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
