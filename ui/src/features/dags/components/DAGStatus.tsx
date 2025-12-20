@@ -276,92 +276,23 @@ function DAGStatus({ dagRun, fileName }: Props) {
                 </div>
               </div>
 
-              {/* Desktop Steps Table Card */}
-              <div className="hidden md:block bg-card rounded-2xl border border-border hover: overflow-hidden">
-                <div className="border-b border-border bg-muted/30 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-                    <span>Steps</span>
-                    {dagRun.nodes && (
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {dagRun.nodes.length} step
-                        {dagRun.nodes.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </h2>
-                </div>
-                <div className="overflow-x-auto">
-                  <NodeStatusTable
-                    nodes={dagRun.nodes}
-                    status={dagRun}
-                    {...props}
-                    onViewLog={handleViewLog}
-                  />
-                </div>
-              </div>
-
-              {/* Mobile Steps - No Card Container */}
-              <div className="md:hidden">
-                <div className="mb-4">
-                  <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-                    <span>Steps</span>
-                    {dagRun.nodes && (
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {dagRun.nodes.length} step
-                        {dagRun.nodes.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </h2>
-                </div>
-                <NodeStatusTable
-                  nodes={dagRun.nodes}
-                  status={dagRun}
-                  {...props}
-                  onViewLog={handleViewLog}
-                />
-              </div>
+              {/* Steps Table */}
+              <NodeStatusTable
+                nodes={dagRun.nodes}
+                status={dagRun}
+                {...props}
+                onViewLog={handleViewLog}
+              />
             </div>
 
             {/* Lifecycle Hooks */}
             {handlers?.length ? (
-              <>
-                {/* Desktop Lifecycle Hooks Card */}
-                <div className="hidden md:block bg-card rounded-2xl border border-border hover: overflow-hidden">
-                  <div className="border-b border-border bg-muted/30 px-6 py-4">
-                    <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-                      <span>Lifecycle Hooks</span>
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
-                      </span>
-                    </h2>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <NodeStatusTable
-                      nodes={handlers}
-                      status={dagRun}
-                      {...props}
-                      onViewLog={handleViewLog}
-                    />
-                  </div>
-                </div>
-
-                {/* Mobile Lifecycle Hooks - No Card Container */}
-                <div className="md:hidden">
-                  <div className="mb-4">
-                    <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-                      <span>Lifecycle Hooks</span>
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
-                      </span>
-                    </h2>
-                  </div>
-                  <NodeStatusTable
-                    nodes={handlers}
-                    status={dagRun}
-                    {...props}
-                    onViewLog={handleViewLog}
-                  />
-                </div>
-              </>
+              <NodeStatusTable
+                nodes={handlers}
+                status={dagRun}
+                {...props}
+                onViewLog={handleViewLog}
+              />
             ) : null}
           </>
         )}

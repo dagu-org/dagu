@@ -306,35 +306,14 @@ function DAGSpec({ fileName }: Props) {
       </div>
 
       {dag.steps ? (
-        <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
-          <div className="border-b border-border bg-muted px-6 py-4">
-            <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-              <span>Steps</span>
-              <span className="text-sm font-normal text-muted-foreground">
-                {dag.steps.length} step
-                {dag.steps.length !== 1 ? 's' : ''}
-              </span>
-            </h2>
-          </div>
-          <div className="overflow-x-auto">
-            <DAGStepTable steps={dag.steps} />
-          </div>
+        <div className="overflow-hidden">
+          <DAGStepTable steps={dag.steps} />
         </div>
       ) : null}
 
       {getHandlers(dag)?.length ? (
-        <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
-          <div className="border-b border-border bg-muted px-6 py-4">
-            <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-              <span>Lifecycle Hooks</span>
-              <span className="text-sm font-normal text-muted-foreground">
-                {getHandlers(dag).length} hook{getHandlers(dag).length !== 1 ? 's' : ''}
-              </span>
-            </h2>
-          </div>
-          <div className="overflow-x-auto">
-            <DAGStepTable steps={getHandlers(dag)} />
-          </div>
+        <div className="overflow-hidden">
+          <DAGStepTable steps={getHandlers(dag)} />
         </div>
       ) : null}
     </div>

@@ -33,10 +33,10 @@ function DAGStepTable({ steps }: Props) {
   }
 
   return (
-    <div className="w-full overflow-x-auto">
+    <div className="w-full overflow-x-auto p-px">
       <Table>
         <TableHeader className="bg-muted">
-          <TableRow className="border-b border-border h-8">
+          <TableRow className="h-8">
             <TableHead className="w-[4%] py-1.5 text-xs font-semibold text-foreground/90 text-center">
               No
             </TableHead>
