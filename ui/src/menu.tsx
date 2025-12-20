@@ -145,32 +145,26 @@ export const mainListItems = React.forwardRef<
             }
 
             return (
-              <div className="space-y-0.5 mb-2">
-                {isOpen && (
-                  <div className="px-2 py-0.5">
-                    <span className="text-[11px] text-sidebar-foreground/70 font-medium">
-                      Node
-                    </span>
-                  </div>
-                )}
+              <div className="mb-3 px-1">
                 {isOpen ? (
-                  <div className="px-2">
-                    <Select
-                      value={context.selectedRemoteNode}
-                      onValueChange={context.selectRemoteNode}
-                    >
-                      <SelectTrigger className="h-7 w-full text-xs bg-sidebar-foreground/5 border-0 text-sidebar-foreground hover:bg-sidebar-foreground/10 focus:ring-0 focus:ring-offset-0">
+                  <Select
+                    value={context.selectedRemoteNode}
+                    onValueChange={context.selectRemoteNode}
+                  >
+                    <SelectTrigger className="h-8 w-full text-xs bg-sidebar-foreground/10 border border-sidebar-foreground/20 text-sidebar-foreground hover:bg-sidebar-foreground/15 focus:ring-1 focus:ring-sidebar-foreground/30 focus:ring-offset-0 rounded-md">
+                      <div className="flex items-center gap-2">
+                        <Globe size={14} className="shrink-0 opacity-70" />
                         <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {context.remoteNodes.map((node) => (
-                          <SelectItem key={node} value={node} className="text-xs">
-                            {node}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {context.remoteNodes.map((node) => (
+                        <SelectItem key={node} value={node} className="text-sm">
+                          {node}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : (
                   <div className="flex justify-center">
                     <Select
@@ -178,14 +172,14 @@ export const mainListItems = React.forwardRef<
                       onValueChange={context.selectRemoteNode}
                     >
                       <SelectTrigger
-                        className="w-7 h-7 p-0 bg-transparent border-0 text-sidebar-foreground hover:bg-sidebar-foreground/5 focus:ring-0 focus:ring-offset-0 [&>svg:last-child]:hidden flex items-center justify-center"
+                        className="w-8 h-8 p-0 bg-sidebar-foreground/10 border border-sidebar-foreground/20 text-sidebar-foreground hover:bg-sidebar-foreground/15 focus:ring-1 focus:ring-sidebar-foreground/30 focus:ring-offset-0 rounded-md [&>svg:last-child]:hidden flex items-center justify-center"
                         title={`Node: ${context.selectedRemoteNode}`}
                       >
                         <Globe size={16} className="shrink-0" />
                       </SelectTrigger>
                       <SelectContent>
                         {context.remoteNodes.map((node) => (
-                          <SelectItem key={node} value={node} className="text-xs">
+                          <SelectItem key={node} value={node} className="text-sm">
                             {node}
                           </SelectItem>
                         ))}

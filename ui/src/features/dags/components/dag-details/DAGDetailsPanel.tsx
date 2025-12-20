@@ -160,7 +160,7 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
           },
         }}
       >
-        <div className="p-4 w-full flex flex-col h-full overflow-hidden">
+        <div className="px-4 w-full flex flex-col h-full overflow-hidden">
           <div className="flex justify-between items-center mb-3 flex-shrink-0">
             <p className="text-xs text-muted-foreground">
               Use{' '}
@@ -180,11 +180,7 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
               >
                 <Maximize2 className="h-4 w-4" />
               </Button>
-              <Button
-                size="icon"
-                onClick={onClose}
-                title="Close (Esc)"
-              >
+              <Button size="icon" onClick={onClose} title="Close (Esc)">
                 <X className="h-4 w-4" />
               </Button>
             </div>
