@@ -224,19 +224,20 @@ func LoadConfig(workDir string, ct core.Container, registryAuths map[string]*cor
 	}
 
 	return loadDefaults(&Config{
-		Image:       ct.Image,
-		Platform:    ct.Platform,
-		Pull:        ct.PullPolicy,
-		AutoRemove:  autoRemove,
-		Container:   containerConfig,
-		Host:        hostConfig,
-		Network:     networkConfig,
-		ExecOptions: execOptions,
-		Startup:     strings.ToLower(strings.TrimSpace(string(ct.Startup))),
-		WaitFor:     strings.ToLower(strings.TrimSpace(string(ct.WaitFor))),
-		LogPattern:  ct.LogPattern,
-		StartCmd:    append([]string{}, ct.Command...),
-		AuthManager: authManager,
+		ContainerName: ct.Name,
+		Image:         ct.Image,
+		Platform:      ct.Platform,
+		Pull:          ct.PullPolicy,
+		AutoRemove:    autoRemove,
+		Container:     containerConfig,
+		Host:          hostConfig,
+		Network:       networkConfig,
+		ExecOptions:   execOptions,
+		Startup:       strings.ToLower(strings.TrimSpace(string(ct.Startup))),
+		WaitFor:       strings.ToLower(strings.TrimSpace(string(ct.WaitFor))),
+		LogPattern:    ct.LogPattern,
+		StartCmd:      append([]string{}, ct.Command...),
+		AuthManager:   authManager,
 	}), nil
 }
 

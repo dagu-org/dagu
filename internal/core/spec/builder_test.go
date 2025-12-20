@@ -2836,6 +2836,54 @@ steps:
 		assert.Equal(t, core.PullPolicyAlways, dag.Container.PullPolicy)
 	})
 
+	t.Run("ContainerWithName", func(t *testing.T) {
+		yaml := `
+container:
+  name: my-dag-container
+  image: alpine:latest
+steps:
+  - name: step1
+    command: echo hello
+`
+		ctx := context.Background()
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Container)
+		assert.Equal(t, "my-dag-container", dag.Container.Name)
+		assert.Equal(t, "alpine:latest", dag.Container.Image)
+	})
+
+	t.Run("ContainerNameEmpty", func(t *testing.T) {
+		yaml := `
+container:
+  image: alpine:latest
+steps:
+  - name: step1
+    command: echo hello
+`
+		ctx := context.Background()
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Container)
+		assert.Equal(t, "", dag.Container.Name)
+	})
+
+	t.Run("ContainerNameTrimmed", func(t *testing.T) {
+		yaml := `
+container:
+  name: "  my-container  "
+  image: alpine:latest
+steps:
+  - name: step1
+    command: echo hello
+`
+		ctx := context.Background()
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Container)
+		assert.Equal(t, "my-container", dag.Container.Name)
+	})
+
 	t.Run("ContainerWithAllFields", func(t *testing.T) {
 		yaml := `
 container:
