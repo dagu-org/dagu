@@ -65,28 +65,25 @@ function Mermaid({
   );
 
   // Extract background-related styles for the scroll container
-  const {
-    background,
-    backgroundSize,
-    backgroundAttachment,
-    backgroundColor,
-    ...contentStyle
-  } = style;
+  const { background, backgroundSize, backgroundColor, ...contentStyle } =
+    style;
 
   const dStyle: CSSProperties = {
     overflow: 'auto',
     position: 'relative',
-    maxHeight: '80vh',
+    // Removed hardcoded maxHeight to allow parent flex containers or explicit heights to work correctly
     // Apply background styles to the scroll container so grid scrolls with content
     background,
     backgroundSize,
     backgroundAttachment: 'local', // Makes background scroll with content
     backgroundColor,
+    height: '100%', // Ensure it takes full height of parent
   };
 
   const mStyle: CSSProperties = {
     ...contentStyle,
     padding: '2em',
+    minHeight: '100%', // Ensure inner div also takes full height
   };
 
   const render = async () => {

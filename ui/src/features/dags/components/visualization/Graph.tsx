@@ -1,13 +1,16 @@
-/**
- * Graph component for visualizing DAG dagRuns using Mermaid.js
- *
- * @module features/dags/components/visualization
- */
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
-import { toMermaidNodeId } from '@/lib/utils';
+import { cn, toMermaidNodeId } from '@/lib/utils';
 import {
   ArrowDownUp,
   ArrowRightLeft,
+  Expand,
+  GitGraph,
   Maximize2,
   RotateCcw,
   ZoomIn,
@@ -47,6 +50,8 @@ type Props = {
   showIcons?: boolean;
   /** Whether to animate running nodes */
   animate?: boolean;
+  /** Whether the graph is currently displayed in an expanded modal view */
+  isExpandedView?: boolean;
 };
 
 /** Extend window interface to include the click handler (kept for backward compatibility) */
@@ -68,8 +73,10 @@ const Graph: React.FC<Props> = ({
   onClickNode,
   onRightClickNode,
   showIcons = true,
+  isExpandedView = false,
 }) => {
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(isExpandedView ? 0.8 : 1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   /** Increase zoom level */
@@ -91,7 +98,7 @@ const Graph: React.FC<Props> = ({
   const fitToScreen = () => {
     // Simple approach: set to a small scale that typically shows the full graph
     // This is more reliable than trying to calculate exact dimensions
-    setScale(0.3);
+    setScale(isExpandedView ? 0.4 : 0.3);
   };
 
   // Calculate width based on flowchart type and graph breadth
@@ -115,7 +122,8 @@ const Graph: React.FC<Props> = ({
     width: width,
     minWidth: '100%',
     minHeight: '200px',
-    maxHeight: '300px',
+    maxHeight: isExpandedView ? 'none' : '300px',
+    height: isExpandedView ? '100%' : 'auto',
     borderRadius: '0.5em',
     background: `
       linear-gradient(90deg, #f0ebe3 1px, transparent 1px),
@@ -272,8 +280,11 @@ const Graph: React.FC<Props> = ({
   }, [steps, onClickNode, flowchart, showIcons]);
 
   return (
-    <div className="relative" ref={containerRef}>
-      <div className="absolute right-4 top-2 z-10 bg-card rounded-md">
+    <div
+      className={cn('relative', isExpandedView ? 'h-full flex flex-col' : '')}
+      ref={containerRef}
+    >
+      <div className="absolute right-4 top-2 z-10 bg-card rounded-md shadow-sm border border-border/50">
         <ToggleGroup aria-label="Graph controls">
           {onChangeFlowchart && (
             <>
@@ -327,19 +338,68 @@ const Graph: React.FC<Props> = ({
             value="reset"
             onClick={() => resetZoom()}
             aria-label="Reset zoom"
-            position="last"
+            position="middle"
           >
             <RotateCcw className="h-4 w-4" />
           </ToggleButton>
+
+          {!isExpandedView && (
+            <>
+              <div className="w-px h-6 bg-border mx-1 self-center" />
+              <ToggleButton
+                value="expand"
+                onClick={() => setIsModalOpen(true)}
+                aria-label="Expand graph"
+                position="last"
+              >
+                <Expand className="h-4 w-4" />
+              </ToggleButton>
+            </>
+          )}
         </ToggleGroup>
       </div>
-      <Mermaid
-        style={mermaidStyle}
-        def={graph}
-        scale={scale}
-        onDoubleClick={onClickNode}
-        onRightClick={onRightClickNode}
-      />
+
+      <div
+        className={cn(
+          'overflow-auto custom-scrollbar',
+          isExpandedView
+            ? 'flex-1 rounded-lg border border-border/30 bg-muted/5'
+            : ''
+        )}
+      >
+        <Mermaid
+          style={mermaidStyle}
+          def={graph}
+          scale={scale}
+          onDoubleClick={onClickNode}
+          onRightClick={onRightClickNode}
+        />
+      </div>
+
+      {!isExpandedView && (
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogContent className="max-w-[95vw] w-full max-h-[90vh] h-full flex flex-col p-6 overflow-hidden">
+            <DialogHeader className="flex-shrink-0 mb-2">
+              <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
+                <GitGraph className="h-5 w-5 text-primary" />
+                Visual Graph
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 min-h-0 bg-surface rounded-xl p-1 shadow-inner border border-border/20">
+              <Graph
+                steps={steps}
+                flowchart={flowchart}
+                onChangeFlowchart={onChangeFlowchart}
+                type={type}
+                onClickNode={onClickNode}
+                onRightClickNode={onRightClickNode}
+                showIcons={showIcons}
+                isExpandedView={true}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
