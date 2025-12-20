@@ -18,7 +18,7 @@ export function StatusDot({ status, statusLabel }: Props) {
       bgColor = 'bg-[red]';
       break;
     case Status.Running:
-      bgColor = 'bg-[limegreen]';
+      bgColor = 'bg-success';
       animation = 'animate-pulse';
       break;
     case Status.Aborted:

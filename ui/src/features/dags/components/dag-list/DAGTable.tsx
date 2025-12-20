@@ -273,7 +273,7 @@ const defaultColumns = [
             style={{ paddingLeft: `${row.depth * 1.5}rem` }}
             className="space-y-0.5 min-w-0"
           >
-            <div className="font-medium text-gray-800 tracking-tight text-xs truncate">
+            <div className="font-medium text-foreground tracking-tight text-xs truncate">
               {getValue()}
             </div>
 
@@ -289,7 +289,7 @@ const defaultColumns = [
                   <Badge
                     key={tag}
                     variant="outline"
-                    className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 transition-colors duration-200 cursor-pointer font-normal"
+                    className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal"
                     onClick={(e) => {
                       e.stopPropagation(); // Prevent row click
                       e.preventDefault();
@@ -1341,7 +1341,7 @@ function DAGTable({
                                     <Badge
                                       key={tag}
                                       variant="outline"
-                                      className="text-[9px] px-1 py-0 h-3 rounded-sm border-blue-200 bg-blue-50 text-blue-700"
+                                      className="text-[9px] px-1 py-0 h-3 rounded-sm border-primary/30 bg-primary/10 text-primary"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleSearchTagChange(tag);
@@ -1443,7 +1443,7 @@ function DAGTable({
                         <Badge
                           key={tag}
                           variant="outline"
-                          className="text-[9px] px-1 py-0 h-3 rounded-sm border-blue-200 bg-blue-50 text-blue-700"
+                          className="text-[9px] px-1 py-0 h-3 rounded-sm border-primary/30 bg-primary/10 text-primary"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleSearchTagChange(tag);

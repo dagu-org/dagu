@@ -218,7 +218,7 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
   const EmptyState = () => (
     <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-card">
       <div className="text-6xl mb-4">🔍</div>
-      <h3 className="text-lg font-normal text-gray-900 mb-2">
+      <h3 className="text-lg font-normal text-foreground mb-2">
         No DAG runs found
       </h3>
       <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
@@ -297,7 +297,7 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
                     dagRun.status
                   )}
                   {dagRun.status === Status.Running && dagRun.startedAt && (
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-lime-500 animate-pulse" />
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
                   )}
                 </span>
               </div>
@@ -401,7 +401,7 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
                     dagRun.status
                   )}
                   {dagRun.status === Status.Running && dagRun.startedAt && (
-                    <span className="inline-block w-2 h-2 rounded-full bg-lime-500 animate-pulse" />
+                    <span className="inline-block w-2 h-2 rounded-full bg-success animate-pulse" />
                   )}
                 </div>
               </TableCell>

@@ -217,7 +217,7 @@ export function ParallelExecutionModal({
         <div className="p-4 border-b border-border">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-mono">
-              <Layers className="h-4 w-4 text-violet-600" />
+              <Layers className="h-4 w-4 text-info" />
               {subDAGName}
             </DialogTitle>
             <DialogDescription className="text-xs mt-1 font-mono text-muted-foreground">
@@ -240,13 +240,13 @@ export function ParallelExecutionModal({
                     className={`
                       px-2 py-1 text-xs font-medium rounded transition-colors
                       ${isActive
-                        ? 'bg-violet-100 text-violet-700'
+                        ? 'bg-info-muted text-info'
                         : 'bg-muted text-muted-foreground hover:bg-accent'
                       }
                     `}
                   >
                     {filter.label}
-                    <span className={`ml-1 ${isActive ? 'text-violet-500' : 'text-muted-foreground'}`}>
+                    <span className={`ml-1 ${isActive ? 'text-info' : 'text-muted-foreground'}`}>
                       {filter.count}
                     </span>
                   </button>
@@ -278,7 +278,7 @@ export function ParallelExecutionModal({
                       className={`
                         flex-1 text-left transition-all duration-150 border rounded px-3 py-2 flex items-center gap-3 focus:outline-none
                         ${selectedIndex === displayIndex
-                          ? 'border-violet-500 bg-violet-50'
+                          ? 'border-info bg-info-muted'
                           : 'border-transparent hover:border-border hover:bg-muted'
                         }
                       `}
@@ -300,7 +300,7 @@ export function ParallelExecutionModal({
                       )}
                       <div className="flex-1 min-w-0 overflow-x-auto">
                         {subRun.params ? (
-                          <code className="text-sm font-mono text-zinc-700 whitespace-nowrap">
+                          <code className="text-sm font-mono text-muted-foreground whitespace-nowrap">
                             {subRun.params}
                           </code>
                         ) : (

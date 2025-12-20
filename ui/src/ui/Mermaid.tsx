@@ -9,29 +9,25 @@ type Props = {
   onRightClick?: (id: string) => void;
 };
 
-// Initialize Mermaid with dynamic theme support
+// Initialize Mermaid with sepia theme
 const initializeMermaid = () => {
-  const isDarkMode = document.documentElement.classList.contains('dark');
-
   mermaid.initialize({
     securityLevel: 'loose',
     startOnLoad: false,
     maxTextSize: 99999999,
-    theme: isDarkMode ? 'dark' : 'default',
-    themeVariables: isDarkMode
-      ? {
-          background: 'transparent',
-          primaryColor: '#18181b', // zinc-900
-          primaryTextColor: '#e4e4e7', // zinc-200
-          primaryBorderColor: '#3f3f46', // zinc-700
-          lineColor: '#71717a', // zinc-500
-          sectionBkgColor: 'transparent',
-          altSectionBkgColor: 'transparent',
-          gridColor: 'transparent',
-          secondaryColor: 'transparent',
-          tertiaryColor: 'transparent',
-        }
-      : {},
+    theme: 'default',
+    themeVariables: {
+      background: 'transparent',
+      primaryColor: '#faf8f5', // card
+      primaryTextColor: '#3d3833', // foreground
+      primaryBorderColor: '#c8bfb0', // border
+      lineColor: '#6b635a', // muted-foreground
+      sectionBkgColor: 'transparent',
+      altSectionBkgColor: 'transparent',
+      gridColor: 'transparent',
+      secondaryColor: '#f0ebe3', // secondary
+      tertiaryColor: '#f5f0e8', // background
+    },
     flowchart: {
       curve: 'basis',
       useMaxWidth: false,

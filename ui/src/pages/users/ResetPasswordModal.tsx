@@ -113,7 +113,7 @@ export function ResetPasswordModal({ open, user, onClose }: ResetPasswordModalPr
           )}
 
           {success && (
-            <div className="flex items-center gap-2 p-3 text-sm text-green-600 bg-green-500/10 rounded-md">
+            <div className="flex items-center gap-2 p-3 text-sm text-success bg-success/10 rounded-md">
               <CheckCircle className="h-4 w-4 flex-shrink-0" />
               <span>Password reset successfully!</span>
             </div>

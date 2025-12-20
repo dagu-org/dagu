@@ -45,8 +45,8 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
       break;
     case NodeStatus.Running: // running -> lime
       bgColorClass = 'bg-[rgba(0,255,0,0.1)],205,50,0.2)]';
-      borderColorClass = 'border-[lime]';
-      textColorClass = 'text-[limegreen]';
+      borderColorClass = 'border-success';
+      textColorClass = 'text-success';
       pulseAnimation = 'animate-pulse';
       statusIcon = '●'; // Dot
       break;

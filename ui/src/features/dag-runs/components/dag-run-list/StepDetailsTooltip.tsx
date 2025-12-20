@@ -108,7 +108,7 @@ export function StepDetailsTooltip({
           </div>
         )}
         {canRequestDetails && error && (
-          <div className="text-xs text-red-400">
+          <div className="text-xs text-error">
             Failed to load step details
           </div>
         )}
@@ -119,9 +119,9 @@ export function StepDetailsTooltip({
                 {renderStepList(
                   'Running steps',
                   runningSteps,
-                  'text-emerald-500'
+                  'text-success'
                 )}
-                {renderStepList('Failed steps', failedSteps, 'text-red-400')}
+                {renderStepList('Failed steps', failedSteps, 'text-error')}
               </>
             ) : (
               <div className="text-xs text-muted-foreground">

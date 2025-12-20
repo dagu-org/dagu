@@ -107,15 +107,15 @@ export default function UsersPage() {
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'admin':
-        return 'bg-red-500/20 text-red-600';
+        return 'bg-error/20 text-error';
       case 'manager':
-        return 'bg-blue-500/20 text-blue-600';
+        return 'bg-primary/100/20 text-primary';
       case 'operator':
-        return 'bg-green-500/20 text-green-600';
+        return 'bg-success/20 text-success';
       case 'viewer':
-        return 'bg-gray-500/20 text-muted-foreground';
+        return 'bg-muted-foreground/20 text-muted-foreground';
       default:
-        return 'bg-gray-500/20 text-muted-foreground';
+        return 'bg-muted-foreground/20 text-muted-foreground';
     }
   };
 

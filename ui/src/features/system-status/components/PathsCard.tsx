@@ -28,7 +28,7 @@ function PathItem({ label, path }: PathItemProps) {
       <code
         className={cn(
           'font-mono px-1 py-0.5 rounded truncate flex-1',
-          'bg-slate-100 text-slate-600'
+          'bg-muted text-muted-foreground'
         )}
         title={path}
       >
@@ -39,8 +39,8 @@ function PathItem({ label, path }: PathItemProps) {
         className={cn(
           'p-0.5 rounded transition-all shrink-0',
           'opacity-0 group-hover:opacity-100',
-          'hover:bg-slate-200',
-          copied && 'opacity-100 text-green-500'
+          'hover:bg-accent',
+          copied && 'opacity-100 text-success'
         )}
         title="Copy path"
       >

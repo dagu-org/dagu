@@ -125,13 +125,13 @@ function SystemStatus() {
             onClick={() => setAutoRefresh(!autoRefresh)}
             className={cn(
               'h-7 px-2',
-              autoRefresh && 'bg-green-50 border-green-500'
+              autoRefresh && 'bg-success-muted border-success'
             )}
             aria-label={`Auto-refresh ${autoRefresh ? 'enabled' : 'disabled'}`}
             title={`Toggle auto-refresh (currently ${autoRefresh ? 'ON' : 'OFF'})`}
           >
             <Activity
-              className={cn('h-3 w-3 mr-1', autoRefresh && 'text-green-500')}
+              className={cn('h-3 w-3 mr-1', autoRefresh && 'text-success')}
             />
             <span className="text-xs">Auto: {autoRefresh ? 'ON' : 'OFF'}</span>
           </Button>
@@ -193,28 +193,28 @@ function SystemStatus() {
         <ResourceChart
           title="CPU Usage"
           data={resourceData?.cpu}
-          color="#3b82f6" // blue-500
+          color="#c4956a" // primary
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
         <ResourceChart
           title="Memory Usage"
           data={resourceData?.memory}
-          color="#8b5cf6" // violet-500
+          color="#8a9fc4" // info
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
         <ResourceChart
           title="Disk Usage"
           data={resourceData?.disk}
-          color="#10b981" // emerald-500
+          color="#7da87d" // success
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
         <ResourceChart
           title="Load Average"
           data={resourceData?.load}
-          color="#f59e0b" // amber-500
+          color="#d4a574" // chart-4
           unit=""
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}

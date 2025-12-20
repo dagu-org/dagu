@@ -27,21 +27,21 @@ function WorkerMetrics({ metrics, isLoading }: WorkerMetricsProps) {
       title: 'Pollers',
       value: `${metrics.busyPollers}/${metrics.totalPollers}`,
       subValue: 'busy/total',
-      icon: <Activity className="h-3 w-3 text-blue-500" />,
-      valueClass: metrics.busyPollers > 0 ? 'text-blue-600' : 'text-foreground',
+      icon: <Activity className="h-3 w-3 text-primary" />,
+      valueClass: metrics.busyPollers > 0 ? 'text-primary' : 'text-foreground',
     },
     {
       title: 'Active Tasks',
       value: metrics.totalTasks,
       subValue: 'running',
-      icon: <Zap className="h-3 w-3 text-green-500" />,
-      valueClass: metrics.totalTasks > 0 ? 'text-green-600' : 'text-foreground',
+      icon: <Zap className="h-3 w-3 text-success" />,
+      valueClass: metrics.totalTasks > 0 ? 'text-success' : 'text-foreground',
     },
     {
       title: 'Utilization',
       value: `${metrics.utilization}%`,
       subValue: 'capacity',
-      icon: <Gauge className="h-3 w-3 text-orange-500" />,
+      icon: <Gauge className="h-3 w-3 text-warning" />,
       valueClass: getUtilizationColor(metrics.utilization),
     },
   ];
@@ -93,18 +93,18 @@ function WorkerMetrics({ metrics, isLoading }: WorkerMetricsProps) {
 }
 
 function getUtilizationColor(utilization: number): string {
-  if (utilization >= 90) return 'text-red-600';
-  if (utilization >= 70) return 'text-orange-600';
-  if (utilization >= 50) return 'text-yellow-600';
-  if (utilization > 0) return 'text-green-600';
+  if (utilization >= 90) return 'text-error';
+  if (utilization >= 70) return 'text-warning';
+  if (utilization >= 50) return 'text-warning';
+  if (utilization > 0) return 'text-success';
   return 'text-muted-foreground';
 }
 
 function getUtilizationBarColor(utilization: number): string {
-  if (utilization >= 90) return 'bg-red-500';
-  if (utilization >= 70) return 'bg-orange-500';
-  if (utilization >= 50) return 'bg-yellow-500';
-  if (utilization > 0) return 'bg-green-500';
+  if (utilization >= 90) return 'bg-error';
+  if (utilization >= 70) return 'bg-warning';
+  if (utilization >= 50) return 'bg-warning';
+  if (utilization > 0) return 'bg-success';
   return 'bg-muted';
 }
 

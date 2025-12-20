@@ -42,28 +42,28 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
       <div className="hidden md:block w-full overflow-x-auto">
         <div className="min-w-[900px]">
           <Table className="w-full">
-            <TableHeader className="bg-slate-50">
+            <TableHeader className="bg-muted">
               <TableRow className="border-b border-border">
-                <TableHead className="w-[5%] py-3 text-sm font-semibold text-slate-700 text-center">
+                <TableHead className="w-[5%] py-3 text-sm font-semibold text-foreground/90 text-center">
                   No
                 </TableHead>
-                <TableHead className="w-[20%] py-3 text-sm font-semibold text-slate-700">
+                <TableHead className="w-[20%] py-3 text-sm font-semibold text-foreground/90">
                   Step Name
                 </TableHead>
-                <TableHead className="w-[15%] py-3 text-sm font-semibold text-slate-700">
+                <TableHead className="w-[15%] py-3 text-sm font-semibold text-foreground/90">
                   Command
                 </TableHead>
-                <TableHead className="w-[15%] py-3 text-sm font-semibold text-slate-700">
+                <TableHead className="w-[15%] py-3 text-sm font-semibold text-foreground/90">
                   Last Run
                 </TableHead>
-                <TableHead className="w-[10%] py-3 text-center text-sm font-semibold text-slate-700">
+                <TableHead className="w-[10%] py-3 text-center text-sm font-semibold text-foreground/90">
                   Status
                 </TableHead>
-                <TableHead className="w-[35%] py-3 text-sm font-semibold text-slate-700 min-w-[150px]">
+                <TableHead className="w-[35%] py-3 text-sm font-semibold text-foreground/90 min-w-[150px]">
                   Error / Logs
                 </TableHead>
                 {status?.dagRunId && (
-                  <TableHead className="w-[8%] py-3 text-sm font-semibold text-slate-700 text-center">
+                  <TableHead className="w-[8%] py-3 text-sm font-semibold text-foreground/90 text-center">
                     Actions
                   </TableHead>
                 )}

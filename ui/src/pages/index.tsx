@@ -219,7 +219,7 @@ function Dashboard(): React.ReactElement | null {
     const errorData = error as components['schemas']['Error'];
     const errorMessage =
       errorData?.message || 'Unknown error loading dashboard';
-    return <div className="p-4 text-red-600">Error: {errorMessage}</div>;
+    return <div className="p-4 text-error">Error: {errorMessage}</div>;
   }
 
   // --- Calculate metrics ---
@@ -248,7 +248,7 @@ function Dashboard(): React.ReactElement | null {
     {
       title: 'running',
       value: metrics[Status.Running],
-      icon: <Play className="h-5 w-5 text-[limegreen]" />,
+      icon: <Play className="h-5 w-5 text-success" />,
     },
     {
       title: 'queued',

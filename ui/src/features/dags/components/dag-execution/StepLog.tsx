@@ -247,9 +247,9 @@ function StepLog({
             // Scroll the element into view
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
             // Highlight the line temporarily
-            element.classList.add('bg-blue-500', 'bg-opacity-20');
+            element.classList.add('bg-primary/100', 'bg-opacity-20');
             setTimeout(() => {
-              element.classList.remove('bg-blue-500', 'bg-opacity-20');
+              element.classList.remove('bg-primary/100', 'bg-opacity-20');
             }, 2000);
             break;
           }
@@ -270,7 +270,7 @@ function StepLog({
   if (error && !logData) {
     return (
       <div className="w-full h-full flex items-center justify-center">
-        <div className="text-red-500">
+        <div className="text-error">
           Error loading log data: {error.message || 'Unknown error'}
         </div>
       </div>
@@ -374,14 +374,14 @@ function StepLog({
                   relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
                   transition-all duration-200 ease-in-out
                   ${isLiveMode 
-                    ? 'bg-green-500 text-white shadow-green-500/25' 
+                    ? 'bg-success text-white shadow-success/25' 
                     : 'bg-accent text-muted-foreground hover:bg-accent'
                   }
                 `}
               >
                 <span className={`
                   inline-block w-2 h-2 rounded-full
-                  ${isLiveMode ? 'bg-card animate-pulse' : 'bg-zinc-400'}
+                  ${isLiveMode ? 'bg-card animate-pulse' : 'bg-muted-foreground'}
                 `} />
                 <span>LIVE</span>
               </button>
@@ -466,7 +466,7 @@ function StepLog({
       {/* Log content with overlay loading indicator when navigating */}
       <div
         ref={logContainerRef}
-        className="flex-1 overflow-auto rounded-lg bg-zinc-900 p-4 relative"
+        className="flex-1 overflow-auto rounded-lg bg-code-bg p-4 relative"
       >
         {isNavigating && (
           <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 pointer-events-none">
@@ -479,7 +479,7 @@ function StepLog({
             {lines.map((line, index) => (
             <div
               key={index}
-              className="flex hover:bg-zinc-800 px-2 py-0.5 rounded"
+              className="flex hover:bg-code-bg/80 px-2 py-0.5 rounded"
             >
               <span
                 className="text-muted-foreground mr-4 select-none w-8 text-right flex-shrink-0 self-start"

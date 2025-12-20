@@ -25,7 +25,7 @@ function QueueMetrics({ metrics, isLoading }: QueueMetricsProps) {
     {
       title: 'Global Queues',
       value: metrics.globalQueues,
-      icon: <Layers className="h-5 w-5 text-blue-500" />,
+      icon: <Layers className="h-5 w-5 text-primary" />,
       tooltip: 'Number of global queues (shared across multiple DAGs with maxConcurrency limits)',
     },
     {
@@ -37,25 +37,25 @@ function QueueMetrics({ metrics, isLoading }: QueueMetricsProps) {
     {
       title: 'Active Queues',
       value: metrics.activeQueues,
-      icon: <Activity className="h-5 w-5 text-green-500" />,
+      icon: <Activity className="h-5 w-5 text-success" />,
       tooltip: 'Number of queues currently with running or queued DAG runs',
     },
     {
       title: 'Running',
       value: metrics.totalRunning,
-      icon: <Play className="h-5 w-5 text-green-500" />,
+      icon: <Play className="h-5 w-5 text-success" />,
       tooltip: 'Total number of DAG runs currently executing across all queues',
     },
     {
       title: 'Queued',
       value: metrics.totalQueued,
-      icon: <Clock className="h-5 w-5 text-purple-500" />,
+      icon: <Clock className="h-5 w-5 text-info" />,
       tooltip: 'Total number of DAG runs waiting to be executed across all queues',
     },
     {
       title: 'Utilization',
       value: `${metrics.utilization}%`,
-      icon: <BarChart3 className="h-5 w-5 text-orange-500" />,
+      icon: <BarChart3 className="h-5 w-5 text-warning" />,
       tooltip: 'Percentage of global queue capacity being used (total running DAG runs ÷ global queue maxConcurrency)',
     },
   ];

@@ -91,7 +91,7 @@ function DAGEditButtons({ fileName }: Props) {
       <Button
         variant="outline"
         size="sm"
-        className="text-red-600 hover:text-red-600 border-red-200 hover:border-red-300 hover:bg-red-50 cursor-pointer"
+        className="text-error hover:text-error border-error/30 hover:border-error/50 hover:bg-error-muted cursor-pointer"
         onClick={async () => {
           if (!confirm('Are you sure to delete the DAG?')) {
             return;

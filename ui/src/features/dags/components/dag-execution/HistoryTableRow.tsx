@@ -31,16 +31,16 @@ function getStatusStyling(status: number) {
 
   switch (status) {
     case NodeStatus.Success: // done -> green
-      bgColorClass = 'bg-green-600';
-      borderColorClass = 'border-green-700';
+      bgColorClass = 'bg-success';
+      borderColorClass = 'border-success';
       break;
     case NodeStatus.Failed: // error -> red
-      bgColorClass = 'bg-red-600';
-      borderColorClass = 'border-red-700';
+      bgColorClass = 'bg-error';
+      borderColorClass = 'border-error';
       break;
     case NodeStatus.Running: // running -> lime
-      bgColorClass = 'bg-lime-500';
-      borderColorClass = 'border-lime-600';
+      bgColorClass = 'bg-success';
+      borderColorClass = 'border-success';
       pulseAnimation = 'animate-pulse';
       break;
     case NodeStatus.Aborted: // aborted -> pink
@@ -48,20 +48,20 @@ function getStatusStyling(status: number) {
       borderColorClass = 'border-pink-600';
       break;
     case NodeStatus.Skipped: // skipped -> gray
-      bgColorClass = 'bg-gray-500';
-      borderColorClass = 'border-gray-600';
+      bgColorClass = 'bg-muted-foreground';
+      borderColorClass = 'border-border';
       break;
     case NodeStatus.NotStarted: // none -> lightblue
-      bgColorClass = 'bg-blue-400';
-      borderColorClass = 'border-blue-500';
+      bgColorClass = 'bg-primary/60';
+      borderColorClass = 'border-primary';
       break;
     case NodeStatus.PartialSuccess: // partial success -> orange/amber
-      bgColorClass = 'bg-amber-500';
-      borderColorClass = 'border-amber-600';
+      bgColorClass = 'bg-warning';
+      borderColorClass = 'border-warning';
       break;
     default: // Fallback to gray
-      bgColorClass = 'bg-gray-500';
-      borderColorClass = 'border-gray-600';
+      bgColorClass = 'bg-muted-foreground';
+      borderColorClass = 'border-border';
   }
 
   return { bgColorClass, borderColorClass, pulseAnimation };
@@ -73,7 +73,7 @@ function getStatusStyling(status: number) {
  */
 function HistoryTableRow({ data, onSelect, idx }: Props) {
   return (
-    <StyledTableRow className="hover:bg-slate-50 transition-colors duration-200">
+    <StyledTableRow className="hover:bg-muted transition-colors duration-200">
       <TableCell className="font-medium text-sm">{data.name}</TableCell>
       {[...data.history].reverse().map((status, i) => {
         // Determine if this cell should be highlighted
@@ -89,8 +89,8 @@ function HistoryTableRow({ data, onSelect, idx }: Props) {
             }}
             className={cn(
               'max-w-[22px] min-w-[22px] p-2 text-center cursor-pointer',
-              'hover:bg-slate-200 transition-all duration-200',
-              isSelected && 'bg-slate-200'
+              'hover:bg-accent transition-all duration-200',
+              isSelected && 'bg-accent'
             )}
           >
             {status !== 0 && (

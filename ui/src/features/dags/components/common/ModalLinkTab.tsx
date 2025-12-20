@@ -27,8 +27,8 @@ const ModalLinkTab: React.FC<ModalLinkTabProps> = ({
         'group relative rounded-md px-4 py-2 transition-all duration-200 ease-in-out',
         'flex items-center gap-2 text-sm font-medium cursor-pointer',
         isActive
-          ? 'bg-blue-100 text-blue-700 border border-blue-200 font-semibold'
-          : 'hover:bg-blue-50 hover:text-blue-700 border border-transparent',
+          ? 'bg-primary/15 text-primary border border-primary/30 font-semibold'
+          : 'hover:bg-primary/10 hover:text-primary border border-transparent',
         className
       )}
       {...props}
@@ -38,8 +38,8 @@ const ModalLinkTab: React.FC<ModalLinkTabProps> = ({
           className={cn(
             'h-4 w-4 transition-transform',
             isActive
-              ? 'text-blue-700 scale-110'
-              : 'text-blue-600 group-hover:text-blue-700'
+              ? 'text-primary scale-110'
+              : 'text-primary group-hover:text-primary'
           )}
         />
       )}

@@ -123,7 +123,7 @@ function Workers() {
             {errorData?.message || 'Failed to load workers'}
           </p>
           {data?.errors?.map((err, idx) => (
-            <p key={idx} className="text-xs text-red-600">{err}</p>
+            <p key={idx} className="text-xs text-error">{err}</p>
           ))}
         </div>
       </div>
@@ -185,15 +185,15 @@ function Workers() {
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
                 <span>Healthy</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                <div className="w-2 h-2 rounded-full bg-warning" />
                 <span>Warning</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-red-500" />
+                <div className="w-2 h-2 rounded-full bg-error" />
                 <span>Offline</span>
               </div>
             </div>

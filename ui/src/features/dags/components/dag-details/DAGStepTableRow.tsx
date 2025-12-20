@@ -34,43 +34,43 @@ function DAGStepTableRow({ step, index }: Props) {
   const preconditions = step.preconditions?.map((c, index) => (
     <div
       key={index}
-      className="flex items-center gap-1.5 mb-1 text-xs bg-slate-100 rounded-md p-1.5"
+      className="flex items-center gap-1.5 mb-1 text-xs bg-muted rounded-md p-1.5"
     >
-      <span className="font-medium text-slate-700">
+      <span className="font-medium text-foreground/90">
         {c.condition}
       </span>
-      <span className="text-slate-500">=&gt;</span>
-      <span className="text-slate-700">{c.expected}</span>
+      <span className="text-muted-foreground">=&gt;</span>
+      <span className="text-foreground/90">{c.expected}</span>
     </div>
   ));
 
   return (
-    <TableRow className="hover:bg-slate-50 transition-colors duration-200 h-auto">
+    <TableRow className="hover:bg-muted transition-colors duration-200 h-auto">
       {/* Number */}
-      <TableCell className="text-center font-semibold text-slate-700 text-xs py-2">
+      <TableCell className="text-center font-semibold text-foreground/90 text-xs py-2">
         {index + 1}
       </TableCell>
 
       {/* Step Details */}
       <TableCell>
         <div className="space-y-1">
-          <div className="text-sm font-semibold text-slate-800 break-all">
+          <div className="text-sm font-semibold text-foreground break-all">
             {step.name}
           </div>
           {step.id && (
-            <div className="text-xs text-slate-600 font-mono">
+            <div className="text-xs text-muted-foreground font-mono">
               ID: {step.id}
             </div>
           )}
           {step.description && (
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-muted-foreground">
               {step.description}
             </div>
           )}
           {subDagName && (
-            <div className="mt-1 flex w-fit items-center gap-1.5 rounded-md bg-purple-50 px-1.5 py-0.5 text-xs">
-              <GitBranch className="h-3.5 w-3.5 text-purple-500" />
-              <span className="font-medium text-purple-600">
+            <div className="mt-1 flex w-fit items-center gap-1.5 rounded-md bg-info-muted px-1.5 py-0.5 text-xs">
+              <GitBranch className="h-3.5 w-3.5 text-info" />
+              <span className="font-medium text-info">
                 Sub-DAG: {subDagName}
               </span>
             </div>
@@ -98,9 +98,9 @@ function DAGStepTableRow({ step, index }: Props) {
 
           {/* Directory */}
           {step.dir && (
-            <div className="flex items-center gap-1.5 text-xs bg-slate-50 rounded-md px-1.5 py-0.5 w-fit">
-              <Folder className="h-3.5 w-3.5 text-slate-500" />
-              <span className="font-medium text-slate-600">
+            <div className="flex items-center gap-1.5 text-xs bg-muted rounded-md px-1.5 py-0.5 w-fit">
+              <Folder className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-medium text-muted-foreground">
                 {step.dir}
               </span>
             </div>
@@ -108,9 +108,9 @@ function DAGStepTableRow({ step, index }: Props) {
 
           {/* Output */}
           {step.output && (
-            <div className="flex items-center gap-1.5 text-xs bg-green-50 rounded-md px-1.5 py-0.5 w-fit">
-              <ArrowRight className="h-3.5 w-3.5 text-green-500" />
-              <span className="font-medium text-green-600">
+            <div className="flex items-center gap-1.5 text-xs bg-success-muted rounded-md px-1.5 py-0.5 w-fit">
+              <ArrowRight className="h-3.5 w-3.5 text-success" />
+              <span className="font-medium text-success">
                 Output: {step.output}
               </span>
             </div>
@@ -126,14 +126,14 @@ function DAGStepTableRow({ step, index }: Props) {
               <Badge
                 key={idx}
                 variant="outline"
-                className="bg-slate-100 text-slate-700 px-1.5 py-0.5 text-wrap break-all text-xs"
+                className="bg-muted text-foreground/90 px-1.5 py-0.5 text-wrap break-all text-xs"
               >
                 {dep}
               </Badge>
             ))}
           </div>
         ) : (
-          <span className="text-xs text-slate-500 leading-tight">None</span>
+          <span className="text-xs text-muted-foreground leading-tight">None</span>
         )}
       </TableCell>
 
@@ -147,10 +147,10 @@ function DAGStepTableRow({ step, index }: Props) {
                 variant="outline"
                 className={`flex items-center gap-1.5 px-2 py-0.5 text-xs ${
                   step.repeatPolicy.repeat === 'while'
-                    ? 'bg-cyan-50 text-cyan-600 border-cyan-200'
+                    ? 'bg-info-muted text-info border-info/30'
                     : step.repeatPolicy.repeat === 'until'
-                      ? 'bg-purple-50 text-purple-600 border-purple-200'
-                      : 'bg-blue-50 text-blue-600 border-blue-200'
+                      ? 'bg-info-muted text-info border-info/30'
+                      : 'bg-primary/10 text-primary border-primary/30'
                 }`}
               >
                 <RefreshCw className="h-3 w-3" />
@@ -175,23 +175,23 @@ function DAGStepTableRow({ step, index }: Props) {
 
               {/* Repeat Condition */}
               {step.repeatPolicy.condition && (
-                <div className="text-[10px] bg-slate-100 rounded px-1.5 py-0.5 font-mono">
-                  <span className="text-slate-500">
+                <div className="text-[10px] bg-muted rounded px-1.5 py-0.5 font-mono">
+                  <span className="text-muted-foreground">
                     {step.repeatPolicy.repeat === 'while'
                       ? '↻ while'
                       : '↻ until'}
                     :
                   </span>{' '}
-                  <span className="text-slate-700">
+                  <span className="text-foreground/90">
                     {step.repeatPolicy.condition.condition}
                   </span>
                   {step.repeatPolicy.condition.expected && (
                     <>
-                      <span className="text-slate-500">
+                      <span className="text-muted-foreground">
                         {' '}
                         ={' '}
                       </span>
-                      <span className="text-emerald-600">
+                      <span className="text-success">
                         {step.repeatPolicy.condition.expected}
                       </span>
                     </>
@@ -202,11 +202,11 @@ function DAGStepTableRow({ step, index }: Props) {
               {/* Exit Codes */}
               {step.repeatPolicy.exitCode &&
                 step.repeatPolicy.exitCode.length > 0 && (
-                  <div className="text-[10px] bg-slate-100 rounded px-1.5 py-0.5">
-                    <span className="text-slate-500">
+                  <div className="text-[10px] bg-muted rounded px-1.5 py-0.5">
+                    <span className="text-muted-foreground">
                       exit codes:
                     </span>{' '}
-                    <span className="font-mono text-amber-600">
+                    <span className="font-mono text-warning">
                       [{step.repeatPolicy.exitCode.join(', ')}]
                     </span>
                   </div>
@@ -216,9 +216,9 @@ function DAGStepTableRow({ step, index }: Props) {
 
           {/* Mail on Error */}
           {step.mailOnError && (
-            <div className="flex items-center gap-1.5 text-xs bg-red-50 rounded-md px-1.5 py-0.5 w-fit">
-              <Mail className="h-3.5 w-3.5 text-red-500" />
-              <span className="font-medium text-red-600">
+            <div className="flex items-center gap-1.5 text-xs bg-error-muted rounded-md px-1.5 py-0.5 w-fit">
+              <Mail className="h-3.5 w-3.5 text-error" />
+              <span className="font-medium text-error">
                 Mail on Error
               </span>
             </div>
@@ -226,7 +226,7 @@ function DAGStepTableRow({ step, index }: Props) {
 
           {/* Stdout/Stderr */}
           {(step.stdout || step.stderr) && (
-            <div className="text-xs text-slate-500 bg-slate-50 rounded-md p-1.5 leading-tight">
+            <div className="text-xs text-muted-foreground bg-muted rounded-md p-1.5 leading-tight">
               {step.stdout && (
                 <div className="mb-1">
                   stdout: <span className="font-mono">{step.stdout}</span>
@@ -244,7 +244,7 @@ function DAGStepTableRow({ step, index }: Props) {
           {step.params && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="text-xs text-slate-500 bg-slate-50 rounded-md p-1.5 truncate cursor-pointer leading-tight">
+                <div className="text-xs text-muted-foreground bg-muted rounded-md p-1.5 truncate cursor-pointer leading-tight">
                   <span className="font-medium">Params:</span>{' '}
                   <span className="font-mono">{step.params}</span>
                 </div>
@@ -264,7 +264,7 @@ function DAGStepTableRow({ step, index }: Props) {
         {preconditions && preconditions.length > 0 ? (
           <div className="space-y-1">{preconditions}</div>
         ) : (
-          <span className="text-xs text-slate-500 leading-tight">None</span>
+          <span className="text-xs text-muted-foreground leading-tight">None</span>
         )}
       </TableCell>
     </TableRow>

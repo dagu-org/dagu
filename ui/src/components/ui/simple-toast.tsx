@@ -44,13 +44,13 @@ export const SimpleToast: React.FC<SimpleToastProps> = ({
 
   return createPortal(
     <div
-      className={`fixed bottom-4 right-4 z-[100] max-w-sm bg-green-50 border border-green-200 text-green-800 rounded-md p-3 cursor-pointer hover:opacity-90 transition-all duration-300 ${
+      className={`fixed bottom-4 right-4 z-[100] max-w-sm bg-success-muted border border-success/30 text-success rounded-md p-3 cursor-pointer hover:opacity-90 transition-all duration-300 ${
         isFading ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
       }`}
       onClick={handleClose}
     >
       <div className="flex items-start gap-2">
-        <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+        <CheckCircle className="h-4 w-4 text-success flex-shrink-0 mt-0.5" />
         <div className="text-sm font-medium whitespace-pre-line break-words">{message}</div>
       </div>
     </div>,

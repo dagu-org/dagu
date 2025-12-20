@@ -39,7 +39,7 @@ export const ReloadButton: React.FC<ReloadButtonProps> = ({
         transition-all duration-200 ease-in-out transform
         ${
           isReloading
-            ? 'bg-blue-500 text-white scale-90'
+            ? 'bg-primary/100 text-white scale-90'
             : isDisabled
             ? 'bg-muted text-muted-foreground cursor-not-allowed'
             : 'bg-accent text-muted-foreground hover:bg-accent hover:scale-110 active:scale-95'

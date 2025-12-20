@@ -25,11 +25,13 @@
   outline: none;
 }
 
-/* Remove conflicting border and shadow overrides for select content and items */
-[data-slot='select-content'],
+/* Remove conflicting shadow overrides for select content and items */
+[data-slot='select-content'] {
+  box-shadow: none;
+}
 [data-slot='select-item'] {
-  box-shadow: initial;
-  border: initial;
+  box-shadow: none;
+  border: none;
 }
 
 /* Fix for tag filter select in DAG list page */
@@ -93,6 +95,22 @@
   --chart-4: #d4a574;
   --chart-5: #d4847a;
   --radius: 0.625rem;
+  /* Semantic status colors - sepia-compatible */
+  --success: #7da87d;
+  --success-foreground: #ffffff;
+  --success-muted: #e8f0e8;
+  --warning: #c4956a;
+  --warning-foreground: #ffffff;
+  --warning-muted: #f5ede3;
+  --error: #c4726a;
+  --error-foreground: #ffffff;
+  --error-muted: #f5e8e6;
+  --info: #8a9fc4;
+  --info-foreground: #ffffff;
+  --info-muted: #e8ecf5;
+  /* Code block colors - warm dark */
+  --code-bg: #2d2a26;
+  --code-foreground: #e8e0d6;
   --sidebar: #faf8f5;
   --sidebar-foreground: #3d3833;
   --sidebar-primary: #c4956a;
@@ -140,6 +158,20 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
+  --color-error: var(--error);
+  --color-error-foreground: var(--error-foreground);
+  --color-error-muted: var(--error-muted);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-muted: var(--info-muted);
+  --color-code-bg: var(--code-bg);
+  --color-code-foreground: var(--code-foreground);
 }
 
 @layer base {

@@ -53,15 +53,15 @@ export function ScriptDialog({
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-4 py-3 border-b border-border">
           <DialogTitle className="flex items-center gap-2 text-sm font-semibold">
-            <FileText className="h-4 w-4 text-amber-500" />
+            <FileText className="h-4 w-4 text-warning" />
             {stepName ? `Script: ${stepName}` : 'Script Content'}
           </DialogTitle>
         </DialogHeader>
         <div className="flex-1 overflow-auto min-h-0">
-          <div className="bg-zinc-900 min-h-full">
-            <pre className="font-mono text-[12px] text-zinc-100 p-3">
+          <div className="bg-code-bg min-h-full">
+            <pre className="font-mono text-[12px] text-code-foreground p-3">
               {lines.map((line, index) => (
-                <div key={index} className="flex hover:bg-zinc-800 px-1">
+                <div key={index} className="flex hover:bg-code-bg/80 px-1">
                   <span className="text-muted-foreground mr-4 select-none w-8 text-right flex-shrink-0">
                     {index + 1}
                   </span>
@@ -92,9 +92,9 @@ interface ScriptBadgeProps {
 export function ScriptBadge({ script, stepName }: ScriptBadgeProps) {
   return (
     <ScriptDialog script={script} stepName={stepName}>
-      <div className="flex items-center gap-1.5 text-xs bg-amber-50 rounded-md px-1.5 py-0.5 w-fit hover:bg-amber-100 transition-colors">
-        <FileText className="h-3.5 w-3.5 text-amber-500" />
-        <span className="font-medium text-amber-600">
+      <div className="flex items-center gap-1.5 text-xs bg-warning-muted rounded-md px-1.5 py-0.5 w-fit hover:bg-warning-muted transition-colors">
+        <FileText className="h-3.5 w-3.5 text-warning" />
+        <span className="font-medium text-warning">
           Script defined
         </span>
       </div>

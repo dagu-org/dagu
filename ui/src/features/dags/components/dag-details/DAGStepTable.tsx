@@ -35,24 +35,24 @@ function DAGStepTable({ steps }: Props) {
   return (
     <div className="w-full overflow-x-auto">
       <Table>
-        <TableHeader className="bg-slate-50">
+        <TableHeader className="bg-muted">
           <TableRow className="border-b border-border h-8">
-            <TableHead className="w-[4%] py-1.5 text-xs font-semibold text-slate-700 text-center">
+            <TableHead className="w-[4%] py-1.5 text-xs font-semibold text-foreground/90 text-center">
               No
             </TableHead>
-            <TableHead className="w-[20%] py-1.5 text-xs font-semibold text-slate-700">
+            <TableHead className="w-[20%] py-1.5 text-xs font-semibold text-foreground/90">
               Step Details
             </TableHead>
-            <TableHead className="w-[22%] py-1.5 text-xs font-semibold text-slate-700">
+            <TableHead className="w-[22%] py-1.5 text-xs font-semibold text-foreground/90">
               Execution
             </TableHead>
-            <TableHead className="w-[18%] py-1.5 text-xs font-semibold text-slate-700">
+            <TableHead className="w-[18%] py-1.5 text-xs font-semibold text-foreground/90">
               Dependencies
             </TableHead>
-            <TableHead className="w-[18%] py-1.5 text-xs font-semibold text-slate-700">
+            <TableHead className="w-[18%] py-1.5 text-xs font-semibold text-foreground/90">
               Configuration
             </TableHead>
-            <TableHead className="w-[18%] py-1.5 text-xs font-semibold text-slate-700">
+            <TableHead className="w-[18%] py-1.5 text-xs font-semibold text-foreground/90">
               Conditions
             </TableHead>
           </TableRow>

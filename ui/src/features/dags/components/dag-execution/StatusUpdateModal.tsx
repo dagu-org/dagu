@@ -102,15 +102,15 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
               className={`
                 group relative overflow-hidden rounded-lg border p-4 transition-all duration-200 focus:outline-none
                 ${selectedButton === 0 
-                  ? 'border-green-500 bg-green-50' 
-                  : 'border-border hover:border-green-500 hover:bg-green-50'
+                  ? 'border-success bg-success-muted' 
+                  : 'border-border hover:border-success hover:bg-success-muted'
                 }
               `}
               onClick={() => onSubmit(step, NodeStatus.Success)}
               onMouseEnter={() => setSelectedButton(0)}
             >
               <div className="flex flex-col items-center gap-2">
-                <CheckCircle2 className="h-8 w-8 text-green-600" />
+                <CheckCircle2 className="h-8 w-8 text-success" />
                 <span className="font-mono text-sm">Success</span>
               </div>
             </button>
@@ -120,15 +120,15 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
               className={`
                 group relative overflow-hidden rounded-lg border p-4 transition-all duration-200 focus:outline-none
                 ${selectedButton === 1 
-                  ? 'border-red-500 bg-red-50' 
-                  : 'border-border hover:border-red-500 hover:bg-red-50'
+                  ? 'border-error bg-error-muted' 
+                  : 'border-border hover:border-error hover:bg-error-muted'
                 }
               `}
               onClick={() => onSubmit(step, NodeStatus.Failed)}
               onMouseEnter={() => setSelectedButton(1)}
             >
               <div className="flex flex-col items-center gap-2">
-                <XCircle className="h-8 w-8 text-red-600" />
+                <XCircle className="h-8 w-8 text-error" />
                 <span className="font-mono text-sm">Failed</span>
               </div>
             </button>

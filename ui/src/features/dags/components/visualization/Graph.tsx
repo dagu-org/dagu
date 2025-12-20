@@ -109,8 +109,8 @@ const Graph: React.FC<Props> = ({
     padding: '2em',
     borderRadius: '0.5em',
     background: `
-      linear-gradient(90deg, #f8fafc 1px, transparent 1px),
-      linear-gradient(180deg, #f8fafc 1px, transparent 1px)
+      linear-gradient(90deg, #f0ebe3 1px, transparent 1px),
+      linear-gradient(180deg, #f0ebe3 1px, transparent 1px)
     `,
     backgroundSize: '20px 20px',
   };
@@ -191,19 +191,19 @@ const Graph: React.FC<Props> = ({
             // Dashed line for error state
             dat.push(`${depId} -.- ${id};`);
             linkStyles.push(
-              `linkStyle ${linkIndex} stroke:#ef4444,stroke-width:1.8px,stroke-dasharray:3`
+              `linkStyle ${linkIndex} stroke:#c4726a,stroke-width:1.8px,stroke-dasharray:3`
             );
           } else if (status === NodeStatus.Success) {
             // Solid line with success color
             dat.push(`${depId} --> ${id};`);
             linkStyles.push(
-              `linkStyle ${linkIndex} stroke:#16a34a,stroke-width:1.8px`
+              `linkStyle ${linkIndex} stroke:#7da87d,stroke-width:1.8px`
             );
           } else {
             // Default connection style
             dat.push(`${depId} --> ${id};`);
             linkStyles.push(
-              `linkStyle ${linkIndex} stroke:#64748b,stroke-width:1px`
+              `linkStyle ${linkIndex} stroke:#6b635a,stroke-width:1px`
             );
           }
           linkIndex++;
@@ -225,32 +225,30 @@ const Graph: React.FC<Props> = ({
       );
     }
 
-    // Define node styles for different states with refined colors
-    // Check if dark mode is active
-    const isDarkMode = document.documentElement.classList.contains('dark');
-    const nodeFill = isDarkMode ? '#18181b' : 'white'; // zinc-900 for dark mode
-    const nodeColor = isDarkMode ? '#e4e4e7' : '#333'; // zinc-200 for dark mode text
+    // Define node styles for different states with sepia theme colors
+    const nodeFill = '#faf8f5'; // card
+    const nodeColor = '#3d3833'; // foreground
 
     dat.push(
-      `classDef none color:${nodeColor},fill:${nodeFill},stroke:lightblue,stroke-width:1.2px`
+      `classDef none color:${nodeColor},fill:${nodeFill},stroke:#c8bfb0,stroke-width:1.2px`
     );
     dat.push(
-      `classDef running color:${nodeColor},fill:${nodeFill},stroke:lime,stroke-width:1.2px`
+      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#7da87d,stroke-width:1.2px`
     );
     dat.push(
-      `classDef error color:${nodeColor},fill:${nodeFill},stroke:red,stroke-width:1.2px`
+      `classDef error color:${nodeColor},fill:${nodeFill},stroke:#c4726a,stroke-width:1.2px`
     );
     dat.push(
-      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:pink,stroke-width:1.2px`
+      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:#d4a574,stroke-width:1.2px`
     );
     dat.push(
-      `classDef done color:${nodeColor},fill:${nodeFill},stroke:green,stroke-width:1.2px`
+      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#7da87d,stroke-width:1.2px`
     );
     dat.push(
-      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:gray,stroke-width:1.2px`
+      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#6b635a,stroke-width:1.2px`
     );
     dat.push(
-      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:1.2px`
+      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#c4956a,stroke-width:1.2px`
     );
 
     // Add custom link styles

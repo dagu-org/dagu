@@ -31,11 +31,11 @@ function DAGErrors({ dags, errors, hasError }: Props) {
   return (
     <Alert 
       variant="destructive" 
-      className="py-2 mb-2 bg-red-50 border-red-200 text-red-800"
+      className="py-2 mb-2 bg-error-muted border-error/30 text-error"
     >
-      <AlertCircle className="h-4 w-4 text-red-600" />
-      <AlertTitle className="text-sm font-medium text-red-800">Error</AlertTitle>
-      <AlertDescription className="text-xs mt-1 text-red-700">
+      <AlertCircle className="h-4 w-4 text-error" />
+      <AlertTitle className="text-sm font-medium text-error">Error</AlertTitle>
+      <AlertDescription className="text-xs mt-1 text-error">
         <ul className="list-disc pl-4 space-y-0.5">
           {dags
             .filter((dag) => dag.errors && dag.errors.length > 0)
@@ -43,7 +43,7 @@ function DAGErrors({ dags, errors, hasError }: Props) {
               const url = `/dags/${dag.fileName}`;
               return dag.errors.map((err, index) => (
                 <li key={`${dag.dag.name}-${index}`} className="text-xs">
-                  <a href={url} className="font-medium underline hover:text-red-900">
+                  <a href={url} className="font-medium underline hover:text-error">
                     {dag.dag.name}
                   </a>
                   : {err}
