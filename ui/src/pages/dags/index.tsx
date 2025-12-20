@@ -341,7 +341,7 @@ function DAGs() {
     <SplitLayout
       leftPanel={leftPanel}
       rightPanel={rightPanel}
-      leftWidth="40%"
+      defaultLeftWidth={40}
       emptyRightMessage="Select a DAG to view details"
     />
   );

@@ -34,6 +34,7 @@ import { useQuery } from '../hooks/api';
 import type { components } from '../api/v2/schema';
 import { Status } from '../api/v2/schema';
 import dayjs from '../lib/dayjs';
+import Title from '../ui/Title';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 type SchedulerInstance = components['schemas']['SchedulerInstance'];
@@ -380,6 +381,7 @@ function Dashboard(): React.ReactElement | null {
 
   return (
     <div className="flex flex-col gap-2 w-full h-full overflow-auto">
+      <Title>Dashboard</Title>
       {/* Header: Filters + Actions + Metrics */}
       <div className="border rounded bg-card flex-shrink-0">
         <div className="flex flex-wrap items-center justify-between gap-2 p-2">

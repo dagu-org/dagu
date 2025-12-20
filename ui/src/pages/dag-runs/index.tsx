@@ -588,7 +588,7 @@ function DAGRuns() {
 
   return (
     <div className="">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <Title>DAG Runs</Title>
         <ToggleGroup aria-label="View mode">
           <ToggleButton
@@ -616,7 +616,7 @@ function DAGRuns() {
         </ToggleGroup>
       </div>
       <div>
-        <div className="bg-muted/50 rounded-lg mb-4 space-y-3">
+        <div className="bg-muted/50 rounded-lg mb-2 space-y-2">
           <div className="flex flex-wrap gap-2">
             <Input
               placeholder="Filter by DAG name..."

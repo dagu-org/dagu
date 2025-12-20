@@ -128,7 +128,7 @@ function Search() {
     <div className="w-full">
       <div className="w-full">
         <Title>Search DAG Definitions</Title>
-        <div className="flex items-center">
+        <div className="flex items-center pt-2">
           <Input
             placeholder="Search text..."
             className="flex-1"
@@ -158,7 +158,7 @@ function Search() {
           </Button>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-2">
           {(() => {
             if (!q) {
               return (

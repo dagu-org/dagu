@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Activity, Search, RefreshCw } from 'lucide-react';
+import { Layers, Search, RefreshCw } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import {
@@ -15,6 +15,7 @@ import QueueMetrics from '../../features/queues/components/QueueMetrics';
 import QueueList from '../../features/queues/components/QueueList';
 import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
 import { cn } from '../../lib/utils';
+import Title from '../../ui/Title';
 
 function Queues() {
   const appBarContext = React.useContext(AppBarContext);
@@ -216,13 +217,10 @@ function Queues() {
 
   return (
     <div className="flex flex-col gap-2 w-full h-full overflow-hidden">
+      <Title>Queues</Title>
       {/* Header with search and refresh */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-muted-foreground" />
-              <h1 className="text-sm font-semibold">Execution Queues</h1>
-            </div>
             <div className="flex items-center gap-2">
               <div className="relative">
                 <Search className="absolute left-2 top-1.5 h-3 w-3 text-muted-foreground" />

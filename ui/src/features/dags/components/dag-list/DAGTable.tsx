@@ -957,10 +957,10 @@ function DAGTable({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Search, Filter and Pagination Controls */}
       <div
-        className={`bg-muted/50 rounded-lg mb-4 space-y-3 ${
+        className={`bg-muted/50 rounded-lg mb-2 space-y-2 ${
           isLoading ? 'opacity-70 pointer-events-none' : ''
         }`}
       >
@@ -1046,9 +1046,7 @@ function DAGTable({
 
       {/* Desktop Table View - Hidden on mobile */}
       <div className="hidden md:block w-full overflow-hidden">
-        <Table
-          className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}
-        >
+        <Table className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}>
           <TableHeader>
             {instance.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -1056,10 +1054,13 @@ function DAGTable({
                   <TableHead
                     key={header.id}
                     className={`py-1 px-2 text-muted-foreground text-xs ${
-                      header.column.id === 'Expand' ? 'w-10' :
-                      header.column.id === 'Actions' ? 'w-14' :
-                      header.column.id === 'Status' ? 'w-20' :
-                      ''
+                      header.column.id === 'Expand'
+                        ? 'w-10'
+                        : header.column.id === 'Actions'
+                          ? 'w-14'
+                          : header.column.id === 'Status'
+                            ? 'w-20'
+                            : ''
                     }`}
                   >
                     {header.isPlaceholder ? null : (
@@ -1140,11 +1141,15 @@ function DAGTable({
                       <TableCell
                         key={cell.id}
                         className={`py-1 px-2 overflow-hidden align-middle ${
-                          cell.column.id === 'Expand' ? 'w-10' :
-                          cell.column.id === 'Actions' ? 'w-14' :
-                          cell.column.id === 'Status' ? 'w-20' :
-                          cell.column.id === 'Name' ? 'max-w-0' :
-                          ''
+                          cell.column.id === 'Expand'
+                            ? 'w-10'
+                            : cell.column.id === 'Actions'
+                              ? 'w-14'
+                              : cell.column.id === 'Status'
+                                ? 'w-20'
+                                : cell.column.id === 'Name'
+                                  ? 'max-w-0'
+                                  : ''
                         }`}
                       >
                         {flexRender(
