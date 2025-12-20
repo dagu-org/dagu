@@ -13,8 +13,14 @@ type IndexedSubRunDetail = SubDAGRunDetail & { originalIndex: number };
 type SubRunListItem = IndexedSubRun | IndexedSubRunDetail;
 
 type Props = {
+  /** Current DAG name (the parent of sub-runs) - used for display */
   dagName: string;
+  /** Current DAG run ID (the parent of sub-runs) - used for filtering */
   dagRunId: string;
+  /** Root DAG name - used for API calls */
+  rootDagName: string;
+  /** Root DAG run ID - used for API calls */
+  rootDagRunId: string;
   subDagName: string;
   allSubRuns: SubDAGRun[];
   isExpanded: boolean;
@@ -25,6 +31,8 @@ type Props = {
 export function SubDAGRunsList({
   dagName,
   dagRunId,
+  rootDagName,
+  rootDagRunId,
   subDagName,
   allSubRuns,
   isExpanded,
@@ -37,17 +45,22 @@ export function SubDAGRunsList({
 
   // Fetch sub DAG run details with timing information
   // Only fetch if we have multiple sub runs AND expanded
+  // Always use root DAG's name and ID for the API call since all sub-runs are stored under the root
+  // For multi-level nested DAGs, pass the current DAG's run ID as parentSubDAGRunId
   const shouldFetch = allSubRuns.length > 1 && isExpanded;
+  const isNestedSubDAG = dagRunId !== rootDagRunId;
   const { data: subRunsData, mutate: refetchSubRuns } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs',
     {
       params: {
         path: {
-          name: dagName,
-          dagRunId,
+          name: rootDagName,
+          dagRunId: rootDagRunId,
         },
         query: {
           remoteNode,
+          // For multi-level nested DAGs, pass the parent sub DAG run ID
+          parentSubDAGRunId: isNestedSubDAG ? dagRunId : undefined,
         },
       },
     },
@@ -146,8 +159,7 @@ export function SubDAGRunsList({
       {isExpanded && (
         <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
           {subRunsWithTiming.map((subRun, displayIndex) => {
-            const startedAt =
-              'startedAt' in subRun ? subRun.startedAt : null;
+            const startedAt = 'startedAt' in subRun ? subRun.startedAt : null;
             const status = 'status' in subRun ? subRun.status : null;
             const statusLabel =
               'statusLabel' in subRun ? subRun.statusLabel : undefined;
@@ -172,7 +184,9 @@ export function SubDAGRunsList({
                       {dayjs(startedAt).format('MMM D, HH:mm:ss')}
                     </div>
                   )}
-                  {status && <StatusDot status={status} statusLabel={statusLabel} />}
+                  {status && (
+                    <StatusDot status={status} statusLabel={statusLabel} />
+                  )}
                 </div>
                 {subRun.params && (
                   <div className="text-xs text-slate-500 dark:text-slate-400 ml-0 mt-1 font-mono">

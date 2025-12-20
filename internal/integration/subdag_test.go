@@ -429,7 +429,6 @@ steps:
     output: RESULT
 `)
 
-	err := dag.Agent().Run(dag.Agent().Context)
-	require.Error(t, err)
+	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
 }
