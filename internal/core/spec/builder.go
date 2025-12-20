@@ -330,6 +330,7 @@ func buildContainer(ctx BuildContext, spec *definition, dag *core.DAG) error {
 	}
 
 	container := core.Container{
+		Name:          strings.TrimSpace(spec.Container.Name),
 		Image:         spec.Container.Image,
 		PullPolicy:    pullPolicy,
 		Env:           envs,

@@ -164,6 +164,23 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 		return fmt.Errorf("container already exists. id=%s", c.containerID)
 	}
 
+	// Check if a container with the specified name already exists
+	if name := c.cfg.ContainerName; name != "" {
+		info, err := c.cli.ContainerInspect(ctx, name)
+		if err == nil {
+			// Container exists - fail regardless of state
+			if info.State != nil && info.State.Running {
+				return fmt.Errorf("container with name %q already exists and is running", name)
+			}
+			return fmt.Errorf("container with name %q already exists", name)
+		}
+		// If error is not "not found", it's an unexpected error
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to check existing container %q: %w", name, err)
+		}
+		// Container doesn't exist, proceed to create
+	}
+
 	// Choose startup mode and command
 	var cmd []string
 	mode := c.cfg.Startup

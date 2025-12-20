@@ -7,6 +7,8 @@ import (
 
 // Container defines the container configuration for the DAG.
 type Container struct {
+	// Name is the container name to use. If empty, Docker generates a random name.
+	Name string `yaml:"name,omitempty"`
 	// Image is the container image to use.
 	Image string `yaml:"image,omitempty"`
 	// PullPolicy is the policy to pull the image (e.g., "Always", "IfNotPresent").

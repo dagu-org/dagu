@@ -1109,6 +1109,41 @@ func TestLoadConfig(t *testing.T) {
 				ExecOptions: &container.ExecOptions{},
 			},
 		},
+		{
+			name: "ContainerNamePropagation",
+			input: core.Container{
+				Name:  "my-dag-container",
+				Image: "alpine",
+			},
+			expected: &Config{
+				ContainerName: "my-dag-container",
+				Image:         "alpine",
+				AutoRemove:    true,
+				Container: &container.Config{
+					Image: "alpine",
+				},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
+			},
+		},
+		{
+			name: "ContainerNameEmptyWhenNotSpecified",
+			input: core.Container{
+				Image: "alpine",
+			},
+			expected: &Config{
+				ContainerName: "",
+				Image:         "alpine",
+				AutoRemove:    true,
+				Container: &container.Config{
+					Image: "alpine",
+				},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1122,6 +1157,7 @@ func TestLoadConfig(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			assert.Equal(t, tt.expected.ContainerName, result.ContainerName)
 			assert.Equal(t, tt.expected.Image, result.Image)
 			assert.Equal(t, tt.expected.Platform, result.Platform)
 			assert.Equal(t, tt.expected.Pull, result.Pull)
