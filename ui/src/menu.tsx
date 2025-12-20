@@ -1,6 +1,6 @@
 import logoDark from '@/assets/images/logo_dark.png';
-import { useConfig } from '@/contexts/ConfigContext';
 import { useIsAdmin } from '@/contexts/AuthContext';
+import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils'; // Assuming cn utility is available
 import {
   Activity,
