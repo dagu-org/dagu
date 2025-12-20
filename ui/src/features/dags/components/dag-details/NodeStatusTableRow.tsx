@@ -24,10 +24,10 @@ import {
   DialogTitle,
 } from '@/ui/CustomDialog';
 import {
+  AlertCircle,
   ChevronDown,
   ChevronRight,
   Code,
-  FileText,
   GitBranch,
   Play,
   RefreshCw,
@@ -663,47 +663,10 @@ function NodeStatusTableRow({
             <div className="space-y-1.5">
               {/* Logs */}
               {(node.stdout || node.stderr) && (
-                <div className="flex items-center gap-1.5">
-                  {/* Single log file - show simple button */}
-                  {(node.stdout && !node.stderr) ||
-                  (!node.stdout && node.stderr) ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <a
-                          href={node.stderr ? `${url}&stream=stderr` : url}
-                          onClick={
-                            node.stderr
-                              ? (e) => {
-                                  e.stopPropagation();
-                                  if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                                    e.preventDefault();
-                                    onViewLog(
-                                      `${node.step.name}_stderr`,
-                                      dagRunId || ''
-                                    );
-                                  }
-                                }
-                              : (e) => {
-                                  e.stopPropagation();
-                                  handleViewLog(e);
-                                }
-                          }
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 rounded cursor-pointer text-muted-foreground hover:text-foreground bg-muted hover:bg-muted"
-                          title={`Click to view ${node.stderr ? 'stderr' : 'stdout'} log (Cmd/Ctrl+Click to open in new tab)`}
-                        >
-                          <FileText className="h-3 w-3" />
-                          {node.stderr ? 'stderr' : 'stdout'}
-                        </a>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <span className="text-xs">
-                          {node.stderr ? 'Error' : 'Output'} Log
-                        </span>
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    /* Both stdout and stderr - show combined button with split design */
-                    <div className="inline-flex rounded overflow-hidden">
+                <div className="inline-flex items-center rounded-md overflow-hidden border border-border shadow-sm">
+                  {/* stdout button */}
+                  {node.stdout && (
+                    <>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <a
@@ -712,43 +675,48 @@ function NodeStatusTableRow({
                               e.stopPropagation();
                               handleViewLog(e);
                             }}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-muted-foreground hover:text-foreground bg-muted hover:bg-muted cursor-pointer border-r border-border"
-                            title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition-colors bg-card hover:bg-muted cursor-pointer"
+                            title="View stdout log (Cmd/Ctrl+Click for new tab)"
                           >
-                            <FileText className="h-3 w-3" />
-                            out
+                            <Code className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span>stdout</span>
                           </a>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <span className="text-xs">Output Log</span>
+                          <span className="text-xs">Standard Output Log</span>
                         </TooltipContent>
                       </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <a
-                            href={`${url}&stream=stderr`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                                e.preventDefault();
-                                onViewLog(
-                                  `${node.step.name}_stderr`,
-                                  dagRunId || ''
-                                );
-                              }
-                            }}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-muted-foreground hover:text-foreground bg-muted hover:bg-muted cursor-pointer"
-                            title="Click to view stderr log (Cmd/Ctrl+Click to open in new tab)"
-                          >
-                            <FileText className="h-3 w-3" />
-                            err
-                          </a>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <span className="text-xs">Error Log</span>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
+                      {node.stderr && <div className="w-px h-5 bg-border" />}
+                    </>
+                  )}
+
+                  {/* stderr button */}
+                  {node.stderr && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={`${url}&stream=stderr`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                              e.preventDefault();
+                              onViewLog(
+                                `${node.step.name}_stderr`,
+                                dagRunId || ''
+                              );
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition-colors bg-card hover:bg-warning/10 cursor-pointer"
+                          title="View stderr log (Cmd/Ctrl+Click for new tab)"
+                        >
+                          <AlertCircle className="h-3.5 w-3.5 text-warning" />
+                          <span className="text-warning">stderr</span>
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <span className="text-xs">Error Output Log</span>
+                      </TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
               )}
@@ -1085,42 +1053,25 @@ function NodeStatusTableRow({
       {/* Log buttons */}
       {(node.stdout || node.stderr) && (
         <div className="flex justify-end">
-          {/* Single log file - show simple button */}
-          {(node.stdout && !node.stderr) || (!node.stdout && node.stderr) ? (
-            <a
-              href={node.stderr ? `${url}&stream=stderr` : url}
-              onClick={
-                node.stderr
-                  ? (e) => {
-                      if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                        e.preventDefault();
-                        onViewLog(
-                          `${node.step.name}_stderr`,
-                          dagRunId || '',
-                          node
-                        );
-                      }
-                    }
-                  : handleViewLog
-              }
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 rounded-md cursor-pointer text-muted-foreground hover:text-foreground hover:bg-muted border border-border"
-              title={`Click to view ${node.stderr ? 'stderr' : 'stdout'} log (Cmd/Ctrl+Click to open in new tab)`}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              {node.stderr ? 'stderr' : 'stdout'}
-            </a>
-          ) : (
-            /* Both stdout and stderr - show combined button with split design */
-            <div className="inline-flex rounded-md border border-border overflow-hidden">
-              <a
-                href={url}
-                onClick={handleViewLog}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer border-r border-border"
-                title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                stdout
-              </a>
+          <div className="inline-flex items-center rounded-md overflow-hidden border border-border shadow-sm">
+            {/* stdout button */}
+            {node.stdout && (
+              <>
+                <a
+                  href={url}
+                  onClick={handleViewLog}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors bg-card hover:bg-muted cursor-pointer"
+                  title="View stdout log (Cmd/Ctrl+Click for new tab)"
+                >
+                  <Code className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>stdout</span>
+                </a>
+                {node.stderr && <div className="w-px h-5 bg-border" />}
+              </>
+            )}
+
+            {/* stderr button */}
+            {node.stderr && (
               <a
                 href={`${url}&stream=stderr`}
                 onClick={(e) => {
@@ -1129,14 +1080,14 @@ function NodeStatusTableRow({
                     onViewLog(`${node.step.name}_stderr`, dagRunId || '', node);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
-                title="Click to view stderr log (Cmd/Ctrl+Click to open in new tab)"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors bg-card hover:bg-warning/10 cursor-pointer"
+                title="View stderr log (Cmd/Ctrl+Click for new tab)"
               >
-                <FileText className="h-3.5 w-3.5" />
-                stderr
+                <AlertCircle className="h-3.5 w-3.5 text-warning" />
+                <span className="text-warning">stderr</span>
               </a>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 

@@ -7,7 +7,6 @@ import dayjs from '@/lib/dayjs';
 import {
   Calendar,
   Clock,
-  FileText,
   Hash,
   Info,
   Layers,
@@ -168,11 +167,11 @@ function DAGStatusOverview({
                   onViewLog(status.dagRunId);
                 }
               }}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-200 cursor-pointer"
-              title="Click to view log (Cmd/Ctrl+Click to open in new tab)"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border border-border shadow-sm bg-card hover:bg-muted transition-colors duration-200 cursor-pointer"
+              title="View Scheduler Log (Cmd/Ctrl+Click for new tab)"
             >
-              <FileText className="h-3.5 w-3.5" />
-              <span>Log</span>
+              <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>Scheduler Log</span>
             </a>
           </div>
         )}
@@ -204,11 +203,11 @@ function DAGStatusOverview({
                     onViewLog(status.dagRunId);
                   }
                 }}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-200 cursor-pointer"
-                title="Click to view log (Cmd/Ctrl+Click to open in new tab)"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border shadow-sm bg-card hover:bg-muted transition-colors duration-200 cursor-pointer"
+                title="View Scheduler Log (Cmd/Ctrl+Click for new tab)"
               >
-                <FileText className="h-3.5 w-3.5" />
-                <span>View Log</span>
+                <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>Scheduler Log</span>
               </a>
             </div>
           </div>
