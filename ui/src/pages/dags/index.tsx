@@ -188,7 +188,7 @@ function DAGs() {
     {
       refreshInterval: 1000,
       revalidateIfStale: false,
-      keepPreviousData: true, // Keep previous data while loading new data
+      keepPreviousData: true,
     }
   );
 
@@ -219,9 +219,9 @@ function DAGs() {
     let errorCount = 0;
     if (data && data.dags) {
       for (const val of data.dags) {
-        dagFiles.push(val); // Always add the DAG to the list
+        dagFiles.push(val);
         if (val.errors?.length) {
-          errorCount += 1; // Count DAGs with errors
+          errorCount += 1;
         }
       }
     }
@@ -271,22 +271,19 @@ function DAGs() {
     addSearchParam('order', order);
     setSortField(field);
     setSortOrder(order);
-    setPage(1); // Reset to first page when sorting changes
+    setPage(1);
   };
 
-  // Store the last valid data to prevent blank screens during loading
   const [lastValidData, setLastValidData] = React.useState<typeof data | null>(
     null
   );
 
-  // Update lastValidData whenever we get new data
   React.useEffect(() => {
     if (data) {
       setLastValidData(data);
     }
   }, [data]);
 
-  // Use the current data if available, otherwise use the last valid data
   const displayData = data || lastValidData;
 
   const leftPanel = (
