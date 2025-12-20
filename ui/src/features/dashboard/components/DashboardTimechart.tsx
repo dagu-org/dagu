@@ -428,52 +428,55 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
   return (
     <TimelineWrapper>
-      <div className="flex justify-end gap-1 p-2 border-b bg-muted/30 flex-shrink-0">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleCurrent}
-          title="Go to current time"
-          className="h-6 px-2 text-xs"
-        >
-          <Clock className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleFit}
-          title="Fit all items in view"
-          className="h-6 px-2 text-xs"
-        >
-          <Maximize className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleZoomIn}
-          title="Zoom in"
-          className="h-6 px-2 text-xs"
-        >
-          <ZoomIn className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleZoomOut}
-          title="Zoom out"
-          className="h-6 px-2 text-xs"
-        >
-          <ZoomOut className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleReset}
-          title="Reset view to initial state"
-          className="h-6 px-2 text-xs"
-        >
-          <RotateCcw className="h-3 w-3" />
-        </Button>
+      <div className="flex justify-between items-center gap-2 px-3 py-2 border-b border-border bg-card flex-shrink-0">
+        <span className="text-xs font-medium text-muted-foreground">Timeline</span>
+        <div className="flex gap-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCurrent}
+            title="Go to current time"
+            className="h-7 w-7 p-0"
+          >
+            <Clock className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleFit}
+            title="Fit all items in view"
+            className="h-7 w-7 p-0"
+          >
+            <Maximize className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleZoomIn}
+            title="Zoom in"
+            className="h-7 w-7 p-0"
+          >
+            <ZoomIn className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleZoomOut}
+            title="Zoom out"
+            className="h-7 w-7 p-0"
+          >
+            <ZoomOut className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleReset}
+            title="Reset view to initial state"
+            className="h-7 w-7 p-0"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
       <div ref={timelineRef} className="flex-1 min-h-0 overflow-auto" />
       {selectedDAGRun && (
@@ -487,9 +490,14 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       <style>
         {`
         .vis-timeline {
+          font-family: inherit !important;
           font-size: 12px !important;
-          background-color: var(--background) !important;
-          border-color: var(--border) !important;
+          background-color: var(--card) !important;
+          border: none !important;
+          border-radius: 0 !important;
+        }
+        .vis-timeline .vis-panel {
+          border: none !important;
         }
         .vis-item .vis-item-overflow {
           overflow: visible;
@@ -499,46 +507,46 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           position: sticky;
           top: 0;
           z-index: 1;
-          background-color: var(--background) !important;
-          border-color: var(--border) !important;
+          background-color: var(--muted) !important;
         }
         .vis-labelset {
           position: sticky;
           left: 0;
           z-index: 2;
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-foreground {
           background-color: transparent !important;
         }
         .vis-background {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-center {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-left {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-right {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-top {
-          background-color: var(--background) !important;
+          background-color: var(--muted) !important;
         }
         .vis-bottom {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-time-axis {
-          background-color: var(--background) !important;
+          background-color: var(--muted) !important;
           color: var(--foreground) !important;
         }
         .vis-time-axis .vis-text {
           font-size: 11px !important;
-          color: var(--foreground) !important;
+          color: var(--muted-foreground) !important;
+          font-family: inherit !important;
         }
         .vis-time-axis .vis-text.vis-major {
-          font-size: 12px !important;
+          font-size: 11px !important;
           font-weight: 600;
           color: var(--foreground) !important;
         }
@@ -548,34 +556,64 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         }
         .vis-time-axis .vis-grid.vis-minor {
           border-color: var(--border) !important;
-          opacity: 0.5;
+          opacity: 0.3;
         }
         .vis-time-axis .vis-grid.vis-major {
           border-color: var(--border) !important;
+          opacity: 0.6;
         }
         .vis-item .vis-item-content {
           position: absolute;
           left: 100% !important;
-          padding-left: 4px;
+          padding-left: 6px;
           transform: translateY(-50%);
           top: 50%;
           white-space: nowrap;
-          font-size: 12px !important;
+          font-size: 11px !important;
           font-weight: 500;
           color: var(--foreground) !important;
+          text-shadow: 0 0 2px var(--card);
         }
         .vis-item {
           overflow: visible !important;
-          height: 18px !important;
+          height: 20px !important;
+          border-radius: 3px !important;
+          border-width: 1px !important;
+          cursor: pointer !important;
+          transition: opacity 0.15s ease !important;
+        }
+        .vis-item:hover {
+          opacity: 0.85 !important;
         }
         .vis-panel {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-item.vis-selected {
           border-color: var(--ring) !important;
+          border-width: 2px !important;
         }
         .vis-current-time {
-          background-color: var(--destructive) !important;
+          background-color: var(--primary) !important;
+          width: 2px !important;
+        }
+        .vis-custom-time {
+          background-color: var(--primary) !important;
+        }
+        /* Scrollbar styling */
+        .vis-timeline::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .vis-timeline::-webkit-scrollbar-track {
+          background: var(--muted);
+          border-radius: 4px;
+        }
+        .vis-timeline::-webkit-scrollbar-thumb {
+          background: var(--border);
+          border-radius: 4px;
+        }
+        .vis-timeline::-webkit-scrollbar-thumb:hover {
+          background: var(--muted-foreground);
         }
         `}
       </style>
@@ -598,7 +636,9 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
 function TimelineWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <div className="w-full h-full flex flex-col bg-background">{children}</div>
+    <div className="w-full h-full flex flex-col bg-card overflow-hidden">
+      {children}
+    </div>
   );
 }
 
