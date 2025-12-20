@@ -99,9 +99,9 @@
   --glass-bg-alpha: 0.85;
   --glass-border: 210 212 204;
 
-  /* Primary intent (modern teal) */
-  --primary: 13 148 136;                /* teal-600 - modern, fresh */
-  --primary-highlight: 13 148 136;
+  /* Primary intent (vibrant orange) */
+  --primary: 234 88 12;                 /* orange-600 - bold, energetic */
+  --primary-highlight: 234 88 12;
   --primary-highlight-alpha: 0.08;
   --link: 59 130 246;                   /* blue-500 for links */
   --primary-alt-highlight: 240 240 242;
@@ -112,10 +112,10 @@
   --secondary-hover: 209 213 219;       /* gray-300 */
 
   /* Button component tokens */
-  --button-primary-bg: 13 148 136;      /* teal-600 */
-  --button-primary-border: 13 148 136;
-  --button-primary-border-hover: 15 118 110; /* teal-700 */
-  --frame-primary-bg: 13 148 136;
+  --button-primary-bg: 234 88 12;       /* orange-600 */
+  --button-primary-border: 234 88 12;
+  --button-primary-border-hover: 194 65 12; /* orange-700 */
+  --frame-primary-bg: 234 88 12;
   --frame-secondary-bg: 243 244 246;    /* gray-100 */
   --button-secondary-bg: 255 255 255;
   --button-secondary-border: 209 213 219;
@@ -153,7 +153,7 @@
   --info-highlight-alpha: 0.08;
 
   /* Emphasis and selection */
-  --emphasis: 13 148 136;
+  --emphasis: 234 88 12;
   --selection: 219 234 254;             /* blue-100 */
   --selection-alpha: 0.6;
 
