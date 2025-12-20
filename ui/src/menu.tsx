@@ -43,8 +43,8 @@ function Icon({
   return (
     <span
       className={cn(
-        'flex items-center justify-center w-5 h-5 transform-none text-primary-foreground',
-        isActive ? 'text-primary-foreground' : 'text-primary-foreground'
+        'flex items-center justify-center w-5 h-5 transform-none text-sidebar-foreground',
+        isActive ? 'text-sidebar-foreground' : 'text-sidebar-foreground'
       )}
     >
       {children}
@@ -90,10 +90,10 @@ export const mainListItems = React.forwardRef<
             {isHovered ? (
               <PanelLeft
                 size={20}
-                className="text-primary-foreground hover:text-primary-foreground/70"
+                className="text-sidebar-foreground hover:text-sidebar-foreground/70"
               />
             ) : (
-              <span className="text-lg font-bold text-primary-foreground">
+              <span className="text-lg font-bold text-sidebar-foreground">
                 {(config.title || 'Dagu').charAt(0).toUpperCase()}
               </span>
             )}
@@ -104,7 +104,7 @@ export const mainListItems = React.forwardRef<
         {isOpen && (
           <>
             <div className="absolute inset-0 flex items-center pl-3">
-              <span className="font-bold tracking-wide select-none text-xl text-primary-foreground">
+              <span className="font-bold tracking-wide select-none text-xl text-sidebar-foreground">
                 {config.title || 'Dagu'}
               </span>
             </div>
@@ -113,7 +113,7 @@ export const mainListItems = React.forwardRef<
                 setIsHovered(false);
                 onToggle?.();
               }}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center z-10 text-primary-foreground/40 hover:text-primary-foreground/70 transition-all duration-200 cursor-pointer"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center z-10 text-sidebar-foreground/40 hover:text-sidebar-foreground/70 transition-all duration-200 cursor-pointer"
               aria-label="Toggle sidebar"
             >
               <PanelLeft size={20} />
@@ -127,7 +127,7 @@ export const mainListItems = React.forwardRef<
         <div className="space-y-1">
           {isOpen && (
             <div className="px-3 py-1">
-              <span className="text-[10px] uppercase text-primary-foreground/40 font-medium">
+              <span className="text-[10px] uppercase text-sidebar-foreground/40 font-medium">
                 Overview
               </span>
             </div>
@@ -144,11 +144,11 @@ export const mainListItems = React.forwardRef<
         {/* Workflows Section */}
         <div className="space-y-1 mt-4">
           {!isOpen && (
-            <div className="mx-auto w-4 border-t border-primary-foreground/30 mb-2" />
+            <div className="mx-auto w-4 border-t border-sidebar-foreground/30 mb-2" />
           )}
           {isOpen && (
             <div className="px-3 py-1">
-              <span className="text-[10px] uppercase text-primary-foreground/40 font-medium">
+              <span className="text-[10px] uppercase text-sidebar-foreground/40 font-medium">
                 Workflows
               </span>
             </div>
@@ -186,11 +186,11 @@ export const mainListItems = React.forwardRef<
         {/* System Section */}
         <div className="space-y-1 mt-4">
           {!isOpen && (
-            <div className="mx-auto w-4 border-t border-primary-foreground/30 mb-2" />
+            <div className="mx-auto w-4 border-t border-sidebar-foreground/30 mb-2" />
           )}
           {isOpen && (
             <div className="px-3 py-1">
-              <span className="text-[10px] uppercase text-primary-foreground/40 font-medium">
+              <span className="text-[10px] uppercase text-sidebar-foreground/40 font-medium">
                 System
               </span>
             </div>
@@ -229,8 +229,8 @@ export const mainListItems = React.forwardRef<
           className={cn(
             'flex items-center transition-all duration-200',
             isOpen
-              ? 'h-9 px-3 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground justify-start'
-              : 'w-8 h-8 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground justify-center'
+              ? 'h-9 px-3 rounded-lg hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-start'
+              : 'w-8 h-8 rounded-lg hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-center'
           )}
           title="Discord Community"
         >
@@ -247,8 +247,8 @@ export const mainListItems = React.forwardRef<
           className={cn(
             'flex items-center transition-all duration-200',
             isOpen
-              ? 'h-9 px-3 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground justify-start'
-              : 'w-8 h-8 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground justify-center'
+              ? 'h-9 px-3 rounded-lg hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-start'
+              : 'w-8 h-8 rounded-lg hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-center'
           )}
           title="GitHub Repository"
         >
@@ -258,8 +258,8 @@ export const mainListItems = React.forwardRef<
       </div>
       {/* Version display - only shown when sidebar is expanded */}
       {isOpen && (
-        <div className="px-3 py-2 text-xs text-primary-foreground/60">
-          <div className="border-t border-primary-foreground/10 pt-2">
+        <div className="px-3 py-2 text-xs text-sidebar-foreground/60">
+          <div className="border-t border-sidebar-foreground/10 pt-2">
             Version: {config.version}
           </div>
         </div>
@@ -292,8 +292,8 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           className={cn(
             'block h-9 flex items-center text-xs font-medium rounded-lg transition-all duration-200 ease-in-out pl-10 pr-3',
             isActive
-              ? 'text-primary-foreground bg-primary-foreground/10' // Active: subtle background
-              : 'text-primary-foreground hover:text-primary-foreground hover:bg-primary-foreground/5' // Inactive: lighter green for better contrast
+              ? 'text-sidebar-foreground bg-sidebar-foreground/10' // Active: subtle background
+              : 'text-sidebar-foreground hover:text-sidebar-foreground hover:bg-sidebar-foreground/5' // Inactive: lighter green for better contrast
           )}
           aria-current={isActive ? 'page' : undefined}
           title={text}
@@ -304,7 +304,7 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           </div>
 
           {/* Text with fade-in animation */}
-          <span className="font-medium text-primary-foreground text-xs ml-3">
+          <span className="font-medium text-sidebar-foreground text-xs ml-3">
             {text}
           </span>
         </Link>
@@ -319,8 +319,8 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           className={cn(
             'flex items-center justify-center w-8 h-8 text-xs font-medium rounded-lg transition-all duration-200 ease-in-out',
             isActive
-              ? 'text-primary-foreground bg-primary-foreground/10' // Active: subtle background
-              : 'text-primary-foreground hover:text-primary-foreground hover:bg-primary-foreground/5'
+              ? 'text-sidebar-foreground bg-sidebar-foreground/10' // Active: subtle background
+              : 'text-sidebar-foreground hover:text-sidebar-foreground hover:bg-sidebar-foreground/5'
           )}
           aria-current={isActive ? 'page' : undefined}
           title={text}

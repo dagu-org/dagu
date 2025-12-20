@@ -41,24 +41,24 @@
 .dag-list-tag-filter [data-slot='select-item'][data-selected],
 .dag-list-tag-filter [data-slot='select-value'],
 .dag-list-tag-filter [data-slot='select-trigger'] {
-  color: var(--muted-foreground);
+  color: var(--muted);
 }
 
 /* Style for highlighted/selected items */
 .dag-list-tag-filter [data-slot='select-item'][data-highlighted],
 .dag-list-tag-filter [data-slot='select-item'][data-selected] {
-  color: var(--foreground);
+  color: var(--text);
 }
 
 /* Ensure placeholder text is visible but slightly muted */
 .dag-list-tag-filter [data-placeholder] {
-  color: var(--muted-foreground);
+  color: var(--muted);
 }
 
 [data-slot='select-item'][data-highlighted],
 [data-slot='select-item'][data-selected] {
-  background-color: var(--accent);
-  color: var(--accent-foreground);
+  background-color: var(--accent-surface);
+  color: var(--text);
 }
 
 /* Make the checkmark icon visible */
@@ -68,88 +68,259 @@
 }
 @import 'tw-animate-css';
 
+/* =============================================================================
+   TOKEN-BASED COLOR SYSTEM
+   Following the principle: semantic tokens backed by mode-specific values
+   Components reference only semantic tokens; theme swaps underlying values
+   ============================================================================= */
+
 :root {
-  /* Warm sepia-toned light theme */
-  --background: #f5f0e8;
-  --foreground: #3d3833;
-  --card: #faf8f5;
-  --card-foreground: #3d3833;
-  --popover: #faf8f5;
-  --popover-foreground: #3d3833;
-  --primary: #c4956a;
-  --primary-foreground: #ffffff;
-  --secondary: #f0ebe3;
-  --secondary-foreground: #3d3833;
-  --muted: #f0ebe3;
-  --muted-foreground: #6b635a;
-  --accent: #f0ebe3;
-  --accent-foreground: #3d3833;
-  --destructive: #c4726a;
-  --destructive-foreground: #ffffff;
-  --border: #c8bfb0;
-  --input: #ffffff;
-  --ring: #c4956a;
-  --chart-1: #c4956a;
-  --chart-2: #7da87d;
-  --chart-3: #8a9fc4;
-  --chart-4: #d4a574;
-  --chart-5: #d4847a;
-  --radius: 0.625rem;
-  /* Semantic status colors - sepia-compatible */
-  --success: #7da87d;
-  --success-foreground: #ffffff;
-  --success-muted: #e8f0e8;
-  --warning: #c4956a;
-  --warning-foreground: #ffffff;
-  --warning-muted: #f5ede3;
-  --error: #c4726a;
-  --error-foreground: #ffffff;
-  --error-muted: #f5e8e6;
-  --info: #8a9fc4;
-  --info-foreground: #ffffff;
-  --info-muted: #e8ecf5;
-  /* Code block colors - warm dark */
-  --code-bg: #2d2a26;
-  --code-foreground: #e8e0d6;
-  --sidebar: #faf8f5;
-  --sidebar-foreground: #3d3833;
-  --sidebar-primary: #c4956a;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f0ebe3;
-  --sidebar-accent-foreground: #3d3833;
-  --sidebar-border: #c8bfb0;
-  --sidebar-ring: #c4956a;
+  /* -------------------------------------------------------------------------
+     LIGHT MODE - Professional Gray Theme
+     Clean, minimal, easy on the eyes
+     ------------------------------------------------------------------------- */
+
+  /* Text and emphasis */
+  --text: 30 30 32;                     /* near black, slightly warm */
+  --text-secondary: 30 30 32;
+  --text-secondary-alpha: 0.72;
+  --muted: 30 30 32;
+  --muted-alpha: 0.55;
+  --trace: 30 30 32;
+  --trace-alpha: 0.25;
+
+  /* Surfaces and borders */
+  --bg: 241 242 238;                    /* warm light gray - content area */
+  --accent-surface: 235 237 230;        /* slightly darker warm gray */
+  --surface: 255 255 255;               /* white - for cards, inputs */
+  --border: 210 212 204;                /* warm gray border */
+  --border-bold: 190 192 184;           /* darker border for emphasis */
+  --glass-bg: 241 242 238;
+  --glass-bg-alpha: 0.85;
+  --glass-border: 210 212 204;
+
+  /* Primary intent (professional slate blue) */
+  --primary: 55 65 81;                  /* slate-700 - professional dark gray */
+  --primary-highlight: 55 65 81;
+  --primary-highlight-alpha: 0.08;
+  --link: 59 130 246;                   /* blue-500 for links */
+  --primary-alt-highlight: 240 240 242;
+
+  /* Secondary intent */
+  --secondary: 229 231 235;             /* gray-200 */
+  --secondary-alpha: 1;
+  --secondary-hover: 209 213 219;       /* gray-300 */
+
+  /* Button component tokens */
+  --button-primary-bg: 55 65 81;        /* slate-700 */
+  --button-primary-border: 55 65 81;
+  --button-primary-border-hover: 31 41 55; /* slate-800 */
+  --frame-primary-bg: 55 65 81;
+  --frame-secondary-bg: 243 244 246;    /* gray-100 */
+  --button-secondary-bg: 255 255 255;
+  --button-secondary-border: 209 213 219;
+  --button-secondary-border-hover: 156 163 175;
+  --frame-danger-bg: 220 38 38;
+  --frame-danger-bg-alpha: 0.9;
+  --button-danger-border: 220 38 38;
+  --button-danger-border-hover: 185 28 28;
+
+  /* Status: Danger (muted red) */
+  --danger: 220 38 38;                  /* red-600 */
+  --danger-light: 248 113 113;          /* red-400 */
+  --danger-lighter: 254 226 226;        /* red-100 */
+  --danger-dark: 185 28 28;             /* red-700 */
+  --danger-highlight: 220 38 38;
+  --danger-highlight-alpha: 0.08;
+
+  /* Status: Warning (muted amber) */
+  --warning: 217 119 6;                 /* amber-600 */
+  --warning-dark: 180 83 9;             /* amber-700 */
+  --warning-highlight: 217 119 6;
+  --warning-highlight-alpha: 0.08;
+
+  /* Status: Success (muted green) */
+  --success: 22 163 74;                 /* green-600 */
+  --success-light: 74 222 128;          /* green-400 */
+  --success-dark: 21 128 61;            /* green-700 */
+  --success-highlight: 22 163 74;
+  --success-highlight-alpha: 0.08;
+
+  /* Status: Info (muted blue) */
+  --info: 37 99 235;                    /* blue-600 */
+  --info-light: 96 165 250;             /* blue-400 */
+  --info-highlight: 37 99 235;
+  --info-highlight-alpha: 0.08;
+
+  /* Emphasis and selection */
+  --emphasis: 55 65 81;
+  --selection: 219 234 254;             /* blue-100 */
+  --selection-alpha: 0.6;
+
+  /* Legacy neutral tokens (for compatibility) */
+  --text-muted-legacy: 107 114 128;     /* gray-500 */
+  --text-muted-dark-legacy: 75 85 99;   /* gray-600 */
+  --text-muted-alt-legacy: 107 114 128;
+
+  /* Code block colors */
+  --code-bg: 31 41 55;                  /* slate-800 */
+  --code-text: 243 244 246;             /* gray-100 */
+
+  /* Data visualization palette (professional, muted) */
+  --chart-1: 59 130 246;                /* blue-500 */
+  --chart-2: 34 197 94;                 /* green-500 */
+  --chart-3: 168 85 247;                /* purple-500 */
+  --chart-4: 249 115 22;                /* orange-500 */
+  --chart-5: 236 72 153;                /* pink-500 */
+  --chart-6: 20 184 166;                /* teal-500 */
+  --chart-7: 245 158 11;                /* amber-500 */
+  --chart-8: 107 114 128;               /* gray-500 */
+
+  /* Sidebar & Navbar */
+  --sidebar-bg: 229 231 223;            /* rgb(229, 231, 223) - warm gray */
+  --sidebar-text: 30 30 32;
+  --sidebar-border: 200 202 194;
+  --sidebar-accent: 220 222 214;
+
+  /* Ring (focus) */
+  --ring: 59 130 246;                   /* blue-500 for focus */
+
+  /* Border radius */
+  --radius: 0.375rem;
+
+  /* -------------------------------------------------------------------------
+     SHADCN COMPATIBILITY MAPPINGS (light mode)
+     ------------------------------------------------------------------------- */
+  --background: rgb(var(--bg));
+  --foreground: rgb(var(--text));
+  --card: rgb(var(--surface));
+  --card-foreground: rgb(var(--text));
+  --popover: rgb(var(--surface));
+  --popover-foreground: rgb(var(--text));
+  --primary-color: rgb(var(--primary));
+  --primary-foreground: 255 255 255;
+  --secondary-color: rgb(var(--secondary));
+  --secondary-foreground: rgb(var(--text));
+  --muted-color: rgb(var(--accent-surface));
+  --muted-foreground: rgba(var(--text), var(--muted-alpha));
+  --accent: rgb(var(--accent-surface));
+  --accent-foreground: rgb(var(--text));
+  --destructive: rgb(var(--danger));
+  --destructive-foreground: 255 255 255;
+  --border-color: rgb(var(--border));
+  --input: rgb(var(--surface));
+  --ring-color: rgb(var(--ring));
+
+  /* Sidebar compatibility */
+  --sidebar: rgb(var(--sidebar-bg));
+  --sidebar-foreground: rgb(var(--sidebar-text));
+  --sidebar-primary: rgb(var(--primary));
+  --sidebar-primary-foreground: rgb(255 255 255);
+  --sidebar-accent: rgb(var(--sidebar-accent));
+  --sidebar-accent-foreground: rgb(var(--sidebar-text));
+  --sidebar-border: rgb(var(--sidebar-border));
+  --sidebar-ring: rgb(var(--ring));
 }
 
+/* Tailwind theme inline - maps CSS vars to Tailwind classes */
 @theme inline {
+  /* Core semantic colors */
+  --color-text: rgb(var(--text));
+  --color-text-secondary: rgba(var(--text-secondary), var(--text-secondary-alpha));
+  --color-muted: rgba(var(--muted), var(--muted-alpha));
+  --color-trace: rgba(var(--trace), var(--trace-alpha));
+
+  /* Surfaces */
+  --color-bg: rgb(var(--bg));
+  --color-surface: rgb(var(--surface));
+  --color-accent-surface: rgb(var(--accent-surface));
+  --color-glass-bg: rgba(var(--glass-bg), var(--glass-bg-alpha));
+  --color-glass-border: rgb(var(--glass-border));
+
+  /* Borders */
+  --color-border: rgb(var(--border));
+  --color-border-bold: rgb(var(--border-bold));
+
+  /* Primary intent */
+  --color-primary: rgb(var(--primary));
+  --color-primary-highlight: rgba(var(--primary-highlight), var(--primary-highlight-alpha));
+  --color-link: rgb(var(--link));
+  --color-primary-alt-highlight: rgb(var(--primary-alt-highlight));
+
+  /* Secondary */
+  --color-secondary: rgba(var(--secondary), var(--secondary-alpha));
+  --color-secondary-hover: rgb(var(--secondary-hover));
+
+  /* Button tokens */
+  --color-button-primary-bg: rgb(var(--button-primary-bg));
+  --color-button-primary-border: rgb(var(--button-primary-border));
+  --color-button-primary-border-hover: rgb(var(--button-primary-border-hover));
+  --color-frame-primary-bg: rgb(var(--frame-primary-bg));
+  --color-frame-secondary-bg: rgb(var(--frame-secondary-bg));
+  --color-button-secondary-bg: rgb(var(--button-secondary-bg));
+  --color-button-secondary-border: rgb(var(--button-secondary-border));
+  --color-button-secondary-border-hover: rgb(var(--button-secondary-border-hover));
+  --color-frame-danger-bg: rgba(var(--frame-danger-bg), var(--frame-danger-bg-alpha));
+  --color-button-danger-border: rgb(var(--button-danger-border));
+  --color-button-danger-border-hover: rgb(var(--button-danger-border-hover));
+
+  /* Status: Danger */
+  --color-danger: rgb(var(--danger));
+  --color-danger-light: rgb(var(--danger-light));
+  --color-danger-lighter: rgb(var(--danger-lighter));
+  --color-danger-dark: rgb(var(--danger-dark));
+  --color-danger-highlight: rgba(var(--danger-highlight), var(--danger-highlight-alpha));
+
+  /* Status: Warning */
+  --color-warning: rgb(var(--warning));
+  --color-warning-dark: rgb(var(--warning-dark));
+  --color-warning-highlight: rgba(var(--warning-highlight), var(--warning-highlight-alpha));
+
+  /* Status: Success */
+  --color-success: rgb(var(--success));
+  --color-success-light: rgb(var(--success-light));
+  --color-success-dark: rgb(var(--success-dark));
+  --color-success-highlight: rgba(var(--success-highlight), var(--success-highlight-alpha));
+
+  /* Status: Info */
+  --color-info: rgb(var(--info));
+  --color-info-light: rgb(var(--info-light));
+  --color-info-highlight: rgba(var(--info-highlight), var(--info-highlight-alpha));
+
+  /* Emphasis and selection */
+  --color-emphasis: rgb(var(--emphasis));
+  --color-selection: rgba(var(--selection), var(--selection-alpha));
+
+  /* Code */
+  --color-code-bg: rgb(var(--code-bg));
+  --color-code-text: rgb(var(--code-text));
+
+  /* Charts / Data viz */
+  --color-chart-1: rgb(var(--chart-1));
+  --color-chart-2: rgb(var(--chart-2));
+  --color-chart-3: rgb(var(--chart-3));
+  --color-chart-4: rgb(var(--chart-4));
+  --color-chart-5: rgb(var(--chart-5));
+  --color-chart-6: rgb(var(--chart-6));
+  --color-chart-7: rgb(var(--chart-7));
+  --color-chart-8: rgb(var(--chart-8));
+
+  /* SHADCN COMPATIBILITY (for existing components) */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
+  --color-destructive-foreground: rgb(var(--destructive-foreground));
   --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-ring: var(--ring-color);
+
+  /* Sidebar */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -158,20 +329,12 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-success-muted: var(--success-muted);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-warning-muted: var(--warning-muted);
-  --color-error: var(--error);
-  --color-error-foreground: var(--error-foreground);
-  --color-error-muted: var(--error-muted);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
-  --color-info-muted: var(--info-muted);
-  --color-code-bg: var(--code-bg);
-  --color-code-foreground: var(--code-foreground);
+
+  /* Radius */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 @layer base {
@@ -230,6 +393,6 @@
 
 /* Enhanced line highlighting for search results and code displays */
 .line-highlight {
-  background: rgba(196, 149, 106, 0.15) !important; /* Warm sepia highlight */
-  background: linear-gradient(to right, rgba(196, 149, 106, 0.2) 70%, rgba(196, 149, 106, 0.05)) !important;
+  background: rgba(var(--primary), 0.15) !important;
+  background: linear-gradient(to right, rgba(var(--primary), 0.2) 70%, rgba(var(--primary), 0.05)) !important;
 }

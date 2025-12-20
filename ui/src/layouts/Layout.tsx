@@ -131,10 +131,8 @@ function Content({ title, navbarColor, children }: LayoutProps) {
       {/* Desktop Sidebar - Hidden on mobile, visible in collapsed state on desktop */}
       <div
         className={cn(
-          // Modern base styles with dark background
-          'h-full overflow-hidden bg-primary text-primary-foreground',
-          // Shadow effect
-          '',
+          // Modern base styles with sidebar background
+          'h-full overflow-hidden bg-sidebar text-sidebar-foreground',
           // Hidden on mobile, visible on desktop
           'hidden md:block',
           'z-40 transition-all duration-200 ease-in-out',
@@ -160,13 +158,13 @@ function Content({ title, navbarColor, children }: LayoutProps) {
           onClick={() => setIsMobileSidebarOpen(false)}
         >
           <div
-            className="h-full w-60 bg-primary text-primary-foreground overflow-hidden"
+            className="h-full w-60 bg-sidebar text-sidebar-foreground overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-end p-4">
               <button
                 onClick={() => setIsMobileSidebarOpen(false)}
-                className="text-primary-foreground hover:text-primary-foreground/70 transition-colors"
+                className="text-sidebar-foreground hover:text-sidebar-foreground/70 transition-colors"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -194,7 +192,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
               : 'border-b border-transparent',
             // Use theme-aware classes when no custom color is set
             !navbarColor || navbarColor.trim() === ''
-              ? 'bg-primary text-primary-foreground'
+              ? 'bg-sidebar text-sidebar-foreground'
               : ''
           )}
           style={
