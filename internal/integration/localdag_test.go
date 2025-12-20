@@ -109,9 +109,8 @@ steps:
 	})
 
 	t.Run("NestedLocalDAGs", func(t *testing.T) {
-		// Test that nested local DAGs beyond 1 level are not supported
-		// This should fail because middle-dag tries to run leaf-dag, but leaf-dag
-		// is not visible to middle-dag (only to root-dag)
+		// Test that multi-level nested local DAGs are supported
+		// middle-dag calls leaf-dag, which should work correctly
 		yamlContent := `
 steps:
   - name: run-middle-dag
@@ -148,20 +147,21 @@ steps:
 
 		agent := testDAG.Agent()
 		err := agent.Run(agent.Context)
-		// The root DAG execution will fail because middle-dag fails
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed")
+		require.NoError(t, err)
 
-		// This should fail because middle-dag cannot see leaf-dag
-		testDAG.AssertLatestStatus(t, core.Failed)
+		// Multi-level nested local DAGs should succeed
+		testDAG.AssertLatestStatus(t, core.Succeeded)
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
 
-		// Root DAG should have one step that tried to run middle-dag
+		// Root DAG should have one step that ran middle-dag successfully
 		require.Len(t, dagRunStatus.Nodes, 1)
 		require.Equal(t, "run-middle-dag", dagRunStatus.Nodes[0].Step.Name)
-		require.Equal(t, core.NodeFailed, dagRunStatus.Nodes[0].Status)
+		require.Equal(t, core.NodeSucceeded, dagRunStatus.Nodes[0].Status)
+
+		// Verify middle-dag has a sub-run
+		require.Len(t, dagRunStatus.Nodes[0].SubRuns, 1, "middle-dag should have one sub-run")
 	})
 
 	t.Run("LocalDAGWithConditionalExecution", func(t *testing.T) {
