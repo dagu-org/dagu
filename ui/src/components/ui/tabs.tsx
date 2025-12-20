@@ -38,8 +38,8 @@ function Tab({
         'transition-all duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         'disabled:pointer-events-none disabled:opacity-50',
         isActive
-          ? 'text-amber-700 font-semibold [&_svg]:text-amber-700'
-          : 'text-gray-700 hover:text-gray-900',
+          ? 'text-primary font-semibold [&_svg]:text-primary'
+          : 'text-foreground hover:text-foreground/80',
         className
       )}
       {...props}

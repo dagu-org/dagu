@@ -61,8 +61,8 @@ export const ToggleButton = ({
         'inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer',
         borderRadiusClasses,
         isSelected
-          ? 'text-amber-700 font-semibold [&_svg]:text-amber-700'
-          : 'text-gray-700 hover:text-gray-900',
+          ? 'text-primary font-semibold [&_svg]:text-primary'
+          : 'text-foreground hover:text-foreground/80',
         className
       )}
       onClick={onClick}
