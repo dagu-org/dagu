@@ -1,14 +1,14 @@
+import { Button } from '@/components/ui/button';
+import { Clock, Maximize, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
-import { Timeline } from 'vis-timeline/standalone';
 import { DataSet } from 'vis-data';
+import { Timeline } from 'vis-timeline/standalone';
 import 'vis-timeline/styles/vis-timeline-graph2d.css';
 import { components } from '../../../api/v2/schema';
 import { statusColorMapping } from '../../../consts';
 import { useConfig } from '../../../contexts/ConfigContext';
 import dayjs from '../../../lib/dayjs';
 import DAGRunDetailsModal from '../../dag-runs/components/dag-run-details/DAGRunDetailsModal';
-import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, Maximize, Clock, RotateCcw } from 'lucide-react';
 
 type Props = {
   data: components['schemas']['DAGRunSummary'][];
@@ -329,26 +329,11 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       timelineInstance.current.setWindow(validViewStartDate, validViewEndDate);
     }
 
-    return () => {
-      if (timelineInstance.current) {
-        timelineInstance.current.off('rangechanged');
-        timelineInstance.current.destroy();
-        timelineInstance.current = null;
-      }
-    };
-  }, [
-    input,
-    config.tz,
-    getValidTimezone,
-    selectedDate,
-    updateTimeAxisBasedOnZoom,
-  ]);
-
-  useEffect(() => {
+    // Register click handler for opening DAG-run modal
+    // Must be done after timeline creation/update to ensure it's attached to current instance
     const timeline = timelineInstance.current;
     if (timeline) {
-      timeline.off('click');
-
+      timeline.off('click'); // Remove any previous handler
       timeline.on('click', (properties) => {
         if (properties.item) {
           const itemId = properties.item.toString();
@@ -369,11 +354,20 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     }
 
     return () => {
-      if (timeline) {
-        timeline.off('click');
+      if (timelineInstance.current) {
+        timelineInstance.current.off('rangechanged');
+        timelineInstance.current.off('click');
+        timelineInstance.current.destroy();
+        timelineInstance.current = null;
       }
     };
-  }, [input]);
+  }, [
+    input,
+    config.tz,
+    getValidTimezone,
+    selectedDate,
+    updateTimeAxisBasedOnZoom,
+  ]);
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
@@ -429,7 +423,9 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
   return (
     <TimelineWrapper>
       <div className="flex justify-between items-center gap-2 px-3 py-2 border-b border-border bg-card flex-shrink-0">
-        <span className="text-xs font-medium text-muted-foreground">Timeline</span>
+        <span className="text-xs font-medium text-muted-foreground">
+          Timeline
+        </span>
         <div className="flex gap-1">
           <Button
             variant="ghost"
