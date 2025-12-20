@@ -3,6 +3,7 @@
  *
  * @module features/dags/components/dag-editor
  */
+import { cn } from '@/lib/utils';
 import MonacoEditor, { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 import { configureMonacoYaml } from 'monaco-yaml';
@@ -127,9 +128,9 @@ function DAGEditor({
     document.documentElement.classList.contains('dark');
 
   return (
-    <div className={className}>
+    <div className={cn('h-full', className)}>
       <MonacoEditor
-        height="400px"
+        height="100%"
         language="yaml"
         theme={isDarkMode ? 'vs-dark' : 'vs'}
         value={value}

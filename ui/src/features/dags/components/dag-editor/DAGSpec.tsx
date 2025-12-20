@@ -308,9 +308,12 @@ function DAGSpec({ fileName }: Props) {
         return (
           data?.dag && (
             <React.Fragment>
-              <div className="space-y-6" ref={containerRef}>
-                {hasLocalDags ? (
-                  <div className="">
+              <div
+                className="flex flex-col flex-1 h-full min-h-[500px] space-y-6"
+                ref={containerRef}
+              >
+                {hasLocalDags && (
+                  <div className="flex-shrink-0">
                     <div className="overflow-x-auto -mx-2 px-2 scrollbar-thin scrollbar-thumb-gray-300">
                       <Tabs className="w-max min-w-full">
                         <Tab
@@ -335,13 +338,37 @@ function DAGSpec({ fileName }: Props) {
                       </Tabs>
                     </div>
                   </div>
-                ) : (
-                  data?.dag && renderDAGContent(data.dag, data?.errors)
                 )}
 
-                <div className="bg-surface border border-border rounded-lg">
+                {(() => {
+                  if (activeTab === 'parent') {
+                    return (
+                      data?.dag && (
+                        <div className="flex-shrink-0">
+                          {renderDAGContent(data.dag, data?.errors)}
+                        </div>
+                      )
+                    );
+                  }
+                  const selectedLocalDag = dagDetails?.localDags?.find(
+                    (ld: components['schemas']['LocalDag']) =>
+                      ld.name === activeTab
+                  );
+                  return (
+                    selectedLocalDag?.dag && (
+                      <div className="flex-shrink-0">
+                        {renderDAGContent(
+                          selectedLocalDag.dag,
+                          selectedLocalDag.errors
+                        )}
+                      </div>
+                    )
+                  );
+                })()}
+
+                <div className="flex-1 flex flex-col bg-surface border border-border rounded-lg overflow-hidden min-h-[400px]">
                   {editable && (
-                    <div className="flex justify-end p-2 border-b border-border">
+                    <div className="flex-shrink-0 flex justify-end p-2 border-b border-border">
                       <Button
                         id="save-config"
                         title="Save changes (Ctrl+S / Cmd+S)"
@@ -355,18 +382,20 @@ function DAGSpec({ fileName }: Props) {
                       </Button>
                     </div>
                   )}
-                  <DAGEditor
-                    value={editable ? (currentValue ?? data.spec) : data.spec}
-                    readOnly={!editable}
-                    lineNumbers={true}
-                    onChange={
-                      editable
-                        ? (newValue) => {
-                            setCurrentValue(newValue || '');
-                          }
-                        : undefined
-                    }
-                  />
+                  <div className="flex-1">
+                    <DAGEditor
+                      value={editable ? (currentValue ?? data.spec) : data.spec}
+                      readOnly={!editable}
+                      lineNumbers={true}
+                      onChange={
+                        editable
+                          ? (newValue) => {
+                              setCurrentValue(newValue || '');
+                            }
+                          : undefined
+                      }
+                    />
+                  </div>
                 </div>
               </div>
             </React.Fragment>

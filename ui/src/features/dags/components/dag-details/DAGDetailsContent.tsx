@@ -89,7 +89,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         name: dag?.name || '',
       }}
     >
-      <div className="w-full flex flex-col">
+      <div className="w-full h-full flex flex-col">
         {/* Only render the header if skipHeader is not true */}
         {!skipHeader && (
           <DAGHeader
@@ -262,7 +262,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             <DAGEditButtons fileName={fileName || ''} />
           ) : null}
         </div>
-        <div className="flex-1">
+        <div className="flex-1 flex flex-col min-h-0">
           {activeTab === 'status' ? (
             <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
           ) : null}

@@ -380,11 +380,6 @@ function Dashboard(): React.ReactElement | null {
     },
   ];
 
-  let timelineTitle = 'Timeline';
-  if (config.tz) {
-    timelineTitle = `Timeline (${config.tz})`;
-  }
-
   return (
     <div className="flex flex-col gap-2 w-full h-full overflow-auto">
       <Title>Dashboard</Title>
