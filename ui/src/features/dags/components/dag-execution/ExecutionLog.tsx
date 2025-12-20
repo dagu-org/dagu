@@ -297,7 +297,7 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
   return (
     <div className="w-full h-full flex flex-col">
       {/* Controls for log navigation */}
-      <div className="flex flex-col gap-2 mb-2 p-2 bg-zinc-100 rounded">
+      <div className="flex flex-col gap-2 mb-2 p-2 bg-muted rounded">
         <div className="flex flex-wrap items-center gap-2">
           {/* Responsive button container */}
           <div className="flex flex-wrap gap-2 min-h-[28px]">
@@ -331,7 +331,7 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
           </div>
 
           <select
-            className="px-2 py-1 text-xs border rounded bg-white flex-shrink-0"
+            className="px-2 py-1 text-xs border rounded bg-card flex-shrink-0"
             value={pageSize}
             onChange={(e) => setPageSize(Number(e.target.value))}
             disabled={isNavigating}
@@ -365,15 +365,15 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
                   transition-all duration-200 ease-in-out
                   ${
                     isLiveMode
-                      ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
-                      : 'bg-zinc-200 text-zinc-600 hover:bg-zinc-300'
+                      ? 'bg-green-500 text-white shadow-green-500/25'
+                      : 'bg-accent text-muted-foreground hover:bg-accent'
                   }
                 `}
               >
                 <span
                   className={`
                   inline-block w-2 h-2 rounded-full
-                  ${isLiveMode ? 'bg-white animate-pulse' : 'bg-zinc-400'}
+                  ${isLiveMode ? 'bg-card animate-pulse' : 'bg-zinc-400'}
                 `}
                 />
                 <span>LIVE</span>
@@ -383,7 +383,7 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
         </div>
 
         {/* Stats line - full width on mobile */}
-        <div className="text-xs text-zinc-500 flex items-center">
+        <div className="text-xs text-muted-foreground flex items-center">
           Showing {lineCount} of {totalLines} lines{' '}
           {isEstimate ? '(estimated)' : ''} {hasMore ? '(more available)' : ''}
         </div>
@@ -462,7 +462,7 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
       >
         {isNavigating && (
           <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 pointer-events-none">
-            <div className="bg-white rounded-lg p-2 shadow-lg">
+            <div className="bg-card rounded-lg p-2">
               <div className="h-5 w-5 animate-spin rounded-full border-3 border-primary border-t-transparent"></div>
             </div>
           </div>
@@ -474,7 +474,7 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
               className="flex hover:bg-zinc-800 px-2 py-0.5 rounded"
             >
               <span
-                className="text-zinc-500 mr-4 select-none w-8 text-right flex-shrink-0 self-start"
+                className="text-muted-foreground mr-4 select-none w-8 text-right flex-shrink-0 self-start"
                 data-line-number={getLineNumber(index)}
               >
                 {getLineNumber(index)}

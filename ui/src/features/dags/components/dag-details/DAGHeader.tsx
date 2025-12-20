@@ -122,7 +122,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   }, [params.tab, handleRefresh]);
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-white to-slate-50 rounded-2xl p-6 mb-6 border border-slate-200 shadow-sm">
+    <div className="bg-gradient-to-br from-slate-50 via-white to-slate-50 rounded-2xl p-6 mb-6 border border-border">
       {/* Header with title and actions */}
       <div className="flex items-start justify-between gap-6 mb-4">
         <div className="flex-1 min-w-0">
@@ -243,7 +243,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 
       {/* Parameters - Show if present */}
       {dagRunToDisplay.params && (
-        <div className="mt-4 border-t border-slate-200 pt-4">
+        <div className="mt-4 border-t border-border pt-4">
           <div className="flex items-center gap-2 mb-2">
             <Terminal className="h-4 w-4 text-slate-500" />
             <span className="text-sm font-semibold text-slate-700">

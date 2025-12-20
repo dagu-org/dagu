@@ -162,7 +162,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
               value={dagRunId}
               readOnly={runIdReadOnly}
               disabled={runIdReadOnly}
-              className={runIdReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}
+              className={runIdReadOnly ? 'bg-muted cursor-not-allowed' : ''}
               onChange={(e) => {
                 if (!runIdReadOnly) {
                   setDAGRunId(e.target.value);
@@ -183,7 +183,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
                     readOnly={paramsReadOnly}
                     disabled={paramsReadOnly}
                     className={
-                      paramsReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+                      paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
                     }
                     onChange={(e) => {
                       if (p.Name && !paramsReadOnly) {
@@ -216,7 +216,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
                     readOnly={paramsReadOnly}
                     disabled={paramsReadOnly}
                     className={
-                      paramsReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+                      paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
                     }
                     onChange={(e) => {
                       if (paramsReadOnly) return;

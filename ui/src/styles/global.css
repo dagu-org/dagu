@@ -11,7 +11,11 @@
   body {
     @apply bg-background text-foreground;
   }
-  
+  /* Remove all shadows globally for flat design */
+  * {
+    --tw-shadow: none !important;
+    --tw-shadow-colored: none !important;
+  }
 }
 
 /* Override focus styles for select components */

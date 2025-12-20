@@ -103,7 +103,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
                 group relative overflow-hidden rounded-lg border p-4 transition-all duration-200 focus:outline-none
                 ${selectedButton === 0 
                   ? 'border-green-500 bg-green-50' 
-                  : 'border-zinc-200 hover:border-green-500 hover:bg-green-50'
+                  : 'border-border hover:border-green-500 hover:bg-green-50'
                 }
               `}
               onClick={() => onSubmit(step, NodeStatus.Success)}
@@ -121,7 +121,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
                 group relative overflow-hidden rounded-lg border p-4 transition-all duration-200 focus:outline-none
                 ${selectedButton === 1 
                   ? 'border-red-500 bg-red-50' 
-                  : 'border-zinc-200 hover:border-red-500 hover:bg-red-50'
+                  : 'border-border hover:border-red-500 hover:bg-red-50'
                 }
               `}
               onClick={() => onSubmit(step, NodeStatus.Failed)}
@@ -135,7 +135,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-zinc-500 font-mono pt-2 border-t border-zinc-200">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono pt-2 border-t border-border">
           <span>←→ Select</span>
           <span className="opacity-40">•</span>
           <span>Enter: Confirm</span>

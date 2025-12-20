@@ -125,7 +125,7 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
           isMobile 
             ? 'border border-border rounded-none' 
             : 'border-l border-border'
-        } shadow-xl overflow-hidden flex flex-col ${
+        } overflow-hidden flex flex-col ${
           isMobile ? 'animate-in fade-in-0 slide-in-from-bottom-10' : 'slide-in-from-right'
         }`}
         style={{ zIndex: zIndex + 1 }} // Make sure modal is above backdrop

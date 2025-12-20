@@ -113,9 +113,9 @@ export default function UsersPage() {
       case 'operator':
         return 'bg-green-500/20 text-green-600';
       case 'viewer':
-        return 'bg-gray-500/20 text-gray-600';
+        return 'bg-gray-500/20 text-muted-foreground';
       default:
-        return 'bg-gray-500/20 text-gray-600';
+        return 'bg-gray-500/20 text-muted-foreground';
     }
   };
 

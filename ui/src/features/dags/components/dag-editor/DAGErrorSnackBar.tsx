@@ -42,7 +42,7 @@ const DAGErrorSnackBar = ({ open, setOpen, errors }: DAGErrorSnackBarProps) => {
   return (
     <ToastProvider>
       <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-[20vw] max-w-md">
-        <Toast variant="destructive" className="bg-white border-red-500">
+        <Toast variant="destructive" className="bg-card border-red-500">
           <div className="flex flex-col items-center w-full">
             <ToastTitle className="text-red-500 text-xl font-bold">
               Error Detected

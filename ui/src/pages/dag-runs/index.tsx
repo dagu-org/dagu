@@ -611,7 +611,7 @@ function DAGRuns() {
             <SelectTrigger className="w-[160px] bg-background">
               <SelectValue placeholder="Status">
                 {status === 'all' ? (
-                  <div className="inline-flex items-center rounded-full border bg-gray-100 border-gray-300 text-gray-700 py-0.5 px-2 text-xs font-medium">
+                  <div className="inline-flex items-center rounded-full border bg-muted border-border text-foreground py-0.5 px-2 text-xs font-medium">
                     All
                   </div>
                 ) : status === String(Status.NotStarted) ? (
@@ -647,7 +647,7 @@ function DAGRuns() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">
-                <div className="inline-flex items-center rounded-full border bg-gray-100 border-gray-300 text-gray-700 py-0.5 px-2 text-xs font-medium">
+                <div className="inline-flex items-center rounded-full border bg-muted border-border text-foreground py-0.5 px-2 text-xs font-medium">
                   All Statuses
                 </div>
               </SelectItem>

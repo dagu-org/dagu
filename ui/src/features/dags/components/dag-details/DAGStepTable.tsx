@@ -36,7 +36,7 @@ function DAGStepTable({ steps }: Props) {
     <div className="w-full overflow-x-auto">
       <Table>
         <TableHeader className="bg-slate-50">
-          <TableRow className="border-b border-slate-200 h-8">
+          <TableRow className="border-b border-border h-8">
             <TableHead className="w-[4%] py-1.5 text-xs font-semibold text-slate-700 text-center">
               No
             </TableHead>

@@ -126,7 +126,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
 
   if (isLoading || !data || !data.latestDAGRun) {
     return (
-      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border shadow-xl z-50 flex items-center justify-center">
+      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 flex items-center justify-center">
         <LoadingIndicator />
       </div>
     );
@@ -141,7 +141,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
       />
 
       {/* Side Modal */}
-      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border shadow-xl z-50 overflow-y-auto">
+      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 overflow-y-auto">
         <DAGContext.Provider
           value={{
             refresh: refreshFn,

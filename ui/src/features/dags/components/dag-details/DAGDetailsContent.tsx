@@ -104,7 +104,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 lg:gap-0 mb-4">
           {/* Desktop Tabs (lg and up) */}
           <div className="hidden lg:block overflow-x-auto">
-            <Tabs className="bg-white p-1 rounded-lg border border-gray-200 whitespace-nowrap">
+            <Tabs className="bg-card p-1 rounded-lg border border-border whitespace-nowrap">
               {isModal ? (
                 <ModalLinkTab
                   label="Status"
@@ -178,7 +178,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
 
           {/* Mobile/Tablet Tabs (sm to lg) */}
           <div className="lg:hidden w-full overflow-x-auto">
-            <div className="flex space-x-1 bg-white p-1 rounded-lg border border-gray-200 w-full">
+            <div className="flex space-x-1 bg-card p-1 rounded-lg border border-border w-full">
               {isModal ? (
                 <ModalLinkTab
                   label=""

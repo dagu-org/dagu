@@ -51,7 +51,7 @@ export function ScriptDialog({
         {children}
       </div>
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-4 py-3 border-b border-slate-200">
+        <DialogHeader className="px-4 py-3 border-b border-border">
           <DialogTitle className="flex items-center gap-2 text-sm font-semibold">
             <FileText className="h-4 w-4 text-amber-500" />
             {stepName ? `Script: ${stepName}` : 'Script Content'}
@@ -62,7 +62,7 @@ export function ScriptDialog({
             <pre className="font-mono text-[12px] text-zinc-100 p-3">
               {lines.map((line, index) => (
                 <div key={index} className="flex hover:bg-zinc-800 px-1">
-                  <span className="text-zinc-500 mr-4 select-none w-8 text-right flex-shrink-0">
+                  <span className="text-muted-foreground mr-4 select-none w-8 text-right flex-shrink-0">
                     {index + 1}
                   </span>
                   <span className="whitespace-pre-wrap break-all flex-grow">

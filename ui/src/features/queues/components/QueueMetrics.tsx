@@ -31,7 +31,7 @@ function QueueMetrics({ metrics, isLoading }: QueueMetricsProps) {
     {
       title: 'DAG-based Queues',
       value: metrics.dagBasedQueues,
-      icon: <Layers className="h-5 w-5 text-gray-500" />,
+      icon: <Layers className="h-5 w-5 text-muted-foreground" />,
       tooltip: 'Number of DAG-based queues (each DAG has its own queue with maxActiveRuns limit, default 1)',
     },
     {

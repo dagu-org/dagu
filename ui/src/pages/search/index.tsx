@@ -159,7 +159,7 @@ function Search() {
           {(() => {
             if (!q) {
               return (
-                <div className="text-sm text-gray-500 italic">
+                <div className="text-sm text-muted-foreground italic">
                   Enter a search term and press Enter or click Search
                 </div>
               );
@@ -181,7 +181,7 @@ function Search() {
               (data && data.results && data.results.length === 0)
             ) {
               return (
-                <div className="text-sm text-gray-500 italic">
+                <div className="text-sm text-muted-foreground italic">
                   No results found
                 </div>
               );

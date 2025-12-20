@@ -75,7 +75,7 @@ function PathsDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-card border rounded-lg shadow-lg w-full max-w-lg mx-4">
+      <div className="relative bg-card border rounded-lg w-full max-w-lg mx-4">
         <div className="flex items-center justify-between p-2 border-b">
           <div className="flex items-center gap-1.5">
             <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />

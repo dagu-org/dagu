@@ -43,7 +43,7 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
         <div className="min-w-[900px]">
           <Table className="w-full">
             <TableHeader className="bg-slate-50">
-              <TableRow className="border-b border-slate-200">
+              <TableRow className="border-b border-border">
                 <TableHead className="w-[5%] py-3 text-sm font-semibold text-slate-700 text-center">
                   No
                 </TableHead>

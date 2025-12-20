@@ -236,7 +236,7 @@ function DAGSpec({ fileName }: Props) {
   ) => (
     <div className="space-y-6">
       {errors?.length ? (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
           <div className="border-b border-slate-100 bg-red-50 px-6 py-4">
             <h2 className="text-lg font-semibold text-red-600 flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
@@ -258,7 +258,7 @@ function DAGSpec({ fileName }: Props) {
         </div>
       ) : null}
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+      <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50 px-6 py-4 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-slate-900">
             Graph
@@ -294,7 +294,7 @@ function DAGSpec({ fileName }: Props) {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+      <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
           <h2 className="text-lg font-semibold text-slate-900">
             Attributes
@@ -306,7 +306,7 @@ function DAGSpec({ fileName }: Props) {
       </div>
 
       {dag.steps ? (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
           <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
             <h2 className="text-lg font-semibold text-slate-900 flex items-center justify-between">
               <span>Steps</span>
@@ -323,7 +323,7 @@ function DAGSpec({ fileName }: Props) {
       ) : null}
 
       {getHandlers(dag)?.length ? (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
           <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
             <h2 className="text-lg font-semibold text-slate-900 flex items-center justify-between">
               <span>Lifecycle Hooks</span>
@@ -381,7 +381,7 @@ function DAGSpec({ fileName }: Props) {
                         {localDag.dag ? (
                           renderDAGContent(localDag.dag, localDag.errors)
                         ) : (
-                          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                          <div className="bg-card rounded-2xl border border-border p-6">
                             <div className="text-red-600">
                               <AlertTriangle className="h-5 w-5 inline mr-2" />
                               Failed to load local DAG: {localDag.name}
@@ -405,7 +405,7 @@ function DAGSpec({ fileName }: Props) {
 
               <div
                 className={
-                  'rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden bg-white border-slate-200'
+                  'rounded-2xl border hover: overflow-hidden bg-card border-border'
                 }
               >
                 <div
@@ -426,7 +426,7 @@ function DAGSpec({ fileName }: Props) {
                         variant="default"
                         size="sm"
                         title="Save changes (Ctrl+S / Cmd+S)"
-                        className="cursor-pointer shadow-sm hover:shadow-md transition-shadow duration-200 relative group"
+                        className="cursor-pointer hover: relative group"
                         onClick={async () => {
                           await handleSave();
                           props.refresh();

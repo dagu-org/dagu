@@ -35,7 +35,7 @@ function DAGRunCard({ dagRun, timezoneInfo }: DAGRunCardProps) {
     };
   }, [isModalOpen]);
   return (
-    <Card className="h-full hover:shadow-md transition-shadow">
+    <Card className="h-full hover:">
       <div
         className="block h-full no-underline text-inherit cursor-pointer"
         onClick={(e) => {

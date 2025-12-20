@@ -134,7 +134,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
           // Modern base styles with dark background
           'h-full overflow-hidden bg-primary text-primary-foreground',
           // Shadow effect
-          'shadow-lg',
+          '',
           // Hidden on mobile, visible on desktop
           'hidden md:block',
           'z-40 transition-all duration-200 ease-in-out',
@@ -160,7 +160,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
           onClick={() => setIsMobileSidebarOpen(false)}
         >
           <div
-            className="h-full w-60 bg-primary text-primary-foreground shadow-lg overflow-hidden"
+            className="h-full w-60 bg-primary text-primary-foreground overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-end p-4">
@@ -188,9 +188,9 @@ function Content({ title, navbarColor, children }: LayoutProps) {
         {/* AppBar */}
         <header
           className={cn(
-            'relative w-full px-6 transition-shadow duration-200',
+            'relative w-full px-6',
             scrolled
-              ? 'shadow-md border-b border-border'
+              ? ' border-b border-border'
               : 'border-b border-transparent',
             // Use theme-aware classes when no custom color is set
             !navbarColor || navbarColor.trim() === ''
@@ -263,7 +263,7 @@ function Content({ title, navbarColor, children }: LayoutProps) {
                       <SelectTrigger className="h-7 text-sm !bg-transparent text-current border-0 hover:!bg-transparent focus:!bg-transparent focus:ring-0 focus:outline-none focus:border-0 focus-visible:ring-0 focus-visible:outline-none focus-visible:border-0 focus-visible:shadow-none active:border-0 px-2 py-0 flex items-center min-h-0 gap-1 rounded-md transition-colors duration-200 [&_svg]:!text-current [&_svg]:!opacity-100 shadow-none cursor-pointer">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="text-sm rounded-md overflow-hidden p-1 bg-popover border-border shadow-lg outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 text-popover-foreground">
+                      <SelectContent className="text-sm rounded-md overflow-hidden p-1 bg-popover border-border outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 text-popover-foreground">
                         {context.remoteNodes.map((node) => (
                           <SelectItem
                             key={node}

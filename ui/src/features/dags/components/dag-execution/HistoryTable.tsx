@@ -35,10 +35,10 @@ type Props = {
  */
 function HistoryTable({ dagRuns, gridData, onSelect, idx }: Props) {
   return (
-    <div className="rounded-xl bg-white overflow-hidden border">
+    <div className="rounded-xl bg-card overflow-hidden border">
       <Table className="select-none border-collapse">
         <TableHeader className="bg-slate-50">
-          <TableRow className="border-b border-slate-200">
+          <TableRow className="border-b border-border">
             <TableHead className="py-3"></TableHead>
             {dagRuns.map((_, i) => {
               if (!dagRuns || i >= dagRuns.length || !dagRuns[i]) {

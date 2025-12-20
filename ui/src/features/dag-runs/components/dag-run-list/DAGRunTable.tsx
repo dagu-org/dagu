@@ -216,12 +216,12 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
 
   // Empty state component
   const EmptyState = () => (
-    <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-white">
+    <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-card">
       <div className="text-6xl mb-4">🔍</div>
       <h3 className="text-lg font-normal text-gray-900 mb-2">
         No DAG runs found
       </h3>
-      <p className="text-sm text-gray-500 text-center max-w-md mb-4">
+      <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
         There are no DAG runs matching your current filters. Try adjusting your
         search criteria or date range.
       </p>
@@ -244,7 +244,7 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
               selectedIndex === index
                 ? 'bg-primary/10 border-primary'
                 : 'bg-card border-border'
-            } cursor-pointer shadow-sm`}
+            } cursor-pointer`}
             onClick={(e) => {
               // Navigate directly to DAG-run page with correct URL pattern
               if (e.metaKey || e.ctrlKey) {
@@ -315,7 +315,7 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
 
   // Table view for larger screens
   return (
-    <div className="border rounded-md bg-white" ref={tableRef}>
+    <div className="border rounded-md bg-card" ref={tableRef}>
       <Table className="w-full text-xs">
         <TableHeader>
           <TableRow>

@@ -157,9 +157,9 @@ function InlineLogViewer({
   return (
     <div className="bg-zinc-900 rounded overflow-hidden">
       {isLoading && !data ? (
-        <div className="text-zinc-400 text-xs py-4 px-3">Loading logs...</div>
+        <div className="text-muted-foreground text-xs py-4 px-3">Loading logs...</div>
       ) : lines.length === 0 ? (
-        <div className="text-zinc-400 text-xs py-4 px-3">
+        <div className="text-muted-foreground text-xs py-4 px-3">
           &lt;No log output&gt;
         </div>
       ) : (
@@ -169,7 +169,7 @@ function InlineLogViewer({
               const lineNumber = totalLines - lineCount + index + 1;
               return (
                 <div key={index} className="flex hover:bg-zinc-800 px-1 py-0.5">
-                  <span className="text-zinc-500 mr-3 select-none w-12 text-right flex-shrink-0">
+                  <span className="text-muted-foreground mr-3 select-none w-12 text-right flex-shrink-0">
                     {lineNumber}
                   </span>
                   <span className="whitespace-pre-wrap break-all flex-grow">
@@ -711,7 +711,7 @@ function NodeStatusTableRow({
                               e.stopPropagation();
                               handleViewLog(e);
                             }}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 cursor-pointer border-r border-slate-200"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 cursor-pointer border-r border-border"
                             title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
                           >
                             <FileText className="h-3 w-3" />
@@ -814,7 +814,7 @@ function NodeStatusTableRow({
 
         {/* Inline log viewer row - spans entire table width */}
         {isLogExpanded && hasLogs && (
-          <StyledTableRow className="bg-zinc-50">
+          <StyledTableRow className="bg-muted">
             <TableCell colSpan={dagRunId ? 7 : 6} className="p-3">
               <div className="w-full">
                 {/* Header with tabs and expand button */}
@@ -907,7 +907,7 @@ function NodeStatusTableRow({
   return (
     <div
       className={cn(
-        'p-4 rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow duration-200',
+        'p-4 rounded-2xl border border-border bg-card hover:',
         getRowHighlight()
       )}
     >
@@ -1099,7 +1099,7 @@ function NodeStatusTableRow({
                     }
                   : handleViewLog
               }
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 rounded-md cursor-pointer text-slate-600 hover:text-slate-800 hover:bg-slate-100 border border-slate-200"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 rounded-md cursor-pointer text-slate-600 hover:text-slate-800 hover:bg-slate-100 border border-border"
               title={`Click to view ${node.stderr ? 'stderr' : 'stdout'} log (Cmd/Ctrl+Click to open in new tab)`}
             >
               <FileText className="h-3.5 w-3.5" />
@@ -1107,11 +1107,11 @@ function NodeStatusTableRow({
             </a>
           ) : (
             /* Both stdout and stderr - show combined button with split design */
-            <div className="inline-flex rounded-md border border-slate-200 overflow-hidden">
+            <div className="inline-flex rounded-md border border-border overflow-hidden">
               <a
                 href={url}
                 onClick={handleViewLog}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 hover:bg-slate-100 cursor-pointer border-r border-slate-200"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 hover:bg-slate-100 cursor-pointer border-r border-border"
                 title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
               >
                 <FileText className="h-3.5 w-3.5" />

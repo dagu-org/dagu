@@ -289,7 +289,7 @@ const DAGPagination = ({
               <circle cx="12" cy="19" r="1" />
             </svg>
           </Button>
-          <div className="absolute right-0 mt-1 w-[100px] bg-background border border-border rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+          <div className="absolute right-0 mt-1 w-[100px] bg-background border border-border rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
             {[10, 25, 50, 100, 200].map((limit) => (
               <div
                 key={limit}

@@ -278,7 +278,7 @@ export function SubDAGRunsList({
       )}
 
       {isExpanded && (
-        <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 pl-3">
+        <div className="mt-2 ml-4 space-y-1 border-l border-border pl-3">
           {filteredSubRuns.length === 0 ? (
             <div className="py-2 text-slate-500 italic">
               No sub DAG runs match the selected filter

@@ -141,12 +141,12 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
 
   // Empty state component
   const EmptyState = () => (
-    <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-white">
+    <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-card">
       <div className="text-6xl mb-4">🔍</div>
       <h3 className="text-lg font-normal text-gray-900 mb-2">
         No DAG runs found
       </h3>
-      <p className="text-sm text-gray-500 text-center max-w-md mb-4">
+      <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
         There are no DAG runs matching your current filters. Try adjusting your
         search criteria or date range.
       </p>
@@ -160,7 +160,7 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
   const sortedDagNames = Object.keys(groupedDAGRuns).sort();
 
   return (
-    <div className="border rounded-md bg-white">
+    <div className="border rounded-md bg-card">
       <div className="divide-y divide-border">
         {sortedDagNames.map((dagName) => {
           const runs = groupedDAGRuns[dagName];

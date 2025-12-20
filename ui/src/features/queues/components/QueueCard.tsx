@@ -161,7 +161,7 @@ function QueueCard({
                 {queue.type === 'global' ? (
                   <Settings className="h-4 w-4 text-blue-500" />
                 ) : (
-                  <GitBranch className="h-4 w-4 text-gray-500" />
+                  <GitBranch className="h-4 w-4 text-muted-foreground" />
                 )}
                 <span className="font-semibold text-sm">{queue.name}</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">

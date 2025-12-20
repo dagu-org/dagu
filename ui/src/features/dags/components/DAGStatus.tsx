@@ -234,7 +234,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
     <div className="space-y-6">
       {/* DAG Visualization Card */}
       {dagRun.nodes && dagRun.nodes.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
           <div className="border-b border-border bg-muted/30 px-6 py-4">
             <h2 className="text-lg font-semibold text-foreground">Graph</h2>
           </div>
@@ -253,7 +253,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
           <>
             <div className="grid grid-cols-1 gap-6">
               {/* Status Overview Card */}
-              <div className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+              <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
                 <div className="border-b border-border bg-muted/30 px-6 py-4">
                   <h2 className="text-lg font-semibold text-foreground">
                     Run Status
@@ -277,7 +277,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
               </div>
 
               {/* Desktop Steps Table Card */}
-              <div className="hidden md:block bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+              <div className="hidden md:block bg-card rounded-2xl border border-border hover: overflow-hidden">
                 <div className="border-b border-border bg-muted/30 px-6 py-4">
                   <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
                     <span>Steps</span>
@@ -325,7 +325,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
             {handlers?.length ? (
               <>
                 {/* Desktop Lifecycle Hooks Card */}
-                <div className="hidden md:block bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="hidden md:block bg-card rounded-2xl border border-border hover: overflow-hidden">
                   <div className="border-b border-border bg-muted/30 px-6 py-4">
                     <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
                       <span>Lifecycle Hooks</span>
