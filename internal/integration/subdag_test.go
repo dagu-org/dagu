@@ -374,3 +374,62 @@ steps:
 	require.Contains(t, variables, "STEP_OUTPUT", "Output variable STEP_OUTPUT should exist")
 	require.Contains(t, variables["STEP_OUTPUT"], "output_first_attempt_success", "Output should contain success message from first attempt")
 }
+
+func TestTwoLevelNestedSubDAG(t *testing.T) {
+	th := test.Setup(t)
+
+	// 2-level nesting: root -> child (should succeed)
+	dag := th.DAG(t, `
+steps:
+  - name: call_child
+    call: child
+    params: "MSG=hello"
+
+---
+
+name: child
+params: "MSG=default"
+steps:
+  - name: echo_msg
+    command: echo "${MSG}_from_child"
+    output: RESULT
+`)
+
+	dag.Agent().RunSuccess(t)
+	dag.AssertLatestStatus(t, core.Succeeded)
+}
+
+func TestThreeLevelNestedSubDAG(t *testing.T) {
+	th := test.Setup(t)
+
+	// 3-level nesting: root -> middle -> leaf (should fail)
+	// middle-dag cannot see leaf-dag because inline DAGs are only visible to the root
+	dag := th.DAG(t, `
+steps:
+  - name: call_middle
+    call: middle
+    params: "MSG=hello"
+
+---
+
+name: middle
+params: "MSG=default"
+steps:
+  - name: call_leaf
+    call: leaf
+    params: "MSG=${MSG}_middle"
+
+---
+
+name: leaf
+params: "MSG=default"
+steps:
+  - name: echo_msg
+    command: echo "${MSG}_from_leaf"
+    output: RESULT
+`)
+
+	err := dag.Agent().Run(dag.Agent().Context)
+	require.Error(t, err)
+	dag.AssertLatestStatus(t, core.Succeeded)
+}
