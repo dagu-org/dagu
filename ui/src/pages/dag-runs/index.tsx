@@ -5,10 +5,7 @@ import { useLocation } from 'react-router-dom';
 import { Status } from '../../api/v2/schema';
 import { Button } from '../../components/ui/button';
 import { DateRangePicker } from '../../components/ui/date-range-picker';
-import {
-  Dialog,
-  DialogContent,
-} from '../../components/ui/dialog';
+import { Dialog, DialogContent } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import {
   Select,
@@ -590,7 +587,7 @@ function DAGRuns() {
   const tzLabel = formatTimezoneOffset();
 
   return (
-    <div className="px-4 py-2">
+    <div className="">
       <div className="flex items-center justify-between mb-3">
         <Title>DAG Runs</Title>
         <ToggleGroup aria-label="View mode">

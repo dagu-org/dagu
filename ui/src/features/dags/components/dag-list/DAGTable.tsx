@@ -244,8 +244,6 @@ const defaultColumns = [
   }),
   columnHelper.accessor('name', {
     id: 'Name',
-    size: 250,
-    minSize: 150,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Name</span>
@@ -347,9 +345,8 @@ const defaultColumns = [
   // The filter functionality is preserved in the Name column
   columnHelper.accessor('kind', {
     id: 'Status',
-    size: 90,
-    minSize: 90,
-    maxSize: 90,
+    size: 80,
+    minSize: 80,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Status</span>
@@ -375,9 +372,8 @@ const defaultColumns = [
   // Removed Started At and Finished At columns
   columnHelper.accessor('kind', {
     id: 'LastRun',
-    size: 130,
-    minSize: 130,
-    maxSize: 130,
+    size: 110,
+    minSize: 90,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Last Run</span>
@@ -440,10 +436,10 @@ const defaultColumns = [
       }
 
       return (
-        <div className="space-y-0.5">
-          <span className="font-normal text-foreground/70 text-xs">
+        <div className="space-y-0.5 min-w-0">
+          <div className="font-normal text-foreground/70 text-xs truncate">
             {formattedStartedAt}
-          </span>
+          </div>
           {durationContent}
         </div>
       );
@@ -451,9 +447,8 @@ const defaultColumns = [
   }),
   columnHelper.accessor('kind', {
     id: 'ScheduleAndNextRun',
-    size: 170,
-    minSize: 160,
-    maxSize: 200,
+    size: 140,
+    minSize: 120,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Live / Schedule</span>
@@ -536,9 +531,9 @@ const defaultColumns = [
       }
 
       return (
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-1 min-w-0">
           {liveSwitch}
-          <div className="space-y-0.5 min-w-0">
+          <div className="space-y-0.5 min-w-0 overflow-hidden">
             {scheduleContent}
             {nextRunContent}
           </div>
@@ -548,9 +543,9 @@ const defaultColumns = [
   }),
   columnHelper.display({
     id: 'Actions',
-    size: 70,
-    minSize: 70,
-    maxSize: 70,
+    size: 60,
+    minSize: 60,
+    maxSize: 60,
     header: () => (
       <div className="flex flex-col items-center py-1">
         <span className="text-xs">Actions</span>
@@ -1050,15 +1045,9 @@ function DAGTable({
       </div>
 
       {/* Desktop Table View - Hidden on mobile */}
-      <div
-        className="hidden md:block w-full max-w-full min-w-0 overflow-x-auto transition-all duration-300 p-px"
-        style={{
-          fontFamily:
-            'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
-        }}
-      >
+      <div className="hidden md:block w-full overflow-hidden">
         <Table
-          className={`w-full text-xs table-fixed ${isLoading ? 'opacity-70' : ''}`}
+          className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}
         >
           <TableHeader>
             {instance.getHeaderGroups().map((headerGroup) => (
@@ -1066,20 +1055,12 @@ function DAGTable({
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className={
-                      'py-1 px-2 ' +
-                      (header.column.id === 'Description'
-                        ? 'max-w-[250px] '
-                        : '') +
-                      'text-muted-foreground text-xs'
-                    }
-                    style={{
-                      width: header.getSize(),
-                      minWidth: header.column.columnDef.minSize,
-                      maxWidth: header.column.columnDef.maxSize,
-                      fontWeight: 500, // Medium weight headers
-                      fontSize: '0.75rem', // Smaller font size for headers
-                    }}
+                    className={`py-1 px-2 text-muted-foreground text-xs ${
+                      header.column.id === 'Expand' ? 'w-10' :
+                      header.column.id === 'Actions' ? 'w-14' :
+                      header.column.id === 'Status' ? 'w-20' :
+                      ''
+                    }`}
                   >
                     {header.isPlaceholder ? null : (
                       <div>
@@ -1158,12 +1139,13 @@ function DAGTable({
                     {row.getVisibleCells().map((cell) => (
                       <TableCell
                         key={cell.id}
-                        className="py-1 px-2 overflow-hidden"
-                        style={{
-                          width: cell.column.getSize(),
-                          minWidth: cell.column.columnDef.minSize,
-                          maxWidth: cell.column.columnDef.maxSize,
-                        }}
+                        className={`py-1 px-2 overflow-hidden align-middle ${
+                          cell.column.id === 'Expand' ? 'w-10' :
+                          cell.column.id === 'Actions' ? 'w-14' :
+                          cell.column.id === 'Status' ? 'w-20' :
+                          cell.column.id === 'Name' ? 'max-w-0' :
+                          ''
+                        }`}
                       >
                         {flexRender(
                           cell.column.columnDef.cell,

@@ -58,9 +58,7 @@ function DAGs() {
     []
   );
 
-  const [searchText, setSearchText] = React.useState(
-    defaultFilters.searchText
-  );
+  const [searchText, setSearchText] = React.useState(defaultFilters.searchText);
   const [searchTag, setSearchTag] = React.useState(defaultFilters.searchTag);
   const [page, setPage] = React.useState<number>(defaultFilters.page);
   const [apiSearchText, setAPISearchText] = React.useState(
@@ -89,8 +87,9 @@ function DAGs() {
     currentFiltersRef.current = currentFilters;
   }, [currentFilters]);
 
-  const lastPersistedFiltersRef =
-    React.useRef<DAGDefinitionsFilters | null>(null);
+  const lastPersistedFiltersRef = React.useRef<DAGDefinitionsFilters | null>(
+    null
+  );
 
   React.useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -155,12 +154,7 @@ function DAGs() {
 
     lastPersistedFiltersRef.current = next;
     searchState.writeState('dagDefinitions', remoteKey, next);
-  }, [
-    defaultFilters,
-    location.search,
-    remoteKey,
-    searchState,
-  ]);
+  }, [defaultFilters, location.search, remoteKey, searchState]);
 
   React.useEffect(() => {
     const persisted = lastPersistedFiltersRef.current;
@@ -296,7 +290,7 @@ function DAGs() {
   const displayData = data || lastValidData;
 
   const leftPanel = (
-    <div className="px-2">
+    <div className="pr-2">
       <DAGListHeader onRefresh={refreshFn} />
       {displayData ? (
         <>

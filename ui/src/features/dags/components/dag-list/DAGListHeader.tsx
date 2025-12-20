@@ -8,7 +8,7 @@ interface DAGListHeaderProps {
 }
 
 const DAGListHeader: React.FC<DAGListHeaderProps> = ({ onRefresh }) => (
-  <div className="flex flex-row items-center justify-between mb-2 mr-2">
+  <div className="flex flex-row items-center justify-between mb-2">
     <Title className="text-xl mb-0">DAG Definitions</Title>
     <div className="flex gap-2">
       <CreateDAGButton />

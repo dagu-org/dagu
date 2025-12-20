@@ -1,5 +1,5 @@
-import { cn } from '@/lib/utils';
 import { useConfig } from '@/contexts/ConfigContext';
+import { cn } from '@/lib/utils';
 import { Menu, X } from 'lucide-react';
 import * as React from 'react';
 import { mainListItems as MainListItems } from '../menu';
@@ -33,7 +33,9 @@ function getContrastColor(input?: string): string {
   }
 
   hex = hex.replace('#', '');
-  let r = 0, g = 0, b = 0;
+  let r = 0,
+    g = 0,
+    b = 0;
   if (hex.length === 3) {
     if (hex[0] && hex[1] && hex[2]) {
       r = parseInt(hex[0] + hex[0], 16);
@@ -73,14 +75,18 @@ type LayoutProps = {
  */
 function Content({ navbarColor, children }: LayoutProps) {
   const config = useConfig();
-  const hasCustomColor: boolean = Boolean(navbarColor && navbarColor.trim() !== '');
-  const contrastColor = hasCustomColor ? getContrastColor(navbarColor) : undefined;
+  const hasCustomColor: boolean = Boolean(
+    navbarColor && navbarColor.trim() !== ''
+  );
+  const contrastColor = hasCustomColor
+    ? getContrastColor(navbarColor)
+    : undefined;
   const sidebarStyle = hasCustomColor
-    ? {
+    ? ({
         backgroundColor: navbarColor,
         color: contrastColor,
         '--sidebar-text': contrastColor,
-      } as React.CSSProperties
+      } as React.CSSProperties)
     : undefined;
   // Sidebar state with localStorage persistence
   const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(() => {
@@ -187,7 +193,7 @@ function Content({ navbarColor, children }: LayoutProps) {
         </div>
 
         {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-6 py-4 md:py-6">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden px-2 md:px-2 py-2 md:py-2">
           {children}
         </main>
       </div>

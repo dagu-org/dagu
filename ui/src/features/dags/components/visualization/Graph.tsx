@@ -108,15 +108,14 @@ const Graph: React.FC<Props> = ({
     }
   }, [steps, flowchart]);
 
-  const mermaidStyle = {
+  const mermaidStyle: React.CSSProperties = {
     display: 'flex',
-    alignItems: 'flex-center',
+    alignItems: 'flex-start',
     justifyContent: 'flex-start',
     width: width,
     minWidth: '100%',
     minHeight: '200px',
     maxHeight: '300px',
-    padding: '2em',
     borderRadius: '0.5em',
     background: `
       linear-gradient(90deg, #f0ebe3 1px, transparent 1px),

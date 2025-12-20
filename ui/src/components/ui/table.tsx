@@ -9,7 +9,7 @@ function Table({
   ...props
 }: React.ComponentProps<typeof RadixTable.Root>) {
   return (
-    <div className="w-full">
+    <div className="w-full overflow-hidden">
       <RadixTable.Root
         data-slot="table"
         variant="surface"
@@ -84,7 +84,7 @@ function TableCell({
   return (
     <RadixTable.Cell
       data-slot="table-cell"
-      className={cn('whitespace-nowrap', className)}
+      className={cn(className)}
       {...props}
     />
   );

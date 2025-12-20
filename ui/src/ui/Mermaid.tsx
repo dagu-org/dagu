@@ -64,15 +64,29 @@ function Mermaid({
     () => `mermaid-${Math.random().toString(36).substr(2, 9)}`
   );
 
-  const mStyle = {
-    ...style,
-  };
+  // Extract background-related styles for the scroll container
+  const {
+    background,
+    backgroundSize,
+    backgroundAttachment,
+    backgroundColor,
+    ...contentStyle
+  } = style;
 
   const dStyle: CSSProperties = {
-    overflow: 'auto', // Use 'auto' for both directions if needed
-    padding: '2em',
+    overflow: 'auto',
     position: 'relative',
-    maxHeight: '80vh', // Keep max height if desired
+    maxHeight: '80vh',
+    // Apply background styles to the scroll container so grid scrolls with content
+    background,
+    backgroundSize,
+    backgroundAttachment: 'local', // Makes background scroll with content
+    backgroundColor,
+  };
+
+  const mStyle: CSSProperties = {
+    ...contentStyle,
+    padding: '2em',
   };
 
   const render = async () => {

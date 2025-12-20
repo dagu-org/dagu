@@ -24,7 +24,7 @@ function SplitLayout({
     <div className="flex h-[calc(100vh-48px)] overflow-hidden">
       {/* Left Panel - Table/List - Fixed width */}
       <div
-        className="h-full overflow-y-auto border-r border-border w-full md:w-auto"
+        className="h-full overflow-y-auto overflow-x-hidden border-r border-border w-full md:w-auto"
         style={{ minWidth: leftWidth, maxWidth: leftWidth }}
       >
         {leftPanel}

@@ -45,7 +45,10 @@ function Search() {
   const lastPersistedFiltersRef = React.useRef<SearchFilters | null>(null);
 
   React.useEffect(() => {
-    const stored = searchState.readState<SearchFilters>('searchPage', remoteKey);
+    const stored = searchState.readState<SearchFilters>(
+      'searchPage',
+      remoteKey
+    );
     const hasUrl = !!searchParams.get('q');
     let next: SearchFilters;
     let shouldSyncUrl = false;
@@ -125,7 +128,7 @@ function Search() {
     <div className="w-full">
       <div className="w-full">
         <Title>Search DAG Definitions</Title>
-        <div className="flex space-x-4 items-center">
+        <div className="flex items-center">
           <Input
             placeholder="Search text..."
             className="flex-1"

@@ -8,12 +8,7 @@ interface TitleProps {
 
 export default function Title({ children, className }: TitleProps) {
   return (
-    <h2
-      className={cn(
-        'text-2xl font-bold text-foreground mb-4',
-        className
-      )}
-    >
+    <h2 className={cn('text-2xl font-bold text-foreground', className)}>
       {children}
     </h2>
   );
