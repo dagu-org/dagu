@@ -273,7 +273,7 @@ const Graph: React.FC<Props> = ({
 
   return (
     <div className="relative" ref={containerRef}>
-      <div className="absolute right-2 top-2 z-10 bg-card rounded-md">
+      <div className="absolute right-4 top-2 z-10 bg-card rounded-md">
         <ToggleGroup aria-label="Graph controls">
           {onChangeFlowchart && (
             <>

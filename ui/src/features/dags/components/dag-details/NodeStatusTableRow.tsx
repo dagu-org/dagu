@@ -3,6 +3,7 @@
  *
  * @module features/dags/components/dag-details
  */
+import { Button } from '@/components/ui/button';
 import { CommandDisplay } from '@/components/ui/command-display';
 import { ScriptBadge } from '@/components/ui/script-dialog';
 import { TableCell } from '@/components/ui/table';
@@ -28,7 +29,7 @@ import {
   Code,
   FileText,
   GitBranch,
-  PlayCircle,
+  Play,
   RefreshCw,
 } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
@@ -767,8 +768,9 @@ function NodeStatusTableRow({
           </TableCell>
           {dagRunId && (
             <TableCell className="text-center">
-              <button
-                className="p-1 rounded hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              <Button
+                size="icon-sm"
+                className="btn-3d-secondary"
                 title="Retry from this step"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -776,8 +778,8 @@ function NodeStatusTableRow({
                 }}
                 disabled={loading || dagRun.status === Status.Running}
               >
-                <PlayCircle className="h-5 w-5 text-success" />
-              </button>
+                <Play className="h-4 w-4 text-success" />
+              </Button>
               <Dialog open={showDialog} onOpenChange={setShowDialog}>
                 <DialogContent>
                   <DialogHeader>
@@ -791,20 +793,22 @@ function NodeStatusTableRow({
                     )}
                   </div>
                   <DialogFooter>
-                    <button
-                      className="px-3 py-1 rounded bg-accent text-foreground mr-2"
+                    <Button
+                      size="sm"
+                      className="btn-3d-secondary mr-2"
                       onClick={() => setShowDialog(false)}
                       disabled={loading}
                     >
                       Cancel
-                    </button>
-                    <button
-                      className="px-3 py-1 rounded bg-success text-white hover:bg-success/90 disabled:opacity-50"
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="btn-3d-primary"
                       onClick={handleRetry}
                       disabled={loading}
                     >
                       {loading ? 'Retrying...' : 'Retry'}
-                    </button>
+                    </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -1144,7 +1148,7 @@ function NodeStatusTableRow({
             onClick={() => setShowDialog(true)}
             disabled={loading || dagRun.status === Status.Running}
           >
-            <PlayCircle className="h-6 w-6 text-success" />
+            <Play className="h-6 w-6 text-success" />
           </button>
           <Dialog open={showDialog} onOpenChange={setShowDialog}>
             <DialogContent>
