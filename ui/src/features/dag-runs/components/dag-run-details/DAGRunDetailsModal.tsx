@@ -150,7 +150,7 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
                   className="relative group"
                 >
                   <Maximize2 className="h-4 w-4" />
-                  <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-[10px] font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
                     F
                   </span>
                 </Button>
@@ -162,7 +162,7 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
                   className="relative group"
                 >
                   <X className="h-4 w-4" />
-                  <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-[10px] font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
                     Esc
                   </span>
                 </Button>

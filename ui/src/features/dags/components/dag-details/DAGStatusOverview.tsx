@@ -168,10 +168,11 @@ function DAGStatusOverview({
                   onViewLog(status.dagRunId);
                 }
               }}
-              className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-200 cursor-pointer"
               title="Click to view log (Cmd/Ctrl+Click to open in new tab)"
             >
               <FileText className="h-3.5 w-3.5" />
+              <span>Log</span>
             </a>
           </div>
         )}
