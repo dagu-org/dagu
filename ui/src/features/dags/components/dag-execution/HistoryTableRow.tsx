@@ -1,13 +1,7 @@
-/**
- * HistoryTableRow component renders a single row in the execution history table.
- *
- * @module features/dags/components/dag-execution
- */
-import React from 'react';
 import { TableCell } from '@/components/ui/table';
-import StyledTableRow from '../../../../ui/StyledTableRow';
-import { components, NodeStatus } from '../../../../api/v2/schema';
 import { cn } from '@/lib/utils';
+import { components, Status } from '../../../../api/v2/schema';
+import StyledTableRow from '../../../../ui/StyledTableRow';
 
 /**
  * Props for the HistoryTableRow component
@@ -22,7 +16,8 @@ type Props = {
 };
 
 /**
- * Get status styling based on node status
+ * Get status styling based on DAG run status
+ * Uses Status enum values which map to DAG run statuses
  */
 function getStatusStyling(status: number) {
   let bgColorClass = '';
@@ -30,32 +25,32 @@ function getStatusStyling(status: number) {
   let pulseAnimation = '';
 
   switch (status) {
-    case NodeStatus.Success: // done -> green
+    case Status.Success: // 4 - success -> green
       bgColorClass = 'bg-success';
       borderColorClass = 'border-success';
       break;
-    case NodeStatus.Failed: // error -> red
-      bgColorClass = 'bg-error';
-      borderColorClass = 'border-error';
+    case Status.Failed: // 2 - failed -> red
+      bgColorClass = 'bg-danger';
+      borderColorClass = 'border-danger';
       break;
-    case NodeStatus.Running: // running -> lime
+    case Status.Running: // 1 - running -> green with pulse
       bgColorClass = 'bg-success';
       borderColorClass = 'border-success';
       pulseAnimation = 'animate-pulse';
       break;
-    case NodeStatus.Aborted: // aborted -> pink
+    case Status.Aborted: // 3 - aborted -> pink
       bgColorClass = 'bg-pink-500';
       borderColorClass = 'border-pink-600';
       break;
-    case NodeStatus.Skipped: // skipped -> gray
-      bgColorClass = 'bg-muted-foreground';
-      borderColorClass = 'border-border';
-      break;
-    case NodeStatus.NotStarted: // none -> lightblue
+    case Status.NotStarted: // 0 - not started -> light blue
       bgColorClass = 'bg-primary/60';
       borderColorClass = 'border-primary';
       break;
-    case NodeStatus.PartialSuccess: // partial success -> orange/amber
+    case Status.Queued: // 5 - queued -> info/purple
+      bgColorClass = 'bg-info';
+      borderColorClass = 'border-info';
+      break;
+    case Status.PartialSuccess: // 6 - partial success -> warning/amber
       bgColorClass = 'bg-warning';
       borderColorClass = 'border-warning';
       break;
