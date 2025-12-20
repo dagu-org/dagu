@@ -28,14 +28,14 @@ function WorkerMetrics({ metrics, isLoading }: WorkerMetricsProps) {
       value: `${metrics.busyPollers}/${metrics.totalPollers}`,
       subValue: 'busy/total',
       icon: <Activity className="h-3 w-3 text-blue-500" />,
-      valueClass: metrics.busyPollers > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-foreground',
+      valueClass: metrics.busyPollers > 0 ? 'text-blue-600' : 'text-foreground',
     },
     {
       title: 'Active Tasks',
       value: metrics.totalTasks,
       subValue: 'running',
       icon: <Zap className="h-3 w-3 text-green-500" />,
-      valueClass: metrics.totalTasks > 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground',
+      valueClass: metrics.totalTasks > 0 ? 'text-green-600' : 'text-foreground',
     },
     {
       title: 'Utilization',
@@ -93,10 +93,10 @@ function WorkerMetrics({ metrics, isLoading }: WorkerMetricsProps) {
 }
 
 function getUtilizationColor(utilization: number): string {
-  if (utilization >= 90) return 'text-red-600 dark:text-red-400';
-  if (utilization >= 70) return 'text-orange-600 dark:text-orange-400';
-  if (utilization >= 50) return 'text-yellow-600 dark:text-yellow-400';
-  if (utilization > 0) return 'text-green-600 dark:text-green-400';
+  if (utilization >= 90) return 'text-red-600';
+  if (utilization >= 70) return 'text-orange-600';
+  if (utilization >= 50) return 'text-yellow-600';
+  if (utilization > 0) return 'text-green-600';
   return 'text-muted-foreground';
 }
 

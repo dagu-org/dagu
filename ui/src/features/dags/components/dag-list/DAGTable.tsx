@@ -273,7 +273,7 @@ const defaultColumns = [
             style={{ paddingLeft: `${row.depth * 1.5}rem` }}
             className="space-y-0.5 min-w-0"
           >
-            <div className="font-medium text-gray-800 dark:text-gray-200 tracking-tight text-xs truncate">
+            <div className="font-medium text-gray-800 tracking-tight text-xs truncate">
               {getValue()}
             </div>
 
@@ -289,7 +289,7 @@ const defaultColumns = [
                   <Badge
                     key={tag}
                     variant="outline"
-                    className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-blue-200 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800/50 hover:text-blue-800 dark:hover:text-blue-200 transition-colors duration-200 cursor-pointer font-normal"
+                    className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 transition-colors duration-200 cursor-pointer font-normal"
                     onClick={(e) => {
                       e.stopPropagation(); // Prevent row click
                       e.preventDefault();
@@ -987,7 +987,7 @@ function DAGTable({
 
       {/* Search, Filter and Pagination Controls */}
       <div
-        className={`bg-muted/50 dark:bg-zinc-900/50 rounded-lg p-3 mb-4 space-y-3 ${
+        className={`bg-muted/50 rounded-lg p-3 mb-4 space-y-3 ${
           isLoading ? 'opacity-70 pointer-events-none' : ''
         }`}
       >
@@ -1238,7 +1238,7 @@ function DAGTable({
                 <div key={row.id} className="space-y-1.5">
                   {/* Group Header */}
                   <div
-                    className="flex items-center justify-between px-3 py-2 bg-muted/70 dark:bg-muted/30 rounded-md border border-muted-foreground/20 cursor-pointer active:bg-muted"
+                    className="flex items-center justify-between px-3 py-2 bg-muted/70 rounded-md border border-muted-foreground/20 cursor-pointer active:bg-muted"
                     onClick={() => row.toggleExpanded()}
                   >
                     <div className="flex items-center gap-2 min-w-0">
@@ -1341,7 +1341,7 @@ function DAGTable({
                                     <Badge
                                       key={tag}
                                       variant="outline"
-                                      className="text-[9px] px-1 py-0 h-3 rounded-sm border-blue-200 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                                      className="text-[9px] px-1 py-0 h-3 rounded-sm border-blue-200 bg-blue-50 text-blue-700"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleSearchTagChange(tag);
@@ -1443,7 +1443,7 @@ function DAGTable({
                         <Badge
                           key={tag}
                           variant="outline"
-                          className="text-[9px] px-1 py-0 h-3 rounded-sm border-blue-200 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                          className="text-[9px] px-1 py-0 h-3 rounded-sm border-blue-200 bg-blue-50 text-blue-700"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleSearchTagChange(tag);

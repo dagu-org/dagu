@@ -102,7 +102,7 @@ function DAGRunActions({
                   size="icon"
                   disabled={!buttonState['stop']}
                   onClick={() => setIsStopModal(true)}
-                  className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                  className="h-8 w-8 disabled:text-gray-400 cursor-pointer"
                 >
                   <Square className="h-4 w-4" />
                   <span className="sr-only">Stop</span>
@@ -113,7 +113,7 @@ function DAGRunActions({
                   size="sm"
                   disabled={!buttonState['stop']}
                   onClick={() => setIsStopModal(true)}
-                  className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                  className="h-8 disabled:text-gray-400 cursor-pointer"
                 >
                   <Square className="mr-2 h-4 w-4" />
                   Stop
@@ -136,7 +136,7 @@ function DAGRunActions({
                   size="icon"
                   disabled={!buttonState['retry']}
                   onClick={() => setIsRetryModal(true)}
-                  className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                  className="h-8 w-8 disabled:text-gray-400 cursor-pointer"
                 >
                   <RefreshCw className="h-4 w-4" />
                   <span className="sr-only">Retry</span>
@@ -147,7 +147,7 @@ function DAGRunActions({
                   size="sm"
                   disabled={!buttonState['retry']}
                   onClick={() => setIsRetryModal(true)}
-                  className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                  className="h-8 disabled:text-gray-400 cursor-pointer"
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Retry
@@ -170,7 +170,7 @@ function DAGRunActions({
                   size="icon"
                   disabled={!buttonState['dequeue']}
                   onClick={() => setIsDequeueModal(true)}
-                  className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                  className="h-8 w-8 disabled:text-gray-400 cursor-pointer"
                 >
                   <X className="h-4 w-4" />
                   <span className="sr-only">Dequeue</span>
@@ -181,7 +181,7 @@ function DAGRunActions({
                   size="sm"
                   disabled={!buttonState['dequeue']}
                   onClick={() => setIsDequeueModal(true)}
-                  className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                  className="h-8 disabled:text-gray-400 cursor-pointer"
                 >
                   <X className="mr-2 h-4 w-4" />
                   Dequeue
@@ -332,7 +332,7 @@ function DAGRunActions({
                 id="reschedule"
                 checked={retryAsNew}
                 onCheckedChange={(checked) => setRetryAsNew(checked as boolean)}
-                className="border-gray-400 dark:border-gray-500"
+                className="border-gray-400"
               />
               <Label htmlFor="reschedule" className="cursor-pointer text-sm">
                 Reschedule with new DAG-run

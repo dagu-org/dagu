@@ -102,15 +102,15 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
               className={`
                 group relative overflow-hidden rounded-lg border p-4 transition-all duration-200 focus:outline-none
                 ${selectedButton === 0 
-                  ? 'border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/20' 
-                  : 'border-zinc-200 dark:border-zinc-800 hover:border-green-500 dark:hover:border-green-600 hover:bg-green-50 dark:hover:bg-green-950/20'
+                  ? 'border-green-500 bg-green-50' 
+                  : 'border-zinc-200 hover:border-green-500 hover:bg-green-50'
                 }
               `}
               onClick={() => onSubmit(step, NodeStatus.Success)}
               onMouseEnter={() => setSelectedButton(0)}
             >
               <div className="flex flex-col items-center gap-2">
-                <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-500" />
+                <CheckCircle2 className="h-8 w-8 text-green-600" />
                 <span className="font-mono text-sm">Success</span>
               </div>
             </button>
@@ -120,22 +120,22 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
               className={`
                 group relative overflow-hidden rounded-lg border p-4 transition-all duration-200 focus:outline-none
                 ${selectedButton === 1 
-                  ? 'border-red-500 dark:border-red-600 bg-red-50 dark:bg-red-950/20' 
-                  : 'border-zinc-200 dark:border-zinc-800 hover:border-red-500 dark:hover:border-red-600 hover:bg-red-50 dark:hover:bg-red-950/20'
+                  ? 'border-red-500 bg-red-50' 
+                  : 'border-zinc-200 hover:border-red-500 hover:bg-red-50'
                 }
               `}
               onClick={() => onSubmit(step, NodeStatus.Failed)}
               onMouseEnter={() => setSelectedButton(1)}
             >
               <div className="flex flex-col items-center gap-2">
-                <XCircle className="h-8 w-8 text-red-600 dark:text-red-500" />
+                <XCircle className="h-8 w-8 text-red-600" />
                 <span className="font-mono text-sm">Failed</span>
               </div>
             </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-500 font-mono pt-2 border-t border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center gap-3 text-xs text-zinc-500 font-mono pt-2 border-t border-zinc-200">
           <span>←→ Select</span>
           <span className="opacity-40">•</span>
           <span>Enter: Confirm</span>

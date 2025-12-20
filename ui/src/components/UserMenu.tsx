@@ -40,15 +40,15 @@ export function UserMenu() {
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'admin':
-        return 'bg-red-500/20 text-red-600 dark:text-red-400';
+        return 'bg-red-500/20 text-red-600';
       case 'manager':
-        return 'bg-blue-500/20 text-blue-600 dark:text-blue-400';
+        return 'bg-blue-500/20 text-blue-600';
       case 'operator':
-        return 'bg-green-500/20 text-green-600 dark:text-green-400';
+        return 'bg-green-500/20 text-green-600';
       case 'viewer':
-        return 'bg-gray-500/20 text-gray-600 dark:text-gray-400';
+        return 'bg-gray-500/20 text-gray-600';
       default:
-        return 'bg-gray-500/20 text-gray-600 dark:text-gray-400';
+        return 'bg-gray-500/20 text-gray-600';
     }
   };
 
@@ -85,7 +85,7 @@ export function UserMenu() {
             Change Password
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleLogout} className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400">
+          <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
             <LogOut className="h-4 w-4 mr-2" />
             Sign Out
           </DropdownMenuItem>

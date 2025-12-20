@@ -31,37 +31,37 @@ function getStatusStyling(status: number) {
 
   switch (status) {
     case NodeStatus.Success: // done -> green
-      bgColorClass = 'bg-green-600 dark:bg-green-700';
-      borderColorClass = 'border-green-700 dark:border-green-800';
+      bgColorClass = 'bg-green-600';
+      borderColorClass = 'border-green-700';
       break;
     case NodeStatus.Failed: // error -> red
-      bgColorClass = 'bg-red-600 dark:bg-red-700';
-      borderColorClass = 'border-red-700 dark:border-red-800';
+      bgColorClass = 'bg-red-600';
+      borderColorClass = 'border-red-700';
       break;
     case NodeStatus.Running: // running -> lime
-      bgColorClass = 'bg-lime-500 dark:bg-lime-600';
-      borderColorClass = 'border-lime-600 dark:border-lime-700';
+      bgColorClass = 'bg-lime-500';
+      borderColorClass = 'border-lime-600';
       pulseAnimation = 'animate-pulse';
       break;
     case NodeStatus.Aborted: // aborted -> pink
-      bgColorClass = 'bg-pink-500 dark:bg-pink-600';
-      borderColorClass = 'border-pink-600 dark:border-pink-700';
+      bgColorClass = 'bg-pink-500';
+      borderColorClass = 'border-pink-600';
       break;
     case NodeStatus.Skipped: // skipped -> gray
-      bgColorClass = 'bg-gray-500 dark:bg-gray-600';
-      borderColorClass = 'border-gray-600 dark:border-gray-700';
+      bgColorClass = 'bg-gray-500';
+      borderColorClass = 'border-gray-600';
       break;
     case NodeStatus.NotStarted: // none -> lightblue
-      bgColorClass = 'bg-blue-400 dark:bg-blue-500';
-      borderColorClass = 'border-blue-500 dark:border-blue-600';
+      bgColorClass = 'bg-blue-400';
+      borderColorClass = 'border-blue-500';
       break;
     case NodeStatus.PartialSuccess: // partial success -> orange/amber
-      bgColorClass = 'bg-amber-500 dark:bg-amber-600';
-      borderColorClass = 'border-amber-600 dark:border-amber-700';
+      bgColorClass = 'bg-amber-500';
+      borderColorClass = 'border-amber-600';
       break;
     default: // Fallback to gray
-      bgColorClass = 'bg-gray-500 dark:bg-gray-600';
-      borderColorClass = 'border-gray-600 dark:border-gray-700';
+      bgColorClass = 'bg-gray-500';
+      borderColorClass = 'border-gray-600';
   }
 
   return { bgColorClass, borderColorClass, pulseAnimation };
@@ -73,7 +73,7 @@ function getStatusStyling(status: number) {
  */
 function HistoryTableRow({ data, onSelect, idx }: Props) {
   return (
-    <StyledTableRow className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200">
+    <StyledTableRow className="hover:bg-slate-50 transition-colors duration-200">
       <TableCell className="font-medium text-sm">{data.name}</TableCell>
       {[...data.history].reverse().map((status, i) => {
         // Determine if this cell should be highlighted
@@ -89,8 +89,8 @@ function HistoryTableRow({ data, onSelect, idx }: Props) {
             }}
             className={cn(
               'max-w-[22px] min-w-[22px] p-2 text-center cursor-pointer',
-              'hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200',
-              isSelected && 'bg-slate-200 dark:bg-slate-700'
+              'hover:bg-slate-200 transition-all duration-200',
+              isSelected && 'bg-slate-200'
             )}
           >
             {status !== 0 && (

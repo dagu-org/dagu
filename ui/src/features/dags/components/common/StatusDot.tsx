@@ -12,29 +12,29 @@ export function StatusDot({ status, statusLabel }: Props) {
 
   switch (status) {
     case Status.Success:
-      bgColor = 'bg-[green] dark:bg-[lightgreen]';
+      bgColor = 'bg-[green]';
       break;
     case Status.Failed:
-      bgColor = 'bg-[red] dark:bg-[lightcoral]';
+      bgColor = 'bg-[red]';
       break;
     case Status.Running:
-      bgColor = 'bg-[limegreen] dark:bg-[lime]';
+      bgColor = 'bg-[limegreen]';
       animation = 'animate-pulse';
       break;
     case Status.Aborted:
-      bgColor = 'bg-[deeppink] dark:bg-[pink]';
+      bgColor = 'bg-[deeppink]';
       break;
     case Status.NotStarted:
-      bgColor = 'bg-[steelblue] dark:bg-[lightblue]';
+      bgColor = 'bg-[steelblue]';
       break;
     case Status.Queued:
-      bgColor = 'bg-[purple] dark:bg-[plum]';
+      bgColor = 'bg-[purple]';
       break;
     case Status.PartialSuccess:
-      bgColor = 'bg-[#ea580c] dark:bg-[#f59e0b]';
+      bgColor = 'bg-[#ea580c]';
       break;
     default:
-      bgColor = 'bg-[gray] dark:bg-[lightgray]';
+      bgColor = 'bg-[gray]';
   }
 
   return (

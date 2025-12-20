@@ -255,27 +255,27 @@ function QueueCard({
           {/* Running DAGs */}
           {queue.running && queue.running.length > 0 && (
             <div className="border-t">
-              <div className="p-2 bg-green-50 dark:bg-green-950/20">
+              <div className="p-2 bg-green-50">
                 <div className="flex items-center gap-2 mb-2">
                   <Play className="h-4 w-4 text-green-500" />
-                  <h4 className="text-sm font-semibold text-green-700 dark:text-green-400">
+                  <h4 className="text-sm font-semibold text-green-700">
                     Running DAGs ({queue.running.length})
                   </h4>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-green-200 dark:border-green-800">
-                        <th className="text-left py-1 px-2 font-medium text-green-700 dark:text-green-400">
+                      <tr className="border-b border-green-200">
+                        <th className="text-left py-1 px-2 font-medium text-green-700">
                           DAG Name
                         </th>
-                        <th className="text-left py-1 px-2 font-medium text-green-700 dark:text-green-400">
+                        <th className="text-left py-1 px-2 font-medium text-green-700">
                           Status
                         </th>
-                        <th className="text-left py-1 px-2 font-medium text-green-700 dark:text-green-400">
+                        <th className="text-left py-1 px-2 font-medium text-green-700">
                           Started At
                         </th>
-                        <th className="text-left py-1 px-2 font-medium text-green-700 dark:text-green-400">
+                        <th className="text-left py-1 px-2 font-medium text-green-700">
                           Run ID
                         </th>
                       </tr>
@@ -293,11 +293,11 @@ function QueueCard({
 
           {/* Queued DAGs */}
           <div className="border-t">
-            <div className="p-2 bg-purple-50 dark:bg-purple-950/20">
+            <div className="p-2 bg-purple-50">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-purple-500" />
-                  <h4 className="text-sm font-semibold text-purple-700 dark:text-purple-400">
+                  <h4 className="text-sm font-semibold text-purple-700">
                     Queued DAGs ({queue.queued?.length || 0})
                   </h4>
                 </div>
@@ -313,7 +313,7 @@ function QueueCard({
                       disabled={
                         isClearing || !queue.queued || queue.queued.length === 0
                       }
-                      className="h-6 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-6 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Trash2
                         className={cn('h-3 w-3', isClearing && 'animate-pulse')}
@@ -330,17 +330,17 @@ function QueueCard({
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-purple-200 dark:border-purple-800">
-                        <th className="text-left py-1 px-2 font-medium text-purple-700 dark:text-purple-400">
+                      <tr className="border-b border-purple-200">
+                        <th className="text-left py-1 px-2 font-medium text-purple-700">
                           DAG Name
                         </th>
-                        <th className="text-left py-1 px-2 font-medium text-purple-700 dark:text-purple-400">
+                        <th className="text-left py-1 px-2 font-medium text-purple-700">
                           Status
                         </th>
-                        <th className="text-left py-1 px-2 font-medium text-purple-700 dark:text-purple-400">
+                        <th className="text-left py-1 px-2 font-medium text-purple-700">
                           Queued At
                         </th>
-                        <th className="text-left py-1 px-2 font-medium text-purple-700 dark:text-purple-400">
+                        <th className="text-left py-1 px-2 font-medium text-purple-700">
                           Run ID
                         </th>
                       </tr>

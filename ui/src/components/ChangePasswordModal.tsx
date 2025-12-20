@@ -112,7 +112,7 @@ export function ChangePasswordModal({ open, onClose }: ChangePasswordModalProps)
           )}
 
           {success && (
-            <div className="flex items-center gap-2 p-3 text-sm text-green-600 dark:text-green-400 bg-green-500/10 rounded-md">
+            <div className="flex items-center gap-2 p-3 text-sm text-green-600 bg-green-500/10 rounded-md">
               <CheckCircle className="h-4 w-4 flex-shrink-0" />
               <span>Password changed successfully!</span>
             </div>

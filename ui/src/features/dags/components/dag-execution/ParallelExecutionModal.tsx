@@ -214,10 +214,10 @@ export function ParallelExecutionModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px] overflow-hidden p-0">
-        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="p-4 border-b border-zinc-200">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-mono">
-              <Layers className="h-4 w-4 text-violet-600 dark:text-violet-500" />
+              <Layers className="h-4 w-4 text-violet-600" />
               {subDAGName}
             </DialogTitle>
             <DialogDescription className="text-xs mt-1 font-mono text-muted-foreground">
@@ -240,13 +240,13 @@ export function ParallelExecutionModal({
                     className={`
                       px-2 py-1 text-xs font-medium rounded transition-colors
                       ${isActive
-                        ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
-                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                        ? 'bg-violet-100 text-violet-700'
+                        : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                       }
                     `}
                   >
                     {filter.label}
-                    <span className={`ml-1 ${isActive ? 'text-violet-500 dark:text-violet-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                    <span className={`ml-1 ${isActive ? 'text-violet-500' : 'text-zinc-400'}`}>
                       {filter.count}
                     </span>
                   </button>
@@ -262,7 +262,7 @@ export function ParallelExecutionModal({
             className="space-y-1 max-h-[400px] overflow-y-auto"
           >
             {filteredSubRuns.length === 0 ? (
-              <div className="text-center py-8 text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="text-center py-8 text-sm text-zinc-500">
                 No sub DAG-runs match the selected filter
               </div>
             ) : (
@@ -278,8 +278,8 @@ export function ParallelExecutionModal({
                       className={`
                         flex-1 text-left transition-all duration-150 border rounded px-3 py-2 flex items-center gap-3 focus:outline-none
                         ${selectedIndex === displayIndex
-                          ? 'border-violet-500 dark:border-violet-500 bg-violet-50 dark:bg-violet-950/20'
-                          : 'border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                          ? 'border-violet-500 bg-violet-50'
+                          : 'border-transparent hover:border-zinc-300 hover:bg-zinc-50'
                         }
                       `}
                       onClick={(e) => {
@@ -290,7 +290,7 @@ export function ParallelExecutionModal({
                         }
                       }}
                     >
-                      <span className="font-mono text-xs text-zinc-500 dark:text-zinc-600 min-w-[24px] flex-shrink-0">
+                      <span className="font-mono text-xs text-zinc-500 min-w-[24px] flex-shrink-0">
                         {String(originalIndex + 1).padStart(2, '0')}
                       </span>
                       {detail && (
@@ -300,24 +300,24 @@ export function ParallelExecutionModal({
                       )}
                       <div className="flex-1 min-w-0 overflow-x-auto">
                         {subRun.params ? (
-                          <code className="text-sm font-mono text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+                          <code className="text-sm font-mono text-zinc-700 whitespace-nowrap">
                             {subRun.params}
                           </code>
                         ) : (
-                          <span className="text-sm text-zinc-400 dark:text-zinc-600 italic">
+                          <span className="text-sm text-zinc-400 italic">
                             No parameters
                           </span>
                         )}
                       </div>
                     </button>
                     <button
-                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 focus:outline-none"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1.5 rounded hover:bg-zinc-100 focus:outline-none"
                       onClick={() => {
                         onSelectSubRun(originalIndex, true);
                       }}
                       title="Open in new tab"
                     >
-                      <ExternalLink className="h-3 w-3 text-zinc-500 dark:text-zinc-500" />
+                      <ExternalLink className="h-3 w-3 text-zinc-500" />
                     </button>
                   </div>
                 );
@@ -326,8 +326,8 @@ export function ParallelExecutionModal({
           </div>
         </div>
         
-        <div className="px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800">
-          <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-500 font-mono">
+        <div className="px-4 py-2 bg-zinc-50 border-t border-zinc-200">
+          <div className="flex items-center gap-3 text-xs text-zinc-500 font-mono">
             <span>{isMac ? '⌘' : 'Ctrl'}+Click: new tab</span>
             <span className="opacity-40">•</span>
             <span>↑↓ Navigate</span>

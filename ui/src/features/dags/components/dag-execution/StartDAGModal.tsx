@@ -124,8 +124,8 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
         </DialogHeader>
 
         {(paramsReadOnly || runIdReadOnly) && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+            <p className="text-sm text-yellow-800">
               <strong>Note:</strong> This DAG has restrictions:
               {paramsReadOnly && runIdReadOnly && (
                 <span> Parameter editing and custom run IDs are disabled.</span>
@@ -147,7 +147,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
               id="enqueue"
               checked={enqueue}
               onCheckedChange={(checked) => setEnqueue(checked as boolean)}
-              className="border-gray-400 dark:border-gray-500"
+              className="border-gray-400"
             />
             <Label htmlFor="enqueue" className="cursor-pointer">
               Enqueue

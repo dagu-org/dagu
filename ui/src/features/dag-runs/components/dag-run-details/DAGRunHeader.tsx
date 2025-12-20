@@ -80,22 +80,22 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
   }, [handleRefresh]);
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 rounded-2xl p-6 mb-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+    <div className="bg-gradient-to-br from-slate-50 via-white to-slate-50 rounded-2xl p-6 mb-6 border border-slate-200 shadow-sm">
       {/* Header with title and actions */}
       <div className="flex items-start justify-between gap-6 mb-4">
         <div className="flex-1 min-w-0">
           {/* Breadcrumb navigation */}
-          <nav className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 mb-2">
+          <nav className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 mb-2">
             {dagRun.rootDAGRunId !== dagRun.dagRunId && (
               <>
                 <a
                   href={`/dag-runs/${dagRun.rootDAGRunName}/${dagRun.rootDAGRunId}`}
                   onClick={handleRootDAGRunClick}
-                  className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors font-medium"
+                  className="text-blue-600 hover:text-blue-700 hover:underline transition-colors font-medium"
                 >
                   {dagRun.rootDAGRunName}
                 </a>
-                <span className="text-slate-400 dark:text-slate-500 mx-1">
+                <span className="text-slate-400 mx-1">
                   /
                 </span>
               </>
@@ -109,18 +109,18 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
                   <a
                     href="#"
                     onClick={handleParentDAGRunClick}
-                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors font-medium"
+                    className="text-blue-600 hover:text-blue-700 hover:underline transition-colors font-medium"
                   >
                     {dagRun.parentDAGRunName}
                   </a>
-                  <span className="text-slate-400 dark:text-slate-500 mx-1">
+                  <span className="text-slate-400 mx-1">
                     /
                   </span>
                 </>
               )}
           </nav>
 
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 truncate">
+          <h1 className="text-2xl font-bold text-slate-900 truncate">
             {dagRun.name}
           </h1>
         </div>
@@ -139,7 +139,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="relative group inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="relative group inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               title="Refresh (R)"
             >
               <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -159,8 +159,8 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
 
           {/* Metadata items */}
           <div className="flex flex-wrap items-center gap-4 lg:gap-6 text-sm">
-            <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md px-3 py-1.5 border">
-              <Calendar className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            <div className="flex items-center gap-2 text-slate-800 bg-slate-200 rounded-md px-3 py-1.5 border">
+              <Calendar className="h-4 w-4 text-slate-600" />
               <span className="font-medium text-xs">
                 {dagRun?.startedAt
                   ? `${dayjs(dagRun.startedAt).format('MMM D, HH:mm:ss')} ${dayjs(dagRun.startedAt).format('z')}`
@@ -168,8 +168,8 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
               </span>
             </div>
 
-            <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md px-3 py-1.5 border">
-              <Timer className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            <div className="flex items-center gap-2 text-slate-800 bg-slate-200 rounded-md px-3 py-1.5 border">
+              <Timer className="h-4 w-4 text-slate-600" />
               <span className="font-medium text-xs">
                 {dagRun.finishedAt
                   ? formatDuration(dagRun.startedAt, dagRun.finishedAt)
@@ -179,11 +179,11 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
               </span>
             </div>
 
-            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 ml-auto">
-              <span className="font-medium text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+            <div className="flex items-center gap-2 text-slate-600 ml-auto">
+              <span className="font-medium text-xs text-slate-500 uppercase tracking-wide">
                 Run ID
               </span>
-              <code className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded-md text-xs font-mono border">
+              <code className="bg-slate-200 text-slate-800 px-3 py-1.5 rounded-md text-xs font-mono border">
                 {dagRun.dagRunId}
               </code>
             </div>
@@ -193,14 +193,14 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
 
       {/* Parameters - Show if present */}
       {dagRun.params && (
-        <div className="mt-4 border-t border-slate-200 dark:border-slate-700 pt-4">
+        <div className="mt-4 border-t border-slate-200 pt-4">
           <div className="flex items-center gap-2 mb-2">
             <Terminal className="h-4 w-4 text-slate-500" />
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            <span className="text-sm font-semibold text-slate-700">
               Parameters
             </span>
           </div>
-          <div className="bg-slate-200 dark:bg-slate-700 rounded-md px-4 py-3 font-mono text-sm text-slate-800 dark:text-slate-200 max-h-[120px] overflow-y-auto border">
+          <div className="bg-slate-200 rounded-md px-4 py-3 font-mono text-sm text-slate-800 max-h-[120px] overflow-y-auto border">
             {dagRun.params}
           </div>
         </div>

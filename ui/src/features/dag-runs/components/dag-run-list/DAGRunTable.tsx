@@ -216,12 +216,12 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
 
   // Empty state component
   const EmptyState = () => (
-    <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-white dark:bg-zinc-900">
+    <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-white">
       <div className="text-6xl mb-4">🔍</div>
-      <h3 className="text-lg font-normal text-gray-900 dark:text-gray-100 mb-2">
+      <h3 className="text-lg font-normal text-gray-900 mb-2">
         No DAG runs found
       </h3>
-      <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-md mb-4">
+      <p className="text-sm text-gray-500 text-center max-w-md mb-4">
         There are no DAG runs matching your current filters. Try adjusting your
         search criteria or date range.
       </p>
@@ -315,7 +315,7 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
 
   // Table view for larger screens
   return (
-    <div className="border rounded-md bg-white dark:bg-zinc-900" ref={tableRef}>
+    <div className="border rounded-md bg-white" ref={tableRef}>
       <Table className="w-full text-xs">
         <TableHeader>
           <TableRow>

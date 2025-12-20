@@ -236,9 +236,9 @@ function DAGSpec({ fileName }: Props) {
   ) => (
     <div className="space-y-6">
       {errors?.length ? (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-          <div className="border-b border-slate-100 dark:border-slate-800 bg-red-50 dark:bg-red-900/10 px-6 py-4">
-            <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+          <div className="border-b border-slate-100 bg-red-50 px-6 py-4">
+            <h2 className="text-lg font-semibold text-red-600 flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
               Configuration Errors
             </h2>
@@ -248,7 +248,7 @@ function DAGSpec({ fileName }: Props) {
               {errors.map((e, i) => (
                 <div
                   key={i}
-                  className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-red-600 dark:text-red-400 font-mono text-sm break-words"
+                  className="p-3 bg-red-50 rounded-md text-red-600 font-mono text-sm break-words"
                 >
                   {e}
                 </div>
@@ -258,9 +258,9 @@ function DAGSpec({ fileName }: Props) {
         </div>
       ) : null}
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-        <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+        <div className="border-b border-slate-100 bg-slate-50 px-6 py-4 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-slate-900">
             Graph
           </h2>
           {!errors?.length && (
@@ -273,11 +273,11 @@ function DAGSpec({ fileName }: Props) {
         <div className="p-6">
           {errors?.length || !dag.steps || dag.steps.length === 0 ? (
             <div className="py-8 px-4 text-center">
-              <AlertTriangle className="h-12 w-12 text-yellow-500 dark:text-yellow-400 mx-auto mb-4" />
-              <p className="text-slate-600 dark:text-slate-400 mb-2">
+              <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+              <p className="text-slate-600 mb-2">
                 Cannot render graph due to configuration errors
               </p>
-              <p className="text-sm text-slate-500 dark:text-slate-500">
+              <p className="text-sm text-slate-500">
                 Please fix the errors above and save the configuration to view the graph
               </p>
             </div>
@@ -294,9 +294,9 @@ function DAGSpec({ fileName }: Props) {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-        <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+        <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">
             Attributes
           </h2>
         </div>
@@ -306,11 +306,11 @@ function DAGSpec({ fileName }: Props) {
       </div>
 
       {dag.steps ? (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-          <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+          <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
+            <h2 className="text-lg font-semibold text-slate-900 flex items-center justify-between">
               <span>Steps</span>
-              <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+              <span className="text-sm font-normal text-slate-500">
                 {dag.steps.length} step
                 {dag.steps.length !== 1 ? 's' : ''}
               </span>
@@ -323,11 +323,11 @@ function DAGSpec({ fileName }: Props) {
       ) : null}
 
       {getHandlers(dag)?.length ? (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-          <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+          <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
+            <h2 className="text-lg font-semibold text-slate-900 flex items-center justify-between">
               <span>Lifecycle Hooks</span>
-              <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+              <span className="text-sm font-normal text-slate-500">
                 {getHandlers(dag).length} hook{getHandlers(dag).length !== 1 ? 's' : ''}
               </span>
             </h2>
@@ -351,7 +351,7 @@ function DAGSpec({ fileName }: Props) {
             <div className="space-y-6" ref={containerRef}>
               {hasLocalDags ? (
                 <div className="space-y-6">
-                  <div className="overflow-x-auto -mx-2 px-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+                  <div className="overflow-x-auto -mx-2 px-2 scrollbar-thin scrollbar-thumb-gray-300">
                     <Tabs className="mb-4 w-max min-w-full">
                       <Tab
                         isActive={activeTab === 'parent'}
@@ -381,8 +381,8 @@ function DAGSpec({ fileName }: Props) {
                         {localDag.dag ? (
                           renderDAGContent(localDag.dag, localDag.errors)
                         ) : (
-                          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
-                            <div className="text-red-600 dark:text-red-400">
+                          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                            <div className="text-red-600">
                               <AlertTriangle className="h-5 w-5 inline mr-2" />
                               Failed to load local DAG: {localDag.name}
                             </div>
@@ -405,16 +405,16 @@ function DAGSpec({ fileName }: Props) {
 
               <div
                 className={
-                  'rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                  'rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden bg-white border-slate-200'
                 }
               >
                 <div
                   className={
-                    'border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50'
+                    'border-b border-slate-100 px-6 py-4 flex justify-between items-center bg-slate-50'
                   }
                 >
                   <div className="flex items-center">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mr-3">
+                    <h2 className="text-lg font-semibold text-slate-900 mr-3">
                       Definition
                     </h2>
                   </div>

@@ -107,7 +107,7 @@ function DAGActions({
                 size="icon"
                 disabled={!buttonState['enqueue']}
                 onClick={() => setIsEnqueueModal(true)}
-                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                className="h-8 w-8 disabled:text-gray-400 cursor-pointer"
               >
                 <Play className="h-4 w-4" />
                 <span className="sr-only">Enqueue</span>
@@ -118,7 +118,7 @@ function DAGActions({
                 size="sm"
                 disabled={!buttonState['enqueue']}
                 onClick={() => setIsEnqueueModal(true)}
-                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                className="h-8 disabled:text-gray-400 cursor-pointer"
               >
                 <Play className="mr-2 h-4 w-4" />
                 Enqueue
@@ -139,7 +139,7 @@ function DAGActions({
                 size="icon"
                 disabled={!buttonState['stop']}
                 onClick={() => setIsStopModal(true)}
-                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                className="h-8 w-8 disabled:text-gray-400 cursor-pointer"
               >
                 <Square className="h-4 w-4" />
                 <span className="sr-only">Stop</span>
@@ -150,7 +150,7 @@ function DAGActions({
                 size="sm"
                 disabled={!buttonState['stop']}
                 onClick={() => setIsStopModal(true)}
-                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                className="h-8 disabled:text-gray-400 cursor-pointer"
               >
                 <Square className="mr-2 h-4 w-4" />
                 Stop
@@ -231,7 +231,7 @@ function DAGActions({
                   // Show the modal
                   setIsRetryModal(true);
                 }}
-                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                className="h-8 w-8 disabled:text-gray-400 cursor-pointer"
               >
                 <RefreshCw className="h-4 w-4" />
                 <span className="sr-only">Retry</span>
@@ -302,7 +302,7 @@ function DAGActions({
                   // Show the modal
                   setIsRetryModal(true);
                 }}
-                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
+                className="h-8 disabled:text-gray-400 cursor-pointer"
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Retry
@@ -406,18 +406,18 @@ function DAGActions({
                 </StatusChip>
               </LabeledItem>
             )}
-            <div className="mt-4 flex items-center space-x-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+            <div className="mt-4 flex items-center space-x-2 p-2 bg-amber-50 rounded border border-amber-200">
               <Checkbox
                 id="stop-all"
                 checked={stopAllRunning}
                 onCheckedChange={(checked) =>
                   setStopAllRunning(checked as boolean)
                 }
-                className="border-amber-600 dark:border-amber-400 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600 data-[state=checked]:text-white dark:data-[state=checked]:text-black"
+                className="border-amber-600 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600 data-[state=checked]:text-white=checked]:text-black"
               />
               <label
                 htmlFor="stop-all"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-amber-700 dark:text-amber-300"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-amber-700"
               >
                 Stop all running instances
               </label>
@@ -543,7 +543,7 @@ function DAGActions({
                 id="reschedule-dag"
                 checked={retryAsNew}
                 onCheckedChange={(checked) => setRetryAsNew(checked as boolean)}
-                className="border-gray-400 dark:border-gray-500"
+                className="border-gray-400"
               />
               <Label htmlFor="reschedule-dag" className="cursor-pointer text-sm">
                 Reschedule with new DAG-run

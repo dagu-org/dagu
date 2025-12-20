@@ -266,7 +266,7 @@ const Graph: React.FC<Props> = ({
 
   return (
     <div className="relative" ref={containerRef}>
-      <div className="absolute right-2 top-2 z-10 bg-white dark:bg-zinc-900 rounded-md">
+      <div className="absolute right-2 top-2 z-10 bg-white rounded-md">
         <ToggleGroup aria-label="Zoom controls">
           <ToggleButton
             value="zoomin"

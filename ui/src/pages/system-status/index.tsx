@@ -125,7 +125,7 @@ function SystemStatus() {
             onClick={() => setAutoRefresh(!autoRefresh)}
             className={cn(
               'h-7 px-2',
-              autoRefresh && 'bg-green-50 dark:bg-green-950 border-green-500'
+              autoRefresh && 'bg-green-50 border-green-500'
             )}
             aria-label={`Auto-refresh ${autoRefresh ? 'enabled' : 'disabled'}`}
             title={`Toggle auto-refresh (currently ${autoRefresh ? 'ON' : 'OFF'})`}

@@ -40,7 +40,7 @@ function WorkerList({ workers, isLoading, errors, onTaskClick }: WorkerListProps
   if (errors && errors.length > 0) {
     return (
       <div className="p-4 space-y-2">
-        <div className="flex items-center gap-2 text-sm text-orange-600 dark:text-orange-400">
+        <div className="flex items-center gap-2 text-sm text-orange-600">
           <AlertCircle className="h-4 w-4" />
           <span>Warnings:</span>
         </div>
@@ -102,7 +102,7 @@ function WorkerList({ workers, isLoading, errors, onTaskClick }: WorkerListProps
                   {worker.labels && Object.entries(worker.labels).map(([key, value]) => (
                     <span
                       key={key}
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200 text-slate-700"
                     >
                       {key}={value}
                     </span>

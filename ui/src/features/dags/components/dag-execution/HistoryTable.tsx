@@ -35,10 +35,10 @@ type Props = {
  */
 function HistoryTable({ dagRuns, gridData, onSelect, idx }: Props) {
   return (
-    <div className="rounded-xl bg-white overflow-hidden border dark:bg-zinc-900 dark:border-zinc-700">
+    <div className="rounded-xl bg-white overflow-hidden border">
       <Table className="select-none border-collapse">
-        <TableHeader className="bg-slate-50 dark:bg-slate-800">
-          <TableRow className="border-b border-slate-200 dark:border-slate-700">
+        <TableHeader className="bg-slate-50">
+          <TableRow className="border-b border-slate-200">
             <TableHead className="py-3"></TableHead>
             {dagRuns.map((_, i) => {
               if (!dagRuns || i >= dagRuns.length || !dagRuns[i]) {
@@ -68,8 +68,8 @@ function HistoryTable({ dagRuns, gridData, onSelect, idx }: Props) {
                   key={`date-${i}`}
                   className={cn(
                     'max-w-[22px] min-w-[22px] text-left p-2 cursor-pointer text-xs font-medium',
-                    'hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200',
-                    i === idx && 'bg-slate-100 dark:bg-slate-600'
+                    'hover:bg-slate-100 transition-colors duration-200',
+                    i === idx && 'bg-slate-100'
                   )}
                   onClick={() => {
                     onSelect(i);

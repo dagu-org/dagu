@@ -92,7 +92,7 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
           <div className="flex justify-end mb-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded cursor-help">
+                <div className="flex items-center text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded cursor-help">
                   <MousePointerClick className="h-3 w-3 mr-1" />
                   {config.permissions.runDags
                     ? 'Double-click to navigate / Right-click to change status'

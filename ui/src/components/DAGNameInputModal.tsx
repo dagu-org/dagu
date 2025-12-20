@@ -121,7 +121,7 @@ export function DAGNameInputModal({
             <DialogTitle>{modalContent.title}</DialogTitle>
             <DialogDescription>
               {modalContent.description}
-              <div className="mt-1 font-mono text-xs bg-slate-100 p-1 rounded dark:bg-slate-800">
+              <div className="mt-1 font-mono text-xs bg-slate-100 p-1 rounded">
                 Pattern: {DAG_NAME_PATTERN_STRING}
               </div>
             </DialogDescription>

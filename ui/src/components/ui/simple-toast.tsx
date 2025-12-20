@@ -44,7 +44,7 @@ export const SimpleToast: React.FC<SimpleToastProps> = ({
 
   return createPortal(
     <div
-      className={`fixed bottom-4 right-4 z-[100] max-w-sm bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300 rounded-md shadow-lg p-3 cursor-pointer hover:opacity-90 transition-all duration-300 ${
+      className={`fixed bottom-4 right-4 z-[100] max-w-sm bg-green-50 border border-green-200 text-green-800 rounded-md shadow-lg p-3 cursor-pointer hover:opacity-90 transition-all duration-300 ${
         isFading ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
       }`}
       onClick={handleClose}

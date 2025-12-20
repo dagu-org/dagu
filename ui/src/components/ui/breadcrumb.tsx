@@ -10,7 +10,7 @@ const Breadcrumb = React.forwardRef<
     ref={ref}
     aria-label="breadcrumb"
     className={cn(
-      'flex flex-row items-center text-sm text-slate-600 dark:text-slate-400',
+      'flex flex-row items-center text-sm text-slate-600',
       className
     )}
     {...props}
@@ -65,7 +65,7 @@ const BreadcrumbLink = React.forwardRef<
   return (
     <a
       ref={ref}
-      className={cn('hover:text-slate-900 dark:hover:text-slate-50', className)}
+      className={cn('hover:text-slate-900', className)}
       {...props}
     />
   );
@@ -81,7 +81,7 @@ const BreadcrumbPage = React.forwardRef<
     role="link"
     aria-disabled="true"
     aria-current="page"
-    className={cn('font-medium text-slate-900 dark:text-slate-50', className)}
+    className={cn('font-medium text-slate-900', className)}
     {...props}
   />
 ));

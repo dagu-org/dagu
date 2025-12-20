@@ -51,7 +51,7 @@ export function ScriptDialog({
         {children}
       </div>
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <DialogHeader className="px-4 py-3 border-b border-slate-200">
           <DialogTitle className="flex items-center gap-2 text-sm font-semibold">
             <FileText className="h-4 w-4 text-amber-500" />
             {stepName ? `Script: ${stepName}` : 'Script Content'}
@@ -92,9 +92,9 @@ interface ScriptBadgeProps {
 export function ScriptBadge({ script, stepName }: ScriptBadgeProps) {
   return (
     <ScriptDialog script={script} stepName={stepName}>
-      <div className="flex items-center gap-1.5 text-xs bg-amber-50 dark:bg-amber-900/10 rounded-md px-1.5 py-0.5 w-fit hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-colors">
-        <FileText className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-        <span className="font-medium text-amber-600 dark:text-amber-400">
+      <div className="flex items-center gap-1.5 text-xs bg-amber-50 rounded-md px-1.5 py-0.5 w-fit hover:bg-amber-100 transition-colors">
+        <FileText className="h-3.5 w-3.5 text-amber-500" />
+        <span className="font-medium text-amber-600">
           Script defined
         </span>
       </div>

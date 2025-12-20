@@ -54,14 +54,14 @@ function DAGRunDetailsPage() {
     if (statusCode === 404) {
       return (
         <div className="container mx-auto">
-          <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-6 m-4">
-            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">
+          <div className="bg-slate-100 rounded-lg p-6 m-4">
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">
               DAG Run Not Found
             </h2>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-slate-600">
               This DAG run may have been dequeued or removed. The previous state is no longer available.
             </p>
-            <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">
+            <p className="text-sm text-slate-500 mt-2">
               DAG: {name} | Run ID: {dagRunId}
             </p>
           </div>
@@ -71,11 +71,11 @@ function DAGRunDetailsPage() {
     // For other errors, show a generic error message
     return (
       <div className="container mx-auto">
-        <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-6 m-4">
-          <h2 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+        <div className="bg-red-50 rounded-lg p-6 m-4">
+          <h2 className="text-lg font-semibold text-red-800 mb-2">
             Error Loading DAG Run
           </h2>
-          <p className="text-red-600 dark:text-red-400">
+          <p className="text-red-600">
             {(error as { message?: string })?.message || 'Failed to load DAG run details'}
           </p>
         </div>

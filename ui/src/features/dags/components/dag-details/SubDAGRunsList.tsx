@@ -204,7 +204,7 @@ export function SubDAGRunsList({
     return (
       <>
         <div
-          className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline"
+          className="text-xs text-blue-500 font-medium cursor-pointer hover:underline"
           onClick={(e) => {
             e.stopPropagation();
             onNavigate(0, e);
@@ -214,7 +214,7 @@ export function SubDAGRunsList({
           View Sub DAG Run: {subDagName}
         </div>
         {allSubRuns[0]?.params && (
-          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <div className="text-xs text-slate-500 mt-1">
             Parameters:{' '}
             <span className="font-mono">{allSubRuns[0].params}</span>
           </div>
@@ -225,14 +225,14 @@ export function SubDAGRunsList({
 
   // Multiple sub DAG runs
   return (
-    <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+    <div className="text-xs text-slate-600 mt-1">
       <div className="flex items-center gap-2">
         <button
           onClick={(e) => {
             e.stopPropagation();
             onToggleExpand();
           }}
-          className="flex items-center gap-1 text-blue-500 dark:text-blue-400 font-medium hover:underline"
+          className="flex items-center gap-1 text-blue-500 font-medium hover:underline"
         >
           {isExpanded ? (
             <ChevronDown className="h-3 w-3" />
@@ -262,13 +262,13 @@ export function SubDAGRunsList({
                 className={`
                   px-1.5 py-0.5 text-xs rounded transition-colors
                   ${isActive
-                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }
                 `}
               >
                 {filter.label}
-                <span className={`ml-1 ${isActive ? 'text-blue-500 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                <span className={`ml-1 ${isActive ? 'text-blue-500' : 'text-slate-400'}`}>
                   {filter.count}
                 </span>
               </button>
@@ -278,9 +278,9 @@ export function SubDAGRunsList({
       )}
 
       {isExpanded && (
-        <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 dark:border-slate-700 pl-3">
+        <div className="mt-2 ml-4 space-y-1 border-l border-slate-200 pl-3">
           {filteredSubRuns.length === 0 ? (
-            <div className="py-2 text-slate-500 dark:text-slate-400 italic">
+            <div className="py-2 text-slate-500 italic">
               No sub DAG runs match the selected filter
             </div>
           ) : (
@@ -295,7 +295,7 @@ export function SubDAGRunsList({
                 <div key={subRun.dagRunId} className="py-1">
                   <div className="flex items-center gap-2">
                     <div
-                      className="text-xs text-blue-500 dark:text-blue-400 cursor-pointer hover:underline"
+                      className="text-xs text-blue-500 cursor-pointer hover:underline"
                       onClick={(e) => {
                         e.stopPropagation();
                         onNavigate(subRun.originalIndex, e);
@@ -305,7 +305,7 @@ export function SubDAGRunsList({
                       #{String(displayNumber).padStart(2, '0')}: {subDagName}
                     </div>
                     {startedAt && (
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                      <div className="text-xs text-slate-500">
                         {dayjs(startedAt).format('MMM D, HH:mm:ss')}
                       </div>
                     )}
@@ -314,7 +314,7 @@ export function SubDAGRunsList({
                     )}
                   </div>
                   {subRun.params && (
-                    <div className="text-xs text-slate-500 dark:text-slate-400 ml-0 mt-1 font-mono">
+                    <div className="text-xs text-slate-500 ml-0 mt-1 font-mono">
                       {subRun.params}
                     </div>
                   )}

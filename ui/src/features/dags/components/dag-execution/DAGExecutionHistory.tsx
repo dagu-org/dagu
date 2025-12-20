@@ -330,9 +330,9 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
     <DAGContext.Consumer>
       {(props) => (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-            <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+            <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-900">
                 Execution History
               </h2>
             </div>
@@ -348,9 +348,9 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
 
           {reversedDAGRuns && reversedDAGRuns[idx] ? (
             <React.Fragment>
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">
                     DAGRun Visualization
                   </h2>
                 </div>
@@ -363,9 +363,9 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">
                     Execution Status
                   </h2>
                 </div>
@@ -388,12 +388,12 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
               </div>
 
               {/* Desktop Steps - Card Container */}
-              <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+              <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900 flex items-center justify-between">
                     <span>Execution Steps</span>
                     {reversedDAGRuns[idx].nodes && (
-                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                      <span className="text-sm font-normal text-slate-500">
                         {reversedDAGRuns[idx].nodes.length} step
                         {reversedDAGRuns[idx].nodes.length !== 1 ? 's' : ''}
                       </span>
@@ -428,10 +428,10 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
               {/* Mobile Steps - No Card Container */}
               <div className="md:hidden">
                 <div className="mb-4">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-slate-900 flex items-center justify-between">
                     <span>Execution Steps</span>
                     {reversedDAGRuns[idx].nodes && (
-                      <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                      <span className="text-sm font-normal text-slate-500">
                         {reversedDAGRuns[idx].nodes.length} step
                         {reversedDAGRuns[idx].nodes.length !== 1 ? 's' : ''}
                       </span>
@@ -464,11 +464,11 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
               {handlers && handlers.length ? (
                 <>
                   {/* Desktop Lifecycle Hooks - Card Container */}
-                  <div className="hidden md:block bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                    <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-4">
-                      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                  <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                    <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
+                      <h2 className="text-lg font-semibold text-slate-900 flex items-center justify-between">
                         <span>Lifecycle Hooks</span>
-                        <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                        <span className="text-sm font-normal text-slate-500">
                           {handlers.length} hook
                           {handlers.length !== 1 ? 's' : ''}
                         </span>
@@ -502,9 +502,9 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                   {/* Mobile Lifecycle Hooks - No Card Container */}
                   <div className="md:hidden">
                     <div className="mb-4">
-                      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                      <h2 className="text-lg font-semibold text-slate-900 flex items-center justify-between">
                         <span>Lifecycle Hooks</span>
-                        <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                        <span className="text-sm font-normal text-slate-500">
                           {handlers.length} hook
                           {handlers.length !== 1 ? 's' : ''}
                         </span>

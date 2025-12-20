@@ -42,28 +42,28 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
       <div className="hidden md:block w-full overflow-x-auto">
         <div className="min-w-[900px]">
           <Table className="w-full">
-            <TableHeader className="bg-slate-50 dark:bg-slate-800">
-              <TableRow className="border-b border-slate-200 dark:border-slate-700">
-                <TableHead className="w-[5%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 text-center">
+            <TableHeader className="bg-slate-50">
+              <TableRow className="border-b border-slate-200">
+                <TableHead className="w-[5%] py-3 text-sm font-semibold text-slate-700 text-center">
                   No
                 </TableHead>
-                <TableHead className="w-[20%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <TableHead className="w-[20%] py-3 text-sm font-semibold text-slate-700">
                   Step Name
                 </TableHead>
-                <TableHead className="w-[15%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <TableHead className="w-[15%] py-3 text-sm font-semibold text-slate-700">
                   Command
                 </TableHead>
-                <TableHead className="w-[15%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <TableHead className="w-[15%] py-3 text-sm font-semibold text-slate-700">
                   Last Run
                 </TableHead>
-                <TableHead className="w-[10%] py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <TableHead className="w-[10%] py-3 text-center text-sm font-semibold text-slate-700">
                   Status
                 </TableHead>
-                <TableHead className="w-[35%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 min-w-[150px]">
+                <TableHead className="w-[35%] py-3 text-sm font-semibold text-slate-700 min-w-[150px]">
                   Error / Logs
                 </TableHead>
                 {status?.dagRunId && (
-                  <TableHead className="w-[8%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 text-center">
+                  <TableHead className="w-[8%] py-3 text-sm font-semibold text-slate-700 text-center">
                     Actions
                   </TableHead>
                 )}

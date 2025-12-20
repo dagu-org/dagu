@@ -15,44 +15,44 @@ function StatusChip({ status, children, size = 'md' }: Props) {
   let borderColorClass = '';
   switch (status) {
     case Status.Success: // done -> muted green (sepia-compatible)
-      bgColorClass = 'bg-[rgba(107,168,107,0.12)] dark:bg-[rgba(125,168,125,0.18)]';
-      borderColorClass = 'border-[#6ba86b] dark:border-[#7da87d]';
-      textColorClass = 'text-[#5a8a5a] dark:text-[#8ac48a]';
+      bgColorClass = 'bg-[rgba(107,168,107,0.12)]';
+      borderColorClass = 'border-[#6ba86b]';
+      textColorClass = 'text-[#5a8a5a]';
       break;
     case Status.Failed: // error -> warm coral red (sepia-compatible)
-      bgColorClass = 'bg-[rgba(196,114,106,0.12)] dark:bg-[rgba(196,114,106,0.18)]';
-      borderColorClass = 'border-[#c4726a] dark:border-[#d4847a]';
-      textColorClass = 'text-[#b05a52] dark:text-[#e89a92]';
+      bgColorClass = 'bg-[rgba(196,114,106,0.12)]';
+      borderColorClass = 'border-[#c4726a]';
+      textColorClass = 'text-[#b05a52]';
       break;
     case Status.Running: // running -> accent green (sepia-compatible)
-      bgColorClass = 'bg-[rgba(125,168,125,0.15)] dark:bg-[rgba(138,196,138,0.2)]';
-      borderColorClass = 'border-[#7da87d] dark:border-[#8ac48a]';
-      textColorClass = 'text-[#6b9a6b] dark:text-[#9ad49a]';
+      bgColorClass = 'bg-[rgba(125,168,125,0.15)]';
+      borderColorClass = 'border-[#7da87d]';
+      textColorClass = 'text-[#6b9a6b]';
       break;
     case Status.Aborted: // aborted -> muted coral/pink (sepia-compatible)
-      bgColorClass = 'bg-[rgba(212,132,122,0.12)] dark:bg-[rgba(212,132,122,0.18)]';
-      borderColorClass = 'border-[#d4847a] dark:border-[#e4948a]';
-      textColorClass = 'text-[#c06a62] dark:text-[#f0a49a]';
+      bgColorClass = 'bg-[rgba(212,132,122,0.12)]';
+      borderColorClass = 'border-[#d4847a]';
+      textColorClass = 'text-[#c06a62]';
       break;
     case Status.NotStarted: // none -> slate blue (sepia-compatible)
-      bgColorClass = 'bg-[rgba(138,159,196,0.12)] dark:bg-[rgba(138,159,196,0.18)]';
-      borderColorClass = 'border-[#8a9fc4] dark:border-[#9aafda]';
-      textColorClass = 'text-[#6a7fa4] dark:text-[#aabfea]';
+      bgColorClass = 'bg-[rgba(138,159,196,0.12)]';
+      borderColorClass = 'border-[#8a9fc4]';
+      textColorClass = 'text-[#6a7fa4]';
       break;
     case Status.Queued: // queued -> muted purple (sepia-compatible)
-      bgColorClass = 'bg-[rgba(154,122,196,0.12)] dark:bg-[rgba(154,122,196,0.18)]';
-      borderColorClass = 'border-[#9a7ac4] dark:border-[#aa8ad4]';
-      textColorClass = 'text-[#7a5aa4] dark:text-[#ba9ae4]';
+      bgColorClass = 'bg-[rgba(154,122,196,0.12)]';
+      borderColorClass = 'border-[#9a7ac4]';
+      textColorClass = 'text-[#7a5aa4]';
       break;
     case Status.PartialSuccess: // partial success -> warm amber (sepia-compatible)
-      bgColorClass = 'bg-[rgba(212,148,106,0.12)] dark:bg-[rgba(212,148,106,0.18)]';
-      borderColorClass = 'border-[#d4946a] dark:border-[#e4a47a]';
-      textColorClass = 'text-[#c47a4a] dark:text-[#f4b48a]';
+      bgColorClass = 'bg-[rgba(212,148,106,0.12)]';
+      borderColorClass = 'border-[#d4946a]';
+      textColorClass = 'text-[#c47a4a]';
       break;
     default: // Fallback to warm gray (sepia-compatible)
-      bgColorClass = 'bg-[rgba(168,160,152,0.12)] dark:bg-[rgba(168,160,152,0.18)]';
-      borderColorClass = 'border-[#a8a098] dark:border-[#b8b0a8]';
-      textColorClass = 'text-[#6b635a] dark:text-[#c8c0b8]';
+      bgColorClass = 'bg-[rgba(168,160,152,0.12)]';
+      borderColorClass = 'border-[#a8a098]';
+      textColorClass = 'text-[#6b635a]';
   }
 
   // Size classes
