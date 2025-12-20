@@ -113,7 +113,9 @@ function DAGSpec({ fileName }: Props) {
 
     if (lastFetchedSpecRef.current === fetchedSpec) {
       // Ensure the editor initializes with the fetched value on first load.
-      setCurrentValue((prev) => (typeof prev === 'undefined' ? fetchedSpec : prev));
+      setCurrentValue((prev) =>
+        typeof prev === 'undefined' ? fetchedSpec : prev
+      );
       return;
     }
 
@@ -167,7 +169,14 @@ function DAGSpec({ fileName }: Props) {
 
     // Show success toast notification
     showToast('Changes saved successfully');
-  }, [currentValue, fileName, appBarContext.selectedRemoteNode, client, saveScrollPosition, showToast]);
+  }, [
+    currentValue,
+    fileName,
+    appBarContext.selectedRemoteNode,
+    client,
+    saveScrollPosition,
+    showToast,
+  ]);
 
   // Restore scroll position after render
   useEffect(() => {
@@ -260,9 +269,7 @@ function DAGSpec({ fileName }: Props) {
 
       <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
         <div className="border-b border-border bg-muted px-6 py-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-foreground">
-            Graph
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground">Graph</h2>
           {!errors?.length && (
             <FlowchartSwitch
               value={cookie['flowchart']}
@@ -278,7 +285,8 @@ function DAGSpec({ fileName }: Props) {
                 Cannot render graph due to configuration errors
               </p>
               <p className="text-sm text-muted-foreground">
-                Please fix the errors above and save the configuration to view the graph
+                Please fix the errors above and save the configuration to view
+                the graph
               </p>
             </div>
           ) : (
@@ -296,9 +304,7 @@ function DAGSpec({ fileName }: Props) {
 
       <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
         <div className="border-b border-border bg-muted px-6 py-4">
-          <h2 className="text-lg font-semibold text-foreground">
-            Attributes
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground">Attributes</h2>
         </div>
         <div className="p-6">
           <DAGAttributes dag={dag} />
@@ -325,119 +331,135 @@ function DAGSpec({ fileName }: Props) {
         // Update refresh callback ref directly (safe in render)
         refreshCallbackRef.current = props.refresh;
 
-        return data?.dag && (
-          <React.Fragment>
-            <div className="space-y-6" ref={containerRef}>
-              {hasLocalDags ? (
-                <div className="space-y-6">
-                  <div className="overflow-x-auto -mx-2 px-2 scrollbar-thin scrollbar-thumb-gray-300">
-                    <Tabs className="mb-4 w-max min-w-full">
-                      <Tab
-                        isActive={activeTab === 'parent'}
-                        onClick={() => setActiveTab('parent')}
-                        className="cursor-pointer whitespace-nowrap"
-                      >
-                        {data?.dag?.name} (Parent)
-                      </Tab>
-                      {dagDetails?.localDags?.map((localDag: components['schemas']['LocalDag']) => (
+        return (
+          data?.dag && (
+            <React.Fragment>
+              <div className="space-y-6" ref={containerRef}>
+                {hasLocalDags ? (
+                  <div className="">
+                    <div className="overflow-x-auto -mx-2 px-2 scrollbar-thin scrollbar-thumb-gray-300">
+                      <Tabs className="mb-4 w-max min-w-full">
                         <Tab
-                          key={localDag.name}
-                          isActive={activeTab === localDag.name}
-                          onClick={() => setActiveTab(localDag.name)}
+                          isActive={activeTab === 'parent'}
+                          onClick={() => setActiveTab('parent')}
                           className="cursor-pointer whitespace-nowrap"
                         >
-                          {localDag.name}
+                          {data?.dag?.name} (Parent)
                         </Tab>
-                      ))}
-                    </Tabs>
-                  </div>
-                  
-                  {activeTab === 'parent' && data?.dag && renderDAGContent(data.dag, data?.errors)}
-                  
-                  {dagDetails?.localDags?.map((localDag: components['schemas']['LocalDag']) => (
-                    activeTab === localDag.name && (
-                      <div key={localDag.name}>
-                        {localDag.dag ? (
-                          renderDAGContent(localDag.dag, localDag.errors)
-                        ) : (
-                          <div className="bg-card rounded-2xl border border-border p-6">
-                            <div className="text-error">
-                              <AlertTriangle className="h-5 w-5 inline mr-2" />
-                              Failed to load local DAG: {localDag.name}
-                            </div>
-                            {localDag.errors?.length ? (
-                              <div className="mt-4 space-y-2">
-                                {localDag.errors.map((e: string, i: number) => (
-                                  <div key={i} className="text-sm font-mono">{e}</div>
-                                ))}
-                              </div>
-                            ) : null}
-                          </div>
+                        {dagDetails?.localDags?.map(
+                          (localDag: components['schemas']['LocalDag']) => (
+                            <Tab
+                              key={localDag.name}
+                              isActive={activeTab === localDag.name}
+                              onClick={() => setActiveTab(localDag.name)}
+                              className="cursor-pointer whitespace-nowrap"
+                            >
+                              {localDag.name}
+                            </Tab>
+                          )
                         )}
-                      </div>
-                    )
-                  ))}
-                </div>
-              ) : (
-                data?.dag && renderDAGContent(data.dag, data?.errors)
-              )}
+                      </Tabs>
+                    </div>
 
-              <div
-                className={
-                  'rounded-2xl border hover: overflow-hidden bg-card border-border'
-                }
-              >
+                    {activeTab === 'parent' &&
+                      data?.dag &&
+                      renderDAGContent(data.dag, data?.errors)}
+
+                    {dagDetails?.localDags?.map(
+                      (localDag: components['schemas']['LocalDag']) =>
+                        activeTab === localDag.name && (
+                          <div key={localDag.name}>
+                            {localDag.dag ? (
+                              renderDAGContent(localDag.dag, localDag.errors)
+                            ) : (
+                              <div className="bg-card rounded-2xl border border-border p-6">
+                                <div className="text-error">
+                                  <AlertTriangle className="h-5 w-5 inline mr-2" />
+                                  Failed to load local DAG: {localDag.name}
+                                </div>
+                                {localDag.errors?.length ? (
+                                  <div className="mt-4 space-y-2">
+                                    {localDag.errors.map(
+                                      (e: string, i: number) => (
+                                        <div
+                                          key={i}
+                                          className="text-sm font-mono"
+                                        >
+                                          {e}
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+                        )
+                    )}
+                  </div>
+                ) : (
+                  data?.dag && renderDAGContent(data.dag, data?.errors)
+                )}
+
                 <div
                   className={
-                    'border-b border-border px-6 py-4 flex justify-between items-center bg-muted'
+                    'rounded-2xl border hover: overflow-hidden bg-card border-border'
                   }
                 >
-                  <div className="flex items-center">
-                    <h2 className="text-lg font-semibold text-foreground mr-3">
-                      Definition
-                    </h2>
+                  <div
+                    className={
+                      'border-b border-border px-6 py-4 flex justify-between items-center bg-muted'
+                    }
+                  >
+                    <div className="flex items-center">
+                      <h2 className="text-lg font-semibold text-foreground mr-3">
+                        Definition
+                      </h2>
+                    </div>
+
+                    {editable ? (
+                      <div className="flex gap-2">
+                        <Button
+                          id="save-config"
+                          variant="default"
+                          size="sm"
+                          title="Save changes (Ctrl+S / Cmd+S)"
+                          className="cursor-pointer hover: relative group"
+                          onClick={async () => {
+                            await handleSave();
+                            props.refresh();
+                          }}
+                        >
+                          <Save className="h-4 w-4 mr-1" />
+                          Save Changes
+                          <span className="absolute -bottom-1 -right-1 bg-primary-foreground text-primary text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                            {navigator.platform.indexOf('Mac') > -1
+                              ? '⌘S'
+                              : 'Ctrl+S'}
+                          </span>
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
 
-                  {editable ? (
-                    <div className="flex gap-2">
-                      <Button
-                        id="save-config"
-                        variant="default"
-                        size="sm"
-                        title="Save changes (Ctrl+S / Cmd+S)"
-                        className="cursor-pointer hover: relative group"
-                        onClick={async () => {
-                          await handleSave();
-                          props.refresh();
-                        }}
-                      >
-                        <Save className="h-4 w-4 mr-1" />
-                        Save Changes
-                        <span className="absolute -bottom-1 -right-1 bg-primary-foreground text-primary text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                          {navigator.platform.indexOf('Mac') > -1 ? '⌘S' : 'Ctrl+S'}
-                        </span>
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="p-6">
-                  <DAGEditor
-                    value={editable ? (currentValue ?? data.spec) : data.spec}
-                    readOnly={!editable}
-                    lineNumbers={true}
-                    onChange={
-                      editable
-                        ? (newValue) => {
-                            setCurrentValue(newValue || '');
-                          }
-                        : undefined
-                    }
-                  />
+                  <div className="p-6">
+                    <DAGEditor
+                      value={editable ? (currentValue ?? data.spec) : data.spec}
+                      readOnly={!editable}
+                      lineNumbers={true}
+                      onChange={
+                        editable
+                          ? (newValue) => {
+                              setCurrentValue(newValue || '');
+                            }
+                          : undefined
+                      }
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </React.Fragment>
+            </React.Fragment>
+          )
         );
       }}
     </DAGContext.Consumer>

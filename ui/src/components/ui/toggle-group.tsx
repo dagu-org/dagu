@@ -58,11 +58,11 @@ export const ToggleButton = ({
     <button
       type="button"
       className={cn(
-        'inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer',
+        'inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer',
         borderRadiusClasses,
         isSelected
-          ? 'bg-accent-surface text-foreground'
-          : 'text-muted-foreground bg-transparent',
+          ? 'text-amber-700 font-semibold [&_svg]:text-amber-700'
+          : 'text-gray-700 hover:text-gray-900',
         className
       )}
       onClick={onClick}

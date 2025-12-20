@@ -61,10 +61,7 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
           <Tab
             isActive={sub === '0'}
             onClick={() => setSub('0')}
-            className={cn(
-              'flex items-center gap-2 text-sm h-10 cursor-pointer',
-              sub === '0' && 'bg-accent-surface text-foreground font-medium'
-            )}
+            className="flex items-center gap-2 text-sm h-10 cursor-pointer"
           >
             <GitGraph className="h-4 w-4" />
             Graph
@@ -72,10 +69,7 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
           <Tab
             isActive={sub === '1'}
             onClick={() => setSub('1')}
-            className={cn(
-              'flex items-center gap-2 text-sm h-10 cursor-pointer',
-              sub === '1' && 'bg-accent-surface text-foreground font-medium'
-            )}
+            className="flex items-center gap-2 text-sm h-10 cursor-pointer"
           >
             <GanttChart className="h-4 w-4" />
             Timeline
