@@ -987,7 +987,7 @@ function DAGTable({
 
       {/* Search, Filter and Pagination Controls */}
       <div
-        className={`bg-muted/50 rounded-lg p-3 mb-4 space-y-3 ${
+        className={`bg-muted/50 rounded-lg mb-4 space-y-3 ${
           isLoading ? 'opacity-70 pointer-events-none' : ''
         }`}
       >
@@ -1073,14 +1073,10 @@ function DAGTable({
 
       {/* Desktop Table View - Hidden on mobile */}
       <div
-        className="hidden md:block rounded-xl w-full max-w-full min-w-0 overflow-x-auto transition-all duration-300"
+        className="hidden md:block w-full max-w-full min-w-0 overflow-x-auto transition-all duration-300 p-px"
         style={{
           fontFamily:
             'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"',
-          background:
-            'linear-gradient(to bottom, var(--background) 0%, var(--background) 100%)',
-          border: '1px solid var(--border)',
-          borderRadius: '0.75rem',
         }}
       >
         <Table
@@ -1157,7 +1153,7 @@ function DAGTable({
                             'dag' in row.original &&
                             selectedDAG ===
                               (row.original as DAGRow).dag.fileName
-                          ? 'cursor-pointer bg-accent-surface hover:bg-accent-surface/80 border-l-4 border-muted-foreground border-b-0' // Highlight selected DAG
+                          ? 'cursor-pointer bg-accent-surface hover:bg-accent-surface/80 border-l-4 border-l-muted-foreground' // Highlight selected DAG
                           : 'cursor-pointer hover:bg-muted/50'
                     }
                     style={{ fontSize: '0.8125rem' }} // Smaller font size for more density

@@ -315,7 +315,7 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
 
   // Table view for larger screens
   return (
-    <div className="border rounded-md bg-card" ref={tableRef}>
+    <div ref={tableRef}>
       <Table className="w-full text-xs">
         <TableHeader>
           <TableRow>

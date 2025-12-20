@@ -1,3 +1,5 @@
+import { Theme } from '@radix-ui/themes';
+import '@radix-ui/themes/styles.css';
 import React from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { SWRConfig } from 'swr';
@@ -84,15 +86,16 @@ function App({ config }: Props) {
   }, [remoteNodes, selectedRemoteNode]);
 
   return (
-    <SWRConfig
-      value={{
-        fetcher: fetchJson,
-        onError: (err) => {
-          console.error(err);
-        },
-      }}
-    >
-      <AppBarContext.Provider
+    <Theme appearance="light" accentColor="gray" grayColor="slate" radius="medium">
+      <SWRConfig
+        value={{
+          fetcher: fetchJson,
+          onError: (err) => {
+            console.error(err);
+          },
+        }}
+      >
+        <AppBarContext.Provider
         value={{
           title,
           setTitle,
@@ -157,7 +160,8 @@ function App({ config }: Props) {
           </UserPreferencesProvider>
         </ConfigContext.Provider>
       </AppBarContext.Provider>
-    </SWRConfig>
+      </SWRConfig>
+    </Theme>
   );
 }
 
