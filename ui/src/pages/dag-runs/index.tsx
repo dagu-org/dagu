@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { List, Layers, Search } from 'lucide-react';
+import { Layers, List, Search } from 'lucide-react';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Status } from '../../api/v2/schema';
@@ -13,13 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
-import { ToggleGroup, ToggleButton } from '../../components/ui/toggle-group';
+import { ToggleButton, ToggleGroup } from '../../components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
-import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
 import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
+import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
 import { useQuery } from '../../hooks/api';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
@@ -147,9 +147,7 @@ function DAGRuns() {
   const [apiSearchText, setAPISearchText] = React.useState(
     defaultFilters.searchText
   );
-  const [apiDagRunId, setApiDagRunId] = React.useState(
-    defaultFilters.dagRunId
-  );
+  const [apiDagRunId, setApiDagRunId] = React.useState(defaultFilters.dagRunId);
   const [apiStatus, setApiStatus] = React.useState(defaultFilters.status);
   const [apiFromDate, setApiFromDate] = React.useState<string | undefined>(
     defaultFilters.fromDate
@@ -244,7 +242,11 @@ function DAGRuns() {
     }
 
     const dateModeParam = params.get('dateMode');
-    if (dateModeParam === 'preset' || dateModeParam === 'specific' || dateModeParam === 'custom') {
+    if (
+      dateModeParam === 'preset' ||
+      dateModeParam === 'specific' ||
+      dateModeParam === 'custom'
+    ) {
       urlFilters.dateRangeMode = dateModeParam;
       hasUrlFilters = true;
     }
@@ -265,7 +267,8 @@ function DAGRuns() {
     }
 
     if (params.has('specificValue')) {
-      urlFilters.specificValue = params.get('specificValue') || defaultFilters.specificValue;
+      urlFilters.specificValue =
+        params.get('specificValue') || defaultFilters.specificValue;
       hasUrlFilters = true;
     }
 
@@ -406,9 +409,10 @@ function DAGRuns() {
 
   const getPresetDates = (preset: string): { from: string; to?: string } => {
     const now = dayjs();
-    const startOfDay = config.tzOffsetInSec !== undefined
-      ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
-      : now.startOf('day');
+    const startOfDay =
+      config.tzOffsetInSec !== undefined
+        ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+        : now.startOf('day');
 
     switch (preset) {
       case 'today':
@@ -419,9 +423,13 @@ function DAGRuns() {
           to: startOfDay.format('YYYY-MM-DDTHH:mm'),
         };
       case 'last7days':
-        return { from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm') };
+        return {
+          from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm'),
+        };
       case 'last30days':
-        return { from: startOfDay.subtract(30, 'day').format('YYYY-MM-DDTHH:mm') };
+        return {
+          from: startOfDay.subtract(30, 'day').format('YYYY-MM-DDTHH:mm'),
+        };
       case 'thisWeek':
         return { from: startOfDay.startOf('week').format('YYYY-MM-DDTHH:mm') };
       case 'thisMonth':
@@ -446,7 +454,10 @@ function DAGRuns() {
     mutate();
   };
 
-  const getSpecificPeriodDates = (period: 'date' | 'month' | 'year', value: string): { from: string; to?: string } => {
+  const getSpecificPeriodDates = (
+    period: 'date' | 'month' | 'year',
+    value: string
+  ): { from: string; to?: string } => {
     switch (period) {
       case 'date': {
         const date = dayjs(value);
@@ -483,7 +494,10 @@ function DAGRuns() {
     }
   };
 
-  const handleSpecificPeriodChange = (value: string, period?: 'date' | 'month' | 'year') => {
+  const handleSpecificPeriodChange = (
+    value: string,
+    period?: 'date' | 'month' | 'year'
+  ) => {
     setSpecificValue(value);
     const periodToUse = period || specificPeriod;
     const dates = getSpecificPeriodDates(periodToUse, value);
@@ -500,7 +514,9 @@ function DAGRuns() {
     mutate();
   };
 
-  const handleDateRangeModeChange = (newMode: 'preset' | 'specific' | 'custom') => {
+  const handleDateRangeModeChange = (
+    newMode: 'preset' | 'specific' | 'custom'
+  ) => {
     setDateRangeMode(newMode);
     addSearchParam('dateMode', newMode);
 
@@ -591,7 +607,7 @@ function DAGRuns() {
           </ToggleButton>
         </ToggleGroup>
       </div>
-      <div className="bg-muted/50 rounded-lg p-3 mb-4 space-y-3">
+      <div className="bg-muted/50 rounded-lg mb-4 space-y-3">
         <div className="flex flex-wrap gap-2">
           <Input
             placeholder="Filter by DAG name..."
@@ -758,13 +774,19 @@ function DAGRuns() {
 
                   if (newPeriod === 'date') {
                     // If switching to date, use the parsed date or today
-                    newValue = parsedDate.isValid() ? parsedDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
+                    newValue = parsedDate.isValid()
+                      ? parsedDate.format('YYYY-MM-DD')
+                      : dayjs().format('YYYY-MM-DD');
                   } else if (newPeriod === 'month') {
                     // If switching to month, extract year-month from current value
-                    newValue = parsedDate.isValid() ? parsedDate.format('YYYY-MM') : dayjs().format('YYYY-MM');
+                    newValue = parsedDate.isValid()
+                      ? parsedDate.format('YYYY-MM')
+                      : dayjs().format('YYYY-MM');
                   } else {
                     // If switching to year, extract year from current value
-                    newValue = parsedDate.isValid() ? parsedDate.format('YYYY') : dayjs().format('YYYY');
+                    newValue = parsedDate.isValid()
+                      ? parsedDate.format('YYYY')
+                      : dayjs().format('YYYY');
                   }
 
                   setSpecificValue(newValue);
