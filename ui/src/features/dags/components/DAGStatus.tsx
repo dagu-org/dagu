@@ -232,49 +232,33 @@ function DAGStatus({ dagRun, fileName }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* DAG Visualization Card */}
+      {/* DAG Visualization */}
       {dagRun.nodes && dagRun.nodes.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
-          <div className="border-b border-border bg-muted/30 px-6 py-4">
-            <h2 className="text-lg font-semibold text-foreground">Graph</h2>
-          </div>
-          <div className="p-6">
-            <DAGGraph
-              dagRun={dagRun}
-              onSelectStep={onSelectStepOnGraph}
-              onRightClickStep={onRightClickStepOnGraph}
-            />
-          </div>
-        </div>
+        <DAGGraph
+          dagRun={dagRun}
+          onSelectStep={onSelectStepOnGraph}
+          onRightClickStep={onRightClickStepOnGraph}
+        />
       )}
 
       <DAGContext.Consumer>
         {(props) => (
           <>
             <div className="grid grid-cols-1 gap-6">
-              {/* Status Overview Card */}
-              <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
-                <div className="border-b border-border bg-muted/30 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-foreground">
-                    Run Status
-                  </h2>
-                </div>
-                <div className="p-6">
-                  <DAGStatusOverview
-                    status={dagRun}
-                    fileName={fileName}
-                    onViewLog={(dagRunId) => {
-                      setLogViewer({
-                        isOpen: true,
-                        logType: 'execution',
-                        stepName: '',
-                        dagRunId,
-                        stream: 'stdout',
-                      });
-                    }}
-                  />
-                </div>
-              </div>
+              {/* Status Overview */}
+              <DAGStatusOverview
+                status={dagRun}
+                fileName={fileName}
+                onViewLog={(dagRunId) => {
+                  setLogViewer({
+                    isOpen: true,
+                    logType: 'execution',
+                    stepName: '',
+                    dagRunId,
+                    stream: 'stdout',
+                  });
+                }}
+              />
 
               {/* Steps Table */}
               <NodeStatusTable

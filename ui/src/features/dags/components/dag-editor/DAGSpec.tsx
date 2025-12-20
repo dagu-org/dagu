@@ -245,71 +245,50 @@ function DAGSpec({ fileName }: Props) {
   ) => (
     <div className="space-y-6">
       {errors?.length ? (
-        <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
-          <div className="border-b border-border bg-error-muted px-6 py-4">
-            <h2 className="text-lg font-semibold text-error flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Configuration Errors
-            </h2>
-          </div>
-          <div className="p-6">
-            <div className="space-y-3">
-              {errors.map((e, i) => (
-                <div
-                  key={i}
-                  className="p-3 bg-error-muted rounded-md text-error font-mono text-sm break-words"
-                >
-                  {e}
-                </div>
-              ))}
+        <div className="space-y-3">
+          {errors.map((e, i) => (
+            <div
+              key={i}
+              className="p-3 bg-danger-highlight rounded-md text-danger font-mono text-sm break-words flex items-start gap-2"
+            >
+              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              {e}
             </div>
-          </div>
+          ))}
         </div>
       ) : null}
 
-      <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
-        <div className="border-b border-border bg-muted px-6 py-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-foreground">Graph</h2>
-          {!errors?.length && (
+      {errors?.length || !dag.steps || dag.steps.length === 0 ? (
+        <div className="py-8 px-4 text-center">
+          <AlertTriangle className="h-12 w-12 text-warning mx-auto mb-4" />
+          <p className="text-muted-foreground mb-2">
+            Cannot render graph due to configuration errors
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Please fix the errors above and save the configuration to view
+            the graph
+          </p>
+        </div>
+      ) : (
+        <div>
+          <div className="flex justify-end mb-2">
             <FlowchartSwitch
               value={cookie['flowchart']}
               onChange={onChangeFlowchart}
             />
-          )}
+          </div>
+          <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
+            <Graph
+              steps={dag.steps}
+              type="config"
+              flowchart={flowchart}
+              showIcons={false}
+            />
+          </BorderedBox>
         </div>
-        <div className="p-6">
-          {errors?.length || !dag.steps || dag.steps.length === 0 ? (
-            <div className="py-8 px-4 text-center">
-              <AlertTriangle className="h-12 w-12 text-warning mx-auto mb-4" />
-              <p className="text-muted-foreground mb-2">
-                Cannot render graph due to configuration errors
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Please fix the errors above and save the configuration to view
-                the graph
-              </p>
-            </div>
-          ) : (
-            <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
-              <Graph
-                steps={dag.steps}
-                type="config"
-                flowchart={flowchart}
-                showIcons={false}
-              />
-            </BorderedBox>
-          )}
-        </div>
-      </div>
+      )}
 
-      <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
-        <div className="border-b border-border bg-muted px-6 py-4">
-          <h2 className="text-lg font-semibold text-foreground">Attributes</h2>
-        </div>
-        <div className="p-6">
-          <DAGAttributes dag={dag} />
-        </div>
-      </div>
+      <DAGAttributes dag={dag} />
 
       {dag.steps ? (
         <div className="overflow-hidden">
@@ -401,61 +380,42 @@ function DAGSpec({ fileName }: Props) {
                   data?.dag && renderDAGContent(data.dag, data?.errors)
                 )}
 
-                <div
-                  className={
-                    'rounded-2xl border hover: overflow-hidden bg-card border-border'
-                  }
-                >
-                  <div
-                    className={
-                      'border-b border-border px-6 py-4 flex justify-between items-center bg-muted'
-                    }
-                  >
-                    <div className="flex items-center">
-                      <h2 className="text-lg font-semibold text-foreground mr-3">
-                        Definition
-                      </h2>
+                <div>
+                  {editable && (
+                    <div className="flex justify-end mb-2">
+                      <Button
+                        id="save-config"
+                        variant="default"
+                        size="sm"
+                        title="Save changes (Ctrl+S / Cmd+S)"
+                        className="cursor-pointer relative group"
+                        onClick={async () => {
+                          await handleSave();
+                          props.refresh();
+                        }}
+                      >
+                        <Save className="h-4 w-4 mr-1" />
+                        Save Changes
+                        <span className="absolute -bottom-1 -right-1 bg-primary-foreground text-primary text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                          {navigator.platform.indexOf('Mac') > -1
+                            ? '⌘S'
+                            : 'Ctrl+S'}
+                        </span>
+                      </Button>
                     </div>
-
-                    {editable ? (
-                      <div className="flex gap-2">
-                        <Button
-                          id="save-config"
-                          variant="default"
-                          size="sm"
-                          title="Save changes (Ctrl+S / Cmd+S)"
-                          className="cursor-pointer hover: relative group"
-                          onClick={async () => {
-                            await handleSave();
-                            props.refresh();
-                          }}
-                        >
-                          <Save className="h-4 w-4 mr-1" />
-                          Save Changes
-                          <span className="absolute -bottom-1 -right-1 bg-primary-foreground text-primary text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                            {navigator.platform.indexOf('Mac') > -1
-                              ? '⌘S'
-                              : 'Ctrl+S'}
-                          </span>
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="p-6">
-                    <DAGEditor
-                      value={editable ? (currentValue ?? data.spec) : data.spec}
-                      readOnly={!editable}
-                      lineNumbers={true}
-                      onChange={
-                        editable
-                          ? (newValue) => {
-                              setCurrentValue(newValue || '');
-                            }
-                          : undefined
-                      }
-                    />
-                  </div>
+                  )}
+                  <DAGEditor
+                    value={editable ? (currentValue ?? data.spec) : data.spec}
+                    readOnly={!editable}
+                    lineNumbers={true}
+                    onChange={
+                      editable
+                        ? (newValue) => {
+                            setCurrentValue(newValue || '');
+                          }
+                        : undefined
+                    }
+                  />
                 </div>
               </div>
             </React.Fragment>

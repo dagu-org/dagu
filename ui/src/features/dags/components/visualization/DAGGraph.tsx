@@ -9,7 +9,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
 import { GanttChart, GitGraph, MousePointerClick } from 'lucide-react';
 import React from 'react';
 import { useCookies } from 'react-cookie';
