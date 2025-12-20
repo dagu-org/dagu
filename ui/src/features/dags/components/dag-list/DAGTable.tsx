@@ -8,6 +8,7 @@ import {
   getExpandedRowModel,
   getFilteredRowModel,
   RowData,
+  Updater,
   useReactTable,
 } from '@tanstack/react-table';
 import cronParser, { CronDate } from 'cron-parser';
@@ -243,8 +244,8 @@ const defaultColumns = [
   }),
   columnHelper.accessor('name', {
     id: 'Name',
-    size: 350,
-    minSize: 200,
+    size: 250,
+    minSize: 150,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Name</span>
@@ -346,9 +347,9 @@ const defaultColumns = [
   // The filter functionality is preserved in the Name column
   columnHelper.accessor('kind', {
     id: 'Status',
-    size: 100,
-    minSize: 100,
-    maxSize: 120,
+    size: 90,
+    minSize: 90,
+    maxSize: 90,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Status</span>
@@ -374,9 +375,9 @@ const defaultColumns = [
   // Removed Started At and Finished At columns
   columnHelper.accessor('kind', {
     id: 'LastRun',
-    size: 150,
-    minSize: 150,
-    maxSize: 180,
+    size: 130,
+    minSize: 130,
+    maxSize: 130,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Last Run</span>
@@ -450,9 +451,9 @@ const defaultColumns = [
   }),
   columnHelper.accessor('kind', {
     id: 'ScheduleAndNextRun',
-    size: 200,
-    minSize: 180,
-    maxSize: 250,
+    size: 170,
+    minSize: 160,
+    maxSize: 200,
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Live / Schedule</span>
@@ -547,9 +548,9 @@ const defaultColumns = [
   }),
   columnHelper.display({
     id: 'Actions',
-    size: 100,
-    minSize: 100,
-    maxSize: 100,
+    size: 70,
+    minSize: 70,
+    maxSize: 70,
     header: () => (
       <div className="flex flex-col items-center py-1">
         <span className="text-xs">Actions</span>
@@ -708,7 +709,25 @@ function DAGTable({
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
-  const [expanded, setExpanded] = React.useState<ExpandedState>({});
+  const [expanded, setExpanded] = React.useState<ExpandedState>(() => {
+    try {
+      const saved = localStorage.getItem('dagu_dag_table_expanded');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const handleExpandedChange = React.useCallback(
+    (updater: Updater<ExpandedState>) => {
+      setExpanded((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        localStorage.setItem('dagu_dag_table_expanded', JSON.stringify(next));
+        return next;
+      });
+    },
+    []
+  );
 
   // State for client-side sorting
   const [clientSort, setClientSort] = React.useState<string>('');
@@ -904,6 +923,11 @@ function DAGTable({
   const instance = useReactTable<Data>({
     data,
     columns,
+    // Use stable IDs for persistence
+    getRowId: (row) =>
+      row.kind === ItemKind.Group
+        ? `group:${row.name}`
+        : `dag:${(row as DAGRow).dag.fileName}`,
     getSubRows: (row) => row.subRows,
     getCoreRowModel: getCoreRowModel<Data>(),
     // Disable client-side sorting as we're using server-side sorting
@@ -916,7 +940,7 @@ function DAGTable({
       expanded,
       columnFilters, // Pass filters to table state
     },
-    onExpandedChange: setExpanded,
+    onExpandedChange: handleExpandedChange,
     // Pass handlers via meta
     meta: {
       group, // Pass group if needed elsewhere

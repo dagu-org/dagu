@@ -40,7 +40,7 @@ function QueueCard({
   const config = useConfig();
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
-  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(true);
   const [isClearing, setIsClearing] = React.useState(false);
   const [showClearConfirm, setShowClearConfirm] = React.useState(false);
 
@@ -141,7 +141,7 @@ function QueueCard({
     <div
       className={cn(
         'border rounded-lg bg-card transition-all duration-200',
-        isSelected && 'ring-2 ring-primary/20 bg-muted/10'
+        isSelected && 'ring-2 ring-primary/20'
       )}
     >
       {/* Queue Header */}
@@ -292,41 +292,39 @@ function QueueCard({
           )}
 
           {/* Queued DAGs */}
-          <div className="border-t">
-            <div className="p-2 bg-info-muted">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-info" />
-                  <h4 className="text-sm font-semibold text-info">
-                    Queued DAGs ({queue.queued?.length || 0})
-                  </h4>
+          {queue.queued && queue.queued.length > 0 && (
+            <div className="border-t">
+              <div className="p-2 bg-info-muted">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-info" />
+                    <h4 className="text-sm font-semibold text-info">
+                      Queued DAGs ({queue.queued.length})
+                    </h4>
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowClearConfirm(true);
+                        }}
+                        disabled={isClearing}
+                        className="h-6 px-2"
+                      >
+                        <Trash2
+                          className={cn('h-3 w-3', isClearing && 'animate-pulse')}
+                        />
+                        <span className="ml-1 text-xs">Clear</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Remove all queued DAG runs from this queue</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowClearConfirm(true);
-                      }}
-                      disabled={
-                        isClearing || !queue.queued || queue.queued.length === 0
-                      }
-                      className="h-6 px-2"
-                    >
-                      <Trash2
-                        className={cn('h-3 w-3', isClearing && 'animate-pulse')}
-                      />
-                      <span className="ml-1 text-xs">Clear</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Remove all queued DAG runs from this queue</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              {queue.queued && queue.queued.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
@@ -356,18 +354,14 @@ function QueueCard({
                     </tbody>
                   </table>
                 </div>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  <p className="text-sm">No queued DAG runs</p>
-                </div>
-              )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Empty state */}
           {(!queue.running || queue.running.length === 0) &&
             (!queue.queued || queue.queued.length === 0) && (
-              <div className="p-4 text-center text-muted-foreground">
+              <div className="p-4 text-center text-muted-foreground bg-muted/30 border-t">
                 <p className="text-sm">
                   No DAGs currently running or queued in this queue.
                 </p>

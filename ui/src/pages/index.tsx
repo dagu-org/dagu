@@ -8,6 +8,8 @@ import {
   StopCircle,
   Clock,
   Loader2,
+  Calendar,
+  Server,
 } from 'lucide-react';
 import {
   Select,
@@ -23,28 +25,31 @@ import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { useSearchState } from '../contexts/SearchStateContext';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
+import MiniResourceChart from '../features/dashboard/components/MiniResourceChart';
+import MiniServiceCard from '../features/dashboard/components/MiniServiceCard';
+import WorkersSummary from '../features/dashboard/components/WorkersSummary';
+import PathsCard from '../features/system-status/components/PathsCard';
+import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-details';
 import { useQuery } from '../hooks/api';
-// Import the main 'components' type and Status enum
-import type { components } from '../api/v2/schema'; // Import the main components interface
-import { Status } from '../api/v2/schema'; // Import the Status enum
+import type { components } from '../api/v2/schema';
+import { Status } from '../api/v2/schema';
 import dayjs from '../lib/dayjs';
 
-// Define types using the imported components structure
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
+type SchedulerInstance = components['schemas']['SchedulerInstance'];
+type CoordinatorInstance = components['schemas']['CoordinatorInstance'];
 
 type Metrics = Record<Status, number>;
 
-// Initialize metrics count for relevant statuses
 const initializeMetrics = (): Metrics => {
   const initialMetrics: Partial<Metrics> = {};
-  // Use only statuses defined in the enum
   const relevantStatuses = [
     Status.Success,
     Status.Failed,
     Status.Running,
     Status.Aborted,
     Status.Queued,
-    Status.NotStarted, // Include NotStarted if relevant
+    Status.NotStarted,
     Status.PartialSuccess,
   ];
   relevantStatuses.forEach((status: Status) => {
@@ -53,14 +58,17 @@ const initializeMetrics = (): Metrics => {
   return initialMetrics as Metrics;
 };
 
-// Ensure the function returns a React Element or null
 function Dashboard(): React.ReactElement | null {
-  // --- Hooks ---
-  // All hooks must be called unconditionally at the top level.
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
+
+  // State for DAG run modal
+  const [modalDAGRun, setModalDAGRun] = React.useState<{
+    name: string;
+    dagRunId: string;
+  } | null>(null);
 
   type DashboardFilters = {
     selectedDAGRun: string;
@@ -162,7 +170,6 @@ function Dashboard(): React.ReactElement | null {
     searchState.writeState('dashboard', remoteKey, currentFilters);
   }, [currentFilters, remoteKey, searchState]);
 
-  // Handle date change from the timeline component
   const handleDateChange = (startTimestamp: number, endTimestamp: number) => {
     setDateRange({
       startDate: startTimestamp,
@@ -170,6 +177,7 @@ function Dashboard(): React.ReactElement | null {
     });
   };
 
+  // DAG runs data
   const { data, error, isLoading, mutate } = useQuery('/dag-runs', {
     params: {
       query: {
@@ -179,14 +187,112 @@ function Dashboard(): React.ReactElement | null {
         name: selectedDAGRun !== 'all' ? selectedDAGRun : undefined,
       },
     },
-    // Refresh every 5 seconds to keep the dashboard up-to-date
     refreshInterval: 5000,
   });
 
-  // Extract unique dagRun names for the select dropdown - must be before conditional returns
+  // System status data
+  const {
+    data: schedulerData,
+    error: schedulerError,
+    mutate: mutateScheduler,
+  } = useQuery(
+    '/services/scheduler',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+      },
+    },
+    {
+      refreshInterval: 5000,
+    }
+  );
+
+  const {
+    data: coordinatorData,
+    error: coordinatorError,
+    mutate: mutateCoordinator,
+  } = useQuery(
+    '/services/coordinator',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+      },
+    },
+    {
+      refreshInterval: 5000,
+    }
+  );
+
+  const {
+    data: resourceData,
+    error: resourceError,
+    mutate: mutateResource,
+  } = useQuery(
+    '/services/resources/history',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+      },
+    },
+    {
+      refreshInterval: 5000,
+    }
+  );
+
+  // Workers data
+  const {
+    data: workersData,
+    error: workersError,
+    isLoading: workersLoading,
+    mutate: mutateWorkers,
+  } = useQuery('/workers', {
+    params: {
+      query: {
+        remoteNode: appBarContext.selectedRemoteNode || 'local',
+      },
+    },
+    refreshInterval: 1000,
+  });
+
+  const handleRefreshAll = async () => {
+    await Promise.all([
+      mutate(),
+      mutateResource(),
+      mutateScheduler(),
+      mutateCoordinator(),
+      mutateWorkers(),
+    ]);
+  };
+
+  // Handle task click from workers
+  const handleTaskClick = React.useCallback((task: components['schemas']['RunningTask']) => {
+    if (task.parentDagRunName && task.parentDagRunId) {
+      const searchParams = new URLSearchParams();
+      searchParams.set('subDAGRunId', task.dagRunId);
+      searchParams.set('dagRunId', task.parentDagRunId);
+      searchParams.set('dagRunName', task.parentDagRunName);
+      window.history.pushState({}, '', `${window.location.pathname}?${searchParams.toString()}`);
+
+      setModalDAGRun({
+        name: task.parentDagRunName,
+        dagRunId: task.parentDagRunId,
+      });
+    } else {
+      setModalDAGRun({
+        name: task.dagName,
+        dagRunId: task.dagRunId,
+      });
+    }
+  }, []);
+
   const dagRunsList: DAGRunSummary[] = data?.dagRuns || [];
 
-  // This useMemo hook must be called unconditionally
   const uniqueDAGRunNames = React.useMemo(() => {
     const names = new Set<string>();
     if (data && data.dagRuns) {
@@ -199,35 +305,26 @@ function Dashboard(): React.ReactElement | null {
     return Array.from(names).sort();
   }, [data]);
 
-  // Handle dagRun selection change
   const handleDAGRunChange = (value: string) => {
     setSelectedDAGRun(value);
   };
 
-  // Effect for setting AppBar title - MUST be called before conditional returns
   React.useEffect(() => {
-    // Ensure context is available before using it, although useContext should guarantee it here
     if (appBarContext) {
       appBarContext.setTitle('Dashboard');
     }
-  }, [appBarContext]); // Dependency array includes the context
+  }, [appBarContext]);
 
-  // --- Conditional Returns ---
-  // Handle error state
   if (error) {
-    // Type assertion for the error object based on the default error schema
     const errorData = error as components['schemas']['Error'];
     const errorMessage =
       errorData?.message || 'Unknown error loading dashboard';
     return <div className="p-4 text-error">Error: {errorMessage}</div>;
   }
 
-  // --- Calculate metrics ---
-  // Initialize metrics
   const metrics = initializeMetrics();
   const totalDAGRuns = dagRunsList.length;
 
-  // Calculate metrics from dagRun data
   dagRunsList.forEach((dagRun) => {
     if (
       dagRun &&
@@ -238,79 +335,68 @@ function Dashboard(): React.ReactElement | null {
     }
   });
 
-  // --- Define metric cards data ---
   const metricCards = [
     {
       title: 'Total',
       value: totalDAGRuns,
-      icon: <ListChecks className="h-5 w-5 text-muted-foreground" />,
+      icon: <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />,
     },
     {
-      title: 'running',
+      title: 'Running',
       value: metrics[Status.Running],
-      icon: <Play className="h-5 w-5 text-success" />,
+      icon: <Play className="h-3.5 w-3.5 text-success" />,
     },
     {
-      title: 'queued',
+      title: 'Queued',
       value: metrics[Status.Queued],
-      icon: <Clock className="h-5 w-5 text-[purple]" />,
+      icon: <Clock className="h-3.5 w-3.5 text-[purple]" />,
     },
     {
-      title: 'succeeded',
+      title: 'Success',
       value: metrics[Status.Success],
-      icon: <CheckCircle className="h-5 w-5 text-[green]" />,
+      icon: <CheckCircle className="h-3.5 w-3.5 text-success" />,
     },
     {
-      title: 'partially_succeeded',
+      title: 'Partial',
       value: metrics[Status.PartialSuccess],
-      icon: <CheckCircle className="h-5 w-5 text-[#f59e0b]" />,
+      icon: <CheckCircle className="h-3.5 w-3.5 text-warning" />,
     },
     {
-      title: 'failed',
+      title: 'Failed',
       value: metrics[Status.Failed],
-      icon: <XCircle className="h-5 w-5 text-[red]" />,
+      icon: <XCircle className="h-3.5 w-3.5 text-error" />,
     },
     {
-      title: 'aborted',
+      title: 'Aborted',
       value: metrics[Status.Aborted],
-      icon: <StopCircle className="h-5 w-5 text-[deeppink]" />,
+      icon: <StopCircle className="h-3.5 w-3.5 text-[deeppink]" />,
     },
   ];
 
-  let title = 'Timeline';
+  let timelineTitle = 'Timeline';
   if (config.tz) {
-    title = `Timeline in ${config.tz}`;
+    timelineTitle = `Timeline (${config.tz})`;
   }
 
-  // --- Render the dashboard UI ---
   return (
-    <div className="flex flex-col gap-3 w-full h-full overflow-hidden">
-      {/* Dense Header with Filters and Metrics */}
+    <div className="flex flex-col gap-2 w-full h-full overflow-auto">
+      {/* Header: Filters + Actions + Metrics */}
       <div className="border rounded bg-card flex-shrink-0">
-        {/* Top row: Filters */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border-b">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">
-                DAG Name:
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2">
+          {/* Left: Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <Filter className="h-3.5 w-3.5 text-muted-foreground" />
               <Select
                 value={selectedDAGRun}
                 onValueChange={handleDAGRunChange}
                 disabled={isLoading}
               >
-                <SelectTrigger className="h-7 w-full sm:w-[180px] text-xs">
-                  <SelectValue
-                    placeholder={isLoading ? 'Loading...' : 'All dagRuns'}
-                  />
+                <SelectTrigger className="h-7 w-[160px] text-xs">
+                  <SelectValue placeholder={isLoading ? 'Loading...' : 'All DAGs'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-xs">
-                    All
-                  </SelectItem>
+                  <SelectItem value="all" className="text-xs">All DAGs</SelectItem>
                   {uniqueDAGRunNames.map((name) => (
                     <SelectItem key={name} value={name} className="text-xs">
                       {name}
@@ -318,35 +404,20 @@ function Dashboard(): React.ReactElement | null {
                   ))}
                 </SelectContent>
               </Select>
-              {selectedDAGRun !== 'all' && (
-                <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded whitespace-nowrap">
-                  {selectedDAGRun}
-                </span>
-              )}
             </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">
-                Date:
-              </span>
+            <div className="flex items-center gap-1.5">
               <div className="relative">
                 <Input
                   type="date"
                   value={dayjs.unix(dateRange.startDate).format('YYYY-MM-DD')}
                   onChange={(e) => {
                     const newDate = e.target.value;
-                    if (!newDate) return; // Handle empty input
-
+                    if (!newDate) return;
                     const date = dayjs(newDate);
-                    if (!date.isValid()) return; // Handle invalid dates
-
+                    if (!date.isValid()) return;
                     const startOfDay =
                       config.tzOffsetInSec !== undefined
-                        ? date
-                            .utcOffset(config.tzOffsetInSec / 60)
-                            .startOf('day')
+                        ? date.utcOffset(config.tzOffsetInSec / 60).startOf('day')
                         : date.startOf('day');
                     const endOfDay =
                       config.tzOffsetInSec !== undefined
@@ -354,7 +425,7 @@ function Dashboard(): React.ReactElement | null {
                         : date.endOf('day');
                     handleDateChange(startOfDay.unix(), endOfDay.unix());
                   }}
-                  className="h-7 w-[140px] text-xs pr-8"
+                  className="h-7 w-[130px] text-xs"
                 />
                 {isLoading && (
                   <Loader2 className="absolute right-2 top-1.5 h-4 w-4 animate-spin text-muted-foreground" />
@@ -362,6 +433,7 @@ function Dashboard(): React.ReactElement | null {
               </div>
               <Button
                 size="sm"
+                variant="outline"
                 onClick={() => {
                   const now = dayjs();
                   const startOfDay =
@@ -374,49 +446,41 @@ function Dashboard(): React.ReactElement | null {
                       : now.endOf('day');
                   handleDateChange(startOfDay.unix(), endOfDay.unix());
                 }}
-                className="px-4"
+                className="h-7 text-xs px-2"
               >
                 Today
               </Button>
-              <RefreshButton 
-                onRefresh={async () => { await mutate(); }} 
-              />
             </div>
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-1.5">
+            <PathsCard />
+            <RefreshButton onRefresh={handleRefreshAll} />
           </div>
         </div>
 
-        {/* Bottom row: Dense metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x divide-y lg:divide-y-0">
+        {/* Metrics Row */}
+        <div className="flex flex-wrap items-center border-t px-2 py-1.5 gap-x-4 gap-y-1">
           {metricCards.map((card) => (
             <div
               key={card.title}
-              className="p-2 sm:p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2"
+              className="flex items-center gap-1.5"
             >
-              <div className="flex items-center gap-1 sm:gap-2">
-                {React.cloneElement(card.icon, {
-                  className: card.icon.props.className.replace(
-                    'h-5 w-5',
-                    'h-3 w-3'
-                  ),
-                })}
-                <span className="text-xs font-medium text-muted-foreground">
-                  {card.title}
-                </span>
-              </div>
-              <span className="text-lg font-bold">{card.value}</span>
+              {card.icon}
+              <span className="text-xs text-muted-foreground">{card.title}</span>
+              <span className="text-sm font-semibold">{card.value}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Compact Timeline Chart */}
-      <div className="border rounded bg-card flex-1 flex flex-col min-h-0">
-        <div className="flex items-center justify-between p-3 border-b flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold">{title}</span>
-          </div>
+      {/* Timeline Chart - fixed height */}
+      <div className="border rounded bg-card flex-shrink-0">
+        <div className="flex items-center justify-between px-3 py-2 border-b">
+          <span className="text-sm font-medium">{timelineTitle}</span>
         </div>
-        <div className="flex-1 min-h-0">
+        <div className="h-64">
           <DashboardTimeChart
             data={dagRunsList}
             selectedDate={{
@@ -426,6 +490,112 @@ function Dashboard(): React.ReactElement | null {
           />
         </div>
       </div>
+
+      {/* Workers */}
+      <div className="border rounded bg-card h-48 flex-shrink-0 flex flex-col min-h-0">
+        <WorkersSummary
+          workers={workersData?.workers || []}
+          isLoading={workersLoading && !workersData}
+          errors={workersData?.errors}
+          onTaskClick={handleTaskClick}
+        />
+      </div>
+
+      {/* System Status: Services + Resources */}
+      <div className="border rounded bg-card flex-shrink-0">
+        <div className="flex items-center gap-2 px-3 py-2 border-b">
+          <Server className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-sm font-medium">System</span>
+        </div>
+        <div className="flex flex-wrap items-stretch">
+          {/* Services */}
+          <div className="flex items-center gap-4 px-3 py-2 border-r">
+            <MiniServiceCard
+              title="Scheduler"
+              instances={
+                schedulerData?.schedulers?.map((s: SchedulerInstance) => ({
+                  instanceId: s.instanceId,
+                  host: s.host,
+                  status: s.status,
+                  startedAt: s.startedAt,
+                })) || []
+              }
+              icon={<Calendar className="h-3.5 w-3.5" />}
+              isLoading={!schedulerData && !schedulerError}
+              error={schedulerError ? String(schedulerError) : undefined}
+            />
+            <MiniServiceCard
+              title="Coordinator"
+              instances={
+                coordinatorData?.coordinators?.map((c: CoordinatorInstance) => ({
+                  instanceId: c.instanceId,
+                  host: c.host,
+                  port: c.port,
+                  status: c.status,
+                  startedAt: c.startedAt,
+                })) || []
+              }
+              icon={<Server className="h-3.5 w-3.5" />}
+              isLoading={!coordinatorData && !coordinatorError}
+              error={coordinatorError ? String(coordinatorError) : undefined}
+            />
+          </div>
+
+          {/* Resource Charts */}
+          <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3 px-3 py-2">
+            <div className="h-12">
+              <MiniResourceChart
+                title="CPU"
+                data={resourceData?.cpu}
+                color="#c4956a"
+                isLoading={!resourceData && !resourceError}
+                error={resourceError ? String(resourceError) : undefined}
+              />
+            </div>
+            <div className="h-12">
+              <MiniResourceChart
+                title="Memory"
+                data={resourceData?.memory}
+                color="#8a9fc4"
+                isLoading={!resourceData && !resourceError}
+                error={resourceError ? String(resourceError) : undefined}
+              />
+            </div>
+            <div className="h-12">
+              <MiniResourceChart
+                title="Disk"
+                data={resourceData?.disk}
+                color="#7da87d"
+                isLoading={!resourceData && !resourceError}
+                error={resourceError ? String(resourceError) : undefined}
+              />
+            </div>
+            <div className="h-12">
+              <MiniResourceChart
+                title="Load"
+                data={resourceData?.load}
+                color="#d4a574"
+                unit=""
+                isLoading={!resourceData && !resourceError}
+                error={resourceError ? String(resourceError) : undefined}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* DAG Run Details Modal */}
+      {modalDAGRun && (
+        <DAGRunDetailsModal
+          name={modalDAGRun.name}
+          dagRunId={modalDAGRun.dagRunId}
+          isOpen={!!modalDAGRun}
+          onClose={() => {
+            setModalDAGRun(null);
+            window.history.pushState({}, '', window.location.pathname);
+          }}
+        />
+      )}
     </div>
   );
 }

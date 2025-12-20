@@ -10,7 +10,6 @@ import { useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils';
 import {
-  Activity,
   BarChart2,
   Github,
   Globe,
@@ -19,7 +18,6 @@ import {
   Network,
   PanelLeft,
   Search,
-  Server,
   Users,
 } from 'lucide-react';
 import * as React from 'react';
@@ -62,11 +60,12 @@ function Icon({
   );
 }
 
-// Define props for mainListItems to accept isOpen, onNavItemClick, and onToggle
+// Define props for mainListItems to accept isOpen, onNavItemClick, onToggle, and customColor
 type MainListItemsProps = {
   isOpen?: boolean;
   onNavItemClick?: () => void;
   onToggle?: () => void;
+  customColor?: boolean;
 };
 
 // Main navigation items structure - now accepts isOpen prop
@@ -179,10 +178,10 @@ export const mainListItems = React.forwardRef<
                       onValueChange={context.selectRemoteNode}
                     >
                       <SelectTrigger
-                        className="w-7 h-7 p-0 bg-transparent border-0 text-sidebar-foreground hover:bg-sidebar-foreground/5 focus:ring-0 focus:ring-offset-0 [&>svg:last-child]:hidden"
+                        className="w-7 h-7 p-0 bg-transparent border-0 text-sidebar-foreground hover:bg-sidebar-foreground/5 focus:ring-0 focus:ring-offset-0 [&>svg:last-child]:hidden flex items-center justify-center"
                         title={`Node: ${context.selectedRemoteNode}`}
                       >
-                        <Globe size={16} />
+                        <Globe size={16} className="shrink-0" />
                       </SelectTrigger>
                       <SelectContent>
                         {context.remoteNodes.map((node) => (
@@ -259,33 +258,19 @@ export const mainListItems = React.forwardRef<
           />
         </div>
 
-        {/* System Section */}
-        <div className="space-y-0.5 mt-2">
-          {!isOpen && (
-            <div className="mx-auto w-4 border-t border-sidebar-foreground/30 mb-1" />
-          )}
-          {isOpen && (
-            <div className="px-2 py-0.5">
-              <span className="text-[11px] text-sidebar-foreground/70 font-medium">
-                System
-              </span>
-            </div>
-          )}
-          <NavItem
-            to="/workers"
-            text="Workers"
-            icon={<Server size={16} />}
-            isOpen={isOpen}
-            onClick={onNavItemClick}
-          />
-          <NavItem
-            to="/system-status"
-            text="System Status"
-            icon={<Activity size={16} />}
-            isOpen={isOpen}
-            onClick={onNavItemClick}
-          />
-          {isAdmin && config.authMode === 'builtin' && (
+        {/* System Section - only show if admin with builtin auth */}
+        {isAdmin && config.authMode === 'builtin' && (
+          <div className="space-y-0.5 mt-2">
+            {!isOpen && (
+              <div className="mx-auto w-4 border-t border-sidebar-foreground/30 mb-1" />
+            )}
+            {isOpen && (
+              <div className="px-2 py-0.5">
+                <span className="text-[11px] text-sidebar-foreground/70 font-medium">
+                  System
+                </span>
+              </div>
+            )}
             <NavItem
               to="/users"
               text="User Management"
@@ -293,8 +278,8 @@ export const mainListItems = React.forwardRef<
               isOpen={isOpen}
               onClick={onNavItemClick}
             />
-          )}
-        </div>
+          </div>
+        )}
       </nav>
       {/* Discord Community link */}
       <div className="px-1 pb-0.5">

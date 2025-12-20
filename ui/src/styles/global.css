@@ -18,6 +18,12 @@
   }
 }
 
+/* Custom sidebar color - force all descendants to use the custom text color */
+.custom-sidebar-color,
+.custom-sidebar-color * {
+  color: var(--sidebar-text) !important;
+}
+
 /* Override focus styles for select components */
 [data-slot='select-trigger'],
 [data-slot='select-content'],

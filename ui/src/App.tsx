@@ -19,8 +19,6 @@ import Search from './pages/search';
 import DAGRuns from './pages/dag-runs';
 import DAGRunDetails from './pages/dag-runs/dag-run';
 import Queues from './pages/queues';
-import Workers from './pages/workers';
-import SystemStatus from './pages/system-status';
 import LoginPage from './pages/login';
 import UsersPage from './pages/users';
 
@@ -119,11 +117,10 @@ function App({ config }: Props) {
                         path="/*"
                         element={
                           <ProtectedRoute>
-                            <Layout>
+                            <Layout navbarColor={config.navbarColor}>
                               <Routes>
                                 <Route path="/" element={<Dashboard />} />
                                 <Route path="/dashboard" element={<Dashboard />} />
-                                <Route path="/system-status" element={<SystemStatus />} />
                                 <Route path="/dags/" element={<DAGs />} />
                                 <Route
                                   path="/dags/:fileName/:tab"
@@ -137,7 +134,6 @@ function App({ config }: Props) {
                                   path="/dag-runs/:name/:dagRunId"
                                   element={<DAGRunDetails />}
                                 />
-                                <Route path="/workers" element={<Workers />} />
                                 {/* Admin-only route */}
                                 <Route
                                   path="/users"
