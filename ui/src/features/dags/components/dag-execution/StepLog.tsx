@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
+import { Input } from '../../../../components/ui/input';
 import { ReloadButton } from '../../../../components/ui/reload-button';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
@@ -71,7 +72,7 @@ function StepLog({
   const [jumpToLine, setJumpToLine] = useState<number | ''>('');
   // Check if the node is running
   const isRunning = node?.status === NodeStatus.Running;
-  
+
   const [isLiveMode, setIsLiveMode] = useState(isRunning);
 
   // Keep track of previous data to prevent flashing
@@ -85,9 +86,7 @@ function StepLog({
 
   // Determine if this is a sub DAG-run
   const isSubDAGRun =
-    dagRun &&
-    dagRun.rootDAGRunId &&
-    dagRun.rootDAGRunId !== dagRun.dagRunId;
+    dagRun && dagRun.rootDAGRunId && dagRun.rootDAGRunId !== dagRun.dagRunId;
 
   // Determine query parameters based on view mode
   const queryParams: Record<string, number | string> = {
@@ -308,41 +307,38 @@ function StepLog({
   return (
     <div className="w-full h-full flex flex-col">
       {/* Controls for log navigation */}
-      <div className="flex flex-col gap-2 mb-2 p-2 bg-muted rounded">
+      <div className="flex flex-col gap-2 mb-2 bg-muted rounded">
         <div className="flex flex-wrap items-center gap-2">
           {/* Responsive button container */}
-          <div className="flex flex-wrap gap-2 min-h-[28px]">
+          <div className="flex flex-wrap gap-1">
             <Button
               size="sm"
-              variant={viewMode === 'tail' ? 'default' : 'outline'}
+              variant={viewMode === 'tail' ? 'primary' : 'default'}
               onClick={() => handleViewModeChange('tail')}
               disabled={isNavigating}
-              className="flex-shrink-0"
             >
               Show End
             </Button>
             <Button
               size="sm"
-              variant={viewMode === 'head' ? 'default' : 'outline'}
+              variant={viewMode === 'head' ? 'primary' : 'default'}
               onClick={() => handleViewModeChange('head')}
               disabled={isNavigating}
-              className="flex-shrink-0"
             >
               Show Beginning
             </Button>
             <Button
               size="sm"
-              variant={viewMode === 'page' ? 'default' : 'outline'}
+              variant={viewMode === 'page' ? 'primary' : 'default'}
               onClick={() => handleViewModeChange('page')}
               disabled={isNavigating}
-              className="flex-shrink-0"
             >
               Page View
             </Button>
           </div>
 
           <select
-            className="px-2 py-1 text-xs border rounded bg-card flex-shrink-0"
+            className="h-7 px-2 text-xs border border-border rounded-md bg-surface text-foreground flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-ring"
             value={pageSize}
             onChange={(e) => setPageSize(Number(e.target.value))}
             disabled={isNavigating}
@@ -368,32 +364,24 @@ function StepLog({
 
             {/* Live mode toggle - only show when node is running */}
             {isRunning && (
-              <button
+              <Button
+                size="sm"
+                variant={isLiveMode ? 'primary' : 'default'}
                 onClick={() => setIsLiveMode(!isLiveMode)}
-                className={`
-                  relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
-                  transition-all duration-200 ease-in-out
-                  ${isLiveMode 
-                    ? 'bg-success text-white shadow-success/25' 
-                    : 'bg-accent text-muted-foreground hover:bg-accent'
-                  }
-                `}
               >
-                <span className={`
-                  inline-block w-2 h-2 rounded-full
-                  ${isLiveMode ? 'bg-card animate-pulse' : 'bg-muted-foreground'}
-                `} />
-                <span>LIVE</span>
-              </button>
+                <span
+                  className={`inline-block w-2 h-2 rounded-full ${isLiveMode ? 'bg-white animate-pulse' : 'bg-muted-foreground'}`}
+                />
+                LIVE
+              </Button>
             )}
           </div>
         </div>
-        
+
         {/* Stats line - full width on mobile */}
         <div className="text-xs text-muted-foreground flex items-center">
           Showing {lineCount} of {totalLines} lines{' '}
-          {isEstimate ? '(estimated)' : ''}{' '}
-          {hasMore ? '(more available)' : ''}
+          {isEstimate ? '(estimated)' : ''} {hasMore ? '(more available)' : ''}
         </div>
 
         {/* Page navigation controls */}
@@ -423,10 +411,10 @@ function StepLog({
 
         {/* Jump to line controls */}
         <div className="flex items-center gap-2 mt-2">
-          <span className="text-xs">Jump to line:</span>
-          <input
+          <span className="text-xs text-muted-foreground">Jump to line:</span>
+          <Input
             type="number"
-            min="1"
+            min={1}
             max={totalLines}
             value={jumpToLine}
             onChange={(e) =>
@@ -434,7 +422,6 @@ function StepLog({
             }
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                // Only trigger if the button is not disabled
                 if (
                   !isNavigating &&
                   jumpToLine !== '' &&
@@ -445,7 +432,7 @@ function StepLog({
                 }
               }
             }}
-            className="w-20 px-2 py-1 text-xs border rounded"
+            className="w-20 h-7 text-xs"
             disabled={isNavigating}
           />
           <Button
@@ -466,7 +453,7 @@ function StepLog({
       {/* Log content with overlay loading indicator when navigating */}
       <div
         ref={logContainerRef}
-        className="flex-1 overflow-auto rounded-lg bg-code-bg p-4 relative"
+        className="flex-1 overflow-auto rounded-lg bg-slate-800 p-4 relative"
       >
         {isNavigating && (
           <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 pointer-events-none">
@@ -475,14 +462,11 @@ function StepLog({
             </div>
           </div>
         )}
-        <pre className="h-full font-mono text-sm text-white">
-            {lines.map((line, index) => (
-            <div
-              key={index}
-              className="flex hover:bg-code-bg/80 px-2 py-0.5 rounded"
-            >
+        <pre className="h-full font-mono text-sm text-slate-100">
+          {lines.map((line, index) => (
+            <div key={index} className="flex px-2 py-0.5">
               <span
-                className="text-muted-foreground mr-4 select-none w-8 text-right flex-shrink-0 self-start"
+                className="text-slate-500 mr-4 select-none w-8 text-right flex-shrink-0 self-start"
                 data-line-number={getLineNumber(index)}
               >
                 {getLineNumber(index)}

@@ -58,7 +58,7 @@ export const ToggleButton = ({
     <button
       type="button"
       className={cn(
-        'inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer',
+        'inline-flex items-center justify-center h-8 px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer',
         borderRadiusClasses,
         isSelected
           ? 'text-primary font-semibold [&_svg]:text-primary'

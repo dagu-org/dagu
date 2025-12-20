@@ -119,7 +119,7 @@ function App({ config }: Props) {
                         path="/*"
                         element={
                           <ProtectedRoute>
-                            <Layout {...config}>
+                            <Layout>
                               <Routes>
                                 <Route path="/" element={<Dashboard />} />
                                 <Route path="/dashboard" element={<Dashboard />} />

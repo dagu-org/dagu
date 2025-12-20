@@ -53,7 +53,7 @@ function DAGRunDetailsPage() {
     const statusCode = (error as { response?: { status?: number } })?.response?.status;
     if (statusCode === 404) {
       return (
-        <div className="container mx-auto">
+        <div className="w-full px-4">
           <div className="bg-muted rounded-lg p-6 m-4">
             <h2 className="text-lg font-semibold text-foreground mb-2">
               DAG Run Not Found
@@ -70,7 +70,7 @@ function DAGRunDetailsPage() {
     }
     // For other errors, show a generic error message
     return (
-      <div className="container mx-auto">
+      <div className="w-full px-4">
         <div className="bg-error-muted rounded-lg p-6 m-4">
           <h2 className="text-lg font-semibold text-error mb-2">
             Error Loading DAG Run
@@ -98,7 +98,7 @@ function DAGRunDetailsPage() {
     : name || '';
 
   return (
-    <div className="container mx-auto">
+    <div className="w-full px-4">
       <DAGRunContext.Provider
         value={{
           refresh: refreshFn,

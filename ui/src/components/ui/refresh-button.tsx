@@ -28,15 +28,15 @@ export const RefreshButton: React.FC<RefreshButtonProps> = ({
 
   return (
     <Button
-      size="sm"
+      size="icon"
       onClick={handleRefresh}
       disabled={disabled || isRefreshing}
-      className={cn("p-2", className)}
+      className={className}
       title="Refresh"
     >
       <RefreshCw
-        size={16}
         className={cn(
+          "h-4 w-4",
           isRefreshing && "animate-spin"
         )}
       />

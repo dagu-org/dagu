@@ -155,21 +155,21 @@ function InlineLogViewer({
   const lineCount = data?.lineCount || 0;
 
   return (
-    <div className="bg-code-bg rounded overflow-hidden">
+    <div className="bg-slate-800 rounded overflow-hidden">
       {isLoading && !data ? (
-        <div className="text-muted-foreground text-xs py-4 px-3">Loading logs...</div>
+        <div className="text-slate-400 text-xs py-4 px-3">Loading logs...</div>
       ) : lines.length === 0 ? (
-        <div className="text-muted-foreground text-xs py-4 px-3">
+        <div className="text-slate-400 text-xs py-4 px-3">
           &lt;No log output&gt;
         </div>
       ) : (
         <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-          <pre className="font-mono text-[11px] text-code-foreground p-2">
+          <pre className="font-mono text-[11px] text-slate-100 p-2">
             {lines.map((line, index) => {
               const lineNumber = totalLines - lineCount + index + 1;
               return (
-                <div key={index} className="flex hover:bg-code-bg/80 px-1 py-0.5">
-                  <span className="text-muted-foreground mr-3 select-none w-12 text-right flex-shrink-0">
+                <div key={index} className="flex px-1 py-0.5">
+                  <span className="text-slate-500 mr-3 select-none w-12 text-right flex-shrink-0">
                     {lineNumber}
                   </span>
                   <span className="whitespace-pre-wrap break-all flex-grow">

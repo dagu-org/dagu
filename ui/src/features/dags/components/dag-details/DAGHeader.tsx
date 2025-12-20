@@ -186,75 +186,65 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
       {/* Status and metadata row */}
       {dagRunToDisplay.status !== undefined &&
         dagRunToDisplay.status !== null && (
-          <div className="flex flex-wrap items-center gap-4 text-sm">
-            {/* Status and Refresh */}
-            <div className="flex items-center gap-2">
-              {dagRunToDisplay.status !== undefined && (
-                <StatusChip status={dagRunToDisplay.status} size="md">
-                  {dagRunToDisplay.statusLabel || ''}
-                </StatusChip>
-              )}
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="relative group inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                title="Refresh (R)"
-              >
-                <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
-                <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                  R
-                </span>
-              </button>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <StatusChip status={dagRunToDisplay.status} size="md">
+              {dagRunToDisplay.statusLabel || ''}
+            </StatusChip>
+
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              title="Refresh (R)"
+            >
+              <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+
+            <div className="flex items-center gap-1.5 text-foreground bg-accent rounded-md px-2 py-1 border">
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-medium text-xs">
+                {dagRunToDisplay?.startedAt
+                  ? `${dayjs(dagRunToDisplay.startedAt).format('MMM D, HH:mm:ss')} ${dayjs(dagRunToDisplay.startedAt).format('z')}`
+                  : '--'}
+              </span>
             </div>
 
-            {/* Metadata items */}
-            <div className="flex flex-wrap items-center gap-4 lg:gap-6 text-sm">
-              <div className="flex items-center gap-2 text-foreground bg-accent rounded-md px-3 py-1.5 border">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-xs">
-                  {dagRunToDisplay?.startedAt
-                    ? `${dayjs(dagRunToDisplay.startedAt).format('MMM D, HH:mm:ss')} ${dayjs(dagRunToDisplay.startedAt).format('z')}`
-                    : '--'}
-                </span>
-              </div>
+            <div className="flex items-center gap-1.5 text-foreground bg-accent rounded-md px-2 py-1 border">
+              <Timer className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-medium text-xs flex items-center gap-1">
+                {currentDuration}
+                {isRunning && (
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                )}
+              </span>
+            </div>
 
-              <div className="flex items-center gap-2 text-foreground bg-accent rounded-md px-3 py-1.5 border">
-                <Timer className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-xs flex items-center gap-1">
-                  {currentDuration}
-                  {isRunning && (
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                  )}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 text-muted-foreground ml-auto">
-                <span className="font-medium text-xs text-muted-foreground uppercase tracking-wide">
-                  Run ID
-                </span>
-                <code className="bg-accent text-foreground px-3 py-1.5 rounded-md text-xs font-mono border">
-                  {dagRunToDisplay.rootDAGRunId}
-                </code>
-              </div>
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <span className="font-medium text-xs uppercase tracking-wide">Run ID</span>
+              <code className="bg-accent text-foreground px-2 py-1 rounded-md text-xs font-mono border">
+                {dagRunToDisplay.rootDAGRunId}
+              </code>
             </div>
           </div>
         )}
 
-      {/* Parameters - Show if present */}
-      {dagRunToDisplay.params && (
-        <div className="mt-4 border-t border-border pt-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Terminal className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold text-foreground/90">
-              Parameters
-            </span>
-          </div>
-          <div className="bg-accent rounded-md px-4 py-3 font-mono text-sm text-foreground max-h-[120px] overflow-y-auto border">
-            {dagRunToDisplay.params}
-          </div>
+      {/* Parameters - Always show to prevent layout jumping */}
+      <div className="mt-4 border-t border-border pt-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Terminal className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-semibold text-foreground/90">
+            Parameters
+          </span>
         </div>
-      )}
+        <div className="bg-accent rounded-md px-3 py-2 font-mono text-sm min-h-[36px] max-h-[100px] overflow-y-auto border">
+          {dagRunToDisplay.params ? (
+            <span className="text-foreground">{dagRunToDisplay.params}</span>
+          ) : (
+            <span className="text-muted-foreground italic">No parameters</span>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

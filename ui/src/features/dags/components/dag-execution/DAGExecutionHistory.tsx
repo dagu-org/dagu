@@ -330,124 +330,69 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
     <DAGContext.Consumer>
       {(props) => (
         <div className="space-y-6">
-          <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
-            <div className="border-b border-border bg-muted px-6 py-4">
-              <h2 className="text-lg font-semibold text-foreground">
-                Execution History
-              </h2>
-            </div>
-            <div className="p-6">
-              <HistoryTable
-                dagRuns={reversedDAGRuns || []}
-                gridData={gridData || []}
-                onSelect={updateIdx}
-                idx={idx}
-              />
-            </div>
-          </div>
+          <HistoryTable
+            dagRuns={reversedDAGRuns || []}
+            gridData={gridData || []}
+            onSelect={updateIdx}
+            idx={idx}
+          />
 
           {reversedDAGRuns && reversedDAGRuns[idx] ? (
             <React.Fragment>
-              <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
-                <div className="border-b border-border bg-muted px-6 py-4">
-                  <h2 className="text-lg font-semibold text-foreground">
-                    DAGRun Visualization
-                  </h2>
-                </div>
-                <div className="p-6">
-                  <DAGGraph
-                    dagRun={reversedDAGRuns[idx]}
-                    onSelectStep={onSelectStepOnGraph}
-                    onRightClickStep={onRightClickStepOnGraph}
-                  />
-                </div>
+              <DAGGraph
+                dagRun={reversedDAGRuns[idx]}
+                onSelectStep={onSelectStepOnGraph}
+                onRightClickStep={onRightClickStepOnGraph}
+              />
+
+              <div className="bg-surface border border-border rounded-lg p-4">
+                <DAGStatusOverview
+                  status={reversedDAGRuns[idx]}
+                  dagRunId={reversedDAGRuns[idx].dagRunId}
+                  {...props}
+                  onViewLog={(dagRunId) => {
+                    setLogViewer({
+                      isOpen: true,
+                      logType: 'execution',
+                      stepName: '',
+                      dagRunId,
+                      stream: 'stdout',
+                    });
+                  }}
+                />
               </div>
 
-              <div className="bg-card rounded-2xl border border-border hover: overflow-hidden">
-                <div className="border-b border-border bg-muted px-6 py-4">
-                  <h2 className="text-lg font-semibold text-foreground">
-                    Execution Status
-                  </h2>
-                </div>
-                <div className="p-6">
-                  <DAGStatusOverview
-                    status={reversedDAGRuns[idx]}
-                    dagRunId={reversedDAGRuns[idx].dagRunId}
-                    {...props}
-                    onViewLog={(dagRunId) => {
-                      setLogViewer({
-                        isOpen: true,
-                        logType: 'execution',
-                        stepName: '',
-                        dagRunId,
-                        stream: 'stdout',
-                      });
-                    }}
-                  />
-                </div>
-              </div>
+              <NodeStatusTable
+                nodes={reversedDAGRuns[idx].nodes}
+                status={reversedDAGRuns[idx]}
+                {...props}
+                onViewLog={(stepName, dagRunId) => {
+                  const isStderr = stepName.endsWith('_stderr');
+                  const actualStepName = isStderr
+                    ? stepName.slice(0, -7)
+                    : stepName;
 
-              {/* Desktop Steps - Card Container */}
-              <div className="hidden md:block bg-card rounded-2xl border border-border hover: overflow-hidden">
-                <div className="border-b border-border bg-muted px-6 py-4">
-                  <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-                    <span>Execution Steps</span>
-                    {reversedDAGRuns[idx].nodes && (
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {reversedDAGRuns[idx].nodes.length} step
-                        {reversedDAGRuns[idx].nodes.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </h2>
-                </div>
-                <div className="overflow-x-auto">
-                  <NodeStatusTable
-                    nodes={reversedDAGRuns[idx].nodes}
-                    status={reversedDAGRuns[idx]}
-                    {...props}
-                    onViewLog={(stepName, dagRunId) => {
-                      // Check if this is a stderr log (indicated by _stderr suffix)
-                      const isStderr = stepName.endsWith('_stderr');
-                      const actualStepName = isStderr
-                        ? stepName.slice(0, -7)
-                        : stepName; // Remove '_stderr' suffix
+                  setLogViewer({
+                    isOpen: true,
+                    logType: 'step',
+                    stepName: actualStepName,
+                    dagRunId:
+                      dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
+                    stream: isStderr ? 'stderr' : 'stdout',
+                  });
+                }}
+              />
 
-                      setLogViewer({
-                        isOpen: true,
-                        logType: 'step',
-                        stepName: actualStepName,
-                        dagRunId:
-                          dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
-                        stream: isStderr ? 'stderr' : 'stdout',
-                      });
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Mobile Steps - No Card Container */}
-              <div className="md:hidden">
-                <div className="mb-4">
-                  <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-                    <span>Execution Steps</span>
-                    {reversedDAGRuns[idx].nodes && (
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {reversedDAGRuns[idx].nodes.length} step
-                        {reversedDAGRuns[idx].nodes.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </h2>
-                </div>
+              {handlers && handlers.length ? (
                 <NodeStatusTable
-                  nodes={reversedDAGRuns[idx].nodes}
+                  nodes={getEventHandlers(reversedDAGRuns[idx])}
                   status={reversedDAGRuns[idx]}
                   {...props}
                   onViewLog={(stepName, dagRunId) => {
-                    // Check if this is a stderr log (indicated by _stderr suffix)
                     const isStderr = stepName.endsWith('_stderr');
                     const actualStepName = isStderr
                       ? stepName.slice(0, -7)
-                      : stepName; // Remove '_stderr' suffix
+                      : stepName;
 
                     setLogViewer({
                       isOpen: true,
@@ -459,80 +404,6 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                     });
                   }}
                 />
-              </div>
-
-              {handlers && handlers.length ? (
-                <>
-                  {/* Desktop Lifecycle Hooks - Card Container */}
-                  <div className="hidden md:block bg-card rounded-2xl border border-border hover: overflow-hidden">
-                    <div className="border-b border-border bg-muted px-6 py-4">
-                      <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-                        <span>Lifecycle Hooks</span>
-                        <span className="text-sm font-normal text-muted-foreground">
-                          {handlers.length} hook
-                          {handlers.length !== 1 ? 's' : ''}
-                        </span>
-                      </h2>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <NodeStatusTable
-                        nodes={getEventHandlers(reversedDAGRuns[idx])}
-                        status={reversedDAGRuns[idx]}
-                        {...props}
-                        onViewLog={(stepName, dagRunId) => {
-                          // Check if this is a stderr log (indicated by _stderr suffix)
-                          const isStderr = stepName.endsWith('_stderr');
-                          const actualStepName = isStderr
-                            ? stepName.slice(0, -7)
-                            : stepName; // Remove '_stderr' suffix
-
-                          setLogViewer({
-                            isOpen: true,
-                            logType: 'step',
-                            stepName: actualStepName,
-                            dagRunId:
-                              dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
-                            stream: isStderr ? 'stderr' : 'stdout',
-                          });
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Mobile Lifecycle Hooks - No Card Container */}
-                  <div className="md:hidden">
-                    <div className="mb-4">
-                      <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-                        <span>Lifecycle Hooks</span>
-                        <span className="text-sm font-normal text-muted-foreground">
-                          {handlers.length} hook
-                          {handlers.length !== 1 ? 's' : ''}
-                        </span>
-                      </h2>
-                    </div>
-                    <NodeStatusTable
-                      nodes={getEventHandlers(reversedDAGRuns[idx])}
-                      status={reversedDAGRuns[idx]}
-                      {...props}
-                      onViewLog={(stepName, dagRunId) => {
-                        // Check if this is a stderr log (indicated by _stderr suffix)
-                        const isStderr = stepName.endsWith('_stderr');
-                        const actualStepName = isStderr
-                          ? stepName.slice(0, -7)
-                          : stepName; // Remove '_stderr' suffix
-
-                        setLogViewer({
-                          isOpen: true,
-                          logType: 'step',
-                          stepName: actualStepName,
-                          dagRunId:
-                            dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
-                          stream: isStderr ? 'stderr' : 'stdout',
-                        });
-                      }}
-                    />
-                  </div>
-                </>
               ) : null}
 
               {/* Log viewer modal - moved outside to handle all log viewing */}

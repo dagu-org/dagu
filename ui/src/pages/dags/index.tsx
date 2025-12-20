@@ -6,9 +6,11 @@ import {
   PathsDagsGetParametersQueryOrder,
   PathsDagsGetParametersQuerySort,
 } from '../../api/v2/schema';
+import SplitLayout from '../../components/SplitLayout';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
+import { DAGDetailsPanel } from '../../features/dags/components/dag-details';
 import { DAGErrors } from '../../features/dags/components/dag-editor';
 import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
@@ -69,6 +71,7 @@ function DAGs() {
   );
   const [sortField, setSortField] = React.useState(defaultFilters.sortField);
   const [sortOrder, setSortOrder] = React.useState(defaultFilters.sortOrder);
+  const [selectedDAG, setSelectedDAG] = React.useState<string | null>(null);
 
   const currentFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
@@ -292,48 +295,61 @@ function DAGs() {
   // Use the current data if available, otherwise use the last valid data
   const displayData = data || lastValidData;
 
-  return (
-    <div className="flex flex-col">
+  const leftPanel = (
+    <div className="px-2">
       <DAGListHeader onRefresh={refreshFn} />
-
-      {/* Content */}
-      <div className="w-full">
-        {displayData ? (
-          <>
-            <DAGErrors
-              dags={displayData.dags || []}
-              errors={displayData.errors || []}
-              hasError={
-                (errorCount > 0 || displayData.errors?.length > 0) && !isLoading
-              }
-            />
-            <DAGTable
-              dags={isLoading ? (lastValidData ? dagFiles : []) : dagFiles}
-              group={group}
-              refreshFn={refreshFn}
-              searchText={searchText}
-              handleSearchTextChange={searchTextChange}
-              searchTag={searchTag}
-              handleSearchTagChange={searchTagChange}
-              pagination={{
-                totalPages: displayData.pagination.totalPages,
-                page: page,
-                pageChange: pageChange,
-                onPageLimitChange: handlePageLimitChange,
-                pageLimit: preferences.pageLimit,
-              }}
-              isLoading={isLoading}
-              sortField={sortField}
-              sortOrder={sortOrder}
-              onSortChange={handleSortChange}
-            />
-          </>
-        ) : (
-          /* Show initial loading state if no data yet */
-          <LoadingIndicator />
-        )}
-      </div>
+      {displayData ? (
+        <>
+          <DAGErrors
+            dags={displayData.dags || []}
+            errors={displayData.errors || []}
+            hasError={
+              (errorCount > 0 || displayData.errors?.length > 0) && !isLoading
+            }
+          />
+          <DAGTable
+            dags={isLoading ? (lastValidData ? dagFiles : []) : dagFiles}
+            group={group}
+            refreshFn={refreshFn}
+            searchText={searchText}
+            handleSearchTextChange={searchTextChange}
+            searchTag={searchTag}
+            handleSearchTagChange={searchTagChange}
+            pagination={{
+              totalPages: displayData.pagination.totalPages,
+              page: page,
+              pageChange: pageChange,
+              onPageLimitChange: handlePageLimitChange,
+              pageLimit: preferences.pageLimit,
+            }}
+            isLoading={isLoading}
+            sortField={sortField}
+            sortOrder={sortOrder}
+            onSortChange={handleSortChange}
+            selectedDAG={selectedDAG}
+            onSelectDAG={setSelectedDAG}
+          />
+        </>
+      ) : (
+        <LoadingIndicator />
+      )}
     </div>
+  );
+
+  const rightPanel = selectedDAG ? (
+    <DAGDetailsPanel
+      fileName={selectedDAG}
+      onClose={() => setSelectedDAG(null)}
+    />
+  ) : null;
+
+  return (
+    <SplitLayout
+      leftPanel={leftPanel}
+      rightPanel={rightPanel}
+      leftWidth="40%"
+      emptyRightMessage="Select a DAG to view details"
+    />
   );
 }
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,9 +11,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
 import { User, LogOut, Key, Shield } from 'lucide-react';
 import { ChangePasswordModal } from './ChangePasswordModal';
+
+type UserMenuProps = {
+  isCollapsed?: boolean;
+};
 
 /**
  * Renders a user dropdown menu with profile info, a change-password action, and sign-out.
@@ -21,7 +25,7 @@ import { ChangePasswordModal } from './ChangePasswordModal';
  *
  * @returns The user menu JSX element when shown, or `null` when authentication is not available.
  */
-export function UserMenu() {
+export function UserMenu({ isCollapsed = false }: UserMenuProps) {
   const { user, logout, isAuthenticated } = useAuth();
   const config = useConfig();
   const navigate = useNavigate();
@@ -56,16 +60,24 @@ export function UserMenu() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-current hover:bg-accent/10"
+          <button
+            className={cn(
+              'flex items-center transition-all duration-200 cursor-pointer',
+              isCollapsed
+                ? 'w-7 h-7 justify-center rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground'
+                : 'h-7 px-2 rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground justify-start w-full'
+            )}
+            title={isCollapsed ? user.username : undefined}
           >
-            <User className="h-4 w-4 mr-1.5" />
-            <span className="text-sm">{user.username}</span>
-          </Button>
+            <User className="h-4 w-4 shrink-0" />
+            {!isCollapsed && (
+              <span className="ml-2 text-xs font-medium truncate">
+                {user.username}
+              </span>
+            )}
+          </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align={isCollapsed ? 'center' : 'end'} side="top" className="w-56">
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
               <p className="text-sm font-medium">{user.username}</p>

@@ -6,10 +6,10 @@
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import React from 'react';
+import { DAGNameInputModal } from '../../../../components/DAGNameInputModal';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
-import { DAGNameInputModal } from '../../../../components/DAGNameInputModal';
 
 /**
  * CreateDAGButton displays a button that opens a prompt to create a new DAG
@@ -68,15 +68,11 @@ function CreateDAGButton() {
 
   return (
     <>
-      <Button
-        aria-label="Create new DAG"
-        className="flex items-center gap-1.5 bg-surface border border-border text-foreground font-medium px-3 py-1 text-sm rounded-md hover:bg-accent-surface focus:outline-none focus:ring-1 focus:ring-border focus:ring-offset-1 transition cursor-pointer h-8"
-        onClick={() => setIsOpen(true)}
-      >
-        <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-        <span>New</span>
+      <Button aria-label="Create new DAG" onClick={() => setIsOpen(true)}>
+        <Plus className="h-4 w-4" />
+        New
       </Button>
-      
+
       <DAGNameInputModal
         isOpen={isOpen}
         onClose={handleClose}

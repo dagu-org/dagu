@@ -1,28 +1,28 @@
-import React from 'react';
 import {
+  BarChart3,
   ChevronDown,
   ChevronRight,
-  Settings,
+  Clock,
   GitBranch,
   Play,
-  Clock,
-  BarChart3,
+  Settings,
   Trash2,
 } from 'lucide-react';
+import React from 'react';
 import type { components } from '../../../api/v2/schema';
-import { cn } from '../../../lib/utils';
-import StatusChip from '../../../ui/StatusChip';
-import dayjs from '../../../lib/dayjs';
-import { useConfig } from '../../../contexts/ConfigContext';
-import { useClient } from '../../../hooks/api';
-import { AppBarContext } from '../../../contexts/AppBarContext';
 import { Button } from '../../../components/ui/button';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '../../../components/ui/tooltip';
+import { AppBarContext } from '../../../contexts/AppBarContext';
+import { useConfig } from '../../../contexts/ConfigContext';
+import { useClient } from '../../../hooks/api';
+import dayjs from '../../../lib/dayjs';
+import { cn } from '../../../lib/utils';
 import ConfirmModal from '../../../ui/ConfirmModal';
+import StatusChip from '../../../ui/StatusChip';
 
 interface QueueCardProps {
   queue: components['schemas']['Queue'];
@@ -304,7 +304,7 @@ function QueueCard({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant="ghost"
+                      variant="destructive"
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -313,7 +313,7 @@ function QueueCard({
                       disabled={
                         isClearing || !queue.queued || queue.queued.length === 0
                       }
-                      className="h-6 px-2 text-error hover:text-error hover:bg-error-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-6 px-2"
                     >
                       <Trash2
                         className={cn('h-3 w-3', isClearing && 'animate-pulse')}

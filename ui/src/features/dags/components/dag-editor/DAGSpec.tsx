@@ -17,7 +17,7 @@ import { useClient, useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStepTable } from '../dag-details';
-import { FlowchartSwitch, FlowchartType, Graph } from '../visualization';
+import { FlowchartType, Graph } from '../visualization';
 import DAGAttributes from './DAGAttributes';
 import DAGEditor from './DAGEditor';
 
@@ -265,23 +265,18 @@ function DAGSpec({ fileName }: Props) {
             Cannot render graph due to configuration errors
           </p>
           <p className="text-sm text-muted-foreground">
-            Please fix the errors above and save the configuration to view
-            the graph
+            Please fix the errors above and save the configuration to view the
+            graph
           </p>
         </div>
       ) : (
         <div>
-          <div className="flex justify-end mb-2">
-            <FlowchartSwitch
-              value={cookie['flowchart']}
-              onChange={onChangeFlowchart}
-            />
-          </div>
           <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
             <Graph
               steps={dag.steps}
               type="config"
               flowchart={flowchart}
+              onChangeFlowchart={onChangeFlowchart}
               showIcons={false}
             />
           </BorderedBox>
@@ -317,7 +312,7 @@ function DAGSpec({ fileName }: Props) {
                 {hasLocalDags ? (
                   <div className="">
                     <div className="overflow-x-auto -mx-2 px-2 scrollbar-thin scrollbar-thumb-gray-300">
-                      <Tabs className="mb-4 w-max min-w-full">
+                      <Tabs className="w-max min-w-full">
                         <Tab
                           isActive={activeTab === 'parent'}
                           onClick={() => setActiveTab('parent')}
@@ -339,68 +334,24 @@ function DAGSpec({ fileName }: Props) {
                         )}
                       </Tabs>
                     </div>
-
-                    {activeTab === 'parent' &&
-                      data?.dag &&
-                      renderDAGContent(data.dag, data?.errors)}
-
-                    {dagDetails?.localDags?.map(
-                      (localDag: components['schemas']['LocalDag']) =>
-                        activeTab === localDag.name && (
-                          <div key={localDag.name}>
-                            {localDag.dag ? (
-                              renderDAGContent(localDag.dag, localDag.errors)
-                            ) : (
-                              <div className="bg-card rounded-2xl border border-border p-6">
-                                <div className="text-error">
-                                  <AlertTriangle className="h-5 w-5 inline mr-2" />
-                                  Failed to load local DAG: {localDag.name}
-                                </div>
-                                {localDag.errors?.length ? (
-                                  <div className="mt-4 space-y-2">
-                                    {localDag.errors.map(
-                                      (e: string, i: number) => (
-                                        <div
-                                          key={i}
-                                          className="text-sm font-mono"
-                                        >
-                                          {e}
-                                        </div>
-                                      )
-                                    )}
-                                  </div>
-                                ) : null}
-                              </div>
-                            )}
-                          </div>
-                        )
-                    )}
                   </div>
                 ) : (
                   data?.dag && renderDAGContent(data.dag, data?.errors)
                 )}
 
-                <div>
+                <div className="bg-surface border border-border rounded-lg">
                   {editable && (
-                    <div className="flex justify-end mb-2">
+                    <div className="flex justify-end p-2 border-b border-border">
                       <Button
                         id="save-config"
-                        variant="default"
-                        size="sm"
                         title="Save changes (Ctrl+S / Cmd+S)"
-                        className="cursor-pointer relative group"
                         onClick={async () => {
                           await handleSave();
                           props.refresh();
                         }}
                       >
-                        <Save className="h-4 w-4 mr-1" />
-                        Save Changes
-                        <span className="absolute -bottom-1 -right-1 bg-primary-foreground text-primary text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                          {navigator.platform.indexOf('Mac') > -1
-                            ? '⌘S'
-                            : 'Ctrl+S'}
-                        </span>
+                        <Save className="h-4 w-4" />
+                        Save
                       </Button>
                     </div>
                   )}

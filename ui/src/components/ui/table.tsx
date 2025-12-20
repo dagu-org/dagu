@@ -55,7 +55,10 @@ function TableRow({
   return (
     <RadixTable.Row
       data-slot="table-row"
-      className={cn('hover:bg-muted/50 transition-colors', className)}
+      className={cn(
+        'hover:bg-muted/50 transition-colors bg-surface',
+        className
+      )}
       {...props}
     />
   );
@@ -68,10 +71,7 @@ function TableHead({
   return (
     <RadixTable.ColumnHeaderCell
       data-slot="table-head"
-      className={cn(
-        'text-foreground font-medium whitespace-nowrap',
-        className
-      )}
+      className={cn('text-foreground font-medium whitespace-nowrap', className)}
       {...props}
     />
   );

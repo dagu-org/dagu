@@ -66,7 +66,9 @@ function DAGEditor({
   // Update editor theme when dark mode changes
   useEffect(() => {
     if (editorRef.current) {
-      const newTheme = document.documentElement.classList.contains('dark') ? 'vs-dark' : 'vs';
+      const newTheme = document.documentElement.classList.contains('dark')
+        ? 'vs-dark'
+        : 'vs';
       monaco.editor.setTheme(newTheme);
     }
   }, []);
@@ -75,9 +77,14 @@ function DAGEditor({
   useEffect(() => {
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
-        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        if (
+          mutation.type === 'attributes' &&
+          mutation.attributeName === 'class'
+        ) {
           if (editorRef.current) {
-            const newTheme = document.documentElement.classList.contains('dark') ? 'vs-dark' : 'vs';
+            const newTheme = document.documentElement.classList.contains('dark')
+              ? 'vs-dark'
+              : 'vs';
             monaco.editor.setTheme(newTheme);
           }
         }
@@ -115,11 +122,12 @@ function DAGEditor({
   };
 
   // Detect dark mode
-  const isDarkMode = typeof window !== 'undefined' && 
+  const isDarkMode =
+    typeof window !== 'undefined' &&
     document.documentElement.classList.contains('dark');
 
   return (
-    <div className={`relative transition-all duration-300 rounded-lg ${className}`}>
+    <div className={className}>
       <MonacoEditor
         height="400px"
         language="yaml"
@@ -129,7 +137,7 @@ function DAGEditor({
         onMount={editorDidMount}
         options={{
           readOnly: readOnly,
-          automaticLayout: true,
+          // automaticLayout: true,
           minimap: { enabled: false },
           scrollBeyondLastLine: false,
           quickSuggestions: readOnly
@@ -144,11 +152,10 @@ function DAGEditor({
             "'JetBrains Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace",
           fontSize: 13,
           padding: {
-            top: readOnly ? 8 : 24,
+            top: 8,
             bottom: 8,
           },
         }}
-        className="rounded-lg overflow-hidden"
       />
     </div>
   );

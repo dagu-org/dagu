@@ -97,9 +97,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
       // find the clicked step
-      const n = dagRun.nodes?.find(
-        (n) => toMermaidNodeId(n.step.name) == id
-      );
+      const n = dagRun.nodes?.find((n) => toMermaidNodeId(n.step.name) == id);
 
       const subDAGName = n?.step?.call;
       if (n && subDAGName) {
@@ -194,9 +192,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
       // Only allow status updates for completed DAG runs
       if (status !== Status.Running && status !== Status.NotStarted) {
         // find the right-clicked step
-        const n = dagRun.nodes?.find(
-          (n) => toMermaidNodeId(n.step.name) == id
-        );
+        const n = dagRun.nodes?.find((n) => toMermaidNodeId(n.step.name) == id);
 
         if (n) {
           // Show the modal (it will be centered by default)
@@ -246,19 +242,21 @@ function DAGStatus({ dagRun, fileName }: Props) {
           <>
             <div className="grid grid-cols-1 gap-6">
               {/* Status Overview */}
-              <DAGStatusOverview
-                status={dagRun}
-                fileName={fileName}
-                onViewLog={(dagRunId) => {
-                  setLogViewer({
-                    isOpen: true,
-                    logType: 'execution',
-                    stepName: '',
-                    dagRunId,
-                    stream: 'stdout',
-                  });
-                }}
-              />
+              <div className="bg-surface border border-border rounded-lg p-4">
+                <DAGStatusOverview
+                  status={dagRun}
+                  fileName={fileName}
+                  onViewLog={(dagRunId) => {
+                    setLogViewer({
+                      isOpen: true,
+                      logType: 'execution',
+                      stepName: '',
+                      dagRunId,
+                      stream: 'stdout',
+                    });
+                  }}
+                />
+              </div>
 
               {/* Steps Table */}
               <NodeStatusTable

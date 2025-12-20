@@ -24,7 +24,11 @@ type Props = {
   /** DAG file name */
   fileName: string;
   /** Function to open log viewer */
-  onViewLog?: (stepName: string, dagRunId: string, node?: components['schemas']['Node']) => void;
+  onViewLog?: (
+    stepName: string,
+    dagRunId: string,
+    node?: components['schemas']['Node']
+  ) => void;
 };
 
 /**
@@ -42,7 +46,7 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
       <div className="hidden md:block w-full overflow-x-auto p-px">
         <div className="min-w-[900px]">
           <Table className="w-full">
-            <TableHeader className="bg-muted">
+            <TableHeader>
               <TableRow>
                 <TableHead className="w-[5%] py-3 text-sm font-semibold text-foreground/90 text-center">
                   No

@@ -126,23 +126,25 @@ function DAGStatusOverview({
 
   return (
     <div className="space-y-3">
-      {/* Parameters - Show at the top if present */}
-      {status.params && (
-        <div className="border-b border-border pb-3">
-          <div className="flex items-center mb-1.5">
-            <Terminal className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-            <span className="text-xs font-semibold text-foreground/90">
-              Parameters
-            </span>
-          </div>
-          <div className="p-2 bg-accent rounded-md font-medium text-xs text-foreground font-mono max-h-[100px] overflow-y-auto w-full border">
-            {status.params}
-          </div>
+      {/* Parameters - Always show to prevent layout jumping */}
+      <div className="pb-3">
+        <div className="flex items-center mb-1.5">
+          <Terminal className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
+          <span className="text-xs font-semibold text-foreground/90">
+            Parameters
+          </span>
         </div>
-      )}
+        <div className="p-2 bg-accent rounded-md text-xs font-mono h-[40px] overflow-y-auto w-full border">
+          {status.params ? (
+            <span className="font-medium text-foreground">{status.params}</span>
+          ) : (
+            <span className="text-muted-foreground italic">No parameters</span>
+          )}
+        </div>
+      </div>
 
       {/* Status Section - Desktop */}
-      <div className="hidden md:flex items-center justify-between border-b border-border pb-2">
+      <div className="hidden md:flex items-center justify-between pb-2">
         <div className="flex items-center gap-2">
           <StatusChip status={status.status} size="md">
             {status.statusLabel}
@@ -176,7 +178,7 @@ function DAGStatusOverview({
       </div>
 
       {/* Status Section - Mobile */}
-      <div className="md:hidden border-b border-border pb-2 space-y-2">
+      <div className="md:hidden pb-2 space-y-2">
         <div>
           <StatusChip status={status.status} size="md">
             {status.statusLabel}
@@ -213,7 +215,7 @@ function DAGStatusOverview({
       </div>
 
       {/* Timing Information */}
-      <div className="border-b border-border pb-2">
+      <div className="pb-2">
         <div className="flex flex-col md:flex-row flex-wrap items-start gap-1">
           {status.queuedAt && (
             <div className="flex items-center">
@@ -259,7 +261,7 @@ function DAGStatusOverview({
       </div>
 
       {/* Node Status Summary */}
-      <div className="border-b border-border pb-2">
+      <div className="pb-2">
         <div className="flex items-center mb-1">
           <Layers className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
           <span className="text-xs font-semibold text-foreground/90">
@@ -410,7 +412,7 @@ function DAGStatusOverview({
       {status.preconditions?.some(
         (cond: components['schemas']['Condition']) => cond.error
       ) && (
-        <div className="border-b border-border pb-2">
+        <div className="pb-2">
           <div className="flex items-center mb-1">
             <Info className="h-3.5 w-3.5 mr-1 text-warning" />
             <span className="text-xs font-semibold text-warning">

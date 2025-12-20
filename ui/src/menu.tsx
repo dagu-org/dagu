@@ -1,10 +1,19 @@
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { UserMenu } from '@/components/UserMenu';
 import { useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
-import { cn } from '@/lib/utils'; // Assuming cn utility is available
+import { cn } from '@/lib/utils';
 import {
   Activity,
   BarChart2,
   Github,
+  Globe,
   History,
   Inbox,
   Network,
@@ -15,6 +24,7 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { AppBarContext } from './contexts/AppBarContext';
 
 // Discord SVG Icon component
 function DiscordIcon({ className }: { className?: string }) {
@@ -123,6 +133,72 @@ export const mainListItems = React.forwardRef<
       </div>
       {/* Navigation */}
       <nav className="flex-1 flex flex-col py-1 px-1">
+        {/* Remote Node Selector */}
+        <AppBarContext.Consumer>
+          {(context) => {
+            // Hide remote node selector when builtin auth is enabled or no remote nodes
+            if (
+              config.authMode === 'builtin' ||
+              !context.remoteNodes ||
+              context.remoteNodes.length === 0
+            ) {
+              return null;
+            }
+
+            return (
+              <div className="space-y-0.5 mb-2">
+                {isOpen && (
+                  <div className="px-2 py-0.5">
+                    <span className="text-[11px] text-sidebar-foreground/70 font-medium">
+                      Node
+                    </span>
+                  </div>
+                )}
+                {isOpen ? (
+                  <div className="px-2">
+                    <Select
+                      value={context.selectedRemoteNode}
+                      onValueChange={context.selectRemoteNode}
+                    >
+                      <SelectTrigger className="h-7 w-full text-xs bg-sidebar-foreground/5 border-0 text-sidebar-foreground hover:bg-sidebar-foreground/10 focus:ring-0 focus:ring-offset-0">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {context.remoteNodes.map((node) => (
+                          <SelectItem key={node} value={node} className="text-xs">
+                            {node}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="flex justify-center">
+                    <Select
+                      value={context.selectedRemoteNode}
+                      onValueChange={context.selectRemoteNode}
+                    >
+                      <SelectTrigger
+                        className="w-7 h-7 p-0 bg-transparent border-0 text-sidebar-foreground hover:bg-sidebar-foreground/5 focus:ring-0 focus:ring-offset-0 [&>svg:last-child]:hidden"
+                        title={`Node: ${context.selectedRemoteNode}`}
+                      >
+                        <Globe size={16} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {context.remoteNodes.map((node) => (
+                          <SelectItem key={node} value={node} className="text-xs">
+                            {node}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            );
+          }}
+        </AppBarContext.Consumer>
+
         {/* Overview Section */}
         <div className="space-y-0.5">
           {isOpen && (
@@ -256,14 +332,10 @@ export const mainListItems = React.forwardRef<
           {isOpen && <span className="ml-2 text-xs font-medium">GitHub</span>}
         </a>
       </div>
-      {/* Version display - only shown when sidebar is expanded */}
-      {isOpen && (
-        <div className="px-2 py-1 text-[10px] text-sidebar-foreground/50">
-          <div className="border-t border-sidebar-foreground/10 pt-1">
-            v{config.version}
-          </div>
-        </div>
-      )}
+      {/* User Menu - at the very bottom */}
+      <div className={cn('px-1 pb-2', isOpen ? '' : 'flex justify-center')}>
+        <UserMenu isCollapsed={!isOpen} />
+      </div>
     </div>
   );
 });

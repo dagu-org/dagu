@@ -111,13 +111,8 @@ function PathsCard() {
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setOpen(true)}
-        className="h-7 px-2 text-xs"
-      >
-        <FolderOpen className="h-3 w-3 mr-1" />
+      <Button onClick={() => setOpen(true)}>
+        <FolderOpen className="h-4 w-4" />
         Paths
       </Button>
       <PathsDialog open={open} onClose={() => setOpen(false)} />

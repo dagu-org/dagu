@@ -20,14 +20,13 @@ import {
   Filter,
   Search,
 } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import Ticker from '../../../../ui/Ticker';
 import VisuallyHidden from '../../../../ui/VisuallyHidden';
-import { DAGDetailsModal } from '../../components/dag-details';
 import { CreateDAGModal, DAGPagination } from '../common';
 import DAGActions from '../common/DAGActions';
 import LiveSwitch from '../common/LiveSwitch';
@@ -113,6 +112,10 @@ type Props = {
   sortOrder?: string;
   /** Handler for sort changes */
   onSortChange?: (field: string, order: string) => void;
+  /** Currently selected DAG file name */
+  selectedDAG?: string | null;
+  /** Handler for DAG selection changes */
+  onSelectDAG?: (fileName: string | null) => void;
 };
 
 /**
@@ -447,106 +450,97 @@ const defaultColumns = [
   }),
   columnHelper.accessor('kind', {
     id: 'ScheduleAndNextRun',
-    size: 180,
-    minSize: 150,
-    maxSize: 200,
+    size: 200,
+    minSize: 180,
+    maxSize: 250,
     header: () => (
       <div className="flex flex-col py-1">
-        <span className="text-xs">Schedule</span>
+        <span className="text-xs">Live / Schedule</span>
         <span className="text-[10px] font-normal text-muted-foreground">
-          Next execution
-        </span>
-      </div>
-    ),
-    cell: ({ row }) => {
-      const data = row.original!;
-      if (data.kind === ItemKind.DAG) {
-        const schedules = data.dag.dag.schedule || [];
-
-        if (schedules.length === 0) {
-          return null;
-        }
-
-        // Display schedule expressions
-        const scheduleContent = (
-          <div className="flex flex-wrap gap-0.5">
-            {schedules.map((schedule) => (
-              <Badge
-                key={schedule.expression}
-                variant="outline"
-                className="text-[10px] font-normal px-1 py-0 h-3.5"
-              >
-                {schedule.expression}
-              </Badge>
-            ))}
-          </div>
-        );
-
-        // Display next run information
-        let nextRunContent: React.ReactNode | null = null;
-        if (!data.dag.suspended && schedules.length > 0) {
-          const nextRun = getNextSchedule(data.dag);
-          if (nextRun) {
-            nextRunContent = (
-              <div className="text-[10px] text-muted-foreground font-normal leading-tight">
-                <Ticker intervalMs={1000}>
-                  {() => {
-                    const ms = nextRun.getTime() - new Date().getTime();
-                    return <span>Run in {formatMs(ms)}</span>;
-                  }}
-                </Ticker>
-              </div>
-            );
-          }
-        } else if (data.dag.suspended) {
-          nextRunContent = (
-            <div className="text-[10px] text-muted-foreground font-normal leading-tight">
-              Suspended
-            </div>
-          );
-        }
-
-        return (
-          <div className="space-y-0.5">
-            {scheduleContent}
-            {nextRunContent}
-          </div>
-        );
-      }
-      return null;
-    },
-  }),
-  // Description column removed as description is now displayed under the name
-  columnHelper.accessor('kind', {
-    id: 'Live',
-    size: 70,
-    minSize: 70,
-    maxSize: 70,
-    header: () => (
-      <div className="flex flex-col py-1">
-        <span className="text-xs">Live</span>
-        <span className="text-[10px] font-normal text-muted-foreground">
-          Auto-schedule
+          Toggle & next run
         </span>
       </div>
     ),
     cell: ({ row, table }) => {
-      // Use row and table
       const data = row.original!;
       if (data.kind !== ItemKind.DAG) {
-        return null; // Changed from false to null
+        return null;
       }
-      // Wrap LiveSwitch in a div and stop propagation on its click
-      return (
+
+      const schedules = data.dag.dag.schedule || [];
+      const hasSchedule = schedules.length > 0;
+
+      // LiveSwitch component
+      const liveSwitch = (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="flex justify-center scale-90" // Scale the container instead
+          className={`flex-shrink-0 p-0.5 ${!hasSchedule ? 'opacity-40 pointer-events-none' : ''}`}
         >
           <LiveSwitch
             dag={data.dag}
             refresh={table.options.meta?.refreshFn}
             aria-label={`Toggle ${data.name}`}
           />
+        </div>
+      );
+
+      if (!hasSchedule) {
+        return (
+          <div className="flex items-center gap-2">
+            {liveSwitch}
+            <span className="text-[10px] text-muted-foreground">
+              No schedule
+            </span>
+          </div>
+        );
+      }
+
+      // Display schedule expressions
+      const scheduleContent = (
+        <div className="flex flex-wrap gap-0.5">
+          {schedules.map((schedule) => (
+            <Badge
+              key={schedule.expression}
+              variant="outline"
+              className="text-[10px] font-normal px-1 py-0 h-3.5"
+            >
+              {schedule.expression}
+            </Badge>
+          ))}
+        </div>
+      );
+
+      // Display next run information
+      let nextRunContent: React.ReactNode | null = null;
+      if (!data.dag.suspended && schedules.length > 0) {
+        const nextRun = getNextSchedule(data.dag);
+        if (nextRun) {
+          nextRunContent = (
+            <div className="text-[10px] text-muted-foreground font-normal leading-tight">
+              <Ticker intervalMs={1000}>
+                {() => {
+                  const ms = nextRun.getTime() - new Date().getTime();
+                  return <span>Run in {formatMs(ms)}</span>;
+                }}
+              </Ticker>
+            </div>
+          );
+        }
+      } else if (data.dag.suspended) {
+        nextRunContent = (
+          <div className="text-[10px] text-muted-foreground font-normal leading-tight">
+            Suspended
+          </div>
+        );
+      }
+
+      return (
+        <div className="flex items-start gap-2">
+          {liveSwitch}
+          <div className="space-y-0.5 min-w-0">
+            {scheduleContent}
+            {nextRunContent}
+          </div>
         </div>
       );
     },
@@ -706,6 +700,8 @@ function DAGTable({
   sortField = 'name',
   sortOrder = 'asc',
   onSortChange,
+  selectedDAG = null,
+  onSelectDAG,
 }: Props) {
   const navigate = useNavigate();
   const [columns] = React.useState(() => [...defaultColumns]);
@@ -713,10 +709,6 @@ function DAGTable({
     []
   );
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
-
-  // State for the side modal
-  const [selectedDAG, setSelectedDAG] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // State for client-side sorting
   const [clientSort, setClientSort] = React.useState<string>('');
@@ -728,69 +720,40 @@ function DAGTable({
     setClientOrder(order);
   };
 
-  // Handlers for the modal
-  const openModal = (fileName: string) => {
+  // Handler for DAG selection
+  const handleSelectDAG = (fileName: string) => {
     // Check if screen is small (less than 768px width)
     const isSmallScreen = window.innerWidth < 768;
 
     if (isSmallScreen) {
       // For small screens, navigate directly to the DAG details page
       navigate(`/dags/${fileName}`);
-    } else {
-      // For larger screens, open the side modal
-      setSelectedDAG(fileName);
-      setIsModalOpen(true);
+    } else if (onSelectDAG) {
+      // For larger screens, call the selection handler
+      onSelectDAG(fileName);
     }
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-  };
-
-  // Close modal and navigate to full page on window resize if screen becomes small
-  React.useEffect(() => {
-    const handleResize = () => {
-      if (isModalOpen && selectedDAG && window.innerWidth < 768) {
-        // Close the modal
-        setIsModalOpen(false);
-        // Navigate to the full page
-        navigate(`/dags/${selectedDAG}`);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [isModalOpen, selectedDAG, navigate]);
-
   // Update column filters based on external search props
+  // Tags filtering is combined with Name filter since Name column's filterFn searches in tags too
   React.useEffect(() => {
     const nameFilter = columnFilters.find((f) => f.id === 'Name');
-    const tagFilter = columnFilters.find((f) => f.id === 'Tags');
+
+    // Combine searchText and searchTag for the Name filter
+    const combinedFilter = searchTag || searchText || '';
+    const currentValue = nameFilter?.value || '';
 
     let updated = false;
     const newFilters = [...columnFilters];
 
-    if (searchText && (!nameFilter || nameFilter.value !== searchText)) {
+    if (combinedFilter !== currentValue) {
       const idx = newFilters.findIndex((f) => f.id === 'Name');
-      if (idx > -1) newFilters[idx] = { id: 'Name', value: searchText };
-      else newFilters.push({ id: 'Name', value: searchText });
-      updated = true;
-    } else if (!searchText && nameFilter) {
-      const idx = newFilters.findIndex((f) => f.id === 'Name');
-      if (idx > -1) newFilters.splice(idx, 1);
-      updated = true;
-    }
-
-    if (searchTag && (!tagFilter || tagFilter.value !== searchTag)) {
-      const idx = newFilters.findIndex((f) => f.id === 'Tags');
-      if (idx > -1) newFilters[idx] = { id: 'Tags', value: searchTag };
-      else newFilters.push({ id: 'Tags', value: searchTag });
-      updated = true;
-    } else if (!searchTag && tagFilter) {
-      const idx = newFilters.findIndex((f) => f.id === 'Tags');
-      if (idx > -1) newFilters.splice(idx, 1);
+      if (combinedFilter) {
+        if (idx > -1) newFilters[idx] = { id: 'Name', value: combinedFilter };
+        else newFilters.push({ id: 'Name', value: combinedFilter });
+      } else if (idx > -1) {
+        newFilters.splice(idx, 1);
+      }
       updated = true;
     }
 
@@ -891,18 +854,18 @@ function DAGTable({
     return hierarchicalData;
   }, [dags, clientSort, clientOrder]); // Added client sort dependencies
 
-  // Add keyboard navigation between DAGs when modal is open
-  // Create a ref to store the table instance
+  // Create a ref to store the table instance for external access
   const tableInstanceRef = React.useRef<ReturnType<
     typeof useReactTable
   > | null>(null);
 
+  // Expose navigation function for external keyboard handling
   React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isModalOpen || !selectedDAG || !tableInstanceRef.current) return;
+    if (!selectedDAG || !tableInstanceRef.current || !onSelectDAG) return;
 
+    const handleKeyDown = (event: KeyboardEvent) => {
       // Get all DAG rows from the sorted table rows (not groups)
-      const sortedRows = tableInstanceRef.current.getRowModel().rows;
+      const sortedRows = tableInstanceRef.current?.getRowModel().rows || [];
       const dagRows = sortedRows
         .filter((row) => (row.original as Data)?.kind === ItemKind.DAG)
         .map((row) => ({
@@ -918,16 +881,16 @@ function DAGTable({
 
       // Navigate with arrow keys
       if (event.key === 'ArrowDown' && currentIndex < dagRows.length - 1) {
-        // Move to next DAG
+        event.preventDefault();
         const nextDAG = dagRows[currentIndex + 1];
         if (nextDAG) {
-          setSelectedDAG(nextDAG.fileName);
+          onSelectDAG(nextDAG.fileName);
         }
       } else if (event.key === 'ArrowUp' && currentIndex > 0) {
-        // Move to previous DAG
+        event.preventDefault();
         const prevDAG = dagRows[currentIndex - 1];
         if (prevDAG) {
-          setSelectedDAG(prevDAG.fileName);
+          onSelectDAG(prevDAG.fileName);
         }
       }
     };
@@ -936,7 +899,7 @@ function DAGTable({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isModalOpen, selectedDAG]); // No need for sorting in dependencies anymore
+  }, [selectedDAG, onSelectDAG]);
 
   const instance = useReactTable<Data>({
     data,
@@ -976,15 +939,6 @@ function DAGTable({
 
   return (
     <div className="space-y-4">
-      {/* Side Modal for DAG Details */}
-      {selectedDAG && (
-        <DAGDetailsModal
-          fileName={selectedDAG}
-          isOpen={isModalOpen}
-          onClose={closeModal}
-        />
-      )}
-
       {/* Search, Filter and Pagination Controls */}
       <div
         className={`bg-muted/50 rounded-lg mb-4 space-y-3 ${
@@ -1153,7 +1107,7 @@ function DAGTable({
                             'dag' in row.original &&
                             selectedDAG ===
                               (row.original as DAGRow).dag.fileName
-                          ? 'cursor-pointer bg-accent-surface hover:bg-accent-surface/80 border-l-4 border-l-muted-foreground' // Highlight selected DAG
+                          ? 'cursor-pointer bg-primary/10 hover:bg-primary/15 border-l-4 border-primary' // Highlight selected DAG
                           : 'cursor-pointer hover:bg-muted/50'
                     }
                     style={{ fontSize: '0.8125rem' }} // Smaller font size for more density
@@ -1162,18 +1116,17 @@ function DAGTable({
                       if ((row.original as Data)?.kind === ItemKind.Group) {
                         row.toggleExpanded();
                       }
-                      // Handle DAG row clicks - open modal or new tab
+                      // Handle DAG row clicks - select DAG or open in new tab
                       else if (isDAGRow && 'dag' in row.original) {
                         const dagRow = row.original as DAGRow;
                         const fileName = dagRow.dag.fileName;
 
                         // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, open in new tab
                         if (e.metaKey || e.ctrlKey) {
-                          // Open in new tab
                           window.open(`/dags/${fileName}`, '_blank');
                         } else {
-                          // Normal click behavior
-                          openModal(fileName);
+                          // Normal click behavior - select the DAG
+                          handleSelectDAG(fileName);
                         }
                       }
                     }}
@@ -1285,7 +1238,7 @@ function DAGTable({
                                 if (e.metaKey || e.ctrlKey) {
                                   window.open(`/dags/${fileName}`, '_blank');
                                 } else {
-                                  openModal(fileName);
+                                  handleSelectDAG(fileName);
                                 }
                               }}
                             >
@@ -1387,7 +1340,7 @@ function DAGTable({
                     if (e.metaKey || e.ctrlKey) {
                       window.open(`/dags/${fileName}`, '_blank');
                     } else {
-                      openModal(fileName);
+                      handleSelectDAG(fileName);
                     }
                   }}
                 >

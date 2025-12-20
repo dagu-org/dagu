@@ -3,6 +3,7 @@ import React from 'react';
 import type { components } from '../../api/v2/schema';
 import { Button } from '../../components/ui/button';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useConfig } from '../../contexts/ConfigContext';
 import PathsCard from '../../features/system-status/components/PathsCard';
 import ResourceChart from '../../features/system-status/components/ResourceChart';
 import ServiceCard from '../../features/system-status/components/ServiceCard';
@@ -23,6 +24,7 @@ type CoordinatorInstance = components['schemas']['CoordinatorInstance'];
  */
 function SystemStatus() {
   const appBarContext = React.useContext(AppBarContext);
+  const config = useConfig();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [autoRefresh, setAutoRefresh] = React.useState(true);
   const [lastUpdateTime, setLastUpdateTime] = React.useState<Date>(new Date());
@@ -120,32 +122,24 @@ function SystemStatus() {
         <div className="flex items-center gap-2">
           <PathsCard />
           <Button
-            variant="outline"
-            size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
-            className={cn(
-              'h-7 px-2',
-              autoRefresh && 'bg-success-muted border-success'
-            )}
             aria-label={`Auto-refresh ${autoRefresh ? 'enabled' : 'disabled'}`}
             title={`Toggle auto-refresh (currently ${autoRefresh ? 'ON' : 'OFF'})`}
           >
             <Activity
-              className={cn('h-3 w-3 mr-1', autoRefresh && 'text-success')}
+              className={cn('h-4 w-4', autoRefresh && 'text-success')}
             />
-            <span className="text-xs">Auto: {autoRefresh ? 'ON' : 'OFF'}</span>
+            Auto: {autoRefresh ? 'ON' : 'OFF'}
           </Button>
           <Button
-            variant="outline"
-            size="sm"
+            size="icon"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="h-7 px-2"
             aria-label="Refresh system status"
             title="Refresh system status"
           >
             <RefreshCw
-              className={cn('h-3 w-3', isRefreshing && 'animate-spin')}
+              className={cn('h-4 w-4', isRefreshing && 'animate-spin')}
             />
           </Button>
         </div>
@@ -221,10 +215,13 @@ function SystemStatus() {
         />
       </div>
 
-      {/* Last Update */}
-      <div className="text-xs text-muted-foreground text-center">
-        Last updated: {lastUpdateTime.toLocaleTimeString()}
-        {autoRefresh && ' • Refreshing every 5 seconds'}
+      {/* Footer */}
+      <div className="text-xs text-muted-foreground text-center space-y-1">
+        <div>
+          Last updated: {lastUpdateTime.toLocaleTimeString()}
+          {autoRefresh && ' • Refreshing every 5 seconds'}
+        </div>
+        <div>Dagu v{config.version}</div>
       </div>
     </div>
   );

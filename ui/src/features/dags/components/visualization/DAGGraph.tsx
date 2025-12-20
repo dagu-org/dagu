@@ -15,7 +15,7 @@ import { useCookies } from 'react-cookie';
 import { components, Status } from '../../../../api/v2/schema';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import BorderedBox from '../../../../ui/BorderedBox';
-import { FlowchartSwitch, FlowchartType, Graph, TimelineChart } from './';
+import { FlowchartType, Graph, TimelineChart } from './';
 
 /**
  * Props for the DAGGraph component
@@ -60,7 +60,7 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
           <Tab
             isActive={sub === '0'}
             onClick={() => setSub('0')}
-            className="flex items-center gap-2 text-sm h-10 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer"
           >
             <GitGraph className="h-4 w-4" />
             Graph
@@ -68,16 +68,14 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
           <Tab
             isActive={sub === '1'}
             onClick={() => setSub('1')}
-            className="flex items-center gap-2 text-sm h-10 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer"
           >
             <GanttChart className="h-4 w-4" />
             Timeline
           </Tab>
         </Tabs>
 
-        <div className="self-center sm:self-auto">
-          <FlowchartSwitch value={flowchart} onChange={onChangeFlowchart} />
-        </div>
+        <div className="self-center sm:self-auto"></div>
       </div>
 
       <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
@@ -109,6 +107,7 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
               steps={dagRun.nodes}
               type="status"
               flowchart={flowchart}
+              onChangeFlowchart={onChangeFlowchart}
               onClickNode={onSelectStep}
               onRightClickNode={
                 config.permissions.runDags ? onRightClickStep : undefined

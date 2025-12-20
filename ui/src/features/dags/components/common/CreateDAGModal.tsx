@@ -63,13 +63,9 @@ function CreateDAGModal() {
 
   return (
     <>
-      <Button
-        aria-label="Create new DAG"
-        className="flex items-center gap-1.5 bg-primary text-white font-medium px-3 py-1 text-sm rounded-md hover:bg-primary/90 focus:outline-none focus:ring-1 focus:ring-primary focus:ring-offset-1 transition cursor-pointer h-8"
-        onClick={() => setIsOpen(true)}
-      >
-        <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-        <span>New</span>
+      <Button aria-label="Create new DAG" onClick={() => setIsOpen(true)}>
+        <Plus className="h-4 w-4" />
+        New
       </Button>
 
       <DAGNameInputModal

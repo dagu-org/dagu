@@ -5,7 +5,14 @@
  */
 import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
 import { toMermaidNodeId } from '@/lib/utils';
-import { Maximize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+import {
+  ArrowDownUp,
+  ArrowRightLeft,
+  Maximize2,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 import React, { useState } from 'react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
 import Mermaid from '../../../../ui/Mermaid';
@@ -28,6 +35,8 @@ type Props = {
   type: 'status' | 'config';
   /** Direction of the flowchart - TD (top-down) or LR (left-right) */
   flowchart?: FlowchartType;
+  /** Callback when flowchart direction changes */
+  onChangeFlowchart?: (value: FlowchartType) => void;
   /** Steps or nodes to visualize */
   steps?: Steps;
   /** Callback for node click events (double-click) */
@@ -54,6 +63,7 @@ declare global {
 const Graph: React.FC<Props> = ({
   steps,
   flowchart = 'TD',
+  onChangeFlowchart,
   type = 'status',
   onClickNode,
   onRightClickNode,
@@ -265,12 +275,36 @@ const Graph: React.FC<Props> = ({
   return (
     <div className="relative" ref={containerRef}>
       <div className="absolute right-2 top-2 z-10 bg-card rounded-md">
-        <ToggleGroup aria-label="Zoom controls">
+        <ToggleGroup aria-label="Graph controls">
+          {onChangeFlowchart && (
+            <>
+              <ToggleButton
+                value="LR"
+                groupValue={flowchart}
+                onClick={() => onChangeFlowchart('LR')}
+                aria-label="Horizontal layout"
+                position="first"
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+              </ToggleButton>
+              <ToggleButton
+                value="TD"
+                groupValue={flowchart}
+                onClick={() => onChangeFlowchart('TD')}
+                aria-label="Vertical layout"
+                position="middle"
+              >
+                <ArrowDownUp className="h-4 w-4" />
+              </ToggleButton>
+              <div className="w-px h-6 bg-border mx-1 self-center" />
+            </>
+          )}
+
           <ToggleButton
             value="zoomin"
             onClick={() => zoomIn()}
             aria-label="Zoom in"
-            position="first"
+            position={onChangeFlowchart ? 'middle' : 'first'}
           >
             <ZoomIn className="h-4 w-4" />
           </ToggleButton>
