@@ -430,51 +430,46 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     <TimelineWrapper>
       <div className="flex justify-between items-center gap-2 px-3 py-2 border-b border-border bg-card flex-shrink-0">
         <span className="text-xs font-medium text-muted-foreground">Timeline</span>
-        <div className="flex gap-0.5">
+        <div className="flex gap-1">
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={handleCurrent}
             title="Go to current time"
-            className="h-7 w-7 p-0"
           >
-            <Clock className="h-3.5 w-3.5" />
+            <Clock className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={handleFit}
             title="Fit all items in view"
-            className="h-7 w-7 p-0"
           >
-            <Maximize className="h-3.5 w-3.5" />
+            <Maximize className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={handleZoomIn}
             title="Zoom in"
-            className="h-7 w-7 p-0"
           >
-            <ZoomIn className="h-3.5 w-3.5" />
+            <ZoomIn className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={handleZoomOut}
             title="Zoom out"
-            className="h-7 w-7 p-0"
           >
-            <ZoomOut className="h-3.5 w-3.5" />
+            <ZoomOut className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={handleReset}
             title="Reset view to initial state"
-            className="h-7 w-7 p-0"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
+            <RotateCcw className="h-4 w-4" />
           </Button>
         </div>
       </div>

@@ -5,26 +5,25 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 shrink-0 outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer',
+  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded text-sm font-semibold transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 shrink-0 outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer',
   {
     variants: {
       variant: {
-        default:
-          'bg-surface border border-border text-foreground hover:bg-accent-surface',
-        destructive:
-          'bg-surface border border-destructive/50 text-destructive hover:bg-destructive/10',
-        outline: 'border border-border bg-transparent hover:bg-accent-surface',
-        secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'hover:bg-accent-surface',
-        link: 'text-link underline-offset-4 hover:underline',
-        primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        default: 'btn-3d-secondary',
+        destructive: 'btn-3d-destructive',
+        outline: 'btn-3d-outline',
+        secondary: 'btn-3d-secondary',
+        ghost: 'btn-3d-ghost',
+        link: 'btn-3d-link',
+        primary: 'btn-3d-primary',
       },
       size: {
-        default: 'h-8 px-3 py-1.5',
-        sm: 'h-7 px-2.5 text-xs',
-        lg: 'h-10 px-6',
-        icon: 'size-8',
+        default: 'h-9 px-4 py-2',
+        sm: 'h-8 px-3 py-1.5 text-xs',
+        xs: 'h-7 px-2 py-1 text-xs',
+        lg: 'h-11 px-6 py-2.5',
+        icon: 'size-9',
+        'icon-sm': 'size-7',
       },
     },
     defaultVariants: {

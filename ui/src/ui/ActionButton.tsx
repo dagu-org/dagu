@@ -22,7 +22,7 @@ export default function ActionButton({
       size="sm"
       disabled={disabled}
       onClick={onClick}
-      className="flex items-center gap-2 cursor-pointer"
+      className="flex items-center gap-2"
     >
       <span className="h-4 w-4">{icon}</span>
       {children}
@@ -33,7 +33,6 @@ export default function ActionButton({
       size="icon"
       disabled={disabled}
       onClick={onClick}
-      className="h-8 w-8 cursor-pointer"
     >
       <span className="h-4 w-4">{icon}</span>
       <span className="sr-only">{children}</span>

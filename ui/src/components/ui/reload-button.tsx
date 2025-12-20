@@ -37,7 +37,7 @@ export const ReloadButton: React.FC<ReloadButtonProps> = ({
       size="icon"
       onClick={handleClick}
       disabled={isDisabled}
-      className={cn('size-7', className)}
+      className={className}
       title={title}
     >
       <RefreshCw className={cn('h-4 w-4', (isReloading || isLoading) && 'animate-spin')} />
