@@ -628,14 +628,14 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	}
 
 	if request.Body.StepName != nil && *request.Body.StepName != "" {
-		spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, *request.Body.StepName, true)
+		spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, *request.Body.StepName)
 		if err := runtime.Start(ctx, spec); err != nil {
 			return nil, fmt.Errorf("error retrying DAG step: %w", err)
 		}
 		return api.RetryDAGRun200Response{}, nil
 	}
 
-	spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, "", false)
+	spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, "")
 	if err := runtime.Start(ctx, spec); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}

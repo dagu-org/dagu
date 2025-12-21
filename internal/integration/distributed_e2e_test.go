@@ -50,15 +50,15 @@ steps:
 		// Load the DAG
 		dagWrapper := coord.DAG(t, yamlContent)
 
-		// Build the start command spec
+		// Build the enqueue command spec
 		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
-		startSpec := subCmdBuilder.Start(dagWrapper.DAG, runtime.StartOptions{
+		enqueueSpec := subCmdBuilder.Enqueue(dagWrapper.DAG, runtime.EnqueueOptions{
 			Quiet: true,
 		})
 
-		// Execute the start command (spawns subprocess)
-		err := runtime.Start(coord.Context, startSpec)
-		require.NoError(t, err, "Start command should succeed")
+		// Execute the enqueue command (spawns subprocess)
+		err := runtime.Start(coord.Context, enqueueSpec)
+		require.NoError(t, err, "Enqueue command should succeed")
 
 		// Wait for the subprocess to complete enqueueing
 		require.Eventually(t, func() bool {
@@ -138,10 +138,10 @@ steps:
 		t.Log("E2E test completed successfully!")
 	})
 
-	t.Run("E2E_StartCommand_WithNoQueueFlag_ShouldExecuteDirectly", func(t *testing.T) {
-		// Verify that --no-queue flag bypasses enqueueing even when workerSelector exists
+	t.Run("E2E_StartCommand_WorkerSelector_ShouldExecuteLocally", func(t *testing.T) {
+		// Verify that dagu start always executes locally even when workerSelector exists
 		yamlContent := `
-name: no-queue-dag
+name: local-start-dag
 workerSelector:
   test: value
 steps:
@@ -154,11 +154,10 @@ steps:
 		// Load the DAG
 		dagWrapper := coord.DAG(t, yamlContent)
 
-		// Build start command WITH --no-queue flag
+		// Build start command
 		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
 		startSpec := subCmdBuilder.Start(dagWrapper.DAG, runtime.StartOptions{
-			Quiet:   true,
-			NoQueue: true, // This bypasses enqueueing
+			Quiet: true,
 		})
 
 		err := runtime.Start(ctx, startSpec)
@@ -170,7 +169,7 @@ steps:
 		// Should NOT be enqueued (executed directly)
 		queueItems, err := coord.QueueStore.ListByDAGName(ctx, dagWrapper.ProcGroup(), dagWrapper.Name)
 		require.NoError(t, err)
-		require.Len(t, queueItems, 0, "DAG should NOT be enqueued when --no-queue is set")
+		require.Len(t, queueItems, 0, "DAG should NOT be enqueued (dagu start runs locally)")
 	})
 
 	t.Run("E2E_DistributedExecution_Cancellation_SubDAG", func(t *testing.T) {

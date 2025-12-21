@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log/slog"
 	"path/filepath"
 	"time"
 
@@ -37,12 +36,12 @@ Examples:
 	)
 }
 
-var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry, disableMaxActiveRuns, noQueueFlag}
+var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry}
 
 func runRetry(ctx *Context, args []string) error {
+	// Extract retry details
 	dagRunID, _ := ctx.StringParam("run-id")
 	stepName, _ := ctx.StringParam("step")
-	disableMaxActiveRuns := ctx.Command.Flags().Changed("disable-max-active-runs")
 
 	name, err := extractDAGName(ctx, args[0])
 	if err != nil {
@@ -71,42 +70,11 @@ func runRetry(ctx *Context, args []string) error {
 	// Set DAG context for all logs
 	ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
 
-	// Check if queue is disabled via config or flag
-	queueDisabled := !ctx.Config.Queues.Enabled || ctx.Command.Flags().Changed("no-queue")
-
-	// Check if this DAG should be distributed to workers
-	// If the DAG has a workerSelector and the queue is not disabled,
-	// enqueue it so the scheduler can dispatch it to a worker.
-	// The --no-queue flag acts as a circuit breaker to prevent infinite loops
-	// when the worker executes the dispatched retry task.
-	if !queueDisabled && len(dag.WorkerSelector) > 0 {
-		logger.Info(ctx, "DAG has workerSelector, enqueueing retry for distributed execution", slog.Any("worker-selector", dag.WorkerSelector))
-
-		// Enqueue the retry - must create new attempt with status "Queued"
-		// so the scheduler will process it
-		if err := enqueueRetry(ctx, dag, dagRunID); err != nil {
-			return fmt.Errorf("failed to enqueue retry: %w", err)
-		}
-
-		logger.Info(ctx.Context, "Retry enqueued")
-		return nil
-	}
-
 	// Try lock proc store to avoid race
 	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
 		return fmt.Errorf("failed to lock process group: %w", err)
 	}
 	defer ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
-
-	if !disableMaxActiveRuns && dag.MaxActiveRuns == 1 {
-		liveCount, err := ctx.ProcStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-		if err != nil {
-			return fmt.Errorf("failed to access proc store: %w", err)
-		}
-		if liveCount > 0 {
-			return fmt.Errorf("DAG %s is already running, cannot retry", dag.Name)
-		}
-	}
 
 	// Acquire process handle
 	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))

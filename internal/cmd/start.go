@@ -57,7 +57,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag, defaultWorkingDirFlag}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, defaultWorkingDirFlag}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
@@ -155,14 +155,6 @@ func runStart(ctx *Context, args []string) error {
 		return handleSubDAGRun(ctx, dag, dagRunID, params, root, parent)
 	}
 
-	// Check if queue is disabled via config or flag
-	queueDisabled := !ctx.Config.Queues.Enabled
-
-	// check no-queue flag (overrides config)
-	if ctx.Command.Flags().Changed("no-queue") {
-		queueDisabled = true
-	}
-
 	// Check if the DAG run-id is unique
 	attempt, _ := ctx.DAGRunStore.FindAttempt(ctx, root)
 	if attempt != nil {
@@ -178,17 +170,6 @@ func runStart(ctx *Context, args []string) error {
 		)
 	} else {
 		logger.Info(ctx, "Executing root dag-run", slog.String("params", params))
-	}
-
-	// Check if this DAG should be distributed to workers
-	// If the DAG has a workerSelector and the queue is not disabled,
-	// enqueue it so the scheduler can dispatch it to a worker.
-	// The --no-queue flag acts as a circuit breaker to prevent infinite loops
-	// when the worker executes the dispatched task.
-	if !queueDisabled && len(dag.WorkerSelector) > 0 {
-		logger.Info(ctx, "DAG has workerSelector, enqueueing for distributed execution", slog.Any("worker-selector", dag.WorkerSelector))
-		dag.Location = "" // Queued dag-runs must not have a location
-		return enqueueDAGRun(ctx, dag, dagRunID)
 	}
 
 	return tryExecuteDAG(ctx, dag, dagRunID, root)

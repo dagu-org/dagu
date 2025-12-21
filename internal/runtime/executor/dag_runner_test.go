@@ -193,7 +193,6 @@ func TestBuildCommand(t *testing.T) {
 	assert.Contains(t, args, "--root=parent:root-123")
 	assert.Contains(t, args, "--parent=parent:parent-456")
 	assert.Contains(t, args, "--run-id=child-789")
-	assert.Contains(t, args, "--no-queue")
 	assert.Contains(t, args, "/path/to/test.yaml")
 	assert.Contains(t, args, "--")
 	assert.Contains(t, args, "param1=value1 param2=value2")

@@ -79,16 +79,6 @@ func TestStart(t *testing.T) {
 		assert.Contains(t, spec.Args, "-q")
 	})
 
-	t.Run("StartWithNoQueue", func(t *testing.T) {
-		t.Parallel()
-		opts := runtime.StartOptions{
-			NoQueue: true,
-		}
-		spec := builder.Start(dag, opts)
-
-		assert.Contains(t, spec.Args, "--no-queue")
-	})
-
 	t.Run("StartWithDAGRunID", func(t *testing.T) {
 		t.Parallel()
 		opts := runtime.StartOptions{
@@ -104,7 +94,6 @@ func TestStart(t *testing.T) {
 		opts := runtime.StartOptions{
 			Params:   "env=prod",
 			Quiet:    true,
-			NoQueue:  true,
 			DAGRunID: "full-test-id",
 		}
 		spec := builder.Start(dag, opts)
@@ -113,7 +102,6 @@ func TestStart(t *testing.T) {
 		assert.Contains(t, spec.Args, "-p")
 		assert.Contains(t, spec.Args, `"env=prod"`)
 		assert.Contains(t, spec.Args, "-q")
-		assert.Contains(t, spec.Args, "--no-queue")
 		assert.Contains(t, spec.Args, "--run-id=full-test-id")
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/path/to/dag.yaml")
@@ -365,7 +353,7 @@ func TestRetry(t *testing.T) {
 
 	t.Run("BasicRetry", func(t *testing.T) {
 		t.Parallel()
-		spec := builder.Retry(dag, "retry-run-id", "", false)
+		spec := builder.Retry(dag, "retry-run-id", "")
 
 		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
 		assert.Contains(t, spec.Args, "retry")
@@ -377,26 +365,18 @@ func TestRetry(t *testing.T) {
 
 	t.Run("RetryWithStepName", func(t *testing.T) {
 		t.Parallel()
-		spec := builder.Retry(dag, "retry-run-id", "step-1", false)
+		spec := builder.Retry(dag, "retry-run-id", "step-1")
 
 		assert.Contains(t, spec.Args, "--step=step-1")
 	})
 
-	t.Run("RetryWithDisableMaxActiveRuns", func(t *testing.T) {
-		t.Parallel()
-		spec := builder.Retry(dag, "retry-run-id", "", true)
-
-		assert.Contains(t, spec.Args, "--disable-max-active-runs")
-	})
-
 	t.Run("RetryWithAllOptions", func(t *testing.T) {
 		t.Parallel()
-		spec := builder.Retry(dag, "full-retry-id", "step-2", true)
+		spec := builder.Retry(dag, "full-retry-id", "step-2")
 
 		assert.Contains(t, spec.Args, "retry")
 		assert.Contains(t, spec.Args, "--run-id=full-retry-id")
 		assert.Contains(t, spec.Args, "--step=step-2")
-		assert.Contains(t, spec.Args, "--disable-max-active-runs")
 		assert.Contains(t, spec.Args, "test-dag")
 	})
 
@@ -408,7 +388,7 @@ func TestRetry(t *testing.T) {
 			},
 		}
 		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
-		spec := builderNoFile.Retry(dag, "retry-run-id", "", false)
+		spec := builderNoFile.Retry(dag, "retry-run-id", "")
 
 		assert.NotContains(t, spec.Args, "--config")
 	})
@@ -436,7 +416,7 @@ func TestTaskStart(t *testing.T) {
 		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
 		assert.Contains(t, spec.Args, "start")
 		assert.Contains(t, spec.Args, "--run-id=task-run-id")
-		assert.Contains(t, spec.Args, "--no-queue")
+
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
 		assert.Contains(t, spec.Args, "/path/to/task.yaml")
@@ -457,7 +437,7 @@ func TestTaskStart(t *testing.T) {
 		assert.Contains(t, spec.Args, "--root=root-dag:root-id")
 		assert.Contains(t, spec.Args, "--parent=parent-dag:parent-id")
 		assert.Contains(t, spec.Args, "--run-id=child-run-id")
-		assert.Contains(t, spec.Args, "--no-queue")
+
 	})
 
 	t.Run("TaskStartWithParams", func(t *testing.T) {

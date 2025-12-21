@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"strings"
 
@@ -30,7 +29,6 @@ var (
 		dagRunIDFlag,
 		nameFlag,
 		queueFlag,
-		noQueueFlag,
 		workdirFlag,
 		shellFlag,
 		baseFlag,
@@ -180,25 +178,16 @@ func runExec(ctx *Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read queue flag: %w", err)
 	}
-	noQueue, err := ctx.Command.Flags().GetBool("no-queue")
-	if err != nil {
-		return fmt.Errorf("failed to read no-queue flag: %w", err)
-	}
 
 	singleton, err := ctx.Command.Flags().GetBool(flagSingleton)
 	if err != nil {
 		return fmt.Errorf("failed to read singleton flag: %w", err)
 	}
 
-	queueDisabled := !ctx.Config.Queues.Enabled || noQueue
 	if len(workerLabels) > 0 {
 		if !ctx.Config.Queues.Enabled {
 			return fmt.Errorf("worker selector requires queues; enable queues or remove --worker-label")
 		}
-		if noQueue {
-			return fmt.Errorf("--worker-label cannot be combined with --no-queue")
-		}
-		queueDisabled = false
 	}
 
 	opts := ExecOptions{
@@ -210,7 +199,6 @@ func runExec(ctx *Context, args []string) error {
 		DotenvFiles:   dotenvPaths,
 		BaseConfig:    baseConfig,
 		Queue:         queueName,
-		NoQueue:       noQueue,
 		Singleton:     singleton,
 		WorkerLabels:  workerLabels,
 	}
@@ -221,28 +209,6 @@ func runExec(ctx *Context, args []string) error {
 	}
 
 	dagRunRef := execution.NewDAGRunRef(dag.Name, runID)
-
-	if !queueDisabled && len(workerLabels) > 0 {
-		logger.Info(ctx, "Queueing inline dag-run for distributed execution",
-			tag.DAG(dag.Name),
-			tag.RunID(runID),
-			slog.Any("worker-selector", workerLabels),
-			tag.Command(strings.Join(args, " ")),
-		)
-		dag.Location = ""
-		return enqueueDAGRun(ctx, dag, runID)
-	}
-
-	if !queueDisabled && dag.Queue != "" {
-		logger.Info(ctx, "Queueing inline dag-run",
-			tag.DAG(dag.Name),
-			tag.Queue(dag.Queue),
-			tag.RunID(runID),
-			tag.Command(strings.Join(args, " ")),
-		)
-		dag.Location = ""
-		return enqueueDAGRun(ctx, dag, runID)
-	}
 
 	attempt, _ := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 	if attempt != nil {

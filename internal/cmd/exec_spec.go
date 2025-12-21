@@ -23,7 +23,6 @@ type ExecOptions struct {
 	DotenvFiles   []string
 	BaseConfig    string
 	Queue         string
-	NoQueue       bool
 	Singleton     bool
 	WorkerLabels  map[string]string
 }
@@ -64,10 +63,7 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 		maxActiveRuns = 1
 	}
 
-	queueValue := ""
-	if opts.Queue != "" && !opts.NoQueue {
-		queueValue = opts.Queue
-	}
+	queueValue := opts.Queue
 
 	specDoc := execSpec{
 		Name:           name,
@@ -127,10 +123,8 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 
 	dag.Name = name
 	dag.WorkingDir = opts.WorkingDir
-	if opts.Queue != "" && !opts.NoQueue {
+	if opts.Queue != "" {
 		dag.Queue = opts.Queue
-	} else if opts.NoQueue {
-		dag.Queue = ""
 	}
 	if len(opts.WorkerLabels) > 0 {
 		dag.WorkerSelector = opts.WorkerLabels

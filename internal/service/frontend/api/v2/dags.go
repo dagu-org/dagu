@@ -646,7 +646,6 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 		Params:       opts.params,
 		DAGRunID:     opts.dagRunID,
 		Quiet:        true,
-		NoQueue:      false,
 		NameOverride: opts.nameOverride,
 		FromRunID:    opts.fromRunID,
 		Target:       opts.target,
