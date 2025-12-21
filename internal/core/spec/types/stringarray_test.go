@@ -37,9 +37,10 @@ func TestStringOrArray_UnmarshalYAML(t *testing.T) {
 		var s types.StringOrArray
 		err := yaml.Unmarshal([]byte(`""`), &s)
 		require.NoError(t, err)
-		assert.Empty(t, s.Values())
-		assert.True(t, s.IsEmpty())
-		assert.False(t, s.IsZero()) // Was set, but empty
+		// Empty string is preserved for validation layer to handle
+		assert.Equal(t, []string{""}, s.Values())
+		assert.False(t, s.IsEmpty()) // Has one element (empty string)
+		assert.False(t, s.IsZero())  // Was set
 	})
 
 	t.Run("empty array", func(t *testing.T) {

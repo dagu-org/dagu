@@ -248,9 +248,9 @@ func (s *step) buildRetryPolicy(_ StepBuildContext, result *core.Step) error {
 	case string:
 		result.RetryPolicy.LimitStr = v
 	case nil:
-		// No limit specified
+		return core.NewValidationError("retryPolicy.limit", nil, fmt.Errorf("limit is required when retryPolicy is specified"))
 	default:
-		return core.NewValidationError("retryPolicy.Limit", v, fmt.Errorf("invalid type: %T", v))
+		return core.NewValidationError("retryPolicy.limit", v, fmt.Errorf("invalid type: %T", v))
 	}
 
 	switch v := s.RetryPolicy.IntervalSec.(type) {
@@ -263,9 +263,9 @@ func (s *step) buildRetryPolicy(_ StepBuildContext, result *core.Step) error {
 	case string:
 		result.RetryPolicy.IntervalSecStr = v
 	case nil:
-		// No interval specified
+		return core.NewValidationError("retryPolicy.intervalSec", nil, fmt.Errorf("intervalSec is required when retryPolicy is specified"))
 	default:
-		return core.NewValidationError("retryPolicy.IntervalSec", v, fmt.Errorf("invalid type: %T", v))
+		return core.NewValidationError("retryPolicy.intervalSec", v, fmt.Errorf("invalid type: %T", v))
 	}
 
 	if s.RetryPolicy.ExitCode != nil {

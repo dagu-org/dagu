@@ -214,26 +214,30 @@ type secretRef struct {
 // build transforms the dag specification into a core.DAG.
 // Simple field mappings are done inline; complex transformations call dedicated methods.
 func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
-	// Initialize with simple field mappings
+	// Initialize with simple field mappings (metadata fields only)
 	result := &core.DAG{
-		Location:          ctx.file,
-		Name:              d.buildName(ctx),
-		Group:             strings.TrimSpace(d.Group),
-		Description:       strings.TrimSpace(d.Description),
-		Timeout:           time.Second * time.Duration(d.TimeoutSec),
-		Delay:             time.Second * time.Duration(d.DelaySec),
-		RestartWait:       time.Second * time.Duration(d.RestartWaitSec),
-		Tags:              d.buildTags(),
-		MaxActiveSteps:    d.MaxActiveSteps,
-		MaxActiveRuns:     d.buildMaxActiveRuns(),
-		Queue:             strings.TrimSpace(d.Queue),
-		MaxOutputSize:     d.MaxOutputSize,
-		LogDir:            d.LogDir,
-		SkipIfSuccessful:  d.SkipIfSuccessful,
-		MailOn:            d.buildMailOn(),
-		RunConfig:         d.buildRunConfig(),
-		HistRetentionDays: d.buildHistRetentionDays(),
-		MaxCleanUpTime:    d.buildMaxCleanUpTime(),
+		Location:         ctx.file,
+		Name:             d.buildName(ctx),
+		Group:            strings.TrimSpace(d.Group),
+		Description:      strings.TrimSpace(d.Description),
+		Timeout:          time.Second * time.Duration(d.TimeoutSec),
+		Delay:            time.Second * time.Duration(d.DelaySec),
+		RestartWait:      time.Second * time.Duration(d.RestartWaitSec),
+		Tags:             d.buildTags(),
+		MaxActiveSteps:   d.MaxActiveSteps,
+		MaxActiveRuns:    d.buildMaxActiveRuns(),
+		Queue:            strings.TrimSpace(d.Queue),
+		MaxOutputSize:    d.MaxOutputSize,
+		SkipIfSuccessful: d.SkipIfSuccessful,
+	}
+
+	// Non-metadata fields are only populated when not in OnlyMetadata mode
+	if !ctx.opts.Has(BuildFlagOnlyMetadata) {
+		result.LogDir = d.LogDir
+		result.MailOn = d.buildMailOn()
+		result.RunConfig = d.buildRunConfig()
+		result.HistRetentionDays = d.buildHistRetentionDays()
+		result.MaxCleanUpTime = d.buildMaxCleanUpTime()
 	}
 
 	// Complex transformations that may return errors

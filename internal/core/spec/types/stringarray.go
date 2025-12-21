@@ -33,10 +33,8 @@ func (s *StringOrArray) UnmarshalYAML(data []byte) error {
 
 	switch v := raw.(type) {
 	case string:
-		// Single string value
-		if v != "" {
-			s.values = []string{v}
-		}
+		// Single string value - preserve empty strings for validation layer to handle
+		s.values = []string{v}
 		return nil
 
 	case []any:
