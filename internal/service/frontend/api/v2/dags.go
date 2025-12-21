@@ -593,6 +593,20 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
+	if singleton {
+		alive, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check singleton execution status: %w", err)
+		}
+		if alive > 0 {
+			return nil, &Error{
+				HTTPStatus: http.StatusConflict,
+				Code:       api.ErrorCodeAlreadyExists,
+				Message:    fmt.Sprintf("DAG %s is already running (singleton mode)", dag.Name),
+			}
+		}
+	}
+
 	if err := a.ensureDAGRunIDUnique(ctx, dag, dagRunId); err != nil {
 		return nil, err
 	}
@@ -741,6 +755,35 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		dagRunId, err = a.dagRunMgr.GenDAGRunID(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error generating dag-run ID: %w", err)
+		}
+	}
+
+	singleton := valueOf(request.Body.Singleton)
+	if singleton {
+		// Check if running
+		alive, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check singleton execution status (proc): %w", err)
+		}
+		if alive > 0 {
+			return nil, &Error{
+				HTTPStatus: http.StatusConflict,
+				Code:       api.ErrorCodeAlreadyExists,
+				Message:    fmt.Sprintf("DAG %s is already running (singleton mode)", dag.Name),
+			}
+		}
+
+		// Check if queued
+		queued, err := a.queueStore.ListByDAGName(ctx, dag.ProcGroup(), dag.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check singleton execution status (queue): %w", err)
+		}
+		if len(queued) > 0 {
+			return nil, &Error{
+				HTTPStatus: http.StatusConflict,
+				Code:       api.ErrorCodeAlreadyExists,
+				Message:    fmt.Sprintf("DAG %s is already in queue (singleton mode)", dag.Name),
+			}
 		}
 	}
 
