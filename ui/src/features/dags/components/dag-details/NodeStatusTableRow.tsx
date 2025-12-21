@@ -3,6 +3,7 @@
  *
  * @module features/dags/components/dag-details
  */
+import { Button } from '@/components/ui/button';
 import { CommandDisplay } from '@/components/ui/command-display';
 import { ScriptBadge } from '@/components/ui/script-dialog';
 import { TableCell } from '@/components/ui/table';
@@ -23,13 +24,14 @@ import {
   DialogTitle,
 } from '@/ui/CustomDialog';
 import {
+  AlertCircle,
   ChevronDown,
   ChevronRight,
   Code,
-  FileText,
   GitBranch,
-  PlayCircle,
+  Play,
   RefreshCw,
+  X,
 } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -155,21 +157,21 @@ function InlineLogViewer({
   const lineCount = data?.lineCount || 0;
 
   return (
-    <div className="bg-zinc-900 rounded overflow-hidden">
+    <div className="bg-slate-800 rounded overflow-hidden">
       {isLoading && !data ? (
-        <div className="text-zinc-400 text-xs py-4 px-3">Loading logs...</div>
+        <div className="text-slate-400 text-xs py-4 px-3">Loading logs...</div>
       ) : lines.length === 0 ? (
-        <div className="text-zinc-400 text-xs py-4 px-3">
+        <div className="text-slate-400 text-xs py-4 px-3">
           &lt;No log output&gt;
         </div>
       ) : (
         <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-          <pre className="font-mono text-[11px] text-zinc-100 p-2">
+          <pre className="font-mono text-[11px] text-slate-100 p-2">
             {lines.map((line, index) => {
               const lineNumber = totalLines - lineCount + index + 1;
               return (
-                <div key={index} className="flex hover:bg-zinc-800 px-1 py-0.5">
-                  <span className="text-zinc-500 mr-3 select-none w-12 text-right flex-shrink-0">
+                <div key={index} className="flex px-1 py-0.5">
+                  <span className="text-slate-500 mr-3 select-none w-12 text-right flex-shrink-0">
                     {lineNumber}
                   </span>
                   <span className="whitespace-pre-wrap break-all flex-grow">
@@ -294,9 +296,9 @@ function NodeStatusTableRow({
   const getRowHighlight = () => {
     switch (node.status) {
       case NodeStatus.Running:
-        return 'bg-lime-50 dark:bg-lime-900/10';
+        return 'bg-success-muted';
       case NodeStatus.Failed:
-        return 'bg-red-50 dark:bg-red-900/10';
+        return 'bg-error-muted';
       default:
         return '';
     }
@@ -472,7 +474,7 @@ function NodeStatusTableRow({
       <>
         <StyledTableRow
           className={cn(
-            'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200 h-auto cursor-pointer',
+            'hover:bg-muted transition-colors duration-200 h-auto cursor-pointer',
             getRowHighlight()
           )}
           onClick={() => {
@@ -496,7 +498,7 @@ function NodeStatusTableRow({
                       setActiveLogTab(hasStdout ? 'stdout' : 'stderr');
                     }
                   }}
-                  className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                  className="text-muted-foreground hover:text-foreground/90"
                 >
                   {isLogExpanded ? (
                     <ChevronDown className="h-4 w-4" />
@@ -505,7 +507,7 @@ function NodeStatusTableRow({
                   )}
                 </button>
               )}
-              <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs">
+              <span className="font-semibold text-foreground/90 text-xs">
                 {rownum}
               </span>
             </div>
@@ -514,12 +516,12 @@ function NodeStatusTableRow({
           {/* Combined Step Name & Description */}
           <TableCell>
             <div className="space-y-0.5">
-              <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-wrap break-all flex items-center gap-1.5">
+              <div className="text-sm font-semibold text-foreground text-wrap break-all flex items-center gap-1.5">
                 {node.step.name}
                 {hasSubDAGRun && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="inline-flex items-center text-blue-500 cursor-pointer">
+                      <span className="inline-flex items-center text-primary cursor-pointer">
                         <GitBranch className="h-4 w-4" />
                       </span>
                     </TooltipTrigger>
@@ -530,7 +532,7 @@ function NodeStatusTableRow({
                 )}
               </div>
               {node.step.description && (
-                <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
+                <div className="text-xs text-muted-foreground leading-tight">
                   {node.step.description}
                 </div>
               )}
@@ -541,10 +543,10 @@ function NodeStatusTableRow({
                   <span
                     className={`inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
                       node.step.repeatPolicy.repeat === 'while'
-                        ? 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
+                        ? 'bg-info-muted text-info'
                         : node.step.repeatPolicy.repeat === 'until'
-                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                          : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                          ? 'bg-info-muted text-info'
+                          : 'bg-primary/15 text-primary'
                     }`}
                   >
                     <RefreshCw className="h-2.5 w-2.5" />
@@ -566,10 +568,10 @@ function NodeStatusTableRow({
                   </span>
 
                   {node.step.repeatPolicy.condition && (
-                    <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">
+                    <span className="text-[10px] text-muted-foreground font-mono">
                       {node.step.repeatPolicy.condition.condition}
                       {node.step.repeatPolicy.condition.expected && (
-                        <span className="text-emerald-600 dark:text-emerald-400">
+                        <span className="text-success">
                           ={node.step.repeatPolicy.condition.expected}
                         </span>
                       )}
@@ -578,7 +580,7 @@ function NodeStatusTableRow({
 
                   {node.step.repeatPolicy.exitCode &&
                     node.step.repeatPolicy.exitCode.length > 0 && (
-                      <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">
+                      <span className="text-[10px] text-muted-foreground font-mono">
                         exit:[{node.step.repeatPolicy.exitCode.join(',')}]
                       </span>
                     )}
@@ -624,15 +626,15 @@ function NodeStatusTableRow({
           {/* Last Run & Duration */}
           <TableCell>
             <div className="space-y-0.5">
-              <div className="font-medium text-slate-700 dark:text-slate-300 text-sm">
+              <div className="font-medium text-foreground/90 text-sm">
                 {formatTimestamp(node.startedAt)}
               </div>
               {node.startedAt && (
-                <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 leading-tight">
+                <div className="text-xs text-muted-foreground flex items-center gap-1.5 leading-tight">
                   <span className="font-medium flex items-center">
                     Duration:
                     {node.status === NodeStatus.Running && (
-                      <span className="inline-block w-2 h-2 rounded-full bg-lime-500 ml-1.5 animate-pulse" />
+                      <span className="inline-block w-2 h-2 rounded-full bg-success ml-1.5 animate-pulse" />
                     )}
                   </span>
                   {currentDuration}
@@ -662,47 +664,10 @@ function NodeStatusTableRow({
             <div className="space-y-1.5">
               {/* Logs */}
               {(node.stdout || node.stderr) && (
-                <div className="flex items-center gap-1.5">
-                  {/* Single log file - show simple button */}
-                  {(node.stdout && !node.stderr) ||
-                  (!node.stdout && node.stderr) ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <a
-                          href={node.stderr ? `${url}&stream=stderr` : url}
-                          onClick={
-                            node.stderr
-                              ? (e) => {
-                                  e.stopPropagation();
-                                  if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                                    e.preventDefault();
-                                    onViewLog(
-                                      `${node.step.name}_stderr`,
-                                      dagRunId || ''
-                                    );
-                                  }
-                                }
-                              : (e) => {
-                                  e.stopPropagation();
-                                  handleViewLog(e);
-                                }
-                          }
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 rounded cursor-pointer text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
-                          title={`Click to view ${node.stderr ? 'stderr' : 'stdout'} log (Cmd/Ctrl+Click to open in new tab)`}
-                        >
-                          <FileText className="h-3 w-3" />
-                          {node.stderr ? 'stderr' : 'stdout'}
-                        </a>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <span className="text-xs">
-                          {node.stderr ? 'Error' : 'Output'} Log
-                        </span>
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    /* Both stdout and stderr - show combined button with split design */
-                    <div className="inline-flex rounded overflow-hidden">
+                <div className="inline-flex items-center rounded-md overflow-hidden border border-border shadow-sm">
+                  {/* stdout button */}
+                  {node.stdout && (
+                    <>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <a
@@ -711,55 +676,60 @@ function NodeStatusTableRow({
                               e.stopPropagation();
                               handleViewLog(e);
                             }}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer border-r border-slate-200 dark:border-slate-700"
-                            title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition-colors bg-card hover:bg-muted cursor-pointer"
+                            title="View stdout log (Cmd/Ctrl+Click for new tab)"
                           >
-                            <FileText className="h-3 w-3" />
-                            out
+                            <Code className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span>stdout</span>
                           </a>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <span className="text-xs">Output Log</span>
+                          <span className="text-xs">Standard Output Log</span>
                         </TooltipContent>
                       </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <a
-                            href={`${url}&stream=stderr`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                                e.preventDefault();
-                                onViewLog(
-                                  `${node.step.name}_stderr`,
-                                  dagRunId || ''
-                                );
-                              }
-                            }}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
-                            title="Click to view stderr log (Cmd/Ctrl+Click to open in new tab)"
-                          >
-                            <FileText className="h-3 w-3" />
-                            err
-                          </a>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <span className="text-xs">Error Log</span>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
+                      {node.stderr && <div className="w-px h-5 bg-border" />}
+                    </>
+                  )}
+
+                  {/* stderr button */}
+                  {node.stderr && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={`${url}&stream=stderr`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!(e.metaKey || e.ctrlKey) && onViewLog) {
+                              e.preventDefault();
+                              onViewLog(
+                                `${node.step.name}_stderr`,
+                                dagRunId || ''
+                              );
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition-colors bg-card hover:bg-warning/10 cursor-pointer"
+                          title="View stderr log (Cmd/Ctrl+Click for new tab)"
+                        >
+                          <AlertCircle className="h-3.5 w-3.5 text-warning" />
+                          <span className="text-warning">stderr</span>
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <span className="text-xs">Error Output Log</span>
+                      </TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
               )}
 
               {/* Errors - Simplified */}
               {node.error && (
-                <div className="text-xs text-red-600 dark:text-red-400 leading-relaxed whitespace-normal break-words">
+                <div className="text-xs text-error leading-relaxed whitespace-normal break-words">
                   {node.error}
                 </div>
               )}
               {node.step.preconditions?.some((cond) => cond.error) && (
-                <div className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
+                <div className="text-xs text-warning leading-relaxed">
                   Precondition unmet
                 </div>
               )}
@@ -767,8 +737,9 @@ function NodeStatusTableRow({
           </TableCell>
           {dagRunId && (
             <TableCell className="text-center">
-              <button
-                className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              <Button
+                size="icon-sm"
+                className="btn-3d-secondary"
                 title="Retry from this step"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -776,8 +747,8 @@ function NodeStatusTableRow({
                 }}
                 disabled={loading || dagRun.status === Status.Running}
               >
-                <PlayCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </button>
+                <Play className="h-4 w-4 text-success" />
+              </Button>
               <Dialog open={showDialog} onOpenChange={setShowDialog}>
                 <DialogContent>
                   <DialogHeader>
@@ -785,26 +756,29 @@ function NodeStatusTableRow({
                   </DialogHeader>
                   <div className="py-2 text-sm">
                     This will re-execute <b>{node.step.name}</b>. Are you sure?
-                    {error && <div className="text-red-500 mt-2">{error}</div>}
+                    {error && <div className="text-error mt-2">{error}</div>}
                     {success && (
-                      <div className="text-green-600 mt-2">Retry started!</div>
+                      <div className="text-success mt-2">Retry started!</div>
                     )}
                   </div>
                   <DialogFooter>
-                    <button
-                      className="px-3 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 mr-2"
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       onClick={() => setShowDialog(false)}
                       disabled={loading}
                     >
+                      <X className="h-4 w-4" />
                       Cancel
-                    </button>
-                    <button
-                      className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                    </Button>
+                    <Button
+                      size="sm"
                       onClick={handleRetry}
                       disabled={loading}
                     >
+                      <Play className="h-4 w-4" />
                       {loading ? 'Retrying...' : 'Retry'}
-                    </button>
+                    </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -814,7 +788,7 @@ function NodeStatusTableRow({
 
         {/* Inline log viewer row - spans entire table width */}
         {isLogExpanded && hasLogs && (
-          <StyledTableRow className="bg-zinc-50 dark:bg-zinc-900">
+          <StyledTableRow className="bg-muted">
             <TableCell colSpan={dagRunId ? 7 : 6} className="p-3">
               <div className="w-full">
                 {/* Header with tabs and expand button */}
@@ -830,8 +804,8 @@ function NodeStatusTableRow({
                         className={cn(
                           'px-3 py-1 text-xs font-medium transition-colors rounded',
                           activeLogTab === 'stdout'
-                            ? 'bg-slate-700 dark:bg-slate-600 text-white'
-                            : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                            ? 'bg-foreground/80 text-white'
+                            : 'bg-accent text-foreground/90 hover:bg-accent'
                         )}
                       >
                         out
@@ -844,15 +818,15 @@ function NodeStatusTableRow({
                         className={cn(
                           'px-3 py-1 text-xs font-medium transition-colors rounded',
                           activeLogTab === 'stderr'
-                            ? 'bg-slate-700 dark:bg-slate-600 text-white'
-                            : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                            ? 'bg-foreground/80 text-white'
+                            : 'bg-accent text-foreground/90 hover:bg-accent'
                         )}
                       >
                         err
                       </button>
                     </div>
                   ) : (
-                    <div className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                    <div className="text-xs font-medium text-muted-foreground">
                       {hasStdout ? 'stdout' : 'stderr'}
                     </div>
                   )}
@@ -871,7 +845,7 @@ function NodeStatusTableRow({
                         );
                       }
                     }}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary hover:text-primary transition-colors"
                     title="Open in full modal"
                   >
                     <Code className="h-3 w-3" />
@@ -907,20 +881,20 @@ function NodeStatusTableRow({
   return (
     <div
       className={cn(
-        'p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition-shadow duration-200',
+        'p-4 rounded-2xl border border-border bg-card hover:',
         getRowHighlight()
       )}
     >
       {/* Header with number and status */}
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-slate-700 dark:text-slate-300 text-sm bg-slate-100 dark:bg-slate-800 rounded-full w-6 h-6 flex items-center justify-center">
+          <span className="font-semibold text-foreground/90 text-sm bg-muted rounded-full w-6 h-6 flex items-center justify-center">
             {rownum}
           </span>
-          <h3 className="font-semibold text-slate-800 dark:text-slate-200">
+          <h3 className="font-semibold text-foreground">
             {node.step.name}
             {hasSubDAGRun && (
-              <span className="inline-flex items-center text-blue-500 ml-1.5">
+              <span className="inline-flex items-center text-primary ml-1.5">
                 <GitBranch className="h-4 w-4" />
               </span>
             )}
@@ -933,7 +907,7 @@ function NodeStatusTableRow({
 
       {/* Description */}
       {node.step.description && (
-        <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+        <div className="text-xs text-muted-foreground mb-3">
           {node.step.description}
         </div>
       )}
@@ -945,13 +919,13 @@ function NodeStatusTableRow({
             // Single sub DAG run
             <>
               <div
-                className="text-xs text-blue-500 dark:text-blue-400 font-medium cursor-pointer hover:underline mb-1"
+                className="text-xs text-primary font-medium cursor-pointer hover:underline mb-1"
                 onClick={(e) => handleSubDAGRunNavigation(0, e)}
               >
                 View Sub DAG Run: {subDagName}
               </div>
               {allSubRuns[0]?.params && (
-                <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                <div className="text-xs text-muted-foreground mb-3">
                   Parameters:{' '}
                   <span className="font-mono">{allSubRuns[0].params}</span>
                 </div>
@@ -978,14 +952,14 @@ function NodeStatusTableRow({
 
       {/* Command section */}
       <div className="mb-3">
-        <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+        <div className="text-xs font-medium text-foreground/90 mb-1">
           Command:
         </div>
         <div className="space-y-1.5">
           {!node.step.command && node.step.cmdWithArgs ? (
             <div className="flex items-center gap-1.5 text-xs font-medium">
-              <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-              <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300 break-all whitespace-pre-wrap">
+              <Code className="h-4 w-4 text-primary" />
+              <span className="bg-muted rounded-md px-1.5 py-0.5 text-foreground/90 break-all whitespace-pre-wrap">
                 {node.step.cmdWithArgs}
               </span>
             </div>
@@ -994,14 +968,14 @@ function NodeStatusTableRow({
           {node.step.command && (
             <div className="space-y-1">
               <div className="flex items-center gap-1.5 text-xs font-medium">
-                <Code className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300 break-all whitespace-pre-wrap">
+                <Code className="h-4 w-4 text-primary" />
+                <span className="bg-muted rounded-md px-1.5 py-0.5 text-foreground/90 break-all whitespace-pre-wrap">
                   {node.step.command}
                 </span>
               </div>
 
               {node.step.args && (
-                <div className="pl-5 text-xs font-medium text-slate-500 dark:text-slate-400 leading-tight">
+                <div className="pl-5 text-xs font-medium text-muted-foreground leading-tight">
                   <span className="break-all whitespace-pre-wrap">
                     {Array.isArray(node.step.args)
                       ? node.step.args.join(' ')
@@ -1020,19 +994,19 @@ function NodeStatusTableRow({
 
       {/* Timing section */}
       <div className="mb-3">
-        <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+        <div className="text-xs font-medium text-foreground/90 mb-1">
           Timing:
         </div>
         <div className="space-y-0.5">
-          <div className="text-xs text-slate-600 dark:text-slate-400">
+          <div className="text-xs text-muted-foreground">
             Started: {formatTimestamp(node.startedAt)}
           </div>
           {node.startedAt && (
-            <div className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
               <span className="font-medium flex items-center">
                 Duration:
                 {node.status === NodeStatus.Running && (
-                  <span className="inline-block w-2 h-2 rounded-full bg-lime-500 ml-1.5 animate-pulse" />
+                  <span className="inline-block w-2 h-2 rounded-full bg-success ml-1.5 animate-pulse" />
                 )}
               </span>
               {currentDuration}
@@ -1044,19 +1018,19 @@ function NodeStatusTableRow({
       {/* Error section */}
       {(node.error || node.step.preconditions?.some((cond) => cond.error)) && (
         <div className="mb-3">
-          <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+          <div className="text-xs font-medium text-foreground/90 mb-1">
             Errors:
           </div>
 
           {node.error && (
-            <div className="text-xs bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800 rounded-md p-1.5 mb-2 whitespace-pre-wrap break-words text-red-600 dark:text-red-400 leading-tight">
+            <div className="text-xs bg-error-muted border border-error/20 rounded-md p-1.5 mb-2 whitespace-pre-wrap break-words text-error leading-tight">
               {node.error}
             </div>
           )}
 
           {node.step.preconditions?.some((cond) => cond.error) && (
             <div>
-              <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-1">
+              <div className="text-xs font-medium text-warning mb-1">
                 Precondition Unmet:
               </div>
               {node.step.preconditions
@@ -1064,7 +1038,7 @@ function NodeStatusTableRow({
                 .map((cond, idx) => (
                   <div
                     key={idx}
-                    className="text-xs bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800 rounded-md p-1.5 mb-1 whitespace-pre-wrap break-words text-amber-600 dark:text-amber-400 leading-tight"
+                    className="text-xs bg-warning-muted border border-warning/20 rounded-md p-1.5 mb-1 whitespace-pre-wrap break-words text-warning leading-tight"
                   >
                     <div className="font-medium">
                       Condition: {cond.condition}
@@ -1081,42 +1055,25 @@ function NodeStatusTableRow({
       {/* Log buttons */}
       {(node.stdout || node.stderr) && (
         <div className="flex justify-end">
-          {/* Single log file - show simple button */}
-          {(node.stdout && !node.stderr) || (!node.stdout && node.stderr) ? (
-            <a
-              href={node.stderr ? `${url}&stream=stderr` : url}
-              onClick={
-                node.stderr
-                  ? (e) => {
-                      if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                        e.preventDefault();
-                        onViewLog(
-                          `${node.step.name}_stderr`,
-                          dagRunId || '',
-                          node
-                        );
-                      }
-                    }
-                  : handleViewLog
-              }
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 rounded-md cursor-pointer text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
-              title={`Click to view ${node.stderr ? 'stderr' : 'stdout'} log (Cmd/Ctrl+Click to open in new tab)`}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              {node.stderr ? 'stderr' : 'stdout'}
-            </a>
-          ) : (
-            /* Both stdout and stderr - show combined button with split design */
-            <div className="inline-flex rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-              <a
-                href={url}
-                onClick={handleViewLog}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border-r border-slate-200 dark:border-slate-700"
-                title="Click to view stdout log (Cmd/Ctrl+Click to open in new tab)"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                stdout
-              </a>
+          <div className="inline-flex items-center rounded-md overflow-hidden border border-border shadow-sm">
+            {/* stdout button */}
+            {node.stdout && (
+              <>
+                <a
+                  href={url}
+                  onClick={handleViewLog}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors bg-card hover:bg-muted cursor-pointer"
+                  title="View stdout log (Cmd/Ctrl+Click for new tab)"
+                >
+                  <Code className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>stdout</span>
+                </a>
+                {node.stderr && <div className="w-px h-5 bg-border" />}
+              </>
+            )}
+
+            {/* stderr button */}
+            {node.stderr && (
               <a
                 href={`${url}&stream=stderr`}
                 onClick={(e) => {
@@ -1125,26 +1082,26 @@ function NodeStatusTableRow({
                     onViewLog(`${node.step.name}_stderr`, dagRunId || '', node);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors duration-200 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                title="Click to view stderr log (Cmd/Ctrl+Click to open in new tab)"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors bg-card hover:bg-warning/10 cursor-pointer"
+                title="View stderr log (Cmd/Ctrl+Click for new tab)"
               >
-                <FileText className="h-3.5 w-3.5" />
-                stderr
+                <AlertCircle className="h-3.5 w-3.5 text-warning" />
+                <span className="text-warning">stderr</span>
               </a>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
       {dagRunId && (
         <div className="flex justify-end mt-4">
           <button
-            className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-2 rounded-full hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             title="Retry from this step"
             onClick={() => setShowDialog(true)}
             disabled={loading || dagRun.status === Status.Running}
           >
-            <PlayCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+            <Play className="h-6 w-6 text-success" />
           </button>
           <Dialog open={showDialog} onOpenChange={setShowDialog}>
             <DialogContent>
@@ -1153,26 +1110,29 @@ function NodeStatusTableRow({
               </DialogHeader>
               <div className="py-2 text-sm">
                 This will re-execute <b>{node.step.name}</b>. Are you sure?
-                {error && <div className="text-red-500 mt-2">{error}</div>}
+                {error && <div className="text-error mt-2">{error}</div>}
                 {success && (
-                  <div className="text-green-600 mt-2">Retry started!</div>
+                  <div className="text-success mt-2">Retry started!</div>
                 )}
               </div>
               <DialogFooter>
-                <button
-                  className="px-3 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 mr-2"
+                <Button
+                  size="sm"
+                  variant="ghost"
                   onClick={() => setShowDialog(false)}
                   disabled={loading}
                 >
+                  <X className="h-4 w-4" />
                   Cancel
-                </button>
-                <button
-                  className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                </Button>
+                <Button
+                  size="sm"
                   onClick={handleRetry}
                   disabled={loading}
                 >
+                  <Play className="h-4 w-4" />
                   {loading ? 'Retrying...' : 'Retry'}
-                </button>
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

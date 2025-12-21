@@ -97,9 +97,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
       // find the clicked step
-      const n = dagRun.nodes?.find(
-        (n) => toMermaidNodeId(n.step.name) == id
-      );
+      const n = dagRun.nodes?.find((n) => toMermaidNodeId(n.step.name) == id);
 
       const subDAGName = n?.step?.call;
       if (n && subDAGName) {
@@ -194,9 +192,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
       // Only allow status updates for completed DAG runs
       if (status !== Status.Running && status !== Status.NotStarted) {
         // find the right-clicked step
-        const n = dagRun.nodes?.find(
-          (n) => toMermaidNodeId(n.step.name) == id
-        );
+        const n = dagRun.nodes?.find((n) => toMermaidNodeId(n.step.name) == id);
 
         if (n) {
           // Show the modal (it will be centered by default)
@@ -232,136 +228,53 @@ function DAGStatus({ dagRun, fileName }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* DAG Visualization Card */}
+      {/* DAG Visualization */}
       {dagRun.nodes && dagRun.nodes.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-          <div className="border-b border-border bg-muted/30 px-6 py-4">
-            <h2 className="text-lg font-semibold text-foreground">Graph</h2>
-          </div>
-          <div className="p-6">
-            <DAGGraph
-              dagRun={dagRun}
-              onSelectStep={onSelectStepOnGraph}
-              onRightClickStep={onRightClickStepOnGraph}
-            />
-          </div>
-        </div>
+        <DAGGraph
+          dagRun={dagRun}
+          onSelectStep={onSelectStepOnGraph}
+          onRightClickStep={onRightClickStepOnGraph}
+        />
       )}
 
       <DAGContext.Consumer>
         {(props) => (
           <>
             <div className="grid grid-cols-1 gap-6">
-              {/* Status Overview Card */}
-              <div className="bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                <div className="border-b border-border bg-muted/30 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-foreground">
-                    Run Status
-                  </h2>
-                </div>
-                <div className="p-6">
-                  <DAGStatusOverview
-                    status={dagRun}
-                    fileName={fileName}
-                    onViewLog={(dagRunId) => {
-                      setLogViewer({
-                        isOpen: true,
-                        logType: 'execution',
-                        stepName: '',
-                        dagRunId,
-                        stream: 'stdout',
-                      });
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Desktop Steps Table Card */}
-              <div className="hidden md:block bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                <div className="border-b border-border bg-muted/30 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-                    <span>Steps</span>
-                    {dagRun.nodes && (
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {dagRun.nodes.length} step
-                        {dagRun.nodes.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </h2>
-                </div>
-                <div className="overflow-x-auto">
-                  <NodeStatusTable
-                    nodes={dagRun.nodes}
-                    status={dagRun}
-                    {...props}
-                    onViewLog={handleViewLog}
-                  />
-                </div>
-              </div>
-
-              {/* Mobile Steps - No Card Container */}
-              <div className="md:hidden">
-                <div className="mb-4">
-                  <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-                    <span>Steps</span>
-                    {dagRun.nodes && (
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {dagRun.nodes.length} step
-                        {dagRun.nodes.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </h2>
-                </div>
-                <NodeStatusTable
-                  nodes={dagRun.nodes}
+              {/* Status Overview */}
+              <div className="bg-surface border border-border rounded-lg p-4">
+                <DAGStatusOverview
                   status={dagRun}
-                  {...props}
-                  onViewLog={handleViewLog}
+                  fileName={fileName}
+                  onViewLog={(dagRunId) => {
+                    setLogViewer({
+                      isOpen: true,
+                      logType: 'execution',
+                      stepName: '',
+                      dagRunId,
+                      stream: 'stdout',
+                    });
+                  }}
                 />
               </div>
+
+              {/* Steps Table */}
+              <NodeStatusTable
+                nodes={dagRun.nodes}
+                status={dagRun}
+                {...props}
+                onViewLog={handleViewLog}
+              />
             </div>
 
             {/* Lifecycle Hooks */}
             {handlers?.length ? (
-              <>
-                {/* Desktop Lifecycle Hooks Card */}
-                <div className="hidden md:block bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                  <div className="border-b border-border bg-muted/30 px-6 py-4">
-                    <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-                      <span>Lifecycle Hooks</span>
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
-                      </span>
-                    </h2>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <NodeStatusTable
-                      nodes={handlers}
-                      status={dagRun}
-                      {...props}
-                      onViewLog={handleViewLog}
-                    />
-                  </div>
-                </div>
-
-                {/* Mobile Lifecycle Hooks - No Card Container */}
-                <div className="md:hidden">
-                  <div className="mb-4">
-                    <h2 className="text-lg font-semibold text-foreground flex items-center justify-between">
-                      <span>Lifecycle Hooks</span>
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {handlers.length} hook{handlers.length !== 1 ? 's' : ''}
-                      </span>
-                    </h2>
-                  </div>
-                  <NodeStatusTable
-                    nodes={handlers}
-                    status={dagRun}
-                    {...props}
-                    onViewLog={handleViewLog}
-                  />
-                </div>
-              </>
+              <NodeStatusTable
+                nodes={handlers}
+                status={dagRun}
+                {...props}
+                onViewLog={handleViewLog}
+              />
             ) : null}
           </>
         )}

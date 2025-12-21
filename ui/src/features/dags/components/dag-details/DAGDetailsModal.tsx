@@ -126,7 +126,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
 
   if (isLoading || !data || !data.latestDAGRun) {
     return (
-      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border shadow-xl z-50 flex items-center justify-center">
+      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 flex items-center justify-center">
         <LoadingIndicator />
       </div>
     );
@@ -141,7 +141,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
       />
 
       {/* Side Modal */}
-      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border shadow-xl z-50 overflow-y-auto">
+      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 overflow-y-auto">
         <DAGContext.Provider
           value={{
             refresh: refreshFn,
@@ -178,7 +178,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
                     className="relative group"
                   >
                     <Maximize2 className="h-4 w-4" />
-                    <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-[10px] font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
                       F
                     </span>
                   </Button>
@@ -190,7 +190,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
                     className="relative group"
                   >
                     <X className="h-4 w-4" />
-                    <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-[10px] font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
                       Esc
                     </span>
                   </Button>

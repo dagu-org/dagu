@@ -1,14 +1,19 @@
+import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Clock, Maximize, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
-import { Timeline } from 'vis-timeline/standalone';
 import { DataSet } from 'vis-data';
+import { Timeline } from 'vis-timeline/standalone';
 import 'vis-timeline/styles/vis-timeline-graph2d.css';
 import { components } from '../../../api/v2/schema';
 import { statusColorMapping } from '../../../consts';
 import { useConfig } from '../../../contexts/ConfigContext';
 import dayjs from '../../../lib/dayjs';
 import DAGRunDetailsModal from '../../dag-runs/components/dag-run-details/DAGRunDetailsModal';
-import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, Maximize, Clock, RotateCcw } from 'lucide-react';
 
 type Props = {
   data: components['schemas']['DAGRunSummary'][];
@@ -216,32 +221,111 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     }
   }, []);
 
+  // Store input data in a ref for click handler access
+  const inputRef = useRef(input);
   useEffect(() => {
-    if (!timelineRef.current) return;
+    inputRef.current = input;
+  }, [input]);
 
-    const validTimezone = getValidTimezone(config.tz);
-    const items: TimelineItem[] = [];
+  // Initialize timeline once on mount
+  useEffect(() => {
+    if (!timelineRef.current || timelineInstance.current) return;
+
     const now = dayjs();
-
     const viewStartDate = selectedDate
       ? dayjs.unix(selectedDate.startTimestamp)
       : dayjs().startOf('day');
-
     const viewEndDate = selectedDate?.endTimestamp
       ? dayjs.unix(selectedDate.endTimestamp)
       : now.endOf('day');
 
-    if (!timelineInstance.current) {
-      initialViewRef.current = {
-        start: !isNaN(viewStartDate.toDate().getTime())
-          ? viewStartDate.toDate()
-          : dayjs().startOf('day').toDate(),
-        end: !isNaN(viewEndDate.toDate().getTime())
-          ? viewEndDate.toDate()
-          : dayjs().endOf('day').toDate(),
-      };
-    }
+    const validViewStartDate = !isNaN(viewStartDate.toDate().getTime())
+      ? viewStartDate.toDate()
+      : dayjs().startOf('day').toDate();
+    const validViewEndDate = !isNaN(viewEndDate.toDate().getTime())
+      ? viewEndDate.toDate()
+      : dayjs().endOf('day').toDate();
 
+    initialViewRef.current = {
+      start: validViewStartDate,
+      end: validViewEndDate,
+    };
+
+    timelineInstance.current = new Timeline(timelineRef.current, new DataSet([]), {
+      start: validViewStartDate,
+      end: validViewEndDate,
+      orientation: 'top',
+      stack: true,
+      showMajorLabels: true,
+      showMinorLabels: true,
+      showTooltips: true,
+      zoomable: true,
+      verticalScroll: true,
+      zoomKey: 'ctrlKey',
+      timeAxis: { scale: 'hour', step: 1 },
+      format: {
+        minorLabels: {
+          minute: 'HH:mm',
+          hour: 'HH:mm',
+        },
+        majorLabels: {
+          hour: 'ddd D MMM',
+          day: 'ddd D MMM',
+        },
+      },
+      height: '100%',
+      maxHeight: '100%',
+      margin: {
+        item: { vertical: 4, horizontal: 2 },
+        axis: 2,
+      },
+    });
+
+    // Add range change listener for dynamic time axis
+    timelineInstance.current.on('rangechanged', () => {
+      if (timelineInstance.current) {
+        updateTimeAxisBasedOnZoom(timelineInstance.current);
+      }
+    });
+
+    // Register click handler
+    timelineInstance.current.on('click', (properties) => {
+      if (properties.item) {
+        const itemId = properties.item.toString();
+        const matchingDAGRun = inputRef.current.find(
+          (dagRun) => itemId === dagRun.name + `_${dagRun.dagRunId}`
+        );
+        if (matchingDAGRun) {
+          setSelectedDAGRun({
+            name: matchingDAGRun.name,
+            dagRunId: matchingDAGRun.dagRunId,
+          });
+          setIsModalOpen(true);
+        }
+      }
+    });
+
+    // Initial update based on current view
+    updateTimeAxisBasedOnZoom(timelineInstance.current);
+
+    return () => {
+      if (timelineInstance.current) {
+        timelineInstance.current.off('rangechanged');
+        timelineInstance.current.off('click');
+        timelineInstance.current.destroy();
+        timelineInstance.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  // Update timeline data when input changes (without recreating timeline)
+  useEffect(() => {
+    if (!timelineInstance.current) return;
+
+    const validTimezone = getValidTimezone(config.tz);
+    const items: TimelineItem[] = [];
+    const now = dayjs();
     const seenIds = new Set<string>();
 
     input.forEach((dagRun) => {
@@ -276,6 +360,20 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     });
 
     const dataset = new DataSet(items);
+    timelineInstance.current.setItems(dataset);
+  }, [input, config.tz, getValidTimezone]);
+
+  // Update window when selectedDate changes
+  useEffect(() => {
+    if (!timelineInstance.current) return;
+
+    const now = dayjs();
+    const viewStartDate = selectedDate
+      ? dayjs.unix(selectedDate.startTimestamp)
+      : dayjs().startOf('day');
+    const viewEndDate = selectedDate?.endTimestamp
+      ? dayjs.unix(selectedDate.endTimestamp)
+      : now.endOf('day');
 
     const validViewStartDate = !isNaN(viewStartDate.toDate().getTime())
       ? viewStartDate.toDate()
@@ -284,96 +382,14 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       ? viewEndDate.toDate()
       : dayjs().endOf('day').toDate();
 
-    if (!timelineInstance.current) {
-      timelineInstance.current = new Timeline(timelineRef.current, dataset, {
-        start: validViewStartDate,
-        end: validViewEndDate,
-        orientation: 'top',
-        stack: true,
-        showMajorLabels: true,
-        showMinorLabels: true,
-        showTooltips: true,
-        zoomable: true,
-        verticalScroll: true,
-        zoomKey: 'ctrlKey',
-        timeAxis: { scale: 'hour', step: 1 },
-        format: {
-          minorLabels: {
-            minute: 'HH:mm',
-            hour: 'HH:mm',
-          },
-          majorLabels: {
-            hour: 'ddd D MMM',
-            day: 'ddd D MMM',
-          },
-        },
-        height: '100%',
-        maxHeight: '100%',
-        margin: {
-          item: { vertical: 4, horizontal: 2 },
-          axis: 2,
-        },
-      });
+    timelineInstance.current.setWindow(validViewStartDate, validViewEndDate);
 
-      // Add range change listener for dynamic time axis
-      timelineInstance.current.on('rangechanged', () => {
-        if (timelineInstance.current) {
-          updateTimeAxisBasedOnZoom(timelineInstance.current);
-        }
-      });
-
-      // Initial update based on current view
-      updateTimeAxisBasedOnZoom(timelineInstance.current);
-    } else {
-      timelineInstance.current.setItems(dataset);
-      timelineInstance.current.setWindow(validViewStartDate, validViewEndDate);
-    }
-
-    return () => {
-      if (timelineInstance.current) {
-        timelineInstance.current.off('rangechanged');
-        timelineInstance.current.destroy();
-        timelineInstance.current = null;
-      }
+    // Update initial view ref for reset button
+    initialViewRef.current = {
+      start: validViewStartDate,
+      end: validViewEndDate,
     };
-  }, [
-    input,
-    config.tz,
-    getValidTimezone,
-    selectedDate,
-    updateTimeAxisBasedOnZoom,
-  ]);
-
-  useEffect(() => {
-    const timeline = timelineInstance.current;
-    if (timeline) {
-      timeline.off('click');
-
-      timeline.on('click', (properties) => {
-        if (properties.item) {
-          const itemId = properties.item.toString();
-
-          const matchingDAGRun = input.find(
-            (dagRun) => itemId === dagRun.name + `_${dagRun.dagRunId}`
-          );
-
-          if (matchingDAGRun) {
-            setSelectedDAGRun({
-              name: matchingDAGRun.name,
-              dagRunId: matchingDAGRun.dagRunId,
-            });
-            setIsModalOpen(true);
-          }
-        }
-      });
-    }
-
-    return () => {
-      if (timeline) {
-        timeline.off('click');
-      }
-    };
-  }, [input]);
+  }, [selectedDate]);
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
@@ -427,55 +443,103 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
   };
 
   return (
-    <TimelineWrapper>
-      <div className="flex justify-end gap-1 p-2 border-b bg-muted/30 flex-shrink-0">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleCurrent}
-          title="Go to current time"
-          className="h-6 px-2 text-xs"
-        >
-          <Clock className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleFit}
-          title="Fit all items in view"
-          className="h-6 px-2 text-xs"
-        >
-          <Maximize className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleZoomIn}
-          title="Zoom in"
-          className="h-6 px-2 text-xs"
-        >
-          <ZoomIn className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleZoomOut}
-          title="Zoom out"
-          className="h-6 px-2 text-xs"
-        >
-          <ZoomOut className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleReset}
-          title="Reset view to initial state"
-          className="h-6 px-2 text-xs"
-        >
-          <RotateCcw className="h-3 w-3" />
-        </Button>
+    <div className="w-full h-full flex flex-col bg-card overflow-hidden">
+      {/* Toolbar */}
+      <div className="flex justify-between items-center gap-2 px-3 py-1.5 bg-muted/30 flex-shrink-0">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Timeline
+        </span>
+        <div className="flex items-center gap-0.5 rounded-md border border-border bg-card p-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCurrent}
+                className="h-7 w-7 rounded-sm"
+              >
+                <Clock className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Current time</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleFit}
+                className="h-7 w-7 rounded-sm"
+              >
+                <Maximize className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Fit all</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <div className="w-px h-4 bg-border mx-0.5" />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleZoomIn}
+                className="h-7 w-7 rounded-sm"
+              >
+                <ZoomIn className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Zoom in</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleZoomOut}
+                className="h-7 w-7 rounded-sm"
+              >
+                <ZoomOut className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Zoom out</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <div className="w-px h-4 bg-border mx-0.5" />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleReset}
+                className="h-7 w-7 rounded-sm"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Reset view</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
+
+      {/* Timeline content */}
       <div ref={timelineRef} className="flex-1 min-h-0 overflow-auto" />
+
+      {/* DAG Run details modal */}
       {selectedDAGRun && (
         <DAGRunDetailsModal
           name={selectedDAGRun.name}
@@ -487,9 +551,14 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       <style>
         {`
         .vis-timeline {
+          font-family: inherit !important;
           font-size: 12px !important;
-          background-color: var(--background) !important;
-          border-color: var(--border) !important;
+          background-color: var(--card) !important;
+          border: none !important;
+          border-radius: 0 !important;
+        }
+        .vis-timeline .vis-panel {
+          border: none !important;
         }
         .vis-item .vis-item-overflow {
           overflow: visible;
@@ -499,46 +568,46 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           position: sticky;
           top: 0;
           z-index: 1;
-          background-color: var(--background) !important;
-          border-color: var(--border) !important;
+          background-color: var(--muted) !important;
         }
         .vis-labelset {
           position: sticky;
           left: 0;
           z-index: 2;
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-foreground {
           background-color: transparent !important;
         }
         .vis-background {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-center {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-left {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-right {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-top {
-          background-color: var(--background) !important;
+          background-color: var(--muted) !important;
         }
         .vis-bottom {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-time-axis {
-          background-color: var(--background) !important;
+          background-color: var(--muted) !important;
           color: var(--foreground) !important;
         }
         .vis-time-axis .vis-text {
           font-size: 11px !important;
-          color: var(--foreground) !important;
+          color: var(--muted-foreground) !important;
+          font-family: inherit !important;
         }
         .vis-time-axis .vis-text.vis-major {
-          font-size: 12px !important;
+          font-size: 11px !important;
           font-weight: 600;
           color: var(--foreground) !important;
         }
@@ -548,34 +617,64 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         }
         .vis-time-axis .vis-grid.vis-minor {
           border-color: var(--border) !important;
-          opacity: 0.5;
+          opacity: 0.3;
         }
         .vis-time-axis .vis-grid.vis-major {
           border-color: var(--border) !important;
+          opacity: 0.6;
         }
         .vis-item .vis-item-content {
           position: absolute;
           left: 100% !important;
-          padding-left: 4px;
+          padding-left: 6px;
           transform: translateY(-50%);
           top: 50%;
           white-space: nowrap;
-          font-size: 12px !important;
+          font-size: 11px !important;
           font-weight: 500;
           color: var(--foreground) !important;
+          text-shadow: 0 0 2px var(--card);
         }
         .vis-item {
           overflow: visible !important;
-          height: 18px !important;
+          height: 20px !important;
+          border-radius: 3px !important;
+          border-width: 1px !important;
+          cursor: pointer !important;
+          transition: opacity 0.15s ease !important;
+        }
+        .vis-item:hover {
+          opacity: 0.85 !important;
         }
         .vis-panel {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-item.vis-selected {
           border-color: var(--ring) !important;
+          border-width: 2px !important;
         }
         .vis-current-time {
-          background-color: var(--destructive) !important;
+          background-color: var(--primary) !important;
+          width: 2px !important;
+        }
+        .vis-custom-time {
+          background-color: var(--primary) !important;
+        }
+        /* Scrollbar styling */
+        .vis-timeline::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .vis-timeline::-webkit-scrollbar-track {
+          background: var(--muted);
+          border-radius: 4px;
+        }
+        .vis-timeline::-webkit-scrollbar-thumb {
+          background: var(--border);
+          border-radius: 4px;
+        }
+        .vis-timeline::-webkit-scrollbar-thumb:hover {
+          background: var(--muted-foreground);
         }
         `}
       </style>
@@ -592,13 +691,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           )
           .join('\n')}
       `}</style>
-    </TimelineWrapper>
-  );
-}
-
-function TimelineWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="w-full h-full flex flex-col bg-background">{children}</div>
+    </div>
   );
 }
 

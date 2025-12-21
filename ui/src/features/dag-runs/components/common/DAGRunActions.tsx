@@ -3,7 +3,6 @@
  *
  * @module features/dagRuns/components/common
  */
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +13,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import dayjs from '@/lib/dayjs';
+import ActionButton from '@/ui/ActionButton';
 import { RefreshCw, Square, X } from 'lucide-react';
 import React from 'react';
 import { components, Status } from '../../../../api/v2/schema';
@@ -79,7 +79,11 @@ function DAGRunActions({
   // Determine which buttons should be enabled based on current status and root level
   const buttonState = {
     stop: isRootLevel && dagRun?.status === Status.Running, // Running and at root level
-    retry: isRootLevel && dagRun?.status !== Status.Running && dagRun?.status !== Status.Queued && dagRun?.dagRunId !== '', // Not running, not queued, has dagRunId, and at root level
+    retry:
+      isRootLevel &&
+      dagRun?.status !== Status.Running &&
+      dagRun?.status !== Status.Queued &&
+      dagRun?.dagRunId !== '', // Not running, not queued, has dagRunId, and at root level
     dequeue: isRootLevel && dagRun?.status === Status.Queued, // Queued and at root level
   };
 
@@ -96,33 +100,23 @@ function DAGRunActions({
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
-              {displayMode === 'compact' ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={!buttonState['stop']}
-                  onClick={() => setIsStopModal(true)}
-                  className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-                >
-                  <Square className="h-4 w-4" />
-                  <span className="sr-only">Stop</span>
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!buttonState['stop']}
-                  onClick={() => setIsStopModal(true)}
-                  className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-                >
-                  <Square className="mr-2 h-4 w-4" />
-                  Stop
-                </Button>
-              )}
+              <ActionButton
+                label={displayMode !== 'compact'}
+                icon={<Square className="h-4 w-4" />}
+                disabled={!buttonState['stop']}
+                onClick={() => setIsStopModal(true)}
+                className="cursor-pointer"
+              >
+                Stop
+              </ActionButton>
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{isRootLevel ? 'Stop DAGRun execution' : 'Stop action only available at root dagRun level'}</p>
+            <p>
+              {isRootLevel
+                ? 'Stop DAGRun execution'
+                : 'Stop action only available at root dagRun level'}
+            </p>
           </TooltipContent>
         </Tooltip>
 
@@ -130,33 +124,23 @@ function DAGRunActions({
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
-              {displayMode === 'compact' ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={!buttonState['retry']}
-                  onClick={() => setIsRetryModal(true)}
-                  className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  <span className="sr-only">Retry</span>
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!buttonState['retry']}
-                  onClick={() => setIsRetryModal(true)}
-                  className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Retry
-                </Button>
-              )}
+              <ActionButton
+                label={displayMode !== 'compact'}
+                icon={<RefreshCw className="h-4 w-4" />}
+                disabled={!buttonState['retry']}
+                onClick={() => setIsRetryModal(true)}
+                className="cursor-pointer"
+              >
+                Retry
+              </ActionButton>
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{isRootLevel ? 'Retry DAGRun execution' : 'Retry action only available at root dagRun level'}</p>
+            <p>
+              {isRootLevel
+                ? 'Retry DAGRun execution'
+                : 'Retry action only available at root dagRun level'}
+            </p>
           </TooltipContent>
         </Tooltip>
 
@@ -164,33 +148,23 @@ function DAGRunActions({
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
-              {displayMode === 'compact' ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={!buttonState['dequeue']}
-                  onClick={() => setIsDequeueModal(true)}
-                  className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-                >
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Dequeue</span>
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!buttonState['dequeue']}
-                  onClick={() => setIsDequeueModal(true)}
-                  className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Dequeue
-                </Button>
-              )}
+              <ActionButton
+                label={displayMode !== 'compact'}
+                icon={<X className="h-4 w-4" />}
+                disabled={!buttonState['dequeue']}
+                onClick={() => setIsDequeueModal(true)}
+                className="cursor-pointer"
+              >
+                Dequeue
+              </ActionButton>
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{isRootLevel ? 'Remove DAGRun from queue' : 'Dequeue action only available at root dagRun level'}</p>
+            <p>
+              {isRootLevel
+                ? 'Remove DAGRun from queue'
+                : 'Dequeue action only available at root dagRun level'}
+            </p>
           </TooltipContent>
         </Tooltip>
 
@@ -202,17 +176,20 @@ function DAGRunActions({
           dismissModal={() => setIsStopModal(false)}
           onSubmit={async () => {
             setIsStopModal(false);
-            const { error } = await client.POST('/dag-runs/{name}/{dagRunId}/stop', {
-              params: {
-                query: {
-                  remoteNode: appBarContext.selectedRemoteNode || 'local',
+            const { error } = await client.POST(
+              '/dag-runs/{name}/{dagRunId}/stop',
+              {
+                params: {
+                  query: {
+                    remoteNode: appBarContext.selectedRemoteNode || 'local',
+                  },
+                  path: {
+                    name: name,
+                    dagRunId: dagRun.dagRunId,
+                  },
                 },
-                path: {
-                  name: name,
-                  dagRunId: dagRun.dagRunId,
-                },
-              },
-            });
+              }
+            );
             if (error) {
               console.error('Stop API error:', error);
               alert(error.message || 'An error occurred');
@@ -226,8 +203,8 @@ function DAGRunActions({
 
         {/* Retry Confirmation Modal */}
         <ConfirmModal
-          title={retryAsNew ? "Reschedule DAG Run" : "Confirmation"}
-          buttonText={retryAsNew ? "Reschedule" : "Retry"}
+          title={retryAsNew ? 'Reschedule DAG Run' : 'Confirmation'}
+          buttonText={retryAsNew ? 'Reschedule' : 'Retry'}
           visible={isRetryModal}
           dismissModal={() => {
             setIsRetryModal(false);
@@ -240,22 +217,25 @@ function DAGRunActions({
 
             if (retryAsNew) {
               // Use reschedule endpoint for retry-as-new
-              const { error, data } = await client.POST('/dag-runs/{name}/{dagRunId}/reschedule', {
-                params: {
-                  path: {
-                    name: name,
-                    dagRunId: dagRun.dagRunId,
+              const { error, data } = await client.POST(
+                '/dag-runs/{name}/{dagRunId}/reschedule',
+                {
+                  params: {
+                    path: {
+                      name: name,
+                      dagRunId: dagRun.dagRunId,
+                    },
+                    query: {
+                      remoteNode: appBarContext.selectedRemoteNode || 'local',
+                    },
                   },
-                  query: {
-                    remoteNode: appBarContext.selectedRemoteNode || 'local',
+                  body: {
+                    dagRunId: newRunId || undefined, // Auto-generate if empty
+                    ...(dagNameOverride ? { dagName: dagNameOverride } : {}), // Use original if empty
+                    singleton: false,
                   },
-                },
-                body: {
-                  dagRunId: newRunId || undefined, // Auto-generate if empty
-                  ...(dagNameOverride ? { dagName: dagNameOverride } : {}), // Use original if empty
-                  singleton: false,
-                },
-              });
+                }
+              );
               if (error) {
                 alert(error.message || 'An error occurred');
                 // Reset state on error
@@ -266,7 +246,9 @@ function DAGRunActions({
               }
               // Show success message with new run ID
               if (data?.dagRunId) {
-                alert(`New DAG run created with ID: ${data.dagRunId}${data.queued ? ' (queued)' : ''}`);
+                alert(
+                  `New DAG run created with ID: ${data.dagRunId}${data.queued ? ' (queued)' : ''}`
+                );
               }
               // Reset state after success
               setRetryAsNew(false);
@@ -274,20 +256,23 @@ function DAGRunActions({
               setDagNameOverride('');
             } else {
               // Use retry endpoint for regular retry
-              const { error } = await client.POST('/dag-runs/{name}/{dagRunId}/retry', {
-                params: {
-                  path: {
-                    name: name,
+              const { error } = await client.POST(
+                '/dag-runs/{name}/{dagRunId}/retry',
+                {
+                  params: {
+                    path: {
+                      name: name,
+                      dagRunId: dagRun.dagRunId,
+                    },
+                    query: {
+                      remoteNode: appBarContext.selectedRemoteNode || 'local',
+                    },
+                  },
+                  body: {
                     dagRunId: dagRun.dagRunId,
                   },
-                  query: {
-                    remoteNode: appBarContext.selectedRemoteNode || 'local',
-                  },
-                },
-                body: {
-                  dagRunId: dagRun.dagRunId,
-                },
-              });
+                }
+              );
               if (error) {
                 alert(error.message || 'An error occurred');
                 return;
@@ -302,9 +287,7 @@ function DAGRunActions({
               Do you really want to retry the following execution?
             </p>
             <LabeledItem label="DAGRun-Name">
-              <span className="font-mono text-sm">
-                {dagRun?.name || 'N/A'}
-              </span>
+              <span className="font-mono text-sm">{dagRun?.name || 'N/A'}</span>
             </LabeledItem>
             <LabeledItem label="DAGRun-ID">
               <span className="font-mono text-sm">
@@ -332,7 +315,7 @@ function DAGRunActions({
                 id="reschedule"
                 checked={retryAsNew}
                 onCheckedChange={(checked) => setRetryAsNew(checked as boolean)}
-                className="border-gray-400 dark:border-gray-500"
+                className="border-border"
               />
               <Label htmlFor="reschedule" className="cursor-pointer text-sm">
                 Reschedule with new DAG-run
@@ -380,17 +363,20 @@ function DAGRunActions({
           onSubmit={async () => {
             setIsDequeueModal(false);
 
-            const { error } = await client.GET('/dag-runs/{name}/{dagRunId}/dequeue', {
-              params: {
-                path: {
-                  name: name,
-                  dagRunId: dagRun.dagRunId,
+            const { error } = await client.GET(
+              '/dag-runs/{name}/{dagRunId}/dequeue',
+              {
+                params: {
+                  path: {
+                    name: name,
+                    dagRunId: dagRun.dagRunId,
+                  },
+                  query: {
+                    remoteNode: appBarContext.selectedRemoteNode || 'local',
+                  },
                 },
-                query: {
-                  remoteNode: appBarContext.selectedRemoteNode || 'local',
-                },
-              },
-            });
+              }
+            );
             if (error) {
               alert(error.message || 'An error occurred');
               return;
@@ -403,9 +389,7 @@ function DAGRunActions({
               Do you really want to dequeue the following dagRun?
             </p>
             <LabeledItem label="DAGRun-Name">
-              <span className="font-mono text-sm">
-                {dagRun?.name || 'N/A'}
-              </span>
+              <span className="font-mono text-sm">{dagRun?.name || 'N/A'}</span>
             </LabeledItem>
             <LabeledItem label="DAGRun-ID">
               <span className="font-mono text-sm">

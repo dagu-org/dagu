@@ -107,15 +107,15 @@ export default function UsersPage() {
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'admin':
-        return 'bg-red-500/20 text-red-600 dark:text-red-400';
+        return 'bg-error/20 text-error';
       case 'manager':
-        return 'bg-blue-500/20 text-blue-600 dark:text-blue-400';
+        return 'bg-primary/100/20 text-primary';
       case 'operator':
-        return 'bg-green-500/20 text-green-600 dark:text-green-400';
+        return 'bg-success/20 text-success';
       case 'viewer':
-        return 'bg-gray-500/20 text-gray-600 dark:text-gray-400';
+        return 'bg-muted-foreground/20 text-muted-foreground';
       default:
-        return 'bg-gray-500/20 text-gray-600 dark:text-gray-400';
+        return 'bg-muted-foreground/20 text-muted-foreground';
     }
   };
 
@@ -194,7 +194,7 @@ export default function UsersPage() {
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                        <Button variant="ghost" size="icon">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

@@ -35,8 +35,8 @@ function SystemOverview({
   };
 
   const getHealthColor = () => {
-    if (error || !health) return 'text-red-500';
-    return health.status === 'healthy' ? 'text-green-500' : 'text-yellow-500';
+    if (error || !health) return 'text-error';
+    return health.status === 'healthy' ? 'text-success' : 'text-warning';
   };
 
   return (
@@ -116,7 +116,7 @@ function SystemOverview({
           <div className="flex items-center gap-2">
             <div className="text-sm font-medium">{activeRuns}</div>
             {recentErrors > 0 && (
-              <div className="flex items-center gap-1 text-xs text-red-500">
+              <div className="flex items-center gap-1 text-xs text-error">
                 <AlertCircle className="h-3 w-3" />
                 <span>{recentErrors}</span>
               </div>
@@ -127,7 +127,7 @@ function SystemOverview({
       </div>
 
       {error && (
-        <div className="mt-3 pt-3 border-t text-xs text-red-500">{error}</div>
+        <div className="mt-3 pt-3 border-t text-xs text-error">{error}</div>
       )}
     </div>
   );

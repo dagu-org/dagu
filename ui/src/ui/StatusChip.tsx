@@ -14,49 +14,45 @@ function StatusChip({ status, children, size = 'md' }: Props) {
   let textColorClass = '';
   let borderColorClass = '';
   switch (status) {
-    case Status.Success: // done -> green
-      bgColorClass = 'bg-[rgba(0,128,0,0.1)] dark:bg-[rgba(0,100,0,0.2)]';
-      borderColorClass = 'border-[green] dark:border-[darkgreen]';
-      textColorClass = 'text-[green] dark:text-[lightgreen]';
+    case Status.Success: // done -> muted green (sepia-compatible)
+      bgColorClass = 'bg-[rgba(107,168,107,0.12)]';
+      borderColorClass = 'border-[#6ba86b]';
+      textColorClass = 'text-[#5a8a5a]';
       break;
-    case Status.Failed: // error -> red
-      bgColorClass = 'bg-[rgba(255,0,0,0.1)] dark:bg-[rgba(139,0,0,0.2)]';
-      borderColorClass = 'border-[red] dark:border-[darkred]';
-      textColorClass = 'text-[red] dark:text-[lightcoral]';
+    case Status.Failed: // error -> warm coral red (sepia-compatible)
+      bgColorClass = 'bg-[rgba(196,114,106,0.12)]';
+      borderColorClass = 'border-[#c4726a]';
+      textColorClass = 'text-[#b05a52]';
       break;
-    case Status.Running: // running -> lime
-      bgColorClass = 'bg-[rgba(0,255,0,0.1)] dark:bg-[rgba(50,205,50,0.2)]';
-      borderColorClass = 'border-[lime] dark:border-[limegreen]';
-      textColorClass = 'text-[limegreen] dark:text-[lime]';
+    case Status.Running: // running -> accent green (sepia-compatible)
+      bgColorClass = 'bg-[rgba(125,168,125,0.15)]';
+      borderColorClass = 'border-[#7da87d]';
+      textColorClass = 'text-[#6b9a6b]';
       break;
-    case Status.Aborted: // aborted -> pink
-      bgColorClass =
-        'bg-[rgba(255,192,203,0.1)] dark:bg-[rgba(255,20,147,0.2)]';
-      borderColorClass = 'border-[pink] dark:border-[deeppink]';
-      textColorClass = 'text-[deeppink] dark:text-[pink]';
+    case Status.Aborted: // aborted -> muted coral/pink (sepia-compatible)
+      bgColorClass = 'bg-[rgba(212,132,122,0.12)]';
+      borderColorClass = 'border-[#d4847a]';
+      textColorClass = 'text-[#c06a62]';
       break;
-    case Status.NotStarted: // none -> lightblue
-      bgColorClass =
-        'bg-[rgba(173,216,230,0.1)] dark:bg-[rgba(70,130,180,0.2)]';
-      borderColorClass = 'border-[lightblue] dark:border-[steelblue]';
-      textColorClass = 'text-[steelblue] dark:text-[lightblue]';
+    case Status.NotStarted: // none -> slate blue (sepia-compatible)
+      bgColorClass = 'bg-[rgba(138,159,196,0.12)]';
+      borderColorClass = 'border-[#8a9fc4]';
+      textColorClass = 'text-[#6a7fa4]';
       break;
-    case Status.Queued: // queued -> purple
-      bgColorClass =
-        'bg-[rgba(221,160,221,0.1)] dark:bg-[rgba(147,112,219,0.2)]';
-      borderColorClass = 'border-[plum] dark:border-[mediumpurple]';
-      textColorClass = 'text-[purple] dark:text-[plum]';
+    case Status.Queued: // queued -> muted purple (sepia-compatible)
+      bgColorClass = 'bg-[rgba(154,122,196,0.12)]';
+      borderColorClass = 'border-[#9a7ac4]';
+      textColorClass = 'text-[#7a5aa4]';
       break;
-    case Status.PartialSuccess: // partial success -> orange/amber
-      bgColorClass = 'bg-[rgba(251,146,60,0.1)] dark:bg-[rgba(245,158,11,0.2)]';
-      borderColorClass = 'border-[orange] dark:border-[#d97706]';
-      textColorClass = 'text-[#ea580c] dark:text-[#f59e0b]';
+    case Status.PartialSuccess: // partial success -> warm amber (sepia-compatible)
+      bgColorClass = 'bg-[rgba(212,148,106,0.12)]';
+      borderColorClass = 'border-[#d4946a]';
+      textColorClass = 'text-[#c47a4a]';
       break;
-    default: // Fallback to gray for any other status (including undefined)
-      bgColorClass =
-        'bg-[rgba(128,128,128,0.1)] dark:bg-[rgba(169,169,169,0.2)]';
-      borderColorClass = 'border-[gray] dark:border-[darkgray]';
-      textColorClass = 'text-[gray] dark:text-[lightgray]';
+    default: // Fallback to warm gray (sepia-compatible)
+      bgColorClass = 'bg-[rgba(168,160,152,0.12)]';
+      borderColorClass = 'border-[#a8a098]';
+      textColorClass = 'text-[#6b635a]';
   }
 
   // Size classes

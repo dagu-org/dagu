@@ -192,7 +192,7 @@ function DAGDetails() {
           setData: setRootDAGRunData,
         }}
       >
-        <div className="w-full flex flex-col">
+        <div className="w-full h-full flex flex-col">
           {/* Always render the DAG Header when basic data is available */}
           {dagData?.dag && headerDAGRun && (
             <DAGHeader

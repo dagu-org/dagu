@@ -1,7 +1,7 @@
 import React from 'react';
-import { Layers, Activity, Search, RefreshCw } from 'lucide-react';
+import { Layers, Search } from 'lucide-react';
 import { Input } from '../../components/ui/input';
-import { Button } from '../../components/ui/button';
+import { RefreshButton } from '../../components/ui/refresh-button';
 import {
   Tooltip,
   TooltipContent,
@@ -14,7 +14,7 @@ import type { components } from '../../api/v2/schema';
 import QueueMetrics from '../../features/queues/components/QueueMetrics';
 import QueueList from '../../features/queues/components/QueueList';
 import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
-import { cn } from '../../lib/utils';
+import Title from '../../ui/Title';
 
 function Queues() {
   const appBarContext = React.useContext(AppBarContext);
@@ -38,7 +38,6 @@ function Queues() {
   );
 
   const [searchText, setSearchText] = React.useState(defaultFilters.searchText);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [selectedQueueType, setSelectedQueueType] = React.useState<string>(
     defaultFilters.queueType
   );
@@ -113,9 +112,7 @@ function Queues() {
   });
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
     await mutate();
-    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   // Filter queues based on search text and type
@@ -215,15 +212,11 @@ function Queues() {
   }
 
   return (
-    <div className="flex flex-col gap-3 w-full h-full overflow-hidden">
+    <div className="flex flex-col gap-2 w-full h-full overflow-hidden">
+      <Title>Queues</Title>
       {/* Header with search and refresh */}
-      <div className="border rounded bg-card flex-shrink-0">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-muted-foreground" />
-              <h1 className="text-sm font-semibold">Execution Queues</h1>
-            </div>
             <div className="flex items-center gap-2">
               <div className="relative">
                 <Search className="absolute left-2 top-1.5 h-3 w-3 text-muted-foreground" />
@@ -238,7 +231,7 @@ function Queues() {
               <select
                 value={selectedQueueType}
                 onChange={(e) => setSelectedQueueType(e.target.value)}
-                className="h-7 px-2 text-xs border rounded bg-background"
+                className="h-7 px-2 text-xs border border-border rounded bg-input"
               >
                 <option value="all">All Types</option>
                 <option value="global">Global</option>
@@ -252,86 +245,21 @@ function Queues() {
                 ({filteredQueues.length} of {data?.queues?.length})
               </span>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="h-7 px-2"
-            >
-              <RefreshCw
-                className={cn('h-3 w-3', isRefreshing && 'animate-spin')}
-              />
-              <span className="ml-1 text-xs">Refresh</span>
-            </Button>
+            <RefreshButton onRefresh={handleRefresh} />
           </div>
-        </div>
       </div>
 
       {/* Metrics */}
       <QueueMetrics metrics={metrics} isLoading={isLoading} />
 
       {/* Queue List */}
-      <div className="border rounded bg-card flex-1 flex flex-col min-h-0">
-        <div className="p-3 border-b flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Layers className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Queue Status</span>
-              {filteredQueues.length !== data?.queues?.length && (
-                <span className="text-xs text-muted-foreground">
-                  ({filteredQueues.length} queues)
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-green-500" />
-                <span>Running</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-purple-500" />
-                <span>Queued</span>
-              </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-1 cursor-help">
-                    <div className="w-2 h-2 rounded-full bg-blue-500" />
-                    <span>Global</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs">
-                    Shared queues with maxConcurrency limits that can process
-                    DAG runs from multiple DAGs
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-1 cursor-help">
-                    <div className="w-2 h-2 rounded-full bg-gray-500" />
-                    <span>DAG-based</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs">
-                    Dedicated queues where each DAG has its own queue with
-                    maxActiveRuns limit (default 1)
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        </div>
-        <div className="flex-1 min-h-0 overflow-auto">
-          <QueueList
-            queues={filteredQueues}
-            isLoading={isLoading && !data}
-            onDAGRunClick={handleDAGRunClick}
-            onQueueCleared={handleRefresh}
-          />
-        </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        <QueueList
+          queues={filteredQueues}
+          isLoading={isLoading && !data}
+          onDAGRunClick={handleDAGRunClick}
+          onQueueCleared={handleRefresh}
+        />
       </div>
 
       {/* DAG Run Details Modal */}

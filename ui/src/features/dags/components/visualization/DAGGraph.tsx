@@ -9,14 +9,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
 import { GanttChart, GitGraph, MousePointerClick } from 'lucide-react';
 import React from 'react';
 import { useCookies } from 'react-cookie';
 import { components, Status } from '../../../../api/v2/schema';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import BorderedBox from '../../../../ui/BorderedBox';
-import { FlowchartSwitch, FlowchartType, Graph, TimelineChart } from './';
+import { FlowchartType, Graph, TimelineChart } from './';
 
 /**
  * Props for the DAGGraph component
@@ -61,10 +60,7 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
           <Tab
             isActive={sub === '0'}
             onClick={() => setSub('0')}
-            className={cn(
-              'flex items-center gap-2 text-sm h-10 cursor-pointer',
-              sub === '0' && 'bg-primary text-primary-foreground font-medium'
-            )}
+            className="flex items-center gap-2 cursor-pointer"
           >
             <GitGraph className="h-4 w-4" />
             Graph
@@ -72,19 +68,14 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
           <Tab
             isActive={sub === '1'}
             onClick={() => setSub('1')}
-            className={cn(
-              'flex items-center gap-2 text-sm h-10 cursor-pointer',
-              sub === '1' && 'bg-primary text-primary-foreground font-medium'
-            )}
+            className="flex items-center gap-2 cursor-pointer"
           >
             <GanttChart className="h-4 w-4" />
             Timeline
           </Tab>
         </Tabs>
 
-        <div className="self-center sm:self-auto">
-          <FlowchartSwitch value={flowchart} onChange={onChangeFlowchart} />
-        </div>
+        <div className="self-center sm:self-auto"></div>
       </div>
 
       <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
@@ -92,7 +83,7 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
           <div className="flex justify-end mb-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded cursor-help">
+                <div className="flex items-center text-xs text-muted-foreground bg-muted px-2 py-1 rounded cursor-help">
                   <MousePointerClick className="h-3 w-3 mr-1" />
                   {config.permissions.runDags
                     ? 'Double-click to navigate / Right-click to change status'
@@ -116,6 +107,7 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
               steps={dagRun.nodes}
               type="status"
               flowchart={flowchart}
+              onChangeFlowchart={onChangeFlowchart}
               onClickNode={onSelectStep}
               onRightClickNode={
                 config.permissions.runDags ? onRightClickStep : undefined

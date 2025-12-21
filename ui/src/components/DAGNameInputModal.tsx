@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Pencil, Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { validateDAGName, DAG_NAME_PATTERN_STRING } from '../lib/dag-validation';
 
@@ -121,7 +122,7 @@ export function DAGNameInputModal({
             <DialogTitle>{modalContent.title}</DialogTitle>
             <DialogDescription>
               {modalContent.description}
-              <div className="mt-1 font-mono text-xs bg-slate-100 p-1 rounded dark:bg-slate-800">
+              <div className="mt-1 font-mono text-xs bg-muted p-1 rounded">
                 Pattern: {DAG_NAME_PATTERN_STRING}
               </div>
             </DialogDescription>
@@ -151,13 +152,15 @@ export function DAGNameInputModal({
           <DialogFooter>
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={onClose}
               disabled={isLoading}
             >
+              <X className="h-4 w-4" />
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>
+              {mode === 'create' ? <Plus className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
               {isLoading ? `${modalContent.submitText}ing...` : modalContent.submitText}
             </Button>
           </DialogFooter>

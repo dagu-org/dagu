@@ -28,7 +28,7 @@ function PathItem({ label, path }: PathItemProps) {
       <code
         className={cn(
           'font-mono px-1 py-0.5 rounded truncate flex-1',
-          'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+          'bg-muted text-muted-foreground'
         )}
         title={path}
       >
@@ -39,8 +39,8 @@ function PathItem({ label, path }: PathItemProps) {
         className={cn(
           'p-0.5 rounded transition-all shrink-0',
           'opacity-0 group-hover:opacity-100',
-          'hover:bg-slate-200 dark:hover:bg-slate-700',
-          copied && 'opacity-100 text-green-500'
+          'hover:bg-accent',
+          copied && 'opacity-100 text-success'
         )}
         title="Copy path"
       >
@@ -75,7 +75,7 @@ function PathsDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-card border rounded-lg shadow-lg w-full max-w-lg mx-4">
+      <div className="relative bg-card border rounded-lg w-full max-w-lg mx-4">
         <div className="flex items-center justify-between p-2 border-b">
           <div className="flex items-center gap-1.5">
             <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
@@ -111,13 +111,8 @@ function PathsCard() {
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setOpen(true)}
-        className="h-7 px-2 text-xs"
-      >
-        <FolderOpen className="h-3 w-3 mr-1" />
+      <Button onClick={() => setOpen(true)}>
+        <FolderOpen className="h-4 w-4" />
         Paths
       </Button>
       <PathsDialog open={open} onClose={() => setOpen(false)} />

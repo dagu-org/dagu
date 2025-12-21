@@ -1,28 +1,36 @@
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { UserMenu } from '@/components/UserMenu';
 import { useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
-import { cn } from '@/lib/utils'; // Assuming cn utility is available
+import { cn } from '@/lib/utils';
 import {
-  Activity,
   BarChart2,
   Github,
-  Layers,
-  List,
+  Globe,
+  History,
+  Inbox,
+  Network,
   PanelLeft,
   Search,
-  Server,
   Users,
-  Workflow,
 } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { AppBarContext } from './contexts/AppBarContext';
 
 // Discord SVG Icon component
 function DiscordIcon({ className }: { className?: string }) {
   return (
     <svg
       className={className}
-      width="18"
-      height="18"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="currentColor"
       xmlns="http://www.w3.org/2000/svg"
@@ -43,8 +51,8 @@ function Icon({
   return (
     <span
       className={cn(
-        'flex items-center justify-center w-5 h-5 transform-none text-primary-foreground',
-        isActive ? 'text-primary-foreground' : 'text-primary-foreground'
+        'flex items-center justify-center w-4 h-4 transform-none text-sidebar-foreground',
+        isActive ? 'text-sidebar-foreground' : 'text-sidebar-foreground'
       )}
     >
       {children}
@@ -52,11 +60,12 @@ function Icon({
   );
 }
 
-// Define props for mainListItems to accept isOpen, onNavItemClick, and onToggle
+// Define props for mainListItems to accept isOpen, onNavItemClick, onToggle, and customColor
 type MainListItemsProps = {
   isOpen?: boolean;
   onNavItemClick?: () => void;
   onToggle?: () => void;
+  customColor?: boolean;
 };
 
 // Main navigation items structure - now accepts isOpen prop
@@ -74,7 +83,7 @@ export const mainListItems = React.forwardRef<
   return (
     <div ref={ref} className="flex flex-col h-full">
       {/* Fixed height header with menu toggle button */}
-      <div className="h-12 relative mb-2">
+      <div className="h-8 relative mb-1">
         {/* When collapsed: Show first letter of title, switch to panel icon on hover */}
         {!isOpen && (
           <button
@@ -90,10 +99,10 @@ export const mainListItems = React.forwardRef<
             {isHovered ? (
               <PanelLeft
                 size={20}
-                className="text-primary-foreground hover:text-primary-foreground/70"
+                className="text-sidebar-foreground hover:text-sidebar-foreground/70"
               />
             ) : (
-              <span className="text-lg font-bold text-primary-foreground">
+              <span className="text-lg font-bold text-sidebar-foreground">
                 {(config.title || 'Dagu').charAt(0).toUpperCase()}
               </span>
             )}
@@ -104,7 +113,7 @@ export const mainListItems = React.forwardRef<
         {isOpen && (
           <>
             <div className="absolute inset-0 flex items-center pl-3">
-              <span className="font-bold tracking-wide select-none text-xl text-primary-foreground">
+              <span className="font-bold tracking-wide select-none text-xl text-sidebar-foreground">
                 {config.title || 'Dagu'}
               </span>
             </div>
@@ -113,7 +122,7 @@ export const mainListItems = React.forwardRef<
                 setIsHovered(false);
                 onToggle?.();
               }}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center z-10 text-primary-foreground/40 hover:text-primary-foreground/70 transition-all duration-200 cursor-pointer"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center z-10 text-sidebar-foreground/40 hover:text-sidebar-foreground/70 transition-all duration-200 cursor-pointer"
               aria-label="Toggle sidebar"
             >
               <PanelLeft size={20} />
@@ -122,12 +131,72 @@ export const mainListItems = React.forwardRef<
         )}
       </div>
       {/* Navigation */}
-      <nav className="flex-1 flex flex-col py-2 px-2">
+      <nav className="flex-1 flex flex-col py-1 px-1">
+        {/* Remote Node Selector */}
+        <AppBarContext.Consumer>
+          {(context) => {
+            // Hide remote node selector when builtin auth is enabled or no remote nodes
+            if (
+              config.authMode === 'builtin' ||
+              !context.remoteNodes ||
+              context.remoteNodes.length === 0
+            ) {
+              return null;
+            }
+
+            return (
+              <div className="mb-3 px-1">
+                {isOpen ? (
+                  <Select
+                    value={context.selectedRemoteNode}
+                    onValueChange={context.selectRemoteNode}
+                  >
+                    <SelectTrigger className="h-8 w-full text-xs bg-sidebar-foreground/10 border border-sidebar-foreground/20 text-sidebar-foreground hover:bg-sidebar-foreground/15 focus:ring-1 focus:ring-sidebar-foreground/30 focus:ring-offset-0 rounded-md">
+                      <div className="flex items-center gap-2">
+                        <Globe size={14} className="shrink-0 opacity-70" />
+                        <SelectValue />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {context.remoteNodes.map((node) => (
+                        <SelectItem key={node} value={node} className="text-sm">
+                          {node}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex justify-center">
+                    <Select
+                      value={context.selectedRemoteNode}
+                      onValueChange={context.selectRemoteNode}
+                    >
+                      <SelectTrigger
+                        className="w-8 h-8 p-0 bg-sidebar-foreground/10 border border-sidebar-foreground/20 text-sidebar-foreground hover:bg-sidebar-foreground/15 focus:ring-1 focus:ring-sidebar-foreground/30 focus:ring-offset-0 rounded-md [&>svg:last-child]:hidden flex items-center justify-center"
+                        title={`Node: ${context.selectedRemoteNode}`}
+                      >
+                        <Globe size={16} className="shrink-0" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {context.remoteNodes.map((node) => (
+                          <SelectItem key={node} value={node} className="text-sm">
+                            {node}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            );
+          }}
+        </AppBarContext.Consumer>
+
         {/* Overview Section */}
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {isOpen && (
-            <div className="px-3 py-1">
-              <span className="text-[10px] uppercase text-primary-foreground/40 font-medium">
+            <div className="px-2 py-0.5">
+              <span className="text-[11px] text-sidebar-foreground/70 font-medium">
                 Overview
               </span>
             </div>
@@ -135,20 +204,20 @@ export const mainListItems = React.forwardRef<
           <NavItem
             to="/dashboard"
             text="Dashboard"
-            icon={<BarChart2 size={18} />}
+            icon={<BarChart2 size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
         </div>
 
         {/* Workflows Section */}
-        <div className="space-y-1 mt-4">
+        <div className="space-y-0.5 mt-2">
           {!isOpen && (
-            <div className="mx-auto w-4 border-t border-primary-foreground/30 mb-2" />
+            <div className="mx-auto w-4 border-t border-sidebar-foreground/30 mb-1" />
           )}
           {isOpen && (
-            <div className="px-3 py-1">
-              <span className="text-[10px] uppercase text-primary-foreground/40 font-medium">
+            <div className="px-2 py-0.5">
+              <span className="text-[11px] text-sidebar-foreground/70 font-medium">
                 Workflows
               </span>
             </div>
@@ -156,72 +225,58 @@ export const mainListItems = React.forwardRef<
           <NavItem
             to="/queues"
             text="Queues"
-            icon={<Layers size={18} />}
+            icon={<Inbox size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
           <NavItem
             to="/dag-runs"
             text="DAG Runs"
-            icon={<List size={18} />}
+            icon={<History size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
           <NavItem
             to="/dags"
             text="DAG Definitions"
-            icon={<Workflow size={18} />}
+            icon={<Network size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
           <NavItem
             to="/search"
             text="Search DAG Definitions"
-            icon={<Search size={18} />}
+            icon={<Search size={16} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
         </div>
 
-        {/* System Section */}
-        <div className="space-y-1 mt-4">
-          {!isOpen && (
-            <div className="mx-auto w-4 border-t border-primary-foreground/30 mb-2" />
-          )}
-          {isOpen && (
-            <div className="px-3 py-1">
-              <span className="text-[10px] uppercase text-primary-foreground/40 font-medium">
-                System
-              </span>
-            </div>
-          )}
-          <NavItem
-            to="/workers"
-            text="Workers"
-            icon={<Server size={18} />}
-            isOpen={isOpen}
-            onClick={onNavItemClick}
-          />
-          <NavItem
-            to="/system-status"
-            text="System Status"
-            icon={<Activity size={18} />}
-            isOpen={isOpen}
-            onClick={onNavItemClick}
-          />
-          {isAdmin && config.authMode === 'builtin' && (
+        {/* System Section - only show if admin with builtin auth */}
+        {isAdmin && config.authMode === 'builtin' && (
+          <div className="space-y-0.5 mt-2">
+            {!isOpen && (
+              <div className="mx-auto w-4 border-t border-sidebar-foreground/30 mb-1" />
+            )}
+            {isOpen && (
+              <div className="px-2 py-0.5">
+                <span className="text-[11px] text-sidebar-foreground/70 font-medium">
+                  System
+                </span>
+              </div>
+            )}
             <NavItem
               to="/users"
               text="User Management"
-              icon={<Users size={18} />}
+              icon={<Users size={16} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
             />
-          )}
-        </div>
+          </div>
+        )}
       </nav>
       {/* Discord Community link */}
-      <div className="px-2 pb-1">
+      <div className="px-1 pb-0.5">
         <a
           href="https://discord.gg/gpahPUjGRk"
           target="_blank"
@@ -229,17 +284,17 @@ export const mainListItems = React.forwardRef<
           className={cn(
             'flex items-center transition-all duration-200',
             isOpen
-              ? 'h-9 px-3 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground justify-start'
-              : 'w-8 h-8 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground justify-center'
+              ? 'h-7 px-2 rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-start'
+              : 'w-7 h-7 rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-center'
           )}
           title="Discord Community"
         >
           <DiscordIcon />
-          {isOpen && <span className="ml-3 text-xs font-medium">Discord</span>}
+          {isOpen && <span className="ml-2 text-xs font-medium">Discord</span>}
         </a>
       </div>
       {/* GitHub link */}
-      <div className="px-2 pb-6 md:pb-1">
+      <div className="px-1 pb-4 md:pb-1">
         <a
           href="https://github.com/dagu-org/dagu"
           target="_blank"
@@ -247,23 +302,19 @@ export const mainListItems = React.forwardRef<
           className={cn(
             'flex items-center transition-all duration-200',
             isOpen
-              ? 'h-9 px-3 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground justify-start'
-              : 'w-8 h-8 rounded-lg hover:bg-primary-foreground/5 text-primary-foreground/60 hover:text-primary-foreground justify-center'
+              ? 'h-7 px-2 rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-start'
+              : 'w-7 h-7 rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground/60 hover:text-sidebar-foreground justify-center'
           )}
           title="GitHub Repository"
         >
-          <Github size={18} />
-          {isOpen && <span className="ml-3 text-xs font-medium">GitHub</span>}
+          <Github size={16} />
+          {isOpen && <span className="ml-2 text-xs font-medium">GitHub</span>}
         </a>
       </div>
-      {/* Version display - only shown when sidebar is expanded */}
-      {isOpen && (
-        <div className="px-3 py-2 text-xs text-primary-foreground/60">
-          <div className="border-t border-primary-foreground/10 pt-2">
-            Version: {config.version}
-          </div>
-        </div>
-      )}
+      {/* User Menu - at the very bottom */}
+      <div className={cn('px-1 pb-2', isOpen ? '' : 'flex justify-center')}>
+        <UserMenu isCollapsed={!isOpen} />
+      </div>
     </div>
   );
 });
@@ -285,30 +336,23 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
   // Use different layouts for expanded and collapsed states
   if (isOpen) {
     return (
-      <div className="relative h-9">
-        <Link
-          to={to}
-          onClick={onClick}
-          className={cn(
-            'block h-9 flex items-center text-xs font-medium rounded-lg transition-all duration-200 ease-in-out pl-10 pr-3',
-            isActive
-              ? 'text-primary-foreground bg-primary-foreground/10' // Active: subtle background
-              : 'text-primary-foreground hover:text-primary-foreground hover:bg-primary-foreground/5' // Inactive: lighter green for better contrast
-          )}
-          aria-current={isActive ? 'page' : undefined}
-          title={text}
-        >
-          {/* Icon with fixed position */}
-          <div className="flex items-center justify-center absolute left-3 top-1/2 transform -translate-y-1/2">
-            <Icon isActive={isActive}>{icon}</Icon>
-          </div>
-
-          {/* Text with fade-in animation */}
-          <span className="font-medium text-primary-foreground text-xs ml-3">
-            {text}
-          </span>
-        </Link>
-      </div>
+      <Link
+        to={to}
+        onClick={onClick}
+        className={cn(
+          'flex items-center h-7 text-xs font-medium rounded transition-all duration-200 ease-in-out px-2 gap-2',
+          isActive
+            ? 'text-sidebar-foreground bg-sidebar-foreground/10'
+            : 'text-sidebar-foreground hover:bg-sidebar-foreground/5'
+        )}
+        aria-current={isActive ? 'page' : undefined}
+        title={text}
+      >
+        <Icon isActive={isActive}>{icon}</Icon>
+        <span className="font-medium text-sidebar-foreground text-xs">
+          {text}
+        </span>
+      </Link>
     );
   } else {
     return (
@@ -317,10 +361,10 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           to={to}
           onClick={onClick}
           className={cn(
-            'flex items-center justify-center w-8 h-8 text-xs font-medium rounded-lg transition-all duration-200 ease-in-out',
+            'flex items-center justify-center w-7 h-7 text-xs font-medium rounded transition-all duration-200 ease-in-out',
             isActive
-              ? 'text-primary-foreground bg-primary-foreground/10' // Active: subtle background
-              : 'text-primary-foreground hover:text-primary-foreground hover:bg-primary-foreground/5'
+              ? 'text-sidebar-foreground bg-sidebar-foreground/10'
+              : 'text-sidebar-foreground hover:bg-sidebar-foreground/5'
           )}
           aria-current={isActive ? 'page' : undefined}
           title={text}

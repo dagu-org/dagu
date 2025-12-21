@@ -3,6 +3,7 @@ import React from 'react';
 import type { components } from '../../api/v2/schema';
 import { Button } from '../../components/ui/button';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import { useConfig } from '../../contexts/ConfigContext';
 import PathsCard from '../../features/system-status/components/PathsCard';
 import ResourceChart from '../../features/system-status/components/ResourceChart';
 import ServiceCard from '../../features/system-status/components/ServiceCard';
@@ -23,6 +24,7 @@ type CoordinatorInstance = components['schemas']['CoordinatorInstance'];
  */
 function SystemStatus() {
   const appBarContext = React.useContext(AppBarContext);
+  const config = useConfig();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [autoRefresh, setAutoRefresh] = React.useState(true);
   const [lastUpdateTime, setLastUpdateTime] = React.useState<Date>(new Date());
@@ -108,7 +110,7 @@ function SystemStatus() {
   }, [resourceData]);
 
   return (
-    <div className="flex flex-col gap-4 p-4 max-w-7xl mx-auto">
+    <div className="flex flex-col gap-4 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
@@ -120,32 +122,24 @@ function SystemStatus() {
         <div className="flex items-center gap-2">
           <PathsCard />
           <Button
-            variant="outline"
-            size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
-            className={cn(
-              'h-7 px-2',
-              autoRefresh && 'bg-green-50 dark:bg-green-950 border-green-500'
-            )}
             aria-label={`Auto-refresh ${autoRefresh ? 'enabled' : 'disabled'}`}
             title={`Toggle auto-refresh (currently ${autoRefresh ? 'ON' : 'OFF'})`}
           >
             <Activity
-              className={cn('h-3 w-3 mr-1', autoRefresh && 'text-green-500')}
+              className={cn('h-4 w-4', autoRefresh && 'text-success')}
             />
-            <span className="text-xs">Auto: {autoRefresh ? 'ON' : 'OFF'}</span>
+            Auto: {autoRefresh ? 'ON' : 'OFF'}
           </Button>
           <Button
-            variant="outline"
-            size="sm"
+            size="icon"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="h-7 px-2"
             aria-label="Refresh system status"
             title="Refresh system status"
           >
             <RefreshCw
-              className={cn('h-3 w-3', isRefreshing && 'animate-spin')}
+              className={cn('h-4 w-4', isRefreshing && 'animate-spin')}
             />
           </Button>
         </div>
@@ -193,38 +187,41 @@ function SystemStatus() {
         <ResourceChart
           title="CPU Usage"
           data={resourceData?.cpu}
-          color="#3b82f6" // blue-500
+          color="#c4956a" // primary
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
         <ResourceChart
           title="Memory Usage"
           data={resourceData?.memory}
-          color="#8b5cf6" // violet-500
+          color="#8a9fc4" // info
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
         <ResourceChart
           title="Disk Usage"
           data={resourceData?.disk}
-          color="#10b981" // emerald-500
+          color="#7da87d" // success
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
         <ResourceChart
           title="Load Average"
           data={resourceData?.load}
-          color="#f59e0b" // amber-500
+          color="#d4a574" // chart-4
           unit=""
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
       </div>
 
-      {/* Last Update */}
-      <div className="text-xs text-muted-foreground text-center">
-        Last updated: {lastUpdateTime.toLocaleTimeString()}
-        {autoRefresh && ' • Refreshing every 5 seconds'}
+      {/* Footer */}
+      <div className="text-xs text-muted-foreground text-center space-y-1">
+        <div>
+          Last updated: {lastUpdateTime.toLocaleTimeString()}
+          {autoRefresh && ' • Refreshing every 5 seconds'}
+        </div>
+        <div>Dagu v{config.version}</div>
       </div>
     </div>
   );

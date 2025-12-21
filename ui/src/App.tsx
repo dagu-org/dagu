@@ -1,3 +1,5 @@
+import { Theme } from '@radix-ui/themes';
+import '@radix-ui/themes/styles.css';
 import React from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { SWRConfig } from 'swr';
@@ -17,8 +19,6 @@ import Search from './pages/search';
 import DAGRuns from './pages/dag-runs';
 import DAGRunDetails from './pages/dag-runs/dag-run';
 import Queues from './pages/queues';
-import Workers from './pages/workers';
-import SystemStatus from './pages/system-status';
 import LoginPage from './pages/login';
 import UsersPage from './pages/users';
 
@@ -84,15 +84,16 @@ function App({ config }: Props) {
   }, [remoteNodes, selectedRemoteNode]);
 
   return (
-    <SWRConfig
-      value={{
-        fetcher: fetchJson,
-        onError: (err) => {
-          console.error(err);
-        },
-      }}
-    >
-      <AppBarContext.Provider
+    <Theme appearance="light" accentColor="gray" grayColor="slate" radius="medium">
+      <SWRConfig
+        value={{
+          fetcher: fetchJson,
+          onError: (err) => {
+            console.error(err);
+          },
+        }}
+      >
+        <AppBarContext.Provider
         value={{
           title,
           setTitle,
@@ -116,11 +117,10 @@ function App({ config }: Props) {
                         path="/*"
                         element={
                           <ProtectedRoute>
-                            <Layout {...config}>
+                            <Layout navbarColor={config.navbarColor}>
                               <Routes>
                                 <Route path="/" element={<Dashboard />} />
                                 <Route path="/dashboard" element={<Dashboard />} />
-                                <Route path="/system-status" element={<SystemStatus />} />
                                 <Route path="/dags/" element={<DAGs />} />
                                 <Route
                                   path="/dags/:fileName/:tab"
@@ -134,7 +134,6 @@ function App({ config }: Props) {
                                   path="/dag-runs/:name/:dagRunId"
                                   element={<DAGRunDetails />}
                                 />
-                                <Route path="/workers" element={<Workers />} />
                                 {/* Admin-only route */}
                                 <Route
                                   path="/users"
@@ -157,7 +156,8 @@ function App({ config }: Props) {
           </UserPreferencesProvider>
         </ConfigContext.Provider>
       </AppBarContext.Provider>
-    </SWRConfig>
+      </SWRConfig>
+    </Theme>
   );
 }
 

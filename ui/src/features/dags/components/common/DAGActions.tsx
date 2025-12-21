@@ -3,17 +3,17 @@
  *
  * @module features/dags/components/common
  */
-import { Button } from '@/components/ui/button'; // Import Shadcn Button
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'; // Import Shadcn Tooltip
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import dayjs from '@/lib/dayjs';
+import ActionButton from '@/ui/ActionButton';
 import StatusChip from '@/ui/StatusChip';
 import { Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
 import React from 'react';
@@ -101,29 +101,15 @@ function DAGActions({
         {/* Enqueue Button */}
         <Tooltip>
           <TooltipTrigger asChild>
-            {displayMode === 'compact' ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={!buttonState['enqueue']}
-                onClick={() => setIsEnqueueModal(true)}
-                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-              >
-                <Play className="h-4 w-4" />
-                <span className="sr-only">Enqueue</span>
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!buttonState['enqueue']}
-                onClick={() => setIsEnqueueModal(true)}
-                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-              >
-                <Play className="mr-2 h-4 w-4" />
-                Enqueue
-              </Button>
-            )}
+            <ActionButton
+              label={displayMode !== 'compact'}
+              icon={<Play className="h-4 w-4" />}
+              disabled={!buttonState['enqueue']}
+              onClick={() => setIsEnqueueModal(true)}
+              className="cursor-pointer"
+            >
+              Enqueue
+            </ActionButton>
           </TooltipTrigger>
           <TooltipContent>
             <p>Start DAG execution</p>
@@ -133,29 +119,15 @@ function DAGActions({
         {/* Stop Button */}
         <Tooltip>
           <TooltipTrigger asChild>
-            {displayMode === 'compact' ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={!buttonState['stop']}
-                onClick={() => setIsStopModal(true)}
-                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-              >
-                <Square className="h-4 w-4" />
-                <span className="sr-only">Stop</span>
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!buttonState['stop']}
-                onClick={() => setIsStopModal(true)}
-                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-              >
-                <Square className="mr-2 h-4 w-4" />
-                Stop
-              </Button>
-            )}
+            <ActionButton
+              label={displayMode !== 'compact'}
+              icon={<Square className="h-4 w-4" />}
+              disabled={!buttonState['stop']}
+              onClick={() => setIsStopModal(true)}
+              className="cursor-pointer"
+            >
+              Stop
+            </ActionButton>
           </TooltipTrigger>
           <TooltipContent>
             <p>Stop DAG execution</p>
@@ -165,149 +137,75 @@ function DAGActions({
         {/* Retry Button */}
         <Tooltip>
           <TooltipTrigger asChild>
-            {displayMode === 'compact' ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={!buttonState['retry']}
-                onClick={async () => {
-                  // Get the current URL parameters
-                  const urlParams = new URLSearchParams(window.location.search);
-                  const idxParam = urlParams.get('idx');
+            <ActionButton
+              label={displayMode !== 'compact'}
+              icon={<RefreshCw className="h-4 w-4" />}
+              disabled={!buttonState['retry']}
+              onClick={async () => {
+                // Get the current URL parameters
+                const urlParams = new URLSearchParams(window.location.search);
+                const idxParam = urlParams.get('idx');
 
-                  // Default to current status dagRunId
-                  let dagRunIdToUse = status?.dagRunId || '';
+                // Default to current status dagRunId
+                let dagRunIdToUse = status?.dagRunId || '';
 
-                  // If we're in the history page or modal history tab with a specific run selected
-                  const isInHistoryPage =
-                    window.location.pathname.includes('/history');
-                  const isInModalHistoryTab =
-                    document.querySelector(
-                      '.dag-modal-content [data-tab="history"]'
-                    ) !== null;
+                // If we're in the history page or modal history tab with a specific run selected
+                const isInHistoryPage =
+                  window.location.pathname.includes('/history');
+                const isInModalHistoryTab =
+                  document.querySelector(
+                    '.dag-modal-content [data-tab="history"]'
+                  ) !== null;
 
-                  if (
-                    (isInHistoryPage || isInModalHistoryTab) &&
-                    idxParam !== null
-                  ) {
-                    try {
-                      // Get all dag-runs for this DAG to find the correct dagRunId
-                      const { data } = await client.GET(
-                        '/dags/{fileName}/dag-runs',
-                        {
-                          params: {
-                            path: {
-                              fileName: fileName,
-                            },
-                            query: {
-                              remoteNode:
-                                appBarContext.selectedRemoteNode || 'local',
-                            },
+                if (
+                  (isInHistoryPage || isInModalHistoryTab) &&
+                  idxParam !== null
+                ) {
+                  try {
+                    // Get all dag-runs for this DAG to find the correct dagRunId
+                    const { data } = await client.GET(
+                      '/dags/{fileName}/dag-runs',
+                      {
+                        params: {
+                          path: {
+                            fileName: fileName,
                           },
-                        }
-                      );
-
-                      if (data?.dagRuns && data.dagRuns.length > 0) {
-                        // Convert idx to integer
-                        const selectedIdx = parseInt(idxParam);
-
-                        // Get the dag-run at the selected index (reversed order)
-                        const selectedDagRun = [...data.dagRuns].reverse()[
-                          selectedIdx
-                        ];
-
-                        if (selectedDagRun && selectedDagRun.dagRunId) {
-                          dagRunIdToUse = selectedDagRun.dagRunId;
-                        }
-                      }
-                    } catch (err) {
-                      console.error('Error fetching dag-runs for retry:', err);
-                    }
-                  }
-
-                  // Set the dagRunId to use for retry
-                  setRetryDagRunId(dagRunIdToUse);
-
-                  // Show the modal
-                  setIsRetryModal(true);
-                }}
-                className="h-8 w-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span className="sr-only">Retry</span>
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!buttonState['retry']}
-                onClick={async () => {
-                  // Get the current URL parameters
-                  const urlParams = new URLSearchParams(window.location.search);
-                  const idxParam = urlParams.get('idx');
-
-                  // Default to current status dagRunId
-                  let dagRunIdToUse = status?.dagRunId || '';
-
-                  // If we're in the history page or modal history tab with a specific run selected
-                  const isInHistoryPage =
-                    window.location.pathname.includes('/history');
-                  const isInModalHistoryTab =
-                    document.querySelector(
-                      '.dag-modal-content [data-tab="history"]'
-                    ) !== null;
-
-                  if (
-                    (isInHistoryPage || isInModalHistoryTab) &&
-                    idxParam !== null
-                  ) {
-                    try {
-                      // Get all dag-runs for this DAG to find the correct dagRunId
-                      const { data } = await client.GET(
-                        '/dags/{fileName}/dag-runs',
-                        {
-                          params: {
-                            path: {
-                              fileName: fileName,
-                            },
-                            query: {
-                              remoteNode:
-                                appBarContext.selectedRemoteNode || 'local',
-                            },
+                          query: {
+                            remoteNode:
+                              appBarContext.selectedRemoteNode || 'local',
                           },
-                        }
-                      );
-
-                      if (data?.dagRuns && data.dagRuns.length > 0) {
-                        // Convert idx to integer
-                        const selectedIdx = parseInt(idxParam);
-
-                        // Get the dag-run at the selected index (reversed order)
-                        const selectedDagRun = [...data.dagRuns].reverse()[
-                          selectedIdx
-                        ];
-
-                        if (selectedDagRun && selectedDagRun.dagRunId) {
-                          dagRunIdToUse = selectedDagRun.dagRunId;
-                        }
+                        },
                       }
-                    } catch (err) {
-                      console.error('Error fetching dag-runs for retry:', err);
+                    );
+
+                    if (data?.dagRuns && data.dagRuns.length > 0) {
+                      // Convert idx to integer
+                      const selectedIdx = parseInt(idxParam);
+
+                      // Get the dag-run at the selected index (reversed order)
+                      const selectedDagRun = [...data.dagRuns].reverse()[
+                        selectedIdx
+                      ];
+
+                      if (selectedDagRun && selectedDagRun.dagRunId) {
+                        dagRunIdToUse = selectedDagRun.dagRunId;
+                      }
                     }
+                  } catch (err) {
+                    console.error('Error fetching dag-runs for retry:', err);
                   }
+                }
 
-                  // Set the dagRunId to use for retry
-                  setRetryDagRunId(dagRunIdToUse);
+                // Set the dagRunId to use for retry
+                setRetryDagRunId(dagRunIdToUse);
 
-                  // Show the modal
-                  setIsRetryModal(true);
-                }}
-                className="h-8 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer"
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Retry
-              </Button>
-            )}
+                // Show the modal
+                setIsRetryModal(true);
+              }}
+              className="cursor-pointer"
+            >
+              Retry
+            </ActionButton>
           </TooltipTrigger>
           <TooltipContent>
             <p>Retry DAG execution</p>
@@ -406,18 +304,18 @@ function DAGActions({
                 </StatusChip>
               </LabeledItem>
             )}
-            <div className="mt-4 flex items-center space-x-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+            <div className="mt-4 flex items-center space-x-2 p-2 bg-warning-muted rounded border border-warning/30">
               <Checkbox
                 id="stop-all"
                 checked={stopAllRunning}
                 onCheckedChange={(checked) =>
                   setStopAllRunning(checked as boolean)
                 }
-                className="border-amber-600 dark:border-amber-400 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600 data-[state=checked]:text-white dark:data-[state=checked]:text-black"
+                className="border-warning data-[state=checked]:bg-warning data-[state=checked]:border-warning data-[state=checked]:text-white=checked]:text-black"
               />
               <label
                 htmlFor="stop-all"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-amber-700 dark:text-amber-300"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-warning"
               >
                 Stop all running instances
               </label>
@@ -425,8 +323,8 @@ function DAGActions({
           </div>
         </ConfirmModal>
         <ConfirmModal
-          title={retryAsNew ? "Reschedule DAG Run" : "Confirmation"}
-          buttonText={retryAsNew ? "Reschedule" : "Rerun"}
+          title={retryAsNew ? 'Reschedule DAG Run' : 'Confirmation'}
+          buttonText={retryAsNew ? 'Reschedule' : 'Rerun'}
           visible={isRetryModal}
           dismissModal={() => {
             setIsRetryModal(false);
@@ -470,7 +368,9 @@ function DAGActions({
                 }
                 // Show success message with new run ID
                 if (data?.dagRunId) {
-                  alert(`New DAG run created with ID: ${data.dagRunId}${data.queued ? ' (queued)' : ''}`);
+                  alert(
+                    `New DAG run created with ID: ${data.dagRunId}${data.queued ? ' (queued)' : ''}`
+                  );
                 }
                 // Reset state after success
                 setRetryAsNew(false);
@@ -543,9 +443,12 @@ function DAGActions({
                 id="reschedule-dag"
                 checked={retryAsNew}
                 onCheckedChange={(checked) => setRetryAsNew(checked as boolean)}
-                className="border-gray-400 dark:border-gray-500"
+                className="border-border"
               />
-              <Label htmlFor="reschedule-dag" className="cursor-pointer text-sm">
+              <Label
+                htmlFor="reschedule-dag"
+                className="cursor-pointer text-sm"
+              >
                 Reschedule with new DAG-run
               </Label>
             </div>

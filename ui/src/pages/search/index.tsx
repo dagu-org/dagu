@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Search as SearchIcon } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppBarContext } from '../../contexts/AppBarContext';
@@ -45,7 +46,10 @@ function Search() {
   const lastPersistedFiltersRef = React.useRef<SearchFilters | null>(null);
 
   React.useEffect(() => {
-    const stored = searchState.readState<SearchFilters>('searchPage', remoteKey);
+    const stored = searchState.readState<SearchFilters>(
+      'searchPage',
+      remoteKey
+    );
     const hasUrl = !!searchParams.get('q');
     let next: SearchFilters;
     let shouldSyncUrl = false;
@@ -125,10 +129,10 @@ function Search() {
     <div className="w-full">
       <div className="w-full">
         <Title>Search DAG Definitions</Title>
-        <div className="flex space-x-4 items-center">
+        <div className="flex items-center gap-2 pt-2">
           <Input
             placeholder="Search text..."
-            className="flex-1"
+            className="max-w-md"
             ref={ref}
             value={searchVal}
             onChange={(e) => {
@@ -145,21 +149,20 @@ function Search() {
           />
           <Button
             disabled={!searchVal}
-            variant="outline"
-            className="w-24 cursor-pointer"
             onClick={async () => {
               onSubmit(searchVal);
             }}
           >
+            <SearchIcon className="h-4 w-4" />
             Search
           </Button>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-2">
           {(() => {
             if (!q) {
               return (
-                <div className="text-sm text-gray-500 italic">
+                <div className="text-sm text-muted-foreground italic">
                   Enter a search term and press Enter or click Search
                 </div>
               );
@@ -181,7 +184,7 @@ function Search() {
               (data && data.results && data.results.length === 0)
             ) {
               return (
-                <div className="text-sm text-gray-500 italic">
+                <div className="text-sm text-muted-foreground italic">
                   No results found
                 </div>
               );

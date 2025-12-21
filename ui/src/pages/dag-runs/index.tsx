@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { List, Layers, Search } from 'lucide-react';
+import { Layers, List, Search } from 'lucide-react';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Status } from '../../api/v2/schema';
@@ -13,13 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
-import { ToggleGroup, ToggleButton } from '../../components/ui/toggle-group';
+import { ToggleButton, ToggleGroup } from '../../components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
-import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
+import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
 import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
+import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
 import { useQuery } from '../../hooks/api';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
@@ -147,9 +148,7 @@ function DAGRuns() {
   const [apiSearchText, setAPISearchText] = React.useState(
     defaultFilters.searchText
   );
-  const [apiDagRunId, setApiDagRunId] = React.useState(
-    defaultFilters.dagRunId
-  );
+  const [apiDagRunId, setApiDagRunId] = React.useState(defaultFilters.dagRunId);
   const [apiStatus, setApiStatus] = React.useState(defaultFilters.status);
   const [apiFromDate, setApiFromDate] = React.useState<string | undefined>(
     defaultFilters.fromDate
@@ -157,6 +156,12 @@ function DAGRuns() {
   const [apiToDate, setApiToDate] = React.useState<string | undefined>(
     defaultFilters.toDate
   );
+
+  // State for selected DAG run in split layout
+  const [selectedDAGRun, setSelectedDAGRun] = React.useState<{
+    name: string;
+    dagRunId: string;
+  } | null>(null);
 
   // View mode comes from user preferences (local storage)
   const viewMode = preferences.dagRunsViewMode;
@@ -244,7 +249,11 @@ function DAGRuns() {
     }
 
     const dateModeParam = params.get('dateMode');
-    if (dateModeParam === 'preset' || dateModeParam === 'specific' || dateModeParam === 'custom') {
+    if (
+      dateModeParam === 'preset' ||
+      dateModeParam === 'specific' ||
+      dateModeParam === 'custom'
+    ) {
       urlFilters.dateRangeMode = dateModeParam;
       hasUrlFilters = true;
     }
@@ -265,7 +274,8 @@ function DAGRuns() {
     }
 
     if (params.has('specificValue')) {
-      urlFilters.specificValue = params.get('specificValue') || defaultFilters.specificValue;
+      urlFilters.specificValue =
+        params.get('specificValue') || defaultFilters.specificValue;
       hasUrlFilters = true;
     }
 
@@ -406,9 +416,10 @@ function DAGRuns() {
 
   const getPresetDates = (preset: string): { from: string; to?: string } => {
     const now = dayjs();
-    const startOfDay = config.tzOffsetInSec !== undefined
-      ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
-      : now.startOf('day');
+    const startOfDay =
+      config.tzOffsetInSec !== undefined
+        ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+        : now.startOf('day');
 
     switch (preset) {
       case 'today':
@@ -419,9 +430,13 @@ function DAGRuns() {
           to: startOfDay.format('YYYY-MM-DDTHH:mm'),
         };
       case 'last7days':
-        return { from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm') };
+        return {
+          from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm'),
+        };
       case 'last30days':
-        return { from: startOfDay.subtract(30, 'day').format('YYYY-MM-DDTHH:mm') };
+        return {
+          from: startOfDay.subtract(30, 'day').format('YYYY-MM-DDTHH:mm'),
+        };
       case 'thisWeek':
         return { from: startOfDay.startOf('week').format('YYYY-MM-DDTHH:mm') };
       case 'thisMonth':
@@ -446,7 +461,10 @@ function DAGRuns() {
     mutate();
   };
 
-  const getSpecificPeriodDates = (period: 'date' | 'month' | 'year', value: string): { from: string; to?: string } => {
+  const getSpecificPeriodDates = (
+    period: 'date' | 'month' | 'year',
+    value: string
+  ): { from: string; to?: string } => {
     switch (period) {
       case 'date': {
         const date = dayjs(value);
@@ -483,7 +501,10 @@ function DAGRuns() {
     }
   };
 
-  const handleSpecificPeriodChange = (value: string, period?: 'date' | 'month' | 'year') => {
+  const handleSpecificPeriodChange = (
+    value: string,
+    period?: 'date' | 'month' | 'year'
+  ) => {
     setSpecificValue(value);
     const periodToUse = period || specificPeriod;
     const dates = getSpecificPeriodDates(periodToUse, value);
@@ -500,7 +521,9 @@ function DAGRuns() {
     mutate();
   };
 
-  const handleDateRangeModeChange = (newMode: 'preset' | 'specific' | 'custom') => {
+  const handleDateRangeModeChange = (
+    newMode: 'preset' | 'specific' | 'custom'
+  ) => {
     setDateRangeMode(newMode);
     addSearchParam('dateMode', newMode);
 
@@ -563,8 +586,8 @@ function DAGRuns() {
   const tzLabel = formatTimezoneOffset();
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center justify-between mb-3">
+    <div className="">
+      <div className="flex items-center justify-between mb-2">
         <Title>DAG Runs</Title>
         <ToggleGroup aria-label="View mode">
           <ToggleButton
@@ -591,223 +614,237 @@ function DAGRuns() {
           </ToggleButton>
         </ToggleGroup>
       </div>
-      <div className="bg-muted/50 dark:bg-zinc-900/50 rounded-lg p-3 mb-4 space-y-3">
-        <div className="flex flex-wrap gap-2">
-          <Input
-            placeholder="Filter by DAG name..."
-            value={searchText}
-            onChange={handleNameInputChange}
-            onKeyDown={handleInputKeyPress}
-            className="w-[220px] bg-background"
-          />
-          <Input
-            placeholder="Filter by Run ID..."
-            value={dagRunId}
-            onChange={handleDagRunIdInputChange}
-            onKeyDown={handleInputKeyPress}
-            className="w-[200px] bg-background"
-          />
-          <Select value={status} onValueChange={handleStatusChange}>
-            <SelectTrigger className="w-[160px] bg-background">
-              <SelectValue placeholder="Status">
-                {status === 'all' ? (
-                  <div className="inline-flex items-center rounded-full border bg-gray-100 border-gray-300 text-gray-700 py-0.5 px-2 text-xs font-medium">
-                    All
+      <div>
+        <div className="bg-muted/50 rounded-lg mb-2 space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <Input
+              placeholder="Filter by DAG name..."
+              value={searchText}
+              onChange={handleNameInputChange}
+              onKeyDown={handleInputKeyPress}
+              className="w-[220px]"
+            />
+            <Input
+              placeholder="Filter by Run ID..."
+              value={dagRunId}
+              onChange={handleDagRunIdInputChange}
+              onKeyDown={handleInputKeyPress}
+              className="w-[200px]"
+            />
+            <Select value={status} onValueChange={handleStatusChange}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Status">
+                  {status === 'all' ? (
+                    <div className="inline-flex items-center rounded-full border bg-muted border-border text-foreground py-0.5 px-2 text-xs font-medium">
+                      All
+                    </div>
+                  ) : status === String(Status.NotStarted) ? (
+                    <StatusChip status={Status.NotStarted} size="sm">
+                      not_started
+                    </StatusChip>
+                  ) : status === String(Status.Running) ? (
+                    <StatusChip status={Status.Running} size="sm">
+                      running
+                    </StatusChip>
+                  ) : status === String(Status.Failed) ? (
+                    <StatusChip status={Status.Failed} size="sm">
+                      failed
+                    </StatusChip>
+                  ) : status === String(Status.Aborted) ? (
+                    <StatusChip status={Status.Aborted} size="sm">
+                      aborted
+                    </StatusChip>
+                  ) : status === String(Status.Success) ? (
+                    <StatusChip status={Status.Success} size="sm">
+                      succeeded
+                    </StatusChip>
+                  ) : status === String(Status.Queued) ? (
+                    <StatusChip status={Status.Queued} size="sm">
+                      queued
+                    </StatusChip>
+                  ) : status === String(Status.PartialSuccess) ? (
+                    <StatusChip status={Status.PartialSuccess} size="sm">
+                      partially_succeeded
+                    </StatusChip>
+                  ) : null}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  <div className="inline-flex items-center rounded-full border bg-muted border-border text-foreground py-0.5 px-2 text-xs font-medium">
+                    All Statuses
                   </div>
-                ) : status === String(Status.NotStarted) ? (
+                </SelectItem>
+                <SelectItem value={String(Status.NotStarted)}>
                   <StatusChip status={Status.NotStarted} size="sm">
                     not_started
                   </StatusChip>
-                ) : status === String(Status.Running) ? (
+                </SelectItem>
+                <SelectItem value={String(Status.Running)}>
                   <StatusChip status={Status.Running} size="sm">
                     running
                   </StatusChip>
-                ) : status === String(Status.Failed) ? (
+                </SelectItem>
+                <SelectItem value={String(Status.Failed)}>
                   <StatusChip status={Status.Failed} size="sm">
                     failed
                   </StatusChip>
-                ) : status === String(Status.Aborted) ? (
+                </SelectItem>
+                <SelectItem value={String(Status.Aborted)}>
                   <StatusChip status={Status.Aborted} size="sm">
                     aborted
                   </StatusChip>
-                ) : status === String(Status.Success) ? (
+                </SelectItem>
+                <SelectItem value={String(Status.Success)}>
                   <StatusChip status={Status.Success} size="sm">
                     succeeded
                   </StatusChip>
-                ) : status === String(Status.Queued) ? (
+                </SelectItem>
+                <SelectItem value={String(Status.Queued)}>
                   <StatusChip status={Status.Queued} size="sm">
                     queued
                   </StatusChip>
-                ) : status === String(Status.PartialSuccess) ? (
+                </SelectItem>
+                <SelectItem value={String(Status.PartialSuccess)}>
                   <StatusChip status={Status.PartialSuccess} size="sm">
                     partially_succeeded
                   </StatusChip>
-                ) : null}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">
-                <div className="inline-flex items-center rounded-full border bg-gray-100 border-gray-300 text-gray-700 py-0.5 px-2 text-xs font-medium">
-                  All Statuses
-                </div>
-              </SelectItem>
-              <SelectItem value={String(Status.NotStarted)}>
-                <StatusChip status={Status.NotStarted} size="sm">
-                  not_started
-                </StatusChip>
-              </SelectItem>
-              <SelectItem value={String(Status.Running)}>
-                <StatusChip status={Status.Running} size="sm">
-                  running
-                </StatusChip>
-              </SelectItem>
-              <SelectItem value={String(Status.Failed)}>
-                <StatusChip status={Status.Failed} size="sm">
-                  failed
-                </StatusChip>
-              </SelectItem>
-              <SelectItem value={String(Status.Aborted)}>
-                <StatusChip status={Status.Aborted} size="sm">
-                  aborted
-                </StatusChip>
-              </SelectItem>
-              <SelectItem value={String(Status.Success)}>
-                <StatusChip status={Status.Success} size="sm">
-                  succeeded
-                </StatusChip>
-              </SelectItem>
-              <SelectItem value={String(Status.Queued)}>
-                <StatusChip status={Status.Queued} size="sm">
-                  queued
-                </StatusChip>
-              </SelectItem>
-              <SelectItem value={String(Status.PartialSuccess)}>
-                <StatusChip status={Status.PartialSuccess} size="sm">
-                  partially_succeeded
-                </StatusChip>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            onClick={() => handleSearch()}
-            size="default"
-            className="px-6 font-medium"
-          >
-            <Search size={18} className="mr-2" />
-            Search
-          </Button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ToggleGroup aria-label="Date range mode">
-            <ToggleButton
-              value="preset"
-              groupValue={dateRangeMode}
-              onClick={() => handleDateRangeModeChange('preset')}
-              position="first"
-              aria-label="Quick select"
-              className="h-10 px-3 text-xs"
-            >
-              Quick
-            </ToggleButton>
-            <ToggleButton
-              value="specific"
-              groupValue={dateRangeMode}
-              onClick={() => handleDateRangeModeChange('specific')}
-              position="middle"
-              aria-label="Specific date/month/year"
-              className="h-10 px-3 text-xs"
-            >
-              Specific
-            </ToggleButton>
-            <ToggleButton
-              value="custom"
-              groupValue={dateRangeMode}
-              onClick={() => handleDateRangeModeChange('custom')}
-              position="last"
-              aria-label="Custom range"
-              className="h-10 px-3 text-xs"
-            >
-              Custom
-            </ToggleButton>
-          </ToggleGroup>
-          {dateRangeMode === 'preset' ? (
-            <Select value={datePreset} onValueChange={handleDatePresetChange}>
-              <SelectTrigger className="w-[180px] bg-background">
-                <SelectValue placeholder="Select period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="yesterday">Yesterday</SelectItem>
-                <SelectItem value="last7days">Last 7 days</SelectItem>
-                <SelectItem value="last30days">Last 30 days</SelectItem>
-                <SelectItem value="thisWeek">This week</SelectItem>
-                <SelectItem value="thisMonth">This month</SelectItem>
+                </SelectItem>
               </SelectContent>
             </Select>
-          ) : dateRangeMode === 'specific' ? (
-            <>
-              <Select
-                value={specificPeriod}
-                onValueChange={(v) => {
-                  const newPeriod = v as 'date' | 'month' | 'year';
-                  setSpecificPeriod(newPeriod);
-                  // Update the value format based on the new period type
-                  // Extract the base date from current value and reformat
-                  let newValue: string;
-                  const parsedDate = dayjs(specificValue);
-
-                  if (newPeriod === 'date') {
-                    // If switching to date, use the parsed date or today
-                    newValue = parsedDate.isValid() ? parsedDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
-                  } else if (newPeriod === 'month') {
-                    // If switching to month, extract year-month from current value
-                    newValue = parsedDate.isValid() ? parsedDate.format('YYYY-MM') : dayjs().format('YYYY-MM');
-                  } else {
-                    // If switching to year, extract year from current value
-                    newValue = parsedDate.isValid() ? parsedDate.format('YYYY') : dayjs().format('YYYY');
-                  }
-
-                  setSpecificValue(newValue);
-                  handleSpecificPeriodChange(newValue, newPeriod);
-                }}
+            <Button
+              onClick={() => handleSearch()}
+              size="default"
+              className="px-6 font-medium"
+            >
+              <Search size={18} className="mr-2" />
+              Search
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <ToggleGroup aria-label="Date range mode">
+              <ToggleButton
+                value="preset"
+                groupValue={dateRangeMode}
+                onClick={() => handleDateRangeModeChange('preset')}
+                position="first"
+                aria-label="Quick select"
               >
-                <SelectTrigger className="w-[120px] bg-background">
-                  <SelectValue />
+                Quick
+              </ToggleButton>
+              <ToggleButton
+                value="specific"
+                groupValue={dateRangeMode}
+                onClick={() => handleDateRangeModeChange('specific')}
+                position="middle"
+                aria-label="Specific date/month/year"
+              >
+                Specific
+              </ToggleButton>
+              <ToggleButton
+                value="custom"
+                groupValue={dateRangeMode}
+                onClick={() => handleDateRangeModeChange('custom')}
+                position="last"
+                aria-label="Custom range"
+              >
+                Custom
+              </ToggleButton>
+            </ToggleGroup>
+            {dateRangeMode === 'preset' ? (
+              <Select value={datePreset} onValueChange={handleDatePresetChange}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select period" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="date">Date</SelectItem>
-                  <SelectItem value="month">Month</SelectItem>
-                  <SelectItem value="year">Year</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="yesterday">Yesterday</SelectItem>
+                  <SelectItem value="last7days">Last 7 days</SelectItem>
+                  <SelectItem value="last30days">Last 30 days</SelectItem>
+                  <SelectItem value="thisWeek">This week</SelectItem>
+                  <SelectItem value="thisMonth">This month</SelectItem>
                 </SelectContent>
               </Select>
-              <Input
-                type={getInputTypeForPeriod(specificPeriod)}
-                value={specificValue}
-                onChange={(e) => handleSpecificPeriodChange(e.target.value)}
-                placeholder={specificPeriod === 'year' ? 'YYYY' : undefined}
-                min={specificPeriod === 'year' ? '2000' : undefined}
-                max={specificPeriod === 'year' ? '2100' : undefined}
-                className="w-[160px] bg-background h-10"
+            ) : dateRangeMode === 'specific' ? (
+              <>
+                <Select
+                  value={specificPeriod}
+                  onValueChange={(v) => {
+                    const newPeriod = v as 'date' | 'month' | 'year';
+                    setSpecificPeriod(newPeriod);
+                    let newValue: string;
+                    const parsedDate = dayjs(specificValue);
+
+                    if (newPeriod === 'date') {
+                      newValue = parsedDate.isValid()
+                        ? parsedDate.format('YYYY-MM-DD')
+                        : dayjs().format('YYYY-MM-DD');
+                    } else if (newPeriod === 'month') {
+                      newValue = parsedDate.isValid()
+                        ? parsedDate.format('YYYY-MM')
+                        : dayjs().format('YYYY-MM');
+                    } else {
+                      newValue = parsedDate.isValid()
+                        ? parsedDate.format('YYYY')
+                        : dayjs().format('YYYY');
+                    }
+
+                    setSpecificValue(newValue);
+                    handleSpecificPeriodChange(newValue, newPeriod);
+                  }}
+                >
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date">Date</SelectItem>
+                    <SelectItem value="month">Month</SelectItem>
+                    <SelectItem value="year">Year</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type={getInputTypeForPeriod(specificPeriod)}
+                  value={specificValue}
+                  onChange={(e) => handleSpecificPeriodChange(e.target.value)}
+                  placeholder={specificPeriod === 'year' ? 'YYYY' : undefined}
+                  min={specificPeriod === 'year' ? '2000' : undefined}
+                  max={specificPeriod === 'year' ? '2100' : undefined}
+                  className="w-[160px] h-8"
+                />
+              </>
+            ) : (
+              <DateRangePicker
+                fromDate={fromDate}
+                toDate={toDate}
+                onFromDateChange={setFromDate}
+                onToDateChange={setToDate}
+                onEnterPress={() => handleSearch()}
+                fromLabel={`From ${tzLabel}`}
+                toLabel={`To ${tzLabel}`}
+                className="w-full md:w-auto"
               />
-            </>
-          ) : (
-            <DateRangePicker
-              fromDate={fromDate}
-              toDate={toDate}
-              onFromDateChange={setFromDate}
-              onToDateChange={setToDate}
-              onEnterPress={() => handleSearch()}
-              fromLabel={`From ${tzLabel}`}
-              toLabel={`To ${tzLabel}`}
-              className="w-full md:w-auto"
-            />
-          )}
+            )}
+          </div>
         </div>
+        {viewMode === 'list' ? (
+          <DAGRunTable
+            dagRuns={data?.dagRuns || []}
+            selectedDAGRun={selectedDAGRun}
+            onSelectDAGRun={setSelectedDAGRun}
+          />
+        ) : (
+          <DAGRunGroupedView dagRuns={data?.dagRuns || []} />
+        )}
       </div>
-      {viewMode === 'list' ? (
-        <DAGRunTable dagRuns={data?.dagRuns || []} />
-      ) : (
-        <DAGRunGroupedView dagRuns={data?.dagRuns || []} />
+
+      {/* Side Modal for DAG Run Details */}
+      {selectedDAGRun && (
+        <DAGRunDetailsModal
+          name={selectedDAGRun.name}
+          dagRunId={selectedDAGRun.dagRunId}
+          isOpen={!!selectedDAGRun}
+          onClose={() => setSelectedDAGRun(null)}
+        />
       )}
     </div>
   );

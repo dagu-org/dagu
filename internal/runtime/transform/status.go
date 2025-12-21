@@ -122,6 +122,13 @@ func WithLogFilePath(logFilePath string) StatusOption {
 	}
 }
 
+// WithError returns a StatusOption that sets the top-level error message
+func WithError(err string) StatusOption {
+	return func(s *execution.DAGRunStatus) {
+		s.Error = err
+	}
+}
+
 // WithPreconditions returns a StatusOption that sets the preconditions
 func WithPreconditions(conditions []*core.Condition) StatusOption {
 	return func(s *execution.DAGRunStatus) {

@@ -14,13 +14,13 @@ function WorkerHealth({ healthStatus }: WorkerHealthProps) {
       <div
         className={cn(
           "w-2 h-2 rounded-full transition-colors duration-300",
-          healthStatus === 'healthy' && "bg-green-500",
-          healthStatus === 'warning' && "bg-yellow-500",
-          healthStatus === 'unhealthy' && "bg-red-500"
+          healthStatus === 'healthy' && "bg-success",
+          healthStatus === 'warning' && "bg-warning",
+          healthStatus === 'unhealthy' && "bg-error"
         )}
       />
       {healthStatus === 'healthy' && (
-        <div className="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-75" />
+        <div className="absolute inset-0 rounded-full bg-success animate-ping opacity-75" />
       )}
     </div>
   );

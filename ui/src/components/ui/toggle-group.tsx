@@ -16,7 +16,12 @@ export const ToggleGroup = ({
 }: Omit<ToggleGroupProps, 'value' | 'onChange'>) => {
   return (
     <div
-      className={cn('inline-flex rounded-md border bg-background', className)}
+      className={cn(
+        'inline-flex rounded border border-[rgb(var(--btn-secondary-border))] overflow-hidden',
+        'bg-gradient-to-b from-[rgb(var(--btn-secondary-top))] to-[rgb(var(--btn-secondary-bottom))]',
+        'border-b-[3px] border-b-[rgb(var(--btn-secondary-platform))]',
+        className
+      )}
       role="group"
       aria-label={ariaLabel}
     >
@@ -48,21 +53,21 @@ export const ToggleButton = ({
 
   // Apply different border radius based on position
   const borderRadiusClasses = cn({
-    'rounded-l-md rounded-r-none': position === 'first',
-    'rounded-r-md rounded-l-none': position === 'last',
+    'rounded-l rounded-r-none': position === 'first',
+    'rounded-r rounded-l-none': position === 'last',
     'rounded-none': position === 'middle',
-    'rounded-md': position === 'single',
+    'rounded': position === 'single',
   });
 
   return (
     <button
       type="button"
       className={cn(
-        'inline-flex items-center justify-center px-3 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer',
+        'inline-flex items-center justify-center h-8 px-4 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer',
         borderRadiusClasses,
         isSelected
-          ? 'bg-primary text-primary-foreground'
-          : 'text-muted-foreground',
+          ? 'bg-gradient-to-b from-[rgb(var(--btn-primary-top))] to-[rgb(var(--btn-primary-bottom))] text-white [&_svg]:text-white'
+          : 'text-[#3d3833] hover:bg-white/50 [&_svg]:text-[#3d3833]',
         className
       )}
       onClick={onClick}

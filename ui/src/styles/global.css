@@ -11,7 +11,12 @@
   body {
     @apply bg-background text-foreground;
   }
-  
+}
+
+/* Custom sidebar color - force all descendants to use the custom text color */
+.custom-sidebar-color,
+.custom-sidebar-color * {
+  color: var(--sidebar-text) !important;
 }
 
 /* Override focus styles for select components */
@@ -21,11 +26,13 @@
   outline: none;
 }
 
-/* Remove conflicting border and shadow overrides for select content and items */
-[data-slot='select-content'],
+/* Remove conflicting shadow overrides for select content and items */
+[data-slot='select-content'] {
+  box-shadow: none;
+}
 [data-slot='select-item'] {
-  box-shadow: initial;
-  border: initial;
+  box-shadow: none;
+  border: none;
 }
 
 /* Fix for tag filter select in DAG list page */
@@ -35,24 +42,24 @@
 .dag-list-tag-filter [data-slot='select-item'][data-selected],
 .dag-list-tag-filter [data-slot='select-value'],
 .dag-list-tag-filter [data-slot='select-trigger'] {
-  color: var(--muted-foreground);
+  color: var(--muted);
 }
 
 /* Style for highlighted/selected items */
 .dag-list-tag-filter [data-slot='select-item'][data-highlighted],
 .dag-list-tag-filter [data-slot='select-item'][data-selected] {
-  color: var(--foreground);
+  color: var(--text);
 }
 
 /* Ensure placeholder text is visible but slightly muted */
 .dag-list-tag-filter [data-placeholder] {
-  color: var(--muted-foreground);
+  color: var(--muted);
 }
 
 [data-slot='select-item'][data-highlighted],
 [data-slot='select-item'][data-selected] {
-  background-color: var(--accent);
-  color: var(--accent-foreground);
+  background-color: var(--accent-surface);
+  color: var(--text);
 }
 
 /* Make the checkmark icon visible */
@@ -62,108 +69,285 @@
 }
 @import 'tw-animate-css';
 
-@custom-variant dark (&:is(.dark *));
+/* =============================================================================
+   TOKEN-BASED COLOR SYSTEM
+   Following the principle: semantic tokens backed by mode-specific values
+   Components reference only semantic tokens; theme swaps underlying values
+   ============================================================================= */
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #222222;
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* -------------------------------------------------------------------------
+     LIGHT MODE - Professional Gray Theme
+     Clean, minimal, easy on the eyes
+     ------------------------------------------------------------------------- */
+
+  /* Text and emphasis */
+  --text: 30 30 32;                     /* near black, slightly warm */
+  --text-secondary: 30 30 32;
+  --text-secondary-alpha: 0.72;
+  --muted: 30 30 32;
+  --muted-alpha: 0.55;
+  --trace: 30 30 32;
+  --trace-alpha: 0.25;
+
+  /* Surfaces and borders */
+  --bg: 241 242 238;                    /* warm light gray - content area */
+  --accent-surface: 235 237 230;        /* slightly darker warm gray */
+  --surface: 255 255 255;               /* white - for cards, inputs */
+  --border: 210 212 204;                /* warm gray border */
+  --border-bold: 190 192 184;           /* darker border for emphasis */
+  --glass-bg: 241 242 238;
+  --glass-bg-alpha: 0.85;
+  --glass-border: 210 212 204;
+
+  /* Primary intent (vibrant orange) */
+  --primary: 234 88 12;                 /* orange-600 - bold, energetic */
+  --primary-highlight: 234 88 12;
+  --primary-highlight-alpha: 0.08;
+  --link: 59 130 246;                   /* blue-500 for links */
+  --primary-alt-highlight: 240 240 242;
+
+  /* Secondary intent */
+  --secondary: 229 231 235;             /* gray-200 */
+  --secondary-alpha: 1;
+  --secondary-hover: 209 213 219;       /* gray-300 */
+
+  /* Button component tokens - Sepia 3D Design */
+  /* Primary button - warm sepia gradient */
+  --btn-primary-top: 196 149 106;       /* #c4956a - light sepia */
+  --btn-primary-bottom: 176 132 88;     /* #b08458 - darker sepia */
+  --btn-primary-platform: 154 112 72;   /* #9a7048 - platform shadow */
+  --btn-primary-hover-top: 212 165 122; /* #d4a57a - hover light */
+  --btn-primary-hover-bottom: 196 149 106; /* #c4956a - hover dark */
+
+  /* Secondary button - cream/warm white gradient */
+  --btn-secondary-top: 250 248 245;     /* #faf8f5 - cream white */
+  --btn-secondary-bottom: 245 240 232;  /* #f5f0e8 - warm off-white */
+  --btn-secondary-platform: 200 191 176; /* #c8bfb0 - warm gray */
+  --btn-secondary-border: 200 191 176;  /* #c8bfb0 - warm gray border */
+  --btn-secondary-hover-border: 168 152 136; /* #a89888 - darker border */
+  --btn-secondary-hover-top: 255 255 255; /* pure white hover */
+  --btn-secondary-hover-bottom: 250 248 245; /* #faf8f5 hover */
+
+  /* Destructive button - muted red 3D */
+  --btn-destructive-top: 239 154 154;   /* light red */
+  --btn-destructive-bottom: 220 120 120; /* medium red */
+  --btn-destructive-platform: 185 80 80; /* dark red platform */
+  --btn-destructive-border: 220 100 100;
+
+  /* Ghost/outline button platform for subtle depth */
+  --btn-ghost-platform: 210 212 204;    /* warm gray */
+
+  /* Legacy tokens for compatibility */
+  --button-primary-bg: 196 149 106;
+  --button-primary-border: 154 112 72;
+  --button-primary-border-hover: 176 132 88;
+  --frame-primary-bg: 196 149 106;
+  --frame-secondary-bg: 250 248 245;
+  --button-secondary-bg: 250 248 245;
+  --button-secondary-border: 200 191 176;
+  --button-secondary-border-hover: 168 152 136;
+  --frame-danger-bg: 220 38 38;
+  --frame-danger-bg-alpha: 0.9;
+  --button-danger-border: 220 38 38;
+  --button-danger-border-hover: 185 28 28;
+
+  /* Status: Danger (muted red) */
+  --danger: 220 38 38;                  /* red-600 */
+  --danger-light: 248 113 113;          /* red-400 */
+  --danger-lighter: 254 226 226;        /* red-100 */
+  --danger-dark: 185 28 28;             /* red-700 */
+  --danger-highlight: 220 38 38;
+  --danger-highlight-alpha: 0.08;
+
+  /* Status: Warning (muted amber) */
+  --warning: 217 119 6;                 /* amber-600 */
+  --warning-dark: 180 83 9;             /* amber-700 */
+  --warning-highlight: 217 119 6;
+  --warning-highlight-alpha: 0.08;
+
+  /* Status: Success (muted green) */
+  --success: 22 163 74;                 /* green-600 */
+  --success-light: 74 222 128;          /* green-400 */
+  --success-dark: 21 128 61;            /* green-700 */
+  --success-highlight: 22 163 74;
+  --success-highlight-alpha: 0.08;
+
+  /* Status: Info (muted blue) */
+  --info: 37 99 235;                    /* blue-600 */
+  --info-light: 96 165 250;             /* blue-400 */
+  --info-highlight: 37 99 235;
+  --info-highlight-alpha: 0.08;
+
+  /* Emphasis and selection */
+  --emphasis: 234 88 12;
+  --selection: 219 234 254;             /* blue-100 */
+  --selection-alpha: 0.6;
+
+  /* Legacy neutral tokens (for compatibility) */
+  --text-muted-legacy: 107 114 128;     /* gray-500 */
+  --text-muted-dark-legacy: 75 85 99;   /* gray-600 */
+  --text-muted-alt-legacy: 107 114 128;
+
+  /* Code block colors */
+  --code-bg: 31 41 55;                  /* slate-800 */
+  --code-text: 243 244 246;             /* gray-100 */
+
+  /* Data visualization palette (professional, muted) */
+  --chart-1: 59 130 246;                /* blue-500 */
+  --chart-2: 34 197 94;                 /* green-500 */
+  --chart-3: 168 85 247;                /* purple-500 */
+  --chart-4: 249 115 22;                /* orange-500 */
+  --chart-5: 236 72 153;                /* pink-500 */
+  --chart-6: 20 184 166;                /* teal-500 */
+  --chart-7: 245 158 11;                /* amber-500 */
+  --chart-8: 107 114 128;               /* gray-500 */
+
+  /* Sidebar & Navbar */
+  --sidebar-bg: 229 231 223;            /* rgb(229, 231, 223) - warm gray */
+  --sidebar-text: 30 30 32;
+  --sidebar-border: 200 202 194;
+  --sidebar-accent: 220 222 214;
+
+  /* Ring (focus) */
+  --ring: 59 130 246;                   /* blue-500 for focus */
+
+  /* Border radius */
+  --radius: 0.375rem;
+
+  /* -------------------------------------------------------------------------
+     SHADCN COMPATIBILITY MAPPINGS (light mode)
+     ------------------------------------------------------------------------- */
+  --background: rgb(var(--bg));
+  --foreground: rgb(var(--text));
+  --card: rgb(var(--surface));
+  --card-foreground: rgb(var(--text));
+  --popover: rgb(var(--surface));
+  --popover-foreground: rgb(var(--text));
+  --primary-color: rgb(var(--primary));
+  --primary-foreground: 255 255 255;
+  --secondary-color: rgb(var(--secondary));
+  --secondary-foreground: rgb(var(--text));
+  --muted-color: rgb(var(--accent-surface));
+  --muted-foreground: rgba(var(--text), var(--muted-alpha));
+  --accent: rgb(var(--accent-surface));
+  --accent-foreground: rgb(var(--text));
+  --destructive: rgb(var(--danger));
+  --destructive-foreground: 255 255 255;
+  --border-color: rgb(var(--border));
+  --input: rgb(var(--surface));
+  --ring-color: rgb(var(--ring));
+
+  /* Sidebar compatibility */
+  --sidebar: rgb(var(--sidebar-bg));
+  --sidebar-foreground: rgb(var(--sidebar-text));
+  --sidebar-primary: rgb(var(--primary));
+  --sidebar-primary-foreground: rgb(255 255 255);
+  --sidebar-accent: rgb(var(--sidebar-accent));
+  --sidebar-accent-foreground: rgb(var(--sidebar-text));
+  --sidebar-border: rgb(var(--sidebar-border));
+  --sidebar-ring: rgb(var(--ring));
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: #222222;
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
-}
-
+/* Tailwind theme inline - maps CSS vars to Tailwind classes */
 @theme inline {
+  /* Core semantic colors */
+  --color-text: rgb(var(--text));
+  --color-text-secondary: rgba(var(--text-secondary), var(--text-secondary-alpha));
+  --color-muted: rgba(var(--muted), var(--muted-alpha));
+  --color-trace: rgba(var(--trace), var(--trace-alpha));
+
+  /* Surfaces */
+  --color-bg: rgb(var(--bg));
+  --color-surface: rgb(var(--surface));
+  --color-accent-surface: rgb(var(--accent-surface));
+  --color-glass-bg: rgba(var(--glass-bg), var(--glass-bg-alpha));
+  --color-glass-border: rgb(var(--glass-border));
+
+  /* Borders */
+  --color-border: rgb(var(--border));
+  --color-border-bold: rgb(var(--border-bold));
+
+  /* Primary intent */
+  --color-primary: rgb(var(--primary));
+  --color-primary-highlight: rgba(var(--primary-highlight), var(--primary-highlight-alpha));
+  --color-link: rgb(var(--link));
+  --color-primary-alt-highlight: rgb(var(--primary-alt-highlight));
+
+  /* Secondary */
+  --color-secondary: rgba(var(--secondary), var(--secondary-alpha));
+  --color-secondary-hover: rgb(var(--secondary-hover));
+
+  /* Button tokens */
+  --color-button-primary-bg: rgb(var(--button-primary-bg));
+  --color-button-primary-border: rgb(var(--button-primary-border));
+  --color-button-primary-border-hover: rgb(var(--button-primary-border-hover));
+  --color-frame-primary-bg: rgb(var(--frame-primary-bg));
+  --color-frame-secondary-bg: rgb(var(--frame-secondary-bg));
+  --color-button-secondary-bg: rgb(var(--button-secondary-bg));
+  --color-button-secondary-border: rgb(var(--button-secondary-border));
+  --color-button-secondary-border-hover: rgb(var(--button-secondary-border-hover));
+  --color-frame-danger-bg: rgba(var(--frame-danger-bg), var(--frame-danger-bg-alpha));
+  --color-button-danger-border: rgb(var(--button-danger-border));
+  --color-button-danger-border-hover: rgb(var(--button-danger-border-hover));
+
+  /* Status: Danger */
+  --color-danger: rgb(var(--danger));
+  --color-danger-light: rgb(var(--danger-light));
+  --color-danger-lighter: rgb(var(--danger-lighter));
+  --color-danger-dark: rgb(var(--danger-dark));
+  --color-danger-highlight: rgba(var(--danger-highlight), var(--danger-highlight-alpha));
+
+  /* Status: Warning */
+  --color-warning: rgb(var(--warning));
+  --color-warning-dark: rgb(var(--warning-dark));
+  --color-warning-highlight: rgba(var(--warning-highlight), var(--warning-highlight-alpha));
+
+  /* Status: Success */
+  --color-success: rgb(var(--success));
+  --color-success-light: rgb(var(--success-light));
+  --color-success-dark: rgb(var(--success-dark));
+  --color-success-highlight: rgba(var(--success-highlight), var(--success-highlight-alpha));
+
+  /* Status: Info */
+  --color-info: rgb(var(--info));
+  --color-info-light: rgb(var(--info-light));
+  --color-info-highlight: rgba(var(--info-highlight), var(--info-highlight-alpha));
+
+  /* Emphasis and selection */
+  --color-emphasis: rgb(var(--emphasis));
+  --color-selection: rgba(var(--selection), var(--selection-alpha));
+
+  /* Code */
+  --color-code-bg: rgb(var(--code-bg));
+  --color-code-text: rgb(var(--code-text));
+
+  /* Charts / Data viz */
+  --color-chart-1: rgb(var(--chart-1));
+  --color-chart-2: rgb(var(--chart-2));
+  --color-chart-3: rgb(var(--chart-3));
+  --color-chart-4: rgb(var(--chart-4));
+  --color-chart-5: rgb(var(--chart-5));
+  --color-chart-6: rgb(var(--chart-6));
+  --color-chart-7: rgb(var(--chart-7));
+  --color-chart-8: rgb(var(--chart-8));
+
+  /* SHADCN COMPATIBILITY (for existing components) */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
+  --color-destructive-foreground: rgb(var(--destructive-foreground));
   --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-ring: var(--ring-color);
+
+  /* Sidebar */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -172,6 +356,12 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Radius */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 @layer base {
@@ -209,15 +399,30 @@
 
 @keyframes slideInFromRight {
   0% {
-    transform: translateX(100%);
+    transform: translateX(40%);
+    opacity: 0;
   }
   100% {
     transform: translateX(0);
+    opacity: 1;
   }
 }
 
 .slide-in-from-right {
-  animation: slideInFromRight 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: slideInFromRight 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.15s ease-out;
 }
 
 /* Disable text selection for elements with this class */
@@ -228,164 +433,148 @@
   user-select: none;
 }
 
-/* Mermaid dark mode support */
-.dark .mermaid {
-  /* Timeline/Gantt chart tooltip styles */
-  --mermaid-tooltip-background: rgb(39 39 42); /* zinc-800 */
-  --mermaid-tooltip-color: rgb(244 244 245); /* zinc-100 */
-  --mermaid-tooltip-border: rgb(63 63 70); /* zinc-700 */
-}
-
-/* Override Mermaid's default tooltip styles for dark mode */
-.dark .mermaid .tooltip {
-  background: var(--mermaid-tooltip-background) !important;
-  color: var(--mermaid-tooltip-color) !important;
-  border: 1px solid var(--mermaid-tooltip-border) !important;
-}
-
-/* Mermaid gantt chart text elements for dark mode */
-.dark .mermaid .gantt text {
-  fill: rgb(244 244 245) !important; /* zinc-100 */
-}
-
-/* Mermaid gantt chart axis labels for dark mode */
-.dark .mermaid .gantt .axisLabel {
-  fill: rgb(244 244 245) !important; /* zinc-100 */
-}
-
-/* Mermaid gantt chart grid lines for dark mode */
-.dark .mermaid .gantt .grid .tick {
-  stroke: rgb(63 63 70) !important; /* zinc-700 */
-}
-
-/* Mermaid gantt chart section labels for dark mode */
-.dark .mermaid .gantt .sectionTitle {
-  fill: rgb(244 244 245) !important; /* zinc-100 */
-}
-
-/* Native date picker dark mode support */
-.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-}
-
-/* Style the date picker popup for Webkit browsers (Chrome, Safari, Edge) */
-.dark input[type="datetime-local"]::-webkit-datetime-edit {
-  color: rgb(244 244 245); /* zinc-100 */
-}
-
-.dark input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
-  background-color: rgb(24 24 27); /* zinc-900 */
-}
-
-.dark input[type="datetime-local"]::-webkit-datetime-edit-text {
-  color: rgb(161 161 170); /* zinc-400 */
-}
-
-.dark input[type="datetime-local"]::-webkit-datetime-edit-month-field,
-.dark input[type="datetime-local"]::-webkit-datetime-edit-day-field,
-.dark input[type="datetime-local"]::-webkit-datetime-edit-year-field,
-.dark input[type="datetime-local"]::-webkit-datetime-edit-hour-field,
-.dark input[type="datetime-local"]::-webkit-datetime-edit-minute-field,
-.dark input[type="datetime-local"]::-webkit-datetime-edit-second-field,
-.dark input[type="datetime-local"]::-webkit-datetime-edit-ampm-field {
-  color: rgb(244 244 245); /* zinc-100 */
-}
-
-.dark input[type="datetime-local"]::-webkit-datetime-edit-month-field:focus,
-.dark input[type="datetime-local"]::-webkit-datetime-edit-day-field:focus,
-.dark input[type="datetime-local"]::-webkit-datetime-edit-year-field:focus,
-.dark input[type="datetime-local"]::-webkit-datetime-edit-hour-field:focus,
-.dark input[type="datetime-local"]::-webkit-datetime-edit-minute-field:focus,
-.dark input[type="datetime-local"]::-webkit-datetime-edit-second-field:focus,
-.dark input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
-  background-color: rgb(39 39 42); /* zinc-800 */
-  color: rgb(244 244 245); /* zinc-100 */
-  outline: none;
-}
-
-/* Attempt to style the calendar popup (limited browser support) */
-.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  background-color: rgb(24 24 27); /* zinc-900 */
-  border-radius: 4px;
-}
-
-/* Firefox date picker support */
-.dark input[type="datetime-local"] {
-  color-scheme: dark;
-}
-
-/* General dark mode support for all date/time inputs */
-.dark input[type="date"],
-.dark input[type="time"],
-.dark input[type="datetime-local"] {
-  color-scheme: dark;
-}
-
-/* Ensure the calendar picker indicator is visible in dark mode */
-.dark input[type="date"]::-webkit-calendar-picker-indicator,
-.dark input[type="time"]::-webkit-calendar-picker-indicator,
-.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  filter: invert(1) contrast(0.8);
-  opacity: 0.8;
-}
-
-/* Style for browsers that support ::backdrop */
-.dark input[type="datetime-local"]::backdrop {
-  background-color: rgba(0, 0, 0, 0.5);
-}
-
-/* Mermaid flowchart background pattern for dark mode */
-.dark .mermaid .flowchart-v2 {
-  background: transparent !important;
-}
-
-/* Remove or darken the grid pattern in dark mode */
-.dark .mermaid svg {
-  background: transparent !important;
-}
-
-/* Style any grid/pattern elements in the graph */
-.dark .mermaid pattern#grid line {
-  stroke: rgb(39 39 42) !important; /* zinc-800 - very subtle grid */
-  stroke-opacity: 0.3 !important;
-}
-
 /* Enhanced line highlighting for search results and code displays */
 .line-highlight {
-  background: rgba(255, 255, 0, 0.15) !important; /* Light yellow background */
-  background: linear-gradient(to right, rgba(255, 255, 0, 0.2) 70%, rgba(255, 255, 0, 0.05)) !important;
+  background: rgba(var(--primary), 0.15) !important;
+  background: linear-gradient(to right, rgba(var(--primary), 0.2) 70%, rgba(var(--primary), 0.05)) !important;
 }
 
-/* Dark mode line highlighting */
-.dark .line-highlight {
-  background: rgba(255, 255, 100, 0.15) !important; /* Slightly different yellow for dark mode */
-  background: linear-gradient(to right, rgba(255, 255, 100, 0.2) 70%, rgba(255, 255, 100, 0.05)) !important;
+/* =============================================================================
+   3D SEPIA BUTTON SYSTEM
+   Clean, tactile buttons using border-based depth (no shadows)
+   ============================================================================= */
+
+/* Primary Button - Sepia/Tan with thick bottom border */
+.btn-3d-primary {
+  background: linear-gradient(180deg, rgb(var(--btn-primary-top)) 0%, rgb(var(--btn-primary-bottom)) 100%);
+  color: white;
+  border: none;
+  border-bottom: 4px solid rgb(var(--btn-primary-platform));
+  transition: all 0.1s ease;
 }
 
-/* Alternative: completely hide the grid in dark mode */
-.dark .mermaid defs pattern {
-  display: none !important;
+.btn-3d-primary:hover {
+  background: linear-gradient(180deg, rgb(var(--btn-primary-hover-top)) 0%, rgb(var(--btn-primary-hover-bottom)) 100%);
+  transform: translateY(-1px);
+  border-bottom-width: 5px;
 }
 
-/* Ensure graph container has proper background */
-.dark .mermaid {
-  background: transparent !important;
+.btn-3d-primary:active {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
 }
 
-/* Fix any white rectangles used as backgrounds */
-.dark .mermaid rect[fill="white"],
-.dark .mermaid rect[fill="#ffffff"],
-.dark .mermaid rect[fill="#FFFFFF"] {
-  fill: transparent !important;
+/* Secondary/Default Button - Cream with bottom border */
+.btn-3d-secondary {
+  background: linear-gradient(180deg, rgb(var(--btn-secondary-top)) 0%, rgb(var(--btn-secondary-bottom)) 100%);
+  color: #3d3833;
+  border: 1px solid rgb(var(--btn-secondary-border));
+  border-bottom: 4px solid rgb(var(--btn-secondary-platform));
+  transition: all 0.1s ease;
 }
 
-/* Fix grid lines if they exist as path elements */
-.dark .mermaid path[stroke="white"],
-.dark .mermaid path[stroke="#ffffff"],
-.dark .mermaid path[stroke="#FFFFFF"],
-.dark .mermaid line[stroke="white"],
-.dark .mermaid line[stroke="#ffffff"],
-.dark .mermaid line[stroke="#FFFFFF"] {
-  stroke: rgb(63 63 70) !important; /* zinc-700 */
-  stroke-opacity: 0.2 !important;
+.btn-3d-secondary:hover {
+  background: linear-gradient(180deg, rgb(var(--btn-secondary-hover-top)) 0%, rgb(var(--btn-secondary-hover-bottom)) 100%);
+  transform: translateY(-1px);
+  border-bottom-width: 5px;
+}
+
+.btn-3d-secondary:active {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+}
+
+/* Outline Button - Same as secondary */
+.btn-3d-outline {
+  background: linear-gradient(180deg, rgb(var(--btn-secondary-top)) 0%, rgb(var(--btn-secondary-bottom)) 100%);
+  color: rgb(var(--text));
+  border: 1px solid rgb(var(--btn-secondary-border));
+  border-bottom: 3px solid rgb(var(--btn-secondary-platform));
+  transition: all 0.1s ease;
+}
+
+.btn-3d-outline:hover {
+  background: linear-gradient(180deg, rgb(var(--btn-secondary-hover-top)) 0%, rgb(var(--btn-secondary-hover-bottom)) 100%);
+  transform: translateY(-1px);
+  border-bottom-width: 4px;
+}
+
+.btn-3d-outline:active {
+  transform: translateY(1px);
+  border-bottom-width: 2px;
+}
+
+/* Ghost Button - Minimal, appears on hover */
+.btn-3d-ghost {
+  background: transparent;
+  color: rgb(var(--text));
+  border: none;
+  border-bottom: 2px solid transparent;
+  transition: all 0.1s ease;
+}
+
+.btn-3d-ghost:hover {
+  background: rgb(var(--btn-secondary-top));
+  border-bottom: 3px solid rgb(var(--btn-secondary-platform));
+  transform: translateY(-1px);
+}
+
+.btn-3d-ghost:active {
+  transform: translateY(1px);
+  border-bottom-width: 1px;
+}
+
+/* Destructive Button - Soft red with depth */
+.btn-3d-destructive {
+  background: linear-gradient(180deg, rgb(var(--btn-destructive-top)) 0%, rgb(var(--btn-destructive-bottom)) 100%);
+  color: #5c1a1a;
+  border: 1px solid rgb(var(--btn-destructive-border));
+  border-bottom: 4px solid rgb(var(--btn-destructive-platform));
+  transition: all 0.1s ease;
+}
+
+.btn-3d-destructive:hover {
+  background: linear-gradient(180deg, #f8aaaa 0%, rgb(var(--btn-destructive-top)) 100%);
+  transform: translateY(-1px);
+  border-bottom-width: 5px;
+}
+
+.btn-3d-destructive:active {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+}
+
+/* Link variant - no 3D, just text */
+.btn-3d-link {
+  background: transparent;
+  color: rgb(var(--link));
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.btn-3d-link:hover {
+  color: rgb(var(--primary));
+}
+
+/* Disabled state */
+.btn-3d-primary:disabled,
+.btn-3d-secondary:disabled,
+.btn-3d-outline:disabled,
+.btn-3d-ghost:disabled,
+.btn-3d-destructive:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  transform: none !important;
+  border-bottom-width: 2px !important;
+}
+
+/* Focus ring */
+.btn-3d-primary:focus-visible,
+.btn-3d-secondary:focus-visible,
+.btn-3d-outline:focus-visible,
+.btn-3d-ghost:focus-visible,
+.btn-3d-destructive:focus-visible {
+  outline: 2px solid rgb(var(--ring));
+  outline-offset: 2px;
 }

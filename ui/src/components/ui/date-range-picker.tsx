@@ -189,7 +189,7 @@ function CustomDateTimeInput({
         type="datetime-local"
         value={value || ''}
         onChange={handleDatePickerChange}
-        className="sr-only dark:color-scheme-dark"
+        className="sr-only"
         tabIndex={-1}
         aria-hidden="true"
       />
@@ -209,7 +209,7 @@ export function DateRangePicker({
   return (
     <div
       className={cn(
-        'relative items-center flex rounded-md border shadow-xs bg-white dark:bg-zinc-900',
+        'relative items-center flex rounded-md border border-border bg-input',
         className
       )}
       {...props}

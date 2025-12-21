@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/ui/CustomDialog';
+import { Play, ListPlus, X } from 'lucide-react';
 import React from 'react';
 import { components } from '../../../../api/v2/schema';
 import {
@@ -124,8 +125,8 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
         </DialogHeader>
 
         {(paramsReadOnly || runIdReadOnly) && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+          <div className="bg-warning-muted border border-warning/30 rounded-md p-3">
+            <p className="text-sm text-warning">
               <strong>Note:</strong> This DAG has restrictions:
               {paramsReadOnly && runIdReadOnly && (
                 <span> Parameter editing and custom run IDs are disabled.</span>
@@ -147,7 +148,6 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
               id="enqueue"
               checked={enqueue}
               onCheckedChange={(checked) => setEnqueue(checked as boolean)}
-              className="border-gray-400 dark:border-gray-500"
             />
             <Label htmlFor="enqueue" className="cursor-pointer">
               Enqueue
@@ -162,7 +162,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
               value={dagRunId}
               readOnly={runIdReadOnly}
               disabled={runIdReadOnly}
-              className={runIdReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}
+              className={runIdReadOnly ? 'bg-muted cursor-not-allowed' : ''}
               onChange={(e) => {
                 if (!runIdReadOnly) {
                   setDAGRunId(e.target.value);
@@ -183,7 +183,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
                     readOnly={paramsReadOnly}
                     disabled={paramsReadOnly}
                     className={
-                      paramsReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+                      paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
                     }
                     onChange={(e) => {
                       if (p.Name && !paramsReadOnly) {
@@ -216,7 +216,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
                     readOnly={paramsReadOnly}
                     disabled={paramsReadOnly}
                     className={
-                      paramsReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+                      paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
                     }
                     onChange={(e) => {
                       if (paramsReadOnly) return;
@@ -243,9 +243,10 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
         <DialogFooter>
           <Button
             ref={cancelButtonRef}
-            variant="outline"
+            variant="ghost"
             onClick={dismissModal}
           >
+            <X className="h-4 w-4" />
             Cancel
           </Button>
           <Button
@@ -258,7 +259,17 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
               );
             }}
           >
-            {enqueue ? 'Enqueue' : 'Start'}
+            {enqueue ? (
+              <>
+                <ListPlus className="h-4 w-4" />
+                Enqueue
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" />
+                Start
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

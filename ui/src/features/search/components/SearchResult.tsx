@@ -19,7 +19,7 @@ function SearchResult({ results }: Props) {
               <div className="flex flex-col space-y-2 w-full">
                 {j == 0 ? (
                   <Link to={`/dags/${encodeURI(result.name)}/spec`}>
-                    <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+                    <h3 className="text-lg font-semibold text-foreground">
                       {result.name}
                     </h3>
                   </Link>
@@ -39,7 +39,7 @@ function SearchResult({ results }: Props) {
           ret.push(
             <div
               key={`${result.name}-divider`}
-              className="h-px bg-gray-200 my-2"
+              className="h-px bg-accent my-2"
             />
           );
         }

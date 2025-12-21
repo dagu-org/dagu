@@ -65,14 +65,14 @@ export const CommandDisplay: React.FC<CommandDisplayProps> = ({
   const commandElement = (
     <div className={`space-y-1 ${className}`}>
       <div className="flex items-center gap-1.5 text-xs font-medium">
-        <Icon className="h-4 w-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
-        <span className="bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300 font-mono">
+        <Icon className="h-4 w-4 text-primary flex-shrink-0" />
+        <span className="bg-muted rounded-md px-1.5 py-0.5 text-foreground/90 font-mono">
           {truncatedCommand}
         </span>
       </div>
 
       {argsString && (
-        <div className="pl-5 text-xs text-slate-500 dark:text-slate-400 font-mono">
+        <div className="pl-5 text-xs text-muted-foreground font-mono">
           <span className="opacity-60"></span> {truncatedArgs}
         </div>
       )}
@@ -90,15 +90,15 @@ export const CommandDisplay: React.FC<CommandDisplayProps> = ({
       </TooltipTrigger>
       <TooltipContent className="max-w-[600px]">
         <div className="space-y-2">
-          <div className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+          <div className="text-xs font-semibold text-muted-foreground">
             Full Command:
           </div>
-          <pre className="whitespace-pre-wrap break-all text-xs font-mono bg-slate-50 dark:bg-slate-900 p-2 rounded">
+          <pre className="whitespace-pre-wrap break-all text-xs font-mono bg-muted p-2 rounded">
             {command}
             {argsString && (
               <>
                 {'\n'}
-                <span className="text-slate-500 dark:text-slate-400">
+                <span className="text-muted-foreground">
                   Arguments:{' '}
                 </span>
                 {argsString}

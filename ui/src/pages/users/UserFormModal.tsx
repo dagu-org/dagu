@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Check, UserPlus, X } from 'lucide-react';
 
 type User = components['schemas']['User'];
 
@@ -191,10 +191,12 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} className="h-8">
+            <Button type="button" variant="ghost" onClick={onClose}>
+              <X className="h-4 w-4" />
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading} className="h-8">
+            <Button type="submit" disabled={isLoading}>
+              {isEditing ? <Check className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
               {isLoading ? 'Saving...' : isEditing ? 'Update' : 'Create'}
             </Button>
           </div>

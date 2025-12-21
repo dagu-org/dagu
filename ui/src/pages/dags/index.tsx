@@ -6,9 +6,11 @@ import {
   PathsDagsGetParametersQueryOrder,
   PathsDagsGetParametersQuerySort,
 } from '../../api/v2/schema';
+import SplitLayout from '../../components/SplitLayout';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
+import { DAGDetailsPanel } from '../../features/dags/components/dag-details';
 import { DAGErrors } from '../../features/dags/components/dag-editor';
 import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
@@ -56,9 +58,7 @@ function DAGs() {
     []
   );
 
-  const [searchText, setSearchText] = React.useState(
-    defaultFilters.searchText
-  );
+  const [searchText, setSearchText] = React.useState(defaultFilters.searchText);
   const [searchTag, setSearchTag] = React.useState(defaultFilters.searchTag);
   const [page, setPage] = React.useState<number>(defaultFilters.page);
   const [apiSearchText, setAPISearchText] = React.useState(
@@ -69,6 +69,7 @@ function DAGs() {
   );
   const [sortField, setSortField] = React.useState(defaultFilters.sortField);
   const [sortOrder, setSortOrder] = React.useState(defaultFilters.sortOrder);
+  const [selectedDAG, setSelectedDAG] = React.useState<string | null>(null);
 
   const currentFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
@@ -86,8 +87,9 @@ function DAGs() {
     currentFiltersRef.current = currentFilters;
   }, [currentFilters]);
 
-  const lastPersistedFiltersRef =
-    React.useRef<DAGDefinitionsFilters | null>(null);
+  const lastPersistedFiltersRef = React.useRef<DAGDefinitionsFilters | null>(
+    null
+  );
 
   React.useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -152,12 +154,7 @@ function DAGs() {
 
     lastPersistedFiltersRef.current = next;
     searchState.writeState('dagDefinitions', remoteKey, next);
-  }, [
-    defaultFilters,
-    location.search,
-    remoteKey,
-    searchState,
-  ]);
+  }, [defaultFilters, location.search, remoteKey, searchState]);
 
   React.useEffect(() => {
     const persisted = lastPersistedFiltersRef.current;
@@ -191,7 +188,7 @@ function DAGs() {
     {
       refreshInterval: 1000,
       revalidateIfStale: false,
-      keepPreviousData: true, // Keep previous data while loading new data
+      keepPreviousData: true,
     }
   );
 
@@ -222,9 +219,9 @@ function DAGs() {
     let errorCount = 0;
     if (data && data.dags) {
       for (const val of data.dags) {
-        dagFiles.push(val); // Always add the DAG to the list
+        dagFiles.push(val);
         if (val.errors?.length) {
-          errorCount += 1; // Count DAGs with errors
+          errorCount += 1;
         }
       }
     }
@@ -274,66 +271,76 @@ function DAGs() {
     addSearchParam('order', order);
     setSortField(field);
     setSortOrder(order);
-    setPage(1); // Reset to first page when sorting changes
+    setPage(1);
   };
 
-  // Store the last valid data to prevent blank screens during loading
   const [lastValidData, setLastValidData] = React.useState<typeof data | null>(
     null
   );
 
-  // Update lastValidData whenever we get new data
   React.useEffect(() => {
     if (data) {
       setLastValidData(data);
     }
   }, [data]);
 
-  // Use the current data if available, otherwise use the last valid data
   const displayData = data || lastValidData;
 
-  return (
-    <div className="flex flex-col">
+  const leftPanel = (
+    <div className="pr-2">
       <DAGListHeader onRefresh={refreshFn} />
-
-      {/* Content */}
-      <div className="w-full">
-        {displayData ? (
-          <>
-            <DAGErrors
-              dags={displayData.dags || []}
-              errors={displayData.errors || []}
-              hasError={
-                (errorCount > 0 || displayData.errors?.length > 0) && !isLoading
-              }
-            />
-            <DAGTable
-              dags={isLoading ? (lastValidData ? dagFiles : []) : dagFiles}
-              group={group}
-              refreshFn={refreshFn}
-              searchText={searchText}
-              handleSearchTextChange={searchTextChange}
-              searchTag={searchTag}
-              handleSearchTagChange={searchTagChange}
-              pagination={{
-                totalPages: displayData.pagination.totalPages,
-                page: page,
-                pageChange: pageChange,
-                onPageLimitChange: handlePageLimitChange,
-                pageLimit: preferences.pageLimit,
-              }}
-              isLoading={isLoading}
-              sortField={sortField}
-              sortOrder={sortOrder}
-              onSortChange={handleSortChange}
-            />
-          </>
-        ) : (
-          /* Show initial loading state if no data yet */
-          <LoadingIndicator />
-        )}
-      </div>
+      {displayData ? (
+        <>
+          <DAGErrors
+            dags={displayData.dags || []}
+            errors={displayData.errors || []}
+            hasError={
+              (errorCount > 0 || displayData.errors?.length > 0) && !isLoading
+            }
+          />
+          <DAGTable
+            dags={isLoading ? (lastValidData ? dagFiles : []) : dagFiles}
+            group={group}
+            refreshFn={refreshFn}
+            searchText={searchText}
+            handleSearchTextChange={searchTextChange}
+            searchTag={searchTag}
+            handleSearchTagChange={searchTagChange}
+            pagination={{
+              totalPages: displayData.pagination.totalPages,
+              page: page,
+              pageChange: pageChange,
+              onPageLimitChange: handlePageLimitChange,
+              pageLimit: preferences.pageLimit,
+            }}
+            isLoading={isLoading}
+            sortField={sortField}
+            sortOrder={sortOrder}
+            onSortChange={handleSortChange}
+            selectedDAG={selectedDAG}
+            onSelectDAG={setSelectedDAG}
+          />
+        </>
+      ) : (
+        <LoadingIndicator />
+      )}
     </div>
+  );
+
+  const rightPanel = selectedDAG ? (
+    <DAGDetailsPanel
+      fileName={selectedDAG}
+      onClose={() => setSelectedDAG(null)}
+    />
+  ) : null;
+
+  return (
+    <SplitLayout
+      leftPanel={leftPanel}
+      rightPanel={rightPanel}
+      defaultLeftWidth={40}
+      emptyRightMessage="Select a DAG to view details"
+    />
   );
 }
 

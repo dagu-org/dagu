@@ -24,7 +24,11 @@ type Props = {
   /** DAG file name */
   fileName: string;
   /** Function to open log viewer */
-  onViewLog?: (stepName: string, dagRunId: string, node?: components['schemas']['Node']) => void;
+  onViewLog?: (
+    stepName: string,
+    dagRunId: string,
+    node?: components['schemas']['Node']
+  ) => void;
 };
 
 /**
@@ -39,31 +43,31 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
   return (
     <div>
       {/* Desktop view - Table with horizontal scroll for intermediate sizes */}
-      <div className="hidden md:block w-full overflow-x-auto">
+      <div className="hidden md:block w-full overflow-x-auto p-px">
         <div className="min-w-[900px]">
           <Table className="w-full">
-            <TableHeader className="bg-slate-50 dark:bg-slate-800">
-              <TableRow className="border-b border-slate-200 dark:border-slate-700">
-                <TableHead className="w-[5%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 text-center">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[5%] py-3 text-sm font-semibold text-foreground/90 text-center">
                   No
                 </TableHead>
-                <TableHead className="w-[20%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <TableHead className="w-[20%] py-3 text-sm font-semibold text-foreground/90">
                   Step Name
                 </TableHead>
-                <TableHead className="w-[15%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <TableHead className="w-[15%] py-3 text-sm font-semibold text-foreground/90">
                   Command
                 </TableHead>
-                <TableHead className="w-[15%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <TableHead className="w-[15%] py-3 text-sm font-semibold text-foreground/90">
                   Last Run
                 </TableHead>
-                <TableHead className="w-[10%] py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <TableHead className="w-[10%] py-3 text-center text-sm font-semibold text-foreground/90">
                   Status
                 </TableHead>
-                <TableHead className="w-[35%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 min-w-[150px]">
+                <TableHead className="w-[35%] py-3 text-sm font-semibold text-foreground/90 min-w-[150px]">
                   Error / Logs
                 </TableHead>
                 {status?.dagRunId && (
-                  <TableHead className="w-[8%] py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 text-center">
+                  <TableHead className="w-[8%] py-3 text-sm font-semibold text-foreground/90 text-center">
                     Actions
                   </TableHead>
                 )}

@@ -76,7 +76,7 @@ const generatePaginationItems = (
           <Button
             variant="ghost"
             size="icon"
-            className={`h-6 w-6 sm:h-7 sm:w-7 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${i === currentPage ? 'bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/60 text-blue-700 dark:text-blue-300 font-medium' : 'text-muted-foreground font-normal'}`}
+            className={`h-6 w-6 sm:h-7 sm:w-7 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${i === currentPage ? 'bg-primary/15 hover:bg-primary/20 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
             onClick={(e) => {
               e.preventDefault();
               onPageChange(i);
@@ -95,7 +95,7 @@ const generatePaginationItems = (
         <Button
           variant="ghost"
           size="icon"
-          className={`h-6 w-6 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${1 === currentPage ? 'bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/60 text-blue-700 dark:text-blue-300 font-medium' : 'text-muted-foreground font-normal'}`}
+          className={`h-6 w-6 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${1 === currentPage ? 'bg-primary/15 hover:bg-primary/20 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
           onClick={(e) => {
             e.preventDefault();
             onPageChange(1);
@@ -127,7 +127,7 @@ const generatePaginationItems = (
           <Button
             variant="ghost"
             size="icon"
-            className={`h-6 w-6 sm:h-7 sm:w-7 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${i === currentPage ? 'bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/60 text-blue-700 dark:text-blue-300 font-medium' : 'text-muted-foreground font-normal'}`}
+            className={`h-6 w-6 sm:h-7 sm:w-7 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${i === currentPage ? 'bg-primary/15 hover:bg-primary/20 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
             onClick={(e) => {
               e.preventDefault();
               onPageChange(i);
@@ -157,7 +157,7 @@ const generatePaginationItems = (
         <Button
           variant="ghost"
           size="icon"
-          className={`h-6 w-6 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${totalPages === currentPage ? 'bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/60 text-blue-700 dark:text-blue-300 font-medium' : 'text-muted-foreground font-normal'}`}
+          className={`h-6 w-6 rounded-md text-xs flex items-center justify-center hover:bg-muted transition-colors cursor-pointer ${totalPages === currentPage ? 'bg-primary/15 hover:bg-primary/20 text-primary font-medium' : 'text-muted-foreground font-normal'}`}
           onClick={(e) => {
             e.preventDefault();
             onPageChange(totalPages);
@@ -289,11 +289,11 @@ const DAGPagination = ({
               <circle cx="12" cy="19" r="1" />
             </svg>
           </Button>
-          <div className="absolute right-0 mt-1 w-[100px] bg-background border border-border rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+          <div className="absolute right-0 mt-1 w-[100px] bg-background border border-border rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
             {[10, 25, 50, 100, 200].map((limit) => (
               <div
                 key={limit}
-                className={`px-2 py-1 text-xs cursor-pointer hover:bg-muted transition-colors ${pageLimit === limit ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium' : ''}`}
+                className={`px-2 py-1 text-xs cursor-pointer hover:bg-muted transition-colors ${pageLimit === limit ? 'bg-primary/15 text-primary font-medium' : ''}`}
                 onClick={() => onPageLimitChange(limit)}
               >
                 {limit}

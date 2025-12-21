@@ -42,13 +42,13 @@ const DAGErrorSnackBar = ({ open, setOpen, errors }: DAGErrorSnackBarProps) => {
   return (
     <ToastProvider>
       <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-[20vw] max-w-md">
-        <Toast variant="destructive" className="bg-white border-red-500">
+        <Toast variant="destructive" className="bg-card border-error">
           <div className="flex flex-col items-center w-full">
-            <ToastTitle className="text-red-500 text-xl font-bold">
+            <ToastTitle className="text-error text-xl font-bold">
               Error Detected
             </ToastTitle>
 
-            <ToastDescription className="text-red-400 text-lg mt-1">
+            <ToastDescription className="text-error text-lg mt-1">
               Please check the following errors:
             </ToastDescription>
 
@@ -57,7 +57,7 @@ const DAGErrorSnackBar = ({ open, setOpen, errors }: DAGErrorSnackBarProps) => {
                 <Alert
                   key={index}
                   variant="destructive"
-                  className="mb-2 bg-red-50 text-red-400 text-sm py-2"
+                  className="mb-2 bg-error-muted text-error text-sm py-2"
                 >
                   {error}
                 </Alert>
