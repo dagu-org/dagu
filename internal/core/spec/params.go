@@ -20,71 +20,6 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 )
 
-// buildParams builds the parameters for the DAG.
-func buildParams(ctx BuildContext, spec *dag, dag *core.DAG) error {
-	var (
-		paramPairs []paramPair
-		envs       []string
-	)
-
-	if err := parseParams(ctx, spec.Params, &paramPairs, &envs); err != nil {
-		return err
-	}
-
-	// Create default parameters string in the form of "key=value key=value ..."
-	var paramsToJoin []string
-	for _, paramPair := range paramPairs {
-		paramsToJoin = append(paramsToJoin, paramPair.Escaped())
-	}
-	dag.DefaultParams = strings.Join(paramsToJoin, " ")
-
-	if ctx.opts.Parameters != "" {
-		// Parse the parameters from the command line and override the default parameters
-		var (
-			overridePairs []paramPair
-			overrideEnvs  []string
-		)
-		if err := parseParams(ctx, ctx.opts.Parameters, &overridePairs, &overrideEnvs); err != nil {
-			return err
-		}
-		// Override the default parameters with the command line parameters
-		overrideParams(&paramPairs, overridePairs)
-	}
-
-	if len(ctx.opts.ParametersList) > 0 {
-		var (
-			overridePairs []paramPair
-			overrideEnvs  []string
-		)
-		if err := parseParams(ctx, ctx.opts.ParametersList, &overridePairs, &overrideEnvs); err != nil {
-			return err
-		}
-		// Override the default parameters with the command line parameters
-		overrideParams(&paramPairs, overridePairs)
-	}
-
-	// Validate the parameters against a resolved schema (if declared)
-	if !ctx.opts.Has(BuildFlagSkipSchemaValidation) {
-		if resolvedSchema, err := resolveSchemaFromParams(spec.Params, spec.WorkingDir, dag.Location); err != nil {
-			return fmt.Errorf("failed to get JSON schema: %w", err)
-		} else if resolvedSchema != nil {
-			updatedPairs, err := validateParams(paramPairs, resolvedSchema)
-			if err != nil {
-				return err
-			}
-			paramPairs = updatedPairs
-		}
-	}
-
-	for _, paramPair := range paramPairs {
-		dag.Params = append(dag.Params, paramPair.String())
-	}
-
-	dag.Env = append(dag.Env, envs...)
-
-	return nil
-}
-
 func validateParams(paramPairs []paramPair, schema *jsonschema.Resolved) ([]paramPair, error) {
 	// Convert paramPairs to a map for validation
 	paramMap := make(map[string]any)
@@ -545,4 +480,3 @@ func resolveSchemaFromParams(params any, workingDir, dagLocation string) (*jsons
 	}
 	return getSchemaFromRef(workingDir, dagLocation, schemaRef)
 }
-

@@ -213,7 +213,7 @@ func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.D
 		return nil, core.ErrorList{err}
 	}
 
-	return def.Build(BuildContext{ctx: ctx, opts: opts})
+	return def.build(BuildContext{ctx: ctx, opts: opts})
 }
 
 // LoadBaseConfig loads the global configuration from the given file.
@@ -240,7 +240,7 @@ func LoadBaseConfig(ctx BuildContext, file string) (*core.DAG, error) {
 		Flags: ctx.opts.Flags,
 	}).WithFile(file)
 
-	return def.Build(ctx)
+	return def.build(ctx)
 }
 
 // loadDAG loads the core.DAG from the given file.
@@ -360,7 +360,7 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *dag) ([]*core.
 			buildCtx.opts.Parameters = ""
 			buildCtx.opts.ParametersList = nil
 			// Build the base core.DAG
-			baseDAG, err := baseDef.Build(buildCtx)
+			baseDAG, err := baseDef.build(buildCtx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build base core.DAG for document %d: %w", docIndex, err)
 			}
@@ -377,7 +377,7 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *dag) ([]*core.
 		}
 
 		// Build the core.DAG from the current document
-		dag, err := spec.Build(ctx)
+		dag, err := spec.build(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build core.DAG in document %d: %w", docIndex, err)
 		}

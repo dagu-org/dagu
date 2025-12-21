@@ -211,9 +211,9 @@ type secretRef struct {
 	Options map[string]string `yaml:"options,omitempty"`
 }
 
-// Build transforms the dag specification into a core.DAG.
+// build transforms the dag specification into a core.DAG.
 // Simple field mappings are done inline; complex transformations call dedicated methods.
-func (d *dag) Build(ctx BuildContext) (*core.DAG, error) {
+func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	// Initialize with simple field mappings
 	result := &core.DAG{
 		Location:          ctx.file,
@@ -829,28 +829,28 @@ func (d *dag) buildHandlers(ctx BuildContext, result *core.DAG) (err error) {
 
 	if d.HandlerOn.Init != nil {
 		d.HandlerOn.Init.Name = core.HandlerOnInit.String()
-		if result.HandlerOn.Init, err = d.HandlerOn.Init.Build(buildCtx); err != nil {
+		if result.HandlerOn.Init, err = d.HandlerOn.Init.build(buildCtx); err != nil {
 			return err
 		}
 	}
 
 	if d.HandlerOn.Exit != nil {
 		d.HandlerOn.Exit.Name = core.HandlerOnExit.String()
-		if result.HandlerOn.Exit, err = d.HandlerOn.Exit.Build(buildCtx); err != nil {
+		if result.HandlerOn.Exit, err = d.HandlerOn.Exit.build(buildCtx); err != nil {
 			return err
 		}
 	}
 
 	if d.HandlerOn.Success != nil {
 		d.HandlerOn.Success.Name = core.HandlerOnSuccess.String()
-		if result.HandlerOn.Success, err = d.HandlerOn.Success.Build(buildCtx); err != nil {
+		if result.HandlerOn.Success, err = d.HandlerOn.Success.build(buildCtx); err != nil {
 			return
 		}
 	}
 
 	if d.HandlerOn.Failure != nil {
 		d.HandlerOn.Failure.Name = core.HandlerOnFailure.String()
-		if result.HandlerOn.Failure, err = d.HandlerOn.Failure.Build(buildCtx); err != nil {
+		if result.HandlerOn.Failure, err = d.HandlerOn.Failure.build(buildCtx); err != nil {
 			return
 		}
 	}
@@ -868,7 +868,7 @@ func (d *dag) buildHandlers(ctx BuildContext, result *core.DAG) (err error) {
 	}
 	if abortStep != nil {
 		abortStep.Name = core.HandlerOnCancel.String()
-		if result.HandlerOn.Cancel, err = abortStep.Build(buildCtx); err != nil {
+		if result.HandlerOn.Cancel, err = abortStep.build(buildCtx); err != nil {
 			return
 		}
 	}
@@ -1041,7 +1041,7 @@ func (d *dag) buildSteps(ctx BuildContext, result *core.DAG) error {
 		for name, st := range stepsMap {
 			st.Name = name
 			names[st.Name] = struct{}{}
-			builtStep, err := st.Build(buildCtx)
+			builtStep, err := st.build(buildCtx)
 			if err != nil {
 				return err
 			}

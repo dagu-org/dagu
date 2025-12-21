@@ -105,9 +105,9 @@ type retryPolicy struct {
 	MaxIntervalSec int   `yaml:"maxIntervalSec,omitempty"`
 }
 
-// Build transforms the step specification into a core.Step.
+// build transforms the step specification into a core.Step.
 // Simple field mappings are done inline; complex transformations call dedicated methods.
-func (s *step) Build(ctx StepBuildContext) (*core.Step, error) {
+func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	// Initialize with simple field mappings
 	result := &core.Step{
 		Name:           strings.TrimSpace(s.Name),

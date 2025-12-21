@@ -4366,7 +4366,7 @@ steps:
 	})
 }
 
-func TestStepTimeout(t *testing.T) {
+func TestBuildStepTimeout(t *testing.T) {
 	t.Parallel()
 
 	// Positive timeout

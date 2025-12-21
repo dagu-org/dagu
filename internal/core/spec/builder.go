@@ -244,7 +244,7 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 	if err := md.Decode(raw); err != nil {
 		return nil, core.NewValidationError("steps", raw, err)
 	}
-	builtStep, err := st.Build(ctx)
+	builtStep, err := st.build(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -331,4 +331,3 @@ func getStepAlternateKey(step *core.Step, primaryKey string) string {
 	}
 	return ""
 }
-
