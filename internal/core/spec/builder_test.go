@@ -1475,6 +1475,36 @@ steps:
 		assert.Nil(t, dag)
 		assert.Contains(t, err.Error(), "backoff must be greater than 1.0")
 	})
+	t.Run("RetryPolicyMissingLimit", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: "test"
+    command: "echo test"
+    retryPolicy:
+      intervalSec: 5
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		assert.Error(t, err)
+		assert.Nil(t, dag)
+		assert.Contains(t, err.Error(), "limit is required when retryPolicy is specified")
+	})
+	t.Run("RetryPolicyMissingIntervalSec", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+steps:
+  - name: "test"
+    command: "echo test"
+    retryPolicy:
+      limit: 3
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		assert.Error(t, err)
+		assert.Nil(t, dag)
+		assert.Contains(t, err.Error(), "intervalSec is required when retryPolicy is specified")
+	})
 	t.Run("RepeatPolicy", func(t *testing.T) {
 		t.Parallel()
 
@@ -4421,5 +4451,465 @@ steps:
 		_, err := spec.LoadYAML(context.Background(), data)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "timeoutSec must be >= 0")
+	})
+}
+
+func TestBuildHandlers(t *testing.T) {
+	t.Parallel()
+
+	t.Run("AllHandlers", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+handlerOn:
+  init:
+    command: echo init
+  exit:
+    command: echo exit
+  success:
+    command: echo success
+  failure:
+    command: echo failure
+  abort:
+    command: echo abort
+steps:
+  - name: main
+    command: echo main
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.NotNil(t, dag.HandlerOn.Init)
+		assert.Equal(t, "echo init", dag.HandlerOn.Init.CmdWithArgs)
+		require.NotNil(t, dag.HandlerOn.Exit)
+		assert.Equal(t, "echo exit", dag.HandlerOn.Exit.CmdWithArgs)
+		require.NotNil(t, dag.HandlerOn.Success)
+		assert.Equal(t, "echo success", dag.HandlerOn.Success.CmdWithArgs)
+		require.NotNil(t, dag.HandlerOn.Failure)
+		assert.Equal(t, "echo failure", dag.HandlerOn.Failure.CmdWithArgs)
+		require.NotNil(t, dag.HandlerOn.Cancel)
+		assert.Equal(t, "echo abort", dag.HandlerOn.Cancel.CmdWithArgs)
+	})
+
+	t.Run("CancelDeprecated", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+handlerOn:
+  cancel:
+    command: echo cancel
+steps:
+  - name: main
+    command: echo main
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.NotNil(t, dag.HandlerOn.Cancel)
+		assert.Equal(t, "echo cancel", dag.HandlerOn.Cancel.CmdWithArgs)
+	})
+
+	t.Run("AbortAndCancelConflict", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+handlerOn:
+  abort:
+    command: echo abort
+  cancel:
+    command: echo cancel
+steps:
+  - name: main
+    command: echo main
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot specify both 'abort' and 'cancel'")
+	})
+}
+
+func TestBuildParallel(t *testing.T) {
+	t.Parallel()
+
+	t.Run("StringForm_VariableReference", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel: ${ITEMS}
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.NotNil(t, dag.Steps[0].Parallel)
+		assert.Equal(t, "${ITEMS}", dag.Steps[0].Parallel.Variable)
+		assert.Equal(t, core.DefaultMaxConcurrent, dag.Steps[0].Parallel.MaxConcurrent)
+	})
+
+	t.Run("ArrayForm_StaticItems", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      - item1
+      - item2
+      - item3
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.NotNil(t, dag.Steps[0].Parallel)
+		require.Len(t, dag.Steps[0].Parallel.Items, 3)
+		assert.Equal(t, "item1", dag.Steps[0].Parallel.Items[0].Value)
+		assert.Equal(t, "item2", dag.Steps[0].Parallel.Items[1].Value)
+		assert.Equal(t, "item3", dag.Steps[0].Parallel.Items[2].Value)
+	})
+
+	t.Run("ArrayForm_NumericItems", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      - 1
+      - 2
+      - 3
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.NotNil(t, dag.Steps[0].Parallel)
+		require.Len(t, dag.Steps[0].Parallel.Items, 3)
+		assert.Equal(t, "1", dag.Steps[0].Parallel.Items[0].Value)
+		assert.Equal(t, "2", dag.Steps[0].Parallel.Items[1].Value)
+		assert.Equal(t, "3", dag.Steps[0].Parallel.Items[2].Value)
+	})
+
+	t.Run("ArrayForm_ObjectItems", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      - name: first
+        value: 100
+      - name: second
+        value: 200
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.NotNil(t, dag.Steps[0].Parallel)
+		require.Len(t, dag.Steps[0].Parallel.Items, 2)
+		assert.Equal(t, "first", dag.Steps[0].Parallel.Items[0].Params["name"])
+		assert.Equal(t, "100", dag.Steps[0].Parallel.Items[0].Params["value"])
+		assert.Equal(t, "second", dag.Steps[0].Parallel.Items[1].Params["name"])
+		assert.Equal(t, "200", dag.Steps[0].Parallel.Items[1].Params["value"])
+	})
+
+	t.Run("ObjectForm_WithVariable", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      items: ${MY_ITEMS}
+      maxConcurrent: 5
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.NotNil(t, dag.Steps[0].Parallel)
+		assert.Equal(t, "${MY_ITEMS}", dag.Steps[0].Parallel.Variable)
+		assert.Equal(t, 5, dag.Steps[0].Parallel.MaxConcurrent)
+	})
+
+	t.Run("ObjectForm_WithStaticItems", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      items:
+        - a
+        - b
+      maxConcurrent: 3
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.NotNil(t, dag.Steps[0].Parallel)
+		require.Len(t, dag.Steps[0].Parallel.Items, 2)
+		assert.Equal(t, "a", dag.Steps[0].Parallel.Items[0].Value)
+		assert.Equal(t, "b", dag.Steps[0].Parallel.Items[1].Value)
+		assert.Equal(t, 3, dag.Steps[0].Parallel.MaxConcurrent)
+	})
+
+	t.Run("ObjectForm_MaxConcurrentAsInt64", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      items: ${ITEMS}
+      maxConcurrent: 10
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.NotNil(t, dag.Steps[0].Parallel)
+		assert.Equal(t, 10, dag.Steps[0].Parallel.MaxConcurrent)
+	})
+
+	t.Run("ObjectForm_MaxConcurrentAsFloat", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      items: ${ITEMS}
+      maxConcurrent: 7.0
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.NotNil(t, dag.Steps[0].Parallel)
+		assert.Equal(t, 7, dag.Steps[0].Parallel.MaxConcurrent)
+	})
+
+	t.Run("Error_InvalidParallelType", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel: 123
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parallel must be string, array, or object")
+	})
+
+	t.Run("Error_InvalidItemsType", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      items: 123
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parallel.items must be string or array")
+	})
+
+	t.Run("Error_InvalidMaxConcurrentType", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      items: ${ITEMS}
+      maxConcurrent: "invalid"
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parallel.maxConcurrent must be int")
+	})
+
+	t.Run("Error_InvalidItemValue", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      - [nested, array]
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parallel items must be strings, numbers, or objects")
+	})
+
+	t.Run("ObjectItem_WithBoolValue", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      - name: test
+        enabled: true
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.NotNil(t, dag.Steps[0].Parallel)
+		require.Len(t, dag.Steps[0].Parallel.Items, 1)
+		assert.Equal(t, "true", dag.Steps[0].Parallel.Items[0].Params["enabled"])
+	})
+
+	t.Run("ObjectItem_WithFloatValue", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      - name: test
+        rate: 3.14
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.NotNil(t, dag.Steps[0].Parallel)
+		require.Len(t, dag.Steps[0].Parallel.Items, 1)
+		assert.Equal(t, "3.14", dag.Steps[0].Parallel.Items[0].Params["rate"])
+	})
+
+	t.Run("Error_InvalidObjectParamType", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      - name: test
+        nested:
+          key: value
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parameter values must be strings, numbers, or booleans")
+	})
+
+	t.Run("ParallelSetsExecutorType", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: parallel-step
+    call: subdag
+    parallel:
+      - item1
+      - item2
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		assert.Equal(t, core.ExecutorTypeParallel, dag.Steps[0].ExecutorConfig.Type)
+	})
+}
+
+func TestBuildRegistryAuthsExtra(t *testing.T) {
+	t.Parallel()
+
+	t.Run("StringForm_JSON", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+registryAuths: '{"auths":{"docker.io":{"auth":"dXNlcjpwYXNz"}}}'
+steps:
+  - name: test
+    command: echo test
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Contains(t, dag.RegistryAuths, "_json")
+		assert.Equal(t, `{"auths":{"docker.io":{"auth":"dXNlcjpwYXNz"}}}`, dag.RegistryAuths["_json"].Auth)
+	})
+
+	t.Run("MapForm_WithAuthString", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+registryAuths:
+  docker.io: "dXNlcjpwYXNz"
+  gcr.io: "another-token"
+steps:
+  - name: test
+    command: echo test
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Contains(t, dag.RegistryAuths, "docker.io")
+		require.Contains(t, dag.RegistryAuths, "gcr.io")
+		assert.Equal(t, "dXNlcjpwYXNz", dag.RegistryAuths["docker.io"].Auth)
+		assert.Equal(t, "another-token", dag.RegistryAuths["gcr.io"].Auth)
+	})
+
+	t.Run("Error_InvalidType", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+registryAuths: 123
+steps:
+  - name: test
+    command: echo test
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid type")
+	})
+}
+
+func TestLoadWithOptions(t *testing.T) {
+	t.Run("WithoutEval_DisablesEnvExpansion", func(t *testing.T) {
+		// Cannot use t.Parallel() with t.Setenv()
+		t.Setenv("MY_VAR", "expanded-value")
+
+		data := []byte(`
+env:
+  - TEST: "${MY_VAR}"
+steps:
+  - name: test
+    command: echo test
+`)
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{Flags: spec.BuildFlagNoEval})
+		require.NoError(t, err)
+
+		// When NoEval is set, the variable should not be expanded
+		// dag.Env is []string in format "KEY=VALUE"
+		assert.Contains(t, dag.Env, "TEST=${MY_VAR}")
+	})
+
+	t.Run("WithAllowBuildErrors_CapturesErrors", func(t *testing.T) {
+		t.Parallel()
+		data := []byte(`
+steps:
+  - name: test
+    command: echo test
+    depends:
+      - nonexistent
+`)
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{Flags: spec.BuildFlagAllowBuildErrors})
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		assert.NotEmpty(t, dag.BuildErrors)
+	})
+
+	t.Run("SkipSchemaValidation_SkipsParamsSchema", func(t *testing.T) {
+		t.Parallel()
+		// BuildFlagSkipSchemaValidation skips JSON schema validation for params,
+		// not YAML structure validation
+		data := []byte(`
+params:
+  schema: "nonexistent-schema.json"
+  values:
+    key: value
+steps:
+  - name: test
+    command: echo test
+`)
+		// Without the flag, it would error due to missing schema file
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+
+		// With schema validation skipped, it succeeds
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{Flags: spec.BuildFlagSkipSchemaValidation})
+		require.NoError(t, err)
+		require.NotNil(t, dag)
 	})
 }

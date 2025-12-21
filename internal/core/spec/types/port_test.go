@@ -51,6 +51,20 @@ func TestPortValue_UnmarshalYAML(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be string or number")
 	})
+
+	t.Run("float with decimal - must be integer", func(t *testing.T) {
+		var p types.PortValue
+		err := yaml.Unmarshal([]byte(`22.5`), &p)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "port must be an integer")
+	})
+
+	t.Run("float whole number - allowed", func(t *testing.T) {
+		var p types.PortValue
+		err := yaml.Unmarshal([]byte(`22.0`), &p)
+		require.NoError(t, err)
+		assert.Equal(t, "22", p.String())
+	})
 }
 
 func TestPortValue_InStruct(t *testing.T) {

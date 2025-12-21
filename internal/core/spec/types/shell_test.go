@@ -87,6 +87,31 @@ func TestShellValue_UnmarshalYAML(t *testing.T) {
 		assert.Equal(t, "nix-shell", s.Command())
 		assert.Equal(t, []string{"-p", "python3"}, s.Arguments())
 	})
+
+	t.Run("null value", func(t *testing.T) {
+		var s types.ShellValue
+		err := yaml.Unmarshal([]byte(`null`), &s)
+		require.NoError(t, err)
+		assert.True(t, s.IsZero())
+	})
+
+	t.Run("array with non-string items - stringified", func(t *testing.T) {
+		var s types.ShellValue
+		err := yaml.Unmarshal([]byte(`[123, true]`), &s)
+		require.NoError(t, err)
+		// Non-string items are stringified for flexibility
+		assert.Equal(t, "123", s.Command())
+		assert.Equal(t, []string{"true"}, s.Arguments())
+	})
+
+	t.Run("single element array", func(t *testing.T) {
+		var s types.ShellValue
+		err := yaml.Unmarshal([]byte(`["bash"]`), &s)
+		require.NoError(t, err)
+		assert.Equal(t, "bash", s.Command())
+		assert.Empty(t, s.Arguments())
+		assert.True(t, s.IsArray())
+	})
 }
 
 func TestShellValue_InStruct(t *testing.T) {

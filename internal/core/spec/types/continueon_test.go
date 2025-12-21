@@ -163,6 +163,54 @@ markSuccess: true
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be string or map")
 	})
+
+	t.Run("output as string array", func(t *testing.T) {
+		data := `output: ["success", "warning", "info"]`
+		var c types.ContinueOnValue
+		err := yaml.Unmarshal([]byte(data), &c)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"success", "warning", "info"}, c.Output())
+	})
+
+	t.Run("exit code as int64", func(t *testing.T) {
+		data := `exitCode: 255`
+		var c types.ContinueOnValue
+		err := yaml.Unmarshal([]byte(data), &c)
+		require.NoError(t, err)
+		assert.Equal(t, []int{255}, c.ExitCode())
+	})
+
+	t.Run("exit code as string", func(t *testing.T) {
+		data := `exitCode: "42"`
+		var c types.ContinueOnValue
+		err := yaml.Unmarshal([]byte(data), &c)
+		require.NoError(t, err)
+		assert.Equal(t, []int{42}, c.ExitCode())
+	})
+
+	t.Run("exit code array with mixed types", func(t *testing.T) {
+		data := `exitCode: [0, "1", 2]`
+		var c types.ContinueOnValue
+		err := yaml.Unmarshal([]byte(data), &c)
+		require.NoError(t, err)
+		assert.Equal(t, []int{0, 1, 2}, c.ExitCode())
+	})
+
+	t.Run("output invalid type in array", func(t *testing.T) {
+		data := `output: [123, true]`
+		var c types.ContinueOnValue
+		err := yaml.Unmarshal([]byte(data), &c)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected string")
+	})
+
+	t.Run("exit code invalid string", func(t *testing.T) {
+		data := `exitCode: "not-a-number"`
+		var c types.ContinueOnValue
+		err := yaml.Unmarshal([]byte(data), &c)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot parse")
+	})
 }
 
 func TestContinueOnValue_InStruct(t *testing.T) {

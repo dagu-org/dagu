@@ -39,6 +39,9 @@ func (p *PortValue) UnmarshalYAML(data []byte) error {
 		return nil
 
 	case float64:
+		if v != float64(int(v)) {
+			return fmt.Errorf("port must be an integer, got %v", v)
+		}
 		p.value = fmt.Sprintf("%d", int(v))
 		return nil
 

@@ -54,15 +54,26 @@ func TestLoad(t *testing.T) {
 	t.Run("MetadataOnly", func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := createTempYAMLFile(t, `steps:
+		testDAG := createTempYAMLFile(t, `
+logDir: /var/log/dagu
+histRetentionDays: 90
+maxCleanUpTimeSec: 60
+mailOn:
+  failure: true
+steps:
   - name: "1"
     command: "true"
 `)
 		dag, err := spec.Load(context.Background(), testDAG, spec.OnlyMetadata())
 		require.NoError(t, err)
+		// Steps should not be loaded in metadata-only mode
 		require.Empty(t, dag.Steps)
-		// Check if the metadata is loaded correctly
-		require.Len(t, dag.Steps, 0)
+		// Non-metadata fields from YAML should NOT be populated in metadata-only mode
+		assert.Empty(t, dag.LogDir, "LogDir should be empty in metadata-only mode")
+		assert.Nil(t, dag.MailOn, "MailOn should be nil in metadata-only mode")
+		// Defaults are still applied by InitializeDefaults (not from YAML)
+		assert.Equal(t, 30, dag.HistRetentionDays, "HistRetentionDays should be default (30), not YAML value (90)")
+		assert.Equal(t, 5*time.Second, dag.MaxCleanUpTime, "MaxCleanUpTime should be default (5s), not YAML value (60s)")
 	})
 	t.Run("DefaultConfig", func(t *testing.T) {
 		t.Parallel()
@@ -614,4 +625,148 @@ steps:
 		// The explicit workingDir from the DAG should take precedence
 		assert.Equal(t, explicitDir, dag.WorkingDir)
 	})
+}
+
+func TestLoadWithLoaderOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("WithDAGsDir", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a DAGs directory
+		dagsDir := t.TempDir()
+
+		// Create a sub-DAG file
+		subDAGPath := filepath.Join(dagsDir, "subdag.yaml")
+		require.NoError(t, os.WriteFile(subDAGPath, []byte(`
+steps:
+  - name: sub-step
+    command: echo sub
+`), 0644))
+
+		// Create main DAG that calls the sub-DAG
+		mainDAG := createTempYAMLFile(t, `
+steps:
+  - name: main-step
+    command: echo main
+`)
+		// Load with WithDAGsDir
+		dag, err := spec.Load(context.Background(), mainDAG, spec.WithDAGsDir(dagsDir))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+	})
+
+	t.Run("WithAllowBuildErrors", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+steps:
+  - name: test
+    command: echo test
+    depends:
+      - nonexistent-step
+`)
+		// Without AllowBuildErrors, this would fail
+		_, err := spec.Load(context.Background(), testDAG)
+		require.Error(t, err)
+
+		// With AllowBuildErrors, it should succeed but capture errors
+		dag, err := spec.Load(context.Background(), testDAG, spec.WithAllowBuildErrors())
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		assert.NotEmpty(t, dag.BuildErrors)
+	})
+
+	t.Run("SkipSchemaValidation", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+params:
+  schema: "nonexistent-schema.json"
+  values:
+    foo: bar
+steps:
+  - name: test
+    command: echo test
+`)
+		// Without SkipSchemaValidation, this would fail due to missing schema
+		_, err := spec.Load(context.Background(), testDAG)
+		require.Error(t, err)
+
+		// With SkipSchemaValidation, it should succeed
+		dag, err := spec.Load(context.Background(), testDAG, spec.SkipSchemaValidation())
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+	})
+
+	t.Run("WithSkipBaseHandlers", func(t *testing.T) {
+		t.Parallel()
+
+		// Create base config with handlers
+		baseDir := t.TempDir()
+		baseConfig := filepath.Join(baseDir, "base.yaml")
+		require.NoError(t, os.WriteFile(baseConfig, []byte(`
+handlerOn:
+  success:
+    command: echo base-success
+`), 0644))
+
+		testDAG := createTempYAMLFile(t, `
+steps:
+  - name: test
+    command: echo test
+`)
+		// Load with base config but skip base handlers
+		dag, err := spec.Load(context.Background(), testDAG,
+			spec.WithBaseConfig(baseConfig),
+			spec.WithSkipBaseHandlers())
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		// The base success handler should not be present
+		assert.Nil(t, dag.HandlerOn.Success)
+	})
+
+	t.Run("WithParamsAsList", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+params: KEY1 KEY2
+steps:
+  - name: test
+    command: echo $KEY1 $KEY2
+`)
+		// Load with params as list
+		dag, err := spec.Load(context.Background(), testDAG,
+			spec.WithParams([]string{"KEY1=value1", "KEY2=value2"}))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// Check that params were applied
+		found := 0
+		for _, p := range dag.Params {
+			if p == "KEY1=value1" || p == "KEY2=value2" {
+				found++
+			}
+		}
+		assert.Equal(t, 2, found, "Both params should be applied")
+	})
+}
+
+// TestLoadWithoutEval tests the WithoutEval loader option
+// This test cannot be parallel because it uses t.Setenv
+func TestLoadWithoutEval(t *testing.T) {
+	t.Setenv("TEST_VAR", "should-not-expand")
+
+	testDAG := createTempYAMLFile(t, `
+env:
+  - MY_VAR: "${TEST_VAR}"
+steps:
+  - name: test
+    command: echo test
+`)
+	dag, err := spec.Load(context.Background(), testDAG, spec.WithoutEval())
+	require.NoError(t, err)
+
+	// With NoEval, environment variables should not be expanded
+	assert.Contains(t, dag.Env, "MY_VAR=${TEST_VAR}")
 }
