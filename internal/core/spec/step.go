@@ -621,7 +621,7 @@ func (s *step) buildParallel(_ StepBuildContext, result *core.Step) error {
 
 	case []any:
 		// Static array: parallel: [item1, item2]
-		items, err := parseParallelItems(v)
+		items, err := s.parseParallelItems(v)
 		if err != nil {
 			return core.NewValidationError("parallel", v, err)
 		}
@@ -636,7 +636,7 @@ func (s *step) buildParallel(_ StepBuildContext, result *core.Step) error {
 				case string:
 					result.Parallel.Variable = itemsVal
 				case []any:
-					items, err := parseParallelItems(itemsVal)
+					items, err := s.parseParallelItems(itemsVal)
 					if err != nil {
 						return core.NewValidationError("parallel.items", itemsVal, err)
 					}
@@ -666,50 +666,6 @@ func (s *step) buildParallel(_ StepBuildContext, result *core.Step) error {
 	}
 
 	return nil
-}
-
-// parseParallelItems converts an array of any type to core.ParallelItem slice
-func parseParallelItems(items []any) ([]core.ParallelItem, error) {
-	var result []core.ParallelItem
-
-	for _, item := range items {
-		switch v := item.(type) {
-		case string:
-			result = append(result, core.ParallelItem{Value: v})
-
-		case int, int64, uint64, float64:
-			result = append(result, core.ParallelItem{Value: fmt.Sprintf("%v", v)})
-
-		case map[string]any:
-			params := make(collections.DeterministicMap)
-			for key, val := range v {
-				var strVal string
-				switch pv := val.(type) {
-				case string:
-					strVal = pv
-				case int:
-					strVal = fmt.Sprintf("%d", pv)
-				case int64:
-					strVal = fmt.Sprintf("%d", pv)
-				case uint64:
-					strVal = fmt.Sprintf("%d", pv)
-				case float64:
-					strVal = fmt.Sprintf("%g", pv)
-				case bool:
-					strVal = fmt.Sprintf("%t", pv)
-				default:
-					return nil, fmt.Errorf("parameter values must be strings, numbers, or booleans, got %T for key %s", val, key)
-				}
-				params[key] = strVal
-			}
-			result = append(result, core.ParallelItem{Params: params})
-
-		default:
-			return nil, fmt.Errorf("parallel items must be strings, numbers, or objects, got %T", v)
-		}
-	}
-
-	return result, nil
 }
 
 // buildSubDAG parses the child core.DAG definition and sets up the step to run a sub DAG.
@@ -764,4 +720,48 @@ func (s *step) buildSubDAG(ctx StepBuildContext, result *core.Step) error {
 	result.Args = []string{name, paramsStr}
 	result.CmdWithArgs = strings.TrimSpace(fmt.Sprintf("%s %s", name, paramsStr))
 	return nil
+}
+
+// parseParallelItems converts an array of any type to core.ParallelItem slice
+func (s *step) parseParallelItems(items []any) ([]core.ParallelItem, error) {
+	var result []core.ParallelItem
+
+	for _, item := range items {
+		switch v := item.(type) {
+		case string:
+			result = append(result, core.ParallelItem{Value: v})
+
+		case int, int64, uint64, float64:
+			result = append(result, core.ParallelItem{Value: fmt.Sprintf("%v", v)})
+
+		case map[string]any:
+			params := make(collections.DeterministicMap)
+			for key, val := range v {
+				var strVal string
+				switch pv := val.(type) {
+				case string:
+					strVal = pv
+				case int:
+					strVal = fmt.Sprintf("%d", pv)
+				case int64:
+					strVal = fmt.Sprintf("%d", pv)
+				case uint64:
+					strVal = fmt.Sprintf("%d", pv)
+				case float64:
+					strVal = fmt.Sprintf("%g", pv)
+				case bool:
+					strVal = fmt.Sprintf("%t", pv)
+				default:
+					return nil, fmt.Errorf("parameter values must be strings, numbers, or booleans, got %T for key %s", val, key)
+				}
+				params[key] = strVal
+			}
+			result = append(result, core.ParallelItem{Params: params})
+
+		default:
+			return nil, fmt.Errorf("parallel items must be strings, numbers, or objects, got %T", v)
+		}
+	}
+
+	return result, nil
 }
