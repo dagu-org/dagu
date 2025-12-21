@@ -31,7 +31,7 @@ import (
 //
 // ```
 // It returns an error if the command is not nil but empty.
-func buildCommand(_ StepBuildContext, def stepDef, step *core.Step) error {
+func buildCommand(_ StepBuildContext, def step, st *core.Step) error {
 	command := def.Command
 
 	// Case 1: command is nil
@@ -49,18 +49,18 @@ func buildCommand(_ StepBuildContext, def stepDef, step *core.Step) error {
 
 		// If the value is multi-line, treat it as a script
 		if strings.Contains(val, "\n") {
-			step.Script = val
+			st.Script = val
 			return nil
 		}
 
 		// We need to split the command into command and args.
-		step.CmdWithArgs = val
+		st.CmdWithArgs = val
 		cmd, args, err := cmdutil.SplitCommand(val)
 		if err != nil {
 			return core.NewValidationError("command", val, fmt.Errorf("failed to parse command: %w", err))
 		}
-		step.Command = strings.TrimSpace(cmd)
-		step.Args = args
+		st.Command = strings.TrimSpace(cmd)
+		st.Args = args
 
 	case []any:
 		// Case 3: command is an array
@@ -84,17 +84,17 @@ func buildCommand(_ StepBuildContext, def stepDef, step *core.Step) error {
 
 		// Setup CmdWithArgs (this will be actually used in the command execution)
 		var sb strings.Builder
-		for i, arg := range step.Args {
+		for i, arg := range st.Args {
 			if i > 0 {
 				sb.WriteString(" ")
 			}
 			sb.WriteString(fmt.Sprintf("%q", arg))
 		}
 
-		step.Command = command
-		step.Args = args
-		step.CmdWithArgs = fmt.Sprintf("%s %s", step.Command, sb.String())
-		step.CmdArgsSys = cmdutil.JoinCommandArgs(step.Command, step.Args)
+		st.Command = command
+		st.Args = args
+		st.CmdWithArgs = fmt.Sprintf("%s %s", st.Command, sb.String())
+		st.CmdArgsSys = cmdutil.JoinCommandArgs(st.Command, st.Args)
 
 	default:
 		// Unknown type for command field.

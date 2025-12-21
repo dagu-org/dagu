@@ -2,10 +2,9 @@ package spec
 
 import "github.com/dagu-org/dagu/internal/core/spec/types"
 
-// definition is a temporary struct to hold the DAG definition.
-// This struct is used to unmarshal the YAML data.
-// The data is then converted to the DAG struct.
-type definition struct {
+// dag is the intermediate representation of a DAG specification.
+// It mirrors the YAML structure and gets validated/transformed into core.DAG.
+type dag struct {
 	// Name is the name of the DAG.
 	Name string
 	// Group is the group of the DAG for grouping DAGs on the UI.
@@ -36,17 +35,17 @@ type definition struct {
 	// Env is the environment variables setting.
 	Env types.EnvValue
 	// HandlerOn is the handler configuration.
-	HandlerOn handlerOnDef
+	HandlerOn handlerOn
 	// Steps is the list of steps to run.
-	Steps any // []stepDef or map[string]stepDef
+	Steps any // []step or map[string]step
 	// SMTP is the SMTP configuration.
-	SMTP smtpConfigDef
+	SMTP smtpConfig
 	// MailOn is the mail configuration.
-	MailOn *mailOnDef
+	MailOn *mailOn
 	// ErrorMail is the mail configuration for error.
-	ErrorMail mailConfigDef
+	ErrorMail mailConfig
 	// InfoMail is the mail configuration for information.
-	InfoMail mailConfigDef
+	InfoMail mailConfig
 	// TimeoutSec is the timeout in seconds to finish the DAG.
 	TimeoutSec int
 	// DelaySec is the delay in seconds to start the first node.
@@ -80,30 +79,30 @@ type definition struct {
 	// WorkerSelector specifies required worker labels for execution.
 	WorkerSelector map[string]string
 	// Container is the container definition for the DAG.
-	Container *containerDef
+	Container *container
 	// RunConfig contains configuration for controlling user interactions during DAG runs.
-	RunConfig *runConfigDef
+	RunConfig *runConfig
 	// RegistryAuths maps registry hostnames to authentication configs.
 	// Can be either a JSON string or a map of registry to auth config.
 	RegistryAuths any
 	// SSH is the default SSH configuration for the DAG.
-	SSH *sshDef
+	SSH *ssh
 	// Secrets contains references to external secrets.
-	Secrets []secretRefDef
+	Secrets []secretRef
 }
 
-// handlerOnDef defines the steps to be executed on different events.
-type handlerOnDef struct {
-	Init    *stepDef // Step to execute before steps (after preconditions pass)
-	Failure *stepDef // Step to execute on failure
-	Success *stepDef // Step to execute on success
-	Abort   *stepDef // Step to execute on abort (canonical field)
-	Cancel  *stepDef // Step to execute on cancel (deprecated: use Abort instead)
-	Exit    *stepDef // Step to execute on exit
+// handlerOn defines the steps to be executed on different events.
+type handlerOn struct {
+	Init    *step // Step to execute before steps (after preconditions pass)
+	Failure *step // Step to execute on failure
+	Success *step // Step to execute on success
+	Abort   *step // Step to execute on abort (canonical field)
+	Cancel  *step // Step to execute on cancel (deprecated: use Abort instead)
+	Exit    *step // Step to execute on exit
 }
 
-// stepDef defines a step in the DAG.
-type stepDef struct {
+// step defines a step in the DAG.
+type step struct {
 	// Name is the name of the step.
 	Name string `yaml:"name,omitempty"`
 	// ID is the optional unique identifier for the step.
@@ -139,9 +138,9 @@ type stepDef struct {
 	// Can be a string ("skipped", "failed") or an object with detailed config.
 	ContinueOn types.ContinueOnValue `yaml:"continueOn,omitempty"`
 	// RetryPolicy is the retry policy.
-	RetryPolicy *retryPolicyDef `yaml:"retryPolicy,omitempty"`
+	RetryPolicy *retryPolicy `yaml:"retryPolicy,omitempty"`
 	// RepeatPolicy is the repeat policy.
-	RepeatPolicy *repeatPolicyDef `yaml:"repeatPolicy,omitempty"`
+	RepeatPolicy *repeatPolicy `yaml:"repeatPolicy,omitempty"`
 	// MailOnError is the flag to send mail on error.
 	MailOnError bool `yaml:"mailOnError,omitempty"`
 	// Precondition is the condition to run the step.
@@ -173,8 +172,8 @@ type stepDef struct {
 	TimeoutSec int `yaml:"timeoutSec,omitempty"`
 }
 
-// repeatPolicyDef defines the repeat policy for a step.
-type repeatPolicyDef struct {
+// repeatPolicy defines the repeat policy for a step.
+type repeatPolicy struct {
 	Repeat         any    `yaml:"repeat,omitempty"`         // Flag to indicate if the step should be repeated, can be bool (legacy) or string ("while" or "until")
 	IntervalSec    int    `yaml:"intervalSec,omitempty"`    // Interval in seconds to wait before repeating the step
 	Limit          int    `yaml:"limit,omitempty"`          // Maximum number of times to repeat the step
@@ -185,8 +184,8 @@ type repeatPolicyDef struct {
 	MaxIntervalSec int    `yaml:"maxIntervalSec,omitempty"` // Maximum interval in seconds
 }
 
-// retryPolicyDef defines the retry policy for a step.
-type retryPolicyDef struct {
+// retryPolicy defines the retry policy for a step.
+type retryPolicy struct {
 	Limit          any   `yaml:"limit,omitempty"`
 	IntervalSec    any   `yaml:"intervalSec,omitempty"`
 	ExitCode       []int `yaml:"exitCode,omitempty"`
@@ -194,30 +193,30 @@ type retryPolicyDef struct {
 	MaxIntervalSec int   `yaml:"maxIntervalSec,omitempty"`
 }
 
-// smtpConfigDef defines the SMTP configuration.
-type smtpConfigDef struct {
-	Host     string           // SMTP host
-	Port     types.PortValue  // SMTP port (can be string or number)
-	Username string           // SMTP username
-	Password string           // SMTP password
+// smtpConfig defines the SMTP configuration.
+type smtpConfig struct {
+	Host     string          // SMTP host
+	Port     types.PortValue // SMTP port (can be string or number)
+	Username string          // SMTP username
+	Password string          // SMTP password
 }
 
-// mailConfigDef defines the mail configuration.
-type mailConfigDef struct {
+// mailConfig defines the mail configuration.
+type mailConfig struct {
 	From       string              // Sender email address
 	To         types.StringOrArray // Recipient email address(es) - can be string or []string
 	Prefix     string              // Prefix for the email subject
 	AttachLogs bool                // Flag to attach logs to the email
 }
 
-// mailOnDef defines the conditions to send mail.
-type mailOnDef struct {
+// mailOn defines the conditions to send mail.
+type mailOn struct {
 	Failure bool // Send mail on failure
 	Success bool // Send mail on success
 }
 
-// containerDef defines the container configuration for the DAG.
-type containerDef struct {
+// container defines the container configuration for the DAG.
+type container struct {
 	// Name is the container name to use. If empty, Docker generates a random name.
 	Name string `yaml:"name,omitempty"`
 	// Image is the container image to use.
@@ -255,14 +254,14 @@ type containerDef struct {
 	RestartPolicy string `yaml:"restartPolicy,omitempty"`
 }
 
-// runConfigDef defines configuration for controlling user interactions during DAG runs.
-type runConfigDef struct {
+// runConfig defines configuration for controlling user interactions during DAG runs.
+type runConfig struct {
 	DisableParamEdit bool `yaml:"disableParamEdit,omitempty"` // Disable parameter editing when starting DAG
 	DisableRunIdEdit bool `yaml:"disableRunIdEdit,omitempty"` // Disable custom run ID specification
 }
 
-// sshDef defines the SSH configuration for the DAG.
-type sshDef struct {
+// ssh defines the SSH configuration for the DAG.
+type ssh struct {
 	// User is the SSH user.
 	User string `yaml:"user,omitempty"`
 	// Host is the SSH host.
@@ -279,8 +278,8 @@ type sshDef struct {
 	KnownHostFile string `yaml:"knownHostFile,omitempty"`
 }
 
-// secretRefDef defines a reference to an external secret.
-type secretRefDef struct {
+// secretRef defines a reference to an external secret.
+type secretRef struct {
 	// Name is the environment variable name (required).
 	Name string `yaml:"name"`
 	// Provider specifies the secret backend (required).

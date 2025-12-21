@@ -21,7 +21,7 @@ import (
 )
 
 // buildParams builds the parameters for the DAG.
-func buildParams(ctx BuildContext, spec *definition, dag *core.DAG) error {
+func buildParams(ctx BuildContext, spec *dag, dag *core.DAG) error {
 	var (
 		paramPairs []paramPair
 		envs       []string
@@ -546,9 +546,9 @@ func resolveSchemaFromParams(params any, workingDir, dagLocation string) (*jsons
 	return getSchemaFromRef(workingDir, dagLocation, schemaRef)
 }
 
-// buildStepParams parses the params field in the step definition.
-// Params are converted to map[string]string and stored in step.Params
-func buildStepParams(ctx StepBuildContext, def stepDef, step *core.Step) error {
+// buildStepParams parses the params field in the step specification.
+// Params are converted to map[string]string and stored in st.Params
+func buildStepParams(ctx StepBuildContext, def step, st *core.Step) error {
 	if def.Params == nil {
 		return nil
 	}
@@ -565,6 +565,6 @@ func buildStepParams(ctx StepBuildContext, def stepDef, step *core.Step) error {
 		paramsData[pair.Name] = pair.Value
 	}
 
-	step.Params = core.NewSimpleParams(paramsData)
+	st.Params = core.NewSimpleParams(paramsData)
 	return nil
 }

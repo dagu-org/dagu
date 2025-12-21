@@ -230,7 +230,7 @@ func LoadBaseConfig(ctx BuildContext, file string) (*core.DAG, error) {
 		return nil, err
 	}
 
-	// Decode the raw data into a config definition.
+	// Decode the raw data into a manifest.
 	def, err := decode(raw)
 	if err != nil {
 		return nil, core.ErrorList{err}
@@ -256,8 +256,8 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 
 	ctx = ctx.WithFile(filePath)
 
-	// Load base config definition if specified
-	var baseDef *definition
+	// Load base manifest if specified
+	var baseDef *dag
 	if !ctx.opts.Has(BuildFlagOnlyMetadata) && ctx.opts.Base != "" && fileutil.FileExists(ctx.opts.Base) {
 		raw, err := readYAMLFile(ctx.opts.Base)
 		if err != nil {
@@ -309,7 +309,7 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 }
 
 // loadDAGsFromFile loads all DAGs from a multi-document YAML file
-func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([]*core.DAG, error) {
+func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *dag) ([]*core.DAG, error) {
 	// Open the file
 	f, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
@@ -349,13 +349,13 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 		// Update the context with the current document index
 		ctx.index = docIndex
 
-		// Decode the document into definition
+		// Decode the document into manifest
 		spec, err := decode(doc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode document %d: %w", docIndex, err)
 		}
 
-		// Build a fresh base core.DAG from base definition if provided
+		// Build a fresh base core.DAG from base manifest if provided
 		var dest *core.DAG
 		if baseDef != nil {
 			// Build a new base core.DAG for this document
@@ -541,9 +541,9 @@ func unmarshalData(data []byte) (map[string]any, error) {
 	return cm, err
 }
 
-// decode decodes the configuration map into a configDefinition.
-func decode(cm map[string]any) (*definition, error) {
-	c := new(definition)
+// decode decodes the configuration map into a manifest.
+func decode(cm map[string]any) (*dag, error) {
+	c := new(dag)
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      c,
