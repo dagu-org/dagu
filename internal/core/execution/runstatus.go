@@ -51,6 +51,7 @@ type DAGRunStatus struct {
 	StartedAt     string            `json:"startedAt,omitempty"`
 	FinishedAt    string            `json:"finishedAt,omitempty"`
 	Log           string            `json:"log,omitempty"`
+	Error         string            `json:"error,omitempty"`
 	Params        string            `json:"params,omitempty"`
 	ParamsList    []string          `json:"paramsList,omitempty"`
 	Preconditions []*core.Condition `json:"preconditions,omitempty"`
@@ -64,6 +65,9 @@ func (st *DAGRunStatus) DAGRun() DAGRunRef {
 // Errors returns a slice of errors for the current status
 func (st *DAGRunStatus) Errors() []error {
 	var errs []error
+	if st.Error != "" {
+		errs = append(errs, fmt.Errorf("%s", st.Error))
+	}
 	for _, node := range st.Nodes {
 		if node.Error != "" {
 			errs = append(errs, fmt.Errorf("node %s: %s", node.Step.Name, node.Error))
