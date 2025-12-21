@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -136,30 +137,51 @@ func parseIntArray(v any) ([]int, error) {
 	case []any:
 		var result []int
 		for i, item := range val {
-			n, ok := item.(int)
-			if !ok {
-				// Try float64 (common in YAML parsing)
-				if f, ok := item.(float64); ok {
-					n = int(f)
-				} else if u, ok := item.(uint64); ok {
-					// Exit codes are small numbers, overflow won't happen in practice
-					n = int(u) //nolint:gosec // Exit codes are small numbers
-				} else {
-					return nil, fmt.Errorf("[%d]: expected int, got %T", i, item)
-				}
+			n, err := parseIntValue(item)
+			if err != nil {
+				return nil, fmt.Errorf("[%d]: %w", i, err)
 			}
 			result = append(result, n)
 		}
 		return result, nil
 	case int:
 		return []int{val}, nil
+	case int64:
+		return []int{int(val)}, nil
 	case float64:
 		return []int{int(val)}, nil
 	case uint64:
 		// Exit codes are small numbers, overflow won't happen in practice
 		return []int{int(val)}, nil //nolint:gosec // Exit codes are small numbers
+	case string:
+		n, err := strconv.Atoi(val)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse %q as int: %w", val, err)
+		}
+		return []int{n}, nil
 	default:
 		return nil, fmt.Errorf("expected int or array of ints, got %T", v)
+	}
+}
+
+func parseIntValue(item any) (int, error) {
+	switch v := item.(type) {
+	case int:
+		return v, nil
+	case int64:
+		return int(v), nil
+	case float64:
+		return int(v), nil
+	case uint64:
+		return int(v), nil //nolint:gosec // Exit codes are small numbers
+	case string:
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, fmt.Errorf("cannot parse %q as int: %w", v, err)
+		}
+		return n, nil
+	default:
+		return 0, fmt.Errorf("expected int, got %T", item)
 	}
 }
 

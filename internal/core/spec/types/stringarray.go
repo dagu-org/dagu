@@ -40,12 +40,13 @@ func (s *StringOrArray) UnmarshalYAML(data []byte) error {
 		return nil
 
 	case []any:
-		// Array of values
-		for i, item := range v {
+		// Array of values - convert non-strings to strings for compatibility
+		for _, item := range v {
 			if str, ok := item.(string); ok {
 				s.values = append(s.values, str)
 			} else {
-				return fmt.Errorf("[%d]: expected string, got %T", i, item)
+				// Stringify non-string items (e.g., numeric tags)
+				s.values = append(s.values, fmt.Sprintf("%v", item))
 			}
 		}
 		return nil

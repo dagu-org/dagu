@@ -307,7 +307,15 @@ func (d *dag) buildName(ctx BuildContext) string {
 	if ctx.opts.Name != "" {
 		return strings.TrimSpace(ctx.opts.Name)
 	}
-	return strings.TrimSpace(d.Name)
+	if name := strings.TrimSpace(d.Name); name != "" {
+		return name
+	}
+	// Fallback to filename without extension only for the main DAG (index 0)
+	// Sub-DAGs in multi-DAG files must have explicit names
+	if ctx.index == 0 {
+		return defaultName(ctx.file)
+	}
+	return ""
 }
 
 func (d *dag) buildType(_ BuildContext, result *core.DAG) error {
@@ -317,11 +325,14 @@ func (d *dag) buildType(_ BuildContext, result *core.DAG) error {
 		return nil
 	}
 	switch t {
-	case core.TypeGraph, core.TypeChain, core.TypeAgent:
+	case core.TypeGraph, core.TypeChain:
 		result.Type = t
 		return nil
+	case core.TypeAgent:
+		// Agent type is reserved for future use
+		return core.NewValidationError("type", t, fmt.Errorf("type 'agent' is reserved and not yet supported"))
 	default:
-		return core.NewValidationError("type", t, fmt.Errorf("invalid type: %s (must be one of: graph, chain, agent)", t))
+		return core.NewValidationError("type", t, fmt.Errorf("invalid type: %s (must be one of: graph, chain)", t))
 	}
 }
 

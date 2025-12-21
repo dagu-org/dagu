@@ -257,11 +257,15 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 // buildMailConfig builds a core.MailConfig from the mail configuration.
 func buildMailConfig(def mailConfig) (*core.MailConfig, error) {
 	// StringOrArray already parsed during YAML unmarshal
-	toAddresses := def.To.Values()
+	rawAddresses := def.To.Values()
 
-	// Trim whitespace from addresses
-	for i, addr := range toAddresses {
-		toAddresses[i] = strings.TrimSpace(addr)
+	// Trim whitespace and filter out empty entries
+	var toAddresses []string
+	for _, addr := range rawAddresses {
+		trimmed := strings.TrimSpace(addr)
+		if trimmed != "" {
+			toAddresses = append(toAddresses, trimmed)
+		}
 	}
 
 	// Return nil if no valid configuration
