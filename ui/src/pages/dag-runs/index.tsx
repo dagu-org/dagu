@@ -5,7 +5,6 @@ import { useLocation } from 'react-router-dom';
 import { Status } from '../../api/v2/schema';
 import { Button } from '../../components/ui/button';
 import { DateRangePicker } from '../../components/ui/date-range-picker';
-import { Dialog, DialogContent } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import {
   Select,
@@ -19,7 +18,7 @@ import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
-import { DAGRunDetailsPanel } from '../../features/dag-runs/components/dag-run-details';
+import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
 import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
 import { useQuery } from '../../hooks/api';
@@ -838,26 +837,15 @@ function DAGRuns() {
         )}
       </div>
 
-      {/* Modal Dialog for DAG Run Details */}
-      <Dialog
-        open={!!selectedDAGRun}
-        onOpenChange={(open) => {
-          if (!open) setSelectedDAGRun(null);
-        }}
-      >
-        <DialogContent
-          className="max-w-[95vw] w-[95vw] h-[92vh] p-0 overflow-hidden"
-          hideCloseButton
-        >
-          {selectedDAGRun && (
-            <DAGRunDetailsPanel
-              name={selectedDAGRun.name}
-              dagRunId={selectedDAGRun.dagRunId}
-              onClose={() => setSelectedDAGRun(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Side Modal for DAG Run Details */}
+      {selectedDAGRun && (
+        <DAGRunDetailsModal
+          name={selectedDAGRun.name}
+          dagRunId={selectedDAGRun.dagRunId}
+          isOpen={!!selectedDAGRun}
+          onClose={() => setSelectedDAGRun(null)}
+        />
+      )}
     </div>
   );
 }

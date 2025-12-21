@@ -10,7 +10,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/spf13/cobra"
 )
@@ -103,16 +102,9 @@ func runStartAll(ctx *Context, _ []string) error {
 	}
 
 	// Only start coordinator if not bound to localhost
-	var coordinator *coordinator.Service
-	enableCoordinator := ctx.Config.Coordinator.Host != "127.0.0.1" && ctx.Config.Coordinator.Host != "localhost" && ctx.Config.Coordinator.Host != "::1"
-
-	if enableCoordinator {
-		coordinator, err = newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry)
-		if err != nil {
-			return fmt.Errorf("failed to initialize coordinator: %w", err)
-		}
-	} else {
-		logger.Info(ctx, "Coordinator disabled (bound to localhost), set --coordinator.host and --coordinator.advertise to enable distributed mode")
+	coordinator, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry)
+	if err != nil {
+		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
 
 	// Create a new context with the signal context for services
@@ -136,10 +128,7 @@ func runStartAll(ctx *Context, _ []string) error {
 
 	// WaitGroup to track all services
 	var wg sync.WaitGroup
-	serviceCount := 2 // scheduler + server
-	if enableCoordinator {
-		serviceCount = 3 // + coordinator
-	}
+	serviceCount := 3 // scheduler + server + coordinator
 	errCh := make(chan error, serviceCount)
 
 	// Start scheduler
@@ -157,19 +146,16 @@ func runStartAll(ctx *Context, _ []string) error {
 		}
 	}()
 
-	// Start coordinator (if enabled)
-	if enableCoordinator {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := coordinator.Start(serviceCtx); err != nil {
-				select {
-				case errCh <- fmt.Errorf("coordinator failed: %w", err):
-				default:
-				}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := coordinator.Start(serviceCtx); err != nil {
+			select {
+			case errCh <- fmt.Errorf("coordinator failed: %w", err):
+			default:
 			}
-		}()
-	}
+		}
+	}()
 
 	// Start server
 	wg.Add(1)
@@ -203,13 +189,11 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Stop all services gracefully
 	logger.Info(ctx, "Stopping all services")
 
-	// Stop coordinator first to unregister from service registry (if it was started)
-	if enableCoordinator && coordinator != nil {
-		if err := coordinator.Stop(ctx); err != nil {
-			logger.Error(ctx, "Failed to stop coordinator",
-				tag.Error(err),
-			)
-		}
+	// Stop coordinator first to unregister from service registry
+	if err := coordinator.Stop(ctx); err != nil {
+		logger.Error(ctx, "Failed to stop coordinator",
+			tag.Error(err),
+		)
 	}
 
 	// Stop resource service

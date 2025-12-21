@@ -25,6 +25,19 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
 
+  // Track if animation has already played to prevent re-animation on content changes
+  const hasAnimatedRef = React.useRef(false);
+
+  // Reset animation flag when modal closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      hasAnimatedRef.current = false;
+    } else {
+      // Mark as animated after first render when open
+      hasAnimatedRef.current = true;
+    }
+  }, [isOpen]);
+
   // Check for sub DAG-run ID in URL search params
   const searchParams = new URLSearchParams(window.location.search);
   const subDAGRunId = searchParams.get('subDAGRunId');
@@ -102,15 +115,10 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
     };
   }, [isOpen, onClose, handleFullscreenClick]);
 
-  if (!isOpen) return null;
+  // Track if this is the initial open to apply animation only once
+  const shouldAnimate = !hasAnimatedRef.current;
 
-  if (isLoading || !data) {
-    return (
-      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 flex items-center justify-center">
-        <LoadingIndicator />
-      </div>
-    );
-  }
+  if (!isOpen) return null;
 
   return (
     <>
@@ -120,8 +128,10 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
         onClick={onClose}
       />
 
-      {/* Side Modal */}
-      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 overflow-y-auto">
+      {/* Side Modal - keep structure consistent to prevent re-animation */}
+      <div
+        className={`fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 overflow-y-auto ${shouldAnimate ? 'slide-in-from-right' : ''}`}
+      >
         <DAGRunContext.Provider
           value={{
             refresh: refreshFn,
@@ -170,12 +180,18 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              <DAGRunDetailsContent
-                name={name}
-                dagRun={data.dagRunDetails}
-                refreshFn={refreshFn}
-                dagRunId={dagRunId}
-              />
+              {isLoading || !data ? (
+                <div className="flex items-center justify-center h-full">
+                  <LoadingIndicator />
+                </div>
+              ) : (
+                <DAGRunDetailsContent
+                  name={name}
+                  dagRun={data.dagRunDetails}
+                  refreshFn={refreshFn}
+                  dagRunId={dagRunId}
+                />
+              )}
             </div>
           </div>
         </DAGRunContext.Provider>
