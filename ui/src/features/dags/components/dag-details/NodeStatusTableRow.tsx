@@ -31,6 +31,7 @@ import {
   GitBranch,
   Play,
   RefreshCw,
+  X,
 } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -763,18 +764,19 @@ function NodeStatusTableRow({
                   <DialogFooter>
                     <Button
                       size="sm"
-                      className="btn-3d-secondary mr-2"
+                      variant="ghost"
                       onClick={() => setShowDialog(false)}
                       disabled={loading}
                     >
+                      <X className="h-4 w-4" />
                       Cancel
                     </Button>
                     <Button
                       size="sm"
-                      className="btn-3d-primary"
                       onClick={handleRetry}
                       disabled={loading}
                     >
+                      <Play className="h-4 w-4" />
                       {loading ? 'Retrying...' : 'Retry'}
                     </Button>
                   </DialogFooter>
@@ -1114,20 +1116,23 @@ function NodeStatusTableRow({
                 )}
               </div>
               <DialogFooter>
-                <button
-                  className="px-3 py-1 rounded bg-accent text-foreground mr-2"
+                <Button
+                  size="sm"
+                  variant="ghost"
                   onClick={() => setShowDialog(false)}
                   disabled={loading}
                 >
+                  <X className="h-4 w-4" />
                   Cancel
-                </button>
-                <button
-                  className="px-3 py-1 rounded bg-success text-white hover:bg-success/90 disabled:opacity-50"
+                </Button>
+                <Button
+                  size="sm"
                   onClick={handleRetry}
                   disabled={loading}
                 >
+                  <Play className="h-4 w-4" />
                   {loading ? 'Retrying...' : 'Retry'}
-                </button>
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

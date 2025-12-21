@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, KeyRound, X } from 'lucide-react';
 
 type User = components['schemas']['User'];
 
@@ -153,17 +153,17 @@ export function ResetPasswordModal({ open, user, onClose }: ResetPasswordModalPr
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={handleClose}
-              className="h-8"
             >
+              <X className="h-4 w-4" />
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isLoading || success}
-              className="h-8"
             >
+              <KeyRound className="h-4 w-4" />
               {isLoading ? 'Resetting...' : 'Reset Password'}
             </Button>
           </div>

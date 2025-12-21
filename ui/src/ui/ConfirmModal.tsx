@@ -93,7 +93,7 @@ function ConfirmModal({
         <DialogFooter>
           <Button
             ref={cancelButtonRef}
-            className="btn-3d-secondary"
+            variant="ghost"
             onClick={dismissModal}
           >
             <X className="h-4 w-4" />

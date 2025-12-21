@@ -1,19 +1,17 @@
 import React from 'react';
-import { Server, Activity, Cpu, Search, RefreshCw } from 'lucide-react';
+import { Server, Activity, Cpu, Search } from 'lucide-react';
 import { Input } from '../../components/ui/input';
-import { Button } from '../../components/ui/button';
+import { RefreshButton } from '../../components/ui/refresh-button';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useQuery } from '../../hooks/api';
 import type { components } from '../../api/v2/schema';
 import WorkerList from '../../features/workers/components/WorkerList';
 import WorkerMetrics from '../../features/workers/components/WorkerMetrics';
 import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
-import { cn } from '../../lib/utils';
 
 function Workers() {
   const appBarContext = React.useContext(AppBarContext);
   const [searchText, setSearchText] = React.useState('');
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
   
   // State for DAG run modal
   const [modalDAGRun, setModalDAGRun] = React.useState<{
@@ -37,9 +35,7 @@ function Workers() {
   });
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
     await mutate();
-    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   // Filter workers based on search text
@@ -151,19 +147,7 @@ function Workers() {
               />
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="h-7 px-2"
-          >
-            <RefreshCw className={cn(
-              "h-3 w-3",
-              isRefreshing && "animate-spin"
-            )} />
-            <span className="ml-1 text-xs">Refresh</span>
-          </Button>
+          <RefreshButton onRefresh={handleRefresh} />
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Search as SearchIcon } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppBarContext } from '../../contexts/AppBarContext';
@@ -128,10 +129,10 @@ function Search() {
     <div className="w-full">
       <div className="w-full">
         <Title>Search DAG Definitions</Title>
-        <div className="flex items-center pt-2">
+        <div className="flex items-center gap-2 pt-2">
           <Input
             placeholder="Search text..."
-            className="flex-1"
+            className="max-w-md"
             ref={ref}
             value={searchVal}
             onChange={(e) => {
@@ -148,12 +149,11 @@ function Search() {
           />
           <Button
             disabled={!searchVal}
-            variant="outline"
-            className="w-24 cursor-pointer"
             onClick={async () => {
               onSubmit(searchVal);
             }}
           >
+            <SearchIcon className="h-4 w-4" />
             Search
           </Button>
         </div>

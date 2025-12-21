@@ -1,7 +1,7 @@
 import React from 'react';
-import { Layers, Search, RefreshCw } from 'lucide-react';
+import { Layers, Search } from 'lucide-react';
 import { Input } from '../../components/ui/input';
-import { Button } from '../../components/ui/button';
+import { RefreshButton } from '../../components/ui/refresh-button';
 import {
   Tooltip,
   TooltipContent,
@@ -14,7 +14,6 @@ import type { components } from '../../api/v2/schema';
 import QueueMetrics from '../../features/queues/components/QueueMetrics';
 import QueueList from '../../features/queues/components/QueueList';
 import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
-import { cn } from '../../lib/utils';
 import Title from '../../ui/Title';
 
 function Queues() {
@@ -39,7 +38,6 @@ function Queues() {
   );
 
   const [searchText, setSearchText] = React.useState(defaultFilters.searchText);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [selectedQueueType, setSelectedQueueType] = React.useState<string>(
     defaultFilters.queueType
   );
@@ -114,9 +112,7 @@ function Queues() {
   });
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
     await mutate();
-    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   // Filter queues based on search text and type
@@ -249,18 +245,7 @@ function Queues() {
                 ({filteredQueues.length} of {data?.queues?.length})
               </span>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="h-7 px-2"
-            >
-              <RefreshCw
-                className={cn('h-3 w-3', isRefreshing && 'animate-spin')}
-              />
-              <span className="ml-1 text-xs">Refresh</span>
-            </Button>
+            <RefreshButton onRefresh={handleRefresh} />
           </div>
       </div>
 

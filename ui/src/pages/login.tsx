@@ -5,7 +5,7 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, LogIn } from 'lucide-react';
 
 /**
  * Renders the login page UI and handles authentication flow.
@@ -98,6 +98,7 @@ export default function LoginPage() {
           </div>
 
           <Button type="submit" className="w-full h-9" disabled={isLoading}>
+            <LogIn className="h-4 w-4" />
             {isLoading ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
