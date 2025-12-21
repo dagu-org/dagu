@@ -32,56 +32,56 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
 
   switch (status) {
     case NodeStatus.Success: // done -> green
-      bgColorClass = 'bg-[rgba(0,128,0,0.1)] dark:bg-[rgba(0,100,0,0.2)]';
-      borderColorClass = 'border-[green] dark:border-[darkgreen]';
-      textColorClass = 'text-[green] dark:text-[lightgreen]';
+      bgColorClass = 'bg-[rgba(0,128,0,0.1)],100,0,0.2)]';
+      borderColorClass = 'border-[green]';
+      textColorClass = 'text-[green]';
       statusIcon = '✓'; // Checkmark
       break;
     case NodeStatus.Failed: // error -> red
-      bgColorClass = 'bg-[rgba(255,0,0,0.1)] dark:bg-[rgba(139,0,0,0.2)]';
-      borderColorClass = 'border-[red] dark:border-[darkred]';
-      textColorClass = 'text-[red] dark:text-[lightcoral]';
+      bgColorClass = 'bg-[rgba(255,0,0,0.1)],0,0,0.2)]';
+      borderColorClass = 'border-[red]';
+      textColorClass = 'text-[red]';
       statusIcon = '✕'; // X mark
       break;
     case NodeStatus.Running: // running -> lime
-      bgColorClass = 'bg-[rgba(0,255,0,0.1)] dark:bg-[rgba(50,205,50,0.2)]';
-      borderColorClass = 'border-[lime] dark:border-[limegreen]';
-      textColorClass = 'text-[limegreen] dark:text-[lime]';
+      bgColorClass = 'bg-[rgba(0,255,0,0.1)],205,50,0.2)]';
+      borderColorClass = 'border-success';
+      textColorClass = 'text-success';
       pulseAnimation = 'animate-pulse';
       statusIcon = '●'; // Dot
       break;
     case NodeStatus.Aborted: // aborted -> pink
       bgColorClass =
-        'bg-[rgba(255,192,203,0.1)] dark:bg-[rgba(255,20,147,0.2)]';
-      borderColorClass = 'border-[pink] dark:border-[deeppink]';
-      textColorClass = 'text-[deeppink] dark:text-[pink]';
+        'bg-[rgba(255,192,203,0.1)],20,147,0.2)]';
+      borderColorClass = 'border-[pink]';
+      textColorClass = 'text-[deeppink]';
       statusIcon = '■'; // Square
       break;
     case NodeStatus.Skipped: // skipped -> gray
       bgColorClass =
-        'bg-[rgba(128,128,128,0.1)] dark:bg-[rgba(169,169,169,0.2)]';
-      borderColorClass = 'border-[gray] dark:border-[darkgray]';
-      textColorClass = 'text-[gray] dark:text-[lightgray]';
+        'bg-[rgba(128,128,128,0.1)],169,169,0.2)]';
+      borderColorClass = 'border-[gray]';
+      textColorClass = 'text-[gray]';
       statusIcon = '▫'; // White small square
       break;
     case NodeStatus.NotStarted: // none -> lightblue
       bgColorClass =
-        'bg-[rgba(173,216,230,0.1)] dark:bg-[rgba(70,130,180,0.2)]';
-      borderColorClass = 'border-[lightblue] dark:border-[steelblue]';
-      textColorClass = 'text-[steelblue] dark:text-[lightblue]';
+        'bg-[rgba(173,216,230,0.1)],130,180,0.2)]';
+      borderColorClass = 'border-[lightblue]';
+      textColorClass = 'text-[steelblue]';
       statusIcon = '○'; // Circle
       break;
     case NodeStatus.PartialSuccess: // partial success -> orange/amber
-      bgColorClass = 'bg-[rgba(245,158,11,0.1)] dark:bg-[rgba(245,158,11,0.2)]';
-      borderColorClass = 'border-[#f59e0b] dark:border-[#f59e0b]';
-      textColorClass = 'text-[#f59e0b] dark:text-[#fbbf24]';
+      bgColorClass = 'bg-[rgba(245,158,11,0.1)],158,11,0.2)]';
+      borderColorClass = 'border-[#f59e0b]';
+      textColorClass = 'text-[#f59e0b]';
       statusIcon = '◐'; // Half-filled circle
       break;
     default: // Fallback to gray
       bgColorClass =
-        'bg-[rgba(128,128,128,0.1)] dark:bg-[rgba(169,169,169,0.2)]';
-      borderColorClass = 'border-[gray] dark:border-[darkgray]';
-      textColorClass = 'text-[gray] dark:text-[lightgray]';
+        'bg-[rgba(128,128,128,0.1)],169,169,0.2)]';
+      borderColorClass = 'border-[gray]';
+      textColorClass = 'text-[gray]';
       statusIcon = '○'; // Circle
   }
 

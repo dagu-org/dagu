@@ -1,11 +1,21 @@
-/**
- * Graph component for visualizing DAG dagRuns using Mermaid.js
- *
- * @module features/dags/components/visualization
- */
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
-import { toMermaidNodeId } from '@/lib/utils';
-import { Maximize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+import { cn, toMermaidNodeId } from '@/lib/utils';
+import {
+  ArrowDownUp,
+  ArrowRightLeft,
+  Expand,
+  GitGraph,
+  Maximize2,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 import React, { useState } from 'react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
 import Mermaid from '../../../../ui/Mermaid';
@@ -28,6 +38,8 @@ type Props = {
   type: 'status' | 'config';
   /** Direction of the flowchart - TD (top-down) or LR (left-right) */
   flowchart?: FlowchartType;
+  /** Callback when flowchart direction changes */
+  onChangeFlowchart?: (value: FlowchartType) => void;
   /** Steps or nodes to visualize */
   steps?: Steps;
   /** Callback for node click events (double-click) */
@@ -38,6 +50,8 @@ type Props = {
   showIcons?: boolean;
   /** Whether to animate running nodes */
   animate?: boolean;
+  /** Whether the graph is currently displayed in an expanded modal view */
+  isExpandedView?: boolean;
 };
 
 /** Extend window interface to include the click handler (kept for backward compatibility) */
@@ -54,12 +68,15 @@ declare global {
 const Graph: React.FC<Props> = ({
   steps,
   flowchart = 'TD',
+  onChangeFlowchart,
   type = 'status',
   onClickNode,
   onRightClickNode,
   showIcons = true,
+  isExpandedView = false,
 }) => {
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(isExpandedView ? 0.8 : 1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   /** Increase zoom level */
@@ -81,7 +98,7 @@ const Graph: React.FC<Props> = ({
   const fitToScreen = () => {
     // Simple approach: set to a small scale that typically shows the full graph
     // This is more reliable than trying to calculate exact dimensions
-    setScale(0.3);
+    setScale(isExpandedView ? 0.4 : 0.3);
   };
 
   // Calculate width based on flowchart type and graph breadth
@@ -98,19 +115,19 @@ const Graph: React.FC<Props> = ({
     }
   }, [steps, flowchart]);
 
-  const mermaidStyle = {
+  const mermaidStyle: React.CSSProperties = {
     display: 'flex',
-    alignItems: 'flex-center',
+    alignItems: 'flex-start',
     justifyContent: 'flex-start',
     width: width,
     minWidth: '100%',
     minHeight: '200px',
-    maxHeight: '300px',
-    padding: '2em',
+    maxHeight: isExpandedView ? 'none' : '300px',
+    height: isExpandedView ? '100%' : 'auto',
     borderRadius: '0.5em',
     background: `
-      linear-gradient(90deg, #f8fafc 1px, transparent 1px),
-      linear-gradient(180deg, #f8fafc 1px, transparent 1px)
+      linear-gradient(90deg, #f0ebe3 1px, transparent 1px),
+      linear-gradient(180deg, #f0ebe3 1px, transparent 1px)
     `,
     backgroundSize: '20px 20px',
   };
@@ -191,19 +208,19 @@ const Graph: React.FC<Props> = ({
             // Dashed line for error state
             dat.push(`${depId} -.- ${id};`);
             linkStyles.push(
-              `linkStyle ${linkIndex} stroke:#ef4444,stroke-width:1.8px,stroke-dasharray:3`
+              `linkStyle ${linkIndex} stroke:#c4726a,stroke-width:1.8px,stroke-dasharray:3`
             );
           } else if (status === NodeStatus.Success) {
             // Solid line with success color
             dat.push(`${depId} --> ${id};`);
             linkStyles.push(
-              `linkStyle ${linkIndex} stroke:#16a34a,stroke-width:1.8px`
+              `linkStyle ${linkIndex} stroke:#7da87d,stroke-width:1.8px`
             );
           } else {
             // Default connection style
             dat.push(`${depId} --> ${id};`);
             linkStyles.push(
-              `linkStyle ${linkIndex} stroke:#64748b,stroke-width:1px`
+              `linkStyle ${linkIndex} stroke:#6b635a,stroke-width:1px`
             );
           }
           linkIndex++;
@@ -225,32 +242,30 @@ const Graph: React.FC<Props> = ({
       );
     }
 
-    // Define node styles for different states with refined colors
-    // Check if dark mode is active
-    const isDarkMode = document.documentElement.classList.contains('dark');
-    const nodeFill = isDarkMode ? '#18181b' : 'white'; // zinc-900 for dark mode
-    const nodeColor = isDarkMode ? '#e4e4e7' : '#333'; // zinc-200 for dark mode text
+    // Define node styles for different states with sepia theme colors
+    const nodeFill = '#faf8f5'; // card
+    const nodeColor = '#3d3833'; // foreground
 
     dat.push(
-      `classDef none color:${nodeColor},fill:${nodeFill},stroke:lightblue,stroke-width:1.2px`
+      `classDef none color:${nodeColor},fill:${nodeFill},stroke:#c8bfb0,stroke-width:1.2px`
     );
     dat.push(
-      `classDef running color:${nodeColor},fill:${nodeFill},stroke:lime,stroke-width:1.2px`
+      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#7da87d,stroke-width:1.2px`
     );
     dat.push(
-      `classDef error color:${nodeColor},fill:${nodeFill},stroke:red,stroke-width:1.2px`
+      `classDef error color:${nodeColor},fill:${nodeFill},stroke:#c4726a,stroke-width:1.2px`
     );
     dat.push(
-      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:pink,stroke-width:1.2px`
+      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:#d4a574,stroke-width:1.2px`
     );
     dat.push(
-      `classDef done color:${nodeColor},fill:${nodeFill},stroke:green,stroke-width:1.2px`
+      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#7da87d,stroke-width:1.2px`
     );
     dat.push(
-      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:gray,stroke-width:1.2px`
+      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#6b635a,stroke-width:1.2px`
     );
     dat.push(
-      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:1.2px`
+      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#c4956a,stroke-width:1.2px`
     );
 
     // Add custom link styles
@@ -265,14 +280,41 @@ const Graph: React.FC<Props> = ({
   }, [steps, onClickNode, flowchart, showIcons]);
 
   return (
-    <div className="relative" ref={containerRef}>
-      <div className="absolute right-2 top-2 z-10 bg-white dark:bg-zinc-900 rounded-md">
-        <ToggleGroup aria-label="Zoom controls">
+    <div
+      className={cn('relative', isExpandedView ? 'h-full flex flex-col' : '')}
+      ref={containerRef}
+    >
+      <div className="absolute right-4 top-2 z-10 bg-card rounded-md shadow-sm border border-border/50">
+        <ToggleGroup aria-label="Graph controls">
+          {onChangeFlowchart && (
+            <>
+              <ToggleButton
+                value="LR"
+                groupValue={flowchart}
+                onClick={() => onChangeFlowchart('LR')}
+                aria-label="Horizontal layout"
+                position="first"
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+              </ToggleButton>
+              <ToggleButton
+                value="TD"
+                groupValue={flowchart}
+                onClick={() => onChangeFlowchart('TD')}
+                aria-label="Vertical layout"
+                position="middle"
+              >
+                <ArrowDownUp className="h-4 w-4" />
+              </ToggleButton>
+              <div className="w-px h-6 bg-border mx-1 self-center" />
+            </>
+          )}
+
           <ToggleButton
             value="zoomin"
             onClick={() => zoomIn()}
             aria-label="Zoom in"
-            position="first"
+            position={onChangeFlowchart ? 'middle' : 'first'}
           >
             <ZoomIn className="h-4 w-4" />
           </ToggleButton>
@@ -296,19 +338,68 @@ const Graph: React.FC<Props> = ({
             value="reset"
             onClick={() => resetZoom()}
             aria-label="Reset zoom"
-            position="last"
+            position="middle"
           >
             <RotateCcw className="h-4 w-4" />
           </ToggleButton>
+
+          {!isExpandedView && (
+            <>
+              <div className="w-px h-6 bg-border mx-1 self-center" />
+              <ToggleButton
+                value="expand"
+                onClick={() => setIsModalOpen(true)}
+                aria-label="Expand graph"
+                position="last"
+              >
+                <Expand className="h-4 w-4" />
+              </ToggleButton>
+            </>
+          )}
         </ToggleGroup>
       </div>
-      <Mermaid
-        style={mermaidStyle}
-        def={graph}
-        scale={scale}
-        onDoubleClick={onClickNode}
-        onRightClick={onRightClickNode}
-      />
+
+      <div
+        className={cn(
+          'overflow-auto custom-scrollbar',
+          isExpandedView
+            ? 'flex-1 rounded-lg border border-border/30 bg-muted/5'
+            : ''
+        )}
+      >
+        <Mermaid
+          style={mermaidStyle}
+          def={graph}
+          scale={scale}
+          onDoubleClick={onClickNode}
+          onRightClick={onRightClickNode}
+        />
+      </div>
+
+      {!isExpandedView && (
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogContent className="max-w-[95vw] w-full max-h-[90vh] h-full flex flex-col p-6 overflow-hidden">
+            <DialogHeader className="flex-shrink-0 mb-2">
+              <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
+                <GitGraph className="h-5 w-5 text-primary" />
+                Visual Graph
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 min-h-0 bg-surface rounded-xl p-1 shadow-inner border border-border/20">
+              <Graph
+                steps={steps}
+                flowchart={flowchart}
+                onChangeFlowchart={onChangeFlowchart}
+                type={type}
+                onClickNode={onClickNode}
+                onRightClickNode={onRightClickNode}
+                showIcons={showIcons}
+                isExpandedView={true}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

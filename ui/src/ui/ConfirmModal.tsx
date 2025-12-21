@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/ui/CustomDialog';
+import { Check, X } from 'lucide-react';
 import React from 'react';
 
 type Props = {
@@ -92,12 +93,18 @@ function ConfirmModal({
         <DialogFooter>
           <Button
             ref={cancelButtonRef}
-            variant="outline"
+            variant="ghost"
             onClick={dismissModal}
           >
+            <X className="h-4 w-4" />
             Cancel
           </Button>
-          <Button ref={submitButtonRef} onClick={onSubmit}>
+          <Button
+            ref={submitButtonRef}
+            className="btn-3d-primary"
+            onClick={onSubmit}
+          >
+            <Check className="h-4 w-4" />
             {buttonText}
           </Button>
         </DialogFooter>

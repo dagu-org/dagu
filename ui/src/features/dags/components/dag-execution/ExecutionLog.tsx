@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { components, Status } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
+import { Input } from '../../../../components/ui/input';
 import { ReloadButton } from '../../../../components/ui/reload-button';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
@@ -236,9 +237,9 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
             // Scroll the element into view
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
             // Highlight the line temporarily
-            element.classList.add('bg-blue-500', 'bg-opacity-20');
+            element.classList.add('bg-primary/100', 'bg-opacity-20');
             setTimeout(() => {
-              element.classList.remove('bg-blue-500', 'bg-opacity-20');
+              element.classList.remove('bg-primary/100', 'bg-opacity-20');
             }, 2000);
             break;
           }
@@ -259,7 +260,7 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
   if (error && !logData) {
     return (
       <div className="w-full h-full flex items-center justify-center">
-        <div className="text-red-500">
+        <div className="text-error">
           Error loading log data: {error.message || 'Unknown error'}
         </div>
       </div>
@@ -297,41 +298,38 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
   return (
     <div className="w-full h-full flex flex-col">
       {/* Controls for log navigation */}
-      <div className="flex flex-col gap-2 mb-2 p-2 bg-zinc-100 dark:bg-zinc-800 rounded">
+      <div className="flex flex-col gap-2 mb-2 bg-muted rounded">
         <div className="flex flex-wrap items-center gap-2">
           {/* Responsive button container */}
-          <div className="flex flex-wrap gap-2 min-h-[28px]">
+          <div className="flex flex-wrap gap-1">
             <Button
               size="sm"
-              variant={viewMode === 'tail' ? 'default' : 'outline'}
+              variant={viewMode === 'tail' ? 'primary' : 'default'}
               onClick={() => handleViewModeChange('tail')}
               disabled={isNavigating}
-              className="flex-shrink-0"
             >
               Show End
             </Button>
             <Button
               size="sm"
-              variant={viewMode === 'head' ? 'default' : 'outline'}
+              variant={viewMode === 'head' ? 'primary' : 'default'}
               onClick={() => handleViewModeChange('head')}
               disabled={isNavigating}
-              className="flex-shrink-0"
             >
               Show Beginning
             </Button>
             <Button
               size="sm"
-              variant={viewMode === 'page' ? 'default' : 'outline'}
+              variant={viewMode === 'page' ? 'primary' : 'default'}
               onClick={() => handleViewModeChange('page')}
               disabled={isNavigating}
-              className="flex-shrink-0"
             >
               Page View
             </Button>
           </div>
 
           <select
-            className="px-2 py-1 text-xs border rounded bg-white dark:bg-zinc-700 dark:text-white flex-shrink-0"
+            className="h-7 px-2 text-xs border border-border rounded-md bg-surface text-foreground flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-ring"
             value={pageSize}
             onChange={(e) => setPageSize(Number(e.target.value))}
             disabled={isNavigating}
@@ -358,32 +356,22 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
 
             {/* Live mode toggle - only show when DAG is running */}
             {isRunningStatus && (
-              <button
+              <Button
+                size="sm"
+                variant={isLiveMode ? 'primary' : 'default'}
                 onClick={() => setIsLiveMode(!isLiveMode)}
-                className={`
-                  relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
-                  transition-all duration-200 ease-in-out
-                  ${
-                    isLiveMode
-                      ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
-                      : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-600'
-                  }
-                `}
               >
                 <span
-                  className={`
-                  inline-block w-2 h-2 rounded-full
-                  ${isLiveMode ? 'bg-white animate-pulse' : 'bg-zinc-400 dark:bg-zinc-500'}
-                `}
+                  className={`inline-block w-2 h-2 rounded-full ${isLiveMode ? 'bg-white animate-pulse' : 'bg-muted-foreground'}`}
                 />
-                <span>LIVE</span>
-              </button>
+                LIVE
+              </Button>
             )}
           </div>
         </div>
 
         {/* Stats line - full width on mobile */}
-        <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center">
+        <div className="text-xs text-muted-foreground flex items-center">
           Showing {lineCount} of {totalLines} lines{' '}
           {isEstimate ? '(estimated)' : ''} {hasMore ? '(more available)' : ''}
         </div>
@@ -415,10 +403,10 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
 
         {/* Jump to line controls */}
         <div className="flex items-center gap-2 mt-2">
-          <span className="text-xs">Jump to line:</span>
-          <input
+          <span className="text-xs text-muted-foreground">Jump to line:</span>
+          <Input
             type="number"
-            min="1"
+            min={1}
             max={totalLines}
             value={jumpToLine}
             onChange={(e) =>
@@ -426,7 +414,6 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
             }
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                // Only trigger if the button is not disabled
                 if (
                   !isNavigating &&
                   jumpToLine !== '' &&
@@ -437,7 +424,7 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
                 }
               }
             }}
-            className="w-20 px-2 py-1 text-xs border rounded"
+            className="w-20 h-7 text-xs"
             disabled={isNavigating}
           />
           <Button
@@ -458,23 +445,20 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
       {/* Log content with overlay loading indicator when navigating */}
       <div
         ref={logContainerRef}
-        className="flex-1 overflow-auto rounded-lg bg-zinc-900 p-4 border relative"
+        className="flex-1 overflow-auto rounded-lg bg-slate-800 p-4 relative"
       >
         {isNavigating && (
           <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 pointer-events-none">
-            <div className="bg-white dark:bg-zinc-800 rounded-lg p-2 shadow-lg">
+            <div className="bg-card rounded-lg p-2">
               <div className="h-5 w-5 animate-spin rounded-full border-3 border-primary border-t-transparent"></div>
             </div>
           </div>
         )}
-        <pre className="h-full font-mono text-sm text-white">
+        <pre className="h-full font-mono text-sm text-slate-100">
           {lines.map((line, index) => (
-            <div
-              key={index}
-              className="flex hover:bg-zinc-800 px-2 py-0.5 rounded"
-            >
+            <div key={index} className="flex px-2 py-0.5">
               <span
-                className="text-zinc-500 mr-4 select-none w-8 text-right flex-shrink-0 self-start"
+                className="text-slate-500 mr-4 select-none w-8 text-right flex-shrink-0 self-start"
                 data-line-number={getLineNumber(index)}
               >
                 {getLineNumber(index)}

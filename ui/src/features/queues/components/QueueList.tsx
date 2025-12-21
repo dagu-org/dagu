@@ -1,5 +1,5 @@
-import React from 'react';
 import { Layers } from 'lucide-react';
+import React from 'react';
 import type { components } from '../../../api/v2/schema';
 import QueueCard from './QueueCard';
 
@@ -74,7 +74,7 @@ function QueueList({
   }
 
   return (
-    <div className="space-y-2 p-2">
+    <div className="space-y-2">
       {queues.map((queue, index) => (
         <QueueCard
           key={queue.name}

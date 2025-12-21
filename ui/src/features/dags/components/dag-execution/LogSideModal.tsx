@@ -125,7 +125,7 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
           isMobile 
             ? 'border border-border rounded-none' 
             : 'border-l border-border'
-        } shadow-xl overflow-hidden flex flex-col ${
+        } overflow-hidden flex flex-col ${
           isMobile ? 'animate-in fade-in-0 slide-in-from-bottom-10' : 'slide-in-from-right'
         }`}
         style={{ zIndex: zIndex + 1 }} // Make sure modal is above backdrop
@@ -133,15 +133,13 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
       >
         <div className={`flex justify-between items-center ${isMobile ? 'p-3' : 'p-4'} border-b`}>
           <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>{title}</h2>
-          <div className="flex gap-2">
+          <div className="flex gap-1">
             {/* Hide expand/minimize button on mobile since it's always full screen */}
             {!isMobile && (
               <Button
-                variant="outline"
                 size="icon"
                 onClick={toggleExpand}
                 title={isExpanded ? 'Minimize' : 'Expand'}
-                className="relative group"
               >
                 {isExpanded ? (
                   <Minimize2 className="h-4 w-4" />
@@ -151,27 +149,18 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
               </Button>
             )}
             <Button
-              variant="outline"
               size="icon"
               onClick={openInNewTab}
               title="Open in new tab"
-              className="relative group"
             >
               <ExternalLink className="h-4 w-4" />
             </Button>
             <Button
-              variant="outline"
               size="icon"
               onClick={onClose}
               title="Close (Esc)"
-              className="relative group"
             >
               <X className="h-4 w-4" />
-              {!isMobile && (
-                <span className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[10px] font-medium px-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                  Esc
-                </span>
-              )}
             </Button>
           </div>
         </div>

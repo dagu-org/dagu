@@ -9,29 +9,25 @@ type Props = {
   onRightClick?: (id: string) => void;
 };
 
-// Initialize Mermaid with dynamic theme support
+// Initialize Mermaid with sepia theme
 const initializeMermaid = () => {
-  const isDarkMode = document.documentElement.classList.contains('dark');
-
   mermaid.initialize({
     securityLevel: 'loose',
     startOnLoad: false,
     maxTextSize: 99999999,
-    theme: isDarkMode ? 'dark' : 'default',
-    themeVariables: isDarkMode
-      ? {
-          background: 'transparent',
-          primaryColor: '#18181b', // zinc-900
-          primaryTextColor: '#e4e4e7', // zinc-200
-          primaryBorderColor: '#3f3f46', // zinc-700
-          lineColor: '#71717a', // zinc-500
-          sectionBkgColor: 'transparent',
-          altSectionBkgColor: 'transparent',
-          gridColor: 'transparent',
-          secondaryColor: 'transparent',
-          tertiaryColor: 'transparent',
-        }
-      : {},
+    theme: 'default',
+    themeVariables: {
+      background: 'transparent',
+      primaryColor: '#faf8f5', // card
+      primaryTextColor: '#3d3833', // foreground
+      primaryBorderColor: '#c8bfb0', // border
+      lineColor: '#6b635a', // muted-foreground
+      sectionBkgColor: 'transparent',
+      altSectionBkgColor: 'transparent',
+      gridColor: 'transparent',
+      secondaryColor: '#f0ebe3', // secondary
+      tertiaryColor: '#f5f0e8', // background
+    },
     flowchart: {
       curve: 'basis',
       useMaxWidth: false,
@@ -68,15 +64,26 @@ function Mermaid({
     () => `mermaid-${Math.random().toString(36).substr(2, 9)}`
   );
 
-  const mStyle = {
-    ...style,
-  };
+  // Extract background-related styles for the scroll container
+  const { background, backgroundSize, backgroundColor, ...contentStyle } =
+    style;
 
   const dStyle: CSSProperties = {
-    overflow: 'auto', // Use 'auto' for both directions if needed
-    padding: '2em',
+    overflow: 'auto',
     position: 'relative',
-    maxHeight: '80vh', // Keep max height if desired
+    // Removed hardcoded maxHeight to allow parent flex containers or explicit heights to work correctly
+    // Apply background styles to the scroll container so grid scrolls with content
+    background,
+    backgroundSize,
+    backgroundAttachment: 'local', // Makes background scroll with content
+    backgroundColor,
+    height: '100%', // Ensure it takes full height of parent
+  };
+
+  const mStyle: CSSProperties = {
+    ...contentStyle,
+    padding: '2em',
+    minHeight: '100%', // Ensure inner div also takes full height
   };
 
   const render = async () => {

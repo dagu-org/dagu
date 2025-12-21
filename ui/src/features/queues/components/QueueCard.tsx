@@ -1,28 +1,28 @@
-import React from 'react';
 import {
+  BarChart3,
   ChevronDown,
   ChevronRight,
-  Settings,
+  Clock,
   GitBranch,
   Play,
-  Clock,
-  BarChart3,
+  Settings,
   Trash2,
 } from 'lucide-react';
+import React from 'react';
 import type { components } from '../../../api/v2/schema';
-import { cn } from '../../../lib/utils';
-import StatusChip from '../../../ui/StatusChip';
-import dayjs from '../../../lib/dayjs';
-import { useConfig } from '../../../contexts/ConfigContext';
-import { useClient } from '../../../hooks/api';
-import { AppBarContext } from '../../../contexts/AppBarContext';
 import { Button } from '../../../components/ui/button';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '../../../components/ui/tooltip';
+import { AppBarContext } from '../../../contexts/AppBarContext';
+import { useConfig } from '../../../contexts/ConfigContext';
+import { useClient } from '../../../hooks/api';
+import dayjs from '../../../lib/dayjs';
+import { cn } from '../../../lib/utils';
 import ConfirmModal from '../../../ui/ConfirmModal';
+import StatusChip from '../../../ui/StatusChip';
 
 interface QueueCardProps {
   queue: components['schemas']['Queue'];
@@ -40,7 +40,7 @@ function QueueCard({
   const config = useConfig();
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
-  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(true);
   const [isClearing, setIsClearing] = React.useState(false);
   const [showClearConfirm, setShowClearConfirm] = React.useState(false);
 
@@ -141,7 +141,7 @@ function QueueCard({
     <div
       className={cn(
         'border rounded-lg bg-card transition-all duration-200',
-        isSelected && 'ring-2 ring-primary/20 bg-muted/10'
+        isSelected && 'ring-2 ring-primary/20'
       )}
     >
       {/* Queue Header */}
@@ -159,9 +159,9 @@ function QueueCard({
               )}
               <div className="flex items-center gap-2">
                 {queue.type === 'global' ? (
-                  <Settings className="h-4 w-4 text-blue-500" />
+                  <Settings className="h-4 w-4 text-primary" />
                 ) : (
-                  <GitBranch className="h-4 w-4 text-gray-500" />
+                  <GitBranch className="h-4 w-4 text-muted-foreground" />
                 )}
                 <span className="font-semibold text-sm">{queue.name}</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
@@ -178,10 +178,10 @@ function QueueCard({
                     className={cn(
                       'h-full transition-all duration-300',
                       utilization && utilization > 80
-                        ? 'bg-amber-600'
+                        ? 'bg-warning'
                         : utilization && utilization > 60
-                          ? 'bg-orange-500'
-                          : 'bg-green-500'
+                          ? 'bg-warning'
+                          : 'bg-success'
                     )}
                     style={{ width: `${utilization || 0}%` }}
                   />
@@ -196,14 +196,14 @@ function QueueCard({
           {/* Summary counts */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1">
-              <Play className="h-3 w-3 text-green-500" />
+              <Play className="h-3 w-3 text-success" />
               <span className="text-sm font-medium">
                 {queue.running?.length || 0}
               </span>
               <span className="text-xs text-muted-foreground">running</span>
             </div>
             <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3 text-purple-500" />
+              <Clock className="h-3 w-3 text-info" />
               <span className="text-sm font-medium">
                 {queue.queued?.length || 0}
               </span>
@@ -211,7 +211,7 @@ function QueueCard({
             </div>
             {utilization !== null && (
               <div className="flex items-center gap-1">
-                <BarChart3 className="h-3 w-3 text-orange-500" />
+                <BarChart3 className="h-3 w-3 text-warning" />
                 <span className="text-sm font-medium">{utilization}%</span>
               </div>
             )}
@@ -255,27 +255,27 @@ function QueueCard({
           {/* Running DAGs */}
           {queue.running && queue.running.length > 0 && (
             <div className="border-t">
-              <div className="p-2 bg-green-50 dark:bg-green-950/20">
+              <div className="p-2 bg-success-muted">
                 <div className="flex items-center gap-2 mb-2">
-                  <Play className="h-4 w-4 text-green-500" />
-                  <h4 className="text-sm font-semibold text-green-700 dark:text-green-400">
+                  <Play className="h-4 w-4 text-success" />
+                  <h4 className="text-sm font-semibold text-success">
                     Running DAGs ({queue.running.length})
                   </h4>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-green-200 dark:border-green-800">
-                        <th className="text-left py-1 px-2 font-medium text-green-700 dark:text-green-400">
+                      <tr className="border-b border-success/30">
+                        <th className="text-left py-1 px-2 font-medium text-success">
                           DAG Name
                         </th>
-                        <th className="text-left py-1 px-2 font-medium text-green-700 dark:text-green-400">
+                        <th className="text-left py-1 px-2 font-medium text-success">
                           Status
                         </th>
-                        <th className="text-left py-1 px-2 font-medium text-green-700 dark:text-green-400">
+                        <th className="text-left py-1 px-2 font-medium text-success">
                           Started At
                         </th>
-                        <th className="text-left py-1 px-2 font-medium text-green-700 dark:text-green-400">
+                        <th className="text-left py-1 px-2 font-medium text-success">
                           Run ID
                         </th>
                       </tr>
@@ -292,55 +292,53 @@ function QueueCard({
           )}
 
           {/* Queued DAGs */}
-          <div className="border-t">
-            <div className="p-2 bg-purple-50 dark:bg-purple-950/20">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-purple-500" />
-                  <h4 className="text-sm font-semibold text-purple-700 dark:text-purple-400">
-                    Queued DAGs ({queue.queued?.length || 0})
-                  </h4>
+          {queue.queued && queue.queued.length > 0 && (
+            <div className="border-t">
+              <div className="p-2 bg-info-muted">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-info" />
+                    <h4 className="text-sm font-semibold text-info">
+                      Queued DAGs ({queue.queued.length})
+                    </h4>
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowClearConfirm(true);
+                        }}
+                        disabled={isClearing}
+                        className="h-6 px-2"
+                      >
+                        <Trash2
+                          className={cn('h-3 w-3', isClearing && 'animate-pulse')}
+                        />
+                        <span className="ml-1 text-xs">Clear</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Remove all queued DAG runs from this queue</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowClearConfirm(true);
-                      }}
-                      disabled={
-                        isClearing || !queue.queued || queue.queued.length === 0
-                      }
-                      className="h-6 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Trash2
-                        className={cn('h-3 w-3', isClearing && 'animate-pulse')}
-                      />
-                      <span className="ml-1 text-xs">Clear</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Remove all queued DAG runs from this queue</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              {queue.queued && queue.queued.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-purple-200 dark:border-purple-800">
-                        <th className="text-left py-1 px-2 font-medium text-purple-700 dark:text-purple-400">
+                      <tr className="border-b border-info/30">
+                        <th className="text-left py-1 px-2 font-medium text-info">
                           DAG Name
                         </th>
-                        <th className="text-left py-1 px-2 font-medium text-purple-700 dark:text-purple-400">
+                        <th className="text-left py-1 px-2 font-medium text-info">
                           Status
                         </th>
-                        <th className="text-left py-1 px-2 font-medium text-purple-700 dark:text-purple-400">
+                        <th className="text-left py-1 px-2 font-medium text-info">
                           Queued At
                         </th>
-                        <th className="text-left py-1 px-2 font-medium text-purple-700 dark:text-purple-400">
+                        <th className="text-left py-1 px-2 font-medium text-info">
                           Run ID
                         </th>
                       </tr>
@@ -356,18 +354,14 @@ function QueueCard({
                     </tbody>
                   </table>
                 </div>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  <p className="text-sm">No queued DAG runs</p>
-                </div>
-              )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Empty state */}
           {(!queue.running || queue.running.length === 0) &&
             (!queue.queued || queue.queued.length === 0) && (
-              <div className="p-4 text-center text-muted-foreground">
+              <div className="p-4 text-center text-muted-foreground bg-muted/30 border-t">
                 <p className="text-sm">
                   No DAGs currently running or queued in this queue.
                 </p>

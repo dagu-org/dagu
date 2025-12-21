@@ -14,11 +14,11 @@ export default function LabeledItem({
 }: LabeledItemProps) {
   return (
     <div className={cn('flex flex-row items-center', className)}>
-      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+      <span className="text-sm font-semibold text-foreground/90">
         {label}:&nbsp;
       </span>
       {typeof children === 'string' ? (
-        <span className="text-sm text-slate-600 dark:text-slate-400">
+        <span className="text-sm text-muted-foreground">
           {children}
         </span>
       ) : (

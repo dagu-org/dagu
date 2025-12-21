@@ -1,13 +1,7 @@
-/**
- * HistoryTableRow component renders a single row in the execution history table.
- *
- * @module features/dags/components/dag-execution
- */
-import React from 'react';
 import { TableCell } from '@/components/ui/table';
-import StyledTableRow from '../../../../ui/StyledTableRow';
-import { components, NodeStatus } from '../../../../api/v2/schema';
 import { cn } from '@/lib/utils';
+import { components, Status } from '../../../../api/v2/schema';
+import StyledTableRow from '../../../../ui/StyledTableRow';
 
 /**
  * Props for the HistoryTableRow component
@@ -22,7 +16,8 @@ type Props = {
 };
 
 /**
- * Get status styling based on node status
+ * Get status styling based on DAG run status
+ * Uses Status enum values which map to DAG run statuses
  */
 function getStatusStyling(status: number) {
   let bgColorClass = '';
@@ -30,38 +25,38 @@ function getStatusStyling(status: number) {
   let pulseAnimation = '';
 
   switch (status) {
-    case NodeStatus.Success: // done -> green
-      bgColorClass = 'bg-green-600 dark:bg-green-700';
-      borderColorClass = 'border-green-700 dark:border-green-800';
+    case Status.Success: // 4 - success -> green
+      bgColorClass = 'bg-success';
+      borderColorClass = 'border-success';
       break;
-    case NodeStatus.Failed: // error -> red
-      bgColorClass = 'bg-red-600 dark:bg-red-700';
-      borderColorClass = 'border-red-700 dark:border-red-800';
+    case Status.Failed: // 2 - failed -> red
+      bgColorClass = 'bg-danger';
+      borderColorClass = 'border-danger';
       break;
-    case NodeStatus.Running: // running -> lime
-      bgColorClass = 'bg-lime-500 dark:bg-lime-600';
-      borderColorClass = 'border-lime-600 dark:border-lime-700';
+    case Status.Running: // 1 - running -> green with pulse
+      bgColorClass = 'bg-success';
+      borderColorClass = 'border-success';
       pulseAnimation = 'animate-pulse';
       break;
-    case NodeStatus.Aborted: // aborted -> pink
-      bgColorClass = 'bg-pink-500 dark:bg-pink-600';
-      borderColorClass = 'border-pink-600 dark:border-pink-700';
+    case Status.Aborted: // 3 - aborted -> pink
+      bgColorClass = 'bg-pink-500';
+      borderColorClass = 'border-pink-600';
       break;
-    case NodeStatus.Skipped: // skipped -> gray
-      bgColorClass = 'bg-gray-500 dark:bg-gray-600';
-      borderColorClass = 'border-gray-600 dark:border-gray-700';
+    case Status.NotStarted: // 0 - not started -> light blue
+      bgColorClass = 'bg-primary/60';
+      borderColorClass = 'border-primary';
       break;
-    case NodeStatus.NotStarted: // none -> lightblue
-      bgColorClass = 'bg-blue-400 dark:bg-blue-500';
-      borderColorClass = 'border-blue-500 dark:border-blue-600';
+    case Status.Queued: // 5 - queued -> info/purple
+      bgColorClass = 'bg-info';
+      borderColorClass = 'border-info';
       break;
-    case NodeStatus.PartialSuccess: // partial success -> orange/amber
-      bgColorClass = 'bg-amber-500 dark:bg-amber-600';
-      borderColorClass = 'border-amber-600 dark:border-amber-700';
+    case Status.PartialSuccess: // 6 - partial success -> warning/amber
+      bgColorClass = 'bg-warning';
+      borderColorClass = 'border-warning';
       break;
     default: // Fallback to gray
-      bgColorClass = 'bg-gray-500 dark:bg-gray-600';
-      borderColorClass = 'border-gray-600 dark:border-gray-700';
+      bgColorClass = 'bg-muted-foreground';
+      borderColorClass = 'border-border';
   }
 
   return { bgColorClass, borderColorClass, pulseAnimation };
@@ -73,7 +68,7 @@ function getStatusStyling(status: number) {
  */
 function HistoryTableRow({ data, onSelect, idx }: Props) {
   return (
-    <StyledTableRow className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200">
+    <StyledTableRow className="hover:bg-muted transition-colors duration-200">
       <TableCell className="font-medium text-sm">{data.name}</TableCell>
       {[...data.history].reverse().map((status, i) => {
         // Determine if this cell should be highlighted
@@ -89,15 +84,15 @@ function HistoryTableRow({ data, onSelect, idx }: Props) {
             }}
             className={cn(
               'max-w-[22px] min-w-[22px] p-2 text-center cursor-pointer',
-              'hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-200',
-              isSelected && 'bg-slate-200 dark:bg-slate-700'
+              'hover:bg-accent transition-all duration-200',
+              isSelected && 'bg-accent'
             )}
           >
             {status !== 0 && (
               <div
                 className={cn(
                   'w-[12px] h-[12px] rounded-full border-[1.5px] transition-all duration-300 mx-auto',
-                  'shadow-sm hover:scale-110',
+                  ' hover:scale-110',
                   bgColorClass,
                   borderColorClass,
                   pulseAnimation

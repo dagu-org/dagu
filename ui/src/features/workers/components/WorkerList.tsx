@@ -40,7 +40,7 @@ function WorkerList({ workers, isLoading, errors, onTaskClick }: WorkerListProps
   if (errors && errors.length > 0) {
     return (
       <div className="p-4 space-y-2">
-        <div className="flex items-center gap-2 text-sm text-orange-600 dark:text-orange-400">
+        <div className="flex items-center gap-2 text-sm text-warning">
           <AlertCircle className="h-4 w-4" />
           <span>Warnings:</span>
         </div>
@@ -102,7 +102,7 @@ function WorkerList({ workers, isLoading, errors, onTaskClick }: WorkerListProps
                   {worker.labels && Object.entries(worker.labels).map(([key, value]) => (
                     <span
                       key={key}
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent text-foreground/90"
                     >
                       {key}={value}
                     </span>
@@ -165,10 +165,10 @@ function UtilizationBar({ busy, total }: { busy: number; total: number }) {
         <div
           className={cn(
             "h-full transition-all duration-300",
-            percentage >= 90 ? "bg-red-500" :
-            percentage >= 70 ? "bg-orange-500" :
-            percentage >= 50 ? "bg-yellow-500" :
-            percentage > 0 ? "bg-green-500" : "bg-muted"
+            percentage >= 90 ? "bg-error" :
+            percentage >= 70 ? "bg-warning" :
+            percentage >= 50 ? "bg-warning" :
+            percentage > 0 ? "bg-success" : "bg-muted"
           )}
           style={{ width: `${percentage}%` }}
         />

@@ -33,10 +33,10 @@ function ServiceCard({
   const allActive = activeCount === instances.length && instances.length > 0;
 
   const getStatusColor = () => {
-    if (error) return 'text-red-500';
-    if (!hasActive) return 'text-yellow-500';
-    if (allActive) return 'text-green-500';
-    return 'text-green-500';
+    if (error) return 'text-error';
+    if (!hasActive) return 'text-warning';
+    if (allActive) return 'text-success';
+    return 'text-success';
   };
 
   const getUptime = (startedAt: string): string => {
@@ -145,10 +145,10 @@ function ServiceCard({
                     className={cn(
                       'w-1.5 h-1.5 rounded-full',
                       instance.status === 'active'
-                        ? 'bg-green-500'
+                        ? 'bg-success'
                         : instance.status === 'inactive'
-                          ? 'bg-yellow-500'
-                          : 'bg-gray-500'
+                          ? 'bg-warning'
+                          : 'bg-muted-foreground'
                     )}
                   />
                   <span className="text-muted-foreground">
@@ -170,7 +170,7 @@ function ServiceCard({
         )}
 
         {/* Error Message */}
-        {error && <div className="mt-2 text-xs text-red-500">{error}</div>}
+        {error && <div className="mt-2 text-xs text-error">{error}</div>}
 
         {/* Loading State */}
         {isLoading && (

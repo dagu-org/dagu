@@ -89,7 +89,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         name: dag?.name || '',
       }}
     >
-      <div className="w-full flex flex-col">
+      <div className="w-full h-full flex flex-col">
         {/* Only render the header if skipHeader is not true */}
         {!skipHeader && (
           <DAGHeader
@@ -104,7 +104,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 lg:gap-0 mb-4">
           {/* Desktop Tabs (lg and up) */}
           <div className="hidden lg:block overflow-x-auto">
-            <Tabs className="bg-white dark:bg-zinc-900 p-1 rounded-lg border border-gray-200 dark:border-gray-700 whitespace-nowrap">
+            <Tabs className="whitespace-nowrap">
               {isModal ? (
                 <ModalLinkTab
                   label="Status"
@@ -178,7 +178,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
 
           {/* Mobile/Tablet Tabs (sm to lg) */}
           <div className="lg:hidden w-full overflow-x-auto">
-            <div className="flex space-x-1 bg-white dark:bg-zinc-900 p-1 rounded-lg border border-gray-200 dark:border-gray-700 w-full">
+            <div className="flex space-x-1 w-full">
               {isModal ? (
                 <ModalLinkTab
                   label=""
@@ -262,7 +262,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             <DAGEditButtons fileName={fileName || ''} />
           ) : null}
         </div>
-        <div className="flex-1">
+        <div className="flex-1 flex flex-col min-h-0">
           {activeTab === 'status' ? (
             <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
           ) : null}

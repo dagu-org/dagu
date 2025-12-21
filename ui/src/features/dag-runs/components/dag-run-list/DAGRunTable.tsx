@@ -12,22 +12,23 @@ import {
 import { useConfig } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
-import { DAGRunDetailsModal } from '../dag-run-details';
 import { StepDetailsTooltip } from './StepDetailsTooltip';
 
 interface DAGRunTableProps {
   dagRuns: components['schemas']['DAGRunSummary'][];
+  selectedDAGRun?: { name: string; dagRunId: string } | null;
+  onSelectDAGRun?: (dagRun: { name: string; dagRunId: string } | null) => void;
 }
 
-function DAGRunTable({ dagRuns }: DAGRunTableProps) {
+function DAGRunTable({
+  dagRuns,
+  selectedDAGRun = null,
+  onSelectDAGRun,
+}: DAGRunTableProps) {
   const config = useConfig();
   const navigate = useNavigate();
   const [isSmallScreen, setIsSmallScreen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
-  const [selectedDAGRun, setSelectedDAGRun] = useState<{
-    name: string;
-    dagRunId: string;
-  } | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
   // Check screen size on mount and when window resizes
@@ -46,82 +47,76 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // Enhanced keyboard navigation for dagRuns
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // If modal is open, use the existing navigation logic
-      if (selectedDAGRun) {
-        const currentIndex = dagRuns.findIndex(
-          (item) => item.dagRunId === selectedDAGRun.dagRunId
-        );
-        if (currentIndex === -1) return;
-
-        // Navigate with arrow keys
-        if (event.key === 'ArrowDown' && currentIndex < dagRuns.length - 1) {
-          // Move to next DAG-run
-          const nextIndex = currentIndex + 1;
-          const nextDAGRun = dagRuns[nextIndex];
-          if (nextDAGRun) {
-            // Update both selectedDAGRun and selectedIndex
-            setSelectedDAGRun({
-              name: nextDAGRun.name,
-              dagRunId: nextDAGRun.dagRunId,
-            });
-            setSelectedIndex(nextIndex);
-            scrollToSelectedRow(nextIndex);
-          }
-        } else if (event.key === 'ArrowUp' && currentIndex > 0) {
-          // Move to previous DAG-run
-          const prevIndex = currentIndex - 1;
-          const prevDAGRun = dagRuns[prevIndex];
-          if (prevDAGRun) {
-            // Update both selectedDAGRun and selectedIndex
-            setSelectedDAGRun({
-              name: prevDAGRun.name,
-              dagRunId: prevDAGRun.dagRunId,
-            });
-            setSelectedIndex(prevIndex);
-            scrollToSelectedRow(prevIndex);
-          }
-        }
-        return;
+  // Helper function to scroll to the selected row
+  const scrollToSelectedRow = (index: number) => {
+    if (index >= 0 && tableRef.current) {
+      const rows = tableRef.current.querySelectorAll('tbody tr');
+      if (rows[index]) {
+        rows[index].scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
       }
+    }
+  };
 
-      // If no modal is open, handle table row selection
+  // Update selectedIndex when selectedDAGRun changes from parent
+  useEffect(() => {
+    if (selectedDAGRun) {
+      const index = dagRuns.findIndex(
+        (item) => item.dagRunId === selectedDAGRun.dagRunId
+      );
+      if (index !== -1 && index !== selectedIndex) {
+        setSelectedIndex(index);
+        scrollToSelectedRow(index);
+      }
+    }
+  }, [selectedDAGRun, dagRuns]);
+
+  // Keyboard navigation - works both when panel is open and closed
+  useEffect(() => {
+    if (!onSelectDAGRun) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Find current index based on selectedDAGRun or selectedIndex
+      const currentIdx = selectedDAGRun
+        ? dagRuns.findIndex((item) => item.dagRunId === selectedDAGRun.dagRunId)
+        : selectedIndex;
+
       if (event.key === 'ArrowDown') {
         event.preventDefault();
-        setSelectedIndex((prev) => {
-          const newIndex = prev < dagRuns.length - 1 ? prev + 1 : prev;
+        const newIndex = currentIdx < dagRuns.length - 1 ? currentIdx + 1 : currentIdx;
+        if (newIndex !== currentIdx) {
+          setSelectedIndex(newIndex);
           scrollToSelectedRow(newIndex);
-          return newIndex;
-        });
+          // If panel is open, navigate to new item
+          if (selectedDAGRun && dagRuns[newIndex]) {
+            onSelectDAGRun({
+              name: dagRuns[newIndex].name,
+              dagRunId: dagRuns[newIndex].dagRunId,
+            });
+          }
+        }
       } else if (event.key === 'ArrowUp') {
         event.preventDefault();
-        setSelectedIndex((prev) => {
-          const newIndex = prev > 0 ? prev - 1 : prev === -1 ? 0 : prev;
+        const newIndex = currentIdx > 0 ? currentIdx - 1 : currentIdx === -1 ? 0 : currentIdx;
+        if (newIndex !== currentIdx || currentIdx === -1) {
+          setSelectedIndex(newIndex);
           scrollToSelectedRow(newIndex);
-          return newIndex;
-        });
-      } else if (event.key === 'Enter' && selectedIndex >= 0) {
-        // Open modal when Enter is pressed on selected row
-        const selectedItem = dagRuns[selectedIndex];
+          // If panel is open, navigate to new item
+          if (selectedDAGRun && dagRuns[newIndex]) {
+            onSelectDAGRun({
+              name: dagRuns[newIndex].name,
+              dagRunId: dagRuns[newIndex].dagRunId,
+            });
+          }
+        }
+      } else if (event.key === 'Enter' && !selectedDAGRun && currentIdx >= 0) {
+        const selectedItem = dagRuns[currentIdx];
         if (selectedItem) {
-          setSelectedDAGRun({
+          onSelectDAGRun({
             name: selectedItem.name,
             dagRunId: selectedItem.dagRunId,
-          });
-        }
-      }
-    };
-
-    // Helper function to scroll to the selected row
-    const scrollToSelectedRow = (index: number) => {
-      if (index >= 0 && tableRef.current) {
-        const rows = tableRef.current.querySelectorAll('tbody tr');
-        if (rows[index]) {
-          rows[index].scrollIntoView({
-            behavior: 'smooth',
-            block: 'nearest',
           });
         }
       }
@@ -131,7 +126,7 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedDAGRun, dagRuns, selectedIndex]);
+  }, [selectedDAGRun, dagRuns, selectedIndex, onSelectDAGRun]);
 
   // Initialize selection when dagRuns change
   useEffect(() => {
@@ -216,12 +211,12 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
 
   // Empty state component
   const EmptyState = () => (
-    <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-white dark:bg-zinc-900">
+    <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-card">
       <div className="text-6xl mb-4">🔍</div>
-      <h3 className="text-lg font-normal text-gray-900 dark:text-gray-100 mb-2">
+      <h3 className="text-lg font-normal text-foreground mb-2">
         No DAG runs found
       </h3>
-      <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-md mb-4">
+      <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
         There are no DAG runs matching your current filters. Try adjusting your
         search criteria or date range.
       </p>
@@ -244,7 +239,7 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
               selectedIndex === index
                 ? 'bg-primary/10 border-primary'
                 : 'bg-card border-border'
-            } cursor-pointer shadow-sm`}
+            } cursor-pointer`}
             onClick={(e) => {
               // Navigate directly to DAG-run page with correct URL pattern
               if (e.metaKey || e.ctrlKey) {
@@ -297,7 +292,7 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
                     dagRun.status
                   )}
                   {dagRun.status === Status.Running && dagRun.startedAt && (
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-lime-500 animate-pulse" />
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
                   )}
                 </span>
               </div>
@@ -315,7 +310,7 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
 
   // Table view for larger screens
   return (
-    <div className="border rounded-md bg-white dark:bg-zinc-900" ref={tableRef}>
+    <div ref={tableRef}>
       <Table className="w-full text-xs">
         <TableHeader>
           <TableRow>
@@ -362,10 +357,13 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
                     `/dag-runs/${dagRun.name}/${dagRun.dagRunId}`,
                     '_blank'
                   );
-                } else {
-                  // Open modal
+                } else if (isSmallScreen) {
+                  // On small screens, navigate to full page
+                  navigate(`/dag-runs/${dagRun.name}/${dagRun.dagRunId}`);
+                } else if (onSelectDAGRun) {
+                  // Select the DAG run
                   setSelectedIndex(index);
-                  setSelectedDAGRun({
+                  onSelectDAGRun({
                     name: dagRun.name,
                     dagRunId: dagRun.dagRunId,
                   });
@@ -401,7 +399,7 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
                     dagRun.status
                   )}
                   {dagRun.status === Status.Running && dagRun.startedAt && (
-                    <span className="inline-block w-2 h-2 rounded-full bg-lime-500 animate-pulse" />
+                    <span className="inline-block w-2 h-2 rounded-full bg-success animate-pulse" />
                   )}
                 </div>
               </TableCell>
@@ -409,20 +407,6 @@ function DAGRunTable({ dagRuns }: DAGRunTableProps) {
           ))}
         </TableBody>
       </Table>
-
-      {/* DAG-run Details Modal */}
-      {selectedDAGRun && (
-        <DAGRunDetailsModal
-          name={selectedDAGRun.name}
-          dagRunId={selectedDAGRun.dagRunId}
-          isOpen={!!selectedDAGRun}
-          onClose={() => {
-            setSelectedDAGRun(null);
-            // Don't reset selectedIndex when closing modal
-            // This keeps the row highlighted after closing
-          }}
-        />
-      )}
     </div>
   );
 }
