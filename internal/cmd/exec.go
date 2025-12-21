@@ -19,7 +19,6 @@ const (
 	flagWorkdir      = "workdir"
 	flagShell        = "shell"
 	flagBase         = "base"
-	flagSingleton    = "singleton"
 	defaultStepName  = "main"
 	execCommandUsage = "exec [flags] -- <command> [args...]"
 )
@@ -31,7 +30,6 @@ var (
 		workdirFlag,
 		shellFlag,
 		baseFlag,
-		singletonFlag,
 	}
 )
 
@@ -58,14 +56,12 @@ Examples:
 	return command
 }
 
-// runExec parses flags and arguments and executes the provided command as an inline DAG run,
-// either enqueueing it for distributed execution or running it immediately in-process.
-// It validates inputs (run-id, working directory, base and dotenv files, env vars, worker labels,
-// singleton flags), builds the DAG for the inline command, and chooses between enqueueing
-// (when queues/worker labels require it or when max runs are reached) or direct execution.
+// runExec parses flags and arguments and executes the provided command as an inline DAG run.
+// It validates inputs (run-id, working directory, base and dotenv files, env vars, worker labels),
+// builds the DAG for the inline command, and executes it locally.
 // ctx provides CLI and application context; args are the command and its arguments.
 // Returns an error for validation failures, when a dag-run with the same run-id already exists,
-// or if enqueueing/execution fails.
+// or if execution fails.
 func runExec(ctx *Context, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("command is required (try: dagu exec -- <command>)")
@@ -173,11 +169,6 @@ func runExec(ctx *Context, args []string) error {
 		workerLabels[key] = value
 	}
 
-	singleton, err := ctx.Command.Flags().GetBool(flagSingleton)
-	if err != nil {
-		return fmt.Errorf("failed to read singleton flag: %w", err)
-	}
-
 	if len(workerLabels) > 0 {
 		if !ctx.Config.Queues.Enabled {
 			return fmt.Errorf("worker selector requires queues; enable queues or remove --worker-label")
@@ -192,7 +183,6 @@ func runExec(ctx *Context, args []string) error {
 		Env:           envVars,
 		DotenvFiles:   dotenvPaths,
 		BaseConfig:    baseConfig,
-		Singleton:     singleton,
 		WorkerLabels:  workerLabels,
 	}
 
@@ -229,10 +219,5 @@ var (
 	baseFlag = commandLineFlag{
 		name:  flagBase,
 		usage: "Path to a base DAG YAML whose defaults are applied before inline overrides",
-	}
-	singletonFlag = commandLineFlag{
-		name:   flagSingleton,
-		usage:  "Limit execution to a single active run (sets maxActiveRuns=1)",
-		isBool: true,
 	}
 )

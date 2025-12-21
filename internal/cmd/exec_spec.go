@@ -22,7 +22,6 @@ type ExecOptions struct {
 	Env           []string
 	DotenvFiles   []string
 	BaseConfig    string
-	Singleton     bool
 	WorkerLabels  map[string]string
 }
 
@@ -32,7 +31,6 @@ type execSpec struct {
 	WorkingDir     string            `yaml:"workingDir,omitempty"`
 	Env            []string          `yaml:"env,omitempty"`
 	Dotenv         []string          `yaml:"dotenv,omitempty"`
-	MaxActiveRuns  int               `yaml:"maxActiveRuns,omitempty"`
 	WorkerSelector map[string]string `yaml:"workerSelector,omitempty"`
 	Steps          []execStep        `yaml:"steps"`
 }
@@ -56,18 +54,12 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 		return nil, "", fmt.Errorf("invalid DAG name: %w", err)
 	}
 
-	maxActiveRuns := -1
-	if opts.Singleton {
-		maxActiveRuns = 1
-	}
-
 	specDoc := execSpec{
 		Name:           name,
 		Type:           core.TypeChain,
 		WorkingDir:     opts.WorkingDir,
 		Env:            opts.Env,
 		Dotenv:         opts.DotenvFiles,
-		MaxActiveRuns:  maxActiveRuns,
 		WorkerSelector: opts.WorkerLabels,
 		Steps: []execStep{
 			{
@@ -121,11 +113,7 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 	if len(opts.WorkerLabels) > 0 {
 		dag.WorkerSelector = opts.WorkerLabels
 	}
-	if opts.Singleton {
-		dag.MaxActiveRuns = 1
-	} else {
-		dag.MaxActiveRuns = -1
-	}
+	dag.MaxActiveRuns = -1
 	dag.Location = ""
 
 	return dag, string(specYAML), nil
