@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button';
-import { Maximize2, X } from 'lucide-react';
+import { Loader2, Maximize2, X } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
@@ -28,10 +29,18 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
   // Track if animation has already played to prevent re-animation on content changes
   const hasAnimatedRef = React.useRef(false);
 
+  // Keep previous data to prevent flickering during navigation
+  const previousDataRef = React.useRef<{
+    name: string;
+    dagRunId: string;
+    dagRunDetails: components['schemas']['DAGRunDetails'];
+  } | null>(null);
+
   // Reset animation flag when modal closes
   React.useEffect(() => {
     if (!isOpen) {
       hasAnimatedRef.current = false;
+      previousDataRef.current = null;
     } else {
       // Mark as animated after first render when open
       hasAnimatedRef.current = true;
@@ -50,7 +59,7 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
     : '/dag-runs/{name}/{dagRunId}';
 
   // Fetch DAG-run details
-  const { data, isLoading, mutate } = useQuery(
+  const { data, isLoading, isValidating, mutate } = useQuery(
     endpoint,
     {
       params: {
@@ -69,8 +78,30 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
             },
       },
     },
-    { refreshInterval: 2000 }
+    { refreshInterval: 2000, keepPreviousData: true }
   );
+
+  // Update previous data ref when we get new data
+  React.useEffect(() => {
+    if (data?.dagRunDetails) {
+      previousDataRef.current = {
+        name,
+        dagRunId,
+        dagRunDetails: data.dagRunDetails,
+      };
+    }
+  }, [data, name, dagRunId]);
+
+  // Use current data or fall back to previous data to prevent flickering
+  const displayData = data?.dagRunDetails || previousDataRef.current?.dagRunDetails;
+  const displayName = data?.dagRunDetails ? name : (previousDataRef.current?.name || name);
+  const displayDagRunId = data?.dagRunDetails ? dagRunId : (previousDataRef.current?.dagRunId || dagRunId);
+
+  // Show loading indicator only on very first load (no previous data at all)
+  const isInitialLoading = isLoading && !displayData;
+  // Show subtle loading indicator when switching between items
+  const isTransitioning = isValidating && previousDataRef.current &&
+    (previousDataRef.current.dagRunId !== dagRunId || previousDataRef.current.name !== name);
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);
@@ -179,19 +210,26 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
-              {isLoading || !data ? (
+            <div className="flex-1 overflow-y-auto relative">
+              {/* Subtle loading indicator when transitioning between items */}
+              {isTransitioning && (
+                <div className="absolute top-2 right-2 z-10">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
+
+              {isInitialLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <LoadingIndicator />
                 </div>
-              ) : (
+              ) : displayData ? (
                 <DAGRunDetailsContent
-                  name={name}
-                  dagRun={data.dagRunDetails}
+                  name={displayName}
+                  dagRun={displayData}
                   refreshFn={refreshFn}
-                  dagRunId={dagRunId}
+                  dagRunId={displayDagRunId}
                 />
-              )}
+              ) : null}
             </div>
           </div>
         </DAGRunContext.Provider>

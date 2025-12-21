@@ -399,15 +399,17 @@
 
 @keyframes slideInFromRight {
   0% {
-    transform: translateX(100%);
+    transform: translateX(40%);
+    opacity: 0;
   }
   100% {
     transform: translateX(0);
+    opacity: 1;
   }
 }
 
 .slide-in-from-right {
-  animation: slideInFromRight 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: slideInFromRight 0.2s ease-out;
 }
 
 /* Disable text selection for elements with this class */
