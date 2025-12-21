@@ -222,18 +222,20 @@ const defaultColumns = [
     cell: ({ row }) => {
       if (row.getCanExpand()) {
         return (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={row.getToggleExpandedHandler()}
-            className="text-muted-foreground cursor-pointer"
-          >
-            {row.getIsExpanded() ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
+          <div className="flex items-center min-h-[2.5rem]">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={row.getToggleExpandedHandler()}
+              className="text-muted-foreground cursor-pointer"
+            >
+              {row.getIsExpanded() ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         );
       }
       return null; // Return null instead of empty string for clarity
@@ -256,13 +258,12 @@ const defaultColumns = [
       const data = row.original!;
 
       if (data.kind === ItemKind.Group) {
-        // Group Row: Render group name directly
+        // Group Row: Render group name directly with vertical centering
         return (
-          <div style={{ paddingLeft: `${row.depth * 1.5}rem` }}>
+          <div style={{ paddingLeft: `${row.depth * 1.5}rem` }} className="flex items-center min-h-[2.5rem]">
             <span className="font-normal text-muted-foreground">
               {getValue()}
-            </span>{' '}
-            {/* Muted color group text */}
+            </span>
           </div>
         );
       } else {
