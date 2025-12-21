@@ -3,6 +3,7 @@ package cmd_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/core"
@@ -122,5 +123,60 @@ steps:
 		err := ctx.RecordEarlyFailure(dag.DAG, "", errors.New("test error"))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "DAG and dag-run ID are required")
+	})
+
+	t.Run("CanRetryEarlyFailureRecord", func(t *testing.T) {
+		th := test.SetupCommand(t)
+
+		dag := th.DAG(t, `
+steps:
+  - name: step1
+    command: echo hello
+`)
+
+		dagRunID := "early-failure-retry-test"
+		testErr := errors.New("initial process acquisition failed")
+
+		// Create Context and record early failure
+		ctx := &cmd.Context{
+			Context:     th.Context,
+			Config:      th.Config,
+			DAGRunStore: th.DAGRunStore,
+		}
+
+		err := ctx.RecordEarlyFailure(dag.DAG, dagRunID, testErr)
+		require.NoError(t, err)
+
+		// Verify initial failure status
+		ref := execution.NewDAGRunRef(dag.Name, dagRunID)
+		attempt, err := th.DAGRunStore.FindAttempt(th.Context, ref)
+		require.NoError(t, err)
+		require.NotNil(t, attempt)
+
+		status, err := attempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.Equal(t, core.Failed, status.Status)
+
+		// Verify DAG can be read back (required for retry)
+		storedDAG, err := attempt.ReadDAG(th.Context)
+		require.NoError(t, err)
+		require.NotNil(t, storedDAG)
+		require.Equal(t, dag.Name, storedDAG.Name)
+
+		// Now retry the early failure record
+		th.RunCommand(t, cmd.Retry(), test.CmdTest{
+			Args: []string{"retry", "--run-id", dagRunID, dag.Name},
+		})
+
+		// Wait for retry to complete
+		require.Eventually(t, func() bool {
+			currentStatus, err := th.DAGRunMgr.GetCurrentStatus(th.Context, dag.DAG, dagRunID)
+			return err == nil && currentStatus != nil && currentStatus.Status == core.Succeeded
+		}, 5*time.Second, 100*time.Millisecond, "Retry should succeed")
+
+		// Verify final status is succeeded
+		finalStatus, err := th.DAGRunMgr.GetCurrentStatus(th.Context, dag.DAG, dagRunID)
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, finalStatus.Status)
 	})
 }
