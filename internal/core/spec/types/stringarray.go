@@ -3,7 +3,7 @@ package types
 import (
 	"fmt"
 
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 )
 
 // StringOrArray represents a value that can be specified as either a single
@@ -21,31 +21,46 @@ type StringOrArray struct {
 	values []string // Parsed values
 }
 
-// UnmarshalYAML implements yaml.Unmarshaler for StringOrArray.
-func (s *StringOrArray) UnmarshalYAML(node *yaml.Node) error {
+// UnmarshalYAML implements BytesUnmarshaler for goccy/go-yaml.
+func (s *StringOrArray) UnmarshalYAML(data []byte) error {
 	s.isSet = true
 
-	switch node.Kind {
-	case yaml.ScalarNode:
+	var raw any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("unmarshal error: %w", err)
+	}
+	s.raw = raw
+
+	switch v := raw.(type) {
+	case string:
 		// Single string value
-		s.raw = node.Value
-		if node.Value != "" {
-			s.values = []string{node.Value}
+		if v != "" {
+			s.values = []string{v}
 		}
 		return nil
 
-	case yaml.SequenceNode:
-		// Array of strings
-		var arr []string
-		if err := node.Decode(&arr); err != nil {
-			return fmt.Errorf("array must contain strings: %w", err)
+	case []any:
+		// Array of values
+		for i, item := range v {
+			if str, ok := item.(string); ok {
+				s.values = append(s.values, str)
+			} else {
+				return fmt.Errorf("[%d]: expected string, got %T", i, item)
+			}
 		}
-		s.raw = arr
-		s.values = arr
+		return nil
+
+	case []string:
+		// Array of strings (from Go types)
+		s.values = v
+		return nil
+
+	case nil:
+		s.isSet = false
 		return nil
 
 	default:
-		return fmt.Errorf("must be string or array, got %v", node.Tag)
+		return fmt.Errorf("must be string or array, got %T", v)
 	}
 }
 

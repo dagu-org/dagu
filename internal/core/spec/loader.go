@@ -14,6 +14,7 @@ import (
 	"dario.cat/mergo"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/goccy/go-yaml"
@@ -547,10 +548,62 @@ func decode(cm map[string]any) (*definition, error) {
 		ErrorUnused: true,
 		Result:      c,
 		TagName:     "",
+		DecodeHook:  TypedUnionDecodeHook(),
 	})
 	err := md.Decode(cm)
 
 	return c, err
+}
+
+// TypedUnionDecodeHook returns a decode hook that handles our typed union types.
+// It converts raw map[string]any values to the appropriate typed values.
+func TypedUnionDecodeHook() mapstructure.DecodeHookFunc {
+	return func(_ reflect.Type, to reflect.Type, data any) (any, error) {
+		// Handle types.ShellValue
+		if to == reflect.TypeOf(types.ShellValue{}) {
+			return decodeViaYAML[types.ShellValue](data)
+		}
+		// Handle types.StringOrArray
+		if to == reflect.TypeOf(types.StringOrArray{}) {
+			return decodeViaYAML[types.StringOrArray](data)
+		}
+		// Handle types.ScheduleValue
+		if to == reflect.TypeOf(types.ScheduleValue{}) {
+			return decodeViaYAML[types.ScheduleValue](data)
+		}
+		// Handle types.EnvValue
+		if to == reflect.TypeOf(types.EnvValue{}) {
+			return decodeViaYAML[types.EnvValue](data)
+		}
+		// Handle types.ContinueOnValue
+		if to == reflect.TypeOf(types.ContinueOnValue{}) {
+			return decodeViaYAML[types.ContinueOnValue](data)
+		}
+		// Handle types.PortValue
+		if to == reflect.TypeOf(types.PortValue{}) {
+			return decodeViaYAML[types.PortValue](data)
+		}
+		return data, nil
+	}
+}
+
+// decodeViaYAML converts data to YAML and unmarshals it to the target type.
+// This allows the custom UnmarshalYAML methods to be used.
+func decodeViaYAML[T any](data any) (T, error) {
+	var result T
+	if data == nil {
+		return result, nil
+	}
+	// Convert the data to YAML bytes
+	yamlBytes, err := yaml.Marshal(data)
+	if err != nil {
+		return result, fmt.Errorf("failed to marshal to YAML: %w", err)
+	}
+	// Unmarshal using the custom UnmarshalYAML method
+	if err := yaml.Unmarshal(yamlBytes, &result); err != nil {
+		return result, fmt.Errorf("failed to unmarshal from YAML: %w", err)
+	}
+	return result, nil
 }
 
 // merge merges the source core.DAG into the destination DAG.

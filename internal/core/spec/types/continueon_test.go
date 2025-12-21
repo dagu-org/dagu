@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core/spec/types"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 func TestContinueOnValue_UnmarshalYAML(t *testing.T) {
@@ -99,7 +99,7 @@ failed: true
 		var c types.ContinueOnValue
 		err := yaml.Unmarshal([]byte(data), &c)
 		require.NoError(t, err)
-		assert.Equal(t, "success|warning", c.Output())
+		assert.Equal(t, []string{"success|warning"}, c.Output())
 	})
 
 	t.Run("map with all fields", func(t *testing.T) {
@@ -108,6 +108,7 @@ skipped: true
 failed: true
 exitCode: [0, 1]
 output: "OK"
+markSuccess: true
 `
 		var c types.ContinueOnValue
 		err := yaml.Unmarshal([]byte(data), &c)
@@ -115,7 +116,8 @@ output: "OK"
 		assert.True(t, c.Skipped())
 		assert.True(t, c.Failed())
 		assert.Equal(t, []int{0, 1}, c.ExitCode())
-		assert.Equal(t, "OK", c.Output())
+		assert.Equal(t, []string{"OK"}, c.Output())
+		assert.True(t, c.MarkSuccess())
 	})
 
 	t.Run("not set - zero value", func(t *testing.T) {

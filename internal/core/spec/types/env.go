@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 )
 
 // EnvValue represents environment variable configuration that can be specified as:
@@ -38,31 +38,31 @@ type EnvEntry struct {
 	Value string
 }
 
-// UnmarshalYAML implements yaml.Unmarshaler for EnvValue.
-func (e *EnvValue) UnmarshalYAML(node *yaml.Node) error {
+// UnmarshalYAML implements BytesUnmarshaler for goccy/go-yaml.
+func (e *EnvValue) UnmarshalYAML(data []byte) error {
 	e.isSet = true
 
-	switch node.Kind {
-	case yaml.MappingNode:
-		// Map of key-value pairs
-		var m map[string]any
-		if err := node.Decode(&m); err != nil {
-			return fmt.Errorf("env map decode error: %w", err)
-		}
-		e.raw = m
-		return e.parseMap(m)
+	var raw any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("env unmarshal error: %w", err)
+	}
+	e.raw = raw
 
-	case yaml.SequenceNode:
+	switch v := raw.(type) {
+	case map[string]any:
+		// Map of key-value pairs
+		return e.parseMap(v)
+
+	case []any:
 		// Array of maps or strings
-		var arr []any
-		if err := node.Decode(&arr); err != nil {
-			return fmt.Errorf("env array decode error: %w", err)
-		}
-		e.raw = arr
-		return e.parseArray(arr)
+		return e.parseArray(v)
+
+	case nil:
+		e.isSet = false
+		return nil
 
 	default:
-		return fmt.Errorf("env must be map or array, got %v", node.Tag)
+		return fmt.Errorf("env must be map or array, got %T", v)
 	}
 }
 

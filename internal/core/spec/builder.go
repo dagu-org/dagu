@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"
 )
 
@@ -163,7 +164,7 @@ func build(ctx BuildContext, spec *definition) (*core.DAG, error) {
 		Timeout:        time.Second * time.Duration(spec.TimeoutSec),
 		Delay:          time.Second * time.Duration(spec.DelaySec),
 		RestartWait:    time.Second * time.Duration(spec.RestartWaitSec),
-		Tags:           parseTags(spec.Tags),
+		Tags:           buildTags(spec.Tags),
 		MaxActiveSteps: spec.MaxActiveSteps,
 		Queue:          strings.TrimSpace(spec.Queue),
 		MaxOutputSize:  spec.MaxOutputSize,
@@ -202,32 +203,22 @@ func build(ctx BuildContext, spec *definition) (*core.DAG, error) {
 	return dag, nil
 }
 
-// parseTags builds a list of tags from the value.
+// buildTags builds a list of tags from the typed TagsValue.
 // It converts the tags to lowercase and trims the whitespace.
-func parseTags(value any) []string {
+func buildTags(value types.TagsValue) []string {
+	if value.IsZero() {
+		return nil
+	}
 	var ret []string
-
-	switch v := value.(type) {
-	case string:
-		for _, v := range strings.Split(v, ",") {
-			tag := strings.ToLower(strings.TrimSpace(v))
-			if tag != "" {
-				ret = append(ret, tag)
-			}
-		}
-	case []any:
-		for _, v := range v {
-			switch v := v.(type) {
-			case string:
-				ret = append(ret, strings.ToLower(strings.TrimSpace(v)))
-			default:
-				ret = append(ret, strings.ToLower(
-					strings.TrimSpace(fmt.Sprintf("%v", v))),
-				)
+	for _, tag := range value.Values() {
+		// Support comma-separated tags in a single string
+		for _, t := range strings.Split(tag, ",") {
+			normalized := strings.ToLower(strings.TrimSpace(t))
+			if normalized != "" {
+				ret = append(ret, normalized)
 			}
 		}
 	}
-
 	return ret
 }
 
@@ -255,52 +246,22 @@ func parseTags(value any) []string {
 // - stop: string or array of strings
 // - restart: string or array of strings
 func buildSchedule(_ BuildContext, spec *definition, dag *core.DAG) error {
-	var starts, stops, restarts []string
-
-	switch schedule := (spec.Schedule).(type) {
-	case string:
-		// Case 1. schedule is a string.
-		starts = append(starts, schedule)
-
-	case []any:
-		// Case 2. schedule is an array of strings.
-		// Append all the schedules to the starts slice.
-		for _, s := range schedule {
-			s, ok := s.(string)
-			if !ok {
-				return core.NewValidationError("schedule", s, ErrScheduleMustBeStringOrArray)
-			}
-			starts = append(starts, s)
-		}
-
-	case map[string]any:
-		// Case 3. schedule is a map.
-		if err := parseScheduleMap(
-			schedule, &starts, &stops, &restarts,
-		); err != nil {
-			return err
-		}
-
-	case nil:
-		// If schedule is nil, return without error.
-
-	default:
-		// If schedule is of an invalid type, return an error.
-		return core.NewValidationError("schedule", spec.Schedule, ErrInvalidScheduleType)
-
+	// ScheduleValue already parsed and validated during YAML unmarshal
+	if spec.Schedule.IsZero() {
+		return nil
 	}
 
 	// Parse each schedule as a cron expression.
 	var err error
-	dag.Schedule, err = buildScheduler(starts)
+	dag.Schedule, err = buildScheduler(spec.Schedule.Starts())
 	if err != nil {
 		return err
 	}
-	dag.StopSchedule, err = buildScheduler(stops)
+	dag.StopSchedule, err = buildScheduler(spec.Schedule.Stops())
 	if err != nil {
 		return err
 	}
-	dag.RestartSchedule, err = buildScheduler(restarts)
+	dag.RestartSchedule, err = buildScheduler(spec.Schedule.Restarts())
 	return err
 }
 
@@ -511,24 +472,12 @@ func buildRegistryAuths(ctx BuildContext, spec *definition, dag *core.DAG) error
 }
 
 func buildDotenv(ctx BuildContext, spec *definition, dag *core.DAG) error {
-	switch v := spec.Dotenv.(type) {
-	case nil:
+	// StringOrArray already parsed and validated during YAML unmarshal
+	if spec.Dotenv.IsZero() {
+		// Default to .env if not specified
 		dag.Dotenv = append(dag.Dotenv, ".env")
-
-	case string:
-		dag.Dotenv = append(dag.Dotenv, v)
-
-	case []any:
-		for _, e := range v {
-			switch e := e.(type) {
-			case string:
-				dag.Dotenv = append(dag.Dotenv, e)
-			default:
-				return core.NewValidationError("dotenv", e, ErrDotEnvMustBeStringOrArray)
-			}
-		}
-	default:
-		return core.NewValidationError("dotenv", v, ErrDotEnvMustBeStringOrArray)
+	} else {
+		dag.Dotenv = append(dag.Dotenv, spec.Dotenv.Values()...)
 	}
 
 	if !ctx.opts.Has(BuildFlagNoEval) {
@@ -629,16 +578,51 @@ func parseShellValue(val any, expandEnv bool) (string, []string, error) {
 }
 
 func buildShell(ctx BuildContext, spec *definition, dag *core.DAG) error {
-	shell, args, err := parseShellValue(spec.Shell, !ctx.opts.Has(BuildFlagNoEval))
-	if err != nil {
-		return core.NewValidationError("shell", spec.Shell, err)
-	}
-	if shell == "" {
+	// ShellValue already parsed during YAML unmarshal
+	if spec.Shell.IsZero() {
 		dag.Shell = cmdutil.GetShellCommand("")
-	} else {
+		return nil
+	}
+
+	// For array form, Command() returns first element, Arguments() returns rest
+	if spec.Shell.IsArray() {
+		shell := spec.Shell.Command()
+		// Empty array should fall back to default shell
+		if shell == "" {
+			dag.Shell = cmdutil.GetShellCommand("")
+			return nil
+		}
+		if !ctx.opts.Has(BuildFlagNoEval) {
+			shell = os.ExpandEnv(shell)
+		}
+		args := spec.Shell.Arguments()
+		if !ctx.opts.Has(BuildFlagNoEval) {
+			for i, arg := range args {
+				args[i] = os.ExpandEnv(arg)
+			}
+		}
 		dag.Shell = shell
 		dag.ShellArgs = args
+		return nil
 	}
+
+	// For string form, need to split command and args
+	command := spec.Shell.Command()
+	if command == "" {
+		dag.Shell = cmdutil.GetShellCommand("")
+		return nil
+	}
+
+	if !ctx.opts.Has(BuildFlagNoEval) {
+		command = os.ExpandEnv(command)
+	}
+
+	shell, args, err := cmdutil.SplitCommand(command)
+	if err != nil {
+		return core.NewValidationError("shell", spec.Shell.Value(), fmt.Errorf("failed to parse shell command: %w", err))
+	}
+	dag.Shell = strings.TrimSpace(shell)
+	dag.ShellArgs = args
 	return nil
 }
 
@@ -706,7 +690,7 @@ func buildType(_ BuildContext, spec *definition, dag *core.DAG) error {
 // Case 1: env is an array of maps with string keys and string values.
 // Case 2: env is a map with string keys and string values.
 func buildEnvs(ctx BuildContext, spec *definition, dag *core.DAG) error {
-	vars, err := loadVariables(ctx, spec.Env)
+	vars, err := loadVariablesFromEnvValue(ctx, spec.Env)
 	if err != nil {
 		return err
 	}
@@ -922,26 +906,8 @@ func buildSSH(_ BuildContext, spec *definition, dag *core.DAG) error {
 		return nil
 	}
 
-	// Parse port - can be string or number
-	port := ""
-	switch v := spec.SSH.Port.(type) {
-	case string:
-		port = v
-	case int:
-		port = fmt.Sprintf("%d", v)
-	case int64:
-		port = fmt.Sprintf("%d", v)
-	case uint64:
-		port = fmt.Sprintf("%d", v)
-	case float64:
-		port = fmt.Sprintf("%.0f", v)
-	case nil:
-		port = ""
-	default:
-		return fmt.Errorf("invalid SSH port type: %T", v)
-	}
-
-	// Set default port if not specified
+	// PortValue already parsed during YAML unmarshal
+	port := spec.SSH.Port.String()
 	if port == "" {
 		port = "22"
 	}
@@ -1119,6 +1085,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *core.DAG) error {
 		md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 			ErrorUnused: true,
 			Result:      &stepDefs,
+			DecodeHook:  TypedUnionDecodeHook(),
 		})
 		if err := md.Decode(v); err != nil {
 			return core.NewValidationError("steps", v, err)
@@ -1164,6 +1131,7 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      &stepDef,
+		DecodeHook:  TypedUnionDecodeHook(),
 	})
 	if err := md.Decode(raw); err != nil {
 		return nil, core.NewValidationError("steps", raw, err)
@@ -1180,22 +1148,8 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 
 // buildSMTPConfig builds the SMTP configuration for the DAG.
 func buildSMTPConfig(_ BuildContext, spec *definition, dag *core.DAG) (err error) {
-	// Convert port to string if it's provided as a number
-	var portStr string
-	if spec.SMTP.Port != nil {
-		switch v := spec.SMTP.Port.(type) {
-		case string:
-			portStr = v
-		case int:
-			portStr = strconv.Itoa(v)
-		case float64:
-			portStr = strconv.Itoa(int(v))
-		default:
-			if spec.SMTP.Port != "" {
-				portStr = fmt.Sprintf("%v", spec.SMTP.Port)
-			}
-		}
-	}
+	// PortValue already parsed during YAML unmarshal
+	portStr := spec.SMTP.Port.String()
 
 	if spec.SMTP.Host == "" && portStr == "" {
 		return nil
@@ -1227,34 +1181,12 @@ func buildInfoMailConfig(_ BuildContext, spec *definition, dag *core.DAG) (err e
 
 // buildMailConfig builds a core.MailConfig from the definition.
 func buildMailConfig(def mailConfigDef) (*core.MailConfig, error) {
-	// Handle case where To is not specified
-	if def.From == "" && def.To == nil {
-		return nil, nil
-	}
+	// StringOrArray already parsed during YAML unmarshal
+	toAddresses := def.To.Values()
 
-	// Convert To field to []string
-	var toAddresses []string
-	switch v := def.To.(type) {
-	case nil:
-		// To field not specified
-	case string:
-		// Single recipient
-		v = strings.TrimSpace(v)
-		if v != "" {
-			toAddresses = []string{v}
-		}
-	case []any:
-		// Multiple recipients
-		for _, addr := range v {
-			if str, ok := addr.(string); ok {
-				str = strings.TrimSpace(str)
-				if str != "" {
-					toAddresses = append(toAddresses, str)
-				}
-			}
-		}
-	default:
-		return nil, fmt.Errorf("invalid type for 'to' field: expected string or array, got %T", v)
+	// Trim whitespace from addresses
+	for i, addr := range toAddresses {
+		toAddresses[i] = strings.TrimSpace(addr)
 	}
 
 	// Return nil if no valid configuration
@@ -1306,12 +1238,29 @@ func buildStepWorkingDir(_ StepBuildContext, def stepDef, step *core.Step) error
 }
 
 func buildStepShell(_ StepBuildContext, def stepDef, step *core.Step) error {
+	// ShellValue already parsed during YAML unmarshal
 	// Step shell is NOT evaluated here - it's evaluated at runtime
-	shell, args, err := parseShellValue(def.Shell, false)
-	if err != nil {
-		return core.NewValidationError("shell", def.Shell, err)
+	if def.Shell.IsZero() {
+		return nil
 	}
-	step.Shell = shell
+
+	if def.Shell.IsArray() {
+		step.Shell = def.Shell.Command()
+		step.ShellArgs = def.Shell.Arguments()
+		return nil
+	}
+
+	// For string form, need to split command and args
+	command := def.Shell.Command()
+	if command == "" {
+		return nil
+	}
+
+	shell, args, err := cmdutil.SplitCommand(command)
+	if err != nil {
+		return core.NewValidationError("shell", def.Shell.Value(), fmt.Errorf("failed to parse shell command: %w", err))
+	}
+	step.Shell = strings.TrimSpace(shell)
 	step.ShellArgs = args
 	return nil
 }
@@ -1329,61 +1278,16 @@ func buildStepTimeout(_ StepBuildContext, def stepDef, step *core.Step) error {
 }
 
 func buildContinueOn(_ StepBuildContext, def stepDef, step *core.Step) error {
-	if def.ContinueOn == nil {
+	// ContinueOnValue already parsed and validated during YAML unmarshal
+	if def.ContinueOn.IsZero() {
 		return nil
 	}
 
-	switch v := def.ContinueOn.(type) {
-	case string:
-		// Shorthand syntax: "skipped" or "failed"
-		switch strings.ToLower(strings.TrimSpace(v)) {
-		case "skipped":
-			step.ContinueOn.Skipped = true
-		case "failed":
-			step.ContinueOn.Failure = true
-		default:
-			return core.NewValidationError("continueOn", v, ErrContinueOnInvalidStringValue)
-		}
-
-	case map[string]any:
-		// Object syntax with detailed configuration
-		if val, exists := v["failure"]; exists {
-			b, ok := val.(bool)
-			if !ok {
-				return core.NewValidationError("continueOn.failure", val, ErrContinueOnFieldMustBeBool)
-			}
-			step.ContinueOn.Failure = b
-		}
-		if val, exists := v["skipped"]; exists {
-			b, ok := val.(bool)
-			if !ok {
-				return core.NewValidationError("continueOn.skipped", val, ErrContinueOnFieldMustBeBool)
-			}
-			step.ContinueOn.Skipped = b
-		}
-		if val, exists := v["markSuccess"]; exists {
-			b, ok := val.(bool)
-			if !ok {
-				return core.NewValidationError("continueOn.markSuccess", val, ErrContinueOnFieldMustBeBool)
-			}
-			step.ContinueOn.MarkSuccess = b
-		}
-
-		exitCodes, err := parseIntOrArray(v["exitCode"])
-		if err != nil {
-			return core.NewValidationError("continueOn.exitCode", v["exitCode"], ErrContinueOnExitCodeMustBeIntOrArray)
-		}
-		step.ContinueOn.ExitCode = exitCodes
-
-		output, err := parseStringOrArray(v["output"])
-		if err != nil {
-			return core.NewValidationError("continueOn.output", v["output"], ErrContinueOnOutputMustBeStringOrArray)
-		}
-		step.ContinueOn.Output = output
-
-	default:
-		return core.NewValidationError("continueOn", def.ContinueOn, ErrContinueOnMustBeStringOrMap)
-	}
+	step.ContinueOn.Skipped = def.ContinueOn.Skipped()
+	step.ContinueOn.Failure = def.ContinueOn.Failed()
+	step.ContinueOn.MarkSuccess = def.ContinueOn.MarkSuccess()
+	step.ContinueOn.ExitCode = def.ContinueOn.ExitCode()
+	step.ContinueOn.Output = def.ContinueOn.Output()
 
 	return nil
 }
@@ -1615,19 +1519,15 @@ func buildOutput(_ StepBuildContext, def stepDef, step *core.Step) error {
 	return nil
 }
 
-func buildStepEnvs(ctx StepBuildContext, def stepDef, step *core.Step) error {
-	if def.Env == nil {
+func buildStepEnvs(_ StepBuildContext, def stepDef, step *core.Step) error {
+	// EnvValue already parsed during YAML unmarshal
+	if def.Env.IsZero() {
 		return nil
 	}
-	// For step environment variables, we load them without evaluation. They will
-	// be evaluated later when the step is executed.
-	ctx.opts.Flags |= BuildFlagNoEval
-	vars, err := loadVariables(ctx.BuildContext, def.Env)
-	if err != nil {
-		return err
-	}
-	for k, v := range vars {
-		step.Env = append(step.Env, fmt.Sprintf("%s=%s", k, v))
+	// For step environment variables, we don't evaluate them here.
+	// They will be evaluated later when the step is executed.
+	for _, entry := range def.Env.Entries() {
+		step.Env = append(step.Env, fmt.Sprintf("%s=%s", entry.Key, entry.Value))
 	}
 	return nil
 }
@@ -1715,14 +1615,11 @@ func buildSubDAG(ctx StepBuildContext, def stepDef, step *core.Step) error {
 
 // buildDepends parses the depends field in the step definition.
 func buildDepends(_ StepBuildContext, def stepDef, step *core.Step) error {
-	deps, err := parseStringOrArray(def.Depends)
-	if err != nil {
-		return core.NewValidationError("depends", def.Depends, ErrDependsMustBeStringOrArray)
-	}
-	step.Depends = deps
+	// StringOrArray already parsed during YAML unmarshal
+	step.Depends = def.Depends.Values()
 
 	// Check if depends was explicitly set to empty array
-	if def.Depends != nil && len(deps) == 0 {
+	if !def.Depends.IsZero() && def.Depends.IsEmpty() {
 		step.ExplicitlyNoDeps = true
 	}
 

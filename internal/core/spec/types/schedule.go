@@ -3,7 +3,7 @@ package types
 import (
 	"fmt"
 
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 )
 
 // ScheduleValue represents a schedule configuration that can be specified as:
@@ -27,40 +27,51 @@ type ScheduleValue struct {
 	restarts []string // Restart schedules
 }
 
-// UnmarshalYAML implements yaml.Unmarshaler for ScheduleValue.
-func (s *ScheduleValue) UnmarshalYAML(node *yaml.Node) error {
+// UnmarshalYAML implements BytesUnmarshaler for goccy/go-yaml.
+func (s *ScheduleValue) UnmarshalYAML(data []byte) error {
 	s.isSet = true
 
-	switch node.Kind {
-	case yaml.ScalarNode:
+	var raw any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("schedule unmarshal error: %w", err)
+	}
+	s.raw = raw
+
+	switch v := raw.(type) {
+	case string:
 		// Single cron expression
-		s.raw = node.Value
-		if node.Value != "" {
-			s.starts = []string{node.Value}
+		if v != "" {
+			s.starts = []string{v}
 		}
 		return nil
 
-	case yaml.SequenceNode:
+	case []any:
 		// Array of cron expressions
-		var arr []string
-		if err := node.Decode(&arr); err != nil {
-			return fmt.Errorf("schedule array must contain strings: %w", err)
+		for i, item := range v {
+			str, ok := item.(string)
+			if !ok {
+				return fmt.Errorf("schedule[%d]: expected string, got %T", i, item)
+			}
+			s.starts = append(s.starts, str)
 		}
-		s.raw = arr
-		s.starts = arr
 		return nil
 
-	case yaml.MappingNode:
+	case []string:
+		// Array of strings (from Go types)
+		s.starts = v
+		return nil
+
+	case map[string]any:
 		// Map with start/stop/restart keys
-		var m map[string]any
-		if err := node.Decode(&m); err != nil {
-			return fmt.Errorf("schedule map decode error: %w", err)
-		}
-		s.raw = m
-		return s.parseScheduleMap(m)
+		return s.parseScheduleMap(v)
+
+	case nil:
+		// nil is valid, just means not set
+		s.isSet = false
+		return nil
 
 	default:
-		return fmt.Errorf("schedule must be string, array, or map, got %v", node.Tag)
+		return fmt.Errorf("schedule must be string, array, or map, got %T", v)
 	}
 }
 

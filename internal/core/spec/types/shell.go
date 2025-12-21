@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 )
 
 // ShellValue represents a shell configuration that can be specified as either
@@ -25,32 +25,54 @@ type ShellValue struct {
 	arguments []string // Additional arguments
 }
 
-// UnmarshalYAML implements yaml.Unmarshaler for ShellValue.
-func (s *ShellValue) UnmarshalYAML(node *yaml.Node) error {
+// UnmarshalYAML implements BytesUnmarshaler for goccy/go-yaml.
+func (s *ShellValue) UnmarshalYAML(data []byte) error {
 	s.isSet = true
 
-	switch node.Kind {
-	case yaml.ScalarNode:
+	var raw any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("shell unmarshal error: %w", err)
+	}
+	s.raw = raw
+
+	switch v := raw.(type) {
+	case string:
 		// String value: "bash -e" or "bash"
-		s.raw = node.Value
-		s.command = strings.TrimSpace(node.Value)
+		s.command = strings.TrimSpace(v)
 		return nil
 
-	case yaml.SequenceNode:
+	case []any:
 		// Array value: ["bash", "-e"]
-		var arr []string
-		if err := node.Decode(&arr); err != nil {
-			return fmt.Errorf("shell array must contain strings: %w", err)
+		if len(v) > 0 {
+			if cmd, ok := v[0].(string); ok {
+				s.command = cmd
+			} else {
+				s.command = fmt.Sprintf("%v", v[0])
+			}
+			for i := 1; i < len(v); i++ {
+				if arg, ok := v[i].(string); ok {
+					s.arguments = append(s.arguments, arg)
+				} else {
+					s.arguments = append(s.arguments, fmt.Sprintf("%v", v[i]))
+				}
+			}
 		}
-		s.raw = arr
-		if len(arr) > 0 {
-			s.command = arr[0]
-			s.arguments = arr[1:]
+		return nil
+
+	case []string:
+		// Array of strings (from Go types)
+		if len(v) > 0 {
+			s.command = v[0]
+			s.arguments = v[1:]
 		}
+		return nil
+
+	case nil:
+		s.isSet = false
 		return nil
 
 	default:
-		return fmt.Errorf("shell must be string or array, got %v", node.Tag)
+		return fmt.Errorf("shell must be string or array, got %T", v)
 	}
 }
 
@@ -68,6 +90,10 @@ func (s ShellValue) Arguments() []string { return s.arguments }
 
 // IsArray returns true if the value was specified as an array.
 func (s ShellValue) IsArray() bool {
-	_, ok := s.raw.([]string)
-	return ok
+	switch s.raw.(type) {
+	case []any, []string:
+		return true
+	default:
+		return false
+	}
 }

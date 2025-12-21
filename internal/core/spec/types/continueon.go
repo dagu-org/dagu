@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 )
 
 // ContinueOnValue represents a continue-on configuration that can be specified as:
@@ -19,45 +19,51 @@ import (
 //	  skipped: true
 //	  failed: true
 //	  exitCode: [0, 1]
-//	  output: "pattern"
+//	  output: ["pattern1", "pattern2"]
+//	  markSuccess: true
 type ContinueOnValue struct {
-	raw      any    // Original value for error reporting
-	isSet    bool   // Whether the field was set in YAML
-	skipped  bool   // Continue on skipped
-	failed   bool   // Continue on failed
-	exitCode []int  // Specific exit codes to continue on
-	output   string // Output pattern to match
+	raw         any      // Original value for error reporting
+	isSet       bool     // Whether the field was set in YAML
+	skipped     bool     // Continue on skipped
+	failed      bool     // Continue on failed
+	exitCode    []int    // Specific exit codes to continue on
+	output      []string // Output patterns to match
+	markSuccess bool     // Mark step as success when condition is met
 }
 
-// UnmarshalYAML implements yaml.Unmarshaler for ContinueOnValue.
-func (c *ContinueOnValue) UnmarshalYAML(node *yaml.Node) error {
+// UnmarshalYAML implements BytesUnmarshaler for goccy/go-yaml.
+func (c *ContinueOnValue) UnmarshalYAML(data []byte) error {
 	c.isSet = true
 
-	switch node.Kind {
-	case yaml.ScalarNode:
+	var raw any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("continueOn unmarshal error: %w", err)
+	}
+	c.raw = raw
+
+	switch v := raw.(type) {
+	case string:
 		// String shorthand: "skipped" or "failed"
-		c.raw = node.Value
-		switch strings.ToLower(strings.TrimSpace(node.Value)) {
+		switch strings.ToLower(strings.TrimSpace(v)) {
 		case "skipped":
 			c.skipped = true
 		case "failed":
 			c.failed = true
 		default:
-			return fmt.Errorf("continueOn: expected 'skipped' or 'failed', got %q", node.Value)
+			return fmt.Errorf("continueOn: expected 'skipped' or 'failed', got %q", v)
 		}
 		return nil
 
-	case yaml.MappingNode:
+	case map[string]any:
 		// Detailed configuration
-		var m map[string]any
-		if err := node.Decode(&m); err != nil {
-			return fmt.Errorf("continueOn map decode error: %w", err)
-		}
-		c.raw = m
-		return c.parseMap(m)
+		return c.parseMap(v)
+
+	case nil:
+		c.isSet = false
+		return nil
 
 	default:
-		return fmt.Errorf("continueOn must be string or map, got %v", node.Tag)
+		return fmt.Errorf("continueOn must be string or map, got %T", v)
 	}
 }
 
@@ -68,13 +74,13 @@ func (c *ContinueOnValue) parseMap(m map[string]any) error {
 			if b, ok := v.(bool); ok {
 				c.skipped = b
 			} else {
-				return fmt.Errorf("continueOn.skipped: expected bool, got %T", v)
+				return fmt.Errorf("continueOn.skipped: expected boolean, got %T", v)
 			}
-		case "failed":
+		case "failed", "failure":
 			if b, ok := v.(bool); ok {
 				c.failed = b
 			} else {
-				return fmt.Errorf("continueOn.failed: expected bool, got %T", v)
+				return fmt.Errorf("continueOn.%s: expected boolean, got %T", key, v)
 			}
 		case "exitCode":
 			codes, err := parseIntArray(v)
@@ -83,16 +89,46 @@ func (c *ContinueOnValue) parseMap(m map[string]any) error {
 			}
 			c.exitCode = codes
 		case "output":
-			if s, ok := v.(string); ok {
-				c.output = s
+			outputs, err := parseStringArray(v)
+			if err != nil {
+				return fmt.Errorf("continueOn.output: %w", err)
+			}
+			c.output = outputs
+		case "markSuccess":
+			if b, ok := v.(bool); ok {
+				c.markSuccess = b
 			} else {
-				return fmt.Errorf("continueOn.output: expected string, got %T", v)
+				return fmt.Errorf("continueOn.markSuccess: expected boolean, got %T", v)
 			}
 		default:
 			return fmt.Errorf("continueOn: unknown key %q", key)
 		}
 	}
 	return nil
+}
+
+func parseStringArray(v any) ([]string, error) {
+	switch val := v.(type) {
+	case nil:
+		return nil, nil
+	case string:
+		if val == "" {
+			return nil, nil
+		}
+		return []string{val}, nil
+	case []any:
+		var result []string
+		for i, item := range val {
+			s, ok := item.(string)
+			if !ok {
+				return nil, fmt.Errorf("[%d]: expected string, got %T", i, item)
+			}
+			result = append(result, s)
+		}
+		return result, nil
+	default:
+		return nil, fmt.Errorf("expected string or array of strings, got %T", v)
+	}
 }
 
 func parseIntArray(v any) ([]int, error) {
@@ -105,6 +141,9 @@ func parseIntArray(v any) ([]int, error) {
 				// Try float64 (common in YAML parsing)
 				if f, ok := item.(float64); ok {
 					n = int(f)
+				} else if u, ok := item.(uint64); ok {
+					// Exit codes are small numbers, overflow won't happen in practice
+					n = int(u) //nolint:gosec // Exit codes are small numbers
 				} else {
 					return nil, fmt.Errorf("[%d]: expected int, got %T", i, item)
 				}
@@ -116,6 +155,9 @@ func parseIntArray(v any) ([]int, error) {
 		return []int{val}, nil
 	case float64:
 		return []int{int(val)}, nil
+	case uint64:
+		// Exit codes are small numbers, overflow won't happen in practice
+		return []int{int(val)}, nil //nolint:gosec // Exit codes are small numbers
 	default:
 		return nil, fmt.Errorf("expected int or array of ints, got %T", v)
 	}
@@ -136,5 +178,8 @@ func (c ContinueOnValue) Failed() bool { return c.failed }
 // ExitCode returns exit codes to continue on.
 func (c ContinueOnValue) ExitCode() []int { return c.exitCode }
 
-// Output returns output pattern to match.
-func (c ContinueOnValue) Output() string { return c.output }
+// Output returns output patterns to match.
+func (c ContinueOnValue) Output() []string { return c.output }
+
+// MarkSuccess returns true if step should be marked as success when condition is met.
+func (c ContinueOnValue) MarkSuccess() bool { return c.markSuccess }

@@ -3,7 +3,7 @@ package types
 import (
 	"fmt"
 
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 )
 
 // PortValue represents a port number that can be specified as either
@@ -19,17 +19,39 @@ type PortValue struct {
 	value string // Normalized string value
 }
 
-// UnmarshalYAML implements yaml.Unmarshaler for PortValue.
-func (p *PortValue) UnmarshalYAML(node *yaml.Node) error {
+// UnmarshalYAML implements BytesUnmarshaler for goccy/go-yaml.
+func (p *PortValue) UnmarshalYAML(data []byte) error {
 	p.isSet = true
-	p.raw = node.Value
 
-	switch node.Kind {
-	case yaml.ScalarNode:
-		p.value = node.Value
+	var raw any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("port unmarshal error: %w", err)
+	}
+	p.raw = raw
+
+	switch v := raw.(type) {
+	case string:
+		p.value = v
 		return nil
+
+	case int:
+		p.value = fmt.Sprintf("%d", v)
+		return nil
+
+	case float64:
+		p.value = fmt.Sprintf("%d", int(v))
+		return nil
+
+	case uint64:
+		p.value = fmt.Sprintf("%d", v)
+		return nil
+
+	case nil:
+		p.isSet = false
+		return nil
+
 	default:
-		return fmt.Errorf("port must be string or number, got %v", node.Tag)
+		return fmt.Errorf("port must be string or number, got %T", v)
 	}
 }
 

@@ -1,5 +1,7 @@
 package spec
 
+import "github.com/dagu-org/dagu/internal/core/spec/types"
+
 // definition is a temporary struct to hold the DAG definition.
 // This struct is used to unmarshal the YAML data.
 // The data is then converted to the DAG struct.
@@ -19,20 +21,20 @@ type definition struct {
 	// If not specified, the system default shell is used.
 	// Can be overridden at the step level.
 	// Can be a string (e.g., "bash -e") or an array (e.g., ["bash", "-e"]).
-	Shell any
+	Shell types.ShellValue
 	// WorkingDir is working directory for DAG execution
 	WorkingDir string
 	// Dotenv is the path to the dotenv file (string or []string).
-	Dotenv any
+	Dotenv types.StringOrArray
 	// Schedule is the cron schedule to run the DAG.
-	Schedule any
+	Schedule types.ScheduleValue
 	// SkipIfSuccessful is the flag to skip the DAG on schedule when it is
 	// executed manually before the schedule.
 	SkipIfSuccessful bool
 	// LogFile is the file to write the log.
 	LogDir string
 	// Env is the environment variables setting.
-	Env any
+	Env types.EnvValue
 	// HandlerOn is the handler configuration.
 	HandlerOn handlerOnDef
 	// Steps is the list of steps to run.
@@ -68,7 +70,7 @@ type definition struct {
 	// If the time is exceeded, the process is killed.
 	MaxCleanUpTimeSec *int
 	// Tags is the tags for the DAG.
-	Tags any
+	Tags types.StringOrArray
 	// Queue is the name of the queue to assign this DAG to.
 	Queue string
 	// MaxOutputSize is the maximum size of the output for each step.
@@ -119,7 +121,7 @@ type stepDef struct {
 	Command any `yaml:"command,omitempty"`
 	// Shell is the shell to run the command. Default is `$SHELL` or `sh`.
 	// Can be a string (e.g., "bash -e") or an array (e.g., ["bash", "-e"]).
-	Shell any `yaml:"shell,omitempty"`
+	Shell types.ShellValue `yaml:"shell,omitempty"`
 	// ShellPackages is the list of packages to install.
 	// This is used only when the shell is `nix-shell`.
 	ShellPackages []string `yaml:"shellPackages,omitempty"`
@@ -132,10 +134,10 @@ type stepDef struct {
 	// Output is the variable name to store the output.
 	Output string `yaml:"output,omitempty"`
 	// Depends is the list of steps to depend on.
-	Depends any `yaml:"depends,omitempty"` // string or []string
+	Depends types.StringOrArray `yaml:"depends,omitempty"`
 	// ContinueOn is the condition to continue on.
 	// Can be a string ("skipped", "failed") or an object with detailed config.
-	ContinueOn any `yaml:"continueOn,omitempty"`
+	ContinueOn types.ContinueOnValue `yaml:"continueOn,omitempty"`
 	// RetryPolicy is the retry policy.
 	RetryPolicy *retryPolicyDef `yaml:"retryPolicy,omitempty"`
 	// RepeatPolicy is the repeat policy.
@@ -166,7 +168,7 @@ type stepDef struct {
 	// WorkerSelector specifies required worker labels for execution.
 	WorkerSelector map[string]string `yaml:"workerSelector,omitempty"`
 	// Env specifies the environment variables for the step.
-	Env any `yaml:"env,omitempty"`
+	Env types.EnvValue `yaml:"env,omitempty"`
 	// TimeoutSec specifies the maximum runtime for the step in seconds.
 	TimeoutSec int `yaml:"timeoutSec,omitempty"`
 }
@@ -194,18 +196,18 @@ type retryPolicyDef struct {
 
 // smtpConfigDef defines the SMTP configuration.
 type smtpConfigDef struct {
-	Host     string // SMTP host
-	Port     any    // SMTP port (can be string or number)
-	Username string // SMTP username
-	Password string // SMTP password
+	Host     string           // SMTP host
+	Port     types.PortValue  // SMTP port (can be string or number)
+	Username string           // SMTP username
+	Password string           // SMTP password
 }
 
 // mailConfigDef defines the mail configuration.
 type mailConfigDef struct {
-	From       string // Sender email address
-	To         any    // Recipient email address(es) - can be string or []string
-	Prefix     string // Prefix for the email subject
-	AttachLogs bool   // Flag to attach logs to the email
+	From       string              // Sender email address
+	To         types.StringOrArray // Recipient email address(es) - can be string or []string
+	Prefix     string              // Prefix for the email subject
+	AttachLogs bool                // Flag to attach logs to the email
 }
 
 // mailOnDef defines the conditions to send mail.
@@ -266,7 +268,7 @@ type sshDef struct {
 	// Host is the SSH host.
 	Host string `yaml:"host,omitempty"`
 	// Port is the SSH port (can be string or number).
-	Port any `yaml:"port,omitempty"`
+	Port types.PortValue `yaml:"port,omitempty"`
 	// Key is the path to the SSH private key.
 	Key string `yaml:"key,omitempty"`
 	// Password is the SSH password.

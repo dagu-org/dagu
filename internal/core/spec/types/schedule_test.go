@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core/spec/types"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 func TestScheduleValue_UnmarshalYAML(t *testing.T) {
