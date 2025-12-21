@@ -26,4 +26,3 @@ func buildScheduler(values []string) ([]core.Schedule, error) {
 
 	return ret, nil
 }
-

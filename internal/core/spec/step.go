@@ -2,6 +2,7 @@ package spec
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -244,6 +245,9 @@ func (s *step) buildRetryPolicy(_ StepBuildContext, result *core.Step) error {
 	case int64:
 		result.RetryPolicy.Limit = int(v)
 	case uint64:
+		if v > math.MaxInt {
+			return core.NewValidationError("retryPolicy.limit", v, fmt.Errorf("value %d exceeds maximum int", v))
+		}
 		result.RetryPolicy.Limit = int(v)
 	case string:
 		result.RetryPolicy.LimitStr = v
@@ -259,6 +263,9 @@ func (s *step) buildRetryPolicy(_ StepBuildContext, result *core.Step) error {
 	case int64:
 		result.RetryPolicy.Interval = time.Second * time.Duration(v)
 	case uint64:
+		if v > math.MaxInt64 {
+			return core.NewValidationError("retryPolicy.intervalSec", v, fmt.Errorf("value %d exceeds maximum int64", v))
+		}
 		result.RetryPolicy.Interval = time.Second * time.Duration(v)
 	case string:
 		result.RetryPolicy.IntervalSecStr = v
@@ -652,6 +659,9 @@ func (s *step) buildParallel(_ StepBuildContext, result *core.Step) error {
 				case int64:
 					result.Parallel.MaxConcurrent = int(mc)
 				case uint64:
+					if mc > math.MaxInt {
+						return core.NewValidationError("parallel.maxConcurrent", mc, fmt.Errorf("value %d exceeds maximum int", mc))
+					}
 					result.Parallel.MaxConcurrent = int(mc)
 				case float64:
 					result.Parallel.MaxConcurrent = int(mc)
