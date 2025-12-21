@@ -105,11 +105,11 @@ func handleRestartProcess(ctx *Context, d *core.DAG, dagRunID string) error {
 		_ = ctx.RecordEarlyFailure(d, dagRunID, err)
 		return errProcAcquisitionFailed
 	}
-	defer ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 
 	// Acquire process handle
 	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), execution.NewDAGRunRef(d.Name, dagRunID))
 	if err != nil {
+		ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
 		_ = ctx.RecordEarlyFailure(d, dagRunID, err)
 		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
@@ -118,7 +118,7 @@ func handleRestartProcess(ctx *Context, d *core.DAG, dagRunID string) error {
 		_ = proc.Stop(ctx)
 	}()
 
-	// Unlock the process group
+	// Unlock the process group immediately after acquiring the handle
 	ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 
 	return executeDAG(ctx, ctx.DAGRunMgr, d)
