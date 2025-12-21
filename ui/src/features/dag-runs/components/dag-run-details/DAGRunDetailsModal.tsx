@@ -155,7 +155,7 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 h-screen w-screen bg-black/20 z-40"
+        className={`fixed inset-0 h-screen w-screen bg-black/20 z-40 ${shouldAnimate ? 'fade-in' : ''}`}
         onClick={onClose}
       />
 

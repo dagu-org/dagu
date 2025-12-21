@@ -412,6 +412,19 @@
   animation: slideInFromRight 0.2s ease-out;
 }
 
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.15s ease-out;
+}
+
 /* Disable text selection for elements with this class */
 .no-text-select {
   -webkit-user-select: none;
