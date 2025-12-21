@@ -526,57 +526,6 @@ func findName(ctx BuildContext, spec *definition) string {
 	return ""
 }
 
-// parseShellValue parses a shell value (string or array) into shell command and args.
-// If expandEnv is true, environment variables are expanded in the values.
-// Returns shell command, args, and error.
-func parseShellValue(val any, expandEnv bool) (string, []string, error) {
-	if val == nil {
-		return "", nil, nil
-	}
-
-	switch v := val.(type) {
-	case string:
-		v = strings.TrimSpace(v)
-		if v == "" {
-			return "", nil, nil
-		}
-		if expandEnv {
-			v = os.ExpandEnv(v)
-		}
-		cmd, args, err := cmdutil.SplitCommand(v)
-		if err != nil {
-			return "", nil, fmt.Errorf("failed to parse shell command: %w", err)
-		}
-		return strings.TrimSpace(cmd), args, nil
-
-	case []any:
-		if len(v) == 0 {
-			return "", nil, nil
-		}
-		var shell string
-		var args []string
-		for i, item := range v {
-			s, ok := item.(string)
-			if !ok {
-				s = fmt.Sprintf("%v", item)
-			}
-			s = strings.TrimSpace(s)
-			if expandEnv {
-				s = os.ExpandEnv(s)
-			}
-			if i == 0 {
-				shell = s
-			} else {
-				args = append(args, s)
-			}
-		}
-		return shell, args, nil
-
-	default:
-		return "", nil, fmt.Errorf("shell must be a string or array, got %T", val)
-	}
-}
-
 func buildShell(ctx BuildContext, spec *definition, dag *core.DAG) error {
 	// ShellValue already parsed during YAML unmarshal
 	if spec.Shell.IsZero() {
