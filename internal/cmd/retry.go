@@ -74,13 +74,13 @@ func runRetry(ctx *Context, args []string) error {
 	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
 		return fmt.Errorf("failed to lock process group: %w", err)
 	}
-	defer ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
 	// Acquire process handle
 	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
 	if err != nil {
+		ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
-		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
+		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
 	}
 	defer func() {
 		_ = proc.Stop(ctx)

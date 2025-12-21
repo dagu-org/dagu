@@ -176,29 +176,30 @@ func runStart(ctx *Context, args []string) error {
 }
 
 var (
-	errMaxRunReached = errors.New("max run reached")
+	errProcAcquisitionFailed = errors.New("failed to acquire process handle")
 )
 
-// tryExecuteDAG tries to run the DAG within the max concurrent run config
+// tryExecuteDAG tries to run the DAG.
 func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef) error {
 	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
 		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
-		return errMaxRunReached
+		return errProcAcquisitionFailed
 	}
-	defer ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
 	// Acquire process handle
 	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
 	if err != nil {
+		ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
-		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
+		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
 	}
 	defer func() {
 		_ = proc.Stop(ctx)
 	}()
 	ctx.Proc = proc
 
-	// Unlock the process group
+	// Unlock the process group immediately after acquiring the handle
+	// to allow other instances of the same DAG to start.
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
 	return executeDAGRun(ctx, dag, execution.DAGRunRef{}, dagRunID, root)

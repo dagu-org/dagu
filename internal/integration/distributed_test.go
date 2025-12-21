@@ -131,19 +131,20 @@ steps:
 		Quiet: true,
 	})
 
+	// Execute the start command (runs locally now)
 	err := runtime.Start(coord.Context, startSpec)
-	require.NoError(t, err, "Start command should succeed")
+	require.NoError(t, err, "Start command should succeed (process started)")
 
-	// Wait for the DAG to be enqueued
+	// Wait for completion (executed locally)
 	require.Eventually(t, func() bool {
-		queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
-		return err == nil && len(queueItems) == 1
-	}, 2*time.Second, 50*time.Millisecond, "DAG should be enqueued")
+		status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
+		return err == nil && status.Status == core.Failed
+	}, 5*time.Second, 100*time.Millisecond, "DAG should fail")
 
-	// Verify the DAG was enqueued
+	// Should NOT be enqueued
 	queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
 	require.NoError(t, err)
-	require.Len(t, queueItems, 1, "DAG should be enqueued once")
+	require.Len(t, queueItems, 0, "DAG should NOT be enqueued (dagu start runs locally)")
 
 	status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
 	require.NoError(t, err)
@@ -152,18 +153,17 @@ steps:
 
 	// Now retry the DAG - it should run locally
 	retrySpec := subCmdBuilder.Retry(dagWrapper.DAG, dagRunID, "")
-	err = runtime.Run(coord.Context, retrySpec)
-	require.NoError(t, err, "Retry command should succeed")
+	err = runtime.Start(coord.Context, retrySpec)
+	require.NoError(t, err, "Retry command should succeed (process started)")
 
-	// Should NOT be enqueued again (dagu retry runs locally)
+	// Wait for completion
+	require.Eventually(t, func() bool {
+		status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
+		return err == nil && status.Status == core.Failed
+	}, 5*time.Second, 100*time.Millisecond, "Retry should fail")
+
+	// Should NOT be enqueued
 	queueItems, err = coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
 	require.NoError(t, err)
 	require.Len(t, queueItems, 0, "Retry should NOT be enqueued (dagu retry runs locally)")
-
-	if len(queueItems) > 0 {
-		data, err := queueItems[0].Data()
-		require.NoError(t, err, "Should be able to get queue item data")
-		require.Equal(t, dagRunID, data.ID, "Should have same DAG run ID")
-		t.Logf("Retry enqueued: dag=%s runId=%s", data.Name, data.ID)
-	}
 }
