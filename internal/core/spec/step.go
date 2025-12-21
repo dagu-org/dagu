@@ -308,12 +308,12 @@ func (s *step) buildRepeatPolicy(_ StepBuildContext, result *core.Step) error {
 	if s.RepeatPolicy == nil {
 		return nil
 	}
-	rpDef := s.RepeatPolicy
+	rp := s.RepeatPolicy
 
 	// Determine repeat mode
 	var mode core.RepeatMode
-	if rpDef.Repeat != nil {
-		switch v := rpDef.Repeat.(type) {
+	if rp.Repeat != nil {
+		switch v := rp.Repeat.(type) {
 		case bool:
 			if v {
 				mode = core.RepeatModeWhile
@@ -334,9 +334,9 @@ func (s *step) buildRepeatPolicy(_ StepBuildContext, result *core.Step) error {
 
 	// Backward compatibility: infer mode if not set
 	if mode == "" {
-		if rpDef.Condition != "" && rpDef.Expected != "" {
+		if rp.Condition != "" && rp.Expected != "" {
 			mode = core.RepeatModeUntil
-		} else if rpDef.Condition != "" || len(rpDef.ExitCode) > 0 {
+		} else if rp.Condition != "" || len(rp.ExitCode) > 0 {
 			mode = core.RepeatModeWhile
 		}
 	}
@@ -347,32 +347,32 @@ func (s *step) buildRepeatPolicy(_ StepBuildContext, result *core.Step) error {
 	}
 
 	// Validate that explicit while/until modes have appropriate conditions
-	if rpDef.Repeat != nil {
-		switch v := rpDef.Repeat.(type) {
+	if rp.Repeat != nil {
+		switch v := rp.Repeat.(type) {
 		case string:
-			if (v == "while" || v == "until") && rpDef.Condition == "" && len(rpDef.ExitCode) == 0 {
+			if (v == "while" || v == "until") && rp.Condition == "" && len(rp.ExitCode) == 0 {
 				return fmt.Errorf("repeat mode '%s' requires either 'condition' or 'exitCode' to be specified", v)
 			}
 		}
 	}
 
 	result.RepeatPolicy.RepeatMode = mode
-	if rpDef.IntervalSec > 0 {
-		result.RepeatPolicy.Interval = time.Second * time.Duration(rpDef.IntervalSec)
+	if rp.IntervalSec > 0 {
+		result.RepeatPolicy.Interval = time.Second * time.Duration(rp.IntervalSec)
 	}
-	result.RepeatPolicy.Limit = rpDef.Limit
+	result.RepeatPolicy.Limit = rp.Limit
 
-	if rpDef.Condition != "" {
+	if rp.Condition != "" {
 		result.RepeatPolicy.Condition = &core.Condition{
-			Condition: rpDef.Condition,
-			Expected:  rpDef.Expected,
+			Condition: rp.Condition,
+			Expected:  rp.Expected,
 		}
 	}
-	result.RepeatPolicy.ExitCode = rpDef.ExitCode
+	result.RepeatPolicy.ExitCode = rp.ExitCode
 
 	// Parse backoff field
-	if rpDef.Backoff != nil {
-		switch v := rpDef.Backoff.(type) {
+	if rp.Backoff != nil {
+		switch v := rp.Backoff.(type) {
 		case bool:
 			if v {
 				result.RepeatPolicy.Backoff = 2.0 // Default multiplier when true
@@ -395,8 +395,8 @@ func (s *step) buildRepeatPolicy(_ StepBuildContext, result *core.Step) error {
 	}
 
 	// Parse maxIntervalSec
-	if rpDef.MaxIntervalSec > 0 {
-		result.RepeatPolicy.MaxInterval = time.Second * time.Duration(rpDef.MaxIntervalSec)
+	if rp.MaxIntervalSec > 0 {
+		result.RepeatPolicy.MaxInterval = time.Second * time.Duration(rp.MaxIntervalSec)
 	}
 
 	return nil
@@ -404,12 +404,12 @@ func (s *step) buildRepeatPolicy(_ StepBuildContext, result *core.Step) error {
 
 func (s *step) buildSignalOnStop(_ StepBuildContext, result *core.Step) error {
 	if s.SignalOnStop != nil {
-		sigDef := *s.SignalOnStop
-		sig := signal.GetSignalNum(sigDef, 0)
+		sigOnStop := *s.SignalOnStop
+		sig := signal.GetSignalNum(sigOnStop, 0)
 		if sig == 0 {
-			return fmt.Errorf("%w: %s", ErrInvalidSignal, sigDef)
+			return fmt.Errorf("%w: %s", ErrInvalidSignal, sigOnStop)
 		}
-		result.SignalOnStop = sigDef
+		result.SignalOnStop = sigOnStop
 	}
 	return nil
 }

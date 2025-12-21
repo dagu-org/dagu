@@ -254,33 +254,6 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 	return builtStep, nil
 }
 
-// buildMailConfig builds a core.MailConfig from the mail configuration.
-func buildMailConfig(def mailConfig) (*core.MailConfig, error) {
-	// StringOrArray already parsed during YAML unmarshal
-	rawAddresses := def.To.Values()
-
-	// Trim whitespace and filter out empty entries
-	var toAddresses []string
-	for _, addr := range rawAddresses {
-		trimmed := strings.TrimSpace(addr)
-		if trimmed != "" {
-			toAddresses = append(toAddresses, trimmed)
-		}
-	}
-
-	// Return nil if no valid configuration
-	if def.From == "" && len(toAddresses) == 0 {
-		return nil, nil
-	}
-
-	return &core.MailConfig{
-		From:       strings.TrimSpace(def.From),
-		To:         toAddresses,
-		Prefix:     strings.TrimSpace(def.Prefix),
-		AttachLogs: def.AttachLogs,
-	}, nil
-}
-
 // injectChainDependencies adds implicit dependencies for chain type execution.
 // In chain execution, each step depends on all previous steps unless explicitly configured otherwise.
 func injectChainDependencies(dag *core.DAG, prevSteps []*core.Step, step *core.Step) {
@@ -297,7 +270,10 @@ func injectChainDependencies(dag *core.DAG, prevSteps []*core.Step, step *core.S
 
 	// Add each previous step as a dependency if not already present
 	for _, prevStep := range prevSteps {
-		depKey := getStepKey(prevStep)
+		var depKey = prevStep.ID
+		if depKey == "" {
+			depKey = prevStep.Name
+		}
 
 		// Skip if this dependency already exists
 		if _, exists := existingDeps[depKey]; exists {
@@ -315,14 +291,6 @@ func injectChainDependencies(dag *core.DAG, prevSteps []*core.Step, step *core.S
 		step.Depends = append(step.Depends, depKey)
 		existingDeps[depKey] = struct{}{}
 	}
-}
-
-// getStepKey returns the preferred identifier for a step (ID if available, otherwise Name)
-func getStepKey(step *core.Step) string {
-	if step.ID != "" {
-		return step.ID
-	}
-	return step.Name
 }
 
 // getStepAlternateKey returns the alternate identifier for a step, or empty string if none
