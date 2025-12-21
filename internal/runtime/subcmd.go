@@ -42,9 +42,7 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	if opts.NoQueue {
-		args = append(args, "--no-queue")
-	}
+
 	if opts.DAGRunID != "" {
 		args = append(args, fmt.Sprintf("--run-id=%s", opts.DAGRunID))
 	}
@@ -141,15 +139,13 @@ func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 }
 
 // Retry creates a retry command spec.
-func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string, disableMaxActiveRuns bool) CmdSpec {
+func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string) CmdSpec {
 	args := []string{"retry", fmt.Sprintf("--run-id=%s", dagRunID), "-q"}
 
 	if stepName != "" {
 		args = append(args, fmt.Sprintf("--step=%s", stepName))
 	}
-	if disableMaxActiveRuns {
-		args = append(args, "--disable-max-active-runs")
-	}
+
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
@@ -174,7 +170,7 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 		args = append(args, fmt.Sprintf("--parent=%s:%s", task.ParentDagRunName, task.ParentDagRunId))
 	}
 
-	args = append(args, fmt.Sprintf("--run-id=%s", task.DagRunId), "--no-queue", "--disable-max-active-runs")
+	args = append(args, fmt.Sprintf("--run-id=%s", task.DagRunId))
 
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
@@ -194,7 +190,7 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 
 // TaskRetry creates a retry command spec for coordinator tasks.
 func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
-	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId), "--no-queue", "--disable-max-active-runs", "-q"}
+	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId), "-q"}
 
 	if task.Step != "" {
 		args = append(args, fmt.Sprintf("--step=%s", task.Step))
@@ -224,10 +220,10 @@ type CmdSpec struct {
 
 // StartOptions contains options for initiating a dag-run.
 type StartOptions struct {
-	Params       string // Parameters to pass to the DAG
-	Quiet        bool   // Whether to run in quiet mode
-	DAGRunID     string // ID for the dag-run
-	NoQueue      bool   // Do not allow queueing
+	Params   string // Parameters to pass to the DAG
+	Quiet    bool   // Whether to run in quiet mode
+	DAGRunID string // ID for the dag-run
+
 	NameOverride string // Optional DAG name override
 	FromRunID    string // Historic dag-run ID to use as a template
 	Target       string // Optional CLI argument override (DAG name or file path)

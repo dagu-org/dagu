@@ -57,7 +57,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, noQueueFlag, disableMaxActiveRuns, defaultWorkingDirFlag}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, defaultWorkingDirFlag}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
@@ -80,8 +80,6 @@ func runStart(ctx *Context, args []string) error {
 	if fromRunID != "" && isSubDAGRun {
 		return fmt.Errorf("--from-run-id cannot be combined with --parent or --root")
 	}
-
-	disableMaxActiveRuns := ctx.Command.Flags().Changed("disable-max-active-runs")
 
 	var (
 		dag    *core.DAG
@@ -157,28 +155,11 @@ func runStart(ctx *Context, args []string) error {
 		return handleSubDAGRun(ctx, dag, dagRunID, params, root, parent)
 	}
 
-	// Check if queue is disabled via config or flag
-	queueDisabled := !ctx.Config.Queues.Enabled
-
-	// check no-queue flag (overrides config)
-	if ctx.Command.Flags().Changed("no-queue") {
-		queueDisabled = true
-	}
-
 	// Check if the DAG run-id is unique
 	attempt, _ := ctx.DAGRunStore.FindAttempt(ctx, root)
 	if attempt != nil {
 		// If the dag-run ID already exists, we cannot start a new run with the same ID
 		return fmt.Errorf("dag-run ID %s already exists for DAG %s", dagRunID, dag.Name)
-	}
-
-	// Count running DAG to check against maxActiveRuns setting (best effort).
-	liveCount, err := ctx.ProcStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
-	if err != nil {
-		return fmt.Errorf("failed to access proc store: %w", err)
-	}
-	if !disableMaxActiveRuns && dag.MaxActiveRuns == 1 && liveCount > 0 {
-		return fmt.Errorf("DAG %s is already running, cannot start", dag.Name)
 	}
 
 	// Log root dag-run or reschedule action
@@ -191,65 +172,36 @@ func runStart(ctx *Context, args []string) error {
 		logger.Info(ctx, "Executing root dag-run", slog.String("params", params))
 	}
 
-	// Check if this DAG should be distributed to workers
-	// If the DAG has a workerSelector and the queue is not disabled,
-	// enqueue it so the scheduler can dispatch it to a worker.
-	// The --no-queue flag acts as a circuit breaker to prevent infinite loops
-	// when the worker executes the dispatched task.
-	if !queueDisabled && len(dag.WorkerSelector) > 0 {
-		logger.Info(ctx, "DAG has workerSelector, enqueueing for distributed execution", slog.Any("worker-selector", dag.WorkerSelector))
-		dag.Location = "" // Queued dag-runs must not have a location
-		return enqueueDAGRun(ctx, dag, dagRunID)
-	}
-
-	err = tryExecuteDAG(ctx, dag, dagRunID, root, disableMaxActiveRuns)
-	if errors.Is(err, errMaxRunReached) && !queueDisabled && !disableMaxActiveRuns {
-		dag.Location = "" // Queued dag-runs must not have a location
-		return enqueueDAGRun(ctx, dag, dagRunID)
-	}
-
-	return err // return executed result
+	return tryExecuteDAG(ctx, dag, dagRunID, root)
 }
 
 var (
-	errMaxRunReached = errors.New("max run reached")
+	errProcAcquisitionFailed = errors.New("failed to acquire process handle")
 )
 
-// tryExecuteDAG tries to run the DAG within the max concurrent run config
-func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef, disableMaxActiveRuns bool) error {
+// tryExecuteDAG tries to run the DAG.
+func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef) error {
 	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
 		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
-		return errMaxRunReached
-	}
-	defer ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
-
-	if !disableMaxActiveRuns {
-		runningCount, err := ctx.ProcStore.CountAlive(ctx, dag.ProcGroup())
-		if err != nil {
-			logger.Debug(ctx, "Failed to count live processes", tag.Error(err))
-			return fmt.Errorf("failed to count live process for %s: %w", dag.ProcGroup(), errMaxRunReached)
-		}
-
-		// If the DAG has a queue configured and maxActiveRuns > 0, ensure the number
-		// of active runs in the queue does not exceed this limit.
-		if dag.MaxActiveRuns > 0 && runningCount >= dag.MaxActiveRuns {
-			// It's not possible to run right now.
-			return fmt.Errorf("max active run is reached (%d >= %d): %w", runningCount, dag.MaxActiveRuns, errMaxRunReached)
-		}
+		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
+		return errProcAcquisitionFailed
 	}
 
 	// Acquire process handle
 	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
 	if err != nil {
+		ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
-		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
+		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
+		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
 	}
 	defer func() {
 		_ = proc.Stop(ctx)
 	}()
 	ctx.Proc = proc
 
-	// Unlock the process group
+	// Unlock the process group immediately after acquiring the handle
+	// to allow other instances of the same DAG to start.
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
 	return executeDAGRun(ctx, dag, execution.DAGRunRef{}, dagRunID, root)

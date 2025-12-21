@@ -143,7 +143,7 @@ func (e *DAGExecutor) ExecuteDAG(
 		return runtime.Start(ctx, spec)
 
 	case coordinatorv1.Operation_OPERATION_RETRY:
-		spec := e.subCmdBuilder.Retry(dag, runID, "", true)
+		spec := e.subCmdBuilder.Retry(dag, runID, "")
 		return runtime.Run(ctx, spec)
 
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
