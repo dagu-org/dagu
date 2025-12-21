@@ -118,6 +118,7 @@ func (s *step) Build(ctx StepBuildContext) (*core.Step, error) {
 		Stdout:         strings.TrimSpace(s.Stdout),
 		Stderr:         strings.TrimSpace(s.Stderr),
 		MailOnError:    s.MailOnError,
+		WorkerSelector: s.WorkerSelector,
 		ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
 	}
 

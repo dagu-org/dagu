@@ -277,7 +277,6 @@ func buildMailConfig(def mailConfig) (*core.MailConfig, error) {
 	}, nil
 }
 
-
 // injectChainDependencies adds implicit dependencies for chain type execution.
 // In chain execution, each step depends on all previous steps unless explicitly configured otherwise.
 func injectChainDependencies(dag *core.DAG, prevSteps []*core.Step, step *core.Step) {
