@@ -183,6 +183,7 @@ var (
 func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef) error {
 	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
 		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
+		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
 		return errProcAcquisitionFailed
 	}
 
@@ -191,6 +192,7 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.
 	if err != nil {
 		ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
+		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
 		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
 	}
 	defer func() {

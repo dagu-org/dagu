@@ -22,7 +22,6 @@ type ExecOptions struct {
 	Env           []string
 	DotenvFiles   []string
 	BaseConfig    string
-	Queue         string
 	Singleton     bool
 	WorkerLabels  map[string]string
 }
@@ -34,7 +33,6 @@ type execSpec struct {
 	Env            []string          `yaml:"env,omitempty"`
 	Dotenv         []string          `yaml:"dotenv,omitempty"`
 	MaxActiveRuns  int               `yaml:"maxActiveRuns,omitempty"`
-	Queue          string            `yaml:"queue,omitempty"`
 	WorkerSelector map[string]string `yaml:"workerSelector,omitempty"`
 	Steps          []execStep        `yaml:"steps"`
 }
@@ -63,8 +61,6 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 		maxActiveRuns = 1
 	}
 
-	queueValue := opts.Queue
-
 	specDoc := execSpec{
 		Name:           name,
 		Type:           core.TypeChain,
@@ -72,7 +68,6 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 		Env:            opts.Env,
 		Dotenv:         opts.DotenvFiles,
 		MaxActiveRuns:  maxActiveRuns,
-		Queue:          queueValue,
 		WorkerSelector: opts.WorkerLabels,
 		Steps: []execStep{
 			{
@@ -123,9 +118,6 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 
 	dag.Name = name
 	dag.WorkingDir = opts.WorkingDir
-	if opts.Queue != "" {
-		dag.Queue = opts.Queue
-	}
 	if len(opts.WorkerLabels) > 0 {
 		dag.WorkerSelector = opts.WorkerLabels
 	}

@@ -28,7 +28,6 @@ var (
 	execFlags = []commandLineFlag{
 		dagRunIDFlag,
 		nameFlag,
-		queueFlag,
 		workdirFlag,
 		shellFlag,
 		baseFlag,
@@ -46,7 +45,7 @@ func Exec() *cobra.Command {
 Examples:
   dagu exec -- echo "hello world"
   dagu exec --env FOO=bar -- sh -c 'echo $FOO'
-  dagu exec --queue nightly --worker-label role=batch -- python nightly.py`,
+  dagu exec --worker-label role=batch -- python remote_script.py`,
 		Args: cobra.ArbitraryArgs,
 	}
 
@@ -62,7 +61,7 @@ Examples:
 // runExec parses flags and arguments and executes the provided command as an inline DAG run,
 // either enqueueing it for distributed execution or running it immediately in-process.
 // It validates inputs (run-id, working directory, base and dotenv files, env vars, worker labels,
-// queue/singleton flags), builds the DAG for the inline command, and chooses between enqueueing
+// singleton flags), builds the DAG for the inline command, and chooses between enqueueing
 // (when queues/worker labels require it or when max runs are reached) or direct execution.
 // ctx provides CLI and application context; args are the command and its arguments.
 // Returns an error for validation failures, when a dag-run with the same run-id already exists,
@@ -174,11 +173,6 @@ func runExec(ctx *Context, args []string) error {
 		workerLabels[key] = value
 	}
 
-	queueName, err := ctx.Command.Flags().GetString("queue")
-	if err != nil {
-		return fmt.Errorf("failed to read queue flag: %w", err)
-	}
-
 	singleton, err := ctx.Command.Flags().GetBool(flagSingleton)
 	if err != nil {
 		return fmt.Errorf("failed to read singleton flag: %w", err)
@@ -198,7 +192,6 @@ func runExec(ctx *Context, args []string) error {
 		Env:           envVars,
 		DotenvFiles:   dotenvPaths,
 		BaseConfig:    baseConfig,
-		Queue:         queueName,
 		Singleton:     singleton,
 		WorkerLabels:  workerLabels,
 	}

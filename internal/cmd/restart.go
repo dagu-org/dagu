@@ -102,6 +102,7 @@ func handleRestartProcess(ctx *Context, d *core.DAG, dagRunID string) error {
 	// Execute the exact same DAG with the same parameters but a new dag-run ID
 	if err := ctx.ProcStore.Lock(ctx, d.ProcGroup()); err != nil {
 		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
+		_ = ctx.RecordEarlyFailure(d, dagRunID, err)
 		return errProcAcquisitionFailed
 	}
 	defer ctx.ProcStore.Unlock(ctx, d.ProcGroup())
@@ -110,6 +111,7 @@ func handleRestartProcess(ctx *Context, d *core.DAG, dagRunID string) error {
 	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), execution.NewDAGRunRef(d.Name, dagRunID))
 	if err != nil {
 		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
+		_ = ctx.RecordEarlyFailure(d, dagRunID, err)
 		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
 	}
 	defer func() {
