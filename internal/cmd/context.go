@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -27,6 +28,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/persistence/fileserviceregistry"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/service/resource"
@@ -486,6 +488,53 @@ func (cfg LogConfig) LogDir() (string, error) {
 	}
 
 	return logDir, nil
+}
+
+// RecordEarlyFailure records a failure in the execution history before the DAG has fully started.
+// This is used for infrastructure errors like singleton conflicts or process acquisition failures.
+func (c *Context) RecordEarlyFailure(dag *core.DAG, dagRunID string, err error) error {
+	if dag == nil || dagRunID == "" {
+		return fmt.Errorf("DAG and dag-run ID are required to record failure")
+	}
+
+	// 1. Check if a DAGRunAttempt already exists for the given run-id.
+	ref := execution.NewDAGRunRef(dag.Name, dagRunID)
+	attempt, findErr := c.DAGRunStore.FindAttempt(c, ref)
+	if findErr != nil && !errors.Is(findErr, execution.ErrDAGRunIDNotFound) {
+		return fmt.Errorf("failed to check for existing attempt: %w", findErr)
+	}
+
+	if attempt == nil {
+		// 2. Create the attempt if not exists
+		att, createErr := c.DAGRunStore.CreateAttempt(c, dag, time.Now(), dagRunID, execution.NewDAGRunAttemptOptions{})
+		if createErr != nil {
+			return fmt.Errorf("failed to create run to record failure: %w", createErr)
+		}
+		attempt = att
+	}
+
+	// 3. Construct the "Failed" status
+	statusBuilder := transform.NewStatusBuilder(dag)
+	logPath, _ := c.GenLogFileName(dag, dagRunID)
+	status := statusBuilder.Create(dagRunID, core.Failed, 0, time.Now(),
+		transform.WithLogFilePath(logPath),
+		transform.WithFinishedAt(time.Now()),
+		transform.WithError(err.Error()),
+	)
+
+	// 4. Write the status
+	if err := attempt.Open(c); err != nil {
+		return fmt.Errorf("failed to open attempt for recording failure: %w", err)
+	}
+	defer func() {
+		_ = attempt.Close(c)
+	}()
+
+	if err := attempt.Write(c, status); err != nil {
+		return fmt.Errorf("failed to write failed status: %w", err)
+	}
+
+	return nil
 }
 
 // LogFile constructs the log filename using the prefix, safe DAG name, current timestamp,

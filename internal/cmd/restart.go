@@ -87,9 +87,9 @@ func runRestart(ctx *Context, args []string) error {
 	return nil
 }
 
-func handleRestartProcess(ctx *Context, d *core.DAG, dagRunID string) error {
+func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string) error {
 	// Stop if running
-	if err := stopDAGIfRunning(ctx, ctx.DAGRunMgr, d, dagRunID); err != nil {
+	if err := stopDAGIfRunning(ctx, ctx.DAGRunMgr, d, oldDagRunID); err != nil {
 		return err
 	}
 
@@ -99,36 +99,40 @@ func handleRestartProcess(ctx *Context, d *core.DAG, dagRunID string) error {
 		time.Sleep(d.RestartWait)
 	}
 
+	// Generate new dag-run ID for the restart
+	newDagRunID, err := genRunID()
+	if err != nil {
+		return fmt.Errorf("failed to generate dag-run ID: %w", err)
+	}
+
 	// Execute the exact same DAG with the same parameters but a new dag-run ID
 	if err := ctx.ProcStore.Lock(ctx, d.ProcGroup()); err != nil {
 		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
-		return errMaxRunReached
+		_ = ctx.RecordEarlyFailure(d, newDagRunID, err)
+		return errProcAcquisitionFailed
 	}
-	defer ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 
 	// Acquire process handle
-	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), execution.NewDAGRunRef(d.Name, dagRunID))
+	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), execution.NewDAGRunRef(d.Name, newDagRunID))
 	if err != nil {
+		ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
-		return fmt.Errorf("failed to acquire process handle: %w", errMaxRunReached)
+		_ = ctx.RecordEarlyFailure(d, newDagRunID, err)
+		return fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
 	}
 	defer func() {
 		_ = proc.Stop(ctx)
 	}()
 
-	// Unlock the process group
+	// Unlock the process group immediately after acquiring the handle
 	ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 
-	return executeDAG(ctx, ctx.DAGRunMgr, d)
+	return executeDAGWithRunID(ctx, ctx.DAGRunMgr, d, newDagRunID)
 }
 
-// It returns an error if run ID generation, log or DAG store initialization, or agent execution fails.
-func executeDAG(ctx *Context, cli runtime.Manager, dag *core.DAG) error {
-	dagRunID, err := genRunID()
-	if err != nil {
-		return fmt.Errorf("failed to generate dag-run ID: %w", err)
-	}
-
+// executeDAGWithRunID executes a DAG with a pre-generated run ID.
+// It returns an error if log or DAG store initialization, or agent execution fails.
+func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRunID string) error {
 	logFile, err := ctx.OpenLogFile(dag, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)

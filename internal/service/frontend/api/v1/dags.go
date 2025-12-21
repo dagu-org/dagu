@@ -597,14 +597,14 @@ func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionReques
 			}
 		}
 		if request.Body.Step != nil && *request.Body.Step != "" {
-			spec := a.subCmdBuilder.Retry(dag, *request.Body.RequestId, *request.Body.Step, true)
+			spec := a.subCmdBuilder.Retry(dag, *request.Body.RequestId, *request.Body.Step)
 			if err := runtime.Start(ctx, spec); err != nil {
 				return nil, fmt.Errorf("error retrying DAG step: %w", err)
 			}
 			return api.PostDAGAction200JSONResponse{}, nil
 		}
 
-		spec := a.subCmdBuilder.Retry(dag, *request.Body.RequestId, "", false)
+		spec := a.subCmdBuilder.Retry(dag, *request.Body.RequestId, "")
 		if err := runtime.Start(ctx, spec); err != nil {
 			return nil, fmt.Errorf("error retrying DAG: %w", err)
 		}
