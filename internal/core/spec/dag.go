@@ -114,98 +114,6 @@ type handlerOn struct {
 	Exit    *step // Step to execute on exit
 }
 
-// step defines a step in the DAG.
-type step struct {
-	// Name is the name of the step.
-	Name string `yaml:"name,omitempty"`
-	// ID is the optional unique identifier for the step.
-	ID string `yaml:"id,omitempty"`
-	// Description is the description of the step.
-	Description string `yaml:"description,omitempty"`
-	// WorkingDir is the working directory of the step.
-	WorkingDir string `yaml:"workingDir,omitempty"`
-	// Dir is the working directory of the step.
-	// Deprecated: use WorkingDir instead
-	Dir string `yaml:"dir,omitempty"`
-	// Executor is the executor configuration.
-	Executor any `yaml:"executor,omitempty"`
-	// Command is the command to run (on shell).
-	Command any `yaml:"command,omitempty"`
-	// Shell is the shell to run the command. Default is `$SHELL` or `sh`.
-	// Can be a string (e.g., "bash -e") or an array (e.g., ["bash", "-e"]).
-	Shell types.ShellValue `yaml:"shell,omitempty"`
-	// ShellPackages is the list of packages to install.
-	// This is used only when the shell is `nix-shell`.
-	ShellPackages []string `yaml:"shellPackages,omitempty"`
-	// Script is the script to run.
-	Script string `yaml:"script,omitempty"`
-	// Stdout is the file to write the stdout.
-	Stdout string `yaml:"stdout,omitempty"`
-	// Stderr is the file to write the stderr.
-	Stderr string `yaml:"stderr,omitempty"`
-	// Output is the variable name to store the output.
-	Output string `yaml:"output,omitempty"`
-	// Depends is the list of steps to depend on.
-	Depends types.StringOrArray `yaml:"depends,omitempty"`
-	// ContinueOn is the condition to continue on.
-	// Can be a string ("skipped", "failed") or an object with detailed config.
-	ContinueOn types.ContinueOnValue `yaml:"continueOn,omitempty"`
-	// RetryPolicy is the retry policy.
-	RetryPolicy *retryPolicy `yaml:"retryPolicy,omitempty"`
-	// RepeatPolicy is the repeat policy.
-	RepeatPolicy *repeatPolicy `yaml:"repeatPolicy,omitempty"`
-	// MailOnError is the flag to send mail on error.
-	MailOnError bool `yaml:"mailOnError,omitempty"`
-	// Precondition is the condition to run the step.
-	Precondition any `yaml:"precondition,omitempty"`
-	// Preconditions is the condition to run the step.
-	Preconditions any `yaml:"preconditions,omitempty"`
-	// SignalOnStop is the signal when the step is requested to stop.
-	// When it is empty, the same signal as the parent process is sent.
-	// It can be KILL when the process does not stop over the timeout.
-	SignalOnStop *string `yaml:"signalOnStop,omitempty"`
-	// Call is the name of a DAG to run as a sub dag-run.
-	Call string `yaml:"call,omitempty"`
-	// Run is the name of a DAG to run as a sub dag-run.
-	// Deprecated: use Call instead.
-	Run string `yaml:"run,omitempty"`
-	// Params specifies the parameters for the sub dag-run.
-	Params any `yaml:"params,omitempty"`
-	// Parallel specifies parallel execution configuration.
-	// Can be:
-	// - Direct array reference: parallel: ${ITEMS}
-	// - Static array: parallel: [item1, item2]
-	// - Object configuration: parallel: {items: ${ITEMS}, maxConcurrent: 5}
-	Parallel any `yaml:"parallel,omitempty"`
-	// WorkerSelector specifies required worker labels for execution.
-	WorkerSelector map[string]string `yaml:"workerSelector,omitempty"`
-	// Env specifies the environment variables for the step.
-	Env types.EnvValue `yaml:"env,omitempty"`
-	// TimeoutSec specifies the maximum runtime for the step in seconds.
-	TimeoutSec int `yaml:"timeoutSec,omitempty"`
-}
-
-// repeatPolicy defines the repeat policy for a step.
-type repeatPolicy struct {
-	Repeat         any    `yaml:"repeat,omitempty"`         // Flag to indicate if the step should be repeated, can be bool (legacy) or string ("while" or "until")
-	IntervalSec    int    `yaml:"intervalSec,omitempty"`    // Interval in seconds to wait before repeating the step
-	Limit          int    `yaml:"limit,omitempty"`          // Maximum number of times to repeat the step
-	Condition      string `yaml:"condition,omitempty"`      // Condition to check before repeating
-	Expected       string `yaml:"expected,omitempty"`       // Expected output to match before repeating
-	ExitCode       []int  `yaml:"exitCode,omitempty"`       // List of exit codes to consider for repeating the step
-	Backoff        any    `yaml:"backoff,omitempty"`        // Accepts bool or float
-	MaxIntervalSec int    `yaml:"maxIntervalSec,omitempty"` // Maximum interval in seconds
-}
-
-// retryPolicy defines the retry policy for a step.
-type retryPolicy struct {
-	Limit          any   `yaml:"limit,omitempty"`
-	IntervalSec    any   `yaml:"intervalSec,omitempty"`
-	ExitCode       []int `yaml:"exitCode,omitempty"`
-	Backoff        any   `yaml:"backoff,omitempty"` // Accepts bool or float
-	MaxIntervalSec int   `yaml:"maxIntervalSec,omitempty"`
-}
-
 // smtpConfig defines the SMTP configuration.
 type smtpConfig struct {
 	Host     string          // SMTP host
@@ -921,28 +829,28 @@ func (d *dag) buildHandlers(ctx BuildContext, result *core.DAG) (err error) {
 
 	if d.HandlerOn.Init != nil {
 		d.HandlerOn.Init.Name = core.HandlerOnInit.String()
-		if result.HandlerOn.Init, err = buildStep(buildCtx, *d.HandlerOn.Init); err != nil {
+		if result.HandlerOn.Init, err = d.HandlerOn.Init.Build(buildCtx); err != nil {
 			return err
 		}
 	}
 
 	if d.HandlerOn.Exit != nil {
 		d.HandlerOn.Exit.Name = core.HandlerOnExit.String()
-		if result.HandlerOn.Exit, err = buildStep(buildCtx, *d.HandlerOn.Exit); err != nil {
+		if result.HandlerOn.Exit, err = d.HandlerOn.Exit.Build(buildCtx); err != nil {
 			return err
 		}
 	}
 
 	if d.HandlerOn.Success != nil {
 		d.HandlerOn.Success.Name = core.HandlerOnSuccess.String()
-		if result.HandlerOn.Success, err = buildStep(buildCtx, *d.HandlerOn.Success); err != nil {
+		if result.HandlerOn.Success, err = d.HandlerOn.Success.Build(buildCtx); err != nil {
 			return
 		}
 	}
 
 	if d.HandlerOn.Failure != nil {
 		d.HandlerOn.Failure.Name = core.HandlerOnFailure.String()
-		if result.HandlerOn.Failure, err = buildStep(buildCtx, *d.HandlerOn.Failure); err != nil {
+		if result.HandlerOn.Failure, err = d.HandlerOn.Failure.Build(buildCtx); err != nil {
 			return
 		}
 	}
@@ -960,7 +868,7 @@ func (d *dag) buildHandlers(ctx BuildContext, result *core.DAG) (err error) {
 	}
 	if abortStep != nil {
 		abortStep.Name = core.HandlerOnCancel.String()
-		if result.HandlerOn.Cancel, err = buildStep(buildCtx, *abortStep); err != nil {
+		if result.HandlerOn.Cancel, err = abortStep.Build(buildCtx); err != nil {
 			return
 		}
 	}
@@ -1133,7 +1041,7 @@ func (d *dag) buildSteps(ctx BuildContext, result *core.DAG) error {
 		for name, st := range stepsMap {
 			st.Name = name
 			names[st.Name] = struct{}{}
-			builtStep, err := buildStep(buildCtx, st)
+			builtStep, err := st.Build(buildCtx)
 			if err != nil {
 				return err
 			}

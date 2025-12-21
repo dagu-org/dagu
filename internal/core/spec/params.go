@@ -546,25 +546,3 @@ func resolveSchemaFromParams(params any, workingDir, dagLocation string) (*jsons
 	return getSchemaFromRef(workingDir, dagLocation, schemaRef)
 }
 
-// buildStepParams parses the params field in the step specification.
-// Params are converted to map[string]string and stored in st.Params
-func buildStepParams(ctx StepBuildContext, def step, st *core.Step) error {
-	if def.Params == nil {
-		return nil
-	}
-
-	// Parse params using existing parseParamValue function
-	paramPairs, err := parseParamValue(ctx.BuildContext, def.Params)
-	if err != nil {
-		return core.NewValidationError("params", def.Params, err)
-	}
-
-	// Convert to map[string]string
-	paramsData := make(map[string]string)
-	for _, pair := range paramPairs {
-		paramsData[pair.Name] = pair.Value
-	}
-
-	st.Params = core.NewSimpleParams(paramsData)
-	return nil
-}
